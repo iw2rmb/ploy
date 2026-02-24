@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Integration: Post-mod Build Gate failure and healing flow.
+# Integration: Post-mig Build Gate failure and healing flow.
 #
-# This scenario validates gate-heal-regate behavior when a mod introduces a
-# compile error (post-mod gate fails). It guards against regressions in the
+# This scenario validates gate-heal-regate behavior when a mig introduces a
+# compile error (post-mig gate fails). It guards against regressions in the
 # healing pipeline by testing two outcomes:
 #   1. Healing cannot fix the error → run fails with build-gate reason.
 #   2. Healing fixes the error → post-gate passes, GateSummary reflects final result.
 #
 # Flow:
 #   1) Create a tiny Maven project that compiles successfully (pre-gate passes).
-#   2) Simulate a mod that introduces a broken symbol (post-mod gate fails).
+#   2) Simulate a mig that introduces a broken symbol (post-mig gate fails).
 #   3) Run healing stub to fix the error.
 #   4) Re-run the Build Gate and expect success.
-#   5) Verify GateSummary reflects the final (post-mod) gate result.
+#   5) Verify GateSummary reflects the final (post-mig) gate result.
 #
-# Unlike scenario-build-fail.sh (which tests pre-mod gate failure), this tests
-# post-mod gate failure specifically: code passes initially, mod breaks it,
+# Unlike scenario-build-fail.sh (which tests pre-mig gate failure), this tests
+# post-mig gate failure specifically: code passes initially, mig breaks it,
 # healing restores it.
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -28,7 +28,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 WORKDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-postmod)
-INDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-postmod-in)
+INDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-postmig-in)
 cleanup() { rm -rf "$WORKDIR" "$INDIR" || true; }
 trap cleanup EXIT
 
@@ -42,7 +42,7 @@ cat >"$WORKDIR/pom.xml" <<'POM'
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>e2e</groupId>
-  <artifactId>post-mod-fail-sample</artifactId>
+  <artifactId>post-mig-fail-sample</artifactId>
   <version>1.0-SNAPSHOT</version>
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
@@ -63,9 +63,9 @@ JAVA
 echo "[scenario] workspace: $WORKDIR"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 2: Pre-mod gate should PASS (valid code compiles).
+# Step 2: Pre-mig gate should PASS (valid code compiles).
 # ─────────────────────────────────────────────────────────────────────────────
-echo "[scenario] Running pre-mod Build Gate (should pass)..."
+echo "[scenario] Running pre-mig Build Gate (should pass)..."
 
 set +e
 PRE_LOGS=$(docker run --rm -v "$WORKDIR":/workspace -w /workspace \
@@ -75,34 +75,34 @@ PRE_STATUS=$?
 set -e
 
 if [[ $PRE_STATUS -ne 0 ]]; then
-  echo "FAIL: pre-mod Build Gate should pass, but failed"
+  echo "FAIL: pre-mig Build Gate should pass, but failed"
   echo "$PRE_LOGS"
   exit 1
 fi
 
-echo "[scenario] Pre-mod gate passed (as expected)"
+echo "[scenario] Pre-mig gate passed (as expected)"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 3: Simulate mod that introduces a compile error (post-mod gate fails).
-# This mimics what happens when an OpenRewrite recipe or LLM-based mod breaks
+# Step 3: Simulate mig that introduces a compile error (post-mig gate fails).
+# This mimics what happens when an OpenRewrite recipe or LLM-based mig breaks
 # the build by introducing references to undefined symbols.
 # ─────────────────────────────────────────────────────────────────────────────
-echo "[scenario] Simulating mod that introduces compile error..."
+echo "[scenario] Simulating mig that introduces compile error..."
 
 cat >"$WORKDIR/src/main/java/e2e/BrokenByMod.java" <<'JAVA'
 package e2e;
 
-// This class was "introduced by a mod" and references an undefined symbol.
-// Post-mod gate should fail due to this compile error.
+// This class was "introduced by a mig" and references an undefined symbol.
+// Post-mig gate should fail due to this compile error.
 public class BrokenByMod {
     public String broken() { return new UndefinedModSymbol().toString(); }
 }
 JAVA
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 4: Post-mod gate should FAIL (mod broke the build).
+# Step 4: Post-mig gate should FAIL (mig broke the build).
 # ─────────────────────────────────────────────────────────────────────────────
-echo "[scenario] Running post-mod Build Gate (should fail)..."
+echo "[scenario] Running post-mig Build Gate (should fail)..."
 
 set +e
 POST_LOGS=$(docker run --rm -v "$WORKDIR":/workspace -w /workspace \
@@ -112,26 +112,26 @@ POST_STATUS=$?
 set -e
 
 if [[ $POST_STATUS -eq 0 ]]; then
-  echo "FAIL: post-mod Build Gate should fail (mod broke the build), but it passed"
+  echo "FAIL: post-mig Build Gate should fail (mig broke the build), but it passed"
   exit 1
 fi
 
 # Verify the failure is a compile error referencing the missing symbol.
 if ! grep -E -q 'COMPILATION ERROR|cannot find symbol|UndefinedModSymbol' <<<"$POST_LOGS"; then
-  echo "FAIL: post-mod Build Gate failed but not with expected compile error"
+  echo "FAIL: post-mig Build Gate failed but not with expected compile error"
   echo "$POST_LOGS"
   exit 1
 fi
 
-echo "[scenario] Post-mod gate failed as expected (compile error from mod)"
+echo "[scenario] Post-mig gate failed as expected (compile error from mig)"
 
-# Save the post-mod failure log to /in for healing mods to consume.
+# Save the post-mig failure log to /in for healing migs to consume.
 mkdir -p "$INDIR"
 echo "$POST_LOGS" >"$INDIR/build-gate.log"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 5: Healing stub creates the missing class (simulates LLM/Codex healing).
-# In production, this would be mods-codex editing the workspace and exiting;
+# In production, this would be migs-codex editing the workspace and exiting;
 # the node agent would then detect workspace diffs and re-run the gate.
 # Here we directly create the fix to test the gate-heal-regate flow.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ echo "[scenario] Running healing (creating UndefinedModSymbol.java)..."
 cat >"$WORKDIR/src/main/java/e2e/UndefinedModSymbol.java" <<'JAVA'
 package e2e;
 
-// Healing stub created this class to fix the post-mod compile error.
+// Healing stub created this class to fix the post-mig compile error.
 // After this fix, post-gate re-run should pass.
 public class UndefinedModSymbol {
     @Override
@@ -173,7 +173,7 @@ echo "[scenario] Re-gate passed after healing"
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 7: Verify scenario where healing fails to fix the error.
 # This branch tests that the run terminates with build-gate failure when
-# healing cannot resolve the post-mod issue.
+# healing cannot resolve the post-mig issue.
 # ─────────────────────────────────────────────────────────────────────────────
 echo "[scenario] Testing scenario where healing fails (incomplete fix)..."
 
@@ -206,14 +206,14 @@ fi
 echo "[scenario] Re-gate with incomplete healing failed (as expected)"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Summary: Both paths of post-mod gate-heal-regate tested.
+# Summary: Both paths of post-mig gate-heal-regate tested.
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "OK: Post-mod gate failure scenarios verified:"
+echo "OK: Post-mig gate failure scenarios verified:"
 echo "  - Pre-gate passes with valid initial code"
-echo "  - Post-gate fails when mod introduces compile error"
+echo "  - Post-gate fails when mig introduces compile error"
 echo "  - Re-gate passes when healing fixes the error"
 echo "  - Re-gate fails when healing does not fix the error"
 echo ""
-echo "GateSummary behavior: The final gate result should reflect the post-mod gate"
+echo "GateSummary behavior: The final gate result should reflect the post-mig gate"
 echo "(passed after healing, or failed if healing was incomplete)."

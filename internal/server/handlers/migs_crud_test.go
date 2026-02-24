@@ -20,13 +20,13 @@ import (
 // POST /v1/migs — Create Mig
 // =============================================================================
 
-// TestMods_Create_Success verifies POST /v1/migs creates a mod with valid input.
-// Tests mod project creation endpoint.
+// TestMods_Create_Success verifies POST /v1/migs creates a mig with valid input.
+// Tests mig project creation endpoint.
 func TestMods_Create_Success(t *testing.T) {
 	st := &mockStore{}
 	handler := createMigHandler(st)
 
-	reqBody := map[string]any{"name": "my-mod"}
+	reqBody := map[string]any{"name": "my-mig"}
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
@@ -43,8 +43,8 @@ func TestMods_Create_Success(t *testing.T) {
 	if !st.createMigCalled {
 		t.Error("store.CreateMig was not called")
 	}
-	if st.createMigParams.Name != "my-mod" {
-		t.Errorf("store Name = %q, want %q", st.createMigParams.Name, "my-mod")
+	if st.createMigParams.Name != "my-mig" {
+		t.Errorf("store Name = %q, want %q", st.createMigParams.Name, "my-mig")
 	}
 
 	// Verify response shape.
@@ -57,15 +57,15 @@ func TestMods_Create_Success(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.Name != "my-mod" {
-		t.Errorf("response Name = %q, want %q", resp.Name, "my-mod")
+	if resp.Name != "my-mig" {
+		t.Errorf("response Name = %q, want %q", resp.Name, "my-mig")
 	}
 	if resp.ID == "" {
 		t.Error("response ID is empty")
 	}
 }
 
-// TestMods_Create_WithSpec verifies POST /v1/migs with spec creates both mod and spec.
+// TestMods_Create_WithSpec verifies POST /v1/migs with spec creates both mig and spec.
 // Optional spec parameter creates initial spec row.
 func TestMods_Create_WithSpec(t *testing.T) {
 	st := &mockStore{}
@@ -74,10 +74,10 @@ func TestMods_Create_WithSpec(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
-		"name": "mod-with-spec",
+		"name": "mig-with-spec",
 		"spec": spec,
 	}
 	body, _ := json.Marshal(reqBody)
@@ -92,7 +92,7 @@ func TestMods_Create_WithSpec(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
 	}
 
-	// Verify both mod and spec were created.
+	// Verify both mig and spec were created.
 	if !st.createMigCalled {
 		t.Error("store.CreateMig was not called")
 	}
@@ -145,7 +145,7 @@ func TestMods_Create_InvalidName(t *testing.T) {
 	st := &mockStore{}
 	handler := createMigHandler(st)
 
-	reqBody := map[string]any{"name": "my mod"}
+	reqBody := map[string]any{"name": "my mig"}
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
@@ -171,7 +171,7 @@ func TestMods_Create_DuplicateName(t *testing.T) {
 	}
 	handler := createMigHandler(st)
 
-	reqBody := map[string]any{"name": "existing-mod"}
+	reqBody := map[string]any{"name": "existing-mig"}
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
@@ -202,16 +202,16 @@ func TestMods_Create_InvalidJSON(t *testing.T) {
 }
 
 // TestMods_Create_InvalidSpec verifies POST /v1/migs rejects invalid spec JSON.
-// Legacy spec shapes (with top-level "mod" key) are rejected per
+// Legacy spec shapes (with top-level "mig" key) are rejected per
 // internal/workflow/contracts/mods_spec.go:402-404.
 func TestMods_Create_InvalidSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := createMigHandler(st)
 
-	// Legacy spec shape with "mod" key is explicitly rejected.
+	// Legacy spec shape with "mig" key is explicitly rejected.
 	reqBody := map[string]any{
-		"name": "mod-invalid-spec",
-		"spec": map[string]any{"mod": map[string]any{"command": "echo hello"}},
+		"name": "mig-invalid-spec",
+		"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -236,7 +236,7 @@ func TestMods_Create_StoreError(t *testing.T) {
 	}
 	handler := createMigHandler(st)
 
-	reqBody := map[string]any{"name": "test-mod"}
+	reqBody := map[string]any{"name": "test-mig"}
 	body, _ := json.Marshal(reqBody)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
@@ -255,13 +255,13 @@ func TestMods_Create_StoreError(t *testing.T) {
 // =============================================================================
 
 // TestMods_List_Success verifies GET /v1/migs returns migs list.
-// Tests mod listing with pagination and filters.
+// Tests mig listing with pagination and filters.
 func TestMods_List_Success(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
 		listMigsResult: []store.Mig{
-			{ID: "mod1", Name: "alpha-mod", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-			{ID: "mod2", Name: "beta-mod", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
+			{ID: "mod1", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+			{ID: "mod2", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
 		},
 	}
 	handler := listMigsHandler(st)
@@ -289,8 +289,8 @@ func TestMods_List_Success(t *testing.T) {
 	if len(resp.Migs) != 2 {
 		t.Fatalf("got %d migs, want 2", len(resp.Migs))
 	}
-	if resp.Migs[0].Name != "alpha-mod" {
-		t.Errorf("first mod Name = %q, want %q", resp.Migs[0].Name, "alpha-mod")
+	if resp.Migs[0].Name != "alpha-mig" {
+		t.Errorf("first mig Name = %q, want %q", resp.Migs[0].Name, "alpha-mig")
 	}
 }
 
@@ -513,11 +513,11 @@ func TestMods_List_StoreError(t *testing.T) {
 // DELETE /v1/migs/{mig_ref} — Delete Mig
 // =============================================================================
 
-// TestMods_Delete_Success verifies DELETE /v1/migs/{mig_ref} deletes a mod.
-// Tests mod deletion when no runs exist.
+// TestMods_Delete_Success verifies DELETE /v1/migs/{mig_ref} deletes a mig.
+// Tests mig deletion when no runs exist.
 func TestMods_Delete_Success(t *testing.T) {
 	st := &mockStore{
-		// No runs exist for this mod.
+		// No runs exist for this mig.
 		listRunsResult: []store.Run{},
 	}
 	handler := deleteMigHandler(st)
@@ -544,7 +544,7 @@ func TestMods_Delete_Success(t *testing.T) {
 	}
 }
 
-// TestMods_Delete_NotFound verifies DELETE /v1/migs/{mig_ref} returns 404 for missing mod.
+// TestMods_Delete_NotFound verifies DELETE /v1/migs/{mig_ref} returns 404 for missing mig.
 func TestMods_Delete_NotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
@@ -563,16 +563,16 @@ func TestMods_Delete_NotFound(t *testing.T) {
 
 	// DeleteMig should not be called.
 	if st.deleteMigCalled {
-		t.Error("store.DeleteMig should not be called for missing mod")
+		t.Error("store.DeleteMig should not be called for missing mig")
 	}
 }
 
 // TestMods_Delete_RefusesWithRuns verifies DELETE /v1/migs/{mig_ref} returns 409
-// when runs exist for the mod.
-// Deletion is refused if any runs exist for the mod.
+// when runs exist for the mig.
+// Deletion is refused if any runs exist for the mig.
 func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 	st := &mockStore{
-		// Runs exist for this mod.
+		// Runs exist for this mig.
 		listRunsResult: []store.Run{
 			{ID: "run1", MigID: "mod123"},
 		},
@@ -598,14 +598,14 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 func TestMods_Delete_ByName(t *testing.T) {
 	st := &mockStore{
 		getModErr:          pgx.ErrNoRows,
-		getModByNameResult: store.Mig{ID: "mod123", Name: "my-mod"},
-		// No runs exist for this mod.
+		getModByNameResult: store.Mig{ID: "mod123", Name: "my-mig"},
+		// No runs exist for this mig.
 		listRunsResult: []store.Run{},
 	}
 	handler := deleteMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/my-mod", nil)
-	req.SetPathValue("mig_ref", "my-mod")
+	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/my-mig", nil)
+	req.SetPathValue("mig_ref", "my-mig")
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)

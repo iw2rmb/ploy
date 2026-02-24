@@ -1,8 +1,8 @@
 # Ploy Workflow CLI
 
 `ploy` is a single-purpose CLI that claims workflow runs from the Ploy control plane,
-reconstructs the default mods→build→test DAG, and dispatches stages via the
-configured runtime adapter. Legacy subcommands (apps, env, mods, security, etc.) were
+reconstructs the default migs→build→test DAG, and dispatches stages via the
+configured runtime adapter. Legacy subcommands (apps, env, migs, security, etc.) were
 removed during the workstation legacy teardown.
 
 ## Usage
@@ -19,7 +19,7 @@ Common command patterns:
 
 ```bash
 ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->  # submit a single-repo run
-ploy mig run <mod-id|name> [--repo <url> ...] [--failed]                   # execute a mod project over its repo set
+ploy mig run <mig-id|name> [--repo <url> ...] [--failed]                   # execute a mig project over its repo set
 ploy mig run \
   [--repo-url <url> --repo-base-ref <branch> [--repo-target-ref <branch>] \
    --repo-workspace-hint <dir>] \
@@ -44,11 +44,11 @@ TICKET=$(ploy mig run --json \
   --follow | jq -r '.run_id')
 ```
 
-`mod run` submits a run to the control plane (server assigns the run id),
+`mig run` submits a run to the control plane (server assigns the run id),
 materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest (when provided),
 publishes checkpoints for every stage transition (including lane cache keys),
-executes mods/build/test against a temporary workspace, and cleans up before
+executes migs/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--migs-plan-timeout`, `--migs-max-parallel`)
 flow into stage metadata so the control plane can respect concurrency/timebox controls.
 
@@ -73,30 +73,30 @@ digest is available it prefixes the name, otherwise the artifact CID is used.
 Mod projects are long-lived containers with a unique name, a current spec, and a managed repo set.
 
 ```bash
-# Create a mod project.
-ploy mig add --name my-mod --spec mod.yaml
+# Create a mig project.
+ploy mig add --name my-mig --spec mig.yaml
 
-# Update the mod's current spec.
-ploy mig spec set my-mod mod.yaml
+# Update the mig's current spec.
+ploy mig spec set my-mig mig.yaml
 
-# Manage the mod's repo set.
-ploy mig repo add my-mod --repo https://github.com/org/repo-a.git --base-ref main --target-ref upgrade
-ploy mig repo add my-mod --repo https://github.com/org/repo-b.git --base-ref main --target-ref upgrade
-ploy mig repo list my-mod
+# Manage the mig's repo set.
+ploy mig repo add my-mig --repo https://github.com/org/repo-a.git --base-ref main --target-ref upgrade
+ploy mig repo add my-mig --repo https://github.com/org/repo-b.git --base-ref main --target-ref upgrade
+ploy mig repo list my-mig
 
-# Execute the mod project (all repos by default).
-ploy mig run my-mod
+# Execute the mig project (all repos by default).
+ploy mig run my-mig
 
 # Execute only specific repos (repeatable).
-ploy mig run my-mod --repo https://github.com/org/repo-a.git --repo https://github.com/org/repo-b.git
+ploy mig run my-mig --repo https://github.com/org/repo-a.git --repo https://github.com/org/repo-b.git
 
 # Re-run only repos whose last terminal state is Fail.
-ploy mig run my-mod --failed
+ploy mig run my-mig --failed
 ```
 
 ## Batched Mod Runs
 
-`mod run` supports two usage patterns: **single-repo runs** and **batch runs** that
+`mig run` supports two usage patterns: **single-repo runs** and **batch runs** that
 operate over multiple repositories under a shared run spec. In a batch, `ploy mig run`
 submits the spec once, then `ploy mig run repo add` attaches multiple repositories
 under the same run via `run_repos`.
@@ -107,8 +107,8 @@ A single-repo run specifies all repository parameters inline with the initial co
 The run executes immediately against that repository:
 
 ```bash
-# Single repository run — executes mods against one repo and follows job graph.
-ploy mig run --spec mod.yaml \
+# Single repository run — executes migs against one repo and follows job graph.
+ploy mig run --spec mig.yaml \
   --repo-url https://github.com/example/repo.git \
   --repo-base-ref main \
   --repo-target-ref feature-branch \
@@ -119,13 +119,13 @@ This is the most common usage for quick, ad-hoc transformations.
 
 ### Batch Run (Multiple Repositories)
 
-Batch runs allow orchestrating the same mod spec across multiple repositories.
+Batch runs allow orchestrating the same mig spec across multiple repositories.
 First, create a batch run with a name but no repository; then attach repos
 incrementally:
 
 ```bash
 # Step 1: Create a named batch run (no repository attached yet).
-ploy mig run --spec mod.yaml --name my-batch
+ploy mig run --spec mig.yaml --name my-batch
 
 # Step 2: Add repositories to the batch.
 ploy mig run repo add \
@@ -151,10 +151,10 @@ the same transformation (e.g., Java 17 upgrade) applies to many repositories.
 ### Restart a Repo Within a Batch
 
 If a repository job fails or needs reprocessing with a different branch, use
-`mod run repo restart`:
+`mig run repo restart`:
 
 ```bash
-# Restart repo-a with a hotfix branch (use repo-id from `mod run repo status`).
+# Restart repo-a with a hotfix branch (use repo-id from `mig run repo status`).
 # Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ploy mig run repo restart \
   --repo-id <repo-id> \
@@ -179,12 +179,12 @@ ploy mig run repo remove \
 
 | Command                  | Description                                   |
 |--------------------------|-----------------------------------------------|
-| `mod run --name <batch>` | Create a batch run (no repos yet)             |
-| `mod run repo add`       | Attach a repository to an existing batch      |
-| `mod run repo remove`    | Detach a repository from a batch              |
-| `mod run repo restart`   | Re-queue a repo job with optional new branch  |
+| `mig run --name <batch>` | Create a batch run (no repos yet)             |
+| `mig run repo add`       | Attach a repository to an existing batch      |
+| `mig run repo remove`    | Detach a repository from a batch              |
+| `mig run repo restart`   | Re-queue a repo job with optional new branch  |
 | `run pull <run-id>`      | Pull diffs for the current repo from a run    |
-| `mod pull [<mod>]`       | Pull diffs for the current repo from a mod    |
+| `mig pull [<mig>]`       | Pull diffs for the current repo from a mig    |
 | `run logs <batch>`       | Stream logs/events for all repos in a batch   |
 
 See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
@@ -192,7 +192,7 @@ See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and
 ### Pull Mods Changes Locally
 
 After a run completes, you can pull the Mods-generated changes into your local
-repository using either `ploy run pull <run-id>` (run-based) or `ploy mig pull` (mod-based).
+repository using either `ploy run pull <run-id>` (run-based) or `ploy mig pull` (mig-based).
 These commands reconstruct the Mods branch locally by fetching stored diffs from the
 control plane and applying them to a new branch.
 
@@ -204,20 +204,20 @@ cd service-a
 ploy run pull <run-id>
 
 # Mod-based pull (default: last succeeded):
-ploy mig pull <mod-id|name>
+ploy mig pull <mig-id|name>
 ```
 
 **How it works:**
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mod_id}/pull` for mod-based pull).
+3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mod_id}/pull` for mig-based pull).
 4. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
 5. Creates a new branch at the fetched commit using the run's `target_ref`.
 6. Downloads and applies all stored Mods diffs via `git apply`.
 
 **Arguments:**
 - `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
-- `[<mod-id|name>]` — Mod ID or name (optional), for `ploy mig pull`.
+- `[<mig-id|name>]` — Mod ID or name (optional), for `ploy mig pull`.
 
 **Flags:**
 - `--origin <remote>` — Git remote to match (default: `origin`). Use this when your
@@ -237,11 +237,11 @@ ploy run pull --dry-run <run-id>
 # Pull from a run using a specific remote.
 ploy run pull --origin upstream <run-id>
 
-# Pull changes from the latest successful run for a mod.
-ploy mig pull <mod-id|name>
+# Pull changes from the latest successful run for a mig.
+ploy mig pull <mig-id|name>
 
-# Pull changes from the latest failed run for a mod.
-ploy mig pull --last-failed <mod-id|name>
+# Pull changes from the latest failed run for a mig.
+ploy mig pull --last-failed <mig-id|name>
 ```
 
 **Requirements:**
@@ -270,8 +270,8 @@ ploy pull --dry-run
 **How it works:**
 1. Reads the current HEAD SHA via `git rev-parse HEAD`.
 2. Checks for saved pull state in `<git-dir>/ploy/pull_state.json`.
-3. If no state exists or `--new-run` is set: infers the mod from the repo
-   and creates a mod-project run scoped to this repo (unless `--dry-run`, which
+3. If no state exists or `--new-run` is set: infers the mig from the repo
+   and creates a mig-project run scoped to this repo (unless `--dry-run`, which
    prints intended actions and exits without initiating a run or saving state).
 4. If state exists and SHA matches: reuses the saved run ID.
 5. If SHA mismatch: requires `--new-run` to initiate a fresh run.
@@ -342,7 +342,7 @@ ploy completion powershell | Out-String | Invoke-Expression
 ```
 
 The completion command is powered by Cobra and provides:
-- Command completion for all subcommands (mod, cluster, config, etc.)
+- Command completion for all subcommands (mig, cluster, config, etc.)
 - Flag completion for available options
 - Context-aware suggestions based on command hierarchy
 
@@ -364,22 +364,22 @@ ploy completion <shell> --help
   required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
-- `--spec` — Path to a YAML/JSON spec file defining mod parameters, Build Gate settings,
-  and healing configuration for `mod run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
+- `--spec` — Path to a YAML/JSON spec file defining mig parameters, Build Gate settings,
+  and healing configuration for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical shapes:
   top-level fields for single-step runs (`image`, `command`, `env`, `retain_container`)
-  and `mods[]` for multi-step runs. The spec supports inline environment variables (`env`),
+  and `migs[]` for multi-step runs. The spec supports inline environment variables (`env`),
   file-based secrets (`env_from_file`), Build Gate healing (`build_gate_healing`),
   and GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mod run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods stages execute.
+  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Mods stages execute.
 - `--migs-plan-timeout` — Duration string passed to the Mods planner to timebox
-  plan evaluation (`mod run`).
+  plan evaluation (`mig run`).
 - `--migs-max-parallel` — Upper bound on concurrent Mods stages emitted by the
-  planner (`mod run`).
+  planner (`mig run`).
 - `--artifact-dir` — Download final artifacts to the given directory after a
-  successful run (`mod run --follow`). A `manifest.json` file is created with
+  successful run (`mig run --follow`). A `manifest.json` file is created with
   artifact metadata.
 - Streaming guards (long-lived SSE):
   - `run logs` uses resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
@@ -408,7 +408,7 @@ enriched fields for execution context:
 | `line`       | string | Log message content                                               |
 | `node_id`    | string | Execution node identifier (NanoID string, optional)               |
 | `job_id`     | string | Job identifier (KSUID string, optional)                           |
-| `job_type`   | string | Step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate` (opt)|
+| `job_type`   | string | Step type: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate` (opt)|
 | `next_id` | int    | Job ordering index, e.g., 1000, 2000 (optional)                   |
 
 ### Output formats
@@ -417,7 +417,7 @@ enriched fields for execution context:
 
 When enriched fields are present:
 ```
-2025-10-22T10:00:00Z stdout node=a1b2c3d4 mod=mod step=2000 job=e5f6g7h8 Step started
+2025-10-22T10:00:00Z stdout node=a1b2c3d4 mig=mig step=2000 job=e5f6g7h8 Step started
 ```
 
 When only core fields are available:
@@ -453,8 +453,8 @@ credentials, CA bundles, and other shared settings without embedding them in eve
 ### Key Concepts
 
 **Scopes** control which job types receive each variable:
-- `all` — Inject into every job type (mods, healing, gates)
-- `mods` — Inject into `mod` and `post_gate` jobs (code modification phases)
+- `all` — Inject into every job type (migs, healing, gates)
+- `migs` — Inject into `mig` and `post_gate` jobs (code modification phases)
 - `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
 - `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate execution phases)
 
@@ -476,7 +476,7 @@ ploy config env show --key OPENAI_API_KEY --raw
 
 # Set a variable from a file (common for certs and JSON credentials)
 ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
-ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods
+ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope migs
 
 # Set a variable with an inline value
 ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
@@ -493,8 +493,8 @@ ploy config env unset --key OLD_VAR
 | Variable | Description | Recommended Scope |
 |----------|-------------|-------------------|
 | `CA_CERTS_PEM_BUNDLE` | PEM-encoded CA certificates for TLS trust | `all` |
-| `CODEX_AUTH_JSON` | Codex authentication credentials | `mods` |
-| `OPENAI_API_KEY` | OpenAI API key for LLM-integrated mods | `all` |
+| `CODEX_AUTH_JSON` | Codex authentication credentials | `migs` |
+| `OPENAI_API_KEY` | OpenAI API key for LLM-integrated migs | `all` |
 
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and
 `docs/migs-lifecycle.md` for how these variables flow into job containers.
@@ -538,7 +538,7 @@ See `docs/how-to/create-mr.md` for end-to-end usage examples and `internal/nodea
 
 ## Build Gate Healing
 
-When a Build Gate fails before the main mod runs, the node agent can execute a healing
+When a Build Gate fails before the main mig runs, the node agent can execute a healing
 sequence configured via the `build_gate_healing` block in the spec. This enables automated
 repair of build failures using tools like Codex or other LLM-based workflows.
 
@@ -546,10 +546,10 @@ repair of build failures using tools like Codex or other LLM-based workflows.
 1. Gate checks run as jobs in the unified `jobs` queue (`pre_gate` and `re_gate` phases)
    and are claimed by nodes via `/v1/nodes/{id}/claim`.
 2. If the pre-gate job fails and `build_gate_healing` is configured, the node executes
-   the healing mod defined under `build_gate_healing.mod` against the same workspace
+   the healing mig defined under `build_gate_healing.mig` against the same workspace
    and Build Gate logs.
 3. After all healing steps complete, a `re_gate` job runs as another job in the queue. If it
-   passes, the main mod proceeds.
+   passes, the main mig proceeds.
 4. The healing loop can retry up to `build_gate_healing.retries` times (default: 1).
 5. If the gate still fails after exhausting retries, the run terminates with status `failed`
    and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
@@ -570,13 +570,13 @@ and `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses remain un
 gate executor logic abstracts execution location, ensuring consistent gate status
 reporting.
 
-**Spec format (single healing mod):**
+**Spec format (single healing mig):**
 ```yaml
 build_gate_healing:
   retries: 1
-  mod:
+  mig:
     image: docker.io/you/migs-codex:latest
-    command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
+    command: ["mig-codex", "--input", "/workspace", "--out", "/out"]
     env:
       CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
     env_from_file:
@@ -585,7 +585,7 @@ build_gate_healing:
 ```
 
 **Cross-phase inputs:**
-- `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing mods).
+- `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec).
 
 See `docs/schemas/mig.example.yaml` for a complete example and `tests/e2e/migs/README.md`
@@ -599,23 +599,23 @@ Run status includes a `stages` map. Each job has a `next_id` for execution order
 and optional metadata identifying the job phase.
 
 **Job phases (job_type):**
-- `pre_gate` — Build Gate validation before mods run
-- `mod` — Main mod execution (code transformation)
-- `post_gate` — Build Gate validation after mods succeed
-- `heal` — Healing mod execution (when pre/post gate fails)
+- `pre_gate` — Build Gate validation before migs run
+- `mig` — Main mig execution (code transformation)
+- `post_gate` — Build Gate validation after migs succeed
+- `heal` — Healing mig execution (when pre/post gate fails)
 - `re_gate` — Build Gate re-validation after healing
 
 **DAG structure:**
 
 ```
-pre-gate → mod-0 → post-gate
+pre-gate → mig-0 → post-gate
           │
-          └─(fail)→ heal → re-gate → mod-0
+          └─(fail)→ heal → re-gate → mig-0
 ```
 
 When a gate fails with a retryable outcome, the runner branches into the healing
 flow. The heal job attempts to fix the build issue, then re-gate validates the
-fix. If re-gate passes, the DAG continues to the next mod.
+fix. If re-gate passes, the DAG continues to the next mig.
 
 **CLI inspection:**
 

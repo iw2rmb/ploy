@@ -12,8 +12,8 @@ import (
 )
 
 type Querier interface {
-	// Archives a mod by setting archived_at to now().
-	// Archiving must be refused when the mod has any jobs in a running state.
+	// Archives a mig by setting archived_at to now().
+	// Archiving must be refused when the mig has any jobs in a running state.
 	// This query only sets the timestamp; validation logic must be in the caller.
 	ArchiveMig(ctx context.Context, id types.MigID) error
 	// Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
@@ -53,7 +53,7 @@ type Querier interface {
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
-	// v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
+	// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	// v1: Creates a new run_repos row scoped to (run_id, repo_id).
@@ -78,7 +78,7 @@ type Querier interface {
 	DeleteJob(ctx context.Context, id types.JobID) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
-	// Deletes a mod. Use with caution; should only be called when safe to remove.
+	// Deletes a mig. Use with caution; should only be called when safe to remove.
 	DeleteMig(ctx context.Context, id types.MigID) error
 	// Deletes a mod_repo by id.
 	// Note: mig_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
@@ -99,7 +99,7 @@ type Querier interface {
 	// Returns pgx.ErrNoRows if the key does not exist.
 	GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
-	// v1: Gets the newest run_repos row for a specific repo_id in a mod,
+	// v1: Gets the newest run_repos row for a specific repo_id in a mig,
 	// filtered by terminal status (Success or Fail).
 	// Used by POST /v1/migs/{mig_id}/pull to select last-succeeded or last-failed.
 	// Order by created_at DESC to get the newest matching run_repos row.
@@ -160,7 +160,7 @@ type Querier interface {
 	// Returns event metadata (without the meta blob) for a run since a given id.
 	// Use GetEvent to fetch the full event with meta by id.
 	ListEventsMetaByRunSince(ctx context.Context, arg ListEventsMetaByRunSinceParams) ([]ListEventsMetaByRunSinceRow, error)
-	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
+	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mig.
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
 	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
@@ -223,7 +223,7 @@ type Querier interface {
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
-	// Unarchives a mod by clearing archived_at.
+	// Unarchives a mig by clearing archived_at.
 	UnarchiveMig(ctx context.Context, id types.MigID) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
@@ -260,7 +260,7 @@ type Querier interface {
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 	// Bulk upsert a mod_repo by normalized repo_url.
-	// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mod.
+	// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
 	// If a row exists, update refs; otherwise insert.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 }

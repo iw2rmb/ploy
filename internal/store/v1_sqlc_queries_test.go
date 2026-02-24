@@ -30,7 +30,7 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 	createdBy := "test-user"
 
 	modID1 := types.NewMigID()
-	modName1 := "v1-sqlc-mod-alpha-" + modID1.String()
+	modName1 := "v1-sqlc-mig-alpha-" + modID1.String()
 	mod1, err := db.CreateMig(ctx, CreateMigParams{
 		ID:        modID1,
 		Name:      modName1,
@@ -43,7 +43,7 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 	defer func() { _ = db.DeleteMig(ctx, mod1.ID) }()
 
 	modID2 := types.NewMigID()
-	modName2 := "v1-sqlc-mod-beta-" + modID2.String()
+	modName2 := "v1-sqlc-mig-beta-" + modID2.String()
 	mod2, err := db.CreateMig(ctx, CreateMigParams{
 		ID:        modID2,
 		Name:      modName2,
@@ -60,7 +60,7 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 		t.Fatalf("GetMigByName() failed: %v", err)
 	}
 	if gotByName.ID != mod1.ID {
-		t.Fatalf("GetMigByName() returned wrong mod id: got=%q want=%q", gotByName.ID, mod1.ID)
+		t.Fatalf("GetMigByName() returned wrong mig id: got=%q want=%q", gotByName.ID, mod1.ID)
 	}
 
 	if err := db.ArchiveMig(ctx, mod2.ID); err != nil {
@@ -102,7 +102,7 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 		}
 	}
 	if !foundArchived {
-		t.Fatalf("ListMigs(archived) did not return expected archived mod: id=%q", mod2.ID)
+		t.Fatalf("ListMigs(archived) did not return expected archived mig: id=%q", mod2.ID)
 	}
 
 	// Active only.
@@ -169,23 +169,23 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 
 	createdBy := "test-user"
 	modID := types.NewMigID()
-	mod, err := db.CreateMig(ctx, CreateMigParams{
+	mig, err := db.CreateMig(ctx, CreateMigParams{
 		ID:        modID,
-		Name:      "v1-sqlc-mod-repos-" + modID.String(),
+		Name:      "v1-sqlc-mig-repos-" + modID.String(),
 		SpecID:    nil,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateMig() failed: %v", err)
 	}
-	defer func() { _ = db.DeleteMig(ctx, mod.ID) }()
+	defer func() { _ = db.DeleteMig(ctx, mig.ID) }()
 
 	repoURL := "https://github.com/iw2rmb/ploy-test-repo.git"
 
 	repoID1 := types.NewMigRepoID()
 	inserted, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
 		ID:        repoID1,
-		MigID:     mod.ID,
+		MigID:     mig.ID,
 		RepoUrl:   repoURL,
 		BaseRef:   "main",
 		TargetRef: "feature",
@@ -198,7 +198,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	repoID2 := types.NewMigRepoID()
 	updated, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
 		ID:        repoID2,
-		MigID:     mod.ID,
+		MigID:     mig.ID,
 		RepoUrl:   repoURL,
 		BaseRef:   "trunk",
 		TargetRef: "feature-2",
@@ -214,7 +214,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	}
 
 	got, err := db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{
-		MigID:   mod.ID,
+		MigID:   mig.ID,
 		RepoUrl: repoURL,
 	})
 	if err != nil {
@@ -229,7 +229,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	}
 
 	_, err = db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{
-		MigID:   mod.ID,
+		MigID:   mig.ID,
 		RepoUrl: repoURL,
 	})
 	if err == nil {

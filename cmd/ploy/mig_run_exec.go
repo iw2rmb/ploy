@@ -1,11 +1,11 @@
 // Package main implements the ploy CLI.
 //
-// The CLI provides commands for mods execution, rollouts, server deployment,
+// The CLI provides commands for migs execution, rollouts, server deployment,
 // and related utilities. Package-level documentation lives here so `go doc
 // github.com/iw2rmb/ploy/cmd/ploy` renders a clear overview for users.
 //
-// mod_run_exec.go contains the core mod run execution orchestration.
-// This file owns executeModRun which orchestrates the end-to-end mod run
+// mod_run_exec.go contains the core mig run execution orchestration.
+// This file owns executeModRun which orchestrates the end-to-end mig run
 // flow: spec building, run submission, optional follow mode, and artifact
 // download. It delegates to specialized files for spec parsing, artifact
 // fetching, and flag handling. The orchestrator maintains the high-level
@@ -174,7 +174,7 @@ func followRunEvents(ctx context.Context, base *url.URL, httpClient *http.Client
 
 	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
 	if final != modsapi.RunStateSucceeded {
-		return final, fmt.Errorf("mod run ended in %s", strings.ToLower(string(final)))
+		return final, fmt.Errorf("mig run ended in %s", strings.ToLower(string(final)))
 	}
 
 	return final, nil

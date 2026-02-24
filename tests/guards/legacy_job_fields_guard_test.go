@@ -13,8 +13,8 @@ import (
 func TestNoLegacyJobFieldTokens(t *testing.T) {
 	tokens := []string{
 		"step" + "_index",
-		"mod" + "_type",
-		"mod" + "_image",
+		"mig" + "_type",
+		"mig" + "_image",
 		"Mod" + "Type",
 		"Mod" + "Image",
 	}

@@ -76,7 +76,7 @@ post:
                   properties:
                     kind:
                       type: string
-                      enum: [ mod, gate, build ]
+                      enum: [ mig, gate, build ]
                     gate:
                       type: object
                       nullable: true

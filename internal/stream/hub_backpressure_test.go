@@ -66,7 +66,7 @@ func TestHubBackpressureWithEnrichedLogs(t *testing.T) {
 			Line:      "Log line " + string(rune('0'+i)),
 			NodeID:    nodeID,
 			JobID:     jobID,
-			JobType:   "mod",
+			JobType:   "mig",
 		}
 		// Should not block; slow subscriber should be dropped.
 		if err := hub.PublishLog(ctx, runID, record); err != nil {

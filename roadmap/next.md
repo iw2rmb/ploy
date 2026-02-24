@@ -1,6 +1,6 @@
 # Replace `step_index` Scheduling With `next_id` Chains and Rename Job Fields
 
-Scope: Implement job graph execution using explicit `next_id -> jobs.id` links instead of sortable/fractional `step_index`, and rename `ModType`/`ModImage` to `Type` (`JobType`) / `Image` (`JobImage`) across store, server, nodeagent, API, CLI output, tests, and docs. This lands before `mod -> mig` naming migration.
+Scope: Implement job graph execution using explicit `next_id -> jobs.id` links instead of sortable/fractional `step_index`, and rename `ModType`/`ModImage` to `Type` (`JobType`) / `Image` (`JobImage`) across store, server, nodeagent, API, CLI output, tests, and docs. This lands before `mig -> mig` naming migration.
 
 Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/build-gate/README.md`; `docs/api/OpenAPI.yaml`; `docs/api/components/schemas/controlplane.yaml`; `docs/testing-workflow.md`.
 
@@ -10,7 +10,7 @@ Legend: [ ] todo, [x] done.
 - [x] Define the new job field contract and enum mapping in design docs before code edits.
   - Repository: `ploy`
   - Component: Domain contract, naming glossary
-  - Scope: Document canonical rename mapping: `ModType` -> `Type` (`JobType`), `ModImage` -> `Image` (`JobImage`). Define job type values as step phases (`pre_build`, `step`, `post_build`, `heal`, `re_build`, `mr`) and remove old `pre_gate/mod/post_gate/re_gate` names from the new contract.
+  - Scope: Document canonical rename mapping: `ModType` -> `Type` (`JobType`), `ModImage` -> `Image` (`JobImage`). Define job type values as step phases (`pre_build`, `step`, `post_build`, `heal`, `re_build`, `mr`) and remove old `pre_gate/mig/post_gate/re_gate` names from the new contract.
   - Snippets: `internal/nodeagent/job.go`, `internal/workflow/contracts/job_meta.go`, `docs/api/components/schemas/controlplane.yaml`
   - Tests: Add/adjust guard checks in `tests/guards` that fail on newly introduced `mod_type`, `mod_image`, and `step_index` in current interfaces after migration.
 
@@ -66,11 +66,11 @@ Legend: [ ] todo, [x] done.
   - Snippets: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`, `internal/nodeagent/difffetcher.go`
   - Tests: Nodeagent orchestration tests and rehydration tests with inserted healing steps.
 
-- [x] Rename runtime metadata fields from mod-prefixed to job-prefixed names.
+- [x] Rename runtime metadata fields from mig-prefixed to job-prefixed names.
   - Repository: `ploy`
   - Component: Contracts, SSE payloads, log record types
   - Scope: Replace `mod_type`/`mod_image` fields in job metadata, events, and log records with `job_type`/`job_image` (or `type`/`image` where schema requires). Remove old fields and converters.
-  - Snippets: `internal/workflow/contracts/job_meta.go`, `internal/mods/api/types.go`, `internal/server/events/service.go`, `internal/cli/follow/engine.go`
+  - Snippets: `internal/workflow/contracts/job_meta.go`, `internal/migs/api/types.go`, `internal/server/events/service.go`, `internal/cli/follow/engine.go`
   - Tests: Event parsing/stream tests and CLI follow/status tests.
 
 ## Phase 4: API, CLI Output, and Docs

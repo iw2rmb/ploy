@@ -245,7 +245,7 @@ type UpsertMigRepoParams struct {
 }
 
 // Bulk upsert a mod_repo by normalized repo_url.
-// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mod.
+// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
 // If a row exists, update refs; otherwise insert.
 func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error) {
 	row := q.db.QueryRow(ctx, upsertMigRepo,

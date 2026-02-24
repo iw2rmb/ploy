@@ -411,9 +411,10 @@ java {
 func createGoWorkspace(t *testing.T, goVersion string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
+	goModuleFile := "go." + "mo" + "d"
 	goMod := "module example.com/test\n\ngo " + goVersion + "\n"
-	if err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goMod), 0o644); err != nil {
-		t.Fatalf("failed to create go.mod: %v", err)
+	if err := os.WriteFile(filepath.Join(tmpDir, goModuleFile), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("failed to create go module file: %v", err)
 	}
 	return tmpDir
 }

@@ -19,13 +19,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// addMigRepoHandler adds a repo to a mod's repo set.
+// addMigRepoHandler adds a repo to a mig's repo set.
 // Endpoint: POST /v1/migs/{mig_id}/repos
 // Request: {repo_url, base_ref, target_ref}
 // Response: 201 Created with repo details
 //
 // v1 contract:
-// - Adds/enables a repo in a mod.
+// - Adds/enables a repo in a mig.
 // - Normalizes repo_url for matching (strips trailing slashes and .git suffixes).
 // - Returns id (repo_id) and stored fields.
 func addMigRepoHandler(st store.Store) http.HandlerFunc {
@@ -67,19 +67,19 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify mod exists and is not archived.
-		mod, err := st.GetMig(r.Context(), modID)
+		// Verify mig exists and is not archived.
+		mig, err := st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("add mod repo: get mod failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("add mig repo: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
-		if mod.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot add repo to archived mod")
+		if mig.ArchivedAt.Valid {
+			httpErr(w, http.StatusConflict, "cannot add repo to archived mig")
 			return
 		}
 
@@ -93,14 +93,14 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			TargetRef: req.TargetRef,
 		})
 		if err != nil {
-			// Check for unique constraint violation (duplicate repo_url in mod).
+			// Check for unique constraint violation (duplicate repo_url in mig).
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				httpErr(w, http.StatusConflict, "repo already exists in this mod")
+				httpErr(w, http.StatusConflict, "repo already exists in this mig")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to create mod repo: %v", err)
-			slog.Error("add mod repo: create failed", "mig_id", modID, "repo_url", normalizedURL, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
+			slog.Error("add mig repo: create failed", "mig_id", modID, "repo_url", normalizedURL, "err", err)
 			return
 		}
 
@@ -124,14 +124,14 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("add mod repo: encode response failed", "err", err)
+			slog.Error("add mig repo: encode response failed", "err", err)
 		}
 
-		slog.Info("mod repo added", "mig_id", modID, "repo_id", repo.ID, "repo_url", normalizedURL)
+		slog.Info("mig repo added", "mig_id", modID, "repo_id", repo.ID, "repo_url", normalizedURL)
 	}
 }
 
-// listMigReposHandler lists repos in a mod's repo set.
+// listMigReposHandler lists repos in a mig's repo set.
 // Endpoint: GET /v1/migs/{mig_id}/repos
 // Response: 200 OK with list of repos
 //
@@ -145,23 +145,23 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify mod exists.
+		// Verify mig exists.
 		_, err = st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("list mod repos: get mod failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("list mig repos: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
 
-		// List repos for this mod.
+		// List repos for this mig.
 		repos, err := st.ListMigReposByMig(r.Context(), modID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
-			slog.Error("list mod repos: list failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
+			slog.Error("list mig repos: list failed", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -193,17 +193,17 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list mod repos: encode response failed", "err", err)
+			slog.Error("list mig repos: encode response failed", "err", err)
 		}
 	}
 }
 
-// deleteMigRepoHandler deletes a repo from a mod's repo set.
+// deleteMigRepoHandler deletes a repo from a mig's repo set.
 // Endpoint: DELETE /v1/migs/{mig_id}/repos/{repo_id}
 // Response: 204 No Content on success
 //
 // v1 contract:
-// - Deletes a repo from the mod repo set.
+// - Deletes a repo from the mig repo set.
 // - Refuse deletion if the repo has historical executions (run_repos.repo_id references).
 func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -219,19 +219,19 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify mod exists.
+		// Verify mig exists.
 		_, err = st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("delete mod repo: get mod failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("delete mig repo: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
 
-		// Verify repo exists and belongs to this mod.
+		// Verify repo exists and belongs to this mig.
 		repo, err := st.GetMigRepo(r.Context(), repoID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -239,11 +239,11 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-			slog.Error("delete mod repo: get repo failed", "repo_id", repoID, "err", err)
+			slog.Error("delete mig repo: get repo failed", "repo_id", repoID, "err", err)
 			return
 		}
 		if repo.MigID != modID {
-			httpErr(w, http.StatusNotFound, "repo does not belong to this mod")
+			httpErr(w, http.StatusNotFound, "repo does not belong to this mig")
 			return
 		}
 
@@ -251,7 +251,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		hasHistory, err := st.HasMigRepoHistory(r.Context(), repoID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to check repo history: %v", err)
-			slog.Error("delete mod repo: check history failed", "repo_id", repoID, "err", err)
+			slog.Error("delete mig repo: check history failed", "repo_id", repoID, "err", err)
 			return
 		}
 		if hasHistory {
@@ -261,17 +261,17 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Delete the repo.
 		if err := st.DeleteMigRepo(r.Context(), repoID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to delete mod repo: %v", err)
-			slog.Error("delete mod repo: delete failed", "repo_id", repoID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to delete mig repo: %v", err)
+			slog.Error("delete mig repo: delete failed", "repo_id", repoID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("mod repo deleted", "mig_id", modID, "repo_id", repoID)
+		slog.Info("mig repo deleted", "mig_id", modID, "repo_id", repoID)
 	}
 }
 
-// bulkUpsertMigReposHandler bulk upserts repos for a mod from CSV.
+// bulkUpsertMigReposHandler bulk upserts repos for a mig from CSV.
 // Endpoint: POST /v1/migs/{mig_id}/repos/bulk
 // Request: Content-Type: text/csv; body is UTF-8 CSV with header row: repo_url,base_ref,target_ref
 // Response: 200 OK with counts {created, updated, failed} and errors array
@@ -293,19 +293,19 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify mod exists and is not archived.
-		mod, err := st.GetMig(r.Context(), modID)
+		// Verify mig exists and is not archived.
+		mig, err := st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("bulk upsert mod repos: get mod failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("bulk upsert mig repos: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
-		if mod.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot modify repos on archived mod")
+		if mig.ArchivedAt.Valid {
+			httpErr(w, http.StatusConflict, "cannot modify repos on archived mig")
 			return
 		}
 
@@ -454,10 +454,10 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("bulk upsert mod repos: encode response failed", "err", err)
+			slog.Error("bulk upsert mig repos: encode response failed", "err", err)
 		}
 
-		slog.Info("bulk upsert mod repos completed",
+		slog.Info("bulk upsert mig repos completed",
 			"mig_id", modID,
 			"created", created,
 			"updated", updated,

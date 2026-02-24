@@ -40,7 +40,7 @@ type BuildGateStageMetadata struct {
 //   - "java" tool → ModStackJava
 //   - unknown/empty → ModStackUnknown
 //
-// This method ensures the same stack value is visible to both mod and healing
+// This method ensures the same stack value is visible to both mig and healing
 // executions, enabling consistent image resolution across re-gates.
 func (m BuildGateStageMetadata) DetectedStack() ModStack {
 	if len(m.StaticChecks) == 0 {

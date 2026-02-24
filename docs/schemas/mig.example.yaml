@@ -1,7 +1,7 @@
 # apiVersion and kind are informational; the current control plane forwards this
 # spec as an opaque JSON object. Keep keys stable and snake_case to align with
 # existing CLI/agent options.
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 
 ################################################################################
@@ -9,20 +9,20 @@ kind: ModRunSpec
 ################################################################################
 # Main container to run against the hydrated repository at /workspace.
 # Single-step specs use top-level fields. For multi-step workflows, use the
-# mods[] array instead (see MULTI-STEP section below).
+# migs[] array instead (see MULTI-STEP section below).
 
 # Required: image that performs the transformation (e.g., OpenRewrite).
 #
 # The `image` field accepts two forms:
 #
 # 1. **Universal image (string)** — A single image used for all stacks:
-#    image: docker.io/your-dh-user/mods-openrewrite:latest
+#    image: docker.io/your-dh-user/migs-openrewrite:latest
 #
 # 2. **Stack-specific images (map)** — Different images per Build Gate stack:
 #    image:
-#      default: docker.io/your-dh-user/mods-openrewrite:latest
-#      java-maven: docker.io/your-dh-user/mods-orw-maven:latest
-#      java-gradle: docker.io/your-dh-user/mods-orw-gradle:latest
+#      default: docker.io/your-dh-user/migs-openrewrite:latest
+#      java-maven: docker.io/your-dh-user/migs-orw-maven:latest
+#      java-gradle: docker.io/your-dh-user/migs-orw-gradle:latest
 #
 # Stack Resolution Rules (for map form):
 #   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
@@ -39,10 +39,10 @@ kind: ModRunSpec
 #   - "default"     — Fallback key for unrecognized stacks
 #
 # The universal string form ignores stack detection and always uses the same image.
-image: docker.io/your-dh-user/mods-openrewrite:latest
+image: docker.io/your-dh-user/migs-openrewrite:latest
 # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
-# command: ["/bin/sh", "-lc", "mods-orw --apply --dir /workspace --out /out"]
-# Environment variables passed into the mod container
+# command: ["/bin/sh", "-lc", "migs-orw --apply --dir /workspace --out /out"]
+# Environment variables passed into the mig container
 #   - use `env` for literal values
 #   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
 env:
@@ -60,58 +60,58 @@ retain_container: false
 ################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
 ################################################################################
-# When you need multiple transformation steps executed sequentially, use mods[]
+# When you need multiple transformation steps executed sequentially, use migs[]
 # instead of top-level fields. Each step runs with the same global
 # build gate and healing policy. The diff from each step is captured before the
 # next step begins, enabling per-step rehydration and multi-node execution.
 #
 # Rules:
 # - Mods execute in array order (steps are sequential within one run).
-# - All mods share the same repository, base_ref, target_ref, and global gate policy.
-# - Each mod step produces a diff artifact before the next step starts.
+# - All migs share the same repository, base_ref, target_ref, and global gate policy.
+# - Each mig step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
 #
-# Each entry in mods[] supports the same `image` field as the single-step spec:
-# - String form: `image: docker.io/user/mod:latest` (universal, any stack)
+# Each entry in migs[] supports the same `image` field as the single-step spec:
+# - String form: `image: docker.io/user/mig:latest` (universal, any stack)
 # - Map form: `image: {default: ..., java-maven: ..., java-gradle: ...}` (stack-aware)
 #
 # Example (disabled by default; remove comments to activate):
-# mods:
-#   - image: docker.io/your-dh-user/mods-migrate-java8:latest
+# migs:
+#   - image: docker.io/your-dh-user/migs-migrate-java8:latest
 #     env:
 #       MIGRATION_TARGET: java8
-#   - image: docker.io/your-dh-user/mods-migrate-java11:latest
+#   - image: docker.io/your-dh-user/migs-migrate-java11:latest
 #     env:
 #       MIGRATION_TARGET: java11
-#   - image: docker.io/your-dh-user/mods-migrate-java17:latest
+#   - image: docker.io/your-dh-user/migs-migrate-java17:latest
 #     env:
 #       MIGRATION_TARGET: java17
 #       RECIPE_VERSION: "3.20.0"
 #
 # Example with stack-specific images (for dedicated Maven/Gradle containers):
-# mods:
+# migs:
 #   - image:
-#       default: docker.io/your-dh-user/mods-openrewrite:latest
-#       java-maven: docker.io/your-dh-user/mods-orw-maven:latest
-#       java-gradle: docker.io/your-dh-user/mods-orw-gradle:latest
+#       default: docker.io/your-dh-user/migs-openrewrite:latest
+#       java-maven: docker.io/your-dh-user/migs-orw-maven:latest
+#       java-gradle: docker.io/your-dh-user/migs-orw-gradle:latest
 #     env:
 #       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 
 ################################################################################
 # GLOBAL BUILD GATE AND HEALING POLICY
 ################################################################################
-# Build Gate settings apply to all mods (both single-mod and multi-step runs).
+# Build Gate settings apply to all migs (both single-mig and multi-step runs).
 # The node agent reuses the same Java gate for Maven/Gradle (maven: -e; gradle:
 # --stacktrace).
 #
-# Gate execution occurs after each mod transformation. For multi-step runs, the
+# Gate execution occurs after each mig transformation. For multi-step runs, the
 # gate validates the accumulated changes from all prior steps.
 build_gate:
   enabled: true
   images: [] # optional stack→image mapping overrides
 
 # Healing configuration executed when the Build Gate fails (applies globally to
-# all mods). For multi-step runs, the healing policy is shared across all mod
+# all migs). For multi-step runs, the healing policy is shared across all mig
 # steps. When a step's gate fails, healing runs once per the retry count, then
 # the gate is re-evaluated before proceeding to the next step.
 #
@@ -122,7 +122,7 @@ build_gate:
 # - This separation keeps Codex focused on code fixes while the control plane
 #   handles validation orchestration and build verification.
 #
-# Environment variables injected by the node agent for healing mods:
+# Environment variables injected by the node agent for healing migs:
 # - PLOY_REPO_URL: Git repository URL (same as the Mods run)
 # - PLOY_BUILDGATE_REF: Git ref for Build Gate baseline (base_ref or commit_sha)
 # - PLOY_HOST_WORKSPACE: Host path to workspace (for direct host verification)
@@ -140,7 +140,7 @@ build_gate:
 #
 # build_gate:
 #   router:
-#     image: docker.io/your-dh-user/mods-codex:latest
+#     image: docker.io/your-dh-user/migs-codex:latest
 #     env:
 #       CODEX_PROMPT: |-
 #         Rules:
@@ -157,12 +157,12 @@ build_gate:
 ################################################################################
 # Healing runs after router (if configured) when the Build Gate fails.
 # Mod-like fields (image, command, env, retain_container) are specified
-# directly under healing (no nested "mod" key).
+# directly under healing (no nested "mig" key).
 #
 # build_gate:
 #   healing:
 #     retries: 2
-#     image: docker.io/your-dh-user/mods-codex:latest
+#     image: docker.io/your-dh-user/migs-codex:latest
 #     env:
 #       CODEX_PROMPT: |-
 #         Fix the compilation error in /in/build-gate.log.
@@ -178,20 +178,20 @@ mr_on_fail: true
 ################################################################################
 # NOTES
 ################################################################################
-# - This YAML is submitted via: `ploy mig run --spec mod.yaml` along with
+# - This YAML is submitted via: `ploy mig run --spec mig.yaml` along with
 #   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
 #
 # - The agent honors: image, command, env, retain_container,
-#   mods[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
+#   migs[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use top-level fields for one transformation.
-#   * Multi-step: Use the `mods[]` array for sequential transformations.
+#   * Multi-step: Use the `migs[]` array for sequential transformations.
 #   * Both formats share the same global build_gate and build_gate_healing policy.
 #
 # - Stack-aware image selection:
-#   * The `image` field (top-level, in mods[], and in build_gate.healing/router)
+#   * The `image` field (top-level, in migs[], and in build_gate.healing/router)
 #     accepts either a string (universal image) or a map (stack-specific images).
 #   * When using the map form, the Build Gate detects the workspace stack
 #     (java-maven, java-gradle, etc.) and resolves the image accordingly.
@@ -200,13 +200,13 @@ mr_on_fail: true
 #
 # - Multi-step semantics:
 #   * Mods execute in array order (sequential steps within one run).
-#   * All mods share the same repository and global gate/heal policy.
-#   * Each mod step produces a diff artifact captured before the next step.
+#   * All migs share the same repository and global gate/heal policy.
+#   * Each mig step produces a diff artifact captured before the next step.
 #   * Diffs enable rehydration: any step can be re-executed on any node by
 #     applying the ordered chain of diffs from prior steps onto the base snapshot.
 #
 # - The node agent consumes build_gate.healing and build_gate.router to run
 #   the router → heal → re-gate loop after the first gate fail (applies to both
-#   single-mod and multi-step runs).
+#   single-mig and multi-step runs).
 # - Router produces bug_summary; healing produces action_summary. Both are
 #   persisted in jobs.meta and written to /in/healing-log.md per iteration.

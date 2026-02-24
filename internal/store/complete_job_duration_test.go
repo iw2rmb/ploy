@@ -32,7 +32,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create v1 fixture (mod, spec, mod_repo, run, run_repo).
+	// Create v1 fixture (mig, spec, mod_repo, run, run_repo).
 	fixture := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-duration-test.git",
 		"main",
@@ -51,7 +51,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-1",
 			Status:      JobStatusQueued,
-			JobType:     "mod",
+			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
 			Meta:        []byte(`{}`),
@@ -105,7 +105,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-2",
 			Status:      JobStatusQueued,
-			JobType:     "mod",
+			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
 			Meta:        []byte(`{}`),
@@ -159,7 +159,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-running-started-at",
 			Status:      JobStatusQueued,
-			JobType:     "mod",
+			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
 			Meta:        []byte(`{}`),
@@ -206,7 +206,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-3",
 			Status:      JobStatusQueued,
-			JobType:     "mod",
+			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
 			Meta:        []byte(`{}`),

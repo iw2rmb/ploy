@@ -10,7 +10,7 @@ ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
 -- name: CreateRun :one
--- v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
+-- v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
 -- Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 INSERT INTO runs (id, mig_id, spec_id, created_by, status, started_at)
 VALUES ($1, $2, $3, $4, 'Started', now())

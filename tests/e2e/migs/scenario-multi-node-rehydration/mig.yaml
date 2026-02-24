@@ -8,7 +8,7 @@
 # 4. Build gate validation passes after accumulated changes
 #
 # Architecture:
-# - Scheduler creates separate step manifests for each mod in mods[] array
+# - Scheduler creates separate step manifests for each mig in migs[] array
 # - Each step can be claimed by any available node (no affinity requirement)
 # - Node rehydrates workspace by: copy base clone + apply diffs[0..k-1] for step k
 # - Final MR contains cumulative changes from all steps
@@ -17,11 +17,11 @@
 #   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
 #     --repo-base-ref main \
-#     --repo-target-ref mods-e2e-multi-node-test \
+#     --repo-target-ref migs-e2e-multi-node-test \
 #     --spec tests/e2e/migs/scenario-multi-node-rehydration/mig.yaml \
 #     --follow
 
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 
 ################################################################################
@@ -87,10 +87,10 @@ build_gate:
   # HEALING POLICY (optional for E2E)
   ################################################################################
   # Include basic healing to validate that healing also works with rehydration.
-  # If any step's build gate fails, the healing mod runs on the same rehydrated workspace.
+  # If any step's build gate fails, the healing mig runs on the same rehydrated workspace.
   healing:
     retries: 1
-    mod:
+    mig:
       # Codex healing container using the workspace diff handshake.
       # Codex edits the workspace and exits when done; the node agent inspects
       # the workspace for diffs and re-runs the Build Gate externally when changes exist.

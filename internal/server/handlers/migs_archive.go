@@ -13,13 +13,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// archiveMigHandler archives a mod project.
+// archiveMigHandler archives a mig project.
 // Endpoint: PATCH /v1/migs/{mig_ref}/archive
-// Response: 200 OK with mod details
+// Response: 200 OK with mig details
 //
 // v1 contract:
-// - Archives a mod (prevents execution).
-// - Cannot archive a mod with running jobs.
+// - Archives a mig (prevents execution).
+// - Cannot archive a mig with running jobs.
 func archiveMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
@@ -28,21 +28,21 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Resolve mod by ID-or-name.
-		mod, err := resolveMigByRef(r.Context(), st, modRef)
+		// Resolve mig by ID-or-name.
+		mig, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("archive mod: get mod failed", "mig_ref", modRef, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("archive mig: get mig failed", "mig_ref", modRef, "err", err)
 			return
 		}
-		modID := mod.ID
+		modID := mig.ID
 
 		// Check if already archived
-		if mod.ArchivedAt.Valid {
+		if mig.ArchivedAt.Valid {
 			// Already archived, return current state (idempotent)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -51,30 +51,30 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 				Name     string `json:"name"`
 				Archived bool   `json:"archived"`
 			}{
-				ID:       mod.ID.String(),
-				Name:     mod.Name,
+				ID:       mig.ID.String(),
+				Name:     mig.Name,
 				Archived: true,
 			}
 			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 
-		// Check for running jobs in this mod's runs
+		// Check for running jobs in this mig's runs
 		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
-			slog.Error("archive mod: check jobs failed", "mig_id", modID, "err", err)
+			slog.Error("archive mig: check jobs failed", "mig_id", modID, "err", err)
 			return
 		}
 		if hasRunningJobs {
-			httpErr(w, http.StatusConflict, "cannot archive mod with running jobs")
+			httpErr(w, http.StatusConflict, "cannot archive mig with running jobs")
 			return
 		}
 
-		// Archive the mod
+		// Archive the mig
 		if err := st.ArchiveMig(r.Context(), modID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to archive mod: %v", err)
-			slog.Error("archive mod: database error", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to archive mig: %v", err)
+			slog.Error("archive mig: database error", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -85,13 +85,13 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 			Name     string `json:"name"`
 			Archived bool   `json:"archived"`
 		}{
-			ID:       mod.ID.String(),
-			Name:     mod.Name,
+			ID:       mig.ID.String(),
+			Name:     mig.Name,
 			Archived: true,
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
-		slog.Info("mod archived", "mig_id", modID)
+		slog.Info("mig archived", "mig_id", modID)
 	}
 }
 
@@ -124,12 +124,12 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 	}
 }
 
-// unarchiveMigHandler unarchives a mod project.
+// unarchiveMigHandler unarchives a mig project.
 // Endpoint: PATCH /v1/migs/{mig_ref}/unarchive
-// Response: 200 OK with mod details
+// Response: 200 OK with mig details
 //
 // v1 contract:
-// - Unarchives a mod (allows execution again).
+// - Unarchives a mig (allows execution again).
 func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
@@ -138,21 +138,21 @@ func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Resolve mod by ID-or-name.
-		mod, err := resolveMigByRef(r.Context(), st, modRef)
+		// Resolve mig by ID-or-name.
+		mig, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("unarchive mod: get mod failed", "mig_ref", modRef, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("unarchive mig: get mig failed", "mig_ref", modRef, "err", err)
 			return
 		}
-		modID := mod.ID
+		modID := mig.ID
 
 		// Check if not archived
-		if !mod.ArchivedAt.Valid {
+		if !mig.ArchivedAt.Valid {
 			// Already unarchived, return current state (idempotent)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -161,18 +161,18 @@ func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 				Name     string `json:"name"`
 				Archived bool   `json:"archived"`
 			}{
-				ID:       mod.ID.String(),
-				Name:     mod.Name,
+				ID:       mig.ID.String(),
+				Name:     mig.Name,
 				Archived: false,
 			}
 			_ = json.NewEncoder(w).Encode(resp)
 			return
 		}
 
-		// Unarchive the mod
+		// Unarchive the mig
 		if err := st.UnarchiveMig(r.Context(), modID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to unarchive mod: %v", err)
-			slog.Error("unarchive mod: database error", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to unarchive mig: %v", err)
+			slog.Error("unarchive mig: database error", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -183,12 +183,12 @@ func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 			Name     string `json:"name"`
 			Archived bool   `json:"archived"`
 		}{
-			ID:       mod.ID.String(),
-			Name:     mod.Name,
+			ID:       mig.ID.String(),
+			Name:     mig.Name,
 			Archived: false,
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
-		slog.Info("mod unarchived", "mig_id", modID)
+		slog.Info("mig unarchived", "mig_id", modID)
 	}
 }

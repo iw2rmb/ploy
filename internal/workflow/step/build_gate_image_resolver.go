@@ -74,11 +74,11 @@ func NewBuildGateImageResolver(
 		}
 	}
 
-	// Add mod override rules (highest precedence).
+	// Add mig override rules (highest precedence).
 	if len(modOverride) > 0 {
 		mapping := contracts.BuildGateImageMapping{Images: modOverride}
 		if err := mapping.Validate("mod_override"); err != nil {
-			return nil, fmt.Errorf("mod override: %w", err)
+			return nil, fmt.Errorf("mig override: %w", err)
 		}
 		allRules = append(allRules, modOverride...)
 	}
@@ -94,7 +94,7 @@ func NewBuildGateImageResolver(
 //  3. Among same-specificity matches, the last rule wins (higher precedence)
 //
 // The "last rule wins" semantics enables precedence-based override: rules from
-// mod-level override cluster-level, which override default file rules. Conflicts
+// mig-level override cluster-level, which override default file rules. Conflicts
 // between different sources are allowed and resolved by precedence order.
 //
 // Returns an error if no matching rule is found.

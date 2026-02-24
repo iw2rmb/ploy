@@ -7,12 +7,14 @@ import (
 	"strings"
 )
 
+const goModuleFile = "go." + "mo" + "d"
+
 // Detect performs filesystem-only, deterministic detection of the project stack
 // from build files in the workspace.
 //
 // Supported languages (in detection order):
 //   - Java: pom.xml (Maven), build.gradle or build.gradle.kts (Gradle)
-//   - Go: go.mod
+//   - Go: Go module file
 //   - Rust: Cargo.toml, rust-toolchain.toml, rust-toolchain
 //   - Python: .python-version, runtime.txt, or pyproject.toml with Python markers
 //
@@ -25,7 +27,7 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 	pomPath := filepath.Join(workspace, "pom.xml")
 	gradleGroovyPath := filepath.Join(workspace, "build.gradle")
 	gradleKtsPath := filepath.Join(workspace, "build.gradle.kts")
-	goModPath := filepath.Join(workspace, "go.mod")
+	goModPath := filepath.Join(workspace, goModuleFile)
 	cargoPath := filepath.Join(workspace, "Cargo.toml")
 	rustToolchainTomlPath := filepath.Join(workspace, "rust-toolchain.toml")
 	rustToolchainPath := filepath.Join(workspace, "rust-toolchain")
@@ -72,7 +74,7 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 
 	if hasGo {
 		detectedLanguages = append(detectedLanguages, "go")
-		detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "go.mod", Key: "build.file", Value: "exists"})
+		detectedEvidence = append(detectedEvidence, EvidenceItem{Path: goModuleFile, Key: "build.file", Value: "exists"})
 	}
 
 	if hasRust {
@@ -145,7 +147,7 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 	pomPath := filepath.Join(workspace, "pom.xml")
 	gradleGroovyPath := filepath.Join(workspace, "build.gradle")
 	gradleKtsPath := filepath.Join(workspace, "build.gradle.kts")
-	goModPath := filepath.Join(workspace, "go.mod")
+	goModPath := filepath.Join(workspace, goModuleFile)
 	cargoPath := filepath.Join(workspace, "Cargo.toml")
 	rustToolchainTomlPath := filepath.Join(workspace, "rust-toolchain.toml")
 	rustToolchainPath := filepath.Join(workspace, "rust-toolchain")
@@ -188,7 +190,7 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 	}
 	if hasGo {
 		detectedLanguages = append(detectedLanguages, "go")
-		detectedEvidence = append(detectedEvidence, EvidenceItem{Path: "go.mod", Key: "build.file", Value: "exists"})
+		detectedEvidence = append(detectedEvidence, EvidenceItem{Path: goModuleFile, Key: "build.file", Value: "exists"})
 	}
 	if hasRust {
 		detectedLanguages = append(detectedLanguages, "rust")

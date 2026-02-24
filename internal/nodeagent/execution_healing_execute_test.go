@@ -114,8 +114,8 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "test/main-mod:latest",
+		Name:  "Main mig",
+		Image: "test/main-mig:latest",
 		Inputs: []contracts.StepInput{
 			{
 				Name:        "workspace",
@@ -151,12 +151,12 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		t.Errorf("pre-gate logs = %q, want '[ERROR] Pre-gate failure\\n'", execResult.PreGate.Metadata.LogsText)
 	}
 
-	// Verify re-gate stats are captured (1 pre-mod re-gate + 1 post-mod gate = 2 total).
+	// Verify re-gate stats are captured (1 pre-mig re-gate + 1 post-mig gate = 2 total).
 	if len(execResult.ReGates) != 2 {
-		t.Fatalf("len(execResult.ReGates) = %d, want 2 (1 pre-mod re-gate + 1 post-mod gate)", len(execResult.ReGates))
+		t.Fatalf("len(execResult.ReGates) = %d, want 2 (1 pre-mig re-gate + 1 post-mig gate)", len(execResult.ReGates))
 	}
 
-	// First re-gate: pre-mod healing re-gate.
+	// First re-gate: pre-mig healing re-gate.
 	reGate := execResult.ReGates[0]
 	if reGate.Metadata == nil {
 		t.Fatal("re-gate metadata should not be nil")
@@ -170,10 +170,10 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		t.Errorf("re-gate logs = %q, want '[INFO] Re-gate success\\n'", reGate.Metadata.LogsText)
 	}
 
-	// Second re-gate: post-mod gate.
+	// Second re-gate: post-mig gate.
 	postGate := execResult.ReGates[1]
 	if postGate.Metadata == nil {
-		t.Fatal("post-mod gate metadata should not be nil")
+		t.Fatal("post-mig gate metadata should not be nil")
 	}
 
 	// Verify duration is tracked (should be >= 0).

@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createMigRunHandler creates a batch run from the mod + spec + selected repos and immediately starts it.
+// createMigRunHandler creates a batch run from the mig + spec + selected repos and immediately starts it.
 // Endpoint: POST /v1/migs/{mig_id}/runs
 // Request: {repo_selector: {mode, repos?}, created_by?}
 // Response: 201 Created with {run_id}
@@ -64,35 +64,35 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify mod exists and is not archived.
-		mod, err := st.GetMig(r.Context(), modID)
+		// Verify mig exists and is not archived.
+		mig, err := st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("create mod run: get mod failed", "mig_id", modID.String(), "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("create mig run: get mig failed", "mig_id", modID.String(), "err", err)
 			return
 		}
 
 		// Archived migs cannot be executed.
-		if mod.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot create run for archived mod")
+		if mig.ArchivedAt.Valid {
+			httpErr(w, http.StatusConflict, "cannot create run for archived mig")
 			return
 		}
 
 		// Validate migs.spec_id is non-NULL.
-		if mod.SpecID == nil {
-			httpErr(w, http.StatusBadRequest, "mod has no spec; set a spec before creating runs")
+		if mig.SpecID == nil {
+			httpErr(w, http.StatusBadRequest, "mig has no spec; set a spec before creating runs")
 			return
 		}
 
 		// Get the spec to use for job creation.
-		spec, err := st.GetSpec(r.Context(), *mod.SpecID)
+		spec, err := st.GetSpec(r.Context(), *mig.SpecID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to get spec: %v", err)
-			slog.Error("create mod run: get spec failed", "mig_id", modID.String(), "spec_id", *mod.SpecID, "err", err)
+			slog.Error("create mig run: get spec failed", "mig_id", modID.String(), "spec_id", *mig.SpecID, "err", err)
 			return
 		}
 
@@ -100,7 +100,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		selectedRepos, err := selectReposForRun(r.Context(), st, modID, req.RepoSelector.Mode, req.RepoSelector.Repos)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to select repos: %v", err)
-			slog.Error("create mod run: select repos failed", "mig_id", modID.String(), "mode", req.RepoSelector.Mode, "err", err)
+			slog.Error("create mig run: select repos failed", "mig_id", modID.String(), "mode", req.RepoSelector.Mode, "err", err)
 			return
 		}
 
@@ -115,12 +115,12 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
 			ID:        runID,
 			MigID:     modID,
-			SpecID:    *mod.SpecID,
+			SpecID:    *mig.SpecID,
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create run: %v", err)
-			slog.Error("create mod run: create run failed", "mig_id", modID.String(), "run_id", runID, "err", err)
+			slog.Error("create mig run: create run failed", "mig_id", modID.String(), "run_id", runID, "err", err)
 			return
 		}
 
@@ -137,7 +137,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			})
 			if err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-				slog.Error("create mod run: create run repo failed",
+				slog.Error("create mig run: create run repo failed",
 					"run_id", run.ID,
 					"repo_id", modRepo.ID,
 					"repo_url", modRepo.RepoUrl,
@@ -150,7 +150,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			// v1 immediate start: jobs are created and made immediately runnable.
 			if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
-				slog.Error("create mod run: create jobs failed",
+				slog.Error("create mig run: create jobs failed",
 					"run_id", run.ID,
 					"repo_id", runRepo.RepoID,
 					"err", err,
@@ -169,36 +169,36 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("create mod run: encode response failed", "err", err)
+			slog.Error("create mig run: encode response failed", "err", err)
 		}
 
-		slog.Info("mod run created",
+		slog.Info("mig run created",
 			"run_id", run.ID,
 			"mig_id", modID.String(),
-			"spec_id", *mod.SpecID,
+			"spec_id", *mig.SpecID,
 			"repo_count", len(selectedRepos),
 			"mode", req.RepoSelector.Mode,
 		)
 	}
 }
 
-// selectReposForRun selects mod repos based on the selection mode.
+// selectReposForRun selects mig repos based on the selection mode.
 // Returns a list of mig_repos to include in the run.
 //
 // Modes:
-// - "all": all repos in the mod's repo set
+// - "all": all repos in the mig's repo set
 // - "failed": repos whose last terminal run_repos status is 'Fail'
 // - "explicit": specific repos by URL (normalized for matching)
 func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.MigID, mode string, repoURLs []string) ([]store.MigRepo, error) {
-	// Get all repos for the mod.
+	// Get all repos for the mig.
 	allRepos, err := st.ListMigReposByMig(ctx, modID)
 	if err != nil {
-		return nil, fmt.Errorf("list mod repos: %w", err)
+		return nil, fmt.Errorf("list mig repos: %w", err)
 	}
 
 	switch mode {
 	case "all":
-		// Return all repos in the mod's repo set.
+		// Return all repos in the mig's repo set.
 		return allRepos, nil
 
 	case "failed":

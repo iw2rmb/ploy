@@ -25,7 +25,7 @@ import (
 // The job_meta field, when present, must be valid per contracts.UnmarshalJobMeta.
 // The metadata field contains string key-value pairs for run-level metadata merging.
 type JobStatsPayload struct {
-	// JobMeta is the structured gate/build/mod metadata to persist in jobs.meta JSONB.
+	// JobMeta is the structured gate/build/mig metadata to persist in jobs.meta JSONB.
 	// When present, it is validated via contracts.UnmarshalJobMeta before persisting.
 	// Empty/null values are treated as "no job meta" (not persisted).
 	JobMeta json.RawMessage `json:"job_meta,omitempty"`

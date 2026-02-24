@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TestModRunRepoRouting verifies that `mod run repo` dispatches to the correct handler.
+// TestModRunRepoRouting verifies that `mig run repo` dispatches to the correct handler.
 // Tests argument parsing without making HTTP calls (no t.Setenv, so t.Parallel is safe).
 func TestModRunRepoRouting(t *testing.T) {
 	t.Parallel()
@@ -23,12 +23,12 @@ func TestModRunRepoRouting(t *testing.T) {
 		{
 			name:    "no action shows usage",
 			args:    []string{"mig", "run", "repo"},
-			wantErr: "mod run repo action required",
+			wantErr: "mig run repo action required",
 		},
 		{
 			name:    "unknown action",
 			args:    []string{"mig", "run", "repo", "unknown"},
-			wantErr: `unknown mod run repo action "unknown"`,
+			wantErr: `unknown mig run repo action "unknown"`,
 		},
 		{
 			name:    "add without run-id",
@@ -87,7 +87,7 @@ func TestModRunRepoRouting(t *testing.T) {
 	}
 }
 
-// TestModRunRepoAddCallsControlPlane verifies that `mod run repo add` calls the correct endpoint.
+// TestModRunRepoAddCallsControlPlane verifies that `mig run repo add` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 	var called bool
@@ -130,7 +130,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo add error: %v", err)
+		t.Fatalf("mig run repo add error: %v", err)
 	}
 	if !called {
 		t.Fatal("expected POST /v1/runs/{id}/repos to be called")
@@ -179,7 +179,7 @@ func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 	}
 }
 
-// TestModRunRepoRemoveCallsControlPlane verifies that `mod run repo remove` calls the correct endpoint.
+// TestModRunRepoRemoveCallsControlPlane verifies that `mig run repo remove` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	var called bool
@@ -218,14 +218,14 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo remove error: %v", err)
+		t.Fatalf("mig run repo remove error: %v", err)
 	}
 	if !called {
 		t.Fatal("expected POST /v1/runs/{id}/repos/{repo_id}/cancel to be called")
 	}
 }
 
-// TestModRunRepoRestartCallsControlPlane verifies that `mod run repo restart` calls the correct endpoint.
+// TestModRunRepoRestartCallsControlPlane verifies that `mig run repo restart` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 	var called bool
@@ -267,7 +267,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo restart error: %v", err)
+		t.Fatalf("mig run repo restart error: %v", err)
 	}
 	if !called {
 		t.Fatal("expected POST /v1/runs/{id}/repos/{repo_id}/restart to be called")
@@ -278,7 +278,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestModRunRepoStatusCallsControlPlane verifies that `mod run repo status` calls the correct endpoint.
+// TestModRunRepoStatusCallsControlPlane verifies that `mig run repo status` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 	var called bool
@@ -327,14 +327,14 @@ func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "run", "repo", "status", "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo status error: %v", err)
+		t.Fatalf("mig run repo status error: %v", err)
 	}
 	if !called {
 		t.Fatal("expected GET /v1/runs/{id}/repos to be called")
 	}
 }
 
-// TestModRunRepoStatusEmptyBatch verifies that `mod run repo status` handles empty batches.
+// TestModRunRepoStatusEmptyBatch verifies that `mig run repo status` handles empty batches.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
 func TestModRunRepoStatusEmptyBatch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -356,7 +356,7 @@ func TestModRunRepoStatusEmptyBatch(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "run", "repo", "status", "empty-batch"}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo status error: %v", err)
+		t.Fatalf("mig run repo status error: %v", err)
 	}
 	// Should print "No repos found in this batch."
 	if !strings.Contains(buf.String(), "No repos found") {
@@ -519,7 +519,7 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo restart error: %v", err)
+		t.Fatalf("mig run repo restart error: %v", err)
 	}
 
 	// Verify base-ref was sent in request body.
@@ -567,7 +567,7 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 		"2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
 	}, buf)
 	if err != nil {
-		t.Fatalf("mod run repo restart error: %v", err)
+		t.Fatalf("mig run repo restart error: %v", err)
 	}
 
 	// Verify both refs were sent in request body.

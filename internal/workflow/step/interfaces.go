@@ -39,6 +39,6 @@ type ContainerRuntime interface {
 type DiffGenerator interface {
 	Generate(ctx context.Context, workspace string) ([]byte, error)
 	// GenerateBetween computes a diff between two directories (base and modified).
-	// Used by C2 to capture pre-mod healing changes (base clone → healed workspace).
+	// Used by C2 to capture pre-mig healing changes (base clone → healed workspace).
 	GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error)
 }

@@ -94,7 +94,7 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 
 	// Mod override rules (highest precedence).
 	modRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mod:17"},
+		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
 	}
 
 	tests := []struct {
@@ -104,10 +104,10 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 		wantImage    string
 	}{
 		{
-			name:         "mod overrides all",
+			name:         "mig overrides all",
 			defaultRules: defaultRules,
 			modRules:     modRules,
-			wantImage:    "mod:17",
+			wantImage:    "mig:17",
 		},
 		{
 			name:         "default when no overrides",
@@ -342,10 +342,10 @@ BuildGateImages:
 		t.Fatalf("WriteFile failed: %v", err)
 	}
 	modRules := []contracts.BuildGateImageRule{
-		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mod:17"},
+		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
 	}
 
-	t.Run("mod overrides default", func(t *testing.T) {
+	t.Run("mig overrides default", func(t *testing.T) {
 		resolver, err := NewBuildGateImageResolver(defaultFile, modRules, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
@@ -355,8 +355,8 @@ BuildGateImages:
 		if err != nil {
 			t.Fatalf("Resolve failed: %v", err)
 		}
-		if got != "mod:17" {
-			t.Errorf("Resolve() = %q, want %q (mod should override default)", got, "mod:17")
+		if got != "mig:17" {
+			t.Errorf("Resolve() = %q, want %q (mig should override default)", got, "mig:17")
 		}
 	})
 
@@ -376,7 +376,7 @@ BuildGateImages:
 	})
 
 	t.Run("default used for non-overridden stack", func(t *testing.T) {
-		// mod only overrides java:17, not java:11.
+		// mig only overrides java:17, not java:11.
 		resolver, err := NewBuildGateImageResolver(defaultFile, modRules, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)

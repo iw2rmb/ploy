@@ -4,7 +4,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// StageStatusFromStore converts store.JobStatus to mods API StageState.
+// StageStatusFromStore converts store.JobStatus to migs API StageState.
 func StageStatusFromStore(status store.JobStatus) StageState {
 	switch status {
 	case store.JobStatusCreated, store.JobStatusQueued:
@@ -22,7 +22,7 @@ func StageStatusFromStore(status store.JobStatus) StageState {
 	}
 }
 
-// RunStatusFromStore converts store.RunStatus to mods API RunState.
+// RunStatusFromStore converts store.RunStatus to migs API RunState.
 func RunStatusFromStore(status store.RunStatus) RunState {
 	switch status {
 	case store.RunStatusStarted:
@@ -36,7 +36,7 @@ func RunStatusFromStore(status store.RunStatus) RunState {
 	}
 }
 
-// StageStatusToStore converts mods API StageState to store.JobStatus.
+// StageStatusToStore converts migs API StageState to store.JobStatus.
 func StageStatusToStore(state StageState) store.JobStatus {
 	switch state {
 	case StageStatePending, StageStateQueued:
@@ -54,7 +54,7 @@ func StageStatusToStore(state StageState) store.JobStatus {
 	}
 }
 
-// RunStatusToStore converts mods API RunState to store.RunStatus.
+// RunStatusToStore converts migs API RunState to store.RunStatus.
 func RunStatusToStore(state RunState) store.RunStatus {
 	switch state {
 	case RunStatePending, RunStateRunning:

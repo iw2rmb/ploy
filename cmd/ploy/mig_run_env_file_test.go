@@ -247,7 +247,7 @@ func TestBuildSpecPayloadWithEnvFromFile(t *testing.T) {
 		specPath := filepath.Join(tmpDir, "spec.yaml")
 		specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 env:
   LITERAL_KEY: literal-value
 env_from_file:
@@ -295,7 +295,7 @@ env_from_file:
 		specPath := filepath.Join(tmpDir, "spec-inline.yaml")
 		specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 env:
   LITERAL_KEY: literal-value
   SECRET_KEY:
@@ -337,7 +337,7 @@ env:
 		specPath := filepath.Join(tmpDir, "spec-healing.yaml")
 		specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 build_gate:
   healing:
     retries: 1
@@ -363,7 +363,7 @@ build_gate:
 			t.Fatalf("unmarshal payload: %v", err)
 		}
 
-		// Navigate to build_gate.healing (flattened — no "mod" nesting)
+		// Navigate to build_gate.healing (flattened — no "mig" nesting)
 		buildGate, ok := result["build_gate"].(map[string]any)
 		if !ok {
 			t.Fatalf("expected build_gate in result")
@@ -395,7 +395,7 @@ build_gate:
 		specPath := filepath.Join(tmpDir, "spec-bad.yaml")
 		specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 env_from_file:
   BAD_KEY: /nonexistent/path/file.txt
 `
@@ -440,7 +440,7 @@ env_from_file:
 		specPath := filepath.Join(tmpDir, "spec-tilde.yaml")
 		specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 env_from_file:
   TILDE_AUTH: ` + tildePath + `
 `

@@ -23,7 +23,7 @@ Use the new names everywhere in the migrated contract:
 | `ModImage` / `mod_image` | `Image` / `job_image` (or `image` where schema already uses `image`) | `JobImage` |
 | `step_index` | `next_id` chain links | n/a |
 
-The legacy phase names `pre_gate`, `mod`, `post_gate`, and `re_gate` are not
+The legacy phase names `pre_gate`, `mig`, `post_gate`, and `re_gate` are not
 part of this new contract.
 
 ## Canonical `JobType` Values
@@ -54,6 +54,6 @@ Ordering is defined by link traversal, not by numeric sorting.
 ## References
 
 - `roadmap/next.md`
-- `roadmap/mig.md` (Phase 0 rename matrix and exclusions for `mod` -> `mig`)
+- `roadmap/mig.md` (Phase 0 rename matrix and exclusions for `mig` -> `mig`)
 - `docs/migs-lifecycle.md`
 - `docs/api/OpenAPI.yaml`

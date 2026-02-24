@@ -189,15 +189,15 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 }
 
 func TestCreateMigArtifactBundleHandler_Success(t *testing.T) {
-	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
+	t.Skip("mig-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
 func TestCreateMigArtifactBundleHandler_TooLarge(t *testing.T) {
-	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
+	t.Skip("mig-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
 func TestCreateMigArtifactBundleHandler_RunNotFound(t *testing.T) {
-	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
+	t.Skip("mig-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
 // legacy jobs tests removed with legacy endpoints.

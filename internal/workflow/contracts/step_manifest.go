@@ -88,7 +88,7 @@ type StepGateSpec struct {
 	Enabled bool
 	Env     map[string]string
 
-	// ImageOverrides holds mod-level image mapping overrides for gate execution.
+	// ImageOverrides holds mig-level image mapping overrides for gate execution.
 	// These rules override the default mapping file.
 	ImageOverrides []BuildGateImageRule
 
@@ -109,7 +109,7 @@ type StepGateSpec struct {
 	// on top of the cloned repo_url+ref baseline. Used by healing re-gates to
 	// verify accumulated workspace changes without shipping full archives.
 	//
-	// Set by runGateWithHealing when executing re-gates after healing mods.
+	// Set by runGateWithHealing when executing re-gates after healing migs.
 	// The diff captures all changes relative to the initial repo_url+ref clone.
 	DiffPatch []byte
 

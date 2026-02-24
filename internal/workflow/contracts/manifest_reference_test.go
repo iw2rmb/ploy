@@ -44,7 +44,7 @@ func TestManifestReferenceJSONStable(t *testing.T) {
 }
 
 func TestStageNameJSONRoundtrip(t *testing.T) {
-	var want StageName = "mods-plan"
+	var want StageName = "migs-plan"
 	payload, err := json.Marshal(want)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)

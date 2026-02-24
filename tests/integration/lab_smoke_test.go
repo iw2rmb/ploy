@@ -31,7 +31,7 @@ func TestLabSmoke(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create v1 entities: spec → mod → mod_repo → run → run_repo.
+	// Step 1: Create v1 entities: spec → mig → mod_repo → run → run_repo.
 	createdBy := "smoke-test"
 	specJSON := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
 	specID := domaintypes.NewSpecID()

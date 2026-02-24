@@ -15,12 +15,12 @@ import (
 // POST /v1/runs — Create Single-Repo Run (v1 API)
 // =============================================================================
 
-// TestRunsCreateSingleRepo_Success verifies POST /v1/runs creates a run with mod side-effect.
-// Tests single-repo run creation with automatic mod project creation.
+// TestRunsCreateSingleRepo_Success verifies POST /v1/runs creates a run with mig side-effect.
+// Tests single-repo run creation with automatic mig project creation.
 // Contract:
-//   - Creates a mod project (mod name == mod id).
+//   - Creates a mig project (mig name == mig id).
 //   - Creates a spec row and sets migs.spec_id.
-//   - Creates a mod repo row for the provided repo_url.
+//   - Creates a mig repo row for the provided repo_url.
 //   - Creates a run and run repo row and enqueues jobs.
 //   - Response includes run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
@@ -31,7 +31,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -71,15 +71,15 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 		t.Error("store.CreateJob was not called (jobs should be created immediately)")
 	}
 
-	// Verify mod name == mod id (v1 contract).
+	// Verify mig name == mig id (v1 contract).
 	if st.createMigParams.Name != st.createMigParams.ID.String() {
-		t.Errorf("mod name (%q) != mod id (%q); v1 requires name == id for single-repo runs",
+		t.Errorf("mig name (%q) != mig id (%q); v1 requires name == id for single-repo runs",
 			st.createMigParams.Name, st.createMigParams.ID.String())
 	}
 
-	// Verify spec_id was linked to mod.
+	// Verify spec_id was linked to mig.
 	if st.createMigParams.SpecID == nil {
-		t.Error("mod was not linked to spec (spec_id is nil)")
+		t.Error("mig was not linked to spec (spec_id is nil)")
 	}
 
 	// Verify response shape matches v1 contract.
@@ -112,7 +112,7 @@ func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -161,7 +161,7 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	// URL with trailing slash and .git suffix — should be normalized.
 	reqBody := map[string]any{
@@ -201,7 +201,7 @@ func TestRunsCreateSingleRepo_MissingRepoURL(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"base_ref":   "main",
@@ -235,7 +235,7 @@ func TestRunsCreateSingleRepo_InvalidRepoURLScheme(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	// ftp:// is not an allowed scheme.
 	reqBody := map[string]any{
@@ -265,7 +265,7 @@ func TestRunsCreateSingleRepo_MissingBaseRef(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -293,7 +293,7 @@ func TestRunsCreateSingleRepo_MissingTargetRef(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url": "https://github.com/org/repo",
@@ -341,12 +341,12 @@ func TestRunsCreateSingleRepo_InvalidSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := createSingleRepoRunHandler(st, nil)
 
-	// Legacy spec shape with "mod" key is rejected.
+	// Legacy spec shape with "mig" key is rejected.
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
 		"base_ref":   "main",
 		"target_ref": "feature",
-		"spec":       map[string]any{"mod": map[string]any{"command": "echo hello"}},
+		"spec":       map[string]any{"mig": map[string]any{"command": "echo hello"}},
 	}
 	body, _ := json.Marshal(reqBody)
 
@@ -391,7 +391,7 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -435,8 +435,8 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 		"version": "0.2.0",
 		"env":     map[string]any{},
 		"steps": []any{
-			map[string]any{"image": "mod-image-1"},
-			map[string]any{"image": "mod-image-2"},
+			map[string]any{"image": "mig-image-1"},
+			map[string]any{"image": "mig-image-2"},
 		},
 	}
 	reqBody := map[string]any{
@@ -457,7 +457,7 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
 	}
 
-	// Multi-step spec creates: pre-gate + mod-0 + mod-1 + post-gate = 4 jobs.
+	// Multi-step spec creates: pre-gate + mig-0 + mig-1 + post-gate = 4 jobs.
 	expectedJobCount := 4
 	if st.createJobCallCount != expectedJobCount {
 		t.Errorf("createJobCallCount = %d, want %d", st.createJobCallCount, expectedJobCount)
@@ -478,7 +478,7 @@ func TestRunsCreateSingleRepo_CreateSpecError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -509,7 +509,7 @@ func TestRunsCreateSingleRepo_CreateMigError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -540,7 +540,7 @@ func TestRunsCreateSingleRepo_CreateMigRepoError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -571,7 +571,7 @@ func TestRunsCreateSingleRepo_CreateRunError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -602,7 +602,7 @@ func TestRunsCreateSingleRepo_CreateRunRepoError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",
@@ -633,7 +633,7 @@ func TestRunsCreateSingleRepo_CreateJobError(t *testing.T) {
 	spec := map[string]any{
 		"version": "0.2.0",
 		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mod:latest"}},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{
 		"repo_url":   "https://github.com/org/repo",

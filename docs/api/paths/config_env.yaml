@@ -13,8 +13,8 @@ get:
     CA bundles, and API keys without embedding them in every spec file.
 
     **Scope semantics:**
-    - `all` — Inject into every job type (mod, heal, pre_gate, re_gate, post_gate)
-    - `mods` — Inject into `mod` and `post_gate` jobs (code modification phases)
+    - `all` — Inject into every job type (mig, heal, pre_gate, re_gate, post_gate)
+    - `migs` — Inject into `mig` and `post_gate` jobs (code modification phases)
     - `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
     - `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate execution phases)
 

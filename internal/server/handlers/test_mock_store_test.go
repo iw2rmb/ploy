@@ -454,7 +454,7 @@ type mockStore struct {
 	listRunReposWithURLByRunResult []store.ListRunReposWithURLByRunRow
 	listRunReposWithURLByRunErr    error
 
-	// GetLatestRunRepoByMigAndRepoStatus tracking (for mod pull resolution)
+	// GetLatestRunRepoByMigAndRepoStatus tracking (for mig pull resolution)
 	getLatestRunRepoByModAndRepoStatusCalled bool
 	getLatestRunRepoByModAndRepoStatusParams store.GetLatestRunRepoByMigAndRepoStatusParams
 	getLatestRunRepoByModAndRepoStatusResult store.GetLatestRunRepoByMigAndRepoStatusRow
@@ -577,7 +577,7 @@ func (m *mockStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, erro
 		result.ID = id
 	}
 	if result.Name == "" {
-		result.Name = "mod-" + id.String()
+		result.Name = "mig-" + id.String()
 	}
 	return result, nil
 }
@@ -1341,7 +1341,7 @@ func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID types.Ru
 	return m.listRunReposWithURLByRunResult, m.listRunReposWithURLByRunErr
 }
 
-// GetLatestRunRepoByMigAndRepoStatus returns the latest run_repos row for a repo in a mod filtered by status.
+// GetLatestRunRepoByMigAndRepoStatus returns the latest run_repos row for a repo in a mig filtered by status.
 func (m *mockStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
 	m.getLatestRunRepoByModAndRepoStatusCalled = true
 	m.getLatestRunRepoByModAndRepoStatusParams = arg

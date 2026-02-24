@@ -239,7 +239,7 @@ func (s *Service) publishLogToHubWithBytes(ctx context.Context, runID domaintype
 }
 
 // jobContext holds execution context extracted from job metadata.
-// Used to enrich log records with node and mod information.
+// Used to enrich log records with node and mig information.
 // Uses domain types to preserve type safety end-to-end without lossy casts.
 type jobContext struct {
 	NodeID  domaintypes.NodeID

@@ -47,7 +47,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		}
 		step := typedOpts.Steps[stepIdx]
 		if step.Stack != nil {
-			// Get mod-level images from BuildGate config for image resolution.
+			// Get mig-level images from BuildGate config for image resolution.
 			modImages := typedOpts.BuildGate.Images
 
 			switch req.JobType {
@@ -130,7 +130,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	// Persist the detected stack for this run so mod and healing jobs can
+	// Persist the detected stack for this run so mig and healing jobs can
 	// resolve stack-specific images consistently. This is done for all gate
 	// results (pass or fail) to ensure deterministic image selection.
 	r.persistGateStack(req.RunID, gateResult)
@@ -319,7 +319,7 @@ func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
 }
 
 // persistGateStack writes the detected stack from a gate result to a stable
-// per-run path under the node's cache/temp home. This allows mod and healing
+// per-run path under the node's cache/temp home. This allows mig and healing
 // jobs to resolve stack-specific images consistently, even when executed as
 // separate jobs on the same or different nodes.
 //
@@ -363,7 +363,7 @@ func (r *runController) persistGateStack(runID types.RunID, meta *contracts.Buil
 // loadPersistedStack reads the persisted stack for a run from the node's
 // cache/temp home. Returns ModStackUnknown if no stack file exists or on error.
 //
-// This allows mod and healing jobs to use the same stack detected during the
+// This allows mig and healing jobs to use the same stack detected during the
 // initial gate execution, ensuring deterministic image selection across jobs.
 func (r *runController) loadPersistedStack(runID types.RunID) contracts.ModStack {
 	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
@@ -453,8 +453,8 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 // Uploads gate logs as artifact bundles for debugging.
 //
 // final_gate semantics:
-//   - When a post-mod gate exists (result.BuildGate != nil), final_gate is the last post-mod gate.
-//   - When no mods executed (no BuildGate), final_gate falls back to the pre-mod gate, ensuring
+//   - When a post-mig gate exists (result.BuildGate != nil), final_gate is the last post-mig gate.
+//   - When no migs executed (no BuildGate), final_gate falls back to the pre-mig gate, ensuring
 //     CLI/API gate summaries always have a final_gate to report on.
 //   - This keeps gate summary behavior consistent: final_gate → last re-gate → pre_gate.
 func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult) *types.RunStatsGate {
@@ -505,7 +505,7 @@ func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, res
 		gate.PreGate = buildGatePhase(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre")
 	}
 
-	// Include re-gate stats if present (healing attempts from both pre- and post-mod phases
+	// Include re-gate stats if present (healing attempts from both pre- and post-mig phases
 	// in chronological order).
 	if len(execResult.ReGates) > 0 {
 		gate.ReGates = make([]types.RunStatsGatePhase, 0, len(execResult.ReGates))
@@ -517,14 +517,14 @@ func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, res
 		}
 	}
 
-	// Populate final_gate: use the post-mod gate (result.BuildGate) when present,
-	// otherwise fall back to the pre-mod gate (for runs where no mods executed).
+	// Populate final_gate: use the post-mig gate (result.BuildGate) when present,
+	// otherwise fall back to the pre-mig gate (for runs where no migs executed).
 	// This ensures CLI/API gate summaries always have a final_gate to report on.
 	if result.BuildGate != nil {
 		gate.FinalGate = buildGatePhase(result.BuildGate, time.Duration(result.Timings.BuildGateDuration).Milliseconds(), "")
 	} else if execResult.PreGate != nil {
-		// No post-mod gate executed (run terminated at pre-mod phase or no mods).
-		// Use the pre-mod gate as the final gate for consistent summary output.
+		// No post-mig gate executed (run terminated at pre-mig phase or no migs).
+		// Use the pre-mig gate as the final gate for consistent summary output.
 		gate.FinalGate = buildGatePhase(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre-as-final")
 	}
 

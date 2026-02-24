@@ -228,22 +228,22 @@ func isCodexHealingImage(image string) bool {
 }
 
 // buildHealingManifest constructs a StepManifest from a typed ModContainerSpec.
-// The healing mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
+// The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // When codexSession is non-empty and the image is Codex-based, CODEX_RESUME=1 is injected.
-func buildHealingManifest(req StartRunRequest, mod ModContainerSpec, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
+func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
 
-	image, err := resolveImage(mod.Image, stack, fmt.Sprintf("healing mod[%d]", index))
+	image, err := resolveImage(mig.Image, stack, fmt.Sprintf("healing mig[%d]", index))
 	if err != nil {
 		return contracts.StepManifest{}, err
 	}
 
-	command := mod.Command.ToSlice()
+	command := mig.Command.ToSlice()
 
-	env := make(map[string]string, len(mod.Env)+4)
-	for k, v := range mod.Env {
+	env := make(map[string]string, len(mig.Env)+4)
+	for k, v := range mig.Env {
 		env[k] = v
 	}
 	injectRepoMetadataEnv(env, req)
@@ -256,7 +256,7 @@ func buildHealingManifest(req StartRunRequest, mod ModContainerSpec, index int, 
 
 	manifest := contracts.StepManifest{
 		ID:         healingStepID,
-		Name:       fmt.Sprintf("Healing mod %d for run %s", index, req.RunID),
+		Name:       fmt.Sprintf("Healing mig %d for run %s", index, req.RunID),
 		Image:      image,
 		Command:    command,
 		WorkingDir: "/workspace",
@@ -270,7 +270,7 @@ func buildHealingManifest(req StartRunRequest, mod ModContainerSpec, index int, 
 			},
 		},
 		Retention: contracts.StepRetentionSpec{
-			RetainContainer: mod.RetainContainer,
+			RetainContainer: mig.RetainContainer,
 			TTL:             types.Duration(time.Hour),
 		},
 		Options: map[string]any{

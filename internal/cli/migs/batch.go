@@ -1,4 +1,4 @@
-// Package mods provides CLI client implementations for Mods operations.
+// Package migs provides CLI client implementations for Mods operations.
 // This file implements the batch run lifecycle client for create/list/stop/status
 // operations against the control-plane /v1/runs endpoints.
 //

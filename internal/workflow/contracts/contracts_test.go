@@ -67,7 +67,7 @@ func TestWorkflowRunValidate(t *testing.T) {
 		Repo: RepoMaterialization{
 			URL:       types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
 			BaseRef:   types.GitRef("main"),
-			TargetRef: types.GitRef("mods/example-grid"),
+			TargetRef: types.GitRef("migs/example-grid"),
 		},
 	}
 	if err := withRepo.Validate(); err != nil {

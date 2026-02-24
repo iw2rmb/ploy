@@ -16,7 +16,7 @@ func TestBuildSpecPayloadCLIOverrides(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
 steps:
-  - image: docker.io/test/mod:v1
+  - image: docker.io/test/mig:v1
 env:
   KEY1: from_spec
   KEY2: value2
@@ -31,7 +31,7 @@ gitlab_domain: gitlab.com
 	payload, err := buildSpecPayload(
 		specPath,
 		modEnvs,
-		"docker.io/test/mod:v2", // override image
+		"docker.io/test/mig:v2", // override image
 		true,                    // retain
 		"",
 		"glpat-test",         // gitlab_pat
@@ -57,8 +57,8 @@ gitlab_domain: gitlab.com
 	if !ok {
 		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
 	}
-	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:v2" {
-		t.Errorf("expected steps[0].image=docker.io/test/mod:v2 (CLI override), got %v", step0["image"])
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mig:v2" {
+		t.Errorf("expected steps[0].image=docker.io/test/mig:v2 (CLI override), got %v", step0["image"])
 	}
 
 	// Verify CLI override for env
@@ -104,7 +104,7 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 	payload, err := buildSpecPayload(
 		"",
 		[]string{"KEY1=value1"},
-		"docker.io/test/mod:latest",
+		"docker.io/test/mig:latest",
 		false,
 		"",
 		"",
@@ -130,8 +130,8 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
 	}
-	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-		t.Errorf("expected steps[0].image=docker.io/test/mod:latest, got %v", step0["image"])
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mig:latest" {
+		t.Errorf("expected steps[0].image=docker.io/test/mig:latest, got %v", step0["image"])
 	}
 
 	if env, ok := result["env"].(map[string]any); ok {
@@ -235,7 +235,7 @@ func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
 
 			modImage := ""
 			if tt.gitlabPAT != "" || strings.TrimSpace(tt.specContent) != "" || tt.gitlabDomain != "" {
-				modImage = "docker.io/test/mod:latest"
+				modImage = "docker.io/test/mig:latest"
 			}
 			payload, err := buildSpecPayload(
 				specFile,
@@ -289,7 +289,7 @@ func TestBuildSpecPayloadGitLabDomainDefaultingWithMRFlags(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 env:
   KEY1: value1
 `
@@ -347,7 +347,7 @@ env:
 	if !ok {
 		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
 	}
-	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mig:latest" {
 		t.Errorf("expected steps[0].image from spec to be preserved, got %v", step0["image"])
 	}
 }
@@ -364,7 +364,7 @@ func TestBuildSpecPayload_EnvFromFile_Router(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := strings.ReplaceAll(`
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 build_gate:
   healing:
     retries: 1
@@ -408,7 +408,7 @@ func TestBuildSpecPayload_EnvFromFile_FlattenedHealing(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := strings.ReplaceAll(`
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 build_gate:
   healing:
     retries: 1

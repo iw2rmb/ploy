@@ -28,32 +28,32 @@ version = "2025-09-26"
 summary = "ok"
 
 [topology]
-description = "Standard mods topology"
+description = "Standard migs topology"
 [[topology.allow]]
-from = "mods-api"
-to = "mods-postgres"
+from = "migs-api"
+to = "migs-postgres"
 
 [[services]]
-name = "mods-postgres"
+name = "migs-postgres"
 kind = "postgres"
 [services.identity]
-dns = "mods-postgres.svc.local"
+dns = "migs-postgres.svc.local"
 [[services.ports]]
 name = "psql"
 port = 5432
 protocol = "tcp"
 
 [[services]]
-name = "mods-api"
+name = "migs-api"
 kind = "http"
 [services.identity]
-dns = "mods-api.svc.local"
+dns = "migs-api.svc.local"
 [[services.ports]]
 name = "http"
 port = 8080
 protocol = "tcp"
 [[services.requires]]
-target = "mods-postgres"
+target = "migs-postgres"
 edge = "api->postgres"
 
 [fixtures]
@@ -67,8 +67,8 @@ name = "go-native"
 reason = "baseline"
 
 [[edges]]
-source = "mods-api"
-target = "mods-postgres"
+source = "migs-api"
+target = "migs-postgres"
 ports = ["psql"]
 protocols = ["tcp"]
 `
@@ -95,43 +95,43 @@ version = "2025-09-26"
 summary = "rewrite"
 
 [topology]
-description = "Standard mods topology"
+description = "Standard migs topology"
 [[topology.allow]]
-from = "mods-api"
-to = "mods-postgres"
+from = "migs-api"
+to = "migs-postgres"
 
 [[services]]
-name = "mods-redis"
+name = "migs-redis"
 kind = "redis"
 optional = true
 [services.identity]
-dns = "mods-redis.svc.local"
+dns = "migs-redis.svc.local"
 [[services.ports]]
 name = "tcp"
 port = 6379
 protocol = "tcp"
 
 [[services]]
-name = "mods-api"
+name = "migs-api"
 kind = "http"
 [services.identity]
-dns = "mods-api.svc.local"
+dns = "migs-api.svc.local"
 [[services.ports]]
 name = "http"
 port = 8080
 protocol = "tcp"
 [[services.requires]]
-target = "mods-postgres"
+target = "migs-postgres"
 edge = "api->postgres"
 [[services.requires]]
-target = "mods-redis"
+target = "migs-redis"
 edge = "api->redis"
 
 [[services]]
-name = "mods-postgres"
+name = "migs-postgres"
 kind = "postgres"
 [services.identity]
-dns = "mods-postgres.svc.local"
+dns = "migs-postgres.svc.local"
 [[services.ports]]
 name = "psql"
 port = 5432
@@ -148,14 +148,14 @@ name = "go-native"
 reason = "baseline"
 
 [[edges]]
-source = "mods-api"
-target = "mods-postgres"
+source = "migs-api"
+target = "migs-postgres"
 ports = ["psql"]
 protocols = ["tcp"]
 
 [[edges]]
-source = "mods-api"
-target = "mods-redis"
+source = "migs-api"
+target = "migs-redis"
 ports = ["tcp"]
 protocols = ["tcp"]
 `

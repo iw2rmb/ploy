@@ -58,7 +58,7 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 
 // claimAndExecute attempts to claim a job from the unified queue and execute it.
 // Jobs are claimed FIFO by next_id from a single queue — there is no separate
-// Build Gate queue or claim path. All job types (pre-gate, mod, heal, re-gate,
+// Build Gate queue or claim path. All job types (pre-gate, mig, heal, re-gate,
 // post-gate) are consumed from the same queue.
 // Returns true if a job was claimed, false if no work is available (204).
 //

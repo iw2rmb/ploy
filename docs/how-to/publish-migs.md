@@ -17,7 +17,7 @@ Overview
 - The runner pulls images from Docker Hub by default: `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Stack-aware images
-- Use the stack-aware `image` map in `mod.yaml` to select `orw-maven` or `orw-gradle` based on the Build Gate detected stack:
+- Use the stack-aware `image` map in `mig.yaml` to select `orw-maven` or `orw-gradle` based on the Build Gate detected stack:
   ```yaml
   image:
     default: $PLOY_CONTAINER_REGISTRY/migs-orw-maven:latest
@@ -35,7 +35,7 @@ Prerequisites
 Publish all Mods images
 ```bash
 deploy/images/build-and-push-migs.sh
-# Discovers mods subfolders, builds for linux/amd64, and pushes :latest to Docker Hub.
+# Discovers migs subfolders, builds for linux/amd64, and pushes :latest to Docker Hub.
 # Special-cases mig-codex to use repo-root context automatically.
 ```
 

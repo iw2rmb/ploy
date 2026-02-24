@@ -24,7 +24,7 @@ type CreateRunParams struct {
 	CreatedBy *string      `json:"created_by"`
 }
 
-// v1: Creates a new run for a mod + spec snapshot. Runs are created in Started state.
+// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,

@@ -10,7 +10,7 @@ import (
 // handleMigRun executes the Mods-specific run command.
 // Routes to batch lifecycle subcommands (list/stop/start), repo
 // subcommands when args[0] matches a known action. Otherwise executes
-// the standard mod run workflow for single-repo run submission.
+// the standard mig run workflow for single-repo run submission.
 //
 // Batch lifecycle commands:
 //   - list: Lists runs with status and repo counts.
@@ -24,7 +24,7 @@ func handleMigRun(args []string, stderr io.Writer) error {
 	return executeModRun(args, stderr)
 }
 
-// executeModRun orchestrates the full mod run workflow:
+// executeModRun orchestrates the full mig run workflow:
 // 1. Parse CLI flags
 // 2. Build and submit run request
 // 3. Follow run logs/events (if requested)

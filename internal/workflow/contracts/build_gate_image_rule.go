@@ -83,7 +83,7 @@ func (r BuildGateImageRule) SelectorKey() string {
 }
 
 // BuildGateImageMapping holds rules from a single source for validation.
-// Each precedence level (default file, cluster inline, mod override) has
+// Each precedence level (default file, cluster inline, mig override) has
 // its own mapping that is validated independently before merging.
 type BuildGateImageMapping struct {
 	// Images holds the image rules from this source.

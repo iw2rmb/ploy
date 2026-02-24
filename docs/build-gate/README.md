@@ -7,17 +7,17 @@ Scope
 ## Overview: Unified Jobs Pipeline
 
 Build Gate validation runs as part of the **unified jobs pipeline**. Gate jobs are
-stored in the `jobs` table alongside mod and healing jobs, and nodes claim work
+stored in the `jobs` table alongside mig and healing jobs, and nodes claim work
 from a single queue with chain progression driven by `next_id`. There is no dedicated Build Gate
 queue or separate worker mode—all nodes pull from the same jobs queue.
 
 **Key characteristics:**
 - **Single queue:** Gate jobs (`pre-gate`, `post-gate`, `re-gate`) are stored in the
-  `jobs` table with the same schema as mod jobs.
+  `jobs` table with the same schema as mig jobs.
 - **Docker-based execution:** Gates execute locally on the claiming node via Docker
   containers. There is no remote HTTP Build Gate mode.
 - **Chain progression:** Jobs advance through `next_id` successor links, ensuring
-  sequential execution of pre-gate → mod → post-gate flows.
+  sequential execution of pre-gate → mig → post-gate flows.
 - **Workspace semantics:** Gate validation runs against the local workspace on the
   node. For re-gates after healing, the workspace already contains accumulated changes.
 
@@ -76,7 +76,7 @@ flow details.
 
 ## Gate Configuration
 
-Gates are configured via the mod spec and environment variables on worker nodes.
+Gates are configured via the mig spec and environment variables on worker nodes.
 
 **Spec configuration:**
 ```yaml
@@ -186,7 +186,7 @@ The gate does not modify the repository; it validates the current working tree.
 
 Healing containers receive environment variables from the node agent to support
 Build Gate verification. Since gate execution is local (no HTTP API), these variables
-provide repository metadata for healing mods that need Git baseline information.
+provide repository metadata for healing migs that need Git baseline information.
 
 **Repo metadata (injected from StartRunRequest):**
 - `PLOY_REPO_URL` — Git repository URL for the Mods run.

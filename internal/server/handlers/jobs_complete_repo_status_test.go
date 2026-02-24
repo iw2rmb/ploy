@@ -21,7 +21,7 @@ import (
 func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 2000)
+	f := newJobFixture("mig", 2000)
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
@@ -42,9 +42,9 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
-				Name:        "mod-0",
+				Name:        "mig-0",
 				Status:      store.JobStatusSuccess,
-				JobType:     "mod",
+				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
 		},
@@ -105,7 +105,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 func TestCompleteJob_RepoStatusFail(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 2000)
+	f := newJobFixture("mig", 2000)
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
@@ -125,9 +125,9 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
-				Name:        "mod-0",
+				Name:        "mig-0",
 				Status:      store.JobStatusFail,
-				JobType:     "mod",
+				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
 		},
@@ -184,9 +184,9 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 		RepoID:      f.Job.RepoID,
 		RepoBaseRef: "main",
 		Attempt:     1,
-		Name:        "mod-0",
+		Name:        "mig-0",
 		Status:      store.JobStatusCreated,
-		JobType:     "mod",
+		JobType:     "mig",
 		Meta:        withNextIDMeta([]byte(`{}`), 2000),
 	}
 
@@ -216,9 +216,9 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
-				Name:        "mod-0",
+				Name:        "mig-0",
 				Status:      store.JobStatusCreated,
-				JobType:     "mod",
+				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
 		},
@@ -315,9 +315,9 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
-				Name:        "mod-0",
+				Name:        "mig-0",
 				Status:      store.JobStatusSuccess,
-				JobType:     "mod",
+				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
 			// Last job: post-gate succeeded.
@@ -417,7 +417,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 2000)
+	f := newJobFixture("mig", 2000)
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
@@ -440,9 +440,9 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 				RepoID:      f.Job.RepoID,
 				RepoBaseRef: "main",
 				Attempt:     1,
-				Name:        "mod-0",
+				Name:        "mig-0",
 				Status:      store.JobStatusSuccess,
-				JobType:     "mod",
+				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
 		},
@@ -486,7 +486,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
@@ -511,7 +511,7 @@ func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {
 func TestCompleteJob_RejectsV0StatusFailed(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 
@@ -536,7 +536,7 @@ func TestCompleteJob_RejectsV0StatusFailed(t *testing.T) {
 func TestCompleteJob_RejectsV0StatusCanceled(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mod", 1000)
+	f := newJobFixture("mig", 1000)
 	st := &mockStore{}
 	handler := completeJobHandler(st, nil)
 

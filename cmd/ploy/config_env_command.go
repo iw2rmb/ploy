@@ -51,7 +51,7 @@ func printConfigEnvUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  list                            List all global environment variables")
 	_, _ = fmt.Fprintln(w, "  show --key <NAME> [--raw]       Show a specific environment variable")
 	_, _ = fmt.Fprintln(w, "  set --key <NAME> (--value <STRING> | --file <PATH>)")
-	_, _ = fmt.Fprintln(w, "                                  [--scope mods|heal|gate|all] [--secret=true|false]")
+	_, _ = fmt.Fprintln(w, "                                  [--scope migs|heal|gate|all] [--secret=true|false]")
 	_, _ = fmt.Fprintln(w, "                                  Set an environment variable")
 	_, _ = fmt.Fprintln(w, "  unset --key <NAME>              Delete an environment variable")
 }
@@ -273,7 +273,7 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 	fs.Var(&key, "key", "Environment variable name (required)")
 	fs.Var(&value, "value", "Inline value (mutually exclusive with --file)")
 	fs.Var(&file, "file", "Path to file containing value (mutually exclusive with --value)")
-	fs.StringVar(&scope, "scope", "all", "Scope: mods, heal, gate, all")
+	fs.StringVar(&scope, "scope", "all", "Scope: migs, heal, gate, all")
 	fs.Var(&secret, "secret", "Mark value as secret (default: true)")
 
 	if err := fs.Parse(args); err != nil {
@@ -372,12 +372,12 @@ func printConfigEnvSetUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --key      Environment variable name (required)")
 	_, _ = fmt.Fprintln(w, "  --value    Inline value (mutually exclusive with --file)")
 	_, _ = fmt.Fprintln(w, "  --file     Path to file containing value (mutually exclusive with --value)")
-	_, _ = fmt.Fprintln(w, "  --scope    Scope: mods, heal, gate, all (default: all)")
+	_, _ = fmt.Fprintln(w, "  --scope    Scope: migs, heal, gate, all (default: all)")
 	_, _ = fmt.Fprintln(w, "  --secret   Mark value as secret (default: true)")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
 	_, _ = fmt.Fprintln(w, "  ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all")
-	_, _ = fmt.Fprintln(w, "  ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope mods")
+	_, _ = fmt.Fprintln(w, "  ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope migs")
 	_, _ = fmt.Fprintln(w, "  ploy config env set --key OPENAI_API_KEY --value sk-... --scope all")
 }
 

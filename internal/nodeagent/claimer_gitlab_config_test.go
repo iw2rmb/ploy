@@ -11,7 +11,7 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 	t.Parallel()
 
 	spec := json.RawMessage(`{
-		"steps": [{"image": "docker.io/test/mod:latest"}],
+		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"job_id": "` + testKSUID + `",
 		"gitlab_pat": "server-default-token",
 		"gitlab_domain": "https://gitlab.example.com"
@@ -46,7 +46,7 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	t.Parallel()
 
 	spec := json.RawMessage(`{
-		"steps": [{"image": "docker.io/test/mod:latest"}],
+		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"job_id": "` + testKSUID + `",
 		"gitlab_pat": "server-default-token",
 		"gitlab_domain": "https://gitlab.example.com",

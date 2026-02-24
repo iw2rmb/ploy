@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Multi-step mods E2E scenario runner
+# Multi-step migs E2E scenario runner
 #
-# This script demonstrates submission of a multi-step mod spec with sequential
-# transformation steps (Java 8 → Java 11 → Java 17). The spec uses the mods[]
+# This script demonstrates submission of a multi-step mig spec with sequential
+# transformation steps (Java 8 → Java 11 → Java 17). The spec uses the migs[]
 # array format with global build_gate and build_gate_healing policy.
 #
 # Prerequisites:
@@ -36,7 +36,7 @@ fi
 # Configuration (override via environment variables)
 REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 REPO_BASE_REF="${REPO_BASE_REF:-main}"
-REPO_TARGET_REF="${REPO_TARGET_REF:-java6-multy-mod}"
+REPO_TARGET_REF="${REPO_TARGET_REF:-java6-multy-mig}"
 SPEC_FILE="$(dirname "$0")/mig.yaml"
 
 echo "=========================================="

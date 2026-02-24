@@ -42,7 +42,7 @@ func (p *SimplePrinter) Stage(s modsapi.StageStatus) {
 
 // EventsCommand streams run events until a terminal state is reached.
 // When LogPrinter is set, also handles "log" events using the shared log printer
-// for unified log output alongside run/stage updates (used by `mod run --follow`).
+// for unified log output alongside run/stage updates (used by `mig run --follow`).
 // Uses domain type (RunID) for type-safe identification.
 type EventsCommand struct {
 	Client  stream.Client
@@ -62,14 +62,14 @@ type EventsCommand struct {
 // run state. When LogPrinter is set, "log" events are rendered using the shared printer.
 func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if c.Client.HTTPClient == nil {
-		return "", errors.New("mods events: http client required")
+		return "", errors.New("migs events: http client required")
 	}
 	if c.BaseURL == nil {
-		return "", errors.New("mods events: base url required")
+		return "", errors.New("migs events: base url required")
 	}
 	// Use domain type's IsZero method for validation.
 	if c.RunID.IsZero() {
-		return "", errors.New("mods events: run id required")
+		return "", errors.New("migs events: run id required")
 	}
 	runID := c.RunID.String()
 	out := c.Output
@@ -100,7 +100,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 		case "run":
 			var t modsapi.RunSummary
 			if err := json.Unmarshal(evt.Data, &t); err != nil {
-				return fmt.Errorf("mods events: decode run: %w", err)
+				return fmt.Errorf("migs events: decode run: %w", err)
 			}
 			printer.Run(t)
 			if isTerminalRunState(t.State) {
@@ -113,7 +113,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 				Stage modsapi.StageStatus `json:"stage"`
 			}
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
-				return fmt.Errorf("mods events: decode stage: %w", err)
+				return fmt.Errorf("migs events: decode stage: %w", err)
 			}
 			printer.Stage(payload.Stage)
 		case "log":
@@ -121,7 +121,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 			if logPrinter != nil && len(evt.Data) > 0 {
 				var rec logstream.LogRecord
 				if err := json.Unmarshal(evt.Data, &rec); err != nil {
-					return fmt.Errorf("mods events: decode log: %w", err)
+					return fmt.Errorf("migs events: decode log: %w", err)
 				}
 				logPrinter.PrintLog(rec)
 			}
@@ -131,7 +131,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 			if logPrinter != nil && len(evt.Data) > 0 {
 				var hint logstream.RetentionHint
 				if err := json.Unmarshal(evt.Data, &hint); err != nil {
-					return fmt.Errorf("mods events: decode retention: %w", err)
+					return fmt.Errorf("migs events: decode retention: %w", err)
 				}
 				logPrinter.RecordRetention(hint)
 			}

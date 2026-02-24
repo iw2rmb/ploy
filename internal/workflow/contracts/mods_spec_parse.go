@@ -38,7 +38,7 @@ func ParseModsSpecJSON(data []byte) (*ModsSpec, error) {
 	// Unmarshal into intermediate map to handle polymorphic fields.
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parse mods spec json: %w", err)
+		return nil, fmt.Errorf("parse migs spec json: %w", err)
 	}
 
 	return parseModsSpecFromMap(raw)
@@ -253,7 +253,7 @@ func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
 	return spec, nil
 }
 
-// parseModStep parses a single mod step entry from the steps[] array.
+// parseModStep parses a single mig step entry from the steps[] array.
 func parseModStep(raw map[string]any, index int) (ModStep, error) {
 	step := ModStep{}
 	prefix := fmt.Sprintf("steps[%d]", index)
@@ -267,7 +267,7 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 		step.Name = strings.TrimSpace(s)
 	}
 
-	// Parse shared mod-like fields (image, command, env, retain_container).
+	// Parse shared mig-like fields (image, command, env, retain_container).
 	f, err := parseModLikeFields(raw, prefix)
 	if err != nil {
 		return step, err
@@ -309,7 +309,7 @@ func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 		}
 	}
 
-	// Parse mod-like fields directly on the healing map (flattened form).
+	// Parse mig-like fields directly on the healing map (flattened form).
 	f, err := parseModLikeFields(raw, prefix)
 	if err != nil {
 		return nil, err

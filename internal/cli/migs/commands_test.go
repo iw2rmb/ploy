@@ -242,7 +242,7 @@ func TestSimplePrinterFormats(t *testing.T) {
 }
 
 // TestEventsCommandWithLogPrinter verifies that EventsCommand renders log events
-// using the shared LogPrinter when configured (unified log streaming for mod run --follow).
+// using the shared LogPrinter when configured (unified log streaming for mig run --follow).
 func TestEventsCommandWithLogPrinter(t *testing.T) {
 	t.Parallel()
 
@@ -258,7 +258,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 			buildEvents: func(runID, nodeID, jobID string) []string {
 				return []string{
 					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
-					"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"" + nodeID + "\",\"job_id\":\"" + jobID + "\",\"job_type\":\"mod\",\"next_id\":100}\n\n",
+					"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"" + nodeID + "\",\"job_id\":\"" + jobID + "\",\"job_type\":\"mig\",\"next_id\":100}\n\n",
 					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
 				}
 			},

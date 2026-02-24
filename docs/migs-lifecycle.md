@@ -8,84 +8,84 @@ checkpoint notes in the repository.
 
 - **Run** — A Mods run submitted to the control plane. Runs are stored as
   `runs` rows in PostgreSQL and exposed via the `/v1/runs` API.
-- **Job** — A unit of work inside a  run (for example `pre-gate`, `mod-0`,
+- **Job** — A unit of work inside a  run (for example `pre-gate`, `mig-0`,
   `post-gate`). Jobs are stored as `jobs` rows. Persisted job fields are
   `job_type`, `job_image`, and `next_id` (successor link in the job chain).
 - **Spec** — YAML/JSON file or inline JSON describing container image,
-  command, env, Build Gate and optional `mods[]` steps. Parsed by the CLI in
+  command, env, Build Gate and optional `migs[]` steps. Parsed by the CLI in
   `cmd/ploy/mod_run_spec.go`.
 - **Build Gate** — Validation pass run via Docker containers to ensure the
   workspace compiles/tests successfully. The `GateExecutor` adapter
   (`internal/workflow/step`) abstracts execution; nodes claim gate jobs
   from the unified queue and execute them locally. Gates run at two distinct points
   in the lifecycle:
-  - **Pre-mod gate** — runs once on the initial workspace before any mods execute.
-  - **Post-mod gate** — runs after each mod in `mods[]` that exits with code 0.
+  - **Pre-mig gate** — runs once on the initial workspace before any migs execute.
+  - **Post-mig gate** — runs after each mig in `migs[]` that exits with code 0.
 - **Healing** — Optional corrective steps run when any Build Gate (pre or post)
-  fails. The system enters a fail → heal mods → re-gate loop; if the gate still
+  fails. The system enters a fail → heal migs → re-gate loop; if the gate still
   fails after retries, the run terminates.
 
 ## 1.1 Build Gate Sequence
 
 This section makes the pre-/post-gate execution order explicit for both
-single-mod and multi-mod runs. All gate failures follow the same healing
-protocol: fail → heal mods → re-gate; if healing is exhausted, the run fails
-and no further mods execute.
+single-mig and multi-mig runs. All gate failures follow the same healing
+protocol: fail → heal migs → re-gate; if healing is exhausted, the run fails
+and no further migs execute.
 
-### Single-mod runs (no `mods[]`)
+### Single-mig runs (no `migs[]`)
 
 > **Note:** A single-repo submission is internally a degenerate batch with one
 > `run_repos` entry. See § 1.4 (Batched Mods Runs) for the batch model
 > (`runs` + `run_repos`) and how single-repo runs fit into the unified architecture.
 
-When the spec does **not** contain a `mods[]` array (single-step run using
+When the spec does **not** contain a `migs[]` array (single-step run using
 top-level `image`/`command`/`env`), the execution sequence is:
 
 ```
-pre-gate(+healing) → mod → post-gate(+healing)
+pre-gate(+healing) → mig → post-gate(+healing)
 ```
 
-1. **Pre-mod Build Gate** — Runs once on the initial hydrated workspace (step 0)
-   before the mod container starts. Validates that the baseline code compiles
+1. **Pre-mig Build Gate** — Runs once on the initial hydrated workspace (step 0)
+   before the mig container starts. Validates that the baseline code compiles
    and tests pass.
-   - On failure with healing mods configured: enter fail → heal → re-gate loop.
-   - If healing is exhausted: run exits without executing the mod.
+   - On failure with healing migs configured: enter fail → heal → re-gate loop.
+   - If healing is exhausted: run exits without executing the mig.
 
-2. **Mod execution** — The mod container runs against the validated workspace.
-   - Exit code 0: proceed to post-mod gate.
-   - Non-zero exit: run fails; no post-mod gate is run.
+2. **Mod execution** — The mig container runs against the validated workspace.
+   - Exit code 0: proceed to post-mig gate.
+   - Non-zero exit: run fails; no post-mig gate is run.
 
-3. **Post-mod Build Gate** — Runs on the same workspace after the mod exits
-   with code 0. Validates that the mod's changes do not break the build.
-   - On failure with healing mods configured: enter fail → heal → re-gate loop.
+3. **Post-mig Build Gate** — Runs on the same workspace after the mig exits
+   with code 0. Validates that the mig's changes do not break the build.
+   - On failure with healing migs configured: enter fail → heal → re-gate loop.
    - If healing is exhausted: run fails.
 
-### Multi-mod runs (`mods[]`)
+### Multi-mig runs (`migs[]`)
 
-When the spec contains a `mods[]` array with multiple entries, the execution
+When the spec contains a `migs[]` array with multiple entries, the execution
 sequence is:
 
 ```
-pre-gate(+healing) → mod[0] → post-gate[0](+healing) → mod[1] → post-gate[1](+healing) → ... → mod[N-1] → post-gate[N-1](+healing)
+pre-gate(+healing) → mig[0] → post-gate[0](+healing) → mig[1] → post-gate[1](+healing) → ... → mig[N-1] → post-gate[N-1](+healing)
 ```
 
-1. **Pre-mod Build Gate** — Runs once on the initial hydrated workspace before
-   any mods execute.
+1. **Pre-mig Build Gate** — Runs once on the initial hydrated workspace before
+   any migs execute.
    - On failure with healing: enter fail → heal → re-gate loop.
-   - If healing exhausted: run exits without executing any mods.
+   - If healing exhausted: run exits without executing any migs.
 
-2. **For each mod[k] in `mods[]` (k = 0, 1, ..., N-1)**:
+2. **For each mig[k] in `migs[]` (k = 0, 1, ..., N-1)**:
    - **Mod[k] execution** — Runs against the workspace with changes from all
-     prior mods applied.
-   - **Post-mod gate[k]** — Runs after mod[k] exits with code 0.
+     prior migs applied.
+   - **Post-mig gate[k]** — Runs after mig[k] exits with code 0.
      - On failure with healing: enter fail → heal → re-gate loop.
-     - If healing exhausted: run fails and no further mods execute.
-   - If mod[k] exits non-zero: run fails; no post-gate and no further mods.
+     - If healing exhausted: run fails and no further migs execute.
+   - If mig[k] exits non-zero: run fails; no post-gate and no further migs.
 
 ### Gate execution via unified jobs queue
 
 Pre-gate and re-gate validation runs through the `GateExecutor` adapter as part of
-the unified jobs pipeline. Gate jobs are stored in the `jobs` table alongside mod
+the unified jobs pipeline. Gate jobs are stored in the `jobs` table alongside mig
 jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 
 ```
@@ -110,9 +110,9 @@ jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 5. For healing flows: re-gate runs against the workspace with accumulated changes.
 
 **Key characteristics:**
-- Single unified queue: gate, mod, and healing jobs all use the same `jobs` table.
+- Single unified queue: gate, mig, and healing jobs all use the same `jobs` table.
 - Local Docker execution: gates run on the node that claims the job.
-- Chain progression via `next_id`: ensures sequential pre-gate → mod → post-gate flow.
+- Chain progression via `next_id`: ensures sequential pre-gate → mig → post-gate flow.
 
 See `docs/build-gate/README.md` for gate configuration and execution details.
 
@@ -120,15 +120,15 @@ See `docs/build-gate/README.md` for gate configuration and execution details.
 
 All Build Gate failures (pre or post) follow identical handling:
 
-- **Without healing mods**: The run fails immediately with `reason="build-gate"`.
-- **With healing mods**: The system enters the fail → heal → re-gate loop:
+- **Without healing migs**: The run fails immediately with `reason="build-gate"`.
+- **With healing migs**: The system enters the fail → heal → re-gate loop:
   1. Gate fails: capture build output to `/in/build-gate.log`.
-  2. Execute healing mods (e.g., Codex) to fix the issue.
+  2. Execute healing migs (e.g., Codex) to fix the issue.
   3. Re-run the gate on the healed workspace.
   4. Repeat until gate passes or max retries exhausted.
   5. If exhausted: run fails with `ErrBuildGateFailed`.
 
-The final gate result (pre-gate for runs with no mods executed, or the last
+The final gate result (pre-gate for runs with no migs executed, or the last
 post-gate) is surfaced in:
 - `Metadata["gate_summary"]` in run status responses.
 Gate summary is exposed in `RunSummary.Metadata["gate_summary"]` and can be consumed via
@@ -153,7 +153,7 @@ build_gate:
 
   # Router runs once after gate failure to produce bug_summary.
   router:
-    image: docker.io/user/mods-codex:latest
+    image: docker.io/user/migs-codex:latest
     env:
       CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
     env_from_file:
@@ -162,7 +162,7 @@ build_gate:
   # Healing runs after router, retrying up to `retries` times.
   healing:
     retries: 2
-    image: docker.io/user/mods-codex:latest
+    image: docker.io/user/migs-codex:latest
     env:
       CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
     env_from_file:
@@ -170,7 +170,7 @@ build_gate:
 ```
 
 Healing fields (image, command, env, retain_container) are specified directly
-under `healing` — there is no nested `mod` key.
+under `healing` — there is no nested `mig` key.
 
 **Router** runs once per gate failure that triggers healing (each iteration),
 before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to
@@ -181,12 +181,12 @@ Router is required when healing is configured.
 **Healing** semantics:
 
 - **Single workspace**: Healing runs on the same workspace that the failing gate validated.
-- **Linear execution**: The healing mod runs, then the gate is re-run.
-- **Retries**: If the gate still fails, the healing mod may be retried up to `retries`.
+- **Linear execution**: The healing mig runs, then the gate is re-run.
+- **Retries**: If the gate still fails, the healing mig may be retried up to `retries`.
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
 - **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
-  `jobs.meta.action_summary` for mod jobs.
+  `jobs.meta.action_summary` for mig jobs.
 
 ### Per-iteration artifacts and healing log
 
@@ -236,25 +236,25 @@ about multi-step runs where diffs accumulate across steps.
 **Implementation reference:**
 - `internal/nodeagent/execution_orchestrator.go` — `executeRun` and `rehydrateWorkspaceForStep`.
 
-#### Pre-mod gate workspace
+#### Pre-mig gate workspace
 
-The **pre-mod gate** runs on the **initial hydrated workspace** (step 0). This workspace
+The **pre-mig gate** runs on the **initial hydrated workspace** (step 0). This workspace
 is created by cloning the repository at `base_ref`
-and contains no modifications from any mods. The pre-mod gate validates that the baseline
-code compiles and tests pass before any mods execute.
+and contains no modifications from any migs. The pre-mig gate validates that the baseline
+code compiles and tests pass before any migs execute.
 
-Workspace state for pre-mod gate:
+Workspace state for pre-mig gate:
 ```
-base_ref → fresh clone → pre-mod gate
+base_ref → fresh clone → pre-mig gate
 ```
 
-#### Post-mod gate workspace
+#### Post-mig gate workspace
 
-Each **post-mod gate** runs on the **rehydrated workspace for that step**. The workspace
-reflects all changes from prior mods (steps 0 through k-1) plus the changes from the
-current mod (step k).
+Each **post-mig gate** runs on the **rehydrated workspace for that step**. The workspace
+reflects all changes from prior migs (steps 0 through k-1) plus the changes from the
+current mig (step k).
 
-Before `mod[k]` executes, `rehydrateWorkspaceForStep` reconstructs the workspace for
+Before `mig[k]` executes, `rehydrateWorkspaceForStep` reconstructs the workspace for
 step k from:
 
 1. **Base clone**: A cached copy of the initial repository state (base_ref).
@@ -262,12 +262,12 @@ step k from:
    sorted deterministically by chain position, then `(created_at, id)` in the node agent, and
    applied in order using `git apply`.
 
-After `mod[k]` completes, its changes are present in the same workspace that the
-post-mod gate validates.
+After `mig[k]` completes, its changes are present in the same workspace that the
+post-mig gate validates.
 
-Workspace state for post-mod gate at step k:
+Workspace state for post-mig gate at step k:
 ```
-base_ref → base clone → apply diffs[0..k-1] → mod[k] execution → post-mod gate[k]
+base_ref → base clone → apply diffs[0..k-1] → mig[k] execution → post-mig gate[k]
 ```
 
 #### Multi-node execution
@@ -287,8 +287,8 @@ Key invariants:
 
 | Gate Phase     | Workspace State                                      | Code Reference                              |
 |----------------|------------------------------------------------------|---------------------------------------------|
-| Pre-mod gate   | Fresh clone of base_ref                              | `rehydrateWorkspaceForStep` with stepIndex=0 |
-| Post-mod gate[k] | Base clone + diffs[0..k-1] + mod[k] changes         | `rehydrateWorkspaceForStep` with stepIndex=k |
+| Pre-mig gate   | Fresh clone of base_ref                              | `rehydrateWorkspaceForStep` with stepIndex=0 |
+| Post-mig gate[k] | Base clone + diffs[0..k-1] + mig[k] changes         | `rehydrateWorkspaceForStep` with stepIndex=k |
 
 ### Implementation references
 
@@ -309,19 +309,19 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (top-level, in `mods[]`, and in `build_gate.healing`/`build_gate.router`) accepts two forms:
+The `image` field (top-level, in `migs[]`, and in `build_gate.healing`/`build_gate.router`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
-image: docker.io/user/mods-openrewrite:latest
+image: docker.io/user/migs-openrewrite:latest
 ```
 
 **Stack-specific images (map)** — Different images per detected stack:
 ```yaml
 image:
-  default: docker.io/user/mods-openrewrite:latest
-  java-maven: docker.io/user/mods-orw-maven:latest
-  java-gradle: docker.io/user/mods-orw-gradle:latest
+  default: docker.io/user/migs-openrewrite:latest
+  java-maven: docker.io/user/migs-orw-maven:latest
+  java-gradle: docker.io/user/migs-orw-gradle:latest
 ```
 
 ### Stack detection via Build Gate
@@ -381,12 +381,12 @@ When resolving an image for a given stack:
 
 ### Consistency across run lifecycle
 
-Stack detection occurs during the pre-mod Build Gate execution. The detected stack
+Stack detection occurs during the pre-mig Build Gate execution. The detected stack
 is then used consistently for all subsequent Mods steps within the same run:
 
-1. **Pre-mod gate**: Build Gate detects workspace stack (e.g., `java-maven`).
+1. **Pre-mig gate**: Build Gate detects workspace stack (e.g., `java-maven`).
 2. **Stack propagation**: The stack is stored in run context/metadata.
-3. **Image resolution**: Each mod step resolves its image using the same stack.
+3. **Image resolution**: Each mig step resolves its image using the same stack.
 4. **Healing steps**: Stack remains consistent across heal → re-gate cycles.
 
 This ensures deterministic image selection: a Maven workspace always uses the
@@ -398,21 +398,21 @@ A common use case is dedicated OpenRewrite images for Maven and Gradle:
 
 ```yaml
 image:
-  default: docker.io/user/mods-openrewrite:latest
-  java-maven: docker.io/user/mods-orw-maven:latest
-  java-gradle: docker.io/user/mods-orw-gradle:latest
+  default: docker.io/user/migs-openrewrite:latest
+  java-maven: docker.io/user/migs-orw-maven:latest
+  java-gradle: docker.io/user/migs-orw-gradle:latest
 env:
   RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
 When this spec runs against a Maven project (`pom.xml` present):
 - Build Gate detects `java-maven` stack.
-- Image resolves to `mods-orw-maven:latest`.
+- Image resolves to `migs-orw-maven:latest`.
 - The Maven-specific entrypoint executes OpenRewrite via `mvn rewrite:run`.
 
 When the same spec runs against a Gradle project (`build.gradle` present):
 - Build Gate detects `java-gradle` stack.
-- Image resolves to `mods-orw-gradle:latest`.
+- Image resolves to `migs-orw-gradle:latest`.
 - The Gradle-specific entrypoint executes OpenRewrite via `gradle rewriteRun`.
 
 ### Example: Parameterized OpenRewrite via rewrite.yml
@@ -420,12 +420,12 @@ When the same spec runs against a Gradle project (`build.gradle` present):
 When OpenRewrite recipes require parameters, you can generate a `rewrite.yml`
 config as a code change, then let the stack-aware ORW Mods apply it.
 
-1. **Generate rewrite.yml with mod-shell** (scripts live in the repo):
+1. **Generate rewrite.yml with mig-shell** (scripts live in the repo):
 
 ```yaml
-mods:
+migs:
   - name: generate-rewrite-config
-    image: docker.io/user/mods-shell:latest
+    image: docker.io/user/migs-shell:latest
     env:
       MOD_SHELL_SCRIPT: ./generate-rewrite.sh
 ```
@@ -444,15 +444,15 @@ recipeList:
 2. **Apply OpenRewrite using the YAML recipe name**:
 
 ```yaml
-mods:
+migs:
   - name: generate-rewrite-config
-    image: docker.io/user/mods-shell:latest
+    image: docker.io/user/migs-shell:latest
     env:
       MOD_SHELL_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite
     image:
-      java-maven: docker.io/user/mods-orw-maven:latest
-      java-gradle: docker.io/user/mods-orw-gradle:latest
+      java-maven: docker.io/user/migs-orw-maven:latest
+      java-gradle: docker.io/user/migs-orw-gradle:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -487,19 +487,19 @@ transaction.
 
 | Type        | Description                                  | Example        |
 |-------------|----------------------------------------------|----------------|
-| `pre_gate`  | Pre-mod Build Gate validation                | `pre-gate`     |
-| `mod`       | Modification container execution             | `mod-0`        |
-| `post_gate` | Post-mod Build Gate validation               | `post-gate`    |
+| `pre_gate`  | Pre-mig Build Gate validation                | `pre-gate`     |
+| `mig`       | Modification container execution             | `mig-0`        |
+| `post_gate` | Post-mig Build Gate validation               | `post-gate`    |
 | `heal`      | Healing job after gate failure               | `heal-0`       |
 | `re_gate`   | Re-validation after healing                  | `re-gate`      |
 
 ### Simple run graph
 
-A successful single-mod run creates a linear three-node chain:
+A successful single-mig run creates a linear three-node chain:
 
 ```
 ┌───────────┐       ┌───────────┐       ┌───────────┐
-│ pre-gate  │──────▶│   mod-0   │──────▶│ post-gate │
+│ pre-gate  │──────▶│   mig-0   │──────▶│ post-gate │
 └───────────┘       └───────────┘       └───────────┘
 ```
 
@@ -510,7 +510,7 @@ by rewiring `next_id` links:
 
 ```
 ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐     ┌───────────┐
-│ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│   mod-0   │────▶│ post-gate │
+│ pre-gate  │────▶│  heal-0   │────▶│  re-gate  │────▶│   mig-0   │────▶│ post-gate │
 │  FAILED   │     │           │     │  PASSED   │     │           │     │           │
 └───────────┘     └───────────┘     └───────────┘     └───────────┘     └───────────┘
 ```
@@ -546,7 +546,7 @@ post-gate  ───────────────▶├─▶ heal-a → 
 ## 1.4 Batched Mods Runs (`runs` + `run_repos`)
 
 This section describes how batch runs coordinate multiple repositories under a
-single specification. A batch run allows executing the same mod workflow across
+single specification. A batch run allows executing the same mig workflow across
 many repos without submitting separate  runs for each.
 
 ### Conceptual model
@@ -579,10 +579,10 @@ artifacts) remain job-addressed via `job_id`.
 - **Run (`runs`)** — Stores a run referencing `mod_id` + `spec_id` and run-level
   status (`Started`, `Finished`, `Cancelled`). Per-repo execution lives in `run_repos`.
 
-- **Specs (`specs`)** — Append-only spec JSON dictionary. Runs and mods reference
+- **Specs (`specs`)** — Append-only spec JSON dictionary. Runs and migs reference
   a spec by ID.
 
-- **Repo set (`mod_repos`)** — Managed repositories for a mod project, each with
+- **Repo set (`mod_repos`)** — Managed repositories for a mig project, each with
   current `repo_url`, `base_ref`, and `target_ref`.
 
 - **Run repos (`run_repos`)** — One row per `(run_id, repo_id)` capturing snapshot
@@ -661,14 +661,14 @@ repo attempt. It does not create per-repo child runs.
 
 | Table       | Purpose                                    | Key relationships                         |
 |-------------|--------------------------------------------|-------------------------------------------|
-| `specs`     | Append-only spec dictionary                | referenced by `mods.spec_id`, `runs.spec_id` |
-| `mods`      | Mod projects                               | `mods` → `mod_repos` (1:N), `mods` → `runs` (1:N) |
-| `mod_repos` | Managed repo set for a mod                 | `mod_repos` → `run_repos` (1:N), `mod_repos` → `jobs` (1:N) |
+| `specs`     | Append-only spec dictionary                | referenced by `migs.spec_id`, `runs.spec_id` |
+| `migs`      | Mod projects                               | `migs` → `mod_repos` (1:N), `migs` → `runs` (1:N) |
+| `mod_repos` | Managed repo set for a mig                 | `mod_repos` → `run_repos` (1:N), `mod_repos` → `jobs` (1:N) |
 | `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
 | `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id)` → `jobs` (1:N)        |
-| `jobs`      | Execution units (pre-gate, mod, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
+| `jobs`      | Execution units (pre-gate, mig, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
 
-### Pulling Diffs Locally (`run pull` / `mod pull`)
+### Pulling Diffs Locally (`run pull` / `mig pull`)
 
 The `ploy run pull <run-id>` and `ploy mig pull` commands enable developers to reconstruct
 Mods-generated changes in their local git repository. This is useful for reviewing,
@@ -685,7 +685,7 @@ workflows.
 │  1. Resolve repo context                                                    │
 │     ├─ Get origin URL from `git remote get-url <origin>`                    │
 │     ├─ (run pull) Call POST /v1/runs/{run_id}/pull with repo_url             │
-│     └─ (mod pull) Optionally infer mod via GET /v1/migs?repo_url=...         │
+│     └─ (mig pull) Optionally infer mig via GET /v1/migs?repo_url=...         │
 │               then call POST /v1/migs/{mod_id}/pull with repo_url + mode     │
 │                                                                             │
 │  2. Fetch base snapshot                                                      │
@@ -751,8 +751,8 @@ The CLI derives `repo_url` from the git remote URL; the server performs normaliz
 to select the correct `run_repos` entry.
 
 The CLI validates `repo_url` using `internal/domain/types.RepoURL` (allowed schemes: `https://`, `ssh://`, `file://`) when:
-- the user provides a repo URL explicitly (submit, batch create, `mod repo add`, `mod run --repo`), and
-- the CLI derives `repo_url` from a git remote for pull commands (`run pull`, `mod pull`).
+- the user provides a repo URL explicitly (submit, batch create, `mig repo add`, `mig run --repo`), and
+- the CLI derives `repo_url` from a git remote for pull commands (`run pull`, `mig pull`).
 
 If your git remote uses SCP-like syntax (example: `git@github.com:org/repo.git`), change it to an allowed form (example: `ssh://git@github.com/org/repo.git`) or use an HTTPS remote.
 
@@ -766,7 +766,7 @@ cd /path/to/service-a
 ploy run pull <run-id>
 
 # Mod-based pull:
-ploy mig pull <mod-id|name>
+ploy mig pull <mig-id|name>
 
 # Preview without making changes:
 ploy run pull --dry-run <run-id>
@@ -835,7 +835,7 @@ value is a `StageStatus` object describing that job's execution state.
 
 - Keys are job IDs (KSUID strings), **not** job names or step indices.
 - Use `next_id` within each `StageStatus` to follow successor links.
-- Typical entries: `pre-gate`, `mod-0`, `post-gate` jobs, plus dynamically inserted
+- Typical entries: `pre-gate`, `mig-0`, `post-gate` jobs, plus dynamically inserted
   `heal-*` and `re-gate` jobs for healing flows.
 
 #### StageStatus fields
@@ -847,7 +847,7 @@ value is a `StageStatus` object describing that job's execution state.
 | `max_attempts`  | int                 | Maximum allowed attempts.                           |
 | `current_job_id`| string (optional)   | Execution job ID (may differ in retry scenarios).   |
 | `artifacts`     | map[string]string   | Artifact logical names → bundle CIDs.               |
-| `last_error`    | string (optional)   | Error message from the most recent failed attempt. Includes explicit `exit code 137` OOM-kill hints for killed mod jobs. |
+| `last_error`    | string (optional)   | Error message from the most recent failed attempt. Includes explicit `exit code 137` OOM-kill hints for killed mig jobs. |
 | `next_id`       | string (optional)   | Successor job ID from `jobs.next_id`; null for chain tail jobs. |
 
 #### Example response
@@ -887,16 +887,16 @@ value is a `StageStatus` object describing that job's execution state.
   - Created by the control plane when a run is submitted via `POST /v1/runs`.
 		- Each job row has:
 		    - `id` — job ID (KSUID string, used as key in `RunSummary.stages`).
-		    - `name` — job name (e.g., `pre-gate`, `mod-0`, `post-gate`).
+		    - `name` — job name (e.g., `pre-gate`, `mig-0`, `post-gate`).
 	    - `next_id` — successor job ID for chain progression (`null` for tail jobs).
 		  - `status` — job status in the database (`Created`, `Queued`, `Running`, `Success`, `Fail`, `Cancelled`).
 		    - `RunSummary.stages[*].state` is the external API representation (`pending`, `running`, `succeeded`, `failed`, `cancelled`).
 		    - `node_id` — which node claimed this job.
-	    - `job_type` — job phase (`pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`, `mr`).
-	    - `job_image` — container image name for this job (persisted by the node for mod/heal/gate jobs).
+	    - `job_type` — job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`, `mr`).
+	    - `job_image` — container image name for this job (persisted by the node for mig/heal/gate jobs).
 		    - `meta` — JSONB with structured job metadata (optional; see `internal/workflow/contracts.JobMeta`).
   - Dynamic insertion rewires explicit successor links:
-    - Initial chain: `pre-gate -> mod-0 -> post-gate`.
+    - Initial chain: `pre-gate -> mig-0 -> post-gate`.
     - Healing insertion updates `failed.next_id` to `heal`, then links healing tail to the former successor.
 
 	- **Server-driven scheduling**
@@ -907,7 +907,7 @@ value is a `StageStatus` object describing that job's execution state.
 		    are ready.
 		  - When a job completes successfully, the server promotes that job's
 		    `next_id` successor from `Created` to `Queued` (when present).
-		  - This model enforces sequential execution: `pre-gate` → `mod-0` → `post-gate`.
+		  - This model enforces sequential execution: `pre-gate` → `mig-0` → `post-gate`.
 		  - Healing jobs follow the same pattern: heal jobs are created with status
 		    `Queued` to be claimed immediately after insertion.
 
@@ -939,7 +939,7 @@ value is a `StageStatus` object describing that job's execution state.
   - Shape: `{repo_url, base_ref, target_ref, spec, created_by?}`.
   - Handler: `createSingleRepoRunHandler`.
   - Behaviour (single source of truth for Mods execution):
-    - Creates a spec (`specs`), a mod project (`mods`), a managed repo (`mod_repos`),
+    - Creates a spec (`specs`), a mig project (`migs`), a managed repo (`mod_repos`),
       a run (`runs`, `status=Started`), a run repo (`run_repos`, `status=Queued`),
       and the repo-scoped `jobs` pipeline (first job `Queued`, later jobs `Created`).
     - The run repo transitions to `Running` when the first job is claimed.
@@ -1013,33 +1013,33 @@ artifacts/diffs to the correct node.
 
 ### 4.1 Single-step runs
 
-For a spec without `mods[]` (single-step top-level `image`/`command`/`env`):
+For a spec without `migs[]` (single-step top-level `image`/`command`/`env`):
 
 1. CLI (`ploy mig run`) builds a `RunSubmitRequest` in
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
    `cmd/ploy/mod_run_spec.go`.
 2. CLI submits to `POST /v1/runs`. The control plane:
-   - Creates jobs (pre-gate, mod, post-gate) as a `next_id`-linked chain.
+   - Creates jobs (pre-gate, mig, post-gate) as a `next_id`-linked chain.
    - Publishes an initial `RunSummary` over SSE.
 3. A node:
    - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
    - For each claimed job:
      - Hydrates the workspace using `step.WorkspaceHydrator`.
-     - Executes the job (gate check or mod container).
+     - Executes the job (gate check or mig container).
      - Generates diffs with `DiffGenerator` and uploads them.
      - Completes the job via `/v1/jobs/{job_id}/complete`.
 4. Control plane updates  run status and emits a final `run` snapshot plus
    a `done` status on the SSE stream.
 
-### 4.2 Multi-step runs (`mods[]`) and rehydration
+### 4.2 Multi-step runs (`migs[]`) and rehydration
 
-For a spec with `mods[]`:
+For a spec with `migs[]`:
 
-1. CLI preserves the `mods[]` array as-is (`buildSpecPayload` does not rewrite
+1. CLI preserves the `migs[]` array as-is (`buildSpecPayload` does not rewrite
    or reorder entries).
 2. `POST /v1/runs`:
-   - Creates jobs for pre-gate, each mod, and post-gates as a linked chain.
-   - Each job row includes `job_type` (pre_gate, mod, post_gate, heal, re_gate)
+   - Creates jobs for pre-gate, each mig, and post-gates as a linked chain.
+   - Each job row includes `job_type` (pre_gate, mig, post_gate, heal, re_gate)
      and `job_image` (saved by the executing node before the container starts).
 3. Scheduler and nodeagents:
    - ClaimJob returns queued jobs from the unified queue, and the server promotes
@@ -1088,13 +1088,13 @@ Mods container images are standard OCI images with the following expectations:
       values.
     - Supported on:
       - top-level spec (single-step runs),
-      - each `mods[]` entry (multi-step runs),
+      - each `migs[]` entry (multi-step runs),
       - `build_gate.healing` and `build_gate.router`.
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
-    env vars are filtered by scope (`all`, `mods`, `heal`, `gate`) to match job types:
+    env vars are filtered by scope (`all`, `migs`, `heal`, `gate`) to match job types:
     - `all` → injected into every job
-    - `mods` → `mod` and `post_gate` jobs
+    - `migs` → `mig` and `post_gate` jobs
     - `heal` → `heal` and `re_gate` jobs
     - `gate` → `pre_gate`, `re_gate`, and `post_gate` jobs
     The job spec must be a JSON object; invalid/non-object specs are rejected at submission
@@ -1136,8 +1136,8 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
     SSE events from `/v1/runs/{id}/logs` but does not stream container logs.
     Use `ploy run logs <run-id>` to stream logs.
 
-- `ploy mig run <mod-id|name>`:
-  - Creates a run from a mod project via `cmd/ploy/mod_run_project.go`.
+- `ploy mig run <mig-id|name>`:
+  - Creates a run from a mig project via `cmd/ploy/mod_run_project.go`.
   - Supports `--repo`, `--failed` for repo selection.
   - Optional `--follow` displays the job graph until completion.
 
@@ -1198,14 +1198,14 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 |--------------|--------|------------------------------------------------------------------------|
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
 | `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
-| `job_type`   | string | Mods step type: `pre_gate`, `mod`, `post_gate`, `heal`, `re_gate`      |
+| `job_type`   | string | Mods step type: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`      |
 | `next_id` | number | Optional step metadata used for log enrichment                          |
 
 **Example SSE frame:**
 
 ```
 event: log
-data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mod","next_id":2000}
+data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mig","next_id":2000}
 ```
 
 **Notes:**

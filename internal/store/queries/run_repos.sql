@@ -101,7 +101,7 @@ ORDER BY rr.created_at DESC, rr.run_id DESC
 LIMIT $2 OFFSET $3;
 
 -- name: ListFailedRepoIDsByMig :many
--- Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mod.
+-- Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mig.
 -- "Last terminal state" per repo_id is determined by looking at the newest run_repos
 -- row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 -- Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
@@ -128,7 +128,7 @@ WHERE rr.run_id = $1
 ORDER BY rr.created_at ASC, rr.repo_id ASC;
 
 -- name: GetLatestRunRepoByMigAndRepoStatus :one
--- v1: Gets the newest run_repos row for a specific repo_id in a mod,
+-- v1: Gets the newest run_repos row for a specific repo_id in a mig,
 -- filtered by terminal status (Success or Fail).
 -- Used by POST /v1/migs/{mig_id}/pull to select last-succeeded or last-failed.
 -- Order by created_at DESC to get the newest matching run_repos row.

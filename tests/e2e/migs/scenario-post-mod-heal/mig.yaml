@@ -1,7 +1,7 @@
-# E2E scenario: Multi-step Mods run with post-mod gate healing.
+# E2E scenario: Multi-step Mods run with post-mig gate healing.
 #
-# This spec validates gate-heal-regate behavior for post-mod gate failures:
-# 1. Each mods[] entry is followed by a post-gate check
+# This spec validates gate-heal-regate behavior for post-mig gate failures:
+# 1. Each migs[] entry is followed by a post-gate check
 # 2. At least one step triggers post-gate failure requiring healing
 # 3. Healing runs and fixes the error; re-gate passes
 # 4. SSE events and final artifacts show gate and healing events for each step
@@ -13,9 +13,9 @@
 #   Step 2: Java17 migration (should pass post-gate after step 1 healing)
 #
 # This tests the gate-heal-regate regression guard by exercising:
-# - Post-mod gate failures (not just pre-mod)
-# - Healing mods that fix post-mod failures
-# - GateSummary reflecting the final (post-mod) gate result
+# - Post-mig gate failures (not just pre-mig)
+# - Healing migs that fix post-mig failures
+# - GateSummary reflecting the final (post-mig) gate result
 # - Multi-step execution continuing after successful healing
 #
 # Prerequisites:
@@ -27,11 +27,11 @@
 #   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
 #     --repo-base-ref e2e/fail-missing-symbol \
-#     --repo-target-ref mods-e2e-post-mod-heal-test \
-#     --spec tests/e2e/migs/scenario-post-mod-heal/mig.yaml \
+#     --repo-target-ref migs-e2e-post-mig-heal-test \
+#     --spec tests/e2e/migs/scenario-post-mig-heal/mig.yaml \
 #     --follow
 
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 
 ################################################################################
@@ -77,23 +77,23 @@ steps:
 # BUILD GATE VALIDATION
 ################################################################################
 # Build gate runs after each step to validate the transformation.
-# Post-mod gate failures trigger the healing sequence below.
+# Post-mig gate failures trigger the healing sequence below.
 build_gate:
   enabled: true
 
   ################################################################################
   # HEALING POLICY FOR POST-MOD FAILURES
   ################################################################################
-  # When a post-mod gate fails (transformation broke the build), this healing
-  # sequence runs to fix the error. The healing mod:
+  # When a post-mig gate fails (transformation broke the build), this healing
+  # sequence runs to fix the error. The healing mig:
   # 1. Reads /in/build-gate.log to understand the failure
   # 2. Edits the workspace to fix the issue
   # 3. Edits the workspace and exits; node agent re-gates only when workspace
   #    diffs are present. This tests the critical gate-heal-regate flow for
-  #    post-mod failures using the workspace diff handshake.
+  #    post-mig failures using the workspace diff handshake.
   healing:
     retries: 2 # Allow multiple healing attempts for complex errors
-    mod:
+    mig:
       # Codex healing container using the workspace diff handshake.
       # For this E2E, Codex will analyze the compile error (missing class) and
       # create the necessary stub class to fix the build.
@@ -110,7 +110,7 @@ build_gate:
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
-          This is a post-mod gate failure (the mod transformation broke the build).
+          This is a post-mig gate failure (the mig transformation broke the build).
           Create any missing classes or fix any syntax errors introduced by the transformation.
       # Uncomment if you have Codex auth configured:
       env_from_file:
@@ -133,13 +133,13 @@ mr_on_success: true
 ################################################################################
 # When running this scenario, verify:
 #
-# 1. Post-mod gate failure detection:
+# 1. Post-mig gate failure detection:
 #    - Step 1 post-gate should fail (missing class reference)
 #    - SSE events should show "gate_failed" for step 1 post-gate
-#    - Logs should indicate post-mod (not pre-mod) gate failure
+#    - Logs should indicate post-mig (not pre-mig) gate failure
 #
 # 2. Healing execution:
-#    - Healing mod should run after post-gate failure
+#    - Healing mig should run after post-gate failure
 #    - Codex should edit the workspace to create the missing class file
 #
 # 3. Re-gate success:
@@ -158,8 +158,8 @@ mr_on_success: true
 #    - Final workspace should include healing fix
 #
 # Success criteria:
-# - At least one step triggers post-mod gate failure
+# - At least one step triggers post-mig gate failure
 # - Healing successfully fixes the error
 # - All steps complete after healing
-# - GateSummary reflects final (post-mod) gate state
+# - GateSummary reflects final (post-mig) gate state
 # - SSE events show gate/healing sequence for affected steps

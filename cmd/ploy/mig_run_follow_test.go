@@ -65,7 +65,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 				"repo_id": repoID,
 				"attempt": 1,
 				"jobs": []map[string]interface{}{
-					{"job_id": stageID.String(), "name": "mod-0", "job_type": "mod", "next_id": nil, "status": "Success", "duration_ms": 100},
+					{"job_id": stageID.String(), "name": "mig-0", "job_type": "mig", "next_id": nil, "status": "Success", "duration_ms": 100},
 				},
 			})
 
@@ -181,7 +181,7 @@ func list(dir string) []string {
 	return out
 }
 
-// TestModRunFollowShowsJobGraph verifies that mod run --follow displays
+// TestModRunFollowShowsJobGraph verifies that mig run --follow displays
 // the job graph with repo URL, job type, status, and display name.
 // This replaces the old log streaming test since --follow now shows job graphs.
 func TestModRunFollowShowsJobGraph(t *testing.T) {
@@ -233,7 +233,7 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 				"repo_id": repoID,
 				"attempt": 1,
 				"jobs": []map[string]interface{}{
-					{"job_id": jobID, "name": "mod-0", "job_type": "mod", "next_id": nil, "status": "Running", "duration_ms": 0, "display_name": "java17-upgrade"},
+					{"job_id": jobID, "name": "mig-0", "job_type": "mig", "next_id": nil, "status": "Running", "duration_ms": 0, "display_name": "java17-upgrade"},
 				},
 			})
 
@@ -314,12 +314,12 @@ func TestModRunFollowShowsJobGraph(t *testing.T) {
 	if !strings.Contains(out, "example.com/repo") {
 		t.Errorf("expected repo URL in output, got: %s", out)
 	}
-	if !strings.Contains(out, "mod") {
-		t.Errorf("expected mod type in output, got: %s", out)
+	if !strings.Contains(out, "mig") {
+		t.Errorf("expected mig type in output, got: %s", out)
 	}
 }
 
-// TestModRunFollowWithMultipleJobs verifies that mod run --follow displays
+// TestModRunFollowWithMultipleJobs verifies that mig run --follow displays
 // all jobs in the job graph when a run has multiple jobs.
 func TestModRunFollowWithMultipleJobs(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
@@ -372,7 +372,7 @@ func TestModRunFollowWithMultipleJobs(t *testing.T) {
 				"attempt": 1,
 				"jobs": []map[string]interface{}{
 					{"job_id": preGateJobID, "name": "pre-gate", "job_type": "pre_gate", "next_id": modJobID, "status": "Success", "duration_ms": 50},
-					{"job_id": modJobID, "name": "mod-0", "job_type": "mod", "next_id": postGateJobID, "status": "Running", "duration_ms": 0},
+					{"job_id": modJobID, "name": "mig-0", "job_type": "mig", "next_id": postGateJobID, "status": "Running", "duration_ms": 0},
 					{"job_id": postGateJobID, "name": "post-gate", "job_type": "post_gate", "next_id": nil, "status": "Created", "duration_ms": 0},
 				},
 			})

@@ -301,7 +301,7 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
-		getModResult: store.Mig{ID: modID, Name: "test-mod"},
+		getModResult: store.Mig{ID: modID, Name: "test-mig"},
 		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,
@@ -362,7 +362,7 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
-		getModResult: store.Mig{ID: modID, Name: "test-mod"},
+		getModResult: store.Mig{ID: modID, Name: "test-mig"},
 		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,

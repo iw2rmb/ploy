@@ -56,7 +56,7 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 				ID:      jobID,
 				RunID:   runID,
 				Name:    "build-step",
-				JobType: "mod",
+				JobType: "mig",
 				Meta:    []byte(`{"next_id":2000}`),
 				NodeID:  &nodeID,
 			}, nil
@@ -113,8 +113,8 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	if rec.JobID != jobID {
 		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
 	}
-	if rec.JobType != "mod" {
-		t.Errorf("job_type: got %q, want %q", rec.JobType, "mod")
+	if rec.JobType != "mig" {
+		t.Errorf("job_type: got %q, want %q", rec.JobType, "mig")
 	}
 }
 

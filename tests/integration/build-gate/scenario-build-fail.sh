@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Integration: Build Gate failure produces an error artifact consumable by LLM mod.
+# Integration: Build Gate failure produces an error artifact consumable by LLM mig.
 # Flow:
 #  1) Create a tiny Maven project that fails to compile (missing symbol).
 #  2) Run the Build Gate container (maven:3-eclipse-temurin-17) and capture logs.
 #  3) Save logs to /in/build-gate.log (artifact to pass to LLM; /in is read-only cross-phase input).
-#  4) Run mods/mod-llm stub to heal the missing symbol.
+#  4) Run migs/mig-llm stub to heal the missing symbol.
 #  5) Re-run the Build Gate and expect success.
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -37,7 +37,7 @@ cat >"$WORKDIR/pom.xml" <<'POM'
 </project>
 POM
 
-# Failing class referencing UnknownClass (healed by mods-llm stub)
+# Failing class referencing UnknownClass (healed by migs-llm stub)
 cat >"$WORKDIR/src/main/java/e2e/FailMissingSymbol.java" <<'JAVA'
 package e2e;
 
@@ -71,10 +71,10 @@ fi
 
 echo "[scenario] Build Gate failed as expected; artifact saved to /in/build-gate.log"
 
-# Run LLM healer stub (mods/mod-llm) to create e2e/UnknownClass.java
+# Run LLM healer stub (migs/mig-llm) to create e2e/UnknownClass.java
 OUTDIR="$WORKDIR/out"
 mkdir -p "$OUTDIR"
-bash "$ROOT_DIR/mods/mod-llm/mod-llm.sh" --execute --input "$WORKDIR" --out "$OUTDIR/plan.json"
+bash "$ROOT_DIR/migs/mig-llm/mig-llm.sh" --execute --input "$WORKDIR" --out "$OUTDIR/plan.json"
 
 if [[ ! -f "$WORKDIR/src/main/java/e2e/UnknownClass.java" ]]; then
   echo "FAIL: LLM healer did not create UnknownClass.java"

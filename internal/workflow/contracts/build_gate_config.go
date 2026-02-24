@@ -1,12 +1,12 @@
 // build_gate_config.go defines Build Gate validation and healing configuration types.
 //
-// These types configure how Build Gate validation runs before/after mod execution
+// These types configure how Build Gate validation runs before/after mig execution
 // and how healing operates when the gate fails.
 package contracts
 
 // BuildGateConfig configures Build Gate validation for a Mods run.
 type BuildGateConfig struct {
-	// Enabled controls whether the build gate runs before/after mod execution.
+	// Enabled controls whether the build gate runs before/after mig execution.
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 
 	// Pre configures stack detection policy for the pre-gate phase.
@@ -23,7 +23,7 @@ type BuildGateConfig struct {
 	// to produce a bug_summary before healing begins.
 	Router *RouterSpec `json:"router,omitempty" yaml:"router,omitempty"`
 
-	// Images provides mod-level image mapping overrides for Build Gate image resolution.
+	// Images provides mig-level image mapping overrides for Build Gate image resolution.
 	// These rules override the default mapping file.
 	Images []BuildGateImageRule `json:"images,omitempty" yaml:"images,omitempty"`
 }
@@ -49,16 +49,16 @@ type BuildGateStackConfig struct {
 }
 
 // HealingSpec describes the heal → re-gate loop configuration.
-// When the build gate fails, the agent can execute a healing mod then re-run the gate.
+// When the build gate fails, the agent can execute a healing mig then re-run the gate.
 //
-// HealingSpec is itself mod-like: it carries Image, Command, Env, and RetainContainer
+// HealingSpec is itself mig-like: it carries Image, Command, Env, and RetainContainer
 // directly (no nested Mod object). Retries controls the healing retry count.
 type HealingSpec struct {
 	// Retries is the maximum number of healing attempts (default: 1).
-	// Each retry executes the healing mod, then re-runs the gate.
+	// Each retry executes the healing mig, then re-runs the gate.
 	Retries int `json:"retries,omitempty" yaml:"retries,omitempty"`
 
-	// Image is the container image for the healing mod (required).
+	// Image is the container image for the healing mig (required).
 	// Supports both universal images (string) and stack-specific images (map).
 	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
 
@@ -73,7 +73,7 @@ type HealingSpec struct {
 }
 
 // RouterSpec describes the router container that runs on gate failure to produce
-// a bug_summary before healing begins. Router is mod-like (Image, Command, Env,
+// a bug_summary before healing begins. Router is mig-like (Image, Command, Env,
 // RetainContainer) but has no Retries — it runs exactly once per gate failure.
 type RouterSpec struct {
 	// Image is the container image for the router (required).

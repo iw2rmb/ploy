@@ -76,7 +76,7 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 		rejectKeys []string
 	}{
 		{
-			name:       "mod job gets all and migs",
+			name:       "mig job gets all and migs",
 			jobType:    domaintypes.JobTypeMod,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY"},
 			rejectKeys: []string{"HEAL_KEY", "GATE_KEY"},
@@ -234,7 +234,7 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 		"OPENAI_API_KEY":      {Value: "sk-...", Scope: domaintypes.GlobalEnvScopeMods, Secret: true},
 	}
 
-	// Test mod job should receive all three keys.
+	// Test mig job should receive all three keys.
 	result, err := mergeGlobalEnvIntoSpec(json.RawMessage(`{}`), env, domaintypes.JobTypeMod)
 	if err != nil {
 		t.Fatalf("mergeGlobalEnvIntoSpec: %v", err)
@@ -246,13 +246,13 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 	em := m["env"].(map[string]any)
 
 	if _, ok := em["CA_CERTS_PEM_BUNDLE"]; !ok {
-		t.Error("expected CA_CERTS_PEM_BUNDLE for mod job")
+		t.Error("expected CA_CERTS_PEM_BUNDLE for mig job")
 	}
 	if _, ok := em["CODEX_AUTH_JSON"]; !ok {
-		t.Error("expected CODEX_AUTH_JSON for mod job")
+		t.Error("expected CODEX_AUTH_JSON for mig job")
 	}
 	if _, ok := em["OPENAI_API_KEY"]; !ok {
-		t.Error("expected OPENAI_API_KEY for mod job")
+		t.Error("expected OPENAI_API_KEY for mig job")
 	}
 
 	// Test pre_gate job should only receive CA_CERTS_PEM_BUNDLE (scope=all).

@@ -13,7 +13,7 @@ import (
 // TestExecuteWithHealing_RepoDiffSemantics verifies that healing verification aligns
 // with the HTTP Build Gate API's repo+diff model:
 //   - Pre-gate validates the workspace (repo_url+ref clone)
-//   - Healing mods modify the workspace in-place
+//   - Healing migs modify the workspace in-place
 //   - Re-gate validates workspace = repo_url+ref + healing modifications
 //
 // This ensures conceptual equivalence with POST /v1/buildgate/validate using diff_patch.
@@ -47,7 +47,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		},
 	}
 
-	// Track container specs to verify healing mod receives workspace.
+	// Track container specs to verify healing mig receives workspace.
 	var containerSpecs []step.ContainerSpec
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
@@ -102,7 +102,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		JobID:     types.JobID("test-job-repo-diff"),
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("e2e/fail-missing-symbol"),
-		TargetRef: types.GitRef("mods-upgrade-java17"),
+		TargetRef: types.GitRef("migs-upgrade-java17"),
 		CommitSHA: types.CommitSHA("abc123"),
 		Env:       map[string]string{},
 		TypedOptions: RunOptions{
@@ -115,8 +115,8 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "test/main-mod:latest",
+		Name:  "Main mig",
+		Image: "test/main-mig:latest",
 		Inputs: []contracts.StepInput{
 			{
 				Name:        "workspace",
@@ -142,10 +142,10 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		t.Errorf("exit code = %d, want 0", result.ExitCode)
 	}
 
-	// Verify repo+diff semantics: all gates (pre-gate, pre-mod re-gate, post-mod gate) use the SAME workspace path.
-	// With post-mod gate, we now have 3 gate calls: pre-gate, pre-mod re-gate, post-mod gate.
+	// Verify repo+diff semantics: all gates (pre-gate, pre-mig re-gate, post-mig gate) use the SAME workspace path.
+	// With post-mig gate, we now have 3 gate calls: pre-gate, pre-mig re-gate, post-mig gate.
 	if len(gateWorkspaces) != 3 {
-		t.Fatalf("expected 3 gate calls (pre-gate, pre-mod re-gate, post-mod gate), got %d", len(gateWorkspaces))
+		t.Fatalf("expected 3 gate calls (pre-gate, pre-mig re-gate, post-mig gate), got %d", len(gateWorkspaces))
 	}
 
 	// All gate calls should use the same workspace.
@@ -163,9 +163,9 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 	}
 
 	// Verify healing container also received the same workspace to modify.
-	// This ensures healing mods accumulate changes on top of the repo baseline.
+	// This ensures healing migs accumulate changes on top of the repo baseline.
 	if len(containerSpecs) < 1 {
-		t.Fatal("expected at least one container spec for healing mod")
+		t.Fatal("expected at least one container spec for healing mig")
 	}
 
 	healerWorkspace := ""
@@ -176,7 +176,7 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		}
 	}
 	if healerWorkspace != workspace {
-		t.Errorf("healing mod workspace = %q, want %q (same repo_url+ref workspace)", healerWorkspace, workspace)
+		t.Errorf("healing mig workspace = %q, want %q (same repo_url+ref workspace)", healerWorkspace, workspace)
 	}
 }
 
@@ -202,7 +202,7 @@ func (t *trackingDiffGenerator) GenerateBetween(ctx context.Context, baseDir, mo
 }
 
 // TestUploadHealingJobDiff_UsesGenerateBetween verifies that discrete healing jobs
-// use GenerateBetween (repo+diff semantics) and still publish job_type="mod" diffs.
+// use GenerateBetween (repo+diff semantics) and still publish job_type="mig" diffs.
 func TestUploadHealingJobDiff_UsesGenerateBetween(t *testing.T) {
 	t.Parallel()
 

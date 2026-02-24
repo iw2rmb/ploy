@@ -31,7 +31,7 @@ func BenchmarkHubPublishEnrichedLog(b *testing.B) {
 		Line:      "Build step completed: compiling module org.example.service",
 		NodeID:    "aB3xY9",
 		JobID:     domaintypes.NewJobID(),
-		JobType:   "mod",
+		JobType:   "mig",
 	}
 
 	b.ResetTimer()
@@ -162,7 +162,7 @@ func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 			Line:      "Compiling module " + string(rune('A'+i%26)),
 			NodeID:    nodeID,
 			JobID:     jobID,
-			JobType:   "mod",
+			JobType:   "mig",
 		}
 		if err := hub.PublishLog(ctx, runID, record); err != nil {
 			t.Fatalf("publish log %d: %v", i, err)

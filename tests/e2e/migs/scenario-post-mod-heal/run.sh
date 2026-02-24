@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# E2E scenario: Multi-step Mods run with post-mod gate healing.
+# E2E scenario: Multi-step Mods run with post-mig gate healing.
 #
-# This script validates gate-heal-regate behavior when a mod transformation
-# introduces a compile error (post-mod gate fails), requiring healing to fix
+# This script validates gate-heal-regate behavior when a mig transformation
+# introduces a compile error (post-mig gate fails), requiring healing to fix
 # it before the run can continue.
 #
 # Scenario flow:
 #   1. Submit multi-step mig run to fail-missing-symbol branch
 #   2. Some steps may trigger post-gate failures (missing class reference)
-#   3. Healing mod creates the missing class
+#   3. Healing mig creates the missing class
 #   4. Re-gate passes after healing
 #   5. Subsequent steps execute successfully
 #
 # This guards against regressions in:
-# - Post-mod gate failure detection
+# - Post-mig gate failure detection
 # - Healing execution after post-gate failures
 # - Re-gate success propagation
-# - GateSummary reflecting final (post-mod) gate result
+# - GateSummary reflecting final (post-mig) gate result
 #
 # Prerequisites:
 # - ploy binary available at dist/ploy (run: make build)
@@ -26,15 +26,15 @@
 #
 # Usage:
 #   # From repository root:
-#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mig-heal/run.sh
 #
 #   # With custom configuration:
 #   REPO_URL="https://gitlab.com/example/repo.git" \
 #   REPO_BASE_REF="fail-branch" \
-#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mig-heal/run.sh
 #
 #   # Skip artifact collection:
-#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mod-heal/run.sh
+#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mig-heal/run.sh
 
 set -euo pipefail
 
@@ -66,7 +66,7 @@ fi
 # Uses e2e/fail-missing-symbol branch which has code referencing UndefinedClass.
 REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 REPO_BASE_REF="${REPO_BASE_REF:-e2e/fail-missing-symbol}"
-REPO_TARGET_REF="${REPO_TARGET_REF:-mods-e2e-post-mod-heal-$(date +%y%m%d%H%M%S)}"
+REPO_TARGET_REF="${REPO_TARGET_REF:-migs-e2e-post-mig-heal-$(date +%y%m%d%H%M%S)}"
 
 # Spec file location (relative to script directory).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,7 +76,7 @@ SPEC_FILE="${SCRIPT_DIR}/mig.yaml"
 SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
 if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   TS=$(date +%y%m%d%H%M%S)
-  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mod-heal/${TS}}"
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mig-heal/${TS}}"
   mkdir -p "${ARTIFACT_DIR}"
 fi
 
@@ -126,7 +126,7 @@ fi
 # SUBMIT RUN AND FOLLOW LOGS
 ################################################################################
 
-echo "Submitting multi-step mig run with post-mod healing..."
+echo "Submitting multi-step mig run with post-mig healing..."
 echo ""
 
 # Build command with required flags.
@@ -155,9 +155,9 @@ set -e
 echo ""
 echo "=========================================="
 if [[ $EXIT_CODE -eq 0 ]]; then
-  echo "✓ Post-mod gate healing scenario PASSED"
+  echo "✓ Post-mig gate healing scenario PASSED"
 else
-  echo "✗ Post-mod gate healing scenario FAILED (exit code: $EXIT_CODE)"
+  echo "✗ Post-mig gate healing scenario FAILED (exit code: $EXIT_CODE)"
 fi
 echo "=========================================="
 echo ""
@@ -167,7 +167,7 @@ echo ""
 ################################################################################
 
 if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
-  echo "Validating post-mod healing artifacts..."
+  echo "Validating post-mig healing artifacts..."
   echo ""
 
   # ────────────────────────────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
     done
   else
     echo "     ⚠ No build-gate artifacts found"
-    echo "       Gate artifacts should be present for post-mod gate runs."
+    echo "       Gate artifacts should be present for post-mig gate runs."
   fi
   echo ""
 
@@ -277,8 +277,8 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   echo "     Artifacts saved to: $ARTIFACT_DIR"
   echo ""
   if [[ $EXIT_CODE -eq 0 ]]; then
-    echo "  Post-mod gate healing validation complete."
-    echo "  Run succeeded; GateSummary should reflect final (post-mod) gate result."
+    echo "  Post-mig gate healing validation complete."
+    echo "  Run succeeded; GateSummary should reflect final (post-mig) gate result."
   else
     echo "  Run failed. Check artifacts and logs for details."
     echo "  Possible causes:"
@@ -296,9 +296,9 @@ fi
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo "Manual validation checklist:"
   echo ""
-  echo "1. Post-mod gate failure detection:"
-  echo "   - Review SSE events for 'gate_failed' events after mod steps"
-  echo "   - Logs should indicate post-mod (not pre-mod) gate failure"
+  echo "1. Post-mig gate failure detection:"
+  echo "   - Review SSE events for 'gate_failed' events after mig steps"
+  echo "   - Logs should indicate post-mig (not pre-mig) gate failure"
   echo ""
   echo "2. Healing execution:"
   echo "   - Review codex.log for healing activity"

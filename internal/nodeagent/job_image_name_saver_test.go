@@ -49,15 +49,15 @@ func TestJobImageNameSaver_SaveJobImageName_RequestShape(t *testing.T) {
 	}
 
 	jobID := types.JobID("test-job-id")
-	if err := saver.SaveJobImageName(context.Background(), jobID, "docker.io/example/mods:latest"); err != nil {
+	if err := saver.SaveJobImageName(context.Background(), jobID, "docker.io/example/migs:latest"); err != nil {
 		t.Fatalf("SaveJobImageName() error = %v", err)
 	}
 
 	if gotPath != "/v1/jobs/test-job-id/image" {
 		t.Fatalf("path = %q, want %q", gotPath, "/v1/jobs/test-job-id/image")
 	}
-	if gotImage != "docker.io/example/mods:latest" {
-		t.Fatalf("payload.image = %q, want %q", gotImage, "docker.io/example/mods:latest")
+	if gotImage != "docker.io/example/migs:latest" {
+		t.Fatalf("payload.image = %q, want %q", gotImage, "docker.io/example/migs:latest")
 	}
 	if gotAuth != "Bearer test-token" {
 		t.Fatalf("Authorization = %q, want %q", gotAuth, "Bearer test-token")
@@ -95,7 +95,7 @@ func TestJobImageNameSaver_SaveJobImageName_RetryOn5xx(t *testing.T) {
 	}
 
 	jobID := types.JobID("test-job-id")
-	if err := saver.SaveJobImageName(context.Background(), jobID, "docker.io/example/mods:latest"); err != nil {
+	if err := saver.SaveJobImageName(context.Background(), jobID, "docker.io/example/migs:latest"); err != nil {
 		t.Fatalf("SaveJobImageName() error = %v", err)
 	}
 	if attempts != 3 {

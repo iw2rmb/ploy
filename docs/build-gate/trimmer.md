@@ -103,18 +103,18 @@ for downstream consumers.
 
 ## Healing and Codex Considerations
 
-Healing mods (including `mods-codex`) receive the first failing gate log in
+Healing migs (including `migs-codex`) receive the first failing gate log in
 `/in/build-gate.log`. The node agent now prefers the trimmed view when
 available:
 
 - When `BuildGateStageMetadata.LogFindings` contains at least one entry, the
-  first finding's `Message` is written to `/in/build-gate.log` for healing mods.
+  first finding's `Message` is written to `/in/build-gate.log` for healing migs.
 - When no trimmed view is available (unknown tool / legacy gate), the agent
   falls back to `BuildGateStageMetadata.LogsText`.
 
 This behavior ensures:
 
-- `mods-codex` and other healing mods see a focused failure slice for known
+- `migs-codex` and other healing migs see a focused failure slice for known
   tools (Maven/Gradle).
 - Full logs remain available via artifacts and `LogsText` for manual inspection.
 

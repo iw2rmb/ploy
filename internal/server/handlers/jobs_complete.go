@@ -221,7 +221,7 @@ func completeJobHandler(st store.Store, eventsService *events.Service) http.Hand
 		// When a job fails, either:
 		// - If it is a gate job, invoke maybeCreateHealingJobs (which may create healing/re-gate
 		//   jobs or cancel remaining jobs when healing is not configured or exhausted).
-		// - If it is a non-gate job (mod/heal), cancel remaining non-terminal jobs so the run
+		// - If it is a non-gate job (mig/heal), cancel remaining non-terminal jobs so the run
 		//   can reach a terminal state instead of leaving jobs stranded.
 		// v1 uses Fail instead of failed.
 		if jobStatus == store.JobStatusFail && err == nil {

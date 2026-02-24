@@ -6,9 +6,9 @@
 //
 // Endpoints:
 //   - POST /v1/runs/{run_id}/pull — resolve repo for a specific run
-//   - POST /v1/migs/{mig_id}/pull — resolve repo for a mod (last succeeded/failed)
+//   - POST /v1/migs/{mig_id}/pull — resolve repo for a mig (last succeeded/failed)
 //
-// Implements pull resolution endpoints for mod and run repos.
+// Implements pull resolution endpoints for mig and run repos.
 package handlers
 
 import (
@@ -160,7 +160,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-// pullMigRepoHandler resolves a repo_url to execution identifiers for a mod.
+// pullMigRepoHandler resolves a repo_url to execution identifiers for a mig.
 // Endpoint: POST /v1/migs/{mig_id}/pull
 // Request: {repo_url, mode?}
 // Response: 200 OK with {run_id, repo_id, repo_target_ref}
@@ -217,23 +217,23 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Verify the mod exists.
+		// Verify the mig exists.
 		_, err = st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mod not found")
+				httpErr(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("pull mod repo: get mod failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("pull mig repo: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
 
-		// List all repos for this mod to find matching repo by normalized URL.
+		// List all repos for this mig to find matching repo by normalized URL.
 		modRepos, err := st.ListMigReposByMig(r.Context(), modID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
-			slog.Error("pull mod repo: list mod repos failed", "mig_id", modID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
+			slog.Error("pull mig repo: list mig repos failed", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -247,7 +247,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if matchedRepoID.IsZero() {
-			httpErr(w, http.StatusNotFound, "no matching repo found in mod")
+			httpErr(w, http.StatusNotFound, "no matching repo found in mig")
 			return
 		}
 
@@ -264,7 +264,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get run repo: %v", err)
-			slog.Error("pull mod repo: get latest run repo failed",
+			slog.Error("pull mig repo: get latest run repo failed",
 				"mig_id", modID,
 				"repo_id", matchedRepoID,
 				"status", targetStatus,
@@ -283,10 +283,10 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("pull mod repo: encode response failed", "err", err)
+			slog.Error("pull mig repo: encode response failed", "err", err)
 		}
 
-		slog.Info("pull mod repo resolved",
+		slog.Info("pull mig repo resolved",
 			"mig_id", modID.String(),
 			"run_id", latestRunRepo.RunID,
 			"repo_id", latestRunRepo.RepoID.String(),

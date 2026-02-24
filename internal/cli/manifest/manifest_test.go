@@ -13,32 +13,32 @@ version = "2025-09-26"
 summary = "ok"
 
 [topology]
-description = "Standard mods topology"
+description = "Standard migs topology"
 [[topology.allow]]
-from = "mods-api"
-to = "mods-postgres"
+from = "migs-api"
+to = "migs-postgres"
 
 [[services]]
-name = "mods-postgres"
+name = "migs-postgres"
 kind = "postgres"
 [services.identity]
-dns = "mods-postgres.svc.local"
+dns = "migs-postgres.svc.local"
 [[services.ports]]
 name = "psql"
 port = 5432
 protocol = "tcp"
 
 [[services]]
-name = "mods-api"
+name = "migs-api"
 kind = "http"
 [services.identity]
-dns = "mods-api.svc.local"
+dns = "migs-api.svc.local"
 [[services.ports]]
 name = "http"
 port = 8080
 protocol = "tcp"
 [[services.requires]]
-target = "mods-postgres"
+target = "migs-postgres"
 edge = "api->postgres"
 
 [fixtures]
@@ -52,8 +52,8 @@ name = "go-native"
 reason = "baseline"
 
 [[edges]]
-source = "mods-api"
-target = "mods-postgres"
+source = "migs-api"
+target = "migs-postgres"
 ports = ["psql"]
 protocols = ["tcp"]
 `

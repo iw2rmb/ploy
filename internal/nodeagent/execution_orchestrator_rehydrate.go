@@ -63,7 +63,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 	}
 
 	// Determine repo materialization:
-	// - Prefer manifest inputs that already carry hydration.Repo (gate/mod jobs).
+	// - Prefer manifest inputs that already carry hydration.Repo (gate/mig jobs).
 	// - Fallback to StartRunRequest repo fields (healing jobs and other callers).
 	var repo *contracts.RepoMaterialization
 	for _, input := range manifest.Inputs {
@@ -98,7 +98,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 
 	// Step 2: Rehydrate workspace from base clone + ordered diffs.
 	// C2: For ALL steps (including step 0), fetch diffs and apply them.
-	// This ensures step 0 runs on the healed baseline if pre-mod healing occurred.
+	// This ensures step 0 runs on the healed baseline if pre-mig healing occurred.
 	workspacePath, err := createWorkspaceDir()
 	if err != nil {
 		return "", fmt.Errorf("create workspace dir: %w", err)
@@ -152,9 +152,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 	return workspacePath, nil
 }
 
-// uploadModDiffWithBaseline generates and uploads a diff for a mod job by comparing
-// the pre-mod baseline snapshot with the post-mod workspace. This ensures that
-// untracked files created by the mod are included in the patch (git diff --no-index
+// uploadModDiffWithBaseline generates and uploads a diff for a mig job by comparing
+// the pre-mig baseline snapshot with the post-mig workspace. This ensures that
+// untracked files created by the mig are included in the patch (git diff --no-index
 // semantics via GenerateBetween).
 func (r *runController) uploadModDiffWithBaseline(
 	ctx context.Context,
@@ -174,21 +174,21 @@ func (r *runController) uploadModDiffWithBaseline(
 	// falling back to legacy baseline-less generation. Mod diffs must use
 	// baseline-aware GenerateBetween semantics.
 	if strings.TrimSpace(baseDir) == "" {
-		slog.Warn("mod diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName)
+		slog.Warn("mig diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName)
 		return
 	}
 
-	// Generate diff between baseline snapshot and post-mod workspace so untracked
+	// Generate diff between baseline snapshot and post-mig workspace so untracked
 	// files are included in the patch (git diff --no-index semantics).
 	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
 	if err != nil {
-		slog.Error("failed to generate mod diff from baseline", "run_id", runID, "job_id", jobID, "error", err)
+		slog.Error("failed to generate mig diff from baseline", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
 	if len(diffBytes) == 0 {
 		// No changes between baseline and workspace; skip upload.
-		slog.Info("no diff to upload for mod (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID)
+		slog.Info("no diff to upload for mig (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID)
 		return
 	}
 
@@ -214,9 +214,9 @@ func (r *runController) uploadModDiffWithBaseline(
 	}
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload mod diff", "run_id", runID, "job_id", jobID, "error", err)
+		slog.Error("failed to upload mig diff", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
-	slog.Info("mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
+	slog.Info("mig diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
 }

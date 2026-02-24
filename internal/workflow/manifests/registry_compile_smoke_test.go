@@ -30,7 +30,7 @@ func TestRegistryCompileProvidesNormalizedPayload(t *testing.T) {
 	if len(compiled.Topology.Allow) != 2 {
 		t.Fatalf("expected 2 allow flows, got %d", len(compiled.Topology.Allow))
 	}
-	if compiled.Topology.Allow[0].From != "mods-api" || compiled.Topology.Allow[0].To != "postgres" {
+	if compiled.Topology.Allow[0].From != "migs-api" || compiled.Topology.Allow[0].To != "postgres" {
 		t.Fatalf("unexpected first flow: %+v", compiled.Topology.Allow[0])
 	}
 	if len(compiled.Topology.Deny) != 1 || compiled.Topology.Deny[0].Reason == "" {
@@ -76,7 +76,7 @@ func TestRegistryCompileProvidesNormalizedPayload(t *testing.T) {
 		t.Fatalf("expected 3 services, got %+v", decoded["services"])
 	}
 	firstService, _ := services[0].(map[string]any)
-	if firstService["name"] != "mods-api" {
+	if firstService["name"] != "migs-api" {
 		t.Fatalf("expected services sorted by name, got %+v", services)
 	}
 
@@ -85,7 +85,7 @@ func TestRegistryCompileProvidesNormalizedPayload(t *testing.T) {
 		t.Fatalf("expected edges array, got %+v", decoded["edges"])
 	}
 	firstEdge, _ := edges[0].(map[string]any)
-	if firstEdge["target"] != "mods-postgres" {
+	if firstEdge["target"] != "migs-postgres" {
 		t.Fatalf("expected edges sorted by target, got %+v", edges)
 	}
 

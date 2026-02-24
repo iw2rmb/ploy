@@ -3,40 +3,40 @@ name = "smoke"
 version = "2025-09-26"
 summary = """
 ## Purpose
-Ensure mods workflows stick to baseline caches and fixtures.
+Ensure migs workflows stick to baseline caches and fixtures.
 """
 
 [topology]
-description = "Standard mods topology"
+description = "Standard migs topology"
 
 [[topology.allow]]
-from = "mods-api"
+from = "migs-api"
 to = "postgres"
 
 [[topology.allow]]
-from = "mods-api"
+from = "migs-api"
 to = "redis"
 
 [[topology.deny]]
-from = "mods-api"
+from = "migs-api"
 to = "internet"
 reason = "Block egress"
 
 [[services]]
-name = "mods-postgres"
+name = "migs-postgres"
 kind = "postgres"
 [services.identity]
-dns = "mods-postgres.svc.local"
+dns = "migs-postgres.svc.local"
 [[services.ports]]
 name = "psql"
 port = 5432
 protocol = "tcp"
 
 [[services]]
-name = "mods-api"
+name = "migs-api"
 kind = "http"
 [services.identity]
-dns = "mods-api.svc.local"
+dns = "migs-api.svc.local"
 [[services.ports]]
 name = "metrics"
 port = 9100
@@ -46,18 +46,18 @@ name = "http"
 port = 8080
 protocol = "tcp"
 [[services.requires]]
-target = "mods-postgres"
+target = "migs-postgres"
 edge = "api->postgres"
 [[services.requires]]
-target = "mods-redis"
+target = "migs-redis"
 edge = "api->redis"
 
 [[services]]
-name = "mods-redis"
+name = "migs-redis"
 kind = "redis"
 optional = true
 [services.identity]
-dns = "mods-redis.svc.local"
+dns = "migs-redis.svc.local"
 [[services.ports]]
 name = "tcp"
 port = 6379
@@ -82,7 +82,7 @@ reason = "Only when search stack enabled"
 
 [[lanes.required]]
 name = "node-wasm"
-reason = "mods DAG"
+reason = "migs DAG"
 
 [[lanes.required]]
 name = "go-native"
@@ -93,23 +93,23 @@ name = "python-slim"
 reason = "data tooling"
 
 [[edges]]
-source = "mods-api"
-target = "mods-redis"
+source = "migs-api"
+target = "migs-redis"
 ports = ["tcp"]
 protocols = ["tcp"]
 
 [[edges]]
-source = "mods-api"
-target = "mods-postgres"
+source = "migs-api"
+target = "migs-postgres"
 ports = ["psql"]
 protocols = ["tcp"]
 
 [[exposures]]
-service = "mods-api"
+service = "migs-api"
 port = "http"
 mode = "public"
 
 [[exposures]]
-service = "mods-api"
+service = "migs-api"
 port = "metrics"
 mode = "cluster"

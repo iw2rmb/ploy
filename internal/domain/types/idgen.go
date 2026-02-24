@@ -45,7 +45,7 @@ func NewNodeKey() string {
 
 // NewMigID generates a new unique MigID using NanoID.
 // Uses a 6-character NanoID with the URL-safe alphabet.
-// The 6-character length provides sufficient entropy for mod project identifiers
+// The 6-character length provides sufficient entropy for mig project identifiers
 // while remaining compact for CLI usage and display.
 func NewMigID() MigID {
 	// Generate returns an error only if the alphabet is invalid or length is <= 0.
@@ -75,7 +75,7 @@ func NewSpecID() SpecID {
 
 // NewMigRepoID generates a new unique MigRepoID using NanoID.
 // Uses an 8-character NanoID with the URL-safe alphabet.
-// The 8-character length provides sufficient entropy for per-mod repo identifiers.
+// The 8-character length provides sufficient entropy for per-mig repo identifiers.
 // Note: This type may also be referred to as "repo_id" in API contexts.
 func NewMigRepoID() MigRepoID {
 	// Generate returns an error only if the alphabet is invalid or length is <= 0.

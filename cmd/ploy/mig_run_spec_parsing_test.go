@@ -17,7 +17,7 @@ func TestBuildSpecPayloadFromYAML(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
     retain_container: true
 env:
   KEY1: value1
@@ -62,8 +62,8 @@ mr_on_success: true
 	if !ok {
 		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
 	}
-	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mod:latest" {
-		t.Errorf("expected steps[0].image=docker.io/test/mod:latest, got %v", step0["image"])
+	if img, ok := step0["image"].(string); !ok || img != "docker.io/test/mig:latest" {
+		t.Errorf("expected steps[0].image=docker.io/test/mig:latest, got %v", step0["image"])
 	}
 	if env, ok := result["env"].(map[string]any); ok {
 		if env["KEY1"] != "value1" || env["KEY2"] != "value2" {
@@ -92,7 +92,7 @@ func TestBuildSpecPayloadFromYAML_BuildGateStackPrePost(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 build_gate:
   enabled: true
   pre:
@@ -164,7 +164,7 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "test.json")
 	specContent := `{
-  "steps": [{"image": "docker.io/test/mod:latest"}],
+  "steps": [{"image": "docker.io/test/mig:latest"}],
   "env": {
     "KEY1": "value1"
   },
@@ -215,7 +215,7 @@ func TestBuildSpecPayloadCommand_MergesWithoutCLI(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	spec := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
     command: ["/bin/sh", "-lc", "echo hi"]
 `
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
@@ -253,7 +253,7 @@ func TestBuildSpecPayloadCommand_CLIOverridesJSON(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	spec := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
     command: ["echo", "spec"]
 `
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
@@ -315,7 +315,7 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 	payload, err := buildSpecPayload(
 		"",
 		nil,
-		"docker.io/test/mod:latest",
+		"docker.io/test/mig:latest",
 		false,
 		`["/bin/sh", "-c", "echo test"]`,
 		"",
@@ -359,7 +359,7 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 	payload, err := buildSpecPayload(
 		"",
 		nil,
-		"docker.io/test/mod:latest",
+		"docker.io/test/mig:latest",
 		false,
 		"echo test",
 		"",
@@ -390,7 +390,7 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 }
 
 // TestBuildSpecPayloadContainsBuildGateHealing verifies that complex nested
-// structures (like build_gate_healing with retries and mod fields) are
+// structures (like build_gate_healing with retries and mig fields) are
 // correctly parsed from YAML and preserved in the payload.
 func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
 	// Test that build_gate.healing is preserved when present in spec
@@ -398,7 +398,7 @@ func TestBuildSpecPayloadContainsBuildGateHealing(t *testing.T) {
 	specPath := filepath.Join(tmpDir, "test.yaml")
 	specContent := `
 steps:
-  - image: docker.io/test/mod:latest
+  - image: docker.io/test/mig:latest
 build_gate:
   healing:
     retries: 2
@@ -437,7 +437,7 @@ build_gate:
 		t.Errorf("expected build_gate.healing.retries=2, got %v", healing["retries"])
 	}
 
-	// Verify flattened healing fields (no "mod" key)
+	// Verify flattened healing fields (no "mig" key)
 	if img, ok := healing["image"].(string); !ok || img != "docker.io/test/healer:latest" {
 		t.Errorf("expected healing.image=docker.io/test/healer:latest, got %v", healing["image"])
 	}
@@ -457,26 +457,26 @@ build_gate:
 	}
 }
 
-// TestBuildSpecPayloadMultiStepMods verifies that the mods[] array is correctly
-// parsed and preserved when using multi-step mod format. The mods[] array
+// TestBuildSpecPayloadMultiStepMods verifies that the migs[] array is correctly
+// parsed and preserved when using multi-step mig format. The migs[] array
 // represents sequential transformation steps sharing a global gate/heal policy.
 func TestBuildSpecPayloadMultiStepMods(t *testing.T) {
-	// Create a spec with multi-step mods[] array
+	// Create a spec with multi-step migs[] array
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "multi.yaml")
 	specContent := `
-apiVersion: ploy.mod/v1alpha1
+apiVersion: ploy.mig/v1alpha1
 kind: ModRunSpec
 steps:
-  - image: docker.io/test/mod-step1:latest
+  - image: docker.io/test/mig-step1:latest
     env:
       STEP: "1"
       TARGET: java8
-  - image: docker.io/test/mod-step2:latest
+  - image: docker.io/test/mig-step2:latest
     env:
       STEP: "2"
       TARGET: java11
-  - image: docker.io/test/mod-step3:latest
+  - image: docker.io/test/mig-step3:latest
     env:
       STEP: "3"
       TARGET: java17
@@ -511,13 +511,13 @@ build_gate:
 		t.Fatalf("expected 3 steps in array, got %d", len(steps))
 	}
 
-	// Verify first mod step
+	// Verify first mig step
 	mod0, ok := steps[0].(map[string]any)
 	if !ok {
 		t.Fatalf("expected steps[0] to be map, got %T", steps[0])
 	}
-	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/mod-step1:latest" {
-		t.Errorf("expected steps[0].image=docker.io/test/mod-step1:latest, got %v", mod0["image"])
+	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/mig-step1:latest" {
+		t.Errorf("expected steps[0].image=docker.io/test/mig-step1:latest, got %v", mod0["image"])
 	}
 	env0, ok := mod0["env"].(map[string]any)
 	if !ok {
@@ -527,22 +527,22 @@ build_gate:
 		t.Errorf("expected steps[0].env.STEP=1, got %v", env0["STEP"])
 	}
 
-	// Verify second mod step
+	// Verify second mig step
 	mod1, ok := steps[1].(map[string]any)
 	if !ok {
 		t.Fatalf("expected steps[1] to be map, got %T", steps[1])
 	}
-	if img, ok := mod1["image"].(string); !ok || img != "docker.io/test/mod-step2:latest" {
-		t.Errorf("expected steps[1].image=docker.io/test/mod-step2:latest, got %v", mod1["image"])
+	if img, ok := mod1["image"].(string); !ok || img != "docker.io/test/mig-step2:latest" {
+		t.Errorf("expected steps[1].image=docker.io/test/mig-step2:latest, got %v", mod1["image"])
 	}
 
-	// Verify third mod step
+	// Verify third mig step
 	mod2, ok := steps[2].(map[string]any)
 	if !ok {
 		t.Fatalf("expected steps[2] to be map, got %T", steps[2])
 	}
-	if img, ok := mod2["image"].(string); !ok || img != "docker.io/test/mod-step3:latest" {
-		t.Errorf("expected steps[2].image=docker.io/test/mod-step3:latest, got %v", mod2["image"])
+	if img, ok := mod2["image"].(string); !ok || img != "docker.io/test/mig-step3:latest" {
+		t.Errorf("expected steps[2].image=docker.io/test/mig-step3:latest, got %v", mod2["image"])
 	}
 
 	// Verify global build_gate and build_gate.healing are preserved
@@ -556,7 +556,7 @@ build_gate:
 }
 
 // TestBuildSpecPayloadMultiStepModsWithEnvFromFile verifies that env_from_file
-// resolution works correctly for each mod entry in the mods[] array.
+// resolution works correctly for each mig entry in the migs[] array.
 func TestBuildSpecPayloadMultiStepModsWithEnvFromFile(t *testing.T) {
 	// Create temp files for env_from_file references
 	tmpDir := t.TempDir()
@@ -569,7 +569,7 @@ func TestBuildSpecPayloadMultiStepModsWithEnvFromFile(t *testing.T) {
 		t.Fatalf("write env file 2: %v", err)
 	}
 
-	// Create spec with mods[] using env_from_file
+	// Create spec with migs[] using env_from_file
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 	specContent := fmt.Sprintf(`
 steps:
@@ -623,7 +623,7 @@ steps:
 
 // TestBuildSpecPayload_CanonicalSingleStepWithOverrides verifies that single-step specs
 // using the canonical format (top-level fields) work with CLI overrides.
-// CLI overrides apply to single-step format but not to multi-step mods[] format.
+// CLI overrides apply to single-step format but not to multi-step migs[] format.
 func TestBuildSpecPayload_CanonicalSingleStepWithOverrides(t *testing.T) {
 	t.Parallel()
 
@@ -692,15 +692,15 @@ env:
 		t.Errorf("expected env.CLI_KEY=cli_value, got %v", env["CLI_KEY"])
 	}
 
-	if _, exists := result["mods"]; exists {
-		t.Errorf("expected legacy mods[] to be absent")
+	if _, exists := result["migs"]; exists {
+		t.Errorf("expected legacy migs[] to be absent")
 	}
 }
 
-// TestBuildSpecPayload_MultiStepIgnoresCLIOverrides verifies that when mods[]
-// is present, CLI overrides are NOT applied to the multi-step mods array.
-// Multi-step mods[] must be fully specified in the spec file; CLI flags only
-// apply to single-mod format for backward compatibility.
+// TestBuildSpecPayload_MultiStepIgnoresCLIOverrides verifies that when migs[]
+// is present, CLI overrides are NOT applied to the multi-step migs array.
+// Multi-step migs[] must be fully specified in the spec file; CLI flags only
+// apply to single-mig format for backward compatibility.
 func TestBuildSpecPayload_MultiStepIgnoresCLIOverrides(t *testing.T) {
 	t.Parallel()
 

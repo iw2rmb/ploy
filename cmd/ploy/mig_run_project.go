@@ -1,16 +1,16 @@
-// mod_run_project.go implements the 'ploy mig run <mod-id|name>' command handler for mod projects.
+// mod_run_project.go implements the 'ploy mig run <mig-id|name>' command handler for mig projects.
 //
-// This command creates a run from a mod project:
-// - ploy mig run <mod-id|name> [--repo <repo-url> ...] [--failed]
-// - Resolves <mod-id|name> to a mod (supports both ID and name).
-// - Refuses when the mod is archived.
+// This command creates a run from a mig project:
+// - ploy mig run <mig-id|name> [--repo <repo-url> ...] [--failed]
+// - Resolves <mig-id|name> to a mig (supports both ID and name).
+// - Refuses when the mig is archived.
 // - Uses migs.spec_id as the run's spec_id.
 // - Selects repos:
-//   - --repo ... → explicit repos (by repo_url identity within the mod)
+//   - --repo ... → explicit repos (by repo_url identity within the mig)
 //   - --failed → repos with last terminal state Fail
-//   - omitted → all repos in the mod repo set
+//   - omitted → all repos in the mig repo set
 //
-// - Creates a mod-scoped run via POST /v1/migs/{mod_id}/runs and immediately starts execution.
+// - Creates a mig-scoped run via POST /v1/migs/{mod_id}/runs and immediately starts execution.
 // - Prints run_id.
 package main
 
@@ -31,10 +31,10 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-// handleMigRunProject implements 'ploy mig run <mod-id|name> [--repo <url>...] [--failed]'.
-// This is the v1 mod project run command with repo selection.
+// handleMigRunProject implements 'ploy mig run <mig-id|name> [--repo <url>...] [--failed]'.
+// This is the v1 mig project run command with repo selection.
 func handleMigRunProject(args []string, stderr io.Writer) error {
-	// Handle help flag (support `ploy mig run <mod> --help`).
+	// Handle help flag (support `ploy mig run <mig> --help`).
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
 			printMigRunProjectUsage(stderr)
@@ -42,15 +42,15 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 		}
 	}
 
-	// First positional arg is mod ID/name.
+	// First positional arg is mig ID/name.
 	if len(args) == 0 {
 		printMigRunProjectUsage(stderr)
-		return fmt.Errorf("mod id/name required")
+		return fmt.Errorf("mig id/name required")
 	}
 	modRef := args[0]
 
 	// Parse remaining flags.
-	fs := flag.NewFlagSet("mod run project", flag.ContinueOnError)
+	fs := flag.NewFlagSet("mig run project", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
 	// Repo selection flags.
@@ -84,7 +84,7 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Resolve mod reference to ID (supports both name and ID).
+	// Resolve mig reference to ID (supports both name and ID).
 	resolveCmd := climods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -95,7 +95,7 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Execute mod run command with repo selection.
+	// Execute mig run command with repo selection.
 	cmd := climods.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  base,
@@ -158,22 +158,22 @@ func followModRunProject(ctx context.Context, baseURL *url.URL, client *http.Cli
 
 	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
 	if final != modsapi.RunStateSucceeded {
-		return fmt.Errorf("mod run ended in %s", strings.ToLower(string(final)))
+		return fmt.Errorf("mig run ended in %s", strings.ToLower(string(final)))
 	}
 
 	return nil
 }
 
-// printMigRunProjectUsage prints usage for the mod run <mod> command.
+// printMigRunProjectUsage prints usage for the mig run <mig> command.
 func printMigRunProjectUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig run <mod-id|name> [--repo <url>...] [--failed] [--follow]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig run <mig-id|name> [--repo <url>...] [--failed] [--follow]")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Creates a run from a mod project and immediately starts execution.")
+	_, _ = fmt.Fprintln(w, "Creates a run from a mig project and immediately starts execution.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Repo selection (mutually exclusive):")
 	_, _ = fmt.Fprintln(w, "  --repo <url>    Explicit repo URL(s) to run (repeatable)")
 	_, _ = fmt.Fprintln(w, "  --failed        Run repos with last terminal state Fail")
-	_, _ = fmt.Fprintln(w, "  (omitted)       Run all repos in the mod repo set")
+	_, _ = fmt.Fprintln(w, "  (omitted)       Run all repos in the mig repo set")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Follow mode:")
 	_, _ = fmt.Fprintln(w, "  --follow            Follow run until completion (shows job graph)")
@@ -182,8 +182,8 @@ func printMigRunProjectUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --max-retries <n>   Max SSE reconnect attempts (default: 5)")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
-	_, _ = fmt.Fprintln(w, "  ploy mig run my-mod                                    # Run all repos")
-	_, _ = fmt.Fprintln(w, "  ploy mig run my-mod --failed                           # Retry failed repos")
-	_, _ = fmt.Fprintln(w, "  ploy mig run my-mod --repo https://a.git --repo https://b.git  # Specific repos")
-	_, _ = fmt.Fprintln(w, "  ploy mig run my-mod --follow                           # Follow until completion")
+	_, _ = fmt.Fprintln(w, "  ploy mig run my-mig                                    # Run all repos")
+	_, _ = fmt.Fprintln(w, "  ploy mig run my-mig --failed                           # Retry failed repos")
+	_, _ = fmt.Fprintln(w, "  ploy mig run my-mig --repo https://a.git --repo https://b.git  # Specific repos")
+	_, _ = fmt.Fprintln(w, "  ploy mig run my-mig --follow                           # Follow until completion")
 }

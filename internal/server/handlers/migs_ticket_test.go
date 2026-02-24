@@ -80,10 +80,10 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	}
 
 	if !st.createSpecCalled || !st.createMigCalled || !st.createMigRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
-		t.Fatalf("expected spec/mod/repo/run creation calls to be made")
+		t.Fatalf("expected spec/mig/repo/run creation calls to be made")
 	}
 	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 jobs (pre-gate, mod-0, post-gate), got %d", st.createJobCallCount)
+		t.Fatalf("expected 3 jobs (pre-gate, mig-0, post-gate), got %d", st.createJobCallCount)
 	}
 	if len(st.createJobParams) != 3 {
 		t.Fatalf("expected 3 CreateJob param sets, got %d", len(st.createJobParams))
@@ -120,7 +120,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	// Verify 3 jobs were created: pre-gate, mod-0, post-gate.
+	// Verify 3 jobs were created: pre-gate, mig-0, post-gate.
 	if st.createJobCallCount != 3 {
 		t.Fatalf("expected 3 jobs, got %d", st.createJobCallCount)
 	}
@@ -132,7 +132,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		status  store.JobStatus
 	}{
 		{"pre-gate", "pre_gate", store.JobStatusQueued}, // First job is Queued.
-		{"mod-0", "mod", store.JobStatusCreated},        // Remaining jobs are Created.
+		{"mig-0", "mig", store.JobStatusCreated},        // Remaining jobs are Created.
 		{"post-gate", "post_gate", store.JobStatusCreated},
 	}
 
@@ -190,7 +190,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	// Verify 5 jobs were created: pre-gate, mod-0, mod-1, mod-2, post-gate.
+	// Verify 5 jobs were created: pre-gate, mig-0, mig-1, mig-2, post-gate.
 	if st.createJobCallCount != 5 {
 		t.Fatalf("expected 5 jobs (pre-gate + 3 migs + post-gate), got %d", st.createJobCallCount)
 	}
@@ -203,9 +203,9 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		modImage string
 	}{
 		{"pre-gate", "pre_gate", store.JobStatusQueued, ""}, // First job is Queued.
-		{"mod-0", "mod", store.JobStatusCreated, "mod1:v1"}, // Remaining jobs are Created.
-		{"mod-1", "mod", store.JobStatusCreated, "mod2:v2"},
-		{"mod-2", "mod", store.JobStatusCreated, "mod3:v3"},
+		{"mig-0", "mig", store.JobStatusCreated, "mod1:v1"}, // Remaining jobs are Created.
+		{"mig-1", "mig", store.JobStatusCreated, "mod2:v2"},
+		{"mig-2", "mig", store.JobStatusCreated, "mod3:v3"},
 		{"post-gate", "post_gate", store.JobStatusCreated, ""},
 	}
 
@@ -351,7 +351,7 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	// Verify chain ordering: pre-gate -> mod-0 -> mod-1 -> post-gate.
+	// Verify chain ordering: pre-gate -> mig-0 -> mig-1 -> post-gate.
 	for i := 0; i < len(st.createJobParams)-1; i++ {
 		next := st.createJobParams[i].NextID
 		if next == nil {
@@ -483,7 +483,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 		"target_ref": "feature",
 		"spec": map[string]any{
 			"steps": []any{
-				map[string]any{"image": "docker.io/test/mod:latest"},
+				map[string]any{"image": "docker.io/test/mig:latest"},
 			},
 		},
 	}
@@ -559,9 +559,9 @@ func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 	if st.createJobCallCount != 4 {
-		t.Fatalf("expected 4 jobs (pre-gate, mod-0, mod-1, post-gate), got %d", st.createJobCallCount)
+		t.Fatalf("expected 4 jobs (pre-gate, mig-0, mig-1, post-gate), got %d", st.createJobCallCount)
 	}
-	if st.createJobParams[0].Name != "pre-gate" || st.createJobParams[1].Name != "mod-0" || st.createJobParams[2].Name != "mod-1" || st.createJobParams[3].Name != "post-gate" {
+	if st.createJobParams[0].Name != "pre-gate" || st.createJobParams[1].Name != "mig-0" || st.createJobParams[2].Name != "mig-1" || st.createJobParams[3].Name != "post-gate" {
 		t.Fatalf("unexpected job ordering: %q, %q, %q, %q", st.createJobParams[0].Name, st.createJobParams[1].Name, st.createJobParams[2].Name, st.createJobParams[3].Name)
 	}
 	if st.createJobParams[0].Status != store.JobStatusQueued {

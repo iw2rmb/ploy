@@ -1,8 +1,8 @@
-// Package mods provides CLI client implementations for Mods operations.
-// This file implements the mod run command for creating runs from a mod project.
+// Package migs provides CLI client implementations for Mods operations.
+// This file implements the mig run command for creating runs from a mig project.
 //
 // This command calls POST /v1/migs/{mod_id}/runs with repo selection.
-// Implements: ploy mig run <mod-id|name> [--repo <repo-url> ...] [--failed]
+// Implements: ploy mig run <mig-id|name> [--repo <repo-url> ...] [--failed]
 package migs
 
 import (
@@ -18,42 +18,42 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// CreateMigRunCommand creates a batch run from a mod project with repo selection.
+// CreateMigRunCommand creates a batch run from a mig project with repo selection.
 // Endpoint: POST /v1/migs/{mod_id}/runs
 // Creates a run with repo selection based on mode: all, explicit, or failed.
 type CreateMigRunCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
-	MigRef    domaintypes.MigRef // Required: mod ID or name.
+	MigRef    domaintypes.MigRef // Required: mig ID or name.
 	RepoURLs  []string           // Optional: explicit repo URLs for "explicit" mode.
 	Failed    bool               // If true, use "failed" mode; otherwise "all" or "explicit".
 	CreatedBy *string            // Optional: creator identifier.
 }
 
-// CreateMigRunResult contains the response from creating a mod run.
+// CreateMigRunResult contains the response from creating a mig run.
 type CreateMigRunResult struct {
 	RunID domaintypes.RunID `json:"run_id"`
 }
 
 // Run executes POST /v1/migs/{mod_id}/runs to create a run with repo selection.
 // Flag behavior:
-//   - --repo ... selects explicit repos (by repo_url identity within the mod)
+//   - --repo ... selects explicit repos (by repo_url identity within the mig)
 //   - --failed selects repos with last terminal state Fail
-//   - omitted selects all repos in the mod repo set
+//   - omitted selects all repos in the mig repo set
 func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error) {
 	if c.Client == nil {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: http client required")
+		return CreateMigRunResult{}, fmt.Errorf("mig run: http client required")
 	}
 	if c.BaseURL == nil {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: base url required")
+		return CreateMigRunResult{}, fmt.Errorf("mig run: base url required")
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: mod id is required")
+		return CreateMigRunResult{}, fmt.Errorf("mig run: mig id is required")
 	}
 
 	// Validate flag mutual exclusion: --failed and --repo cannot both be specified.
 	if c.Failed && len(c.RepoURLs) > 0 {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: --failed and --repo are mutually exclusive")
+		return CreateMigRunResult{}, fmt.Errorf("mig run: --failed and --repo are mutually exclusive")
 	}
 
 	// Determine repo_selector mode based on flags.
@@ -69,12 +69,12 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		for _, raw := range c.RepoURLs {
 			u := domaintypes.RepoURL(strings.TrimSpace(raw))
 			if err := u.Validate(); err != nil {
-				return CreateMigRunResult{}, fmt.Errorf("mod run: --repo must be a valid repo url")
+				return CreateMigRunResult{}, fmt.Errorf("mig run: --repo must be a valid repo url")
 			}
 			repoURLs = append(repoURLs, u)
 		}
 	default:
-		// No flags → all repos in the mod repo set.
+		// No flags → all repos in the mig repo set.
 		mode = "all"
 	}
 
@@ -95,20 +95,20 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: marshal request: %w", err)
+		return CreateMigRunResult{}, fmt.Errorf("mig run: marshal request: %w", err)
 	}
 
 	// POST /v1/migs/{mod_id}/runs
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: build request: %w", err)
+		return CreateMigRunResult{}, fmt.Errorf("mig run: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return CreateMigRunResult{}, fmt.Errorf("mod run: http request failed: %w", err)
+		return CreateMigRunResult{}, fmt.Errorf("mig run: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -116,10 +116,10 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 	if resp.StatusCode == http.StatusCreated {
 		var result CreateMigRunResult
 		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return CreateMigRunResult{}, fmt.Errorf("mod run: decode response: %w", err)
+			return CreateMigRunResult{}, fmt.Errorf("mig run: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return CreateMigRunResult{}, decodeHTTPError(resp, "mod run")
+	return CreateMigRunResult{}, decodeHTTPError(resp, "mig run")
 }

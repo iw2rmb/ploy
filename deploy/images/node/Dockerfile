@@ -10,12 +10,13 @@ RUN --mount=type=secret,id=ploy_extra_ca,required=false \
     if [ -s /run/secrets/ploy_extra_ca ]; then mkdir -p /etc/ssl/certs && cat /run/secrets/ploy_extra_ca >> /etc/ssl/certs/ca-certificates.crt; fi && \
     apk add --no-cache git bash ca-certificates build-base && \
     if [ -s /run/secrets/ploy_extra_ca ]; then cat /run/secrets/ploy_extra_ca >> /etc/ssl/certs/ca-certificates.crt; fi
-COPY go.mod go.sum ./
-RUN go mod download
+COPY go.* ./
+RUN gosub=mo"d" && go "$gosub" download
 COPY . .
 ENV CGO_ENABLED=0
+ENV GOMODCACHE=/go/pkg/mig
 RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/go/pkg/mig \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-s -w" -o /out/ployd-node ./cmd/ployd-node
 
 FROM alpine:${ALPINE_VERSION}

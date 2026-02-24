@@ -23,7 +23,7 @@ type RunOptions struct {
 	StackGate      *contracts.StepGateStackSpec
 }
 
-// BuildGateOptions configures pre-mod build gate validation.
+// BuildGateOptions configures pre-mig build gate validation.
 type BuildGateOptions struct {
 	Enabled   bool
 	Images    []contracts.BuildGateImageRule
@@ -38,7 +38,7 @@ type HealingConfig struct {
 }
 
 // ModContainerSpec describes a container's image, command, env, and retention policy.
-// Used for healing mods, router, execution options, and step mods.
+// Used for healing migs, router, execution options, and step migs.
 type ModContainerSpec struct {
 	Image           contracts.JobImage
 	Command         contracts.CommandSpec
@@ -71,7 +71,7 @@ type ServerMetadataOptions struct {
 	JobID domaintypes.JobID
 }
 
-// StepMod describes a single mod step in a multi-step run (steps[] array).
+// StepMod describes a single mig step in a multi-step run (steps[] array).
 // Each step has its own container spec and optional Stack Gate validation.
 type StepMod struct {
 	ModContainerSpec

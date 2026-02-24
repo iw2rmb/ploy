@@ -15,7 +15,7 @@ import (
 )
 
 // TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails verifies that
-// when healing mods do not produce any workspace changes (as measured by
+// when healing migs do not produce any workspace changes (as measured by
 // `git status --porcelain`), the node agent does not re-run the gate and
 // returns a terminal ErrBuildGateFailed error.
 func TestRunGateWithHealing_NoWorkspaceChanges_SkipsReGateAndFails(t *testing.T) {
@@ -255,7 +255,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	}
 }
 
-// TestPreModGate_HealingFixesAndRunProceeds focuses on the pre-mod gate phase.
+// TestPreModGate_HealingFixesAndRunProceeds focuses on the pre-mig gate phase.
 func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	var callSequence []string
 	gateCallCount := 0
@@ -287,11 +287,11 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	inDir := ""
 	runner := healingRunner(mockGate, mc)
 	rc := healingRC()
-	req := healingRequest("test-premod-gate-heal", "test-job-premod-gate-heal", 1, "healer:latest")
+	req := healingRequest("test-premig-gate-heal", "test-job-premig-gate-heal", 1, "healer:latest")
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "main-mod:latest",
+		Name:  "Main mig",
+		Image: "main-mig:latest",
 		Inputs: []contracts.StepInput{{
 			Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite,
 		}},
@@ -303,7 +303,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	)
 
 	if gateErr != nil {
-		t.Fatalf("pre-mod gate should pass after healing, got error: %v", gateErr)
+		t.Fatalf("pre-mig gate should pass after healing, got error: %v", gateErr)
 	}
 	if preGate == nil || preGate.Metadata == nil {
 		t.Fatal("preGate should be captured")
@@ -329,8 +329,8 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 	}
 }
 
-// TestPreModGate_HealingExhaustedNoMods verifies that when pre-mod healing
-// is exhausted without success, no main mod containers run.
+// TestPreModGate_HealingExhaustedNoMods verifies that when pre-mig healing
+// is exhausted without success, no main mig containers run.
 func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	gateCallCount := 0
 	healingContainerCount := 0
@@ -348,9 +348,9 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 
 	mc := noopContainer()
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-		if spec.Image == "main-mod:latest" {
+		if spec.Image == "main-mig:latest" {
 			mainModExecuted = true
-			t.Error("main mod should NOT execute when pre-mod gate fails")
+			t.Error("main mig should NOT execute when pre-mig gate fails")
 		} else {
 			healingContainerCount++
 		}
@@ -361,11 +361,11 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 	inDir := ""
 	runner := healingRunner(mockGate, mc)
 	rc := healingRC()
-	req := healingRequest("test-premod-exhausted", "test-job-premod-exhausted", 2, "healer:latest")
+	req := healingRequest("test-premig-exhausted", "test-job-premig-exhausted", 2, "healer:latest")
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "main-mod:latest",
+		Name:  "Main mig",
+		Image: "main-mig:latest",
 		Inputs: []contracts.StepInput{{
 			Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite,
 		}},
@@ -392,11 +392,11 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 		t.Errorf("healing container count = %d, want 2", healingContainerCount)
 	}
 	if mainModExecuted {
-		t.Error("main mod should NOT execute when pre-mod gate fails")
+		t.Error("main mig should NOT execute when pre-mig gate fails")
 	}
 }
 
-// TestPreModGate_GatePassesNoHealing verifies that when the pre-mod gate passes
+// TestPreModGate_GatePassesNoHealing verifies that when the pre-mig gate passes
 // immediately, no healing is triggered.
 func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	gateCallCount := 0
@@ -425,7 +425,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	inDir := ""
 	runner := healingRunner(mockGate, mc)
 	rc := healingRC()
-	req := healingRequest("test-premod-pass", "test-job-premod-pass", 1, "healer:latest")
+	req := healingRequest("test-premig-pass", "test-job-premig-pass", 1, "healer:latest")
 	manifest := contracts.StepManifest{
 		ID:   types.StepID(req.JobID),
 		Name: "Test",
@@ -437,7 +437,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	)
 
 	if gateErr != nil {
-		t.Fatalf("pre-mod gate should pass, got error: %v", gateErr)
+		t.Fatalf("pre-mig gate should pass, got error: %v", gateErr)
 	}
 	if preGate == nil || !preGate.Metadata.StaticChecks[0].Passed {
 		t.Error("preGate should be captured with passing check")
@@ -492,7 +492,7 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 	}
 }
 
-// TestRunGateWithHealing_HTTPModeNoDiffPatch verifies that when healing mods modify
+// TestRunGateWithHealing_HTTPModeNoDiffPatch verifies that when healing migs modify
 // the workspace, re-gate execution still occurs but DiffPatch is left empty.
 func TestRunGateWithHealing_HTTPModeNoDiffPatch(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {

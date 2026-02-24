@@ -39,7 +39,7 @@ Unless otherwise specified, the following policies apply when planning changes:
   - Default CLI config: `PLOY_CONFIG_HOME=$PWD/deploy/local/cli`.
 - Coverage: maintain ≥60% overall and ≥90% on critical workflow runner packages.
 - Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise E2E when needed).
-- For Mods E2E details, consult `tests/e2e/mods/README.md`.
+- For Mods E2E details, consult `tests/e2e/migs/README.md`.
 
 #### TDD Discipline Validation
 

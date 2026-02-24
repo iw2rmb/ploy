@@ -12,7 +12,7 @@ import (
 )
 
 // TestExecuteWithHealing_GatePassesAfterModContainerSpec verifies that when the initial gate fails
-// but healing is configured, the healing mod executes and the gate is re-run.
+// but healing is configured, the healing mig executes and the gate is re-run.
 func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	// Track call sequence to ensure proper orchestration.
 	var callSequence []string
@@ -119,8 +119,8 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	// Build main manifest with gate enabled.
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "test/main-mod:latest",
+		Name:  "Main mig",
+		Image: "test/main-mig:latest",
 		Inputs: []contracts.StepInput{
 			{
 				Name:        "workspace",
@@ -142,14 +142,14 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		t.Fatalf("executeWithHealing() error = %v, want nil", err)
 	}
 
-	// Exit code should be 0 (main mod succeeded).
+	// Exit code should be 0 (main mig succeeded).
 	if result.ExitCode != 0 {
 		t.Errorf("executeWithHealing() exit code = %d, want 0", result.ExitCode)
 	}
 
-	// Verify call sequence: gate (fail) → healing container → gate (pass) → main container → gate (post-mod)
-	// After pre-mod gate passes, we run the main mod. After main mod succeeds, post-mod gate runs.
-	expectedSequence := []string{"gate", "container:test/healer:latest", "gate", "container:test/main-mod:latest", "gate"}
+	// Verify call sequence: gate (fail) → healing container → gate (pass) → main container → gate (post-mig)
+	// After pre-mig gate passes, we run the main mig. After main mig succeeds, post-mig gate runs.
+	expectedSequence := []string{"gate", "container:test/healer:latest", "gate", "container:test/main-mig:latest", "gate"}
 	if len(callSequence) != len(expectedSequence) {
 		t.Fatalf("call sequence length = %d, want %d. Got: %v", len(callSequence), len(expectedSequence), callSequence)
 	}
@@ -172,7 +172,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 
 // TestExecuteWithHealing_UsesTrimmedLogsForInDir verifies that when the gate
 // provides a trimmed view via LogFindings, the node agent writes that trimmed
-// view (rather than the full LogsText) to /in/build-gate.log for healing mods.
+// view (rather than the full LogsText) to /in/build-gate.log for healing migs.
 func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 	// Mock gate executor: first call fails with full + trimmed logs, second passes.
 	gateCallCount := 0
@@ -266,8 +266,8 @@ func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID(req.JobID),
-		Name:  "Main mod",
-		Image: "test/main-mod:latest",
+		Name:  "Main mig",
+		Image: "test/main-mig:latest",
 		Inputs: []contracts.StepInput{
 			{
 				Name:        "workspace",

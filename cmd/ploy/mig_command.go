@@ -47,7 +47,7 @@ func handleMig(args []string, stderr io.Writer) error {
 			// Check if it's not a known subcommand (repo, pull).
 			switch args[1] {
 			case "pull":
-				return errors.New("mod run pull has been removed; use 'ploy run pull <run-id>' or 'ploy mig pull'")
+				return errors.New("mig run pull has been removed; use 'ploy run pull <run-id>' or 'ploy mig pull'")
 			case "repo":
 				// Fall through to existing handleMigRun which routes these.
 			default:

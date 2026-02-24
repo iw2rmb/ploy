@@ -107,7 +107,7 @@ func TestStackExpectation_Equal(t *testing.T) {
 func TestParseStackGateSpec_FullSpec(t *testing.T) {
 	input := `{
 		"steps": [{
-			"image": "docker.io/user/mod:latest",
+			"image": "docker.io/user/mig:latest",
 			"stack": {
 				"inbound": {
 					"enabled": true,
@@ -245,7 +245,7 @@ func TestValidateStackGatePhaseSpec_RejectDisabledWithExpect(t *testing.T) {
 func TestStackGateSpec_RoundTrip(t *testing.T) {
 	original := &ModsSpec{
 		Steps: []ModStep{{
-			Image: JobImage{Universal: "docker.io/user/mod:latest"},
+			Image: JobImage{Universal: "docker.io/user/mig:latest"},
 			Stack: &StackGateSpec{
 				Inbound: &StackGatePhaseSpec{
 					Enabled: true,
@@ -400,7 +400,7 @@ func TestParseModsSpecJSON_StackGate(t *testing.T) {
 		"steps": [
 			{
 				"name": "java11-to-17",
-				"image": "docker.io/user/mods-orw:latest",
+				"image": "docker.io/user/migs-orw:latest",
 				"stack": {
 					"inbound": {
 						"enabled": true,

@@ -92,7 +92,7 @@ type ClusterID = StringID[clusterIDTag]
 // NodeID identifies a worker node in the cluster.
 type NodeID = StringID[nodeIDTag]
 
-// MigID identifies a mod project.
+// MigID identifies a mig project.
 // Uses NanoID(6) for compact, URL-safe identifiers suitable for CLI usage and display.
 type MigID = StringID[modIDTag]
 
@@ -100,12 +100,12 @@ type MigID = StringID[modIDTag]
 // Uses NanoID(8) for spec identifiers in the append-only specs table.
 type SpecID = StringID[specIDTag]
 
-// MigRepoID identifies a repo entry within a mod project.
-// Uses NanoID(8) for per-mod repository identifiers.
+// MigRepoID identifies a repo entry within a mig project.
+// Uses NanoID(8) for per-mig repository identifiers.
 type MigRepoID = StringID[modRepoIDTag]
 
-// MigRef is a reference that can be either a mod ID or a mod name.
-// Used for endpoints that accept "mod id OR name" in the path.
+// MigRef is a reference that can be either a mig ID or a mig name.
+// Used for endpoints that accept "mig id OR name" in the path.
 // This type prevents conflating IDs with names at the type level.
 // Values must be non-empty and URL-safe (no whitespace, no / or ? characters).
 type MigRef string
@@ -152,9 +152,9 @@ var (
 	ErrInvalidRunID     = errors.New("invalid run id")
 	ErrInvalidJobID     = errors.New("invalid job id")
 	ErrInvalidNodeID    = errors.New("invalid node id")
-	ErrInvalidMigID     = errors.New("invalid mod id")
+	ErrInvalidMigID     = errors.New("invalid mig id")
 	ErrInvalidSpecID    = errors.New("invalid spec id")
-	ErrInvalidMigRepoID = errors.New("invalid mod repo id")
+	ErrInvalidMigRepoID = errors.New("invalid mig repo id")
 	ErrInvalidDiffID    = errors.New("invalid diff id")
 )
 

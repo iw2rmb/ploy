@@ -21,7 +21,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		original := RunSummary{
 			ID:         RunID("2NQPoBfVkc8dFmGAQqJnUwMu9jR"),
 			Status:     "Started",
-			MigID:      MigID("mod-x1"),
+			MigID:      MigID("mig-x1"),
 			SpecID:     SpecID("spec-y2Z"),
 			CreatedBy:  ptr("test-user"),
 			CreatedAt:  now,
@@ -88,7 +88,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		jsonData := `{
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
 			"status": "Started",
-			"mig_id": "mod-x1",
+			"mig_id": "mig-x1",
 			"spec_id": "",
 			"created_at": "2024-01-01T00:00:00Z"
 		}`
@@ -126,7 +126,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		jsonData := `{
 			"id": "2NQPoBfVkc8dFmGAQqJnUwMu9jR",
 			"status": "Started",
-			"mig_id": "mod-x1",
+			"mig_id": "mig-x1",
 			"spec_id": "   ",
 			"created_at": "2024-01-01T00:00:00Z"
 		}`
@@ -145,7 +145,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		jsonData := `{
 			"id": "",
 			"status": "Started",
-			"mig_id": "mod-x1",
+			"mig_id": "mig-x1",
 			"spec_id": "spec-y2",
 			"created_at": "2024-01-01T00:00:00Z"
 		}`
@@ -163,7 +163,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		// If these fields were strings, this code would not compile.
 		s := RunSummary{
 			ID:        RunID("run-1"),
-			MigID:     MigID("mod-1"),
+			MigID:     MigID("mig-1"),
 			SpecID:    SpecID("spec-1"),
 			Status:    "Started",
 			CreatedAt: time.Now(),

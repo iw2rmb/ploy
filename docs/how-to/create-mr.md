@@ -188,7 +188,7 @@ echo "Run: $RUN_ID"; echo "MR: ${MR_URL:-<none>}"
 
 ## Batch Workflows with MR Creation
 
-Batch runs enable applying the same mod spec to multiple repositories, with MR creation
+Batch runs enable applying the same mig spec to multiple repositories, with MR creation
 per repo. Each `run_repo` can produce its own merge request.
 
 ### Create Batch with MR-on-Success
@@ -198,7 +198,7 @@ per repo. Each `run_repo` can produce its own merge request.
 ploy config gitlab set --file gitlab-config.json
 
 # 2. Create a named batch.
-ploy mig run --spec mod.yaml --name java17-fleet --mr-success
+ploy mig run --spec mig.yaml --name java17-fleet --mr-success
 
 # 3. Add repositories — each will create an MR on success.
 ploy mig run repo add \
@@ -260,13 +260,13 @@ ploy mig pull java17-fleet
 ploy mig pull --dry-run java17-fleet
 ```
 
-The `mod pull` command:
+The `mig pull` command:
 1. Resolves the run using your local git remote URL.
 2. Creates a new branch at the run's pinned commit.
 3. Applies all stored Mods diffs to reconstruct the changes.
 
 This approach complements MR-based workflows—you can use MRs for production changes
-while using `mod pull` for local development and testing.
+while using `mig pull` for local development and testing.
 
 See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for detailed usage.
 

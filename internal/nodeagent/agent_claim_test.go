@@ -473,7 +473,7 @@ func TestClaimLoop_NextIDMapping(t *testing.T) {
 		RunID:     runID,
 		RepoID:    repoID,
 		JobID:     jobID,
-		JobName:   "mod-0",
+		JobName:   "mig-0",
 		RepoURL:   types.RepoURL("https://github.com/acme/multi.git"),
 		Status:    "Started",
 		NodeID:    types.NodeID(nodeIDStr),
@@ -580,7 +580,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	// Node2 claims job 1 (mod-0).
+	// Node2 claims job 1 (mig-0).
 	// v1: run status is "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are: Started, Cancelled, Finished.
 	nextID1 := types.NewJobID()
@@ -588,7 +588,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 		RunID:     runID,
 		RepoID:    repoID,
 		JobID:     types.NewJobID(),
-		JobName:   "mod-0",
+		JobName:   "mig-0",
 		RepoURL:   types.RepoURL("https://github.com/acme/multi-node.git"),
 		Status:    "Started",
 		NodeID:    nodeID2,
@@ -667,7 +667,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	defer cancel2()
 	_ = claimer2.Start(ctx2)
 
-	// Verify node-2 claimed job 1 (mod-0).
+	// Verify node-2 claimed job 1 (mig-0).
 	if !mock2.startCalled {
 		t.Fatalf("node-2: controller.StartRun not called")
 	}

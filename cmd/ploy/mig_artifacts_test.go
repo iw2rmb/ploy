@@ -37,7 +37,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "artifacts", runID}, buf)
 	if err != nil {
-		t.Fatalf("mod artifacts error: %v", err)
+		t.Fatalf("mig artifacts error: %v", err)
 	}
 	out := buf.String()
 	if !bytes.Contains([]byte(out), []byte(stageA.String())) || !bytes.Contains([]byte(out), []byte(stageB.String())) {

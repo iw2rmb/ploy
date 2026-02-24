@@ -1,4 +1,4 @@
-// mod_run_spec.go separates spec file handling from mod run execution.
+// mod_run_spec.go separates spec file handling from mig run execution.
 //
 // This file contains buildSpecPayload which parses YAML/JSON spec files
 // and resolves env_from_file references to inject file content as environment

@@ -8,14 +8,14 @@ import (
 
 // Regex patterns for Go version detection.
 var (
-	// goDirectiveRegex matches "go 1.xx" directive in go.mod.
+	// goDirectiveRegex matches "go 1.xx" directive in the Go module file.
 	goDirectiveRegex = regexp.MustCompile(`(?m)^go\s+(1\.\d+)`)
 
-	// goToolchainRegex matches "toolchain go1.xx.x" directive in go.mod.
+	// goToolchainRegex matches "toolchain go1.xx.x" directive in the Go module file.
 	goToolchainRegex = regexp.MustCompile(`(?m)^toolchain\s+go(1\.\d+(?:\.\d+)?)`)
 )
 
-// detectGo detects Go version from go.mod.
+// detectGo detects Go version from the Go module file.
 // Returns the version from the "go 1.xx" directive.
 // Optionally captures "toolchain go1.xx.x" as additional evidence.
 func detectGo(ctx context.Context, workspace, goModPath string) (*Observation, error) {
@@ -23,7 +23,7 @@ func detectGo(ctx context.Context, workspace, goModPath string) (*Observation, e
 	if err != nil {
 		return nil, &DetectionError{
 			Reason:  "unknown",
-			Message: "failed to read go.mod: " + err.Error(),
+			Message: "failed to read go module file: " + err.Error(),
 		}
 	}
 
@@ -35,7 +35,7 @@ func detectGo(ctx context.Context, workspace, goModPath string) (*Observation, e
 	if matches == nil {
 		return nil, &DetectionError{
 			Reason:  "unknown",
-			Message: "no go directive found in go.mod",
+			Message: "no go directive found in go module file",
 		}
 	}
 

@@ -39,7 +39,7 @@ func TestJobMeta_Validate(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "valid mod job",
+			name:    "valid mig job",
 			meta:    JobMeta{Kind: JobKindMod},
 			wantErr: false,
 		},
@@ -73,7 +73,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "gate metadata on mod job",
+			name: "gate metadata on mig job",
 			meta: JobMeta{
 				Kind: JobKindMod,
 				Gate: &BuildGateStageMetadata{},
@@ -81,7 +81,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "build metadata on mod job",
+			name: "build metadata on mig job",
 			meta: JobMeta{
 				Kind:  JobKindMod,
 				Build: &BuildMeta{Tool: "maven"},
@@ -125,7 +125,7 @@ func TestMarshalJobMeta(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "gate metadata on mod job returns error",
+			name: "gate metadata on mig job returns error",
 			meta: &JobMeta{
 				Kind: JobKindMod,
 				Gate: &BuildGateStageMetadata{},
@@ -133,9 +133,9 @@ func TestMarshalJobMeta(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "mod job",
+			name: "mig job",
 			meta: &JobMeta{Kind: JobKindMod},
-			want: `{"kind":"mod"}`,
+			want: `{"kind":"mig"}`,
 		},
 		{
 			name: "gate job with metadata",
@@ -212,14 +212,14 @@ func TestUnmarshalJobMeta(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "gate metadata on mod job returns error",
-			data:    []byte(`{"kind":"mod","gate":{"log_digest":"` + testDigestA + `"}}`),
+			name:    "gate metadata on mig job returns error",
+			data:    []byte(`{"kind":"mig","gate":{"log_digest":"` + testDigestA + `"}}`),
 			wantErr: true,
 		},
 		// Valid structured metadata.
 		{
-			name:     "mod job",
-			data:     []byte(`{"kind":"mod"}`),
+			name:     "mig job",
+			data:     []byte(`{"kind":"mig"}`),
 			wantKind: JobKindMod,
 		},
 		{

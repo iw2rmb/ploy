@@ -369,7 +369,7 @@ func createJobForCancelBulkTest(t *testing.T, ctx context.Context, db Store, run
 		Attempt:     1,
 		Name:        name,
 		Status:      status,
-		JobType:     "mod",
+		JobType:     "mig",
 		JobImage:    "test-image",
 		NextID:      nil,
 		Meta:        []byte(`{}`),

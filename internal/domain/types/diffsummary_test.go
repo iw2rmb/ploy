@@ -104,22 +104,22 @@ func TestDiffSummary_JobType(t *testing.T) {
 		want string
 	}{
 		{
-			name: "mod type present",
-			json: `{"job_type": "mod"}`,
-			want: "mod",
+			name: "mig type present",
+			json: `{"job_type": "mig"}`,
+			want: "mig",
 		},
 		{
-			name: "healing mod type",
+			name: "healing mig type",
 			json: `{"job_type": "healing"}`,
 			want: "healing",
 		},
 		{
-			name: "missing mod type",
+			name: "missing mig type",
 			json: `{}`,
 			want: "",
 		},
 		{
-			name: "null mod type",
+			name: "null mig type",
 			json: `{"job_type": null}`,
 			want: "",
 		},
@@ -183,7 +183,7 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 	jsonData := `{
 		"exit_code": 0,
 		"files_changed": 3,
-		"job_type": "mod",
+		"job_type": "mig",
 		"timings": {
 			"hydration_duration_ms": 100,
 			"execution_duration_ms": 200,
@@ -209,10 +209,10 @@ func TestDiffSummary_FromJSON(t *testing.T) {
 		t.Errorf("FilesChanged() = (%d, %v), want (3, true)", files, found)
 	}
 
-	// Verify mod type.
+	// Verify mig type.
 	jobType := summary.JobType()
-	if jobType != "mod" {
-		t.Errorf("JobType() = %q, want %q", jobType, "mod")
+	if jobType != "mig" {
+		t.Errorf("JobType() = %q, want %q", jobType, "mig")
 	}
 }
 
@@ -220,7 +220,7 @@ func TestDiffSummaryBuilder(t *testing.T) {
 	t.Run("basic fields", func(t *testing.T) {
 		summary := NewDiffSummaryBuilder().
 			ExitCode(0).
-			JobType("mod").
+			JobType("mig").
 			MustBuild()
 
 		code, found := summary.ExitCode()
@@ -229,8 +229,8 @@ func TestDiffSummaryBuilder(t *testing.T) {
 		}
 
 		jobType := summary.JobType()
-		if jobType != "mod" {
-			t.Errorf("JobType() = %q, want %q", jobType, "mod")
+		if jobType != "mig" {
+			t.Errorf("JobType() = %q, want %q", jobType, "mig")
 		}
 	})
 

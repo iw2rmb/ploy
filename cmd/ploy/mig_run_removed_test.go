@@ -14,7 +14,7 @@ func TestModRunPull_IsRejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "mod run pull has been removed") {
+	if !strings.Contains(err.Error(), "mig run pull has been removed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
