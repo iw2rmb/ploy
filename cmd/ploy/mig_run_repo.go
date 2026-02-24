@@ -1,7 +1,7 @@
 // mod_run_repo.go implements the `ploy mig run repo` subcommands for managing
 // repos within a batch run.
 //
-// This file provides CLI routing for repo add/remove/restart/status operations
+// This file provides CLI routing for repo add/remove/restart operations
 // that delegate to the control plane's /v1/runs/{id}/repos endpoints. Each
 // subcommand parses its own flags and invokes the corresponding HTTP handler.
 //
@@ -9,7 +9,6 @@
 //   - ploy mig run repo add --repo-url <url> --base-ref <ref> --target-ref <ref> <run-id>
 //   - ploy mig run repo remove --repo-id <id> <run-id>
 //   - ploy mig run repo restart --repo-id <id> [--base-ref <ref>] [--target-ref <ref>] <run-id>
-//   - ploy mig run repo status <run-id>
 package main
 
 import (
@@ -23,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"text/tabwriter"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -46,7 +44,7 @@ func handleMigRunRepo(args []string, stderr io.Writer) error {
 	case "restart":
 		return handleMigRunRepoRestart(args[1:], stderr)
 	case "status":
-		return handleMigRunRepoStatus(args[1:], stderr)
+		return errors.New("mig run repo status has been removed; use 'ploy run status <run-id>'")
 	default:
 		printMigRunRepoUsage(stderr)
 		return fmt.Errorf("unknown mig run repo action %q", args[0])
@@ -61,14 +59,12 @@ func printMigRunRepoUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  add       Add a repo to a batch run")
 	_, _ = fmt.Fprintln(w, "  remove    Remove/cancel a repo from a batch run")
 	_, _ = fmt.Fprintln(w, "  restart   Restart a repo within a batch run")
-	_, _ = fmt.Fprintln(w, "  status    Show repos and their statuses within a batch run")
 	_, _ = fmt.Fprintln(w, "")
 	// Examples use neutral <repo-id> placeholder since repo IDs are NanoID(8) strings, not UUIDs.
 	_, _ = fmt.Fprintln(w, "Examples:")
 	_, _ = fmt.Fprintln(w, "  ploy mig run repo add --repo-url https://github.com/org/repo.git --base-ref main --target-ref feature <run-id>")
 	_, _ = fmt.Fprintln(w, "  ploy mig run repo remove --repo-id <repo-id> <run-id>")
 	_, _ = fmt.Fprintln(w, "  ploy mig run repo restart --repo-id <repo-id> <run-id>")
-	_, _ = fmt.Fprintln(w, "  ploy mig run repo status <run-id>")
 }
 
 // handleMigRunRepoAdd implements `ploy mig run repo add <run-id> --repo-url <url> --base-ref <ref> --target-ref <ref>`.
@@ -241,63 +237,6 @@ func handleMigRunRepoRestart(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// handleMigRunRepoStatus implements `ploy mig run repo status <run-id>`.
-// Lists all repos within a batch with their status, attempt count, and timing.
-func handleMigRunRepoStatus(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mig run repo status", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-
-	if err := fs.Parse(args); err != nil {
-		printMigRunRepoUsage(stderr)
-		return err
-	}
-
-	// Extract positional run ID.
-	rest := fs.Args()
-	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printMigRunRepoUsage(stderr)
-		return errors.New("run-id required")
-	}
-	batchID := strings.TrimSpace(rest[0])
-
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Send GET /v1/runs/{id}/repos.
-	repos, err := doRunRepoList(ctx, base, httpClient, batchID)
-	if err != nil {
-		return err
-	}
-
-	if len(repos) == 0 {
-		_, _ = fmt.Fprintln(stderr, "No repos found in this batch.")
-		return nil
-	}
-
-	// Print table with repo details.
-	// v1: Display repo_id (mod_repos.id) rather than a non-existent run_repos.id.
-	tw := tabwriter.NewWriter(stderr, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "REPO_ID\tREPO URL\tBASE REF\tTARGET REF\tATTEMPT\tSTATUS\tLAST ERROR")
-	for _, r := range repos {
-		lastErr := "-"
-		if r.LastError != nil && *r.LastError != "" {
-			// Truncate long error messages.
-			errStr := *r.LastError
-			if len(errStr) > 40 {
-				errStr = errStr[:37] + "..."
-			}
-			lastErr = errStr
-		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%d\t%s\t%s\n",
-			r.RepoID, domaintypes.NormalizeRepoURLSchemless(r.RepoURL), r.BaseRef, r.TargetRef, r.Attempt, r.Status, lastErr)
-	}
-	_ = tw.Flush()
-	return nil
-}
-
 // -----------------------------------------------------------------------------
 // HTTP client helpers for batch repo operations
 // -----------------------------------------------------------------------------
@@ -424,34 +363,4 @@ func doRunRepoRestart(ctx context.Context, base *url.URL, client *http.Client, b
 		return runRepoResponse{}, fmt.Errorf("decode response: %w", err)
 	}
 	return result, nil
-}
-
-// doRunRepoList sends GET /v1/runs/{id}/repos to list repos within a batch.
-func doRunRepoList(ctx context.Context, base *url.URL, client *http.Client, batchID string) ([]runRepoResponse, error) {
-	endpoint := base.JoinPath("v1", "runs", batchID, "repos")
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("http request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(bodyBytes)))
-	}
-
-	// Response is {"repos": [...]}
-	var result struct {
-		Repos []runRepoResponse `json:"repos"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return result.Repos, nil
 }

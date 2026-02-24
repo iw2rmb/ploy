@@ -60,14 +60,14 @@ Legend: [ ] todo, [x] done.
   - Tests: JSON snapshot tests and schema-shape tests; parity assertions against human renderer fixture input.
 
 ## Phase 4: Command Surface Consolidation (Remove Variants)
-- [ ] Remove `ploy mig run repo status` and route users to `ploy run status` — enforces a single status/report entrypoint.
+- [x] Remove `ploy mig run repo status` and route users to `ploy run status` — enforces a single status/report entrypoint.
   - Repository: `ploy`
   - Component: `cmd/ploy/mig_run_repo.go`, mig command routing/help
   - Scope: Delete repo status handler and usage lines; update command errors/help text to point to `ploy run status <run-id> [--json]`.
   - Snippets: error text `mig run repo status has been removed; use 'ploy run status <run-id>'`
   - Tests: Command routing tests updated for removed action.
 
-- [ ] Remove/replace other status-format variants in CLI docs/help/tests — completes de-duplication.
+- [x] Remove/replace other status-format variants in CLI docs/help/tests — completes de-duplication.
   - Repository: `ploy`
   - Component: `cmd/ploy/usage.go`, `cmd/ploy/README.md`, help goldens, docs references
   - Scope: Ensure docs and help expose only one report command with two formats; remove stale examples mentioning removed status variant.

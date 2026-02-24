@@ -154,7 +154,7 @@ If a repository job fails or needs reprocessing with a different branch, use
 `mig run repo restart`:
 
 ```bash
-# Restart repo-a with a hotfix branch (use repo-id from `mig run repo status`).
+# Restart repo-a with a hotfix branch (discover repo-id from `ploy run status --json`).
 # Repo IDs are NanoID(8) strings (e.g., "a1b2c3d4").
 ploy mig run repo restart \
   --repo-id <repo-id> \
