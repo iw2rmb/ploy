@@ -68,7 +68,7 @@ func TestModRunRepoRouting(t *testing.T) {
 		{
 			name:    "status without run-id",
 			args:    []string{"mig", "run", "repo", "status"},
-			wantErr: "run-id required",
+			wantErr: "mig run repo status has been removed; use 'ploy run status <run-id>'",
 		},
 	}
 
@@ -278,89 +278,19 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestModRunRepoStatusCallsControlPlane verifies that `mig run repo status` calls the correct endpoint.
-// Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoStatusCallsControlPlane(t *testing.T) {
-	var called bool
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Expect GET /v1/runs/{id}/repos
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos" {
-			called = true
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
-			repos := []runRepoResponse{
-				{
-					RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-					RepoID:    "e5f6g7h8", // mod_repos.id (NanoID, 8 chars)
-					RepoURL:   "https://github.com/org/repo1.git",
-					BaseRef:   "main",
-					TargetRef: "feature-1",
-					Status:    "Success",
-					Attempt:   1,
-					CreatedAt: time.Now(),
-				},
-				{
-					RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-					RepoID:    "i9j0k1l2", // mod_repos.id (NanoID, 8 chars)
-					RepoURL:   "https://github.com/org/repo2.git",
-					BaseRef:   "main",
-					TargetRef: "feature-2",
-					Status:    "Queued",
-					Attempt:   1,
-					CreatedAt: time.Now(),
-				},
-			}
-			resp := struct {
-				Repos []runRepoResponse `json:"repos"`
-			}{Repos: repos}
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	useServerDescriptor(t, server.URL)
+// RED gate for roadmap/reporting.md Phase 0:
+// repo status must be removed in favor of `ploy run status`.
+func TestModRunRepoStatusRemoved(t *testing.T) {
+	t.Parallel()
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "run", "repo", "status", "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep"}, buf)
-	if err != nil {
-		t.Fatalf("mig run repo status error: %v", err)
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
-	if !called {
-		t.Fatal("expected GET /v1/runs/{id}/repos to be called")
-	}
-}
-
-// TestModRunRepoStatusEmptyBatch verifies that `mig run repo status` handles empty batches.
-// Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoStatusEmptyBatch(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/empty-batch/repos" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			resp := struct {
-				Repos []runRepoResponse `json:"repos"`
-			}{Repos: []runRepoResponse{}}
-			_ = json.NewEncoder(w).Encode(resp)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	useServerDescriptor(t, server.URL)
-
-	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"mig", "run", "repo", "status", "empty-batch"}, buf)
-	if err != nil {
-		t.Fatalf("mig run repo status error: %v", err)
-	}
-	// Should print "No repos found in this batch."
-	if !strings.Contains(buf.String(), "No repos found") {
-		t.Errorf("expected 'No repos found' message, got: %s", buf.String())
+	want := "mig run repo status has been removed; use 'ploy run status <run-id>'"
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("expected error to contain %q, got %q", want, err.Error())
 	}
 }
 
