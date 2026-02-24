@@ -55,7 +55,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		_, _ = fmt.Fprintf(w, "  Build Log: %s\n", renderLink("build-log", repo.BuildLogURL, opts.EnableOSC8))
 		_, _ = fmt.Fprintf(w, "  Patch: %s\n", renderLink("patch", repo.PatchURL, opts.EnableOSC8))
 
-		repoErr := formatErrorOneLiner(repo.LastError)
+		repoErr := FormatErrorOneLiner(repo.LastError)
 		if repoErr != "" {
 			_, _ = fmt.Fprintf(w, "  Error: %s\n", repoErr)
 		}
@@ -78,9 +78,9 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 				statusToken(job.Status),
 				valueOrDash(strings.TrimSpace(job.JobType)),
 				valueOrDash(job.JobID.String()),
-				formatNodeID(job.NodeID),
+				FormatNodeID(job.NodeID),
 				valueOrDash(strings.TrimSpace(job.JobImage)),
-				formatDurationMs(job.DurationMs),
+				FormatDurationCompact(job.DurationMs),
 				renderLink("build-log", buildLogURL, opts.EnableOSC8),
 				renderLink("patch", patchURL, opts.EnableOSC8),
 			)
@@ -172,23 +172,6 @@ func statusToken(status string) string {
 	}
 }
 
-func formatDurationMs(durationMs int64) string {
-	if durationMs <= 0 {
-		return "-"
-	}
-	if durationMs < 1000 {
-		return fmt.Sprintf("%dms", durationMs)
-	}
-	return fmt.Sprintf("%.1fs", float64(durationMs)/1000.0)
-}
-
-func formatNodeID(nodeID *domaintypes.NodeID) string {
-	if nodeID == nil || nodeID.IsZero() {
-		return "-"
-	}
-	return nodeID.String()
-}
-
 func renderLink(label, rawURL string, enableOSC8 bool) string {
 	url := strings.TrimSpace(rawURL)
 	if url == "" {
@@ -198,17 +181,6 @@ func renderLink(label, rawURL string, enableOSC8 bool) string {
 		return fmt.Sprintf("%s (%s)", label, url)
 	}
 	return "\x1b]8;;" + url + "\x1b\\" + label + "\x1b]8;;\x1b\\"
-}
-
-func formatErrorOneLiner(lastErr *string) string {
-	if lastErr == nil {
-		return ""
-	}
-	fields := strings.Fields(*lastErr)
-	if len(fields) == 0 {
-		return ""
-	}
-	return strings.Join(fields, " ")
 }
 
 func valueOrDash(v string) string {
