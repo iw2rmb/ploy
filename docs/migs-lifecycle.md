@@ -1153,8 +1153,17 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
     `retention` events (see `internal/cli/migs/logs.go`).
   - This is the canonical surface for streaming container stdout/stderr.
 
-- Run summaries (gate/MR/job graph) are exposed via:
-  - `ploy run status <run-id>` (CLI)
+- `ploy run status <run-id>`:
+  - Fetches the canonical `RunReport` model (run identity, mig name/spec, repos,
+    jobs, and link metadata) before rendering.
+  - Renders a one-shot, follow-style snapshot with repo headers in the form
+    `Repo: <repo> <base> -> <target>`, plus status tokens, durations, and
+    repo/job errors.
+  - Build-log and patch references are rendered as OSC8 hyperlinks when output
+    is a terminal that advertises support; otherwise links fall back to plain
+    text labels with URLs.
+
+- Run summaries (gate/MR/job graph) are also exposed via:
   - `GET /v1/runs/{id}/status` (HTTP)
 
 ## 7. SSE Contract

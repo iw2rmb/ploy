@@ -37,14 +37,14 @@ Legend: [ ] todo, [x] done.
   - Tests: Builder tests verify URL presence/absence and stable formatting.
 
 ## Phase 2: Renderer 1 (Human Follow-Style Snapshot)
-- [ ] Reuse follow visual language for `run status` output — provides one readable operator format.
+- [x] Reuse follow visual language for `run status` output — provides one readable operator format.
   - Repository: `ploy`
   - Component: `cmd/ploy/run_commands.go`, `internal/cli/follow` (shared rendering helpers)
   - Scope: Render a static snapshot that matches follow job graph style; prepend run header with mig name and spec id; print repo header as `Repo: <repo> <base> -> <target>`; include statuses, durations, and errors.
   - Snippets: `Repo: github.com/org/repo main -> ploy/upgrade`
   - Tests: Golden output tests for representative runs (success, fail, partial, empty repos).
 
-- [ ] Add OSC8 hyperlinks for build logs and patches in text report — improves terminal navigation without changing JSON schema.
+- [x] Add OSC8 hyperlinks for build logs and patches in text report — improves terminal navigation without changing JSON schema.
   - Repository: `ploy`
   - Component: status renderer utilities
   - Scope: Emit OSC8 links when terminal supports them; provide plain-text fallback labels when unsupported or disabled.
@@ -90,4 +90,4 @@ Legend: [ ] todo, [x] done.
   - Tests: no golden drift except intentional header additions/links.
 
 ## Open Questions
-- Should OSC8 links be enabled by default on all terminals or gated behind an explicit opt-in flag/environment variable?
+- None.

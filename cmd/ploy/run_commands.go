@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -79,46 +80,39 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	cmd := runcmd.GetStatusCommand{
+	report, err := runcmd.GetRunReportCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		RunID:   domaintypes.RunID(runID),
-	}
-
-	summary, err := cmd.Run(ctx)
+	}.Run(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Rich summary output (previously used by `ploy mig run status`).
-	_, _ = fmt.Fprintf(stderr, "Run: %s\n", summary.ID)
-	_, _ = fmt.Fprintf(stderr, "Status: %s\n", summary.Status)
-	_, _ = fmt.Fprintf(stderr, "Mod ID: %s\n", summary.MigID)
-	_, _ = fmt.Fprintf(stderr, "Spec ID: %s\n", summary.SpecID)
-	if summary.CreatedBy != nil && *summary.CreatedBy != "" {
-		_, _ = fmt.Fprintf(stderr, "Created By: %s\n", *summary.CreatedBy)
-	}
-	_, _ = fmt.Fprintf(stderr, "Created At: %s\n", summary.CreatedAt.Format("2006-01-02 15:04:05"))
-	if summary.StartedAt != nil {
-		_, _ = fmt.Fprintf(stderr, "Started At: %s\n", summary.StartedAt.Format("2006-01-02 15:04:05"))
-	}
-	if summary.FinishedAt != nil {
-		_, _ = fmt.Fprintf(stderr, "Finished At: %s\n", summary.FinishedAt.Format("2006-01-02 15:04:05"))
-	}
-
-	if summary.Counts != nil {
-		_, _ = fmt.Fprintln(stderr, "")
-		_, _ = fmt.Fprintln(stderr, "Repo Counts:")
-		_, _ = fmt.Fprintf(stderr, "  Total:     %d\n", summary.Counts.Total)
-		_, _ = fmt.Fprintf(stderr, "  Queued:    %d\n", summary.Counts.Queued)
-		_, _ = fmt.Fprintf(stderr, "  Running:   %d\n", summary.Counts.Running)
-		_, _ = fmt.Fprintf(stderr, "  Success:   %d\n", summary.Counts.Success)
-		_, _ = fmt.Fprintf(stderr, "  Fail:      %d\n", summary.Counts.Fail)
-		_, _ = fmt.Fprintf(stderr, "  Cancelled: %d\n", summary.Counts.Cancelled)
-		_, _ = fmt.Fprintf(stderr, "  Derived:   %s\n", summary.Counts.DerivedStatus)
+	if err := runcmd.RenderRunReportText(stderr, report, runcmd.TextRenderOptions{
+		EnableOSC8: runStatusSupportsOSC8(stderr),
+	}); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func runStatusSupportsOSC8(w io.Writer) bool {
+	term := strings.TrimSpace(os.Getenv("TERM"))
+	if term == "" || strings.EqualFold(term, "dumb") {
+		return false
+	}
+
+	file, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return false
+	}
+	return (info.Mode() & os.ModeCharDevice) != 0
 }
 
 func handleRunLogs(args []string, stderr io.Writer) error {
