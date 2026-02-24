@@ -294,7 +294,7 @@ func (e *Engine) render() {
 	for i, repoID := range e.repoOrder {
 		repoURL := e.repoURLs[repoID]
 		jobs := e.repoJobs[repoID]
-		repoErr := formatErrorOneLiner(e.repoErrors[repoID])
+		repoErr := runs.FormatErrorOneLiner(e.repoErrors[repoID])
 		repoErrRendered := false
 
 		_, _ = fmt.Fprintln(tw)
@@ -303,17 +303,14 @@ func (e *Engine) render() {
 
 		for _, job := range jobs {
 
-			nodeID := "-"
-			if job.NodeID != nil && !job.NodeID.IsZero() {
-				nodeID = job.NodeID.String()
-			}
+			nodeID := runs.FormatNodeID(job.NodeID)
 			image := strings.TrimSpace(job.JobImage)
 			if image == "" {
 				image = "-"
 			}
 
 			glyph := statusGlyph(string(job.Status), e.spinnerFrame)
-			duration := formatDuration(job)
+			duration := runs.FormatDurationMsOrElapsed(job.DurationMs, job.StartedAt, job.FinishedAt, time.Now())
 
 			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 				glyph,
@@ -387,35 +384,6 @@ func statusGlyph(status string, spinnerFrame int) string {
 	default:
 		return " "
 	}
-}
-
-func formatErrorOneLiner(lastErr *string) string {
-	if lastErr == nil {
-		return ""
-	}
-	fields := strings.Fields(*lastErr)
-	if len(fields) == 0 {
-		return ""
-	}
-	return strings.Join(fields, " ")
-}
-
-func formatDuration(job runs.RepoJobEntry) string {
-	if job.DurationMs > 0 {
-		return fmt.Sprintf("%dms", job.DurationMs)
-	}
-	// Fallback: compute from timestamps if duration_ms not set
-	if job.FinishedAt != nil && job.StartedAt != nil {
-		// Terminal job: use finished_at - started_at
-		d := job.FinishedAt.Sub(*job.StartedAt)
-		return fmt.Sprintf("%.1fs", d.Seconds())
-	}
-	if job.StartedAt != nil {
-		// Running job: use time since started
-		d := time.Since(*job.StartedAt)
-		return fmt.Sprintf("%.1fs", d.Seconds())
-	}
-	return "-"
 }
 
 func isTerminalState(s modsapi.RunState) bool {

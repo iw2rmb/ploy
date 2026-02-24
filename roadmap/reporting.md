@@ -75,14 +75,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./cmd/ploy/...` help golden checks pass.
 
 ## Phase 5: GREEN and REFACTOR Validation
-- [ ] Complete GREEN phase with local unit tests and build checks — validates behavior and command UX.
+- [x] Complete GREEN phase with local unit tests and build checks — validates behavior and command UX.
   - Repository: `ploy`
   - Component: CLI + internal report packages
   - Scope: Make all RED tests pass after implementation; keep scope limited to reporting/status surfaces.
   - Snippets: `make test`; `make build`
   - Tests: all relevant CLI/report tests green.
 
-- [ ] REFACTOR shared output code between follow and status report — removes duplication while preserving behavior.
+- [x] REFACTOR shared output code between follow and status report — removes duplication while preserving behavior.
   - Repository: `ploy`
   - Component: `internal/cli/follow`, `internal/cli/runs`
   - Scope: Extract shared row/column formatting primitives and keep follow dynamic redraw independent from status one-shot rendering.
