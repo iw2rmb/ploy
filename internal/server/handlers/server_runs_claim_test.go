@@ -20,7 +20,7 @@ func TestClaimJob_Success(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -54,7 +54,7 @@ func TestClaimJob_Success(t *testing.T) {
 			Status:        store.RunRepoStatusQueued,
 			Attempt:       1,
 		},
-		getModRepoResult: store.ModRepo{
+		getModRepoResult: store.MigRepo{
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},
@@ -125,7 +125,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -159,7 +159,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 			Status:        store.RunRepoStatusQueued,
 			Attempt:       1,
 		},
-		getModRepoResult: store.ModRepo{
+		getModRepoResult: store.MigRepo{
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},
@@ -185,7 +185,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -219,7 +219,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 			Status:        store.RunRepoStatusSuccess,
 			Attempt:       1,
 		},
-		getModRepoResult: store.ModRepo{
+		getModRepoResult: store.MigRepo{
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},
@@ -303,7 +303,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -339,7 +339,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 			Status:        store.RunRepoStatusQueued,
 			Attempt:       1,
 		},
-		getModRepoResult: store.ModRepo{
+		getModRepoResult: store.MigRepo{
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},
@@ -395,7 +395,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -429,7 +429,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 			Status:        store.RunRepoStatusQueued,
 			Attempt:       1,
 		},
-		getModRepoResult: store.ModRepo{
+		getModRepoResult: store.MigRepo{
 			ID:      repoID,
 			RepoUrl: "https://github.com/user/repo.git",
 		},

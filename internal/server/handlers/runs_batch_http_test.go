@@ -49,10 +49,10 @@ type addRunRepoStoreMock struct {
 	getRunResult store.Run
 	getRunErr    error
 
-	createModRepoCalled bool
-	createModRepoParams store.CreateModRepoParams
-	createModRepoResult store.ModRepo
-	createModRepoErr    error
+	createMigRepoCalled bool
+	createMigRepoParams store.CreateMigRepoParams
+	createMigRepoResult store.MigRepo
+	createMigRepoErr    error
 
 	createRunRepoCalled bool
 	createRunRepoParams store.CreateRunRepoParams
@@ -71,10 +71,10 @@ func (m *addRunRepoStoreMock) GetRun(ctx context.Context, id domaintypes.RunID) 
 	return m.getRunResult, m.getRunErr
 }
 
-func (m *addRunRepoStoreMock) CreateModRepo(ctx context.Context, params store.CreateModRepoParams) (store.ModRepo, error) {
-	m.createModRepoCalled = true
-	m.createModRepoParams = params
-	return m.createModRepoResult, m.createModRepoErr
+func (m *addRunRepoStoreMock) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
+	m.createMigRepoCalled = true
+	m.createMigRepoParams = params
+	return m.createMigRepoResult, m.createMigRepoErr
 }
 
 func (m *addRunRepoStoreMock) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
@@ -90,8 +90,8 @@ func (m *addRunRepoStoreMock) CreateRunRepo(ctx context.Context, params store.Cr
 	if result.RepoID.IsZero() {
 		result.RepoID = params.RepoID
 	}
-	if result.ModID.IsZero() {
-		result.ModID = params.ModID
+	if result.MigID.IsZero() {
+		result.MigID = params.MigID
 	}
 	if result.RepoBaseRef == "" {
 		result.RepoBaseRef = params.RepoBaseRef
@@ -144,7 +144,7 @@ type cancelRunRepoStoreMock struct {
 	getRunRepoErr     error
 	getRunRepoCalls   int
 
-	getModRepoResult store.ModRepo
+	getModRepoResult store.MigRepo
 	getModRepoErr    error
 
 	updateRunRepoStatusCalled bool
@@ -172,7 +172,7 @@ func (m *cancelRunRepoStoreMock) GetRunRepo(ctx context.Context, arg store.GetRu
 	return m.getRunRepoResults[idx], nil
 }
 
-func (m *cancelRunRepoStoreMock) GetModRepo(ctx context.Context, id domaintypes.ModRepoID) (store.ModRepo, error) {
+func (m *cancelRunRepoStoreMock) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
 	return m.getModRepoResult, m.getModRepoErr
 }
 
@@ -209,7 +209,7 @@ type restartRunRepoStoreMock struct {
 	updateRunRepoRefsParams []store.UpdateRunRepoRefsParams
 
 	updateModRepoRefsCalled bool
-	updateModRepoRefsParams []store.UpdateModRepoRefsParams
+	updateModRepoRefsParams []store.UpdateMigRepoRefsParams
 
 	incrementRunRepoAttemptCalled bool
 	incrementRunRepoAttemptParam  store.IncrementRunRepoAttemptParams
@@ -222,7 +222,7 @@ type restartRunRepoStoreMock struct {
 	createJobParams    []store.CreateJobParams
 	createJobErr       error
 
-	getModRepoResult store.ModRepo
+	getModRepoResult store.MigRepo
 	getModRepoErr    error
 }
 
@@ -257,7 +257,7 @@ func (m *restartRunRepoStoreMock) UpdateRunRepoRefs(ctx context.Context, params 
 	return nil
 }
 
-func (m *restartRunRepoStoreMock) UpdateModRepoRefs(ctx context.Context, params store.UpdateModRepoRefsParams) error {
+func (m *restartRunRepoStoreMock) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
 	m.updateModRepoRefsCalled = true
 	m.updateModRepoRefsParams = append(m.updateModRepoRefsParams, params)
 	return nil
@@ -282,7 +282,7 @@ func (m *restartRunRepoStoreMock) CreateJob(ctx context.Context, params store.Cr
 	return store.Job{ID: domaintypes.NewJobID()}, nil
 }
 
-func (m *restartRunRepoStoreMock) GetModRepo(ctx context.Context, id domaintypes.ModRepoID) (store.ModRepo, error) {
+func (m *restartRunRepoStoreMock) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
 	return m.getModRepoResult, m.getModRepoErr
 }
 
@@ -364,7 +364,7 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	st := &cancelRunStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -395,7 +395,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 	st := &cancelRunStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -424,7 +424,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 	st := &cancelRunStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
 			Status:    store.RunStatusCancelled,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -449,19 +449,19 @@ func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	st := &addRunRepoStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    specID,
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
-		createModRepoResult: store.ModRepo{
+		createMigRepoResult: store.MigRepo{
 			ID:        repoID,
 			RepoUrl:   "https://github.com/org/repo.git",
 			BaseRef:   "main",
@@ -484,8 +484,8 @@ func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !st.createModRepoCalled || !st.createRunRepoCalled {
-		t.Fatalf("expected CreateModRepo and CreateRunRepo to be called")
+	if !st.createMigRepoCalled || !st.createRunRepoCalled {
+		t.Fatalf("expected CreateMigRepo and CreateRunRepo to be called")
 	}
 	if st.createJobCallCount != 3 {
 		t.Fatalf("expected 3 jobs to be created for new repo, got %d", st.createJobCallCount)
@@ -496,7 +496,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	st := &listRunReposStoreMock{
 		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
@@ -563,7 +563,7 @@ func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	st := &cancelRunRepoStoreMock{
 		getRunRepoErr: pgx.ErrNoRows,
 	}
@@ -584,13 +584,13 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	st := &restartRunRepoStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    specID,
 			Status:    store.RunStatusFinished,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -616,7 +616,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 			},
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
-		getModRepoResult: store.ModRepo{
+		getModRepoResult: store.MigRepo{
 			ID:      repoID,
 			RepoUrl: "https://github.com/org/repo.git",
 		},
@@ -655,7 +655,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	queuedRepo := store.RunRepo{
@@ -671,7 +671,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 	st := &startRunStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    specID,
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -713,7 +713,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 	st := &startRunStoreMock{
 		getRunResult: store.Run{
 			ID:        runID,
-			ModID:     domaintypes.NewModID(),
+			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
 			Status:    store.RunStatusCancelled,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},

@@ -36,7 +36,7 @@ type ListRunRepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  domaintypes.ModRepoID
+	RepoID  domaintypes.MigRepoID
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns all diff entries.
@@ -91,7 +91,7 @@ type DownloadDiffCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
-	RepoID  domaintypes.ModRepoID
+	RepoID  domaintypes.MigRepoID
 	DiffID  domaintypes.DiffID
 }
 

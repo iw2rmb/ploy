@@ -17,7 +17,7 @@ import (
 func TestAddModRepoCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewMigID().String()
 
 	tests := []struct {
 		name        string
@@ -67,8 +67,8 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 				}
 
 				resp := ModRepoSummary{
-					ID:        domaintypes.ModRepoID("repo-001"),
-					ModID:     domaintypes.ModID(tc.modID),
+					ID:        domaintypes.MigRepoID("repo-001"),
+					MigID:     domaintypes.MigID(tc.modID),
 					RepoURL:   tc.repoURL,
 					BaseRef:   domaintypes.GitRef(tc.baseRef),
 					TargetRef: domaintypes.GitRef(tc.targetRef),
@@ -86,7 +86,7 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 			cmd := AddModRepoCommand{
 				Client:    srv.Client(),
 				BaseURL:   baseURL,
-				ModRef:    domaintypes.ModRef(tc.modID),
+				MigRef:    domaintypes.MigRef(tc.modID),
 				RepoURL:   tc.repoURL,
 				BaseRef:   tc.baseRef,
 				TargetRef: tc.targetRef,
@@ -116,7 +116,7 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 func TestListModReposCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -127,8 +127,8 @@ func TestListModReposCommand_Run(t *testing.T) {
 			Repos []ModRepoSummary `json:"repos"`
 		}{
 			Repos: []ModRepoSummary{
-				{ID: domaintypes.ModRepoID("repo-001"), ModID: modID, RepoURL: "https://github.com/a/b.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("feat"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				{ID: domaintypes.ModRepoID("repo-002"), ModID: modID, RepoURL: "https://github.com/c/d.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("fix"), CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+				{ID: domaintypes.MigRepoID("repo-001"), MigID: modID, RepoURL: "https://github.com/a/b.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("feat"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: domaintypes.MigRepoID("repo-002"), MigID: modID, RepoURL: "https://github.com/c/d.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("fix"), CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 		}
 
@@ -142,7 +142,7 @@ func TestListModReposCommand_Run(t *testing.T) {
 	cmd := ListModReposCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  domaintypes.ModRef(modID.String()),
+		MigRef:  domaintypes.MigRef(modID.String()),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -158,7 +158,7 @@ func TestListModReposCommand_Run(t *testing.T) {
 func TestRemoveModRepoCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
@@ -173,8 +173,8 @@ func TestRemoveModRepoCommand_Run(t *testing.T) {
 	cmd := RemoveModRepoCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  domaintypes.ModRef(modID.String()),
-		RepoID:  domaintypes.ModRepoID("repo-001"),
+		MigRef:  domaintypes.MigRef(modID.String()),
+		RepoID:  domaintypes.MigRepoID("repo-001"),
 	}
 
 	err := cmd.Run(context.Background())
@@ -187,7 +187,7 @@ func TestRemoveModRepoCommand_Run(t *testing.T) {
 func TestImportModReposCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -219,7 +219,7 @@ func TestImportModReposCommand_Run(t *testing.T) {
 	cmd := ImportModReposCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  domaintypes.ModRef(modID.String()),
+		MigRef:  domaintypes.MigRef(modID.String()),
 		CSVData: csvData,
 	}
 

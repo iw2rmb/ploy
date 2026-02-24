@@ -33,7 +33,7 @@ type RunRepoJobResponse struct {
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
 type ListRunRepoJobsResponse struct {
 	RunID   domaintypes.RunID     `json:"run_id"`
-	RepoID  domaintypes.ModRepoID `json:"repo_id"`
+	RepoID  domaintypes.MigRepoID `json:"repo_id"`
 	Attempt int32                 `json:"attempt"`
 	Jobs    []RunRepoJobResponse  `json:"jobs"`
 }
@@ -48,7 +48,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

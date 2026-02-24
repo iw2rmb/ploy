@@ -17,56 +17,56 @@ type mockStore struct {
 	updateCertMetadataParams store.UpdateNodeCertMetadataParams
 	updateCertMetadataErr    error
 
-	// v1 mods/specs/mod_repos tracking (used by /v1/mods and /v1/runs handlers)
+	// v1 migs/specs/mig_repos tracking (used by /v1/migs and /v1/runs handlers)
 	createSpecCalled bool
 	createSpecParams store.CreateSpecParams
 	createSpecResult store.Spec
 	createSpecErr    error
 
 	updateModSpecCalled bool
-	updateModSpecParams store.UpdateModSpecParams
+	updateModSpecParams store.UpdateMigSpecParams
 	updateModSpecErr    error
 
-	createModCalled bool
-	createModParams store.CreateModParams
-	createModResult store.Mod
-	createModErr    error
+	createMigCalled bool
+	createMigParams store.CreateMigParams
+	createMigResult store.Mig
+	createMigErr    error
 
-	listModsCalled bool
-	listModsParams store.ListModsParams
-	listModsResult []store.Mod
-	listModsErr    error
+	listMigsCalled bool
+	listMigsParams store.ListMigsParams
+	listMigsResult []store.Mig
+	listMigsErr    error
 
 	getModCalled bool
 	getModParam  string
-	getModResult store.Mod
+	getModResult store.Mig
 	getModErr    error
 
 	getModByNameCalled bool
 	getModByNameParam  string
-	getModByNameResult store.Mod
+	getModByNameResult store.Mig
 	getModByNameErr    error
 
-	deleteModCalled bool
-	deleteModParam  string
-	deleteModErr    error
+	deleteMigCalled bool
+	deleteMigParam  string
+	deleteMigErr    error
 
-	archiveModCalled bool
-	archiveModParam  string
-	archiveModErr    error
+	archiveMigCalled bool
+	archiveMigParam  string
+	archiveMigErr    error
 
-	unarchiveModCalled bool
-	unarchiveModParam  string
-	unarchiveModErr    error
+	unarchiveMigCalled bool
+	unarchiveMigParam  string
+	unarchiveMigErr    error
 
-	createModRepoCalled bool
-	createModRepoParams store.CreateModRepoParams
-	createModRepoResult store.ModRepo
-	createModRepoErr    error
+	createMigRepoCalled bool
+	createMigRepoParams store.CreateMigRepoParams
+	createMigRepoResult store.MigRepo
+	createMigRepoErr    error
 
 	getModRepoCalled bool
 	getModRepoParam  string
-	getModRepoResult store.ModRepo
+	getModRepoResult store.MigRepo
 	getModRepoErr    error
 
 	createRunCalled bool
@@ -413,39 +413,39 @@ type mockStore struct {
 	createRunRepoResult store.RunRepo
 	createRunRepoErr    error
 
-	listModReposByModCalled  bool
-	listModReposByModParam   string
-	listModReposByModResult  []store.ModRepo
-	listModReposByModResults map[string][]store.ModRepo
-	listModReposByModErr     error
+	listMigReposByModCalled  bool
+	listMigReposByModParam   string
+	listMigReposByModResult  []store.MigRepo
+	listMigReposByModResults map[string][]store.MigRepo
+	listMigReposByModErr     error
 
-	// GetModRepoByURL tracking (for bulk upsert duplicate detection)
+	// GetMigRepoByURL tracking (for bulk upsert duplicate detection)
 	getModRepoByURLCalled bool
-	getModRepoByURLParams store.GetModRepoByURLParams
-	getModRepoByURLResult store.ModRepo
+	getModRepoByURLParams store.GetMigRepoByURLParams
+	getModRepoByURLResult store.MigRepo
 	getModRepoByURLErr    error
 
-	// UpsertModRepo tracking (for bulk upsert)
+	// UpsertMigRepo tracking (for bulk upsert)
 	upsertModRepoCalled bool
-	upsertModRepoParams store.UpsertModRepoParams
-	upsertModRepoResult store.ModRepo
+	upsertModRepoParams store.UpsertMigRepoParams
+	upsertModRepoResult store.MigRepo
 	upsertModRepoErr    error
 
-	// DeleteModRepo tracking
-	deleteModRepoCalled bool
-	deleteModRepoParam  string
-	deleteModRepoErr    error
+	// DeleteMigRepo tracking
+	deleteMigRepoCalled bool
+	deleteMigRepoParam  string
+	deleteMigRepoErr    error
 
-	// HasModRepoHistory tracking (for delete validation)
+	// HasMigRepoHistory tracking (for delete validation)
 	hasModRepoHistoryCalled bool
 	hasModRepoHistoryParam  string
 	hasModRepoHistoryResult bool
 	hasModRepoHistoryErr    error
 
-	// ListFailedRepoIDsByMod tracking (for "failed" repo selection)
+	// ListFailedRepoIDsByMig tracking (for "failed" repo selection)
 	listFailedRepoIDsByModCalled bool
 	listFailedRepoIDsByModParam  string
-	listFailedRepoIDsByModResult []types.ModRepoID
+	listFailedRepoIDsByModResult []types.MigRepoID
 	listFailedRepoIDsByModErr    error
 
 	// ListRunReposWithURLByRun tracking (for pull resolution)
@@ -454,10 +454,10 @@ type mockStore struct {
 	listRunReposWithURLByRunResult []store.ListRunReposWithURLByRunRow
 	listRunReposWithURLByRunErr    error
 
-	// GetLatestRunRepoByModAndRepoStatus tracking (for mod pull resolution)
+	// GetLatestRunRepoByMigAndRepoStatus tracking (for mod pull resolution)
 	getLatestRunRepoByModAndRepoStatusCalled bool
-	getLatestRunRepoByModAndRepoStatusParams store.GetLatestRunRepoByModAndRepoStatusParams
-	getLatestRunRepoByModAndRepoStatusResult store.GetLatestRunRepoByModAndRepoStatusRow
+	getLatestRunRepoByModAndRepoStatusParams store.GetLatestRunRepoByMigAndRepoStatusParams
+	getLatestRunRepoByModAndRepoStatusResult store.GetLatestRunRepoByMigAndRepoStatusRow
 	getLatestRunRepoByModAndRepoStatusErr    error
 
 	// GetRunRepo tracking — composite key (run_id, repo_id).
@@ -529,11 +529,11 @@ func (m *mockStore) CreateSpec(ctx context.Context, params store.CreateSpecParam
 	return result, m.createSpecErr
 }
 
-func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams) (store.Mod, error) {
-	m.createModCalled = true
-	m.createModParams = params
+func (m *mockStore) CreateMig(ctx context.Context, params store.CreateMigParams) (store.Mig, error) {
+	m.createMigCalled = true
+	m.createMigParams = params
 
-	result := m.createModResult
+	result := m.createMigResult
 	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
@@ -542,35 +542,35 @@ func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams)
 	}
 	result.SpecID = params.SpecID
 	result.CreatedBy = params.CreatedBy
-	return result, m.createModErr
+	return result, m.createMigErr
 }
 
-func (m *mockStore) UpdateModSpec(ctx context.Context, params store.UpdateModSpecParams) error {
+func (m *mockStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpecParams) error {
 	m.updateModSpecCalled = true
 	m.updateModSpecParams = params
 	return m.updateModSpecErr
 }
 
-func (m *mockStore) ListMods(ctx context.Context, params store.ListModsParams) ([]store.Mod, error) {
-	m.listModsCalled = true
-	m.listModsParams = params
+func (m *mockStore) ListMigs(ctx context.Context, params store.ListMigsParams) ([]store.Mig, error) {
+	m.listMigsCalled = true
+	m.listMigsParams = params
 	// Simulate pagination: return empty list when offset exceeds available results.
-	if int(params.Offset) >= len(m.listModsResult) {
-		return []store.Mod{}, m.listModsErr
+	if int(params.Offset) >= len(m.listMigsResult) {
+		return []store.Mig{}, m.listMigsErr
 	}
 	// Apply simple pagination simulation: return slice starting at offset, up to limit.
 	end := int(params.Offset) + int(params.Limit)
-	if end > len(m.listModsResult) {
-		end = len(m.listModsResult)
+	if end > len(m.listMigsResult) {
+		end = len(m.listMigsResult)
 	}
-	return m.listModsResult[params.Offset:end], m.listModsErr
+	return m.listMigsResult[params.Offset:end], m.listMigsErr
 }
 
-func (m *mockStore) GetMod(ctx context.Context, id types.ModID) (store.Mod, error) {
+func (m *mockStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error) {
 	m.getModCalled = true
 	m.getModParam = id.String()
 	if m.getModErr != nil {
-		return store.Mod{}, m.getModErr
+		return store.Mig{}, m.getModErr
 	}
 	result := m.getModResult
 	if result.ID.IsZero() {
@@ -582,17 +582,17 @@ func (m *mockStore) GetMod(ctx context.Context, id types.ModID) (store.Mod, erro
 	return result, nil
 }
 
-func (m *mockStore) GetModByName(ctx context.Context, name string) (store.Mod, error) {
+func (m *mockStore) GetMigByName(ctx context.Context, name string) (store.Mig, error) {
 	m.getModByNameCalled = true
 	m.getModByNameParam = name
 	if m.getModByNameErr != nil {
-		return store.Mod{}, m.getModByNameErr
+		return store.Mig{}, m.getModByNameErr
 	}
 
 	// Default behavior: not found unless explicitly configured.
 	result := m.getModByNameResult
 	if result.ID.IsZero() && result.Name == "" {
-		return store.Mod{}, pgx.ErrNoRows
+		return store.Mig{}, pgx.ErrNoRows
 	}
 	if result.Name == "" {
 		result.Name = name
@@ -600,34 +600,34 @@ func (m *mockStore) GetModByName(ctx context.Context, name string) (store.Mod, e
 	return result, nil
 }
 
-func (m *mockStore) DeleteMod(ctx context.Context, id types.ModID) error {
-	m.deleteModCalled = true
-	m.deleteModParam = id.String()
-	return m.deleteModErr
+func (m *mockStore) DeleteMig(ctx context.Context, id types.MigID) error {
+	m.deleteMigCalled = true
+	m.deleteMigParam = id.String()
+	return m.deleteMigErr
 }
 
-func (m *mockStore) ArchiveMod(ctx context.Context, id types.ModID) error {
-	m.archiveModCalled = true
-	m.archiveModParam = id.String()
-	return m.archiveModErr
+func (m *mockStore) ArchiveMig(ctx context.Context, id types.MigID) error {
+	m.archiveMigCalled = true
+	m.archiveMigParam = id.String()
+	return m.archiveMigErr
 }
 
-func (m *mockStore) UnarchiveMod(ctx context.Context, id types.ModID) error {
-	m.unarchiveModCalled = true
-	m.unarchiveModParam = id.String()
-	return m.unarchiveModErr
+func (m *mockStore) UnarchiveMig(ctx context.Context, id types.MigID) error {
+	m.unarchiveMigCalled = true
+	m.unarchiveMigParam = id.String()
+	return m.unarchiveMigErr
 }
 
-func (m *mockStore) CreateModRepo(ctx context.Context, params store.CreateModRepoParams) (store.ModRepo, error) {
-	m.createModRepoCalled = true
-	m.createModRepoParams = params
+func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
+	m.createMigRepoCalled = true
+	m.createMigRepoParams = params
 
-	result := m.createModRepoResult
+	result := m.createMigRepoResult
 	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
-	if result.ModID.IsZero() {
-		result.ModID = params.ModID
+	if result.MigID.IsZero() {
+		result.MigID = params.MigID
 	}
 	if result.RepoUrl == "" {
 		result.RepoUrl = params.RepoUrl
@@ -638,25 +638,25 @@ func (m *mockStore) CreateModRepo(ctx context.Context, params store.CreateModRep
 	if result.TargetRef == "" {
 		result.TargetRef = params.TargetRef
 	}
-	return result, m.createModRepoErr
+	return result, m.createMigRepoErr
 }
 
-func (m *mockStore) GetModRepo(ctx context.Context, id types.ModRepoID) (store.ModRepo, error) {
+func (m *mockStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
 	m.getModRepoCalled = true
 	m.getModRepoParam = id.String()
 	return m.getModRepoResult, m.getModRepoErr
 }
 
-func (m *mockStore) ListModReposByMod(ctx context.Context, modID types.ModID) ([]store.ModRepo, error) {
-	m.listModReposByModCalled = true
+func (m *mockStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([]store.MigRepo, error) {
+	m.listMigReposByModCalled = true
 	modIDStr := modID.String()
-	m.listModReposByModParam = modIDStr
-	if m.listModReposByModResults != nil {
-		if repos, ok := m.listModReposByModResults[modIDStr]; ok {
-			return repos, m.listModReposByModErr
+	m.listMigReposByModParam = modIDStr
+	if m.listMigReposByModResults != nil {
+		if repos, ok := m.listMigReposByModResults[modIDStr]; ok {
+			return repos, m.listMigReposByModErr
 		}
 	}
-	return m.listModReposByModResult, m.listModReposByModErr
+	return m.listMigReposByModResult, m.listMigReposByModErr
 }
 
 func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
@@ -686,8 +686,8 @@ func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams)
 	if result.ID.IsZero() {
 		result.ID = params.ID
 	}
-	if result.ModID.IsZero() {
-		result.ModID = params.ModID
+	if result.MigID.IsZero() {
+		result.MigID = params.MigID
 	}
 	if result.SpecID.IsZero() {
 		result.SpecID = params.SpecID
@@ -1199,8 +1199,8 @@ func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRep
 	m.createRunRepoCalled = true
 	m.createRunRepoParams = params
 	result := m.createRunRepoResult
-	if result.ModID.IsZero() {
-		result.ModID = params.ModID
+	if result.MigID.IsZero() {
+		result.MigID = params.MigID
 	}
 	if result.RunID.IsZero() {
 		result.RunID = params.RunID
@@ -1283,23 +1283,23 @@ func (m *mockStore) DeleteGlobalEnv(ctx context.Context, key string) error {
 	return m.deleteGlobalEnvErr
 }
 
-// GetModRepoByURL returns a mod_repo by mod_id and repo_url.
-func (m *mockStore) GetModRepoByURL(ctx context.Context, arg store.GetModRepoByURLParams) (store.ModRepo, error) {
+// GetMigRepoByURL returns a mod_repo by mig_id and repo_url.
+func (m *mockStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByURLParams) (store.MigRepo, error) {
 	m.getModRepoByURLCalled = true
 	m.getModRepoByURLParams = arg
 	return m.getModRepoByURLResult, m.getModRepoByURLErr
 }
 
-// UpsertModRepo upserts a mod_repo by mod_id and repo_url.
-func (m *mockStore) UpsertModRepo(ctx context.Context, arg store.UpsertModRepoParams) (store.ModRepo, error) {
+// UpsertMigRepo upserts a mod_repo by mig_id and repo_url.
+func (m *mockStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoParams) (store.MigRepo, error) {
 	m.upsertModRepoCalled = true
 	m.upsertModRepoParams = arg
 	result := m.upsertModRepoResult
 	if result.ID.IsZero() {
 		result.ID = arg.ID
 	}
-	if result.ModID.IsZero() {
-		result.ModID = arg.ModID
+	if result.MigID.IsZero() {
+		result.MigID = arg.MigID
 	}
 	if result.RepoUrl == "" {
 		result.RepoUrl = arg.RepoUrl
@@ -1313,22 +1313,22 @@ func (m *mockStore) UpsertModRepo(ctx context.Context, arg store.UpsertModRepoPa
 	return result, m.upsertModRepoErr
 }
 
-// DeleteModRepo deletes a mod_repo by id.
-func (m *mockStore) DeleteModRepo(ctx context.Context, id types.ModRepoID) error {
-	m.deleteModRepoCalled = true
-	m.deleteModRepoParam = id.String()
-	return m.deleteModRepoErr
+// DeleteMigRepo deletes a mod_repo by id.
+func (m *mockStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
+	m.deleteMigRepoCalled = true
+	m.deleteMigRepoParam = id.String()
+	return m.deleteMigRepoErr
 }
 
-// HasModRepoHistory checks if a mod_repo has any historical executions.
-func (m *mockStore) HasModRepoHistory(ctx context.Context, repoID types.ModRepoID) (bool, error) {
+// HasMigRepoHistory checks if a mod_repo has any historical executions.
+func (m *mockStore) HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error) {
 	m.hasModRepoHistoryCalled = true
 	m.hasModRepoHistoryParam = repoID.String()
 	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
 }
 
-// ListFailedRepoIDsByMod returns repo IDs whose last terminal status is 'Fail'.
-func (m *mockStore) ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error) {
+// ListFailedRepoIDsByMig returns repo IDs whose last terminal status is 'Fail'.
+func (m *mockStore) ListFailedRepoIDsByMig(ctx context.Context, modID types.MigID) ([]types.MigRepoID, error) {
 	m.listFailedRepoIDsByModCalled = true
 	m.listFailedRepoIDsByModParam = modID.String()
 	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr
@@ -1341,8 +1341,8 @@ func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID types.Ru
 	return m.listRunReposWithURLByRunResult, m.listRunReposWithURLByRunErr
 }
 
-// GetLatestRunRepoByModAndRepoStatus returns the latest run_repos row for a repo in a mod filtered by status.
-func (m *mockStore) GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByModAndRepoStatusParams) (store.GetLatestRunRepoByModAndRepoStatusRow, error) {
+// GetLatestRunRepoByMigAndRepoStatus returns the latest run_repos row for a repo in a mod filtered by status.
+func (m *mockStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
 	m.getLatestRunRepoByModAndRepoStatusCalled = true
 	m.getLatestRunRepoByModAndRepoStatusParams = arg
 	return m.getLatestRunRepoByModAndRepoStatusResult, m.getLatestRunRepoByModAndRepoStatusErr

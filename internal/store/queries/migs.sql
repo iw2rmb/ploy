@@ -1,24 +1,24 @@
--- name: CreateMod :one
-INSERT INTO mods (id, name, spec_id, created_by)
+-- name: CreateMig :one
+INSERT INTO migs (id, name, spec_id, created_by)
 VALUES ($1, $2, $3, $4)
 RETURNING id, name, spec_id, created_by, created_at, archived_at;
 
--- name: GetMod :one
+-- name: GetMig :one
 SELECT id, name, spec_id, created_by, created_at, archived_at
-FROM mods
+FROM migs
 WHERE id = $1;
 
--- name: GetModByName :one
+-- name: GetMigByName :one
 SELECT id, name, spec_id, created_by, created_at, archived_at
-FROM mods
+FROM migs
 WHERE name = $1;
 
--- name: ListMods :many
--- Lists mods with optional filtering by archived status and name substring.
--- archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+-- name: ListMigs :many
+-- Lists migs with optional filtering by archived status and name substring.
+-- archived_only: if true, return only archived migs; if false, return only active migs; if null, return all.
 -- name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
 SELECT id, name, spec_id, created_by, created_at, archived_at
-FROM mods
+FROM migs
 WHERE (sqlc.narg(archived_only)::boolean IS NULL OR
        (sqlc.narg(archived_only)::boolean = true AND archived_at IS NOT NULL) OR
        (sqlc.narg(archived_only)::boolean = false AND archived_at IS NULL))
@@ -26,26 +26,26 @@ WHERE (sqlc.narg(archived_only)::boolean IS NULL OR
 ORDER BY created_at DESC, id DESC
 LIMIT $1 OFFSET $2;
 
--- name: UpdateModSpec :exec
-UPDATE mods
+-- name: UpdateMigSpec :exec
+UPDATE migs
 SET spec_id = $2
 WHERE id = $1;
 
--- name: ArchiveMod :exec
+-- name: ArchiveMig :exec
 -- Archives a mod by setting archived_at to now().
 -- Archiving must be refused when the mod has any jobs in a running state.
 -- This query only sets the timestamp; validation logic must be in the caller.
-UPDATE mods
+UPDATE migs
 SET archived_at = now()
 WHERE id = $1 AND archived_at IS NULL;
 
--- name: UnarchiveMod :exec
+-- name: UnarchiveMig :exec
 -- Unarchives a mod by clearing archived_at.
-UPDATE mods
+UPDATE migs
 SET archived_at = NULL
 WHERE id = $1 AND archived_at IS NOT NULL;
 
--- name: DeleteMod :exec
+-- name: DeleteMig :exec
 -- Deletes a mod. Use with caution; should only be called when safe to remove.
-DELETE FROM mods
+DELETE FROM migs
 WHERE id = $1;

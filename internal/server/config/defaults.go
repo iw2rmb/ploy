@@ -92,7 +92,7 @@ func applyDefaults(cfg *Config) {
 	if cfg.ControlPlane.StatusPublishInterval <= 0 {
 		cfg.ControlPlane.StatusPublishInterval = defaultStatusPublish
 	}
-	// Job* endpoints removed; nodes use /v1/nodes/* and clients stream via /v1/mods/*.
+	// Job* endpoints removed; nodes use /v1/nodes/* and clients stream via /v1/migs/*.
 
 	if cfg.ControlPlane.AssignmentBatchSize <= 0 {
 		cfg.ControlPlane.AssignmentBatchSize = 1

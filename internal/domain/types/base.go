@@ -15,8 +15,8 @@ type Validatable interface {
 // ErrEmpty indicates an empty or whitespace-only value.
 var ErrEmpty = errors.New("empty")
 
-// ErrInvalidModRef indicates a ModRef value contains invalid characters.
-var ErrInvalidModRef = errors.New("invalid mod ref: contains invalid characters")
+// ErrInvalidMigRef indicates a MigRef value contains invalid characters.
+var ErrInvalidMigRef = errors.New("invalid mod ref: contains invalid characters")
 
 // Normalize trims surrounding whitespace from s.
 func Normalize(s string) string { return strings.TrimSpace(s) }

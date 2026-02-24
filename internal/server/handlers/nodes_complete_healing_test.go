@@ -14,20 +14,20 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	specBytes, err := json.Marshal(map[string]any{
 		"steps": []any{
-			map[string]any{"image": "mods-orw:latest"},
+			map[string]any{"image": "migs-orw:latest"},
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
 				"retries": float64(2),
-				"image":   "mods-codex:latest",
+				"image":   "migs-codex:latest",
 			},
 			"router": map[string]any{
-				"image": "mods-router:latest",
+				"image": "migs-router:latest",
 			},
 		},
 	})
@@ -88,8 +88,8 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if healJob.Status != store.JobStatusQueued {
 		t.Fatalf("expected heal-1-0 status=Queued, got %s", healJob.Status)
 	}
-	if healJob.JobImage != "mods-codex:latest" {
-		t.Fatalf("expected heal-1-0 image=mods-codex:latest, got %q", healJob.JobImage)
+	if healJob.JobImage != "migs-codex:latest" {
+		t.Fatalf("expected heal-1-0 image=migs-codex:latest, got %q", healJob.JobImage)
 	}
 	if healJob.NextID == nil {
 		t.Fatalf("expected heal-1-0 next_id to be set")
@@ -118,12 +118,12 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	specBytes, err := json.Marshal(map[string]any{
 		"steps": []any{
-			map[string]any{"image": "mods-orw:latest"},
+			map[string]any{"image": "migs-orw:latest"},
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{

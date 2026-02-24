@@ -25,21 +25,19 @@ const (
 )
 
 func (e *JobStatus) Scan(src interface{}) error {
-	var parsed JobStatus
 	switch s := src.(type) {
 	case []byte:
-		parsed = JobStatus(s)
+		*e = JobStatus(s)
 	case string:
-		parsed = JobStatus(s)
+		*e = JobStatus(s)
 	default:
 		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
 	}
-	switch parsed {
+	switch *e {
 	case JobStatusCreated, JobStatusQueued, JobStatusRunning, JobStatusSuccess, JobStatusFail, JobStatusCancelled:
-		*e = parsed
 		return nil
 	default:
-		return fmt.Errorf("unknown JobStatus value: %q", parsed)
+		return fmt.Errorf("unknown JobStatus value: %q", string(*e))
 	}
 }
 
@@ -77,21 +75,19 @@ const (
 )
 
 func (e *RunRepoStatus) Scan(src interface{}) error {
-	var parsed RunRepoStatus
 	switch s := src.(type) {
 	case []byte:
-		parsed = RunRepoStatus(s)
+		*e = RunRepoStatus(s)
 	case string:
-		parsed = RunRepoStatus(s)
+		*e = RunRepoStatus(s)
 	default:
 		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
 	}
-	switch parsed {
+	switch *e {
 	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled, RunRepoStatusFail, RunRepoStatusSuccess:
-		*e = parsed
 		return nil
 	default:
-		return fmt.Errorf("unknown RunRepoStatus value: %q", parsed)
+		return fmt.Errorf("unknown RunRepoStatus value: %q", string(*e))
 	}
 }
 
@@ -127,21 +123,19 @@ const (
 )
 
 func (e *RunStatus) Scan(src interface{}) error {
-	var parsed RunStatus
 	switch s := src.(type) {
 	case []byte:
-		parsed = RunStatus(s)
+		*e = RunStatus(s)
 	case string:
-		parsed = RunStatus(s)
+		*e = RunStatus(s)
 	default:
 		return fmt.Errorf("unsupported scan type for RunStatus: %T", src)
 	}
-	switch parsed {
+	switch *e {
 	case RunStatusStarted, RunStatusCancelled, RunStatusFinished:
-		*e = parsed
 		return nil
 	default:
-		return fmt.Errorf("unknown RunStatus value: %q", parsed)
+		return fmt.Errorf("unknown RunStatus value: %q", string(*e))
 	}
 }
 
@@ -240,7 +234,7 @@ type Event struct {
 type Job struct {
 	ID          types.JobID        `json:"id"`
 	RunID       types.RunID        `json:"run_id"`
-	RepoID      types.ModRepoID    `json:"repo_id"`
+	RepoID      types.MigRepoID    `json:"repo_id"`
 	RepoBaseRef string             `json:"repo_base_ref"`
 	Attempt     int32              `json:"attempt"`
 	Name        string             `json:"name"`
@@ -266,8 +260,8 @@ type Log struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-type Mod struct {
-	ID         types.ModID        `json:"id"`
+type Mig struct {
+	ID         types.MigID        `json:"id"`
 	Name       string             `json:"name"`
 	SpecID     *types.SpecID      `json:"spec_id"`
 	CreatedBy  *string            `json:"created_by"`
@@ -275,9 +269,9 @@ type Mod struct {
 	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
 }
 
-type ModRepo struct {
-	ID        types.ModRepoID    `json:"id"`
-	ModID     types.ModID        `json:"mod_id"`
+type MigRepo struct {
+	ID        types.MigRepoID    `json:"id"`
+	MigID     types.MigID        `json:"mig_id"`
 	RepoUrl   string             `json:"repo_url"`
 	BaseRef   string             `json:"base_ref"`
 	TargetRef string             `json:"target_ref"`
@@ -324,7 +318,7 @@ type PloySchemaVersion struct {
 
 type Run struct {
 	ID         types.RunID        `json:"id"`
-	ModID      types.ModID        `json:"mod_id"`
+	MigID      types.MigID        `json:"mig_id"`
 	SpecID     types.SpecID       `json:"spec_id"`
 	CreatedBy  *string            `json:"created_by"`
 	Status     RunStatus          `json:"status"`
@@ -335,9 +329,9 @@ type Run struct {
 }
 
 type RunRepo struct {
-	ModID         types.ModID        `json:"mod_id"`
+	MigID         types.MigID        `json:"mig_id"`
 	RunID         types.RunID        `json:"run_id"`
-	RepoID        types.ModRepoID    `json:"repo_id"`
+	RepoID        types.MigRepoID    `json:"repo_id"`
 	RepoBaseRef   string             `json:"repo_base_ref"`
 	RepoTargetRef string             `json:"repo_target_ref"`
 	Status        RunRepoStatus      `json:"status"`

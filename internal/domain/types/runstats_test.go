@@ -290,10 +290,10 @@ func TestRunStats_GateSummary(t *testing.T) {
 }
 
 // TestRunStats_GateSummary_FinalGateFromPreModFallback verifies that when final_gate
-// is populated from a pre-mod gate fallback (runs with no mods executed), GateSummary
+// is populated from a pre-mod gate fallback (runs with no migs executed), GateSummary
 // returns the final_gate content, not the pre_gate directly.
 func TestRunStats_GateSummary_FinalGateFromPreModFallback(t *testing.T) {
-	// Simulate stats from a run where no mods executed: pre_gate and final_gate both
+	// Simulate stats from a run where no migs executed: pre_gate and final_gate both
 	// present with same content (final_gate populated as fallback from pre-mod gate).
 	stats := mustParseRunStats(t, `{
 		"gate": {

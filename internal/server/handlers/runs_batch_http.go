@@ -116,10 +116,10 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		modRepoID := domaintypes.NewModRepoID()
-		modRepo, err := st.CreateModRepo(r.Context(), store.CreateModRepoParams{
+		modRepoID := domaintypes.NewMigRepoID()
+		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        modRepoID,
-			ModID:     run.ModID,
+			MigID:     run.MigID,
 			RepoUrl:   req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
@@ -136,7 +136,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			ModID:         run.ModID,
+			MigID:         run.MigID,
 			RunID:         runID,
 			RepoID:        modRepo.ID,
 			RepoBaseRef:   modRepo.BaseRef,
@@ -187,7 +187,7 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 		reposResp := make([]RunRepoResponse, 0, len(repos))
 		for _, rr := range repos {
 			reposResp = append(reposResp, runRepoToResponse(store.RunRepo{
-				ModID:         rr.ModID,
+				MigID:         rr.MigID,
 				RunID:         rr.RunID,
 				RepoID:        rr.RepoID,
 				RepoBaseRef:   rr.RepoBaseRef,
@@ -220,7 +220,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -239,7 +239,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 		if rr.Status == store.RunRepoStatusCancelled || rr.Status == store.RunRepoStatusSuccess || rr.Status == store.RunRepoStatusFail {
 			repoURL := ""
-			if mr, err := st.GetModRepo(r.Context(), rr.RepoID); err == nil {
+			if mr, err := st.GetMigRepo(r.Context(), rr.RepoID); err == nil {
 				repoURL = mr.RepoUrl
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -275,7 +275,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 		rr, _ = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		repoURL := ""
-		if mr, err := st.GetModRepo(r.Context(), rr.RepoID); err == nil {
+		if mr, err := st.GetMigRepo(r.Context(), rr.RepoID); err == nil {
 			repoURL = mr.RepoUrl
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -293,7 +293,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
@@ -361,7 +361,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 				newTarget = req.TargetRef.String()
 			}
 			_ = st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase, RepoTargetRef: newTarget})
-			_ = st.UpdateModRepoRefs(r.Context(), store.UpdateModRepoRefsParams{ID: repoID, BaseRef: newBase, TargetRef: newTarget})
+			_ = st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: repoID, BaseRef: newBase, TargetRef: newTarget})
 		}
 
 		if err := st.IncrementRunRepoAttempt(r.Context(), store.IncrementRunRepoAttemptParams{RunID: runID, RepoID: repoID}); err != nil {
@@ -387,7 +387,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		repoURL := ""
-		if mr, err := st.GetModRepo(r.Context(), runRepo.RepoID); err == nil {
+		if mr, err := st.GetMigRepo(r.Context(), runRepo.RepoID); err == nil {
 			repoURL = mr.RepoUrl
 		}
 

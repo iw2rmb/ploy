@@ -16,7 +16,7 @@ func TestDiffFetcher_ListRunRepoDiffs(t *testing.T) {
 	t.Parallel()
 
 	runID := types.NewRunID()
-	repoID := types.NewModRepoID()
+	repoID := types.NewMigRepoID()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method=%s", r.Method)
@@ -43,7 +43,7 @@ func TestDiffFetcher_FetchRunRepoDiffPatch(t *testing.T) {
 	t.Parallel()
 
 	runID := types.NewRunID()
-	repoID := types.NewModRepoID()
+	repoID := types.NewMigRepoID()
 	payload := gzipBytes(t, []byte("patch"))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("download") != "true" {
@@ -71,7 +71,7 @@ func TestDiffFetcher_FetchDiffsForJobRepo_FilterAndOrder(t *testing.T) {
 	t.Parallel()
 
 	runID := types.NewRunID()
-	repoID := types.NewModRepoID()
+	repoID := types.NewMigRepoID()
 	currentJobID := types.NewJobID()
 	jobA := types.NewJobID()
 	jobB := types.NewJobID()

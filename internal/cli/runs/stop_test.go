@@ -19,7 +19,7 @@ func TestStopCommand_Run(t *testing.T) {
 
 	okRunID := domaintypes.NewRunID()
 	missingRunID := domaintypes.NewRunID()
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 
 	tests := []struct {
@@ -36,7 +36,7 @@ func TestStopCommand_Run(t *testing.T) {
 			serverResp: domaintypes.RunSummary{
 				ID:        okRunID,
 				Status:    "Cancelled",
-				ModID:     modID,
+				MigID:     modID,
 				SpecID:    specID,
 				CreatedAt: time.Unix(1, 0).UTC(),
 			},

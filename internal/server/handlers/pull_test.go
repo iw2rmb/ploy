@@ -22,11 +22,11 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewModID()
-	repoID := domaintypes.NewModRepoID()
+	modID := domaintypes.NewMigID()
+	repoID := domaintypes.NewMigRepoID()
 
 	st := &mockStore{
-		getRunResult: store.Run{ID: runID, ModID: modID},
+		getRunResult: store.Run{ID: runID, MigID: modID},
 		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
 			{
 				RunID:         runID,
@@ -79,7 +79,7 @@ func TestPullRunRepoHandler_URLNormalization(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	// Test that .git suffix normalization works.
 	// Server stores URL without .git, client sends with .git.
@@ -112,7 +112,7 @@ func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	// Test that trailing slash normalization works.
 	st := &mockStore{
@@ -165,7 +165,7 @@ func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: runID},
@@ -196,11 +196,11 @@ func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID1 := domaintypes.NewModRepoID()
-	repoID2 := domaintypes.NewModRepoID()
+	repoID1 := domaintypes.NewMigRepoID()
+	repoID2 := domaintypes.NewMigRepoID()
 
-	// This shouldn't happen in practice (mod_repos has unique constraint on
-	// (mod_id, repo_url)), but the handler should return an error if it does.
+	// This shouldn't happen in practice (mig_repos has unique constraint on
+	// (mig_id, repo_url)), but the handler should return an error if it does.
 	st := &mockStore{
 		getRunResult: store.Run{ID: runID},
 		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
@@ -290,39 +290,39 @@ func TestPullRunRepoHandler_StoreError(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------
-// Tests for POST /v1/mods/{mod_id}/pull
+// Tests for POST /v1/migs/{mig_id}/pull
 // -------------------------------------------------------------------------
 
 func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
-	repoID := domaintypes.NewModRepoID()
+	modID := domaintypes.NewMigID()
+	repoID := domaintypes.NewMigRepoID()
 	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
-		getModResult: store.Mod{ID: modID, Name: "test-mod"},
-		listModReposByModResult: []store.ModRepo{
+		getModResult: store.Mig{ID: modID, Name: "test-mod"},
+		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,
-				ModID:     modID,
+				MigID:     modID,
 				RepoUrl:   "https://github.com/org/repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
 		},
-		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByModAndRepoStatusRow{
+		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
 			RunID:         runID,
 			RepoID:        repoID,
 			RepoTargetRef: "feature-branch",
 		},
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	// Default mode is "last-succeeded"
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -347,7 +347,7 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 
 	// Verify the store call used the correct status filter
 	if !st.getLatestRunRepoByModAndRepoStatusCalled {
-		t.Fatalf("expected GetLatestRunRepoByModAndRepoStatus to be called")
+		t.Fatalf("expected GetLatestRunRepoByMigAndRepoStatus to be called")
 	}
 	if st.getLatestRunRepoByModAndRepoStatusParams.Status != store.RunRepoStatusSuccess {
 		t.Fatalf("expected status filter 'Success', got %q", st.getLatestRunRepoByModAndRepoStatusParams.Status)
@@ -357,32 +357,32 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
-	repoID := domaintypes.NewModRepoID()
+	modID := domaintypes.NewMigID()
+	repoID := domaintypes.NewMigRepoID()
 	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
-		getModResult: store.Mod{ID: modID, Name: "test-mod"},
-		listModReposByModResult: []store.ModRepo{
+		getModResult: store.Mig{ID: modID, Name: "test-mod"},
+		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,
-				ModID:     modID,
+				MigID:     modID,
 				RepoUrl:   "https://github.com/org/repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
 		},
-		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByModAndRepoStatusRow{
+		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
 			RunID:         runID,
 			RepoID:        repoID,
 			RepoTargetRef: "bugfix-branch",
 		},
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo", "mode": "last-failed"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -408,33 +408,33 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
-	repoID := domaintypes.NewModRepoID()
+	modID := domaintypes.NewMigID()
+	repoID := domaintypes.NewMigRepoID()
 	runID := domaintypes.NewRunID()
 
 	st := &mockStore{
-		getModResult: store.Mod{ID: modID},
-		listModReposByModResult: []store.ModRepo{
+		getModResult: store.Mig{ID: modID},
+		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,
-				ModID:     modID,
+				MigID:     modID,
 				RepoUrl:   "https://github.com/org/repo.git", // with .git
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
 		},
-		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByModAndRepoStatusRow{
+		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
 			RunID:         runID,
 			RepoID:        repoID,
 			RepoTargetRef: "feature",
 		},
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	// Request without .git suffix
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -446,16 +446,16 @@ func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 func TestPullModRepoHandler_ModNotFound(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -467,26 +467,26 @@ func TestPullModRepoHandler_ModNotFound(t *testing.T) {
 func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
-	repoID := domaintypes.NewModRepoID()
+	modID := domaintypes.NewMigID()
+	repoID := domaintypes.NewMigRepoID()
 
 	st := &mockStore{
-		getModResult: store.Mod{ID: modID},
-		listModReposByModResult: []store.ModRepo{
+		getModResult: store.Mig{ID: modID},
+		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,
-				ModID:     modID,
+				MigID:     modID,
 				RepoUrl:   "https://github.com/org/other-repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
 		},
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/nonexistent"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -498,15 +498,15 @@ func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
 func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
-	repoID := domaintypes.NewModRepoID()
+	modID := domaintypes.NewMigID()
+	repoID := domaintypes.NewMigRepoID()
 
 	st := &mockStore{
-		getModResult: store.Mod{ID: modID},
-		listModReposByModResult: []store.ModRepo{
+		getModResult: store.Mig{ID: modID},
+		listMigReposByModResult: []store.MigRepo{
 			{
 				ID:        repoID,
-				ModID:     modID,
+				MigID:     modID,
 				RepoUrl:   "https://github.com/org/repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
@@ -514,11 +514,11 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 		},
 		getLatestRunRepoByModAndRepoStatusErr: pgx.ErrNoRows,
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -530,16 +530,16 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 func TestPullModRepoHandler_InvalidMode(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	st := &mockStore{
-		getModResult: store.Mod{ID: modID},
+		getModResult: store.Mig{ID: modID},
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo", "mode": "invalid"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -551,14 +551,14 @@ func TestPullModRepoHandler_InvalidMode(t *testing.T) {
 func TestPullModRepoHandler_MissingRepoURL(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	st := &mockStore{}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -571,11 +571,11 @@ func TestPullModRepoHandler_MissingModID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods//pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", "")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs//pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", "")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
@@ -587,17 +587,17 @@ func TestPullModRepoHandler_MissingModID(t *testing.T) {
 func TestPullModRepoHandler_StoreError(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 
 	st := &mockStore{
-		getModResult:         store.Mod{ID: modID},
-		listModReposByModErr: errors.New("database error"),
+		getModResult:         store.Mig{ID: modID},
+		listMigReposByModErr: errors.New("database error"),
 	}
-	handler := pullModRepoHandler(st)
+	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mod_id", modID.String())
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
+	req.SetPathValue("mig_id", modID.String())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 

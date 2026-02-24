@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// JobType identifies the job phase in the Mods pipeline.
+// JobType identifies the job phase in the Migs pipeline.
 //
 // Known values:
 //   - JobTypePreGate: pre-mod Build Gate

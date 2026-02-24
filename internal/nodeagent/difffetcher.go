@@ -46,7 +46,7 @@ type diffListResponse struct {
 }
 
 // ListRunRepoDiffs fetches the list of diffs for a specific repo within a run.
-func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, repoID types.ModRepoID) ([]diffListItem, error) {
+func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, repoID types.MigRepoID) ([]diffListItem, error) {
 	apiPath := fmt.Sprintf("/v1/runs/%s/repos/%s/diffs", runID.String(), repoID.String())
 	url := MustBuildURL(f.cfg.ServerURL, apiPath)
 
@@ -75,7 +75,7 @@ func (f *DiffFetcher) ListRunRepoDiffs(ctx context.Context, runID types.RunID, r
 
 // FetchDiffsForJobRepo fetches all prior gzipped patches for a specific repo within
 // a run, excluding the current job's own diff.
-func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunID, repoID types.ModRepoID, currentJobID types.JobID) ([][]byte, error) {
+func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunID, repoID types.MigRepoID, currentJobID types.JobID) ([][]byte, error) {
 	diffs, err := f.ListRunRepoDiffs(ctx, runID, repoID)
 	if err != nil {
 		return nil, fmt.Errorf("list run repo diffs: %w", err)
@@ -117,7 +117,7 @@ func (f *DiffFetcher) FetchDiffsForJobRepo(ctx context.Context, runID types.RunI
 }
 
 // FetchRunRepoDiffPatch downloads the gzipped patch for a specific diff.
-func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.RunID, repoID types.ModRepoID, diffID string) ([]byte, error) {
+func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.RunID, repoID types.MigRepoID, diffID string) ([]byte, error) {
 	base, err := url.Parse(f.cfg.ServerURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse server url: %w", err)

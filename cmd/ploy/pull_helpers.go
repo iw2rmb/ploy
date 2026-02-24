@@ -153,7 +153,7 @@ func createAndCheckoutBranch(ctx context.Context, targetRef, commitSHA string, s
 	return nil
 }
 
-func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.ModRepoID) ([]mods.DiffEntry, error) {
+func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]mods.DiffEntry, error) {
 	cmd := mods.ListRunRepoDiffsCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
@@ -165,7 +165,7 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 // downloadAndApplyDiffs downloads and applies all diffs to the working tree.
 // Returns the count of successfully applied diffs (excluding empty patches).
-func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.ModRepoID, diffs []mods.DiffEntry, stderr io.Writer) (int, error) {
+func downloadAndApplyDiffs(ctx context.Context, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffs []mods.DiffEntry, stderr io.Writer) (int, error) {
 	if len(diffs) == 0 {
 		return 0, nil
 	}

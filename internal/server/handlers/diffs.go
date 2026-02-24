@@ -66,7 +66,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 		}
 
 		// Parse the repo ID from the URL path parameter using the shared helper.
-		repoID, err := parseParam[domaintypes.ModRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

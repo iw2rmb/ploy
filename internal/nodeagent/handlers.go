@@ -35,7 +35,7 @@ const maxRequestBodySize = 10 << 20 // 10 MiB
 type StartRunRequest struct {
 	RunID   types.RunID     `json:"run_id,omitempty"`
 	JobID   types.JobID     `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
-	RepoID  types.ModRepoID `json:"repo_id,omitempty"`  // Repo ID (NanoID) for repo-scoped artifacts (diffs/logs)
+	RepoID  types.MigRepoID `json:"repo_id,omitempty"`  // Repo ID (NanoID) for repo-scoped artifacts (diffs/logs)
 	RepoURL types.RepoURL   `json:"repo_url,omitempty"` // Repository URL for this run
 	// Name is an optional human-friendly run name provided by the control plane.
 	// When set (e.g., for batch runs), it can be used for branch naming in MR flows.

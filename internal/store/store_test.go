@@ -120,21 +120,21 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := types.NewModID()
-	_, err = db.CreateMod(ctx, CreateModParams{
+	modID := types.NewMigID()
+	_, err = db.CreateMig(ctx, CreateMigParams{
 		ID:        modID,
 		Name:      "test-mod-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
+		t.Fatalf("CreateMig() failed: %v", err)
 	}
 
 	runID := types.NewRunID()
 	run, err := db.CreateRun(ctx, CreateRunParams{
 		ID:        runID,
-		ModID:     modID,
+		MigID:     modID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -149,8 +149,8 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if fetched.ModID != modID {
-		t.Fatalf("GetRun().mod_id=%q, want %q", fetched.ModID, modID)
+	if fetched.MigID != modID {
+		t.Fatalf("GetRun().mig_id=%q, want %q", fetched.MigID, modID)
 	}
 	if fetched.SpecID != spec.ID {
 		t.Fatalf("GetRun().spec_id=%q, want %q", fetched.SpecID, spec.ID)
@@ -195,19 +195,19 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	}
 
 	// Add a second repo for the mod and run.
-	modRepo2ID := types.NewModRepoID()
-	_, err = db.CreateModRepo(ctx, CreateModRepoParams{
+	modRepo2ID := types.NewMigRepoID()
+	_, err = db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
-		ModID:     fx.Mod.ID,
+		MigID:     fx.Mig.ID,
 		RepoUrl:   "https://github.com/org/repo-b",
 		BaseRef:   "main",
 		TargetRef: "feature/b",
 	})
 	if err != nil {
-		t.Fatalf("CreateModRepo() for repo-b failed: %v", err)
+		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
 	}
 	rr2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		ModID:         fx.Mod.ID,
+		MigID:         fx.Mig.ID,
 		RunID:         fx.Run.ID,
 		RepoID:        modRepo2ID,
 		RepoBaseRef:   "main",
@@ -315,20 +315,20 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", "feature/a", []byte(`{"type":"batch"}`))
 
-	modRepo2ID := types.NewModRepoID()
-	modRepo2, err := db.CreateModRepo(ctx, CreateModRepoParams{
+	modRepo2ID := types.NewMigRepoID()
+	modRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
-		ModID:     fx.Mod.ID,
+		MigID:     fx.Mig.ID,
 		RepoUrl:   "https://github.com/org/repo-b",
 		BaseRef:   "main",
 		TargetRef: "feature/b",
 	})
 	if err != nil {
-		t.Fatalf("CreateModRepo() for repo-b failed: %v", err)
+		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
 	}
 
 	_, err = db.CreateRunRepo(ctx, CreateRunRepoParams{
-		ModID:         fx.Mod.ID,
+		MigID:         fx.Mig.ID,
 		RunID:         fx.Run.ID,
 		RepoID:        modRepo2.ID,
 		RepoBaseRef:   modRepo2.BaseRef,
@@ -346,12 +346,12 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		t.Fatalf("expected 2 run repos with urls, got %d", len(rows))
 	}
 
-	expectedURLByRepoID := map[types.ModRepoID]string{
-		fx.ModRepo.ID: fx.ModRepo.RepoUrl,
+	expectedURLByRepoID := map[types.MigRepoID]string{
+		fx.MigRepo.ID: fx.MigRepo.RepoUrl,
 		modRepo2.ID:   modRepo2.RepoUrl,
 	}
 
-	seen := map[types.ModRepoID]bool{}
+	seen := map[types.MigRepoID]bool{}
 	for i, row := range rows {
 		if row.RunID != fx.Run.ID {
 			t.Fatalf("row[%d] run_id=%q, want %q", i, row.RunID, fx.Run.ID)
@@ -381,8 +381,8 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		}
 	}
 
-	if !seen[fx.ModRepo.ID] {
-		t.Fatalf("expected repo_id %q in results", fx.ModRepo.ID)
+	if !seen[fx.MigRepo.ID] {
+		t.Fatalf("expected repo_id %q in results", fx.MigRepo.ID)
 	}
 	if !seen[modRepo2.ID] {
 		t.Fatalf("expected repo_id %q in results", modRepo2.ID)

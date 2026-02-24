@@ -71,7 +71,7 @@ func handleModSpecSet(args []string, stderr io.Writer) error {
 	cmd := mods.SetModSpecCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 		Spec:    specData,
 	}
 

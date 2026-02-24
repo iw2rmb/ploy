@@ -37,24 +37,24 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, bs blobstore.Store, bp *b
 	// POST /v1/runs creates a single-repo run with automatic mod project creation.
 	s.HandleFunc("POST /v1/runs", createSingleRepoRunHandler(st, eventsService), auth.RoleControlPlane)
 
-	// Mods — mod project CRUD (v1 API).
-	// /v1/mods endpoints handle mod project CRUD operations.
-	s.HandleFunc("POST /v1/mods", createModHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods", listModsHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("DELETE /v1/mods/{mod_ref}", deleteModHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("PATCH /v1/mods/{mod_ref}/archive", archiveModHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("PATCH /v1/mods/{mod_ref}/unarchive", unarchiveModHandler(st), auth.RoleControlPlane)
-	// Set mod spec (append-only specs + mods.spec_id pointer).
-	s.HandleFunc("POST /v1/mods/{mod_ref}/specs", setModSpecHandler(st), auth.RoleControlPlane)
-	// Mod repo set management (add/list/delete + bulk CSV upsert).
-	s.HandleFunc("POST /v1/mods/{mod_id}/repos", addModRepoHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/{mod_id}/repos", listModReposHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("DELETE /v1/mods/{mod_id}/repos/{repo_id}", deleteModRepoHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("POST /v1/mods/{mod_id}/repos/bulk", bulkUpsertModReposHandler(st), auth.RoleControlPlane)
+	// Migs — mod project CRUD (v1 API).
+	// /v1/migs endpoints handle mod project CRUD operations.
+	s.HandleFunc("POST /v1/migs", createMigHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/migs", listMigsHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/migs/{mig_ref}", deleteMigHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("PATCH /v1/migs/{mig_ref}/archive", archiveMigHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("PATCH /v1/migs/{mig_ref}/unarchive", unarchiveMigHandler(st), auth.RoleControlPlane)
+	// Set mod spec (append-only specs + migs.spec_id pointer).
+	s.HandleFunc("POST /v1/migs/{mig_ref}/specs", setMigSpecHandler(st), auth.RoleControlPlane)
+	// Mig repo set management (add/list/delete + bulk CSV upsert).
+	s.HandleFunc("POST /v1/migs/{mig_id}/repos", addMigRepoHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/migs/{mig_id}/repos", listMigReposHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/migs/{mig_id}/repos/{repo_id}", deleteMigRepoHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/migs/{mig_id}/repos/bulk", bulkUpsertMigReposHandler(st), auth.RoleControlPlane)
 	// Multi-repo run submission with repo selection (all/failed/explicit).
-	s.HandleFunc("POST /v1/mods/{mod_id}/runs", createModRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/migs/{mig_id}/runs", createMigRunHandler(st), auth.RoleControlPlane)
 	// Pull resolution for mod repos (last-succeeded/last-failed).
-	s.HandleFunc("POST /v1/mods/{mod_id}/pull", pullModRepoHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/migs/{mig_id}/pull", pullMigRepoHandler(st), auth.RoleControlPlane)
 
 	// Artifact download endpoints
 	s.HandleFunc("GET /v1/artifacts", listArtifactsByCIDHandler(st), auth.RoleControlPlane)

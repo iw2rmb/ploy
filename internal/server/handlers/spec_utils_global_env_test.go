@@ -64,7 +64,7 @@ func TestMergeGlobalEnvIntoSpec_EmptySpec(t *testing.T) {
 func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 	env := map[string]GlobalEnvVar{
 		"ALL_KEY":  {Value: "all-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
-		"MODS_KEY": {Value: "mods-value", Scope: domaintypes.GlobalEnvScopeMods, Secret: false},
+		"MODS_KEY": {Value: "migs-value", Scope: domaintypes.GlobalEnvScopeMods, Secret: false},
 		"HEAL_KEY": {Value: "heal-value", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false},
 		"GATE_KEY": {Value: "gate-value", Scope: domaintypes.GlobalEnvScopeGate, Secret: false},
 	}
@@ -76,7 +76,7 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 		rejectKeys []string
 	}{
 		{
-			name:       "mod job gets all and mods",
+			name:       "mod job gets all and migs",
 			jobType:    domaintypes.JobTypeMod,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY"},
 			rejectKeys: []string{"HEAL_KEY", "GATE_KEY"},
@@ -100,7 +100,7 @@ func TestMergeGlobalEnvIntoSpec_ScopeFiltering(t *testing.T) {
 			rejectKeys: []string{"MODS_KEY"},
 		},
 		{
-			name:       "post_gate job gets all, mods, and gate",
+			name:       "post_gate job gets all, migs, and gate",
 			jobType:    domaintypes.JobTypePostGate,
 			expectKeys: []string{"ALL_KEY", "MODS_KEY", "GATE_KEY"},
 			rejectKeys: []string{"HEAL_KEY"},
@@ -269,9 +269,9 @@ func TestMergeGlobalEnvIntoSpec_CommonGlobalEnvKeys(t *testing.T) {
 		t.Error("expected CA_CERTS_PEM_BUNDLE for pre_gate job")
 	}
 	if _, ok := em["CODEX_AUTH_JSON"]; ok {
-		t.Error("CODEX_AUTH_JSON should not be present for pre_gate job (scope=mods)")
+		t.Error("CODEX_AUTH_JSON should not be present for pre_gate job (scope=migs)")
 	}
 	if _, ok := em["OPENAI_API_KEY"]; ok {
-		t.Error("OPENAI_API_KEY should not be present for pre_gate job (scope=mods)")
+		t.Error("OPENAI_API_KEY should not be present for pre_gate job (scope=migs)")
 	}
 }

@@ -14,7 +14,7 @@ func assertType[T any](_ T) {}
 // ensures the sqlc overrides in sqlc.yaml are correctly applied.
 //
 // The test exercises struct field types to confirm:
-// - Primary key IDs use domain newtypes (RunID, JobID, NodeID, ModID, SpecID, ModRepoID)
+// - Primary key IDs use domain newtypes (RunID, JobID, NodeID, MigID, SpecID, MigRepoID)
 // - Foreign key references use matching domain newtypes
 // - jobs.next_id uses *types.JobID
 // - any derived run id columns (e.g. runs_timing.id) also use types.RunID
@@ -28,23 +28,23 @@ func TestSQLCOverridesCompile(t *testing.T) {
 		GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 		GetJob(ctx context.Context, id types.JobID) (Job, error)
 		GetNode(ctx context.Context, id types.NodeID) (Node, error)
-		GetMod(ctx context.Context, id types.ModID) (Mod, error)
+		GetMig(ctx context.Context, id types.MigID) (Mig, error)
 		GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
-		GetModRepo(ctx context.Context, id types.ModRepoID) (ModRepo, error)
+		GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
 	}
 	var _ typedIDQuerier = (Querier)(nil)
 
 	// Verify Run struct field types.
 	var run Run
 	assertType[types.RunID](run.ID)
-	assertType[types.ModID](run.ModID)
+	assertType[types.MigID](run.MigID)
 	assertType[types.SpecID](run.SpecID)
 
 	// Verify Job struct field types including NextID.
 	var job Job
 	assertType[types.JobID](job.ID)
 	assertType[types.RunID](job.RunID)
-	assertType[types.ModRepoID](job.RepoID)
+	assertType[types.MigRepoID](job.RepoID)
 	assertType[*types.JobID](job.NextID)
 	assertType[*types.NodeID](job.NodeID)
 
@@ -52,25 +52,25 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	var node Node
 	assertType[types.NodeID](node.ID)
 
-	// Verify Mod struct field types.
-	var mod Mod
-	assertType[types.ModID](mod.ID)
+	// Verify Mig struct field types.
+	var mod Mig
+	assertType[types.MigID](mod.ID)
 	assertType[*types.SpecID](mod.SpecID)
 
 	// Verify Spec struct field types.
 	var spec Spec
 	assertType[types.SpecID](spec.ID)
 
-	// Verify ModRepo struct field types.
-	var modRepo ModRepo
-	assertType[types.ModRepoID](modRepo.ID)
-	assertType[types.ModID](modRepo.ModID)
+	// Verify MigRepo struct field types.
+	var modRepo MigRepo
+	assertType[types.MigRepoID](modRepo.ID)
+	assertType[types.MigID](modRepo.MigID)
 
 	// Verify RunRepo struct field types.
 	var runRepo RunRepo
-	assertType[types.ModID](runRepo.ModID)
+	assertType[types.MigID](runRepo.MigID)
 	assertType[types.RunID](runRepo.RunID)
-	assertType[types.ModRepoID](runRepo.RepoID)
+	assertType[types.MigRepoID](runRepo.RepoID)
 
 	// Verify Event struct field types.
 	var event Event

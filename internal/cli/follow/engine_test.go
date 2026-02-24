@@ -25,7 +25,7 @@ func TestEngine_refreshRepos_DecodesRunRepoResponseShape(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -78,13 +78,13 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	jobID := domaintypes.NewJobID()
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
 	var out strings.Builder
 	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
-	e.repoOrder = []domaintypes.ModRepoID{repoID}
+	e.repoOrder = []domaintypes.MigRepoID{repoID}
 	e.repoURLs[repoID] = "example.com/org/repo"
 	started := time.Now().Add(-1500 * time.Millisecond).UTC()
 	e.repoJobs[repoID] = []runs.RepoJobEntry{{
@@ -138,12 +138,12 @@ func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	jobID := domaintypes.NewJobID()
 
 	var out strings.Builder
 	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
-	e.repoOrder = []domaintypes.ModRepoID{repoID}
+	e.repoOrder = []domaintypes.MigRepoID{repoID}
 	e.repoURLs[repoID] = "example.com/org/repo"
 	e.repoJobs[repoID] = []runs.RepoJobEntry{{
 		JobID:   jobID,

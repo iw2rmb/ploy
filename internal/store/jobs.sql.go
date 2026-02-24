@@ -130,7 +130,7 @@ GROUP BY status
 
 type CountJobsByRunRepoAttemptGroupByStatusParams struct {
 	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.ModRepoID `json:"repo_id"`
+	RepoID  types.MigRepoID `json:"repo_id"`
 	Attempt int32           `json:"attempt"`
 }
 
@@ -200,7 +200,7 @@ RETURNING
 type CreateJobParams struct {
 	ID          types.JobID     `json:"id"`
 	RunID       types.RunID     `json:"run_id"`
-	RepoID      types.ModRepoID `json:"repo_id"`
+	RepoID      types.MigRepoID `json:"repo_id"`
 	RepoBaseRef string          `json:"repo_base_ref"`
 	Attempt     int32           `json:"attempt"`
 	Name        string          `json:"name"`
@@ -350,7 +350,7 @@ ORDER BY id ASC
 
 type ListCreatedJobsByRunRepoAttemptParams struct {
 	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.ModRepoID `json:"repo_id"`
+	RepoID  types.MigRepoID `json:"repo_id"`
 	Attempt int32           `json:"attempt"`
 }
 
@@ -476,7 +476,7 @@ ORDER BY id ASC
 
 type ListJobsByRunRepoAttemptParams struct {
 	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.ModRepoID `json:"repo_id"`
+	RepoID  types.MigRepoID `json:"repo_id"`
 	Attempt int32           `json:"attempt"`
 }
 
@@ -628,7 +628,7 @@ RETURNING
 
 type ScheduleNextJobParams struct {
 	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.ModRepoID `json:"repo_id"`
+	RepoID  types.MigRepoID `json:"repo_id"`
 	Attempt int32           `json:"attempt"`
 }
 

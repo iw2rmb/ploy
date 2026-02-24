@@ -15,7 +15,7 @@ type Querier interface {
 	// Archives a mod by setting archived_at to now().
 	// Archiving must be refused when the mod has any jobs in a running state.
 	// This query only sets the timestamp; validation logic must be in the caller.
-	ArchiveMod(ctx context.Context, id types.ModID) error
+	ArchiveMig(ctx context.Context, id types.MigID) error
 	// Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
 	// finished_at is set once; duration_ms is computed from started_at when present.
 	CancelActiveJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
@@ -48,8 +48,8 @@ type Querier interface {
 	// Creates a new log chunk metadata. Blob data is stored in object storage.
 	// Logs are grouped at the job level only (build_id removed).
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
-	CreateMod(ctx context.Context, arg CreateModParams) (Mod, error)
-	CreateModRepo(ctx context.Context, arg CreateModRepoParams) (ModRepo, error)
+	CreateMig(ctx context.Context, arg CreateMigParams) (Mig, error)
+	CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (MigRepo, error)
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
@@ -79,11 +79,11 @@ type Querier interface {
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// Deletes a mod. Use with caution; should only be called when safe to remove.
-	DeleteMod(ctx context.Context, id types.ModID) error
+	DeleteMig(ctx context.Context, id types.MigID) error
 	// Deletes a mod_repo by id.
-	// Note: mod_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
+	// Note: mig_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
 	// This DELETE will fail if any run_repos/jobs rows still reference the repo.
-	DeleteModRepo(ctx context.Context, id types.ModRepoID) error
+	DeleteMigRepo(ctx context.Context, id types.MigRepoID) error
 	DeleteNode(ctx context.Context, id types.NodeID) error
 	DeleteRun(ctx context.Context, id types.RunID) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
@@ -101,16 +101,16 @@ type Querier interface {
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	// v1: Gets the newest run_repos row for a specific repo_id in a mod,
 	// filtered by terminal status (Success or Fail).
-	// Used by POST /v1/mods/{mod_id}/pull to select last-succeeded or last-failed.
+	// Used by POST /v1/migs/{mig_id}/pull to select last-succeeded or last-failed.
 	// Order by created_at DESC to get the newest matching run_repos row.
-	GetLatestRunRepoByModAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByModAndRepoStatusParams) (GetLatestRunRepoByModAndRepoStatusRow, error)
+	GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg GetLatestRunRepoByMigAndRepoStatusParams) (GetLatestRunRepoByMigAndRepoStatusRow, error)
 	// Returns log metadata including object_key for object-storage retrieval.
 	GetLog(ctx context.Context, id int64) (Log, error)
-	GetMod(ctx context.Context, id types.ModID) (Mod, error)
-	GetModByName(ctx context.Context, name string) (Mod, error)
-	GetModRepo(ctx context.Context, id types.ModRepoID) (ModRepo, error)
-	// Gets a mod_repo by mod_id and repo_url (for uniqueness constraint enforcement).
-	GetModRepoByURL(ctx context.Context, arg GetModRepoByURLParams) (ModRepo, error)
+	GetMig(ctx context.Context, id types.MigID) (Mig, error)
+	GetMigByName(ctx context.Context, name string) (Mig, error)
+	GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
+	// Gets a mod_repo by mig_id and repo_url (for uniqueness constraint enforcement).
+	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
@@ -119,7 +119,7 @@ type Querier interface {
 	// Checks if a mod_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	// Deletion is refused if the repo has historical executions.
-	HasModRepoHistory(ctx context.Context, repoID types.ModRepoID) (bool, error)
+	HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -148,7 +148,7 @@ type Querier interface {
 	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
 	// Returns diff metadata for a specific repo within a run.
 	ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]Diff, error)
-	// v1: Lists distinct repos (mod_repos) with last known run metadata, optionally filtered by repo_url substring.
+	// v1: Lists distinct repos (mig_repos) with last known run metadata, optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
@@ -164,7 +164,7 @@ type Querier interface {
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
 	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
-	ListFailedRepoIDsByMod(ctx context.Context, modID types.ModID) ([]types.ModRepoID, error)
+	ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.MigRepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
 	// Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
 	// Returns all global environment entries, ordered by key for consistent iteration.
@@ -190,24 +190,24 @@ type Querier interface {
 	ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]Log, error)
 	// Returns log metadata for a run since a given id.
 	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]Log, error)
-	ListModReposByMod(ctx context.Context, modID types.ModID) ([]ModRepo, error)
-	// Lists mods with optional filtering by archived status and name substring.
-	// archived_only: if true, return only archived mods; if false, return only active mods; if null, return all.
+	ListMigReposByMig(ctx context.Context, migID types.MigID) ([]MigRepo, error)
+	// Lists migs with optional filtering by archived status and name substring.
+	// archived_only: if true, return only archived migs; if false, return only active migs; if null, return all.
 	// name_filter: if non-empty, filter by name substring (case-insensitive); if null/empty, no name filtering.
-	ListMods(ctx context.Context, arg ListModsParams) ([]Mod, error)
+	ListMigs(ctx context.Context, arg ListMigsParams) ([]Mig, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// Lists all repos associated with a run, ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
-	// v1: Lists all run_repos for a run with their repo_url (from mod_repos).
+	// v1: Lists all run_repos for a run with their repo_url (from mig_repos).
 	// Used by:
 	// - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
 	// - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
 	ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
-	// Lists runs for a given repo_id (mod_repos.id).
+	// Lists runs for a given repo_id (mig_repos.id).
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	// Lists runs that have queued work (at least one Queued run_repos row).
@@ -224,7 +224,7 @@ type Querier interface {
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
 	// Unarchives a mod by clearing archived_at.
-	UnarchiveMod(ctx context.Context, id types.ModID) error
+	UnarchiveMig(ctx context.Context, id types.MigID) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error
@@ -235,8 +235,8 @@ type Querier interface {
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
 	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
-	UpdateModRepoRefs(ctx context.Context, arg UpdateModRepoRefsParams) error
-	UpdateModSpec(ctx context.Context, arg UpdateModSpecParams) error
+	UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsParams) error
+	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
@@ -260,9 +260,9 @@ type Querier interface {
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 	// Bulk upsert a mod_repo by normalized repo_url.
-	// Uniqueness is on (mod_id, repo_url) to prevent duplicate repo URLs per mod.
+	// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mod.
 	// If a row exists, update refs; otherwise insert.
-	UpsertModRepo(ctx context.Context, arg UpsertModRepoParams) (ModRepo, error)
+	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 }
 
 var _ Querier = (*Queries)(nil)

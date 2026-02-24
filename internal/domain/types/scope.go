@@ -22,7 +22,7 @@ const (
 	// GlobalEnvScopeAll injects into every job type.
 	GlobalEnvScopeAll GlobalEnvScope = "all"
 	// GlobalEnvScopeMods injects into mod and post_gate jobs (modification phases).
-	GlobalEnvScopeMods GlobalEnvScope = "mods"
+	GlobalEnvScopeMods GlobalEnvScope = "migs"
 	// GlobalEnvScopeHeal injects into heal and re_gate jobs (healing phases).
 	GlobalEnvScopeHeal GlobalEnvScope = "heal"
 	// GlobalEnvScopeGate injects into pre_gate, re_gate, and post_gate jobs (gate phases).
@@ -46,7 +46,7 @@ func (s GlobalEnvScope) Validate() error {
 		if normalized == "" {
 			return fmt.Errorf("scope is required")
 		}
-		return fmt.Errorf("invalid scope %q (must be one of: all, mods, heal, gate)", s)
+		return fmt.Errorf("invalid scope %q (must be one of: all, migs, heal, gate)", s)
 	}
 }
 
@@ -69,7 +69,7 @@ func ParseGlobalEnvScope(s string) (GlobalEnvScope, error) {
 //
 // Scope semantics:
 //   - "all"  → inject into every job type
-//   - "mods" → inject into mod and post_gate jobs (code modification phases)
+//   - "migs" → inject into mod and post_gate jobs (code modification phases)
 //   - "heal" → inject into heal and re_gate jobs (healing/retry phases)
 //   - "gate" → inject into pre_gate, re_gate, and post_gate jobs (gate execution phases)
 func (s GlobalEnvScope) MatchesJobType(jobType JobType) bool {
@@ -77,7 +77,7 @@ func (s GlobalEnvScope) MatchesJobType(jobType JobType) bool {
 	case GlobalEnvScopeAll:
 		return true
 	case GlobalEnvScopeMods:
-		// Mods scope applies to mod and post_gate jobs (modification phases).
+		// Migs scope applies to mod and post_gate jobs (modification phases).
 		return jobType == JobTypeMod || jobType == JobTypePostGate
 	case GlobalEnvScopeHeal:
 		// Heal scope applies to heal and re_gate jobs (healing phases).

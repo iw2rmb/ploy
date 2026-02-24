@@ -28,7 +28,7 @@ import (
 // ModSummary represents a mod project returned by the server.
 // Matches the server response shape from internal/server/handlers/mods.go.
 type ModSummary struct {
-	ID        types.ModID   `json:"id"`
+	ID        types.MigID   `json:"id"`
 	Name      string        `json:"name"`
 	SpecID    *types.SpecID `json:"spec_id,omitempty"`
 	CreatedBy *string       `json:"created_by,omitempty"`
@@ -49,7 +49,7 @@ type AddModCommand struct {
 
 // AddModResult contains the response from creating a mod.
 type AddModResult struct {
-	ID        types.ModID   `json:"id"`
+	ID        types.MigID   `json:"id"`
 	Name      string        `json:"name"`
 	SpecID    *types.SpecID `json:"spec_id,omitempty"`
 	CreatedAt time.Time     `json:"created_at"`
@@ -110,10 +110,10 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 	return AddModResult{}, decodeHTTPError(resp, "mod add")
 }
 
-// ListModsCommand lists mod projects with optional filters.
+// ListMigsCommand lists mod projects with optional filters.
 // Endpoint: GET /v1/mods
 // Returns mods with ID, NAME, CREATED_AT, ARCHIVED status.
-type ListModsCommand struct {
+type ListMigsCommand struct {
 	Client        *http.Client
 	BaseURL       *url.URL
 	Limit         int32   // Max results to return (default 50, max 100).
@@ -124,7 +124,7 @@ type ListModsCommand struct {
 }
 
 // Run executes GET /v1/mods to list mods with pagination and filters.
-func (c ListModsCommand) Run(ctx context.Context) ([]ModSummary, error) {
+func (c ListMigsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 	if c.Client == nil {
 		return nil, fmt.Errorf("mod list: http client required")
 	}
@@ -184,7 +184,7 @@ func (c ListModsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 type RemoveModCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModRef  types.ModRef // Required: mod ID or name to delete.
+	MigRef  types.MigRef // Required: mod ID or name to delete.
 }
 
 // Run executes DELETE /v1/mods/{mod_ref} to delete a mod.
@@ -195,12 +195,12 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 	if c.BaseURL == nil {
 		return fmt.Errorf("mod remove: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
+	if err := c.MigRef.Validate(); err != nil {
 		return fmt.Errorf("mod remove: mod ref is required")
 	}
 
 	// DELETE /v1/mods/{mod_ref}
-	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String())
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.MigRef.String())
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("mod remove: build request: %w", err)
@@ -220,108 +220,108 @@ func (c RemoveModCommand) Run(ctx context.Context) error {
 	return decodeHTTPError(resp, "mod remove")
 }
 
-// ArchiveModCommand archives a mod project.
+// ArchiveMigCommand archives a mod project.
 // Endpoint: PATCH /v1/mods/{mod_ref}/archive
 // Refuses archival if the mod has running jobs.
-type ArchiveModCommand struct {
+type ArchiveMigCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModRef  types.ModRef // Required: mod ID or name to archive.
+	MigRef  types.MigRef // Required: mod ID or name to archive.
 }
 
-// ArchiveModResult contains the response from archiving a mod.
-type ArchiveModResult struct {
-	ID       types.ModID `json:"id"`
+// ArchiveMigResult contains the response from archiving a mod.
+type ArchiveMigResult struct {
+	ID       types.MigID `json:"id"`
 	Name     string      `json:"name"`
 	Archived bool        `json:"archived"`
 }
 
 // Run executes PATCH /v1/mods/{mod_ref}/archive to archive a mod.
-func (c ArchiveModCommand) Run(ctx context.Context) (ArchiveModResult, error) {
+func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
 	if c.Client == nil {
-		return ArchiveModResult{}, fmt.Errorf("mod archive: http client required")
+		return ArchiveMigResult{}, fmt.Errorf("mod archive: http client required")
 	}
 	if c.BaseURL == nil {
-		return ArchiveModResult{}, fmt.Errorf("mod archive: base url required")
+		return ArchiveMigResult{}, fmt.Errorf("mod archive: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
-		return ArchiveModResult{}, fmt.Errorf("mod archive: mod ref is required")
+	if err := c.MigRef.Validate(); err != nil {
+		return ArchiveMigResult{}, fmt.Errorf("mod archive: mod ref is required")
 	}
 
 	// PATCH /v1/mods/{mod_ref}/archive
-	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "archive")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.MigRef.String(), "archive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
-		return ArchiveModResult{}, fmt.Errorf("mod archive: build request: %w", err)
+		return ArchiveMigResult{}, fmt.Errorf("mod archive: build request: %w", err)
 	}
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return ArchiveModResult{}, fmt.Errorf("mod archive: http request failed: %w", err)
+		return ArchiveMigResult{}, fmt.Errorf("mod archive: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
-		var result ArchiveModResult
+		var result ArchiveMigResult
 		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return ArchiveModResult{}, fmt.Errorf("mod archive: decode response: %w", err)
+			return ArchiveMigResult{}, fmt.Errorf("mod archive: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return ArchiveModResult{}, decodeHTTPError(resp, "mod archive")
+	return ArchiveMigResult{}, decodeHTTPError(resp, "mod archive")
 }
 
-// UnarchiveModCommand unarchives a mod project.
+// UnarchiveMigCommand unarchives a mod project.
 // Endpoint: PATCH /v1/mods/{mod_ref}/unarchive
 // Restores an archived mod to active status.
-type UnarchiveModCommand struct {
+type UnarchiveMigCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModRef  types.ModRef // Required: mod ID or name to unarchive.
+	MigRef  types.MigRef // Required: mod ID or name to unarchive.
 }
 
-// UnarchiveModResult contains the response from unarchiving a mod.
-type UnarchiveModResult struct {
-	ID       types.ModID `json:"id"`
+// UnarchiveMigResult contains the response from unarchiving a mod.
+type UnarchiveMigResult struct {
+	ID       types.MigID `json:"id"`
 	Name     string      `json:"name"`
 	Archived bool        `json:"archived"`
 }
 
 // Run executes PATCH /v1/mods/{mod_ref}/unarchive to unarchive a mod.
-func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error) {
+func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error) {
 	if c.Client == nil {
-		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: http client required")
+		return UnarchiveMigResult{}, fmt.Errorf("mod unarchive: http client required")
 	}
 	if c.BaseURL == nil {
-		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: base url required")
+		return UnarchiveMigResult{}, fmt.Errorf("mod unarchive: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
-		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: mod ref is required")
+	if err := c.MigRef.Validate(); err != nil {
+		return UnarchiveMigResult{}, fmt.Errorf("mod unarchive: mod ref is required")
 	}
 
 	// PATCH /v1/mods/{mod_ref}/unarchive
-	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "unarchive")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.MigRef.String(), "unarchive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
-		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: build request: %w", err)
+		return UnarchiveMigResult{}, fmt.Errorf("mod unarchive: build request: %w", err)
 	}
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return UnarchiveModResult{}, fmt.Errorf("mod unarchive: http request failed: %w", err)
+		return UnarchiveMigResult{}, fmt.Errorf("mod unarchive: http request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusOK {
-		var result UnarchiveModResult
+		var result UnarchiveMigResult
 		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return UnarchiveModResult{}, fmt.Errorf("mod unarchive: decode response: %w", err)
+			return UnarchiveMigResult{}, fmt.Errorf("mod unarchive: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return UnarchiveModResult{}, decodeHTTPError(resp, "mod unarchive")
+	return UnarchiveMigResult{}, decodeHTTPError(resp, "mod unarchive")
 }
 
 // SetModSpecCommand creates a new spec row and updates mods.spec_id.
@@ -330,7 +330,7 @@ func (c UnarchiveModCommand) Run(ctx context.Context) (UnarchiveModResult, error
 type SetModSpecCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
-	ModRef    types.ModRef    // Required: mod ID or name.
+	MigRef    types.MigRef    // Required: mod ID or name.
 	Spec      json.RawMessage // Required: spec content (YAML/JSON parsed to JSON).
 	Name      *string         // Optional: spec name.
 	CreatedBy *string         // Optional: creator identifier.
@@ -350,7 +350,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	if c.BaseURL == nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
+	if err := c.MigRef.Validate(); err != nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: mod ref is required")
 	}
 	if len(c.Spec) == 0 {
@@ -376,7 +376,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 	}
 
 	// POST /v1/mods/{mod_ref}/specs
-	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "specs")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.MigRef.String(), "specs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
 		return SetModSpecResult{}, fmt.Errorf("mod spec set: build request: %w", err)
@@ -408,7 +408,7 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 type ResolveModByNameCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModRef  types.ModRef // Mod reference (could be ID or name).
+	MigRef  types.MigRef // Mod reference (could be ID or name).
 }
 
 // Run attempts to resolve a mod ID from a name reference.
@@ -421,14 +421,14 @@ func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 	if c.BaseURL == nil {
 		return "", fmt.Errorf("resolve mod: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
+	if err := c.MigRef.Validate(); err != nil {
 		return "", fmt.Errorf("resolve mod: mod reference is required")
 	}
-	ref := c.ModRef.String()
+	ref := c.MigRef.String()
 
 	// Try to find by name using the list endpoint with name filter.
 	// No heuristics - always query the server.
-	listCmd := ListModsCommand{
+	listCmd := ListMigsCommand{
 		Client:        c.Client,
 		BaseURL:       c.BaseURL,
 		Limit:         100,

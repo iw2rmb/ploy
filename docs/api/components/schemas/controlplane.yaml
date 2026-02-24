@@ -270,7 +270,7 @@ CreateSingleRepoRunResponse:
     spec_id: { type: string, description: "Spec ID (NanoID string)" }
   required: [run_id, mod_id, spec_id]
 
-CreateModRequest:
+CreateMigRequest:
   type: object
   properties:
     name: { type: string, description: "Unique mod name." }
@@ -281,7 +281,7 @@ CreateModRequest:
     created_by: { type: string, nullable: true }
   required: [name]
 
-CreateModResponse:
+CreateMigResponse:
   type: object
   properties:
     id: { type: string, description: "Mod ID (NanoID string)" }
@@ -350,7 +350,7 @@ BulkUpsertError:
     message: { type: string }
   required: [line, message]
 
-BulkUpsertModReposResponse:
+BulkUpsertMigReposResponse:
   type: object
   properties:
     created: { type: integer, format: int32 }
@@ -379,7 +379,7 @@ ModRepoSelector:
       description: Repo URLs for explicit selection (required when mode=explicit).
   required: [mode]
 
-CreateModRunRequest:
+CreateMigRunRequest:
   type: object
   properties:
     repo_selector:
@@ -387,7 +387,7 @@ CreateModRunRequest:
     created_by: { type: string, nullable: true }
   required: [repo_selector]
 
-CreateModRunResponse:
+CreateMigRunResponse:
   type: object
   properties:
     run_id: { type: string, description: "Run ID (KSUID string)" }
@@ -444,7 +444,7 @@ ModListItem:
     created_at: { type: string, format: date-time }
   required: [id, name, archived, created_at]
 
-ListModsResponse:
+ListMigsResponse:
   type: object
   properties:
     mods:

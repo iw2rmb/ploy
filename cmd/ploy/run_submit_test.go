@@ -34,7 +34,7 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 	var capturedRequest map[string]any
 
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +52,7 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 			// Return 201 Created with run_id.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mod_id":"` + modID + `","spec_id":"` + specID + `"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + modID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 
@@ -177,7 +177,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 	var submitCalled bool
 	var capturedRequest map[string]any
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
@@ -189,7 +189,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mod_id":"` + modID + `","spec_id":"` + specID + `"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + modID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -255,7 +255,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 
 	var submitCalled bool
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +263,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 			submitCalled = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mod_id":"` + modID + `","spec_id":"` + specID + `"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + modID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 		http.NotFound(w, r)

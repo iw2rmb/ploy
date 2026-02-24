@@ -43,14 +43,14 @@ Exclusions (do not rename these in bulk scans):
   - Tests: RED expected first; checks pass only after all rename slices are complete.
 
 ## Phase 1: Domain, Store, and Server Rename
-- [ ] Rename core domain/store identifiers from mod(s) to mig(s) — keeps server internals consistent with the new canonical term.
+- [x] Rename core domain/store identifiers from mod(s) to mig(s) — keeps server internals consistent with the new canonical term.
   - Repository: `ploy`
   - Component: `internal/domain`, `internal/store`, SQL query layer
   - Scope: Rename files/types/params such as `mods.go`, `modref_*`, `mods.sql`, `mod_repos.sql`, related generated sqlc files, and table/entity references to `migs` naming; remove old symbols. Update DB schema names in `internal/store/schema.sql` as part of the same slice (tables, columns, foreign keys, indexes, and constraints that contain `mod`/`mods` naming), then regenerate and update store/query artifacts accordingly.
   - Snippets: `internal/store/queries/mods.sql` -> `internal/store/queries/migs.sql`; `internal/domain/types/mods.go` -> `internal/domain/types/migs.go`
   - Tests: `make test` with focus on store/domain packages; run coverage to ensure critical runner/store packages stay within targets.
 
-- [ ] Rename HTTP handlers, routes, and event contracts to mig(s) — aligns control-plane API surface to one vocabulary.
+- [x] Rename HTTP handlers, routes, and event contracts to mig(s) — aligns control-plane API surface to one vocabulary.
   - Repository: `ploy`
   - Component: `internal/server/handlers`, router wiring, stream/event contracts
   - Scope: Replace handler files and route registrations named `mods_*` with `migs_*`; rename endpoint paths from `/v1/mods/...` to `/v1/migs/...`; remove legacy route registration.

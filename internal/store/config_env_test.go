@@ -83,7 +83,7 @@ func TestConfigEnv_CRUD(t *testing.T) {
 		err = db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{
 			Key:    "TEST_CA_CERTS_PEM_BUNDLE",
 			Value:  "-----BEGIN CERTIFICATE-----\nUPDATED...\n-----END CERTIFICATE-----",
-			Scope:  "mods",
+			Scope:  "migs",
 			Secret: false,
 		})
 		if err != nil {
@@ -98,8 +98,8 @@ func TestConfigEnv_CRUD(t *testing.T) {
 		if after.Value != "-----BEGIN CERTIFICATE-----\nUPDATED...\n-----END CERTIFICATE-----" {
 			t.Error("value was not updated")
 		}
-		if after.Scope != "mods" {
-			t.Errorf("expected scope=%q after update, got %q", "mods", after.Scope)
+		if after.Scope != "migs" {
+			t.Errorf("expected scope=%q after update, got %q", "migs", after.Scope)
 		}
 		if after.Secret {
 			t.Error("expected secret=false after update, got true")
@@ -116,7 +116,7 @@ func TestConfigEnv_CRUD(t *testing.T) {
 		err := db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{
 			Key:    "TEST_CODEX_AUTH_JSON",
 			Value:  `{"token": "secret-token"}`,
-			Scope:  "mods",
+			Scope:  "migs",
 			Secret: true,
 		})
 		if err != nil {
@@ -254,7 +254,7 @@ func TestConfigEnv_CRUD(t *testing.T) {
 
 	// Subtest: Scope values are stored correctly.
 	t.Run("scope_values", func(t *testing.T) {
-		scopes := []string{"mods", "heal", "gate", "all"}
+		scopes := []string{"migs", "heal", "gate", "all"}
 		for _, scope := range scopes {
 			key := "TEST_SCOPE_" + scope
 			err := db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{

@@ -14,14 +14,14 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/CreateModRunRequest'
+          $ref: '../components/schemas/controlplane.yaml#/CreateMigRunRequest'
   responses:
     '201':
       description: Created
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/CreateModRunResponse'
+            $ref: '../components/schemas/controlplane.yaml#/CreateMigRunResponse'
     '400':
       description: Bad request — missing or invalid fields in the request body.
       content:

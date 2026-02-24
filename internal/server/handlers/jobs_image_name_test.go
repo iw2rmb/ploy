@@ -35,7 +35,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{
-		"image": "docker.io/example/mods:latest",
+		"image": "docker.io/example/migs:latest",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
@@ -54,8 +54,8 @@ func TestSaveJobImageName_Success(t *testing.T) {
 	if st.updateJobImageNameParams.ID != jobID {
 		t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageNameParams.ID, jobID)
 	}
-	if st.updateJobImageNameParams.JobImage != "docker.io/example/mods:latest" {
-		t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageNameParams.JobImage, "docker.io/example/mods:latest")
+	if st.updateJobImageNameParams.JobImage != "docker.io/example/migs:latest" {
+		t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageNameParams.JobImage, "docker.io/example/migs:latest")
 	}
 }
 
@@ -109,7 +109,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 	}
 	handler := saveJobImageNameHandler(st)
 
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/mods:latest"})
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)
@@ -146,7 +146,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 	st := &mockStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/mods:latest"})
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)
@@ -182,7 +182,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	st := &mockStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/mods:latest"})
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)
@@ -218,7 +218,7 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 	st := &mockStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
-	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/mods:latest"})
+	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/image", bytes.NewReader(body))
 	req.SetPathValue("job_id", jobID.String())
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)

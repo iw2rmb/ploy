@@ -75,7 +75,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 	if resp.StatusCode == http.StatusCreated {
 		var created struct {
 			RunID  string `json:"run_id"`
-			ModID  string `json:"mod_id"`
+			MigID  string `json:"mig_id"`
 			SpecID string `json:"spec_id"`
 		}
 		if err := httpx.DecodeJSON(resp.Body, &created, httpx.MaxJSONBodyBytes); err != nil {

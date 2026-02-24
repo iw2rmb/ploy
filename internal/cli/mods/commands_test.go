@@ -56,7 +56,7 @@ func TestArtifactsCommand(t *testing.T) {
 
 func TestCancelResumeSubmitCommands(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewModID()
+	modID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 
 	runIDStr := runID.String()
@@ -73,11 +73,11 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(struct {
 			RunID  string `json:"run_id"`
-			ModID  string `json:"mod_id"`
+			MigID  string `json:"mig_id"`
 			SpecID string `json:"spec_id"`
 		}{
 			RunID:  runIDStr,
-			ModID:  modIDStr,
+			MigID:  modIDStr,
 			SpecID: specIDStr,
 		})
 	})

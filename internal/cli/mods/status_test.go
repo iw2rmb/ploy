@@ -14,7 +14,7 @@ import (
 
 func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	jobID1 := domaintypes.NewJobID()
 	jobID2 := domaintypes.NewJobID()
 	jobID3 := domaintypes.NewJobID()
@@ -74,7 +74,7 @@ func TestListRunRepoDiffsCommand_Success(t *testing.T) {
 
 func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -105,7 +105,7 @@ func TestListRunRepoDiffsCommand_EmptyList(t *testing.T) {
 // TestDownloadDiffCommand_Success verifies successful download and decompression.
 func TestDownloadDiffCommand_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	patchContent := "diff --git a/test.txt b/test.txt\n+added line\n"
 
@@ -154,7 +154,7 @@ func TestDownloadDiffCommand_Success(t *testing.T) {
 // TestDownloadDiffCommand_EmptyPatch verifies handling of empty patches.
 func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"

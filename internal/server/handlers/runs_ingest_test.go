@@ -188,15 +188,15 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	}
 }
 
-func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
+func TestCreateMigArtifactBundleHandler_Success(t *testing.T) {
 	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
-func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
+func TestCreateMigArtifactBundleHandler_TooLarge(t *testing.T) {
 	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 
-func TestCreateModArtifactBundleHandler_RunNotFound(t *testing.T) {
+func TestCreateMigArtifactBundleHandler_RunNotFound(t *testing.T) {
 	t.Skip("mod-scoped artifact upload endpoint removed; use job-scoped /v1/runs/{run_id}/jobs/{job_id}/artifact")
 }
 

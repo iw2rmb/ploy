@@ -33,7 +33,7 @@ type Config struct {
 // RepoEntry represents a repo in the run.
 type RepoEntry struct {
 	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoID     domaintypes.ModRepoID `json:"repo_id"`
+	RepoID     domaintypes.MigRepoID `json:"repo_id"`
 	RepoURL    string                `json:"repo_url"`
 	BaseRef    string                `json:"base_ref"`
 	TargetRef  string                `json:"target_ref"`
@@ -57,10 +57,10 @@ type Engine struct {
 	config    Config
 
 	mu           sync.Mutex
-	repoOrder    []domaintypes.ModRepoID          // Order for stable rendering
-	repoURLs     map[domaintypes.ModRepoID]string // RepoID -> RepoURL
-	repoJobs     map[domaintypes.ModRepoID][]runs.RepoJobEntry
-	repoErrors   map[domaintypes.ModRepoID]*string // RepoID -> LastError
+	repoOrder    []domaintypes.MigRepoID          // Order for stable rendering
+	repoURLs     map[domaintypes.MigRepoID]string // RepoID -> RepoURL
+	repoJobs     map[domaintypes.MigRepoID][]runs.RepoJobEntry
+	repoErrors   map[domaintypes.MigRepoID]*string // RepoID -> LastError
 	spinnerFrame int                               // Current spinner animation frame
 
 	renderedLines int  // number of lines rendered in last frame
@@ -92,10 +92,10 @@ func NewEngine(httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunI
 		baseURL:    baseURL,
 		runID:      runID,
 		config:     cfg,
-		repoOrder:  make([]domaintypes.ModRepoID, 0),
-		repoURLs:   make(map[domaintypes.ModRepoID]string),
-		repoJobs:   make(map[domaintypes.ModRepoID][]runs.RepoJobEntry),
-		repoErrors: make(map[domaintypes.ModRepoID]*string),
+		repoOrder:  make([]domaintypes.MigRepoID, 0),
+		repoURLs:   make(map[domaintypes.MigRepoID]string),
+		repoJobs:   make(map[domaintypes.MigRepoID][]runs.RepoJobEntry),
+		repoErrors: make(map[domaintypes.MigRepoID]*string),
 	}
 }
 
@@ -252,7 +252,7 @@ func (e *Engine) refreshRepos(ctx context.Context) error {
 // refreshAllJobs fetches jobs for all repos.
 func (e *Engine) refreshAllJobs(ctx context.Context) error {
 	e.mu.Lock()
-	repoIDs := make([]domaintypes.ModRepoID, len(e.repoOrder))
+	repoIDs := make([]domaintypes.MigRepoID, len(e.repoOrder))
 	copy(repoIDs, e.repoOrder)
 	e.mu.Unlock()
 

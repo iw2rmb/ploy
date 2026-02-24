@@ -451,7 +451,7 @@ func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
 
 	handler := completeJobHandler(st, nil)
 
-	// Mod job_meta with action_summary.
+	// Mig job_meta with action_summary.
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",

@@ -12,22 +12,22 @@ func TestGlobalEnvScope_Validate(t *testing.T) {
 	}{
 		// Valid scopes.
 		{name: "all is valid", scope: GlobalEnvScopeAll, wantErr: false},
-		{name: "mods is valid", scope: GlobalEnvScopeMods, wantErr: false},
+		{name: "migs is valid", scope: GlobalEnvScopeMods, wantErr: false},
 		{name: "heal is valid", scope: GlobalEnvScopeHeal, wantErr: false},
 		{name: "gate is valid", scope: GlobalEnvScopeGate, wantErr: false},
 
 		// Valid scopes with surrounding whitespace (should be accepted after normalization).
 		{name: "all with spaces", scope: "  all  ", wantErr: false},
-		{name: "mods with tabs", scope: "\tmods\t", wantErr: false},
+		{name: "migs with tabs", scope: "\tmigs\t", wantErr: false},
 
 		// Invalid scopes.
 		{name: "empty string is invalid", scope: "", wantErr: true},
 		{name: "whitespace only is invalid", scope: "   ", wantErr: true},
 		{name: "unknown scope is invalid", scope: "unknown", wantErr: true},
-		{name: "typo mod (not mods) is invalid", scope: "mod", wantErr: true},
+		{name: "typo mig (not migs) is invalid", scope: "mig", wantErr: true},
 		{name: "typo gates is invalid", scope: "gates", wantErr: true},
 		{name: "mixed case ALL is invalid", scope: "ALL", wantErr: true},
-		{name: "mixed case Mods is invalid", scope: "Mods", wantErr: true},
+		{name: "mixed case Migs is invalid", scope: "Migs", wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -53,7 +53,7 @@ func TestParseGlobalEnvScope(t *testing.T) {
 	}{
 		// Valid inputs.
 		{name: "all", input: "all", want: GlobalEnvScopeAll, wantErr: false},
-		{name: "mods", input: "mods", want: GlobalEnvScopeMods, wantErr: false},
+		{name: "migs", input: "migs", want: GlobalEnvScopeMods, wantErr: false},
 		{name: "heal", input: "heal", want: GlobalEnvScopeHeal, wantErr: false},
 		{name: "gate", input: "gate", want: GlobalEnvScopeGate, wantErr: false},
 
@@ -66,7 +66,7 @@ func TestParseGlobalEnvScope(t *testing.T) {
 
 		// Invalid inputs.
 		{name: "unknown scope", input: "unknown", want: "", wantErr: true, errSubstr: "invalid scope"},
-		{name: "typo mod", input: "mod", want: "", wantErr: true, errSubstr: "invalid scope"},
+		{name: "typo mig", input: "mig", want: "", wantErr: true, errSubstr: "invalid scope"},
 	}
 
 	for _, tt := range tests {
@@ -107,13 +107,13 @@ func TestGlobalEnvScope_MatchesJobType(t *testing.T) {
 		{name: "all matches post_gate", scope: GlobalEnvScopeAll, jobType: JobTypePostGate, want: true},
 		{name: "all matches mr", scope: GlobalEnvScopeAll, jobType: JobTypeMR, want: true},
 
-		// "mods" scope matches mod and post_gate jobs.
-		{name: "mods matches mod", scope: GlobalEnvScopeMods, jobType: JobTypeMod, want: true},
-		{name: "mods matches post_gate", scope: GlobalEnvScopeMods, jobType: JobTypePostGate, want: true},
-		{name: "mods does not match heal", scope: GlobalEnvScopeMods, jobType: JobTypeHeal, want: false},
-		{name: "mods does not match pre_gate", scope: GlobalEnvScopeMods, jobType: JobTypePreGate, want: false},
-		{name: "mods does not match re_gate", scope: GlobalEnvScopeMods, jobType: JobTypeReGate, want: false},
-		{name: "mods does not match mr", scope: GlobalEnvScopeMods, jobType: JobTypeMR, want: false},
+		// "migs" scope matches mod and post_gate jobs.
+		{name: "migs matches mod", scope: GlobalEnvScopeMods, jobType: JobTypeMod, want: true},
+		{name: "migs matches post_gate", scope: GlobalEnvScopeMods, jobType: JobTypePostGate, want: true},
+		{name: "migs does not match heal", scope: GlobalEnvScopeMods, jobType: JobTypeHeal, want: false},
+		{name: "migs does not match pre_gate", scope: GlobalEnvScopeMods, jobType: JobTypePreGate, want: false},
+		{name: "migs does not match re_gate", scope: GlobalEnvScopeMods, jobType: JobTypeReGate, want: false},
+		{name: "migs does not match mr", scope: GlobalEnvScopeMods, jobType: JobTypeMR, want: false},
 
 		// "heal" scope matches heal and re_gate jobs.
 		{name: "heal matches heal", scope: GlobalEnvScopeHeal, jobType: JobTypeHeal, want: true},
@@ -154,7 +154,7 @@ func TestGlobalEnvScope_String(t *testing.T) {
 		want  string
 	}{
 		{GlobalEnvScopeAll, "all"},
-		{GlobalEnvScopeMods, "mods"},
+		{GlobalEnvScopeMods, "migs"},
 		{GlobalEnvScopeHeal, "heal"},
 		{GlobalEnvScopeGate, "gate"},
 	}
@@ -175,7 +175,7 @@ func TestGlobalEnvScope_IsZero(t *testing.T) {
 		{"   ", true},
 		{"\t\n", true},
 		{"all", false},
-		{"mods", false},
+		{"migs", false},
 	}
 	for _, tt := range tests {
 		if got := tt.scope.IsZero(); got != tt.want {

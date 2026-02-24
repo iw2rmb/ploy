@@ -30,7 +30,7 @@ type RepoJobEntry struct {
 // ListRepoJobsResult contains the response from listing repo jobs.
 type ListRepoJobsResult struct {
 	RunID   domaintypes.RunID     `json:"run_id"`
-	RepoID  domaintypes.ModRepoID `json:"repo_id"`
+	RepoID  domaintypes.MigRepoID `json:"repo_id"`
 	Attempt int32                 `json:"attempt"`
 	Jobs    []RepoJobEntry        `json:"jobs"`
 }
@@ -40,7 +40,7 @@ type ListRepoJobsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	RepoID  domaintypes.ModRepoID
+	RepoID  domaintypes.MigRepoID
 	Attempt *int32 // Optional: specific attempt
 }
 

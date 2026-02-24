@@ -18,7 +18,7 @@ import (
 func TestExecuteModRunSubmitsRun(t *testing.T) {
 	var received modsapi.RunSubmitRequest
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewModID().String()
+	modID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -30,9 +30,9 @@ func TestExecuteModRunSubmitsRun(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			if err := json.NewEncoder(w).Encode(struct {
 				RunID  string `json:"run_id"`
-				ModID  string `json:"mod_id"`
+				MigID  string `json:"mig_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: modID, SpecID: specID}); err != nil {
+			}{RunID: runID, MigID: modID, SpecID: specID}); err != nil {
 				t.Fatalf("encode response: %v", err)
 			}
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status":
@@ -93,9 +93,9 @@ func TestExecuteModRunServerAssignsRunID(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
 				RunID  string `json:"run_id"`
-				ModID  string `json:"mod_id"`
+				MigID  string `json:"mig_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+			}{RunID: runID, MigID: domaintypes.NewMigID().String(), SpecID: domaintypes.NewSpecID().String()})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status":
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
@@ -131,9 +131,9 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(struct {
 				RunID  string `json:"run_id"`
-				ModID  string `json:"mod_id"`
+				MigID  string `json:"mig_id"`
 				SpecID string `json:"spec_id"`
-			}{RunID: runID, ModID: domaintypes.NewModID().String(), SpecID: domaintypes.NewSpecID().String()})
+			}{RunID: runID, MigID: domaintypes.NewMigID().String(), SpecID: domaintypes.NewSpecID().String()})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID+"/status":
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{

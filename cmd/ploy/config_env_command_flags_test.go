@@ -178,7 +178,7 @@ func TestHandleConfigEnvSetInvalidScope(t *testing.T) {
 
 // TestHandleConfigEnvSetValidScopes verifies that all valid scope values are accepted.
 func TestHandleConfigEnvSetValidScopes(t *testing.T) {
-	validScopes := []string{"all", "mods", "heal", "gate"}
+	validScopes := []string{"all", "migs", "heal", "gate"}
 	for _, scope := range validScopes {
 		t.Run(scope, func(t *testing.T) {
 			buf := &bytes.Buffer{}

@@ -43,43 +43,43 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewModID()
-	_, err = db.CreateMod(ctx, store.CreateModParams{
+	modID := domaintypes.NewMigID()
+	_, err = db.CreateMig(ctx, store.CreateMigParams{
 		ID:        modID,
 		Name:      "integration-mod-" + modID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
+		t.Fatalf("CreateMig() failed: %v", err)
 	}
 
 	repoURL := "https://github.com/example/happy-path-test"
 	baseRef := "main"
 	targetRef := "feature/happy-path"
-	repoID := domaintypes.NewModRepoID()
-	repo, err := db.CreateModRepo(ctx, store.CreateModRepoParams{
+	repoID := domaintypes.NewMigRepoID()
+	repo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
 		ID:        repoID,
-		ModID:     modID,
+		MigID:     modID,
 		RepoUrl:   repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
 	if err != nil {
-		t.Fatalf("CreateModRepo() failed: %v", err)
+		t.Fatalf("CreateMigRepo() failed: %v", err)
 	}
 
 	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
-		ModID:     modID,
+		MigID:     modID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%s, repo_id=%s, repo_url=%s, status=%s", run.ID, run.ModID.String(), repo.ID.String(), repo.RepoUrl, run.Status)
+	t.Logf("Created run: id=%v, mod_id=%s, repo_id=%s, repo_url=%s, status=%s", run.ID, run.MigID.String(), repo.ID.String(), repo.RepoUrl, run.Status)
 
 	// Verify the run was created with expected values.
 	if repo.RepoUrl != repoURL {

@@ -29,7 +29,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	f := newJobFixture("mod", 1000)
 	now := time.Now()
 
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
@@ -189,7 +189,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.JobTypeMod.String(), 2000)
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	postJobID := domaintypes.NewJobID()
 
 	f.Job.RepoID = repoID
@@ -315,7 +315,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	nextJob := store.Job{
 		ID:          domaintypes.NewJobID(),
 		RunID:       f.RunID,
-		RepoID:      domaintypes.NewModRepoID(),
+		RepoID:      domaintypes.NewMigRepoID(),
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Status:      store.JobStatusCreated,
@@ -357,7 +357,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
-	repoID := domaintypes.NewModRepoID()
+	repoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
@@ -366,15 +366,15 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 
 	specBytes, err := json.Marshal(map[string]any{
 		"steps": []any{
-			map[string]any{"image": "mods-orw:latest"},
+			map[string]any{"image": "migs-orw:latest"},
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
 				"retries": 1,
-				"image":   "mods-codex:latest",
+				"image":   "migs-codex:latest",
 			},
 			"router": map[string]any{
-				"image": "mods-router:latest",
+				"image": "migs-router:latest",
 			},
 		},
 	})

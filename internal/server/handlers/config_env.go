@@ -133,7 +133,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 
 		// Parse and validate scope at API boundary using typed enum.
 		// ParseGlobalEnvScope handles empty string (defaults to "all") and validates
-		// against known values (all, mods, heal, gate).
+		// against known values (all, migs, heal, gate).
 		scope, err := domaintypes.ParseGlobalEnvScope(req.Scope)
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)

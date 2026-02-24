@@ -19,8 +19,8 @@ func TestRunListCallsControlPlane(t *testing.T) {
 
 	runID1 := domaintypes.NewRunID().String()
 	runID2 := domaintypes.NewRunID().String()
-	modID1 := domaintypes.NewModID().String()
-	modID2 := domaintypes.NewModID().String()
+	modID1 := domaintypes.NewMigID().String()
+	modID2 := domaintypes.NewMigID().String()
 	specID1 := domaintypes.NewSpecID().String()
 	specID2 := domaintypes.NewSpecID().String()
 
@@ -43,7 +43,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 				Runs []struct {
 					ID        string    `json:"id"`
 					Status    string    `json:"status"`
-					ModID     string    `json:"mod_id"`
+					MigID     string    `json:"mig_id"`
 					SpecID    string    `json:"spec_id"`
 					CreatedAt time.Time `json:"created_at"`
 					Counts    *struct {
@@ -56,7 +56,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 				Runs: []struct {
 					ID        string    `json:"id"`
 					Status    string    `json:"status"`
-					ModID     string    `json:"mod_id"`
+					MigID     string    `json:"mig_id"`
 					SpecID    string    `json:"spec_id"`
 					CreatedAt time.Time `json:"created_at"`
 					Counts    *struct {
@@ -68,7 +68,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 					{
 						ID:        runID1,
 						Status:    "Started",
-						ModID:     modID1,
+						MigID:     modID1,
 						SpecID:    specID1,
 						CreatedAt: now,
 						Counts: &struct {
@@ -80,7 +80,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 					{
 						ID:        runID2,
 						Status:    "Finished",
-						ModID:     modID2,
+						MigID:     modID2,
 						SpecID:    specID2,
 						CreatedAt: now,
 					},

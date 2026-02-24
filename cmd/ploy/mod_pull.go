@@ -139,7 +139,7 @@ func handleModPull(args []string, stderr io.Writer) error {
 	pullCmd := mods.ModPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modID),
+		MigRef:  domaintypes.MigRef(modID),
 		RepoURL: rawOriginURL,
 		Mode:    pullMode,
 	}

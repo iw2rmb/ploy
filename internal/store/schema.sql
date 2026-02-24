@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 
 -- Enums
 --
--- Status model (see docs/mods-lifecycle.md § "State machines"):
+-- Status model (see docs/migs-lifecycle.md § "State machines"):
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Cancelled
@@ -73,52 +73,52 @@ CREATE INDEX IF NOT EXISTS nodes_last_heartbeat_idx ON nodes(last_heartbeat);
 CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained;
 -- One server responds for one cluster only; nodes implicitly belong to this server's cluster.
 
--- Specs (dictionary of all Mods specs; append-only)
--- Mods do not "own" specs; a mod just points at a single current spec via mods.spec_id.
--- Setting/updating a mod spec means: insert a new specs row and update mods.spec_id.
+-- Specs (dictionary of all Migs specs; append-only)
+-- Migs do not "own" specs; a mod just points at a single current spec via migs.spec_id.
+-- Setting/updating a mod spec means: insert a new specs row and update migs.spec_id.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for stable run references over time.
 -- Application code generates IDs via types.NewSpecID() before insertion.
 CREATE TABLE IF NOT EXISTS specs (
   id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewSpecID().
   name         TEXT NOT NULL DEFAULT '',  -- Optional human label.
-  spec         JSONB NOT NULL,  -- Canonical Mods spec JSON.
+  spec         JSONB NOT NULL,  -- Canonical Migs spec JSON.
   created_by   TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at  TIMESTAMPTZ NULL  -- Optional archiving support; not currently enforced.
 );
 CREATE INDEX IF NOT EXISTS specs_created_idx ON specs(created_at);
 
--- Mods (code modification projects)
+-- Migs (code modification projects)
 -- A mod is a long-lived project with a unique name that references a spec and manages a repo set.
 -- Note: id is TEXT (NanoID-backed, 6 chars) for compact, human-friendly mod identifiers.
--- Application code generates IDs via types.NewModID() before insertion.
-CREATE TABLE IF NOT EXISTS mods (
-  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (6 chars); no default, app-generated via NewModID().
+-- Application code generates IDs via types.NewMigID() before insertion.
+CREATE TABLE IF NOT EXISTS migs (
+  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (6 chars); no default, app-generated via NewMigID().
   name         TEXT NOT NULL UNIQUE,  -- Human-readable unique name for the mod project.
   spec_id      TEXT REFERENCES specs(id) ON DELETE SET NULL,  -- Current spec; NULL if no spec set yet.
   created_by   TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   archived_at  TIMESTAMPTZ NULL  -- When non-NULL, creating new runs for this mod must fail.
 );
-CREATE INDEX IF NOT EXISTS mods_name_idx ON mods(name);
--- Optional partial index on active mods for efficient filtering.
-CREATE INDEX IF NOT EXISTS mods_active_idx ON mods(id) WHERE archived_at IS NULL;
+CREATE INDEX IF NOT EXISTS migs_name_idx ON migs(name);
+-- Optional partial index on active migs for efficient filtering.
+CREATE INDEX IF NOT EXISTS migs_active_idx ON migs(id) WHERE archived_at IS NULL;
 
 -- ModRepos (managed repo set for a mod project)
 -- Each row represents a repo participating in a mod, with mutable refs.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
--- Application code generates IDs via types.NewModRepoID() before insertion.
-CREATE TABLE IF NOT EXISTS mod_repos (
-  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewModRepoID().
-  mod_id       TEXT NOT NULL REFERENCES mods(id) ON DELETE CASCADE,
+-- Application code generates IDs via types.NewMigRepoID() before insertion.
+CREATE TABLE IF NOT EXISTS mig_repos (
+  id           TEXT PRIMARY KEY,  -- NanoID-backed string ID (8 chars); no default, app-generated via NewMigRepoID().
+  mig_id       TEXT NOT NULL REFERENCES migs(id) ON DELETE CASCADE,
   repo_url     TEXT NOT NULL,  -- Repository URL (normalized for matching).
   base_ref     TEXT NOT NULL,  -- Mutable base ref (e.g., main).
   target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 -- Enforce uniqueness: one repo_url per mod.
-CREATE UNIQUE INDEX IF NOT EXISTS mod_repos_mod_repo_uniq ON mod_repos(mod_id, repo_url);
-CREATE INDEX IF NOT EXISTS mod_repos_mod_created_idx ON mod_repos(mod_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS mig_repos_mig_repo_uniq ON mig_repos(mig_id, repo_url);
+CREATE INDEX IF NOT EXISTS mig_repos_mig_created_idx ON mig_repos(mig_id, created_at);
 
 -- Runs (execution of one spec_id over a specific set of repos)
 -- v1 model: A run represents the execution of a mod's spec over its repo set.
@@ -127,7 +127,7 @@ CREATE INDEX IF NOT EXISTS mod_repos_mod_created_idx ON mod_repos(mod_id, create
 -- via types.NewRunID() before insertion.
 CREATE TABLE IF NOT EXISTS runs (
   id           TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
-  mod_id       TEXT NOT NULL REFERENCES mods(id) ON DELETE RESTRICT,  -- Mod project this run belongs to.
+  mig_id       TEXT NOT NULL REFERENCES migs(id) ON DELETE RESTRICT,  -- Mig project this run belongs to.
   spec_id      TEXT NOT NULL REFERENCES specs(id) ON DELETE RESTRICT,  -- Spec used for this run (immutable snapshot).
   created_by   TEXT,
   status       run_status NOT NULL DEFAULT 'Started',
@@ -138,19 +138,19 @@ CREATE TABLE IF NOT EXISTS runs (
 );
 CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status);
 CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
-CREATE INDEX IF NOT EXISTS runs_mod_idx ON runs(mod_id);
+CREATE INDEX IF NOT EXISTS runs_mig_idx ON runs(mig_id);
 
 -- RunRepos tracks per-repo execution state within a run.
 -- v1 model: composite PK (run_id, repo_id); execution_run_id removed (no child runs per repo).
--- repo_base_ref and repo_target_ref are snapshots copied from mod_repos at run creation time.
+-- repo_base_ref and repo_target_ref are snapshots copied from mig_repos at run creation time.
 -- Note: run_id is TEXT (KSUID-backed) to match runs.id.
--- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mod_repos.id.
+-- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mig_repos.id.
 CREATE TABLE IF NOT EXISTS run_repos (
-  mod_id           TEXT NOT NULL REFERENCES mods(id) ON DELETE RESTRICT,  -- Copied from runs.mod_id.
+  mig_id           TEXT NOT NULL REFERENCES migs(id) ON DELETE RESTRICT,  -- Copied from runs.mig_id.
   run_id           TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  repo_id          TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT,  -- FK to mod_repos.id.
-  repo_base_ref    TEXT NOT NULL,  -- Snapshot of mod_repos.base_ref at run creation time.
-  repo_target_ref  TEXT NOT NULL,  -- Snapshot of mod_repos.target_ref at run creation time.
+  repo_id          TEXT NOT NULL REFERENCES mig_repos(id) ON DELETE RESTRICT,  -- FK to mig_repos.id.
+  repo_base_ref    TEXT NOT NULL,  -- Snapshot of mig_repos.base_ref at run creation time.
+  repo_target_ref  TEXT NOT NULL,  -- Snapshot of mig_repos.target_ref at run creation time.
   status           run_repo_status NOT NULL DEFAULT 'Queued',
   attempt          INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error       TEXT,
@@ -171,7 +171,7 @@ CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, crea
 -- Server-driven scheduling: only chain head starts as 'Queued'; successors remain 'Created'
 -- until their predecessor succeeds and they are promoted.
 -- Note: id is TEXT (KSUID-backed); run_id is TEXT to match runs.id.
--- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mod_repos.id.
+-- Note: repo_id is TEXT (NanoID-backed, 8 chars) to match mig_repos.id.
 --
 -- The `meta` column stores structured job metadata as JSONB. The schema is
 -- defined by internal/workflow/contracts.JobMeta with the following shape:
@@ -185,7 +185,7 @@ CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, crea
 CREATE TABLE IF NOT EXISTS jobs (
   id              TEXT PRIMARY KEY,  -- KSUID-backed string ID (27 chars); no default, app-generated.
   run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
-  repo_id         TEXT NOT NULL REFERENCES mod_repos(id) ON DELETE RESTRICT,  -- FK to mod_repos.id for repo attribution.
+  repo_id         TEXT NOT NULL REFERENCES mig_repos(id) ON DELETE RESTRICT,  -- FK to mig_repos.id for repo attribution.
   repo_base_ref   TEXT NOT NULL,  -- Copied from run_repos.repo_base_ref at job creation time.
   attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
   name            TEXT NOT NULL,
@@ -341,13 +341,13 @@ CREATE INDEX IF NOT EXISTS bootstrap_tokens_token_id_idx ON bootstrap_tokens(tok
 
 -- Global Environment Variables (config_env)
 -- Stores global environment entries (including secrets) for injection into jobs.
--- scope controls which job types receive the env var (mods, heal, gate, all).
+-- scope controls which job types receive the env var (migs, heal, gate, all).
 -- The secret flag indicates whether the value should be redacted at the CLI/HTTP layer.
 -- Primary key on 'key' ensures uniqueness; upsert semantics for updates.
 CREATE TABLE IF NOT EXISTS config_env (
   key         TEXT PRIMARY KEY,                           -- Environment variable name (e.g., CA_CERTS_PEM_BUNDLE)
   value       TEXT NOT NULL,                              -- Environment variable value (may be large, e.g., PEM bundles)
-  scope       TEXT NOT NULL,                              -- Selection scope: 'mods', 'heal', 'gate', 'all'
+  scope       TEXT NOT NULL,                              -- Selection scope: 'migs', 'heal', 'gate', 'all'
   secret      BOOLEAN NOT NULL DEFAULT TRUE,              -- If true, value is redacted in list views
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- Last modification timestamp
 );

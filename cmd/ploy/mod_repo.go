@@ -99,7 +99,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -110,7 +110,7 @@ func handleModRepoAdd(args []string, stderr io.Writer) error {
 	cmd := mods.AddModRepoCommand{
 		Client:    httpClient,
 		BaseURL:   base,
-		ModRef:    domaintypes.ModRef(modID),
+		MigRef:    domaintypes.MigRef(modID),
 		RepoURL:   *repoURL,
 		BaseRef:   *baseRef,
 		TargetRef: *targetRef,
@@ -151,7 +151,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -162,7 +162,7 @@ func handleModRepoList(args []string, stderr io.Writer) error {
 	cmd := mods.ListModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modID),
+		MigRef:  domaintypes.MigRef(modID),
 	}
 
 	results, err := cmd.Run(ctx)
@@ -235,7 +235,7 @@ func handleModRepoRemove(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -246,8 +246,8 @@ func handleModRepoRemove(args []string, stderr io.Writer) error {
 	cmd := mods.RemoveModRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modID),
-		RepoID:  domaintypes.ModRepoID(*repoID),
+		MigRef:  domaintypes.MigRef(modID),
+		RepoID:  domaintypes.MigRepoID(*repoID),
 	}
 
 	if err := cmd.Run(ctx); err != nil {
@@ -307,7 +307,7 @@ func handleModRepoImport(args []string, stderr io.Writer) error {
 	resolveCmd := mods.ResolveModByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modRef),
+		MigRef:  domaintypes.MigRef(modRef),
 	}
 	modID, err := resolveCmd.Run(ctx)
 	if err != nil {
@@ -318,7 +318,7 @@ func handleModRepoImport(args []string, stderr io.Writer) error {
 	cmd := mods.ImportModReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		ModRef:  domaintypes.ModRef(modID),
+		MigRef:  domaintypes.MigRef(modID),
 		CSVData: csvData,
 	}
 

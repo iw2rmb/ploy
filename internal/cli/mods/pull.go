@@ -32,7 +32,7 @@ import (
 //   - RepoTargetRef: the target ref snapshot from run_repos
 type PullResolution struct {
 	RunID         domaintypes.RunID     `json:"run_id"`
-	RepoID        domaintypes.ModRepoID `json:"repo_id"`
+	RepoID        domaintypes.MigRepoID `json:"repo_id"`
 	RepoTargetRef domaintypes.GitRef    `json:"repo_target_ref"`
 }
 
@@ -139,7 +139,7 @@ const (
 type ModPullCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	ModRef  domaintypes.ModRef
+	MigRef  domaintypes.MigRef
 	RepoURL string   // Repository URL to match
 	Mode    PullMode // Pull mode (last-succeeded or last-failed)
 }
@@ -153,7 +153,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if c.BaseURL == nil {
 		return nil, fmt.Errorf("mod pull: base url required")
 	}
-	if err := c.ModRef.Validate(); err != nil {
+	if err := c.MigRef.Validate(); err != nil {
 		return nil, fmt.Errorf("mod pull: mod id required")
 	}
 	repoURL := strings.TrimSpace(c.RepoURL)
@@ -171,7 +171,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	// Build endpoint: POST /v1/mods/{mod_id}/pull
-	endpoint := c.BaseURL.JoinPath("v1", "mods", c.ModRef.String(), "pull")
+	endpoint := c.BaseURL.JoinPath("v1", "mods", c.MigRef.String(), "pull")
 
 	// Build request body: {"repo_url": "...", "mode": "..."}
 	reqBody := struct {

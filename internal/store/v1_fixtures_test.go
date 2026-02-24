@@ -8,9 +8,9 @@ import (
 )
 
 type v1Fixture struct {
-	Mod     Mod
+	Mig     Mig
 	Spec    Spec
-	ModRepo ModRepo
+	MigRepo MigRepo
 	Run     Run
 	RunRepo RunRepo
 }
@@ -31,33 +31,33 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := types.NewModID()
-	mod, err := db.CreateMod(ctx, CreateModParams{
+	modID := types.NewMigID()
+	mod, err := db.CreateMig(ctx, CreateMigParams{
 		ID:        modID,
 		Name:      "test-mod-" + modID.String(),
 		SpecID:    &specID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
+		t.Fatalf("CreateMig() failed: %v", err)
 	}
 
-	modRepoID := types.NewModRepoID()
-	modRepo, err := db.CreateModRepo(ctx, CreateModRepoParams{
+	modRepoID := types.NewMigRepoID()
+	modRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepoID,
-		ModID:     modID,
+		MigID:     modID,
 		RepoUrl:   repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
 	if err != nil {
-		t.Fatalf("CreateModRepo() failed: %v", err)
+		t.Fatalf("CreateMigRepo() failed: %v", err)
 	}
 
 	runID := types.NewRunID()
 	run, err := db.CreateRun(ctx, CreateRunParams{
 		ID:        runID,
-		ModID:     modID,
+		MigID:     modID,
 		SpecID:    specID,
 		CreatedBy: &createdBy,
 	})
@@ -66,7 +66,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	}
 
 	runRepo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		ModID:         modID,
+		MigID:         modID,
 		RunID:         runID,
 		RepoID:        modRepoID,
 		RepoBaseRef:   baseRef,
@@ -77,9 +77,9 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	}
 
 	return v1Fixture{
-		Mod:     mod,
+		Mig:     mod,
 		Spec:    spec,
-		ModRepo: modRepo,
+		MigRepo: modRepo,
 		Run:     run,
 		RunRepo: runRepo,
 	}

@@ -81,9 +81,9 @@ func TestStringIDs(t *testing.T) {
 	t.Run("JobID", func(t *testing.T) { testStringID[jobIDTag](t, "JobID", NewJobID().String()) })
 	t.Run("ClusterID", func(t *testing.T) { testStringID[clusterIDTag](t, "ClusterID", "c-1") })
 	t.Run("NodeID", func(t *testing.T) { testStringID[nodeIDTag](t, "NodeID", NewNodeKey()) })
-	t.Run("ModID", func(t *testing.T) { testStringID[modIDTag](t, "ModID", NewModID().String()) })
+	t.Run("MigID", func(t *testing.T) { testStringID[modIDTag](t, "MigID", NewMigID().String()) })
 	t.Run("SpecID", func(t *testing.T) { testStringID[specIDTag](t, "SpecID", NewSpecID().String()) })
-	t.Run("ModRepoID", func(t *testing.T) { testStringID[modRepoIDTag](t, "ModRepoID", NewModRepoID().String()) })
+	t.Run("MigRepoID", func(t *testing.T) { testStringID[modRepoIDTag](t, "MigRepoID", NewMigRepoID().String()) })
 }
 
 func TestIDs_RejectInvalidFormats(t *testing.T) {
@@ -98,9 +98,9 @@ func TestIDs_RejectInvalidFormats(t *testing.T) {
 		{"JobID", func(b []byte) error { var v JobID; return v.UnmarshalText(b) }, "job123"},
 		{"NodeID_long", func(b []byte) error { var v NodeID; return v.UnmarshalText(b) }, "too-long"},
 		{"NodeID_chars", func(b []byte) error { var v NodeID; return v.UnmarshalText(b) }, "ab cd1"},
-		{"ModID", func(b []byte) error { var v ModID; return v.UnmarshalText(b) }, "abcdefg"},
+		{"MigID", func(b []byte) error { var v MigID; return v.UnmarshalText(b) }, "abcdefg"},
 		{"SpecID", func(b []byte) error { var v SpecID; return v.UnmarshalText(b) }, "short"},
-		{"ModRepoID", func(b []byte) error { var v ModRepoID; return v.UnmarshalText(b) }, "short"},
+		{"MigRepoID", func(b []byte) error { var v MigRepoID; return v.UnmarshalText(b) }, "short"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -121,9 +121,9 @@ func TestIDGenerators(t *testing.T) {
 		{"NewRunID", func() string { return NewRunID().String() }, 27},
 		{"NewJobID", func() string { return NewJobID().String() }, 27},
 		{"NewNodeKey", func() string { return NewNodeKey() }, 6},
-		{"NewModID", func() string { return NewModID().String() }, 6},
+		{"NewMigID", func() string { return NewMigID().String() }, 6},
 		{"NewSpecID", func() string { return NewSpecID().String() }, 8},
-		{"NewModRepoID", func() string { return NewModRepoID().String() }, 8},
+		{"NewMigRepoID", func() string { return NewMigRepoID().String() }, 8},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

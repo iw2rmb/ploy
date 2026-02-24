@@ -16,20 +16,20 @@ import (
 )
 
 // =============================================================================
-// POST /v1/mods/{mod_ref}/specs — Set Mod Spec
+// POST /v1/migs/{mig_ref}/specs — Set Mig Spec
 // =============================================================================
 
-// TestMods_SetSpec_Success verifies POST /v1/mods/{mod_ref}/specs creates a new spec and updates mods.spec_id.
-// Tests append-only spec creation with mods.spec_id update.
+// TestMods_SetSpec_Success verifies POST /v1/migs/{mig_ref}/specs creates a new spec and updates migs.spec_id.
+// Tests append-only spec creation with migs.spec_id update.
 func TestMods_SetSpec_Success(t *testing.T) {
 	st := &mockStore{
-		getModResult: store.Mod{
+		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mod",
 			ArchivedAt: pgtype.Timestamptz{Valid: false}, // Not archived.
 		},
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	spec := map[string]any{
 		"version": "0.2.0",
@@ -41,8 +41,8 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -54,13 +54,13 @@ func TestMods_SetSpec_Success(t *testing.T) {
 
 	// Verify store methods called.
 	if !st.getModCalled {
-		t.Error("store.GetMod was not called")
+		t.Error("store.GetMig was not called")
 	}
 	if !st.createSpecCalled {
 		t.Error("store.CreateSpec was not called")
 	}
 	if !st.updateModSpecCalled {
-		t.Error("store.UpdateModSpec was not called")
+		t.Error("store.UpdateMigSpec was not called")
 	}
 
 	// Verify response shape.
@@ -79,16 +79,16 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_WithName verifies POST /v1/mods/{mod_ref}/specs accepts optional name.
+// TestMods_SetSpec_WithName verifies POST /v1/migs/{mig_ref}/specs accepts optional name.
 func TestMods_SetSpec_WithName(t *testing.T) {
 	st := &mockStore{
-		getModResult: store.Mod{
+		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mod",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	spec := map[string]any{
 		"version": "0.2.0",
@@ -101,8 +101,8 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -118,16 +118,16 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_RepeatedCalls verifies that repeated set spec calls create new spec rows and update mods.spec_id.
+// TestMods_SetSpec_RepeatedCalls verifies that repeated set spec calls create new spec rows and update migs.spec_id.
 func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	st := &mockStore{
-		getModResult: store.Mod{
+		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mod",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	// First call.
 	spec1 := map[string]any{
@@ -138,8 +138,8 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	reqBody1 := map[string]any{"spec": spec1}
 	body1, _ := json.Marshal(reqBody1)
 
-	req1 := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body1))
-	req1.SetPathValue("mod_ref", "mod123")
+	req1 := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body1))
+	req1.SetPathValue("mig_ref", "mod123")
 	req1.Header.Set("Content-Type", "application/json")
 	rr1 := httptest.NewRecorder()
 
@@ -168,8 +168,8 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	reqBody2 := map[string]any{"spec": spec2}
 	body2, _ := json.Marshal(reqBody2)
 
-	req2 := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body2))
-	req2.SetPathValue("mod_ref", "mod123")
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body2))
+	req2.SetPathValue("mig_ref", "mod123")
 	req2.Header.Set("Content-Type", "application/json")
 	rr2 := httptest.NewRecorder()
 
@@ -184,7 +184,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 		t.Error("store.CreateSpec was not called on second invocation")
 	}
 	if !st.updateModSpecCalled {
-		t.Error("store.UpdateModSpec was not called on second invocation")
+		t.Error("store.UpdateMigSpec was not called on second invocation")
 	}
 
 	var resp2 struct {
@@ -199,16 +199,16 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_MissingSpec verifies POST /v1/mods/{mod_ref}/specs rejects missing spec.
+// TestMods_SetSpec_MissingSpec verifies POST /v1/migs/{mig_ref}/specs rejects missing spec.
 func TestMods_SetSpec_MissingSpec(t *testing.T) {
 	st := &mockStore{}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	reqBody := map[string]any{"name": "no-spec"}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -224,10 +224,10 @@ func TestMods_SetSpec_MissingSpec(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_InvalidSpec verifies POST /v1/mods/{mod_ref}/specs rejects invalid spec JSON.
+// TestMods_SetSpec_InvalidSpec verifies POST /v1/migs/{mig_ref}/specs rejects invalid spec JSON.
 func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	st := &mockStore{}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	// Legacy spec shape with "mod" key is rejected.
 	reqBody := map[string]any{
@@ -235,8 +235,8 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -247,12 +247,12 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_ModNotFound verifies POST /v1/mods/{mod_ref}/specs returns 404 for missing mod.
+// TestMods_SetSpec_ModNotFound verifies POST /v1/migs/{mig_ref}/specs returns 404 for missing mod.
 func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	st := &mockStore{
 		getModErr: pgx.ErrNoRows,
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	spec := map[string]any{
 		"version": "0.2.0",
@@ -262,8 +262,8 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/nonexistent/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "nonexistent")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/nonexistent/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "nonexistent")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -279,16 +279,16 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_ArchivedMod verifies POST /v1/mods/{mod_ref}/specs rejects archived mods.
+// TestMods_SetSpec_ArchivedMod verifies POST /v1/migs/{mig_ref}/specs rejects archived migs.
 func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	st := &mockStore{
-		getModResult: store.Mod{
+		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mod",
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Archived.
 		},
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	spec := map[string]any{
 		"version": "0.2.0",
@@ -298,8 +298,8 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -309,19 +309,19 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
 	}
 
-	// CreateSpec should not be called for archived mods.
+	// CreateSpec should not be called for archived migs.
 	if st.createSpecCalled {
 		t.Error("store.CreateSpec should not be called for archived mod")
 	}
 }
 
-// TestMods_SetSpec_InvalidJSON verifies POST /v1/mods/{mod_ref}/specs rejects malformed JSON body.
+// TestMods_SetSpec_InvalidJSON verifies POST /v1/migs/{mig_ref}/specs rejects malformed JSON body.
 func TestMods_SetSpec_InvalidJSON(t *testing.T) {
 	st := &mockStore{}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader([]byte("not json")))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader([]byte("not json")))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -332,17 +332,17 @@ func TestMods_SetSpec_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_CreateSpecError verifies POST /v1/mods/{mod_ref}/specs returns 500 on CreateSpec failure.
+// TestMods_SetSpec_CreateSpecError verifies POST /v1/migs/{mig_ref}/specs returns 500 on CreateSpec failure.
 func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	st := &mockStore{
-		getModResult: store.Mod{
+		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mod",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		createSpecErr: errors.New("database connection failed"),
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	spec := map[string]any{
 		"version": "0.2.0",
@@ -352,8 +352,8 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -364,17 +364,17 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 	}
 }
 
-// TestMods_SetSpec_UpdateModSpecError verifies POST /v1/mods/{mod_ref}/specs returns 500 on UpdateModSpec failure.
-func TestMods_SetSpec_UpdateModSpecError(t *testing.T) {
+// TestMods_SetSpec_UpdateMigSpecError verifies POST /v1/migs/{mig_ref}/specs returns 500 on UpdateMigSpec failure.
+func TestMods_SetSpec_UpdateMigSpecError(t *testing.T) {
 	st := &mockStore{
-		getModResult: store.Mod{
+		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mod",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		updateModSpecErr: errors.New("database connection failed"),
 	}
-	handler := setModSpecHandler(st)
+	handler := setMigSpecHandler(st)
 
 	spec := map[string]any{
 		"version": "0.2.0",
@@ -384,8 +384,8 @@ func TestMods_SetSpec_UpdateModSpecError(t *testing.T) {
 	reqBody := map[string]any{"spec": spec}
 	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mod_ref", "mod123")
+	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
+	req.SetPathValue("mig_ref", "mod123")
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 

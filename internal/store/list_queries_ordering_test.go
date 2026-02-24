@@ -28,14 +28,14 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		// nodes.sql - created_at needs id tie-breaker
 		{"ListNodes", listNodes, "ORDER BY created_at DESC, id DESC"},
 
-		// mods.sql - created_at needs id tie-breaker
-		{"ListMods", listMods, "ORDER BY created_at DESC, id DESC"},
+		// migs.sql - created_at needs id tie-breaker
+		{"ListMigs", listMigs, "ORDER BY created_at DESC, id DESC"},
 
 		// specs.sql - created_at needs id tie-breaker
 		{"ListSpecs", listSpecs, "ORDER BY created_at DESC, id DESC"},
 
-		// mod_repos.sql - created_at and repo_url need id tie-breakers
-		{"ListModReposByMod", listModReposByMod, "ORDER BY created_at ASC, id ASC"},
+		// mig_repos.sql - created_at and repo_url need id tie-breakers
+		{"ListMigReposByMig", listMigReposByMig, "ORDER BY created_at ASC, id ASC"},
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY mr.repo_url ASC, mr.id ASC"},
 		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 
@@ -55,7 +55,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListQueuedRunReposByRun", listQueuedRunReposByRun, "ORDER BY created_at ASC, repo_id ASC"},
 		{"ListRunReposWithURLByRun", listRunReposWithURLByRun, "ORDER BY rr.created_at ASC, rr.repo_id ASC"},
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
-		{"ListFailedRepoIDsByMod", listFailedRepoIDsByMod, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
+		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
 		// logs.sql and events.sql already have id tie-breakers (verified in logs_sql_ordering_test.go)
 	}

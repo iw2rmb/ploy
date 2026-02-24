@@ -32,7 +32,7 @@ func TestAddModCommand_Run(t *testing.T) {
 			spec:       nil,
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
-				ID:        types.ModID("mod001"),
+				ID:        types.MigID("mod001"),
 				Name:      "test-mod",
 				SpecID:    nil,
 				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -44,7 +44,7 @@ func TestAddModCommand_Run(t *testing.T) {
 			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
 			statusCode: http.StatusCreated,
 			serverResp: AddModResult{
-				ID:        types.ModID("mod002"),
+				ID:        types.MigID("mod002"),
 				Name:      "test-mod-with-spec",
 				SpecID:    specIDPtr(types.SpecID("spec-001")),
 				CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -123,8 +123,8 @@ func TestAddModCommand_Run(t *testing.T) {
 	}
 }
 
-// TestListModsCommand_Run validates ListModsCommand responses.
-func TestListModsCommand_Run(t *testing.T) {
+// TestListMigsCommand_Run validates ListMigsCommand responses.
+func TestListMigsCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -139,8 +139,8 @@ func TestListModsCommand_Run(t *testing.T) {
 			limit:  50,
 			offset: 0,
 			serverResp: []ModSummary{
-				{ID: types.ModID("mod001"), Name: "mod-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				{ID: types.ModID("mod002"), Name: "mod-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+				{ID: types.MigID("mod001"), Name: "mod-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: types.MigID("mod002"), Name: "mod-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 			wantCount: 2,
 		},
@@ -176,7 +176,7 @@ func TestListModsCommand_Run(t *testing.T) {
 
 			baseURL, _ := url.Parse(srv.URL)
 
-			cmd := ListModsCommand{
+			cmd := ListMigsCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
 				Limit:   tc.limit,
@@ -255,7 +255,7 @@ func TestRemoveModCommand_Run(t *testing.T) {
 			cmd := RemoveModCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
-				ModRef:  types.ModRef(tc.modID),
+				MigRef:  types.MigRef(tc.modID),
 			}
 
 			err := cmd.Run(context.Background())
@@ -275,8 +275,8 @@ func TestRemoveModCommand_Run(t *testing.T) {
 	}
 }
 
-// TestArchiveModCommand_Run validates ArchiveModCommand responses.
-func TestArchiveModCommand_Run(t *testing.T) {
+// TestArchiveMigCommand_Run validates ArchiveMigCommand responses.
+func TestArchiveMigCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +287,7 @@ func TestArchiveModCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /archive, got %s", r.URL.Path)
 		}
 
-		resp := ArchiveModResult{ID: types.ModID("mod001"), Name: "test-mod", Archived: true}
+		resp := ArchiveMigResult{ID: types.MigID("mod001"), Name: "test-mod", Archived: true}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -295,10 +295,10 @@ func TestArchiveModCommand_Run(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := ArchiveModCommand{
+	cmd := ArchiveMigCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef("mod001"),
+		MigRef:  types.MigRef("mod001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -310,8 +310,8 @@ func TestArchiveModCommand_Run(t *testing.T) {
 	}
 }
 
-// TestUnarchiveModCommand_Run validates UnarchiveModCommand responses.
-func TestUnarchiveModCommand_Run(t *testing.T) {
+// TestUnarchiveMigCommand_Run validates UnarchiveMigCommand responses.
+func TestUnarchiveMigCommand_Run(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -322,7 +322,7 @@ func TestUnarchiveModCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /unarchive, got %s", r.URL.Path)
 		}
 
-		resp := UnarchiveModResult{ID: types.ModID("mod001"), Name: "test-mod", Archived: false}
+		resp := UnarchiveMigResult{ID: types.MigID("mod001"), Name: "test-mod", Archived: false}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -330,10 +330,10 @@ func TestUnarchiveModCommand_Run(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := UnarchiveModCommand{
+	cmd := UnarchiveMigCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef("mod001"),
+		MigRef:  types.MigRef("mod001"),
 	}
 
 	result, err := cmd.Run(context.Background())
@@ -369,7 +369,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 	cmd := SetModSpecCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef("mod001"),
+		MigRef:  types.MigRef("mod001"),
 		Spec:    json.RawMessage(`{"version":"v1"}`),
 	}
 
@@ -428,7 +428,7 @@ func TestResolveModByNameNoHeuristic(t *testing.T) {
 	cmd := ResolveModByNameCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
-		ModRef:  types.ModRef(uuidLike),
+		MigRef:  types.MigRef(uuidLike),
 	}
 
 	result, err := cmd.Run(context.Background())

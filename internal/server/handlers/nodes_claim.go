@@ -29,7 +29,7 @@ import (
 // - repo progression is attempt-scoped (run_id, repo_id, attempt)
 //
 // v1 response includes repo attribution:
-// - repo_url: from mod_repos (since runs no longer have repo_url fields)
+// - repo_url: from mig_repos (since runs no longer have repo_url fields)
 // - base_ref: from jobs.repo_base_ref (snapshot at job creation)
 // - target_ref: from run_repos.repo_target_ref (snapshot at run_repos creation)
 //
@@ -101,7 +101,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			}
 		}
 
-		modRepo, err := st.GetModRepo(r.Context(), job.RepoID)
+		modRepo, err := st.GetMigRepo(r.Context(), job.RepoID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to get repo for claimed job: %v", err)
 			slog.Error("claim: get mod repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
@@ -139,7 +139,7 @@ func buildAndSendJobClaimResponse(
 	run store.Run,
 	spec []byte,
 	runRepo store.RunRepo,
-	modRepo store.ModRepo,
+	modRepo store.MigRepo,
 	job store.Job,
 ) error {
 	jobType := domaintypes.JobType(job.JobType)
@@ -175,7 +175,7 @@ func buildAndSendJobClaimResponse(
 	resp := struct {
 		RunID     domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
 		Name      *string               `json:"name,omitempty"`
-		RepoID    domaintypes.ModRepoID `json:"repo_id"`
+		RepoID    domaintypes.MigRepoID `json:"repo_id"`
 		Attempt   int32                 `json:"attempt"`
 		JobID     domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
 		JobName   string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mod-0")

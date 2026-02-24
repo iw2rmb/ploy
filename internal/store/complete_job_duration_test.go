@@ -46,7 +46,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
-			RepoID:      fixture.ModRepo.ID,
+			RepoID:      fixture.MigRepo.ID,
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-1",
@@ -100,7 +100,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
-			RepoID:      fixture.ModRepo.ID,
+			RepoID:      fixture.MigRepo.ID,
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-2",
@@ -154,7 +154,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
-			RepoID:      fixture.ModRepo.ID,
+			RepoID:      fixture.MigRepo.ID,
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-running-started-at",
@@ -201,7 +201,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		job, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          jobID,
 			RunID:       fixture.Run.ID,
-			RepoID:      fixture.ModRepo.ID,
+			RepoID:      fixture.MigRepo.ID,
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-3",

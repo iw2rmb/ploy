@@ -317,10 +317,10 @@ func initiatePullRun(ctx context.Context, httpClient *http.Client, baseURL *url.
 	}
 
 	// Create mod-project run scoped to this repo.
-	cmd := climods.CreateModRunCommand{
+	cmd := climods.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  baseURL,
-		ModRef:   domaintypes.ModRef(modID),
+		MigRef:   domaintypes.MigRef(modID),
 		RepoURLs: []string{repoURL},
 	}
 	result, err := cmd.Run(ctx)

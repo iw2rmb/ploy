@@ -21,9 +21,9 @@ func TestListBatchesCommand_Run(t *testing.T) {
 	runID1 := domaintypes.NewRunID()
 	runID2 := domaintypes.NewRunID()
 	runIDPage := domaintypes.NewRunID()
-	modID1 := domaintypes.NewModID()
-	modID2 := domaintypes.NewModID()
-	modIDPage := domaintypes.NewModID()
+	modID1 := domaintypes.NewMigID()
+	modID2 := domaintypes.NewMigID()
+	modIDPage := domaintypes.NewMigID()
 	specID1 := domaintypes.NewSpecID()
 	specID2 := domaintypes.NewSpecID()
 	specIDPage := domaintypes.NewSpecID()
@@ -45,7 +45,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 				{
 					ID:        runID1,
 					Status:    "Started",
-					ModID:     modID1,
+					MigID:     modID1,
 					SpecID:    specID1,
 					CreatedAt: time.Now(),
 					Counts: &domaintypes.RunRepoCounts{
@@ -59,7 +59,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 				{
 					ID:        runID2,
 					Status:    "Finished",
-					ModID:     modID2,
+					MigID:     modID2,
 					SpecID:    specID2,
 					CreatedAt: time.Now(),
 				},
@@ -78,7 +78,7 @@ func TestListBatchesCommand_Run(t *testing.T) {
 			limit:  10,
 			offset: 5,
 			serverResp: []domaintypes.RunSummary{
-				{ID: runIDPage, Status: "Started", ModID: modIDPage, SpecID: specIDPage},
+				{ID: runIDPage, Status: "Started", MigID: modIDPage, SpecID: specIDPage},
 			},
 			wantCount: 1,
 		},
@@ -224,8 +224,8 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 
 	const basePathPrefix = "/api"
 	runID := domaintypes.NewRunID()
-	modID1 := domaintypes.NewModID()
-	modID2 := domaintypes.NewModID()
+	modID1 := domaintypes.NewMigID()
+	modID2 := domaintypes.NewMigID()
 	specID1 := domaintypes.NewSpecID()
 	specID2 := domaintypes.NewSpecID()
 
@@ -246,7 +246,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "feature-branch",
 			batchName:  strPtr("test-batch"),
-			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", ModID: modID1, SpecID: specID1, CreatedAt: time.Now()},
+			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", MigID: modID1, SpecID: specID1, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{
@@ -255,7 +255,7 @@ func TestCreateBatchCommand_Run(t *testing.T) {
 			baseRef:    "main",
 			targetRef:  "hotfix",
 			batchName:  nil,
-			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", ModID: modID2, SpecID: specID2, CreatedAt: time.Now()},
+			runSummary: domaintypes.RunSummary{ID: runID, Status: "Started", MigID: modID2, SpecID: specID2, CreatedAt: time.Now()},
 			statusCode: http.StatusCreated,
 		},
 		{

@@ -21,15 +21,15 @@ import (
 // Specs can be large (JSON blobs), so we allow up to 4 MiB.
 const maxModSpecSize = 4 << 20
 
-// createModHandler creates a new mod project.
-// Endpoint: POST /v1/mods
+// createMigHandler creates a new mod project.
+// Endpoint: POST /v1/migs
 // Request: {name, spec?}
 // Response: 201 Created with mod details
 //
 // v1 contract:
 // - Creates a mod project with a unique name.
-// - Optional spec parameter creates an initial spec row and sets mods.spec_id.
-func createModHandler(st store.Store) http.HandlerFunc {
+// - Optional spec parameter creates an initial spec row and sets migs.spec_id.
+func createMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Name      string           `json:"name"`
@@ -47,7 +47,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "name is required")
 			return
 		}
-		if err := domaintypes.ModRef(name).Validate(); err != nil {
+		if err := domaintypes.MigRef(name).Validate(); err != nil {
 			httpErr(w, http.StatusBadRequest, "name: %v", err)
 			return
 		}
@@ -62,8 +62,8 @@ func createModHandler(st store.Store) http.HandlerFunc {
 
 		// Create mod (create spec only after the mod row exists to avoid creating
 		// orphaned specs on mod-name collisions).
-		modID := domaintypes.NewModID()
-		mod, err := st.CreateMod(r.Context(), store.CreateModParams{
+		modID := domaintypes.NewMigID()
+		mod, err := st.CreateMig(r.Context(), store.CreateMigParams{
 			ID:        modID,
 			Name:      name,
 			SpecID:    nil,
@@ -77,7 +77,7 @@ func createModHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to create mod: %v", err)
-			slog.Error("create mod: create mod failed", "mod_id", modID.String(), "err", err)
+			slog.Error("create mod: create mod failed", "mig_id", modID.String(), "err", err)
 			return
 		}
 
@@ -93,12 +93,12 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			})
 			if err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-				slog.Error("create mod: create spec failed", "mod_id", modID.String(), "err", err)
+				slog.Error("create mod: create spec failed", "mig_id", modID.String(), "err", err)
 				return
 			}
-			if err := st.UpdateModSpec(r.Context(), store.UpdateModSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
+			if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to update mod spec: %v", err)
-				slog.Error("create mod: update spec failed", "mod_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
+				slog.Error("create mod: update spec failed", "mig_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
 				return
 			}
 			createdID := createdSpec.ID
@@ -126,31 +126,31 @@ func createModHandler(st store.Store) http.HandlerFunc {
 			slog.Error("create mod: encode response failed", "err", err)
 		}
 
-		slog.Info("mod created", "mod_id", mod.ID.String(), "name", mod.Name)
+		slog.Info("mod created", "mig_id", mod.ID.String(), "name", mod.Name)
 	}
 }
 
-func resolveModByRef(ctx context.Context, st store.Store, ref domaintypes.ModRef) (store.Mod, error) {
+func resolveMigByRef(ctx context.Context, st store.Store, ref domaintypes.MigRef) (store.Mig, error) {
 	// Prefer direct ID lookup; fall back to exact name lookup.
-	mod, err := st.GetMod(ctx, domaintypes.ModID(ref.String()))
+	mod, err := st.GetMig(ctx, domaintypes.MigID(ref.String()))
 	if err == nil {
 		return mod, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return store.Mod{}, err
+		return store.Mig{}, err
 	}
-	return st.GetModByName(ctx, ref.String())
+	return st.GetMigByName(ctx, ref.String())
 }
 
-// listModsHandler lists mod projects with optional filters.
-// Endpoint: GET /v1/mods
+// listMigsHandler lists mod projects with optional filters.
+// Endpoint: GET /v1/migs
 // Query params: limit, offset, name_substring, archived, repo_url
-// Response: 200 OK with list of mods
+// Response: 200 OK with list of migs
 //
 // v1 contract:
 // - Supports pagination with limit/offset.
 // - Optional filters: name_substring, archived (true/false), repo_url.
-func listModsHandler(st store.Store) http.HandlerFunc {
+func listMigsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		limit := int32(50)
 		offset := int32(0)
@@ -202,32 +202,32 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Repo URL filtering is implemented in the handler because the store does
-		// not currently provide a repo_url-filtered ListMods query.
+		// not currently provide a repo_url-filtered ListMigs query.
 		if repoURLFilter != "" {
-			// Fetch all mods matching archived/name filters, then filter by repo_url membership.
+			// Fetch all migs matching archived/name filters, then filter by repo_url membership.
 			const pageLimit = int32(200)
 			pageOffset := int32(0)
-			var filtered []store.Mod
+			var filtered []store.Mig
 			for {
-				page, err := st.ListMods(r.Context(), store.ListModsParams{
+				page, err := st.ListMigs(r.Context(), store.ListMigsParams{
 					Limit:        pageLimit,
 					Offset:       pageOffset,
 					ArchivedOnly: archivedOnly,
 					NameFilter:   nameFilter,
 				})
 				if err != nil {
-					httpErr(w, http.StatusInternalServerError, "failed to list mods: %v", err)
-					slog.Error("list mods: fetch failed", "err", err)
+					httpErr(w, http.StatusInternalServerError, "failed to list migs: %v", err)
+					slog.Error("list migs: fetch failed", "err", err)
 					return
 				}
 				if len(page) == 0 {
 					break
 				}
 				for _, mod := range page {
-					repos, err := st.ListModReposByMod(r.Context(), mod.ID)
+					repos, err := st.ListMigReposByMig(r.Context(), mod.ID)
 					if err != nil {
 						httpErr(w, http.StatusInternalServerError, "failed to list mod repos: %v", err)
-						slog.Error("list mods: list mod repos failed", "mod_id", mod.ID, "err", err)
+						slog.Error("list migs: list mod repos failed", "mig_id", mod.ID, "err", err)
 						return
 					}
 					for _, mr := range repos {
@@ -249,29 +249,29 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 			if end > len(filtered) {
 				end = len(filtered)
 			}
-			mods := filtered[start:end]
+			migs := filtered[start:end]
 
-			writeModsListResponse(w, mods)
+			writeModsListResponse(w, migs)
 			return
 		}
 
-		mods, err := st.ListMods(r.Context(), store.ListModsParams{
+		migs, err := st.ListMigs(r.Context(), store.ListMigsParams{
 			Limit:        limit,
 			Offset:       offset,
 			ArchivedOnly: archivedOnly,
 			NameFilter:   nameFilter,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list mods: %v", err)
-			slog.Error("list mods: fetch failed", "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to list migs: %v", err)
+			slog.Error("list migs: fetch failed", "err", err)
 			return
 		}
 
-		writeModsListResponse(w, mods)
+		writeModsListResponse(w, migs)
 	}
 }
 
-func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
+func writeModsListResponse(w http.ResponseWriter, migs []store.Mig) {
 	type modItem struct {
 		ID        string              `json:"id"`
 		Name      string              `json:"name"`
@@ -281,8 +281,8 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 		CreatedAt string              `json:"created_at"`
 	}
 
-	items := make([]modItem, 0, len(mods))
-	for _, mod := range mods {
+	items := make([]modItem, 0, len(migs))
+	for _, mod := range migs {
 		var specIDPtr *domaintypes.SpecID
 		if mod.SpecID != nil && !mod.SpecID.IsZero() {
 			specIDPtr = mod.SpecID
@@ -298,48 +298,48 @@ func writeModsListResponse(w http.ResponseWriter, mods []store.Mod) {
 	}
 
 	resp := struct {
-		Mods []modItem `json:"mods"`
-	}{Mods: items}
+		Migs []modItem `json:"migs"`
+	}{Migs: items}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		slog.Error("list mods: encode response failed", "err", err)
+		slog.Error("list migs: encode response failed", "err", err)
 	}
 }
 
-// deleteModHandler deletes a mod project.
-// Endpoint: DELETE /v1/mods/{mod_ref}
+// deleteMigHandler deletes a mod project.
+// Endpoint: DELETE /v1/migs/{mig_ref}
 // Response: 204 No Content on success
 //
 // v1 contract:
 // - Refuses deletion if any runs exist for the mod.
-func deleteModHandler(st store.Store) http.HandlerFunc {
+func deleteMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.ModRef](r, "mod_ref")
+		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Resolve mod by ID-or-name.
-		mod, err := resolveModByRef(r.Context(), st, modRef)
+		mod, err := resolveMigByRef(r.Context(), st, modRef)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				httpErr(w, http.StatusNotFound, "mod not found")
 				return
 			}
 			httpErr(w, http.StatusInternalServerError, "failed to get mod: %v", err)
-			slog.Error("delete mod: get mod failed", "mod_ref", modRef, "err", err)
+			slog.Error("delete mod: get mod failed", "mig_ref", modRef, "err", err)
 			return
 		}
 		modID := mod.ID
 
 		// Check if any runs exist for this mod
-		hasRuns, err := modHasAnyRuns(r.Context(), st, modID)
+		hasRuns, err := migHasAnyRuns(r.Context(), st, modID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to check runs: %v", err)
-			slog.Error("delete mod: check runs failed", "mod_id", modID, "err", err)
+			slog.Error("delete mod: check runs failed", "mig_id", modID, "err", err)
 			return
 		}
 		if hasRuns {
@@ -348,18 +348,18 @@ func deleteModHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Delete the mod
-		if err := st.DeleteMod(r.Context(), modID); err != nil {
+		if err := st.DeleteMig(r.Context(), modID); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to delete mod: %v", err)
-			slog.Error("delete mod: database error", "mod_id", modID, "err", err)
+			slog.Error("delete mod: database error", "mig_id", modID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("mod deleted", "mod_id", modID)
+		slog.Info("mod deleted", "mig_id", modID)
 	}
 }
 
-func modHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.ModID) (bool, error) {
+func migHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.MigID) (bool, error) {
 	const pageLimit = int32(200)
 	pageOffset := int32(0)
 	for {
@@ -371,7 +371,7 @@ func modHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.ModID)
 			return false, nil
 		}
 		for _, run := range page {
-			if run.ModID == modID {
+			if run.MigID == modID {
 				return true, nil
 			}
 		}

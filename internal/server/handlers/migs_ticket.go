@@ -28,7 +28,7 @@ type runJobCreator interface {
 // Run and job IDs are generated using domaintypes.NewRunID() and domaintypes.NewJobID().
 // UUID parsing is no longer performed for run/job IDs; they are treated as opaque strings.
 
-// Mods run handlers implement the Mods-style run status surface (RunSummary)
+// Migs run handlers implement the Migs-style run status surface (RunSummary)
 // and job materialization helpers.
 
 // getRunStatusHandler returns an HTTP handler that fetches run status by ID.
@@ -36,7 +36,7 @@ type runJobCreator interface {
 // Endpoint: GET /v1/runs/{id}/status
 // Response: 200 OK with RunSummary body (canonical schema, no wrapper types)
 //
-// Canonical contract (see docs/mods-lifecycle.md § 2.1):
+// Canonical contract (see docs/migs-lifecycle.md § 2.1):
 //   - Returns RunSummary directly as JSON root (no envelope or wrapper types).
 //   - HTTP 200 on success; 404 if run not found.
 //   - run_id is a KSUID string (27 characters).
@@ -85,7 +85,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			repoBase = rr.RepoBaseRef
 			repoTarget = rr.RepoTargetRef
 
-			mr, err := st.GetModRepo(r.Context(), rr.RepoID)
+			mr, err := st.GetMigRepo(r.Context(), rr.RepoID)
 			if err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 				slog.Error("get run status: get repo failed", "run_id", run.ID, "repo_id", rr.RepoID, "err", err)
@@ -201,10 +201,10 @@ type plannedJob struct {
 
 // createJobsFromSpec parses the run spec and creates an explicit next_id-linked job chain.
 // Queue semantics are head-only: the first job is Queued, all successors are Created.
-func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, spec []byte) error {
+func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, spec []byte) error {
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
-		return fmt.Errorf("parse mods spec: %w", err)
+		return fmt.Errorf("parse migs spec: %w", err)
 	}
 
 	type draft struct {
@@ -276,7 +276,7 @@ func createJobsFromSpec(ctx context.Context, st runJobCreator, runID domaintypes
 	return nil
 }
 
-func createPlannedJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.ModRepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
+func createPlannedJob(ctx context.Context, st runJobCreator, runID domaintypes.RunID, repoID domaintypes.MigRepoID, repoBaseRef string, attempt int32, planned plannedJob) error {
 	// Build job metadata with step name for mod jobs.
 	var meta *contracts.JobMeta
 	if planned.StepName != "" {
