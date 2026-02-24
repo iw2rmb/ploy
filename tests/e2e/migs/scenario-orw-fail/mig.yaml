@@ -8,7 +8,7 @@
 #     --follow
 
 apiVersion: ploy.mig/v1alpha1
-kind: ModRunSpec
+kind: MigRunSpec
 
 steps:
   - image: ghcr.io/iw2rmb/migs-orw-maven:latest

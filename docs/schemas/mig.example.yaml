@@ -2,7 +2,7 @@
 # spec as an opaque JSON object. Keep keys stable and snake_case to align with
 # existing CLI/agent options.
 apiVersion: ploy.mig/v1alpha1
-kind: ModRunSpec
+kind: MigRunSpec
 
 ################################################################################
 # SINGLE-STEP RUNS (canonical)

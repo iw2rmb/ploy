@@ -60,7 +60,7 @@ type ModsSpec struct {
 	// Informational only; the control plane forwards specs as opaque JSON.
 	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 
-	// Kind is an optional schema kind identifier (e.g., "ModRunSpec").
+	// Kind is an optional schema kind identifier (e.g., "MigRunSpec").
 	// Informational only; the control plane forwards specs as opaque JSON.
 	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
 

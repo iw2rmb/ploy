@@ -20,7 +20,7 @@
 #     --follow
 
 apiVersion: ploy.mig/v1alpha1
-kind: ModRunSpec
+kind: MigRunSpec
 
 steps:
   - # Stack-aware image map WITHOUT default key.

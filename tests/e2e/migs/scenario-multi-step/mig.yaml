@@ -12,7 +12,7 @@
 #     --follow
 
 apiVersion: ploy.mig/v1alpha1
-kind: ModRunSpec
+kind: MigRunSpec
 
 ################################################################################
 # MULTI-STEP MODS

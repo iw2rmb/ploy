@@ -337,7 +337,7 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 	input := `{
 		"apiVersion": "ploy.mig/v1alpha1",
-		"kind": "ModRunSpec",
+		"kind": "MigRunSpec",
 		"steps": [{
 			"image": "docker.io/user/mig:latest",
 			"command": "echo hello",
@@ -354,8 +354,8 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 	if spec.APIVersion != "ploy.mig/v1alpha1" {
 		t.Errorf("apiVersion = %q, want %q", spec.APIVersion, "ploy.mig/v1alpha1")
 	}
-	if spec.Kind != "ModRunSpec" {
-		t.Errorf("kind = %q, want %q", spec.Kind, "ModRunSpec")
+	if spec.Kind != "MigRunSpec" {
+		t.Errorf("kind = %q, want %q", spec.Kind, "MigRunSpec")
 	}
 	if spec.Steps[0].Image.Universal != "docker.io/user/mig:latest" {
 		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "docker.io/user/mig:latest")
