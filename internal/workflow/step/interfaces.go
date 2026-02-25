@@ -18,6 +18,9 @@ type DockerContainerRuntimeOptions struct {
 	PullImage bool
 	// Network is optional Docker network name (empty => default bridge).
 	Network string
+	// RegistryAuthConfigJSON is a Docker auth config JSON payload (DOCKER_AUTH_CONFIG
+	// format). When set, image pulls use matching registry credentials.
+	RegistryAuthConfigJSON string
 }
 
 // ContainerRuntime executes containers.

@@ -76,6 +76,7 @@ type fakeDockerClient struct {
 	pullErr    error
 	pullCalled bool
 	pullRef    string // captured image reference
+	pullOpts   client.ImagePullOptions
 
 	// ImageInspect behavior (used by pull policy tests)
 	imageInspectErr    error
@@ -146,6 +147,7 @@ func (f *fakeDockerClient) ContainerStats(ctx context.Context, containerID strin
 func (f *fakeDockerClient) ImagePull(ctx context.Context, refStr string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
 	f.pullCalled = true
 	f.pullRef = refStr
+	f.pullOpts = options
 	if f.pullErr != nil {
 		return nil, f.pullErr
 	}

@@ -173,6 +173,14 @@ setting on typical deployments where Docker runs on the default Unix socket.
 **Implementation**: `internal/workflow/step/container_docker.go:59-66` constructs the
 Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
 
+- `DOCKER_AUTH_CONFIG` — Optional Docker auth config JSON used by node image pulls.
+  When set, the node extracts credentials for the target image registry and passes
+  them to Docker Engine via `ImagePullOptions.RegistryAuth`.
+  Example:
+  `{"auths":{"ghcr.io":{"auth":"<base64(username:token)>"}}}`.
+- `PLOY_DOCKER_AUTH_CONFIG` — Optional override for `DOCKER_AUTH_CONFIG`.
+  When both are set, `PLOY_DOCKER_AUTH_CONFIG` wins.
+
 **When to set these variables:**
 - **Remote Docker daemon**: Set `DOCKER_HOST=tcp://<host>:2376` and TLS variables when the
   daemon runs on a different host or requires TLS authentication.

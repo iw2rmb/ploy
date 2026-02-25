@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -144,6 +146,7 @@ func (s *HTTPServer) Handle(pattern string, handler http.Handler, roles ...auth.
 	if len(roles) > 0 {
 		handler = s.authorizer.Middleware(roles...)(handler)
 	}
+	handler = withPanicRecovery(handler)
 
 	s.mux.Handle(pattern, handler)
 }
@@ -173,4 +176,43 @@ func (s *HTTPServer) listen(ctx context.Context) (net.Listener, error) {
 
 	lc := net.ListenConfig{}
 	return lc.Listen(ctx, "tcp", address)
+}
+
+func withPanicRecovery(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				slog.Error("http handler panic recovered",
+					"method", r.Method,
+					"path", r.URL.Path,
+					"panic_type", fmt.Sprintf("%T", recovered),
+					"panic_message", panicMessageSafe(recovered),
+					"stack", string(debug.Stack()),
+				)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func panicMessageSafe(recovered any) (msg string) {
+	switch v := recovered.(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case runtime.Error:
+		return "runtime panic"
+	case error:
+		defer func() {
+			if panicErr := recover(); panicErr != nil {
+				msg = "error string panicked"
+			}
+		}()
+		return v.Error()
+	default:
+		return fmt.Sprintf("%T", recovered)
+	}
 }
