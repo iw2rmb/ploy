@@ -13,6 +13,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
 // RunRepoJobResponse represents a job within a repo execution.
@@ -87,6 +88,11 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			slog.Error("list run repo jobs: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", attempt, "err", err)
 			return
 		}
+		jobs = jobchain.Order(
+			jobs,
+			func(job store.Job) domaintypes.JobID { return job.ID },
+			func(job store.Job) *domaintypes.JobID { return job.NextID },
+		)
 
 		resp := ListRunRepoJobsResponse{
 			RunID:   runID,

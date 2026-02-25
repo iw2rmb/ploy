@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sort"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
 // RepoJobEntry represents a job within a repo execution.
@@ -92,89 +92,9 @@ func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error
 // orderRepoJobsByChain reconstructs execution order from linked next_id pointers.
 // Head jobs are derived as jobs that have no predecessor in the same payload.
 func orderRepoJobsByChain(jobs []RepoJobEntry) []RepoJobEntry {
-	if len(jobs) <= 1 {
-		return jobs
-	}
-
-	jobByID := make(map[domaintypes.JobID]RepoJobEntry, len(jobs))
-	orderedIDs := make([]domaintypes.JobID, 0, len(jobs))
-	predecessors := make(map[domaintypes.JobID]int, len(jobs))
-	nextByID := make(map[domaintypes.JobID]domaintypes.JobID, len(jobs))
-
-	for _, job := range jobs {
-		jobByID[job.JobID] = job
-		orderedIDs = append(orderedIDs, job.JobID)
-		predecessors[job.JobID] = 0
-	}
-
-	for _, job := range jobs {
-		if job.NextID == nil || job.NextID.IsZero() {
-			continue
-		}
-		nextID := *job.NextID
-		if _, ok := jobByID[nextID]; !ok {
-			continue
-		}
-		predecessors[nextID]++
-		nextByID[job.JobID] = nextID
-	}
-
-	heads := make([]domaintypes.JobID, 0, len(jobs))
-	for _, id := range orderedIDs {
-		if predecessors[id] == 0 {
-			heads = append(heads, id)
-		}
-	}
-	sortJobIDs(heads)
-
-	out := make([]RepoJobEntry, 0, len(jobs))
-	visited := make(map[domaintypes.JobID]struct{}, len(jobs))
-	walkChain := func(start domaintypes.JobID) {
-		current := start
-		for {
-			if _, seen := visited[current]; seen {
-				return
-			}
-			job, ok := jobByID[current]
-			if !ok {
-				return
-			}
-
-			visited[current] = struct{}{}
-			out = append(out, job)
-
-			nextID, ok := nextByID[current]
-			if !ok {
-				return
-			}
-			current = nextID
-		}
-	}
-
-	for _, head := range heads {
-		walkChain(head)
-	}
-
-	if len(out) == len(jobs) {
-		return out
-	}
-
-	remaining := make([]domaintypes.JobID, 0, len(jobs)-len(out))
-	for _, id := range orderedIDs {
-		if _, ok := visited[id]; !ok {
-			remaining = append(remaining, id)
-		}
-	}
-	sortJobIDs(remaining)
-	for _, id := range remaining {
-		walkChain(id)
-	}
-
-	return out
-}
-
-func sortJobIDs(ids []domaintypes.JobID) {
-	sort.Slice(ids, func(i, j int) bool {
-		return ids[i].String() < ids[j].String()
-	})
+	return jobchain.Order(
+		jobs,
+		func(job RepoJobEntry) domaintypes.JobID { return job.JobID },
+		func(job RepoJobEntry) *domaintypes.JobID { return job.NextID },
+	)
 }
