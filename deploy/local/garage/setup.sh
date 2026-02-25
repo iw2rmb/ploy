@@ -5,6 +5,7 @@ cfg="${GARAGE_CONFIG_FILE:-/etc/garage.toml}"
 key_id="${GARAGE_DEFAULT_ACCESS_KEY:-}"
 secret_key="${GARAGE_DEFAULT_SECRET_KEY:-}"
 bucket="${GARAGE_DEFAULT_BUCKET:-}"
+registry_bucket="${GARAGE_REGISTRY_BUCKET:-}"
 zone="${GARAGE_DEFAULT_ZONE:-local}"
 capacity="${GARAGE_DEFAULT_CAPACITY:-1G}"
 
@@ -57,4 +58,12 @@ if ! /garage -c "$cfg" bucket info "$bucket" >/dev/null 2>&1; then
 fi
 
 /garage -c "$cfg" bucket allow --read --write --owner "$bucket" --key "$key_id" >/dev/null
+
+if [ -n "$registry_bucket" ]; then
+  if ! /garage -c "$cfg" bucket info "$registry_bucket" >/dev/null 2>&1; then
+    /garage -c "$cfg" bucket create "$registry_bucket" >/dev/null
+  fi
+  /garage -c "$cfg" bucket allow --read --write --owner "$registry_bucket" --key "$key_id" >/dev/null
+fi
+
 echo "garage bootstrap complete: bucket=$bucket key=$key_id"

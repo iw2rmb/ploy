@@ -26,7 +26,7 @@ steps:
   - # Stack-aware image map WITHOUT default key.
     # This will fail for Maven workspaces because only java-gradle is specified.
     image:
-      java-gradle: ghcr.io/iw2rmb/migs-orw-gradle:latest
+      java-gradle: localhost:5000/ploy/migs-orw-gradle:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

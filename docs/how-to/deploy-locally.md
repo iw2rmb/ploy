@@ -2,6 +2,7 @@
 
 This guide brings up the local Ploy stack using host PostgreSQL plus containers for:
 - Garage object store (`garage`) and bootstrap (`garage-init`)
+- Local OCI registry backed by Garage (`registry`)
 - Control plane `ployd` (`server`)
 - Worker `ployd-node` (`node`)
 - Gradle cache (`gradle-build-cache`)
@@ -23,8 +24,10 @@ From repo root:
 export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
 export PLOY_CA_CERTS='/path/to/ca-bundle.pem'  # optional: custom CA for docker.io registry trust
 export PLOY_SERVER_PORT=18080   # optional; default 8080
+export PLOY_REGISTRY_PORT=5000  # optional; default 5000
 ./deploy/local/run.sh
 export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
+export PLOY_CONTAINER_REGISTRY="localhost:${PLOY_REGISTRY_PORT:-5000}/ploy"
 ```
 
 What the script does:
@@ -34,6 +37,8 @@ What the script does:
 - Builds local binaries (`make build`).
 - Builds runtime images (including `garage-init`; no Go toolchain in image builds).
 - Starts compose services.
+- Syncs mig/build-gate images into the local Garage-backed registry via `deploy/images/garage.sh`
+  (skips tags that already exist; set `PLOY_GARAGE_FORCE_IMAGES=1` to force repush).
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
 - Writes local CLI descriptor in `deploy/local/cli/clusters/local.json`.
@@ -41,6 +46,8 @@ What the script does:
   - access key: `GK000000000000000000000001`
   - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
   - region: `garage` (wired via `PLOY_OBJECTSTORE_REGION`)
+  - object bucket: `ploy` (logs/diffs/artifacts)
+  - registry bucket: `ploy-registry` (OCI image blobs/manifests)
 
 ## Script Flags
 
@@ -52,7 +59,7 @@ What the script does:
 --nodes     # refresh/deploy node (+ required server dependency)
 ```
 
-No flags means full deploy (server + node + garage services).
+No flags means full deploy (server + node + garage + registry services).
 
 ## Binary Mount Model
 
@@ -77,6 +84,12 @@ curl -fsS "http://localhost:${PLOY_SERVER_PORT:-8080}/health"
 
 ```bash
 curl -fsS http://localhost:9100/metrics | head
+```
+
+- Registry API health:
+
+```bash
+curl -fsS "http://localhost:${PLOY_REGISTRY_PORT:-5000}/v2/"
 ```
 
 - Token list (uses local descriptor):
@@ -123,6 +136,7 @@ For a full reset including DB recreation:
   - `docker compose -f deploy/local/docker-compose.yml logs -f server`
   - `docker compose -f deploy/local/docker-compose.yml logs -f node`
   - `docker compose -f deploy/local/docker-compose.yml logs -f garage`
+  - `docker compose -f deploy/local/docker-compose.yml logs -f registry`
 
 ## Related
 

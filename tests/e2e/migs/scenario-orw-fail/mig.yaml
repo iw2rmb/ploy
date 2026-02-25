@@ -11,7 +11,7 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 
 steps:
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -25,7 +25,7 @@ build_gate:
   # Router runs BEFORE healing. It reads /in/build-gate.log and outputs a single-line
   # JSON final message with {"bug_summary":"..."} used to persist jobs.meta.gate.bug_summary.
   router:
-    image: ghcr.io/iw2rmb/migs-codex:latest
+    image: localhost:5000/ploy/migs-codex:latest
     env:
       CODEX_PROMPT: |-
         Rules:
@@ -45,7 +45,7 @@ build_gate:
 
     # Healing runs AFTER router. It edits /workspace, then outputs a single-line JSON
     # final message with {"action_summary":"..."} used to persist jobs.meta.action_summary.
-    image: ghcr.io/iw2rmb/migs-codex:latest
+    image: localhost:5000/ploy/migs-codex:latest
     env:
       CODEX_PROMPT: |-
         Rules:
