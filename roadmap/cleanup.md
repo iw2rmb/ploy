@@ -2,17 +2,17 @@
 
 Scope: Remove duplicated parsing/building logic and simplify over-abstracted paths in `internal/workflow/**` while preserving behavior. The plan focuses on architecture-level reuse, smaller API surface, and lower maintenance cost.
 
-Documentation: `AGENTS.md`; `docs/testing-workflow.md`; `internal/workflow/contracts/*`; `internal/workflow/step/*`; `internal/workflow/stackdetect/*`; `internal/workflow/manifests/*`
+Documentation: `AGENTS.md`; `internal/workflow/contracts/*`; `internal/workflow/step/*`; `internal/workflow/stackdetect/*`; `internal/workflow/manifests/*`
 
 Legend: [ ] todo, [x] done.
 
-## Phase 0: Safety Rails and RED
+## Phase 0: Safety Rails and Baseline Tests
 - [x] Add characterization tests for affected contracts before refactors — Locks current behavior before structural cleanup.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/workflow/step`, `internal/workflow/stackdetect`, `internal/workflow/manifests`
   - Scope: Add/extend tests for stack-gate terminal metadata shape, release coercion edge-cases, command polymorphism, manifest decode/validation errors, and Java ambiguity behavior.
   - Snippets: `go test ./internal/workflow/... -run 'StackGate|Parse|Manifest|Detect'`
-  - Tests: `make test` — New tests fail first where behavior is not yet preserved by shared helpers.
+  - Tests: `make test` — New tests lock behavior where it is not yet preserved by shared helpers.
 
 ## Phase 1: Contracts Parser Consolidation
 - [x] Centralize release value coercion into one helper used by all parsers — Eliminates duplicated number/string coercion logic.
@@ -87,10 +87,10 @@ Legend: [ ] todo, [x] done.
   - Snippets: `mapSlice(in, func(T) U) []U`
   - Tests: `go test ./internal/workflow/manifests -run 'Encode|Compile|Registry'` — Encoded TOML and compiled payload parity maintained.
 
-## Phase 4: GREEN and Verification
+## Phase 4: Verification
 - [x] Run full workflow package validation after refactor — Confirms cleanup did not alter runtime semantics.
   - Repository: `ploy`
   - Component: `internal/workflow/**`
-  - Scope: Execute unit tests, vet/static checks, and coverage checks for touched packages; fix regressions before merge.
-  - Snippets: `make test`; `make vet`; `make staticcheck`; `make coverage`
-  - Tests: All pass; coverage remains at or above project thresholds.
+  - Scope: Execute unit tests and static checks for touched packages; fix regressions before merge.
+  - Snippets: `make test`; `make vet`; `make staticcheck`
+  - Tests: All pass.

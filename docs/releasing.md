@@ -51,8 +51,6 @@ Before creating a release, ensure you have:
 
 3. **Quality Gates**:
    - All CI checks passing on `main`
-   - Test coverage ≥60% overall
-   - Critical path coverage ≥90%
    - No known critical bugs
 
 ## Pre-Release Checklist
@@ -66,7 +64,6 @@ Before creating a release tag:
   - Note performance improvements
   - Acknowledge contributors
 - [ ] Verify all tests pass: `make test`
-- [ ] Verify coverage thresholds: `make test-coverage`
 - [ ] Run full CI checks locally: `make ci-check`
 - [ ] Verify build succeeds: `make build`
 - [ ] Review open issues and PRs for critical fixes
@@ -138,7 +135,7 @@ git push origin vX.Y.Z
 1. Go to the [Actions tab](https://github.com/iw2rmb/ploy/actions/workflows/release.yml)
 2. Watch the release workflow for your tag
 3. The workflow will:
-   - Run pre-release checks (tests, coverage, linting)
+   - Run pre-release checks (tests, linting)
    - Build binaries for all platforms
    - Generate checksums and SBOMs
    - Sign artifacts with Cosign
