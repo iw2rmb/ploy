@@ -77,7 +77,7 @@ No flags means full deploy (server + node + garage + registry services).
 - Server health:
 
 ```bash
-curl -fsS "http://localhost:${PLOY_SERVER_PORT:-8080}/health"
+curl -fsS "http://127.0.0.1:${PLOY_SERVER_PORT:-8080}/health"
 ```
 
 - Metrics:

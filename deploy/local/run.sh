@@ -443,8 +443,13 @@ sync_garage_registry_images() {
   esac
 
   log "Syncing mig/build-gate images into ${PLOY_CONTAINER_REGISTRY} ..."
-  IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
-    ./deploy/images/garage.sh "${args[@]}"
+  if [[ ${#args[@]} -gt 0 ]]; then
+    IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
+      ./deploy/images/garage.sh "${args[@]}"
+  else
+    IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
+      ./deploy/images/garage.sh
+  fi
 }
 
 wait_for_garage_bootstrap() {
@@ -729,7 +734,7 @@ PY
 }
 
 wire_local_cli_descriptor() {
-  local server_url="http://localhost:${PLOY_SERVER_PORT}"
+  local server_url="http://127.0.0.1:${PLOY_SERVER_PORT}"
   local local_no_proxy="localhost,127.0.0.1,::1"
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"
