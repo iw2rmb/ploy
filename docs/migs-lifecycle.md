@@ -518,6 +518,9 @@ by rewiring `next_id` links:
 Rewire example:
 - Before failure handling: `failed.next_id = old_next`
 - After insertion: `failed.next_id = heal.id`, `heal.next_id = re_gate.id`, `re_gate.next_id = old_next`
+- Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
+  so each non-null `next_id` always points to an already existing row under the
+  `jobs.next_id -> jobs.id` foreign key.
 
 ### Parallel healing branches (Phase E)
 
