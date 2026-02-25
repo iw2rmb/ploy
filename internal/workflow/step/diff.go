@@ -8,26 +8,19 @@ import (
 	"strings"
 )
 
-// diffGeneratorFuncs implements DiffGenerator by delegating to plain functions.
-type diffGeneratorFuncs struct {
-	generate        func(ctx context.Context, workspace string) ([]byte, error)
-	generateBetween func(ctx context.Context, baseDir, modifiedDir string) ([]byte, error)
+type filesystemDiffGenerator struct{}
+
+func (d *filesystemDiffGenerator) Generate(ctx context.Context, workspace string) ([]byte, error) {
+	return generateGitDiff(ctx, workspace)
 }
 
-func (d *diffGeneratorFuncs) Generate(ctx context.Context, workspace string) ([]byte, error) {
-	return d.generate(ctx, workspace)
-}
-
-func (d *diffGeneratorFuncs) GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
-	return d.generateBetween(ctx, baseDir, modifiedDir)
+func (d *filesystemDiffGenerator) GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
+	return generateGitDiffBetween(ctx, baseDir, modifiedDir)
 }
 
 // NewFilesystemDiffGenerator creates a DiffGenerator backed by git diff.
 func NewFilesystemDiffGenerator() DiffGenerator {
-	return &diffGeneratorFuncs{
-		generate:        generateGitDiff,
-		generateBetween: generateGitDiffBetween,
-	}
+	return &filesystemDiffGenerator{}
 }
 
 // generateGitDiff runs git diff to capture all changes in the workspace.

@@ -10,6 +10,18 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+type certMountOption struct {
+	key      string
+	target   string
+	readOnly bool
+}
+
+var certMountOptions = []certMountOption{
+	{key: "ploy_ca_cert_path", target: "/etc/ploy/certs/ca.crt", readOnly: true},
+	{key: "ploy_client_cert_path", target: "/etc/ploy/certs/client.crt", readOnly: true},
+	{key: "ploy_client_key_path", target: "/etc/ploy/certs/client.key", readOnly: true},
+}
+
 // ContainerSpec describes a container execution request.
 type ContainerSpec struct {
 	Image      string
@@ -81,20 +93,18 @@ func buildContainerSpec(runID types.RunID, manifest contracts.StepManifest, work
 		}
 	}
 
-	// Optional: mount TLS certificates for control-plane API access from containers
-	if caCertPath, ok := manifest.OptionString("ploy_ca_cert_path"); ok && caCertPath != "" {
-		if fi, err := os.Stat(caCertPath); err == nil && !fi.IsDir() {
-			mounts = append(mounts, ContainerMount{Source: caCertPath, Target: "/etc/ploy/certs/ca.crt", ReadOnly: true})
+	// Optional: mount TLS certificates for control-plane API access from containers.
+	for _, opt := range certMountOptions {
+		certPath, ok := manifest.OptionString(opt.key)
+		if !ok || certPath == "" {
+			continue
 		}
-	}
-	if clientCertPath, ok := manifest.OptionString("ploy_client_cert_path"); ok && clientCertPath != "" {
-		if fi, err := os.Stat(clientCertPath); err == nil && !fi.IsDir() {
-			mounts = append(mounts, ContainerMount{Source: clientCertPath, Target: "/etc/ploy/certs/client.crt", ReadOnly: true})
-		}
-	}
-	if clientKeyPath, ok := manifest.OptionString("ploy_client_key_path"); ok && clientKeyPath != "" {
-		if fi, err := os.Stat(clientKeyPath); err == nil && !fi.IsDir() {
-			mounts = append(mounts, ContainerMount{Source: clientKeyPath, Target: "/etc/ploy/certs/client.key", ReadOnly: true})
+		if fi, err := os.Stat(certPath); err == nil && !fi.IsDir() {
+			mounts = append(mounts, ContainerMount{
+				Source:   certPath,
+				Target:   opt.target,
+				ReadOnly: opt.readOnly,
+			})
 		}
 	}
 	wd := manifest.WorkingDir

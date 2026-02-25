@@ -37,28 +37,28 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts -run 'numbers|ModsSpec'` — No behavior regression on numeric edge cases.
 
 ## Phase 2: Step Package De-duplication
-- [ ] Introduce a shared terminal metadata builder for gate planning failures — Removes repeated `BuildGateStageMetadata` construction branches.
+- [x] Introduce a shared terminal metadata builder for gate planning failures — Removes repeated `BuildGateStageMetadata` construction branches.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope: Refactor `gate_docker_stack_gate.go` to use a compact builder for `StaticChecks`, `LogFindings`, optional runtime image, and optional `StackGateResult` across all terminal-return branches.
   - Snippets: `newGateTerminal(language, tool, code, message, opts...)`
   - Tests: `go test ./internal/workflow/step -run 'Gate|StackGate'` — Terminal payloads remain byte-for-byte equivalent where expected.
 
-- [ ] Extract shared Build Gate limit/env parsing utilities — Replaces repeated env parse cascades.
+- [x] Extract shared Build Gate limit/env parsing utilities — Replaces repeated env parse cascades.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope: In `gate_docker.go`, consolidate CPU/memory/disk env parsing into reusable helpers and keep one place for parse precedence (`RAMInBytes`, `FromHumanSize`, integer fallback).
   - Snippets: `parseBytesLimitEnv(key string) (int64, string)`
   - Tests: `go test ./internal/workflow/step -run 'Gate.*Limit|Docker'` — Existing limit parsing behavior preserved.
 
-- [ ] Convert cert mount option branches to table-driven mapping — Reduces repetitive mount code paths.
+- [x] Convert cert mount option branches to table-driven mapping — Reduces repetitive mount code paths.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope: In `container_spec.go`, replace repeated option checks for `ploy_*_cert_path` with one table of `{optionKey,targetPath,readOnly}` entries.
   - Snippets: `[]struct{ key, target string; ro bool }`
   - Tests: `go test ./internal/workflow/step -run 'container_spec|mount'` — Mount set remains unchanged.
 
-- [ ] Replace function-wrapper diff generator with direct concrete implementation — Removes unnecessary abstraction layer.
+- [x] Replace function-wrapper diff generator with direct concrete implementation — Removes unnecessary abstraction layer.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope: Drop `diffGeneratorFuncs` indirection in `diff.go`; keep `DiffGenerator` interface but return a concrete struct with method implementations.
