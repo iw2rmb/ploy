@@ -26,6 +26,7 @@ type runController struct {
 	artifactUploader  *ArtifactUploader
 	statusUploader    *baseUploader
 	jobImageNameSaver *JobImageNameSaver
+	nodeEventUploader *NodeEventUploader
 }
 
 type jobContext struct {
@@ -129,6 +130,13 @@ func (r *runController) ensureUploaders() error {
 		r.jobImageNameSaver, err = NewJobImageNameSaver(r.cfg)
 		if err != nil {
 			return fmt.Errorf("create job image name saver: %w", err)
+		}
+	}
+
+	if r.nodeEventUploader == nil {
+		r.nodeEventUploader, err = NewNodeEventUploader(r.cfg)
+		if err != nil {
+			return fmt.Errorf("create node event uploader: %w", err)
 		}
 	}
 

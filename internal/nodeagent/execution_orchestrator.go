@@ -38,11 +38,23 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		// Recover from panics to prevent job leaks and slot exhaustion.
 		// Log the panic and stack trace for debugging.
 		if p := recover(); p != nil {
+			stack := string(debug.Stack())
 			slog.Error("executeRun panic recovered",
 				"run_id", req.RunID,
 				"job_id", req.JobID,
 				"panic", p,
-				"stack", string(debug.Stack()),
+				"stack", stack,
+			)
+			r.emitRunEvent(
+				req.RunID,
+				jobIDPtr(req.JobID),
+				"error",
+				"node panic recovered during job execution",
+				map[string]any{
+					"component": "run_controller",
+					"panic":     fmt.Sprintf("%v", p),
+					"stack":     stack,
+				},
 			)
 		}
 
@@ -146,6 +158,17 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 		var preExecutionExitCode int32 = -1 // -1 indicates pre-execution failure
 		exitCode = &preExecutionExitCode
 	}
+
+	r.emitRunException(
+		req,
+		"node failed before container execution",
+		err,
+		map[string]any{
+			"component":   "run_controller",
+			"status":      status.String(),
+			"duration_ms": duration.Milliseconds(),
+		},
+	)
 
 	// Build stats using typed builder to eliminate map[string]any construction.
 	stats := types.NewRunStatsBuilder().

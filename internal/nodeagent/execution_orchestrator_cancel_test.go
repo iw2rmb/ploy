@@ -14,13 +14,29 @@ import (
 func TestRunController_uploadFailureStatus_UsesCancelledOnContextCanceled(t *testing.T) {
 	t.Parallel()
 
-	var gotPath string
-	var gotPayload map[string]any
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+
+	var (
+		statusPath    string
+		statusPayload map[string]any
+		eventPath     string
+		eventPayload  map[string]any
+	)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		_ = json.NewDecoder(r.Body).Decode(&gotPayload)
-		w.WriteHeader(http.StatusNoContent)
+		switch r.URL.Path {
+		case "/v1/jobs/" + jobID.String() + "/complete":
+			statusPath = r.URL.Path
+			_ = json.NewDecoder(r.Body).Decode(&statusPayload)
+			w.WriteHeader(http.StatusNoContent)
+		case "/v1/nodes/" + testNodeID + "/events":
+			eventPath = r.URL.Path
+			_ = json.NewDecoder(r.Body).Decode(&eventPayload)
+			w.WriteHeader(http.StatusCreated)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer server.Close()
 
@@ -35,22 +51,30 @@ func TestRunController_uploadFailureStatus_UsesCancelledOnContextCanceled(t *tes
 	}
 
 	req := StartRunRequest{
-		RunID: types.RunID("test-run"),
-		JobID: types.JobID("test-job-id"),
+		RunID: runID,
+		JobID: jobID,
 	}
 
 	rc.uploadFailureStatus(context.Background(), req, context.Canceled, 250*time.Millisecond)
 
 	wantPath := "/v1/jobs/" + req.JobID.String() + "/complete"
-	if gotPath != wantPath {
-		t.Fatalf("path = %q, want %q", gotPath, wantPath)
+	if statusPath != wantPath {
+		t.Fatalf("status path = %q, want %q", statusPath, wantPath)
 	}
 
-	if gotPayload["status"] != JobStatusCancelled.String() {
-		t.Fatalf("status = %v, want %q", gotPayload["status"], JobStatusCancelled.String())
+	if statusPayload["status"] != JobStatusCancelled.String() {
+		t.Fatalf("status = %v, want %q", statusPayload["status"], JobStatusCancelled.String())
 	}
 
-	if _, ok := gotPayload["exit_code"]; ok {
-		t.Fatalf("did not expect exit_code in cancelled payload, got %v", gotPayload["exit_code"])
+	if _, ok := statusPayload["exit_code"]; ok {
+		t.Fatalf("did not expect exit_code in cancelled payload, got %v", statusPayload["exit_code"])
+	}
+
+	wantEventPath := "/v1/nodes/" + testNodeID + "/events"
+	if eventPath != wantEventPath {
+		t.Fatalf("event path = %q, want %q", eventPath, wantEventPath)
+	}
+	if eventPayload["run_id"] != req.RunID.String() {
+		t.Fatalf("event run_id = %v, want %q", eventPayload["run_id"], req.RunID.String())
 	}
 }

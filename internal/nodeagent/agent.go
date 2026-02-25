@@ -55,6 +55,11 @@ func New(cfg Config) (*Agent, error) {
 		return nil, fmt.Errorf("create job image name saver: %w", err)
 	}
 
+	nodeEventUploader, err := NewNodeEventUploader(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("create node event uploader: %w", err)
+	}
+
 	// Initialize controller with typed JobID keys for compile-time safety.
 	// The shared uploaders are passed in to enable HTTP client reuse.
 	controller := &runController{
@@ -64,6 +69,7 @@ func New(cfg Config) (*Agent, error) {
 		artifactUploader:  artifactUploader,
 		statusUploader:    statusUploader,
 		jobImageNameSaver: jobImageNameSaver,
+		nodeEventUploader: nodeEventUploader,
 	}
 
 	server, err := NewServer(cfg, controller)
