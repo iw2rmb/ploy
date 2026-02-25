@@ -176,6 +176,52 @@ func TestBuildGateImageResolver_MissingFile(t *testing.T) {
 	}
 }
 
+func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
+	t.Setenv(containerRegistryEnvKey, "192.0.2.25:5001/ploy")
+
+	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
+		{
+			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+			Image: "${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17",
+		},
+	}, false)
+	if err != nil {
+		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
+	}
+
+	got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"})
+	if err != nil {
+		t.Fatalf("Resolve() error: %v", err)
+	}
+	want := "192.0.2.25:5001/ploy/maven:3-eclipse-temurin-17"
+	if got != want {
+		t.Fatalf("Resolve() = %q, want %q", got, want)
+	}
+}
+
+func TestBuildGateImageResolver_UsesDefaultPrefixWhenEnvUnset(t *testing.T) {
+	t.Setenv(containerRegistryEnvKey, "")
+
+	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
+		{
+			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
+			Image: "${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17",
+		},
+	}, false)
+	if err != nil {
+		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
+	}
+
+	got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"})
+	if err != nil {
+		t.Fatalf("Resolve() error: %v", err)
+	}
+	want := defaultRegistryImagePrefix + "/maven:3-eclipse-temurin-17"
+	if got != want {
+		t.Fatalf("Resolve() = %q, want %q", got, want)
+	}
+}
+
 // TestBuildGateImageResolver_DuplicateInLevel tests duplicate rejection within same source.
 func TestBuildGateImageResolver_DuplicateInLevel(t *testing.T) {
 	// Duplicates within the same level should be rejected during validation.

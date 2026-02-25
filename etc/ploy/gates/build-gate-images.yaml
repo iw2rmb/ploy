@@ -9,31 +9,31 @@
 ##   are preferred by the resolver.
 BuildGateImages:
   # Java (Maven)
-  - image: localhost:5000/ploy/maven:3-eclipse-temurin-11
+  - image: ${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-11
     language: java
     tool: maven
     release: "11"
-  - image: localhost:5000/ploy/maven:3-eclipse-temurin-17
+  - image: ${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17
     language: java
     tool: maven
     release: "17"
 
   # Java (Gradle)
-  - image: localhost:5000/ploy/ploy-gate-gradle:jdk11
+  - image: ${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk11
     language: java
     tool: gradle
     release: "11"
-  - image: localhost:5000/ploy/ploy-gate-gradle:jdk17
+  - image: ${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk17
     language: java
     tool: gradle
     release: "17"
 
   # Go (tool-agnostic)
-  - image: localhost:5000/ploy/golang:1.22
+  - image: ${PLOY_CONTAINER_REGISTRY}/golang:1.22
     language: go
     release: "1.22"
 
   # Rust (tool-agnostic)
-  - image: localhost:5000/ploy/rust:1.76
+  - image: ${PLOY_CONTAINER_REGISTRY}/rust:1.76
     language: rust
     release: "1.76"

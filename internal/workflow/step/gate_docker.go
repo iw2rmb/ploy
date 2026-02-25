@@ -167,6 +167,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	}
 	specC := ContainerSpec{Image: plan.image, Command: plan.cmd, WorkingDir: "/workspace", Mounts: mounts,
 		Env:              envCopy,
+		Labels:           gateContainerLabels(ctx),
 		LimitMemoryBytes: limitMem,
 		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis -> nanos
 		LimitDiskBytes:   limitDisk,

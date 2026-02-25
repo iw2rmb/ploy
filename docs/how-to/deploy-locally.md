@@ -27,7 +27,7 @@ export PLOY_SERVER_PORT=18080   # optional; default 8080
 export PLOY_REGISTRY_PORT=5000  # optional; default 5000
 ./deploy/local/run.sh
 export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
-export PLOY_CONTAINER_REGISTRY="localhost:${PLOY_REGISTRY_PORT:-5000}/ploy"
+export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT:-5000}/ploy"
 ```
 
 What the script does:

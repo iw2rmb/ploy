@@ -7,7 +7,7 @@ set -Eeuo pipefail
 PLATFORM=${PLATFORM:-linux/amd64}
 PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}        # seconds (default 15m)
 PUSH_RETRIES=${PUSH_RETRIES:-1}          # number of retries on failure
-IMAGE_PREFIX="${IMAGE_PREFIX:-${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}}"
+IMAGE_PREFIX="${IMAGE_PREFIX:-${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker CLI not found" >&2

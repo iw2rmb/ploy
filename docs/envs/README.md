@@ -80,7 +80,7 @@ Role model (bearer token claims):
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
-  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (default local value: `localhost:5000/ploy`).
+  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (default local value: `127.0.0.1:5000/ploy`).
 - `PLOY_GARAGE_FORCE_IMAGES` — Optional flag for `deploy/local/run.sh` image sync step.
   When set to `1`, `true`, `yes`, or `on`, local deploy calls `deploy/images/garage.sh --force`
   and rebuilds/repushes mig + build-gate images even if they already exist in Garage-backed registry.
@@ -89,7 +89,7 @@ Role model (bearer token claims):
 - `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
   as `PLOY_CONTAINER_REGISTRY`.
 - `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by `deploy/images/build-and-push-migs.sh`.
-  Default fallback is `${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}`.
+  Default fallback is `${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}`.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.

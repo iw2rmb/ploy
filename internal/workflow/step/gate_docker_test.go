@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	units "github.com/docker/go-units"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -70,6 +71,31 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 	}
 	if observedImage != "docker.io/example/gate:latest" {
 		t.Fatalf("observed image = %q, want %q", observedImage, "docker.io/example/gate:latest")
+	}
+}
+
+func TestDockerGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{Enabled: true}
+	ctx := WithGateContainerLabels(context.Background(), map[string]string{
+		types.LabelRunID: "run-123",
+		types.LabelJobID: "job-456",
+	})
+
+	if _, err := executor.Execute(ctx, spec, workspace); err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+	if got := rt.captured.Labels[types.LabelRunID]; got != "run-123" {
+		t.Fatalf("label %q = %q, want %q", types.LabelRunID, got, "run-123")
+	}
+	if got := rt.captured.Labels[types.LabelJobID]; got != "job-456" {
+		t.Fatalf("label %q = %q, want %q", types.LabelJobID, got, "job-456")
 	}
 }
 
@@ -607,6 +633,7 @@ func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 // when detected stack doesn't match expectations, without running container.
 func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 	t.Parallel()
+	expectedRuntimeImage := resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17"
 
 	// Create workspace with Java 11, but expect Java 17.
 	workspace := createMavenWorkspace(t, "11")
@@ -648,11 +675,11 @@ func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 	}
 
 	// Verify runtime image is still resolved for observability (even though the container is not run).
-	if meta.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.RuntimeImage != expectedRuntimeImage {
+		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, expectedRuntimeImage)
 	}
-	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.StackGate.RuntimeImage != expectedRuntimeImage {
+		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, expectedRuntimeImage)
 	}
 
 	// Verify static check reports failure.
@@ -685,6 +712,7 @@ func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 // when both Maven and Gradle files are present (ambiguous detection).
 func TestGateDocker_StackGate_PreCheckUnknown_Ambiguous(t *testing.T) {
 	t.Parallel()
+	expectedRuntimeImage := resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17"
 
 	// Create workspace with both pom.xml and build.gradle.
 	tmpDir := t.TempDir()
@@ -744,11 +772,11 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 	}
 
 	// Verify runtime image is still resolved for observability (even though the container is not run).
-	if meta.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.RuntimeImage != expectedRuntimeImage {
+		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, expectedRuntimeImage)
 	}
-	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.StackGate.RuntimeImage != expectedRuntimeImage {
+		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, expectedRuntimeImage)
 	}
 
 	// Verify log finding with STACK_GATE_UNKNOWN code.
@@ -776,6 +804,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 // when no Maven or Gradle build files are present.
 func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 	t.Parallel()
+	expectedRuntimeImage := resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17"
 
 	// Empty workspace.
 	tmpDir := t.TempDir()
@@ -814,11 +843,11 @@ func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 	}
 
 	// Verify runtime image is still resolved for observability (even though the container is not run).
-	if meta.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.RuntimeImage != expectedRuntimeImage {
+		t.Errorf("RuntimeImage = %q, want %q", meta.RuntimeImage, expectedRuntimeImage)
 	}
-	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.StackGate.RuntimeImage != expectedRuntimeImage {
+		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, expectedRuntimeImage)
 	}
 	if len(meta.StaticChecks) > 0 {
 		if meta.StaticChecks[0].Tool != "stack-gate" {
@@ -934,6 +963,7 @@ func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testin
 
 func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 	t.Parallel()
+	expectedRuntimeImage := resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17"
 
 	workspace := createMavenWorkspace(t, "17")
 
@@ -957,11 +987,11 @@ func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if rt.captured.Image != "maven:3-eclipse-temurin-17" {
-		t.Errorf("Image = %q, want %q", rt.captured.Image, "maven:3-eclipse-temurin-17")
+	if rt.captured.Image != expectedRuntimeImage {
+		t.Errorf("Image = %q, want %q", rt.captured.Image, expectedRuntimeImage)
 	}
-	if meta.StackGate == nil || meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
-		t.Fatalf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	if meta.StackGate == nil || meta.StackGate.RuntimeImage != expectedRuntimeImage {
+		t.Fatalf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, expectedRuntimeImage)
 	}
 }
 
