@@ -85,6 +85,7 @@ services:
     image: dxflrs/garage:v2.2.0
     entrypoint: ["/garage"]
     command: ["-c", "/etc/garage.toml", "server"]
+    restart: unless-stopped
     environment:
       - GARAGE_DEFAULT_ACCESS_KEY=GK000000000000000000000001
       - GARAGE_DEFAULT_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
@@ -127,6 +128,7 @@ services:
 
   registry:
     image: registry:2.8.3
+    restart: unless-stopped
     depends_on:
       garage:
         condition: service_healthy
