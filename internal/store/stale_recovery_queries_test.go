@@ -79,6 +79,47 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	}
 }
 
+func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *testing.T) {
+	ctx, db := openStoreForCancelBulkTests(t)
+
+	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-node-count-a", "main", "feature", []byte(`{"type":"stale-node-count"}`))
+	repoB := createRunRepoForStaleRecoveryQueryTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "main", "feature-b")
+
+	cutoff := time.Now().UTC().Add(-45 * time.Second)
+	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
+
+	staleNodeA := createNodeForStaleRecoveryQueryTest(t, ctx, db)
+	staleNodeB := createNodeForStaleRecoveryQueryTest(t, ctx, db)
+	nilHeartbeatNode := createNodeForStaleRecoveryQueryTest(t, ctx, db)
+	freshNode := createNodeForStaleRecoveryQueryTest(t, ctx, db)
+
+	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, staleNodeA.ID, cutoff.Add(-2*time.Minute))
+	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, staleNodeB.ID, cutoff.Add(-3*time.Minute))
+	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, freshNode.ID, cutoff.Add(2*time.Minute))
+
+	staleAOne := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-a-1", JobStatusCreated)
+	staleATwo := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-a-2", JobStatusCreated)
+	staleB := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-b", JobStatusCreated)
+	nilHeartbeat := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 2, "nil-heartbeat", JobStatusCreated)
+	orphaned := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 3, "orphaned", JobStatusCreated)
+	fresh := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 3, "fresh", JobStatusCreated)
+
+	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAOne.ID, &staleNodeA.ID, time.Now().UTC().Add(-2*time.Minute))
+	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleATwo.ID, &staleNodeA.ID, time.Now().UTC().Add(-2*time.Minute))
+	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleB.ID, &staleNodeB.ID, time.Now().UTC().Add(-2*time.Minute))
+	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, nilHeartbeat.ID, &nilHeartbeatNode.ID, time.Now().UTC().Add(-2*time.Minute))
+	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, orphaned.ID, nil, time.Now().UTC().Add(-2*time.Minute))
+	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, fresh.ID, &freshNode.ID, time.Now().UTC().Add(-2*time.Minute))
+
+	count, err := db.CountStaleNodesWithRunningJobs(ctx, cutoffTS)
+	if err != nil {
+		t.Fatalf("CountStaleNodesWithRunningJobs() failed: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("CountStaleNodesWithRunningJobs()=%d, want 3", count)
+	}
+}
+
 func TestCancelActiveJobsByRunRepoAttempt_TransitionsOnlyTargetAttempt(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 

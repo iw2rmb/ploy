@@ -68,14 +68,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./cmd/ployd ./internal/server/scheduler` — Boot wiring and lifecycle pass.
 
 ## Phase 4: Observability and API Surface Consistency
-- [ ] Add structured logs and counters for stale recovery actions — Makes operator diagnosis clear.
+- [x] Add structured logs and counters for stale recovery actions — Makes operator diagnosis clear.
   - Repository: `ploy`
   - Component: recovery task package
   - Scope: Log stale node count, affected attempts, canceled jobs, and finalized runs; include run/repo IDs in structured fields.
   - Snippets: `slog.Info("stale-job-recovery cycle", ...)`
   - Tests: `go test ./internal/server/...` — verify behavior; log assertions where already used.
 
-- [ ] Ensure SSE/run status consistency after recovery finalization — Keeps CLI follow/status behavior coherent.
+- [x] Ensure SSE/run status consistency after recovery finalization — Keeps CLI follow/status behavior coherent.
   - Repository: `ploy`
   - Component: `internal/server/events_service.go`, reconciliation helper usage
   - Scope: Publish run terminal snapshot/done status when recovery causes finalization, matching existing completion path semantics.

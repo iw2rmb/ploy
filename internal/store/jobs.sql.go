@@ -193,6 +193,26 @@ func (q *Queries) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, ar
 	return items, nil
 }
 
+const countStaleNodesWithRunningJobs = `-- name: CountStaleNodesWithRunningJobs :one
+SELECT COUNT(DISTINCT jobs.node_id)::BIGINT
+FROM jobs
+JOIN nodes ON nodes.id = jobs.node_id
+WHERE jobs.status = 'Running'
+  AND (
+    nodes.last_heartbeat IS NULL
+    OR nodes.last_heartbeat < $1
+  )
+`
+
+// Counts distinct stale nodes that currently have at least one running job.
+// Excludes NULL node_id rows (orphaned running jobs) from node count.
+func (q *Queries) CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error) {
+	row := q.db.QueryRow(ctx, countStaleNodesWithRunningJobs, lastHeartbeat)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createJob = `-- name: CreateJob :one
 INSERT INTO jobs (
   id,

@@ -193,6 +193,18 @@ WHERE jobs.status = 'Running'
 GROUP BY jobs.run_id, jobs.repo_id, jobs.attempt
 ORDER BY jobs.run_id ASC, jobs.repo_id ASC, jobs.attempt ASC;
 
+-- name: CountStaleNodesWithRunningJobs :one
+-- Counts distinct stale nodes that currently have at least one running job.
+-- Excludes NULL node_id rows (orphaned running jobs) from node count.
+SELECT COUNT(DISTINCT jobs.node_id)::BIGINT
+FROM jobs
+JOIN nodes ON nodes.id = jobs.node_id
+WHERE jobs.status = 'Running'
+  AND (
+    nodes.last_heartbeat IS NULL
+    OR nodes.last_heartbeat < $1
+  );
+
 -- name: GetAdjacentJobIndices :one
 -- Transitional: returns current job id and linked successor id.
 SELECT

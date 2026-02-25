@@ -1,12 +1,17 @@
 package recovery
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -24,6 +29,11 @@ type mockStore struct {
 	listStaleRunningJobsParam  pgtype.Timestamptz
 	listStaleRunningJobsResult []store.ListStaleRunningJobsRow
 	listStaleRunningJobsErr    error
+
+	countStaleNodesWithRunningJobsCalled bool
+	countStaleNodesWithRunningJobsParam  pgtype.Timestamptz
+	countStaleNodesWithRunningJobsResult int64
+	countStaleNodesWithRunningJobsErr    error
 
 	cancelCalls      []store.CancelActiveJobsByRunRepoAttemptParams
 	cancelRowsResult int64
@@ -46,12 +56,26 @@ type mockStore struct {
 	updateRunStatusCalled bool
 	updateRunStatusParams []store.UpdateRunStatusParams
 	updateRunStatusErr    error
+
+	listRunReposByRunCalled bool
+	listRunReposByRunResult []store.RunRepo
+	listRunReposByRunErr    error
+
+	getMigRepoCalled bool
+	getMigRepoResult store.MigRepo
+	getMigRepoErr    error
 }
 
 func (m *mockStore) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
 	m.listStaleRunningJobsCalled = true
 	m.listStaleRunningJobsParam = lastHeartbeat
 	return m.listStaleRunningJobsResult, m.listStaleRunningJobsErr
+}
+
+func (m *mockStore) CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error) {
+	m.countStaleNodesWithRunningJobsCalled = true
+	m.countStaleNodesWithRunningJobsParam = lastHeartbeat
+	return m.countStaleNodesWithRunningJobsResult, m.countStaleNodesWithRunningJobsErr
 }
 
 func (m *mockStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, arg store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
@@ -97,7 +121,23 @@ func (m *mockStore) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run
 func (m *mockStore) UpdateRunStatus(ctx context.Context, arg store.UpdateRunStatusParams) error {
 	m.updateRunStatusCalled = true
 	m.updateRunStatusParams = append(m.updateRunStatusParams, arg)
+	if m.runsByID != nil {
+		run := m.runsByID[arg.ID]
+		run.ID = arg.ID
+		run.Status = arg.Status
+		m.runsByID[arg.ID] = run
+	}
 	return m.updateRunStatusErr
+}
+
+func (m *mockStore) ListRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error) {
+	m.listRunReposByRunCalled = true
+	return m.listRunReposByRunResult, m.listRunReposByRunErr
+}
+
+func (m *mockStore) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
+	m.getMigRepoCalled = true
+	return m.getMigRepoResult, m.getMigRepoErr
 }
 
 func TestNewStaleJobRecoveryTask(t *testing.T) {
@@ -138,7 +178,8 @@ func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
 		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoID, Attempt: 2, RunningJobs: 3},
 		},
-		cancelRowsResult: 3,
+		countStaleNodesWithRunningJobsResult: 1,
+		cancelRowsResult:                     3,
 		jobsByAttempt: map[staleKey][]store.Job{
 			{runID: runID, repoID: repoID, attempt: 2}: {
 				{
@@ -183,6 +224,12 @@ func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
 	if !st.listStaleRunningJobsParam.Valid {
 		t.Fatal("expected cutoff timestamp to be valid")
 	}
+	if !st.countStaleNodesWithRunningJobsCalled {
+		t.Fatal("expected CountStaleNodesWithRunningJobs call")
+	}
+	if !st.countStaleNodesWithRunningJobsParam.Valid {
+		t.Fatal("expected stale node cutoff timestamp to be valid")
+	}
 	if len(st.cancelCalls) != 1 {
 		t.Fatalf("cancel calls = %d, want 1", len(st.cancelCalls))
 	}
@@ -218,8 +265,9 @@ func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
 	st := &mockStore{
-		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1}},
-		cancelRowsResult:           1,
+		listStaleRunningJobsResult:           []store.ListStaleRunningJobsRow{{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1}},
+		countStaleNodesWithRunningJobsResult: 1,
+		cancelRowsResult:                     1,
 		jobsByAttempt: map[staleKey][]store.Job{
 			{runID: runID, repoID: repoID, attempt: 1}: {
 				{
@@ -260,5 +308,191 @@ func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t 
 	}
 	if st.updateRunStatusCalled {
 		t.Fatal("did not expect UpdateRunStatus while run has non-terminal repos")
+	}
+}
+
+func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	st := &mockStore{
+		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
+			{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 2},
+		},
+		countStaleNodesWithRunningJobsResult: 2,
+		cancelRowsResult:                     2,
+		jobsByAttempt: map[staleKey][]store.Job{
+			{runID: runID, repoID: repoID, attempt: 1}: {
+				{
+					ID:          domaintypes.NewJobID(),
+					RunID:       runID,
+					RepoID:      repoID,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					Name:        "mig-0",
+					Status:      store.JobStatusCancelled,
+					JobType:     domaintypes.JobTypeMod.String(),
+					Meta:        []byte(`{"next_id":1000}`),
+				},
+			},
+		},
+		countRunReposByStatusResult: map[domaintypes.RunID][]store.CountRunReposByStatusRow{
+			runID: {
+				{Status: store.RunRepoStatusCancelled, Count: 1},
+			},
+		},
+		runsByID: map[domaintypes.RunID]store.Run{
+			runID: {ID: runID, Status: store.RunStatusStarted},
+		},
+	}
+
+	var logBuf bytes.Buffer
+	task, err := NewStaleJobRecoveryTask(Options{
+		Store:          st,
+		Interval:       10 * time.Millisecond,
+		NodeStaleAfter: time.Minute,
+		Logger:         slog.New(slog.NewJSONHandler(&logBuf, nil)),
+	})
+	if err != nil {
+		t.Fatalf("NewStaleJobRecoveryTask() error = %v", err)
+	}
+
+	if err := task.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(logBuf.String()), "\n")
+	if len(lines) == 0 {
+		t.Fatal("expected recovery logs, got none")
+	}
+
+	foundCycleLog := false
+	for _, line := range lines {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(line), &payload); err != nil {
+			t.Fatalf("unmarshal log payload: %v", err)
+		}
+		if payload["msg"] != "stale-job-recovery: cycle completed" {
+			continue
+		}
+		foundCycleLog = true
+		if got := int64(payload["stale_nodes"].(float64)); got != 2 {
+			t.Fatalf("stale_nodes=%d, want 2", got)
+		}
+		if got := int64(payload["stale_attempts"].(float64)); got != 1 {
+			t.Fatalf("stale_attempts=%d, want 1", got)
+		}
+		if got := int64(payload["jobs_cancelled"].(float64)); got != 2 {
+			t.Fatalf("jobs_cancelled=%d, want 2", got)
+		}
+		if got := int64(payload["repos_updated"].(float64)); got != 1 {
+			t.Fatalf("repos_updated=%d, want 1", got)
+		}
+		if got := int64(payload["runs_finalized"].(float64)); got != 1 {
+			t.Fatalf("runs_finalized=%d, want 1", got)
+		}
+	}
+
+	if !foundCycleLog {
+		t.Fatal("expected stale-job-recovery cycle log")
+	}
+}
+
+func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoA := domaintypes.NewMigRepoID()
+	repoB := domaintypes.NewMigRepoID()
+	st := &mockStore{
+		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
+			{RunID: runID, RepoID: repoA, Attempt: 1, RunningJobs: 1},
+			{RunID: runID, RepoID: repoB, Attempt: 1, RunningJobs: 1},
+		},
+		countStaleNodesWithRunningJobsResult: 1,
+		cancelRowsResult:                     1,
+		jobsByAttempt: map[staleKey][]store.Job{
+			{runID: runID, repoID: repoA, attempt: 1}: {
+				{
+					ID:          domaintypes.NewJobID(),
+					RunID:       runID,
+					RepoID:      repoA,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					Name:        "mig-a",
+					Status:      store.JobStatusCancelled,
+					JobType:     domaintypes.JobTypeMod.String(),
+					Meta:        []byte(`{"next_id":1000}`),
+				},
+			},
+			{runID: runID, repoID: repoB, attempt: 1}: {
+				{
+					ID:          domaintypes.NewJobID(),
+					RunID:       runID,
+					RepoID:      repoB,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					Name:        "mig-b",
+					Status:      store.JobStatusCancelled,
+					JobType:     domaintypes.JobTypeMod.String(),
+					Meta:        []byte(`{"next_id":2000}`),
+				},
+			},
+		},
+		countRunReposByStatusResult: map[domaintypes.RunID][]store.CountRunReposByStatusRow{
+			runID: {
+				{Status: store.RunRepoStatusCancelled, Count: 2},
+			},
+		},
+		runsByID: map[domaintypes.RunID]store.Run{
+			runID: {ID: runID, Status: store.RunStatusStarted},
+		},
+	}
+
+	eventsService, err := server.NewEventsService(server.EventsOptions{
+		BufferSize:  10,
+		HistorySize: 20,
+	})
+	if err != nil {
+		t.Fatalf("NewEventsService() error = %v", err)
+	}
+
+	task, err := NewStaleJobRecoveryTask(Options{
+		Store:          st,
+		EventsService:  eventsService,
+		Interval:       10 * time.Millisecond,
+		NodeStaleAfter: time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("NewStaleJobRecoveryTask() error = %v", err)
+	}
+
+	if err := task.Run(context.Background()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if len(st.updateRunStatusParams) != 1 {
+		t.Fatalf("run status updates = %d, want 1", len(st.updateRunStatusParams))
+	}
+
+	events := eventsService.Hub().Snapshot(runID)
+	var (
+		runEvents  int
+		doneEvents int
+	)
+	for _, evt := range events {
+		if evt.Type == domaintypes.SSEEventRun {
+			runEvents++
+		}
+		if evt.Type == domaintypes.SSEEventDone {
+			doneEvents++
+		}
+	}
+	if runEvents != 1 {
+		t.Fatalf("run events=%d, want 1", runEvents)
+	}
+	if doneEvents != 1 {
+		t.Fatalf("done events=%d, want 1", doneEvents)
 	}
 }
