@@ -91,6 +91,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}()
 
 	// Run the build gate.
+	ctx = withGateExecutionLabels(ctx, req)
 	ctx = step.WithGateRuntimeImageObserver(ctx, func(obsCtx context.Context, image string) {
 		if err := r.SaveJobImageName(obsCtx, req.JobID, image); err != nil {
 			slog.Warn("failed to save gate job image name", "run_id", req.RunID, "job_id", req.JobID, "error", err)

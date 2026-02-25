@@ -13,6 +13,7 @@ package step
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -24,6 +25,11 @@ import (
 //
 // The ploy Docker images install this file at /etc/ploy/gates/build-gate-images.yaml.
 const DefaultMappingPath = "etc/ploy/gates/build-gate-images.yaml"
+
+const (
+	containerRegistryEnvKey    = "PLOY_CONTAINER_REGISTRY"
+	defaultRegistryImagePrefix = "127.0.0.1:5000/ploy"
+)
 
 // BuildGateImageResolver resolves stack expectations to container images.
 // Rules are merged from multiple sources with higher-precedence sources
@@ -65,6 +71,7 @@ func NewBuildGateImageResolver(
 			return nil, err
 		}
 		if len(fileRules) > 0 {
+			fileRules = normalizeBuildGateImageRules(fileRules)
 			// Validate default file rules.
 			mapping := contracts.BuildGateImageMapping{Images: fileRules}
 			if err := mapping.Validate("default_file"); err != nil {
@@ -76,14 +83,43 @@ func NewBuildGateImageResolver(
 
 	// Add mig override rules (highest precedence).
 	if len(modOverride) > 0 {
-		mapping := contracts.BuildGateImageMapping{Images: modOverride}
+		normalizedOverrides := normalizeBuildGateImageRules(modOverride)
+		mapping := contracts.BuildGateImageMapping{Images: normalizedOverrides}
 		if err := mapping.Validate("mod_override"); err != nil {
 			return nil, fmt.Errorf("mig override: %w", err)
 		}
-		allRules = append(allRules, modOverride...)
+		allRules = append(allRules, normalizedOverrides...)
 	}
 
 	return &BuildGateImageResolver{rules: allRules}, nil
+}
+
+func normalizeBuildGateImageRules(rules []contracts.BuildGateImageRule) []contracts.BuildGateImageRule {
+	normalized := make([]contracts.BuildGateImageRule, len(rules))
+	copy(normalized, rules)
+	for i := range normalized {
+		normalized[i].Image = expandContainerRegistryPrefix(normalized[i].Image)
+	}
+	return normalized
+}
+
+func expandContainerRegistryPrefix(image string) string {
+	image = strings.TrimSpace(image)
+	if image == "" {
+		return image
+	}
+	prefix := resolveContainerRegistryPrefix()
+	expanded := strings.ReplaceAll(image, "${"+containerRegistryEnvKey+"}", prefix)
+	expanded = strings.ReplaceAll(expanded, "$"+containerRegistryEnvKey, prefix)
+	return strings.TrimSpace(expanded)
+}
+
+func resolveContainerRegistryPrefix() string {
+	prefix := strings.TrimSpace(os.Getenv(containerRegistryEnvKey))
+	if prefix == "" {
+		return defaultRegistryImagePrefix
+	}
+	return strings.TrimRight(prefix, "/")
 }
 
 // Resolve finds the best matching image for the given stack expectation.

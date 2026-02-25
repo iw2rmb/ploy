@@ -56,7 +56,7 @@ Environment:
   PLOY_DOCKER_AUTH_CONFIG Optional override for Docker auth config JSON used by node image pulls
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
   PLOY_REGISTRY_PORT Host port for local Garage-backed OCI registry (default: 5000)
-  PLOY_CONTAINER_REGISTRY Registry prefix used for local image sync (default: localhost:<PLOY_REGISTRY_PORT>/ploy)
+  PLOY_CONTAINER_REGISTRY Registry prefix used for local image sync (default: 127.0.0.1:<PLOY_REGISTRY_PORT>/ploy)
   PLOY_GARAGE_FORCE_IMAGES Set to 1/true to force rebuild+repush in deploy/images/garage.sh
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
@@ -840,7 +840,7 @@ main() {
   export PLOY_SERVER_PORT
   export PLOY_REGISTRY_PORT
   export PLOY_CONTAINER_REGISTRY
-  PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-localhost:${PLOY_REGISTRY_PORT}/ploy}"
+  PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:${PLOY_REGISTRY_PORT}/ploy}"
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1

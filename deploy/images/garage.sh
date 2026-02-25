@@ -8,7 +8,7 @@ set -Eeuo pipefail
 # - Use --force to rebuild/repush everything.
 #
 # Inputs (env):
-#   IMAGE_PREFIX  Registry/repo prefix (default: ${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy})
+#   IMAGE_PREFIX  Registry/repo prefix (default: ${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy})
 #   PLATFORM      Build platforms for buildx (default: linux/amd64)
 #   PUSH_TIMEOUT  Per-command timeout in seconds (default: 900)
 #   PUSH_RETRIES  Retries on failure (default: 1)
@@ -17,7 +17,7 @@ set -Eeuo pipefail
 PLATFORM=${PLATFORM:-linux/amd64}
 PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}
 PUSH_RETRIES=${PUSH_RETRIES:-1}
-IMAGE_PREFIX="${IMAGE_PREFIX:-${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}}"
+IMAGE_PREFIX="${IMAGE_PREFIX:-${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}}"
 REGISTRY_SCHEME="${REGISTRY_SCHEME:-}"
 FORCE=0
 CA_CERTS_PATH=""

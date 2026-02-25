@@ -38,6 +38,7 @@ func (r *runController) runGateWithHealing(
 	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
 		return nil, nil, "", nil
 	}
+	ctx = withGateExecutionLabels(ctx, req)
 
 	// Execute initial gate.
 	gateStart := time.Now()

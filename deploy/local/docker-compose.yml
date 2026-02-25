@@ -56,6 +56,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
+      - PLOY_CONTAINER_REGISTRY=${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}
       - PLOY_DOCKER_NETWORK=local_default
       - PLOY_DOCKER_AUTH_CONFIG=${PLOY_DOCKER_AUTH_CONFIG:-}
       - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}

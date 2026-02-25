@@ -7,20 +7,20 @@ Overview
   - `mig-codex` -> `migs-codex`
   - `mig-llm` -> `migs-llm`
   - `mig-plan` -> `migs-plan`
-- Local default registry prefix is `localhost:5000/ploy`.
+- Local default registry prefix is `127.0.0.1:5000/ploy`.
 - The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Local Registry Prerequisites
 - Deploy the local stack:
   - `deploy/local/run.sh`
 - Export the registry prefix for specs/scripts:
-  - `export PLOY_CONTAINER_REGISTRY=localhost:5000/ploy`
+  - `export PLOY_CONTAINER_REGISTRY=127.0.0.1:5000/ploy`
 
 Publish all Mods images
 ```bash
 deploy/images/build-and-push-migs.sh
 # Discovers deploy/images/migs/* and pushes :latest tags.
-# Defaults to IMAGE_PREFIX=${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}.
+# Defaults to IMAGE_PREFIX=${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}.
 ```
 
 Sync all local workflow images (migs + build-gate base images)
@@ -42,7 +42,7 @@ so mig images can trust internal TLS endpoints.
 Publish a single Mods image (example: orw-maven)
 ```bash
 name=orw-maven
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}" \
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   docker buildx build --platform linux/amd64 \
   -t "${IMAGE_PREFIX}/migs-orw-maven:latest" \
   --push "deploy/images/migs/${name}"
@@ -50,7 +50,7 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}" \
 
 Publish `migs-codex` (manual one-off)
 ```bash
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}"
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
 docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/migs/mig-codex/Dockerfile \
