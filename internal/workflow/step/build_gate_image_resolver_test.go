@@ -246,6 +246,69 @@ func TestBuildGateImageResolver_LoadValidFile(t *testing.T) {
 	}
 }
 
+func TestBuildGateImageResolver_LoadFile_ReleaseCoercion(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "build-gate-images.yaml")
+	const body = `BuildGateImages:
+  - language: java
+    tool: maven
+    release: 17
+    image: maven:17
+  - language: java
+    tool: gradle
+    release: 17.0
+    image: gradle:17
+  - language: python
+    release: 3.11
+    image: python:3.11
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write mapping file: %v", err)
+	}
+
+	resolver, err := NewBuildGateImageResolver(path, nil, true)
+	if err != nil {
+		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		exp  contracts.StackExpectation
+		want string
+	}{
+		{
+			name: "integer release",
+			exp:  contracts.StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			want: "maven:17",
+		},
+		{
+			name: "whole float coerces to integer string",
+			exp:  contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
+			want: "gradle:17",
+		},
+		{
+			name: "decimal float preserved",
+			exp:  contracts.StackExpectation{Language: "python", Release: "3.11"},
+			want: "python:3.11",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := resolver.Resolve(tt.exp)
+			if err != nil {
+				t.Fatalf("Resolve() error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("Resolve() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestBuildGateImageResolver_LoadInvalidFile tests error handling for invalid files.
 func TestBuildGateImageResolver_LoadInvalidFile(t *testing.T) {
 	tests := []struct {

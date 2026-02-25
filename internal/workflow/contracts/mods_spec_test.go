@@ -431,6 +431,72 @@ func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
 	}
 }
 
+func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    int
+		wantErr string
+	}{
+		{
+			name: "int value",
+			input: `{
+				"steps": [{"image":"test:latest"}],
+				"build_gate": {"healing":{"retries": 3, "image":"codex:latest"}, "router":{"image":"router:latest"}}
+			}`,
+			want: 3,
+		},
+		{
+			name: "float whole value",
+			input: `{
+				"steps": [{"image":"test:latest"}],
+				"build_gate": {"healing":{"retries": 3.0, "image":"codex:latest"}, "router":{"image":"router:latest"}}
+			}`,
+			want: 3,
+		},
+		{
+			name: "float fraction truncates",
+			input: `{
+				"steps": [{"image":"test:latest"}],
+				"build_gate": {"healing":{"retries": 1.9, "image":"codex:latest"}, "router":{"image":"router:latest"}}
+			}`,
+			want: 1,
+		},
+		{
+			name: "non-number rejected",
+			input: `{
+				"steps": [{"image":"test:latest"}],
+				"build_gate": {"healing":{"retries": "nope", "image":"codex:latest"}, "router":{"image":"router:latest"}}
+			}`,
+			wantErr: "build_gate.healing.retries: expected number, got string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec, err := ParseModsSpecJSON([]byte(tt.input))
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				if err.Error() != tt.wantErr {
+					t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
+				t.Fatal("build_gate.healing is nil")
+			}
+			if spec.BuildGate.Healing.Retries != tt.want {
+				t.Fatalf("retries = %d, want %d", spec.BuildGate.Healing.Retries, tt.want)
+			}
+		})
+	}
+}
+
 // TestModsSpec_ToMap tests round-trip conversion via ToMap.
 func TestModsSpec_ToMap(t *testing.T) {
 	mrOnSuccess := true

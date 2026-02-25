@@ -6,7 +6,6 @@
 package contracts
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -116,7 +115,7 @@ func parseStackExpectation(raw map[string]any, prefix string) (*StackExpectation
 	// Parse release. Handle both string and numeric values.
 	// YAML `release: 11` becomes float64 in JSON, but we want "11" as string.
 	if v, ok := raw["release"]; ok && v != nil {
-		release, err := parseReleaseValue(v, prefix+".release")
+		release, err := ParseReleaseValue(v, prefix+".release")
 		if err != nil {
 			return nil, err
 		}
@@ -124,26 +123,4 @@ func parseStackExpectation(raw map[string]any, prefix string) (*StackExpectation
 	}
 
 	return exp, nil
-}
-
-// parseReleaseValue converts a release value (string, int, or float) to a string.
-// Handles YAML's numeric parsing where `release: 11` becomes float64.
-func parseReleaseValue(v any, field string) (string, error) {
-	switch r := v.(type) {
-	case string:
-		return strings.TrimSpace(r), nil
-	case int:
-		return fmt.Sprintf("%d", r), nil
-	case int64:
-		return fmt.Sprintf("%d", r), nil
-	case float64:
-		// Check if it's a whole number (YAML `release: 11` becomes 11.0).
-		if r == float64(int64(r)) {
-			return fmt.Sprintf("%d", int64(r)), nil
-		}
-		// Preserve decimal for actual floats (e.g., "3.9").
-		return fmt.Sprintf("%g", r), nil
-	default:
-		return "", fmt.Errorf("%s: expected string or number, got %T", field, v)
-	}
 }

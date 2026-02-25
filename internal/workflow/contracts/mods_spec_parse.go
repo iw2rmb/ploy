@@ -298,9 +298,9 @@ func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 		Retries: 1, // Default to 1 retry.
 	}
 
-	// Parse retries (handle both int and float64 from JSON).
+	// Parse retries with shared numeric coercion. Preserve legacy float truncation.
 	if v, ok := raw["retries"]; ok && v != nil {
-		if r, ok := v.(int); ok {
+		if r, ok := intFromAny(v); ok {
 			heal.Retries = r
 		} else if rf, ok := v.(float64); ok {
 			heal.Retries = int(rf)
@@ -401,7 +401,7 @@ func parseBuildGateStackConfig(raw map[string]any, prefix string) (*BuildGateSta
 	}
 
 	if v, ok := raw["release"]; ok && v != nil {
-		release, err := parseReleaseValue(v, prefix+".release")
+		release, err := ParseReleaseValue(v, prefix+".release")
 		if err != nil {
 			return nil, err
 		}
@@ -409,28 +409,6 @@ func parseBuildGateStackConfig(raw map[string]any, prefix string) (*BuildGateSta
 	}
 
 	return stack, nil
-}
-
-// parseCommandSpec parses a command from polymorphic input (string or array).
-func parseCommandSpec(v any) (CommandSpec, error) {
-	switch cmd := v.(type) {
-	case string:
-		return CommandSpec{Shell: strings.TrimSpace(cmd)}, nil
-	case []any:
-		exec := make([]string, 0, len(cmd))
-		for _, elem := range cmd {
-			s, ok := elem.(string)
-			if !ok {
-				return CommandSpec{}, fmt.Errorf("expected string array element, got %T", elem)
-			}
-			exec = append(exec, s)
-		}
-		return CommandSpec{Exec: exec}, nil
-	case []string:
-		return CommandSpec{Exec: cmd}, nil
-	default:
-		return CommandSpec{}, fmt.Errorf("expected string or array, got %T", v)
-	}
 }
 
 // parseEnvMap parses an environment variable map from untyped input.

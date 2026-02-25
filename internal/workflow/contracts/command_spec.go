@@ -62,6 +62,32 @@ func (c CommandSpec) ToSlice() []string {
 	return nil
 }
 
+// ParseCommandSpec parses a command value from map-backed JSON/YAML input.
+// Supported forms:
+//   - string: shell command
+//   - []string: exec command
+//   - []any: exec command elements must all be strings
+func ParseCommandSpec(v any) (CommandSpec, error) {
+	switch cmd := v.(type) {
+	case string:
+		return CommandSpec{Shell: strings.TrimSpace(cmd)}, nil
+	case []any:
+		exec := make([]string, 0, len(cmd))
+		for _, elem := range cmd {
+			s, ok := elem.(string)
+			if !ok {
+				return CommandSpec{}, fmt.Errorf("expected string array element, got %T", elem)
+			}
+			exec = append(exec, s)
+		}
+		return CommandSpec{Exec: exec}, nil
+	case []string:
+		return CommandSpec{Exec: cmd}, nil
+	default:
+		return CommandSpec{}, fmt.Errorf("expected string or array, got %T", v)
+	}
+}
+
 // MarshalJSON implements json.Marshaler for CommandSpec.
 // Serializes as a string when Shell is set, or as an array when Exec is set.
 func (c CommandSpec) MarshalJSON() ([]byte, error) {

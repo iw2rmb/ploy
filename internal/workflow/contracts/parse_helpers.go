@@ -31,7 +31,7 @@ func parseModLikeFields(raw map[string]any, prefix string) (modLikeFields, error
 
 	// Parse command.
 	if v, ok := raw["command"]; ok && v != nil {
-		cmd, err := parseCommandSpec(v)
+		cmd, err := ParseCommandSpec(v)
 		if err != nil {
 			return f, fmt.Errorf("%s.command: %w", prefix, err)
 		}

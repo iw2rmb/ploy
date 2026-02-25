@@ -67,6 +67,14 @@ FAIL
 
 This confirms you're testing something that doesn't exist yet.
 
+For parser/contract refactors under `internal/workflow/**`, start with
+characterization tests that freeze:
+- release coercion (`string`/numeric forms)
+- command polymorphism parsing (string vs array inputs)
+- stack gate terminal metadata shape (`StaticChecks` + `LogFindings`)
+- manifest decode/validation error wrapping
+- stack detection ambiguity evidence
+
 ### 3. GREEN Phase — Make the Test Pass
 
 Write the minimal implementation to pass the test:
