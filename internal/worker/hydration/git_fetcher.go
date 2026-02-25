@@ -218,10 +218,28 @@ func copyGitClone(src, dest string) error {
 
 	// rsync -a preserves permissions, timestamps, and copies recursively.
 	// Trailing slash on src ensures contents are copied, not the directory itself.
-	cmd := exec.Command("rsync", "-a", src+"/", dest)
-	output, err := cmd.CombinedOutput()
+	//
+	// Capture output to a temp file (instead of CombinedOutput) to keep this path
+	// resilient under heavy concurrent process execution in long-running nodes.
+	logFile, err := os.CreateTemp("", "ploy-rsync-*.log")
 	if err != nil {
-		return fmt.Errorf("rsync failed: %w (output: %s)", err, string(output))
+		return fmt.Errorf("create rsync log file: %w", err)
+	}
+	logPath := logFile.Name()
+	defer func() {
+		_ = logFile.Close()
+		_ = os.Remove(logPath)
+	}()
+
+	cmd := exec.Command("rsync", "-a", src+"/", dest)
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	if err := cmd.Run(); err != nil {
+		out, readErr := os.ReadFile(logPath)
+		if readErr != nil {
+			return fmt.Errorf("rsync failed: %w (failed to read output: %v)", err, readErr)
+		}
+		return fmt.Errorf("rsync failed: %w (output: %s)", err, string(out))
 	}
 
 	return nil
