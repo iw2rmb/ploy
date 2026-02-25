@@ -49,12 +49,12 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		// Verify node exists before attempting to claim work.
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if isNoRowsError(err) {
 				httpErr(w, http.StatusNotFound, "node not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
-			slog.Error("claim: node check failed", "node_id", nodeID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to check node: %s", safeErrorString(err))
+			slog.Error("claim: node check failed", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
 			return
 		}
 
@@ -62,13 +62,13 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		job, err := st.ClaimJob(r.Context(), nodeID)
 		if err != nil {
 			// No pending jobs available; return 204 No Content.
-			if errors.Is(err, pgx.ErrNoRows) {
+			if isNoRowsError(err) {
 				w.WriteHeader(http.StatusNoContent)
 				slog.Debug("claim: no work available", "node_id", nodeID)
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to claim job: %v", err)
-			slog.Error("claim: database error", "node_id", nodeID, "err", err)
+			httpErr(w, http.StatusInternalServerError, "failed to claim job: %s", safeErrorString(err))
+			slog.Error("claim: database error", "node_id", nodeID, "err_type", fmt.Sprintf("%T", err), "err", safeErrorString(err))
 			return
 		}
 
@@ -129,6 +129,31 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			"node_id", nodeID,
 		)
 	}
+}
+
+func isNoRowsError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if err == pgx.ErrNoRows {
+		return true
+	}
+	defer func() {
+		_ = recover()
+	}()
+	return errors.Is(err, pgx.ErrNoRows)
+}
+
+func safeErrorString(err error) (msg string) {
+	if err == nil {
+		return ""
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			msg = fmt.Sprintf("unprintable error (%T): panic while reading error string: %v", err, recovered)
+		}
+	}()
+	return err.Error()
 }
 
 // buildAndSendJobClaimResponse constructs and sends the claim response for a job.

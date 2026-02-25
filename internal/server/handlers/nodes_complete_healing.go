@@ -102,23 +102,6 @@ func maybeCreateHealingJobs(
 	reGateID := domaintypes.NewJobID()
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          healID,
-		RunID:       failedJob.RunID,
-		RepoID:      failedJob.RepoID,
-		RepoBaseRef: failedJob.RepoBaseRef,
-		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("heal-%d-0", healingAttemptNumber),
-		JobType:     domaintypes.JobTypeHeal.String(),
-		JobImage:    healImage,
-		Status:      store.JobStatusQueued,
-		NextID:      &reGateID,
-		Meta:        []byte(`{}`),
-	})
-	if err != nil {
-		return fmt.Errorf("create heal job: %w", err)
-	}
-
-	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          reGateID,
 		RunID:       failedJob.RunID,
 		RepoID:      failedJob.RepoID,
@@ -135,13 +118,25 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("create re-gate job: %w", err)
 	}
 
-	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &healID}); err != nil {
-		return fmt.Errorf("rewire failed job next_id: %w", err)
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
+		ID:          healID,
+		RunID:       failedJob.RunID,
+		RepoID:      failedJob.RepoID,
+		RepoBaseRef: failedJob.RepoBaseRef,
+		Attempt:     failedJob.Attempt,
+		Name:        fmt.Sprintf("heal-%d-0", healingAttemptNumber),
+		JobType:     domaintypes.JobTypeHeal.String(),
+		JobImage:    healImage,
+		Status:      store.JobStatusQueued,
+		NextID:      &reGateID,
+		Meta:        []byte(`{}`),
+	})
+	if err != nil {
+		return fmt.Errorf("create heal job: %w", err)
 	}
 
-	// Keep last inserted node's next pointer aligned with the captured old_next.
-	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: reGateID, NextID: oldNext}); err != nil {
-		return fmt.Errorf("rewire healing tail next_id: %w", err)
+	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &healID}); err != nil {
+		return fmt.Errorf("rewire failed job next_id: %w", err)
 	}
 
 	slog.Info("maybeCreateHealingJobs: rewired chain",

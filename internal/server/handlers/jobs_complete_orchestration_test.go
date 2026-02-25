@@ -425,16 +425,22 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	if st.createJobCallCount != 2 {
 		t.Fatalf("expected 2 healing jobs, got %d", st.createJobCallCount)
 	}
-	heal := st.createJobParams[0]
-	reGate := st.createJobParams[1]
+	reGate := st.createJobParams[0]
+	heal := st.createJobParams[1]
+	if reGate.Name != "re-gate-1" {
+		t.Fatalf("expected first created healing job to be re-gate-1, got %q", reGate.Name)
+	}
+	if heal.Name != "heal-1-0" {
+		t.Fatalf("expected second created healing job to be heal-1-0, got %q", heal.Name)
+	}
 	if heal.NextID == nil || *heal.NextID != reGate.ID {
 		t.Fatalf("expected heal.NextID to point to re-gate job")
 	}
 	if reGate.NextID == nil || *reGate.NextID != successor.ID {
 		t.Fatalf("expected re-gate.NextID to preserve old successor %s", successor.ID)
 	}
-	if len(st.updateJobNextIDParams) < 2 {
-		t.Fatalf("expected next_id rewiring updates, got %d", len(st.updateJobNextIDParams))
+	if len(st.updateJobNextIDParams) != 1 {
+		t.Fatalf("expected one next_id rewiring update, got %d", len(st.updateJobNextIDParams))
 	}
 	if st.updateJobNextIDParams[0].ID != f.Job.ID || st.updateJobNextIDParams[0].NextID == nil || *st.updateJobNextIDParams[0].NextID != heal.ID {
 		t.Fatalf("expected failed job rewired to heal")

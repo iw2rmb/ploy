@@ -75,6 +75,12 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if st.createJobCallCount != 2 {
 		t.Fatalf("expected 2 CreateJob calls (heal + re-gate), got %d", st.createJobCallCount)
 	}
+	if st.createJobParams[0].Name != "re-gate-1" {
+		t.Fatalf("expected first created job to be re-gate-1 (tail-first FK-safe insert), got %q", st.createJobParams[0].Name)
+	}
+	if st.createJobParams[1].Name != "heal-1-0" {
+		t.Fatalf("expected second created job to be heal-1-0, got %q", st.createJobParams[1].Name)
+	}
 
 	jobsByName := make(map[string]store.CreateJobParams)
 	for _, p := range st.createJobParams {
@@ -108,8 +114,14 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if reGateJob.NextID == nil || *reGateJob.NextID != successorID {
 		t.Fatalf("expected re-gate to preserve original successor %s", successorID)
 	}
-	if len(st.updateJobNextIDParams) < 2 {
-		t.Fatalf("expected next_id rewiring updates, got %d", len(st.updateJobNextIDParams))
+	if len(st.updateJobNextIDParams) != 1 {
+		t.Fatalf("expected one next_id rewiring update, got %d", len(st.updateJobNextIDParams))
+	}
+	if st.updateJobNextIDParams[0].ID != failed.ID {
+		t.Fatalf("expected failed job %s to be rewired, got %s", failed.ID, st.updateJobNextIDParams[0].ID)
+	}
+	if st.updateJobNextIDParams[0].NextID == nil || *st.updateJobNextIDParams[0].NextID != healJob.ID {
+		t.Fatalf("expected failed job to point to heal job %s", healJob.ID)
 	}
 }
 
@@ -205,19 +217,19 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	if st.createJobCallCount != 2 {
 		t.Fatalf("expected 2 CreateJob calls (heal + re-gate), got %d", st.createJobCallCount)
 	}
-	if st.createJobParams[0].Name != "heal-2-0" {
-		t.Fatalf("expected first healing job name heal-2-0, got %q", st.createJobParams[0].Name)
+	if st.createJobParams[0].Name != "re-gate-2" {
+		t.Fatalf("expected first healing job name re-gate-2, got %q", st.createJobParams[0].Name)
 	}
-	if st.createJobParams[0].JobType != domaintypes.JobTypeHeal.String() {
-		t.Fatalf("expected heal job JobType=heal, got %q", st.createJobParams[0].JobType)
+	if st.createJobParams[0].JobType != domaintypes.JobTypeReGate.String() {
+		t.Fatalf("expected first job JobType=re_gate, got %q", st.createJobParams[0].JobType)
 	}
-	if st.createJobParams[1].Name != "re-gate-2" {
-		t.Fatalf("expected re-gate job name re-gate-2, got %q", st.createJobParams[1].Name)
+	if st.createJobParams[1].Name != "heal-2-0" {
+		t.Fatalf("expected second healing job name heal-2-0, got %q", st.createJobParams[1].Name)
 	}
-	if st.createJobParams[1].JobType != domaintypes.JobTypeReGate.String() {
-		t.Fatalf("expected re-gate job JobType=re_gate, got %q", st.createJobParams[1].JobType)
+	if st.createJobParams[1].JobType != domaintypes.JobTypeHeal.String() {
+		t.Fatalf("expected second job JobType=heal, got %q", st.createJobParams[1].JobType)
 	}
-	if st.createJobParams[1].NextID == nil || *st.createJobParams[1].NextID != mod0ID {
+	if st.createJobParams[0].NextID == nil || *st.createJobParams[0].NextID != mod0ID {
 		t.Fatalf("expected re-gate-2 to link back to original successor %s", mod0ID)
 	}
 }
