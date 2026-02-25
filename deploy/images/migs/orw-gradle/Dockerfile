@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # orw-gradle: Minimal OpenRewrite image for Gradle-only workspaces.
 #
 # This image applies OpenRewrite recipes to Gradle projects via the
@@ -15,7 +17,12 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.created="$BUILD_TS"
 
 # Install minimal dependencies for git operations.
-RUN apt-get update \
+RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
+    if [ -s /run/secrets/ploy_ca_bundle ]; then \
+      cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
+      update-ca-certificates; \
+    fi \
+    && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash git jq unzip curl \
     && rm -rf /var/lib/apt/lists/*
@@ -24,7 +31,12 @@ RUN apt-get update \
 # compatible with the OpenRewrite Gradle plugin. Version 8.5 aligns with
 # typical project Gradle wrapper versions.
 ARG GRADLE_VERSION=8.5
-RUN curl -sSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip \
+RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
+    if [ -s /run/secrets/ploy_ca_bundle ]; then \
+      cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
+      update-ca-certificates; \
+    fi \
+    && curl -sSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip \
     && mkdir -p /opt/gradle \
     && unzip -d /opt/gradle /tmp/gradle.zip \
     && rm /tmp/gradle.zip
