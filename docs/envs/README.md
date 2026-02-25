@@ -80,12 +80,16 @@ Role model (bearer token claims):
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
-  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (example: `ghcr.io/iw2rmb`).
-- `DOCKERHUB_PAT` — Docker Hub Personal Access Token used for non‑interactive `docker login`
-  on worker nodes during bootstrap. If set on the node, bootstrap performs
-  `echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin`.
-- `MODS_IMAGE_PREFIX` — Optional absolute image prefix (e.g., `docker.io/org` or `ghcr.io/org`).
-  Takes effect only when `DOCKERHUB_USERNAME` is unset.
+  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (default local value: `localhost:5000/ploy`).
+- `PLOY_GARAGE_FORCE_IMAGES` — Optional flag for `deploy/local/run.sh` image sync step.
+  When set to `1`, `true`, `yes`, or `on`, local deploy calls `deploy/images/garage.sh --force`
+  and rebuilds/repushes mig + build-gate images even if they already exist in Garage-backed registry.
+- `PLOY_REGISTRY_PORT` — Host port for the local Garage-backed OCI registry in `deploy/local/docker-compose.yml`
+  (default: `5000`).
+- `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
+  as `PLOY_CONTAINER_REGISTRY`.
+- `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by `deploy/images/build-and-push-migs.sh`.
+  Default fallback is `${PLOY_CONTAINER_REGISTRY:-localhost:5000/ploy}`.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
@@ -401,8 +405,12 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
 | `PLOY_OBJECTSTORE_REGION` | AWS region (optional; for local Garage use `garage`) | - |
 
-For local development, these are configured in `deploy/local/docker-compose.yml`. The local stack includes
-a Garage service with automatic bucket/access-key bootstrap via `garage-init`.
+For local development, these are configured in `deploy/local/docker-compose.yml`. The local stack includes:
+- Garage service for S3-compatible storage.
+- `garage-init` bootstrap that creates/authorizes:
+  - `ploy` bucket (logs/diffs/artifacts blobs)
+  - `ploy-registry` bucket (OCI registry backing storage)
+- Local OCI registry (`registry`) backed by Garage S3 API.
 
 Alternatively, you can specify these in the server config file under `object_store.*`. Environment
 variables take precedence over the config file when both are present.

@@ -1,0 +1,24 @@
+version: 0.1
+
+log:
+  level: info
+
+storage:
+  s3:
+    accesskey: GK000000000000000000000001
+    secretkey: 0000000000000000000000000000000000000000000000000000000000000001
+    region: garage
+    regionendpoint: http://garage:3900
+    bucket: ploy-registry
+    secure: false
+    v4auth: true
+    forcepathstyle: true
+    rootdirectory: /registry
+
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+
+delete:
+  enabled: true

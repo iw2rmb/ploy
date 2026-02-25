@@ -22,6 +22,7 @@ PLOY_DB_DSN_CONTAINER=""
 PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
+PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
 WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/deploy/local/node/bearer-token}"
 
 DROP_DB=0
@@ -54,6 +55,9 @@ Environment:
   DOCKER_AUTH_CONFIG Optional Docker auth config JSON used by node image pulls
   PLOY_DOCKER_AUTH_CONFIG Optional override for Docker auth config JSON used by node image pulls
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
+  PLOY_REGISTRY_PORT Host port for local Garage-backed OCI registry (default: 5000)
+  PLOY_CONTAINER_REGISTRY Registry prefix used for local image sync (default: localhost:<PLOY_REGISTRY_PORT>/ploy)
+  PLOY_GARAGE_FORCE_IMAGES Set to 1/true to force rebuild+repush in deploy/images/garage.sh
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
 }
@@ -428,6 +432,21 @@ build_runtime_images() {
   $COMPOSE_CMD build "${services[@]}"
 }
 
+sync_garage_registry_images() {
+  local -a args=()
+  local force_images="${PLOY_GARAGE_FORCE_IMAGES:-0}"
+
+  case "$force_images" in
+    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+      args+=(--force)
+      ;;
+  esac
+
+  log "Syncing mig/build-gate images into ${PLOY_CONTAINER_REGISTRY} ..."
+  IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
+    ./deploy/images/garage.sh "${args[@]}"
+}
+
 wait_for_garage_bootstrap() {
   local garage_cid garage_init_cid garage_health init_state init_exit
 
@@ -462,6 +481,54 @@ wait_for_garage_bootstrap() {
   echo "error: garage bootstrap did not complete in time" >&2
   $COMPOSE_CMD ps || true
   $COMPOSE_CMD logs garage garage-init || true
+  exit 1
+}
+
+wait_for_registry_health() {
+  local registry_cid
+
+  registry_cid="$($COMPOSE_CMD ps -a -q registry)"
+  if [[ -z "$registry_cid" ]]; then
+    echo "error: could not resolve registry container ID" >&2
+    $COMPOSE_CMD ps || true
+    exit 1
+  fi
+
+  log "Waiting for local registry readiness on http://127.0.0.1:${PLOY_REGISTRY_PORT}/v2/ ..."
+  for i in {1..90}; do
+    if "$PYTHON_BIN" - <<PY >/dev/null 2>&1
+import sys
+import urllib.error
+import urllib.request
+
+urls = [
+    "http://127.0.0.1:${PLOY_REGISTRY_PORT}/v2/",
+    "http://localhost:${PLOY_REGISTRY_PORT}/v2/",
+]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+for url in urls:
+    try:
+        with opener.open(url, timeout=2) as resp:
+            if 200 <= resp.status < 500:
+                sys.exit(0)
+    except urllib.error.HTTPError as e:
+        # Some environments return 401/404 for /v2/ probes; treat as ready
+        # as long as the registry responds and status is not server-side.
+        if 200 <= e.code < 500:
+            sys.exit(0)
+    except Exception:
+        pass
+sys.exit(1)
+PY
+    then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "error: registry did not become ready in time" >&2
+  $COMPOSE_CMD ps || true
+  $COMPOSE_CMD logs registry || true
   exit 1
 }
 
@@ -706,7 +773,7 @@ main() {
   local target_server=0
   local target_node=0
   local -a runtime_build_services=(garage-init)
-  local -a compose_services=(garage garage-init gradle-build-cache)
+  local -a compose_services=(garage garage-init registry gradle-build-cache)
 
   parse_args "$@"
 
@@ -766,6 +833,9 @@ main() {
   export PLOY_CA_CERTS
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
+  export PLOY_REGISTRY_PORT
+  export PLOY_CONTAINER_REGISTRY
+  PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-localhost:${PLOY_REGISTRY_PORT}/ploy}"
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1
@@ -807,6 +877,8 @@ main() {
   $COMPOSE_CMD up -d --no-build "${compose_services[@]}"
 
   wait_for_garage_bootstrap
+  wait_for_registry_health
+  sync_garage_registry_images
   wait_for_server_health
 
   seed_tokens

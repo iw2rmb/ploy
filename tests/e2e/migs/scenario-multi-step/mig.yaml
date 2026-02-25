@@ -23,7 +23,7 @@ kind: MigRunSpec
 # next step begins.
 steps:
   # Step 1: Migrate to Java 8
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -33,7 +33,7 @@ steps:
       MIGRATION_STEP: "1"
 
   # Step 2: Migrate to Java 11
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -43,7 +43,7 @@ steps:
       MIGRATION_STEP: "2"
 
   # Step 3: Migrate to Java 17
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -70,7 +70,7 @@ build_gate:
       # Codex edits the workspace and exits when done; the node agent inspects
       # the workspace for diffs and re-runs the Build Gate externally when changes exist.
       # Codex never runs the gate itself.
-      image: ghcr.io/iw2rmb/migs-codex:latest
+      image: localhost:5000/ploy/migs-codex:latest
       env:
         CODEX_PROMPT: |-
           Rules:

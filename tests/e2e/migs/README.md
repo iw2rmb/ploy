@@ -15,15 +15,15 @@
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
-**Build + Publish Mods Images (Docker Hub)**
+**Build + Publish Mods Images (Local Garage Registry)**
 
 - Build Mods images (requires Docker):
   - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t migs-orw-maven:e2e deploy/images/migs/orw-maven`
   - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t migs-orw-gradle:e2e deploy/images/migs/orw-gradle`
   - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f deploy/images/migs/mig-codex/Dockerfile -t migs-codex:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
-- Push to Docker Hub using the helper script:
-  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** deploy/images/build-and-push-migs.sh`
+- Push to local Garage-backed registry using the helper script:
+  - `PLOY_CONTAINER_REGISTRY=localhost:5000/ploy deploy/images/build-and-push-migs.sh`
   - The script special‑cases `mig-codex` to use repo‑root context automatically.
   - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
@@ -234,7 +234,8 @@ This makes gate health visible without requiring raw artifact inspection.
 **Troubleshooting**
 
 - Images not found / pull errors:
-  - Ensure images are pushed to Docker Hub and nodes can pull them. For private repos, log in on each node: `echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin`.
+  - Ensure images are pushed to the configured `$PLOY_CONTAINER_REGISTRY` (local default: `localhost:5000/ploy`) and the node host Docker daemon can pull them.
+  - If you switch to a private remote registry, provide pull auth via `DOCKER_AUTH_CONFIG`/`PLOY_DOCKER_AUTH_CONFIG`.
 - Git access / MR creation:
   - Export `PLOY_GITLAB_PAT` and confirm the control plane has connectivity to GitLab. The sample repo is public for read; MRs require auth for branch writes.
 - Build Gate keeps failing in Scenario B:

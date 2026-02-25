@@ -13,9 +13,12 @@ PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 REPO_URL="${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 GARAGE_ENDPOINT="${GARAGE_ENDPOINT:-http://localhost:3900}"
 GARAGE_BUCKET="${GARAGE_BUCKET:-ploy}"
+GARAGE_REGISTRY_BUCKET="${GARAGE_REGISTRY_BUCKET:-ploy-registry}"
 GARAGE_ACCESS_KEY="${GARAGE_ACCESS_KEY:-GK000000000000000000000001}"
 GARAGE_SECRET_KEY="${GARAGE_SECRET_KEY:-0000000000000000000000000000000000000000000000000000000000000001}"
 GARAGE_REGION="${GARAGE_REGION:-garage}"
+PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
+PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-localhost:${PLOY_REGISTRY_PORT}/ploy}"
 
 TS="$(date +%y%m%d%H%M%S)"
 ARTIFACT_BASE="${PLOY_E2E_ARTIFACT_BASE:-$REPO_ROOT/tmp/garage-smoke}"
@@ -124,6 +127,122 @@ GOCODE
   rm -f "$tmp_go"
 }
 
+verify_registry_prefix_has_objects() {
+  local prefix="$1"
+  local tmp_go
+  tmp_go="$(mktemp -t ploy-garage-registry-list-XXXXXX.go)"
+
+  cat > "$tmp_go" <<'GOCODE'
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+)
+
+func required(name string) string {
+	v := strings.TrimSpace(os.Getenv(name))
+	if v == "" {
+		fmt.Fprintf(os.Stderr, "missing required env: %s\n", name)
+		os.Exit(2)
+	}
+	return v
+}
+
+func main() {
+	if len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: listprefix <prefix>")
+		os.Exit(2)
+	}
+
+	prefix := strings.TrimSpace(os.Args[1])
+	if prefix == "" {
+		fmt.Fprintln(os.Stderr, "prefix is required")
+		os.Exit(2)
+	}
+
+	endpoint := required("GARAGE_ENDPOINT")
+	bucket := required("GARAGE_BUCKET")
+	access := required("GARAGE_ACCESS_KEY")
+	secret := required("GARAGE_SECRET_KEY")
+	region := required("GARAGE_REGION")
+
+	ctx := context.Background()
+	cfg, err := awsconfig.LoadDefaultConfig(
+		ctx,
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(access, secret, "")),
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load aws config: %v\n", err)
+		os.Exit(1)
+	}
+
+	client := awss3.NewFromConfig(cfg, func(o *awss3.Options) {
+		o.UsePathStyle = true
+		o.BaseEndpoint = aws.String(endpoint)
+	})
+
+	total := 0
+	paginator := awss3.NewListObjectsV2Paginator(client, &awss3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
+	})
+
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "list objects: %v\n", err)
+			os.Exit(1)
+		}
+		total += len(page.Contents)
+	}
+
+	if total == 0 {
+		fmt.Fprintf(os.Stderr, "no objects found with prefix %q\n", prefix)
+		os.Exit(1)
+	}
+
+	fmt.Printf("registry prefix has objects: %s (count=%d)\n", prefix, total)
+}
+GOCODE
+
+  GARAGE_ENDPOINT="$GARAGE_ENDPOINT" \
+  GARAGE_BUCKET="$GARAGE_REGISTRY_BUCKET" \
+  GARAGE_ACCESS_KEY="$GARAGE_ACCESS_KEY" \
+  GARAGE_SECRET_KEY="$GARAGE_SECRET_KEY" \
+  GARAGE_REGION="$GARAGE_REGION" \
+    go run "$tmp_go" "$prefix"
+
+  rm -f "$tmp_go"
+}
+
+push_registry_smoke_image() {
+  local image_ref="$1"
+  local build_dir
+  build_dir="$(mktemp -d -t ploy-registry-smoke-XXXXXX)"
+
+  cat > "${build_dir}/Dockerfile" <<'EOFD'
+FROM scratch
+COPY marker.txt /marker.txt
+EOFD
+  printf '%s\n' "garage-registry-smoke-${TS}" > "${build_dir}/marker.txt"
+
+  docker build -t "$image_ref" "$build_dir" >/dev/null
+  docker push "$image_ref" >/dev/null
+  docker image rm "$image_ref" >/dev/null 2>&1 || true
+  docker pull "$image_ref" >/dev/null
+
+  rm -rf "$build_dir"
+}
+
 need docker
 need jq
 need go
@@ -137,6 +256,13 @@ fi
 
 log "Deploying local stack"
 "$REPO_ROOT/deploy/local/run.sh"
+
+REGISTRY_SMOKE_IMAGE="${PLOY_CONTAINER_REGISTRY}/garage-smoke:${TS}"
+REGISTRY_SMOKE_REPO="${REGISTRY_SMOKE_IMAGE%:*}"
+REGISTRY_SMOKE_REPO="${REGISTRY_SMOKE_REPO#*/}"
+
+log "Pushing and pulling registry smoke image: ${REGISTRY_SMOKE_IMAGE}"
+push_registry_smoke_image "$REGISTRY_SMOKE_IMAGE"
 
 MOD_CMD=$(cat <<EOC
 sh -lc 'echo "[garage-smoke] start"; cd /workspace; target="\$(git ls-files | head -n 1)"; if [ -z "\$target" ]; then echo "no tracked files" >&2; exit 1; fi; echo "garage-smoke-${TS}" >> "\$target"; mkdir -p /out; echo "garage-smoke-artifact-${TS}" > /out/garage-smoke.txt; echo "[garage-smoke] done"'
@@ -195,6 +321,14 @@ fi
 
 log "Verifying objects exist in Garage bucket"
 verify_garage_keys "$LOG_KEY" "$DIFF_KEY" "$ARTIFACT_KEY"
+
+REGISTRY_PREFIX="registry/docker/registry/v2/repositories/${REGISTRY_SMOKE_REPO}/"
+REGISTRY_PREFIX_ALT="/registry/docker/registry/v2/repositories/${REGISTRY_SMOKE_REPO}/"
+
+log "Verifying registry objects exist in Garage bucket '${GARAGE_REGISTRY_BUCKET}'"
+if ! verify_registry_prefix_has_objects "$REGISTRY_PREFIX"; then
+  verify_registry_prefix_has_objects "$REGISTRY_PREFIX_ALT"
+fi
 
 log "Smoke passed"
 log "Artifacts: $OUT_DIR"

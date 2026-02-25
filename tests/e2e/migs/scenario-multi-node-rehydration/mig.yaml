@@ -33,7 +33,7 @@ kind: MigRunSpec
 steps:
   # Step 0: Migrate to Java 8
   # This step establishes the base transformation. Any node can claim this step.
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -49,7 +49,7 @@ steps:
   # 1. Copy base clone
   # 2. Fetch and apply diff from step 0
   # 3. Run this transformation on the rehydrated workspace
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -64,7 +64,7 @@ steps:
   # 1. Copy base clone
   # 2. Fetch and apply diffs from steps 0 and 1 in order
   # 3. Run this transformation on the rehydrated workspace
-  - image: ghcr.io/iw2rmb/migs-orw-maven:latest
+  - image: localhost:5000/ploy/migs-orw-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -95,7 +95,7 @@ build_gate:
       # Codex edits the workspace and exits when done; the node agent inspects
       # the workspace for diffs and re-runs the Build Gate externally when changes exist.
       # Codex never runs the gate itself.
-      image: ghcr.io/iw2rmb/migs-codex:latest
+      image: localhost:5000/ploy/migs-codex:latest
       env:
         CODEX_PROMPT: |-
           Rules:
