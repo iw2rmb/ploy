@@ -31,6 +31,14 @@ deploy/images/garage.sh
 # Use --force to rebuild/repush everything.
 ```
 
+If your network requires a custom CA for package downloads during image builds,
+set:
+```bash
+export PLOY_CA_CERTS=/absolute/path/to/ca-bundle.pem
+```
+`deploy/images/garage.sh` passes this bundle as a BuildKit secret (`ploy_ca_bundle`)
+so mig images can trust internal TLS endpoints.
+
 Publish a single Mods image (example: orw-maven)
 ```bash
 name=orw-maven

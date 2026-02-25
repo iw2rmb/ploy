@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 ARG NODE_IMAGE=node:20-alpine
 
 # --- final image ---
@@ -8,7 +10,13 @@ LABEL org.opencontainers.image.title="mig-codex" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="Apache-2.0"
 
-RUN apk add --no-cache bash git ca-certificates curl jq && \
+RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
+    if [ -s /run/secrets/ploy_ca_bundle ]; then \
+      mkdir -p /usr/local/share/ca-certificates && \
+      cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
+      update-ca-certificates || true; \
+    fi && \
+    apk add --no-cache bash git ca-certificates curl jq && \
     npm install -g @openai/codex && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \

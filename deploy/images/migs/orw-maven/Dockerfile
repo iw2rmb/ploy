@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # orw-maven: Minimal OpenRewrite image for Maven-only workspaces.
 #
 # This image applies OpenRewrite recipes to Maven projects via the
@@ -15,7 +17,12 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.created="$BUILD_TS"
 
 # Install minimal dependencies for git operations and TLS manipulation.
-RUN apt-get update \
+RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
+    if [ -s /run/secrets/ploy_ca_bundle ]; then \
+      cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
+      update-ca-certificates; \
+    fi \
+    && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     bash git jq \
     && rm -rf /var/lib/apt/lists/*
