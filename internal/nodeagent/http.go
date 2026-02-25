@@ -231,8 +231,26 @@ type bearerTokenTransport struct {
 }
 
 func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req = req.Clone(req.Context())
-	req.Header.Set("Authorization", "Bearer "+t.token)
-	req.Header.Set("PLOY_NODE_UUID", t.nodeID.String())
-	return t.base.RoundTrip(req)
+	if req == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+
+	base := t.base
+	if base == nil {
+		base = http.DefaultTransport
+	}
+
+	// Avoid Request.Clone() here; in our node runtime this path has shown
+	// unstable behavior in Go's map cloning internals under load.
+	reqCopy := new(http.Request)
+	*reqCopy = *req
+	if req.Header != nil {
+		reqCopy.Header = req.Header.Clone()
+	} else {
+		reqCopy.Header = make(http.Header, 2)
+	}
+
+	reqCopy.Header.Set("Authorization", "Bearer "+t.token)
+	reqCopy.Header.Set("PLOY_NODE_UUID", t.nodeID.String())
+	return base.RoundTrip(reqCopy)
 }

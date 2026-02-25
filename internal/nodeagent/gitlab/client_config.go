@@ -83,8 +83,18 @@ type tokenInjector struct {
 
 // RoundTrip implements http.RoundTripper by injecting the Authorization Bearer header.
 func (t *tokenInjector) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request to avoid mutating the original.
-	reqClone := req.Clone(req.Context())
+	if req == nil {
+		return nil, fmt.Errorf("request is nil")
+	}
+
+	// Copy request metadata and clone headers without Request.Clone().
+	reqClone := new(http.Request)
+	*reqClone = *req
+	if req.Header != nil {
+		reqClone.Header = req.Header.Clone()
+	} else {
+		reqClone.Header = make(http.Header, 1)
+	}
 
 	// Inject Authorization Bearer header to complement the PRIVATE-TOKEN header
 	// that the client-go library already sets. This dual-auth approach ensures
