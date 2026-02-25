@@ -392,6 +392,11 @@ type mockStore struct {
 	listStaleRunningJobsResult []store.ListStaleRunningJobsRow
 	listStaleRunningJobsErr    error
 
+	countStaleNodesWithRunningJobsCalled bool
+	countStaleNodesWithRunningJobsParam  pgtype.Timestamptz
+	countStaleNodesWithRunningJobsResult int64
+	countStaleNodesWithRunningJobsErr    error
+
 	cancelActiveJobsByRunRepoAttemptCalled bool
 	cancelActiveJobsByRunRepoAttemptParams []store.CancelActiveJobsByRunRepoAttemptParams
 	cancelActiveJobsByRunRepoAttemptResult int64
@@ -937,6 +942,12 @@ func (m *mockStore) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgty
 	m.listStaleRunningJobsCalled = true
 	m.listStaleRunningJobsParam = lastHeartbeat
 	return m.listStaleRunningJobsResult, m.listStaleRunningJobsErr
+}
+
+func (m *mockStore) CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error) {
+	m.countStaleNodesWithRunningJobsCalled = true
+	m.countStaleNodesWithRunningJobsParam = lastHeartbeat
+	return m.countStaleNodesWithRunningJobsResult, m.countStaleNodesWithRunningJobsErr
 }
 
 func (m *mockStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {

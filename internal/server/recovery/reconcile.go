@@ -156,14 +156,16 @@ func nextIDFromMeta(meta []byte) (float64, bool) {
 // MaybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when
 // all run_repos are terminal (Success/Fail/Cancelled), and publishes the run and
 // done SSE events.
-func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run, runID domaintypes.RunID) error {
+//
+// Returns true when the run transitions to terminal in this call.
+func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run, runID domaintypes.RunID) (bool, error) {
 	if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
-		return nil
+		return false, nil
 	}
 
 	counts, err := st.CountRunReposByStatus(ctx, runID)
 	if err != nil {
-		return fmt.Errorf("count run repos: %w", err)
+		return false, fmt.Errorf("count run repos: %w", err)
 	}
 
 	var (
@@ -187,11 +189,21 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 	}
 
 	if total == 0 || terminal < total {
-		return nil
+		return false, nil
+	}
+
+	// Re-read current run status before finalization so concurrent or repeated
+	// reconciliation paths do not emit duplicate terminal transitions/events.
+	currentRun, err := st.GetRun(ctx, runID)
+	if err != nil {
+		return false, fmt.Errorf("get run for completion check: %w", err)
+	}
+	if currentRun.Status == store.RunStatusFinished || currentRun.Status == store.RunStatusCancelled {
+		return false, nil
 	}
 
 	if err := st.UpdateRunStatus(ctx, store.UpdateRunStatusParams{ID: runID, Status: store.RunStatusFinished}); err != nil {
-		return fmt.Errorf("update run status: %w", err)
+		return false, fmt.Errorf("update run status: %w", err)
 	}
 
 	if eventsService != nil {
@@ -226,7 +238,7 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 	}
 
 	slog.Info("run completed", "run_id", runID, "status", store.RunStatusFinished)
-	return nil
+	return true, nil
 }
 
 func timeOrZero(ts pgtype.Timestamptz) time.Time {

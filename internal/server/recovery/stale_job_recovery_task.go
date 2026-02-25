@@ -98,10 +98,19 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 	}
 
 	var (
+		staleNodes    int64
 		cancelledJobs int64
 		reposUpdated  int
+		runsFinalized int
 	)
 
+	staleNodes, err = t.store.CountStaleNodesWithRunningJobs(ctx, cutoffTS)
+	if err != nil {
+		t.logger.Error("stale-job-recovery: count stale nodes failed", "err", err)
+		staleNodes = 0
+	}
+
+	finalizedRuns := make(map[string]struct{})
 	for _, stale := range staleRows {
 		affected, err := t.store.CancelActiveJobsByRunRepoAttempt(ctx, store.CancelActiveJobsByRunRepoAttemptParams{
 			RunID:   stale.RunID,
@@ -133,6 +142,9 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 			continue
 		}
 		reposUpdated++
+		if _, ok := finalizedRuns[stale.RunID.String()]; ok {
+			continue
+		}
 
 		run, err := t.store.GetRun(ctx, stale.RunID)
 		if err != nil {
@@ -143,7 +155,8 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 			continue
 		}
 
-		if err := MaybeCompleteRunIfAllReposTerminal(ctx, t.store, t.eventsService, run, stale.RunID); err != nil {
+		finalized, err := MaybeCompleteRunIfAllReposTerminal(ctx, t.store, t.eventsService, run, stale.RunID)
+		if err != nil {
 			t.logger.Error("stale-job-recovery: reconcile run status failed",
 				"run_id", stale.RunID,
 				"repo_id", stale.RepoID,
@@ -152,12 +165,23 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 			)
 			continue
 		}
+		if finalized {
+			finalizedRuns[stale.RunID.String()] = struct{}{}
+			runsFinalized++
+			t.logger.Info("stale-job-recovery: run finalized",
+				"run_id", stale.RunID,
+				"repo_id", stale.RepoID,
+				"attempt", stale.Attempt,
+			)
+		}
 	}
 
 	t.logger.Info("stale-job-recovery: cycle completed",
+		"stale_nodes", staleNodes,
 		"stale_attempts", len(staleRows),
 		"repos_updated", reposUpdated,
 		"jobs_cancelled", cancelledJobs,
+		"runs_finalized", runsFinalized,
 	)
 	return nil
 }

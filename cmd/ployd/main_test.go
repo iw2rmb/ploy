@@ -211,6 +211,10 @@ func (s *schedulerProbeStore) ListStaleRunningJobs(ctx context.Context, cutoff p
 	return nil, nil
 }
 
+func (s *schedulerProbeStore) CountStaleNodesWithRunningJobs(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	return 0, nil
+}
+
 func (s *schedulerProbeStore) Pool() *pgxpool.Pool {
 	return nil
 }

@@ -41,6 +41,9 @@ type Querier interface {
 	// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
+	// Counts distinct stale nodes that currently have at least one running job.
+	// Excludes NULL node_id rows (orphaned running jobs) from node count.
+	CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error)
 	// Creates a new artifact bundle metadata. Blob data is stored in object storage.
 	// Bundles are grouped at the job level only (build_id removed).
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
