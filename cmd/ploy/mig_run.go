@@ -8,14 +8,8 @@ import (
 )
 
 // handleMigRun executes the Mods-specific run command.
-// Routes to batch lifecycle subcommands (list/stop/start), repo
-// subcommands when args[0] matches a known action. Otherwise executes
-// the standard mig run workflow for single-repo run submission.
-//
-// Batch lifecycle commands:
-//   - list: Lists runs with status and repo counts.
-//   - stop <id>: Stops a run and cancels queued repos.
-//   - repo <action>: Routes to repo-level operations (add/remove/restart/status).
+// Routes to repo subcommands when args[0] matches "repo".
+// Otherwise executes the standard mig run workflow for run submission.
 func handleMigRun(args []string, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "repo" {
 		// Repo-level operations for managing repos within a batch.

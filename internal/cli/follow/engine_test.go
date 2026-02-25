@@ -138,6 +138,17 @@ func TestStatusGlyph_RunningUsesConfiguredSpinnerFrames(t *testing.T) {
 	}
 }
 
+func TestStatusGlyph_FailedAliasUsesFailGlyph(t *testing.T) {
+	t.Parallel()
+
+	if got := statusGlyph("fail", 0); got != "✗" {
+		t.Fatalf("statusGlyph(fail,0)=%q, want %q", got, "✗")
+	}
+	if got := statusGlyph("failed", 0); got != "✗" {
+		t.Fatalf("statusGlyph(failed,0)=%q, want %q", got, "✗")
+	}
+}
+
 func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 	t.Parallel()
 
@@ -177,5 +188,34 @@ func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 	// Verify ANSI red color is applied to the error one-liner.
 	if !strings.Contains(raw, "\x1b[31m") || !strings.Contains(raw, "\x1b[0m") {
 		t.Errorf("expected output to contain red ANSI color for error line, got: %q", raw)
+	}
+}
+
+func TestEngine_render_DisplaysRepoLastError_WithFailedStatusAlias(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
+
+	var out strings.Builder
+	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
+	e.repoOrder = []domaintypes.MigRepoID{repoID}
+	e.repoURLs[repoID] = "example.com/org/repo"
+	e.repoJobs[repoID] = []runs.RepoJobEntry{{
+		JobID:   jobID,
+		Name:    "mig-0",
+		JobType: "mig",
+		Status:  store.JobStatus("failed"),
+	}}
+
+	errMsg := "build failed: missing config"
+	e.repoErrors[repoID] = &errMsg
+
+	e.render()
+
+	s := stripANSI(out.String())
+	if !strings.Contains(s, "└ build failed: missing config") {
+		t.Fatalf("expected output to contain failed status alias error line, got: %q", s)
 	}
 }

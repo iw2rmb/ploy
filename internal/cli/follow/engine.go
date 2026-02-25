@@ -321,7 +321,7 @@ func (e *Engine) render() {
 				duration,
 			)
 
-			if !repoErrRendered && repoErr != "" && strings.EqualFold(string(job.Status), string(store.JobStatusFail)) {
+			if !repoErrRendered && repoErr != "" && isFailedStatus(string(job.Status)) {
 				fmt.Fprintf(tw, "%s%s%s\t\t\t\t\t\n", ansiRed, "└ "+repoErr, ansiReset)
 				repoErrRendered = true
 			}
@@ -373,11 +373,11 @@ func statusGlyph(status string, spinnerFrame int) string {
 		frameCount := len(spinnerFrames)
 		frameIndex := ((-spinnerFrame)%frameCount + frameCount) % frameCount
 		return spinnerFrames[frameIndex]
-	case "success":
+	case "success", "succeeded":
 		return "✓"
-	case "fail":
+	case "fail", "failed":
 		return "✗"
-	case "cancelled":
+	case "cancelled", "canceled":
 		return "○"
 	case "created":
 		return "·"
@@ -385,6 +385,15 @@ func statusGlyph(status string, spinnerFrame int) string {
 		return "·"
 	default:
 		return " "
+	}
+}
+
+func isFailedStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "fail", "failed":
+		return true
+	default:
+		return false
 	}
 }
 
