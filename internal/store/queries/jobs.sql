@@ -124,6 +124,22 @@ SET status = 'Cancelled',
 WHERE run_id = $1
   AND status IN ('Created', 'Queued', 'Running');
 
+-- name: CancelActiveJobsByRunRepoAttempt :execrows
+-- Bulk-cancels active jobs for a specific repo attempt.
+-- Targets Created/Queued/Running and preserves terminal jobs.
+-- finished_at is set once; duration_ms is computed from started_at when present.
+UPDATE jobs
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now()),
+    duration_ms = CASE
+      WHEN started_at IS NULL THEN 0
+      ELSE GREATEST(EXTRACT(EPOCH FROM (COALESCE(finished_at, now()) - started_at)) * 1000, 0)::BIGINT
+    END
+WHERE run_id = $1
+  AND repo_id = $2
+  AND attempt = $3
+  AND status IN ('Created', 'Queued', 'Running');
+
 -- name: DeleteJob :exec
 DELETE FROM jobs
 WHERE id = $1;
@@ -157,6 +173,25 @@ SET status = 'Running', node_id = eligible.node_id, started_at = now()
 FROM eligible
 WHERE jobs.id = eligible.id
 RETURNING jobs.*;
+
+-- name: ListStaleRunningJobs :many
+-- Lists running jobs whose assigned node is stale at the provided cutoff.
+-- Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
+SELECT
+  jobs.run_id,
+  jobs.repo_id,
+  jobs.attempt,
+  COUNT(*)::int AS running_jobs
+FROM jobs
+LEFT JOIN nodes ON nodes.id = jobs.node_id
+WHERE jobs.status = 'Running'
+  AND (
+    jobs.node_id IS NULL
+    OR nodes.last_heartbeat IS NULL
+    OR nodes.last_heartbeat < $1
+  )
+GROUP BY jobs.run_id, jobs.repo_id, jobs.attempt
+ORDER BY jobs.run_id ASC, jobs.repo_id ASC, jobs.attempt ASC;
 
 -- name: GetAdjacentJobIndices :one
 -- Transitional: returns current job id and linked successor id.
