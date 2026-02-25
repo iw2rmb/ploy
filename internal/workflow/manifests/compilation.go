@@ -136,27 +136,32 @@ func compile(raw rawManifest) Compilation {
 }
 
 func convertFlows(raw []rawFlow) []Flow {
-	result := make([]Flow, len(raw))
-	for i, f := range raw {
-		result[i] = Flow{From: strings.TrimSpace(f.From), To: strings.TrimSpace(f.To), Reason: strings.TrimSpace(f.Reason)}
-	}
-	return result
+	return mapSlice(raw, func(f rawFlow) Flow {
+		return Flow{
+			From:   strings.TrimSpace(f.From),
+			To:     strings.TrimSpace(f.To),
+			Reason: strings.TrimSpace(f.Reason),
+		}
+	})
 }
 
 func convertFixtures(raw []rawFixture) []Fixture {
-	result := make([]Fixture, len(raw))
-	for i, f := range raw {
-		result[i] = Fixture{Name: strings.TrimSpace(f.Name), Reference: strings.TrimSpace(f.Reference), Reason: strings.TrimSpace(f.Reason)}
-	}
-	return result
+	return mapSlice(raw, func(f rawFixture) Fixture {
+		return Fixture{
+			Name:      strings.TrimSpace(f.Name),
+			Reference: strings.TrimSpace(f.Reference),
+			Reason:    strings.TrimSpace(f.Reason),
+		}
+	})
 }
 
 func convertLanes(raw []rawLane) []Lane {
-	result := make([]Lane, len(raw))
-	for i, l := range raw {
-		result[i] = Lane{Name: strings.TrimSpace(l.Name), Reason: strings.TrimSpace(l.Reason)}
-	}
-	return result
+	return mapSlice(raw, func(l rawLane) Lane {
+		return Lane{
+			Name:   strings.TrimSpace(l.Name),
+			Reason: strings.TrimSpace(l.Reason),
+		}
+	})
 }
 
 // JSON marshals the compilation payload for downstream consumers.

@@ -30,11 +30,7 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 		return RunReport{}, fmt.Errorf("run report: run id required")
 	}
 
-	summary, err := GetStatusCommand{
-		Client:  c.Client,
-		BaseURL: c.BaseURL,
-		RunID:   c.RunID,
-	}.Run(ctx)
+	summary, err := GetStatusCommand(c).Run(ctx)
 	if err != nil {
 		return RunReport{}, err
 	}

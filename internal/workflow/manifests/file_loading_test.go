@@ -73,3 +73,38 @@ func TestLoadDirectory_DecodeErrorIncludesFileName(t *testing.T) {
 	}
 }
 
+func TestLoadDirectory_ValidationErrorIncludesFileName(t *testing.T) {
+	dir := t.TempDir()
+	writeManifest(t, dir, "invalid.toml", `
+manifest_version = "v2"
+name = "smoke"
+version = "2025-09-26"
+summary = "ok"
+[topology]
+[[topology.allow]]
+from = "a"
+to = "b"
+[fixtures]
+[[fixtures.required]]
+name = "x"
+reference = "y"
+[lanes]
+[[lanes.required]]
+name = "go-native"
+reason = "build-gate"
+`)
+
+	_, err := manifests.ExportLoadDirectory(dir)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(err.Error(), "invalid manifest configuration") {
+		t.Fatalf("expected invalid manifest error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "(invalid.toml)") {
+		t.Fatalf("expected file name in validation error, got %v", err)
+	}
+	if strings.Contains(err.Error(), filepath.Join(dir, "invalid.toml")) {
+		t.Fatalf("expected directory loader to report filename only, got %v", err)
+	}
+}

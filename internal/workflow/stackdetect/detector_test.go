@@ -3,6 +3,7 @@ package stackdetect
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -203,6 +204,74 @@ func TestDetectTool_AmbiguousBothMavenGradle(t *testing.T) {
 	}
 	if !hasPom || !hasGradle {
 		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle, got %+v", detErr.Evidence)
+	}
+}
+
+func TestDetect_AmbiguousBothMavenGradleKts(t *testing.T) {
+	ctx := context.Background()
+	workspace := t.TempDir()
+	writeDetectFile(t, workspace, "pom.xml", "<project/>")
+	writeDetectFile(t, workspace, "build.gradle.kts", "plugins {}")
+
+	_, err := Detect(ctx, workspace)
+	if err == nil {
+		t.Fatal("expected error for ambiguous workspace")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected DetectionError, got %T", err)
+	}
+	if !detErr.IsAmbiguous() {
+		t.Fatalf("expected ambiguous error, got %q", detErr.Reason)
+	}
+
+	hasPom := false
+	hasGradleKts := false
+	for _, e := range detErr.Evidence {
+		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
+			hasPom = true
+		}
+		if e.Path == "build.gradle.kts" && e.Key == "build.file" && e.Value == "exists" {
+			hasGradleKts = true
+		}
+	}
+	if !hasPom || !hasGradleKts {
+		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle.kts, got %+v", detErr.Evidence)
+	}
+}
+
+func TestDetectTool_AmbiguousBothMavenGradleKts(t *testing.T) {
+	ctx := context.Background()
+	workspace := t.TempDir()
+	writeDetectFile(t, workspace, "pom.xml", "<project/>")
+	writeDetectFile(t, workspace, "build.gradle.kts", "plugins {}")
+
+	_, err := DetectTool(ctx, workspace)
+	if err == nil {
+		t.Fatal("expected error for ambiguous workspace")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected DetectionError, got %T", err)
+	}
+	if !detErr.IsAmbiguous() {
+		t.Fatalf("expected ambiguous error, got %q", detErr.Reason)
+	}
+
+	hasPom := false
+	hasGradleKts := false
+	for _, e := range detErr.Evidence {
+		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
+			hasPom = true
+		}
+		if e.Path == "build.gradle.kts" && e.Key == "build.file" && e.Value == "exists" {
+			hasGradleKts = true
+		}
+	}
+	if !hasPom || !hasGradleKts {
+		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle.kts, got %+v", detErr.Evidence)
 	}
 }
 
@@ -493,4 +562,12 @@ func TestDetect_Python311VersionFile(t *testing.T) {
 
 	assertObservation(t, obs, "python", "pip", "3.11")
 	assertEvidence(t, obs, "python", "3.11")
+}
+
+func writeDetectFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatalf("write file %s: %v", path, err)
+	}
 }

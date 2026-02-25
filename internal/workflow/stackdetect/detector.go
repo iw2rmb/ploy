@@ -184,31 +184,13 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 	lang := s.languages[0]
 	switch lang {
 	case "java":
-		if s.hasPom && s.hasGradle {
-			gradleFile := "build.gradle"
-			if s.hasGradleKts {
-				gradleFile = "build.gradle.kts"
-			}
-			return nil, &DetectionError{
-				Reason:  "ambiguous",
-				Message: "both pom.xml and build.gradle(.kts) present; tool selection is ambiguous",
-				Evidence: []EvidenceItem{
-					{Path: "pom.xml", Key: "build.file", Value: "exists"},
-					{Path: gradleFile, Key: "build.file", Value: "exists"},
-				},
-			}
-		}
-		if s.hasPom {
-			return &Observation{
-				Language: "java",
-				Tool:     "maven",
-				Release:  nil,
-				Evidence: s.evidence,
-			}, nil
+		tool, err := detectJavaTool(s)
+		if err != nil {
+			return nil, err
 		}
 		return &Observation{
 			Language: "java",
-			Tool:     "gradle",
+			Tool:     tool,
 			Release:  nil,
 			Evidence: s.evidence,
 		}, nil
@@ -250,31 +232,46 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 
 // detectJava handles Java detection with Maven/Gradle disambiguation.
 func detectJava(ctx context.Context, s scanResult) (*Observation, error) {
-	if s.hasPom && s.hasGradle {
-		gradleFile := "build.gradle"
-		if s.hasGradleKts {
-			gradleFile = "build.gradle.kts"
-		}
-		return nil, &DetectionError{
-			Reason:  "ambiguous",
-			Message: "both pom.xml and build.gradle(.kts) present; tool selection is ambiguous",
-			Evidence: []EvidenceItem{
-				{Path: "pom.xml", Key: "build.file", Value: "exists"},
-				{Path: gradleFile, Key: "build.file", Value: "exists"},
-			},
-		}
+	tool, err := detectJavaTool(s)
+	if err != nil {
+		return nil, err
 	}
 
-	if s.hasPom {
+	if tool == "maven" {
 		return detectMaven(ctx, s.workspace, filepath.Join(s.workspace, "pom.xml"))
 	}
 
 	// Prefer Kotlin DSL if present.
-	gradlePath := filepath.Join(s.workspace, "build.gradle")
-	if s.hasGradleKts {
-		gradlePath = filepath.Join(s.workspace, "build.gradle.kts")
-	}
+	gradlePath := filepath.Join(s.workspace, gradleBuildFile(s))
 	return detectGradle(ctx, s.workspace, gradlePath)
+}
+
+func detectJavaTool(s scanResult) (string, error) {
+	if s.hasPom && s.hasGradle {
+		return "", javaAmbiguityError(s)
+	}
+	if s.hasPom {
+		return "maven", nil
+	}
+	return "gradle", nil
+}
+
+func javaAmbiguityError(s scanResult) *DetectionError {
+	return &DetectionError{
+		Reason:  "ambiguous",
+		Message: "both pom.xml and build.gradle(.kts) present; tool selection is ambiguous",
+		Evidence: []EvidenceItem{
+			{Path: "pom.xml", Key: "build.file", Value: "exists"},
+			{Path: gradleBuildFile(s), Key: "build.file", Value: "exists"},
+		},
+	}
+}
+
+func gradleBuildFile(s scanResult) string {
+	if s.hasGradleKts {
+		return "build.gradle.kts"
+	}
+	return "build.gradle"
 }
 
 // isPythonPyproject checks if a pyproject.toml file contains Python-specific markers.

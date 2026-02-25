@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pelletier/go-toml/v2"
 )
 
 type compileOptions struct {
@@ -40,18 +38,9 @@ func loadDirectory(dir string) (*registry, error) {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
-		data, err := os.ReadFile(path)
+		manifest, err := decodeAndValidateManifest(path, entry.Name())
 		if err != nil {
-			return nil, fmt.Errorf("read manifest %s: %w", entry.Name(), err)
-		}
-
-		var manifest rawManifest
-		if err := toml.Unmarshal(data, &manifest); err != nil {
-			return nil, fmt.Errorf("decode manifest %s: %w", entry.Name(), err)
-		}
-
-		if err := validateRawManifest(manifest); err != nil {
-			return nil, fmt.Errorf("%w (%s): %v", errInvalidManifest, entry.Name(), err)
+			return nil, err
 		}
 
 		key := strings.TrimSpace(manifest.Name)
