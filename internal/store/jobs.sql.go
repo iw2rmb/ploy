@@ -34,6 +34,37 @@ func (q *Queries) CancelActiveJobsByRun(ctx context.Context, runID types.RunID) 
 	return result.RowsAffected(), nil
 }
 
+const cancelActiveJobsByRunRepoAttempt = `-- name: CancelActiveJobsByRunRepoAttempt :execrows
+UPDATE jobs
+SET status = 'Cancelled',
+    finished_at = COALESCE(finished_at, now()),
+    duration_ms = CASE
+      WHEN started_at IS NULL THEN 0
+      ELSE GREATEST(EXTRACT(EPOCH FROM (COALESCE(finished_at, now()) - started_at)) * 1000, 0)::BIGINT
+    END
+WHERE run_id = $1
+  AND repo_id = $2
+  AND attempt = $3
+  AND status IN ('Created', 'Queued', 'Running')
+`
+
+type CancelActiveJobsByRunRepoAttemptParams struct {
+	RunID   types.RunID     `json:"run_id"`
+	RepoID  types.MigRepoID `json:"repo_id"`
+	Attempt int32           `json:"attempt"`
+}
+
+// Bulk-cancels active jobs for a specific repo attempt.
+// Targets Created/Queued/Running and preserves terminal jobs.
+// finished_at is set once; duration_ms is computed from started_at when present.
+func (q *Queries) CancelActiveJobsByRunRepoAttempt(ctx context.Context, arg CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
+	result, err := q.db.Exec(ctx, cancelActiveJobsByRunRepoAttempt, arg.RunID, arg.RepoID, arg.Attempt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const claimJob = `-- name: ClaimJob :one
 WITH eligible AS (
   SELECT j.id, n.id AS node_id
@@ -506,6 +537,58 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 			&i.FinishedAt,
 			&i.DurationMs,
 			&i.Meta,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStaleRunningJobs = `-- name: ListStaleRunningJobs :many
+SELECT
+  jobs.run_id,
+  jobs.repo_id,
+  jobs.attempt,
+  COUNT(*)::int AS running_jobs
+FROM jobs
+LEFT JOIN nodes ON nodes.id = jobs.node_id
+WHERE jobs.status = 'Running'
+  AND (
+    jobs.node_id IS NULL
+    OR nodes.last_heartbeat IS NULL
+    OR nodes.last_heartbeat < $1
+  )
+GROUP BY jobs.run_id, jobs.repo_id, jobs.attempt
+ORDER BY jobs.run_id ASC, jobs.repo_id ASC, jobs.attempt ASC
+`
+
+type ListStaleRunningJobsRow struct {
+	RunID       types.RunID     `json:"run_id"`
+	RepoID      types.MigRepoID `json:"repo_id"`
+	Attempt     int32           `json:"attempt"`
+	RunningJobs int32           `json:"running_jobs"`
+}
+
+// Lists running jobs whose assigned node is stale at the provided cutoff.
+// Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
+func (q *Queries) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error) {
+	rows, err := q.db.Query(ctx, listStaleRunningJobs, lastHeartbeat)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaleRunningJobsRow{}
+	for rows.Next() {
+		var i ListStaleRunningJobsRow
+		if err := rows.Scan(
+			&i.RunID,
+			&i.RepoID,
+			&i.Attempt,
+			&i.RunningJobs,
 		); err != nil {
 			return nil, err
 		}

@@ -7,14 +7,15 @@ Documentation: `AGENTS.md`; `docs/testing-workflow.md`; `docs/migs-lifecycle.md`
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Behavior Contract and RED
-- [ ] Add failing tests that reproduce stale `Running` jobs after node loss — Locks target behavior before implementation.
+- Note: Phase 0 tests are scaffolded and intentionally skipped until the Phase 2 recovery worker is wired.
+- [x] Add failing tests that reproduce stale `Running` jobs after node loss — Locks target behavior before implementation.
   - Repository: `ploy`
   - Component: `internal/server/handlers`, `internal/store`, `internal/store/*scheduler*`
   - Scope: Add tests for: node heartbeat becomes stale, job remains `Running`, recovery cycle cancels active chain and unblocks terminal run/repo status transitions.
   - Snippets: `go test ./internal/server/handlers -run 'Stale|Recovery'`
   - Tests: `make test` — New stale-recovery tests fail first.
 
-- [ ] Add run/repo status reconciliation regression tests for cancellation path — Guarantees parity with existing completion semantics.
+- [x] Add run/repo status reconciliation regression tests for cancellation path — Guarantees parity with existing completion semantics.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope: Cover these outcomes after stale cancellation: `run_repos` -> `Cancelled`, `runs` -> `Finished` when all repos terminal, and no transition when other repos are still non-terminal.
@@ -22,14 +23,14 @@ Legend: [ ] todo, [x] done.
   - Tests: Expected failures on missing stale-recovery implementation.
 
 ## Phase 1: Store Primitives for Stale Detection and Cancellation
-- [ ] Add SQL query to list stale running jobs by node heartbeat age — Provides deterministic stale candidate selection.
+- [x] Add SQL query to list stale running jobs by node heartbeat age — Provides deterministic stale candidate selection.
   - Repository: `ploy`
   - Component: `internal/store/queries/jobs.sql`, generated sqlc files
   - Scope: Add query joining `jobs` + `nodes` filtering `jobs.status='Running'` and stale heartbeat (`last_heartbeat` older than cutoff or NULL), returning run/repo/attempt keyed rows.
   - Snippets: `ListStaleRunningJobs(cutoff timestamptz)`
   - Tests: `go test ./internal/store -run 'StaleRunningJobs'` — Correct rows only.
 
-- [ ] Add SQL query to bulk-cancel active jobs in a repo attempt — Ensures orphaned chains become terminal.
+- [x] Add SQL query to bulk-cancel active jobs in a repo attempt — Ensures orphaned chains become terminal.
   - Repository: `ploy`
   - Component: `internal/store/queries/jobs.sql`, generated sqlc files
   - Scope: Add query updating `Created|Queued|Running -> Cancelled` for `(run_id, repo_id, attempt)` with proper `finished_at`/`duration_ms` handling.

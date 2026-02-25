@@ -1001,6 +1001,12 @@ Nodeagents use `/v1/nodes/*` to execute work:
   `/v1/nodes/{id}/claim`. See `docs/build-gate/README.md` for gate configuration,
   unified jobs behavior, and a brief historical note on the removed HTTP mode.
 
+Current stale-heartbeat recovery status:
+- Store primitives are available to list stale running attempts and bulk-cancel
+  active jobs by `(run_id, repo_id, attempt)`.
+- Scheduler-driven stale-job recovery is not wired yet; Phase 2 in
+  `roadmap/heart.md` tracks activation.
+
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 `PLOY_NODE_UUID` header set to the node's ID (NanoID(6) string). The
 control plane uses this header to validate job ownership and attribute

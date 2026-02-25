@@ -19,6 +19,10 @@ type Querier interface {
 	// Bulk-cancels active jobs for a run (Created/Queued/Running -> Cancelled).
 	// finished_at is set once; duration_ms is computed from started_at when present.
 	CancelActiveJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
+	// Bulk-cancels active jobs for a specific repo attempt.
+	// Targets Created/Queued/Running and preserves terminal jobs.
+	// finished_at is set once; duration_ms is computed from started_at when present.
+	CancelActiveJobsByRunRepoAttempt(ctx context.Context, arg CancelActiveJobsByRunRepoAttemptParams) (int64, error)
 	// Bulk-cancels active repos for a run (Queued/Running -> Cancelled).
 	CancelActiveRunReposByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
@@ -215,6 +219,9 @@ type Querier interface {
 	// Lists specs ordered by created_at descending (most recent first).
 	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
+	// Lists running jobs whose assigned node is stale at the provided cutoff.
+	// Rows are grouped by (run_id, repo_id, attempt) for deterministic recovery processing.
+	ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]ListStaleRunningJobsRow, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
