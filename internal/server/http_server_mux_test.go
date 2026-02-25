@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"testing"
 
@@ -135,5 +136,99 @@ func TestHTTPServer_Handle(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestHTTPServer_RecoversHandlerPanic(t *testing.T) {
+	authorizer := auth.NewAuthorizer(auth.Options{
+		AllowInsecure: true,
+		DefaultRole:   auth.RoleControlPlane,
+	})
+	opts := HTTPOptions{
+		Config: config.HTTPConfig{
+			Listen: "127.0.0.1:0",
+		},
+		Authorizer: authorizer,
+	}
+	srv, err := NewHTTPServer(opts)
+	if err != nil {
+		t.Fatalf("NewHTTPServer() error = %v", err)
+	}
+
+	srv.HandleFunc("/panic", func(w http.ResponseWriter, r *http.Request) {
+		panic("boom")
+	})
+	srv.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	ctx := context.Background()
+	if err := srv.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() { _ = srv.Stop(ctx) }()
+
+	resp, err := http.Get("http://" + srv.Addr() + "/panic")
+	if err != nil {
+		t.Fatalf("GET /panic error = %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("GET /panic status = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
+	}
+
+	resp, err = http.Get("http://" + srv.Addr() + "/alive")
+	if err != nil {
+		t.Fatalf("GET /alive error = %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /alive status = %d, want %d", resp.StatusCode, http.StatusOK)
+	}
+}
+
+type panicErr struct{}
+
+func (panicErr) Error() string {
+	panic("panic while formatting error")
+}
+
+func TestHTTPServer_RecoversPanicWithBrokenError(t *testing.T) {
+	authorizer := auth.NewAuthorizer(auth.Options{
+		AllowInsecure: true,
+		DefaultRole:   auth.RoleControlPlane,
+	})
+	opts := HTTPOptions{
+		Config: config.HTTPConfig{
+			Listen: "127.0.0.1:0",
+		},
+		Authorizer: authorizer,
+	}
+	srv, err := NewHTTPServer(opts)
+	if err != nil {
+		t.Fatalf("NewHTTPServer() error = %v", err)
+	}
+
+	srv.HandleFunc("/panic-error", func(w http.ResponseWriter, r *http.Request) {
+		panic(panicErr{})
+	})
+
+	ctx := context.Background()
+	if err := srv.Start(ctx); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	defer func() { _ = srv.Stop(ctx) }()
+
+	resp, err := http.Get("http://" + srv.Addr() + "/panic-error")
+	if err != nil {
+		t.Fatalf("GET /panic-error error = %v", err)
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("GET /panic-error status = %d, want %d", resp.StatusCode, http.StatusInternalServerError)
 	}
 }

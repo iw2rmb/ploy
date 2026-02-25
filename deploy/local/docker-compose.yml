@@ -57,6 +57,8 @@ services:
     restart: unless-stopped
     environment:
       - PLOY_DOCKER_NETWORK=local_default
+      - PLOY_DOCKER_AUTH_CONFIG=${PLOY_DOCKER_AUTH_CONFIG:-}
+      - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}
       - PLOYD_CACHE_HOME=/private/tmp
       - TMPDIR=/private/tmp
     volumes:

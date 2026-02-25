@@ -31,9 +31,14 @@ func (r *runController) createWorkspaceHydrator(fetcher hydration.GitFetcher) (s
 
 func (r *runController) createContainerRuntime() (step.ContainerRuntime, error) {
 	network := os.Getenv("PLOY_DOCKER_NETWORK")
+	registryAuthConfig := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG"))
+	if registryAuthConfig == "" {
+		registryAuthConfig = strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG"))
+	}
 	return step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
-		PullImage: true,
-		Network:   network,
+		PullImage:              true,
+		Network:                network,
+		RegistryAuthConfigJSON: registryAuthConfig,
 	})
 }
 

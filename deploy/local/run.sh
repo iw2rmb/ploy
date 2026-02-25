@@ -51,6 +51,8 @@ Options:
 Environment:
   PLOY_DB_DSN        PostgreSQL DSN used by host setup and server container
   PLOY_CA_CERTS      Optional path to PEM CA bundle for docker.io registry trust
+  DOCKER_AUTH_CONFIG Optional Docker auth config JSON used by node image pulls
+  PLOY_DOCKER_AUTH_CONFIG Optional override for Docker auth config JSON used by node image pulls
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
