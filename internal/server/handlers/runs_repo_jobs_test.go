@@ -109,3 +109,70 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 		t.Fatalf("query attempt override not applied: got %d want %d", got, 3)
 	}
 }
+
+func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	pre := domaintypes.NewJobID()
+	mig0 := domaintypes.NewJobID()
+	mig1 := domaintypes.NewJobID()
+	post := domaintypes.NewJobID()
+
+	st := &mockStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{ID: post, RunID: runID, RepoID: repoID, Attempt: 1, Name: "post-gate", JobType: "post_gate", Status: store.JobStatusCreated},
+			{ID: mig1, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-1", JobType: "mig", NextID: &post, Status: store.JobStatusCreated},
+			{ID: mig0, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-0", JobType: "mig", NextID: &mig1, Status: store.JobStatusCreated},
+			{ID: pre, RunID: runID, RepoID: repoID, Attempt: 1, Name: "pre-gate", JobType: "pre_gate", NextID: &mig0, Status: store.JobStatusQueued},
+		},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	jobs, ok := resp["jobs"].([]any)
+	if !ok || len(jobs) != 4 {
+		t.Fatalf("expected four job entries, got %T len=%d", resp["jobs"], len(jobs))
+	}
+
+	gotJobIDs := make([]string, 0, len(jobs))
+	for _, raw := range jobs {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("job payload type = %T, want object", raw)
+		}
+		id, ok := entry["job_id"].(string)
+		if !ok {
+			t.Fatalf("job_id type = %T, want string", entry["job_id"])
+		}
+		gotJobIDs = append(gotJobIDs, id)
+	}
+
+	wantJobIDs := []string{pre.String(), mig0.String(), mig1.String(), post.String()}
+	for i := range wantJobIDs {
+		if gotJobIDs[i] != wantJobIDs[i] {
+			t.Fatalf("job order mismatch at index %d: got %q want %q (full=%v)", i, gotJobIDs[i], wantJobIDs[i], gotJobIDs)
+		}
+	}
+}
