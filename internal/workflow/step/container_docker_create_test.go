@@ -22,6 +22,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 		spec        ContainerSpec
 		createRes   client.ContainerCreateResult
 		createErr   error
+		createPanic any
 		pullImage   bool
 		inspectErr  error
 		pullErr     error
@@ -95,6 +96,15 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			errContains: "create container",
 		},
 		{
+			name: "error_create_panics",
+			spec: ContainerSpec{
+				Image: "alpine:latest",
+			},
+			createPanic: "json encoder panic",
+			wantErr:     true,
+			errContains: "create container panic",
+		},
+		{
 			name: "success_with_image_pull",
 			spec: ContainerSpec{
 				Image: "alpine:latest",
@@ -137,6 +147,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 			fake := &fakeDockerClient{
 				createResult:    tc.createRes,
 				createErr:       tc.createErr,
+				createPanic:     tc.createPanic,
 				imageInspectErr: tc.inspectErr,
 				pullErr:         tc.pullErr,
 			}

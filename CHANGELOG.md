@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-02-25] Docker Runtime: Guard ContainerCreate Panics
+
+- Added a panic guard in `internal/workflow/step/container_docker.go` so
+  `DockerContainerRuntime.Create` converts unexpected Docker SDK panics into
+  regular errors instead of crashing the node agent process.
+- Extended the Docker runtime fake client to simulate panics during
+  `ContainerCreate` (`internal/workflow/step/container_docker_fake_test.go`).
+- Added regression coverage for panic-to-error behavior in
+  `internal/workflow/step/container_docker_create_test.go`
+  (`error_create_panics` case).
+- Verification (2026-02-25):
+  - `go test ./internal/workflow/step -run 'TestDockerContainerRuntimeCreate|TestDockerContainerRuntimeEnvPassthrough|TestDockerContainerRuntimeNetworkMode'`
+  - `go test ./internal/nodeagent -run TestDoesNotExist`
+
 ## [2025-10-30] Build Gate: Java Executor Embedded
 
 - Embedded the Java build gate executor in place of the previous CLI shell-out

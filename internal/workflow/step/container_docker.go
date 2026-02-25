@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -94,7 +95,16 @@ func newDockerContainerRuntimeWithClient(cli dockerClientAPI, opts DockerContain
 //   - Resource limits (NanoCPUs, Memory) are set via HostConfig.Resources.
 //   - NetworkMode is set via HostConfig.NetworkMode when configured.
 //   - StorageOpt["size"] sets disk quota when supported by the storage driver.
-func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
+func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec) (handle ContainerHandle, err error) {
+	// Guard against unexpected panics inside the Docker SDK JSON/request path.
+	// Panics here must not terminate the node process.
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("step: create container panic: %v\n%s", p, string(debug.Stack()))
+			handle = ""
+		}
+	}()
+
 	if r == nil || r.client == nil {
 		return "", errors.New("step: docker runtime not configured")
 	}
