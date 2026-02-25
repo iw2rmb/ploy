@@ -25,6 +25,46 @@ type gateExecutionTerminal struct {
 	runtimeImage       string
 }
 
+type gateTerminalOptions struct {
+	language           string
+	tool               string
+	code               string
+	message            string
+	evidence           string
+	stackGate          *contracts.StackGateResult
+	runtimeImage       string
+	reportRuntimeImage bool
+	err                error
+}
+
+func newGateTerminal(opts gateTerminalOptions) *gateExecutionTerminal {
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{
+			Language: opts.language,
+			Tool:     opts.tool,
+			Passed:   false,
+		}},
+		LogFindings: []contracts.BuildGateLogFinding{{
+			Severity: "error",
+			Code:     opts.code,
+			Message:  opts.message,
+			Evidence: opts.evidence,
+		}},
+	}
+	if opts.stackGate != nil {
+		meta.StackGate = opts.stackGate
+	}
+	if opts.reportRuntimeImage || opts.runtimeImage != "" {
+		meta.RuntimeImage = opts.runtimeImage
+	}
+	return &gateExecutionTerminal{
+		meta:               meta,
+		err:                opts.err,
+		reportRuntimeImage: opts.reportRuntimeImage,
+		runtimeImage:       opts.runtimeImage,
+	}
+}
+
 func resolveGateExecutionPlan(
 	ctx context.Context,
 	workspace string,
@@ -74,25 +114,16 @@ func resolveStackGateExecutionPlan(
 			runtimeImage = strings.TrimSpace(img)
 			sgResult.RuntimeImage = runtimeImage
 		}
-		return gateExecutionPlan{}, &gateExecutionTerminal{
-			meta: &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: spec.StackGate.Expect.Language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				RuntimeImage: runtimeImage,
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_UNKNOWN",
-					Message:  sgResult.Reason,
-					Evidence: evidenceStr,
-				}},
-			},
-			reportRuntimeImage: true,
+		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+			language:           spec.StackGate.Expect.Language,
+			tool:               "stack-gate",
+			code:               "STACK_GATE_UNKNOWN",
+			message:            sgResult.Reason,
+			evidence:           evidenceStr,
+			stackGate:          sgResult,
 			runtimeImage:       runtimeImage,
-		}
+			reportRuntimeImage: true,
+		})
 	}
 
 	sgResult.Detected = observationToStackExpectation(obs)
@@ -106,25 +137,16 @@ func resolveStackGateExecutionPlan(
 			runtimeImage = strings.TrimSpace(img)
 			sgResult.RuntimeImage = runtimeImage
 		}
-		return gateExecutionPlan{}, &gateExecutionTerminal{
-			meta: &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: spec.StackGate.Expect.Language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				RuntimeImage: runtimeImage,
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_MISMATCH",
-					Message:  sgResult.Reason,
-					Evidence: evidenceStr,
-				}},
-			},
-			reportRuntimeImage: true,
+		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+			language:           spec.StackGate.Expect.Language,
+			tool:               "stack-gate",
+			code:               "STACK_GATE_MISMATCH",
+			message:            sgResult.Reason,
+			evidence:           evidenceStr,
+			stackGate:          sgResult,
 			runtimeImage:       runtimeImage,
-		}
+			reportRuntimeImage: true,
+		})
 	}
 
 	sgResult.Result = "pass"
@@ -140,19 +162,13 @@ func resolveStackGateExecutionPlan(
 		if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
 			sgResult.Result = "unknown"
 			sgResult.Reason = "stack gate expectation missing release; cannot resolve runtime image"
-			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_INVALID_EXPECTATION",
-					Message:  sgResult.Reason,
-				}},
-			}}
+			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+				language:  language,
+				tool:      "stack-gate",
+				code:      "STACK_GATE_INVALID_EXPECTATION",
+				message:   sgResult.Reason,
+				stackGate: sgResult,
+			})
 		}
 
 		resolvedImage, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *spec.StackGate.Expect, true)
@@ -165,19 +181,13 @@ func resolveStackGateExecutionPlan(
 			}
 			sgResult.Result = "unknown"
 			sgResult.Reason = fmt.Sprintf("%s: %s", prefix, err.Error())
-			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     code,
-					Message:  sgResult.Reason,
-				}},
-			}}
+			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+				language:  language,
+				tool:      "stack-gate",
+				code:      code,
+				message:   sgResult.Reason,
+				stackGate: sgResult,
+			})
 		}
 		image = resolvedImage
 	}
@@ -187,24 +197,15 @@ func resolveStackGateExecutionPlan(
 	if err != nil {
 		sgResult.Result = "unknown"
 		sgResult.Reason = err.Error()
-		return gateExecutionPlan{}, &gateExecutionTerminal{
-			meta: &contracts.BuildGateStageMetadata{
-				StackGate: sgResult,
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: language,
-					Tool:     "stack-gate",
-					Passed:   false,
-				}},
-				RuntimeImage: image,
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "STACK_GATE_UNKNOWN",
-					Message:  sgResult.Reason,
-				}},
-			},
-			reportRuntimeImage: true,
+		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+			language:           language,
+			tool:               "stack-gate",
+			code:               "STACK_GATE_UNKNOWN",
+			message:            sgResult.Reason,
+			stackGate:          sgResult,
 			runtimeImage:       image,
-		}
+			reportRuntimeImage: true,
+		})
 	}
 
 	return gateExecutionPlan{
@@ -252,19 +253,13 @@ func resolveDetectedStackExecutionPlan(
 				mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expectedTool, strings.TrimSpace(obs.Tool)))
 			}
 			if len(mismatches) > 0 {
-				return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Language: expectedLanguage,
-						Tool:     "stackdetect",
-						Passed:   false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_STACK_MISMATCH",
-						Message:  "stack mismatch: " + strings.Join(mismatches, "; "),
-						Evidence: formatEvidenceForLog(obs.Evidence),
-					}},
-				}}
+				return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+					language: expectedLanguage,
+					tool:     "stackdetect",
+					code:     "BUILD_GATE_STACK_MISMATCH",
+					message:  "stack mismatch: " + strings.Join(mismatches, "; "),
+					evidence: formatEvidenceForLog(obs.Evidence),
+				})
 			}
 		}
 
@@ -284,30 +279,18 @@ func resolveDetectedStackExecutionPlan(
 		if chosenTool == "" {
 			// Detection couldn't determine tool. Apply default/cancel policy.
 			if !stackDetectCfg.Default {
-				meta := &contracts.BuildGateStageMetadata{
-					StaticChecks: []contracts.BuildGateStaticCheckReport{{
-						Tool:   "stackdetect",
-						Passed: false,
-					}},
-					LogFindings: []contracts.BuildGateLogFinding{{
-						Severity: "error",
-						Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-						Message:  "stack detection could not determine build tool",
-					}},
-				}
-				return gateExecutionPlan{}, &gateExecutionTerminal{meta: meta, err: ErrRepoCancelled}
+				return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+					tool:    "stackdetect",
+					code:    "BUILD_GATE_STACK_DETECT_FAILED",
+					message: "stack detection could not determine build tool",
+					err:     ErrRepoCancelled,
+				})
 			}
-			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Tool:   "stackdetect",
-					Passed: false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-					Message:  "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
-				}},
-			}}
+			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+				tool:    "stackdetect",
+				code:    "BUILD_GATE_STACK_DETECT_FAILED",
+				message: "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
+			})
 		}
 
 		language = expectedLanguage
@@ -339,35 +322,23 @@ func resolveDetectedStackExecutionPlan(
 		// Policy: when StackDetect is enabled and default=false, treat a detection failure
 		// as a repo-level cancellation (no healing / no further execution).
 		if stackDetectCfg != nil && stackDetectCfg.Enabled && !stackDetectCfg.Default {
-			meta := &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Tool:   "stackdetect",
-					Passed: false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-					Message:  msg,
-					Evidence: evidenceStr,
-				}},
-			}
-			return gateExecutionPlan{}, &gateExecutionTerminal{meta: meta, err: ErrRepoCancelled}
+			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+				tool:     "stackdetect",
+				code:     "BUILD_GATE_STACK_DETECT_FAILED",
+				message:  msg,
+				evidence: evidenceStr,
+				err:      ErrRepoCancelled,
+			})
 		}
 
 		if stackDetectCfg == nil || !stackDetectCfg.Enabled {
 			// Default behavior: fail the gate (not cancelled).
-			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Tool:   "stackdetect",
-					Passed: false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     "BUILD_GATE_STACK_DETECT_FAILED",
-					Message:  msg,
-					Evidence: evidenceStr,
-				}},
-			}}
+			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+				tool:     "stackdetect",
+				code:     "BUILD_GATE_STACK_DETECT_FAILED",
+				message:  msg,
+				evidence: evidenceStr,
+			})
 		}
 	} else {
 		// No StackDetect: use detected language/tool.
@@ -385,36 +356,24 @@ func resolveDetectedStackExecutionPlan(
 			if errors.Is(err, errBuildGateImageRuleMatch) {
 				code = "BUILD_GATE_NO_IMAGE_RULE"
 			}
-			return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{{
-					Language: language,
-					Tool:     tool,
-					Passed:   false,
-				}},
-				LogFindings: []contracts.BuildGateLogFinding{{
-					Severity: "error",
-					Code:     code,
-					Message:  err.Error(),
-				}},
-			}}
+			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+				language: language,
+				tool:     tool,
+				code:     code,
+				message:  err.Error(),
+			})
 		}
 		image = resolvedImage
 	}
 
 	cmd, err := buildCommandForTool(tool)
 	if err != nil {
-		return gateExecutionPlan{}, &gateExecutionTerminal{meta: &contracts.BuildGateStageMetadata{
-			StaticChecks: []contracts.BuildGateStaticCheckReport{{
-				Language: language,
-				Tool:     tool,
-				Passed:   false,
-			}},
-			LogFindings: []contracts.BuildGateLogFinding{{
-				Severity: "error",
-				Code:     "BUILD_GATE_UNKNOWN_TOOL",
-				Message:  err.Error(),
-			}},
-		}}
+		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
+			language: language,
+			tool:     tool,
+			code:     "BUILD_GATE_UNKNOWN_TOOL",
+			message:  err.Error(),
+		})
 	}
 
 	return gateExecutionPlan{

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	units "github.com/docker/go-units"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -172,6 +173,103 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 			// For nil/empty input, the container spec env should be nil or empty.
 			if len(rt.captured.Env) != 0 {
 				t.Errorf("expected empty env for %s, got %v", tc.name, rt.captured.Env)
+			}
+		})
+	}
+}
+
+func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
+	memHuman, err := units.RAMInBytes("1GiB")
+	if err != nil {
+		t.Fatalf("RAMInBytes(1GiB) error: %v", err)
+	}
+	diskHuman, err := units.RAMInBytes("5GiB")
+	if err != nil {
+		t.Fatalf("RAMInBytes(5GiB) error: %v", err)
+	}
+
+	testCases := []struct {
+		name       string
+		memEnv     string
+		cpuEnv     string
+		diskEnv    string
+		wantMem    int64
+		wantNano   int64
+		wantDisk   int64
+		wantDiskOp string
+	}{
+		{
+			name:       "numeric_limits",
+			memEnv:     "2048",
+			cpuEnv:     "250",
+			diskEnv:    "4096",
+			wantMem:    2048,
+			wantNano:   250 * 1_000_000,
+			wantDisk:   4096,
+			wantDiskOp: "4096",
+		},
+		{
+			name:       "human_size_limits",
+			memEnv:     "1GiB",
+			cpuEnv:     "500",
+			diskEnv:    "5GiB",
+			wantMem:    memHuman,
+			wantNano:   500 * 1_000_000,
+			wantDisk:   diskHuman,
+			wantDiskOp: "5GiB",
+		},
+		{
+			name:       "invalid_values_fall_back_to_zero",
+			memEnv:     "not-a-size",
+			cpuEnv:     "not-a-number",
+			diskEnv:    "bad-size",
+			wantMem:    0,
+			wantNano:   0,
+			wantDisk:   0,
+			wantDiskOp: "bad-size",
+		},
+		{
+			name:       "integer_fallback_for_bytes",
+			memEnv:     "-512",
+			cpuEnv:     "100",
+			diskEnv:    "-1234",
+			wantMem:    -512,
+			wantNano:   100 * 1_000_000,
+			wantDisk:   -1234,
+			wantDiskOp: "-1234",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(buildGateLimitMemoryEnv, tc.memEnv)
+			t.Setenv(buildGateLimitCPUEnv, tc.cpuEnv)
+			t.Setenv(buildGateLimitDiskEnv, tc.diskEnv)
+
+			rt := &testContainerRuntime{}
+			executor := NewDockerGateExecutor(rt)
+			workspace := createMavenWorkspace(t, "17")
+
+			spec := &contracts.StepGateSpec{Enabled: true}
+			if _, err := executor.Execute(context.Background(), spec, workspace); err != nil {
+				t.Fatalf("Execute() unexpected error: %v", err)
+			}
+			if !rt.createCalled {
+				t.Fatal("expected Create to be called")
+			}
+
+			if rt.captured.LimitMemoryBytes != tc.wantMem {
+				t.Fatalf("LimitMemoryBytes=%d, want %d", rt.captured.LimitMemoryBytes, tc.wantMem)
+			}
+			if rt.captured.LimitNanoCPUs != tc.wantNano {
+				t.Fatalf("LimitNanoCPUs=%d, want %d", rt.captured.LimitNanoCPUs, tc.wantNano)
+			}
+			if rt.captured.LimitDiskBytes != tc.wantDisk {
+				t.Fatalf("LimitDiskBytes=%d, want %d", rt.captured.LimitDiskBytes, tc.wantDisk)
+			}
+			if rt.captured.StorageSizeOpt != tc.wantDiskOp {
+				t.Fatalf("StorageSizeOpt=%q, want %q", rt.captured.StorageSizeOpt, tc.wantDiskOp)
 			}
 		})
 	}

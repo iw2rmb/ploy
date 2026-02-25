@@ -46,6 +46,12 @@ import (
 	"github.com/moby/moby/client"
 )
 
+const (
+	buildGateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
+	buildGateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
+	buildGateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
+)
+
 // dockerGateExecutor runs build validation inside language images using the
 // same container runtime as step execution, mounting the workspace at /workspace.
 //
@@ -145,36 +151,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	// Build container spec with workspace mount.
 	mounts := []ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}
 	// Optional limits via env (human suffixes supported for memory/disk). 0 => unlimited.
-	var (
-		limitMem       int64
-		limitCPUMillis int64
-		limitDisk      int64
-		storageSizeOpt string
-	)
-	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_LIMIT_MEMORY_BYTES")); v != "" {
-		if n, err := units.RAMInBytes(v); err == nil {
-			limitMem = n
-		} else if n2, err2 := units.FromHumanSize(v); err2 == nil {
-			limitMem = n2
-		} else if n3, err3 := parseInt64(v); err3 == nil {
-			limitMem = n3
-		}
-	}
-	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_LIMIT_CPU_MILLIS")); v != "" {
-		if n, err := parseInt64(v); err == nil {
-			limitCPUMillis = n
-		}
-	}
-	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_LIMIT_DISK_SPACE")); v != "" {
-		storageSizeOpt = v
-		if n, err := units.RAMInBytes(v); err == nil {
-			limitDisk = n
-		} else if n2, err2 := units.FromHumanSize(v); err2 == nil {
-			limitDisk = n2
-		} else if n3, err3 := parseInt64(v); err3 == nil {
-			limitDisk = n3
-		}
-	}
+	limitMem, _ := parseBytesLimitEnv(buildGateLimitMemoryEnv)
+	limitCPUMillis := parseInt64LimitEnv(buildGateLimitCPUEnv)
+	limitDisk, storageSizeOpt := parseBytesLimitEnv(buildGateLimitDiskEnv)
 	// Copy env from gate spec to pass through all environment variables to the
 	// Docker container. This includes global env vars injected by the control plane
 	// (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON) which image-level startup hooks
@@ -191,7 +170,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		LimitMemoryBytes: limitMem,
 		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis -> nanos
 		LimitDiskBytes:   limitDisk,
-		StorageSizeOpt:   strings.TrimSpace(storageSizeOpt),
+		StorageSizeOpt:   storageSizeOpt,
 	}
 	if e.rt == nil {
 		return &contracts.BuildGateStageMetadata{}, nil
@@ -259,6 +238,36 @@ func buildGateDefaultImagesFilePath() string {
 }
 
 func parseInt64(s string) (int64, error) { return strconv.ParseInt(strings.TrimSpace(s), 10, 64) }
+
+func parseInt64LimitEnv(key string) int64 {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return 0
+	}
+	n, err := parseInt64(value)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+func parseBytesLimitEnv(key string) (int64, string) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return 0, ""
+	}
+
+	if n, err := units.RAMInBytes(value); err == nil {
+		return n, value
+	}
+	if n, err := units.FromHumanSize(value); err == nil {
+		return n, value
+	}
+	if n, err := parseInt64(value); err == nil {
+		return n, value
+	}
+	return 0, value
+}
 
 // caPreambleScript returns a shell preamble that installs CA certificates from the
 // CA_CERTS_PEM_BUNDLE environment variable into the system trust store and Java
