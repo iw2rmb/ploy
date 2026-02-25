@@ -145,11 +145,31 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// is passed to StartRunRequest.
 	envFromSpec, typedOpts, err := parseSpec(claim.Spec)
 	if err != nil {
+		c.emitRunException(
+			claim.RunID,
+			jobIDPtr(claim.JobID),
+			"failed to parse claimed job spec",
+			err,
+			map[string]any{
+				"component": "claim_loop",
+				"job_name":  claim.JobName,
+			},
+		)
 		return true, fmt.Errorf("parse spec: %w", err)
 	}
 
 	// Validate and derive Stack Gate chaining for multi-step runs.
 	if err := validateAndDeriveStackGateChaining(typedOpts.Steps); err != nil {
+		c.emitRunException(
+			claim.RunID,
+			jobIDPtr(claim.JobID),
+			"failed to validate stack-gate chaining",
+			err,
+			map[string]any{
+				"component": "claim_loop",
+				"job_name":  claim.JobName,
+			},
+		)
 		return true, fmt.Errorf("validate stack gate chaining: %w", err)
 	}
 
@@ -173,6 +193,16 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	if err := c.controller.StartRun(ctx, startReq); err != nil {
 		// Even if StartRun fails, we've already claimed the work.
 		// The node cannot execute this job, so the claim loop surfaces an error.
+		c.emitRunException(
+			claim.RunID,
+			jobIDPtr(claim.JobID),
+			"failed to start claimed job execution",
+			err,
+			map[string]any{
+				"component": "claim_loop",
+				"job_name":  claim.JobName,
+			},
+		)
 		return true, fmt.Errorf("start run: %w", err)
 	}
 

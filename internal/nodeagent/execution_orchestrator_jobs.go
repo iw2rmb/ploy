@@ -357,6 +357,16 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				var runtimeExitCode int32 = -1
 				exitCode = &runtimeExitCode
 			}
+			r.emitRunException(
+				req,
+				"node runtime execution error",
+				runErr,
+				map[string]any{
+					"component":   "run_controller",
+					"status":      status.String(),
+					"duration_ms": duration.Milliseconds(),
+				},
+			)
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
 				slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 			}
