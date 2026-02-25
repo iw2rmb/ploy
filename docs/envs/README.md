@@ -137,6 +137,9 @@ See `docs/build-gate/README.md` for Build Gate configuration and execution detai
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
+  Relevant `ployd.yaml` scheduler keys for stale-job recovery:
+  - `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable the task)
+  - `scheduler.node_stale_after` (default `1m`)
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a NanoID(6)
   string (6 characters from URL-safe alphabet A-Za-z0-9_-). This compact format balances
   brevity with sufficient uniqueness for typical cluster sizes. Note: currently exported by

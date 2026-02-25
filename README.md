@@ -72,6 +72,8 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   - `ttl`: retention for logs/events/diffs/artifact_bundles (default 30d if unset)
   - `ttl_interval`: how often the cleanup runs (default 1h if unset)
   - `drop_partitions`: when true, drop whole monthly partitions older than `ttl`
+  - `stale_job_recovery_interval`: stale-running-job recovery cycle interval (default 30s; set `0` to disable)
+  - `node_stale_after`: node heartbeat staleness threshold used by recovery (default 1m)
 
 **Quick Start (Local Docker)**
 - Deploy the local Docker stack (server + node + garage services) and write a local CLI descriptor:

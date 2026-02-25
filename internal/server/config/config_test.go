@@ -50,6 +50,12 @@ runtime:
 	if cfg.ControlPlane.AssignmentPollInterval != 5*time.Second {
 		t.Fatalf("AssignmentPollInterval = %v, want 5s", cfg.ControlPlane.AssignmentPollInterval)
 	}
+	if cfg.Scheduler.StaleJobRecoveryInterval != 30*time.Second {
+		t.Fatalf("StaleJobRecoveryInterval = %v, want 30s", cfg.Scheduler.StaleJobRecoveryInterval)
+	}
+	if cfg.Scheduler.NodeStaleAfter != time.Minute {
+		t.Fatalf("NodeStaleAfter = %v, want 1m", cfg.Scheduler.NodeStaleAfter)
+	}
 	if cfg.PKI.RenewBefore != time.Hour {
 		t.Fatalf("PKI.RenewBefore = %v, want 1h", cfg.PKI.RenewBefore)
 	}
@@ -93,6 +99,9 @@ runtime:
       module: github.com/example/ployd-k8s
       config:
         address: https://k8s.example.com
+scheduler:
+  stale_job_recovery_interval: 0s
+  node_stale_after: 2m
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -134,6 +143,12 @@ runtime:
 	}
 	if cfg.Runtime.Plugins[0].Config["address"] != "https://k8s.example.com" {
 		t.Fatalf("Runtime.Plugins[0].Config[address] = %v", cfg.Runtime.Plugins[0].Config["address"])
+	}
+	if cfg.Scheduler.StaleJobRecoveryInterval != 0 {
+		t.Fatalf("StaleJobRecoveryInterval = %v, want 0", cfg.Scheduler.StaleJobRecoveryInterval)
+	}
+	if cfg.Scheduler.NodeStaleAfter != 2*time.Minute {
+		t.Fatalf("NodeStaleAfter = %v, want 2m", cfg.Scheduler.NodeStaleAfter)
 	}
 }
 

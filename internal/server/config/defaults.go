@@ -20,6 +20,8 @@ const (
 	defaultGuardBinary            = "/usr/lib/openssh/sftp-server"
 	defaultJanitorInterval        = time.Minute
 	defaultBatchSchedulerInterval = 5 * time.Second
+	defaultStaleJobRecovery       = 30 * time.Second
+	defaultNodeStaleAfter         = time.Minute
 )
 
 // defaultConfig returns the baseline configuration with baked-in defaults.
@@ -41,9 +43,11 @@ func defaultConfig() Config {
 			DefaultAdapter: "local",
 		},
 		Scheduler: SchedulerConfig{
-			HousekeepingInterval:   defaultHousekeeping,
-			DiskPruneInterval:      defaultDiskPrune,
-			BatchSchedulerInterval: defaultBatchSchedulerInterval,
+			HousekeepingInterval:     defaultHousekeeping,
+			DiskPruneInterval:        defaultDiskPrune,
+			BatchSchedulerInterval:   defaultBatchSchedulerInterval,
+			StaleJobRecoveryInterval: defaultStaleJobRecovery,
+			NodeStaleAfter:           defaultNodeStaleAfter,
 		},
 		Worker: WorkerConfig{
 			TaskConcurrency: defaultTaskConcurrency,
@@ -149,6 +153,13 @@ func applyDefaults(cfg *Config) {
 	// Batch scheduler interval: 0 disables the scheduler, negative uses default.
 	if cfg.Scheduler.BatchSchedulerInterval < 0 {
 		cfg.Scheduler.BatchSchedulerInterval = defaultBatchSchedulerInterval
+	}
+	// Stale recovery interval: 0 disables stale-job recovery, negative uses default.
+	if cfg.Scheduler.StaleJobRecoveryInterval < 0 {
+		cfg.Scheduler.StaleJobRecoveryInterval = defaultStaleJobRecovery
+	}
+	if cfg.Scheduler.NodeStaleAfter <= 0 {
+		cfg.Scheduler.NodeStaleAfter = defaultNodeStaleAfter
 	}
 
 	normalizeRuntimeConfig(&cfg.Runtime)

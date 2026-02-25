@@ -53,14 +53,14 @@ Legend: [ ] todo, [x] done.
   - Tests: Existing completion tests + recovery tests remain green with identical status semantics.
 
 ## Phase 3: Config and Wiring
-- [ ] Add explicit recovery configuration with safe defaults — Prevents false positives from heartbeat jitter.
+- [x] Add explicit recovery configuration with safe defaults — Prevents false positives from heartbeat jitter.
   - Repository: `ploy`
   - Component: `internal/server/config/types.go`, `internal/server/config/defaults.go`, `internal/server/config/config_test.go`
   - Scope: Add scheduler config keys for stale threshold and recovery interval; default threshold must exceed normal node heartbeat cadence used in local/dev.
   - Snippets: `scheduler.stale_job_recovery_interval`, `scheduler.node_stale_after`
   - Tests: `go test ./internal/server/config` — Defaults and custom values validated.
 
-- [ ] Register and start the recovery task in server bootstrap — Activates feature in production path.
+- [x] Register and start the recovery task in server bootstrap — Activates feature in production path.
   - Repository: `ploy`
   - Component: `cmd/ployd/server.go`
   - Scope: Build task from config and store, add to scheduler, ensure graceful shutdown path remains unchanged.
