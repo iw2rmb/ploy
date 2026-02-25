@@ -66,21 +66,21 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/step -run 'Diff'` — Diff generation and normalization behavior unchanged.
 
 ## Phase 3: Manifests and Detection Cleanup
-- [ ] Share manifest decode+validate pipeline between file and registry loaders — Removes duplicate TOML/validation flow.
+- [x] Share manifest decode+validate pipeline between file and registry loaders — Removes duplicate TOML/validation flow.
   - Repository: `ploy`
   - Component: `internal/workflow/manifests`
   - Scope: Extract helper used by both `LoadFile` and `loadDirectory` for read/decode/validate and standardized error wrapping.
-  - Snippets: `func decodeAndValidateManifest(path string, data []byte) (rawManifest, error)`
+  - Snippets: `func decodeAndValidateManifest(path string, label string) (rawManifest, error)`
   - Tests: `go test ./internal/workflow/manifests` — Error text and validation semantics preserved.
 
-- [ ] Unify Java ambiguity/tool selection logic across `Detect` and `DetectTool` — Prevents duplicate branch logic and message drift.
+- [x] Unify Java ambiguity/tool selection logic across `Detect` and `DetectTool` — Prevents duplicate branch logic and message drift.
   - Repository: `ploy`
   - Component: `internal/workflow/stackdetect`
   - Scope: Extract shared Java tool resolution and ambiguity error builder used by both flows in `detector.go`.
   - Snippets: `func detectJavaTool(s scanResult) (tool string, err error)`
   - Tests: `go test ./internal/workflow/stackdetect -run 'Detect|Ambiguous|Java'` — Ambiguity evidence remains stable.
 
-- [ ] Reduce repetitive manifest conversion helpers with focused shared mappers — Cuts conversion boilerplate while keeping explicit types.
+- [x] Reduce repetitive manifest conversion helpers with focused shared mappers — Cuts conversion boilerplate while keeping explicit types.
   - Repository: `ploy`
   - Component: `internal/workflow/manifests`
   - Scope: Introduce internal mapping helpers for repeated slice conversion patterns in `compilation.go` and `file.go` (flows/fixtures/lanes/exposures/requires) without changing wire structs.
@@ -88,7 +88,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/manifests -run 'Encode|Compile|Registry'` — Encoded TOML and compiled payload parity maintained.
 
 ## Phase 4: GREEN and Verification
-- [ ] Run full workflow package validation after refactor — Confirms cleanup did not alter runtime semantics.
+- [x] Run full workflow package validation after refactor — Confirms cleanup did not alter runtime semantics.
   - Repository: `ploy`
   - Component: `internal/workflow/**`
   - Scope: Execute unit tests, vet/static checks, and coverage checks for touched packages; fix regressions before merge.
