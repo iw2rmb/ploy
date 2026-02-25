@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `docs/testing-workflow.md`; `internal/workflow/contr
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Safety Rails and RED
-- [ ] Add characterization tests for affected contracts before refactors — Locks current behavior before structural cleanup.
+- [x] Add characterization tests for affected contracts before refactors — Locks current behavior before structural cleanup.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/workflow/step`, `internal/workflow/stackdetect`, `internal/workflow/manifests`
   - Scope: Add/extend tests for stack-gate terminal metadata shape, release coercion edge-cases, command polymorphism, manifest decode/validation errors, and Java ambiguity behavior.
@@ -15,21 +15,21 @@ Legend: [ ] todo, [x] done.
   - Tests: `make test` — New tests fail first where behavior is not yet preserved by shared helpers.
 
 ## Phase 1: Contracts Parser Consolidation
-- [ ] Centralize release value coercion into one helper used by all parsers — Eliminates duplicated number/string coercion logic.
+- [x] Centralize release value coercion into one helper used by all parsers — Eliminates duplicated number/string coercion logic.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/workflow/step`
   - Scope: Extract a single `parseReleaseValue` helper in `contracts`, use it from `stack_gate_spec_parse.go`, `mods_spec_parse.go` build-gate stack parsing, and Build Gate YAML rule parsing in `step/build_gate_image_resolver.go` through contracts helper.
   - Snippets: `func ParseReleaseValue(v any, field string) (string, error)`
   - Tests: `go test ./internal/workflow/contracts ./internal/workflow/step` — Existing + new release coercion tests stay green.
 
-- [ ] Unify command polymorphic parsing into the `CommandSpec` type path — Removes dual command parse implementations.
+- [x] Unify command polymorphic parsing into the `CommandSpec` type path — Removes dual command parse implementations.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`
   - Scope: Replace `parseCommandSpec` duplicate flow in `mods_spec_parse.go` with one canonical constructor/unmarshal helper owned by `command_spec.go`; keep identical error semantics.
   - Snippets: `func ParseCommandSpec(v any) (CommandSpec, error)`
   - Tests: `go test ./internal/workflow/contracts -run 'CommandSpec|ModsSpec'` — JSON/YAML/map-backed parsing parity verified.
 
-- [ ] Resolve numeric coercion helper drift by reusing or removing unused helpers — Shrinks API surface and avoids dead complexity.
+- [x] Resolve numeric coercion helper drift by reusing or removing unused helpers — Shrinks API surface and avoids dead complexity.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`
   - Scope: Route integer extraction in spec parsing (`retries`, similar fields) through `intFromAny`/`int64FromAny`, or delete helpers if no production caller remains after refactor.

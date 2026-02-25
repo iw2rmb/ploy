@@ -561,6 +561,14 @@ func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 	if len(meta.StaticChecks) == 0 || meta.StaticChecks[0].Passed {
 		t.Errorf("expected static check to report failure, got %+v", meta.StaticChecks)
 	}
+	if len(meta.StaticChecks) > 0 {
+		if meta.StaticChecks[0].Tool != "stack-gate" {
+			t.Errorf("StaticChecks[0].Tool = %q, want %q", meta.StaticChecks[0].Tool, "stack-gate")
+		}
+		if meta.StaticChecks[0].Language != "java" {
+			t.Errorf("StaticChecks[0].Language = %q, want %q", meta.StaticChecks[0].Language, "java")
+		}
+	}
 
 	// Verify log finding with STACK_GATE_MISMATCH code.
 	found := false
@@ -656,6 +664,14 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 	if !found {
 		t.Errorf("expected log finding with code STACK_GATE_UNKNOWN, got %+v", meta.LogFindings)
 	}
+	if len(meta.StaticChecks) > 0 {
+		if meta.StaticChecks[0].Tool != "stack-gate" {
+			t.Errorf("StaticChecks[0].Tool = %q, want %q", meta.StaticChecks[0].Tool, "stack-gate")
+		}
+		if meta.StaticChecks[0].Language != "java" {
+			t.Errorf("StaticChecks[0].Language = %q, want %q", meta.StaticChecks[0].Language, "java")
+		}
+	}
 }
 
 // TestGateDocker_StackGate_PreCheckUnknown_NoFiles verifies that Stack Gate fails early
@@ -705,6 +721,14 @@ func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 	}
 	if meta.StackGate.RuntimeImage != "maven:3-eclipse-temurin-17" {
 		t.Errorf("StackGate.RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "maven:3-eclipse-temurin-17")
+	}
+	if len(meta.StaticChecks) > 0 {
+		if meta.StaticChecks[0].Tool != "stack-gate" {
+			t.Errorf("StaticChecks[0].Tool = %q, want %q", meta.StaticChecks[0].Tool, "stack-gate")
+		}
+		if meta.StaticChecks[0].Language != "java" {
+			t.Errorf("StaticChecks[0].Language = %q, want %q", meta.StaticChecks[0].Language, "java")
+		}
 	}
 }
 

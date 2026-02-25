@@ -174,6 +174,38 @@ func TestDetectTool_MavenNoJavaVersion_ReturnsTool(t *testing.T) {
 	}
 }
 
+func TestDetectTool_AmbiguousBothMavenGradle(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "ambiguous", "both-maven-gradle")
+
+	_, err := DetectTool(ctx, workspace)
+	if err == nil {
+		t.Fatal("expected error for ambiguous workspace")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected DetectionError, got %T", err)
+	}
+	if !detErr.IsAmbiguous() {
+		t.Fatalf("expected ambiguous error, got %q", detErr.Reason)
+	}
+
+	hasPom := false
+	hasGradle := false
+	for _, e := range detErr.Evidence {
+		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
+			hasPom = true
+		}
+		if e.Path == "build.gradle" && e.Key == "build.file" && e.Value == "exists" {
+			hasGradle = true
+		}
+	}
+	if !hasPom || !hasGradle {
+		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle, got %+v", detErr.Evidence)
+	}
+}
+
 func TestDetect_GradleJava17CompatibilityJavaVersion(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "gradle", "java17-compatibility-javaversion")

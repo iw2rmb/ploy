@@ -192,22 +192,11 @@ func parseImageRuleFromYAML(raw map[string]any, prefix string) (contracts.BuildG
 
 	// Parse release (string or number).
 	if v, ok := raw["release"]; ok && v != nil {
-		switch r := v.(type) {
-		case string:
-			rule.Stack.Release = r
-		case int:
-			rule.Stack.Release = fmt.Sprintf("%d", r)
-		case int64:
-			rule.Stack.Release = fmt.Sprintf("%d", r)
-		case float64:
-			if r == float64(int64(r)) {
-				rule.Stack.Release = fmt.Sprintf("%d", int64(r))
-			} else {
-				rule.Stack.Release = fmt.Sprintf("%g", r)
-			}
-		default:
-			return rule, fmt.Errorf("%s.release: expected string or number, got %T", prefix, v)
+		release, err := contracts.ParseReleaseValue(v, prefix+".release")
+		if err != nil {
+			return rule, err
 		}
+		rule.Stack.Release = release
 	}
 
 	// Parse tool.
