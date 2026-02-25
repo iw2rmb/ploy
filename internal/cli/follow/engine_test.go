@@ -132,6 +132,10 @@ func TestStatusGlyph_RunningUsesConfiguredSpinnerFrames(t *testing.T) {
 	if got != "⣾ " {
 		t.Fatalf("statusGlyph(running,0)=%q, want %q", got, "⣾ ")
 	}
+	got = statusGlyph("running", 1)
+	if got != "⣷ " {
+		t.Fatalf("statusGlyph(running,1)=%q, want %q", got, "⣷ ")
+	}
 }
 
 func TestEngine_render_DisplaysRepoLastError(t *testing.T) {

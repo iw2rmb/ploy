@@ -369,8 +369,10 @@ func (e *Engine) showCursor() {
 func statusGlyph(status string, spinnerFrame int) string {
 	switch strings.ToLower(status) {
 	case "running":
-		// Animated spinner for running jobs
-		return spinnerFrames[spinnerFrame%len(spinnerFrames)]
+		// Animated spinner for running jobs (reverse frame direction).
+		frameCount := len(spinnerFrames)
+		frameIndex := ((-spinnerFrame)%frameCount + frameCount) % frameCount
+		return spinnerFrames[frameIndex]
 	case "success":
 		return "✓"
 	case "fail":
