@@ -114,6 +114,12 @@ type SchedulerConfig struct {
 	// BatchSchedulerInterval is how often the batch scheduler checks for pending repos.
 	// Set to 0 to disable the batch scheduler. Default: 5 seconds.
 	BatchSchedulerInterval time.Duration `yaml:"batch_scheduler_interval"`
+	// StaleJobRecoveryInterval is how often stale Running jobs are recovered.
+	// Set to 0 to disable stale-job recovery. Default: 30 seconds.
+	StaleJobRecoveryInterval time.Duration `yaml:"stale_job_recovery_interval"`
+	// NodeStaleAfter is the heartbeat age threshold after which a node is considered stale.
+	// Default: 1 minute.
+	NodeStaleAfter time.Duration `yaml:"node_stale_after"`
 }
 
 // LoggingConfig configures logging destinations.

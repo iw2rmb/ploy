@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/handlers"
 	"github.com/iw2rmb/ploy/internal/server/pki"
+	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
@@ -86,6 +87,22 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		}
 	}
 
+	// Initialize stale running-job recovery task.
+	// The task is disabled when StaleJobRecoveryInterval is explicitly set to 0.
+	var staleRecoveryTask *recovery.StaleJobRecoveryTask
+	if st != nil && cfg.Scheduler.StaleJobRecoveryInterval != 0 {
+		staleRecoveryTask, err = recovery.NewStaleJobRecoveryTask(recovery.Options{
+			Store:          st,
+			EventsService:  eventsService,
+			Interval:       cfg.Scheduler.StaleJobRecoveryInterval,
+			NodeStaleAfter: cfg.Scheduler.NodeStaleAfter,
+			Logger:         slog.Default(),
+		})
+		if err != nil {
+			return fmt.Errorf("create stale job recovery task: %w", err)
+		}
+	}
+
 	// Initialize scheduler and register background tasks.
 	sched := scheduler.New()
 	if ttlWorker != nil {
@@ -93,6 +110,9 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	}
 	if batchSched != nil {
 		sched.AddTask(batchSched)
+	}
+	if staleRecoveryTask != nil {
+		sched.AddTask(staleRecoveryTask)
 	}
 
 	// Start PKI manager.

@@ -8,7 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -16,6 +18,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	apiconfig "github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestResolvePgDSN_EnvBeatsConfig(t *testing.T) {
@@ -175,6 +179,98 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
+}
+
+type schedulerProbeStore struct {
+	store.Store
+	staleRecoveryCalls atomic.Int32
+}
+
+func (s *schedulerProbeStore) ListGlobalEnv(ctx context.Context) ([]store.ConfigEnv, error) {
+	return nil, nil
+}
+
+func (s *schedulerProbeStore) DeleteExpiredLogs(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	return 0, nil
+}
+
+func (s *schedulerProbeStore) DeleteExpiredEvents(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	return 0, nil
+}
+
+func (s *schedulerProbeStore) DeleteExpiredDiffs(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	return 0, nil
+}
+
+func (s *schedulerProbeStore) DeleteExpiredArtifactBundles(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	return 0, nil
+}
+
+func (s *schedulerProbeStore) ListStaleRunningJobs(ctx context.Context, cutoff pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
+	s.staleRecoveryCalls.Add(1)
+	return nil, nil
+}
+
+func (s *schedulerProbeStore) Pool() *pgxpool.Pool {
+	return nil
+}
+
+func (s *schedulerProbeStore) Close() {}
+
+func TestRun_StaleRecoverySchedulerEnabled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var cfg apiconfig.Config
+	cfg.HTTP.Listen = "127.0.0.1:0"
+	cfg.Metrics.Listen = "127.0.0.1:0"
+	cfg.Scheduler.BatchSchedulerInterval = 0
+	cfg.Scheduler.StaleJobRecoveryInterval = 10 * time.Millisecond
+	cfg.Scheduler.NodeStaleAfter = time.Minute
+
+	st := &schedulerProbeStore{}
+	authorizer := auth.NewAuthorizer(auth.Options{
+		AllowInsecure: false,
+		DefaultRole:   auth.RoleControlPlane,
+	})
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "ployd.yaml")
+	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
+		t.Fatalf("create temp config: %v", err)
+	}
+
+	bs := bsmock.New()
+	bp := blobpersist.New(st, bs)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp)
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-errCh:
+			t.Fatalf("run() exited before stale recovery task observed: %v", err)
+		default:
+		}
+
+		if st.staleRecoveryCalls.Load() > 0 {
+			cancel()
+			if err := <-errCh; err != nil {
+				t.Fatalf("run() error: %v", err)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	cancel()
+	if err := <-errCh; err != nil {
+		t.Fatalf("run() error: %v", err)
+	}
+	t.Fatal("expected stale recovery task to call ListStaleRunningJobs at least once")
 }
 
 func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {

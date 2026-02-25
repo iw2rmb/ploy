@@ -52,6 +52,11 @@ func loadFromReader(r io.Reader) (Config, error) {
 	dec := yaml.NewDecoder(&buf)
 	dec.KnownFields(true)
 	var cfg Config
+	// Seed explicit defaults for fields that treat 0 as an intentional disable value.
+	// This preserves default-on behavior when keys are omitted while still allowing
+	// users to set 0 explicitly.
+	cfg.Scheduler.StaleJobRecoveryInterval = defaultStaleJobRecovery
+	cfg.Scheduler.NodeStaleAfter = defaultNodeStaleAfter
 	if err := dec.Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("config: decode: %w", err)
 	}
