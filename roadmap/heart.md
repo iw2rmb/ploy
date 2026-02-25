@@ -83,14 +83,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run 'Events|RunCompletion'` — terminal events emitted once.
 
 ## Phase 5: GREEN and Documentation
-- [ ] Run full verification for touched packages — Confirms no regressions in queueing and completion.
+- [x] Run full verification for touched packages — Confirms no regressions in queueing and completion.
   - Repository: `ploy`
   - Component: `internal/store/**`, `internal/server/**`, `cmd/ployd`
   - Scope: Execute unit tests, vet, staticcheck, and coverage checks for affected paths.
   - Snippets: `make test`; `make vet`; `make staticcheck`; `make coverage`
   - Tests: All pass with project thresholds maintained.
 
-- [ ] Update docs to reflect recovery behavior and new config knobs — Keeps runtime docs aligned with implementation.
+- [x] Update docs to reflect recovery behavior and new config knobs — Keeps runtime docs aligned with implementation.
   - Repository: `ploy`
   - Component: `docs/migs-lifecycle.md`, `docs/envs/README.md`, optionally `docs/testing-workflow.md`
   - Scope: Document stale-node detection semantics, recovery lifecycle, config defaults, and troubleshooting commands.

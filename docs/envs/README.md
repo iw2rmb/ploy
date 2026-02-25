@@ -138,8 +138,14 @@ See `docs/build-gate/README.md` for Build Gate configuration and execution detai
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
   Relevant `ployd.yaml` scheduler keys for stale-job recovery:
-  - `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable the task)
-  - `scheduler.node_stale_after` (default `1m`)
+  - `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable recovery)
+  - `scheduler.node_stale_after` (default `1m`; stale cutoff for node heartbeats)
+  Recovery observability and troubleshooting:
+  - Recovery emits structured logs (`stale-job-recovery: cycle completed`) with
+    `stale_nodes`, `stale_attempts`, `repos_updated`, `jobs_cancelled`, and
+    `runs_finalized` counters.
+  - If a stale attempt is recovered to terminal, check `GET /v1/runs/{id}/status`
+    and `GET /v1/runs/{id}/logs` to confirm final repo/run state and terminal SSE.
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a NanoID(6)
   string (6 characters from URL-safe alphabet A-Za-z0-9_-). This compact format balances
   brevity with sufficient uniqueness for typical cluster sizes. Note: currently exported by
