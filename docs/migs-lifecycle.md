@@ -1001,11 +1001,17 @@ Nodeagents use `/v1/nodes/*` to execute work:
   `/v1/nodes/{id}/claim`. See `docs/build-gate/README.md` for gate configuration,
   unified jobs behavior, and a brief historical note on the removed HTTP mode.
 
-Current stale-heartbeat recovery status:
-- Store primitives are available to list stale running attempts and bulk-cancel
-  active jobs by `(run_id, repo_id, attempt)`.
-- Scheduler-driven stale-job recovery is not wired yet; Phase 2 in
-  `roadmap/heart.md` tracks activation.
+Current stale-heartbeat recovery behavior:
+- The scheduler task `stale-job-recovery` runs every
+  `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable).
+- A node is stale when `nodes.last_heartbeat` is missing or older than
+  `now() - scheduler.node_stale_after` (default `1m`).
+- Each cycle lists stale running attempts grouped by `(run_id, repo_id, attempt)`
+  and bulk-cancels active jobs (`Created|Queued|Running`) for those attempts.
+- Recovery reuses the canonical reconciliation helpers to update `run_repos`
+  status and finalize `runs` when all repos are terminal.
+- When recovery finalizes a run, the server publishes the same terminal SSE
+  sequence as normal completion: a terminal `run` snapshot followed by `done`.
 
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 `PLOY_NODE_UUID` header set to the node's ID (NanoID(6) string). The
