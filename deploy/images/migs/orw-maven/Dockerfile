@@ -20,7 +20,9 @@ LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
 RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     if [ -s /run/secrets/ploy_ca_bundle ]; then \
       cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
-      update-ca-certificates; \
+      if command -v update-ca-certificates >/dev/null 2>&1; then \
+        update-ca-certificates; \
+      fi; \
     fi \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
