@@ -13,6 +13,7 @@ LABEL org.opencontainers.image.title="mig-codex" \
 RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     if [ -s /run/secrets/ploy_ca_bundle ]; then \
       mkdir -p /etc/ssl/certs /usr/local/share/ca-certificates && \
+      cp /run/secrets/ploy_ca_bundle /etc/ssl/certs/ploy-ca-bundle.pem && \
       cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
       if [ -f /etc/ssl/cert.pem ]; then \
         cat /run/secrets/ploy_ca_bundle >> /etc/ssl/cert.pem; \
@@ -27,7 +28,13 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     if command -v update-ca-certificates >/dev/null 2>&1; then \
       update-ca-certificates || true; \
     fi && \
-    npm install -g @openai/codex && \
+    if [ -s /etc/ssl/certs/ploy-ca-bundle.pem ]; then \
+      NPM_CONFIG_CAFILE=/etc/ssl/certs/ploy-ca-bundle.pem \
+      NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem \
+      npm install -g @openai/codex; \
+    else \
+      npm install -g @openai/codex; \
+    fi && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
