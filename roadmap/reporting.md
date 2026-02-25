@@ -2,11 +2,11 @@
 
 Scope: Replace fragmented status outputs with one canonical run report exposed by `ploy run status <run-id>` in exactly two formats: human follow-style text (default) and machine JSON (`--json`). Remove overlapping status variants, especially `ploy mig run repo status`.
 
-Documentation: `AGENTS.md`; `cmd/ploy/README.md`; `docs/migs-lifecycle.md`; `docs/testing-workflow.md`; `cmd/ploy/testdata/help.txt`
+Documentation: `AGENTS.md`; `cmd/ploy/README.md`; `docs/migs-lifecycle.md`; `cmd/ploy/testdata/help.txt`
 
 Legend: [ ] todo, [x] done.
 
-## Phase 0: Contract and RED Gates
+## Phase 0: Contract and Baseline Gates
 - [x] Define a single report contract used by both renderers — keeps text and JSON outputs structurally aligned.
   - Repository: `ploy`
   - Component: CLI reporting contract (`internal/cli/runs`), command flags (`cmd/ploy`)
@@ -19,7 +19,7 @@ Legend: [ ] todo, [x] done.
   - Component: `cmd/ploy/*_test.go`, help golden files
   - Scope: Add failing tests for: `ploy run status <id>` default human report, `ploy run status --json <id>` JSON report, and hard failure/removal path for `ploy mig run repo status`.
   - Snippets: `ploy run status <run-id>`; `ploy run status --json <run-id>`; `ploy mig run repo status <run-id>`
-  - Tests: `go test ./cmd/ploy/...` — RED expected before implementation lands.
+  - Tests: `go test ./cmd/ploy/...` — Baseline behavior checks for new command surfaces.
 
 ## Phase 1: Data Assembly (Canonical Report Builder)
 - [x] Implement a report builder that aggregates all data once — centralizes collection logic for both renderers.
@@ -74,15 +74,15 @@ Legend: [ ] todo, [x] done.
   - Snippets: `ploy run status <run-id> [--json]`
   - Tests: `go test ./cmd/ploy/...` help golden checks pass.
 
-## Phase 5: GREEN and REFACTOR Validation
-- [x] Complete GREEN phase with local unit tests and build checks — validates behavior and command UX.
+## Phase 5: Verification and Refactoring
+- [x] Complete implementation phase with local unit tests and build checks — validates behavior and command UX.
   - Repository: `ploy`
   - Component: CLI + internal report packages
   - Scope: Make all RED tests pass after implementation; keep scope limited to reporting/status surfaces.
   - Snippets: `make test`; `make build`
   - Tests: all relevant CLI/report tests green.
 
-- [x] REFACTOR shared output code between follow and status report — removes duplication while preserving behavior.
+- [x] Refactor shared output code between follow and status report — removes duplication while preserving behavior.
   - Repository: `ploy`
   - Component: `internal/cli/follow`, `internal/cli/runs`
   - Scope: Extract shared row/column formatting primitives and keep follow dynamic redraw independent from status one-shot rendering.

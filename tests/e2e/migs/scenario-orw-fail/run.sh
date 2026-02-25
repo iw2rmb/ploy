@@ -67,7 +67,7 @@ fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Validate Codex healing pipeline artifacts (session + workspace diff handshake)
-# RED→GREEN→REFACTOR discipline for Codex healing.
+# Validation checklist for Codex healing.
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "Validating Codex healing pipeline artifacts..."

@@ -92,9 +92,9 @@ Historically, this repo+diff model was exposed via the HTTP Build Gate API (`POS
 
 The recommended approach for Codex-based healing is the workspace diff handshake. Codex edits the workspace and, when ready for validation, simply exits. The node agent re-runs the Build Gate externally after healing completes only when workspace diffs exist; a clean workspace (no diff) means no re-gate and the run remains failed.
 
-**Codex Healing Handshake Checklist (TDD Validation):**
+**Codex Healing Handshake Checklist (Validation):**
 
-Per RED→GREEN→REFACTOR discipline, the following artifacts should be validated after Codex-based healing runs:
+Validate the following artifacts after Codex-based healing runs:
 
 | Artifact | Location | Description | Required |
 |----------|----------|-------------|----------|
@@ -120,7 +120,7 @@ Per RED→GREEN→REFACTOR discipline, the following artifacts should be validat
    - `resumed`: `true` if this was a resumed session, `false` otherwise
 
 See `tests/unit/mig_codex_sh_test.sh` for unit tests covering these behaviors.
-Cross-reference: `docs/testing-workflow.md` and `AGENTS.md`.
+Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 
 **Cross-phase inputs available to healing migs:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)

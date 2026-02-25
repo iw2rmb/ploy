@@ -121,7 +121,6 @@ See `tests/e2e/migs/README.md` for detailed e2e documentation.
 ### Unit Tests
 - **Location:** Colocated with source code (e.g., `internal/workflow/backoff/backoff_test.go`)
 - **Purpose:** Validate individual components in isolation
-- **Coverage target:** ≥90% for critical workflow packages
 - **Run via:** `go test ./internal/...`
 
 ### Integration Tests
@@ -303,11 +302,11 @@ The smoke test suite is designed for CI environments:
 
 ## References
 
-- **Engineering guide:** `AGENTS.md` and `docs/testing-workflow.md` (TDD, coverage targets)
+- **Engineering guide:** `AGENTS.md` and `docs/testing-workflow.md` (testing workflow and validation commands)
 - **E2E documentation:** `tests/e2e/migs/README.md` (container workflows)
 - **System docs:** `docs/` (current contracts and operations)
-- **Agent guide:** `AGENTS.md` (TDD discipline, RED→GREEN→REFACTOR)
+- **Agent guide:** `AGENTS.md` (engineering policies and validation commands)
 
 ---
 
-**Validation status:** This test suite validates the critical workflows modified during the library reuse roadmap (backoff, SSE, GitLab client, CLI). All tests follow TDD discipline with coverage ≥90% on critical packages.
+**Validation status:** This test suite validates the critical workflows modified during the library reuse roadmap (backoff, SSE, GitLab client, CLI).

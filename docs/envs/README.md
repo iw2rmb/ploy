@@ -537,7 +537,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 ## Related Docs
 
 - [README.md](../../README.md) — Server/node pivot architecture
-- [docs/testing-workflow.md](../testing-workflow.md) — Go testing workflow and quality checks
+- [docs/testing-workflow.md](../testing-workflow.md) — Go testing workflow and local validation commands
 - See `CHANGELOG.md` for migration status and recent slices
 - [docs/how-to/deploy-locally.md](../how-to/deploy-locally.md) — Local Docker cluster
 

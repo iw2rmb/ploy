@@ -9,8 +9,7 @@ Unless otherwise specified, the following policies apply when planning changes:
 
 ## Before You Start
 
-- Commit to the RED → GREEN → REFACTOR cadence for the upcoming change.
-- Plan local unit tests and coverage checks before touching code or docs.
+- Plan local unit tests before touching code or docs.
 - Verify required environment variables (see `docs/envs/README.md`) are
   discoverable or called out as TODOs for future slices.
 
@@ -32,26 +31,20 @@ Unless otherwise specified, the following policies apply when planning changes:
 
 ## Development
 
-### TDD Framework (CRITICAL)
+### Testing Framework (CRITICAL)
 
-- Unit tests and CLI builds (RED/GREEN phases) run locally.
+- Unit tests and CLI builds run locally.
 - E2E tests run against the local Docker cluster (see `deploy/local/run.sh`).
   - Default CLI config: `PLOY_CONFIG_HOME=$PWD/deploy/local/cli`.
-- Coverage: maintain ≥60% overall and ≥90% on critical workflow runner packages.
-- Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise E2E when needed).
 - For Mods E2E details, consult `tests/e2e/migs/README.md`.
 
-#### TDD Discipline Validation
+#### Validation Commands
 
 Use Make targets and standard Go tooling:
 
 ```bash
 # Unit tests
 make test
-
-# Statement coverage reports (Go built-in coverage is statement coverage, not branch coverage)
-make coverage
-make coverage-html
 
 # Hygiene
 make vet

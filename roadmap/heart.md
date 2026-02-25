@@ -2,25 +2,25 @@
 
 Scope: Implement end-to-end recovery for jobs stuck in `Running` when a node stops heartbeating. The server must detect stale nodes, cancel orphaned active jobs for affected repo attempts, recompute `run_repos` status, and finalize `runs` status when all repos are terminal.
 
-Documentation: `AGENTS.md`; `docs/testing-workflow.md`; `docs/migs-lifecycle.md`; `internal/server/handlers/jobs_complete.go`; `internal/server/handlers/nodes_complete_run.go`; `internal/store/queries/jobs.sql`; `internal/store/queries/nodes.sql`; `cmd/ployd/server.go`
+Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `internal/server/handlers/jobs_complete.go`; `internal/server/handlers/nodes_complete_run.go`; `internal/store/queries/jobs.sql`; `internal/store/queries/nodes.sql`; `cmd/ployd/server.go`
 
 Legend: [ ] todo, [x] done.
 
-## Phase 0: Behavior Contract and RED
+## Phase 0: Behavior Contract and Baseline Tests
 - Note: Phase 0 tests are scaffolded and intentionally skipped until the Phase 2 recovery worker is wired.
 - [x] Add failing tests that reproduce stale `Running` jobs after node loss — Locks target behavior before implementation.
   - Repository: `ploy`
   - Component: `internal/server/handlers`, `internal/store`, `internal/store/*scheduler*`
   - Scope: Add tests for: node heartbeat becomes stale, job remains `Running`, recovery cycle cancels active chain and unblocks terminal run/repo status transitions.
   - Snippets: `go test ./internal/server/handlers -run 'Stale|Recovery'`
-  - Tests: `make test` — New stale-recovery tests fail first.
+  - Tests: `make test` — New stale-recovery tests lock target behavior.
 
 - [x] Add run/repo status reconciliation regression tests for cancellation path — Guarantees parity with existing completion semantics.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope: Cover these outcomes after stale cancellation: `run_repos` -> `Cancelled`, `runs` -> `Finished` when all repos terminal, and no transition when other repos are still non-terminal.
   - Snippets: `go test ./internal/server/handlers -run 'RepoStatus|RunCompletion|Cancelled'`
-  - Tests: Expected failures on missing stale-recovery implementation.
+  - Tests: Covers behavior that depends on stale-recovery implementation.
 
 ## Phase 1: Store Primitives for Stale Detection and Cancellation
 - [x] Add SQL query to list stale running jobs by node heartbeat age — Provides deterministic stale candidate selection.
@@ -82,17 +82,17 @@ Legend: [ ] todo, [x] done.
   - Snippets: `eventsService.PublishRun(...)`, `Hub().PublishStatus(... done ...)`
   - Tests: `go test ./internal/server/handlers -run 'Events|RunCompletion'` — terminal events emitted once.
 
-## Phase 5: GREEN and Documentation
+## Phase 5: Verification and Documentation
 - [x] Run full verification for touched packages — Confirms no regressions in queueing and completion.
   - Repository: `ploy`
   - Component: `internal/store/**`, `internal/server/**`, `cmd/ployd`
-  - Scope: Execute unit tests, vet, staticcheck, and coverage checks for affected paths.
-  - Snippets: `make test`; `make vet`; `make staticcheck`; `make coverage`
-  - Tests: All pass with project thresholds maintained.
+  - Scope: Execute unit tests, vet, and staticcheck for affected paths.
+  - Snippets: `make test`; `make vet`; `make staticcheck`
+  - Tests: All pass.
 
 - [x] Update docs to reflect recovery behavior and new config knobs — Keeps runtime docs aligned with implementation.
   - Repository: `ploy`
-  - Component: `docs/migs-lifecycle.md`, `docs/envs/README.md`, optionally `docs/testing-workflow.md`
+  - Component: `docs/migs-lifecycle.md`, `docs/envs/README.md`
   - Scope: Document stale-node detection semantics, recovery lifecycle, config defaults, and troubleshooting commands.
   - Snippets: `GET /v1/runs/{id}/status` examples showing recovery-terminalized repos.
   - Tests: `npx --yes markdownlint --config .markdownlint.yaml docs/**/*.md` — docs lint clean.
