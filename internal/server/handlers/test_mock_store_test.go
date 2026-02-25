@@ -386,6 +386,17 @@ type mockStore struct {
 	listRunReposByRunResult []store.RunRepo
 	listRunReposByRunErr    error
 
+	// Stale running jobs recovery tracking
+	listStaleRunningJobsCalled bool
+	listStaleRunningJobsParam  pgtype.Timestamptz
+	listStaleRunningJobsResult []store.ListStaleRunningJobsRow
+	listStaleRunningJobsErr    error
+
+	cancelActiveJobsByRunRepoAttemptCalled bool
+	cancelActiveJobsByRunRepoAttemptParams []store.CancelActiveJobsByRunRepoAttemptParams
+	cancelActiveJobsByRunRepoAttemptResult int64
+	cancelActiveJobsByRunRepoAttemptErr    error
+
 	// CountRunReposByStatus tracking — run IDs are now strings (KSUID).
 	countRunReposByStatusCalled bool
 	countRunReposByStatusParam  string
@@ -920,6 +931,18 @@ func (m *mockStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.List
 	m.listJobsByRunRepoAttemptCalled = true
 	m.listJobsByRunRepoAttemptParams = arg
 	return m.listJobsByRunRepoAttemptResult, m.listJobsByRunRepoAttemptErr
+}
+
+func (m *mockStore) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
+	m.listStaleRunningJobsCalled = true
+	m.listStaleRunningJobsParam = lastHeartbeat
+	return m.listStaleRunningJobsResult, m.listStaleRunningJobsErr
+}
+
+func (m *mockStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
+	m.cancelActiveJobsByRunRepoAttemptCalled = true
+	m.cancelActiveJobsByRunRepoAttemptParams = append(m.cancelActiveJobsByRunRepoAttemptParams, params)
+	return m.cancelActiveJobsByRunRepoAttemptResult, m.cancelActiveJobsByRunRepoAttemptErr
 }
 
 func (m *mockStore) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {

@@ -38,14 +38,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/store -run 'CancelActiveJobsByRunRepoAttempt'` — Only active rows updated.
 
 ## Phase 2: Server Recovery Worker
-- [ ] Implement a scheduler task that performs stale-job recovery cycles — Moves recovery out of request path and makes it self-healing.
+- [x] Implement a scheduler task that performs stale-job recovery cycles — Moves recovery out of request path and makes it self-healing.
   - Repository: `ploy`
   - Component: `internal/server/handlers` (or dedicated recovery package), `internal/server/scheduler`
   - Scope: Add task with cycle: list stale running jobs -> group by repo attempt -> cancel active jobs in attempt -> recompute `run_repos` and `runs` terminal state via existing status derivation logic.
   - Snippets: `type StaleJobRecoveryTask struct { ... }`
   - Tests: `go test ./internal/server/... -run 'StaleJobRecoveryTask'` — One cycle resolves stuck attempts.
 
-- [ ] Reuse one canonical repo/run terminal reconciliation path — Prevents divergence from job-complete behavior.
+- [x] Reuse one canonical repo/run terminal reconciliation path — Prevents divergence from job-complete behavior.
   - Repository: `ploy`
   - Component: `internal/server/handlers/nodes_complete_run.go`, recovery task code
   - Scope: Extract/reuse shared helpers for `run_repos` derivation and `runs` completion checks; avoid duplicate logic forks.
