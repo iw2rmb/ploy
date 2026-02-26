@@ -47,14 +47,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./cmd/ploy -run 'TestMigStatus'`.
 
 ## Phase 1: Shared rendering primitives
-- [ ] Keep shared follow frame rendering for `run status`, and extend row model for optional exit one-liner rows.
+- [x] Keep shared follow frame rendering for `run status`, and extend row model for optional exit one-liner rows.
   - Repository: `ploy`
   - Component: `internal/cli/runs` + `internal/cli/follow`
   - Scope: Reuse one row/table renderer, add optional second line under a step for exit summaries (`Exit <code>: <message>`), and keep cursor/redraw control in follow engine.
   - Snippets: `func RenderFollowFrameText(frame FollowFrame, opts FollowFrameOptions) (string, int)`
   - Tests: update `internal/cli/follow/engine_test.go` and `internal/cli/runs` renderer tests.
 
-- [ ] Keep spinner glyph logic centralized and deterministic.
+- [x] Keep spinner glyph logic centralized and deterministic.
   - Repository: `ploy`
   - Component: shared render helpers
   - Scope: Keep `spinnerFrames` + `statusGlyph` in shared helper; one-shot paths render frame index `0`; live follow increments frames.

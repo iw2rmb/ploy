@@ -82,3 +82,23 @@ func TestFormatDurationMsOrElapsed(t *testing.T) {
 		t.Fatalf("FormatDurationMsOrElapsed(empty)=%q, want %q", got, want)
 	}
 }
+
+func TestStatusGlyph(t *testing.T) {
+	t.Parallel()
+
+	if got := StatusGlyph("running", 0); got != "⣾" {
+		t.Fatalf("StatusGlyph(running,0)=%q, want %q", got, "⣾")
+	}
+	if got := StatusGlyph("running", 1); got != "⣷" {
+		t.Fatalf("StatusGlyph(running,1)=%q, want %q", got, "⣷")
+	}
+	if got := StatusGlyph("started", 0); got != "⣾" {
+		t.Fatalf("StatusGlyph(started,0)=%q, want %q", got, "⣾")
+	}
+	if got := StatusGlyph("failed", 0); got != "✗" {
+		t.Fatalf("StatusGlyph(failed,0)=%q, want %q", got, "✗")
+	}
+	if got := StatusGlyph("queued", 0); got != "·" {
+		t.Fatalf("StatusGlyph(queued,0)=%q, want %q", got, "·")
+	}
+}

@@ -3,7 +3,6 @@
 package follow
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"text/tabwriter"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
@@ -44,9 +42,6 @@ type RepoEntry struct {
 	StartedAt  *time.Time            `json:"started_at,omitempty"`
 	FinishedAt *time.Time            `json:"finished_at,omitempty"`
 }
-
-// spinnerFrames defines the animation frames for the running spinner.
-var spinnerFrames = []string{"⣾ ", "⣽ ", "⣻ ", "⢿ ", "⡿ ", "⣟ ", "⣯ ", "⣷ "}
 
 // Engine manages the follow mode rendering loop.
 type Engine struct {
@@ -285,11 +280,10 @@ func (e *Engine) render() {
 		return
 	}
 
-	// Build the full frame into a buffer so we can count lines and redraw in-place.
-	var buf bytes.Buffer
-	tw := tabwriter.NewWriter(&buf, 0, 8, 2, ' ', 0)
-
-	_, _ = fmt.Fprintf(tw, "  Repos: %d\n", len(e.repoOrder))
+	frame := runs.FollowFrame{
+		TopLines: []string{fmt.Sprintf("  Repos: %d", len(e.repoOrder))},
+		Repos:    make([]runs.FollowRepoFrame, 0, len(e.repoOrder)),
+	}
 
 	for i, repoID := range e.repoOrder {
 		repoURL := e.repoURLs[repoID]
@@ -297,43 +291,49 @@ func (e *Engine) render() {
 		repoErr := runs.FormatErrorOneLiner(e.repoErrors[repoID])
 		repoErrRendered := false
 
-		_, _ = fmt.Fprintln(tw)
-		_, _ = fmt.Fprintf(tw, "  Repo %d/%d: %s\n", i+1, len(e.repoOrder), repoURL)
-		_, _ = fmt.Fprintln(tw, "\tStep\tJob ID\tNode\tImage\tDuration")
+		repoFrame := runs.FollowRepoFrame{
+			HeaderLine: fmt.Sprintf("  Repo %d/%d: %s", i+1, len(e.repoOrder), repoURL),
+			Columns:    []string{"", "Step", "Job ID", "Node", "Image", "Duration"},
+			Rows:       make([]runs.FollowStepRow, 0, len(jobs)),
+		}
 
 		for _, job := range jobs {
-
 			nodeID := runs.FormatNodeID(job.NodeID)
 			image := strings.TrimSpace(job.JobImage)
 			if image == "" {
 				image = "-"
 			}
 
-			glyph := statusGlyph(string(job.Status), e.spinnerFrame)
+			glyph := runs.StatusGlyph(string(job.Status), e.spinnerFrame)
 			duration := runs.FormatDurationMsOrElapsed(job.DurationMs, job.StartedAt, job.FinishedAt, time.Now())
 
-			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
-				glyph,
-				job.JobType,
-				job.JobID.String(),
-				nodeID,
-				image,
-				duration,
-			)
-
+			row := runs.FollowStepRow{
+				Cells: []string{
+					glyph,
+					job.JobType,
+					job.JobID.String(),
+					nodeID,
+					image,
+					duration,
+				},
+			}
 			if !repoErrRendered && repoErr != "" && isFailedStatus(string(job.Status)) {
-				fmt.Fprintf(tw, "%s%s%s\t\t\t\t\t\n", ansiRed, "└ "+repoErr, ansiReset)
+				row.ExitOneLiner = ansiRed + "└ " + repoErr + ansiReset
 				repoErrRendered = true
 			}
+			repoFrame.Rows = append(repoFrame.Rows, row)
 		}
-		if !repoErrRendered && repoErr != "" {
-			fmt.Fprintf(tw, "%s%s%s\t\t\t\t\t\n", ansiRed, "└ "+repoErr, ansiReset)
+		if repoErr != "" && !repoErrRendered {
+			if len(repoFrame.Rows) > 0 {
+				repoFrame.Rows[len(repoFrame.Rows)-1].ExitOneLiner = ansiRed + "└ " + repoErr + ansiReset
+			} else {
+				repoFrame.EmptyLine = ansiRed + "└ " + repoErr + ansiReset
+			}
 		}
+		frame.Repos = append(frame.Repos, repoFrame)
 	}
 
-	_ = tw.Flush()
-	frame := buf.String()
-	lines := strings.Count(frame, "\n")
+	rendered, lines := runs.RenderFollowFrameText(frame, runs.FollowFrameOptions{})
 
 	// In-place redraw: move cursor up over the previously rendered frame and clear.
 	// This keeps output stable (like package managers / docker build) instead of
@@ -346,7 +346,7 @@ func (e *Engine) render() {
 		fmt.Fprintf(out, "\x1b[%dA", e.renderedLines)
 		fmt.Fprint(out, "\x1b[J")
 	}
-	fmt.Fprint(out, frame)
+	fmt.Fprint(out, rendered)
 	e.renderedLines = lines
 
 	// Advance spinner frame for next render
@@ -361,30 +361,6 @@ func (e *Engine) showCursor() {
 	}
 	if e.renderStarted {
 		fmt.Fprint(e.config.Output, "\x1b[?25h")
-	}
-}
-
-// statusGlyph returns the display glyph for a job status.
-// For running jobs, spinnerFrame controls the animation frame.
-func statusGlyph(status string, spinnerFrame int) string {
-	switch strings.ToLower(status) {
-	case "running":
-		// Animated spinner for running jobs (reverse frame direction).
-		frameCount := len(spinnerFrames)
-		frameIndex := ((-spinnerFrame)%frameCount + frameCount) % frameCount
-		return spinnerFrames[frameIndex]
-	case "success", "succeeded":
-		return "✓"
-	case "fail", "failed":
-		return "✗"
-	case "cancelled", "canceled":
-		return "○"
-	case "created":
-		return "·"
-	case "queued":
-		return "·"
-	default:
-		return " "
 	}
 }
 
