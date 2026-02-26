@@ -51,7 +51,7 @@ type BuildGateStackConfig struct {
 // HealingSpec describes the heal → re-gate loop configuration.
 // When the build gate fails, the agent can execute a healing mig then re-run the gate.
 //
-// HealingSpec is itself mig-like: it carries Image, Command, Env, and RetainContainer
+// HealingSpec is itself mig-like: it carries Image, Command, and Env
 // directly (no nested Mod object). Retries controls the healing retry count.
 type HealingSpec struct {
 	// Retries is the maximum number of healing attempts (default: 1).
@@ -67,14 +67,11 @@ type HealingSpec struct {
 
 	// Env holds environment variables to inject into the healing container.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-
-	// RetainContainer controls whether the healing container is retained.
-	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
 }
 
 // RouterSpec describes the router container that runs on gate failure to produce
-// a bug_summary before healing begins. Router is mig-like (Image, Command, Env,
-// RetainContainer) but has no Retries — it runs exactly once per gate failure.
+// a bug_summary before healing begins. Router is mig-like (Image, Command, Env)
+// but has no Retries — it runs exactly once per gate failure.
 type RouterSpec struct {
 	// Image is the container image for the router (required).
 	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
@@ -84,7 +81,4 @@ type RouterSpec struct {
 
 	// Env holds environment variables to inject into the router container.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-
-	// RetainContainer controls whether the router container is retained.
-	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
 }

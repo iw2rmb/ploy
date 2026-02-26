@@ -367,7 +367,7 @@ ploy completion <shell> --help
 - `--spec` — Path to a YAML/JSON spec file defining mig parameters, Build Gate settings,
   and healing configuration for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical shapes:
-  top-level fields for single-step runs (`image`, `command`, `env`, `retain_container`)
+  top-level fields for single-step runs (`image`, `command`, `env`)
   and `migs[]` for multi-step runs. The spec supports inline environment variables (`env`),
   file-based secrets (`env_from_file`), Build Gate healing (`build_gate_healing`),
   and GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
@@ -581,7 +581,6 @@ build_gate_healing:
       CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
     env_from_file:
       CODEX_AUTH_JSON: ~/.codex/auth.json
-    retain_container: false
 ```
 
 **Cross-phase inputs:**

@@ -247,9 +247,6 @@ func TestBuildManifestFromRequest(t *testing.T) {
 					MROnSuccessSet: true,
 					MROnFailSet:    true,
 				},
-				Execution: ModContainerSpec{
-					RetainContainer: true,
-				},
 			},
 		}
 		// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.

@@ -55,7 +55,6 @@ type migRunFlags struct {
 	ModEnvs    *stringSlice
 	JobImage   *string
 	ModCommand *string
-	Retain     *bool
 
 	// GitLab integration (per-run overrides)
 	GitLabPAT    *string
@@ -96,7 +95,6 @@ func parseMigRunFlags(args []string) (*migRunFlags, error) {
 	fs.Var(flags.ModEnvs, "job-env", "Job environment KEY=VALUE (repeatable)")
 	flags.JobImage = fs.String("job-image", "", "Container image for the mig step (optional)")
 	flags.ModCommand = fs.String("job-command", "", "Container command override (string or JSON array)")
-	flags.Retain = fs.Bool("retain-container", false, "Retain the mig container after execution (for debugging)")
 
 	// GitLab integration (per-run overrides)
 	flags.GitLabPAT = fs.String("gitlab-pat", "", "GitLab Personal Access Token for this run (overrides server default)")
@@ -113,5 +111,5 @@ func parseMigRunFlags(args []string) (*migRunFlags, error) {
 
 // printMigRunUsage writes usage information for the mig run command to the provided writer.
 func printMigRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mig run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--job-env KEY=VALUE ...] [--job-image <image>] [--job-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--cancel-on-cap] [--artifact-dir <dir>] [--json] [--max-retries N]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mig run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--job-env KEY=VALUE ...] [--job-image <image>] [--job-command <cmd>] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--cancel-on-cap] [--artifact-dir <dir>] [--json] [--max-retries N]")
 }

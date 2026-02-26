@@ -124,9 +124,6 @@ type ModStep struct {
 	// Env holds environment variables specific to this step.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 
-	// RetainContainer controls whether this step's container is retained.
-	RetainContainer bool `json:"retain_container,omitempty" yaml:"retain_container,omitempty"`
-
 	// Stack configures Stack Gate validation for this step.
 	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
