@@ -101,35 +101,20 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	var result Result
 
 	// Stage 1: Hydrate workspace.
-	hydrationStart := time.Now()
-	if r.Workspace != nil {
-		if err := r.Workspace.Hydrate(ctx, req.Manifest, req.Workspace); err != nil {
-			return Result{}, fmt.Errorf("workspace hydration failed: %w", err)
-		}
+	hydrationDuration, err := runHydrationStage(ctx, r, req)
+	if err != nil {
+		return Result{}, err
 	}
-	result.Timings.HydrationDuration = types.Duration(time.Since(hydrationStart))
+	result.Timings.HydrationDuration = hydrationDuration
 
 	// Stage 2: Pre-mig Build Gate validation.
-	gateStart := time.Now()
-	gateSpec := req.Manifest.Gate
-	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
-		gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
-		if err != nil {
-			return Result{}, fmt.Errorf("build gate execution failed: %w", err)
-		}
-		result.BuildGate = gateMetadata
-
-		gatePassed := false
-		if len(gateMetadata.StaticChecks) > 0 {
-			gatePassed = gateMetadata.StaticChecks[0].Passed
-		}
-		if !gatePassed {
-			result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
-			result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
-			return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mig validation failed")
-		}
+	gateMetadata, gateDuration, err := runGateStage(ctx, r, req, "pre-mig validation failed")
+	result.BuildGate = gateMetadata
+	result.Timings.BuildGateDuration = gateDuration
+	if err != nil {
+		result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
+		return result, err
 	}
-	result.Timings.BuildGateDuration = types.Duration(time.Since(gateStart))
 
 	// Stage 3: Execute container via configured runtime.
 	executionStart := time.Now()
