@@ -267,7 +267,7 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 		step.Name = strings.TrimSpace(s)
 	}
 
-	// Parse shared mig-like fields (image, command, env, retain_container).
+	// Parse shared mig-like fields (image, command, env).
 	f, err := parseModLikeFields(raw, prefix)
 	if err != nil {
 		return step, err
@@ -275,7 +275,6 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 	step.Image = f.Image
 	step.Command = f.Command
 	step.Env = f.Env
-	step.RetainContainer = f.RetainContainer
 
 	// Parse stack gate configuration.
 	if v, ok := raw["stack"]; ok && v != nil {
@@ -317,7 +316,6 @@ func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
 	heal.Image = f.Image
 	heal.Command = f.Command
 	heal.Env = f.Env
-	heal.RetainContainer = f.RetainContainer
 
 	return heal, nil
 }
@@ -328,10 +326,9 @@ func parseRouterSpec(raw map[string]any, prefix string) (*RouterSpec, error) {
 		return nil, err
 	}
 	return &RouterSpec{
-		Image:           f.Image,
-		Command:         f.Command,
-		Env:             f.Env,
-		RetainContainer: f.RetainContainer,
+		Image:   f.Image,
+		Command: f.Command,
+		Env:     f.Env,
 	}, nil
 }
 

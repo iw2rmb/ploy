@@ -44,7 +44,6 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	specJSON := `{
         "steps": [{
             "image": "docker.io/test/mig:latest",
-            "retain_container": true,
             "command": ["/bin/sh","-c","echo hi"]
         }],
         "env": {"A":"1","B":"2"},
@@ -60,9 +59,6 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	}
 	if img != "docker.io/test/mig:latest" {
 		t.Fatalf("Execution.Image = %q, want docker.io/test/mig:latest", img)
-	}
-	if !typedOpts.Execution.RetainContainer {
-		t.Fatalf("Execution.RetainContainer not extracted")
 	}
 	wantExec := []string{"/bin/sh", "-c", "echo hi"}
 	gotExec := typedOpts.Execution.Command.ToSlice()
@@ -132,8 +128,7 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		"steps": [
 			{
 				"image": "docker.io/test/mig-step1:latest",
-				"env": {"STEP": "1", "TARGET": "java8"},
-				"retain_container": false
+				"env": {"STEP": "1", "TARGET": "java8"}
 			},
 			{
 				"image": "docker.io/test/mig-step2:latest",
@@ -279,7 +274,7 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 }
 
 // TestParseHealingMod_ModFields verifies that healing mig parsing correctly
-// extracts mig fields including image, command, env, and retain_container.
+// extracts mig fields including image, command, and env.
 func TestParseHealingMod_ModFields(t *testing.T) {
 	t.Parallel()
 
@@ -293,8 +288,7 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 				"env": {
 					"MODE": "aggressive",
 					"DEBUG": "true"
-				},
-				"retain_container": true
+				}
 			},
 			"router": {
 				"image": "docker.io/test/router:latest"
@@ -329,10 +323,6 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 		t.Errorf("Mod env DEBUG: got %q, want %q", mig.Env["DEBUG"], "true")
 	}
 
-	// Verify retain_container.
-	if !mig.RetainContainer {
-		t.Error("Mod retain_container: got false, want true")
-	}
 }
 
 // TestParseSpec_ProducesTypedOptions_SingleStepExecArray is a regression test

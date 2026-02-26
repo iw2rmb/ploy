@@ -18,7 +18,6 @@ func TestBuildSpecPayloadFromYAML(t *testing.T) {
 	specContent := `
 steps:
   - image: docker.io/test/mig:latest
-    retain_container: true
 env:
   KEY1: value1
   KEY2: value2
@@ -72,8 +71,8 @@ mr_on_success: true
 	} else {
 		t.Errorf("expected env in payload")
 	}
-	if retain, ok := step0["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected steps[0].retain_container=true, got %v", step0["retain_container"])
+	if _, exists := step0["retain_container"]; exists {
+		t.Errorf("expected steps[0].retain_container to be absent")
 	}
 
 	// Verify gitlab_domain
@@ -84,6 +83,70 @@ mr_on_success: true
 	// Verify mr_on_success
 	if success, ok := result["mr_on_success"].(bool); !ok || !success {
 		t.Errorf("expected mr_on_success=true, got %v", result["mr_on_success"])
+	}
+}
+
+func TestBuildSpecPayloadRejectsRetainContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		specYML string
+		wantErr string
+	}{
+		{
+			name: "step retain forbidden",
+			specYML: `
+steps:
+  - image: docker.io/test/mig:latest
+    retain_container: true
+`,
+			wantErr: "validate spec: steps[0].retain_container: forbidden",
+		},
+		{
+			name: "healing retain forbidden",
+			specYML: `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  healing:
+    image: docker.io/test/heal:latest
+    retain_container: true
+  router:
+    image: docker.io/test/router:latest
+`,
+			wantErr: "validate spec: build_gate.healing.retain_container: forbidden",
+		},
+		{
+			name: "router retain forbidden",
+			specYML: `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  router:
+    image: docker.io/test/router:latest
+    retain_container: true
+`,
+			wantErr: "validate spec: build_gate.router.retain_container: forbidden",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			specPath := filepath.Join(tmpDir, "spec.yaml")
+			if err := os.WriteFile(specPath, []byte(tt.specYML), 0o644); err != nil {
+				t.Fatalf("write spec file: %v", err)
+			}
+
+			_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if err.Error() != tt.wantErr {
+				t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -451,9 +514,9 @@ build_gate:
 	} else {
 		t.Errorf("expected healing.env to be a map")
 	}
-	// retain_container=false → omitted from serialized output (omitempty).
+	// retain_container has been removed from the canonical contract.
 	if _, ok := healing["retain_container"]; ok {
-		t.Errorf("expected retain_container to be omitted (false → omitempty), got %v", healing["retain_container"])
+		t.Errorf("expected retain_container to be absent, got %v", healing["retain_container"])
 	}
 }
 
@@ -640,12 +703,12 @@ env:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	// Apply CLI overrides (env, image, retain).
+	// Apply CLI overrides (env, image).
 	payload, err := buildSpecPayload(
 		specPath,
 		[]string{"CLI_KEY=cli_value"},
 		"docker.io/test/override:v2",
-		true, // retain
+		true, // retain is ignored after retain_container removal.
 		"",
 		"",
 		"",
@@ -675,9 +738,9 @@ env:
 		t.Errorf("expected steps[0].image=docker.io/test/override:v2, got %v", step0["image"])
 	}
 
-	// Retain override applied.
-	if retain, ok := step0["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected steps[0].retain_container=true, got %v", step0["retain_container"])
+	// retain_container override has been removed.
+	if _, exists := step0["retain_container"]; exists {
+		t.Errorf("expected steps[0].retain_container to be absent")
 	}
 
 	// Env merged (CLI + spec).

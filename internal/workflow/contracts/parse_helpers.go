@@ -10,10 +10,9 @@ import (
 
 // modLikeFields holds the common fields shared between ModStep, HealingSpec, and RouterSpec.
 type modLikeFields struct {
-	Image           JobImage
-	Command         CommandSpec
-	Env             map[string]string
-	RetainContainer bool
+	Image   JobImage
+	Command CommandSpec
+	Env     map[string]string
 }
 
 // parseModLikeFields parses the common fields shared by ModStep, HealingSpec, and RouterSpec.
@@ -47,13 +46,9 @@ func parseModLikeFields(raw map[string]any, prefix string) (modLikeFields, error
 		f.Env = env
 	}
 
-	// Parse retain_container.
-	if v, ok := raw["retain_container"]; ok && v != nil {
-		b, err := expectBool(v, prefix+".retain_container")
-		if err != nil {
-			return f, err
-		}
-		f.RetainContainer = b
+	// retain_container is intentionally removed from the canonical contract.
+	if _, ok := raw["retain_container"]; ok {
+		return f, fmt.Errorf("%s.retain_container: forbidden", prefix)
 	}
 
 	return f, nil

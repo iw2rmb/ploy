@@ -76,9 +76,9 @@ gitlab_domain: gitlab.com
 		t.Errorf("expected env in payload")
 	}
 
-	// Verify CLI override for retain_container
-	if retain, ok := step0["retain_container"].(bool); !ok || !retain {
-		t.Errorf("expected steps[0].retain_container=true (CLI override), got %v", step0["retain_container"])
+	// retain_container is removed from the spec contract.
+	if _, exists := step0["retain_container"]; exists {
+		t.Errorf("expected steps[0].retain_container to be absent")
 	}
 
 	// Verify CLI override for gitlab_domain

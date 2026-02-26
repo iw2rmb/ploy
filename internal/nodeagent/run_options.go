@@ -37,13 +37,12 @@ type HealingConfig struct {
 	Mod     ModContainerSpec
 }
 
-// ModContainerSpec describes a container's image, command, env, and retention policy.
+// ModContainerSpec describes a container's image, command, and env.
 // Used for healing migs, router, execution options, and step migs.
 type ModContainerSpec struct {
-	Image           contracts.JobImage
-	Command         contracts.CommandSpec
-	Env             map[string]string
-	RetainContainer bool
+	Image   contracts.JobImage
+	Command contracts.CommandSpec
+	Env     map[string]string
 }
 
 // MRWiringOptions configures GitLab merge request creation for run outcomes.
@@ -104,20 +103,18 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 				healing.Retries = 1
 			}
 			healing.Mod = ModContainerSpec{
-				Image:           spec.BuildGate.Healing.Image,
-				Command:         spec.BuildGate.Healing.Command,
-				Env:             copyStringMap(spec.BuildGate.Healing.Env),
-				RetainContainer: spec.BuildGate.Healing.RetainContainer,
+				Image:   spec.BuildGate.Healing.Image,
+				Command: spec.BuildGate.Healing.Command,
+				Env:     copyStringMap(spec.BuildGate.Healing.Env),
 			}
 			runOpts.Healing = healing
 		}
 
 		if spec.BuildGate.Router != nil {
 			runOpts.Router = &ModContainerSpec{
-				Image:           spec.BuildGate.Router.Image,
-				Command:         spec.BuildGate.Router.Command,
-				Env:             copyStringMap(spec.BuildGate.Router.Env),
-				RetainContainer: spec.BuildGate.Router.RetainContainer,
+				Image:   spec.BuildGate.Router.Image,
+				Command: spec.BuildGate.Router.Command,
+				Env:     copyStringMap(spec.BuildGate.Router.Env),
 			}
 		}
 	}
@@ -138,7 +135,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
-		runOpts.Execution.RetainContainer = step.RetainContainer
 	}
 
 	if len(spec.Steps) > 1 {
@@ -146,10 +142,9 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		for _, step := range spec.Steps {
 			runOpts.Steps = append(runOpts.Steps, StepMod{
 				ModContainerSpec: ModContainerSpec{
-					Image:           step.Image,
-					Command:         step.Command,
-					Env:             copyStringMap(step.Env),
-					RetainContainer: step.RetainContainer,
+					Image:   step.Image,
+					Command: step.Command,
+					Env:     copyStringMap(step.Env),
 				},
 				Stack: step.Stack,
 			})

@@ -181,6 +181,8 @@ func buildSpecPayload(
 	mrSuccess bool,
 	mrFail bool,
 ) ([]byte, error) {
+	_ = retain
+
 	// Start with spec from file (if provided)
 	var base map[string]any
 	if specFile != "" {
@@ -230,7 +232,7 @@ func buildSpecPayload(
 	}
 
 	// Merge CLI flag overrides (CLI flags take precedence)
-	hasOverrides := len(modEnvs) > 0 || modImage != "" || retain || modCommand != "" ||
+	hasOverrides := len(modEnvs) > 0 || modImage != "" || modCommand != "" ||
 		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
 
 	// Only proceed if we have a spec file or CLI overrides
@@ -272,13 +274,13 @@ func buildSpecPayload(
 		}
 	}
 
-	// Image/command/retain overrides apply only to single-step specs. For multi-step
+	// Image/command overrides apply only to single-step specs. For multi-step
 	// specs (len(steps) > 1), these overrides are ignored.
 	var stepsLen int
 	if steps, ok := base["steps"].([]any); ok {
 		stepsLen = len(steps)
 	}
-	if stepsLen <= 1 && (modImage != "" || retain || modCommand != "") {
+	if stepsLen <= 1 && (modImage != "" || modCommand != "") {
 		// Ensure steps[0] exists and is a map.
 		var step0 map[string]any
 		if stepsLen == 1 {
@@ -293,9 +295,6 @@ func buildSpecPayload(
 
 		if modImage != "" {
 			step0["image"] = modImage
-		}
-		if retain {
-			step0["retain_container"] = true
 		}
 		if modCommand != "" {
 			// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.

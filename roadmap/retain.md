@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent -run 'ClaimLoop|claimAndExecute'`
 
 ## Phase 1: Remove Retain Policy Surface
-- [ ] Remove `retain_container` from canonical contracts and parser.
+- [x] Remove `retain_container` from canonical contracts and parser.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`
   - Scope:
@@ -36,7 +36,7 @@ Legend: [ ] todo, [x] done.
   - Tests:
     - update/add `internal/workflow/contracts/mods_spec_test.go` for forbidden-field validation.
 
-- [ ] Remove retain-dependent runtime option plumbing.
+- [x] Remove retain-dependent runtime option plumbing.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope:
@@ -50,7 +50,7 @@ Legend: [ ] todo, [x] done.
     - update `internal/nodeagent/claimer_spec_test.go`
     - update `internal/nodeagent/agent_manifest_builder_test.go`
 
-- [ ] Remove CLI retain switch and retain spec override behavior.
+- [x] Remove CLI retain switch and retain spec override behavior.
   - Repository: `ploy`
   - Component: `cmd/ploy`
   - Scope:

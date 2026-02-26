@@ -66,7 +66,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	image := defaultImage
 	command := []string(nil)
 	env := make(map[string]string, len(req.Env))
-	retain := false
 
 	if len(typedOpts.Steps) > 0 {
 		// Multi-step run.
@@ -90,7 +89,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		for k, v := range stepMod.Env {
 			env[k] = v
 		}
-		retain = stepMod.RetainContainer
 	} else {
 		// Single-step run.
 		if !typedOpts.Execution.Image.IsEmpty() {
@@ -105,7 +103,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		for k, v := range req.Env {
 			env[k] = v
 		}
-		retain = typedOpts.Execution.RetainContainer
 	}
 
 	// Inject placeholder command only for default ubuntu image.
@@ -189,8 +186,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			},
 		},
 		Retention: contracts.StepRetentionSpec{
-			RetainContainer: retain,
-			TTL:             types.Duration(time.Hour),
+			TTL: types.Duration(time.Hour),
 		},
 		Options: mergedOpts,
 	}
@@ -270,8 +266,7 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 			},
 		},
 		Retention: contracts.StepRetentionSpec{
-			RetainContainer: mig.RetainContainer,
-			TTL:             types.Duration(time.Hour),
+			TTL: types.Duration(time.Hour),
 		},
 		Options: map[string]any{
 			"mount_docker_socket": true,
@@ -319,8 +314,7 @@ func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack con
 			},
 		},
 		Retention: contracts.StepRetentionSpec{
-			RetainContainer: router.RetainContainer,
-			TTL:             types.Duration(time.Hour),
+			TTL: types.Duration(time.Hour),
 		},
 		Options: map[string]any{
 			"mount_docker_socket": true,

@@ -13,8 +13,7 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	specJSON := `{
 		"steps": [{
 			"image": "docker.io/test/mig:latest",
-			"command": "run-test.sh",
-			"retain_container": true
+			"command": "run-test.sh"
 		}],
 		"build_gate": {
 			"enabled": false
@@ -38,9 +37,6 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	}
 	if typedOpts.Execution.Command.Shell != "run-test.sh" {
 		t.Errorf("expected typed command.shell=run-test.sh, got %q", typedOpts.Execution.Command.Shell)
-	}
-	if !typedOpts.Execution.RetainContainer {
-		t.Errorf("expected typed retain_container=true")
 	}
 	if typedOpts.BuildGate.Enabled {
 		t.Errorf("expected typed build_gate.enabled=false")
@@ -217,20 +213,18 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			JobID: "job-direct-test-123",
 			Steps: []contracts.ModStep{
 				{
-					Image:           contracts.JobImage{Universal: "docker.io/test/mig:v1"},
-					Command:         contracts.CommandSpec{Exec: []string{"echo", "hello"}},
-					Env:             map[string]string{"KEY": "value"},
-					RetainContainer: true,
+					Image:   contracts.JobImage{Universal: "docker.io/test/mig:v1"},
+					Command: contracts.CommandSpec{Exec: []string{"echo", "hello"}},
+					Env:     map[string]string{"KEY": "value"},
 				},
 			},
 			BuildGate: &contracts.BuildGateConfig{
 				Enabled: true,
 				Healing: &contracts.HealingSpec{
-					Retries:         3,
-					Image:           contracts.JobImage{Universal: "docker.io/test/heal:v1"},
-					Command:         contracts.CommandSpec{Shell: "fix.sh"},
-					Env:             map[string]string{"MODE": "auto"},
-					RetainContainer: true,
+					Retries: 3,
+					Image:   contracts.JobImage{Universal: "docker.io/test/heal:v1"},
+					Command: contracts.CommandSpec{Shell: "fix.sh"},
+					Env:     map[string]string{"MODE": "auto"},
 				},
 			},
 			GitLabPAT:     "glpat-secret",
@@ -263,10 +257,6 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 				t.Errorf("Execution.Command.Exec[%d]: got %q, want %q", i, runOpts.Execution.Command.Exec[i], v)
 			}
 		}
-		if !runOpts.Execution.RetainContainer {
-			t.Error("Execution.RetainContainer: expected true")
-		}
-
 		if !runOpts.BuildGate.Enabled {
 			t.Error("BuildGate.Enabled: expected true")
 		}
@@ -318,10 +308,9 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 					Env:     map[string]string{"STEP": "1"},
 				},
 				{
-					Image:           contracts.JobImage{Universal: "docker.io/test/step2:v1"},
-					Command:         contracts.CommandSpec{Exec: []string{"step2", "--flag"}},
-					Env:             map[string]string{"STEP": "2"},
-					RetainContainer: true,
+					Image:   contracts.JobImage{Universal: "docker.io/test/step2:v1"},
+					Command: contracts.CommandSpec{Exec: []string{"step2", "--flag"}},
+					Env:     map[string]string{"STEP": "2"},
 				},
 			},
 		}
@@ -362,10 +351,6 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 				t.Errorf("Steps[1].Command.Exec[%d]: got %q, want %q", i, runOpts.Steps[1].Command.Exec[i], v)
 			}
 		}
-		if !runOpts.Steps[1].RetainContainer {
-			t.Error("Steps[1].RetainContainer: expected true")
-		}
-
 		if !runOpts.Execution.Image.IsEmpty() {
 			t.Errorf("Execution.Image: expected empty for multi-step spec")
 		}

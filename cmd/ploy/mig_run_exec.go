@@ -48,10 +48,6 @@ func buildRunRequest(flags *migRunFlags) (modsapi.RunSubmitRequest, error) {
 	if flags.JobImage != nil {
 		modImage = strings.TrimSpace(*flags.JobImage)
 	}
-	retain := false
-	if flags.Retain != nil {
-		retain = *flags.Retain
-	}
 	modCommand := ""
 	if flags.ModCommand != nil {
 		modCommand = strings.TrimSpace(*flags.ModCommand)
@@ -77,7 +73,7 @@ func buildRunRequest(flags *migRunFlags) (modsapi.RunSubmitRequest, error) {
 		specFile,
 		modEnvs,
 		modImage,
-		retain,
+		false,
 		modCommand,
 		gitlabPAT,
 		gitlabDomain,

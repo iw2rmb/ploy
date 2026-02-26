@@ -96,7 +96,6 @@ func printMigRunFlagsSummary(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --job-env KEY=VALUE        Job environment (repeatable)")
 	_, _ = fmt.Fprintln(w, "  --job-image <image>        Container image for mig step")
 	_, _ = fmt.Fprintln(w, "  --job-command <cmd>        Container command override")
-	_, _ = fmt.Fprintln(w, "  --retain-container         Retain container after execution")
 	_, _ = fmt.Fprintln(w, "  --gitlab-pat <token>       GitLab Personal Access Token")
 	_, _ = fmt.Fprintln(w, "  --gitlab-domain <domain>   GitLab domain")
 	_, _ = fmt.Fprintln(w, "  --mr-success               Create merge request on success")

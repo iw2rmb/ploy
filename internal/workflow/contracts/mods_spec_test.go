@@ -12,8 +12,7 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 		"steps": [{
 			"image": "docker.io/user/mig:latest",
 			"command": "echo hello",
-			"env": {"FOO": "bar", "BAZ": "qux"},
-			"retain_container": true
+			"env": {"FOO": "bar", "BAZ": "qux"}
 		}],
 		"build_gate": {"enabled": true},
 		"gitlab_pat": "secret",
@@ -63,11 +62,6 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 		t.Errorf("env[BAZ] = %q, want %q", step.Env["BAZ"], "qux")
 	}
 
-	// Verify retain_container.
-	if !step.RetainContainer {
-		t.Errorf("retain_container = false, want true")
-	}
-
 	// Verify build_gate.
 	if spec.BuildGate == nil {
 		t.Fatal("build_gate is nil")
@@ -96,7 +90,7 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	input := `{
 		"steps": [
 			{"name": "step-1", "image": "docker.io/user/mod1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}},
-			{"name": "step-2", "image": "docker.io/user/mod2:latest", "env": {"STEP": "2"}, "retain_container": true}
+			{"name": "step-2", "image": "docker.io/user/mod2:latest", "env": {"STEP": "2"}}
 		],
 		"build_gate": {
 			"enabled": true,
@@ -151,9 +145,6 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	if mod2.Name != "step-2" {
 		t.Errorf("steps[1].name = %q, want %q", mod2.Name, "step-2")
 	}
-	if !mod2.RetainContainer {
-		t.Errorf("steps[1].retain_container = false, want true")
-	}
 
 	// Verify healing.
 	if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
@@ -176,6 +167,55 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	if spec.BuildGate.Router.Image.Universal != "docker.io/user/router:latest" {
 		t.Errorf("build_gate.router.image = %q, want %q",
 			spec.BuildGate.Router.Image.Universal, "docker.io/user/router:latest")
+	}
+}
+
+func TestParseModsSpecJSON_RetainContainerForbidden(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "step retain forbidden",
+			input: `{
+				"steps": [{"image": "docker.io/user/mig:latest", "retain_container": true}]
+			}`,
+			wantErr: "steps[0].retain_container: forbidden",
+		},
+		{
+			name: "healing retain forbidden",
+			input: `{
+				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"build_gate": {
+					"healing": {"image": "docker.io/user/heal:latest", "retain_container": true},
+					"router": {"image": "docker.io/user/router:latest"}
+				}
+			}`,
+			wantErr: "build_gate.healing.retain_container: forbidden",
+		},
+		{
+			name: "router retain forbidden",
+			input: `{
+				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"build_gate": {
+					"router": {"image": "docker.io/user/router:latest", "retain_container": true}
+				}
+			}`,
+			wantErr: "build_gate.router.retain_container: forbidden",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseModsSpecJSON([]byte(tt.input))
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if err.Error() != tt.wantErr {
+				t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -502,10 +542,9 @@ func TestModsSpec_ToMap(t *testing.T) {
 	mrOnSuccess := true
 	original := &ModsSpec{
 		Steps: []ModStep{{
-			Image:           JobImage{Universal: "docker.io/user/mig:latest"},
-			Command:         CommandSpec{Shell: "echo hello"},
-			Env:             map[string]string{"FOO": "bar"},
-			RetainContainer: true,
+			Image:   JobImage{Universal: "docker.io/user/mig:latest"},
+			Command: CommandSpec{Shell: "echo hello"},
+			Env:     map[string]string{"FOO": "bar"},
 		}},
 		BuildGate:   &BuildGateConfig{Enabled: true},
 		GitLabPAT:   "secret",
@@ -531,9 +570,6 @@ func TestModsSpec_ToMap(t *testing.T) {
 	}
 	if parsed.Steps[0].Command.Shell != original.Steps[0].Command.Shell {
 		t.Errorf("command.Shell = %q, want %q", parsed.Steps[0].Command.Shell, original.Steps[0].Command.Shell)
-	}
-	if !parsed.Steps[0].RetainContainer {
-		t.Errorf("retain_container = false, want true")
 	}
 	if parsed.BuildGate == nil || !parsed.BuildGate.Enabled {
 		t.Errorf("build_gate.enabled should be true")

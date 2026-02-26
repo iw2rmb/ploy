@@ -49,7 +49,6 @@ Flags for 'ploy mig run':
   --job-env KEY=VALUE        Job environment (repeatable)
   --job-image <image>        Container image for mig step
   --job-command <cmd>        Container command override
-  --retain-container         Retain container after execution
   --gitlab-pat <token>       GitLab Personal Access Token
   --gitlab-domain <domain>   GitLab domain
   --mr-success               Create merge request on success
