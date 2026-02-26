@@ -31,6 +31,16 @@ parameters:
 get:
   tags: [Control]
   summary: Stream repo-scoped run logs (SSE)
+  parameters:
+    - in: query
+      name: auth_token
+      required: false
+      schema:
+        type: string
+      description: |
+        Optional bearer token supplied as a query parameter for browser/OSC8
+        artifact link flows when setting the `Authorization` header is not
+        possible.
   description: |
     Server-Sent Events stream for real-time status and log updates, filtered to
     jobs belonging to a specific repo execution within a run.

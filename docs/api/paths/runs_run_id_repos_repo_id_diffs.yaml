@@ -44,6 +44,15 @@ get:
         type: string
         format: uuid
       description: Diff ID to download when `download=true`.
+    - in: query
+      name: auth_token
+      required: false
+      schema:
+        type: string
+      description: |
+        Optional bearer token supplied as a query parameter for browser/OSC8
+        artifact link flows when setting the `Authorization` header is not
+        possible.
   responses:
     '200':
       description: OK

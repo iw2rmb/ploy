@@ -26,6 +26,16 @@ parameters:
 get:
   tags: [Control]
   summary: Stream run logs (SSE)
+  parameters:
+    - in: query
+      name: auth_token
+      required: false
+      schema:
+        type: string
+      description: |
+        Optional bearer token supplied as a query parameter for browser/OSC8
+        artifact link flows when setting the `Authorization` header is not
+        possible.
   description: |
     Server-Sent Events stream for real-time run status and log updates.
     Supports `Last-Event-ID` header for resume after reconnection.
