@@ -210,7 +210,7 @@ func isFailedOrCrashedStatus(status string) bool {
 
 func isTerminalJobStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "success", "succeeded", "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
+	case "success", "succeeded", "finished", "completed", "fail", "failed", "crash", "crashed", "error":
 		return true
 	default:
 		return false

@@ -19,7 +19,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/follow"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
@@ -41,6 +40,21 @@ type runSubmitFlags struct {
 	CapDuration *time.Duration
 	CancelOnCap *bool
 	MaxRetries  *int
+
+	// Job container configuration
+	ModEnvs    *stringSlice
+	JobImage   *string
+	ModCommand *string
+
+	// GitLab integration
+	GitLabPAT    *string
+	GitLabDomain *string
+	MRSuccess    *bool
+	MRFail       *bool
+
+	// Artifact and output
+	ArtifactDir *string
+	JSONOut     *bool
 }
 
 // parseRunSubmitFlags creates a FlagSet, defines all run submit flags, and parses the provided arguments.
@@ -62,7 +76,23 @@ func parseRunSubmitFlags(args []string) (*runSubmitFlags, error) {
 	flags.CapDuration = new(time.Duration)
 	fs.DurationVar(flags.CapDuration, "cap", 0, "Optional time cap for --follow")
 	flags.CancelOnCap = fs.Bool("cancel-on-cap", false, "Cancel run if cap exceeded")
-	flags.MaxRetries = fs.Int("max-retries", 5, "Max SSE reconnect attempts")
+	flags.MaxRetries = fs.Int("max-retries", 5, "Max report fetch retries (-1 for unlimited)")
+
+	// Job container configuration
+	flags.ModEnvs = new(stringSlice)
+	fs.Var(flags.ModEnvs, "job-env", "Job environment KEY=VALUE (repeatable)")
+	flags.JobImage = fs.String("job-image", "", "Container image for the mig step (optional)")
+	flags.ModCommand = fs.String("job-command", "", "Container command override")
+
+	// GitLab integration
+	flags.GitLabPAT = fs.String("gitlab-pat", "", "GitLab Personal Access Token for this run (overrides server default)")
+	flags.GitLabDomain = fs.String("gitlab-domain", "", "GitLab domain for this run (overrides server default)")
+	flags.MRSuccess = fs.Bool("mr-success", false, "Create a merge request on success")
+	flags.MRFail = fs.Bool("mr-fail", false, "Create a merge request on failure")
+
+	// Artifact and output
+	flags.ArtifactDir = fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
+	flags.JSONOut = fs.Bool("json", false, "print machine-readable JSON summary to stdout")
 
 	if err := fs.Parse(args); err != nil {
 		return nil, err
@@ -110,10 +140,10 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Load spec from file or stdin (--spec - reads from stdin).
-	specPayload, err := loadSpec(*flags.SpecFile)
+	// Load spec from file or stdin and apply CLI overrides.
+	specPayload, err := buildRunSubmitSpecPayload(flags)
 	if err != nil {
-		return fmt.Errorf("load spec: %w", err)
+		return err
 	}
 
 	ctx := context.Background()
@@ -142,16 +172,119 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID.String())
 	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID.String())
 
+	initialState := "pending"
+	finalState := ""
+
 	// Follow mode: display job graph until completion.
 	if flags.Follow != nil && *flags.Follow {
-		return followRunSubmit(ctx, base, httpClient, runID, flags, stderr)
+		final, err := followRunSubmit(ctx, base, httpClient, runID, flags, stderr)
+		if err != nil {
+			return err
+		}
+		finalState = strings.ToLower(string(final))
+
+		// Download artifacts after successful completion.
+		if final == modsapi.RunStateSucceeded {
+			if artifactDir := strings.TrimSpace(*flags.ArtifactDir); artifactDir != "" {
+				if err := downloadRunArtifacts(ctx, base, httpClient, runID.String(), artifactDir, stderr); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	if *flags.JSONOut {
+		if err := outputRunSubmitJSONSummary(ctx, base, httpClient, runID, initialState, finalState, flags); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// followRunSubmit displays the job graph until run completion.
-func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, flags *runSubmitFlags, stderr io.Writer) error {
+func buildRunSubmitSpecPayload(flags *runSubmitFlags) (json.RawMessage, error) {
+	specPath := strings.TrimSpace(*flags.SpecFile)
+	if specPath == "" {
+		return nil, fmt.Errorf("load spec: spec path is empty")
+	}
+
+	if specPath == "-" {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return nil, fmt.Errorf("load spec: read stdin: %w", err)
+		}
+		if len(data) == 0 {
+			return nil, fmt.Errorf("load spec: spec is empty")
+		}
+		f, err := os.CreateTemp("", "ploy-run-spec-*.yaml")
+		if err != nil {
+			return nil, fmt.Errorf("load spec: create temp file: %w", err)
+		}
+		tempPath := f.Name()
+		if _, err := f.Write(data); err != nil {
+			_ = f.Close()
+			_ = os.Remove(tempPath)
+			return nil, fmt.Errorf("load spec: write temp file: %w", err)
+		}
+		if err := f.Close(); err != nil {
+			_ = os.Remove(tempPath)
+			return nil, fmt.Errorf("load spec: close temp file: %w", err)
+		}
+		defer func() { _ = os.Remove(tempPath) }()
+		specPath = tempPath
+	}
+
+	modEnvs := []string{}
+	if flags.ModEnvs != nil {
+		modEnvs = append(modEnvs, (*flags.ModEnvs)...)
+	}
+	modImage := ""
+	if flags.JobImage != nil {
+		modImage = strings.TrimSpace(*flags.JobImage)
+	}
+	modCommand := ""
+	if flags.ModCommand != nil {
+		modCommand = strings.TrimSpace(*flags.ModCommand)
+	}
+	gitlabPAT := ""
+	if flags.GitLabPAT != nil {
+		gitlabPAT = strings.TrimSpace(*flags.GitLabPAT)
+	}
+	gitlabDomain := ""
+	if flags.GitLabDomain != nil {
+		gitlabDomain = strings.TrimSpace(*flags.GitLabDomain)
+	}
+	mrSuccess := false
+	if flags.MRSuccess != nil {
+		mrSuccess = *flags.MRSuccess
+	}
+	mrFail := false
+	if flags.MRFail != nil {
+		mrFail = *flags.MRFail
+	}
+
+	specPayload, err := buildSpecPayload(
+		specPath,
+		modEnvs,
+		modImage,
+		false,
+		modCommand,
+		gitlabPAT,
+		gitlabDomain,
+		mrSuccess,
+		mrFail,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("load spec: %w", err)
+	}
+	if len(specPayload) == 0 {
+		return nil, fmt.Errorf("load spec: spec is empty")
+	}
+	return specPayload, nil
+}
+
+// followRunSubmit displays run status frames until run completion.
+func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, flags *runSubmitFlags, stderr io.Writer) (modsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
 	capDuration := time.Duration(0)
@@ -163,44 +296,165 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		defer cancel()
 	}
 
+	token, err := resolveControlPlaneToken()
+	if err != nil {
+		return "", err
+	}
+
+	renderOpts := runs.TextRenderOptions{
+		EnableOSC8: runStatusSupportsOSC8(stderr),
+		AuthToken:  token,
+		BaseURL:    baseURL,
+	}
+
+	refreshTicker := time.NewTicker(250 * time.Millisecond)
+	defer refreshTicker.Stop()
 	maxRetries := 5
 	if flags.MaxRetries != nil {
 		maxRetries = *flags.MaxRetries
 	}
+	retries := 0
 
-	engine := follow.NewEngine(cloneForStream(client), baseURL, runID, follow.Config{
-		MaxRetries: maxRetries,
-		Output:     stderr,
-	})
-
-	final, err := engine.Run(followCtx)
-	if err != nil {
-		// Handle timeout with optional cancellation.
-		cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
-		if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-			if cancelOnCap {
-				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
-				_ = runs.CancelCommand{
-					BaseURL: baseURL,
-					Client:  client,
-					RunID:   runID,
-					Reason:  "cap exceeded",
-					Output:  stderr,
-				}.Run(context.Background())
-			} else {
-				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
-			}
-			return nil
+	renderedLines := 0
+	cursorHidden := false
+	defer func() {
+		if cursorHidden {
+			_, _ = fmt.Fprint(stderr, "\x1b[?25h")
 		}
-		return err
+	}()
+
+	for {
+		report, err := runs.GetRunReportCommand{
+			Client:  client,
+			BaseURL: baseURL,
+			RunID:   runID,
+		}.Run(followCtx)
+		if err != nil {
+			// Handle timeout with optional cancellation.
+			cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
+			if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+				if cancelOnCap {
+					_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
+					_ = runs.CancelCommand{
+						BaseURL: baseURL,
+						Client:  client,
+						RunID:   runID,
+						Reason:  "cap exceeded",
+						Output:  stderr,
+					}.Run(context.Background())
+				} else {
+					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
+				}
+				return "", nil
+			}
+			if maxRetries >= 0 && retries >= maxRetries {
+				return "", err
+			}
+			retries++
+			select {
+			case <-followCtx.Done():
+				return "", followCtx.Err()
+			case <-refreshTicker.C:
+				continue
+			}
+		}
+		retries = 0
+
+		var frame bytes.Buffer
+		if err := runs.RenderRunReportText(&frame, report, renderOpts); err != nil {
+			return "", err
+		}
+		rendered := frame.String()
+		lines := countRenderedLines(rendered)
+
+		if !cursorHidden {
+			_, _ = fmt.Fprint(stderr, "\x1b[?25l")
+			cursorHidden = true
+		} else if renderedLines > 0 {
+			_, _ = fmt.Fprintf(stderr, "\x1b[%dA", renderedLines)
+			_, _ = fmt.Fprint(stderr, "\x1b[J")
+		}
+		_, _ = fmt.Fprint(stderr, rendered)
+		renderedLines = lines
+
+		final := deriveRunStateFromReport(report)
+		if final != "" {
+			_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
+			if final != modsapi.RunStateSucceeded {
+				return final, fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
+			}
+			return final, nil
+		}
+
+		select {
+		case <-followCtx.Done():
+			cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
+			if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+				if cancelOnCap {
+					_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
+					_ = runs.CancelCommand{
+						BaseURL: baseURL,
+						Client:  client,
+						RunID:   runID,
+						Reason:  "cap exceeded",
+						Output:  stderr,
+					}.Run(context.Background())
+				} else {
+					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
+				}
+				return "", nil
+			}
+			return "", followCtx.Err()
+		case <-refreshTicker.C:
+		}
+	}
+}
+
+func countRenderedLines(rendered string) int {
+	if rendered == "" {
+		return 0
+	}
+	lines := strings.Count(rendered, "\n")
+	if !strings.HasSuffix(rendered, "\n") {
+		lines++
+	}
+	return lines
+}
+
+func deriveRunStateFromReport(report runs.RunReport) modsapi.RunState {
+	if len(report.Repos) == 0 {
+		return ""
+	}
+	allSuccess := true
+	allCancelled := true
+	hasFailure := false
+
+	for _, repo := range report.Repos {
+		status := strings.ToLower(strings.TrimSpace(repo.Status))
+		switch status {
+		case "success", "succeeded", "finished":
+			allCancelled = false
+		case "cancelled", "canceled":
+			allSuccess = false
+		case "fail", "failed", "error":
+			hasFailure = true
+			allSuccess = false
+			allCancelled = false
+		default:
+			return ""
+		}
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
-	if final != modsapi.RunStateSucceeded {
-		return fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
+	if hasFailure {
+		return modsapi.RunStateFailed
 	}
-
-	return nil
+	if allSuccess {
+		return modsapi.RunStateSucceeded
+	}
+	if allCancelled {
+		return modsapi.RunStateCancelled
+	}
+	return ""
 }
 
 func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.MigID, error) {
@@ -290,6 +544,36 @@ func loadSpec(path string) (json.RawMessage, error) {
 	return normalizeModsSpecToJSON(data)
 }
 
+func outputRunSubmitJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *runSubmitFlags) error {
+	// Optional: probe MR URL from run status metadata.
+	mrURL, _ := fetchMRURL(ctx, base, httpClient, runID.String())
+
+	type runJSON struct {
+		RunID       domaintypes.RunID `json:"run_id"`
+		Initial     string            `json:"initial_state,omitempty"`
+		Final       string            `json:"final_state,omitempty"`
+		ArtifactDir string            `json:"artifact_dir,omitempty"`
+		MRURL       string            `json:"mr_url,omitempty"`
+	}
+
+	out := runJSON{
+		RunID:   runID,
+		Initial: initialState,
+		Final:   finalState,
+	}
+
+	if s := strings.TrimSpace(*flags.ArtifactDir); s != "" {
+		out.ArtifactDir = s
+	}
+	if mrURL != "" {
+		out.MRURL = mrURL
+	}
+
+	b, _ := json.Marshal(out)
+	fmt.Println(string(b))
+	return nil
+}
+
 // printRunSubmitUsage writes usage information for `ploy run --repo ... --spec ...`.
 func printRunSubmitUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run --repo <repo-url> --base-ref <ref> --target-ref <ref> --spec <path|-> [--follow]")
@@ -307,7 +591,22 @@ func printRunSubmitUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --follow            Follow run until completion (shows job graph)")
 	_, _ = fmt.Fprintln(w, "  --cap <duration>    Optional time cap for --follow (e.g., 30m, 1h)")
 	_, _ = fmt.Fprintln(w, "  --cancel-on-cap     Cancel run if cap exceeded")
-	_, _ = fmt.Fprintln(w, "  --max-retries <n>   Max SSE reconnect attempts (default: 5)")
+	_, _ = fmt.Fprintln(w, "  --max-retries <n>   Max report fetch retries (-1 for unlimited)")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Spec overrides:")
+	_, _ = fmt.Fprintln(w, "  --job-env KEY=VALUE  Job environment (repeatable)")
+	_, _ = fmt.Fprintln(w, "  --job-image <image>  Container image for mig step")
+	_, _ = fmt.Fprintln(w, "  --job-command <cmd>  Container command override")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "GitLab options:")
+	_, _ = fmt.Fprintln(w, "  --gitlab-pat <token>      GitLab Personal Access Token")
+	_, _ = fmt.Fprintln(w, "  --gitlab-domain <domain>  GitLab domain")
+	_, _ = fmt.Fprintln(w, "  --mr-success              Create merge request on success")
+	_, _ = fmt.Fprintln(w, "  --mr-fail                 Create merge request on failure")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Artifacts/output:")
+	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir>  Download final artifacts after successful --follow")
+	_, _ = fmt.Fprintln(w, "  --json                Print machine-readable JSON summary to stdout")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
 	_, _ = fmt.Fprintln(w, "  ploy run --repo https://github.com/org/repo --base-ref main --target-ref feature-branch --spec spec.yaml")

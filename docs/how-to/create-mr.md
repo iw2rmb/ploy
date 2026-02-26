@@ -53,34 +53,34 @@ ploy config gitlab show
 ### Step 3: Run a Mod with MR creation
 
 Source branch naming
-- Ploy uses the effective target ref as the MR source branch. When you pass `--repo-target-ref`, that value is used directly. When you omit it, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise. The base branch remains the one provided via `--repo-base-ref` (commonly `main`).
+- Ploy uses the effective target ref as the MR source branch. When you pass `--target-ref`, that value is used directly. When you omit it, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise. The base branch remains the one provided via `--base-ref` (commonly `main`).
 
 Create an MR on success (capture server-assigned run ID via JSON):
 ```bash
-RUN_ID=$(ploy mig run --json \
-  --repo-url https://gitlab.com/yourorg/yourproject.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/upgrade-java-17 \
+RUN_ID=$(ploy run --json \
+  --repo https://gitlab.com/yourorg/yourproject.git \
+  --base-ref main \
+  --target-ref workflow/upgrade-java-17 \
   --mr-success \
   --follow | jq -r '.run_id')
 ```
 
 Create an MR on failure (useful for debugging):
 ```bash
-RUN_ID=$(ploy mig run --json \
-  --repo-url https://gitlab.com/yourorg/yourproject.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/debug-build-failure \
+RUN_ID=$(ploy run --json \
+  --repo https://gitlab.com/yourorg/yourproject.git \
+  --base-ref main \
+  --target-ref workflow/debug-build-failure \
   --mr-fail \
   --follow | jq -r '.run_id')
 ```
 
 Create an MR in both success and failure cases and capture MR URL too:
 ```bash
-read RUN_ID MR_URL < <(ploy mig run --json \
-  --repo-url https://gitlab.com/yourorg/yourproject.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/experiment \
+read RUN_ID MR_URL < <(ploy run --json \
+  --repo https://gitlab.com/yourorg/yourproject.git \
+  --base-ref main \
+  --target-ref workflow/experiment \
   --mr-success \
   --mr-fail \
   --follow | jq -r '[.run_id, .mr_url] | @tsv')
@@ -100,10 +100,10 @@ curl -sk "$PLOY_CONTROL_PLANE_URL/v1/runs/$RUN_ID/status" | jq '.metadata.mr_url
 Override the global GitLab configuration for a single run using flags, capture run+MR via JSON:
 
 ```bash
-read RUN_ID MR_URL < <(ploy mig run --json \
-  --repo-url https://gitlab.com/yourorg/yourproject.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/upgrade \
+read RUN_ID MR_URL < <(ploy run --json \
+  --repo https://gitlab.com/yourorg/yourproject.git \
+  --base-ref main \
+  --target-ref workflow/upgrade \
   --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
   --gitlab-domain https://gitlab.com \
   --mr-success \
@@ -171,10 +171,10 @@ EOF
 ploy config gitlab set --file gitlab-config.json
 
 # 2. Run OpenRewrite to upgrade Java 17
-read RUN_ID MR_URL < <(ploy mig run --json \
-  --repo-url https://gitlab.com/yourorg/spring-petclinic.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/java-17-upgrade \
+read RUN_ID MR_URL < <(ploy run --json \
+  --repo https://gitlab.com/yourorg/spring-petclinic.git \
+  --base-ref main \
+  --target-ref workflow/java-17-upgrade \
   --mr-success \
   --follow | jq -r '[.run_id, .mr_url] | @tsv')
 
@@ -197,8 +197,8 @@ per repo. Each `run_repo` can produce its own merge request.
 # 1. Configure GitLab credentials once.
 ploy config gitlab set --file gitlab-config.json
 
-# 2. Create a named batch.
-ploy mig run --spec mig.yaml --name java17-fleet --mr-success
+# 2. Create a mig project (set `mr_on_success: true` in mig.yaml).
+ploy mig add --name java17-fleet --spec mig.yaml
 
 # 3. Add repositories — each will create an MR on success.
 ploy mig run repo add \
@@ -213,8 +213,8 @@ ploy mig run repo add \
   --target-ref workflow/java-17-upgrade \
   java17-fleet
 
-# 4. Follow batch progress.
-ploy run logs java17-fleet
+# 4. Start and follow the batch run.
+ploy mig run java17-fleet --follow
 ```
 
 ### Restart a Repo with a Hotfix Branch

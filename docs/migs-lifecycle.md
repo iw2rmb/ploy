@@ -598,7 +598,7 @@ artifacts) remain job-addressed via `job_id`.
 ### Single-repo vs batch runs
 
 Single-repo submission via `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
-(or via `ploy mig run --repo-url ... --spec ...`) is
+is
 internally a **degenerate batch** with exactly one `run_repos` entry. The same
 code paths handle both cases:
 

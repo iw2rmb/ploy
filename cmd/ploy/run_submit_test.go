@@ -341,3 +341,239 @@ func TestRunSubmitNonExistentSpec(t *testing.T) {
 		t.Errorf("expected error about missing file, got %q", err.Error())
 	}
 }
+
+func TestRunSubmitAcceptsMigratedSingleRepoFlags(t *testing.T) {
+	t.Setenv("USER", "test-user")
+
+	specDir := t.TempDir()
+	specPath := filepath.Join(specDir, "spec.yaml")
+	specContent := `steps:
+  - image: alpine:3.20
+    command: echo from-spec
+env:
+  KEY1: from-spec
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	var capturedRequest map[string]any
+	runID := domaintypes.NewRunID().String()
+	migID := domaintypes.NewMigID().String()
+	specID := domaintypes.NewSpecID().String()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
+			if err := json.NewDecoder(r.Body).Decode(&capturedRequest); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + migID + `","spec_id":"` + specID + `"}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{
+		"run",
+		"--repo", "https://github.com/acme/service.git",
+		"--base-ref", "main",
+		"--target-ref", "ploy/java17",
+		"--spec", specPath,
+		"--job-env", "KEY1=from-cli",
+		"--job-env", "KEY2=extra",
+		"--job-image", "ghcr.io/acme/mig:2",
+		"--job-command", `["echo","from-cli"]`,
+		"--gitlab-pat", "glpat-test123",
+		"--gitlab-domain", "gitlab.example.com",
+		"--mr-success",
+		"--mr-fail",
+	}, &buf)
+	if err != nil {
+		t.Fatalf("run submit error: %v", err)
+	}
+
+	spec, ok := capturedRequest["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec to be JSON object, got %T (%v)", capturedRequest["spec"], capturedRequest["spec"])
+	}
+	steps, ok := spec["steps"].([]any)
+	if !ok || len(steps) != 1 {
+		t.Fatalf("expected spec.steps[0], got %T (%v)", spec["steps"], spec["steps"])
+	}
+	step0, ok := steps[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec.steps[0] to be object, got %T", steps[0])
+	}
+	if got := step0["image"]; got != "ghcr.io/acme/mig:2" {
+		t.Fatalf("expected steps[0].image override, got %v", got)
+	}
+	command, ok := step0["command"].([]any)
+	if !ok || len(command) != 2 || command[0] != "echo" || command[1] != "from-cli" {
+		t.Fatalf("expected steps[0].command JSON array override, got %v", step0["command"])
+	}
+	env, ok := spec["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected env in spec, got %T", spec["env"])
+	}
+	if env["KEY1"] != "from-cli" || env["KEY2"] != "extra" {
+		t.Fatalf("expected env overrides, got %v", env)
+	}
+	if spec["gitlab_pat"] != "glpat-test123" {
+		t.Fatalf("expected gitlab_pat in spec, got %v", spec["gitlab_pat"])
+	}
+	if spec["gitlab_domain"] != "gitlab.example.com" {
+		t.Fatalf("expected gitlab_domain in spec, got %v", spec["gitlab_domain"])
+	}
+	if spec["mr_on_success"] != true || spec["mr_on_fail"] != true {
+		t.Fatalf("expected mr flags in spec, got success=%v fail=%v", spec["mr_on_success"], spec["mr_on_fail"])
+	}
+
+	// Ensure PAT is not echoed back in textual output.
+	out := buf.String()
+	if strings.Contains(out, "glpat-test123") {
+		t.Fatalf("PAT should not appear in output: %s", out)
+	}
+}
+
+func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
+	t.Setenv("USER", "test-user")
+
+	specDir := t.TempDir()
+	specPath := filepath.Join(specDir, "spec.yaml")
+	specContent := `steps:
+  - image: alpine:latest
+    command: echo hello
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	runID := domaintypes.NewRunID()
+	migID := domaintypes.NewMigID()
+	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
+	repoCalls := 0
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id":  runID.String(),
+				"mig_id":  migID.String(),
+				"spec_id": specID.String(),
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String():
+			status := "running"
+			if repoCalls >= 2 {
+				status = "success"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":         runID.String(),
+				"status":     status,
+				"mig_id":     migID.String(),
+				"spec_id":    specID.String(),
+				"created_at": "2026-02-24T08:00:00Z",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/migs":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"migs": []map[string]any{
+					{
+						"id":         migID.String(),
+						"name":       "java17-upgrade",
+						"spec_id":    specID.String(),
+						"archived":   false,
+						"created_at": "2026-02-24T07:30:00Z",
+					},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos":
+			repoCalls++
+			repoStatus := "Running"
+			if repoCalls >= 2 {
+				repoStatus = "Success"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"repos": []map[string]any{
+					{
+						"run_id":     runID.String(),
+						"repo_id":    repoID.String(),
+						"repo_url":   "https://github.com/acme/service.git",
+						"base_ref":   "main",
+						"target_ref": "ploy/java17",
+						"status":     repoStatus,
+						"attempt":    1,
+						"created_at": "2026-02-24T08:01:00Z",
+					},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs":
+			jobStatus := "Running"
+			duration := int64(0)
+			if repoCalls >= 2 {
+				jobStatus = "Success"
+				duration = 1200
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id":  runID.String(),
+				"repo_id": repoID.String(),
+				"attempt": 1,
+				"jobs": []map[string]any{
+					{
+						"job_id":      jobID.String(),
+						"name":        "mig-0",
+						"job_type":    "mig",
+						"job_image":   "ghcr.io/acme/mig:1",
+						"status":      jobStatus,
+						"duration_ms": duration,
+					},
+				},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
+			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": []map[string]any{}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	useServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{
+		"run",
+		"--repo", "https://github.com/acme/service.git",
+		"--base-ref", "main",
+		"--target-ref", "ploy/java17",
+		"--spec", specPath,
+		"--follow",
+	}, &buf)
+	if err != nil {
+		t.Fatalf("run submit --follow error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "Mig:   "+migID.String()+"   | java17-upgrade") {
+		t.Fatalf("expected run status mig header, got: %q", out)
+	}
+	if !strings.Contains(out, "Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
+		t.Fatalf("expected run status spec download link, got: %q", out)
+	}
+	if !strings.Contains(out, "Repo:  [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") {
+		t.Fatalf("expected run status repo header, got: %q", out)
+	}
+	if strings.Contains(out, "Repo 1/1:") {
+		t.Fatalf("expected old follow format to be absent, got: %q", out)
+	}
+	if !strings.Contains(out, "Final state: succeeded") {
+		t.Fatalf("expected final success line, got: %q", out)
+	}
+}
