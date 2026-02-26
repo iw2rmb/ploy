@@ -36,6 +36,19 @@ BEGIN
   END IF;
 END $$;
 
+-- PrepStatus tracks repo-level prep lifecycle state.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'prep_status' AND n.nspname = 'ploy'
+  ) THEN
+    CREATE TYPE prep_status AS ENUM ('PrepPending', 'PrepRunning', 'PrepRetryScheduled', 'PrepReady', 'PrepFailed');
+  END IF;
+END $$;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -138,11 +151,33 @@ CREATE TABLE IF NOT EXISTS mig_repos (
   repo_url     TEXT NOT NULL,  -- Repository URL (normalized for matching).
   base_ref     TEXT NOT NULL,  -- Mutable base ref (e.g., main).
   target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
+  prep_status  prep_status NOT NULL DEFAULT 'PrepPending',
+  prep_attempts INTEGER NOT NULL DEFAULT 0 CHECK (prep_attempts >= 0),
+  prep_last_error TEXT,
+  prep_failure_code TEXT,
+  prep_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  prep_profile JSONB,
+  prep_artifacts JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 -- Enforce uniqueness: one repo_url per mig.
 CREATE UNIQUE INDEX IF NOT EXISTS mig_repos_mig_repo_uniq ON mig_repos(mig_id, repo_url);
 CREATE INDEX IF NOT EXISTS mig_repos_mig_created_idx ON mig_repos(mig_id, created_at);
+CREATE INDEX IF NOT EXISTS mig_repos_prep_status_updated_idx ON mig_repos(prep_status, prep_updated_at, id);
+
+-- PrepRuns stores prep attempt-level evidence for each repo.
+CREATE TABLE IF NOT EXISTS prep_runs (
+  repo_id      TEXT NOT NULL REFERENCES mig_repos(id) ON DELETE CASCADE,
+  attempt      INTEGER NOT NULL CHECK (attempt >= 1),
+  status       prep_status NOT NULL,
+  started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  finished_at  TIMESTAMPTZ,
+  result_json  JSONB NOT NULL DEFAULT '{}'::jsonb,
+  logs_ref     TEXT,
+  PRIMARY KEY (repo_id, attempt)
+);
+CREATE INDEX IF NOT EXISTS prep_runs_status_started_idx ON prep_runs(status, started_at, repo_id);
+CREATE INDEX IF NOT EXISTS prep_runs_repo_started_idx ON prep_runs(repo_id, started_at DESC, attempt DESC);
 
 -- Runs (execution of one spec_id over a specific set of repos)
 -- v1 model: A run represents the execution of a mig's spec over its repo set.

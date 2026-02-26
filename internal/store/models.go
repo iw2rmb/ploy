@@ -5,162 +5,11 @@
 package store
 
 import (
-	"database/sql/driver"
-	"fmt"
 	"net/netip"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
-
-type JobStatus string
-
-const (
-	JobStatusCreated   JobStatus = "Created"
-	JobStatusQueued    JobStatus = "Queued"
-	JobStatusRunning   JobStatus = "Running"
-	JobStatusSuccess   JobStatus = "Success"
-	JobStatusFail      JobStatus = "Fail"
-	JobStatusCancelled JobStatus = "Cancelled"
-)
-
-func (e *JobStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = JobStatus(s)
-	case string:
-		*e = JobStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
-	}
-	switch *e {
-	case JobStatusCreated, JobStatusQueued, JobStatusRunning, JobStatusSuccess, JobStatusFail, JobStatusCancelled:
-		return nil
-	default:
-		return fmt.Errorf("unknown JobStatus value: %q", string(*e))
-	}
-}
-
-type NullJobStatus struct {
-	JobStatus JobStatus `json:"job_status"`
-	Valid     bool      `json:"valid"` // Valid is true if JobStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullJobStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.JobStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.JobStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullJobStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.JobStatus), nil
-}
-
-type RunRepoStatus string
-
-const (
-	RunRepoStatusQueued    RunRepoStatus = "Queued"
-	RunRepoStatusRunning   RunRepoStatus = "Running"
-	RunRepoStatusCancelled RunRepoStatus = "Cancelled"
-	RunRepoStatusFail      RunRepoStatus = "Fail"
-	RunRepoStatusSuccess   RunRepoStatus = "Success"
-)
-
-func (e *RunRepoStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = RunRepoStatus(s)
-	case string:
-		*e = RunRepoStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for RunRepoStatus: %T", src)
-	}
-	switch *e {
-	case RunRepoStatusQueued, RunRepoStatusRunning, RunRepoStatusCancelled, RunRepoStatusFail, RunRepoStatusSuccess:
-		return nil
-	default:
-		return fmt.Errorf("unknown RunRepoStatus value: %q", string(*e))
-	}
-}
-
-type NullRunRepoStatus struct {
-	RunRepoStatus RunRepoStatus `json:"run_repo_status"`
-	Valid         bool          `json:"valid"` // Valid is true if RunRepoStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullRunRepoStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.RunRepoStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.RunRepoStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullRunRepoStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.RunRepoStatus), nil
-}
-
-type RunStatus string
-
-const (
-	RunStatusStarted   RunStatus = "Started"
-	RunStatusCancelled RunStatus = "Cancelled"
-	RunStatusFinished  RunStatus = "Finished"
-)
-
-func (e *RunStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = RunStatus(s)
-	case string:
-		*e = RunStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for RunStatus: %T", src)
-	}
-	switch *e {
-	case RunStatusStarted, RunStatusCancelled, RunStatusFinished:
-		return nil
-	default:
-		return fmt.Errorf("unknown RunStatus value: %q", string(*e))
-	}
-}
-
-type NullRunStatus struct {
-	RunStatus RunStatus `json:"run_status"`
-	Valid     bool      `json:"valid"` // Valid is true if RunStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullRunStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.RunStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.RunStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullRunStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.RunStatus), nil
-}
 
 type ApiToken struct {
 	ID          pgtype.UUID        `json:"id"`
@@ -280,12 +129,19 @@ type Mig struct {
 }
 
 type MigRepo struct {
-	ID        types.MigRepoID    `json:"id"`
-	MigID     types.MigID        `json:"mig_id"`
-	RepoUrl   string             `json:"repo_url"`
-	BaseRef   string             `json:"base_ref"`
-	TargetRef string             `json:"target_ref"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID              types.MigRepoID    `json:"id"`
+	MigID           types.MigID        `json:"mig_id"`
+	RepoUrl         string             `json:"repo_url"`
+	BaseRef         string             `json:"base_ref"`
+	TargetRef       string             `json:"target_ref"`
+	PrepStatus      PrepStatus         `json:"prep_status"`
+	PrepAttempts    int32              `json:"prep_attempts"`
+	PrepLastError   *string            `json:"prep_last_error"`
+	PrepFailureCode *string            `json:"prep_failure_code"`
+	PrepUpdatedAt   pgtype.Timestamptz `json:"prep_updated_at"`
+	PrepProfile     []byte             `json:"prep_profile"`
+	PrepArtifacts   []byte             `json:"prep_artifacts"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
 type Node struct {
@@ -324,6 +180,16 @@ type NodeMetric struct {
 type PloySchemaVersion struct {
 	Version   int64              `json:"version"`
 	AppliedAt pgtype.Timestamptz `json:"applied_at"`
+}
+
+type PrepRun struct {
+	RepoID     types.MigRepoID    `json:"repo_id"`
+	Attempt    int32              `json:"attempt"`
+	Status     PrepStatus         `json:"status"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	ResultJson []byte             `json:"result_json"`
+	LogsRef    *string            `json:"logs_ref"`
 }
 
 type Run struct {

@@ -7,7 +7,7 @@ Documentation: `design/prep.md`; `design/prep-impl.md`; `design/prep-simple.md`;
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Data Model and State Primitives
-- [ ] Add repo-level prep state and profile storage in the DB schema.
+- [x] Add repo-level prep state and profile storage in the DB schema.
   - Repository: `ploy`
   - Component: `internal/store`
   - Scope:
@@ -38,7 +38,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/store -run 'TestMigrate|TestStore'`
     - `go test ./internal/store -run 'TestSQLCOverridesCompile'`
 
-- [ ] Add prep query surface for claim/transition/persistence.
+- [x] Add prep query surface for claim/transition/persistence.
   - Repository: `ploy`
   - Component: `internal/store/queries`
   - Scope:
