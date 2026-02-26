@@ -303,6 +303,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 		result, runErr := execCtx.runner.Run(ctx, step.Request{
 			RunID:     req.RunID,
+			JobID:     req.JobID,
 			Manifest:  manifest,
 			Workspace: workspace,
 			OutDir:    outDir,

@@ -255,6 +255,7 @@ func (r *runController) runRouterForGateFailure(
 
 	_, runErr := runner.Run(ctx, step.Request{
 		RunID:     req.RunID,
+		JobID:     req.JobID,
 		Manifest:  routerManifest,
 		Workspace: workspace,
 		OutDir:    routerOutDir,

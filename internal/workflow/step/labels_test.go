@@ -8,14 +8,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// TestRunner_Run_SetsRunIDLabel verifies that the container labels include
-// LabelRunID when a RunID is provided in the Request. This enables telemetry
-// and log aggregation systems to correlate containers with workflow runs.
-func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
-	rt := &testContainerRuntime{}
-	runner := Runner{Containers: rt}
-
-	runID := types.RunID("run-123")
+func TestRunnerRun_ContainerLabels(t *testing.T) {
+	t.Parallel()
 
 	manifest := contracts.StepManifest{
 		ID:    types.StepID("step-xyz"),
@@ -26,50 +20,74 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 		},
 	}
 
-	// Pass RunID directly to step.Request for consistent labeling.
-	req := Request{RunID: runID, Manifest: manifest, Workspace: "/tmp/workspace"}
-
-	if _, err := runner.Run(context.Background(), req); err != nil {
-		t.Fatalf("Run() unexpected error: %v", err)
-	}
-
-	if rt.captured.Labels == nil {
-		t.Fatalf("expected labels, got nil")
-	}
-	if got := rt.captured.Labels[types.LabelRunID]; got != runID.String() {
-		t.Fatalf("label %q=%q, want %q", types.LabelRunID, got, runID.String())
-	}
-}
-
-// TestRunner_Run_OmitsRunIDLabelWhenEmpty verifies that container labels
-// do not include LabelRunID when no RunID is provided in the Request.
-// This avoids empty or misleading labels in telemetry systems.
-func TestRunner_Run_OmitsRunIDLabelWhenEmpty(t *testing.T) {
-	rt := &testContainerRuntime{}
-	runner := Runner{Containers: rt}
-
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("step-xyz"),
-		Name:  "Test Run",
-		Image: "test:latest",
-		Inputs: []contracts.StepInput{
-			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite, Hydration: &contracts.StepInputHydration{}},
+	tests := []struct {
+		name     string
+		runID    types.RunID
+		jobID    types.JobID
+		expected map[string]string
+	}{
+		{
+			name:  "run and job labels",
+			runID: types.RunID("run-123"),
+			jobID: types.JobID("job-123"),
+			expected: map[string]string{
+				types.LabelRunID: "run-123",
+				types.LabelJobID: "job-123",
+			},
+		},
+		{
+			name:  "run label only",
+			runID: types.RunID("run-456"),
+			expected: map[string]string{
+				types.LabelRunID: "run-456",
+			},
+		},
+		{
+			name:  "job label only",
+			jobID: types.JobID("job-456"),
+			expected: map[string]string{
+				types.LabelJobID: "job-456",
+			},
+		},
+		{
+			name:     "no labels",
+			expected: map[string]string{},
 		},
 	}
 
-	// No RunID provided — labels should be empty.
-	req := Request{Manifest: manifest, Workspace: "/tmp/workspace"}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			rt := &testContainerRuntime{}
+			runner := Runner{Containers: rt}
 
-	if _, err := runner.Run(context.Background(), req); err != nil {
-		t.Fatalf("Run() unexpected error: %v", err)
-	}
+			req := Request{
+				RunID:     tc.runID,
+				JobID:     tc.jobID,
+				Manifest:  manifest,
+				Workspace: "/tmp/workspace",
+			}
 
-	if rt.captured.Labels != nil {
-		if _, ok := rt.captured.Labels[types.LabelRunID]; ok {
-			t.Fatalf("expected no %q label when RunID empty", types.LabelRunID)
-		}
-		if len(rt.captured.Labels) != 0 {
-			t.Fatalf("expected labels to be empty when RunID empty, got %v", rt.captured.Labels)
-		}
+			if _, err := runner.Run(context.Background(), req); err != nil {
+				t.Fatalf("Run() unexpected error: %v", err)
+			}
+
+			labels := rt.captured.Labels
+			if len(tc.expected) == 0 {
+				if len(labels) != 0 {
+					t.Fatalf("expected no labels, got %v", labels)
+				}
+				return
+			}
+
+			for key, want := range tc.expected {
+				if got := labels[key]; got != want {
+					t.Fatalf("label %q=%q, want %q", key, got, want)
+				}
+			}
+			if len(labels) != len(tc.expected) {
+				t.Fatalf("label count=%d, want %d: %v", len(labels), len(tc.expected), labels)
+			}
+		})
 	}
 }

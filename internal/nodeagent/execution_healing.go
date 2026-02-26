@@ -157,6 +157,7 @@ func (r *runController) executeWithHealing(
 	// Pass RunID directly for consistent labeling and telemetry.
 	result, err := runner.Run(ctx, step.Request{
 		RunID:     req.RunID,
+		JobID:     req.JobID,
 		Manifest:  manifestForMainMod,
 		Workspace: workspace,
 		OutDir:    outDir,

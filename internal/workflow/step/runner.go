@@ -62,7 +62,10 @@ type Runner struct {
 type Request struct {
 	// RunID threads the workflow run identifier for correlation/labels.
 	// Container labels and telemetry use this value via LabelRunID.
-	RunID     types.RunID
+	RunID types.RunID
+	// JobID threads the workflow job identifier for correlation/labels.
+	// Container labels and telemetry use this value via LabelJobID.
+	JobID     types.JobID
 	Manifest  contracts.StepManifest
 	Workspace string
 	OutDir    string
@@ -137,7 +140,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = 0
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 	} else {
-		spec, err := buildContainerSpec(req.RunID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
+		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}

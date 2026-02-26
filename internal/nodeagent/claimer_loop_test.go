@@ -265,3 +265,7 @@ func TestClaimAndExecute_PreClaimCleanupAllowsClaim(t *testing.T) {
 		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.releaseCalls)
 	}
 }
+
+func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
+	t.Skip("phase 0 contract: enable when startup reconciliation is wired before claim loop polling (phase 5)")
+}

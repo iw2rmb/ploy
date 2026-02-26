@@ -59,9 +59,9 @@ type ContainerResult struct {
 }
 
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
-// The runID parameter threads the workflow run identifier into container labels
+// The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
-func buildContainerSpec(runID types.RunID, manifest contracts.StepManifest, workspace string, outDir string, inDir string) (ContainerSpec, error) {
+func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
@@ -110,11 +110,17 @@ func buildContainerSpec(runID types.RunID, manifest contracts.StepManifest, work
 	if wd == "" && len(manifest.Inputs) > 0 {
 		wd = manifest.Inputs[0].MountPath
 	}
-	// Prepare labels: thread run identifier when provided.
+	// Prepare labels: thread run and job identifiers when provided.
 	// Labels enable container correlation with telemetry and log aggregation.
 	var labels map[string]string
 	if !runID.IsZero() {
 		labels = map[string]string{types.LabelRunID: runID.String()}
+	}
+	if !jobID.IsZero() {
+		if labels == nil {
+			labels = make(map[string]string, 1)
+		}
+		labels[types.LabelJobID] = jobID.String()
 	}
 
 	// Convert resource hints to runtime limits.
