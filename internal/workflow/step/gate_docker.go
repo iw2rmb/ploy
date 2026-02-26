@@ -42,6 +42,7 @@ import (
 	units "github.com/docker/go-units"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 	"github.com/moby/moby/client"
 )
@@ -198,26 +199,19 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	return meta, nil
 }
 
-func fileExists(path string) bool {
-	if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
-		return true
-	}
-	return false
-}
-
 func buildGateDefaultImagesFilePath() string {
 	goModuleFile := "go." + "mo" + "d"
 	installed := "/etc/ploy/gates/build-gate-images.yaml"
-	if fileExists(installed) {
+	if fsutil.FileExists(installed) {
 		return installed
 	}
 	wd, err := os.Getwd()
 	if err == nil {
 		dir := wd
 		for {
-			if fileExists(filepath.Join(dir, goModuleFile)) {
+			if fsutil.FileExists(filepath.Join(dir, goModuleFile)) {
 				candidate := filepath.Join(dir, DefaultMappingPath)
-				if fileExists(candidate) {
+				if fsutil.FileExists(candidate) {
 					return candidate
 				}
 				break

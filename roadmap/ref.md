@@ -26,7 +26,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/step -run 'TestRun|TestRunGateOnly'`
 
 ## Phase 2: Centralize File Existence Utility
-- [ ] Replace duplicated `fileExists` functions with one shared helper.
+- [x] Replace duplicated `fileExists` functions with one shared helper.
   - Repository: `ploy`
   - Component: `internal/workflow`
   - Scope:
