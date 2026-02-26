@@ -7,7 +7,7 @@ Documentation: `design/crash.md`; `internal/nodeagent/claimer_loop.go`; `interna
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Behavior Contract Tests
-- [ ] Add startup reconciliation tests before implementation to lock target behavior and ordering. — Prevent regressions in crash semantics and startup sequence.
+- [x] Add startup reconciliation tests before implementation to lock target behavior and ordering. — Prevent regressions in crash semantics and startup sequence.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope: Add a dedicated suite (new file, for example `internal/nodeagent/crash_reconcile_test.go`) and extend `internal/nodeagent/claimer_loop_test.go` to verify:
@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'Crash|Reconcile|ClaimLoop'` — Reconciliation should execute before claim polling and classify containers deterministically.
 
 ## Phase 1: Container Identity Prerequisite
-- [ ] Ensure all job containers carry both `run_id` and `job_id` labels for startup discovery. — Startup reconciliation must map containers to exact jobs without server-side guesswork.
+- [x] Ensure all job containers carry both `run_id` and `job_id` labels for startup discovery. — Startup reconciliation must map containers to exact jobs without server-side guesswork.
   - Repository: `ploy`
   - Component: `internal/workflow/step`, `internal/nodeagent`
   - Scope:

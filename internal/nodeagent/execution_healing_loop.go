@@ -100,6 +100,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 
 				_, routerErr := in.runner.Run(ctx, step.Request{
 					RunID:     in.req.RunID,
+					JobID:     in.req.JobID,
 					Manifest:  routerManifest,
 					Workspace: in.workspace,
 					OutDir:    routerOutDir,
@@ -166,6 +167,7 @@ func (r *runController) runHealingLoop(ctx context.Context, in healingLoopInput)
 		// Pass RunID directly for consistent labeling and telemetry.
 		healResult, healErr := in.runner.Run(ctx, step.Request{
 			RunID:     in.req.RunID,
+			JobID:     in.req.JobID,
 			Manifest:  healManifest,
 			Workspace: in.workspace,
 			OutDir:    in.outDir,
