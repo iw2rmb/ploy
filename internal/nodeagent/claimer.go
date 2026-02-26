@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -60,6 +61,10 @@ type ClaimResponse struct {
 func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error) {
 	// Don't create HTTP client yet - defer until after bootstrap runs.
 	// Client will be lazily initialized on first claim attempt.
+	cleanup, err := newDockerPreClaimCleanup()
+	if err != nil {
+		return nil, fmt.Errorf("create pre-claim cleanup: %w", err)
+	}
 
 	// Initialize shared backoff policy for claim loop polling.
 	// Uses 250ms initial interval, 5s max cap matching previous behavior.
@@ -69,7 +74,7 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 		cfg:             cfg,
 		client:          nil, // Will be initialized lazily
 		controller:      controller,
-		preClaimCleanup: noopPreClaimCleanup{},
+		preClaimCleanup: cleanup,
 		backoff:         backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
 }
