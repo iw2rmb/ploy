@@ -989,7 +989,8 @@ value is a `StageStatus` object describing that job's execution state.
 
 Nodeagents use `/v1/nodes/*` to execute work:
 
-- `POST /v1/nodes/{id}/heartbeat` — report node liveness.
+- `POST /v1/nodes/{id}/heartbeat` — report node liveness and resource snapshot.
+  - Persists the latest snapshot on `nodes` and appends a history row to `node_metrics`.
 - `POST /v1/nodes/{id}/claim` — claim the next queued job from the unified
   jobs queue (returns the claimed job plus run
   metadata) and marks the repo as `Running` in `run_repos`.
