@@ -100,8 +100,8 @@ Role model (bearer token claims):
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
-  - `migs[]` — Multi-step spec steps (each with its own image/command/env/retain_container)
-  - `build_gate_healing` — Automated repair sequence executed when Build Gate fails
+  - `migs[]` — Multi-step spec steps (each with its own image/command/env/env_from_file)
+  - `build_gate.healing` and `build_gate.router` — Automated repair routing/healing after Build Gate failures
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
 - `--name` — Creates a **batch run** with the given name (no repository attached yet).
@@ -109,12 +109,15 @@ Role model (bearer token claims):
   Example: `ploy mig run --spec mig.yaml --name my-batch` followed by
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
-- `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
+- `build_gate.healing` — Spec block defining the healing loop when Build Gate fails:
   - `retries` — Maximum number of healing attempts (default: 1)
-  - `mig` — Single healing mig (container with image/command/env/retain)
+  - `image`, `command`, `env`, `env_from_file` — Healing container configuration
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing migs
+- Container cleanup model:
+  - Containers are retained after step/gate completion.
+  - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem (`DockerRootDir`).
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
 
 ## Healing Container Environment

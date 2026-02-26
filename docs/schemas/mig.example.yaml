@@ -54,8 +54,6 @@ env:
 env_from_file:
   # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
   # CODEX_AUTH_JSON: ~/.codex/auth.json
-# Retain container for debugging (disabled by default)
-retain_container: false
 
 ################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
@@ -156,7 +154,7 @@ build_gate:
 # HEALING CONFIGURATION (build_gate.healing)
 ################################################################################
 # Healing runs after router (if configured) when the Build Gate fails.
-# Mod-like fields (image, command, env, retain_container) are specified
+# Mod-like fields (image, command, env, env_from_file) are specified
 # directly under healing (no nested "mig" key).
 #
 # build_gate:
@@ -181,14 +179,14 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy mig run --spec mig.yaml` along with
 #   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
 #
-# - The agent honors: image, command, env, retain_container,
+# - The agent honors: image, command, env, env_from_file,
 #   migs[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use top-level fields for one transformation.
 #   * Multi-step: Use the `migs[]` array for sequential transformations.
-#   * Both formats share the same global build_gate and build_gate_healing policy.
+#   * Both formats share the same global build_gate policy.
 #
 # - Stack-aware image selection:
 #   * The `image` field (top-level, in migs[], and in build_gate.healing/router)
@@ -208,5 +206,8 @@ mr_on_fail: true
 # - The node agent consumes build_gate.healing and build_gate.router to run
 #   the router → heal → re-gate loop after the first gate fail (applies to both
 #   single-mig and multi-step runs).
+# - Container cleanup model:
+#   * Containers are retained after step/gate completion.
+#   * Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
 # - Router produces bug_summary; healing produces action_summary. Both are
 #   persisted in jobs.meta and written to /in/healing-log.md per iteration.

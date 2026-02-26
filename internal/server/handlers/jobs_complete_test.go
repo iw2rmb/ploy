@@ -37,6 +37,9 @@ func TestCompleteJob_Success(t *testing.T) {
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
+	if rr.Body.Len() != 0 {
+		t.Fatalf("expected empty 204 response body, got %q", rr.Body.String())
+	}
 	if !st.getJobCalled {
 		t.Fatal("expected GetJob to be called")
 	}
