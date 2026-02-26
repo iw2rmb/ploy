@@ -118,6 +118,8 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 				NodeID:        job.NodeID,
 				Status:        string(job.Status),
 				ExitCode:      job.ExitCode,
+				StartedAt:     job.StartedAt,
+				FinishedAt:    job.FinishedAt,
 				DurationMs:    job.DurationMs,
 				DisplayName:   job.DisplayName,
 				ActionSummary: job.ActionSummary,
