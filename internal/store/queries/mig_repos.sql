@@ -1,6 +1,18 @@
 -- name: CreateMigRepo :one
-INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO mig_repos (
+  id,
+  mig_id,
+  repo_url,
+  base_ref,
+  target_ref,
+  prep_status,
+  prep_last_error,
+  prep_failure_code,
+  prep_profile,
+  prep_artifacts,
+  prep_updated_at
+)
+VALUES ($1, $2, $3, $4, $5, 'PrepPending', NULL, NULL, NULL, NULL, now())
 RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at;
 
 -- name: GetMigRepo :one
@@ -37,12 +49,60 @@ WHERE id = $1;
 -- Bulk upsert a mod_repo by normalized repo_url.
 -- Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
 -- If a row exists, update refs; otherwise insert.
-INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO mig_repos (
+  id,
+  mig_id,
+  repo_url,
+  base_ref,
+  target_ref,
+  prep_status,
+  prep_last_error,
+  prep_failure_code,
+  prep_profile,
+  prep_artifacts,
+  prep_updated_at
+)
+VALUES ($1, $2, $3, $4, $5, 'PrepPending', NULL, NULL, NULL, NULL, now())
 ON CONFLICT (mig_id, repo_url)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
-  target_ref = EXCLUDED.target_ref
+  target_ref = EXCLUDED.target_ref,
+  prep_status = CASE
+    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
+      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
+    THEN 'PrepPending'::prep_status
+    ELSE mig_repos.prep_status
+  END,
+  prep_last_error = CASE
+    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
+      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
+    THEN NULL
+    ELSE mig_repos.prep_last_error
+  END,
+  prep_failure_code = CASE
+    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
+      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
+    THEN NULL
+    ELSE mig_repos.prep_failure_code
+  END,
+  prep_profile = CASE
+    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
+      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
+    THEN NULL
+    ELSE mig_repos.prep_profile
+  END,
+  prep_artifacts = CASE
+    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
+      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
+    THEN NULL
+    ELSE mig_repos.prep_artifacts
+  END,
+  prep_updated_at = CASE
+    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
+      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
+    THEN now()
+    ELSE mig_repos.prep_updated_at
+  END
 RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at;
 
 -- name: ListReposByPrepStatus :many

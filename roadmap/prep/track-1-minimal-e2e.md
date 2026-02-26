@@ -119,7 +119,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/prep -run 'TestRunner|TestSchemaValidation|TestStateTransitions'`
 
 ## Phase 3: Trigger and Gate Lifecycle
-- [ ] Trigger prep automatically when a repo is registered.
+- [x] Trigger prep automatically when a repo is registered.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope:
@@ -140,7 +140,7 @@ Legend: [ ] todo, [x] done.
   - Tests:
     - `go test ./internal/server/handlers -run 'TestAddModRepoHandler|TestBulkUpsertMigReposHandler|TestCreateSingleRepoRun'`
 
-- [ ] Gate run job materialization on `PrepReady`.
+- [x] Gate run job materialization on `PrepReady`.
   - Repository: `ploy`
   - Component: `internal/store` + `internal/server/handlers`
   - Scope:

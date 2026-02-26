@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// createSingleRepoRunHandler submits a single-repo run and immediately starts execution.
+// createSingleRepoRunHandler submits a single-repo run and queues it for scheduler-driven execution.
 // Endpoint: POST /v1/runs
 // Request: {repo_url, base_ref, target_ref, spec}
 // Response: 201 Created with {run_id, mig_id, spec_id}
@@ -23,7 +23,8 @@ import (
 // - Creates a mig project as a side-effect; mig name == mig id.
 // - Creates an initial spec row and sets migs.spec_id.
 // - Creates a mig repo row for the provided repo_url.
-// - Creates a run and starts execution immediately.
+// - Creates a run and queued run_repo row.
+// - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
 //
 // This handler replaces the previous POST /v1/migs endpoint for run submission.
 func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
@@ -136,14 +137,6 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", modRepo.ID, "err", err)
-			return
-		}
-
-		// v1 immediate start: Create repo-scoped jobs for the queued repo.
-		// This ensures the run starts execution immediately.
-		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, createdSpec.Spec); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
-			slog.Error("create single-repo run: create jobs failed", "run_id", run.ID, "repo_id", runRepo.RepoID, "err", err)
 			return
 		}
 

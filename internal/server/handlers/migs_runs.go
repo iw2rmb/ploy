@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// createMigRunHandler creates a batch run from the mig + spec + selected repos and immediately starts it.
+// createMigRunHandler creates a batch run from the mig + spec + selected repos.
 // Endpoint: POST /v1/migs/{mig_id}/runs
 // Request: {repo_selector: {mode, repos?}, created_by?}
 // Response: 201 Created with {run_id}
@@ -27,7 +27,7 @@ import (
 // - Archived migs cannot be executed.
 // - Copies migs.spec_id → runs.spec_id for immutability.
 // - Creates run_repos rows snapshotting refs from mig_repos.
-// - Creates jobs for each selected repo and starts execution immediately.
+// - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
 func createMigRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse mig_id from URL path.
@@ -88,14 +88,6 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Get the spec to use for job creation.
-		spec, err := st.GetSpec(r.Context(), *mig.SpecID)
-		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to get spec: %v", err)
-			slog.Error("create mig run: get spec failed", "mig_id", modID.String(), "spec_id", *mig.SpecID, "err", err)
-			return
-		}
-
 		// Select repos based on mode.
 		selectedRepos, err := selectReposForRun(r.Context(), st, modID, req.RepoSelector.Mode, req.RepoSelector.Repos)
 		if err != nil {
@@ -124,11 +116,11 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Create run_repos entries and jobs for each selected repo.
+		// Create run_repos entries for each selected repo.
 		// v1: run_repos snapshots refs from mig_repos at run creation time.
 		for _, modRepo := range selectedRepos {
 			// Create run_repo entry snapshotting refs.
-			runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
+			_, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 				MigID:         modID,
 				RunID:         run.ID,
 				RepoID:        modRepo.ID,
@@ -146,17 +138,6 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 
-			// Create repo-scoped jobs for the queued repo.
-			// v1 immediate start: jobs are created and made immediately runnable.
-			if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
-				slog.Error("create mig run: create jobs failed",
-					"run_id", run.ID,
-					"repo_id", runRepo.RepoID,
-					"err", err,
-				)
-				return
-			}
 		}
 
 		// Build response with run_id.

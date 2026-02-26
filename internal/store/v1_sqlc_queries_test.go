@@ -195,6 +195,39 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpsertMigRepo(insert) failed: %v", err)
 	}
+	if inserted.PrepStatus != PrepStatusPending {
+		t.Fatalf("UpsertMigRepo(insert) prep status mismatch: got=%q want=%q", inserted.PrepStatus, PrepStatusPending)
+	}
+
+	profile := []byte(`{"schema_version":1}`)
+	artifacts := []byte(`{"log_refs":["logs://prep/modrepos"]}`)
+	if err := db.SaveMigRepoPrepProfile(ctx, SaveMigRepoPrepProfileParams{
+		ID:            inserted.ID,
+		PrepProfile:   profile,
+		PrepArtifacts: artifacts,
+	}); err != nil {
+		t.Fatalf("SaveMigRepoPrepProfile() failed: %v", err)
+	}
+
+	unchanged, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
+		ID:        types.NewMigRepoID(),
+		MigID:     mig.ID,
+		RepoUrl:   repoURL,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("UpsertMigRepo(unchanged) failed: %v", err)
+	}
+	if unchanged.PrepStatus != PrepStatusReady {
+		t.Fatalf("UpsertMigRepo(unchanged) prep status mismatch: got=%q want=%q", unchanged.PrepStatus, PrepStatusReady)
+	}
+	if !bytes.Equal(unchanged.PrepProfile, profile) {
+		t.Fatalf("UpsertMigRepo(unchanged) prep profile mismatch: got=%s want=%s", string(unchanged.PrepProfile), string(profile))
+	}
+	if !bytes.Equal(unchanged.PrepArtifacts, artifacts) {
+		t.Fatalf("UpsertMigRepo(unchanged) prep artifacts mismatch: got=%s want=%s", string(unchanged.PrepArtifacts), string(artifacts))
+	}
 
 	// Conflict path: provide a different id but same (mig_id, repo_url). ID must remain stable.
 	repoID2 := types.NewMigRepoID()
@@ -213,6 +246,15 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	}
 	if updated.BaseRef != "trunk" || updated.TargetRef != "feature-2" {
 		t.Fatalf("UpsertMigRepo(update) did not update refs: base=%q target=%q", updated.BaseRef, updated.TargetRef)
+	}
+	if updated.PrepStatus != PrepStatusPending {
+		t.Fatalf("UpsertMigRepo(update) prep status mismatch: got=%q want=%q", updated.PrepStatus, PrepStatusPending)
+	}
+	if len(updated.PrepProfile) != 0 {
+		t.Fatalf("UpsertMigRepo(update) expected prep_profile to be cleared, got=%s", string(updated.PrepProfile))
+	}
+	if len(updated.PrepArtifacts) != 0 {
+		t.Fatalf("UpsertMigRepo(update) expected prep_artifacts to be cleared, got=%s", string(updated.PrepArtifacts))
 	}
 
 	got, err := db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{
