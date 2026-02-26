@@ -26,6 +26,7 @@ type ClaimManager struct {
 	eventUploaderErr  error
 	controller        RunController
 	preClaimCleanup   preClaimCleanup
+	startupReconciler *startupCrashReconciler
 	backoff           *backoff.StatefulBackoff
 }
 
@@ -65,17 +66,22 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 	if err != nil {
 		return nil, fmt.Errorf("create pre-claim cleanup: %w", err)
 	}
+	startupReconciler, err := newStartupCrashReconciler()
+	if err != nil {
+		return nil, fmt.Errorf("create startup crash reconciler: %w", err)
+	}
 
 	// Initialize shared backoff policy for claim loop polling.
 	// Uses 250ms initial interval, 5s max cap matching previous behavior.
 	backoffPolicy := backoff.ClaimLoopPolicy()
 
 	return &ClaimManager{
-		cfg:             cfg,
-		client:          nil, // Will be initialized lazily
-		controller:      controller,
-		preClaimCleanup: cleanup,
-		backoff:         backoff.NewStatefulBackoff(backoffPolicy),
+		cfg:               cfg,
+		client:            nil, // Will be initialized lazily
+		controller:        controller,
+		preClaimCleanup:   cleanup,
+		startupReconciler: startupReconciler,
+		backoff:           backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
 }
 

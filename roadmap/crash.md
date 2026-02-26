@@ -38,7 +38,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/step -run 'Label|Gate'` — Every ploy-managed container should expose both labels when job identity exists.
 
 ## Phase 2: Startup Discovery and Classification
-- [ ] Add a startup crash reconciler service in nodeagent. — Centralize crash policy and keep claim loop focused on polling/backoff.
+- [x] Add a startup crash reconciler service in nodeagent. — Centralize crash policy and keep claim loop focused on polling/backoff.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope:
