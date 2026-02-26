@@ -75,7 +75,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent -run 'Recovered|Startup|Concurrency'` — Recovered running jobs should finish and report without blocking the node indefinitely.
 
 ## Phase 4: Terminal Reconciliation and Idempotent Completion
-- [ ] Reconcile recent terminal containers through `/v1/jobs/{job_id}/complete` and treat already-terminal conflicts as non-fatal. — Startup replay must be safe under races with server stale-recovery.
+- [x] Reconcile recent terminal containers through `/v1/jobs/{job_id}/complete` and treat already-terminal conflicts as non-fatal. — Startup replay must be safe under races with server stale-recovery.
   - Repository: `ploy`
   - Component: `internal/nodeagent` (client behavior), `internal/server/handlers` (contract tests)
   - Scope:

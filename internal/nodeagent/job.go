@@ -67,5 +67,11 @@ func (s *JobImageNameSaver) SaveJobImageName(ctx context.Context, jobID types.Jo
 	if image == "" {
 		return fmt.Errorf("image is empty")
 	}
-	return s.postJSONWithRetry(ctx, fmt.Sprintf("/v1/jobs/%s/image", jobID.String()), map[string]any{"image": image}, "save job image name")
+	return s.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/jobs/%s/image", jobID.String()),
+		map[string]any{"image": image},
+		"save job image name",
+		postJSONRetryModeDefault,
+	)
 }

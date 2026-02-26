@@ -141,7 +141,7 @@ func (c *ClaimManager) uploadRecoveredJobStatus(jobID types.JobID, status JobSta
 
 	statusCtx, cancel := context.WithTimeout(context.Background(), recoveredStatusUploadTimeout)
 	defer cancel()
-	if err := uploader.UploadJobStatus(statusCtx, jobID, status.String(), exitCode, stats); err != nil {
+	if err := uploader.UploadJobStatusReconcile(statusCtx, jobID, status.String(), exitCode, stats); err != nil {
 		return fmt.Errorf("upload job status: %w", err)
 	}
 	return nil

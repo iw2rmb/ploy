@@ -441,6 +441,48 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_AlreadyTerminalConflict(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		jobStatus store.JobStatus
+	}{
+		{name: "success", jobStatus: store.JobStatusSuccess},
+		{name: "fail", jobStatus: store.JobStatusFail},
+		{name: "cancelled", jobStatus: store.JobStatusCancelled},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newJobFixture("mig", 1000)
+			f.Job.Status = tt.jobStatus
+
+			st := &mockStore{
+				getJobResult:        f.Job,
+				listJobsByRunResult: []store.Job{f.Job},
+			}
+
+			handler := completeJobHandler(st, nil)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
+
+			if rr.Code != http.StatusConflict {
+				t.Fatalf("expected status 409, got %d", rr.Code)
+			}
+			if st.updateJobCompletionCalled {
+				t.Fatal("did not expect UpdateJobCompletion to be called")
+			}
+			if st.updateJobCompletionWithMetaCalled {
+				t.Fatal("did not expect UpdateJobCompletionWithMeta to be called")
+			}
+		})
+	}
+}
+
 // TestCompleteJob_InvalidStatus returns 400 when non-terminal status provided.
 func TestCompleteJob_InvalidStatus(t *testing.T) {
 	t.Parallel()
