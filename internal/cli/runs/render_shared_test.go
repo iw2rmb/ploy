@@ -119,6 +119,9 @@ func TestStatusGlyph(t *testing.T) {
 	if got := StatusGlyph("queued", 0); got != "·" {
 		t.Fatalf("StatusGlyph(queued,0)=%q, want %q", got, "·")
 	}
+	if got := StatusGlyph("finished", 0); got != "✓" {
+		t.Fatalf("StatusGlyph(finished,0)=%q, want %q", got, "✓")
+	}
 }
 
 func TestColoredStatusGlyph(t *testing.T) {
@@ -127,7 +130,13 @@ func TestColoredStatusGlyph(t *testing.T) {
 	if got := ColoredStatusGlyph("failed", 0); got != "\x1b[91m✗\x1b[0m" {
 		t.Fatalf("ColoredStatusGlyph(failed,0)=%q, want light-red fail glyph", got)
 	}
-	if got := ColoredStatusGlyph("running", 0); got != "⣾" {
-		t.Fatalf("ColoredStatusGlyph(running,0)=%q, want spinner", got)
+	if got := ColoredStatusGlyph("running", 0); got != "\x1b[92m⣾\x1b[0m" {
+		t.Fatalf("ColoredStatusGlyph(running,0)=%q, want light-green spinner", got)
+	}
+	if got := ColoredStatusGlyph("success", 0); got != "\x1b[92m✓\x1b[0m" {
+		t.Fatalf("ColoredStatusGlyph(success,0)=%q, want light-green check", got)
+	}
+	if got := ColoredStatusGlyph("queued", 0); got != "\x1b[39m·\x1b[0m" {
+		t.Fatalf("ColoredStatusGlyph(queued,0)=%q, want default-color queued glyph", got)
 	}
 }
