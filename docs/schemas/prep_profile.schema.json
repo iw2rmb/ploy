@@ -1,0 +1,326 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ploy Prep Profile",
+  "description": "Schema for non-interactive prep outputs and persisted repo prep profiles. YAML is supported as a JSON superset.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "repo_id",
+    "runner_mode",
+    "targets",
+    "orchestration",
+    "tactics_used",
+    "attempts",
+    "evidence",
+    "repro_check",
+    "prompt_delta_suggestion"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repo_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "runner_mode": {
+      "type": "string",
+      "enum": [
+        "simple",
+        "complex"
+      ]
+    },
+    "targets": {
+      "type": "object",
+      "required": [
+        "build",
+        "unit",
+        "all_tests"
+      ],
+      "properties": {
+        "build": {
+          "$ref": "#/definitions/targetResult"
+        },
+        "unit": {
+          "$ref": "#/definitions/targetResult"
+        },
+        "all_tests": {
+          "$ref": "#/definitions/targetResult"
+        }
+      },
+      "additionalProperties": false
+    },
+    "orchestration": {
+      "type": "object",
+      "required": [
+        "pre",
+        "post"
+      ],
+      "properties": {
+        "pre": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/orchestrationStep"
+          }
+        },
+        "post": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/orchestrationStep"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tactics_used": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/attempt"
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "log_refs",
+        "diagnostics"
+      ],
+      "properties": {
+        "log_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "repro_check": {
+      "type": "object",
+      "required": [
+        "status",
+        "details"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "details": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "prompt_delta_suggestion": {
+      "type": "object",
+      "required": [
+        "status",
+        "summary",
+        "candidate_lines"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "none",
+            "proposed"
+          ]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "candidate_lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "targetStatus": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "not_attempted"
+      ]
+    },
+    "failureCode": {
+      "type": "string",
+      "enum": [
+        "tool_not_detected",
+        "runtime_version_mismatch",
+        "docker_api_mismatch",
+        "registry_auth_failed",
+        "registry_ca_trust_failed",
+        "external_service_unreachable",
+        "command_not_found",
+        "timeout",
+        "unknown"
+      ]
+    },
+    "targetResult": {
+      "type": "object",
+      "required": [
+        "status",
+        "env"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/targetStatus"
+        },
+        "command": {
+          "type": "string"
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "failure_code": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/failureCode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "passed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "command"
+            ],
+            "properties": {
+              "failure_code": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "command",
+              "failure_code"
+            ],
+            "properties": {
+              "failure_code": {
+                "$ref": "#/definitions/failureCode"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "orchestrationStep": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "args"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "docker_network",
+            "docker_network_remove",
+            "docker_container",
+            "docker_remove",
+            "wait_for_log",
+            "health_check"
+          ]
+        },
+        "args": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "attempt": {
+      "type": "object",
+      "required": [
+        "target",
+        "command",
+        "env",
+        "exit_code",
+        "reason"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "enum": [
+            "build",
+            "unit",
+            "all_tests"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
