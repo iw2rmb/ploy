@@ -12,8 +12,10 @@ import (
 var SpinnerFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 
 const (
-	ansiErrorLightRed = "\x1b[91m"
-	ansiColorReset    = "\x1b[0m"
+	ansiSuccessLightGreen = "\x1b[92m"
+	ansiDefaultForeground = "\x1b[39m"
+	ansiErrorLightRed     = "\x1b[91m"
+	ansiColorReset        = "\x1b[0m"
 )
 
 // FormatErrorOneLiner normalizes a multi-line error to a single readable line.
@@ -88,7 +90,7 @@ func StatusGlyph(status string, spinnerFrame int) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "running", "started":
 		return spinnerAtFrame(spinnerFrame)
-	case "success", "succeeded":
+	case "success", "succeeded", "finished", "completed":
 		return "✓"
 	case "fail", "failed", "crash", "crashed", "error":
 		return "✗"
@@ -101,18 +103,39 @@ func StatusGlyph(status string, spinnerFrame int) string {
 	}
 }
 
-// ColoredStatusGlyph returns the status glyph, coloring failures light red.
+// ColoredStatusGlyph returns status glyphs with semantic colors.
 func ColoredStatusGlyph(status string, spinnerFrame int) string {
 	glyph := StatusGlyph(status, spinnerFrame)
 	if isFailedOrCrashedStatus(status) {
 		return ansiErrorLightRed + glyph + ansiColorReset
 	}
-	return glyph
+	if isSuccessfulStatus(status) || isRunningStatus(status) {
+		return ansiSuccessLightGreen + glyph + ansiColorReset
+	}
+	return ansiDefaultForeground + glyph + ansiColorReset
 }
 
 func isFailedOrCrashedStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "fail", "failed", "crash", "crashed", "error":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSuccessfulStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "success", "succeeded", "finished", "completed":
+		return true
+	default:
+		return false
+	}
+}
+
+func isRunningStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running", "started":
 		return true
 	default:
 		return false

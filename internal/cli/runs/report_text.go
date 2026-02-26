@@ -62,10 +62,10 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	}
 
 	headerLines := []string{
-		fmt.Sprintf("  Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
-		fmt.Sprintf("  Spec:  %s | %s", valueOrDash(report.SpecID.String()), renderOptionalLink("Download", buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
-		fmt.Sprintf("  Repos: %d", len(report.Repos)),
-		fmt.Sprintf("  Run:   %s", valueOrDash(report.RunID.String())),
+		fmt.Sprintf("   Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
+		fmt.Sprintf("   Spec:  %s | %s", valueOrDash(report.SpecID.String()), renderOptionalLink("Download", buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
+		fmt.Sprintf("   Repos: %d", len(report.Repos)),
+		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
 		"",
 	}
 
@@ -98,7 +98,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 
 		repoFrame := FollowRepoFrame{
 			HeaderLine: fmt.Sprintf(
-				"     [%d/%d] %s %s -> %s",
+				"   [%d/%d] %s %s -> %s",
 				i+1,
 				len(report.Repos),
 				renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, ""),
@@ -114,7 +114,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 			continue
 		}
 
-		repoFrame.Columns = []string{"", "Step", "Job ID", "Node", "Image", "Duration", "Artefacts"}
+		repoFrame.Columns = []string{"", "Step", "Job", "Node", "Image", "Duration", "Artefacts"}
 		repoFrame.Rows = make([]FollowStepRow, 0, len(entry.Jobs))
 		for _, job := range entry.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
@@ -128,7 +128,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 
 			repoFrame.Rows = append(repoFrame.Rows, FollowStepRow{
 				Cells: []string{
-					"  " + state,
+					state,
 					step,
 					valueOrDash(job.JobID.String()),
 					FormatNodeID(job.NodeID),

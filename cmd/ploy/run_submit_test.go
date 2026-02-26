@@ -561,19 +561,19 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	}
 
 	out := buf.String()
-	if !strings.Contains(out, "  Mig:   "+migID.String()+"   | java17-upgrade") {
+	if !strings.Contains(out, "   Mig:   "+migID.String()+"   | java17-upgrade") {
 		t.Fatalf("expected run status mig header, got: %q", out)
 	}
-	if !strings.Contains(out, "  Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
+	if !strings.Contains(out, "   Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
 		t.Fatalf("expected run status spec download link, got: %q", out)
 	}
-	if !strings.Contains(out, "     [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") {
+	if !strings.Contains(out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") {
 		t.Fatalf("expected run status repo header, got: %q", out)
 	}
-	if strings.Count(out, "  Mig:   "+migID.String()+"   | java17-upgrade") != 1 {
+	if strings.Count(out, "   Mig:   "+migID.String()+"   | java17-upgrade") != 1 {
 		t.Fatalf("expected mig header to render once in follow output, got: %q", out)
 	}
-	if strings.Count(out, "     [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") != 1 {
+	if strings.Count(out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") != 1 {
 		t.Fatalf("expected repo header to render once in follow output, got: %q", out)
 	}
 	if strings.Contains(out, "run_id: ") || strings.Contains(out, "mod_id: ") {

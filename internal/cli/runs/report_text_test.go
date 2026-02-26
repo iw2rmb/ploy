@@ -77,11 +77,11 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "  Mig:   "+migID.String()+"   | java17-upgrade")
-	assertContains(t, out, "  Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
-	assertContains(t, out, "  Repos: 1")
-	assertContains(t, out, "\n  Repos: 1\n  Run:   "+runID.String()+"\n\n")
-	assertContains(t, out, "     [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertContains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
+	assertContains(t, out, "   Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
+	assertContains(t, out, "   Repos: 1")
+	assertContains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
+	assertContains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
 	assertContains(t, out, "Artefacts")
 	assertNotContains(t, out, "State")
 	if strings.Count(out, "Logs (https://example.test/v1/runs/") != 1 {
@@ -384,7 +384,7 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
 	out := buf.String()
-	assertContains(t, out, "  Mig:   "+migID.String()+"\n")
+	assertContains(t, out, "   Mig:   "+migID.String()+"\n")
 	firstLine := strings.SplitN(out, "\n", 2)[0]
 	assertNotContains(t, firstLine, "|")
 }
