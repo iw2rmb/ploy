@@ -29,7 +29,6 @@ type ContainerSpec struct {
 	WorkingDir string
 	Env        map[string]string
 	Mounts     []ContainerMount
-	Retain     bool
 	Labels     map[string]string
 	// Optional resource limits (0 => unlimited)
 	LimitNanoCPUs    int64
@@ -127,7 +126,6 @@ func buildContainerSpec(runID types.RunID, manifest contracts.StepManifest, work
 		WorkingDir:       wd,
 		Env:              manifest.Env,
 		Mounts:           mounts,
-		Retain:           manifest.Retention.RetainContainer,
 		Labels:           labels,
 		LimitNanoCPUs:    nanoCPUs,
 		LimitMemoryBytes: memBytes,

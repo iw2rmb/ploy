@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -185,9 +184,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 				},
 			},
 		},
-		Retention: contracts.StepRetentionSpec{
-			TTL: types.Duration(time.Hour),
-		},
 		Options: mergedOpts,
 	}
 
@@ -265,9 +261,6 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 				Mode:      contracts.StepInputModeReadWrite,
 			},
 		},
-		Retention: contracts.StepRetentionSpec{
-			TTL: types.Duration(time.Hour),
-		},
 		Options: map[string]any{
 			"mount_docker_socket": true,
 		},
@@ -312,9 +305,6 @@ func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack con
 				MountPath: "/workspace",
 				Mode:      contracts.StepInputModeReadOnly,
 			},
-		},
-		Retention: contracts.StepRetentionSpec{
-			TTL: types.Duration(time.Hour),
 		},
 		Options: map[string]any{
 			"mount_docker_socket": true,

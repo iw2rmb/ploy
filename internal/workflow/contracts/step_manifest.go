@@ -32,7 +32,6 @@ type StepManifest struct {
 	Artifacts  []StepArtifact
 	Gate       *StepGateSpec
 	Resources  StepResourceSpec
-	Retention  StepRetentionSpec
 	// Options holds arbitrary run-specific options (e.g., GitLab PAT, MR flags).
 	// Read options via OptionString/OptionBool helpers to avoid scattered type
 	// assertions in callers. This field is not validated and values are never
@@ -174,12 +173,6 @@ func (s StepResourceSpec) ToLimits() (nanoCPUs int64, memoryBytes int64, diskByt
 	return
 }
 
-// StepRetentionSpec controls container and workspace retention.
-type StepRetentionSpec struct {
-	RetainContainer bool
-	TTL             types.Duration
-}
-
 // Validate ensures the manifest is well-formed.
 func (m StepManifest) Validate() error {
 	if err := m.validateIdentity(); err != nil {
@@ -197,7 +190,7 @@ func (m StepManifest) Validate() error {
 	if err := m.validateResources(); err != nil {
 		return err
 	}
-	return m.validateRetention()
+	return nil
 }
 
 func (m StepManifest) validateIdentity() error {
@@ -313,15 +306,6 @@ func (m StepManifest) validateResources() error {
 	}
 	if err := m.Resources.Disk.Validate(); err != nil {
 		return fmt.Errorf("resources disk invalid: %w", err)
-	}
-	return nil
-}
-
-func (m StepManifest) validateRetention() error {
-	if m.Retention.RetainContainer {
-		if timeDur := int64(m.Retention.TTL); timeDur <= 0 {
-			return errors.New("retention ttl required when retaining container")
-		}
 	}
 	return nil
 }
