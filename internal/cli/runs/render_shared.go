@@ -8,6 +8,9 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+// SpinnerFrames defines deterministic spinner glyph order for running states.
+var SpinnerFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
+
 // FormatErrorOneLiner normalizes a multi-line error to a single readable line.
 func FormatErrorOneLiner(lastErr *string) string {
 	if lastErr == nil {
@@ -57,4 +60,30 @@ func FormatDurationMsOrElapsed(durationMs int64, startedAt, finishedAt *time.Tim
 		return fmt.Sprintf("%.1fs", d.Seconds())
 	}
 	return "-"
+}
+
+// StatusGlyph maps a status to a deterministic display glyph.
+func StatusGlyph(status string, spinnerFrame int) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running", "started":
+		return spinnerAtFrame(spinnerFrame)
+	case "success", "succeeded":
+		return "✓"
+	case "fail", "failed", "crash", "crashed", "error":
+		return "✗"
+	case "cancelled", "canceled":
+		return "○"
+	case "created", "queued":
+		return "·"
+	default:
+		return " "
+	}
+}
+
+func spinnerAtFrame(frame int) string {
+	if len(SpinnerFrames) == 0 {
+		return " "
+	}
+	index := ((-frame)%len(SpinnerFrames) + len(SpinnerFrames)) % len(SpinnerFrames)
+	return SpinnerFrames[index]
 }

@@ -128,24 +128,24 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 func TestStatusGlyph_RunningUsesConfiguredSpinnerFrames(t *testing.T) {
 	t.Parallel()
 
-	got := statusGlyph("running", 0)
-	if got != "⣾ " {
-		t.Fatalf("statusGlyph(running,0)=%q, want %q", got, "⣾ ")
+	got := runs.StatusGlyph("running", 0)
+	if got != "⣾" {
+		t.Fatalf("StatusGlyph(running,0)=%q, want %q", got, "⣾")
 	}
-	got = statusGlyph("running", 1)
-	if got != "⣷ " {
-		t.Fatalf("statusGlyph(running,1)=%q, want %q", got, "⣷ ")
+	got = runs.StatusGlyph("running", 1)
+	if got != "⣷" {
+		t.Fatalf("StatusGlyph(running,1)=%q, want %q", got, "⣷")
 	}
 }
 
 func TestStatusGlyph_FailedAliasUsesFailGlyph(t *testing.T) {
 	t.Parallel()
 
-	if got := statusGlyph("fail", 0); got != "✗" {
-		t.Fatalf("statusGlyph(fail,0)=%q, want %q", got, "✗")
+	if got := runs.StatusGlyph("fail", 0); got != "✗" {
+		t.Fatalf("StatusGlyph(fail,0)=%q, want %q", got, "✗")
 	}
-	if got := statusGlyph("failed", 0); got != "✗" {
-		t.Fatalf("statusGlyph(failed,0)=%q, want %q", got, "✗")
+	if got := runs.StatusGlyph("failed", 0); got != "✗" {
+		t.Fatalf("StatusGlyph(failed,0)=%q, want %q", got, "✗")
 	}
 }
 

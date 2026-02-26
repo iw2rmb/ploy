@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -39,11 +38,11 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		runByRepoID[entry.RepoID] = entry
 	}
 
-	for i, repo := range report.Repos {
-		if i > 0 {
-			_, _ = fmt.Fprintln(w, "")
-		}
+	frame := FollowFrame{
+		Repos: make([]FollowRepoFrame, 0, len(report.Repos)),
+	}
 
+	for i, repo := range report.Repos {
 		repoLabel := strings.TrimSpace(repo.RepoURL)
 		if repoLabel != "" {
 			repoLabel = domaintypes.NormalizeRepoURLSchemless(repoLabel)
@@ -51,39 +50,51 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 			repoLabel = repo.RepoID.String()
 		}
 
-		_, _ = fmt.Fprintf(w, "Repo:  [%d/%d] %s %s -> %s\n", i+1, len(report.Repos), repoLabel, valueOrDash(strings.TrimSpace(repo.BaseRef)), valueOrDash(strings.TrimSpace(repo.TargetRef)))
+		repoFrame := FollowRepoFrame{
+			HeaderLine: fmt.Sprintf(
+				"Repo:  [%d/%d] %s %s -> %s",
+				i+1,
+				len(report.Repos),
+				repoLabel,
+				valueOrDash(strings.TrimSpace(repo.BaseRef)),
+				valueOrDash(strings.TrimSpace(repo.TargetRef)),
+			),
+		}
 
 		entry, ok := runByRepoID[repo.RepoID]
 		if !ok || len(entry.Jobs) == 0 {
-			_, _ = fmt.Fprintln(w, "  Jobs: none")
+			repoFrame.EmptyLine = "  Jobs: none"
+			frame.Repos = append(frame.Repos, repoFrame)
 			continue
 		}
 
-		tw := tabwriter.NewWriter(w, 0, 8, 2, ' ', 0)
-		_, _ = fmt.Fprintln(tw, "  State\tStep\tJob ID\tNode\tImage\tDuration\tArtifacts")
+		repoFrame.Columns = []string{"  State", "Step", "Job ID", "Node", "Image", "Duration", "Artifacts"}
+		repoFrame.Rows = make([]FollowStepRow, 0, len(entry.Jobs))
 		for _, job := range entry.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
 			patchURL := firstNonEmpty(strings.TrimSpace(job.PatchURL), strings.TrimSpace(entry.PatchURL), strings.TrimSpace(repo.PatchURL))
-			state := statusGlyph(job.Status, 0)
+			state := StatusGlyph(job.Status, 0)
 			step := renderStepName(job.JobType)
 
-			_, _ = fmt.Fprintf(
-				tw,
-				"  %s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				state,
-				step,
-				valueOrDash(job.JobID.String()),
-				FormatNodeID(job.NodeID),
-				valueOrDash(strings.TrimSpace(job.JobImage)),
-				FormatDurationCompact(job.DurationMs),
-				renderArtifacts(buildLogURL, patchURL, opts),
-			)
-
-			if exitLine := renderExitOneLiner(job, entry.LastError); exitLine != "" {
-				_, _ = fmt.Fprintf(tw, "  \t%s\t\t\t\t\t\n", exitLine)
-			}
+			repoFrame.Rows = append(repoFrame.Rows, FollowStepRow{
+				Cells: []string{
+					"  " + state,
+					step,
+					valueOrDash(job.JobID.String()),
+					FormatNodeID(job.NodeID),
+					valueOrDash(strings.TrimSpace(job.JobImage)),
+					FormatDurationCompact(job.DurationMs),
+					renderArtifacts(buildLogURL, patchURL, opts),
+				},
+				ExitOneLiner: renderExitOneLiner(job, entry.LastError),
+			})
 		}
-		_ = tw.Flush()
+		frame.Repos = append(frame.Repos, repoFrame)
+	}
+
+	rendered, _ := RenderFollowFrameText(frame, FollowFrameOptions{})
+	if rendered != "" {
+		_, _ = fmt.Fprint(w, rendered)
 	}
 
 	return nil
@@ -171,34 +182,6 @@ func renderExitCode(exitCode *int32) string {
 		return "?"
 	}
 	return strconv.FormatInt(int64(*exitCode), 10)
-}
-
-func statusGlyph(status string, spinnerFrame int) string {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "running", "started":
-		return spinnerAtFrame(spinnerFrame)
-	case "success", "succeeded":
-		return "✓"
-	case "fail", "failed":
-		return "✗"
-	case "crash", "crashed", "error":
-		return "✗"
-	case "cancelled", "canceled":
-		return "○"
-	case "created", "queued":
-		return "·"
-	default:
-		return " "
-	}
-}
-
-func spinnerAtFrame(frame int) string {
-	spinnerFrames := []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
-	if len(spinnerFrames) == 0 {
-		return " "
-	}
-	index := ((-frame)%len(spinnerFrames) + len(spinnerFrames)) % len(spinnerFrames)
-	return spinnerFrames[index]
 }
 
 func isFailedOrCrashedStatus(status string) bool {
