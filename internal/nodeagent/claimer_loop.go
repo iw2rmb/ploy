@@ -80,6 +80,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	if !ok {
+		slog.Warn(
+			"pre-claim disk guard blocked claim attempt",
+			"node_id", c.cfg.NodeID,
+			"threshold_bytes", minDockerFreeBytes,
+		)
 		return false, nil
 	}
 
