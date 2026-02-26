@@ -90,18 +90,8 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	if !st.createSpecCalled || !st.createMigCalled || !st.createMigRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
 		t.Fatalf("expected spec/mig/repo/run creation calls to be made")
 	}
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 jobs (pre-gate, mig-0, post-gate), got %d", st.createJobCallCount)
-	}
-	if len(st.createJobParams) != 3 {
-		t.Fatalf("expected 3 CreateJob param sets, got %d", len(st.createJobParams))
-	}
-	byName := createJobsByName(st.createJobParams)
-	if byName["pre-gate"].Status != store.JobStatusQueued {
-		t.Fatalf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
-	}
-	if byName["mig-0"].Status != store.JobStatusCreated || byName["post-gate"].Status != store.JobStatusCreated {
-		t.Fatalf("expected mig-0/post-gate to be Created, got %s/%s", byName["mig-0"].Status, byName["post-gate"].Status)
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no jobs on submission, got %d", st.createJobCallCount)
 	}
 }
 
@@ -567,7 +557,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	}
 }
 
-func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
+func TestCreateSingleRepoRunHandler_MultiStepDefersJobCreation(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
@@ -600,24 +590,8 @@ func TestCreateSingleRepoRunHandler_MultiStepCreatesMultipleJobs(t *testing.T) {
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if st.createJobCallCount != 4 {
-		t.Fatalf("expected 4 jobs (pre-gate, mig-0, mig-1, post-gate), got %d", st.createJobCallCount)
-	}
-	byName := createJobsByName(st.createJobParams)
-	if _, ok := byName["pre-gate"]; !ok {
-		t.Fatalf("missing pre-gate job")
-	}
-	if _, ok := byName["mig-0"]; !ok {
-		t.Fatalf("missing mig-0 job")
-	}
-	if _, ok := byName["mig-1"]; !ok {
-		t.Fatalf("missing mig-1 job")
-	}
-	if _, ok := byName["post-gate"]; !ok {
-		t.Fatalf("missing post-gate job")
-	}
-	if byName["pre-gate"].Status != store.JobStatusQueued {
-		t.Fatalf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no jobs on submission, got %d", st.createJobCallCount)
 	}
 }
 

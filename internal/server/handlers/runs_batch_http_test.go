@@ -445,7 +445,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 	}
 }
 
-func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
+func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -487,8 +487,8 @@ func TestAddRunRepoHandler_CreatesRepoAndJobs(t *testing.T) {
 	if !st.createMigRepoCalled || !st.createRunRepoCalled {
 		t.Fatalf("expected CreateMigRepo and CreateRunRepo to be called")
 	}
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 jobs to be created for new repo, got %d", st.createJobCallCount)
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no jobs to be created for new repo submission, got %d", st.createJobCallCount)
 	}
 }
 

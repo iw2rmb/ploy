@@ -65,9 +65,6 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 	if !st.getModCalled {
 		t.Error("store.GetMig was not called")
 	}
-	if !st.getSpecCalled {
-		t.Error("store.GetSpec was not called")
-	}
 	if !st.listMigReposByModCalled {
 		t.Error("store.ListMigReposByMig was not called")
 	}
@@ -77,8 +74,8 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 	if !st.createRunRepoCalled {
 		t.Error("store.CreateRunRepo was not called")
 	}
-	if !st.createJobCalled {
-		t.Error("store.CreateJob was not called")
+	if st.createJobCalled {
+		t.Error("store.CreateJob should not be called during run submission")
 	}
 
 	// Verify response shape.
@@ -272,9 +269,8 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 	}
 }
 
-// TestModRuns_Create_FirstJobClaimable verifies that the first job is Queued
-// and immediately claimable (v1 job queueing rules).
-func TestModRuns_Create_FirstJobClaimable(t *testing.T) {
+// TestModRuns_Create_DoesNotCreateJobsImmediately verifies submission defers job materialization.
+func TestModRuns_Create_DoesNotCreateJobsImmediately(t *testing.T) {
 	specID := domaintypes.SpecID("spec123")
 	st := &mockStore{
 		getModResult: store.Mig{
@@ -311,21 +307,8 @@ func TestModRuns_Create_FirstJobClaimable(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
 	}
 
-	// Verify jobs were created.
-	if st.createJobCallCount == 0 {
-		t.Fatal("no jobs created")
-	}
-
-	// v1 job queueing rules: first job (pre-gate) is Queued, rest are Created.
-	hasQueuedJob := false
-	for _, params := range st.createJobParams {
-		if params.Status == store.JobStatusQueued {
-			hasQueuedJob = true
-			break
-		}
-	}
-	if !hasQueuedJob {
-		t.Error("no job with Queued status; v1 requires first job to be immediately claimable")
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no jobs to be created during submission, got %d", st.createJobCallCount)
 	}
 }
 
@@ -569,39 +552,6 @@ func TestModRuns_Create_GetMigError(t *testing.T) {
 	}
 }
 
-// TestModRuns_Create_GetSpecError verifies POST /v1/migs/{mig_id}/runs returns 500 on GetSpec failure.
-func TestModRuns_Create_GetSpecError(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
-	st := &mockStore{
-		getModResult: store.Mig{
-			ID:         "mod123",
-			Name:       "test-mig",
-			SpecID:     &specID,
-			ArchivedAt: pgtype.Timestamptz{Valid: false},
-		},
-		getSpecErr: errors.New("database connection failed"),
-	}
-	handler := createMigRunHandler(st)
-
-	reqBody := map[string]any{
-		"repo_selector": map[string]any{
-			"mode": "all",
-		},
-	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
-}
-
 // TestModRuns_Create_ListModReposError verifies POST /v1/migs/{mig_id}/runs returns 500 on ListMigReposByMig failure.
 func TestModRuns_Create_ListModReposError(t *testing.T) {
 	specID := domaintypes.SpecID("spec123")
@@ -697,46 +647,6 @@ func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
 			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		createRunRepoErr: errors.New("database connection failed"),
-	}
-	handler := createMigRunHandler(st)
-
-	reqBody := map[string]any{
-		"repo_selector": map[string]any{
-			"mode": "all",
-		},
-	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
-}
-
-// TestModRuns_Create_CreateJobError verifies POST /v1/migs/{mig_id}/runs returns 500 on CreateJob failure.
-func TestModRuns_Create_CreateJobError(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
-	st := &mockStore{
-		getModResult: store.Mig{
-			ID:         "mod123",
-			Name:       "test-mig",
-			SpecID:     &specID,
-			ArchivedAt: pgtype.Timestamptz{Valid: false},
-		},
-		getSpecResult: store.Spec{
-			ID:   specID,
-			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
-		},
-		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-		},
-		createJobErr: errors.New("database connection failed"),
 	}
 	handler := createMigRunHandler(st)
 

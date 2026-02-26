@@ -969,8 +969,9 @@ value is a `StageStatus` object describing that job's execution state.
   - Handler: `createSingleRepoRunHandler`.
   - Behaviour (single source of truth for Mods execution):
     - Creates a spec (`specs`), a mig project (`migs`), a managed repo (`mod_repos`),
-      a run (`runs`, `status=Started`), a run repo (`run_repos`, `status=Queued`),
-      and the repo-scoped `jobs` pipeline (first job `Queued`, later jobs `Created`).
+      a run (`runs`, `status=Started`), and a run repo (`run_repos`, `status=Queued`).
+    - Jobs are materialized by the scheduler/start path only when the repo prep state
+      is `PrepReady`.
     - The run repo transitions to `Running` when the first job is claimed.
     - Publishes an initial `RunSummary` snapshot via `events.Service.PublishRun`
       (this run_id is used by SSE, diffs, and logs APIs).
@@ -1049,6 +1050,8 @@ Current prep scheduler behavior:
 - Retry claims are eligible when `prep_updated_at <= now() - scheduler.prep_retry_delay`.
 - Each claim increments `mig_repos.prep_attempts` and clears last error/failure code.
 - Success persists `prep_profile` + `prep_artifacts` and transitions repo to `PrepReady`.
+- Queued run repos are eligible for job materialization only when
+  `mig_repos.prep_status='PrepReady'`.
 
 Node startup crash reconciliation behavior:
 - On node process startup, the node agent runs one startup reconciliation pass
@@ -1087,17 +1090,18 @@ For a spec without `migs[]` (single-step top-level `image`/`command`/`env`):
    `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
    `cmd/ploy/mod_run_spec.go`.
 2. CLI submits to `POST /v1/runs`. The control plane:
-   - Creates jobs (pre-gate, mig, post-gate) as a `next_id`-linked chain.
-   - Persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
+   - Creates `runs` + `run_repos` rows.
    - Publishes an initial `RunSummary` over SSE.
-3. A node:
+3. Scheduler/start path materializes jobs (pre-gate, mig, post-gate) as a
+   `next_id`-linked chain only after prep is `PrepReady`.
+4. A node:
    - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
    - For each claimed job:
      - Hydrates the workspace using `step.WorkspaceHydrator`.
      - Executes the job (gate check or mig container).
      - Generates diffs with `DiffGenerator` and uploads them.
      - Completes the job via `/v1/jobs/{job_id}/complete`.
-4. Control plane updates  run status and emits a final `run` snapshot plus
+5. Control plane updates  run status and emits a final `run` snapshot plus
    a `done` status on the SSE stream.
 
 ### 4.2 Multi-step runs (`migs[]`) and rehydration
@@ -1107,11 +1111,12 @@ For a spec with `migs[]`:
 1. CLI preserves the `migs[]` array as-is (`buildSpecPayload` does not rewrite
    or reorder entries).
 2. `POST /v1/runs`:
-   - Creates jobs for pre-gate, each mig, and post-gates as a linked chain.
-   - Persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
+   - Creates `runs` + `run_repos` rows.
+3. Scheduler and nodeagents:
+   - Scheduler/start path creates jobs for pre-gate, each mig, and post-gates as a linked chain after prep is `PrepReady`.
+   - Job creation persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
    - Each job row includes `job_type` (pre_gate, mig, post_gate, heal, re_gate)
      and `job_image` (saved by the executing node before the container starts).
-3. Scheduler and nodeagents:
    - ClaimJob returns queued jobs from the unified queue, and the server promotes
      the claimed job's `next_id` successor only after prior jobs succeed.
    - Execute each job against a workspace that reflects all prior steps.

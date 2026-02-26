@@ -148,19 +148,6 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// v1 immediate start: create repo-scoped jobs for the new queued repo.
-		spec, err := st.GetSpec(r.Context(), run.SpecID)
-		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to load spec: %v", err)
-			slog.Error("add run repo: get spec failed", "run_id", runID.String(), "spec_id", run.SpecID, "err", err)
-			return
-		}
-		if err := createJobsFromSpec(r.Context(), st, run.ID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
-			slog.Error("add run repo: create jobs failed", "run_id", runID.String(), "repo_id", runRepo.RepoID, "err", err)
-			return
-		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, modRepo.RepoUrl))

@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // =============================================================================
@@ -21,7 +19,7 @@ import (
 //   - Creates a mig project (mig name == mig id).
 //   - Creates a spec row and sets migs.spec_id.
 //   - Creates a mig repo row for the provided repo_url.
-//   - Creates a run and run repo row and enqueues jobs.
+//   - Creates a run and run repo row.
 //   - Response includes run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	st := &mockStore{}
@@ -67,8 +65,8 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	if !st.createRunRepoCalled {
 		t.Error("store.CreateRunRepo was not called")
 	}
-	if !st.createJobCalled {
-		t.Error("store.CreateJob was not called (jobs should be created immediately)")
+	if st.createJobCalled {
+		t.Error("store.CreateJob should not be called during submission")
 	}
 
 	// Verify mig name == mig id (v1 contract).
@@ -102,9 +100,8 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_FirstJobClaimable verifies that the first job is Queued
-// and immediately claimable (v1 job queueing rules).
-func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
+// TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately verifies submission defers job materialization.
+func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 	st := &mockStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
@@ -132,22 +129,8 @@ func TestRunsCreateSingleRepo_FirstJobClaimable(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
 	}
 
-	// Verify jobs were created.
-	if st.createJobCallCount == 0 {
-		t.Fatal("no jobs created")
-	}
-
-	// v1 job queueing rules: first job (pre-gate) is Queued, rest are Created.
-	// Check that at least one job has status Queued.
-	hasQueuedJob := false
-	for _, params := range st.createJobParams {
-		if params.Status == store.JobStatusQueued {
-			hasQueuedJob = true
-			break
-		}
-	}
-	if !hasQueuedJob {
-		t.Error("no job with Queued status; v1 requires first job to be immediately claimable")
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no jobs to be created during submission, got %d", st.createJobCallCount)
 	}
 }
 
@@ -424,7 +407,7 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 	}
 }
 
-// TestRunsCreateSingleRepo_MultiStepSpec verifies POST /v1/runs creates jobs for multi-step spec.
+// TestRunsCreateSingleRepo_MultiStepSpec verifies POST /v1/runs accepts multi-step spec without job creation.
 func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	st := &mockStore{}
 	eventsService, _ := createTestEventsService()
@@ -457,10 +440,8 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
 	}
 
-	// Multi-step spec creates: pre-gate + mig-0 + mig-1 + post-gate = 4 jobs.
-	expectedJobCount := 4
-	if st.createJobCallCount != expectedJobCount {
-		t.Errorf("createJobCallCount = %d, want %d", st.createJobCallCount, expectedJobCount)
+	if st.createJobCallCount != 0 {
+		t.Errorf("createJobCallCount = %d, want 0", st.createJobCallCount)
 	}
 }
 
@@ -596,37 +577,6 @@ func TestRunsCreateSingleRepo_CreateRunError(t *testing.T) {
 func TestRunsCreateSingleRepo_CreateRunRepoError(t *testing.T) {
 	st := &mockStore{
 		createRunRepoErr: errors.New("database connection failed"),
-	}
-	handler := createSingleRepoRunHandler(st, nil)
-
-	spec := map[string]any{
-		"version": "0.2.0",
-		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
-	}
-	reqBody := map[string]any{
-		"repo_url":   "https://github.com/org/repo",
-		"base_ref":   "main",
-		"target_ref": "feature",
-		"spec":       spec,
-	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
-}
-
-// TestRunsCreateSingleRepo_CreateJobError verifies POST /v1/runs returns 500 on CreateJob failure.
-func TestRunsCreateSingleRepo_CreateJobError(t *testing.T) {
-	st := &mockStore{
-		createJobErr: errors.New("database connection failed"),
 	}
 	handler := createSingleRepoRunHandler(st, nil)
 
