@@ -199,18 +199,39 @@ func (q *Queries) UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedPa
 }
 
 const updateNodeHeartbeat = `-- name: UpdateNodeHeartbeat :exec
-UPDATE nodes
-SET
-  last_heartbeat = $2,
-  cpu_total_millis = $3,
-  cpu_free_millis = $4,
-  mem_total_bytes = $5,
-  mem_free_bytes = $6,
-  disk_total_bytes = $7,
-  disk_free_bytes = $8,
-  -- Update version only when provided (non-empty); keep existing otherwise.
-  version = COALESCE(NULLIF($9::text, ''), version)
-WHERE id = $1
+WITH updated AS (
+  UPDATE nodes
+  SET
+    last_heartbeat = $2,
+    cpu_total_millis = $3,
+    cpu_free_millis = $4,
+    mem_total_bytes = $5,
+    mem_free_bytes = $6,
+    disk_total_bytes = $7,
+    disk_free_bytes = $8,
+    -- Update version only when provided (non-empty); keep existing otherwise.
+    version = COALESCE(NULLIF($9::text, ''), version)
+  WHERE nodes.id = $1
+  RETURNING nodes.id
+)
+INSERT INTO node_metrics (
+  node_id,
+  cpu_total_millis,
+  cpu_free_millis,
+  mem_total_bytes,
+  mem_free_bytes,
+  disk_total_bytes,
+  disk_free_bytes
+)
+SELECT
+  updated.id,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8
+FROM updated
 `
 
 type UpdateNodeHeartbeatParams struct {
