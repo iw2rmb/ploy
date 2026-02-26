@@ -34,16 +34,20 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "Mig:   "+migID.String()+"   | java17-upgrade")
-	assertContains(t, out, "Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
-	assertContains(t, out, "Repos: 1")
-	assertContains(t, out, "Run:   "+runID.String())
-	assertContains(t, out, "Repo:  [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
-	assertContains(t, out, "Artifacts")
+	assertContains(t, out, "  Mig:   "+migID.String()+"   | java17-upgrade")
+	assertContains(t, out, "  Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
+	assertContains(t, out, "  Repos: 1")
+	assertContains(t, out, "\n  Repos: 1\n  Run:   "+runID.String()+"\n\n")
+	assertContains(t, out, "     [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertContains(t, out, "Artefacts")
 	assertNotContains(t, out, "State")
 	assertContains(t, out, "Logs")
 	assertContains(t, out, " | Patch")
+	if strings.Count(out, "Patch (") != 1 {
+		t.Fatalf("expected exactly one patch link, got %q", out)
+	}
 	assertContains(t, out, "⣾")
+	assertContains(t, out, "\x1b[91m✗\x1b[0m")
 	assertContains(t, out, "└  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
 	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
 }

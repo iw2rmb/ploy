@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -31,6 +32,7 @@ type RunRepoJobResponse struct {
 	DurationMs    int64               `json:"duration_ms"`
 	DisplayName   string              `json:"display_name,omitempty"`
 	ActionSummary string              `json:"action_summary,omitempty"`
+	BugSummary    string              `json:"bug_summary,omitempty"`
 }
 
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
@@ -125,6 +127,9 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 					}
 					if meta.ActionSummary != "" {
 						jr.ActionSummary = meta.ActionSummary
+					}
+					if meta.Gate != nil && strings.TrimSpace(meta.Gate.BugSummary) != "" {
+						jr.BugSummary = strings.TrimSpace(meta.Gate.BugSummary)
 					}
 				}
 			}

@@ -57,6 +57,7 @@ type RunJobEntry struct {
 	DurationMs    int64               `json:"duration_ms"`
 	DisplayName   string              `json:"display_name,omitempty"`
 	ActionSummary string              `json:"action_summary,omitempty"`
+	BugSummary    string              `json:"bug_summary,omitempty"`
 	BuildLogURL   string              `json:"build_log_url,omitempty"`
 	PatchURL      string              `json:"patch_url,omitempty"`
 }
