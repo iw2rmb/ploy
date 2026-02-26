@@ -8,14 +8,15 @@ import (
 // ToMap converts the ModsSpec to a map[string]any for wire serialization.
 // This is useful when the spec needs to be passed through systems that
 // expect untyped map representations.
-func (s ModsSpec) ToMap() map[string]any {
+// Returns an error if marshaling or unmarshaling fails.
+func (s ModsSpec) ToMap() (map[string]any, error) {
 	data, err := json.Marshal(s)
 	if err != nil {
-		panic(fmt.Sprintf("ModsSpec.ToMap: json.Marshal failed: %v", err))
+		return nil, fmt.Errorf("ModsSpec.ToMap: json.Marshal: %w", err)
 	}
 	var result map[string]any
 	if err := json.Unmarshal(data, &result); err != nil {
-		panic(fmt.Sprintf("ModsSpec.ToMap: json.Unmarshal failed: %v", err))
+		return nil, fmt.Errorf("ModsSpec.ToMap: json.Unmarshal: %w", err)
 	}
-	return result
+	return result, nil
 }
