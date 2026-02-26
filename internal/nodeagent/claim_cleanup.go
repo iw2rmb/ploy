@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"sort"
 	"strings"
@@ -61,28 +62,64 @@ func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error
 	if free >= minDockerFreeBytes {
 		return true, nil
 	}
+	slog.Warn(
+		"pre-claim disk guard detected low docker-root capacity",
+		"docker_root", dockerRoot,
+		"free_bytes", free,
+		"threshold_bytes", minDockerFreeBytes,
+	)
 
 	listed, err := c.docker.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		return false, fmt.Errorf("list containers: %w", err)
 	}
 	eligible := eligibleCleanupContainers(listed.Items)
+	removed := 0
 
 	for _, summary := range eligible {
 		if free >= minDockerFreeBytes {
 			return true, nil
 		}
+		freeBefore := free
 		if _, err := c.docker.ContainerRemove(ctx, summary.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
 			return false, fmt.Errorf("remove container %s: %w", summary.ID, err)
 		}
+		removed++
 
 		free, err = c.freeBytes(dockerRoot)
 		if err != nil {
 			return false, fmt.Errorf("free bytes for docker root %q after removing %s: %w", dockerRoot, summary.ID, err)
 		}
+		slog.Info(
+			"pre-claim disk cleanup removed container",
+			"docker_root", dockerRoot,
+			"container_id", summary.ID,
+			"created", summary.Created,
+			"free_bytes_before", freeBefore,
+			"free_bytes_after", free,
+			"threshold_bytes", minDockerFreeBytes,
+		)
 	}
 
-	return free >= minDockerFreeBytes, nil
+	if free >= minDockerFreeBytes {
+		slog.Info(
+			"pre-claim disk cleanup restored capacity",
+			"docker_root", dockerRoot,
+			"free_bytes", free,
+			"threshold_bytes", minDockerFreeBytes,
+			"removed_containers", removed,
+		)
+		return true, nil
+	}
+	slog.Warn(
+		"pre-claim disk cleanup exhausted eligible containers",
+		"docker_root", dockerRoot,
+		"free_bytes", free,
+		"threshold_bytes", minDockerFreeBytes,
+		"removed_containers", removed,
+		"eligible_containers", len(eligible),
+	)
+	return false, nil
 }
 
 func eligibleCleanupContainers(containers []containertypes.Summary) []containertypes.Summary {

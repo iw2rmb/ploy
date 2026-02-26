@@ -128,7 +128,7 @@ Legend: [ ] todo, [x] done.
     - assert “exhausted list + still low disk” returns guard failure.
 
 ## Phase 4: Wire Guard Into Claim Loop Semantics
-- [ ] Run cleanup guard immediately before every claim attempt.
+- [x] Run cleanup guard immediately before every claim attempt.
   - Repository: `ploy`
   - Component: `internal/nodeagent/claimer_loop.go`, `internal/nodeagent/claimer.go`
   - Scope:
@@ -146,7 +146,7 @@ Legend: [ ] todo, [x] done.
       - guard fail => no claim request emitted.
       - guard pass => claim request proceeds.
 
-- [ ] Add focused logging for cleanup decisions.
+- [x] Add focused logging for cleanup decisions.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope:
