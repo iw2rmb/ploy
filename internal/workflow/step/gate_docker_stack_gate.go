@@ -25,44 +25,94 @@ type gateExecutionTerminal struct {
 	runtimeImage       string
 }
 
-type gateTerminalOptions struct {
-	language           string
-	tool               string
-	code               string
-	message            string
-	evidence           string
-	stackGate          *contracts.StackGateResult
-	runtimeImage       string
-	reportRuntimeImage bool
-	err                error
-}
-
-func newGateTerminal(opts gateTerminalOptions) *gateExecutionTerminal {
-	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{
-			Language: opts.language,
-			Tool:     opts.tool,
-			Passed:   false,
-		}},
-		LogFindings: []contracts.BuildGateLogFinding{{
-			Severity: "error",
-			Code:     opts.code,
-			Message:  opts.message,
-			Evidence: opts.evidence,
-		}},
-	}
-	if opts.stackGate != nil {
-		meta.StackGate = opts.stackGate
-	}
-	if opts.reportRuntimeImage || opts.runtimeImage != "" {
-		meta.RuntimeImage = opts.runtimeImage
-	}
+func newGateExecutionTerminal(
+	meta *contracts.BuildGateStageMetadata,
+	err error,
+	runtimeImage string,
+	reportRuntimeImage bool,
+) *gateExecutionTerminal {
 	return &gateExecutionTerminal{
 		meta:               meta,
-		err:                opts.err,
-		reportRuntimeImage: opts.reportRuntimeImage,
-		runtimeImage:       opts.runtimeImage,
+		err:                err,
+		reportRuntimeImage: reportRuntimeImage,
+		runtimeImage:       runtimeImage,
 	}
+}
+
+func buildGateFailureMetadata(
+	language string,
+	tool string,
+	code string,
+	message string,
+	evidence string,
+) *contracts.BuildGateStageMetadata {
+	meta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: language, Tool: tool, Passed: false}},
+		LogFindings:  []contracts.BuildGateLogFinding{{Severity: "error", Code: code, Message: message, Evidence: evidence}},
+	}
+	return meta
+}
+
+func newDetectedStackFailureTerminal(
+	language string,
+	tool string,
+	code string,
+	message string,
+	evidence string,
+	err error,
+) *gateExecutionTerminal {
+	meta := buildGateFailureMetadata(language, tool, code, message, evidence)
+	return newGateExecutionTerminal(meta, err, "", false)
+}
+
+func newStackGateFailureTerminal(
+	language string,
+	stackGate *contracts.StackGateResult,
+	code string,
+	message string,
+	evidence string,
+	runtimeImage string,
+	reportRuntimeImage bool,
+	err error,
+) *gateExecutionTerminal {
+	meta := buildGateFailureMetadata(language, "stack-gate", code, message, evidence)
+	meta.StackGate = stackGate
+	if reportRuntimeImage || runtimeImage != "" {
+		meta.RuntimeImage = runtimeImage
+	}
+	return newGateExecutionTerminal(meta, err, runtimeImage, reportRuntimeImage)
+}
+
+func stackGateTerminalWithResult(
+	language string,
+	stackGate *contracts.StackGateResult,
+	result string,
+	reason string,
+	code string,
+	evidence string,
+	runtimeImage string,
+	reportRuntimeImage bool,
+	err error,
+) *gateExecutionTerminal {
+	stackGate.Result = result
+	stackGate.Reason = reason
+	if runtimeImage != "" {
+		stackGate.RuntimeImage = runtimeImage
+	}
+	return newStackGateFailureTerminal(language, stackGate, code, reason, evidence, runtimeImage, reportRuntimeImage, err)
+}
+
+func resolveStackGateRuntimeImageForTerminal(
+	envImage string,
+	mappingPath string,
+	overrides []contracts.BuildGateImageRule,
+	expect *contracts.StackExpectation,
+) string {
+	img, err := resolveExpectedRuntimeImageForStackGate(envImage, mappingPath, overrides, expect)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(img)
 }
 
 func resolveGateExecutionPlan(
@@ -94,59 +144,45 @@ func resolveStackGateExecutionPlan(
 		Expected: spec.StackGate.Expect,
 	}
 
-	resolveExpectedRuntimeImage := func() (string, error) {
-		return resolveExpectedRuntimeImageForStackGate(envImage, mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
-	}
-
 	if detectErr != nil {
 		var detErr *stackdetect.DetectionError
+		reason := detectErr.Error()
 		var evidenceStr string
 		if errors.As(detectErr, &detErr) {
-			sgResult.Result = "unknown"
-			sgResult.Reason = detErr.Message
+			reason = detErr.Message
 			evidenceStr = formatEvidenceForLog(detErr.Evidence)
-		} else {
-			sgResult.Result = "unknown"
-			sgResult.Reason = detectErr.Error()
 		}
-		var runtimeImage string
-		if img, err := resolveExpectedRuntimeImage(); err == nil {
-			runtimeImage = strings.TrimSpace(img)
-			sgResult.RuntimeImage = runtimeImage
-		}
-		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-			language:           spec.StackGate.Expect.Language,
-			tool:               "stack-gate",
-			code:               "STACK_GATE_UNKNOWN",
-			message:            sgResult.Reason,
-			evidence:           evidenceStr,
-			stackGate:          sgResult,
-			runtimeImage:       runtimeImage,
-			reportRuntimeImage: true,
-		})
+		runtimeImage := resolveStackGateRuntimeImageForTerminal(envImage, mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
+		return gateExecutionPlan{}, stackGateTerminalWithResult(
+			spec.StackGate.Expect.Language,
+			sgResult,
+			"unknown",
+			reason,
+			"STACK_GATE_UNKNOWN",
+			evidenceStr,
+			runtimeImage,
+			true,
+			nil,
+		)
 	}
 
 	sgResult.Detected = observationToStackExpectation(obs)
 
 	if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
-		sgResult.Result = "mismatch"
-		sgResult.Reason = formatMismatchReason(obs, spec.StackGate.Expect)
+		reason := formatMismatchReason(obs, spec.StackGate.Expect)
 		evidenceStr := formatEvidenceForLog(obs.Evidence)
-		var runtimeImage string
-		if img, err := resolveExpectedRuntimeImage(); err == nil {
-			runtimeImage = strings.TrimSpace(img)
-			sgResult.RuntimeImage = runtimeImage
-		}
-		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-			language:           spec.StackGate.Expect.Language,
-			tool:               "stack-gate",
-			code:               "STACK_GATE_MISMATCH",
-			message:            sgResult.Reason,
-			evidence:           evidenceStr,
-			stackGate:          sgResult,
-			runtimeImage:       runtimeImage,
-			reportRuntimeImage: true,
-		})
+		runtimeImage := resolveStackGateRuntimeImageForTerminal(envImage, mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
+		return gateExecutionPlan{}, stackGateTerminalWithResult(
+			spec.StackGate.Expect.Language,
+			sgResult,
+			"mismatch",
+			reason,
+			"STACK_GATE_MISMATCH",
+			evidenceStr,
+			runtimeImage,
+			true,
+			nil,
+		)
 	}
 
 	sgResult.Result = "pass"
@@ -160,15 +196,18 @@ func resolveStackGateExecutionPlan(
 	image := envImage
 	if image == "" {
 		if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
-			sgResult.Result = "unknown"
-			sgResult.Reason = "stack gate expectation missing release; cannot resolve runtime image"
-			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-				language:  language,
-				tool:      "stack-gate",
-				code:      "STACK_GATE_INVALID_EXPECTATION",
-				message:   sgResult.Reason,
-				stackGate: sgResult,
-			})
+			reason := "stack gate expectation missing release; cannot resolve runtime image"
+			return gateExecutionPlan{}, stackGateTerminalWithResult(
+				language,
+				sgResult,
+				"unknown",
+				reason,
+				"STACK_GATE_INVALID_EXPECTATION",
+				"",
+				"",
+				false,
+				nil,
+			)
 		}
 
 		resolvedImage, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *spec.StackGate.Expect, true)
@@ -179,15 +218,18 @@ func resolveStackGateExecutionPlan(
 				code = "STACK_GATE_NO_IMAGE_RULE"
 				prefix = "no matching image rule"
 			}
-			sgResult.Result = "unknown"
-			sgResult.Reason = fmt.Sprintf("%s: %s", prefix, err.Error())
-			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-				language:  language,
-				tool:      "stack-gate",
-				code:      code,
-				message:   sgResult.Reason,
-				stackGate: sgResult,
-			})
+			reason := fmt.Sprintf("%s: %s", prefix, err.Error())
+			return gateExecutionPlan{}, stackGateTerminalWithResult(
+				language,
+				sgResult,
+				"unknown",
+				reason,
+				code,
+				"",
+				"",
+				false,
+				nil,
+			)
 		}
 		image = resolvedImage
 	}
@@ -195,17 +237,17 @@ func resolveStackGateExecutionPlan(
 	sgResult.RuntimeImage = image
 	cmd, err := buildCommandForTool(tool)
 	if err != nil {
-		sgResult.Result = "unknown"
-		sgResult.Reason = err.Error()
-		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-			language:           language,
-			tool:               "stack-gate",
-			code:               "STACK_GATE_UNKNOWN",
-			message:            sgResult.Reason,
-			stackGate:          sgResult,
-			runtimeImage:       image,
-			reportRuntimeImage: true,
-		})
+		return gateExecutionPlan{}, stackGateTerminalWithResult(
+			language,
+			sgResult,
+			"unknown",
+			err.Error(),
+			"STACK_GATE_UNKNOWN",
+			"",
+			image,
+			true,
+			nil,
+		)
 	}
 
 	return gateExecutionPlan{
@@ -253,13 +295,14 @@ func resolveDetectedStackExecutionPlan(
 				mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expectedTool, strings.TrimSpace(obs.Tool)))
 			}
 			if len(mismatches) > 0 {
-				return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-					language: expectedLanguage,
-					tool:     "stackdetect",
-					code:     "BUILD_GATE_STACK_MISMATCH",
-					message:  "stack mismatch: " + strings.Join(mismatches, "; "),
-					evidence: formatEvidenceForLog(obs.Evidence),
-				})
+				return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+					expectedLanguage,
+					"stackdetect",
+					"BUILD_GATE_STACK_MISMATCH",
+					"stack mismatch: "+strings.Join(mismatches, "; "),
+					formatEvidenceForLog(obs.Evidence),
+					nil,
+				)
 			}
 		}
 
@@ -279,18 +322,23 @@ func resolveDetectedStackExecutionPlan(
 		if chosenTool == "" {
 			// Detection couldn't determine tool. Apply default/cancel policy.
 			if !stackDetectCfg.Default {
-				return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-					tool:    "stackdetect",
-					code:    "BUILD_GATE_STACK_DETECT_FAILED",
-					message: "stack detection could not determine build tool",
-					err:     ErrRepoCancelled,
-				})
+				return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+					"",
+					"stackdetect",
+					"BUILD_GATE_STACK_DETECT_FAILED",
+					"stack detection could not determine build tool",
+					"",
+					ErrRepoCancelled,
+				)
 			}
-			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-				tool:    "stackdetect",
-				code:    "BUILD_GATE_STACK_DETECT_FAILED",
-				message: "stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
-			})
+			return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+				"",
+				"stackdetect",
+				"BUILD_GATE_STACK_DETECT_FAILED",
+				"stack detection fallback is enabled but build tool could not be determined (set build_gate.<phase>.stack.tool or ensure workspace has an unambiguous build file)",
+				"",
+				nil,
+			)
 		}
 
 		language = expectedLanguage
@@ -322,23 +370,26 @@ func resolveDetectedStackExecutionPlan(
 		// Policy: when StackDetect is enabled and default=false, treat a detection failure
 		// as a repo-level cancellation (no healing / no further execution).
 		if stackDetectCfg != nil && stackDetectCfg.Enabled && !stackDetectCfg.Default {
-			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-				tool:     "stackdetect",
-				code:     "BUILD_GATE_STACK_DETECT_FAILED",
-				message:  msg,
-				evidence: evidenceStr,
-				err:      ErrRepoCancelled,
-			})
+			return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+				"",
+				"stackdetect",
+				"BUILD_GATE_STACK_DETECT_FAILED",
+				msg,
+				evidenceStr,
+				ErrRepoCancelled,
+			)
 		}
 
 		if stackDetectCfg == nil || !stackDetectCfg.Enabled {
 			// Default behavior: fail the gate (not cancelled).
-			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-				tool:     "stackdetect",
-				code:     "BUILD_GATE_STACK_DETECT_FAILED",
-				message:  msg,
-				evidence: evidenceStr,
-			})
+			return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+				"",
+				"stackdetect",
+				"BUILD_GATE_STACK_DETECT_FAILED",
+				msg,
+				evidenceStr,
+				nil,
+			)
 		}
 	} else {
 		// No StackDetect: use detected language/tool.
@@ -356,24 +407,28 @@ func resolveDetectedStackExecutionPlan(
 			if errors.Is(err, errBuildGateImageRuleMatch) {
 				code = "BUILD_GATE_NO_IMAGE_RULE"
 			}
-			return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-				language: language,
-				tool:     tool,
-				code:     code,
-				message:  err.Error(),
-			})
+			return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+				language,
+				tool,
+				code,
+				err.Error(),
+				"",
+				nil,
+			)
 		}
 		image = resolvedImage
 	}
 
 	cmd, err := buildCommandForTool(tool)
 	if err != nil {
-		return gateExecutionPlan{}, newGateTerminal(gateTerminalOptions{
-			language: language,
-			tool:     tool,
-			code:     "BUILD_GATE_UNKNOWN_TOOL",
-			message:  err.Error(),
-		})
+		return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+			language,
+			tool,
+			"BUILD_GATE_UNKNOWN_TOOL",
+			err.Error(),
+			"",
+			nil,
+		)
 	}
 
 	return gateExecutionPlan{

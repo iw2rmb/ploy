@@ -57,7 +57,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/stackdetect -run 'TestDetectTool|TestDetectPython|TestDetector'`
 
 ## Phase 4: Flatten Gate Plan Control Flow
-- [ ] Simplify stack-gate execution planning internals without behavior changes.
+- [x] Simplify stack-gate execution planning internals without behavior changes.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope:
