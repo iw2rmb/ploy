@@ -59,6 +59,7 @@ func TestClaimLoop_UnifiedQueue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 
 	// Override backoff policy to speed up test.
 	testPolicy := backoff.Policy{
@@ -131,6 +132,7 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 
 	// Override backoff policy to speed up test.
 	testPolicy := backoff.Policy{

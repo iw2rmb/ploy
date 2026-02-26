@@ -70,6 +70,7 @@ func TestClaimLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 
 	// Override backoff policy to speed up test.
 	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
@@ -140,6 +141,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 
 	// Override backoff policy to speed up test.
 	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
@@ -210,6 +212,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 
 	// Set backoff parameters using custom policy.
 	testPolicy := backoff.Policy{
@@ -319,6 +322,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 
 	// Set backoff parameters using custom policy.
 	testPolicy := backoff.Policy{
@@ -424,6 +428,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 	// Override backoff policy to speed up test.
 	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
 
@@ -511,6 +516,7 @@ func TestClaimLoop_NextIDMapping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
 	// Override backoff policy to speed up test.
 	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
 
@@ -622,6 +628,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager node-1: %v", err)
 	}
+	claimer1.preClaimCleanup = noopPreClaimCleanup{}
 	claimer1.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
 
 	ctx1, cancel1 := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -661,6 +668,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager node-2: %v", err)
 	}
+	claimer2.preClaimCleanup = noopPreClaimCleanup{}
 	claimer2.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
 
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)

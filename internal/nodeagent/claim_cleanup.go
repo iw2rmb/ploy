@@ -1,0 +1,131 @@
+package nodeagent
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"math"
+	"sort"
+	"strings"
+	"syscall"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
+	containertypes "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+)
+
+const minDockerFreeBytes int64 = 1 << 30
+
+type claimCleanupDockerClient interface {
+	Info(ctx context.Context, options client.InfoOptions) (client.SystemInfoResult, error)
+	ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error)
+	ContainerRemove(ctx context.Context, containerID string, options client.ContainerRemoveOptions) (client.ContainerRemoveResult, error)
+}
+
+type freeBytesFunc func(path string) (int64, error)
+
+type dockerPreClaimCleanup struct {
+	docker    claimCleanupDockerClient
+	freeBytes freeBytesFunc
+}
+
+func newDockerPreClaimCleanup() (preClaimCleanup, error) {
+	dockerClient, err := client.New(client.FromEnv)
+	if err != nil {
+		return nil, fmt.Errorf("create docker client: %w", err)
+	}
+	return &dockerPreClaimCleanup{
+		docker:    dockerClient,
+		freeBytes: dockerRootFreeBytes,
+	}, nil
+}
+
+func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error) {
+	if c == nil || c.docker == nil || c.freeBytes == nil {
+		return false, errors.New("pre-claim cleanup not configured")
+	}
+
+	info, err := c.docker.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		return false, fmt.Errorf("docker info: %w", err)
+	}
+	dockerRoot := strings.TrimSpace(info.Info.DockerRootDir)
+	if dockerRoot == "" {
+		return false, errors.New("docker info: empty docker root dir")
+	}
+
+	free, err := c.freeBytes(dockerRoot)
+	if err != nil {
+		return false, fmt.Errorf("free bytes for docker root %q: %w", dockerRoot, err)
+	}
+	if free >= minDockerFreeBytes {
+		return true, nil
+	}
+
+	listed, err := c.docker.ContainerList(ctx, client.ContainerListOptions{All: true})
+	if err != nil {
+		return false, fmt.Errorf("list containers: %w", err)
+	}
+	eligible := eligibleCleanupContainers(listed.Items)
+
+	for _, summary := range eligible {
+		if free >= minDockerFreeBytes {
+			return true, nil
+		}
+		if _, err := c.docker.ContainerRemove(ctx, summary.ID, client.ContainerRemoveOptions{Force: true}); err != nil {
+			return false, fmt.Errorf("remove container %s: %w", summary.ID, err)
+		}
+
+		free, err = c.freeBytes(dockerRoot)
+		if err != nil {
+			return false, fmt.Errorf("free bytes for docker root %q after removing %s: %w", dockerRoot, summary.ID, err)
+		}
+	}
+
+	return free >= minDockerFreeBytes, nil
+}
+
+func eligibleCleanupContainers(containers []containertypes.Summary) []containertypes.Summary {
+	eligible := make([]containertypes.Summary, 0, len(containers))
+	for _, summary := range containers {
+		if !isPloyManaged(summary.Labels) {
+			continue
+		}
+		if summary.State == containertypes.StateRunning {
+			continue
+		}
+		eligible = append(eligible, summary)
+	}
+
+	sort.SliceStable(eligible, func(i, j int) bool {
+		if eligible[i].Created == eligible[j].Created {
+			return eligible[i].ID < eligible[j].ID
+		}
+		return eligible[i].Created < eligible[j].Created
+	})
+
+	return eligible
+}
+
+func isPloyManaged(labels map[string]string) bool {
+	if len(labels) == 0 {
+		return false
+	}
+	if strings.TrimSpace(labels[types.LabelRunID]) != "" {
+		return true
+	}
+	return strings.TrimSpace(labels[types.LabelJobID]) != ""
+}
+
+func dockerRootFreeBytes(path string) (int64, error) {
+	var stats syscall.Statfs_t
+	if err := syscall.Statfs(path, &stats); err != nil {
+		return 0, err
+	}
+
+	free := uint64(stats.Bavail) * uint64(stats.Bsize)
+	if free > math.MaxInt64 {
+		return math.MaxInt64, nil
+	}
+	return int64(free), nil
+}

@@ -93,7 +93,7 @@ Legend: [ ] todo, [x] done.
     - update `internal/workflow/step/container_spec*_test.go`
 
 ## Phase 3: Pre-Claim Docker-Root Disk Guard + FIFO Cleanup
-- [ ] Add a dedicated pre-claim cleanup service owned by node runtime.
+- [x] Add a dedicated pre-claim cleanup service owned by node runtime.
   - Repository: `ploy`
   - Component: `internal/nodeagent` (new file, e.g. `claim_cleanup.go`)
   - Scope:
@@ -108,7 +108,7 @@ Legend: [ ] todo, [x] done.
   - Tests:
     - new `internal/nodeagent/claim_cleanup_test.go` with fake docker/info/fs providers.
 
-- [ ] Implement FIFO deletion of stopped ploy-managed containers.
+- [x] Implement FIFO deletion of stopped ploy-managed containers.
   - Repository: `ploy`
   - Component: `internal/nodeagent` pre-claim cleanup service
   - Scope:
