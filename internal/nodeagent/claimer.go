@@ -24,6 +24,7 @@ type ClaimManager struct {
 	eventUploaderOnce sync.Once
 	eventUploaderErr  error
 	controller        RunController
+	preClaimCleanup   preClaimCleanup
 	backoff           *backoff.StatefulBackoff
 }
 
@@ -65,10 +66,11 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 	backoffPolicy := backoff.ClaimLoopPolicy()
 
 	return &ClaimManager{
-		cfg:        cfg,
-		client:     nil, // Will be initialized lazily
-		controller: controller,
-		backoff:    backoff.NewStatefulBackoff(backoffPolicy),
+		cfg:             cfg,
+		client:          nil, // Will be initialized lazily
+		controller:      controller,
+		preClaimCleanup: noopPreClaimCleanup{},
+		backoff:         backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
 }
 

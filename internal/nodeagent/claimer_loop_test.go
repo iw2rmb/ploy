@@ -14,6 +14,12 @@ import (
 
 // Note: mockRunController is defined in handlers_test.go within the same package.
 
+type preClaimCleanupFunc func(context.Context) (bool, error)
+
+func (f preClaimCleanupFunc) EnsureCapacity(ctx context.Context) (bool, error) {
+	return f(ctx)
+}
+
 // TestClaimLoop_UnifiedQueue verifies that the claim loop polls the single unified
 // jobs queue (POST /v1/nodes/{id}/claim) and properly handles 204 No Content.
 // There is no separate Build Gate queue — all job types are claimed from the same endpoint.
@@ -159,5 +165,101 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 	// Verify no unexpected paths were called (e.g., buildgate/claim).
 	if len(unexpectedPaths) > 0 {
 		t.Errorf("unexpected paths called: %v", unexpectedPaths)
+	}
+}
+
+func TestClaimAndExecute_PreClaimCleanupBlocksClaim(t *testing.T) {
+	t.Parallel()
+
+	var claimCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/nodes/"+testNodeID+"/claim" {
+			claimCount++
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{Enabled: false},
+		},
+	}
+	controller := &mockRunController{}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = preClaimCleanupFunc(func(context.Context) (bool, error) {
+		return false, nil
+	})
+
+	claimed, err := claimer.claimAndExecute(context.Background())
+	if err != nil {
+		t.Fatalf("claimAndExecute() error = %v, want nil", err)
+	}
+	if claimed {
+		t.Fatalf("claimAndExecute() claimed = true, want false")
+	}
+	if claimCount != 0 {
+		t.Fatalf("claim endpoint called %d times, want 0", claimCount)
+	}
+	if controller.acquireCalls != 0 {
+		t.Fatalf("AcquireSlot calls = %d, want 0", controller.acquireCalls)
+	}
+	if controller.releaseCalls != 0 {
+		t.Fatalf("ReleaseSlot calls = %d, want 0", controller.releaseCalls)
+	}
+}
+
+func TestClaimAndExecute_PreClaimCleanupAllowsClaim(t *testing.T) {
+	t.Parallel()
+
+	var claimCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/nodes/"+testNodeID+"/claim" {
+			claimCount++
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{Enabled: false},
+		},
+	}
+	controller := &mockRunController{}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = preClaimCleanupFunc(func(context.Context) (bool, error) {
+		return true, nil
+	})
+
+	claimed, err := claimer.claimAndExecute(context.Background())
+	if err != nil {
+		t.Fatalf("claimAndExecute() error = %v, want nil", err)
+	}
+	if claimed {
+		t.Fatalf("claimAndExecute() claimed = true, want false (no work)")
+	}
+	if claimCount != 1 {
+		t.Fatalf("claim endpoint called %d times, want 1", claimCount)
+	}
+	if controller.acquireCalls != 1 {
+		t.Fatalf("AcquireSlot calls = %d, want 1", controller.acquireCalls)
+	}
+	if controller.releaseCalls != 1 {
+		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.releaseCalls)
 	}
 }
