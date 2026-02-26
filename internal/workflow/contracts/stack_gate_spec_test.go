@@ -260,7 +260,10 @@ func TestStackGateSpec_RoundTrip(t *testing.T) {
 	}
 
 	// Convert to map.
-	m := original.ToMap()
+	m, err := original.ToMap()
+	if err != nil {
+		t.Fatalf("ToMap failed: %v", err)
+	}
 
 	// Marshal to JSON and parse back.
 	data, err := json.Marshal(m)
@@ -588,7 +591,10 @@ func TestStackGateWire_EmptyOmitted(t *testing.T) {
 		}},
 	}
 
-	m := spec.ToMap()
+	m, err := spec.ToMap()
+	if err != nil {
+		t.Fatalf("ToMap failed: %v", err)
+	}
 	stepsRaw, ok := m["steps"].([]any)
 	if !ok {
 		t.Fatal("steps not in expected format")
@@ -614,7 +620,10 @@ func TestStackGateWire_DisabledOmitted(t *testing.T) {
 		}},
 	}
 
-	m := spec.ToMap()
+	m, err := spec.ToMap()
+	if err != nil {
+		t.Fatalf("ToMap failed: %v", err)
+	}
 	stepsRaw, ok := m["steps"].([]any)
 	if !ok {
 		t.Fatal("steps not in expected format")

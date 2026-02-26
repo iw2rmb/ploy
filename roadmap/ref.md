@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/step -run 'TestDockerGate|TestGate|TestResolve'`
 
 ## Phase 5: Replace Panic-Based `ModsSpec.ToMap`
-- [ ] Change `ModsSpec.ToMap()` to return `(map[string]any, error)` and update call sites.
+- [x] Change `ModsSpec.ToMap()` to return `(map[string]any, error)` and update call sites.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts` + direct callers
   - Scope:

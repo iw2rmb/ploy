@@ -551,7 +551,10 @@ func TestModsSpec_ToMap(t *testing.T) {
 		MROnSuccess: &mrOnSuccess,
 	}
 
-	m := original.ToMap()
+	m, err := original.ToMap()
+	if err != nil {
+		t.Fatalf("ToMap failed: %v", err)
+	}
 
 	// Marshal to JSON and parse back.
 	data, err := json.Marshal(m)
@@ -601,7 +604,10 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 		},
 	}
 
-	m := original.ToMap()
+	m, err := original.ToMap()
+	if err != nil {
+		t.Fatalf("ToMap failed: %v", err)
+	}
 
 	// Marshal to JSON and parse back.
 	data, err := json.Marshal(m)

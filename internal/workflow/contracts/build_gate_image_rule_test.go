@@ -270,7 +270,10 @@ func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 	}
 
 	// Convert to map.
-	m := original.ToMap()
+	m, err := original.ToMap()
+	if err != nil {
+		t.Fatalf("ToMap failed: %v", err)
+	}
 
 	// Marshal to JSON and parse back.
 	data, err := json.Marshal(m)
