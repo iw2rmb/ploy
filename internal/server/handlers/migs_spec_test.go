@@ -16,6 +16,90 @@ import (
 )
 
 // =============================================================================
+// GET /v1/migs/{mig_ref}/specs/latest — Get Mig Latest Spec
+// =============================================================================
+
+func TestMods_GetLatestSpec_Success(t *testing.T) {
+	specID := store.Spec{ID: "spec123", Spec: []byte(`{"version":"0.2.0","steps":[{"image":"alpine"}]}`)}
+	migSpecID := specID.ID
+	st := &mockStore{
+		getModResult: store.Mig{
+			ID:         "mod123",
+			Name:       "test-mig",
+			SpecID:     &migSpecID,
+			ArchivedAt: pgtype.Timestamptz{Valid: false},
+		},
+		getSpecResult: specID,
+	}
+	handler := getMigLatestSpecHandler(st)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/migs/mod123/specs/latest", nil)
+	req.SetPathValue("mig_ref", "mod123")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if got := rr.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("content-type = %q, want application/json", got)
+	}
+	if rr.Body.String() != string(specID.Spec) {
+		t.Fatalf("body = %q, want %q", rr.Body.String(), string(specID.Spec))
+	}
+	if !st.getModCalled {
+		t.Fatal("expected GetMig/GetMigByName to be called")
+	}
+	if !st.getSpecCalled {
+		t.Fatal("expected GetSpec to be called")
+	}
+}
+
+func TestMods_GetLatestSpec_MigWithoutSpec(t *testing.T) {
+	st := &mockStore{
+		getModResult: store.Mig{
+			ID:         "mod123",
+			Name:       "test-mig",
+			SpecID:     nil,
+			ArchivedAt: pgtype.Timestamptz{Valid: false},
+		},
+	}
+	handler := getMigLatestSpecHandler(st)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/migs/mod123/specs/latest", nil)
+	req.SetPathValue("mig_ref", "mod123")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNotFound, rr.Body.String())
+	}
+	if st.getSpecCalled {
+		t.Fatal("GetSpec must not be called when mig has no spec")
+	}
+}
+
+func TestMods_GetLatestSpec_MigNotFound(t *testing.T) {
+	st := &mockStore{getModErr: pgx.ErrNoRows}
+	handler := getMigLatestSpecHandler(st)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/migs/missing/specs/latest", nil)
+	req.SetPathValue("mig_ref", "missing")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNotFound, rr.Body.String())
+	}
+	if st.getSpecCalled {
+		t.Fatal("GetSpec must not be called when mig is missing")
+	}
+}
+
+// =============================================================================
 // POST /v1/migs/{mig_ref}/specs — Set Mig Spec
 // =============================================================================
 

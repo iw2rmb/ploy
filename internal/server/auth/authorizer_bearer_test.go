@@ -508,6 +508,7 @@ func TestAuthorizerQueryToken_AllowedArtifactPaths(t *testing.T) {
 		"/v1/runs/run-123/logs?auth_token=" + tokenString,
 		"/v1/runs/run-123/repos/repo-123/logs?auth_token=" + tokenString,
 		"/v1/runs/run-123/repos/repo-123/diffs?download=true&diff_id=diff-1&auth_token=" + tokenString,
+		"/v1/migs/mig-123/specs/latest?auth_token=" + tokenString,
 	}
 
 	for _, path := range tests {

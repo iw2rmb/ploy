@@ -34,12 +34,13 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "Mig:   "+migID.String()+"  | java17-upgrade")
-	assertContains(t, out, "Spec:  "+specID.String()+" | Download")
+	assertContains(t, out, "Mig:   "+migID.String()+"   | java17-upgrade")
+	assertContains(t, out, "Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
 	assertContains(t, out, "Repos: 1")
 	assertContains(t, out, "Run:   "+runID.String())
-	assertContains(t, out, "Repo:  [1/1] github.com/acme/service main -> ploy/java17")
+	assertContains(t, out, "Repo:  [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
 	assertContains(t, out, "Artifacts")
+	assertNotContains(t, out, "State")
 	assertContains(t, out, "Logs")
 	assertContains(t, out, " | Patch")
 	assertContains(t, out, "⣾")
@@ -189,5 +190,12 @@ func assertContains(t *testing.T, output string, want string) {
 	t.Helper()
 	if !strings.Contains(output, want) {
 		t.Fatalf("expected output to contain %q, got %q", want, output)
+	}
+}
+
+func assertNotContains(t *testing.T, output string, want string) {
+	t.Helper()
+	if strings.Contains(output, want) {
+		t.Fatalf("expected output to not contain %q, got %q", want, output)
 	}
 }

@@ -14,6 +14,7 @@ import (
 type TextRenderOptions struct {
 	EnableOSC8 bool
 	AuthToken  string
+	BaseURL    *url.URL
 }
 
 // RenderRunReportText renders a one-shot, follow-style run snapshot.
@@ -22,8 +23,8 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		return fmt.Errorf("run report text: output writer required")
 	}
 
-	_, _ = fmt.Fprintf(w, "Mig:   %s  | %s\n", valueOrDash(report.MigID.String()), valueOrDash(strings.TrimSpace(report.MigName)))
-	_, _ = fmt.Fprintf(w, "Spec:  %s | Download\n", valueOrDash(report.SpecID.String()))
+	_, _ = fmt.Fprintf(w, "Mig:   %s\n", renderMigHeader(report.MigID.String(), report.MigName))
+	_, _ = fmt.Fprintf(w, "Spec:  %s | %s\n", valueOrDash(report.SpecID.String()), renderOptionalLink("Download", buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken))
 	_, _ = fmt.Fprintf(w, "Repos: %d\n", len(report.Repos))
 	_, _ = fmt.Fprintf(w, "Run:   %s\n", valueOrDash(report.RunID.String()))
 
@@ -43,11 +44,11 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 	}
 
 	for i, repo := range report.Repos {
-		repoLabel := strings.TrimSpace(repo.RepoURL)
-		if repoLabel != "" {
-			repoLabel = domaintypes.NormalizeRepoURLSchemless(repoLabel)
+		repoLinkLabel := strings.TrimSpace(repo.RepoURL)
+		if repoLinkLabel != "" {
+			repoLinkLabel = domaintypes.NormalizeRepoURLSchemless(repoLinkLabel)
 		} else {
-			repoLabel = repo.RepoID.String()
+			repoLinkLabel = repo.RepoID.String()
 		}
 
 		repoFrame := FollowRepoFrame{
@@ -55,7 +56,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 				"Repo:  [%d/%d] %s %s -> %s",
 				i+1,
 				len(report.Repos),
-				repoLabel,
+				renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, ""),
 				valueOrDash(strings.TrimSpace(repo.BaseRef)),
 				valueOrDash(strings.TrimSpace(repo.TargetRef)),
 			),
@@ -68,7 +69,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 			continue
 		}
 
-		repoFrame.Columns = []string{"  State", "Step", "Job ID", "Node", "Image", "Duration", "Artifacts"}
+		repoFrame.Columns = []string{"", "Step", "Job ID", "Node", "Image", "Duration", "Artifacts"}
 		repoFrame.Rows = make([]FollowStepRow, 0, len(entry.Jobs))
 		for _, job := range entry.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
@@ -84,7 +85,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 					FormatNodeID(job.NodeID),
 					valueOrDash(strings.TrimSpace(job.JobImage)),
 					FormatDurationCompact(job.DurationMs),
-					renderArtifacts(buildLogURL, patchURL, opts),
+					renderArtifactsForStatus(job.Status, buildLogURL, patchURL, opts),
 				},
 				ExitOneLiner: renderExitOneLiner(job, entry.LastError),
 			})
@@ -112,6 +113,13 @@ func renderLink(label, rawURL string, enableOSC8 bool, authToken string) string 
 	return "\x1b]8;;" + url + "\x1b\\" + label + "\x1b]8;;\x1b\\"
 }
 
+func renderOptionalLink(label, rawURL string, enableOSC8 bool, authToken string) string {
+	if strings.TrimSpace(rawURL) == "" {
+		return label
+	}
+	return renderLink(label, rawURL, enableOSC8, authToken)
+}
+
 func renderArtifacts(logURL, patchURL string, opts TextRenderOptions) string {
 	logURL = strings.TrimSpace(logURL)
 	patchURL = strings.TrimSpace(patchURL)
@@ -125,6 +133,13 @@ func renderArtifacts(logURL, patchURL string, opts TextRenderOptions) string {
 	default:
 		return renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
 	}
+}
+
+func renderArtifactsForStatus(status, logURL, patchURL string, opts TextRenderOptions) string {
+	if !isTerminalJobStatus(status) {
+		return "-"
+	}
+	return renderArtifacts(logURL, patchURL, opts)
 }
 
 func appendAuthToken(rawURL, token string) string {
@@ -191,6 +206,31 @@ func isFailedOrCrashedStatus(status string) bool {
 	default:
 		return false
 	}
+}
+
+func isTerminalJobStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "success", "succeeded", "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
+		return true
+	default:
+		return false
+	}
+}
+
+func renderMigHeader(migID, migName string) string {
+	migID = valueOrDash(strings.TrimSpace(migID))
+	migName = strings.TrimSpace(migName)
+	if migName == "" || migName == migID {
+		return migID
+	}
+	return migID + "   | " + migName
+}
+
+func buildSpecDownloadURL(report RunReport, baseURL *url.URL) string {
+	if baseURL == nil || report.MigID.IsZero() {
+		return ""
+	}
+	return baseURL.JoinPath("v1", "migs", report.MigID.String(), "specs", "latest").String()
 }
 
 func valueOrDash(v string) string {

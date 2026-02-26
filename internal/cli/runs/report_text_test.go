@@ -2,6 +2,7 @@ package runs
 
 import (
 	"bytes"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -64,19 +65,27 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 		},
 	}
 
+	baseURL, err := url.Parse("https://example.test")
+	if err != nil {
+		t.Fatalf("parse base url: %v", err)
+	}
+
 	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL}); err != nil {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
 
 	out := buf.String()
-	assertContains(t, out, "Mig:   "+migID.String()+"  | java17-upgrade")
-	assertContains(t, out, "Spec:  "+specID.String()+" | Download")
+	assertContains(t, out, "Mig:   "+migID.String()+"   | java17-upgrade")
+	assertContains(t, out, "Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertContains(t, out, "Repos: 1")
 	assertContains(t, out, "Run:   "+runID.String())
-	assertContains(t, out, "Repo:  [1/1] github.com/acme/service main -> ploy/java17")
+	assertContains(t, out, "Repo:  [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
 	assertContains(t, out, "Artifacts")
-	assertContains(t, out, "Logs (https://example.test/v1/runs/")
+	assertNotContains(t, out, "State")
+	if strings.Count(out, "Logs (https://example.test/v1/runs/") != 1 {
+		t.Fatalf("expected exactly one logs link in output, got: %q", out)
+	}
 	assertContains(t, out, "Logs (https://example.test/v1/runs/")
 	assertContains(t, out, " | Patch (https://example.test/v1/runs/")
 	assertContains(t, out, "⣾")
@@ -163,13 +172,18 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
+	migID := domaintypes.NewMigID()
 	repoID := domaintypes.NewMigRepoID()
 	logURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs"
 	patchURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc"
+	baseURL, err := url.Parse("https://example.test")
+	if err != nil {
+		t.Fatalf("parse base url: %v", err)
+	}
 
 	report := RunReport{
 		RunID:   runID,
-		MigID:   domaintypes.NewMigID(),
+		MigID:   migID,
 		MigName: "links-run",
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RepoReport{
@@ -210,11 +224,14 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	}
 
 	var plain bytes.Buffer
-	if err := RenderRunReportText(&plain, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token"}); err != nil {
+	if err := RenderRunReportText(&plain, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL}); err != nil {
 		t.Fatalf("RenderRunReportText plain error: %v", err)
 	}
 	plainOut := plain.String()
 	assertContains(t, plainOut, "Logs ("+logURL+"?auth_token=test-token)")
+	assertContains(t, plainOut, "Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
+	assertContains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
+	assertNotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
 	assertContains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
 	assertContains(t, plainOut, "auth_token=test-token")
 	assertContains(t, plainOut, "diff_id=abc")
@@ -224,18 +241,50 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	}
 
 	var linked bytes.Buffer
-	if err := RenderRunReportText(&linked, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token"}); err != nil {
+	if err := RenderRunReportText(&linked, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL}); err != nil {
 		t.Fatalf("RenderRunReportText linked error: %v", err)
 	}
 	linkedOut := linked.String()
 	assertContains(t, linkedOut, "\x1b]8;;"+logURL+"?auth_token=test-token")
+	assertContains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
+	assertContains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
+	assertNotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
 	assertContains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
 	assertContains(t, linkedOut, "auth_token=test-token")
+}
+
+func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
+	t.Parallel()
+
+	migID := domaintypes.NewMigID()
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   migID,
+		MigName: migID.String(),
+		SpecID:  domaintypes.NewSpecID(),
+		Repos:   []RepoReport{},
+	}
+
+	var buf bytes.Buffer
+	if err := RenderRunReportText(&buf, report, TextRenderOptions{}); err != nil {
+		t.Fatalf("RenderRunReportText error: %v", err)
+	}
+	out := buf.String()
+	assertContains(t, out, "Mig:   "+migID.String()+"\n")
+	firstLine := strings.SplitN(out, "\n", 2)[0]
+	assertNotContains(t, firstLine, "|")
 }
 
 func assertContains(t *testing.T, haystack string, needle string) {
 	t.Helper()
 	if !strings.Contains(haystack, needle) {
 		t.Fatalf("expected output to contain %q, got: %q", needle, haystack)
+	}
+}
+
+func assertNotContains(t *testing.T, haystack string, needle string) {
+	t.Helper()
+	if strings.Contains(haystack, needle) {
+		t.Fatalf("expected output not to contain %q, got: %q", needle, haystack)
 	}
 }

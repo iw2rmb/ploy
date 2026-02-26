@@ -9,7 +9,7 @@ info:
 
     v1 API surfaces:
     - `/v1/migs` — mig project CRUD (create/list/delete/archive).
-    - `/v1/migs/{mod_id}/specs` — spec management for mig projects.
+    - `/v1/migs/{mod_id}/specs` and `/v1/migs/{mod_id}/specs/latest` — spec management for mig projects.
     - `/v1/migs/{mod_id}/repos` — repo set management (add/list/delete repos).
     - `/v1/migs/{mod_id}/runs` — create multi-repo batch runs for a mig.
     - `/v1/migs/{mod_id}/pull` — resolve repo execution for `ploy mig pull`.
@@ -85,6 +85,8 @@ paths:
     $ref: './paths/migs_mig_id_unarchive.yaml'
   /v1/migs/{mod_id}/specs:
     $ref: './paths/migs_mig_id_specs.yaml'
+  /v1/migs/{mod_id}/specs/latest:
+    $ref: './paths/migs_mig_id_specs_latest.yaml'
   /v1/migs/{mod_id}/repos:
     $ref: './paths/migs_mig_id_repos.yaml'
   /v1/migs/{mod_id}/repos/{repo_id}:

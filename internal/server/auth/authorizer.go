@@ -254,6 +254,10 @@ func queryTokenAuthAllowed(r *http.Request) bool {
 	if len(parts) == 6 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "repos" && parts[5] == "diffs" && parts[2] != "" && parts[4] != "" {
 		return true
 	}
+	// /v1/migs/{mig_ref}/specs/latest (spec download link).
+	if len(parts) == 5 && parts[0] == "v1" && parts[1] == "migs" && parts[3] == "specs" && parts[4] == "latest" && parts[2] != "" {
+		return true
+	}
 	return false
 }
 
