@@ -182,6 +182,18 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 		}
 	}
 
+	// Fallback for browser/OSC8 artifact links:
+	// allow auth_token query parameter on explicit GET artifact endpoints.
+	if queryTokenAuthAllowed(r) {
+		if token := strings.TrimSpace(r.URL.Query().Get("auth_token")); token != "" {
+			a.logger.Debug("auth: attempting query token authentication",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"token_prefix", token[:min(8, len(token))])
+			return a.identityFromBearerToken(r.Context(), token)
+		}
+	}
+
 	// Fall back to mTLS authentication
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 		if a.allowInsecure {
@@ -219,6 +231,30 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 		CommonName: cert.Subject.CommonName,
 		Serial:     cert.SerialNumber.String(),
 	}, nil
+}
+
+func queryTokenAuthAllowed(r *http.Request) bool {
+	if r == nil || r.URL == nil {
+		return false
+	}
+	if r.Method != http.MethodGet {
+		return false
+	}
+
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	// /v1/runs/{id}/logs
+	if len(parts) == 4 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "logs" && parts[2] != "" {
+		return true
+	}
+	// /v1/runs/{run_id}/repos/{repo_id}/logs
+	if len(parts) == 6 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "repos" && parts[5] == "logs" && parts[2] != "" && parts[4] != "" {
+		return true
+	}
+	// /v1/runs/{run_id}/repos/{repo_id}/diffs (download links).
+	if len(parts) == 6 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "repos" && parts[5] == "diffs" && parts[2] != "" && parts[4] != "" {
+		return true
+	}
+	return false
 }
 
 func extractRole(cert *x509.Certificate) Role {

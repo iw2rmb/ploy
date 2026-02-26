@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `roadmap/reporting.md`; `cmd/ploy/run_commands.go`; 
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Behavior Contract Tests
-- [ ] Add/adjust CLI tests for `run status` frame contract.
+- [x] Add/adjust CLI tests for `run status` frame contract.
   - Repository: `ploy`
   - Component: `cmd/ploy` status command tests
   - Scope: Extend `cmd/ploy/run_status_test.go` with assertions for:
@@ -32,7 +32,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: `executeCmd([]string{"run", "status", runID.String()}, &buf)`
   - Tests: `go test ./cmd/ploy -run 'TestRunStatus'`.
 
-- [ ] Add/adjust tests for `ploy mig status <mig-id>` output contract.
+- [x] Add/adjust tests for `ploy mig status <mig-id>` output contract.
   - Repository: `ploy`
   - Component: `cmd/ploy` migration status tests
   - Scope: Add coverage for dedicated migration output:

@@ -3,6 +3,8 @@ package runs
 import (
 	"fmt"
 	"io"
+	"net/url"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -12,6 +14,7 @@ import (
 // TextRenderOptions controls optional features for the text report renderer.
 type TextRenderOptions struct {
 	EnableOSC8 bool
+	AuthToken  string
 }
 
 // RenderRunReportText renders a one-shot, follow-style run snapshot.
@@ -20,12 +23,10 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		return fmt.Errorf("run report text: output writer required")
 	}
 
-	_, _ = fmt.Fprintf(w, "Run: %s\n", report.RunID)
-	_, _ = fmt.Fprintf(w, "Status: %s\n", deriveRunStatus(report))
-	_, _ = fmt.Fprintf(w, "Mig Name: %s\n", valueOrDash(strings.TrimSpace(report.MigName)))
-	_, _ = fmt.Fprintf(w, "Mig ID: %s\n", valueOrDash(report.MigID.String()))
-	_, _ = fmt.Fprintf(w, "Spec ID: %s\n", valueOrDash(report.SpecID.String()))
+	_, _ = fmt.Fprintf(w, "Mig:   %s  | %s\n", valueOrDash(report.MigID.String()), valueOrDash(strings.TrimSpace(report.MigName)))
+	_, _ = fmt.Fprintf(w, "Spec:  %s | Download\n", valueOrDash(report.SpecID.String()))
 	_, _ = fmt.Fprintf(w, "Repos: %d\n", len(report.Repos))
+	_, _ = fmt.Fprintf(w, "Run:   %s\n", valueOrDash(report.RunID.String()))
 
 	if len(report.Repos) == 0 {
 		_, _ = fmt.Fprintln(w, "")
@@ -50,15 +51,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 			repoLabel = repo.RepoID.String()
 		}
 
-		_, _ = fmt.Fprintf(w, "Repo: %s %s -> %s\n", repoLabel, valueOrDash(strings.TrimSpace(repo.BaseRef)), valueOrDash(strings.TrimSpace(repo.TargetRef)))
-		_, _ = fmt.Fprintf(w, "  Repo Status: %s  Attempt: %d\n", statusToken(repo.Status), repo.Attempt)
-		_, _ = fmt.Fprintf(w, "  Build Log: %s\n", renderLink("build-log", repo.BuildLogURL, opts.EnableOSC8))
-		_, _ = fmt.Fprintf(w, "  Patch: %s\n", renderLink("patch", repo.PatchURL, opts.EnableOSC8))
-
-		repoErr := FormatErrorOneLiner(repo.LastError)
-		if repoErr != "" {
-			_, _ = fmt.Fprintf(w, "  Error: %s\n", repoErr)
-		}
+		_, _ = fmt.Fprintf(w, "Repo:  [%d/%d] %s %s -> %s\n", i+1, len(report.Repos), repoLabel, valueOrDash(strings.TrimSpace(repo.BaseRef)), valueOrDash(strings.TrimSpace(repo.TargetRef)))
 
 		entry, ok := runByRepoID[repo.RepoID]
 		if !ok || len(entry.Jobs) == 0 {
@@ -67,23 +60,28 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		}
 
 		tw := tabwriter.NewWriter(w, 0, 8, 2, ' ', 0)
-		_, _ = fmt.Fprintln(tw, "  State\tStep\tJob ID\tNode\tImage\tDuration\tBuild Log\tPatch")
+		_, _ = fmt.Fprintln(tw, "  State\tStep\tJob ID\tNode\tImage\tDuration\tArtifacts")
 		for _, job := range entry.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
 			patchURL := firstNonEmpty(strings.TrimSpace(job.PatchURL), strings.TrimSpace(entry.PatchURL), strings.TrimSpace(repo.PatchURL))
+			state := statusGlyph(job.Status, 0)
+			step := renderStepName(job.JobType)
 
 			_, _ = fmt.Fprintf(
 				tw,
-				"  %s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-				statusToken(job.Status),
-				valueOrDash(strings.TrimSpace(job.JobType)),
+				"  %s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				state,
+				step,
 				valueOrDash(job.JobID.String()),
 				FormatNodeID(job.NodeID),
 				valueOrDash(strings.TrimSpace(job.JobImage)),
 				FormatDurationCompact(job.DurationMs),
-				renderLink("build-log", buildLogURL, opts.EnableOSC8),
-				renderLink("patch", patchURL, opts.EnableOSC8),
+				renderArtifacts(buildLogURL, patchURL, opts),
 			)
+
+			if exitLine := renderExitOneLiner(job, entry.LastError); exitLine != "" {
+				_, _ = fmt.Fprintf(tw, "  \t%s\t\t\t\t\t\n", exitLine)
+			}
 		}
 		_ = tw.Flush()
 	}
@@ -91,96 +89,125 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 	return nil
 }
 
-func deriveRunStatus(report RunReport) string {
-	statuses := make([]string, 0, len(report.Repos)+len(report.Runs))
-	for _, repo := range report.Repos {
-		status := strings.TrimSpace(repo.Status)
-		if status != "" {
-			statuses = append(statuses, status)
-		}
-	}
-	if len(statuses) == 0 {
-		for _, run := range report.Runs {
-			status := strings.TrimSpace(run.Status)
-			if status != "" {
-				statuses = append(statuses, status)
-			}
-		}
-	}
-
-	if len(statuses) == 0 {
-		return "Unknown"
-	}
-
-	hasRunning := false
-	hasQueued := false
-	hasFail := false
-	hasSuccess := false
-	hasCancelled := false
-
-	for _, status := range statuses {
-		switch strings.ToLower(strings.TrimSpace(status)) {
-		case "running", "started":
-			hasRunning = true
-		case "queued", "created":
-			hasQueued = true
-		case "fail", "failed":
-			hasFail = true
-		case "success", "succeeded":
-			hasSuccess = true
-		case "cancelled", "canceled":
-			hasCancelled = true
-		}
-	}
-
-	switch {
-	case hasRunning:
-		return "Running"
-	case hasQueued:
-		return "Queued"
-	case hasFail:
-		return "Fail"
-	case hasSuccess && hasCancelled:
-		return "Partial"
-	case hasSuccess:
-		return "Success"
-	case hasCancelled:
-		return "Cancelled"
-	default:
-		return strings.TrimSpace(statuses[0])
-	}
-}
-
-func statusToken(status string) string {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "running", "started":
-		return "[RUN]"
-	case "success", "succeeded":
-		return "[OK]"
-	case "fail", "failed":
-		return "[FAIL]"
-	case "cancelled", "canceled":
-		return "[CANCEL]"
-	case "queued", "created":
-		return "[QUEUE]"
-	default:
-		clean := strings.TrimSpace(status)
-		if clean == "" {
-			return "[UNKNOWN]"
-		}
-		return "[" + strings.ToUpper(clean) + "]"
-	}
-}
-
-func renderLink(label, rawURL string, enableOSC8 bool) string {
+func renderLink(label, rawURL string, enableOSC8 bool, authToken string) string {
 	url := strings.TrimSpace(rawURL)
 	if url == "" {
 		return "-"
 	}
+	url = appendAuthToken(url, authToken)
 	if !enableOSC8 {
 		return fmt.Sprintf("%s (%s)", label, url)
 	}
 	return "\x1b]8;;" + url + "\x1b\\" + label + "\x1b]8;;\x1b\\"
+}
+
+func renderArtifacts(logURL, patchURL string, opts TextRenderOptions) string {
+	logURL = strings.TrimSpace(logURL)
+	patchURL = strings.TrimSpace(patchURL)
+	switch {
+	case logURL == "" && patchURL == "":
+		return "-"
+	case logURL != "" && patchURL != "":
+		return renderLink("Logs", logURL, opts.EnableOSC8, opts.AuthToken) + " | " + renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
+	case logURL != "":
+		return renderLink("Logs", logURL, opts.EnableOSC8, opts.AuthToken)
+	default:
+		return renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
+	}
+}
+
+func appendAuthToken(rawURL, token string) string {
+	token = strings.TrimSpace(token)
+	if strings.TrimSpace(rawURL) == "" || token == "" {
+		return rawURL
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	query := parsed.Query()
+	if strings.TrimSpace(query.Get("auth_token")) == "" {
+		query.Set("auth_token", token)
+		parsed.RawQuery = query.Encode()
+	}
+	return parsed.String()
+}
+
+func renderStepName(jobType string) string {
+	switch strings.ToLower(strings.TrimSpace(jobType)) {
+	case "heal":
+		return "Heal"
+	default:
+		return valueOrDash(strings.TrimSpace(jobType))
+	}
+}
+
+func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
+	shouldRender := isFailedOrCrashedStatus(job.Status) || strings.EqualFold(strings.TrimSpace(job.JobType), "heal")
+	if !shouldRender {
+		return ""
+	}
+
+	msg := ""
+	if strings.EqualFold(strings.TrimSpace(job.JobType), "heal") {
+		msg = strings.TrimSpace(job.ActionSummary)
+		if msg == "" {
+			msg = "healer output unavailable"
+		}
+	} else {
+		msg = FormatErrorOneLiner(repoLastError)
+		if msg == "" {
+			msg = strings.ToLower(strings.TrimSpace(job.Status))
+		}
+		msg = "\x1b[91m" + msg + "\x1b[0m"
+	}
+
+	return "└  Exit " + renderExitCode(job.ExitCode) + ": " + msg
+}
+
+func renderExitCode(exitCode *int32) string {
+	if exitCode == nil {
+		return "?"
+	}
+	return strconv.FormatInt(int64(*exitCode), 10)
+}
+
+func statusGlyph(status string, spinnerFrame int) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "running", "started":
+		return spinnerAtFrame(spinnerFrame)
+	case "success", "succeeded":
+		return "✓"
+	case "fail", "failed":
+		return "✗"
+	case "crash", "crashed", "error":
+		return "✗"
+	case "cancelled", "canceled":
+		return "○"
+	case "created", "queued":
+		return "·"
+	default:
+		return " "
+	}
+}
+
+func spinnerAtFrame(frame int) string {
+	spinnerFrames := []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
+	if len(spinnerFrames) == 0 {
+		return " "
+	}
+	index := ((-frame)%len(spinnerFrames) + len(spinnerFrames)) % len(spinnerFrames)
+	return spinnerFrames[index]
+}
+
+func isFailedOrCrashedStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "fail", "failed", "crash", "crashed", "error":
+		return true
+	default:
+		return false
+	}
 }
 
 func valueOrDash(v string) string {

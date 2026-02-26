@@ -8,14 +8,15 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestRenderRunReportTextIncludesFollowStyleSnapshot(t *testing.T) {
+func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
+	preGateID := domaintypes.NewJobID()
+	migJobID := domaintypes.NewJobID()
 
 	report := RunReport{
 		RunID:   runID,
@@ -29,9 +30,8 @@ func TestRenderRunReportTextIncludesFollowStyleSnapshot(t *testing.T) {
 				BaseRef:     "main",
 				TargetRef:   "ploy/java17",
 				Status:      "Running",
-				Attempt:     2,
+				Attempt:     1,
 				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
-				PatchURL:    "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc",
 			},
 		},
 		Runs: []RunEntry{
@@ -40,16 +40,24 @@ func TestRenderRunReportTextIncludesFollowStyleSnapshot(t *testing.T) {
 				RepoURL:     "https://github.com/acme/service.git",
 				BaseRef:     "main",
 				TargetRef:   "ploy/java17",
-				Attempt:     2,
+				Attempt:     1,
 				Status:      "Running",
 				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
 				Jobs: []RunJobEntry{
 					{
-						JobID:      jobID,
-						JobType:    "step",
-						JobImage:   "ghcr.io/acme/runner:1",
+						JobID:      preGateID,
+						JobType:    "pre_gate",
+						JobImage:   "ghcr.io/acme/pre-gate:1",
 						Status:     "Running",
 						DurationMs: 2450,
+					},
+					{
+						JobID:      migJobID,
+						JobType:    "mig",
+						JobImage:   "ghcr.io/acme/mig:1",
+						Status:     "Success",
+						DurationMs: 3000,
+						PatchURL:   "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc",
 					},
 				},
 			},
@@ -62,121 +70,93 @@ func TestRenderRunReportTextIncludesFollowStyleSnapshot(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "Mig Name: java17-upgrade")
-	assertContains(t, out, "Repo: github.com/acme/service main -> ploy/java17")
-	assertContains(t, out, "Build Log: build-log (https://example.test/v1/runs/")
-	assertContains(t, out, "State")
-	assertContains(t, out, "[RUN]")
-	assertContains(t, out, "2.5s")
+	assertContains(t, out, "Mig:   "+migID.String()+"  | java17-upgrade")
+	assertContains(t, out, "Spec:  "+specID.String()+" | Download")
+	assertContains(t, out, "Repos: 1")
+	assertContains(t, out, "Run:   "+runID.String())
+	assertContains(t, out, "Repo:  [1/1] github.com/acme/service main -> ploy/java17")
+	assertContains(t, out, "Artifacts")
+	assertContains(t, out, "Logs (https://example.test/v1/runs/")
+	assertContains(t, out, "Logs (https://example.test/v1/runs/")
+	assertContains(t, out, " | Patch (https://example.test/v1/runs/")
+	assertContains(t, out, "⣾")
 }
 
-func TestRenderRunReportTextStatusScenarios(t *testing.T) {
+func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name        string
-		report      RunReport
-		wantStatus  string
-		wantContain string
-	}{
-		{
-			name: "success",
-			report: RunReport{
-				RunID:   domaintypes.NewRunID(),
-				MigID:   domaintypes.NewMigID(),
-				MigName: "ok-run",
-				SpecID:  domaintypes.NewSpecID(),
-				Repos: []RepoReport{
+	runID := domaintypes.NewRunID()
+	migID := domaintypes.NewMigID()
+	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewMigRepoID()
+	preGateID := domaintypes.NewJobID()
+	healID := domaintypes.NewJobID()
+	errText := "compile\nfailed at step 2"
+	failCode := int32(137)
+	healCode := int32(0)
+
+	report := RunReport{
+		RunID:   runID,
+		MigID:   migID,
+		MigName: "healing-run",
+		SpecID:  specID,
+		Repos: []RepoReport{
+			{
+				RepoID:      repoID,
+				RepoURL:     "https://github.com/acme/heal.git",
+				BaseRef:     "main",
+				TargetRef:   "ploy/heal",
+				Status:      "Fail",
+				Attempt:     1,
+				LastError:   &errText,
+				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
+			},
+		},
+		Runs: []RunEntry{
+			{
+				RepoID:      repoID,
+				RepoURL:     "https://github.com/acme/heal.git",
+				BaseRef:     "main",
+				TargetRef:   "ploy/heal",
+				Attempt:     1,
+				Status:      "Fail",
+				LastError:   &errText,
+				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
+				Jobs: []RunJobEntry{
 					{
-						RepoID:    domaintypes.NewMigRepoID(),
-						RepoURL:   "https://github.com/acme/ok.git",
-						BaseRef:   "main",
-						TargetRef: "ploy/ok",
-						Status:    "Success",
-						Attempt:   1,
+						JobID:      preGateID,
+						JobType:    "pre_gate",
+						JobImage:   "ghcr.io/acme/pre-gate:1",
+						Status:     "Failed",
+						ExitCode:   &failCode,
+						DurationMs: 1500,
+					},
+					{
+						JobID:         healID,
+						JobType:       "heal",
+						JobImage:      "ghcr.io/acme/heal:1",
+						Status:        "Success",
+						ExitCode:      &healCode,
+						DurationMs:    1200,
+						ActionSummary: "Applied import fix and retried build",
 					},
 				},
 			},
-			wantStatus:  "Status: Success",
-			wantContain: "Repo: github.com/acme/ok main -> ploy/ok",
-		},
-		{
-			name: "fail",
-			report: RunReport{
-				RunID:   domaintypes.NewRunID(),
-				MigID:   domaintypes.NewMigID(),
-				MigName: "fail-run",
-				SpecID:  domaintypes.NewSpecID(),
-				Repos: []RepoReport{
-					{
-						RepoID:    domaintypes.NewMigRepoID(),
-						RepoURL:   "https://github.com/acme/fail.git",
-						BaseRef:   "main",
-						TargetRef: "ploy/fail",
-						Status:    "Fail",
-						Attempt:   1,
-						LastError: strPtr("compile\nfailed at step 2"),
-					},
-				},
-			},
-			wantStatus:  "Status: Fail",
-			wantContain: "Error: compile failed at step 2",
-		},
-		{
-			name: "partial",
-			report: RunReport{
-				RunID:   domaintypes.NewRunID(),
-				MigID:   domaintypes.NewMigID(),
-				MigName: "partial-run",
-				SpecID:  domaintypes.NewSpecID(),
-				Repos: []RepoReport{
-					{
-						RepoID:    domaintypes.NewMigRepoID(),
-						RepoURL:   "https://github.com/acme/a.git",
-						BaseRef:   "main",
-						TargetRef: "ploy/a",
-						Status:    "Success",
-						Attempt:   1,
-					},
-					{
-						RepoID:    domaintypes.NewMigRepoID(),
-						RepoURL:   "https://github.com/acme/b.git",
-						BaseRef:   "main",
-						TargetRef: "ploy/b",
-						Status:    "Cancelled",
-						Attempt:   1,
-					},
-				},
-			},
-			wantStatus:  "Status: Partial",
-			wantContain: "Repo: github.com/acme/b main -> ploy/b",
-		},
-		{
-			name: "empty repos",
-			report: RunReport{
-				RunID:   domaintypes.NewRunID(),
-				MigID:   domaintypes.NewMigID(),
-				MigName: "empty-run",
-				SpecID:  domaintypes.NewSpecID(),
-				Repos:   []RepoReport{},
-				Runs:    []RunEntry{},
-			},
-			wantStatus:  "Status: Unknown",
-			wantContain: "No repos found in this run.",
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			if err := RenderRunReportText(&buf, tc.report, TextRenderOptions{EnableOSC8: false}); err != nil {
-				t.Fatalf("RenderRunReportText error: %v", err)
-			}
-			out := buf.String()
-			assertContains(t, out, tc.wantStatus)
-			assertContains(t, out, tc.wantContain)
-		})
+	var buf bytes.Buffer
+	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+		t.Fatalf("RenderRunReportText error: %v", err)
 	}
+	out := buf.String()
+
+	assertContains(t, out, "✗")
+	assertContains(t, out, "pre_gate")
+	assertContains(t, out, "└  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
+	assertContains(t, out, "✓")
+	assertContains(t, out, "Heal")
+	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
@@ -204,25 +184,53 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 				PatchURL:    patchURL,
 			},
 		},
+		Runs: []RunEntry{
+			{
+				RepoID:      repoID,
+				RepoURL:     "https://github.com/acme/links.git",
+				BaseRef:     "main",
+				TargetRef:   "ploy/links",
+				Status:      "Success",
+				Attempt:     1,
+				BuildLogURL: logURL,
+				PatchURL:    patchURL,
+				Jobs: []RunJobEntry{
+					{
+						JobID:       domaintypes.NewJobID(),
+						JobType:     "mig",
+						JobImage:    "ghcr.io/acme/mig:1",
+						Status:      "Success",
+						DurationMs:  1000,
+						BuildLogURL: logURL,
+						PatchURL:    patchURL,
+					},
+				},
+			},
+		},
 	}
 
 	var plain bytes.Buffer
-	if err := RenderRunReportText(&plain, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+	if err := RenderRunReportText(&plain, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token"}); err != nil {
 		t.Fatalf("RenderRunReportText plain error: %v", err)
 	}
 	plainOut := plain.String()
-	assertContains(t, plainOut, "build-log ("+logURL+")")
+	assertContains(t, plainOut, "Logs ("+logURL+"?auth_token=test-token)")
+	assertContains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
+	assertContains(t, plainOut, "auth_token=test-token")
+	assertContains(t, plainOut, "diff_id=abc")
+	assertContains(t, plainOut, "download=true")
 	if strings.Contains(plainOut, "\x1b]8;;") {
 		t.Fatalf("plain output unexpectedly contains OSC8 sequence: %q", plainOut)
 	}
 
 	var linked bytes.Buffer
-	if err := RenderRunReportText(&linked, report, TextRenderOptions{EnableOSC8: true}); err != nil {
+	if err := RenderRunReportText(&linked, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token"}); err != nil {
 		t.Fatalf("RenderRunReportText linked error: %v", err)
 	}
 	linkedOut := linked.String()
-	assertContains(t, linkedOut, "\x1b]8;;"+logURL)
-	assertContains(t, linkedOut, "\x1b]8;;"+patchURL)
+	assertContains(t, linkedOut, "\x1b]8;;"+logURL+"?auth_token=test-token")
+	assertContains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
+	assertContains(t, linkedOut, "auth_token=test-token")
 }
 
 func assertContains(t *testing.T, haystack string, needle string) {
@@ -230,8 +238,4 @@ func assertContains(t *testing.T, haystack string, needle string) {
 	if !strings.Contains(haystack, needle) {
 		t.Fatalf("expected output to contain %q, got: %q", needle, haystack)
 	}
-}
-
-func strPtr(v string) *string {
-	return &v
 }

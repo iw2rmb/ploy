@@ -39,6 +39,8 @@ func handleMig(args []string, stderr io.Writer) error {
 	// Pull command: pulls diffs from a mig's latest run into the current repo.
 	case "pull":
 		return handleMigPull(args[1:], stderr)
+	case "status":
+		return handleMigStatus(args[1:], stderr)
 	// Mig run with repo selection.
 	// Check if first arg looks like a mig ID/name (not a flag) to route to project run.
 	case "run":

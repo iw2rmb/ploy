@@ -1192,12 +1192,17 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 - `ploy run status <run-id>`:
   - Fetches the canonical `RunReport` model (run identity, mig name/spec, repos,
     jobs, and link metadata) before rendering.
-  - Renders a one-shot, follow-style snapshot with repo headers in the form
-    `Repo: <repo> <base> -> <target>`, plus status tokens, durations, and
-    repo/job errors.
-  - Build-log and patch references are rendered as OSC8 hyperlinks when output
-    is a terminal that advertises support; otherwise links fall back to plain
-    text labels with URLs.
+  - Renders a one-shot, follow-style snapshot with header lines:
+    `Mig`, `Spec`, `Repos`, `Run`, and per-repo blocks.
+  - Step rows include an `Artifacts` column with `Logs` or `Logs | Patch`.
+  - Build failures/crashes and healing rows render an `Exit <code>: <one-liner>`
+    continuation line beneath the step row.
+  - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
+    `auth_token` query parameters for browser/OSC8 flows.
+
+- `ploy mig status <mig-id>`:
+  - Resolves migration metadata (`Mig`, `Spec`, `Repos`) and lists runs for the
+    migration with per-run success/fail repo counts.
 
 - Run summaries (gate/MR/job graph) are also exposed via:
   - `GET /v1/runs/{id}/status` (HTTP)

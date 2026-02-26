@@ -112,15 +112,17 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 
 		for _, job := range jobsResult.Jobs {
 			runEntry.Jobs = append(runEntry.Jobs, RunJobEntry{
-				JobID:       job.JobID,
-				JobType:     job.JobType,
-				JobImage:    job.JobImage,
-				NodeID:      job.NodeID,
-				Status:      string(job.Status),
-				DurationMs:  job.DurationMs,
-				DisplayName: job.DisplayName,
-				BuildLogURL: buildLogURL,
-				PatchURL:    jobPatchByID[job.JobID],
+				JobID:         job.JobID,
+				JobType:       job.JobType,
+				JobImage:      job.JobImage,
+				NodeID:        job.NodeID,
+				Status:        string(job.Status),
+				ExitCode:      job.ExitCode,
+				DurationMs:    job.DurationMs,
+				DisplayName:   job.DisplayName,
+				ActionSummary: job.ActionSummary,
+				BuildLogURL:   buildLogURL,
+				PatchURL:      jobPatchByID[job.JobID],
 			})
 		}
 
