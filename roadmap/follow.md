@@ -2,7 +2,7 @@
 
 Scope: keep `ploy run status` on follow-style repo/job frames, add build/heal exit one-liners, rename `Logs` column to `Artifacts` with tokenized OSC8 links, and change `ploy mig status` to accept `<mig-id>` with its own migration-level output.
 
-Documentation: `AGENTS.md`; `roadmap/reporting.md`; `cmd/ploy/run_commands.go`; `cmd/ploy/mig_command.go`; `cmd/ploy/usage.go`; `internal/cli/follow/engine.go`; `internal/cli/runs/report_text.go`; `internal/cli/runs/report_builder.go`; `internal/server/auth/authorizer.go`; `internal/server/handlers/events.go`; `docs/api/paths/runs_id_logs.yaml`; `docs/api/paths/runs_run_id_repos_repo_id_logs.yaml`
+Documentation: `AGENTS.md`; `roadmap/reporting.md`; `cmd/ploy/run_commands.go`; `cmd/ploy/mig_command.go`; `cmd/ploy/usage.go`; `internal/cli/follow/engine.go`; `internal/cli/runs/report_text.go`; `internal/cli/runs/report_builder.go`; `internal/server/auth/authorizer.go`; `internal/server/handlers/events.go`; `docs/api/paths/runs_id_logs.yaml`; `docs/api/paths/runs_run_id_repos_repo_id_logs.yaml`; `docs/api/paths/runs_run_id_repos_repo_id_diffs.yaml`
 
 Legend: [ ] todo, [x] done.
 
@@ -62,7 +62,7 @@ Legend: [ ] todo, [x] done.
   - Tests: spinner tests in `internal/cli/follow/engine_test.go`.
 
 ## Phase 2: `run status` content changes
-- [ ] Rename table column and wire artifacts link rendering.
+- [x] Rename table column and wire artifacts link rendering.
   - Repository: `ploy`
   - Component: `internal/cli/runs/report_text.go`, `internal/cli/runs/report_builder.go`
   - Scope:
@@ -72,7 +72,7 @@ Legend: [ ] todo, [x] done.
   - Snippets: `Step | Job ID | Node | Image | Duration | Artifacts`
   - Tests: update `internal/cli/runs/report_text_test.go` and `cmd/ploy/run_status_test.go`.
 
-- [ ] Add exit one-liners for build failures/crashes and healing steps.
+- [x] Add exit one-liners for build failures/crashes and healing steps.
   - Repository: `ploy`
   - Component: `internal/cli/runs/report_builder.go`, `internal/cli/runs/report_text.go`
   - Scope:
@@ -84,14 +84,14 @@ Legend: [ ] todo, [x] done.
   - Tests: golden assertions for failed build and heal rows.
 
 ## Phase 3: Artifact links with `auth_token` query parameter
-- [ ] Build tokenized `Logs` and `Patch` URLs in CLI output.
+- [x] Build tokenized `Logs` and `Patch` URLs in CLI output.
   - Repository: `ploy`
   - Component: `cmd/ploy/common_http.go`, `cmd/ploy/run_commands.go`, renderer options
   - Scope: Load cluster token once and append `?auth_token=<token>` to artifact links used by OSC8 rendering.
   - Snippets: `q.Set("auth_token", token)`
   - Tests: renderer/link tests in `internal/cli/runs/report_text_test.go` for OSC8 and plain modes.
 
-- [ ] Keep server query-token auth behavior aligned for artifact endpoints.
+- [x] Keep server query-token auth behavior aligned for artifact endpoints.
   - Repository: `ploy`
   - Component: `internal/server/auth/authorizer.go`
   - Scope: Use query token fallback on allowed GET artifact endpoints when Authorization header is absent; validate token with existing bearer validation path.
@@ -99,14 +99,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `authorizer_bearer_test.go` cases for allowed/disallowed path+method combinations.
 
 ## Phase 4: `mig status <mig-id>` with dedicated output
-- [ ] Change command shape from run-scoped to migration-scoped.
+- [x] Change command shape from run-scoped to migration-scoped.
   - Repository: `ploy`
   - Component: `cmd/ploy/mig_command.go`, `cmd/ploy/usage.go`
   - Scope: `ploy mig status <mig-id>` resolves migration and lists its runs.
   - Snippets: `ploy mig status <mig-id>`
   - Tests: command parsing tests and usage goldens.
 
-- [ ] Implement dedicated migration status renderer (not run-status frame reuse).
+- [x] Implement dedicated migration status renderer (not run-status frame reuse).
   - Repository: `ploy`
   - Component: `internal/cli/runs/report_text.go` (or dedicated mig status text file)
   - Scope:
@@ -121,14 +121,14 @@ Legend: [ ] todo, [x] done.
   - Tests: `cmd/ploy/mig_status_test.go` golden coverage for mixed run states.
 
 ## Phase 5: Help/docs and API docs sync
-- [ ] Update CLI help text and goldens.
+- [x] Update CLI help text and goldens.
   - Repository: `ploy`
   - Component: `cmd/ploy/usage.go`, `cmd/ploy/testdata/help_mig.txt`, `cmd/ploy/help_flags_test.go`, `cmd/ploy/cli_test.go`
   - Scope: Replace `ploy mig status <run-id>` with `ploy mig status <mig-id>` and document dedicated output contract.
   - Snippets: `ploy mig status <mig-id>`
   - Tests: `go test ./cmd/ploy/...`.
 
-- [ ] Document query-token behavior for artifact links.
+- [x] Document query-token behavior for artifact links.
   - Repository: `ploy`
   - Component: `docs/api/paths/runs_id_logs.yaml`, `docs/api/paths/runs_run_id_repos_repo_id_logs.yaml`, patch artifact path docs if separate
   - Scope: Document `auth_token` query parameter for browser/OSC8 artifact link flows.
@@ -136,7 +136,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./docs/api/...`.
 
 ## Phase 6: Verification and cleanup
-- [ ] Run focused local tests, then full suite.
+- [x] Run focused local tests, then full suite.
   - Repository: `ploy`
   - Component: CLI, follow renderer, auth, API docs
   - Scope: Validate one-liners, artifact links, and migration-level status output; remove duplicate rendering code.
