@@ -63,7 +63,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/store -run 'TestClaimJob|TestRunRepos|TestMigRepos'`
 
 ## Phase 2: Prep Orchestrator Runtime
-- [ ] Implement a prep task (`scheduler.Task`) with retry/state transitions.
+- [x] Implement a prep task (`scheduler.Task`) with retry/state transitions.
   - Repository: `ploy`
   - Component: `internal/server` + `cmd/ployd`
   - Scope:
@@ -91,7 +91,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/prep -run 'TestNew|TestRunCycle'`
     - `go test ./cmd/ployd -run 'Test.*server'`
 
-- [ ] Implement non-interactive prep execution and schema validation.
+- [x] Implement non-interactive prep execution and schema validation.
   - Repository: `ploy`
   - Component: `internal/server/prep`
   - Scope:

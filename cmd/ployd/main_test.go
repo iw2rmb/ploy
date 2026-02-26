@@ -18,6 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	apiconfig "github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -184,6 +185,7 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 type schedulerProbeStore struct {
 	store.Store
 	staleRecoveryCalls atomic.Int32
+	prepClaimCalls     atomic.Int32
 }
 
 func (s *schedulerProbeStore) ListGlobalEnv(ctx context.Context) ([]store.ConfigEnv, error) {
@@ -213,6 +215,15 @@ func (s *schedulerProbeStore) ListStaleRunningJobs(ctx context.Context, cutoff p
 
 func (s *schedulerProbeStore) CountStaleNodesWithRunningJobs(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
 	return 0, nil
+}
+
+func (s *schedulerProbeStore) ClaimNextPrepRepo(ctx context.Context) (store.MigRepo, error) {
+	s.prepClaimCalls.Add(1)
+	return store.MigRepo{}, pgx.ErrNoRows
+}
+
+func (s *schedulerProbeStore) ClaimNextPrepRetryRepo(ctx context.Context, cutoff pgtype.Timestamptz) (store.MigRepo, error) {
+	return store.MigRepo{}, pgx.ErrNoRows
 }
 
 func (s *schedulerProbeStore) Pool() *pgxpool.Pool {
@@ -275,6 +286,64 @@ func TestRun_StaleRecoverySchedulerEnabled(t *testing.T) {
 		t.Fatalf("run() error: %v", err)
 	}
 	t.Fatal("expected stale recovery task to call ListStaleRunningJobs at least once")
+}
+
+func TestRun_PrepSchedulerEnabled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var cfg apiconfig.Config
+	cfg.HTTP.Listen = "127.0.0.1:0"
+	cfg.Metrics.Listen = "127.0.0.1:0"
+	cfg.Scheduler.BatchSchedulerInterval = 0
+	cfg.Scheduler.StaleJobRecoveryInterval = 0
+	cfg.Scheduler.PrepInterval = 10 * time.Millisecond
+	cfg.Scheduler.PrepMaxAttempts = 3
+	cfg.Scheduler.PrepRetryDelay = 30 * time.Second
+
+	st := &schedulerProbeStore{}
+	authorizer := auth.NewAuthorizer(auth.Options{
+		AllowInsecure: false,
+		DefaultRole:   auth.RoleControlPlane,
+	})
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "ployd.yaml")
+	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
+		t.Fatalf("create temp config: %v", err)
+	}
+
+	bs := bsmock.New()
+	bp := blobpersist.New(st, bs)
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp)
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-errCh:
+			t.Fatalf("run() exited before prep task observed: %v", err)
+		default:
+		}
+
+		if st.prepClaimCalls.Load() > 0 {
+			cancel()
+			if err := <-errCh; err != nil {
+				t.Fatalf("run() error: %v", err)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	cancel()
+	if err := <-errCh; err != nil {
+		t.Fatalf("run() error: %v", err)
+	}
+	t.Fatal("expected prep scheduler task to call ClaimNextPrepRepo at least once")
 }
 
 func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {

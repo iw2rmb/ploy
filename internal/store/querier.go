@@ -35,6 +35,7 @@ type Querier interface {
 	// - nodeID must be non-empty
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
 	ClaimNextPrepRepo(ctx context.Context) (MigRepo, error)
+	ClaimNextPrepRetryRepo(ctx context.Context, prepUpdatedAt pgtype.Timestamptz) (MigRepo, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt, excluding MR jobs.

@@ -663,6 +663,23 @@ insert `heal-*` + `re-gate-*` jobs by rewiring `next_id` links.
 The background scheduler ensures queued repos have jobs and promotes the next job for a
 repo attempt. It does not create per-repo child runs.
 
+### Prep scheduler (track 1)
+
+The prep scheduler claims repos in `PrepPending` and due repos in
+`PrepRetryScheduled`, runs one non-interactive prep attempt, validates the profile
+against `docs/schemas/prep_profile.schema.json`, and persists attempt evidence in
+`prep_runs`.
+
+Failure handling:
+- attempt row is finalized as `PrepFailed`
+- repo state transitions to `PrepRetryScheduled` while attempts remain
+- repo transitions to `PrepFailed` when attempts are exhausted
+
+Current defaults:
+- `scheduler.prep_interval`: `0` (disabled)
+- `scheduler.prep_max_attempts`: `3`
+- `scheduler.prep_retry_delay`: `30s`
+
 ### Relationship summary (v1)
 
 | Table       | Purpose                                    | Key relationships                         |
@@ -1026,6 +1043,12 @@ Current stale-heartbeat recovery behavior:
   status and finalize `runs` when all repos are terminal.
 - When recovery finalizes a run, the server publishes the same terminal SSE
   sequence as normal completion: a terminal `run` snapshot followed by `done`.
+
+Current prep scheduler behavior:
+- Prep orchestration runs every `scheduler.prep_interval` (`0` disables).
+- Retry claims are eligible when `prep_updated_at <= now() - scheduler.prep_retry_delay`.
+- Each claim increments `mig_repos.prep_attempts` and clears last error/failure code.
+- Success persists `prep_profile` + `prep_artifacts` and transitions repo to `PrepReady`.
 
 Node startup crash reconciliation behavior:
 - On node process startup, the node agent runs one startup reconciliation pass
