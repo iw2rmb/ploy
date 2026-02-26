@@ -6,19 +6,6 @@ Documentation: `AGENTS.md`; `internal/workflow/step/runner.go`; `internal/workfl
 
 Legend: [ ] todo, [x] done.
 
-## Phase 0: Baseline and Guardrails
-- [ ] Capture current behavior with focused tests before refactor.
-  - Repository: `ploy`
-  - Component: `internal/workflow/step`, `internal/workflow/stackdetect`, `internal/workflow/contracts`
-  - Scope:
-    - verify existing gate pass/fail semantics in `Runner.Run` and `RunGateOnly`
-    - verify stack detection behavior for Python/Poetry paths
-    - verify current `ModsSpec.ToMap()` call coverage
-  - Snippets:
-    - `go test ./internal/workflow/step -run 'TestRun|TestRunGateOnly'`
-    - `go test ./internal/workflow/stackdetect -run 'TestDetect|TestDetectTool|TestDetectPython'`
-    - `go test ./internal/workflow/contracts -run 'TestModsSpec'`
-
 ## Phase 1: Deduplicate Gate Stage Flow
 - [ ] Extract shared hydration and gate execution stage helpers.
   - Repository: `ploy`
