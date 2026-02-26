@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 )
 
 const goModuleFile = "go." + "mo" + "d"
@@ -53,23 +55,23 @@ func scanWorkspace(workspace string) scanResult {
 		pyprojectPath: pyprojectPath,
 	}
 
-	s.hasPom = fileExists(pomPath)
-	s.hasGradleGroovy = fileExists(gradleGroovyPath)
-	s.hasGradleKts = fileExists(gradleKtsPath)
+	s.hasPom = fsutil.FileExists(pomPath)
+	s.hasGradleGroovy = fsutil.FileExists(gradleGroovyPath)
+	s.hasGradleKts = fsutil.FileExists(gradleKtsPath)
 	s.hasGradle = s.hasGradleGroovy || s.hasGradleKts
 	s.hasJava = s.hasPom || s.hasGradle
 
-	s.hasGoMod = fileExists(goModPath)
+	s.hasGoMod = fsutil.FileExists(goModPath)
 	s.hasGo = s.hasGoMod
 
-	s.hasCargo = fileExists(cargoPath)
-	hasRustToolchainToml := fileExists(rustToolchainTomlPath)
-	s.hasRustToolchain = fileExists(rustToolchainPath)
+	s.hasCargo = fsutil.FileExists(cargoPath)
+	hasRustToolchainToml := fsutil.FileExists(rustToolchainTomlPath)
+	s.hasRustToolchain = fsutil.FileExists(rustToolchainPath)
 	s.hasRust = s.hasCargo || hasRustToolchainToml || s.hasRustToolchain
 
-	s.hasPyproject = fileExists(pyprojectPath)
-	s.hasPythonVersion = fileExists(pythonVersionPath)
-	s.hasRuntimeTxt = fileExists(runtimeTxtPath)
+	s.hasPyproject = fsutil.FileExists(pyprojectPath)
+	s.hasPythonVersion = fsutil.FileExists(pythonVersionPath)
+	s.hasRuntimeTxt = fsutil.FileExists(runtimeTxtPath)
 	s.hasPython = s.hasPythonVersion || s.hasRuntimeTxt || (s.hasPyproject && isPythonPyproject(pyprojectPath))
 
 	// Build detected languages and evidence.
@@ -294,13 +296,4 @@ func isPythonPyproject(path string) bool {
 	}
 
 	return false
-}
-
-// fileExists returns true if the path exists and is a regular file.
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
 }

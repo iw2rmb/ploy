@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 )
 
 // Regex patterns for Python version detection.
@@ -61,7 +63,7 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 	var detections []pythonDetection
 
 	// 1. Check .python-version (highest precedence).
-	if fileExists(pythonVersionPath) {
+	if fsutil.FileExists(pythonVersionPath) {
 		content, err := os.ReadFile(pythonVersionPath)
 		if err == nil {
 			version := strings.TrimSpace(string(content))
@@ -77,7 +79,7 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	// 2. Check runtime.txt.
-	if fileExists(runtimeTxtPath) {
+	if fsutil.FileExists(runtimeTxtPath) {
 		content, err := os.ReadFile(runtimeTxtPath)
 		if err == nil {
 			line := strings.TrimSpace(string(content))
@@ -95,7 +97,7 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	// 3 & 4. Check pyproject.toml.
-	if fileExists(pyprojectPath) {
+	if fsutil.FileExists(pyprojectPath) {
 		content, err := os.ReadFile(pyprojectPath)
 		if err == nil {
 			text := string(content)
@@ -192,7 +194,7 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 
 	// Determine tool.
 	tool := "pip"
-	if fileExists(pyprojectPath) {
+	if fsutil.FileExists(pyprojectPath) {
 		content, _ := os.ReadFile(pyprojectPath)
 		if poetryToolRegex.MatchString(string(content)) {
 			tool = "poetry"

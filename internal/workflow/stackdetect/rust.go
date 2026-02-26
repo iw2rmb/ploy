@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 )
 
 // Regex patterns for Rust version detection.
@@ -33,7 +35,7 @@ func detectRust(ctx context.Context, workspace string) (*Observation, error) {
 	toolchainPath := filepath.Join(workspace, "rust-toolchain")
 
 	// 1. Check Cargo.toml for rust-version (highest precedence).
-	if fileExists(cargoPath) {
+	if fsutil.FileExists(cargoPath) {
 		content, err := os.ReadFile(cargoPath)
 		if err == nil {
 			if matches := rustVersionRegex.FindStringSubmatch(string(content)); matches != nil {
@@ -51,7 +53,7 @@ func detectRust(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	// 2. Check rust-toolchain.toml for channel.
-	if fileExists(toolchainTomlPath) {
+	if fsutil.FileExists(toolchainTomlPath) {
 		content, err := os.ReadFile(toolchainTomlPath)
 		if err == nil {
 			if matches := rustToolchainChannelRegex.FindStringSubmatch(string(content)); matches != nil {
@@ -93,7 +95,7 @@ func detectRust(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	// 3. Check rust-toolchain plain file.
-	if fileExists(toolchainPath) {
+	if fsutil.FileExists(toolchainPath) {
 		content, err := os.ReadFile(toolchainPath)
 		if err == nil {
 			channel := strings.TrimSpace(string(content))
