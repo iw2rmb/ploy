@@ -22,16 +22,17 @@ type RunStats json.RawMessage
 // runStatsAccessor is the internal typed structure for field extraction.
 // Fields are decoded on-demand by accessor methods.
 type runStatsAccessor struct {
-	ExitCode      *int              `json:"exit_code,omitempty"`
-	DurationMs    *int64            `json:"duration_ms,omitempty"`
-	Error         *string           `json:"error,omitempty"`
-	HealingWarn   *string           `json:"healing_warning,omitempty"`
-	ResumeCount   *int              `json:"resume_count,omitempty"`
-	LastResumedAt *string           `json:"last_resumed_at,omitempty"`
-	Metadata      map[string]string `json:"metadata,omitempty"`
-	Gate          *RunStatsGate     `json:"gate,omitempty"`
-	JobMeta       json.RawMessage   `json:"job_meta,omitempty"`
-	Timings       *runStatsTimings  `json:"timings,omitempty"`
+	ExitCode      *int                  `json:"exit_code,omitempty"`
+	DurationMs    *int64                `json:"duration_ms,omitempty"`
+	Error         *string               `json:"error,omitempty"`
+	HealingWarn   *string               `json:"healing_warning,omitempty"`
+	ResumeCount   *int                  `json:"resume_count,omitempty"`
+	LastResumedAt *string               `json:"last_resumed_at,omitempty"`
+	Metadata      map[string]string     `json:"metadata,omitempty"`
+	Gate          *RunStatsGate         `json:"gate,omitempty"`
+	JobResources  *RunStatsJobResources `json:"job_resources,omitempty"`
+	JobMeta       json.RawMessage       `json:"job_meta,omitempty"`
+	Timings       *runStatsTimings      `json:"timings,omitempty"`
 }
 
 // RunStatsGate represents the gate sub-structure in stats.
@@ -72,6 +73,13 @@ type RunStatsResourceUsage struct {
 	BlkioReadBytes  uint64 `json:"blkio_read_bytes,omitempty"`
 	BlkioWriteBytes uint64 `json:"blkio_write_bytes,omitempty"`
 	SizeRwBytes     int64  `json:"size_rw_bytes,omitempty"`
+}
+
+// RunStatsJobResources represents per-job container resource consumption.
+type RunStatsJobResources struct {
+	CPUConsumedNs     int64 `json:"cpu_consumed_ns,omitempty"`
+	DiskConsumedBytes int64 `json:"disk_consumed_bytes,omitempty"`
+	MemConsumedBytes  int64 `json:"mem_consumed_bytes,omitempty"`
 }
 
 // runStatsTimings represents execution timing metadata.
@@ -345,6 +353,12 @@ func (b *RunStatsBuilder) Gate(passed bool, durationMs int64) *RunStatsBuilder {
 // GateDetails sets the full gate object (pre-gate, re-gates, final gate, resources, etc.).
 func (b *RunStatsBuilder) GateDetails(gate *RunStatsGate) *RunStatsBuilder {
 	b.acc.Gate = gate
+	return b
+}
+
+// JobResources sets the job_resources field.
+func (b *RunStatsBuilder) JobResources(resources *RunStatsJobResources) *RunStatsBuilder {
+	b.acc.JobResources = resources
 	return b
 }
 

@@ -24,19 +24,43 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- - job_status: Created | Queued | Running | Success | Fail | Cancelled
 --
 -- Capitalized values are canonical; no aliases.
-CREATE TYPE run_status AS ENUM (
-  'Started', 'Cancelled', 'Finished'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'run_status' AND n.nspname = 'ploy'
+  ) THEN
+    CREATE TYPE run_status AS ENUM ('Started', 'Cancelled', 'Finished');
+  END IF;
+END $$;
 
-CREATE TYPE job_status AS ENUM (
-  'Created', 'Queued', 'Running', 'Success', 'Fail', 'Cancelled'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'job_status' AND n.nspname = 'ploy'
+  ) THEN
+    CREATE TYPE job_status AS ENUM ('Created', 'Queued', 'Running', 'Success', 'Fail', 'Cancelled');
+  END IF;
+END $$;
 
 -- RunRepoStatus tracks per-repo execution state within a batched run.
 -- Status values: Queued, Running, Cancelled, Fail, Success.
-CREATE TYPE run_repo_status AS ENUM (
-  'Queued', 'Running', 'Cancelled', 'Fail', 'Success'
-);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'run_repo_status' AND n.nspname = 'ploy'
+  ) THEN
+    CREATE TYPE run_repo_status AS ENUM ('Queued', 'Running', 'Cancelled', 'Fail', 'Success');
+  END IF;
+END $$;
 
 
 
@@ -305,6 +329,21 @@ CREATE TABLE IF NOT EXISTS node_metrics (
 );
 CREATE INDEX IF NOT EXISTS node_metrics_node_time_idx ON node_metrics USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS node_metrics_node_idx ON node_metrics(node_id);
+
+-- Job resource consumption history.
+-- One row per job execution (job_id), populated from node-reported completion stats.
+CREATE TABLE IF NOT EXISTS job_metrics (
+  id                  BIGSERIAL PRIMARY KEY,
+  node_id             TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,  -- NanoID string FK to nodes.id.
+  job_id              TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,   -- KSUID string FK to jobs.id.
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cpu_consumed_ns     BIGINT NOT NULL DEFAULT 0 CHECK (cpu_consumed_ns >= 0),
+  disk_consumed_bytes BIGINT NOT NULL DEFAULT 0 CHECK (disk_consumed_bytes >= 0),
+  mem_consumed_bytes  BIGINT NOT NULL DEFAULT 0 CHECK (mem_consumed_bytes >= 0),
+  UNIQUE (job_id)
+);
+CREATE INDEX IF NOT EXISTS job_metrics_node_time_idx ON job_metrics USING BRIN (created_at);
+CREATE INDEX IF NOT EXISTS job_metrics_node_idx ON job_metrics(node_id);
 
 -- API Tokens (bearer tokens for API access)
 CREATE TABLE IF NOT EXISTS api_tokens (

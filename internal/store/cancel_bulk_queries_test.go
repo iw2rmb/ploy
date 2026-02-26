@@ -311,6 +311,9 @@ func openStoreForCancelBulkTests(t *testing.T) (context.Context, Store) {
 	if err != nil {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
+	if err := RunMigrations(ctx, db.Pool()); err != nil {
+		t.Fatalf("RunMigrations() failed: %v", err)
+	}
 	t.Cleanup(db.Close)
 	return ctx, db
 }

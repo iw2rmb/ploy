@@ -77,8 +77,16 @@ type Request struct {
 type Result struct {
 	ExitCode int
 	// Per-stage timings captured during execution.
-	Timings   StageTiming
-	BuildGate *contracts.BuildGateStageMetadata
+	Timings            StageTiming
+	BuildGate          *contracts.BuildGateStageMetadata
+	ContainerResources *ContainerResourceUsage
+}
+
+// ContainerResourceUsage captures per-job container resource consumption.
+type ContainerResourceUsage struct {
+	CPUConsumedNs     int64
+	DiskConsumedBytes int64
+	MemConsumedBytes  int64
 }
 
 // StageTiming captures duration of each execution stage.
@@ -140,6 +148,9 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		if err != nil {
 			return Result{}, fmt.Errorf("container wait failed: %w", err)
 		}
+		if usage := collectDockerResourceUsage(ctx, r.Containers, handle, spec); usage != nil {
+			result.ContainerResources = toContainerResourceUsage(usage)
+		}
 		if r.LogWriter != nil {
 			if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
 				_, _ = r.LogWriter.Write(logs)
@@ -163,4 +174,31 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil
+}
+
+func toContainerResourceUsage(usage *contracts.BuildGateResourceUsage) *ContainerResourceUsage {
+	if usage == nil {
+		return nil
+	}
+	memConsumed := usage.MemMaxBytes
+	if memConsumed == 0 {
+		memConsumed = usage.MemUsageBytes
+	}
+	var diskConsumed int64
+	if usage.SizeRwBytes != nil && *usage.SizeRwBytes > 0 {
+		diskConsumed = *usage.SizeRwBytes
+	}
+	return &ContainerResourceUsage{
+		CPUConsumedNs:     saturatingInt64FromUint64(usage.CPUTotalNs),
+		DiskConsumedBytes: diskConsumed,
+		MemConsumedBytes:  saturatingInt64FromUint64(memConsumed),
+	}
+}
+
+func saturatingInt64FromUint64(v uint64) int64 {
+	const maxInt64 = ^uint64(0) >> 1
+	if v > maxInt64 {
+		return int64(maxInt64)
+	}
+	return int64(v)
 }
