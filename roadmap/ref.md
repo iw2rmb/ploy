@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `internal/workflow/step/runner.go`; `internal/workfl
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Deduplicate Gate Stage Flow
-- [ ] Extract shared hydration and gate execution stage helpers.
+- [x] Extract shared hydration and gate execution stage helpers.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope:
