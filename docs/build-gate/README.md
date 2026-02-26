@@ -71,6 +71,22 @@ abstraction for gate validation. The only implementation is the Docker-based exe
 - Build tools have direct access to the workspace.
 - Gate results are captured and returned as `BuildGateStageMetadata`.
 
+### Internal Planning Flow
+
+Gate execution planning inside `internal/workflow/step/gate_docker.go` and
+`internal/workflow/step/gate_docker_stack_gate.go` is intentionally flattened:
+
+1. `stackdetect.Detect` runs once per gate execution.
+2. `resolveGateExecutionPlan` produces either:
+   - an executable plan (`image`, `cmd`, detected language/tool), or
+   - a terminal gate result with prebuilt metadata/error for mismatch/unknown cases.
+3. If a plan is returned, Docker execution runs once and `BuildGateStageMetadata`
+   is built from container result + logs.
+
+The stack-gate and detected-stack branches share focused terminal-metadata builders,
+so error codes/messages and `RuntimeImage` reporting stay consistent without duplicating
+gate terminal-state wrappers.
+
 See `docs/migs-lifecycle.md` section 1.1 for gate sequence diagrams and healing
 flow details.
 

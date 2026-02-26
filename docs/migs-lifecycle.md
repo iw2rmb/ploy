@@ -113,6 +113,9 @@ jobs and claimed by nodes using queue eligibility + `next_id` successor links:
 - Single unified queue: gate, mig, and healing jobs all use the same `jobs` table.
 - Local Docker execution: gates run on the node that claims the job.
 - Chain progression via `next_id`: ensures sequential pre-gate → mig → post-gate flow.
+- Gate stage parity: `Runner.Run` and `RunGateOnly` use shared `runHydrationStage`
+  and `runGateStage` helpers, so hydration and gate pass/fail semantics are identical
+  across pre-mig and post/re-gate paths.
 
 See `docs/build-gate/README.md` for gate configuration and execution details.
 

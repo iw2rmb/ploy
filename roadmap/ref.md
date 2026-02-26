@@ -86,7 +86,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./...` (compile guard for all call sites)
 
 ## Phase 6: Docs and Final Verification
-- [ ] Sync docs for changed internals and run full validation suite.
+- [x] Sync docs for changed internals and run full validation suite.
   - Repository: `ploy`
   - Component: docs + workflow packages
   - Scope:
