@@ -6,8 +6,8 @@ Documentation: `AGENTS.md`; `roadmap/reporting.md`; `cmd/ploy/run_commands.go`; 
 
 Legend: [ ] todo, [x] done.
 
-## Phase 0: RED Gates (behavior first)
-- [ ] Add failing CLI tests for the new status frame contract before implementation.
+## Phase 0: Behavior Contract Tests
+- [ ] Add/adjust CLI tests for the new status frame contract.
   - Repository: `ploy`
   - Component: `cmd/ploy` status command tests
   - Scope: Extend `cmd/ploy/run_status_test.go` with assertions for the exact header block and step table contract:
@@ -19,9 +19,9 @@ Legend: [ ] todo, [x] done.
     - step table includes `Logs` column with `Download`
     - running jobs in one-shot status use spinner frame 0 (`⣾ `)
   - Snippets: `executeCmd([]string{"run", "status", runID.String()}, &buf)`
-  - Tests: `go test ./cmd/ploy -run 'TestRunStatus'` — must fail before implementation and pass after.
+  - Tests: `go test ./cmd/ploy -run 'TestRunStatus'` — must pass.
 
-- [ ] Add failing tests for `--follow` on status commands (live update path).
+- [ ] Add/adjust tests for `--follow` on status commands (live update path).
   - Repository: `ploy`
   - Component: `cmd/ploy` integration-style command tests with SSE test server
   - Scope: Add coverage for `ploy run status --follow <run-id>` that verifies frame refresh and terminal stop, and same behavior for `ploy mig status --follow <run-id>`.
