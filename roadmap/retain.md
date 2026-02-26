@@ -183,7 +183,7 @@ Legend: [ ] todo, [x] done.
     - existing completion handler tests remain green; add one regression test if needed for empty response body.
 
 ## Phase 6: Verification
-- [ ] Run targeted suites, then full validation.
+- [x] Run targeted suites, then full validation.
   - Repository: `ploy`
   - Component: contracts, nodeagent, step runtime, CLI/docs
   - Scope:
