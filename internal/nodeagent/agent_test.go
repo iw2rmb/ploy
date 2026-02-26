@@ -102,6 +102,7 @@ func TestAgentLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
+	installNoopStartupReconciler(agent.claimer)
 
 	// Start the agent with a context that we'll cancel after a short time.
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -187,6 +188,7 @@ func TestAgentGracefulShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
+	installNoopStartupReconciler(agent.claimer)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -261,6 +263,7 @@ func TestAgentComponentIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
+	installNoopStartupReconciler(agent.claimer)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -364,6 +367,7 @@ func TestAgentWithTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent with TLS: %v", err)
 	}
+	installNoopStartupReconciler(agent.claimer)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -442,6 +446,7 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create agent: %v", err)
 	}
+	installNoopStartupReconciler(agent.claimer)
 
 	// Run agent for a bit to ensure heartbeat attempts.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

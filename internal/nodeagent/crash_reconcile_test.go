@@ -15,6 +15,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -23,6 +24,7 @@ import (
 type fakeCrashReconcileDockerClient struct {
 	listResult client.ContainerListResult
 	listErr    error
+	listCalls  int
 
 	inspectByID    map[string]client.ContainerInspectResult
 	inspectErrByID map[string]error
@@ -36,6 +38,7 @@ type fakeCrashReconcileDockerClient struct {
 }
 
 func (f *fakeCrashReconcileDockerClient) ContainerList(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
+	f.listCalls++
 	if f.listErr != nil {
 		return client.ContainerListResult{}, f.listErr
 	}
@@ -82,7 +85,106 @@ func (f *fakeCrashReconcileDockerClient) ContainerLogs(_ context.Context, contai
 }
 
 func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
-	t.Skip("phase 0 contract: enable when startup reconciliation wiring (phase 5) is implemented")
+	t.Parallel()
+
+	jobID := types.NewJobID()
+	runID := types.NewRunID()
+	var (
+		mu    sync.Mutex
+		calls []string
+	)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls = append(calls, r.URL.Path)
+		mu.Unlock()
+		switch {
+		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/claim":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := &mockRunController{}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager() error = %v", err)
+	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(50 * time.Millisecond),
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	})
+	claimer.startupReconciler = &startupCrashReconciler{
+		docker: &fakeCrashReconcileDockerClient{
+			listResult: client.ContainerListResult{Items: []containertypes.Summary{
+				{
+					ID:     "ctr-terminal",
+					Labels: map[string]string{types.LabelRunID: runID.String(), types.LabelJobID: jobID.String()},
+				},
+			}},
+			inspectByID: map[string]client.ContainerInspectResult{
+				"ctr-terminal": {
+					Container: containertypes.InspectResponse{
+						State: &containertypes.State{
+							Running:    false,
+							Status:     containertypes.ContainerState("exited"),
+							ExitCode:   0,
+							StartedAt:  "2026-02-26T15:00:00Z",
+							FinishedAt: "2026-02-26T15:00:02Z",
+						},
+					},
+				},
+			},
+			waitByID: map[string]containertypes.WaitResponse{
+				"ctr-terminal": {StatusCode: 0},
+			},
+		},
+		now:            func() time.Time { return time.Date(2026, 2, 26, 15, 0, 10, 0, time.UTC) },
+		terminalWindow: 120 * time.Second,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 220*time.Millisecond)
+	defer cancel()
+
+	err = claimer.Start(ctx)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Start() error = %v, want context deadline exceeded", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	completeIdx := -1
+	claimIdx := -1
+	for i, path := range calls {
+		if path == "/v1/jobs/"+jobID.String()+"/complete" && completeIdx == -1 {
+			completeIdx = i
+		}
+		if path == "/v1/nodes/"+testNodeID+"/claim" && claimIdx == -1 {
+			claimIdx = i
+		}
+	}
+	if completeIdx == -1 {
+		t.Fatalf("missing startup completion call: %v", calls)
+	}
+	if claimIdx == -1 {
+		t.Fatalf("missing claim call: %v", calls)
+	}
+	if completeIdx > claimIdx {
+		t.Fatalf("startup completion call must happen before first claim, calls=%v", calls)
+	}
 }
 
 func TestCrashReconcile_ClassifiesByRuntimeState_Contract(t *testing.T) {
