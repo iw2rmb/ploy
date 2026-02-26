@@ -126,6 +126,10 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService) htt
 				httpErr(w, http.StatusBadRequest, "%s", err)
 				return
 			}
+			if err := statsPayload.ValidateJobResources(); err != nil {
+				httpErr(w, http.StatusBadRequest, "%s", err)
+				return
+			}
 		}
 
 		// Look up the job by job_id (KSUID-backed).
@@ -168,6 +172,26 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService) htt
 		if job.Status != store.JobStatusRunning {
 			httpErr(w, http.StatusConflict, "job status is %s, expected Running", job.Status)
 			return
+		}
+
+		// Persist per-job resource consumption metrics when provided.
+		if statsPayload.HasJobResources() {
+			res := statsPayload.JobResources
+			if err := st.UpsertJobMetric(ctx, store.UpsertJobMetricParams{
+				NodeID:            nodeIDHeader,
+				JobID:             job.ID,
+				CpuConsumedNs:     res.CPUConsumedNs,
+				DiskConsumedBytes: res.DiskConsumedBytes,
+				MemConsumedBytes:  res.MemConsumedBytes,
+			}); err != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to persist job metrics: %v", err)
+				slog.Error("complete job: persist job metrics failed",
+					"job_id", jobID,
+					"node_id", nodeIDHeader,
+					"err", err,
+				)
+				return
+			}
 		}
 
 		// Use the validated job status directly (already a JobStatus type).

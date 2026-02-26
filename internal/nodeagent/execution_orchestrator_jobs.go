@@ -340,6 +340,9 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				time.Duration(result.Timings.DiffDuration).Milliseconds(),
 				time.Duration(result.Timings.TotalDuration).Milliseconds(),
 			)
+		if resources := runStatsJobResourcesFromStepUsage(result.ContainerResources); resources != nil {
+			statsBuilder.JobResources(resources)
+		}
 
 		if cfg.BuildJobMeta != nil {
 			if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {

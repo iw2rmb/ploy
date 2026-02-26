@@ -78,6 +78,86 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig", 1000)
+	st := &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":    "Success",
+		"exit_code": int32(0),
+		"stats": map[string]any{
+			"duration_ms": 1234,
+			"job_resources": map[string]any{
+				"cpu_consumed_ns":     int64(42_000_000),
+				"disk_consumed_bytes": int64(512 * 1024),
+				"mem_consumed_bytes":  int64(128 * 1024 * 1024),
+			},
+		},
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.upsertJobMetricCalled {
+		t.Fatal("expected UpsertJobMetric to be called")
+	}
+	if st.upsertJobMetricParams.NodeID != f.NodeID {
+		t.Fatalf("upsert node_id = %q, want %q", st.upsertJobMetricParams.NodeID, f.NodeID)
+	}
+	if st.upsertJobMetricParams.JobID != f.JobID {
+		t.Fatalf("upsert job_id = %q, want %q", st.upsertJobMetricParams.JobID, f.JobID)
+	}
+	if st.upsertJobMetricParams.CpuConsumedNs != 42_000_000 {
+		t.Fatalf("cpu_consumed_ns = %d, want %d", st.upsertJobMetricParams.CpuConsumedNs, int64(42_000_000))
+	}
+	if st.upsertJobMetricParams.DiskConsumedBytes != 512*1024 {
+		t.Fatalf("disk_consumed_bytes = %d, want %d", st.upsertJobMetricParams.DiskConsumedBytes, int64(512*1024))
+	}
+	if st.upsertJobMetricParams.MemConsumedBytes != 128*1024*1024 {
+		t.Fatalf("mem_consumed_bytes = %d, want %d", st.upsertJobMetricParams.MemConsumedBytes, int64(128*1024*1024))
+	}
+}
+
+func TestCompleteJob_InvalidJobResources_RejectsRequest(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig", 1000)
+	st := &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Success",
+		"stats": map[string]any{
+			"job_resources": map[string]any{
+				"cpu_consumed_ns": -1,
+			},
+		},
+	}))
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
+		t.Fatal("did not expect job completion updates on invalid job_resources")
+	}
+	if st.upsertJobMetricCalled {
+		t.Fatal("did not expect UpsertJobMetric on invalid job_resources")
+	}
+}
+
 // TestCompleteJob_MRJobUpdatesRunStatsMRURL verifies that when an MR job
 // completes with stats.metadata.mr_url, the handler merges that URL into
 // runs.stats via UpdateRunStatsMRURL.

@@ -250,6 +250,16 @@ type Job struct {
 	Meta        []byte             `json:"meta"`
 }
 
+type JobMetric struct {
+	ID                int64              `json:"id"`
+	NodeID            types.NodeID       `json:"node_id"`
+	JobID             types.JobID        `json:"job_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	CpuConsumedNs     int64              `json:"cpu_consumed_ns"`
+	DiskConsumedBytes int64              `json:"disk_consumed_bytes"`
+	MemConsumedBytes  int64              `json:"mem_consumed_bytes"`
+}
+
 type Log struct {
 	ID        int64              `json:"id"`
 	RunID     types.RunID        `json:"run_id"`

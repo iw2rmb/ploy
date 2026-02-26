@@ -269,6 +269,7 @@ type Querier interface {
 	// Updates value, scope, secret, and refreshes updated_at on conflict.
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
+	UpsertJobMetric(ctx context.Context, arg UpsertJobMetricParams) error
 	// Bulk upsert a mod_repo by normalized repo_url.
 	// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
 	// If a row exists, update refs; otherwise insert.

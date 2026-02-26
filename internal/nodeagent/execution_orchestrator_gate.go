@@ -440,6 +440,9 @@ func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMe
 	if gateResult != nil {
 		// Use Gate helper for simple gate stats.
 		builder.Gate(gateResultPassed(gateResult), duration.Milliseconds())
+		if resources := runStatsJobResourcesFromGateUsage(gateResult.Resources); resources != nil {
+			builder.JobResources(resources)
+		}
 
 		// Attach structured job metadata so the control plane can persist
 		// gate results in jobs.meta JSONB.

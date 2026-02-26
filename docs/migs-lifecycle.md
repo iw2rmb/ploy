@@ -997,6 +997,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
   (The separate `/v1/nodes/{id}/ack` endpoint has been removed.)
 - `POST /v1/jobs/{job_id}/complete` — report final status and stats for a job
   (canonical endpoint; node-based `/v1/nodes/{id}/complete` has been removed).
+  - When stats include `job_resources` (`cpu_consumed_ns`, `disk_consumed_bytes`,
+    `mem_consumed_bytes`), the server upserts a row in `job_metrics`.
 - `POST /v1/nodes/{id}/events` — publish run-scoped node exceptions/events
   (for example claim/start failures and runtime panics) into the run SSE stream.
 - `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.

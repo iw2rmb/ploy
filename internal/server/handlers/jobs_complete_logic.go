@@ -36,6 +36,17 @@ type JobStatsPayload struct {
 
 	// DurationMs is the job execution duration in milliseconds (informational).
 	DurationMs int64 `json:"duration_ms,omitempty"`
+
+	// JobResources carries per-job container resource consumption metrics.
+	// When present, the handler persists a row in ploy.job_metrics.
+	JobResources *JobResourcesPayload `json:"job_resources,omitempty"`
+}
+
+// JobResourcesPayload contains per-job container resource consumption metrics.
+type JobResourcesPayload struct {
+	CPUConsumedNs     int64 `json:"cpu_consumed_ns,omitempty"`
+	DiskConsumedBytes int64 `json:"disk_consumed_bytes,omitempty"`
+	MemConsumedBytes  int64 `json:"mem_consumed_bytes,omitempty"`
 }
 
 // MRURL returns the merge request URL from metadata, if present.
@@ -70,6 +81,28 @@ func (p JobStatsPayload) HasJobMeta() bool {
 		}
 	}
 	return true
+}
+
+// HasJobResources returns true if job_resources is present.
+func (p JobStatsPayload) HasJobResources() bool {
+	return p.JobResources != nil
+}
+
+// ValidateJobResources validates non-negative job resource values.
+func (p JobStatsPayload) ValidateJobResources() error {
+	if p.JobResources == nil {
+		return nil
+	}
+	if p.JobResources.CPUConsumedNs < 0 {
+		return fmt.Errorf("invalid job_resources.cpu_consumed_ns: must be non-negative")
+	}
+	if p.JobResources.DiskConsumedBytes < 0 {
+		return fmt.Errorf("invalid job_resources.disk_consumed_bytes: must be non-negative")
+	}
+	if p.JobResources.MemConsumedBytes < 0 {
+		return fmt.Errorf("invalid job_resources.mem_consumed_bytes: must be non-negative")
+	}
+	return nil
 }
 
 // ValidateJobMeta validates the job_meta field using contracts.UnmarshalJobMeta.
