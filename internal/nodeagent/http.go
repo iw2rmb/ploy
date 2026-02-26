@@ -61,9 +61,31 @@ func (b *baseUploader) postJSON(ctx context.Context, apiPath string, payload any
 	return resp, nil
 }
 
+type postJSONRetryMode int
+
+const (
+	postJSONRetryModeDefault postJSONRetryMode = iota
+	postJSONRetryModeStartupReconcile
+)
+
+func classifyPostJSONStatus(mode postJSONRetryMode, statusCode int) (success bool, retry bool) {
+	switch {
+	case statusCode == http.StatusOK || statusCode == http.StatusNoContent:
+		return true, false
+	case mode == postJSONRetryModeStartupReconcile && statusCode == http.StatusConflict:
+		// Startup reconciliation replays terminal completion and must be idempotent.
+		return true, false
+	case statusCode >= 500 && statusCode < 600:
+		return false, true
+	default:
+		return false, false
+	}
+}
+
 // postJSONWithRetry sends a JSON POST request with exponential backoff.
-// Accepts 200 and 204 as success, retries on 5xx, fails permanently on 4xx.
-func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, payload any, action string) error {
+// Accepts 200 and 204 as success in all modes. In startup reconcile mode,
+// 409 is also treated as success (idempotent replay).
+func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, payload any, action string, mode postJSONRetryMode) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
@@ -87,10 +109,11 @@ func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, pa
 		}
 		respBody, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
-		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+		success, retry := classifyPostJSONStatus(mode, resp.StatusCode)
+		if success {
 			return nil
 		}
-		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+		if retry {
 			logger.Warn(action+" received 5xx, retrying", "attempt", attempt, "status_code", resp.StatusCode)
 			return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, string(respBody))
 		}
@@ -102,6 +125,28 @@ func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, pa
 
 // UploadJobStatus uploads terminal status and stats to the job-level endpoint.
 func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats) error {
+	return b.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/jobs/%s/complete", jobID),
+		buildJobStatusPayload(status, exitCode, stats),
+		"upload job status",
+		postJSONRetryModeDefault,
+	)
+}
+
+// UploadJobStatusReconcile uploads terminal status during startup crash
+// reconciliation. This mode treats 409 conflicts as successful idempotent replay.
+func (b *baseUploader) UploadJobStatusReconcile(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats) error {
+	return b.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/jobs/%s/complete", jobID),
+		buildJobStatusPayload(status, exitCode, stats),
+		"upload reconciled job status",
+		postJSONRetryModeStartupReconcile,
+	)
+}
+
+func buildJobStatusPayload(status string, exitCode *int32, stats types.RunStats) map[string]any {
 	payload := map[string]any{"status": status}
 	if exitCode != nil {
 		payload["exit_code"] = *exitCode
@@ -109,7 +154,7 @@ func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, s
 	if stats != nil {
 		payload["stats"] = stats
 	}
-	return b.postJSONWithRetry(ctx, fmt.Sprintf("/v1/jobs/%s/complete", jobID), payload, "upload job status")
+	return payload
 }
 
 // BuildURL resolves a base URL and a path-only reference, preserving scheme/host.

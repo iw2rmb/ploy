@@ -369,6 +369,95 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	}
 }
 
+func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *testing.T) {
+	t.Parallel()
+
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	containerID := "ctr-running-conflict"
+	var logsCalled bool
+	completeCalls := 0
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+			logsCalled = true
+			w.WriteHeader(http.StatusCreated)
+		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+			completeCalls++
+			w.WriteHeader(http.StatusConflict)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	fakeDocker := &fakeCrashReconcileDockerClient{
+		waitByID: map[string]containertypes.WaitResponse{
+			containerID: {StatusCode: 0},
+		},
+		inspectByID: map[string]client.ContainerInspectResult{
+			containerID: {
+				Container: containertypes.InspectResponse{
+					State: &containertypes.State{
+						ExitCode:   0,
+						Status:     containertypes.ContainerState("exited"),
+						StartedAt:  "2026-02-26T15:00:00Z",
+						FinishedAt: "2026-02-26T15:00:02Z",
+					},
+				},
+			},
+		},
+		logsByID: map[string][]byte{
+			containerID: multiplexedDockerLogs("stdout line\n", stdcopy.Stdout),
+		},
+	}
+
+	controller := &mockRunController{}
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager() error = %v", err)
+	}
+	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
+
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+		{ContainerID: containerID, RunID: runID, JobID: jobID},
+	})
+
+	deadline := time.After(2 * time.Second)
+	for {
+		if logsCalled && completeCalls > 0 && controller.releaseCalls == 1 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf(
+				"timeout waiting for recovered monitor completion, logs_called=%v complete_calls=%d release_calls=%d",
+				logsCalled,
+				completeCalls,
+				controller.releaseCalls,
+			)
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	if completeCalls != 1 {
+		t.Fatalf("completion calls = %d, want 1", completeCalls)
+	}
+	if controller.acquireCalls != 1 {
+		t.Fatalf("AcquireSlot calls = %d, want 1", controller.acquireCalls)
+	}
+	if controller.releaseCalls != 1 {
+		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.releaseCalls)
+	}
+}
+
 func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	t.Parallel()
 

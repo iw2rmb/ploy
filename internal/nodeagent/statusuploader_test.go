@@ -127,6 +127,100 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 	}
 }
 
+func TestStatusUploader_ReconcileConflictHandling(t *testing.T) {
+	t.Parallel()
+
+	type uploadFn func(*baseUploader, context.Context, types.JobID) error
+	tests := []struct {
+		name         string
+		responses    []int
+		upload       uploadFn
+		wantErr      bool
+		wantAttempts int
+	}{
+		{
+			name:      "reconcile accepts conflict",
+			responses: []int{http.StatusConflict},
+			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
+				return uploader.UploadJobStatusReconcile(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+			},
+			wantErr:      false,
+			wantAttempts: 1,
+		},
+		{
+			name:      "reconcile retries on 5xx then accepts conflict",
+			responses: []int{http.StatusInternalServerError, http.StatusConflict},
+			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
+				return uploader.UploadJobStatusReconcile(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+			},
+			wantErr:      false,
+			wantAttempts: 2,
+		},
+		{
+			name:      "reconcile keeps non conflict 4xx permanent",
+			responses: []int{http.StatusForbidden},
+			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
+				return uploader.UploadJobStatusReconcile(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+			},
+			wantErr:      true,
+			wantAttempts: 1,
+		},
+		{
+			name:      "default upload keeps conflict permanent",
+			responses: []int{http.StatusConflict},
+			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
+				return uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+			},
+			wantErr:      true,
+			wantAttempts: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			attemptCount := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				if attemptCount < len(tt.responses) {
+					w.WriteHeader(tt.responses[attemptCount])
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				attemptCount++
+			}))
+			defer server.Close()
+
+			cfg := Config{
+				ServerURL: server.URL,
+				NodeID:    testNodeID,
+				HTTP: HTTPConfig{
+					TLS: TLSConfig{
+						Enabled: false,
+					},
+				},
+			}
+
+			uploader, err := newBaseUploader(cfg)
+			if err != nil {
+				t.Fatalf("failed to create uploader: %v", err)
+			}
+
+			err = tt.upload(uploader, context.Background(), types.JobID("test-job-id"))
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if attemptCount != tt.wantAttempts {
+				t.Fatalf("attempts = %d, want %d", attemptCount, tt.wantAttempts)
+			}
+		})
+	}
+}
+
 // TestStatusUploader_RetryBackoff verifies exponential backoff on retries.
 func TestStatusUploader_RetryBackoff(t *testing.T) {
 	t.Parallel()
