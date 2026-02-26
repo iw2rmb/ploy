@@ -79,6 +79,10 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	token, err := resolveControlPlaneToken()
+	if err != nil {
+		return err
+	}
 	report, err := runcmd.GetRunReportCommand{
 		Client:  httpClient,
 		BaseURL: base,
@@ -94,6 +98,7 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 
 	if err := runcmd.RenderRunReportText(stderr, report, runcmd.TextRenderOptions{
 		EnableOSC8: runStatusSupportsOSC8(stderr),
+		AuthToken:  token,
 	}); err != nil {
 		return err
 	}

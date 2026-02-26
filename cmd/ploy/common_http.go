@@ -61,6 +61,16 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	return u, client, nil
 }
 
+// resolveControlPlaneToken returns the configured default cluster bearer token.
+// It is used for rendering browser-friendly artifact links with auth_token query parameters.
+func resolveControlPlaneToken() (string, error) {
+	desc, err := config.LoadDefault()
+	if err != nil {
+		return "", fmt.Errorf("load default cluster descriptor: %w", err)
+	}
+	return strings.TrimSpace(desc.Token), nil
+}
+
 // bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
 type bearerTokenTransport struct {
 	base  http.RoundTripper

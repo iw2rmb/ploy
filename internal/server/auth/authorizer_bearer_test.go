@@ -488,3 +488,73 @@ func TestAuthorizerBearerToken_InsecureModeWithToken(t *testing.T) {
 		t.Errorf("got status %d, want %d", rr.Code, http.StatusOK)
 	}
 }
+
+func TestAuthorizerQueryToken_AllowedArtifactPaths(t *testing.T) {
+	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
+	clusterID := "test-cluster"
+	expiresAt := time.Now().Add(24 * time.Hour)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(RoleControlPlane), expiresAt)
+	if err != nil {
+		t.Fatalf("GenerateAPIToken error: %v", err)
+	}
+
+	auth := NewAuthorizer(Options{
+		AllowInsecure: false,
+		TokenSecret:   secret,
+		Querier:       &mockQuerier{},
+	})
+
+	tests := []string{
+		"/v1/runs/run-123/logs?auth_token=" + tokenString,
+		"/v1/runs/run-123/repos/repo-123/logs?auth_token=" + tokenString,
+		"/v1/runs/run-123/repos/repo-123/diffs?download=true&diff_id=diff-1&auth_token=" + tokenString,
+	}
+
+	for _, path := range tests {
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rr := httptest.NewRecorder()
+		handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("path %s: got status %d, want %d; body=%q", path, rr.Code, http.StatusOK, rr.Body.String())
+		}
+	}
+}
+
+func TestAuthorizerQueryToken_DisallowedPathOrMethod(t *testing.T) {
+	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
+	clusterID := "test-cluster"
+	expiresAt := time.Now().Add(24 * time.Hour)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(RoleControlPlane), expiresAt)
+	if err != nil {
+		t.Fatalf("GenerateAPIToken error: %v", err)
+	}
+
+	auth := NewAuthorizer(Options{
+		AllowInsecure: false,
+		TokenSecret:   secret,
+		Querier:       &mockQuerier{},
+	})
+
+	tests := []struct {
+		method string
+		path   string
+	}{
+		{http.MethodGet, "/v1/runs/run-123?auth_token=" + tokenString},
+		{http.MethodPost, "/v1/runs/run-123/logs?auth_token=" + tokenString},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest(tt.method, tt.path, nil)
+		rr := httptest.NewRecorder()
+		handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		handler.ServeHTTP(rr, req)
+		if rr.Code != http.StatusForbidden {
+			t.Fatalf("%s %s: got status %d, want %d", tt.method, tt.path, rr.Code, http.StatusForbidden)
+		}
+	}
+}

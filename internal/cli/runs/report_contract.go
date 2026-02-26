@@ -42,13 +42,15 @@ type RunEntry struct {
 
 // RunJobEntry is one row in the follow-style job graph.
 type RunJobEntry struct {
-	JobID       domaintypes.JobID   `json:"job_id"`
-	JobType     string              `json:"job_type"`
-	JobImage    string              `json:"job_image"`
-	NodeID      *domaintypes.NodeID `json:"node_id,omitempty"`
-	Status      string              `json:"status"`
-	DurationMs  int64               `json:"duration_ms"`
-	DisplayName string              `json:"display_name,omitempty"`
-	BuildLogURL string              `json:"build_log_url,omitempty"`
-	PatchURL    string              `json:"patch_url,omitempty"`
+	JobID         domaintypes.JobID   `json:"job_id"`
+	JobType       string              `json:"job_type"`
+	JobImage      string              `json:"job_image"`
+	NodeID        *domaintypes.NodeID `json:"node_id,omitempty"`
+	Status        string              `json:"status"`
+	ExitCode      *int32              `json:"exit_code,omitempty"`
+	DurationMs    int64               `json:"duration_ms"`
+	DisplayName   string              `json:"display_name,omitempty"`
+	ActionSummary string              `json:"action_summary,omitempty"`
+	BuildLogURL   string              `json:"build_log_url,omitempty"`
+	PatchURL      string              `json:"patch_url,omitempty"`
 }

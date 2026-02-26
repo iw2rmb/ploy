@@ -11,16 +11,18 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestRunStatusPrintsSummary(t *testing.T) {
+func TestRunStatusReportTextContract(t *testing.T) {
 	t.Helper()
 
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
+	preGateID := domaintypes.NewJobID()
+	healID := domaintypes.NewJobID()
+	postGateID := domaintypes.NewJobID()
 
-	server := newRunStatusReportServer(t, runID, modID, specID, repoID, jobID)
+	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
 	defer server.Close()
 
 	useServerDescriptor(t, server.URL)
@@ -30,46 +32,22 @@ func TestRunStatusPrintsSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run status error: %v", err)
 	}
+
 	out := buf.String()
-	if !strings.Contains(out, "Run: "+runID.String()) {
-		t.Fatalf("expected output to contain run id; got %q", out)
-	}
-	if !strings.Contains(out, "Repo: github.com/acme/service main -> ploy/java17") {
-		t.Fatalf("expected output to contain unified repo header; got %q", out)
-	}
+	assertContains(t, out, "Mig:   "+migID.String()+"  | java17-upgrade")
+	assertContains(t, out, "Spec:  "+specID.String()+" | Download")
+	assertContains(t, out, "Repos: 1")
+	assertContains(t, out, "Run:   "+runID.String())
+	assertContains(t, out, "Repo:  [1/1] github.com/acme/service main -> ploy/java17")
+	assertContains(t, out, "Artifacts")
+	assertContains(t, out, "Logs")
+	assertContains(t, out, " | Patch")
+	assertContains(t, out, "⣾")
+	assertContains(t, out, "└  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
+	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
-// RED gate for roadmap/reporting.md Phase 0:
-// run status should migrate from summary lines to the unified report view.
-func TestRunStatusReportTextGate(t *testing.T) {
-	t.Helper()
-
-	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewMigID()
-	specID := domaintypes.NewSpecID()
-	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
-
-	server := newRunStatusReportServer(t, runID, modID, specID, repoID, jobID)
-	defer server.Close()
-
-	useServerDescriptor(t, server.URL)
-
-	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "status", runID.String()}, &buf)
-	if err != nil {
-		t.Fatalf("run status error: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Mig Name:") {
-		t.Fatalf("expected output to contain unified report field 'Mig Name', got %q", out)
-	}
-	if !strings.Contains(out, "State") {
-		t.Fatalf("expected output to contain follow-style job table header, got %q", out)
-	}
-}
-
-func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, jobID domaintypes.JobID) *httptest.Server {
+func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
 	t.Helper()
 
 	diffID := "11111111-1111-1111-1111-111111111111"
@@ -96,6 +74,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos":
+			lastErr := "compile\nfailed at step 2"
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repos": []map[string]any{
 					{
@@ -106,6 +85,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"target_ref": "ploy/java17",
 						"status":     "Running",
 						"attempt":    1,
+						"last_error": lastErr,
 						"created_at": "2026-02-24T08:01:00Z",
 					},
 				},
@@ -117,14 +97,37 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				"attempt": 1,
 				"jobs": []map[string]any{
 					{
-						"job_id":      jobID.String(),
-						"name":        "step-1",
-						"job_type":    "step",
-						"job_image":   "ghcr.io/acme/runner:1",
+						"job_id":      preGateID.String(),
+						"name":        "pre-gate",
+						"job_type":    "pre_gate",
+						"job_image":   "ghcr.io/acme/pre-gate:1",
+						"next_id":     healID.String(),
+						"node_id":     nil,
+						"status":      "Failed",
+						"exit_code":   137,
+						"duration_ms": 1500,
+					},
+					{
+						"job_id":         healID.String(),
+						"name":           "heal-1-0",
+						"job_type":       "heal",
+						"job_image":      "ghcr.io/acme/heal:1",
+						"next_id":        postGateID.String(),
+						"node_id":        nil,
+						"status":         "Success",
+						"exit_code":      0,
+						"duration_ms":    1200,
+						"action_summary": "Applied import fix and retried build",
+					},
+					{
+						"job_id":      postGateID.String(),
+						"name":        "post-gate",
+						"job_type":    "post_gate",
+						"job_image":   "ghcr.io/acme/post-gate:1",
 						"next_id":     nil,
 						"node_id":     nil,
 						"status":      "Running",
-						"duration_ms": 1500,
+						"duration_ms": 600,
 					},
 				},
 			})
@@ -133,7 +136,7 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				"diffs": []map[string]any{
 					{
 						"id":           diffID,
-						"job_id":       jobID.String(),
+						"job_id":       healID.String(),
 						"created_at":   "2026-02-24T08:03:00Z",
 						"gzipped_size": 128,
 						"summary":      nil,
@@ -146,18 +149,18 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 	}))
 }
 
-// RED gate for roadmap/reporting.md Phase 0:
-// run status must provide JSON mode matching the unified report schema.
 func TestRunStatusJSONGate(t *testing.T) {
 	t.Helper()
 
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
+	preGateID := domaintypes.NewJobID()
+	healID := domaintypes.NewJobID()
+	postGateID := domaintypes.NewJobID()
 
-	server := newRunStatusReportServer(t, runID, modID, specID, repoID, jobID)
+	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
 	defer server.Close()
 
 	useServerDescriptor(t, server.URL)
@@ -172,19 +175,19 @@ func TestRunStatusJSONGate(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
 	}
-	if _, ok := parsed["mig_id"]; !ok {
-		t.Fatalf("expected mig_id in JSON output, got %v", parsed)
+	for _, key := range []string{"mig_id", "mig_name", "repos", "runs"} {
+		if _, ok := parsed[key]; !ok {
+			t.Fatalf("expected %s in JSON output, got %v", key, parsed)
+		}
 	}
-	if _, ok := parsed["mig_name"]; !ok {
-		t.Fatalf("expected mig_name in JSON output, got %v", parsed)
-	}
-	if _, ok := parsed["repos"]; !ok {
-		t.Fatalf("expected repos in JSON output, got %v", parsed)
-	}
-	if _, ok := parsed["runs"]; !ok {
-		t.Fatalf("expected runs in JSON output, got %v", parsed)
-	}
-	if strings.Contains(buf.String(), "Run: ") {
+	if strings.Contains(buf.String(), "Mig:") {
 		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
+	}
+}
+
+func assertContains(t *testing.T, output string, want string) {
+	t.Helper()
+	if !strings.Contains(output, want) {
+		t.Fatalf("expected output to contain %q, got %q", want, output)
 	}
 }

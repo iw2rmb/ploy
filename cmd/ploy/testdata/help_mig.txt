@@ -18,6 +18,7 @@ Repo Set Management:
 
 Pulling Diffs:
   pull        Pull diffs into the current git worktree
+  status      Show migration status and per-run summary
 
 Run Execution:
   run <mig>   Run a mig project (with --repo or --failed for repo selection)

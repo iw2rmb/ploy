@@ -34,6 +34,7 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Pulling Diffs:")
 			_, _ = fmt.Fprintln(w, "  pull        Pull diffs into the current git worktree")
+			_, _ = fmt.Fprintln(w, "  status      Show migration status and per-run summary")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Run Execution:")
 			_, _ = fmt.Fprintln(w, "  run <mig>   Run a mig project (with --repo or --failed for repo selection)")
