@@ -17,17 +17,20 @@ import (
 // Contains configuration, HTTP client, run controller, and backoff state for
 // polling intervals when no work is available.
 type ClaimManager struct {
-	cfg               Config
-	client            *http.Client
-	clientOnce        sync.Once // Ensures thread-safe lazy HTTP client initialization
-	clientErr         error     // Stores initialization error from clientOnce
-	eventUploader     *NodeEventUploader
-	eventUploaderOnce sync.Once
-	eventUploaderErr  error
-	controller        RunController
-	preClaimCleanup   preClaimCleanup
-	startupReconciler *startupCrashReconciler
-	backoff           *backoff.StatefulBackoff
+	cfg                Config
+	client             *http.Client
+	clientOnce         sync.Once // Ensures thread-safe lazy HTTP client initialization
+	clientErr          error     // Stores initialization error from clientOnce
+	statusUploader     *baseUploader
+	statusUploaderOnce sync.Once
+	statusUploaderErr  error
+	eventUploader      *NodeEventUploader
+	eventUploaderOnce  sync.Once
+	eventUploaderErr   error
+	controller         RunController
+	preClaimCleanup    preClaimCleanup
+	startupReconciler  *startupCrashReconciler
+	backoff            *backoff.StatefulBackoff
 }
 
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.

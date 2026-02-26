@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'CrashReconcile|Startup'` — Reconciler should produce stable running/terminal partitions and enforce the 120s window by `finished_at`.
 
 ## Phase 3: Restore Running Container Tracking
-- [ ] Reattach running containers at startup and continue wait/log/status flow. — Running work should complete through the same node->server reporting contracts.
+- [x] Reattach running containers at startup and continue wait/log/status flow. — Running work should complete through the same node->server reporting contracts.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope:
