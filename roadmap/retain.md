@@ -65,7 +65,7 @@ Legend: [ ] todo, [x] done.
     - update `cmd/ploy/help_flags_test.go` and `cmd/ploy/testdata/help_mig.txt`
 
 ## Phase 2: Stop Completion-Time Container Deletion
-- [ ] Remove immediate container deletion from step runner and gate executor.
+- [x] Remove immediate container deletion from step runner and gate executor.
   - Repository: `ploy`
   - Component: `internal/workflow/step`
   - Scope:
@@ -79,7 +79,7 @@ Legend: [ ] todo, [x] done.
     - update `internal/workflow/step/gate_docker_test.go` to assert no remove call.
     - add/adjust runner tests to assert container lifecycle ends at `Wait`/`Logs`.
 
-- [ ] Remove retain-only manifest contract bits.
+- [x] Remove retain-only manifest contract bits.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/nodeagent`, `internal/workflow/step`
   - Scope:

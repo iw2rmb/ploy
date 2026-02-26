@@ -3,7 +3,6 @@ package contracts
 import (
 	"strings"
 	"testing"
-	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -44,10 +43,6 @@ func TestStepManifestValidate(t *testing.T) {
 			Env: map[string]string{
 				"GATE_TIMEOUT": "5m",
 			},
-		},
-		Retention: StepRetentionSpec{
-			RetainContainer: true,
-			TTL:             types.Duration(24 * time.Hour),
 		},
 	}
 
@@ -163,14 +158,6 @@ func TestStepManifestValidate(t *testing.T) {
 				m.Resources.CPU = types.CPUmilli(-1)
 			},
 			wantErr: "resources",
-		},
-		{
-			name: "retention ttl required when retaining container",
-			mutate: func(m *StepManifest) {
-				m.Retention.RetainContainer = true
-				m.Retention.TTL = 0
-			},
-			wantErr: "retention",
 		},
 	}
 
