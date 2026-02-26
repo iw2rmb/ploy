@@ -175,6 +175,46 @@ func TestDetectTool_MavenNoJavaVersion_ReturnsTool(t *testing.T) {
 	}
 }
 
+func TestDetectTool_PythonPoetryPyproject_ReturnsPoetry(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "python", "python311-poetry")
+
+	obs, err := DetectTool(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if obs.Language != "python" {
+		t.Fatalf("Language = %q, want %q", obs.Language, "python")
+	}
+	if obs.Tool != "poetry" {
+		t.Fatalf("Tool = %q, want %q", obs.Tool, "poetry")
+	}
+	if obs.Release != nil {
+		t.Fatalf("Release = %v, want nil", *obs.Release)
+	}
+}
+
+func TestDetectTool_PythonPep621Pyproject_ReturnsPip(t *testing.T) {
+	ctx := context.Background()
+	workspace := filepath.Join("testdata", "python", "python310-pyproject")
+
+	obs, err := DetectTool(ctx, workspace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if obs.Language != "python" {
+		t.Fatalf("Language = %q, want %q", obs.Language, "python")
+	}
+	if obs.Tool != "pip" {
+		t.Fatalf("Tool = %q, want %q", obs.Tool, "pip")
+	}
+	if obs.Release != nil {
+		t.Fatalf("Release = %v, want nil", *obs.Release)
+	}
+}
+
 func TestDetectTool_AmbiguousBothMavenGradle(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "ambiguous", "both-maven-gradle")

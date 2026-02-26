@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 )
 
 // Regex patterns for Python version detection.
@@ -55,15 +53,14 @@ var (
 // Returns unknown for:
 //   - Specifiers spanning multiple minors (e.g., >=3.9, ^3.11)
 //   - Disagreement between sources
-func detectPython(ctx context.Context, workspace string) (*Observation, error) {
-	pythonVersionPath := filepath.Join(workspace, ".python-version")
-	runtimeTxtPath := filepath.Join(workspace, "runtime.txt")
-	pyprojectPath := filepath.Join(workspace, "pyproject.toml")
+func detectPython(ctx context.Context, s scanResult) (*Observation, error) {
+	pythonVersionPath := filepath.Join(s.workspace, ".python-version")
+	runtimeTxtPath := filepath.Join(s.workspace, "runtime.txt")
 
 	var detections []pythonDetection
 
 	// 1. Check .python-version (highest precedence).
-	if fsutil.FileExists(pythonVersionPath) {
+	if s.hasPythonVersion {
 		content, err := os.ReadFile(pythonVersionPath)
 		if err == nil {
 			version := strings.TrimSpace(string(content))
@@ -79,7 +76,7 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	// 2. Check runtime.txt.
-	if fsutil.FileExists(runtimeTxtPath) {
+	if s.hasRuntimeTxt {
 		content, err := os.ReadFile(runtimeTxtPath)
 		if err == nil {
 			line := strings.TrimSpace(string(content))
@@ -97,60 +94,47 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 	}
 
 	// 3 & 4. Check pyproject.toml.
-	if fsutil.FileExists(pyprojectPath) {
-		content, err := os.ReadFile(pyprojectPath)
-		if err == nil {
-			text := string(content)
-
-			// Check for Poetry.
-			isPoetry := poetryToolRegex.MatchString(text)
-
-			// Check PEP 621 requires-python in [project] section.
-			if projectSectionRegex.MatchString(text) {
-				if matches := requiresPythonRegex.FindStringSubmatch(text); matches != nil {
-					specifier := strings.TrimSpace(matches[1])
-					version, err := reduceSpecifier(specifier)
-					if err != nil {
-						return nil, &DetectionError{
-							Reason:  "unknown",
-							Message: err.Error(),
-							Evidence: []EvidenceItem{
-								{Path: "pyproject.toml", Key: "requires-python", Value: specifier},
-							},
-						}
-					}
-					detections = append(detections, pythonDetection{
-						version:  version,
-						path:     "pyproject.toml",
-						key:      "requires-python",
-						priority: 3,
-					})
+	if s.pyprojectLoaded {
+		// Check PEP 621 requires-python in [project] section.
+		if s.pyprojectHasProjectSection && s.pyprojectRequiresPython != "" {
+			specifier := strings.TrimSpace(s.pyprojectRequiresPython)
+			version, err := reduceSpecifier(specifier)
+			if err != nil {
+				return nil, &DetectionError{
+					Reason:  "unknown",
+					Message: err.Error(),
+					Evidence: []EvidenceItem{
+						{Path: "pyproject.toml", Key: "requires-python", Value: specifier},
+					},
 				}
 			}
+			detections = append(detections, pythonDetection{
+				version:  version,
+				path:     "pyproject.toml",
+				key:      "requires-python",
+				priority: 3,
+			})
+		}
 
-			// Check Poetry python dependency.
-			if isPoetry && poetryDepsRegex.MatchString(text) {
-				// Find the [tool.poetry.dependencies] section and extract python.
-				if matches := poetryPythonRegex.FindStringSubmatch(text); matches != nil {
-					specifier := strings.TrimSpace(matches[1])
-					version, err := reduceSpecifier(specifier)
-					if err != nil {
-						return nil, &DetectionError{
-							Reason:  "unknown",
-							Message: err.Error(),
-							Evidence: []EvidenceItem{
-								{Path: "pyproject.toml", Key: "tool.poetry.dependencies.python", Value: specifier},
-							},
-						}
-					}
-					detections = append(detections, pythonDetection{
-						version:  version,
-						path:     "pyproject.toml",
-						key:      "tool.poetry.dependencies.python",
-						priority: 4,
-					})
+		// Check Poetry python dependency.
+		if s.pyprojectHasPoetryTool && s.pyprojectHasPoetryDeps && s.pyprojectPoetryPython != "" {
+			specifier := strings.TrimSpace(s.pyprojectPoetryPython)
+			version, err := reduceSpecifier(specifier)
+			if err != nil {
+				return nil, &DetectionError{
+					Reason:  "unknown",
+					Message: err.Error(),
+					Evidence: []EvidenceItem{
+						{Path: "pyproject.toml", Key: "tool.poetry.dependencies.python", Value: specifier},
+					},
 				}
 			}
+			detections = append(detections, pythonDetection{
+				version:  version,
+				path:     "pyproject.toml",
+				key:      "tool.poetry.dependencies.python",
+				priority: 4,
+			})
 		}
 	}
 
@@ -194,11 +178,8 @@ func detectPython(ctx context.Context, workspace string) (*Observation, error) {
 
 	// Determine tool.
 	tool := "pip"
-	if fsutil.FileExists(pyprojectPath) {
-		content, _ := os.ReadFile(pyprojectPath)
-		if poetryToolRegex.MatchString(string(content)) {
-			tool = "poetry"
-		}
+	if s.pyprojectHasPoetryTool {
+		tool = "poetry"
 	}
 
 	return &Observation{
