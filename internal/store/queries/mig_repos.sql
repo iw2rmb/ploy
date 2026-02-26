@@ -71,6 +71,27 @@ WHERE mr.id = candidate.id
   AND mr.prep_status = 'PrepPending'
 RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at;
 
+-- name: ClaimNextPrepRetryRepo :one
+WITH candidate AS (
+  SELECT mr.id
+  FROM mig_repos mr
+  WHERE mr.prep_status = 'PrepRetryScheduled'
+    AND mr.prep_updated_at <= $1
+  ORDER BY mr.prep_updated_at ASC, mr.created_at ASC, mr.id ASC
+  FOR UPDATE SKIP LOCKED
+  LIMIT 1
+)
+UPDATE mig_repos mr
+SET prep_status = 'PrepRunning',
+    prep_attempts = mr.prep_attempts + 1,
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+FROM candidate
+WHERE mr.id = candidate.id
+  AND mr.prep_status = 'PrepRetryScheduled'
+RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at;
+
 -- name: UpdateMigRepoPrepState :exec
 UPDATE mig_repos
 SET prep_status = $2,

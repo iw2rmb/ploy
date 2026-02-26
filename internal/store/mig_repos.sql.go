@@ -54,6 +54,49 @@ func (q *Queries) ClaimNextPrepRepo(ctx context.Context) (MigRepo, error) {
 	return i, err
 }
 
+const claimNextPrepRetryRepo = `-- name: ClaimNextPrepRetryRepo :one
+WITH candidate AS (
+  SELECT mr.id
+  FROM mig_repos mr
+  WHERE mr.prep_status = 'PrepRetryScheduled'
+    AND mr.prep_updated_at <= $1
+  ORDER BY mr.prep_updated_at ASC, mr.created_at ASC, mr.id ASC
+  FOR UPDATE SKIP LOCKED
+  LIMIT 1
+)
+UPDATE mig_repos mr
+SET prep_status = 'PrepRunning',
+    prep_attempts = mr.prep_attempts + 1,
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+FROM candidate
+WHERE mr.id = candidate.id
+  AND mr.prep_status = 'PrepRetryScheduled'
+RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at
+`
+
+func (q *Queries) ClaimNextPrepRetryRepo(ctx context.Context, prepUpdatedAt pgtype.Timestamptz) (MigRepo, error) {
+	row := q.db.QueryRow(ctx, claimNextPrepRetryRepo, prepUpdatedAt)
+	var i MigRepo
+	err := row.Scan(
+		&i.ID,
+		&i.MigID,
+		&i.RepoUrl,
+		&i.BaseRef,
+		&i.TargetRef,
+		&i.PrepStatus,
+		&i.PrepAttempts,
+		&i.PrepLastError,
+		&i.PrepFailureCode,
+		&i.PrepUpdatedAt,
+		&i.PrepProfile,
+		&i.PrepArtifacts,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createMigRepo = `-- name: CreateMigRepo :one
 INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
 VALUES ($1, $2, $3, $4, $5)

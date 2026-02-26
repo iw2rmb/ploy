@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/handlers"
 	"github.com/iw2rmb/ploy/internal/server/pki"
+	"github.com/iw2rmb/ploy/internal/server/prep"
 	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -103,6 +104,26 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		}
 	}
 
+	// Initialize prep orchestration task.
+	// The task is disabled when PrepInterval is explicitly set to 0.
+	var prepTask *prep.Task
+	if st != nil && cfg.Scheduler.PrepInterval > 0 {
+		prepRunner := prep.NewCodexRunner(prep.CodexRunnerOptions{
+			Logger: slog.Default(),
+		})
+		prepTask, err = prep.NewTask(prep.Options{
+			Store:       st,
+			Runner:      prepRunner,
+			Interval:    cfg.Scheduler.PrepInterval,
+			MaxAttempts: cfg.Scheduler.PrepMaxAttempts,
+			RetryDelay:  cfg.Scheduler.PrepRetryDelay,
+			Logger:      slog.Default(),
+		})
+		if err != nil {
+			return fmt.Errorf("create prep task: %w", err)
+		}
+	}
+
 	// Initialize scheduler and register background tasks.
 	sched := scheduler.New()
 	if ttlWorker != nil {
@@ -113,6 +134,9 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	}
 	if staleRecoveryTask != nil {
 		sched.AddTask(staleRecoveryTask)
+	}
+	if prepTask != nil {
+		sched.AddTask(prepTask)
 	}
 
 	// Start PKI manager.

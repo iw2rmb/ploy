@@ -56,6 +56,15 @@ runtime:
 	if cfg.Scheduler.NodeStaleAfter != time.Minute {
 		t.Fatalf("NodeStaleAfter = %v, want 1m", cfg.Scheduler.NodeStaleAfter)
 	}
+	if cfg.Scheduler.PrepInterval != 0 {
+		t.Fatalf("PrepInterval = %v, want 0", cfg.Scheduler.PrepInterval)
+	}
+	if cfg.Scheduler.PrepMaxAttempts != 3 {
+		t.Fatalf("PrepMaxAttempts = %d, want 3", cfg.Scheduler.PrepMaxAttempts)
+	}
+	if cfg.Scheduler.PrepRetryDelay != 30*time.Second {
+		t.Fatalf("PrepRetryDelay = %v, want 30s", cfg.Scheduler.PrepRetryDelay)
+	}
 	if cfg.PKI.RenewBefore != time.Hour {
 		t.Fatalf("PKI.RenewBefore = %v, want 1h", cfg.PKI.RenewBefore)
 	}
@@ -102,6 +111,9 @@ runtime:
 scheduler:
   stale_job_recovery_interval: 0s
   node_stale_after: 2m
+  prep_interval: 5s
+  prep_max_attempts: 4
+  prep_retry_delay: 45s
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -149,6 +161,15 @@ scheduler:
 	}
 	if cfg.Scheduler.NodeStaleAfter != 2*time.Minute {
 		t.Fatalf("NodeStaleAfter = %v, want 2m", cfg.Scheduler.NodeStaleAfter)
+	}
+	if cfg.Scheduler.PrepInterval != 5*time.Second {
+		t.Fatalf("PrepInterval = %v, want 5s", cfg.Scheduler.PrepInterval)
+	}
+	if cfg.Scheduler.PrepMaxAttempts != 4 {
+		t.Fatalf("PrepMaxAttempts = %d, want 4", cfg.Scheduler.PrepMaxAttempts)
+	}
+	if cfg.Scheduler.PrepRetryDelay != 45*time.Second {
+		t.Fatalf("PrepRetryDelay = %v, want 45s", cfg.Scheduler.PrepRetryDelay)
 	}
 }
 

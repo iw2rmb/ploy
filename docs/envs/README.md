@@ -148,6 +148,10 @@ See `docs/build-gate/README.md` for Build Gate configuration and execution detai
   Relevant `ployd.yaml` scheduler keys for stale-job recovery:
   - `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable recovery)
   - `scheduler.node_stale_after` (default `1m`; stale cutoff for node heartbeats)
+  Relevant `ployd.yaml` scheduler keys for prep orchestration:
+  - `scheduler.prep_interval` (default `0`; set `>0` to enable prep scheduler)
+  - `scheduler.prep_max_attempts` (default `3`; total attempts before `PrepFailed`)
+  - `scheduler.prep_retry_delay` (default `30s`; fixed delay before retry claims)
   Recovery observability and troubleshooting:
   - Recovery emits structured logs (`stale-job-recovery: cycle completed`) with
     `stale_nodes`, `stale_attempts`, `repos_updated`, `jobs_cancelled`, and
