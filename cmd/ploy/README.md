@@ -369,7 +369,7 @@ ploy completion <shell> --help
   override corresponding spec values when both are present. Specs use canonical shapes:
   top-level fields for single-step runs (`image`, `command`, `env`)
   and `migs[]` for multi-step runs. The spec supports inline environment variables (`env`),
-  file-based secrets (`env_from_file`), Build Gate healing (`build_gate_healing`),
+  file-based secrets (`env_from_file`), Build Gate healing/router (`build_gate.healing`, `build_gate.router`),
   and GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
@@ -539,18 +539,18 @@ See `docs/how-to/create-mr.md` for end-to-end usage examples and `internal/nodea
 ## Build Gate Healing
 
 When a Build Gate fails before the main mig runs, the node agent can execute a healing
-sequence configured via the `build_gate_healing` block in the spec. This enables automated
+sequence configured via `build_gate.healing` in the spec. This enables automated
 repair of build failures using tools like Codex or other LLM-based workflows.
 
 **How it works (jobs-based gate model):**
 1. Gate checks run as jobs in the unified `jobs` queue (`pre_gate` and `re_gate` phases)
    and are claimed by nodes via `/v1/nodes/{id}/claim`.
-2. If the pre-gate job fails and `build_gate_healing` is configured, the node executes
-   the healing mig defined under `build_gate_healing.mig` against the same workspace
+2. If the pre-gate job fails and `build_gate.healing` is configured, the node executes
+   the healing container defined under `build_gate.healing` against the same workspace
    and Build Gate logs.
 3. After all healing steps complete, a `re_gate` job runs as another job in the queue. If it
    passes, the main mig proceeds.
-4. The healing loop can retry up to `build_gate_healing.retries` times (default: 1).
+4. The healing loop can retry up to `build_gate.healing.retries` times (default: 1).
 5. If the gate still fails after exhausting retries, the run terminates with status `failed`
    and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
 
@@ -570,11 +570,11 @@ and `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses remain un
 gate executor logic abstracts execution location, ensuring consistent gate status
 reporting.
 
-**Spec format (single healing mig):**
+**Spec format (healing under Build Gate):**
 ```yaml
-build_gate_healing:
-  retries: 1
-  mig:
+build_gate:
+  healing:
+    retries: 1
     image: docker.io/you/migs-codex:latest
     command: ["mig-codex", "--input", "/workspace", "--out", "/out"]
     env:
@@ -586,6 +586,10 @@ build_gate_healing:
 **Cross-phase inputs:**
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec).
+
+**Container cleanup model:**
+- Containers are retained after step/gate completion.
+- Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
 
 See `docs/schemas/mig.example.yaml` for a complete example and `tests/e2e/migs/README.md`
 for end-to-end usage with `migs-codex`.

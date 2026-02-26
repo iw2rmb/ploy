@@ -169,7 +169,7 @@ build_gate:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
 
-Healing fields (image, command, env, retain_container) are specified directly
+Healing fields (image, command, env, env_from_file) are specified directly
 under `healing` — there is no nested `mig` key.
 
 **Router** runs once per gate failure that triggers healing (each iteration),
@@ -1133,10 +1133,11 @@ Mods container images are standard OCI images with the following expectations:
     - `metadata["reason"]` where available,
     - Build Gate summary (if the failure happened in the gate).
 
-- **Retention**
-  - `retain_container` in the spec causes the node runtime
-    (`internal/workflow/step` and `internal/nodeagent`) to skip
-    container removal after completion.
+- **Container lifecycle**
+  - Step and gate containers are retained by default after completion.
+  - Cleanup runs before each claim attempt via the node runtime pre-claim disk guard.
+  - Trigger and threshold: free space below `1 GiB` on the Docker data-root filesystem (`DockerRootDir`).
+  - Cleanup policy: remove only stopped ploy-managed containers in FIFO order (oldest created first) until threshold is restored or candidates are exhausted.
   - Logs are still streamed through `CreateAndPublishLog` and SSE.
 
 ## 6. CLI Surfaces for Mods

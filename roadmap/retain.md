@@ -158,7 +158,7 @@ Legend: [ ] todo, [x] done.
     - optional log assertions in unit tests where logger capture exists; otherwise behavior-only tests.
 
 ## Phase 5: Docs and Contract Sync
-- [ ] Update docs to remove retain policy language and document disk-pressure model.
+- [x] Update docs to remove retain policy language and document disk-pressure model.
   - Repository: `ploy`
   - Component: docs
   - Scope:
@@ -171,7 +171,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./docs/api/...` (where applicable)
     - `go test ./cmd/ploy/...` for help/spec docs tests.
 
-- [ ] Preserve completion API contract (`POST /v1/jobs/{job_id}/complete` => `204`).
+- [x] Preserve completion API contract (`POST /v1/jobs/{job_id}/complete` => `204`).
   - Repository: `ploy`
   - Component: server handlers + API docs
   - Scope:
