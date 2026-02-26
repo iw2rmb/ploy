@@ -2,14 +2,18 @@ package nodeagent
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
+	containertypes "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // Note: mockRunController is defined in handlers_test.go within the same package.
@@ -60,6 +64,7 @@ func TestClaimLoop_UnifiedQueue(t *testing.T) {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
 	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	installNoopStartupReconciler(claimer)
 
 	// Override backoff policy to speed up test.
 	testPolicy := backoff.Policy{
@@ -133,6 +138,7 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
 	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	installNoopStartupReconciler(claimer)
 
 	// Override backoff policy to speed up test.
 	testPolicy := backoff.Policy{
@@ -267,5 +273,168 @@ func TestClaimAndExecute_PreClaimCleanupAllowsClaim(t *testing.T) {
 }
 
 func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
-	t.Skip("phase 0 contract: enable when startup reconciliation is wired before claim loop polling (phase 5)")
+	t.Parallel()
+
+	jobID := types.NewJobID()
+	var seq int32
+	completeSeq := int32(0)
+	claimSeq := int32(0)
+	claimCount := int32(0)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+			if atomic.CompareAndSwapInt32(&completeSeq, 0, atomic.AddInt32(&seq, 1)) {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/claim":
+			if atomic.CompareAndSwapInt32(&claimSeq, 0, atomic.AddInt32(&seq, 1)) {
+				atomic.AddInt32(&claimCount, 1)
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			atomic.AddInt32(&claimCount, 1)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := &mockRunController{}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(50 * time.Millisecond),
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	})
+	claimer.startupReconciler = &startupCrashReconciler{
+		docker: &fakeCrashReconcileDockerClient{
+			listResult: client.ContainerListResult{Items: []containertypes.Summary{
+				{
+					ID:     "terminal-ctr",
+					Labels: map[string]string{types.LabelRunID: types.NewRunID().String(), types.LabelJobID: jobID.String()},
+				},
+			}},
+			inspectByID: map[string]client.ContainerInspectResult{
+				"terminal-ctr": {
+					Container: containertypes.InspectResponse{
+						State: &containertypes.State{
+							Running:    false,
+							Status:     containertypes.ContainerState("exited"),
+							ExitCode:   0,
+							StartedAt:  "2026-02-26T12:00:00Z",
+							FinishedAt: "2026-02-26T12:00:02Z",
+						},
+					},
+				},
+			},
+			waitByID: map[string]containertypes.WaitResponse{
+				"terminal-ctr": {StatusCode: 0},
+			},
+		},
+		now:            func() time.Time { return time.Date(2026, 2, 26, 12, 0, 10, 0, time.UTC) },
+		terminalWindow: 120 * time.Second,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 220*time.Millisecond)
+	defer cancel()
+
+	if err := claimer.Start(ctx); err == nil || err != context.DeadlineExceeded {
+		t.Fatalf("Start() error = %v, want context deadline exceeded", err)
+	}
+
+	if atomic.LoadInt32(&completeSeq) == 0 {
+		t.Fatal("startup reconciliation completion call was not made")
+	}
+	if atomic.LoadInt32(&claimCount) == 0 {
+		t.Fatal("claim endpoint was not called after startup reconciliation")
+	}
+	if completeSeq > claimSeq {
+		t.Fatalf("startup completion ran after claim: complete_seq=%d claim_seq=%d", completeSeq, claimSeq)
+	}
+}
+
+func TestClaimLoop_StartupReconcileFailureStopsClaimLoop(t *testing.T) {
+	t.Parallel()
+
+	var calledPaths []string
+	var mu sync.Mutex
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calledPaths = append(calledPaths, r.URL.Path)
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := &mockRunController{}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer.startupReconciler = &startupCrashReconciler{
+		docker: &fakeCrashReconcileDockerClient{
+			listErr: context.DeadlineExceeded,
+		},
+	}
+
+	err = claimer.Start(context.Background())
+	if err == nil {
+		t.Fatal("Start() error = nil, want startup reconciliation error")
+	}
+	if len(calledPaths) != 0 {
+		body, _ := json.Marshal(calledPaths)
+		t.Fatalf("claim loop should not run when startup reconciliation fails, got paths: %s", string(body))
+	}
+}
+
+func TestClaimLoop_StartupReconcileRunsOncePerProcess(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		ServerURL: "http://127.0.0.1:8080",
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := &mockRunController{}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
+
+	fakeDocker := &fakeCrashReconcileDockerClient{
+		listResult: client.ContainerListResult{},
+	}
+	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
+
+	if err := claimer.runStartupReconcile(context.Background()); err != nil {
+		t.Fatalf("runStartupReconcile() first call error = %v", err)
+	}
+	if err := claimer.runStartupReconcile(context.Background()); err != nil {
+		t.Fatalf("runStartupReconcile() second call error = %v", err)
+	}
+	if fakeDocker.listCalls != 1 {
+		t.Fatalf("ContainerList calls = %d, want 1", fakeDocker.listCalls)
+	}
 }

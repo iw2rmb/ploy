@@ -26,6 +26,10 @@ import (
 // Backoff increases when no work is available or on errors, resets when work is successfully claimed.
 // Nodes claim from a single unified jobs queue (FIFO by next_id).
 func (c *ClaimManager) Start(ctx context.Context) error {
+	if err := c.runStartupReconcile(ctx); err != nil {
+		return err
+	}
+
 	// Initialize ticker with the initial backoff interval from shared policy.
 	ticker := time.NewTicker(time.Duration(c.backoff.GetDuration()))
 	defer ticker.Stop()

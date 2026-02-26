@@ -30,6 +30,8 @@ type ClaimManager struct {
 	controller         RunController
 	preClaimCleanup    preClaimCleanup
 	startupReconciler  *startupCrashReconciler
+	startupOnce        sync.Once
+	startupErr         error
 	backoff            *backoff.StatefulBackoff
 }
 

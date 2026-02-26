@@ -92,7 +92,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent ./internal/server/handlers -run 'Complete|Idempotent|Conflict'` — Duplicate/replayed completion should not fail startup reconciliation.
 
 ## Phase 5: Startup Wiring Before Claim Loop
-- [ ] Wire reconciliation into node startup before normal claim polling. — Enforce design ordering exactly.
+- [x] Wire reconciliation into node startup before normal claim polling. — Enforce design ordering exactly.
   - Repository: `ploy`
   - Component: `internal/nodeagent/claimer_loop.go`, `internal/nodeagent/claimer.go`, `internal/nodeagent/agent.go`
   - Scope:
