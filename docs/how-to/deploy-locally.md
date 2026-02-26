@@ -11,7 +11,8 @@ The local stack no longer runs a PostgreSQL container. The server uses your host
 
 ## Prerequisites
 
-- Go 1.25+ (`make build` produces local binaries).
+- Go toolchain `go1.25.5`. `make` targets fail fast on other versions; run with
+  `GOTOOLCHAIN=go1.25.5` when your host default differs.
 - Local PostgreSQL running and reachable from containers.
 - `psql` and `pg_isready` available on the host.
 - Docker Desktop / Docker Engine with Compose v2.

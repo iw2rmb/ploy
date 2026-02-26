@@ -2,6 +2,7 @@ BINARY := ploy
 BUILD_DIR := dist
 COVERAGE_FILE := $(BUILD_DIR)/coverage.out
 HTML_COVERAGE_FILE := $(BUILD_DIR)/coverage.html
+REQUIRED_GO_TOOLCHAIN := go1.25.5
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -10,8 +11,21 @@ GIT_TAG := $(shell git describe --tags --dirty --always 2>/dev/null || echo dev)
 LDV := github.com/iw2rmb/ploy/internal/version
 LDFLAGS := -X $(LDV).Version=$(GIT_TAG) -X $(LDV).Commit=$(GIT_COMMIT) -X $(LDV).BuiltAt=$(BUILD_DATE)
 
+.PHONY: verify-go-toolchain
+verify-go-toolchain: ## Fail fast when local Go toolchain is not pinned version
+	@toolchain="$$(go env GOVERSION 2>/dev/null || true)"; \
+	if [ -z "$$toolchain" ]; then \
+		echo "error: unable to detect Go toolchain (go env GOVERSION failed)"; \
+		exit 1; \
+	fi; \
+	if [ "$$toolchain" != "$(REQUIRED_GO_TOOLCHAIN)" ]; then \
+		echo "error: Go toolchain $$toolchain detected; require $(REQUIRED_GO_TOOLCHAIN)"; \
+		echo "hint: run 'GOTOOLCHAIN=$(REQUIRED_GO_TOOLCHAIN) make <target>'"; \
+		exit 1; \
+	fi
+
 .PHONY: build
-build: ## Build the Ploy CLI
+build: verify-go-toolchain ## Build the Ploy CLI
 	@mkdir -p $(BUILD_DIR)
 	GOFLAGS= go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
 	@if [ -d ./cmd/ployd ]; then \
@@ -32,13 +46,13 @@ lint-md: ## Lint Markdown documentation with markdownlint
 	npx --yes markdownlint --config .markdownlint.yaml $(shell git ls-files '*.md')
 
 .PHONY: test
-test: ## Run unit tests (fast path)
+test: verify-go-toolchain ## Run unit tests (fast path)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
 	PLOY_CONFIG_HOME="$$TMP" go test ./internal/... ./cmd/...; \
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-race
-test-race: ## Run all unit tests with race detector
+test-race: verify-go-toolchain ## Run all unit tests with race detector
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
 	PLOY_CONFIG_HOME="$$TMP" go test -race -cover ./...; \
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
@@ -51,7 +65,7 @@ test-coverage: $(COVERAGE_FILE) ## Run unit tests and generate coverage report (
 .PHONY: FORCE
 FORCE:
 
-$(COVERAGE_FILE): FORCE
+$(COVERAGE_FILE): verify-go-toolchain FORCE
 	@mkdir -p $(BUILD_DIR)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
 	PLOY_CONFIG_HOME="$$TMP" go test -coverpkg=./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./internal/... ./cmd/...; \
@@ -71,14 +85,14 @@ coverage-open: coverage-html ## Open HTML coverage report (macOS)
 	@open $(HTML_COVERAGE_FILE)
 
 .PHONY: coverage-all
-coverage-all: ## Generate coverage for all packages (may include integration tests)
+coverage-all: verify-go-toolchain ## Generate coverage for all packages (may include integration tests)
 	@mkdir -p $(BUILD_DIR)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
 	PLOY_CONFIG_HOME="$$TMP" go test -coverpkg=./... -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./...; \
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: vet
-vet: ## Run go vet
+vet: verify-go-toolchain ## Run go vet
 	go vet ./...
 
 .PHONY: lint
@@ -91,7 +105,7 @@ lint: ## Run golangci-lint
 	fi
 
 .PHONY: staticcheck
-staticcheck: ## Run staticcheck
+staticcheck: verify-go-toolchain ## Run staticcheck
 	go run honnef.co/go/tools/cmd/staticcheck@v0.6.1 -checks=all,-SA1019,-ST1003,-ST1000,-U1000 ./...
 
 .PHONY: ci-check
@@ -109,7 +123,7 @@ pre-commit-install: ## Install pre-commit hooks
 	fi
 
 .PHONY: experiment-role-sep
-experiment-role-sep: ## Run role-separated TDD experiment (stub fails, impl passes)
+experiment-role-sep: verify-go-toolchain ## Run role-separated TDD experiment (stub fails, impl passes)
 	@echo "[Phase A] Expect failing HT under stub build" && \
 	go test -tags "experiment experiment_stub" ./tests/guards ./tests/experiments/role_sep -run '^TestHT_' || true ; \
 	echo "[Phase B] Expect passing HT under impl build" && \
@@ -123,6 +137,7 @@ clean: ## Remove build artifacts
 help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build                      # Build the CLI and server binaries"
+	@echo "  make verify-go-toolchain        # Enforce pinned local Go toolchain ($(REQUIRED_GO_TOOLCHAIN))"
 	@echo "  make fmt                        # Run gofmt over Go source"
 	@echo "  make test                       # Run unit tests"
 	@echo "  make test-race                  # Run tests with race detector"
