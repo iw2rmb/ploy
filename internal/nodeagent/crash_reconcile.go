@@ -1,14 +1,18 @@
 package nodeagent
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
@@ -16,7 +20,9 @@ const crashTerminalReconcileWindow = 120 * time.Second
 
 type crashReconcileDockerClient interface {
 	ContainerList(ctx context.Context, options client.ContainerListOptions) (client.ContainerListResult, error)
+	ContainerWait(ctx context.Context, containerID string, options client.ContainerWaitOptions) client.ContainerWaitResult
 	ContainerInspect(ctx context.Context, containerID string, options client.ContainerInspectOptions) (client.ContainerInspectResult, error)
+	ContainerLogs(ctx context.Context, containerID string, options client.ContainerLogsOptions) (client.ContainerLogsResult, error)
 }
 
 type recoveredRunningContainer struct {
@@ -133,6 +139,68 @@ func (r *startupCrashReconciler) Discover(ctx context.Context) (startupCrashSnap
 	return snapshot, nil
 }
 
+type recoveredContainerTerminal struct {
+	ExitCode   int
+	StartedAt  time.Time
+	FinishedAt time.Time
+}
+
+func (r *startupCrashReconciler) WaitRecoveredContainer(ctx context.Context, containerID string) (recoveredContainerTerminal, error) {
+	if r == nil || r.docker == nil {
+		return recoveredContainerTerminal{}, errors.New("startup crash reconciler not configured")
+	}
+	waitResult := r.docker.ContainerWait(ctx, containerID, client.ContainerWaitOptions{
+		Condition: containertypes.WaitConditionNotRunning,
+	})
+	select {
+	case waitErr := <-waitResult.Error:
+		if waitErr != nil {
+			return recoveredContainerTerminal{}, fmt.Errorf("wait container %s: %w", containerID, waitErr)
+		}
+	case <-waitResult.Result:
+	}
+
+	inspect, err := r.docker.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if err != nil {
+		return recoveredContainerTerminal{}, fmt.Errorf("inspect container %s after wait: %w", containerID, err)
+	}
+	if inspect.Container.State == nil {
+		return recoveredContainerTerminal{}, fmt.Errorf("container %s has no state after wait", containerID)
+	}
+	state := inspect.Container.State
+	startedAt, _ := parseDockerTimestamp(state.StartedAt)
+	finishedAt, _ := parseDockerTimestamp(state.FinishedAt)
+	return recoveredContainerTerminal{
+		ExitCode:   state.ExitCode,
+		StartedAt:  startedAt,
+		FinishedAt: finishedAt,
+	}, nil
+}
+
+func (r *startupCrashReconciler) ReadContainerLogs(ctx context.Context, containerID string) ([]byte, error) {
+	if r == nil || r.docker == nil {
+		return nil, errors.New("startup crash reconciler not configured")
+	}
+	reader, err := r.docker.ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read container logs %s: %w", containerID, err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&stdoutBuf, &stderrBuf, reader); err != nil {
+		raw, rawErr := io.ReadAll(reader)
+		if rawErr != nil {
+			return nil, fmt.Errorf("demux container logs %s: %w", containerID, err)
+		}
+		return raw, nil
+	}
+	return append(stdoutBuf.Bytes(), stderrBuf.Bytes()...), nil
+}
+
 func ployContainerIdentity(labels map[string]string) (types.RunID, types.JobID, bool) {
 	if len(labels) == 0 {
 		return "", "", false
@@ -155,13 +223,17 @@ func isTerminalContainerStatus(status string) bool {
 }
 
 func parseDockerFinishedAt(value string) (time.Time, bool) {
+	return parseDockerTimestamp(value)
+}
+
+func parseDockerTimestamp(value string) (time.Time, bool) {
 	s := strings.TrimSpace(value)
 	if s == "" {
 		return time.Time{}, false
 	}
-	finishedAt, err := time.Parse(time.RFC3339Nano, s)
-	if err != nil || finishedAt.IsZero() {
+	parsed, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil || parsed.IsZero() {
 		return time.Time{}, false
 	}
-	return finishedAt, true
+	return parsed, true
 }

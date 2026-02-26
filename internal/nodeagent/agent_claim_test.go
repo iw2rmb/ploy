@@ -6,11 +6,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containertypes "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // TestClaimLoop verifies the claim loop posts claim and starts execution.
@@ -692,5 +696,100 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	}
 	if mock1.lastStart.NextID != nil && mock2.lastStart.NextID != nil && *mock1.lastStart.NextID == *mock2.lastStart.NextID {
 		t.Error("nodes executed jobs with identical next_id pointers; expected different claims")
+	}
+}
+
+func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
+	t.Parallel()
+
+	var claimCalls int32
+	jobID := types.NewJobID()
+	runID := types.NewRunID()
+	waitGate := make(chan struct{})
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/claim":
+			atomic.AddInt32(&claimCalls, 1)
+			w.WriteHeader(http.StatusNoContent)
+		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+			w.WriteHeader(http.StatusCreated)
+		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	controller := &mockRunController{slotSem: make(chan struct{}, 1)}
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager() error = %v", err)
+	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer.startupReconciler = &startupCrashReconciler{
+		docker: &fakeCrashReconcileDockerClient{
+			waitByID: map[string]containertypes.WaitResponse{
+				"ctr-recovered": {StatusCode: 0},
+			},
+			waitBlockByID: map[string]chan struct{}{
+				"ctr-recovered": waitGate,
+			},
+			inspectByID: map[string]client.ContainerInspectResult{
+				"ctr-recovered": {
+					Container: containertypes.InspectResponse{
+						State: &containertypes.State{
+							ExitCode:   0,
+							Status:     containertypes.ContainerState("exited"),
+							StartedAt:  "2026-02-26T12:00:00Z",
+							FinishedAt: "2026-02-26T12:00:01Z",
+						},
+					},
+				},
+			},
+			logsByID: map[string][]byte{
+				"ctr-recovered": multiplexedDockerLogs("recovered\n", stdcopy.Stdout),
+			},
+		},
+	}
+
+	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
+		{
+			ContainerID: "ctr-recovered",
+			RunID:       runID,
+			JobID:       jobID,
+		},
+	})
+
+	claimDone := make(chan struct{})
+	var claimErr error
+	go func() {
+		defer close(claimDone)
+		_, claimErr = claimer.claimAndExecute(context.Background())
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	if got := atomic.LoadInt32(&claimCalls); got != 0 {
+		t.Fatalf("claim endpoint called while recovered monitor held slot: %d", got)
+	}
+
+	close(waitGate)
+
+	select {
+	case <-claimDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for claimAndExecute after recovered monitor release")
+	}
+	if claimErr != nil {
+		t.Fatalf("claimAndExecute() error = %v", claimErr)
+	}
+	if got := atomic.LoadInt32(&claimCalls); got != 1 {
+		t.Fatalf("claim endpoint calls = %d, want 1", got)
 	}
 }
