@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/step ./internal/workflow/stackdetect`
 
 ## Phase 3: Eliminate Repeated `pyproject.toml` Reads
-- [ ] Move pyproject parsing to scan phase and reuse cached result.
+- [x] Move pyproject parsing to scan phase and reuse cached result.
   - Repository: `ploy`
   - Component: `internal/workflow/stackdetect`
   - Scope:

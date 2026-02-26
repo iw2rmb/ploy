@@ -10,7 +10,7 @@ func TestDetectPython_Python311VersionFile(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "python", "python311-version-file")
 
-	obs, err := detectPython(ctx, workspace)
+	obs, err := detectPython(ctx, scanWorkspace(workspace))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestDetectPython_Python310Pyproject(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "python", "python310-pyproject")
 
-	obs, err := detectPython(ctx, workspace)
+	obs, err := detectPython(ctx, scanWorkspace(workspace))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestDetectPython_Python311Poetry(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "python", "python311-poetry")
 
-	_, err := detectPython(ctx, workspace)
+	_, err := detectPython(ctx, scanWorkspace(workspace))
 	if err == nil {
 		t.Fatal("expected error for Poetry ^3.11 specifier")
 	}
@@ -55,7 +55,7 @@ func TestDetectPython_Python39Runtime(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "python", "python39-runtime")
 
-	obs, err := detectPython(ctx, workspace)
+	obs, err := detectPython(ctx, scanWorkspace(workspace))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestDetectPython_PythonRangeUnknown(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "python", "python-range-unknown")
 
-	_, err := detectPython(ctx, workspace)
+	_, err := detectPython(ctx, scanWorkspace(workspace))
 	if err == nil {
 		t.Fatal("expected error for open-ended range")
 	}
@@ -87,7 +87,7 @@ func TestDetectPython_PythonDisagreement(t *testing.T) {
 	ctx := context.Background()
 	workspace := filepath.Join("testdata", "python", "python-disagreement")
 
-	_, err := detectPython(ctx, workspace)
+	_, err := detectPython(ctx, scanWorkspace(workspace))
 	if err == nil {
 		t.Fatal("expected error for conflicting versions")
 	}

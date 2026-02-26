@@ -30,7 +30,12 @@ type scanResult struct {
 	hasRuntimeTxt    bool
 	hasPython        bool
 
-	pyprojectPath string
+	pyprojectLoaded            bool
+	pyprojectHasProjectSection bool
+	pyprojectRequiresPython    string
+	pyprojectHasPoetryTool     bool
+	pyprojectHasPoetryDeps     bool
+	pyprojectPoetryPython      string
 
 	languages []string
 	evidence  []EvidenceItem
@@ -51,8 +56,7 @@ func scanWorkspace(workspace string) scanResult {
 	runtimeTxtPath := filepath.Join(workspace, "runtime.txt")
 
 	s := scanResult{
-		workspace:     workspace,
-		pyprojectPath: pyprojectPath,
+		workspace: workspace,
 	}
 
 	s.hasPom = fsutil.FileExists(pomPath)
@@ -72,7 +76,25 @@ func scanWorkspace(workspace string) scanResult {
 	s.hasPyproject = fsutil.FileExists(pyprojectPath)
 	s.hasPythonVersion = fsutil.FileExists(pythonVersionPath)
 	s.hasRuntimeTxt = fsutil.FileExists(runtimeTxtPath)
-	s.hasPython = s.hasPythonVersion || s.hasRuntimeTxt || (s.hasPyproject && isPythonPyproject(pyprojectPath))
+	if s.hasPyproject {
+		content, err := os.ReadFile(pyprojectPath)
+		if err == nil {
+			text := string(content)
+			s.pyprojectLoaded = true
+			s.pyprojectHasProjectSection = projectSectionRegex.MatchString(text)
+			s.pyprojectHasPoetryTool = poetryToolRegex.MatchString(text)
+			s.pyprojectHasPoetryDeps = poetryDepsRegex.MatchString(text)
+			if matches := requiresPythonRegex.FindStringSubmatch(text); matches != nil {
+				s.pyprojectRequiresPython = strings.TrimSpace(matches[1])
+			}
+			if matches := poetryPythonRegex.FindStringSubmatch(text); matches != nil {
+				s.pyprojectPoetryPython = strings.TrimSpace(matches[1])
+			}
+		}
+	}
+	hasPythonPyproject := (s.pyprojectHasProjectSection && s.pyprojectRequiresPython != "") ||
+		(s.pyprojectHasPoetryTool && s.pyprojectHasPoetryDeps && s.pyprojectPoetryPython != "")
+	s.hasPython = s.hasPythonVersion || s.hasRuntimeTxt || (s.hasPyproject && hasPythonPyproject)
 
 	// Build detected languages and evidence.
 	if s.hasJava {
@@ -162,7 +184,7 @@ func Detect(ctx context.Context, workspace string) (*Observation, error) {
 	case "rust":
 		return detectRust(ctx, workspace)
 	case "python":
-		return detectPython(ctx, workspace)
+		return detectPython(ctx, s)
 	default:
 		return nil, &DetectionError{
 			Reason:  "unknown",
@@ -212,11 +234,8 @@ func DetectTool(ctx context.Context, workspace string) (*Observation, error) {
 		}, nil
 	case "python":
 		tool := "pip"
-		if s.hasPyproject {
-			content, _ := os.ReadFile(s.pyprojectPath)
-			if poetryToolRegex.MatchString(string(content)) {
-				tool = "poetry"
-			}
+		if s.pyprojectHasPoetryTool {
+			tool = "poetry"
 		}
 		return &Observation{
 			Language: "python",
@@ -274,26 +293,4 @@ func gradleBuildFile(s scanResult) string {
 		return "build.gradle.kts"
 	}
 	return "build.gradle"
-}
-
-// isPythonPyproject checks if a pyproject.toml file contains Python-specific markers.
-// Returns true if it contains [project] with requires-python or [tool.poetry.dependencies] with python.
-func isPythonPyproject(path string) bool {
-	content, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	text := string(content)
-
-	// Check for PEP 621 requires-python in [project] section.
-	if projectSectionRegex.MatchString(text) && requiresPythonRegex.MatchString(text) {
-		return true
-	}
-
-	// Check for Poetry python dependency.
-	if poetryToolRegex.MatchString(text) && poetryDepsRegex.MatchString(text) && poetryPythonRegex.MatchString(text) {
-		return true
-	}
-
-	return false
 }
