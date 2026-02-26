@@ -125,7 +125,7 @@ Legend: [ ] todo, [x] done.
     - Docs should match code behavior and endpoint contracts.
 
 ## Phase 7: Verification
-- [ ] Run targeted suites first, then full hygiene. — Validate crash semantics, upload contracts, and startup ordering end-to-end.
+- [x] Run targeted suites first, then full hygiene. — Validate crash semantics, upload contracts, and startup ordering end-to-end.
   - Repository: `ploy`
   - Component: nodeagent, step runtime, server handlers, docs/api
   - Scope:
