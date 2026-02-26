@@ -12,10 +12,52 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimNextPrepRepo = `-- name: ClaimNextPrepRepo :one
+WITH candidate AS (
+  SELECT mr.id
+  FROM mig_repos mr
+  WHERE mr.prep_status = 'PrepPending'
+  ORDER BY mr.prep_updated_at ASC, mr.created_at ASC, mr.id ASC
+  FOR UPDATE SKIP LOCKED
+  LIMIT 1
+)
+UPDATE mig_repos mr
+SET prep_status = 'PrepRunning',
+    prep_attempts = mr.prep_attempts + 1,
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+FROM candidate
+WHERE mr.id = candidate.id
+  AND mr.prep_status = 'PrepPending'
+RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at
+`
+
+func (q *Queries) ClaimNextPrepRepo(ctx context.Context) (MigRepo, error) {
+	row := q.db.QueryRow(ctx, claimNextPrepRepo)
+	var i MigRepo
+	err := row.Scan(
+		&i.ID,
+		&i.MigID,
+		&i.RepoUrl,
+		&i.BaseRef,
+		&i.TargetRef,
+		&i.PrepStatus,
+		&i.PrepAttempts,
+		&i.PrepLastError,
+		&i.PrepFailureCode,
+		&i.PrepUpdatedAt,
+		&i.PrepProfile,
+		&i.PrepArtifacts,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createMigRepo = `-- name: CreateMigRepo :one
 INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, mig_id, repo_url, base_ref, target_ref, created_at
+RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 `
 
 type CreateMigRepoParams struct {
@@ -41,6 +83,13 @@ func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (M
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
+		&i.PrepStatus,
+		&i.PrepAttempts,
+		&i.PrepLastError,
+		&i.PrepFailureCode,
+		&i.PrepUpdatedAt,
+		&i.PrepProfile,
+		&i.PrepArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -60,7 +109,7 @@ func (q *Queries) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
 }
 
 const getMigRepo = `-- name: GetMigRepo :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE id = $1
 `
@@ -74,13 +123,20 @@ func (q *Queries) GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, 
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
+		&i.PrepStatus,
+		&i.PrepAttempts,
+		&i.PrepLastError,
+		&i.PrepFailureCode,
+		&i.PrepUpdatedAt,
+		&i.PrepProfile,
+		&i.PrepArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getMigRepoByURL = `-- name: GetMigRepoByURL :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1 AND repo_url = $2
 `
@@ -100,6 +156,13 @@ func (q *Queries) GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
+		&i.PrepStatus,
+		&i.PrepAttempts,
+		&i.PrepLastError,
+		&i.PrepFailureCode,
+		&i.PrepUpdatedAt,
+		&i.PrepProfile,
+		&i.PrepArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -175,7 +238,7 @@ func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListD
 }
 
 const listMigReposByMig = `-- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC
@@ -196,6 +259,13 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 			&i.RepoUrl,
 			&i.BaseRef,
 			&i.TargetRef,
+			&i.PrepStatus,
+			&i.PrepAttempts,
+			&i.PrepLastError,
+			&i.PrepFailureCode,
+			&i.PrepUpdatedAt,
+			&i.PrepProfile,
+			&i.PrepArtifacts,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -206,6 +276,95 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 		return nil, err
 	}
 	return items, nil
+}
+
+const listReposByPrepStatus = `-- name: ListReposByPrepStatus :many
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
+FROM mig_repos
+WHERE prep_status = $1
+ORDER BY prep_updated_at ASC, created_at ASC, id ASC
+`
+
+func (q *Queries) ListReposByPrepStatus(ctx context.Context, prepStatus PrepStatus) ([]MigRepo, error) {
+	rows, err := q.db.Query(ctx, listReposByPrepStatus, prepStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MigRepo{}
+	for rows.Next() {
+		var i MigRepo
+		if err := rows.Scan(
+			&i.ID,
+			&i.MigID,
+			&i.RepoUrl,
+			&i.BaseRef,
+			&i.TargetRef,
+			&i.PrepStatus,
+			&i.PrepAttempts,
+			&i.PrepLastError,
+			&i.PrepFailureCode,
+			&i.PrepUpdatedAt,
+			&i.PrepProfile,
+			&i.PrepArtifacts,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const saveMigRepoPrepProfile = `-- name: SaveMigRepoPrepProfile :exec
+UPDATE mig_repos
+SET prep_profile = $2,
+    prep_artifacts = $3,
+    prep_status = 'PrepReady',
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+WHERE id = $1
+`
+
+type SaveMigRepoPrepProfileParams struct {
+	ID            types.MigRepoID `json:"id"`
+	PrepProfile   []byte          `json:"prep_profile"`
+	PrepArtifacts []byte          `json:"prep_artifacts"`
+}
+
+func (q *Queries) SaveMigRepoPrepProfile(ctx context.Context, arg SaveMigRepoPrepProfileParams) error {
+	_, err := q.db.Exec(ctx, saveMigRepoPrepProfile, arg.ID, arg.PrepProfile, arg.PrepArtifacts)
+	return err
+}
+
+const updateMigRepoPrepState = `-- name: UpdateMigRepoPrepState :exec
+UPDATE mig_repos
+SET prep_status = $2,
+    prep_last_error = $3,
+    prep_failure_code = $4,
+    prep_updated_at = now()
+WHERE id = $1
+`
+
+type UpdateMigRepoPrepStateParams struct {
+	ID              types.MigRepoID `json:"id"`
+	PrepStatus      PrepStatus      `json:"prep_status"`
+	PrepLastError   *string         `json:"prep_last_error"`
+	PrepFailureCode *string         `json:"prep_failure_code"`
+}
+
+func (q *Queries) UpdateMigRepoPrepState(ctx context.Context, arg UpdateMigRepoPrepStateParams) error {
+	_, err := q.db.Exec(ctx, updateMigRepoPrepState,
+		arg.ID,
+		arg.PrepStatus,
+		arg.PrepLastError,
+		arg.PrepFailureCode,
+	)
+	return err
 }
 
 const updateMigRepoRefs = `-- name: UpdateMigRepoRefs :exec
@@ -233,7 +392,7 @@ ON CONFLICT (mig_id, repo_url)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
   target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_url, base_ref, target_ref, created_at
+RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 `
 
 type UpsertMigRepoParams struct {
@@ -262,6 +421,13 @@ func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (M
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
+		&i.PrepStatus,
+		&i.PrepAttempts,
+		&i.PrepLastError,
+		&i.PrepFailureCode,
+		&i.PrepUpdatedAt,
+		&i.PrepProfile,
+		&i.PrepArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err

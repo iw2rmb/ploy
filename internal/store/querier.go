@@ -34,6 +34,7 @@ type Querier interface {
 	// - MR jobs (job_type='mr') are claimable only when runs.status='Finished'
 	// - nodeID must be non-empty
 	ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error)
+	ClaimNextPrepRepo(ctx context.Context) (MigRepo, error)
 	CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error)
 	CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error)
 	// Counts jobs by status for a specific repo attempt, excluding MR jobs.
@@ -60,6 +61,7 @@ type Querier interface {
 	// Creates a new node with an application-supplied NanoID(6) as the primary key.
 	// The `id` parameter must be generated via types.NewNodeKey() before calling.
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
+	CreatePrepRun(ctx context.Context, arg CreatePrepRunParams) (PrepRun, error)
 	// v1: Creates a new run for a mig + spec snapshot. Runs are created in Started state.
 	// Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewRunID().
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
@@ -94,6 +96,7 @@ type Querier interface {
 	DeleteNode(ctx context.Context, id types.NodeID) error
 	DeleteRun(ctx context.Context, id types.RunID) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
+	FinishPrepRun(ctx context.Context, arg FinishPrepRunParams) (PrepRun, error)
 	// Transitional: returns current job id and linked successor id.
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
@@ -206,6 +209,7 @@ type Querier interface {
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
+	ListReposByPrepStatus(ctx context.Context, prepStatus PrepStatus) ([]MigRepo, error)
 	// Lists all repos associated with a run, ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// v1: Lists all run_repos for a run with their repo_url (from mig_repos).
@@ -230,6 +234,7 @@ type Querier interface {
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
+	SaveMigRepoPrepProfile(ctx context.Context, arg SaveMigRepoPrepProfileParams) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.
 	ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams) (Job, error)
@@ -245,6 +250,7 @@ type Querier interface {
 	UpdateJobMeta(ctx context.Context, arg UpdateJobMetaParams) error
 	UpdateJobNextID(ctx context.Context, arg UpdateJobNextIDParams) error
 	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
+	UpdateMigRepoPrepState(ctx context.Context, arg UpdateMigRepoPrepStateParams) error
 	UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsParams) error
 	UpdateMigSpec(ctx context.Context, arg UpdateMigSpecParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error

@@ -1,21 +1,21 @@
 -- name: CreateMigRepo :one
 INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, mig_id, repo_url, base_ref, target_ref, created_at;
+RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at;
 
 -- name: GetMigRepo :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE id = $1;
 
 -- name: GetMigRepoByURL :one
 -- Gets a mod_repo by mig_id and repo_url (for uniqueness constraint enforcement).
-SELECT id, mig_id, repo_url, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1 AND repo_url = $2;
 
 -- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC;
@@ -43,7 +43,51 @@ ON CONFLICT (mig_id, repo_url)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
   target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_url, base_ref, target_ref, created_at;
+RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at;
+
+-- name: ListReposByPrepStatus :many
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
+FROM mig_repos
+WHERE prep_status = $1
+ORDER BY prep_updated_at ASC, created_at ASC, id ASC;
+
+-- name: ClaimNextPrepRepo :one
+WITH candidate AS (
+  SELECT mr.id
+  FROM mig_repos mr
+  WHERE mr.prep_status = 'PrepPending'
+  ORDER BY mr.prep_updated_at ASC, mr.created_at ASC, mr.id ASC
+  FOR UPDATE SKIP LOCKED
+  LIMIT 1
+)
+UPDATE mig_repos mr
+SET prep_status = 'PrepRunning',
+    prep_attempts = mr.prep_attempts + 1,
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+FROM candidate
+WHERE mr.id = candidate.id
+  AND mr.prep_status = 'PrepPending'
+RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at;
+
+-- name: UpdateMigRepoPrepState :exec
+UPDATE mig_repos
+SET prep_status = $2,
+    prep_last_error = $3,
+    prep_failure_code = $4,
+    prep_updated_at = now()
+WHERE id = $1;
+
+-- name: SaveMigRepoPrepProfile :exec
+UPDATE mig_repos
+SET prep_profile = $2,
+    prep_artifacts = $3,
+    prep_status = 'PrepReady',
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+WHERE id = $1;
 
 -- name: HasMigRepoHistory :one
 -- Checks if a mod_repo has any historical executions (run_repos references).

@@ -36,6 +36,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 
 		// mig_repos.sql - created_at and repo_url need id tie-breakers
 		{"ListMigReposByMig", listMigReposByMig, "ORDER BY created_at ASC, id ASC"},
+		{"ListReposByPrepStatus", listReposByPrepStatus, "ORDER BY prep_updated_at ASC, created_at ASC, id ASC"},
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY mr.repo_url ASC, mr.id ASC"},
 		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 

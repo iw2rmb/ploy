@@ -668,11 +668,17 @@ repo attempt. It does not create per-repo child runs.
 | Table       | Purpose                                    | Key relationships                         |
 |-------------|--------------------------------------------|-------------------------------------------|
 | `specs`     | Append-only spec dictionary                | referenced by `migs.spec_id`, `runs.spec_id` |
-| `migs`      | Mod projects                               | `migs` → `mod_repos` (1:N), `migs` → `runs` (1:N) |
-| `mod_repos` | Managed repo set for a mig                 | `mod_repos` → `run_repos` (1:N), `mod_repos` → `jobs` (1:N) |
+| `migs`      | Mod projects                               | `migs` → `mig_repos` (1:N), `migs` → `runs` (1:N) |
+| `mig_repos` | Managed repo set for a mig                 | `mig_repos` → `run_repos` (1:N), `mig_repos` → `jobs` (1:N), `mig_repos` → `prep_runs` (1:N) |
 | `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
 | `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id)` → `jobs` (1:N)        |
+| `prep_runs` | Per-attempt prep evidence for a repo       | `(repo_id, attempt)` with `repo_id` → `mig_repos.id` |
 | `jobs`      | Execution units (pre-gate, mig, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
+
+Prep lifecycle persistence in `mig_repos`:
+- `prep_status`: `PrepPending | PrepRunning | PrepRetryScheduled | PrepReady | PrepFailed`
+- `prep_attempts`, `prep_last_error`, `prep_failure_code`, `prep_updated_at`
+- `prep_profile` and `prep_artifacts` JSON payloads
 
 ### Pulling Diffs Locally (`run pull` / `mig pull`)
 
@@ -789,7 +795,7 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
 - Run repos queries: `internal/store/queries/run_repos.sql`.
 - Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
 - CLI subcommands: `cmd/ploy/mod_run_repo.go`.
-- Schema: `internal/store/schema.sql` (see `runs`, `run_repos`, `jobs` tables).
+- Schema: `internal/store/schema.sql` (see `mig_repos`, `prep_runs`, `runs`, `run_repos`, `jobs` tables).
 
 ## 2. Data Model
 
