@@ -1,6 +1,10 @@
 package runs
 
-import domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+import (
+	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
 
 // RunReport is the canonical status report contract shared by all status renderers.
 // Phase 0 introduces the model only; later phases wire data assembly and rendering.
@@ -48,6 +52,8 @@ type RunJobEntry struct {
 	NodeID        *domaintypes.NodeID `json:"node_id,omitempty"`
 	Status        string              `json:"status"`
 	ExitCode      *int32              `json:"exit_code,omitempty"`
+	StartedAt     *time.Time          `json:"started_at,omitempty"`
+	FinishedAt    *time.Time          `json:"finished_at,omitempty"`
 	DurationMs    int64               `json:"duration_ms"`
 	DisplayName   string              `json:"display_name,omitempty"`
 	ActionSummary string              `json:"action_summary,omitempty"`

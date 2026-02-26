@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -328,6 +329,79 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 	assertContains(t, out, "Mig:   "+migID.String()+"\n")
 	firstLine := strings.SplitN(out, "\n", 2)[0]
 	assertNotContains(t, firstLine, "|")
+}
+
+func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
+	startedAt := time.Date(2026, time.February, 26, 10, 0, 0, 0, time.UTC)
+
+	report := RunReport{
+		RunID:   runID,
+		MigID:   domaintypes.NewMigID(),
+		MigName: "live-run",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RepoReport{
+			{
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/live.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/live",
+				Status:    "Running",
+				Attempt:   1,
+			},
+		},
+		Runs: []RunEntry{
+			{
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/live.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/live",
+				Status:    "Running",
+				Attempt:   1,
+				Jobs: []RunJobEntry{
+					{
+						JobID:      jobID,
+						JobType:    "mig",
+						JobImage:   "ghcr.io/acme/mig:live",
+						Status:     "Running",
+						StartedAt:  &startedAt,
+						DurationMs: 0,
+					},
+				},
+			},
+		},
+	}
+
+	now := time.Date(2026, time.February, 26, 10, 0, 5, 0, time.UTC)
+	var frame0 bytes.Buffer
+	if err := RenderRunReportText(&frame0, report, TextRenderOptions{
+		EnableOSC8:    false,
+		SpinnerFrame:  0,
+		LiveDurations: true,
+		Now:           now,
+	}); err != nil {
+		t.Fatalf("RenderRunReportText frame0 error: %v", err)
+	}
+	out0 := frame0.String()
+	assertContains(t, out0, "⣾")
+	assertContains(t, out0, "5.0s")
+
+	var frame1 bytes.Buffer
+	if err := RenderRunReportText(&frame1, report, TextRenderOptions{
+		EnableOSC8:    false,
+		SpinnerFrame:  1,
+		LiveDurations: true,
+		Now:           now,
+	}); err != nil {
+		t.Fatalf("RenderRunReportText frame1 error: %v", err)
+	}
+	out1 := frame1.String()
+	assertContains(t, out1, "⣷")
+	assertContains(t, out1, "5.0s")
 }
 
 func assertContains(t *testing.T, haystack string, needle string) {

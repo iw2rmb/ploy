@@ -168,15 +168,18 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Print run_id and mod_id on success.
-	_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID.String())
-	_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID.String())
+	followEnabled := flags.Follow != nil && *flags.Follow
+	// Print run_id and mod_id only in non-follow mode; follow output already includes Run/Mig headers.
+	if !followEnabled {
+		_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID.String())
+		_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID.String())
+	}
 
 	initialState := "pending"
 	finalState := ""
 
 	// Follow mode: display job graph until completion.
-	if flags.Follow != nil && *flags.Follow {
+	if followEnabled {
 		final, err := followRunSubmit(ctx, base, httpClient, runID, flags, stderr)
 		if err != nil {
 			return err
@@ -302,9 +305,10 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 	}
 
 	renderOpts := runs.TextRenderOptions{
-		EnableOSC8: runStatusSupportsOSC8(stderr),
-		AuthToken:  token,
-		BaseURL:    baseURL,
+		EnableOSC8:    runStatusSupportsOSC8(stderr),
+		AuthToken:     token,
+		BaseURL:       baseURL,
+		LiveDurations: true,
 	}
 
 	refreshTicker := time.NewTicker(250 * time.Millisecond)
@@ -314,6 +318,7 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		maxRetries = *flags.MaxRetries
 	}
 	retries := 0
+	spinnerFrame := 0
 
 	renderedLines := 0
 	cursorHidden := false
@@ -361,6 +366,8 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		retries = 0
 
 		var frame bytes.Buffer
+		renderOpts.SpinnerFrame = spinnerFrame
+		renderOpts.Now = time.Now()
 		if err := runs.RenderRunReportText(&frame, report, renderOpts); err != nil {
 			return "", err
 		}
@@ -385,6 +392,7 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 			}
 			return final, nil
 		}
+		spinnerFrame++
 
 		select {
 		case <-followCtx.Done():

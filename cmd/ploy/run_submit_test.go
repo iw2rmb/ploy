@@ -570,6 +570,9 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if !strings.Contains(out, "Repo:  [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") {
 		t.Fatalf("expected run status repo header, got: %q", out)
 	}
+	if strings.Contains(out, "run_id: ") || strings.Contains(out, "mod_id: ") {
+		t.Fatalf("expected follow mode to omit preface id lines, got: %q", out)
+	}
 	if strings.Contains(out, "Repo 1/1:") {
 		t.Fatalf("expected old follow format to be absent, got: %q", out)
 	}

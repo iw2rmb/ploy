@@ -6,15 +6,19 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TextRenderOptions controls optional features for the text report renderer.
 type TextRenderOptions struct {
-	EnableOSC8 bool
-	AuthToken  string
-	BaseURL    *url.URL
+	EnableOSC8    bool
+	AuthToken     string
+	BaseURL       *url.URL
+	SpinnerFrame  int
+	LiveDurations bool
+	Now           time.Time
 }
 
 // RenderRunReportText renders a one-shot, follow-style run snapshot.
@@ -41,6 +45,10 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 
 	frame := FollowFrame{
 		Repos: make([]FollowRepoFrame, 0, len(report.Repos)),
+	}
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
 	}
 
 	for i, repo := range report.Repos {
@@ -74,8 +82,12 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		for _, job := range entry.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
 			patchURL := firstNonEmpty(strings.TrimSpace(job.PatchURL), strings.TrimSpace(entry.PatchURL), strings.TrimSpace(repo.PatchURL))
-			state := StatusGlyph(job.Status, 0)
+			state := StatusGlyph(job.Status, opts.SpinnerFrame)
 			step := renderStepName(job.JobType)
+			duration := FormatDurationCompact(job.DurationMs)
+			if opts.LiveDurations {
+				duration = FormatDurationMsOrElapsed(job.DurationMs, job.StartedAt, job.FinishedAt, now)
+			}
 
 			repoFrame.Rows = append(repoFrame.Rows, FollowStepRow{
 				Cells: []string{
@@ -84,7 +96,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 					valueOrDash(job.JobID.String()),
 					FormatNodeID(job.NodeID),
 					valueOrDash(strings.TrimSpace(job.JobImage)),
-					FormatDurationCompact(job.DurationMs),
+					duration,
 					renderArtifactsForStatus(job.Status, buildLogURL, patchURL, opts),
 				},
 				ExitOneLiner: renderExitOneLiner(job, entry.LastError),
