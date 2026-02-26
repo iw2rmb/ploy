@@ -13,8 +13,8 @@ Legend: [ ] todo, [x] done.
   - Scope: Extend `cmd/ploy/run_status_test.go` with assertions for the exact header block and step table contract:
     - `Mig:   <mig id>  | <mig_name>`
     - `Spec:  <spec id> | Download`
-    - `Run:   <run_id>`
     - `Repos: <X>`
+    - `Run:   <run_id>`
     - `Repo:  [1/1] <repo_ref>`
     - step table includes `Logs` column with `Download`
     - running jobs in one-shot status use spinner frame 0 (`⣾ `)
