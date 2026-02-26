@@ -64,16 +64,25 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 // Returns true if a job was claimed, false if no work is available (204).
 //
 // Flow:
-//  1. Acquire a concurrency slot before claiming (blocks until available).
-//  2. POST /v1/nodes/{id}/claim to attempt claiming a job.
-//  3. If 204 returned, release slot and return false (no jobs available).
-//  4. If 200 returned, decode claim response and job metadata.
-//  5. Parse spec into options and environment variables.
-//  6. Invoke controller to start job execution (slot released when job completes).
+//  1. Run pre-claim cleanup guard.
+//  2. Acquire a concurrency slot before claiming (blocks until available).
+//  3. POST /v1/nodes/{id}/claim to attempt claiming a job.
+//  4. If 204 returned, release slot and return false (no jobs available).
+//  5. If 200 returned, decode claim response and job metadata.
+//  6. Parse spec into options and environment variables.
+//  7. Invoke controller to start job execution (slot released when job completes).
 //
 // Note: Returns true if a job was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
 func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
+	ok, err := c.preClaimCleanup.EnsureCapacity(ctx)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
+	}
+
 	// Acquire a concurrency slot before claiming. This ensures the node does not
 	// claim more work than it can execute concurrently (Config.Concurrency).
 	// The slot is released in executeRun's defer when the job completes.

@@ -28,7 +28,7 @@ import (
 //
 //  3. Container Execution — Create, start, and wait on the container via
 //     ContainerRuntime. Logs are forwarded to LogWriter if present.
-//     Container is removed after completion unless retention is requested.
+//     Container cleanup is owned by node-runtime pre-claim disk-pressure flow.
 //
 //  4. Diff Generation — Generate a unified diff of workspace changes via
 //     DiffGenerator. The diff is not published here; the node agent
@@ -160,9 +160,6 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = cRes.ExitCode
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 
-		if !req.Manifest.Retention.RetainContainer {
-			_ = r.Containers.Remove(ctx, handle)
-		}
 	}
 
 	// Stage 4: Generate diff.

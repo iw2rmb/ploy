@@ -1,6 +1,7 @@
 package step
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -80,5 +81,52 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 
 	if result.Timings.TotalDuration < minExpected {
 		t.Errorf("Run() TotalDuration = %v, expected >= %v", result.Timings.TotalDuration, minExpected)
+	}
+}
+
+func TestRunner_Run_DoesNotRemoveContainerAfterCompletion(t *testing.T) {
+	rt := &testContainerRuntime{
+		logsFn: func(ctx context.Context, handle ContainerHandle) ([]byte, error) {
+			return []byte("test logs"), nil
+		},
+	}
+	var logBuf bytes.Buffer
+	runner := Runner{
+		Containers: rt,
+		LogWriter:  &logBuf,
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "test:latest",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "source",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadOnly,
+				SnapshotCID: types.CID("bafytest123"),
+			},
+		},
+	}
+	req := Request{
+		RunID:      types.RunID("run-123"),
+		Manifest:   manifest,
+		Workspace:  "/tmp/test-workspace",
+		OutDir:     "/tmp/test-out",
+	}
+
+	if _, err := runner.Run(context.Background(), req); err != nil {
+		t.Fatalf("Run() unexpected error: %v", err)
+	}
+
+	if !rt.createCalled || !rt.startCalled || !rt.waitCalled || !rt.logsCalled {
+		t.Fatalf("expected create/start/wait/logs to be called; got %+v", rt)
+	}
+	if rt.removeCalled {
+		t.Fatalf("expected Remove not to be called")
+	}
+	if got := logBuf.String(); got == "" {
+		t.Fatalf("expected log output to be written")
 	}
 }

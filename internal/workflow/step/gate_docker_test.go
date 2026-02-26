@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestDockerGateExecutor_RemovesContainerAfterExecution(t *testing.T) {
+func TestDockerGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
 	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
 
@@ -28,11 +28,11 @@ func TestDockerGateExecutor_RemovesContainerAfterExecution(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if !rt.removeCalled {
-		t.Fatalf("expected Remove to be called on container runtime after gate execution")
+	if rt.removeCalled {
+		t.Fatalf("expected Remove not to be called on container runtime after gate execution")
 	}
 	if !rt.createCalled || !rt.startCalled || !rt.waitCalled || !rt.logsCalled {
-		t.Fatalf("expected create/start/wait/logs to be called before remove; got %+v", rt)
+		t.Fatalf("expected create/start/wait/logs to be called; got %+v", rt)
 	}
 }
 

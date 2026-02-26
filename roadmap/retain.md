@@ -7,7 +7,7 @@ Documentation: `design/retain.md`; `internal/nodeagent/claimer_loop.go`; `intern
 Legend: [ ] todo, [x] done.
 
 ## Phase 0: Behavior Contract Tests
-- [ ] Add/adjust tests that encode target behavior.
+- [x] Add/adjust tests that encode target behavior.
   - Repository: `ploy`
   - Component: `internal/workflow/step`, `internal/nodeagent`
   - Scope:

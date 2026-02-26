@@ -192,12 +192,6 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 
-	// Best-effort cleanup: remove container after logs and stats are collected.
-	if remover, ok := e.rt.(interface {
-		Remove(context.Context, ContainerHandle) error
-	}); ok {
-		_ = remover.Remove(ctx, h)
-	}
 	if plan.stackGate != nil {
 		meta.StackGate = plan.stackGate
 	}
