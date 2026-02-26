@@ -153,6 +153,13 @@ See `docs/build-gate/README.md` for Build Gate configuration and execution detai
     `runs_finalized` counters.
   - If a stale attempt is recovered to terminal, check `GET /v1/runs/{id}/status`
     and `GET /v1/runs/{id}/logs` to confirm final repo/run state and terminal SSE.
+  Node startup crash reconciliation policy (fixed, no knob):
+  - Startup executes one reconciliation pass before the normal claim loop.
+  - Terminal replay uses `finished_at >= now-120s` (terminal timestamp only;
+    container create time is not used).
+  - Completion replay uses canonical `POST /v1/jobs/{job_id}/complete`; startup
+    replay treats `409 Conflict` as idempotent success.
+  - There is currently no environment variable or scheduler key to tune the 120s window.
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap as a NanoID(6)
   string (6 characters from URL-safe alphabet A-Za-z0-9_-). This compact format balances
   brevity with sufficient uniqueness for typical cluster sizes. Note: currently exported by

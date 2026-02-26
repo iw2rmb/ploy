@@ -5,6 +5,7 @@ The `ployd-node` binary is the node agent that runs on worker nodes in the Ploy 
 ## Features
 
 - **HTTPS server with mTLS**: Secure communication with the control-plane using mutual TLS authentication
+- **Startup crash reconciliation (pre-claim pass)**: Runs once before claim polling; reattaches recovered running containers and replays recent terminal completions (`finished_at >= now-120s`) through `POST /v1/jobs/{job_id}/complete` (startup replay treats `409 Conflict` as idempotent success)
 - **Claim loop (canonical execution path)**: Polls the control-plane for jobs via `POST /v1/nodes/{id}/claim`
 - **Run management endpoints** (primarily for local/manual use):
   - `POST /v1/run/start`: Start a run/job via the node HTTP API
@@ -73,10 +74,13 @@ ployd-node -config /path/to/config.yaml
 
 ### Run Lifecycle
 
-1. Node agent polls `POST /v1/nodes/{id}/claim` for work
-2. Server returns `204 No Content` when no work is available, or `200 OK` with a claimed job payload (including `spec`)
-3. Node agent parses the spec into typed execution inputs and executes the claimed job
-4. Node agent reports job status and uploads artifacts/diffs back to the control-plane
+1. Node agent performs one startup crash reconciliation pass before claim polling
+2. During startup reconciliation, recovered running containers are reattached to normal wait/log/status reporting
+3. During startup reconciliation, recent terminal containers (`finished_at >= now-120s`) are replayed via `POST /v1/jobs/{job_id}/complete`
+4. Node agent polls `POST /v1/nodes/{id}/claim` for work
+5. Server returns `204 No Content` when no work is available, or `200 OK` with a claimed job payload (including `spec`)
+6. Node agent parses the spec into typed execution inputs and executes the claimed job
+7. Node agent reports job status and uploads artifacts/diffs back to the control-plane
 
 ### Security & Logging
 
