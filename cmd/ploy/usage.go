@@ -38,7 +38,6 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Run Execution:")
 			_, _ = fmt.Fprintln(w, "  run <mig>   Run a mig project (with --repo or --failed for repo selection)")
-			_, _ = fmt.Fprintln(w, "  run         Submit a single-repo run (legacy)")
 			_, _ = fmt.Fprintln(w, "  run repo    Manage repos within a batch run")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Artifacts:")
@@ -108,6 +107,9 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --base-ref <ref>   Base Git ref (branch or tag)")
 	_, _ = fmt.Fprintln(w, "  --target-ref <ref> Target Git ref (branch)")
 	_, _ = fmt.Fprintln(w, "  --spec <path|->    Path to YAML/JSON spec file (use '-' for stdin)")
+	_, _ = fmt.Fprintln(w, "  --follow           Follow run until completion")
+	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir> Download final artifacts after successful --follow")
+	_, _ = fmt.Fprintln(w, "  --json             Print machine-readable JSON summary")
 }
 
 // wantsHelp checks whether the given argument list represents a help request.

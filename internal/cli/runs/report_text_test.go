@@ -253,6 +253,61 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	assertContains(t, linkedOut, "auth_token=test-token")
 }
 
+func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	logURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs"
+
+	report := RunReport{
+		RunID:   runID,
+		MigID:   domaintypes.NewMigID(),
+		MigName: "cancelled-run",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RepoReport{
+			{
+				RepoID:      repoID,
+				RepoURL:     "https://github.com/acme/cancelled.git",
+				BaseRef:     "main",
+				TargetRef:   "ploy/cancelled",
+				Status:      "Cancelled",
+				Attempt:     1,
+				BuildLogURL: logURL,
+			},
+		},
+		Runs: []RunEntry{
+			{
+				RepoID:      repoID,
+				RepoURL:     "https://github.com/acme/cancelled.git",
+				BaseRef:     "main",
+				TargetRef:   "ploy/cancelled",
+				Status:      "Cancelled",
+				Attempt:     1,
+				BuildLogURL: logURL,
+				Jobs: []RunJobEntry{
+					{
+						JobID:       domaintypes.NewJobID(),
+						JobType:     "mig",
+						JobImage:    "ghcr.io/acme/mig:1",
+						Status:      "Cancelled",
+						DurationMs:  0,
+						BuildLogURL: logURL,
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+		t.Fatalf("RenderRunReportText error: %v", err)
+	}
+	out := buf.String()
+
+	assertNotContains(t, out, "Logs (")
+}
+
 func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 	t.Parallel()
 

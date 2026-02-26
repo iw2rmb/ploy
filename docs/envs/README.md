@@ -96,7 +96,7 @@ Role model (bearer token claims):
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `migs-codex`).
   - `/in/build-gate.log` — First Build Gate failure log (node persists to temp host file and mounts)
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
-- `--spec` — Path to a YAML/JSON spec file for `ploy mig run` defining mig parameters,
+- `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
@@ -104,9 +104,10 @@ Role model (bearer token claims):
   - `build_gate.healing` and `build_gate.router` — Automated repair routing/healing after Build Gate failures
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
-- `--name` — Creates a **batch run** with the given name (no repository attached yet).
-  Used with `mig run repo add` to attach multiple repositories under a shared spec.
-  Example: `ploy mig run --spec mig.yaml --name my-batch` followed by
+- `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
+  Use `ploy mig run repo add` to attach multiple repositories under a shared spec, then run it via
+  `ploy mig run <mig-id|name> [--follow]`.
+  Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
 - `build_gate.healing` — Spec block defining the healing loop when Build Gate fails:
@@ -250,7 +251,7 @@ Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
 
 ## E2E Harness
 
-- `ploy mig run` executes Mods against the Ploy control plane; no tenant variable is required.
+- `ploy run` executes Mods against the Ploy control plane; no tenant variable is required.
 - `PLOY_E2E_RUN_PREFIX` — Optional run ID prefix for Mods E2E runs
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
@@ -273,15 +274,15 @@ Control plane configuration (set via CLI or YAML):
   memory at runtime, not persisted back to disk.
 - `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. See details below.
 
-Per-run overrides (CLI flags on `ploy mig run`):
+Per-run overrides (CLI flags on `ploy run`):
 - `--gitlab-pat` — Override the control plane PAT for this run only
 - `--gitlab-domain` — Override the control plane domain for this run only
 - `--mr-success` — Create an MR when the run succeeds
 - `--mr-fail` — Create an MR when the run fails
 
 Branch naming semantics:
-- The MR source branch is always the effective target ref for the run. When `--repo-target-ref` is provided, that value is used. When it is omitted, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise.
-- The base branch is whatever you pass via `--repo-base-ref` (commonly `main`).
+- The MR source branch is always the effective target ref for the run. When `--target-ref` is provided, that value is used. When it is omitted, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise.
+- The base branch is whatever you pass via `--base-ref` (commonly `main`).
 
 Quick test (PAT via config or flags):
 For local testing or CI environments, set the PAT via control plane config or per‑run flags.
@@ -300,16 +301,18 @@ Example usage:
 ploy config gitlab set --file gitlab-config.json
 
 # Run with MR on success (server assigns run ID)
-ploy mig run --mr-success \
-  --repo-url https://gitlab.com/org/repo.git \
-  --repo-base-ref main \
-  --repo-target-ref workflow/upgrade
+ploy run --mr-success \
+  --repo https://gitlab.com/org/repo.git \
+  --base-ref main \
+  --target-ref workflow/upgrade
 
 # Per-run override
-ploy mig run --mr-success \
+ploy run --mr-success \
   --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
   --gitlab-domain https://gitlab.example.com \
-  --repo-url https://gitlab.example.com/org/repo.git
+  --repo https://gitlab.example.com/org/repo.git \
+  --base-ref main \
+  --target-ref workflow/upgrade
 ```
 
 

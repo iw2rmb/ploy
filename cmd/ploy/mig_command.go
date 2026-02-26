@@ -42,22 +42,27 @@ func handleMig(args []string, stderr io.Writer) error {
 	case "status":
 		return handleMigStatus(args[1:], stderr)
 	// Mig run with repo selection.
-	// Check if first arg looks like a mig ID/name (not a flag) to route to project run.
 	case "run":
-		// If next arg exists and doesn't start with '-', it's a mig reference.
-		if len(args) > 1 && len(args[1]) > 0 && args[1][0] != '-' {
-			// Check if it's not a known subcommand (repo, pull).
-			switch args[1] {
-			case "pull":
-				return errors.New("mig run pull has been removed; use 'ploy run pull <run-id>' or 'ploy mig pull'")
-			case "repo":
-				// Fall through to existing handleMigRun which routes these.
-			default:
-				// Treat as mig reference for project run.
-				return handleMigRunProject(args[1:], stderr)
-			}
+		if len(args) <= 1 {
+			printMigRunProjectUsage(stderr)
+			return errors.New("mig id/name required")
 		}
-		return handleMigRun(args[1:], stderr)
+		if args[1] == "--help" || args[1] == "-h" {
+			printMigRunProjectUsage(stderr)
+			return nil
+		}
+		switch args[1] {
+		case "pull":
+			return errors.New("mig run pull has been removed; use 'ploy run pull <run-id>' or 'ploy mig pull'")
+		case "repo":
+			return handleMigRunRepo(args[2:], stderr)
+		default:
+			if len(args[1]) > 0 && args[1][0] == '-' {
+				printMigRunProjectUsage(stderr)
+				return errors.New("mig id/name required")
+			}
+			return handleMigRunProject(args[1:], stderr)
+		}
 	case "fetch":
 		return handleMigFetch(args[1:], stderr)
 	case "artifacts":
@@ -89,23 +94,6 @@ func printMigRunFlagsSummary(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --last-failed        Select the latest failed run (default: last succeeded)")
 	_, _ = fmt.Fprintln(w, "  --last-succeeded     Select the latest succeeded run (default)")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Flags for 'ploy mig run':")
-	_, _ = fmt.Fprintln(w, "  --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)")
-	_, _ = fmt.Fprintln(w, "  --repo-url <url>           Git repository URL")
-	_, _ = fmt.Fprintln(w, "  --repo-base-ref <branch>   Git base ref")
-	_, _ = fmt.Fprintln(w, "  --repo-target-ref <branch> Git target ref")
-	_, _ = fmt.Fprintln(w, "  --repo-workspace-hint <dir> Optional subdirectory hint")
-	_, _ = fmt.Fprintln(w, "  --job-env KEY=VALUE        Job environment (repeatable)")
-	_, _ = fmt.Fprintln(w, "  --job-image <image>        Container image for mig step")
-	_, _ = fmt.Fprintln(w, "  --job-command <cmd>        Container command override")
-	_, _ = fmt.Fprintln(w, "  --gitlab-pat <token>       GitLab Personal Access Token")
-	_, _ = fmt.Fprintln(w, "  --gitlab-domain <domain>   GitLab domain")
-	_, _ = fmt.Fprintln(w, "  --mr-success               Create merge request on success")
-	_, _ = fmt.Fprintln(w, "  --mr-fail                  Create merge request on failure")
-	_, _ = fmt.Fprintln(w, "  --follow                   Follow run logs until completion")
-	_, _ = fmt.Fprintln(w, "  --cap <duration>           Time cap for --follow")
-	_, _ = fmt.Fprintln(w, "  --cancel-on-cap            Cancel run if cap exceeded")
-	_, _ = fmt.Fprintln(w, "  --artifact-dir <dir>       Download final artifacts")
-	_, _ = fmt.Fprintln(w, "  --json                     Print JSON summary")
-	_, _ = fmt.Fprintln(w, "  --max-retries N            Max reconnect attempts for event stream")
+	_, _ = fmt.Fprintln(w, "Single-repo runs now live under 'ploy run':")
+	_, _ = fmt.Fprintln(w, "  ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->")
 }

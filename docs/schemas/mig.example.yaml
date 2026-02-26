@@ -176,8 +176,8 @@ mr_on_fail: true
 ################################################################################
 # NOTES
 ################################################################################
-# - This YAML is submitted via: `ploy mig run --spec mig.yaml` along with
-#   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
+# - This YAML is submitted via: `ploy run --spec mig.yaml` along with
+#   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
 # - The agent honors: image, command, env, env_from_file,
 #   migs[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
