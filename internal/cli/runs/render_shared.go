@@ -11,6 +11,11 @@ import (
 // SpinnerFrames defines deterministic spinner glyph order for running states.
 var SpinnerFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 
+const (
+	ansiErrorLightRed = "\x1b[91m"
+	ansiColorReset    = "\x1b[0m"
+)
+
 // FormatErrorOneLiner normalizes a multi-line error to a single readable line.
 func FormatErrorOneLiner(lastErr *string) string {
 	if lastErr == nil {
@@ -62,6 +67,22 @@ func FormatDurationMsOrElapsed(durationMs int64, startedAt, finishedAt *time.Tim
 	return "-"
 }
 
+// FormatDurationForStatus renders status-aware duration text.
+// Terminal jobs are always rendered in seconds; non-terminal jobs keep
+// millisecond-or-elapsed behavior.
+func FormatDurationForStatus(status string, durationMs int64, startedAt, finishedAt *time.Time, now time.Time) string {
+	if isTerminalJobStatus(status) {
+		if durationMs > 0 {
+			return fmt.Sprintf("%.1fs", float64(durationMs)/1000.0)
+		}
+		if finishedAt != nil && startedAt != nil {
+			d := finishedAt.Sub(*startedAt)
+			return fmt.Sprintf("%.1fs", d.Seconds())
+		}
+	}
+	return FormatDurationMsOrElapsed(durationMs, startedAt, finishedAt, now)
+}
+
 // StatusGlyph maps a status to a deterministic display glyph.
 func StatusGlyph(status string, spinnerFrame int) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
@@ -77,6 +98,33 @@ func StatusGlyph(status string, spinnerFrame int) string {
 		return "·"
 	default:
 		return " "
+	}
+}
+
+// ColoredStatusGlyph returns the status glyph, coloring failures light red.
+func ColoredStatusGlyph(status string, spinnerFrame int) string {
+	glyph := StatusGlyph(status, spinnerFrame)
+	if isFailedOrCrashedStatus(status) {
+		return ansiErrorLightRed + glyph + ansiColorReset
+	}
+	return glyph
+}
+
+func isFailedOrCrashedStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "fail", "failed", "crash", "crashed", "error":
+		return true
+	default:
+		return false
+	}
+}
+
+func isTerminalJobStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "success", "succeeded", "finished", "completed", "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
+		return true
+	default:
+		return false
 	}
 }
 

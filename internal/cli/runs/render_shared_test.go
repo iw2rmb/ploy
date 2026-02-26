@@ -83,6 +83,24 @@ func TestFormatDurationMsOrElapsed(t *testing.T) {
 	}
 }
 
+func TestFormatDurationForStatus(t *testing.T) {
+	t.Parallel()
+
+	started := time.Date(2026, time.January, 15, 12, 0, 0, 0, time.UTC)
+	finished := started.Add(2500 * time.Millisecond)
+	now := started.Add(1500 * time.Millisecond)
+
+	if got, want := FormatDurationForStatus("failed", 2450, nil, nil, now), "2.5s"; got != want {
+		t.Fatalf("FormatDurationForStatus(failed)=%q, want %q", got, want)
+	}
+	if got, want := FormatDurationForStatus("success", 0, &started, &finished, now), "2.5s"; got != want {
+		t.Fatalf("FormatDurationForStatus(success finished)=%q, want %q", got, want)
+	}
+	if got, want := FormatDurationForStatus("running", 2450, nil, nil, now), "2450ms"; got != want {
+		t.Fatalf("FormatDurationForStatus(running)=%q, want %q", got, want)
+	}
+}
+
 func TestStatusGlyph(t *testing.T) {
 	t.Parallel()
 
@@ -100,5 +118,16 @@ func TestStatusGlyph(t *testing.T) {
 	}
 	if got := StatusGlyph("queued", 0); got != "·" {
 		t.Fatalf("StatusGlyph(queued,0)=%q, want %q", got, "·")
+	}
+}
+
+func TestColoredStatusGlyph(t *testing.T) {
+	t.Parallel()
+
+	if got := ColoredStatusGlyph("failed", 0); got != "\x1b[91m✗\x1b[0m" {
+		t.Fatalf("ColoredStatusGlyph(failed,0)=%q, want light-red fail glyph", got)
+	}
+	if got := ColoredStatusGlyph("running", 0); got != "⣾" {
+		t.Fatalf("ColoredStatusGlyph(running,0)=%q, want spinner", got)
 	}
 }

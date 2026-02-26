@@ -28,6 +28,7 @@ type RepoJobEntry struct {
 	DurationMs    int64               `json:"duration_ms"`
 	DisplayName   string              `json:"display_name,omitempty"`
 	ActionSummary string              `json:"action_summary,omitempty"`
+	BugSummary    string              `json:"bug_summary,omitempty"`
 }
 
 // ListRepoJobsResult contains the response from listing repo jobs.

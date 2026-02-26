@@ -77,15 +77,18 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "Mig:   "+migID.String()+"   | java17-upgrade")
-	assertContains(t, out, "Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
-	assertContains(t, out, "Repos: 1")
-	assertContains(t, out, "Run:   "+runID.String())
-	assertContains(t, out, "Repo:  [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
-	assertContains(t, out, "Artifacts")
+	assertContains(t, out, "  Mig:   "+migID.String()+"   | java17-upgrade")
+	assertContains(t, out, "  Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
+	assertContains(t, out, "  Repos: 1")
+	assertContains(t, out, "\n  Repos: 1\n  Run:   "+runID.String()+"\n\n")
+	assertContains(t, out, "     [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertContains(t, out, "Artefacts")
 	assertNotContains(t, out, "State")
 	if strings.Count(out, "Logs (https://example.test/v1/runs/") != 1 {
 		t.Fatalf("expected exactly one logs link in output, got: %q", out)
+	}
+	if strings.Count(out, "Patch (https://example.test/v1/runs/") != 1 {
+		t.Fatalf("expected exactly one patch link in output, got: %q", out)
 	}
 	assertContains(t, out, "Logs (https://example.test/v1/runs/")
 	assertContains(t, out, " | Patch (https://example.test/v1/runs/")
@@ -161,12 +164,67 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	}
 	out := buf.String()
 
-	assertContains(t, out, "✗")
+	assertContains(t, out, "\x1b[91m✗\x1b[0m")
 	assertContains(t, out, "pre_gate")
 	assertContains(t, out, "└  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
 	assertContains(t, out, "✓")
 	assertContains(t, out, "Heal")
 	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
+}
+
+func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	failID := domaintypes.NewJobID()
+	failCode := int32(1)
+
+	report := RunReport{
+		RunID:   runID,
+		MigID:   domaintypes.NewMigID(),
+		MigName: "bug-summary",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RepoReport{
+			{
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/summary.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/summary",
+				Status:    "Fail",
+				Attempt:   1,
+			},
+		},
+		Runs: []RunEntry{
+			{
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/summary.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/summary",
+				Status:    "Fail",
+				Attempt:   1,
+				Jobs: []RunJobEntry{
+					{
+						JobID:      failID,
+						JobType:    "pre_gate",
+						JobImage:   "ghcr.io/acme/pre-gate:1",
+						Status:     "Failed",
+						ExitCode:   &failCode,
+						DurationMs: 750,
+						BugSummary: "missing ; in Foo.java",
+					},
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+		t.Fatalf("RenderRunReportText error: %v", err)
+	}
+	out := buf.String()
+	assertContains(t, out, "└  Exit 1: \x1b[91mmissing ; in Foo.java\x1b[0m")
+	assertContains(t, out, "0.8s")
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
@@ -326,7 +384,7 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
 	out := buf.String()
-	assertContains(t, out, "Mig:   "+migID.String()+"\n")
+	assertContains(t, out, "  Mig:   "+migID.String()+"\n")
 	firstLine := strings.SplitN(out, "\n", 2)[0]
 	assertNotContains(t, firstLine, "|")
 }

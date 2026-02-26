@@ -21,34 +21,71 @@ type TextRenderOptions struct {
 	Now           time.Time
 }
 
+// RunReportDynamicSection represents one mutable block of lines in rendered run text.
+type RunReportDynamicSection struct {
+	StartLine int
+	LineCount int
+	Text      string
+}
+
+// RunReportTextLayout is a rendered run report with per-repo mutable sections.
+type RunReportTextLayout struct {
+	Text            string
+	LineCount       int
+	DynamicSections []RunReportDynamicSection
+}
+
 // RenderRunReportText renders a one-shot, follow-style run snapshot.
 func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) error {
 	if w == nil {
 		return fmt.Errorf("run report text: output writer required")
 	}
 
-	_, _ = fmt.Fprintf(w, "Mig:   %s\n", renderMigHeader(report.MigID.String(), report.MigName))
-	_, _ = fmt.Fprintf(w, "Spec:  %s | %s\n", valueOrDash(report.SpecID.String()), renderOptionalLink("Download", buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken))
-	_, _ = fmt.Fprintf(w, "Repos: %d\n", len(report.Repos))
-	_, _ = fmt.Fprintf(w, "Run:   %s\n", valueOrDash(report.RunID.String()))
-
-	if len(report.Repos) == 0 {
-		_, _ = fmt.Fprintln(w, "")
-		_, _ = fmt.Fprintln(w, "No repos found in this run.")
-		return nil
+	layout, err := RenderRunReportTextLayout(report, opts)
+	if err != nil {
+		return err
 	}
+	_, _ = io.WriteString(w, layout.Text)
+	return nil
+}
 
+// RenderRunReportTextLayout renders run report text plus mutable per-repo row sections.
+func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunReportTextLayout, error) {
 	runByRepoID := make(map[domaintypes.MigRepoID]RunEntry, len(report.Runs))
 	for _, entry := range report.Runs {
 		runByRepoID[entry.RepoID] = entry
 	}
 
-	frame := FollowFrame{
-		Repos: make([]FollowRepoFrame, 0, len(report.Repos)),
-	}
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()
+	}
+
+	headerLines := []string{
+		fmt.Sprintf("  Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
+		fmt.Sprintf("  Spec:  %s | %s", valueOrDash(report.SpecID.String()), renderOptionalLink("Download", buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
+		fmt.Sprintf("  Repos: %d", len(report.Repos)),
+		fmt.Sprintf("  Run:   %s", valueOrDash(report.RunID.String())),
+		"",
+	}
+
+	if len(report.Repos) == 0 {
+		var out strings.Builder
+		for _, line := range headerLines {
+			out.WriteString(line)
+			out.WriteByte('\n')
+		}
+		out.WriteString("No repos found in this run.\n")
+		rendered := out.String()
+		return RunReportTextLayout{
+			Text:            rendered,
+			LineCount:       strings.Count(rendered, "\n"),
+			DynamicSections: nil,
+		}, nil
+	}
+
+	frame := FollowFrame{
+		Repos: make([]FollowRepoFrame, 0, len(report.Repos)),
 	}
 
 	for i, repo := range report.Repos {
@@ -61,7 +98,7 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 
 		repoFrame := FollowRepoFrame{
 			HeaderLine: fmt.Sprintf(
-				"Repo:  [%d/%d] %s %s -> %s",
+				"     [%d/%d] %s %s -> %s",
 				i+1,
 				len(report.Repos),
 				renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, ""),
@@ -77,16 +114,16 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 			continue
 		}
 
-		repoFrame.Columns = []string{"", "Step", "Job ID", "Node", "Image", "Duration", "Artifacts"}
+		repoFrame.Columns = []string{"", "Step", "Job ID", "Node", "Image", "Duration", "Artefacts"}
 		repoFrame.Rows = make([]FollowStepRow, 0, len(entry.Jobs))
 		for _, job := range entry.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
-			patchURL := firstNonEmpty(strings.TrimSpace(job.PatchURL), strings.TrimSpace(entry.PatchURL), strings.TrimSpace(repo.PatchURL))
-			state := StatusGlyph(job.Status, opts.SpinnerFrame)
+			patchURL := strings.TrimSpace(job.PatchURL)
+			state := ColoredStatusGlyph(job.Status, opts.SpinnerFrame)
 			step := renderStepName(job.JobType)
-			duration := FormatDurationCompact(job.DurationMs)
-			if opts.LiveDurations {
-				duration = FormatDurationMsOrElapsed(job.DurationMs, job.StartedAt, job.FinishedAt, now)
+			duration := FormatDurationForStatus(job.Status, job.DurationMs, job.StartedAt, job.FinishedAt, now)
+			if !opts.LiveDurations && !isTerminalJobStatus(job.Status) {
+				duration = FormatDurationCompact(job.DurationMs)
 			}
 
 			repoFrame.Rows = append(repoFrame.Rows, FollowStepRow{
@@ -105,12 +142,31 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 		frame.Repos = append(frame.Repos, repoFrame)
 	}
 
-	rendered, _ := RenderFollowFrameText(frame, FollowFrameOptions{})
-	if rendered != "" {
-		_, _ = fmt.Fprint(w, rendered)
+	frameLayout := RenderFollowFrameTextLayout(frame, FollowFrameOptions{})
+
+	var out strings.Builder
+	for _, line := range headerLines {
+		out.WriteString(line)
+		out.WriteByte('\n')
+	}
+	out.WriteString(frameLayout.Text)
+	rendered := out.String()
+
+	dynamicSections := make([]RunReportDynamicSection, len(frameLayout.Sections))
+	headerLineCount := len(headerLines)
+	for i, section := range frameLayout.Sections {
+		dynamicSections[i] = RunReportDynamicSection{
+			StartLine: headerLineCount + section.StartLine,
+			LineCount: section.LineCount,
+			Text:      section.Text,
+		}
 	}
 
-	return nil
+	return RunReportTextLayout{
+		Text:            rendered,
+		LineCount:       strings.Count(rendered, "\n"),
+		DynamicSections: dynamicSections,
+	}, nil
 }
 
 func renderLink(label, rawURL string, enableOSC8 bool, authToken string) string {
@@ -148,7 +204,8 @@ func renderArtifacts(logURL, patchURL string, opts TextRenderOptions) string {
 }
 
 func renderArtifactsForStatus(status, logURL, patchURL string, opts TextRenderOptions) string {
-	if !isTerminalJobStatus(status) {
+	statusNorm := strings.ToLower(strings.TrimSpace(status))
+	if statusNorm == "cancelled" || statusNorm == "canceled" || !isTerminalJobStatus(status) {
 		return "-"
 	}
 	return renderArtifacts(logURL, patchURL, opts)
@@ -194,7 +251,10 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 			msg = "healer output unavailable"
 		}
 	} else {
-		msg = FormatErrorOneLiner(repoLastError)
+		msg = strings.Join(strings.Fields(strings.TrimSpace(job.BugSummary)), " ")
+		if msg == "" {
+			msg = FormatErrorOneLiner(repoLastError)
+		}
 		if msg == "" {
 			msg = strings.ToLower(strings.TrimSpace(job.Status))
 		}
@@ -209,24 +269,6 @@ func renderExitCode(exitCode *int32) string {
 		return "?"
 	}
 	return strconv.FormatInt(int64(*exitCode), 10)
-}
-
-func isFailedOrCrashedStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "fail", "failed", "crash", "crashed", "error":
-		return true
-	default:
-		return false
-	}
-}
-
-func isTerminalJobStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "success", "succeeded", "finished", "completed", "fail", "failed", "crash", "crashed", "error":
-		return true
-	default:
-		return false
-	}
 }
 
 func renderMigHeader(migID, migName string) string {

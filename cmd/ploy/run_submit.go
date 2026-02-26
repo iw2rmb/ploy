@@ -321,6 +321,8 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 	spinnerFrame := 0
 
 	renderedLines := 0
+	var previousLayout runs.RunReportTextLayout
+	hasPreviousLayout := false
 	cursorHidden := false
 	defer func() {
 		if cursorHidden {
@@ -365,24 +367,32 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		}
 		retries = 0
 
-		var frame bytes.Buffer
 		renderOpts.SpinnerFrame = spinnerFrame
 		renderOpts.Now = time.Now()
-		if err := runs.RenderRunReportText(&frame, report, renderOpts); err != nil {
+		layout, err := runs.RenderRunReportTextLayout(report, renderOpts)
+		if err != nil {
 			return "", err
 		}
-		rendered := frame.String()
-		lines := countRenderedLines(rendered)
 
 		if !cursorHidden {
 			_, _ = fmt.Fprint(stderr, "\x1b[?25l")
 			cursorHidden = true
+		}
+
+		if !hasPreviousLayout {
+			_, _ = fmt.Fprint(stderr, layout.Text)
 		} else if renderedLines > 0 {
 			_, _ = fmt.Fprintf(stderr, "\x1b[%dA", renderedLines)
-			_, _ = fmt.Fprint(stderr, "\x1b[J")
+			if !redrawRunReportRowsOnly(stderr, previousLayout, layout) {
+				_, _ = fmt.Fprint(stderr, "\x1b[J")
+				_, _ = fmt.Fprint(stderr, layout.Text)
+			}
+		} else {
+			_, _ = fmt.Fprint(stderr, layout.Text)
 		}
-		_, _ = fmt.Fprint(stderr, rendered)
-		renderedLines = lines
+		renderedLines = layout.LineCount
+		previousLayout = layout
+		hasPreviousLayout = true
 
 		final := deriveRunStateFromReport(report)
 		if final != "" {
@@ -418,13 +428,73 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 	}
 }
 
-func countRenderedLines(rendered string) int {
-	if rendered == "" {
-		return 0
+func redrawRunReportRowsOnly(w io.Writer, previous, next runs.RunReportTextLayout) bool {
+	if len(previous.DynamicSections) != len(next.DynamicSections) {
+		return false
 	}
-	lines := strings.Count(rendered, "\n")
-	if !strings.HasSuffix(rendered, "\n") {
-		lines++
+	nextLines := make([][]string, len(next.DynamicSections))
+	for i, section := range next.DynamicSections {
+		if section.LineCount == 0 {
+			continue
+		}
+		lines := splitFollowSectionLines(section.Text)
+		if len(lines) != section.LineCount {
+			return false
+		}
+		nextLines[i] = lines
+	}
+
+	cursorLine := 0
+	lineShift := 0
+	moveCursorTo := func(target int) {
+		if target > cursorLine {
+			_, _ = fmt.Fprintf(w, "\x1b[%dB", target-cursorLine)
+		} else if target < cursorLine {
+			_, _ = fmt.Fprintf(w, "\x1b[%dA", cursorLine-target)
+		}
+		cursorLine = target
+	}
+
+	for i := range previous.DynamicSections {
+		prev := previous.DynamicSections[i]
+		nextSection := next.DynamicSections[i]
+		startLine := prev.StartLine + lineShift
+		moveCursorTo(startLine)
+
+		lineDelta := nextSection.LineCount - prev.LineCount
+		if lineDelta > 0 {
+			_, _ = fmt.Fprintf(w, "\x1b[%dL", lineDelta)
+		} else if lineDelta < 0 {
+			_, _ = fmt.Fprintf(w, "\x1b[%dM", -lineDelta)
+		}
+
+		if nextSection.LineCount > 0 {
+			lines := nextLines[i]
+			for lineIndex, line := range lines {
+				_, _ = fmt.Fprint(w, "\r\x1b[2K")
+				_, _ = fmt.Fprint(w, line)
+				if lineIndex < len(lines)-1 {
+					_, _ = fmt.Fprint(w, "\n")
+					cursorLine++
+				}
+			}
+			cursorLine = startLine + nextSection.LineCount - 1
+		}
+
+		lineShift += lineDelta
+	}
+
+	moveCursorTo(next.LineCount)
+	return true
+}
+
+func splitFollowSectionLines(section string) []string {
+	if section == "" {
+		return nil
+	}
+	lines := strings.Split(section, "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
 	}
 	return lines
 }
