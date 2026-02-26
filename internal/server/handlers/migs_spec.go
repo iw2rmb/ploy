@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -108,5 +109,49 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("mig spec set", "mig_id", modID, "spec_id", createdSpec.ID.String())
+	}
+}
+
+// getMigLatestSpecHandler returns the latest spec payload for a mig.
+// Endpoint: GET /v1/migs/{mig_ref}/specs/latest
+// Response: raw spec JSON body.
+func getMigLatestSpecHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		migRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
+		if err != nil {
+			httpErr(w, http.StatusBadRequest, "%s", err)
+			return
+		}
+
+		mig, err := resolveMigByRef(r.Context(), st, migRef)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httpErr(w, http.StatusNotFound, "mig not found")
+				return
+			}
+			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			slog.Error("get mig latest spec: get mig failed", "mig_ref", migRef, "err", err)
+			return
+		}
+		if mig.SpecID == nil || mig.SpecID.IsZero() {
+			httpErr(w, http.StatusNotFound, "mig has no spec")
+			return
+		}
+
+		spec, err := st.GetSpec(r.Context(), *mig.SpecID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				httpErr(w, http.StatusNotFound, "spec not found")
+				return
+			}
+			httpErr(w, http.StatusInternalServerError, "failed to get spec: %v", err)
+			slog.Error("get mig latest spec: get spec failed", "mig_id", mig.ID, "spec_id", mig.SpecID.String(), "err", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", "spec-"+spec.ID.String()+".json"))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(spec.Spec)
 	}
 }

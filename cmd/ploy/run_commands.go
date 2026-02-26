@@ -99,6 +99,7 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	if err := runcmd.RenderRunReportText(stderr, report, runcmd.TextRenderOptions{
 		EnableOSC8: runStatusSupportsOSC8(stderr),
 		AuthToken:  token,
+		BaseURL:    base,
 	}); err != nil {
 		return err
 	}

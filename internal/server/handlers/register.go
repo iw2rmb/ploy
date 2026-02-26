@@ -45,6 +45,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("PATCH /v1/migs/{mig_ref}/unarchive", unarchiveMigHandler(st), auth.RoleControlPlane)
 	// Set mig spec (append-only specs + migs.spec_id pointer).
 	s.HandleFunc("POST /v1/migs/{mig_ref}/specs", setMigSpecHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/migs/{mig_ref}/specs/latest", getMigLatestSpecHandler(st), auth.RoleControlPlane)
 	// Mig repo set management (add/list/delete + bulk CSV upsert).
 	s.HandleFunc("POST /v1/migs/{mig_id}/repos", addMigRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/migs/{mig_id}/repos", listMigReposHandler(st), auth.RoleControlPlane)

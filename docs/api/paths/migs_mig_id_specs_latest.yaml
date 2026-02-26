@@ -1,0 +1,36 @@
+get:
+  tags: [Control]
+  summary: Download latest mig spec
+  parameters:
+    - in: query
+      name: auth_token
+      required: false
+      schema:
+        type: string
+      description: |
+        Optional bearer token supplied as a query parameter for browser/OSC8
+        link flows when setting the `Authorization` header is not possible.
+  description: |
+    Returns the latest spec payload referenced by `migs.spec_id`.
+
+    The response body is raw spec JSON.
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true
+    '404':
+      description: Mig not found or mig has no spec
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

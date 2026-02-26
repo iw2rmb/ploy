@@ -1194,7 +1194,10 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
     jobs, and link metadata) before rendering.
   - Renders a one-shot, follow-style snapshot with header lines:
     `Mig`, `Spec`, `Repos`, `Run`, and per-repo blocks.
-  - Step rows include an `Artifacts` column with `Logs` or `Logs | Patch`.
+  - The status glyph column is rendered with an empty header cell (no `State` label).
+  - Repo headers render the repo URL as a hyperlink and show `<base_ref> -> <target_ref>`.
+  - `Spec` renders a `Download` hyperlink to `/v1/migs/{mig_ref}/specs/latest`.
+  - `Artifacts` are shown only for terminal steps; unfinished steps render `-`.
   - Build failures/crashes and healing rows render an `Exit <code>: <one-liner>`
     continuation line beneath the step row.
   - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
