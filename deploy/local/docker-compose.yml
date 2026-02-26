@@ -67,6 +67,7 @@ services:
       - ./node/bearer-token:/etc/ploy/bearer-token:ro
       - ../../dist/ployd-node-linux:/usr/local/bin/ployd-node:ro
       - ${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
+      - /var/lib/docker:/var/lib/docker:ro
       - /private/tmp:/private/tmp
     command:
       ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]
