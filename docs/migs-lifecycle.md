@@ -1015,6 +1015,22 @@ Current stale-heartbeat recovery behavior:
 - When recovery finalizes a run, the server publishes the same terminal SSE
   sequence as normal completion: a terminal `run` snapshot followed by `done`.
 
+Node startup crash reconciliation behavior:
+- On node process startup, the node agent runs one startup reconciliation pass
+  before the first `/v1/nodes/{id}/claim` poll.
+- Discovery considers only ploy-managed containers that carry both
+  `com.ploy.run_id` and `com.ploy.job_id`.
+- Recovered `running` containers are reattached to normal monitoring (wait,
+  log upload, terminal completion upload).
+- Recovered terminal containers (`exited`/`dead`) are replayed only when
+  `finished_at >= now-120s`; the filter uses terminal timestamp and never
+  container create time.
+- Replay completion uses the canonical `POST /v1/jobs/{job_id}/complete`
+  endpoint; startup replay treats `409 Conflict` as idempotent success.
+- The 120s terminal replay window is fixed for now (no config/env knob) and
+  complements stale-job recovery defaults (`30s` interval, `1m` stale cutoff)
+  listed above.
+
 All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 `PLOY_NODE_UUID` header set to the node's ID (NanoID(6) string). The
 control plane uses this header to validate job ownership and attribute

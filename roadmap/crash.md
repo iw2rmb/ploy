@@ -109,7 +109,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent -run 'Startup|ClaimLoop|Ordering'` — First claim must happen only after startup reconciliation completes.
 
 ## Phase 6: Docs and Contract Sync
-- [ ] Update docs to reflect startup crash reconciliation policy and 120s terminal window. — Keep runtime docs aligned with implemented behavior.
+- [x] Update docs to reflect startup crash reconciliation policy and 120s terminal window. — Keep runtime docs aligned with implemented behavior.
   - Repository: `ploy`
   - Component: docs
   - Scope:
