@@ -13,6 +13,7 @@ import (
 type gateExecutionPlan struct {
 	image     string
 	cmd       []string
+	env       map[string]string
 	language  string
 	tool      string
 	stackGate *contracts.StackGateResult
@@ -235,7 +236,7 @@ func resolveStackGateExecutionPlan(
 	}
 
 	sgResult.RuntimeImage = image
-	cmd, err := buildCommandForTool(tool)
+	cmd, prepEnv, err := resolveGateCommand(tool, spec.Prep)
 	if err != nil {
 		return gateExecutionPlan{}, stackGateTerminalWithResult(
 			language,
@@ -253,6 +254,7 @@ func resolveStackGateExecutionPlan(
 	return gateExecutionPlan{
 		image:     image,
 		cmd:       cmd,
+		env:       prepEnv,
 		language:  language,
 		tool:      tool,
 		stackGate: sgResult,
@@ -419,7 +421,7 @@ func resolveDetectedStackExecutionPlan(
 		image = resolvedImage
 	}
 
-	cmd, err := buildCommandForTool(tool)
+	cmd, prepEnv, err := resolveGateCommand(tool, spec.Prep)
 	if err != nil {
 		return gateExecutionPlan{}, newDetectedStackFailureTerminal(
 			language,
@@ -434,7 +436,34 @@ func resolveDetectedStackExecutionPlan(
 	return gateExecutionPlan{
 		image:    image,
 		cmd:      cmd,
+		env:      prepEnv,
 		language: language,
 		tool:     tool,
 	}, nil
+}
+
+func resolveGateCommand(
+	tool string,
+	prep *contracts.BuildGatePrepOverride,
+) ([]string, map[string]string, error) {
+	if prep != nil && !prep.Command.IsEmpty() {
+		return prep.Command.ToSlice(), copyGateEnv(prep.Env), nil
+	}
+
+	cmd, err := buildCommandForTool(tool)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cmd, nil, nil
+}
+
+func copyGateEnv(env map[string]string) map[string]string {
+	if len(env) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(env))
+	for k, v := range env {
+		out[k] = v
+	}
+	return out
 }

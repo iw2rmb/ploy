@@ -329,6 +329,99 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 	}
 }
 
+func TestParseModsSpecJSON_BuildGatePrepOverride(t *testing.T) {
+	input := `{
+		"steps": [{
+			"image": "docker.io/user/mig:latest"
+		}],
+		"build_gate": {
+			"pre": {
+				"prep": {
+					"command": "go test ./...",
+					"env": {
+						"GOFLAGS": "-mod=readonly"
+					}
+				}
+			},
+			"post": {
+				"prep": {
+					"command": ["go", "test", "./...", "-run", "TestUnit"],
+					"env": {
+						"CGO_ENABLED": "0"
+					}
+				}
+			}
+		}
+	}`
+
+	spec, err := ParseModsSpecJSON([]byte(input))
+	if err != nil {
+		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+	}
+	if spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Prep == nil {
+		t.Fatal("build_gate.pre.prep is nil")
+	}
+	if spec.BuildGate.Pre.Prep.Command.Shell != "go test ./..." {
+		t.Fatalf("build_gate.pre.prep.command.shell = %q, want %q", spec.BuildGate.Pre.Prep.Command.Shell, "go test ./...")
+	}
+	if got := spec.BuildGate.Pre.Prep.Env["GOFLAGS"]; got != "-mod=readonly" {
+		t.Fatalf("build_gate.pre.prep.env[GOFLAGS] = %q, want %q", got, "-mod=readonly")
+	}
+
+	if spec.BuildGate.Post == nil || spec.BuildGate.Post.Prep == nil {
+		t.Fatal("build_gate.post.prep is nil")
+	}
+	wantPost := []string{"go", "test", "./...", "-run", "TestUnit"}
+	if len(spec.BuildGate.Post.Prep.Command.Exec) != len(wantPost) {
+		t.Fatalf("build_gate.post.prep.command.exec length = %d, want %d", len(spec.BuildGate.Post.Prep.Command.Exec), len(wantPost))
+	}
+	for i, v := range wantPost {
+		if got := spec.BuildGate.Post.Prep.Command.Exec[i]; got != v {
+			t.Fatalf("build_gate.post.prep.command.exec[%d] = %q, want %q", i, got, v)
+		}
+	}
+	if got := spec.BuildGate.Post.Prep.Env["CGO_ENABLED"]; got != "0" {
+		t.Fatalf("build_gate.post.prep.env[CGO_ENABLED] = %q, want %q", got, "0")
+	}
+}
+
+func TestParseModsSpecJSON_BuildGatePrepOverride_Invalid(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "pre prep missing command",
+			input: `{
+				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"build_gate": {"pre": {"prep": {"env": {"A": "B"}}}}
+			}`,
+			wantErr: "build_gate.pre.prep.command: required",
+		},
+		{
+			name: "post prep command wrong type",
+			input: `{
+				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"build_gate": {"post": {"prep": {"command": {"bad": true}}}}
+			}`,
+			wantErr: "build_gate.post.prep.command",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseModsSpecJSON([]byte(tt.input))
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestParseModsSpecJSON_StackSpecificImage tests stack-specific image parsing.
 func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	input := `{

@@ -202,8 +202,18 @@ func (s ModsSpec) Validate() error {
 				return err
 			}
 		}
+		if s.BuildGate.Pre != nil && s.BuildGate.Pre.Prep != nil {
+			if err := validateBuildGatePrepOverride(s.BuildGate.Pre.Prep, "build_gate.pre.prep"); err != nil {
+				return err
+			}
+		}
 		if s.BuildGate.Post != nil && s.BuildGate.Post.Stack != nil {
 			if err := validateBuildGateStackConfig(s.BuildGate.Post.Stack, "build_gate.post.stack"); err != nil {
+				return err
+			}
+		}
+		if s.BuildGate.Post != nil && s.BuildGate.Post.Prep != nil {
+			if err := validateBuildGatePrepOverride(s.BuildGate.Post.Prep, "build_gate.post.prep"); err != nil {
 				return err
 			}
 		}
@@ -231,6 +241,16 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 	}
 	if strings.TrimSpace(stack.Release) == "" {
 		return fmt.Errorf("%s.release: required", prefix)
+	}
+	return nil
+}
+
+func validateBuildGatePrepOverride(prep *BuildGatePrepOverride, prefix string) error {
+	if prep == nil {
+		return nil
+	}
+	if prep.Command.IsEmpty() {
+		return fmt.Errorf("%s.command: required", prefix)
 	}
 	return nil
 }

@@ -164,7 +164,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/store/batchscheduler`
 
 ## Phase 4: Use Prep Profile in Build Gate
-- [ ] Thread prep profile command/env into gate planning (simple mode).
+- [x] Thread prep profile command/env into gate planning (simple mode).
   - Repository: `ploy`
   - Component: `internal/workflow/contracts` + `internal/nodeagent` + `internal/workflow/step`
   - Scope:

@@ -155,17 +155,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	limitMem, _ := parseBytesLimitEnv(buildGateLimitMemoryEnv)
 	limitCPUMillis := parseInt64LimitEnv(buildGateLimitCPUEnv)
 	limitDisk, storageSizeOpt := parseBytesLimitEnv(buildGateLimitDiskEnv)
-	// Copy env from gate spec to pass through all environment variables to the
-	// Docker container. This includes global env vars injected by the control plane
-	// (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON) which image-level startup hooks
-	// may consume.
-	var envCopy map[string]string
-	if len(spec.Env) > 0 {
-		envCopy = make(map[string]string, len(spec.Env))
-		for k, v := range spec.Env {
-			envCopy[k] = v
-		}
-	}
+	// Copy env from gate spec and apply prep override env (if present).
+	// Prep override keys win on conflicts.
+	envCopy := mergeGateEnvs(spec.Env, plan.env)
 	specC := ContainerSpec{Image: plan.image, Command: plan.cmd, WorkingDir: "/workspace", Mounts: mounts,
 		Env:              envCopy,
 		Labels:           gateContainerLabels(ctx),
@@ -197,6 +189,21 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		meta.StackGate = plan.stackGate
 	}
 	return meta, nil
+}
+
+func mergeGateEnvs(base map[string]string, override map[string]string) map[string]string {
+	if len(base) == 0 && len(override) == 0 {
+		return nil
+	}
+
+	out := make(map[string]string, len(base)+len(override))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range override {
+		out[k] = v
+	}
+	return out
 }
 
 func buildGateDefaultImagesFilePath() string {
