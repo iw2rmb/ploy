@@ -48,6 +48,21 @@ See also:
   - `make build`
   - Smoke tests locally: `make test` (unit + guardrails). E2E runs target the cluster.
 
+**Prep Lifecycle Scenarios (Track 1)**
+
+Run the prep lifecycle scripts to validate prep orchestration and run gating:
+
+- Happy path (`PrepPending -> PrepRunning -> PrepReady`):
+  - `bash tests/e2e/migs/scenario-prep-ready.sh`
+- Failure path (`PrepPending -> PrepRunning -> PrepFailed`):
+  - `bash tests/e2e/migs/scenario-prep-fail.sh`
+
+These scenarios assert that repo jobs are not created before `PrepReady`, and that
+failure metadata/evidence is exposed through `GET /v1/repos/{repo_id}/prep`.
+Local deploy uses a deterministic prep fixture in the server image (`codex` stub):
+- refs containing `fail` force prep failure
+- all other refs emit a valid prep profile and transition to `PrepReady`
+
 **Spec‑Driven Flow (recommended)**
 
 Use the YAML spec to define mig parameters, Build Gate, and healing.

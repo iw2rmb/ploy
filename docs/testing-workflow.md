@@ -79,7 +79,10 @@ Docker cluster:
 2. **E2E Tests** — Test full system with local deployment
    - Location: `tests/e2e/migs/`
    - Documented in: `tests/e2e/migs/README.md`
-   - Examples: `scenario-orw-pass.sh`
+   - Examples:
+     - `scenario-prep-ready.sh` (prep success + run gating)
+     - `scenario-prep-fail.sh` (prep failure + evidence + run gating)
+     - `scenario-orw-pass.sh`
 
 ## Test Organization
 
