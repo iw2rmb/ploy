@@ -19,6 +19,8 @@ tests/
 │   └── migs/
 │       ├── README.md        # E2E documentation
 │       ├── scenario-selftest.sh
+│       ├── scenario-prep-ready.sh
+│       ├── scenario-prep-fail.sh
 │       ├── scenario-orw-pass.sh
 │       └── scenario-orw-fail/
 │           ├── run.sh
@@ -107,6 +109,12 @@ go test -v ./tests/integration -run=TestSmokeWorkflow_EndToEnd
 # Selftest: minimal container execution
 bash tests/e2e/migs/scenario-selftest.sh
 
+# Prep lifecycle happy path (PrepReady + run gating)
+bash tests/e2e/migs/scenario-prep-ready.sh
+
+# Prep lifecycle failure path (PrepFailed + evidence + run gating)
+bash tests/e2e/migs/scenario-prep-fail.sh
+
 # OpenRewrite Java 11→17 (passing branch)
 bash tests/e2e/migs/scenario-orw-pass.sh
 
@@ -139,6 +147,8 @@ See `tests/e2e/migs/README.md` for detailed e2e documentation.
 - **Prerequisites:** Configured cluster, Docker images, optional GitLab PAT
 - **Scenarios:**
   - `scenario-selftest.sh`: Minimal container execution (echo test)
+  - `scenario-prep-ready.sh`: Prep success lifecycle + run gating
+  - `scenario-prep-fail.sh`: Prep failure lifecycle + evidence + run gating
   - `scenario-orw-pass.sh`: OpenRewrite mig on passing branch
   - `scenario-orw-fail/run.sh`: OpenRewrite mig with Build Gate healing
 

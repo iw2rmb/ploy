@@ -222,7 +222,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./docs/api -run TestOpenAPICompleteness`
 
 ## Phase 6: End-to-End Validation (Track 1 Exit Criteria)
-- [ ] Add E2E coverage for `PrepPending -> PrepRunning -> PrepReady` and failure path.
+- [x] Add E2E coverage for `PrepPending -> PrepRunning -> PrepReady` and failure path.
   - Repository: `ploy`
   - Component: `tests` + focused package tests
   - Scope:
