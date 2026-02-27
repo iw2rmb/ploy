@@ -16,9 +16,10 @@ ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/prep-ready}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
-REPO_URL=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
-BASE_REF=${PLOY_E2E_BASE_REF:-main}
-TARGET_REF=${PLOY_E2E_TARGET_REF:-main}
+REPO_URL=${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}
+BASE_REF=${PLOY_E2E_BASE_REF:-master}
+TARGET_REF=${PLOY_E2E_TARGET_REF:-master}
+SPEC_FILE="${ARTIFACT_DIR}/prep-ready-spec.json"
 
 resolve_descriptor_path() {
   local marker="${PLOY_CONFIG_HOME}/clusters/default"
@@ -51,12 +52,24 @@ api_get() {
     "${SERVER_URL}${path}"
 }
 
-RUN_ID=$("$REPO_ROOT/dist/ploy" mig run --json \
-  --repo-url "$REPO_URL" \
-  --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "$TARGET_REF" \
-  --job-image alpine:3.20 \
-  --job-command 'echo "[prep-ready] step start"; sleep 1; echo "[prep-ready] step done"' \
+cat > "$SPEC_FILE" <<'JSON'
+{
+  "version": "0.2.0",
+  "env": {},
+  "steps": [
+    {
+      "image": "alpine:3.20",
+      "command": "echo \"[prep-ready] step start\"; sleep 1; echo \"[prep-ready] step done\""
+    }
+  ]
+}
+JSON
+
+RUN_ID=$("$REPO_ROOT/dist/ploy" run --json \
+  --repo "$REPO_URL" \
+  --base-ref "$BASE_REF" \
+  --target-ref "$TARGET_REF" \
+  --spec "$SPEC_FILE" \
   | tee "${ARTIFACT_DIR}/run-submit.json" | jq -r '.run_id')
 
 if [[ -z "${RUN_ID:-}" || "$RUN_ID" == "null" ]]; then
@@ -66,8 +79,7 @@ fi
 
 REPO_ID=""
 for _ in $(seq 1 30); do
-  REPO_ID="$("$REPO_ROOT/dist/ploy" run status --json "$RUN_ID" \
-    | jq -r '.repos[0].repo_id // empty')"
+  REPO_ID="$(api_get "/v1/runs/${RUN_ID}/repos" | jq -r '.repos[0].repo_id // empty')"
   if [[ -n "$REPO_ID" ]]; then
     break
   fi
@@ -86,7 +98,6 @@ if [[ "$INITIAL_STATUS" != "PrepPending" ]]; then
   exit 1
 fi
 
-seen_running=0
 prep_status="$INITIAL_STATUS"
 deadline=$((SECONDS + 180))
 : > "${ARTIFACT_DIR}/prep-status.log"
@@ -107,7 +118,6 @@ while (( SECONDS < deadline )); do
     PrepPending)
       ;;
     PrepRunning)
-      seen_running=1
       ;;
     PrepReady)
       break
@@ -128,8 +138,21 @@ if [[ "$prep_status" != "PrepReady" ]]; then
   echo "error: timed out waiting for PrepReady (last_status=${prep_status})" >&2
   exit 1
 fi
-if (( seen_running == 0 )); then
-  echo "error: expected to observe PrepRunning transition before PrepReady" >&2
+
+PREP_ATTEMPTS="$(printf '%s' "$PREP_JSON" | jq -r '.prep_attempts // 0')"
+if (( PREP_ATTEMPTS < 1 )); then
+  echo "error: expected prep_attempts >= 1 for PrepReady, got=${PREP_ATTEMPTS}" >&2
+  exit 1
+fi
+
+RUN_ROWS="$(printf '%s' "$PREP_JSON" | jq '.runs | length')"
+if (( RUN_ROWS < 1 )); then
+  echo "error: expected prep run evidence rows for PrepReady" >&2
+  exit 1
+fi
+LATEST_RUN_STATUS="$(printf '%s' "$PREP_JSON" | jq -r '.runs[0].status // empty')"
+if [[ "$LATEST_RUN_STATUS" != "PrepReady" ]]; then
+  echo "error: expected latest prep run status PrepReady, got=${LATEST_RUN_STATUS}" >&2
   exit 1
 fi
 

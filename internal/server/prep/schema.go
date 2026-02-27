@@ -70,13 +70,26 @@ func loadSchema() error {
 }
 
 func prepProfileSchemaPath() (string, error) {
+	candidates := make([]string, 0, 3)
+
 	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", fmt.Errorf("resolve schema path: runtime caller unavailable")
+	if ok {
+		candidates = append(candidates, filepath.Join(filepath.Dir(file), "..", "..", "..", "docs", "schemas", "prep_profile.schema.json"))
 	}
-	path := filepath.Join(filepath.Dir(file), "..", "..", "..", "docs", "schemas", "prep_profile.schema.json")
-	if _, err := os.Stat(path); err != nil {
-		return "", err
+
+	// Fall back to repository-relative and image-provisioned locations.
+	candidates = append(candidates,
+		filepath.Join("docs", "schemas", "prep_profile.schema.json"),
+		filepath.Join("/etc", "ploy", "schemas", "prep_profile.schema.json"),
+	)
+
+	var errs []string
+	for _, path := range candidates {
+		_, err := os.Stat(path)
+		if err == nil {
+			return path, nil
+		}
+		errs = append(errs, fmt.Sprintf("%s: %v", path, err))
 	}
-	return path, nil
+	return "", fmt.Errorf("resolve schema path: no candidates found (%s)", strings.Join(errs, "; "))
 }

@@ -53,6 +53,9 @@ runtime:
 	if cfg.Scheduler.StaleJobRecoveryInterval != 30*time.Second {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 30s", cfg.Scheduler.StaleJobRecoveryInterval)
 	}
+	if cfg.Scheduler.BatchSchedulerInterval != 5*time.Second {
+		t.Fatalf("BatchSchedulerInterval = %v, want 5s", cfg.Scheduler.BatchSchedulerInterval)
+	}
 	if cfg.Scheduler.NodeStaleAfter != time.Minute {
 		t.Fatalf("NodeStaleAfter = %v, want 1m", cfg.Scheduler.NodeStaleAfter)
 	}
@@ -158,6 +161,9 @@ scheduler:
 	}
 	if cfg.Scheduler.StaleJobRecoveryInterval != 0 {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 0", cfg.Scheduler.StaleJobRecoveryInterval)
+	}
+	if cfg.Scheduler.BatchSchedulerInterval != 5*time.Second {
+		t.Fatalf("BatchSchedulerInterval = %v, want 5s", cfg.Scheduler.BatchSchedulerInterval)
 	}
 	if cfg.Scheduler.NodeStaleAfter != 2*time.Minute {
 		t.Fatalf("NodeStaleAfter = %v, want 2m", cfg.Scheduler.NodeStaleAfter)

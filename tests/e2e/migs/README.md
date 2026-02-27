@@ -62,6 +62,14 @@ failure metadata/evidence is exposed through `GET /v1/repos/{repo_id}/prep`.
 Local deploy uses a deterministic prep fixture in the server image (`codex` stub):
 - refs containing `fail` force prep failure
 - all other refs emit a valid prep profile and transition to `PrepReady`
+- scripts submit via `ploy run --spec` (single-repo run API surface)
+- default repo/refs are public and deterministic:
+  - ready: `https://github.com/octocat/Hello-World.git`, `master -> master`
+  - fail: `https://github.com/octocat/Hello-World.git`, `prep-fail-trigger -> master`
+- override with:
+  - `PLOY_E2E_REPO_OVERRIDE`
+  - `PLOY_E2E_BASE_REF`
+  - `PLOY_E2E_TARGET_REF`
 
 **Spec‑Driven Flow (recommended)**
 
