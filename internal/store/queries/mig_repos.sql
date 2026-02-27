@@ -184,7 +184,10 @@ SELECT
   mr.id AS repo_id,
   mr.repo_url,
   rr.last_run_at,
-  COALESCE(rr.last_status::text, '') AS last_status
+  COALESCE(rr.last_status::text, '') AS last_status,
+  mr.prep_status,
+  mr.prep_failure_code,
+  mr.prep_updated_at
 FROM mig_repos mr
 LEFT JOIN LATERAL (
   SELECT

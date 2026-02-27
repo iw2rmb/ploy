@@ -1,8 +1,7 @@
 get:
   summary: List runs for a repository
   description: |
-    Returns the run history for a specific repository URL. The repo_id path parameter
-    is the URL-encoded repository URL (e.g., https%3A%2F%2Fgithub.com%2Forg%2Frepo.git).
+    Returns the run history for a specific repository identified by `mig_repos.id`.
     Results include both the parent run status and the per-repo status within each batch.
   operationId: listRunsForRepo
   tags:
@@ -13,7 +12,7 @@ get:
     - name: repo_id
       in: path
       required: true
-      description: URL-encoded repository URL
+      description: Repository identifier (mig_repos.id, NanoID string)
       schema:
         type: string
     - name: limit

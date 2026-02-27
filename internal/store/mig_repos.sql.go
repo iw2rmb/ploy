@@ -244,7 +244,10 @@ SELECT
   mr.id AS repo_id,
   mr.repo_url,
   rr.last_run_at,
-  COALESCE(rr.last_status::text, '') AS last_status
+  COALESCE(rr.last_status::text, '') AS last_status,
+  mr.prep_status,
+  mr.prep_failure_code,
+  mr.prep_updated_at
 FROM mig_repos mr
 LEFT JOIN LATERAL (
   SELECT
@@ -260,10 +263,13 @@ ORDER BY mr.repo_url ASC, mr.id ASC
 `
 
 type ListDistinctReposRow struct {
-	RepoID     types.MigRepoID    `json:"repo_id"`
-	RepoUrl    string             `json:"repo_url"`
-	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
-	LastStatus interface{}        `json:"last_status"`
+	RepoID          types.MigRepoID    `json:"repo_id"`
+	RepoUrl         string             `json:"repo_url"`
+	LastRunAt       pgtype.Timestamptz `json:"last_run_at"`
+	LastStatus      interface{}        `json:"last_status"`
+	PrepStatus      PrepStatus         `json:"prep_status"`
+	PrepFailureCode *string            `json:"prep_failure_code"`
+	PrepUpdatedAt   pgtype.Timestamptz `json:"prep_updated_at"`
 }
 
 // v1: Lists distinct repos (mig_repos) with last known run metadata, optionally filtered by repo_url substring.
@@ -281,6 +287,9 @@ func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListD
 			&i.RepoUrl,
 			&i.LastRunAt,
 			&i.LastStatus,
+			&i.PrepStatus,
+			&i.PrepFailureCode,
+			&i.PrepUpdatedAt,
 		); err != nil {
 			return nil, err
 		}

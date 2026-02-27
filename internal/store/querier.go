@@ -209,6 +209,7 @@ type Querier interface {
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
+	ListPrepRunsByRepo(ctx context.Context, repoID types.MigRepoID) ([]PrepRun, error)
 	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	ListReposByPrepStatus(ctx context.Context, prepStatus PrepStatus) ([]MigRepo, error)
 	// Lists all repos associated with a run, ordered by creation time.

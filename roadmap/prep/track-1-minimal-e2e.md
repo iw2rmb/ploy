@@ -192,7 +192,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/step -run 'TestGateDocker'`
 
 ## Phase 5: API Surface, Observability, and Docs
-- [ ] Expose prep status and evidence in repo-facing APIs and OpenAPI.
+- [x] Expose prep status and evidence in repo-facing APIs and OpenAPI.
   - Repository: `ploy`
   - Component: `internal/server/handlers` + `docs/api`
   - Scope:

@@ -85,3 +85,38 @@ func (q *Queries) FinishPrepRun(ctx context.Context, arg FinishPrepRunParams) (P
 	)
 	return i, err
 }
+
+const listPrepRunsByRepo = `-- name: ListPrepRunsByRepo :many
+SELECT repo_id, attempt, status, started_at, finished_at, result_json, logs_ref
+FROM prep_runs
+WHERE repo_id = $1
+ORDER BY attempt DESC
+`
+
+func (q *Queries) ListPrepRunsByRepo(ctx context.Context, repoID types.MigRepoID) ([]PrepRun, error) {
+	rows, err := q.db.Query(ctx, listPrepRunsByRepo, repoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrepRun{}
+	for rows.Next() {
+		var i PrepRun
+		if err := rows.Scan(
+			&i.RepoID,
+			&i.Attempt,
+			&i.Status,
+			&i.StartedAt,
+			&i.FinishedAt,
+			&i.ResultJson,
+			&i.LogsRef,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

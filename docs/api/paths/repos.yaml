@@ -2,8 +2,8 @@ get:
   summary: List known repositories
   description: |
     Returns a list of distinct repository URLs that have been used in batch runs,
-    along with the last run timestamp and status for each. This provides a repo-centric
-    view to complement run-centric navigation.
+    along with the last run metadata and prep lifecycle summary for each repository.
+    This provides a repo-centric view to complement run-centric navigation.
   operationId: listRepos
   tags:
     - Control
