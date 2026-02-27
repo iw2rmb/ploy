@@ -164,7 +164,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/store/batchscheduler`
 
 ## Phase 4: Use Prep Profile in Build Gate
-- [x] Thread prep profile command/env into gate planning (simple mode).
+- [x] Support spec-defined gate prep overrides (`build_gate.<phase>.prep`).
   - Repository: `ploy`
   - Component: `internal/workflow/contracts` + `internal/nodeagent` + `internal/workflow/step`
   - Scope:
@@ -190,6 +190,48 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/contracts -run 'TestParseModsSpecJSON_BuildGate'`
     - `go test ./internal/nodeagent -run 'TestBuildGateManifest|TestExecuteGateJob'`
     - `go test ./internal/workflow/step -run 'TestGateDocker'`
+
+- [ ] Wire persisted repo `prep_profile` into gate planning (simple mode completion).
+  - Repository: `ploy`
+  - Component: `internal/server/handlers` + `internal/workflow/contracts` + `internal/nodeagent` + `internal/workflow/step`
+  - Scope:
+    - Add typed prep-profile decoding and validation helper for server-side claim path:
+      - `internal/workflow/contracts` (shared profile type/parser) or `internal/server/prep` (adapter wrapper).
+    - Inject repo-level prep overrides during claim response build in:
+      - `internal/server/handlers/nodes_claim.go`
+      - merge `mig_repos.prep_profile` into claimed spec before node execution.
+    - Define deterministic simple-profile target mapping for gate phases:
+      - `pre_gate` -> `targets.build`
+      - `post_gate` and `re_gate` -> `targets.unit`
+      - only inject when mapped target status is `passed` and command is non-empty.
+    - Preserve precedence in command/env resolution:
+      - `build_gate.<phase>.prep` already present in submitted spec wins
+      - otherwise use mapped repo `prep_profile` target
+      - fallback remains `buildCommandForTool(tool)`.
+    - Keep env precedence unchanged in gate execution:
+      - base gate env from spec/env injection first
+      - mapped prep env overrides conflicting keys.
+    - Update docs to reflect runtime source precedence and phase mapping:
+      - `docs/build-gate/README.md`
+      - `docs/migs-lifecycle.md`
+  - Snippets:
+    ```go
+    // Claim-time merge point (nodes_claim.go)
+    // mergedSpec := mergeJobIDIntoSpec(spec, job.ID)
+    // mergedSpec = mergeRepoPrepProfileIntoSpec(mergedSpec, modRepo.PrepProfile, job.JobType)
+    ```
+    ```go
+    // Runtime command resolution order
+    // 1) explicit spec build_gate.<phase>.prep
+    // 2) repo prep_profile mapped target
+    // 3) buildCommandForTool(tool)
+    ```
+  - Tests:
+    - `go test ./internal/server/handlers -run 'TestClaimJob.*PrepProfile'`
+    - `go test ./internal/workflow/contracts -run 'TestPrepProfile.*(Parse|MapToGate)'`
+    - `go test ./internal/nodeagent -run 'TestApplyGatePhaseOverrides'`
+    - `go test ./internal/workflow/step -run 'TestResolveGateCommand|TestGateDocker'`
+    - `go test ./docs/api -run TestOpenAPICompleteness`
 
 ## Phase 5: API Surface, Observability, and Docs
 - [x] Expose prep status and evidence in repo-facing APIs and OpenAPI.
