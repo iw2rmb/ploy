@@ -116,6 +116,26 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		}
 	})
 
+	t.Run("GET /v1/repos/{repo_id}/prep rejects empty repo_id before store calls", func(t *testing.T) {
+		t.Parallel()
+
+		st := &mockStore{}
+		h := getRepoPrepHandler(st)
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/repos//prep", nil)
+		req.SetPathValue("repo_id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+		}
+		if st.getModRepoCalled || st.listPrepRunsByRepoCalled {
+			t.Fatalf("expected no store calls, but got GetMigRepo=%v ListPrepRunsByRepo=%v", st.getModRepoCalled, st.listPrepRunsByRepoCalled)
+		}
+	})
+
 	t.Run("POST /v1/nodes/{id}/heartbeat rejects empty node id before store calls", func(t *testing.T) {
 		t.Parallel()
 

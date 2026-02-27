@@ -128,6 +128,8 @@ build_gate:
 
 When `build_gate.<phase>.prep.command` is configured, Build Gate uses that command
 instead of the detected-tool default command (`buildCommandForTool` fallback).
+Prep payload visibility is available via `GET /v1/repos/{repo_id}/prep`
+(`prep_profile`, `prep_artifacts`, and prep attempt evidence).
 
 Environment precedence for gate execution:
 1. Gate env from run/spec (`spec.env` + global env injection)

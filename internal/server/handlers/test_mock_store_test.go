@@ -510,6 +510,12 @@ type mockStore struct {
 	listRunsForRepoResult []store.ListRunsForRepoRow
 	listRunsForRepoErr    error
 
+	// ListPrepRunsByRepo tracking
+	listPrepRunsByRepoCalled bool
+	listPrepRunsByRepoParam  types.MigRepoID
+	listPrepRunsByRepoResult []store.PrepRun
+	listPrepRunsByRepoErr    error
+
 	// Global Env tracking (config_env table; see docs/envs/README.md#Global Env Configuration)
 	listGlobalEnvCalled bool
 	listGlobalEnvResult []store.ConfigEnv
@@ -1301,6 +1307,13 @@ func (m *mockStore) ListRunsForRepo(ctx context.Context, arg store.ListRunsForRe
 	m.listRunsForRepoCalled = true
 	m.listRunsForRepoParams = arg
 	return m.listRunsForRepoResult, m.listRunsForRepoErr
+}
+
+// ListPrepRunsByRepo returns prep attempt history for a repository.
+func (m *mockStore) ListPrepRunsByRepo(ctx context.Context, repoID types.MigRepoID) ([]store.PrepRun, error) {
+	m.listPrepRunsByRepoCalled = true
+	m.listPrepRunsByRepoParam = repoID
+	return m.listPrepRunsByRepoResult, m.listPrepRunsByRepoErr
 }
 
 // Global Env methods (config_env table)

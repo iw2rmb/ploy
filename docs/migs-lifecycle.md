@@ -680,6 +680,13 @@ Current defaults:
 - `scheduler.prep_max_attempts`: `3`
 - `scheduler.prep_retry_delay`: `30s`
 
+Prep observability endpoints:
+- `GET /v1/repos` includes repo-level prep summary fields:
+  `prep_status`, `prep_updated_at`, `prep_failure_code`.
+- `GET /v1/repos/{repo_id}/prep` returns full prep state for one repo:
+  `prep_attempts`, `prep_last_error`, `prep_profile`, `prep_artifacts`,
+  plus `prep_runs` evidence (`attempt`, `status`, timestamps, `result_json`, `logs_ref`).
+
 ### Relationship summary (v1)
 
 | Table       | Purpose                                    | Key relationships                         |

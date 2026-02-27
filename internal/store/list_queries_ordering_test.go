@@ -58,6 +58,9 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
 		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
+		// prep_runs.sql - attempt is unique per repo and ordered descending for history.
+		{"ListPrepRunsByRepo", listPrepRunsByRepo, "ORDER BY attempt DESC"},
+
 		// logs.sql and events.sql already have id tie-breakers (verified in logs_sql_ordering_test.go)
 	}
 
