@@ -158,6 +158,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	// Copy env from gate spec and apply prep override env (if present).
 	// Prep override keys win on conflicts.
 	envCopy := mergeGateEnvs(spec.Env, plan.env)
+	mounts = appendDockerHostSocketMount(mounts, envCopy)
 	specC := ContainerSpec{Image: plan.image, Command: plan.cmd, WorkingDir: "/workspace", Mounts: mounts,
 		Env:              envCopy,
 		Labels:           gateContainerLabels(ctx),
@@ -204,6 +205,42 @@ func mergeGateEnvs(base map[string]string, override map[string]string) map[strin
 		out[k] = v
 	}
 	return out
+}
+
+func appendDockerHostSocketMount(mounts []ContainerMount, env map[string]string) []ContainerMount {
+	socketPath := dockerHostSocketPathFromEnv(env)
+	if socketPath == "" {
+		return mounts
+	}
+	info, err := os.Stat(socketPath)
+	if err != nil || info.IsDir() {
+		return mounts
+	}
+	for _, mount := range mounts {
+		if mount.Target == socketPath {
+			return mounts
+		}
+	}
+	return append(mounts, ContainerMount{
+		Source:   socketPath,
+		Target:   socketPath,
+		ReadOnly: false,
+	})
+}
+
+func dockerHostSocketPathFromEnv(env map[string]string) string {
+	if len(env) == 0 {
+		return ""
+	}
+	dockerHost := strings.TrimSpace(env[contracts.PrepDockerHostEnv])
+	if dockerHost == "" || !strings.HasPrefix(dockerHost, "unix://") {
+		return ""
+	}
+	socketPath := strings.TrimSpace(strings.TrimPrefix(dockerHost, "unix://"))
+	if socketPath == "" || !filepath.IsAbs(socketPath) {
+		return ""
+	}
+	return socketPath
 }
 
 func buildGateDefaultImagesFilePath() string {

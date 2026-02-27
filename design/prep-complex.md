@@ -3,10 +3,13 @@
 ## Definition
 
 A repo is `complex` when successful execution requires orchestration beyond env+command:
-- Docker daemon mode selection
 - service containers or sidecars
 - registry auth and CA trust setup
 - compatibility fallbacks across runtime boundaries
+
+Note:
+- docker mode selection alone (`runtime.docker.mode`) belongs to simple-runtime mode.
+- complex mode starts when lifecycle orchestration is required.
 
 ## Example Signals
 
@@ -19,30 +22,26 @@ A repo is `complex` when successful execution requires orchestration beyond env+
 
 Tactics execute in strict order and stop on first stable success.
 
-1. Host socket mode
-- mount host docker socket
-- run baseline commands
-
-2. Detect and classify Docker handshake failures
+1. Detect and classify Docker handshake failures
 - parse logs for API mismatch (`client too old` / min API)
 
-3. Compatibility env attempt
+2. Compatibility env attempt
 - try explicit API version env overrides
 - validate if negotiation actually changes
 
-4. Old-daemon fallback (sidecar dind)
+3. Old-daemon fallback (sidecar dind)
 - start controlled daemon with lower API floor
 - target test runner to sidecar daemon
 
-5. Registry and trust hardening
+4. Registry and trust hardening
 - configure auth for private registry paths
 - inject CA bundle into daemon context when required
 
-6. Ryuk and image-prefix adaptations
+5. Ryuk and image-prefix adaptations
 - disable Ryuk only when required by environment constraints
 - override image prefix when private mirror policy blocks pulls
 
-7. Full target rerun and cleanup
+6. Full target rerun and cleanup
 - run build/unit/all in resolved mode
 - enforce cleanup of temporary network/containers
 

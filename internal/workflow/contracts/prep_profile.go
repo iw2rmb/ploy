@@ -13,6 +13,16 @@ const (
 	PrepTargetStatusPassed       = "passed"
 	PrepTargetStatusFailed       = "failed"
 	PrepTargetStatusNotAttempted = "not_attempted"
+	PrepRunnerModeSimple         = "simple"
+	PrepRunnerModeComplex        = "complex"
+	PrepDockerModeNone           = "none"
+	PrepDockerModeHostSocket     = "host_socket"
+	PrepDockerModeTCP            = "tcp"
+
+	PrepDockerHostEnv       = "DOCKER_HOST"
+	PrepDockerAPIVersionEnv = "DOCKER_API_VERSION"
+
+	defaultPrepDockerHostSocket = "unix:///var/run/docker.sock"
 )
 
 type BuildGatePrepPhase string
@@ -23,10 +33,12 @@ const (
 )
 
 type PrepProfile struct {
-	SchemaVersion int                `json:"schema_version"`
-	RepoID        string             `json:"repo_id"`
-	RunnerMode    string             `json:"runner_mode"`
-	Targets       PrepProfileTargets `json:"targets"`
+	SchemaVersion int                      `json:"schema_version"`
+	RepoID        string                   `json:"repo_id"`
+	RunnerMode    string                   `json:"runner_mode"`
+	Targets       PrepProfileTargets       `json:"targets"`
+	Runtime       *PrepProfileRuntime      `json:"runtime,omitempty"`
+	Orchestration PrepProfileOrchestration `json:"orchestration"`
 }
 
 type PrepProfileTargets struct {
@@ -40,6 +52,21 @@ type PrepProfileTarget struct {
 	Command     string            `json:"command,omitempty"`
 	Env         map[string]string `json:"env"`
 	FailureCode *string           `json:"failure_code,omitempty"`
+}
+
+type PrepProfileRuntime struct {
+	Docker *PrepProfileRuntimeDocker `json:"docker,omitempty"`
+}
+
+type PrepProfileRuntimeDocker struct {
+	Mode       string `json:"mode"`
+	Host       string `json:"host,omitempty"`
+	APIVersion string `json:"api_version,omitempty"`
+}
+
+type PrepProfileOrchestration struct {
+	Pre  []json.RawMessage `json:"pre"`
+	Post []json.RawMessage `json:"post"`
 }
 
 func ParsePrepProfileJSON(raw []byte) (*PrepProfile, error) {
@@ -60,6 +87,11 @@ func ParsePrepProfileJSON(raw []byte) (*PrepProfile, error) {
 	if strings.TrimSpace(profile.RunnerMode) == "" {
 		return nil, fmt.Errorf("prep_profile.runner_mode: required")
 	}
+	switch profile.RunnerMode {
+	case PrepRunnerModeSimple, PrepRunnerModeComplex:
+	default:
+		return nil, fmt.Errorf("prep_profile.runner_mode: invalid value %q", profile.RunnerMode)
+	}
 	if profile.Targets.Build == nil {
 		return nil, fmt.Errorf("prep_profile.targets.build: required")
 	}
@@ -78,6 +110,20 @@ func ParsePrepProfileJSON(raw []byte) (*PrepProfile, error) {
 	}
 	if err := validatePrepProfileTarget(profile.Targets.AllTests, "prep_profile.targets.all_tests"); err != nil {
 		return nil, err
+	}
+	if err := validatePrepProfileRuntime(profile.Runtime); err != nil {
+		return nil, err
+	}
+	if profile.Orchestration.Pre == nil {
+		return nil, fmt.Errorf("prep_profile.orchestration.pre: required")
+	}
+	if profile.Orchestration.Post == nil {
+		return nil, fmt.Errorf("prep_profile.orchestration.post: required")
+	}
+	if profile.RunnerMode == PrepRunnerModeSimple {
+		if len(profile.Orchestration.Pre) > 0 || len(profile.Orchestration.Post) > 0 {
+			return nil, fmt.Errorf("prep_profile.orchestration: simple mode must not define pre/post steps")
+		}
 	}
 
 	return &profile, nil
@@ -113,6 +159,14 @@ func PrepProfileGateOverrideForJobType(
 	if err != nil {
 		return "", nil, err
 	}
+	if override == nil {
+		return phase, nil, nil
+	}
+	runtimeEnv, err := prepProfileRuntimeGateEnv(profile.Runtime)
+	if err != nil {
+		return "", nil, err
+	}
+	override.Env = mergePrepEnvs(override.Env, runtimeEnv)
 	return phase, override, nil
 }
 
@@ -154,6 +208,86 @@ func copyPrepProfileEnv(env map[string]string) map[string]string {
 	}
 	out := make(map[string]string, len(env))
 	for k, v := range env {
+		out[k] = v
+	}
+	return out
+}
+
+func validatePrepProfileRuntime(runtime *PrepProfileRuntime) error {
+	if runtime == nil || runtime.Docker == nil {
+		return nil
+	}
+
+	mode := strings.TrimSpace(runtime.Docker.Mode)
+	if mode == "" {
+		return fmt.Errorf("prep_profile.runtime.docker.mode: required")
+	}
+	host := strings.TrimSpace(runtime.Docker.Host)
+	switch mode {
+	case PrepDockerModeNone, PrepDockerModeHostSocket:
+		if host != "" {
+			return fmt.Errorf("prep_profile.runtime.docker.host: forbidden for mode %q", mode)
+		}
+	case PrepDockerModeTCP:
+		if host == "" {
+			return fmt.Errorf("prep_profile.runtime.docker.host: required for mode %q", PrepDockerModeTCP)
+		}
+	default:
+		return fmt.Errorf("prep_profile.runtime.docker.mode: invalid value %q", runtime.Docker.Mode)
+	}
+	if runtime.Docker.APIVersion != "" && strings.TrimSpace(runtime.Docker.APIVersion) == "" {
+		return fmt.Errorf("prep_profile.runtime.docker.api_version: must not be blank")
+	}
+	return nil
+}
+
+func prepProfileRuntimeGateEnv(runtime *PrepProfileRuntime) (map[string]string, error) {
+	if runtime == nil || runtime.Docker == nil {
+		return nil, nil
+	}
+
+	mode := strings.TrimSpace(runtime.Docker.Mode)
+	apiVersion := strings.TrimSpace(runtime.Docker.APIVersion)
+	switch mode {
+	case PrepDockerModeNone:
+		if apiVersion == "" {
+			return nil, nil
+		}
+		return map[string]string{PrepDockerAPIVersionEnv: apiVersion}, nil
+	case PrepDockerModeHostSocket:
+		env := map[string]string{
+			PrepDockerHostEnv: defaultPrepDockerHostSocket,
+		}
+		if apiVersion != "" {
+			env[PrepDockerAPIVersionEnv] = apiVersion
+		}
+		return env, nil
+	case PrepDockerModeTCP:
+		host := strings.TrimSpace(runtime.Docker.Host)
+		if host == "" {
+			return nil, fmt.Errorf("prep_profile.runtime.docker.host: required for mode %q", PrepDockerModeTCP)
+		}
+		env := map[string]string{
+			PrepDockerHostEnv: host,
+		}
+		if apiVersion != "" {
+			env[PrepDockerAPIVersionEnv] = apiVersion
+		}
+		return env, nil
+	default:
+		return nil, fmt.Errorf("prep_profile.runtime.docker.mode: invalid value %q", runtime.Docker.Mode)
+	}
+}
+
+func mergePrepEnvs(base map[string]string, override map[string]string) map[string]string {
+	if len(base) == 0 && len(override) == 0 {
+		return nil
+	}
+	out := copyPrepProfileEnv(base)
+	if out == nil {
+		out = map[string]string{}
+	}
+	for k, v := range override {
 		out[k] = v
 	}
 	return out

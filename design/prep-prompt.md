@@ -17,6 +17,11 @@ Constraints:
 - Do not ask user questions.
 - Stay within allowed tools and time budget.
 - Prefer deterministic commands and minimal orchestration.
+- In simple mode, keep `orchestration.pre/post` empty.
+- Use runtime primitives before orchestration:
+  - `runtime.docker.mode = none|host_socket|tcp`
+  - `runtime.docker.host` only for `tcp`
+  - `runtime.docker.api_version` optional
 - If simple mode succeeds, do not escalate to complex mode.
 - If complex mode is required, keep orchestration declarative and fully cleanup.
 
@@ -54,6 +59,13 @@ Output format (JSON only, no prose):
   "schema_version": 1,
   "repo_id": "string",
   "runner_mode": "simple|complex",
+  "runtime": {
+    "docker": {
+      "mode": "none|host_socket|tcp",
+      "host": "string",
+      "api_version": "string"
+    }
+  },
   "targets": {
     "build": {
       "status": "passed|failed|not_attempted",

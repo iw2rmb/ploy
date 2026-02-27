@@ -692,6 +692,11 @@ Prep profile to Build Gate mapping (claim-time):
 - `post_gate` and `re_gate` map to `prep_profile.targets.unit`.
 - Mapping injects a gate prep override only when the mapped target has
   `status=passed` and non-empty `command`.
+- Simple runtime hints are also mapped:
+  - `runtime.docker.mode=host_socket` -> `DOCKER_HOST=unix:///var/run/docker.sock`
+  - `runtime.docker.mode=tcp` -> `DOCKER_HOST=<runtime.docker.host>`
+  - `runtime.docker.api_version` -> `DOCKER_API_VERSION=<value>`
+- During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that socket path into the gate container.
 - Resolution precedence:
   1. Explicit `build_gate.<phase>.prep` in submitted run spec
   2. Mapped repo `prep_profile` target

@@ -88,9 +88,9 @@ Minimum fields:
   - `unit`: `passed|failed|not_attempted`
   - `all_tests`: `passed|failed|not_attempted`
 - `runner_mode`: `simple|complex`
-- `commands`: ordered list with command text and exit code
-- `env`: required env vars
-- `orchestration`: optional lifecycle steps
+- `targets.<target>.command` and `targets.<target>.env`
+- `runtime`: optional minimal runtime hints for simple mode (e.g. `runtime.docker.mode`)
+- `orchestration`: required object; empty arrays for simple mode, populated lifecycle steps for complex mode
 - `evidence`: references to logs and key diagnostics
 - `tactics_used`: ordered identifiers
 - `notes`: short operational caveats

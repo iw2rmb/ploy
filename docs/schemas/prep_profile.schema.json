@@ -31,6 +31,9 @@
         "complex"
       ]
     },
+    "runtime": {
+      "$ref": "#/definitions/runtimeHints"
+    },
     "targets": {
       "type": "object",
       "required": [
@@ -255,6 +258,77 @@
         }
       ]
     },
+    "runtimeHints": {
+      "type": "object",
+      "properties": {
+        "docker": {
+          "$ref": "#/definitions/runtimeDocker"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeDocker": {
+      "type": "object",
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "none",
+            "host_socket",
+            "tcp"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "api_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "mode": {
+              "const": "none"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "properties": {
+            "mode": {
+              "const": "host_socket"
+            }
+          },
+          "required": [
+            "mode"
+          ]
+        },
+        {
+          "properties": {
+            "mode": {
+              "const": "tcp"
+            },
+            "host": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "mode",
+            "host"
+          ]
+        }
+      ]
+    },
     "orchestrationStep": {
       "type": "object",
       "required": [
@@ -322,5 +396,31 @@
       "additionalProperties": false
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "runner_mode": {
+            "const": "simple"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "orchestration": {
+            "type": "object",
+            "properties": {
+              "pre": {
+                "maxItems": 0
+              },
+              "post": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false
 }

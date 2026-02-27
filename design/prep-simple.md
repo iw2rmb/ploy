@@ -5,7 +5,7 @@
 A repo is `simple` when prep can resolve build/test execution using:
 - deterministic commands
 - static env vars
-- no daemon or sidecar orchestration
+- minimal runtime hints only (no lifecycle orchestration)
 - no extra service lifecycle management
 
 Typical examples:
@@ -18,7 +18,23 @@ Typical examples:
 - workspace path
 - default prep prompt
 - tactics catalog entries tagged `simple`
+- Codex non-interactive prep runner
 - baseline runner capabilities (Docker optional, but not orchestrated)
+
+## Simple Split
+
+Simple mode has two sub-levels:
+- `simple_core`: command + env only.
+- `simple_runtime`: command + env plus minimal runtime hints.
+
+Allowed simple runtime hints:
+- `runtime.docker.mode`: `none | host_socket | tcp`
+- `runtime.docker.host`: required only for `tcp`
+- `runtime.docker.api_version`: optional
+
+Not allowed in simple mode:
+- non-empty `orchestration.pre` or `orchestration.post`
+- sidecar lifecycle primitives
 
 ## Algorithm
 
@@ -54,6 +70,9 @@ Examples:
 ```yaml
 version: 1
 runner_mode: simple
+runtime:
+  docker:
+    mode: host_socket
 targets:
   build:
     command: "./gradlew --no-daemon build -x test"
@@ -75,6 +94,9 @@ evidence:
   logs:
     - artifacts/prep/build.log
     - artifacts/prep/unit.log
+orchestration:
+  pre: []
+  post: []
 ```
 
 ## Storage and Reuse

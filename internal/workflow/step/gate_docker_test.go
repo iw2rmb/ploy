@@ -278,6 +278,80 @@ func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_MountsDockerSocketForUnixDockerHost(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	socketDir := t.TempDir()
+	socketPath := filepath.Join(socketDir, "docker.sock")
+	if err := os.WriteFile(socketPath, []byte("mock socket"), 0o600); err != nil {
+		t.Fatalf("write docker socket placeholder: %v", err)
+	}
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		Prep: &contracts.BuildGatePrepOverride{
+			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
+			Env: map[string]string{
+				"DOCKER_HOST": "unix://" + socketPath,
+			},
+		},
+	}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	found := false
+	for _, mount := range rt.captured.Mounts {
+		if mount.Source == socketPath && mount.Target == socketPath {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected docker socket mount for %q, got mounts=%+v", socketPath, rt.captured.Mounts)
+	}
+}
+
+func TestDockerGateExecutor_DoesNotMountDockerSocketForTCPDockerHost(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		Prep: &contracts.BuildGatePrepOverride{
+			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
+			Env: map[string]string{
+				"DOCKER_HOST": "tcp://prep-dind:2375",
+			},
+		},
+	}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+	for _, mount := range rt.captured.Mounts {
+		if strings.Contains(mount.Target, "docker.sock") {
+			t.Fatalf("expected no docker socket mounts for tcp docker host, got mounts=%+v", rt.captured.Mounts)
+		}
+	}
+}
+
 func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 	memHuman, err := units.RAMInBytes("1GiB")
 	if err != nil {

@@ -406,6 +406,11 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"runtime": {
+			"docker": {
+				"mode": "host_socket"
+			}
+		},
 		"targets": {
 			"build": {
 				"status": "passed",
@@ -423,7 +428,8 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 				"status": "not_attempted",
 				"env": {}
 			}
-		}
+		},
+		"orchestration": {"pre": [], "post": []}
 	}`)
 
 	tests := []struct {
@@ -441,8 +447,8 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "pre",
 			wantCmd:   "go test ./...",
-			wantEnvK:  "GOFLAGS",
-			wantEnvV:  "-mod=readonly",
+			wantEnvK:  "DOCKER_HOST",
+			wantEnvV:  "unix:///var/run/docker.sock",
 		},
 		{
 			name:      "post_gate maps targets.unit to build_gate.post.prep",
