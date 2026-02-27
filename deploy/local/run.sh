@@ -188,6 +188,11 @@ if not username:
 password = dsn_u.password
 
 host = dsn_u.hostname or ""
+# Host-style DSN is used by host-side psql/pg_isready checks.
+# Accept container-style aliases as input and normalize them back to localhost
+# so redeploy works regardless of which DSN variant is exported.
+if host.lower() in ("host.docker.internal", "docker.for.mac.host.internal", "gateway.docker.internal"):
+    host = "localhost"
 if ":" in host and not host.startswith("["):
     host = f"[{host}]"
 
@@ -227,14 +232,18 @@ PY
 
 wait_for_postgres() {
   local admin_dsn="$1"
+  local last_status=""
   log "Waiting for local PostgreSQL to be ready..."
   for i in {1..60}; do
-    if pg_isready -d "$admin_dsn" >/dev/null 2>&1; then
+    if last_status="$(PGCONNECT_TIMEOUT=2 pg_isready -d "$admin_dsn" 2>&1)"; then
       return 0
+    fi
+    if (( i == 1 || i % 10 == 0 )); then
+      log "PostgreSQL not ready yet (${i}/60): ${last_status}"
     fi
     sleep 1
   done
-  echo "error: local PostgreSQL did not become ready in time" >&2
+  echo "error: local PostgreSQL did not become ready in time (last status: ${last_status})" >&2
   exit 1
 }
 
