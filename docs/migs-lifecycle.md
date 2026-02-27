@@ -1056,6 +1056,8 @@ Current prep scheduler behavior:
 - Prep orchestration runs every `scheduler.prep_interval` (`0` disables).
 - Retry claims are eligible when `prep_updated_at <= now() - scheduler.prep_retry_delay`.
 - Each claim increments `mig_repos.prep_attempts` and clears last error/failure code.
+- Prep clone uses `mig_repos.base_ref` as the workspace base snapshot (same as run hydration).
+  `target_ref` is not used for prep checkout.
 - Success persists `prep_profile` + `prep_artifacts` and transitions repo to `PrepReady`.
 - Queued run repos are eligible for job materialization only when
   `mig_repos.prep_status='PrepReady'`.

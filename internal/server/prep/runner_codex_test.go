@@ -70,6 +70,70 @@ JSON
 	}
 }
 
+func TestCodexRunnerRunClonesBaseRef(t *testing.T) {
+	t.Parallel()
+
+	binDir := t.TempDir()
+	promptPath := filepath.Join(t.TempDir(), "prompt.txt")
+	if err := os.WriteFile(promptPath, []byte("prep prompt"), 0o644); err != nil {
+		t.Fatalf("write prompt: %v", err)
+	}
+
+	gitPath := filepath.Join(binDir, "git")
+	if err := os.WriteFile(gitPath, []byte(`#!/bin/sh
+if [ "$1" != "clone" ]; then
+  exit 1
+fi
+branch=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--branch" ]; then
+    branch="$arg"
+    break
+  fi
+  prev="$arg"
+done
+if [ "$branch" != "main" ]; then
+  echo "unexpected branch: $branch" >&2
+  exit 2
+fi
+for last; do :; done
+mkdir -p "$last"
+exit 0
+`), 0o755); err != nil {
+		t.Fatalf("write fake git: %v", err)
+	}
+
+	codexPath := filepath.Join(binDir, "codex")
+	if err := os.WriteFile(codexPath, []byte(`#!/bin/sh
+cat <<JSON
+{"schema_version":1,"repo_id":"$PLOY_PREP_REPO_ID","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]},"tactics_used":["go_default"],"attempts":[],"evidence":{"log_refs":["inline://prep/test"],"diagnostics":[]},"repro_check":{"status":"passed","details":"ok"},"prompt_delta_suggestion":{"status":"none","summary":"","candidate_lines":[]}}
+JSON
+`), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	runner := NewCodexRunner(CodexRunnerOptions{
+		Command:    []string{codexPath},
+		GitBinary:  gitPath,
+		PromptPath: promptPath,
+	})
+
+	_, err := runner.Run(context.Background(), RunRequest{
+		Repo: store.MigRepo{
+			ID:           domaintypes.NewMigRepoID(),
+			PrepAttempts: 1,
+			RepoUrl:      "https://example.com/repo.git",
+			BaseRef:      "main",
+			TargetRef:    "branch-that-must-not-be-used",
+		},
+		Attempt: 1,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+}
+
 func TestCodexRunnerRunCommandNotFound(t *testing.T) {
 	t.Parallel()
 

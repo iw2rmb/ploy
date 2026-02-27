@@ -114,7 +114,12 @@ func (r *CodexRunner) Run(ctx context.Context, req RunRequest) (RunResult, error
 	}()
 
 	repoDir := filepath.Join(workDir, "repo")
-	cloneArgs := []string{"clone", "--depth", "1", "--branch", req.Repo.TargetRef, req.Repo.RepoUrl, repoDir}
+	baseRef := strings.TrimSpace(req.Repo.BaseRef)
+	cloneArgs := []string{"clone", "--depth", "1"}
+	if baseRef != "" {
+		cloneArgs = append(cloneArgs, "--branch", baseRef, "--single-branch")
+	}
+	cloneArgs = append(cloneArgs, req.Repo.RepoUrl, repoDir)
 	cloneOutput, cloneErr := runCommand(runCtx, "", r.gitBinary, cloneArgs, nil)
 	if cloneErr != nil {
 		resultJSON := marshalResultJSON(map[string]any{
