@@ -16,6 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // claimJobHandler allows nodes to claim a queued job for execution.
@@ -194,6 +195,10 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return fmt.Errorf("merge global env into spec: %w", err)
 	}
+	mergedSpec, err = mergeRepoPrepProfileIntoSpec(mergedSpec, modRepo.PrepProfile, jobType)
+	if err != nil {
+		return fmt.Errorf("merge repo prep_profile into spec: %w", err)
+	}
 
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
@@ -367,4 +372,99 @@ func mergeGitLabConfigIntoSpec(spec json.RawMessage, cfg config.GitLabConfig) (j
 		return nil, fmt.Errorf("marshal merged spec: %w", err)
 	}
 	return json.RawMessage(b), nil
+}
+
+func mergeRepoPrepProfileIntoSpec(spec json.RawMessage, prepProfile []byte, jobType domaintypes.JobType) (json.RawMessage, error) {
+	if len(bytes.TrimSpace(prepProfile)) == 0 {
+		return spec, nil
+	}
+
+	profile, err := contracts.ParsePrepProfileJSON(prepProfile)
+	if err != nil {
+		return nil, err
+	}
+	phase, override, err := contracts.PrepProfileGateOverrideForJobType(profile, jobType)
+	if err != nil {
+		return nil, err
+	}
+	if override == nil {
+		return spec, nil
+	}
+
+	phaseKey := ""
+	switch phase {
+	case contracts.BuildGatePrepPhasePre:
+		phaseKey = "pre"
+	case contracts.BuildGatePrepPhasePost:
+		phaseKey = "post"
+	default:
+		return spec, nil
+	}
+
+	m, err := parseSpecObjectStrict(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	buildGate, err := ensureObjectField(m, "build_gate", "spec")
+	if err != nil {
+		return nil, err
+	}
+	phaseCfg, err := ensureObjectField(buildGate, phaseKey, "spec.build_gate")
+	if err != nil {
+		return nil, err
+	}
+
+	if existing, exists := phaseCfg["prep"]; exists && existing != nil {
+		return spec, nil
+	}
+	phaseCfg["prep"] = buildGatePrepOverrideToMap(override)
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return json.RawMessage(b), nil
+}
+
+func ensureObjectField(parent map[string]any, key string, prefix string) (map[string]any, error) {
+	if v, ok := parent[key]; ok && v != nil {
+		obj, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s.%s: expected object, got %T", prefix, key, v)
+		}
+		return obj, nil
+	}
+	obj := map[string]any{}
+	parent[key] = obj
+	return obj, nil
+}
+
+func buildGatePrepOverrideToMap(override *contracts.BuildGatePrepOverride) map[string]any {
+	if override == nil {
+		return nil
+	}
+
+	prep := map[string]any{
+		"command": commandSpecToWireValue(override.Command),
+	}
+	if len(override.Env) > 0 {
+		env := make(map[string]any, len(override.Env))
+		for k, v := range override.Env {
+			env[k] = v
+		}
+		prep["env"] = env
+	}
+	return prep
+}
+
+func commandSpecToWireValue(command contracts.CommandSpec) any {
+	if len(command.Exec) > 0 {
+		out := make([]any, 0, len(command.Exec))
+		for _, v := range command.Exec {
+			out = append(out, v)
+		}
+		return out
+	}
+	return command.Shell
 }

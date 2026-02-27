@@ -126,8 +126,17 @@ build_gate:
 
 ### Prep Override Precedence
 
-When `build_gate.<phase>.prep.command` is configured, Build Gate uses that command
-instead of the detected-tool default command (`buildCommandForTool` fallback).
+Gate command resolution uses the following precedence (highest wins):
+1. Explicit run spec override: `build_gate.<phase>.prep`
+2. Repo prep profile mapping (claim-time injection from persisted `prep_profile`)
+3. Detected-tool fallback command (`buildCommandForTool`)
+
+Prep profile mapping for simple mode:
+- `pre_gate` maps to `targets.build`
+- `post_gate` maps to `targets.unit`
+- `re_gate` maps to `targets.unit` (same as post phase)
+- Mapping injects only when mapped target has `status: passed` and a non-empty `command`.
+
 Prep payload visibility is available via `GET /v1/repos/{repo_id}/prep`
 (`prep_profile`, `prep_artifacts`, and prep attempt evidence).
 
