@@ -75,7 +75,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	applyGateStackDetect(&manifest, req.JobType, typedOpts)
+	applyGatePhaseOverrides(&manifest, req.JobType, typedOpts)
 
 	// Rehydrate workspace from base + diffs.
 	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
@@ -272,14 +272,19 @@ func (r *runController) runRouterForGateFailure(
 	}
 }
 
-// applyGateStackDetect wires the optional StackDetect override into the gate manifest.
+// applyGatePhaseOverrides wires optional per-phase overrides into the gate manifest.
 //
 // Semantics:
 //   - pre_gate may use build_gate.pre.stack as a fallback/override.
 //   - post_gate may use build_gate.post.stack as a fallback/override.
 //   - re_gate must *not* use build_gate.post.stack; it re-runs the gate using the
 //     stackdetect output to select the runtime image/tool.
-func applyGateStackDetect(manifest *contracts.StepManifest, jobType types.JobType, typedOpts RunOptions) {
+//
+// Prep override semantics:
+//   - pre_gate may use build_gate.pre.prep command/env override.
+//   - post_gate may use build_gate.post.prep command/env override.
+//   - re_gate reuses build_gate.post.prep command/env override.
+func applyGatePhaseOverrides(manifest *contracts.StepManifest, jobType types.JobType, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
@@ -289,10 +294,14 @@ func applyGateStackDetect(manifest *contracts.StepManifest, jobType types.JobTyp
 		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
 		}
+		manifest.Gate.Prep = typedOpts.BuildGate.PrePrep
 	case types.JobTypePostGate:
 		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
 		}
+		manifest.Gate.Prep = typedOpts.BuildGate.PostPrep
+	case types.JobTypeReGate:
+		manifest.Gate.Prep = typedOpts.BuildGate.PostPrep
 	}
 }
 

@@ -204,6 +204,80 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		Prep: &contracts.BuildGatePrepOverride{
+			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
+		},
+	}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	got := rt.captured.Command
+	want := []string{"/bin/sh", "-c", "echo prep-gate"}
+	if len(got) != len(want) {
+		t.Fatalf("captured command length = %d, want %d (%v)", len(got), len(want), got)
+	}
+	for i, v := range want {
+		if got[i] != v {
+			t.Fatalf("captured command[%d] = %q, want %q", i, got[i], v)
+		}
+	}
+}
+
+func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		Env: map[string]string{
+			"A": "base",
+			"B": "base",
+		},
+		Prep: &contracts.BuildGatePrepOverride{
+			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
+			Env: map[string]string{
+				"B": "prep",
+				"C": "prep",
+			},
+		},
+	}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+	if got := rt.captured.Env["A"]; got != "base" {
+		t.Fatalf("env[A] = %q, want %q", got, "base")
+	}
+	if got := rt.captured.Env["B"]; got != "prep" {
+		t.Fatalf("env[B] = %q, want %q", got, "prep")
+	}
+	if got := rt.captured.Env["C"]; got != "prep" {
+		t.Fatalf("env[C] = %q, want %q", got, "prep")
+	}
+}
+
 func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 	memHuman, err := units.RAMInBytes("1GiB")
 	if err != nil {

@@ -351,11 +351,53 @@ func parseBuildGatePhaseConfig(raw map[string]any, prefix string) (*BuildGatePha
 		phase.Stack = stack
 	}
 
-	if phase.Stack == nil {
+	if v, ok := raw["prep"]; ok && v != nil {
+		prepRaw, err := expectMap(v, prefix+".prep")
+		if err != nil {
+			return nil, err
+		}
+		prep, err := parseBuildGatePrepOverride(prepRaw, prefix+".prep")
+		if err != nil {
+			return nil, err
+		}
+		phase.Prep = prep
+	}
+
+	if phase.Stack == nil && phase.Prep == nil {
 		return nil, nil
 	}
 
 	return phase, nil
+}
+
+func parseBuildGatePrepOverride(raw map[string]any, prefix string) (*BuildGatePrepOverride, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+
+	prep := &BuildGatePrepOverride{}
+
+	if v, ok := raw["command"]; ok && v != nil {
+		cmd, err := ParseCommandSpec(v)
+		if err != nil {
+			return nil, fmt.Errorf("%s.command: %w", prefix, err)
+		}
+		prep.Command = cmd
+	}
+
+	if v, ok := raw["env"]; ok && v != nil {
+		env, err := parseEnvMap(v, prefix+".env")
+		if err != nil {
+			return nil, err
+		}
+		prep.Env = env
+	}
+
+	if prep.Command.IsEmpty() {
+		return nil, fmt.Errorf("%s.command: required", prefix)
+	}
+
+	return prep, nil
 }
 
 func parseBuildGateStackConfig(raw map[string]any, prefix string) (*BuildGateStackConfig, error) {

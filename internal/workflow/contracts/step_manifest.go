@@ -115,6 +115,9 @@ type StepGateSpec struct {
 	// StackGate holds the Stack Gate configuration for this step.
 	// Used for pre/post gate validation of stack expectations.
 	StackGate *StepGateStackSpec
+
+	// Prep holds optional prep-derived command/env overrides for this gate phase.
+	Prep *BuildGatePrepOverride
 }
 
 // StepGateStackSpec holds the effective Stack Gate configuration for a gate phase.

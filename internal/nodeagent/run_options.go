@@ -29,6 +29,8 @@ type BuildGateOptions struct {
 	Images    []contracts.BuildGateImageRule
 	PreStack  *contracts.BuildGateStackConfig
 	PostStack *contracts.BuildGateStackConfig
+	PrePrep   *contracts.BuildGatePrepOverride
+	PostPrep  *contracts.BuildGatePrepOverride
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
@@ -90,9 +92,11 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		runOpts.BuildGate.Images = spec.BuildGate.Images
 		if spec.BuildGate.Pre != nil {
 			runOpts.BuildGate.PreStack = spec.BuildGate.Pre.Stack
+			runOpts.BuildGate.PrePrep = copyBuildGatePrepOverride(spec.BuildGate.Pre.Prep)
 		}
 		if spec.BuildGate.Post != nil {
 			runOpts.BuildGate.PostStack = spec.BuildGate.Post.Stack
+			runOpts.BuildGate.PostPrep = copyBuildGatePrepOverride(spec.BuildGate.Post.Prep)
 		}
 
 		if spec.BuildGate.Healing != nil {
@@ -179,4 +183,14 @@ func copyStringMap(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func copyBuildGatePrepOverride(in *contracts.BuildGatePrepOverride) *contracts.BuildGatePrepOverride {
+	if in == nil {
+		return nil
+	}
+	return &contracts.BuildGatePrepOverride{
+		Command: in.Command,
+		Env:     copyStringMap(in.Env),
+	}
 }

@@ -220,6 +220,18 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			},
 			BuildGate: &contracts.BuildGateConfig{
 				Enabled: true,
+				Pre: &contracts.BuildGatePhaseConfig{
+					Prep: &contracts.BuildGatePrepOverride{
+						Command: contracts.CommandSpec{Shell: "go test ./..."},
+						Env:     map[string]string{"GOFLAGS": "-mod=readonly"},
+					},
+				},
+				Post: &contracts.BuildGatePhaseConfig{
+					Prep: &contracts.BuildGatePrepOverride{
+						Command: contracts.CommandSpec{Exec: []string{"go", "test", "./...", "-run", "TestUnit"}},
+						Env:     map[string]string{"CGO_ENABLED": "0"},
+					},
+				},
 				Healing: &contracts.HealingSpec{
 					Retries: 3,
 					Image:   contracts.JobImage{Universal: "docker.io/test/heal:v1"},
@@ -259,6 +271,30 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		}
 		if !runOpts.BuildGate.Enabled {
 			t.Error("BuildGate.Enabled: expected true")
+		}
+		if runOpts.BuildGate.PrePrep == nil {
+			t.Fatal("BuildGate.PrePrep: expected non-nil")
+		}
+		if runOpts.BuildGate.PrePrep.Command.Shell != "go test ./..." {
+			t.Errorf("BuildGate.PrePrep.Command.Shell: got %q, want %q", runOpts.BuildGate.PrePrep.Command.Shell, "go test ./...")
+		}
+		if got := runOpts.BuildGate.PrePrep.Env["GOFLAGS"]; got != "-mod=readonly" {
+			t.Errorf("BuildGate.PrePrep.Env[GOFLAGS]: got %q, want %q", got, "-mod=readonly")
+		}
+		if runOpts.BuildGate.PostPrep == nil {
+			t.Fatal("BuildGate.PostPrep: expected non-nil")
+		}
+		wantPost := []string{"go", "test", "./...", "-run", "TestUnit"}
+		if len(runOpts.BuildGate.PostPrep.Command.Exec) != len(wantPost) {
+			t.Fatalf("BuildGate.PostPrep.Command.Exec length: got %d, want %d", len(runOpts.BuildGate.PostPrep.Command.Exec), len(wantPost))
+		}
+		for i, v := range wantPost {
+			if got := runOpts.BuildGate.PostPrep.Command.Exec[i]; got != v {
+				t.Errorf("BuildGate.PostPrep.Command.Exec[%d]: got %q, want %q", i, got, v)
+			}
+		}
+		if got := runOpts.BuildGate.PostPrep.Env["CGO_ENABLED"]; got != "0" {
+			t.Errorf("BuildGate.PostPrep.Env[CGO_ENABLED]: got %q, want %q", got, "0")
 		}
 
 		if runOpts.Healing == nil {
