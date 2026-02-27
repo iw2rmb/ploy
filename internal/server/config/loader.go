@@ -55,6 +55,7 @@ func loadFromReader(r io.Reader) (Config, error) {
 	// Seed explicit defaults for fields that treat 0 as an intentional disable value.
 	// This preserves default-on behavior when keys are omitted while still allowing
 	// users to set 0 explicitly.
+	cfg.Scheduler.BatchSchedulerInterval = defaultBatchSchedulerInterval
 	cfg.Scheduler.StaleJobRecoveryInterval = defaultStaleJobRecovery
 	cfg.Scheduler.NodeStaleAfter = defaultNodeStaleAfter
 	if err := dec.Decode(&cfg); err != nil {

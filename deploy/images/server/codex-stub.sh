@@ -28,6 +28,7 @@ if [ "$#" -lt 1 ]; then
 fi
 
 repo_id="${PLOY_PREP_REPO_ID:-}"
+base_ref="${PLOY_PREP_BASE_REF:-}"
 target_ref="${PLOY_PREP_TARGET_REF:-}"
 
 if [ -z "$repo_id" ]; then
@@ -35,9 +36,9 @@ if [ -z "$repo_id" ]; then
   exit 2
 fi
 
-case "$target_ref" in
+case "$base_ref:$target_ref" in
   *fail*)
-    echo "{\"error\":\"forced prep failure\",\"target_ref\":\"$target_ref\"}"
+    echo "{\"error\":\"forced prep failure\",\"base_ref\":\"$base_ref\",\"target_ref\":\"$target_ref\"}"
     exit 1
     ;;
 esac

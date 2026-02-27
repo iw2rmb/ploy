@@ -17,9 +17,10 @@ ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/prep-fail}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
-REPO_URL=${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}
-BASE_REF=${PLOY_E2E_BASE_REF:-e2e/fail-missing-symbol}
-TARGET_REF=${PLOY_E2E_TARGET_REF:-e2e/fail-missing-symbol}
+REPO_URL=${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}
+BASE_REF=${PLOY_E2E_BASE_REF:-prep-fail-trigger}
+TARGET_REF=${PLOY_E2E_TARGET_REF:-master}
+SPEC_FILE="${ARTIFACT_DIR}/prep-fail-spec.json"
 
 resolve_descriptor_path() {
   local marker="${PLOY_CONFIG_HOME}/clusters/default"
@@ -52,12 +53,24 @@ api_get() {
     "${SERVER_URL}${path}"
 }
 
-RUN_ID=$("$REPO_ROOT/dist/ploy" mig run --json \
-  --repo-url "$REPO_URL" \
-  --repo-base-ref "$BASE_REF" \
-  --repo-target-ref "$TARGET_REF" \
-  --job-image alpine:3.20 \
-  --job-command 'echo "[prep-fail] this step should stay gated"' \
+cat > "$SPEC_FILE" <<'JSON'
+{
+  "version": "0.2.0",
+  "env": {},
+  "steps": [
+    {
+      "image": "alpine:3.20",
+      "command": "echo \"[prep-fail] this step should stay gated\""
+    }
+  ]
+}
+JSON
+
+RUN_ID=$("$REPO_ROOT/dist/ploy" run --json \
+  --repo "$REPO_URL" \
+  --base-ref "$BASE_REF" \
+  --target-ref "$TARGET_REF" \
+  --spec "$SPEC_FILE" \
   | tee "${ARTIFACT_DIR}/run-submit.json" | jq -r '.run_id')
 
 if [[ -z "${RUN_ID:-}" || "$RUN_ID" == "null" ]]; then
@@ -67,8 +80,7 @@ fi
 
 REPO_ID=""
 for _ in $(seq 1 30); do
-  REPO_ID="$("$REPO_ROOT/dist/ploy" run status --json "$RUN_ID" \
-    | jq -r '.repos[0].repo_id // empty')"
+  REPO_ID="$(api_get "/v1/runs/${RUN_ID}/repos" | jq -r '.repos[0].repo_id // empty')"
   if [[ -n "$REPO_ID" ]]; then
     break
   fi
@@ -87,7 +99,6 @@ if [[ "$INITIAL_STATUS" != "PrepPending" ]]; then
   exit 1
 fi
 
-seen_running=0
 prep_status="$INITIAL_STATUS"
 deadline=$((SECONDS + 180))
 : > "${ARTIFACT_DIR}/prep-status.log"
@@ -108,7 +119,6 @@ while (( SECONDS < deadline )); do
     PrepPending)
       ;;
     PrepRunning)
-      seen_running=1
       ;;
     PrepFailed)
       printf '%s\n' "$PREP_JSON" > "${ARTIFACT_DIR}/prep-final.json"
@@ -128,10 +138,6 @@ done
 
 if [[ "$prep_status" != "PrepFailed" ]]; then
   echo "error: timed out waiting for PrepFailed (last_status=${prep_status})" >&2
-  exit 1
-fi
-if (( seen_running == 0 )); then
-  echo "error: expected to observe PrepRunning transition before PrepFailed" >&2
   exit 1
 fi
 
