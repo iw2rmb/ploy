@@ -399,6 +399,241 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	}
 }
 
+func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
+	t.Parallel()
+
+	profile := []byte(`{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"targets": {
+			"build": {
+				"status": "passed",
+				"command": "go test ./...",
+				"env": {"GOFLAGS":"-mod=readonly"},
+				"failure_code": null
+			},
+			"unit": {
+				"status": "passed",
+				"command": "go test ./... -run TestUnit",
+				"env": {"CGO_ENABLED":"0"},
+				"failure_code": null
+			},
+			"all_tests": {
+				"status": "not_attempted",
+				"env": {}
+			}
+		}
+	}`)
+
+	tests := []struct {
+		name      string
+		jobType   domaintypes.JobType
+		spec      []byte
+		wantPhase string
+		wantCmd   string
+		wantEnvK  string
+		wantEnvV  string
+	}{
+		{
+			name:      "pre_gate maps targets.build to build_gate.pre.prep",
+			jobType:   domaintypes.JobTypePreGate,
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			wantPhase: "pre",
+			wantCmd:   "go test ./...",
+			wantEnvK:  "GOFLAGS",
+			wantEnvV:  "-mod=readonly",
+		},
+		{
+			name:      "post_gate maps targets.unit to build_gate.post.prep",
+			jobType:   domaintypes.JobTypePostGate,
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			wantPhase: "post",
+			wantCmd:   "go test ./... -run TestUnit",
+			wantEnvK:  "CGO_ENABLED",
+			wantEnvV:  "0",
+		},
+		{
+			name:      "re_gate reuses post phase mapping from targets.unit",
+			jobType:   domaintypes.JobTypeReGate,
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			wantPhase: "post",
+			wantCmd:   "go test ./... -run TestUnit",
+			wantEnvK:  "CGO_ENABLED",
+			wantEnvV:  "0",
+		},
+		{
+			name:    "explicit spec prep wins over profile mapping",
+			jobType: domaintypes.JobTypePreGate,
+			spec: []byte(`{
+				"steps":[{"image":"docker.io/acme/mod:latest"}],
+				"build_gate":{"pre":{"prep":{"command":"echo explicit","env":{"X":"1"}}}}
+			}`),
+			wantPhase: "pre",
+			wantCmd:   "echo explicit",
+			wantEnvK:  "X",
+			wantEnvV:  "1",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			nodeKey := domaintypes.NewNodeKey()
+			nodeID := domaintypes.NodeID(nodeKey)
+			runID := domaintypes.NewRunID()
+			repoID := domaintypes.NewMigRepoID()
+			specID := domaintypes.NewSpecID()
+			jobID := domaintypes.NewJobID()
+			now := time.Now().UTC()
+
+			st := &mockStore{
+				getNodeResult: store.Node{ID: nodeID},
+				claimJobResult: store.Job{
+					ID:          jobID,
+					RunID:       runID,
+					RepoID:      repoID,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					NodeID:      &nodeID,
+					Name:        "gate-0",
+					Status:      store.JobStatusRunning,
+					JobType:     tc.jobType.String(),
+					Meta:        []byte(`{}`),
+				},
+				getRunResult: store.Run{
+					ID:        runID,
+					SpecID:    specID,
+					Status:    store.RunStatusStarted,
+					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+					StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+				},
+				getRunRepoResult: store.RunRepo{
+					RunID:         runID,
+					RepoID:        repoID,
+					RepoBaseRef:   "main",
+					RepoTargetRef: "feature-branch",
+					Status:        store.RunRepoStatusQueued,
+					Attempt:       1,
+				},
+				getModRepoResult: store.MigRepo{
+					ID:          repoID,
+					RepoUrl:     "https://github.com/user/repo.git",
+					PrepProfile: profile,
+				},
+				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
+			}
+
+			handler := claimJobHandler(st, &ConfigHolder{}, nil)
+			req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+			req.SetPathValue("id", nodeKey)
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			var resp map[string]any
+			if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			spec, ok := resp["spec"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected spec object, got %T", resp["spec"])
+			}
+			bg, ok := spec["build_gate"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate object, got %T", spec["build_gate"])
+			}
+			phase, ok := bg[tc.wantPhase].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate.%s object, got %T", tc.wantPhase, bg[tc.wantPhase])
+			}
+			prep, ok := phase["prep"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate.%s.prep object, got %T", tc.wantPhase, phase["prep"])
+			}
+			if got := prep["command"]; got != tc.wantCmd {
+				t.Fatalf("build_gate.%s.prep.command=%v, want %q", tc.wantPhase, got, tc.wantCmd)
+			}
+			env, ok := prep["env"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate.%s.prep.env object, got %T", tc.wantPhase, prep["env"])
+			}
+			if got := env[tc.wantEnvK]; got != tc.wantEnvV {
+				t.Fatalf("build_gate.%s.prep.env[%s]=%v, want %q", tc.wantPhase, tc.wantEnvK, got, tc.wantEnvV)
+			}
+		})
+	}
+}
+
+func TestClaimJob_InvalidPrepProfileReturnsError(t *testing.T) {
+	t.Parallel()
+
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeID,
+			Name:        "pre-gate-0",
+			Status:      store.JobStatusRunning,
+			JobType:     domaintypes.JobTypePreGate.String(),
+			Meta:        []byte(`{}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+		getModRepoResult: store.MigRepo{
+			ID:          repoID,
+			RepoUrl:     "https://github.com/user/repo.git",
+			PrepProfile: []byte(`{"schema_version":1}`),
+		},
+		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "prep_profile") {
+		t.Fatalf("expected prep_profile error, got %q", rr.Body.String())
+	}
+}
+
 func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	t.Parallel()
 

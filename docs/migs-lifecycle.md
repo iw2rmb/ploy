@@ -687,6 +687,19 @@ Prep observability endpoints:
   `prep_attempts`, `prep_last_error`, `prep_profile`, `prep_artifacts`,
   plus `prep_runs` evidence (`attempt`, `status`, timestamps, `result_json`, `logs_ref`).
 
+Prep profile to Build Gate mapping (claim-time):
+- `pre_gate` maps to `prep_profile.targets.build`.
+- `post_gate` and `re_gate` map to `prep_profile.targets.unit`.
+- Mapping injects a gate prep override only when the mapped target has
+  `status=passed` and non-empty `command`.
+- Resolution precedence:
+  1. Explicit `build_gate.<phase>.prep` in submitted run spec
+  2. Mapped repo `prep_profile` target
+  3. Default detected-tool command fallback
+- Gate env precedence remains:
+  1. Base gate env from spec and server env injection
+  2. Mapped/explicit prep env override on key conflicts
+
 ### Relationship summary (v1)
 
 | Table       | Purpose                                    | Key relationships                         |

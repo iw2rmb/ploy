@@ -191,7 +191,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent -run 'TestBuildGateManifest|TestExecuteGateJob'`
     - `go test ./internal/workflow/step -run 'TestGateDocker'`
 
-- [ ] Wire persisted repo `prep_profile` into gate planning (simple mode completion).
+- [x] Wire persisted repo `prep_profile` into gate planning (simple mode completion).
   - Repository: `ploy`
   - Component: `internal/server/handlers` + `internal/workflow/contracts` + `internal/nodeagent` + `internal/workflow/step`
   - Scope:
