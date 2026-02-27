@@ -15,6 +15,11 @@ func TestMergeRepoPrepProfileIntoSpec(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"runtime": {
+			"docker": {
+				"mode": "host_socket"
+			}
+		},
 		"targets": {
 			"build": {
 				"status": "passed",
@@ -32,6 +37,10 @@ func TestMergeRepoPrepProfileIntoSpec(t *testing.T) {
 				"status": "not_attempted",
 				"env": {}
 			}
+		},
+		"orchestration": {
+			"pre": [],
+			"post": []
 		}
 	}`)
 
@@ -53,8 +62,8 @@ func TestMergeRepoPrepProfileIntoSpec(t *testing.T) {
 			profile:   profile,
 			wantPhase: "pre",
 			wantCmd:   "go test ./...",
-			wantEnvK:  "GOFLAGS",
-			wantEnvV:  "-mod=readonly",
+			wantEnvK:  "DOCKER_HOST",
+			wantEnvV:  "unix:///var/run/docker.sock",
 		},
 		{
 			name:      "injects post_gate from unit target",
@@ -107,7 +116,8 @@ func TestMergeRepoPrepProfileIntoSpec(t *testing.T) {
 					"build": {"status": "failed", "command":"go test ./...", "env": {}, "failure_code": "unknown"},
 					"unit": {"status": "passed", "command":"go test ./... -run TestUnit", "env": {}, "failure_code": null},
 					"all_tests": {"status": "not_attempted", "env": {}}
-				}
+				},
+				"orchestration": {"pre": [], "post": []}
 			}`),
 		},
 		{

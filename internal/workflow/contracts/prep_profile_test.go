@@ -14,6 +14,12 @@ func TestPrepProfileParseAndMapToGate(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"runtime": {
+			"docker": {
+				"mode": "host_socket",
+				"api_version": "1.45"
+			}
+		},
 		"targets": {
 			"build": {
 				"status": "passed",
@@ -31,6 +37,10 @@ func TestPrepProfileParseAndMapToGate(t *testing.T) {
 				"status": "not_attempted",
 				"env": {}
 			}
+		},
+		"orchestration": {
+			"pre": [],
+			"post": []
 		}
 	}`)
 
@@ -55,6 +65,12 @@ func TestPrepProfileParseAndMapToGate(t *testing.T) {
 	if got := override.Env["GOFLAGS"]; got != "-mod=readonly" {
 		t.Fatalf("pre env[GOFLAGS]=%q, want %q", got, "-mod=readonly")
 	}
+	if got := override.Env[PrepDockerHostEnv]; got != "unix:///var/run/docker.sock" {
+		t.Fatalf("pre env[%s]=%q, want %q", PrepDockerHostEnv, got, "unix:///var/run/docker.sock")
+	}
+	if got := override.Env[PrepDockerAPIVersionEnv]; got != "1.45" {
+		t.Fatalf("pre env[%s]=%q, want %q", PrepDockerAPIVersionEnv, got, "1.45")
+	}
 
 	phase, override, err = PrepProfileGateOverrideForJobType(profile, types.JobTypePostGate)
 	if err != nil {
@@ -71,6 +87,9 @@ func TestPrepProfileParseAndMapToGate(t *testing.T) {
 	}
 	if got := override.Env["CGO_ENABLED"]; got != "0" {
 		t.Fatalf("post env[CGO_ENABLED]=%q, want %q", got, "0")
+	}
+	if got := override.Env[PrepDockerHostEnv]; got != "unix:///var/run/docker.sock" {
+		t.Fatalf("post env[%s]=%q, want %q", PrepDockerHostEnv, got, "unix:///var/run/docker.sock")
 	}
 
 	phase, override, err = PrepProfileGateOverrideForJobType(profile, types.JobTypeReGate)
@@ -108,18 +127,33 @@ func TestPrepProfileParseRejectsInvalidPayload(t *testing.T) {
 		},
 		{
 			name:    "missing schema version",
-			raw:     []byte(`{"repo_id":"repo_123","runner_mode":"simple","targets":{}}`),
+			raw:     []byte(`{"repo_id":"repo_123","runner_mode":"simple","targets":{},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.schema_version",
 		},
 		{
 			name:    "invalid target status",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"bad","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"bad","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.targets.build.status",
 		},
 		{
 			name:    "passed missing command",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"passed","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"passed","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.targets.build.command",
+		},
+		{
+			name:    "simple mode rejects orchestration steps",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[{"id":"x"}],"post":[]}}`),
+			wantErr: "simple mode must not define pre/post steps",
+		},
+		{
+			name:    "runtime tcp requires host",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","runtime":{"docker":{"mode":"tcp"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "prep_profile.runtime.docker.host",
+		},
+		{
+			name:    "runtime host forbidden for host_socket",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","runtime":{"docker":{"mode":"host_socket","host":"tcp://docker:2375"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "prep_profile.runtime.docker.host: forbidden",
 		},
 	}
 
@@ -147,7 +181,8 @@ func TestPrepProfileMapToGateSkipsWhenNotPassedOrMissingCommand(t *testing.T) {
 			"build": {"status":"not_attempted","env":{}},
 			"unit": {"status":"failed","command":"go test ./... -run TestUnit","env":{},"failure_code":"unknown"},
 			"all_tests": {"status":"not_attempted","env":{}}
-		}
+		},
+		"orchestration": {"pre": [], "post": []}
 	}`))
 	if err != nil {
 		t.Fatalf("ParsePrepProfileJSON: %v", err)
@@ -167,5 +202,41 @@ func TestPrepProfileMapToGateSkipsWhenNotPassedOrMissingCommand(t *testing.T) {
 	}
 	if postOverride != nil {
 		t.Fatalf("post override=%v, want nil", postOverride)
+	}
+}
+
+func TestPrepProfileRuntimeTCPMapsToGateEnv(t *testing.T) {
+	t.Parallel()
+
+	profile, err := ParsePrepProfileJSON([]byte(`{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"runtime": {
+			"docker": {
+				"mode": "tcp",
+				"host": "tcp://prep-dind:2375"
+			}
+		},
+		"targets": {
+			"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
+			"unit": {"status":"not_attempted","env":{}},
+			"all_tests": {"status":"not_attempted","env":{}}
+		},
+		"orchestration": {"pre": [], "post": []}
+	}`))
+	if err != nil {
+		t.Fatalf("ParsePrepProfileJSON: %v", err)
+	}
+
+	_, override, err := PrepProfileGateOverrideForJobType(profile, types.JobTypePreGate)
+	if err != nil {
+		t.Fatalf("PrepProfileGateOverrideForJobType(pre_gate): %v", err)
+	}
+	if override == nil {
+		t.Fatal("override=nil, want non-nil")
+	}
+	if got := override.Env[PrepDockerHostEnv]; got != "tcp://prep-dind:2375" {
+		t.Fatalf("env[%s]=%q, want %q", PrepDockerHostEnv, got, "tcp://prep-dind:2375")
 	}
 }

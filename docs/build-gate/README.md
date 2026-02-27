@@ -136,6 +136,11 @@ Prep profile mapping for simple mode:
 - `post_gate` maps to `targets.unit`
 - `re_gate` maps to `targets.unit` (same as post phase)
 - Mapping injects only when mapped target has `status: passed` and a non-empty `command`.
+- Runtime hint mapping:
+  - `runtime.docker.mode=host_socket` injects `DOCKER_HOST=unix:///var/run/docker.sock`
+  - `runtime.docker.mode=tcp` injects `DOCKER_HOST=<runtime.docker.host>`
+  - `runtime.docker.api_version` injects `DOCKER_API_VERSION=<value>` when set
+  - when `DOCKER_HOST` is `unix://...`, Build Gate mounts that socket path into the gate container automatically.
 
 Prep payload visibility is available via `GET /v1/repos/{repo_id}/prep`
 (`prep_profile`, `prep_artifacts`, and prep attempt evidence).

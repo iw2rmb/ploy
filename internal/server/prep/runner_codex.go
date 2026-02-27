@@ -301,4 +301,6 @@ Find reproducible settings for this repository in strict priority order:
 Constraints:
 - Do not modify repository source code.
 - Do not ask user questions.
+- Use simple mode first; keep orchestration.pre/post empty unless complex mode is required.
+- For simple runtime hints, prefer runtime.docker.mode over ad-hoc orchestration.
 - Output JSON only and ensure it validates against prep profile schema v1.`

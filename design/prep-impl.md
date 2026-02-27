@@ -22,6 +22,7 @@ Tactics:
 - Support `simple` mode first.
 - Record `complex` findings as failure evidence (no orchestration execution yet).
 - Add one reproducibility rerun before marking success.
+- In simple mode, allow minimal runtime hints (`runtime.docker.mode`) without orchestration.
 
 Deliverables:
 - Repo prep state transitions wired to lifecycle.
@@ -45,6 +46,14 @@ Tactics:
 - Enforce target/result consistency:
   - `passed` requires command and null failure code.
   - `failed` requires command and concrete failure code.
+- Split simple profiles into:
+  - `simple_core` (command/env only)
+  - `simple_runtime` (command/env + runtime hints)
+- Enforce simple-mode orchestration constraints:
+  - `orchestration.pre` and `orchestration.post` must be empty.
+- Enforce runtime hint constraints:
+  - `runtime.docker.mode` enum (`none|host_socket|tcp`)
+  - `runtime.docker.host` required only for `tcp`.
 - Enforce stable enums for status and failure taxonomy.
 - Add schema versioning policy (`schema_version` required; additive changes only for v1).
 - Add CI validation fixture set:
@@ -132,4 +141,3 @@ Acceptance:
 - `design/prep-complex.md`
 - `design/prep-prompt.md`
 - `docs/schemas/prep_profile.schema.json`
-
