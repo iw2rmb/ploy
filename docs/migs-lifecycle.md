@@ -177,9 +177,18 @@ under `healing` — there is no nested `mig` key.
 
 **Router** runs once per gate failure that triggers healing (each iteration),
 before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to
-`/out/codex-last.txt` containing `{"bug_summary":"..."}`. The bug_summary
-(max 200 chars, single-line) is persisted in `jobs.meta.gate.bug_summary`.
+`/out/codex-last.txt` containing `bug_summary` plus classifier metadata:
+`error_kind`, optional `strategy_id`, optional `confidence`, optional `reason`,
+and optional structured `expectations`.
+The `bug_summary` (max 200 chars, single-line) is persisted in
+`jobs.meta.gate.bug_summary`.
+Classifier metadata is persisted in `jobs.meta.gate.recovery`.
+If router output is missing/invalid for classification, `error_kind` defaults to `unknown`.
 Router is required when healing is configured.
+
+Router runtime environment:
+- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
+- `PLOY_LOOP_KIND` — loop context (`healing`)
 
 **Healing** semantics:
 

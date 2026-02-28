@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts -run 'TestJobMeta'` and `go test ./internal/server/handlers -run 'TestListRunRepoJobs'` — recovery fields persist and surface.
 
 ## Phase 3: Router Classification Wiring
-- [ ] Parse structured router output on every gate failure — convert router from bug-summary-only to classifier output source.
+- [x] Parse structured router output on every gate failure — convert router from bug-summary-only to classifier output source.
   - Repository: `ploy`
   - Component: nodeagent gate execution
   - Scope: Extend `runRouterForGateFailure(...)` in `internal/nodeagent/execution_orchestrator_gate.go` and parser helpers to read `error_kind`, confidence, reason, optional strategy id, and expectations; keep `bug_summary`; default to `error_kind=unknown` on parse failure.
@@ -84,7 +84,7 @@ Legend: [ ] todo, [x] done.
     ```
   - Tests: `go test ./internal/nodeagent -run 'TestRunRouterForGateFailure'` — gate metadata contains both bug summary and recovery classifier fields.
 
-- [ ] Inject gate phase and loop kind signals into router runtime env — provide router with required phase priors and loop context.
+- [x] Inject gate phase and loop kind signals into router runtime env — provide router with required phase priors and loop context.
   - Repository: `ploy`
   - Component: nodeagent manifest + gate runtime execution
   - Scope: Update `internal/nodeagent/manifest.go` (`buildRouterManifest`) and `internal/nodeagent/execution_orchestrator_gate.go` to pass `PLOY_GATE_PHASE` (`pre_gate|post_gate|re_gate`) and `PLOY_LOOP_KIND=healing` for every gate-failure router execution.

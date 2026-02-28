@@ -199,7 +199,7 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 				Name:    "pre-gate",
 				JobType: "pre_gate",
 				Status:  store.JobStatusFail,
-				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing"}}}`),
+				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}}`),
 			},
 		},
 	}
@@ -225,6 +225,12 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 				StrategyID string   `json:"strategy_id"`
 				Confidence *float64 `json:"confidence"`
 				Reason     string   `json:"reason"`
+				Expectations struct {
+					Artifacts []struct {
+						Path   string `json:"path"`
+						Schema string `json:"schema"`
+					} `json:"artifacts"`
+				} `json:"expectations"`
 			} `json:"recovery"`
 		} `json:"jobs"`
 	}
@@ -254,6 +260,12 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	}
 	if got, want := resp.Jobs[0].Recovery.Reason, "docker socket missing"; got != want {
 		t.Fatalf("recovery.reason = %q, want %q", got, want)
+	}
+	if len(resp.Jobs[0].Recovery.Expectations.Artifacts) != 1 {
+		t.Fatalf("recovery.expectations.artifacts len = %d, want 1", len(resp.Jobs[0].Recovery.Expectations.Artifacts))
+	}
+	if got, want := resp.Jobs[0].Recovery.Expectations.Artifacts[0].Path, "/out/prep-profile-candidate.json"; got != want {
+		t.Fatalf("recovery.expectations.artifacts[0].path = %q, want %q", got, want)
 	}
 }
 

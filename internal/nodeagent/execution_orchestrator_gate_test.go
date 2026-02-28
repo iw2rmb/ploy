@@ -214,9 +214,15 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 	mc := &mockRouterContainerRuntime{}
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		if strings.Contains(spec.Image, "router") {
+			if got, want := spec.Env["PLOY_GATE_PHASE"], "pre_gate"; got != want {
+				t.Fatalf("router env PLOY_GATE_PHASE = %q, want %q", got, want)
+			}
+			if got, want := spec.Env["PLOY_LOOP_KIND"], "healing"; got != want {
+				t.Fatalf("router env PLOY_LOOP_KIND = %q, want %q", got, want)
+			}
 			for _, m := range spec.Mounts {
 				if m.Target == "/out" {
-					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"bug_summary":"`+wantBugSummary+`"}`+"\n"), 0o644)
+					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"bug_summary":"`+wantBugSummary+`","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}`+"\n"), 0o644)
 				}
 			}
 		}
@@ -229,6 +235,7 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 		RunID:   types.RunID("run-router-gate"),
 		JobID:   types.JobID("job-router-gate"),
 		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		JobType: types.JobTypePreGate,
 	}
 
 	typedOpts := RunOptions{
@@ -252,6 +259,76 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 
 	if gateResult.BugSummary != wantBugSummary {
 		t.Fatalf("gateResult.BugSummary = %q, want %q", gateResult.BugSummary, wantBugSummary)
+	}
+	if gateResult.Recovery == nil {
+		t.Fatal("gateResult.Recovery is nil, want classifier metadata")
+	}
+	if got, want := gateResult.Recovery.ErrorKind, "infra"; got != want {
+		t.Fatalf("gateResult.Recovery.ErrorKind = %q, want %q", got, want)
+	}
+	if got, want := gateResult.Recovery.StrategyID, "infra-default"; got != want {
+		t.Fatalf("gateResult.Recovery.StrategyID = %q, want %q", got, want)
+	}
+	if gateResult.Recovery.Confidence == nil || *gateResult.Recovery.Confidence != 0.8 {
+		t.Fatalf("gateResult.Recovery.Confidence = %#v, want %v", gateResult.Recovery.Confidence, 0.8)
+	}
+	if got, want := gateResult.Recovery.Reason, "docker socket missing"; got != want {
+		t.Fatalf("gateResult.Recovery.Reason = %q, want %q", got, want)
+	}
+	if len(gateResult.Recovery.Expectations) == 0 {
+		t.Fatal("gateResult.Recovery.Expectations is empty")
+	}
+}
+
+func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing.T) {
+	t.Parallel()
+
+	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
+	workspace := t.TempDir()
+	mc := &mockRouterContainerRuntime{}
+	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+		if strings.Contains(spec.Image, "router") {
+			for _, m := range spec.Mounts {
+				if m.Target == "/out" {
+					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"error_kind":"routing"}`+"\n"), 0o644)
+				}
+			}
+		}
+		return step.ContainerHandle("mock-" + spec.Image), nil
+	}
+	runner := step.Runner{Containers: mc}
+	req := StartRunRequest{
+		RunID:   types.RunID("run-router-default"),
+		JobID:   types.JobID("job-router-default"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		JobType: types.JobTypeReGate,
+	}
+	typedOpts := RunOptions{
+		Healing: &HealingConfig{
+			Retries: 1,
+			Mod: ModContainerSpec{
+				Image: contracts.JobImage{Universal: "test/healer:latest"},
+			},
+		},
+		Router: &ModContainerSpec{
+			Image: contracts.JobImage{Universal: "test/router:latest"},
+		},
+	}
+	gateResult := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
+		LogsText:     "[ERROR] build failed\n",
+	}
+
+	rc.runRouterForGateFailure(context.Background(), runner, req, typedOpts, workspace, gateResult)
+
+	if gateResult.Recovery == nil {
+		t.Fatal("gateResult.Recovery is nil")
+	}
+	if got, want := gateResult.Recovery.LoopKind, "healing"; got != want {
+		t.Fatalf("LoopKind = %q, want %q", got, want)
+	}
+	if got, want := gateResult.Recovery.ErrorKind, "unknown"; got != want {
+		t.Fatalf("ErrorKind = %q, want %q", got, want)
 	}
 }
 

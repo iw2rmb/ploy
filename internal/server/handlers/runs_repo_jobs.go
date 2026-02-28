@@ -43,6 +43,7 @@ type RecoveryView struct {
 	StrategyID string   `json:"strategy_id,omitempty"`
 	Confidence *float64 `json:"confidence,omitempty"`
 	Reason     string   `json:"reason,omitempty"`
+	Expectations json.RawMessage `json:"expectations,omitempty"`
 }
 
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
@@ -180,5 +181,6 @@ func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *RecoveryView {
 		StrategyID: meta.StrategyID,
 		Confidence: meta.Confidence,
 		Reason:     meta.Reason,
+		Expectations: meta.Expectations,
 	}
 }
