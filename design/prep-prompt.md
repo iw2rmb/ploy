@@ -1,8 +1,13 @@
-# Draft Prompt: Prep Stage (Codex Non-Interactive)
+# Default Prep Prompt Contract
 
-Use this as the default prompt body for prep sessions.
+This file is the default prompt body used by the prep Codex runner.
 
-## Prompt
+Runner behavior:
+- preferred source: this file (`design/prep-prompt.md`)
+- fallback source: builtin prompt in `internal/server/prep/runner_codex.go` if file is missing
+- runtime metadata is appended by runner (`repo_id`, `repo_url`, `base_ref`, `target_ref`, `attempt`)
+
+## Prompt Body
 
 You are running in non-interactive prep mode for repository build readiness.
 
@@ -23,26 +28,20 @@ Constraints:
   - `runtime.docker.host` only for `tcp`
   - `runtime.docker.api_version` optional
 - If simple mode succeeds, do not escalate to complex mode.
-- If complex mode is required, keep orchestration declarative and fully cleanup.
 
 Required process:
 1. Detect stack and likely command family.
 2. Attempt simple tactics first.
-3. If simple fails, classify failure and attempt complex tactics from catalog.
-4. For each command attempt, capture:
-   - exact command
-   - environment additions
-   - exit code
-   - short failure reason
-5. On success, rerun resolved targets once in clean conditions.
-6. Produce final structured output only in the schema below.
+3. If simple fails, classify failure; keep output schema-compliant.
+4. For each command attempt, capture command/env/exit/reason.
+5. Produce final structured output only in the schema below.
 
 Priority semantics:
-- A passing `build` is mandatory for prep success.
-- `unit` is required if discoverable by repository conventions.
-- `all_tests` is best-effort; include status and reason when unresolved.
+- `build` pass is mandatory for prep success.
+- `unit` is required when discoverable by repository conventions.
+- `all_tests` is best-effort and must still report status.
 
-Failure taxonomy (use exact code values when applicable):
+Failure taxonomy values:
 - tool_not_detected
 - runtime_version_mismatch
 - docker_api_mismatch
@@ -117,23 +116,27 @@ Output format (JSON only, no prose):
 ```
 
 Validation:
-- Output must validate against `docs/schemas/prep_profile.schema.json`.
+- output must validate against `docs/schemas/prep_profile.schema.json`
 
-Rules:
-- `prompt_delta_suggestion` must be `proposed` only for reusable cross-repo findings.
-- Use `none` for repo-local specifics.
-- Keep diagnostics concise and factual.
+## Notes
 
-## Notes for Integrators
+- Keep prompt output deterministic and machine-readable.
+- `prompt_delta_suggestion` is stored but not yet automatically promoted.
 
-- Inject the tactics catalog as a separate appendix after this prompt.
-- Include repo identity and working directory in runtime metadata, not in prompt prose.
-- Reject outputs that are not valid JSON or miss required keys.
+## Planned Router Prompt Consolidation
+
+Prep-related recovery design introduces a dedicated `router/` folder for router prompts and classification contracts.
+
+Router design expectations:
+- run router after every gate failure (including failed `re_gate`)
+- provide gate phase and prior loop history as input
+- emit one of: `infra|code|mixed|unknown|custom`
+- `mixed` and `unknown` are treated as terminal stop signals for mig progression
+- strategy contracts can require typed artifacts (for example infra profile candidates) for downstream validation/promotion
 
 ## Cross References
 
-- `design/prep.md`
+- `design/prep-impl.md`
 - `design/prep-simple.md`
 - `design/prep-complex.md`
-- `design/prep-states.md`
 - `docs/schemas/prep_profile.schema.json`

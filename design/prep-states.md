@@ -1,151 +1,87 @@
-# Prep Orchestrator State Machine
+# Prep State Machine (As-Built)
 
-## Goal
+## Repo-Level States
 
-Define deterministic orchestration states for repository prep, including retries, persistence points, and handoff conditions.
-
-## Entities
-
-- `repo`: onboarding unit
-- `prep_run`: one non-interactive prep execution attempt for a repo
-- `prep_profile`: persisted successful configuration artifact
-
-## State Model
-
-### Repo-Level States
-
-1. `PrepPending`
-- Entry: new repo registered in Ploy.
-- Exit:
-  - `PrepRunning` when orchestrator claims repo.
-
-2. `PrepRunning`
-- Entry: prep run started.
-- Exit:
-  - `PrepReady` on successful validated prep.
-  - `PrepFailed` when prep run fails and retry policy is exhausted.
-  - `PrepRetryScheduled` when retry policy allows another attempt.
-
-3. `PrepRetryScheduled`
-- Entry: failed attempt with retries remaining.
-- Exit:
-  - `PrepRunning` at scheduled retry time.
-  - `PrepFailed` if retry window expires.
-
-4. `PrepReady`
-- Entry: profile persisted and reproducibility check passed.
-- Exit:
-  - next lifecycle stage (normal migration flow).
-
-5. `PrepFailed`
-- Entry: hard failure after retries or non-recoverable policy violation.
-- Exit:
-  - manual reset to `PrepPending` (operator action).
-
-### Prep-Run Substates
-
-1. `Init`
-- validate input and load tactics catalog
-- allocate run id and artifact paths
-
-2. `Detect`
-- detect stack/tool/runtime hints
-- classify into initial mode candidate (`simple` first)
-
-3. `SimpleAttempts`
-- execute simple tactic ladder
-- stop early if `build`+`unit` criteria satisfied
-
-4. `ComplexAttempts`
-- entered only when simple path fails or is inapplicable
-- execute orchestration-aware tactic ladder
-
-5. `ReproValidation`
-- clean rerun of resolved targets
-- verify deterministic success
-
-6. `PersistSuccess`
-- write prep profile
-- update repo status to `PrepReady`
-
-7. `PersistFailure`
-- store failure taxonomy, diagnostics, and artifacts
-- compute retry eligibility
-
-8. `Cleanup`
-- guaranteed execution (finally block)
-- remove temporary orchestration resources
+Implemented repo prep states:
+- `PrepPending`
+- `PrepRunning`
+- `PrepRetryScheduled`
+- `PrepReady`
+- `PrepFailed`
 
 ## Transition Rules
 
-### Primary Path
+### Claim transitions
+- `PrepPending -> PrepRunning` when claimed by prep task.
+- `PrepRetryScheduled -> PrepRunning` when retry delay cutoff is reached and repo is claimed.
 
-`PrepPending` → `PrepRunning/Init` → `Detect` → `SimpleAttempts` → `ReproValidation` → `PersistSuccess` → `PrepReady`
+Both claim transitions:
+- increment `prep_attempts`
+- clear `prep_last_error`
+- clear `prep_failure_code`
+- set `prep_updated_at=now()`
 
-### Escalation Path
+### Success transition
+- `PrepRunning -> PrepReady` when:
+  - runner returns profile JSON
+  - profile validates against prep schema
+  - prep run is finalized and profile/artifacts are persisted
 
-`SimpleAttempts` (unresolved) → `ComplexAttempts` → `ReproValidation` → `PersistSuccess`
+### Failure transitions
+- `PrepRunning -> PrepRetryScheduled` when attempt failed and attempts remain.
+- `PrepRunning -> PrepFailed` when attempt failed and max attempts are exhausted.
 
-### Failure Path
+Failure transitions persist:
+- `prep_last_error`
+- `prep_failure_code`
+- `prep_updated_at`
 
-Any substate failure → `PersistFailure` → (`PrepRetryScheduled` or `PrepFailed`)
+## Attempt Records (`prep_runs`)
 
-### Retry Path
+Each claimed attempt creates a `prep_runs` row with `status=PrepRunning`.
 
-`PrepRetryScheduled` → `PrepRunning/Init`
+Attempt completion updates the same attempt row to terminal status:
+- success path writes `PrepReady`
+- failure path writes `PrepFailed`
 
-## Retry Policy
+`prep_runs.status` is attempt-local evidence, while `mig_repos.prep_status` is the repo lifecycle state.
 
-Configurable defaults:
-- `max_attempts_per_repo`: 3
-- backoff: exponential with jitter
-- `max_retry_window`: 24h
+## Retry Policy (As-Built)
 
-Non-retryable failures (default):
-- explicit policy violations (e.g., disallowed orchestration primitive)
-- malformed prompt output schema after parser retries
+Configured by scheduler settings:
+- `prep_max_attempts`
+- `prep_retry_delay`
 
-Retryable failures (default):
-- transient daemon/service/network errors
-- registry timeout/auth propagation failures
+Retry selection rule:
+- only repos in `PrepRetryScheduled` with `prep_updated_at <= now()-prep_retry_delay` are eligible.
 
-## Persistence Boundaries
+## Scheduling Gate Dependency
 
-Must persist at:
-- prep run start (`Init`)
-- each command attempt result
-- final outcome (`PersistSuccess` / `PersistFailure`)
+Run scheduling queries require `mig_repos.prep_status='PrepReady'`.
 
-Atomicity requirements:
-- `PrepReady` state transition and profile write are a single transaction.
-- failure evidence write and `PrepFailed`/`PrepRetryScheduled` transition are a single transaction.
+Repos not in `PrepReady` remain queued at run-repo level and do not materialize job chains.
 
-## Handoff Conditions
+## API Visibility
 
-A repo may proceed to next stage only when:
-- repo state is `PrepReady`
-- prep profile exists and validates against `docs/schemas/prep_profile.schema.json`
-- reproducibility check status is `passed`
+State and evidence are exposed via:
+- `GET /v1/repos` (status summary)
+- `GET /v1/repos/{repo_id}/prep` (full prep status, profile, artifacts, attempt history)
 
-## Observability
+## Planned Gate-Recovery State Context
 
-Track metrics:
-- prep success rate
-- median prep duration
-- retries per repo
-- failure_code distribution
-- simple vs complex mode distribution
+In the next recovery track, gate loops will carry explicit context:
+- `loop_kind`: current value `healing` (reserved as extension point for future loop families)
+- `error_kind`: `infra|code|mixed|unknown|custom` (router output per failed gate)
+- `history`: per-iteration router + healer summaries
 
-Track logs:
-- state transitions with timestamps
-- tactic ids and attempt outcomes
-- cleanup results for complex mode resources
+Routing and stopping policy:
+- any gate fail enters the same loop mechanism (`agent -> re_gate`)
+- `error_kind` selects strategy contract (prompt/tools/expected outputs)
+- `re_gate` fail continues using stored loop context
+- `mixed` or `unknown` classification stops further mig progression for the repo attempt
 
 ## Cross References
 
+- `design/prep-impl.md`
 - `design/prep.md`
-- `design/prep-simple.md`
-- `design/prep-complex.md`
-- `design/prep-prompt.md`
-- `docs/schemas/prep_profile.schema.json`
-
+- `roadmap/prep/track-1-minimal-e2e.md`

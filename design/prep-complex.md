@@ -1,141 +1,98 @@
-# Prep Implementation: Complex Scenarios
+# Prep Complex Mode (Target Design, Not Yet Implemented)
 
-## Definition
+## Status
 
-A repo is `complex` when successful execution requires orchestration beyond env+command:
-- service containers or sidecars
-- registry auth and CA trust setup
-- compatibility fallbacks across runtime boundaries
+Complex prep profile shape is defined, but complex orchestration execution is not implemented in the current runtime.
 
-Note:
-- docker mode selection alone (`runtime.docker.mode`) belongs to simple-runtime mode.
-- complex mode starts when lifecycle orchestration is required.
+Current prep execution path is simple-mode Codex output validation and persistence.
 
-## Example Signals
+## Target Definition
 
-- tests use Testcontainers and fail with Docker API negotiation errors
-- private registry pulls fail due to auth
-- public registry pulls fail due to missing CA trust in daemon context
-- command succeeds only with auxiliary daemon/service lifecycle
+Complex mode is for repositories that cannot be prepared by command/env plus runtime hints alone, and require lifecycle orchestration around build/test execution.
 
-## Tactic Ladder
+Typical triggers:
+- sidecar daemon/container lifecycle requirements
+- registry auth/trust lifecycle setup
+- pre/post execution resource provisioning and cleanup
 
-Tactics execute in strict order and stop on first stable success.
+## Contract Surface
 
-1. Detect and classify Docker handshake failures
-- parse logs for API mismatch (`client too old` / min API)
+Complex profile uses:
+- `runner_mode: complex`
+- non-empty `orchestration.pre` and/or `orchestration.post`
+- same target result structure as simple mode
 
-2. Compatibility env attempt
-- try explicit API version env overrides
-- validate if negotiation actually changes
-
-3. Old-daemon fallback (sidecar dind)
-- start controlled daemon with lower API floor
-- target test runner to sidecar daemon
-
-4. Registry and trust hardening
-- configure auth for private registry paths
-- inject CA bundle into daemon context when required
-
-5. Ryuk and image-prefix adaptations
-- disable Ryuk only when required by environment constraints
-- override image prefix when private mirror policy blocks pulls
-
-6. Full target rerun and cleanup
-- run build/unit/all in resolved mode
-- enforce cleanup of temporary network/containers
-
-## Profile Shape (Complex)
-
-```yaml
-version: 1
-runner_mode: complex
-targets:
-  build:
-    command: "./gradlew --no-daemon build"
-    passed: true
-  unit:
-    command: "./gradlew --no-daemon test --tests 'ru.example.unit.*'"
-    passed: true
-  all_tests:
-    command: "./gradlew --no-daemon test"
-    passed: true
-env:
-  DOCKER_HOST: "tcp://prep-dind:2375"
-  TESTCONTAINERS_RYUK_DISABLED: "true"
-  TESTCONTAINERS_HUB_IMAGE_NAME_PREFIX: ""
-orchestration:
-  pre:
-    - id: create_network
-      type: docker_network
-      args: {name: prep-dind-net}
-    - id: start_dind
-      type: docker_container
-      args:
-        name: prep-dind
-        image: docker:24-dind
-        privileged: true
-        network: prep-dind-net
-        mounts:
-          - "/path/ca-certs.pem:/usr/local/share/ca-certificates/corp-root-ca.crt:ro"
-  post:
-    - id: stop_dind
-      type: docker_remove
-      args: {name: prep-dind, force: true}
-    - id: rm_network
-      type: docker_network_remove
-      args: {name: prep-dind-net}
-tactics_used:
-  - docker_socket_mount
-  - docker_api_mismatch_detection
-  - dind_fallback
-  - ca_injection
-  - ryuk_disable
-failure_codes: {}
-```
-
-## Orchestration Contract
-
-Orchestration steps must be declarative and whitelisted.
-
-Allowed primitive types:
+Declared orchestration primitive types (schema whitelist):
 - `docker_network`
 - `docker_network_remove`
-- `docker_container` (bounded options)
+- `docker_container`
 - `docker_remove`
 - `wait_for_log`
 - `health_check`
 
-No arbitrary shell in persistent profiles.
+## Required Runtime Guarantees (Future Implementation)
 
-## Validation Rules
+When complex execution is implemented, it must guarantee:
+1. `pre` steps run before target command execution.
+2. `post` cleanup steps run on both success and failure paths.
+3. step-level logging and deterministic status reporting.
+4. bounded retries and timeouts.
+5. no backward-compat fallback to ad-hoc orchestration formats.
 
-- all declared pre-hooks must complete before command execution
-- all declared post-hooks must execute even on failure
-- profile must include explicit cleanup steps
-- success requires clean rerun from fresh sidecar lifecycle
+## Router-Guided Loop Policy (Adopted)
 
-## Observability
+Complex recovery flow adopts a router-guided loop:
+- router executes after every gate failure, including each failed `re_gate`
+- router classification drives prompt strategy and stopping policy
+- loop context persists across iterations (history + loop kind)
+- current `loop_kind` value is `healing` for all strategies (reserved for future loop families)
 
-Capture additional evidence for complex mode:
-- daemon version/API and min API
-- registry pull failures by image and host
-- CA/auth related diagnostics
-- orchestration step timings and exit statuses
+Classification outcomes:
+- `infra`
+- `code`
+- `mixed`
+- `unknown`
+- `custom`
 
-## Failure Taxonomy Extensions
+Stopping rule (current decision):
+- `mixed` or `unknown` is terminal for the repo attempt (stop mig progression)
 
-- `docker_api_mismatch`
-- `docker_daemon_unreachable`
-- `registry_auth_failed`
-- `registry_ca_trust_failed`
-- `sidecar_start_failed`
-- `orchestration_cleanup_failed`
+Strategy routing policy:
+- `error_kind` chooses strategy (prompt/tooling/output contract)
+- phase is part of strategy input (pre/post/re gate signal), not a separate loop selector
+
+`infra` strategy contract:
+- expected typed artifact: profile candidate (for example `/out/prep-profile-candidate.json`)
+- candidate may be promoted to repo default prep profile only after schema validation and successful re-gate
+
+## Router Prompt Packaging (Adopted)
+
+Introduce `router/` folder for router assets:
+- phase-aware classification prompts
+- strategy templates for `infra` and `code` routing
+- schema/contracts for router JSON output and strategy artifacts
+
+Goal:
+- keep router behavior versioned, explicit, and shared across all error-kind strategies.
+
+## Separation From Simple Mode
+
+`runtime.docker.mode` is simple runtime hinting, not complex orchestration by itself.
+
+Complex mode starts only when lifecycle orchestration primitives are required.
+
+## Acceptance Criteria For Complex Track
+
+Complex track is complete only when:
+- orchestration executor is wired in production path
+- declared primitives execute with deterministic semantics
+- cleanup is guaranteed on failure paths
+- end-to-end tests cover complex success and cleanup-failure scenarios
 
 ## Cross References
 
-- `design/prep.md`
+- `design/prep-impl.md`
 - `design/prep-simple.md`
-- `design/prep-prompt.md`
 - `design/prep-states.md`
 - `docs/schemas/prep_profile.schema.json`
+- `roadmap/prep/track-1-minimal-e2e.md`
