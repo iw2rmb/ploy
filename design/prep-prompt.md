@@ -1,45 +1,38 @@
-# Default Prep Prompt Contract
+# Prep Candidate Prompt Contract (Future/Strategy Asset)
 
-This file is the default prompt body used by the prep Codex runner.
+## Status
 
-Runner behavior:
-- preferred source: this file (`design/prep-prompt.md`)
-- fallback source: builtin prompt in `internal/server/prep/runner_codex.go` if file is missing
-- runtime metadata is appended by runner (`repo_id`, `repo_url`, `base_ref`, `target_ref`, `attempt`)
+There is no active standalone prep runner that loads this file at runtime.
 
-## Prompt Body
+This document defines a prompt contract for recovery strategies that generate prep profile candidates (typically `infra` healing).
 
-You are running in non-interactive prep mode for repository build readiness.
+## Intended Use
+
+Use this prompt shape when a healing strategy needs to emit a candidate prep profile artifact:
+- output path: `/out/prep-profile-candidate.json`
+- schema id: `prep_profile_v1`
+
+The candidate is consumed by server validation and re-gate integration.
+
+## Prompt Body (Template)
+
+You are generating a deterministic prep profile candidate for Build Gate recovery.
 
 Goal:
-Find reproducible settings for this repository in strict priority order:
-1. Build
-2. Unit tests
-3. All tests
+Produce a schema-valid prep profile that improves gate command/runtime configuration for this repository.
 
 Constraints:
 - Do not modify repository source code.
-- Do not ask user questions.
-- Stay within allowed tools and time budget.
+- Output JSON only.
+- Include stack identity and keep it consistent with observed repository stack.
 - Prefer deterministic commands and minimal orchestration.
-- In simple mode, keep `orchestration.pre/post` empty.
-- Use runtime primitives before orchestration:
-  - `runtime.docker.mode = none|host_socket|tcp`
-  - `runtime.docker.host` only for `tcp`
-  - `runtime.docker.api_version` optional
-- If simple mode succeeds, do not escalate to complex mode.
+- In simple mode, keep `orchestration.pre` and `orchestration.post` empty.
 
 Required process:
-1. Detect stack and likely command family.
-2. Attempt simple tactics first.
-3. If simple fails, classify failure; keep output schema-compliant.
-4. For each command attempt, capture command/env/exit/reason.
-5. Produce final structured output only in the schema below.
-
-Priority semantics:
-- `build` pass is mandatory for prep success.
-- `unit` is required when discoverable by repository conventions.
-- `all_tests` is best-effort and must still report status.
+1. Detect likely stack and command family.
+2. Propose reproducible commands for build/unit/all_tests.
+3. Include runtime hints only when needed.
+4. Keep output schema-compliant.
 
 Failure taxonomy values:
 - tool_not_detected
@@ -58,6 +51,11 @@ Output format (JSON only, no prose):
   "schema_version": 1,
   "repo_id": "string",
   "runner_mode": "simple|complex",
+  "stack": {
+    "language": "string",
+    "tool": "string",
+    "release": "string"
+  },
   "runtime": {
     "docker": {
       "mode": "none|host_socket|tcp",
@@ -118,26 +116,23 @@ Output format (JSON only, no prose):
 Validation:
 - output must validate against `docs/schemas/prep_profile.schema.json`
 
-## Notes
+## Recovery Contract Context
 
-- Keep prompt output deterministic and machine-readable.
-- `prompt_delta_suggestion` is stored but not yet automatically promoted.
+Router and healing expectations:
+- router runs after each failed gate
+- router emits `error_kind`: `infra|code|mixed|unknown`
+- `mixed` and `unknown` are terminal
+- healing strategy is selected by `build_gate.healing.by_error_kind.<error_kind>`
+- server injects `build_gate.healing.selected_error_kind` on heal claims
 
-## Router Prompt Consolidation and Recovery Contract
-
-Prep-related recovery design introduces a dedicated `healing/` folder for recovery prompts and classification contracts.
-
-Router design expectations:
-- run router after every gate failure (including failed `re_gate`)
-- provide gate phase and prior loop history as input
-- emit one of: `infra|code|mixed|unknown`
-- `mixed` and `unknown` are treated as terminal stop signals for mig progression
-- strategy selection is resolved through `build_gate.healing.by_error_kind.<error_kind>`
-- heal claims receive server-injected `build_gate.healing.selected_error_kind`
-- strategy contracts can require typed artifacts (for example `path=/out/prep-profile-candidate.json`, `schema=prep_profile_v1`) for downstream validation/promotion
+Infra candidate handling:
+- candidate is validated against schema and stack compatibility
+- valid candidate can be used in re-gate override
+- promotion to repo `prep_profile` occurs only when re-gate succeeds
 
 ## Cross References
 
+- `design/prep.md`
 - `design/prep-impl.md`
 - `design/prep-simple.md`
 - `design/prep-complex.md`

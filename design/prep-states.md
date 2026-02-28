@@ -1,89 +1,74 @@
-# Prep State Machine (As-Built)
+# Prep Profile State Model (As-Built)
 
-## Repo-Level States
+## Scope
 
-Implemented repo prep states:
-- `PrepPending`
-- `PrepRunning`
-- `PrepRetryScheduled`
-- `PrepReady`
-- `PrepFailed`
+This document describes prep-related state that still exists after prep scheduler removal.
 
-## Transition Rules
+There is no repo prep lifecycle (`PrepPending/PrepReady/...`) and no `prep_runs` attempt state machine.
 
-### Claim transitions
-- `PrepPending -> PrepRunning` when claimed by prep task.
-- `PrepRetryScheduled -> PrepRunning` when retry delay cutoff is reached and repo is claimed.
+## Persisted Repo Prep Fields
 
-Both claim transitions:
-- increment `prep_attempts`
-- clear `prep_last_error`
-- clear `prep_failure_code`
-- set `prep_updated_at=now()`
-
-### Success transition
-- `PrepRunning -> PrepReady` when:
-  - runner returns profile JSON
-  - profile validates against prep schema
-  - prep run is finalized and profile/artifacts are persisted
-
-### Failure transitions
-- `PrepRunning -> PrepRetryScheduled` when attempt failed and attempts remain.
-- `PrepRunning -> PrepFailed` when attempt failed and max attempts are exhausted.
-
-Failure transitions persist:
-- `prep_last_error`
-- `prep_failure_code`
+Stored on `mig_repos`:
+- `prep_profile`
+- `prep_artifacts`
 - `prep_updated_at`
 
-## Attempt Records (`prep_runs`)
+These fields represent the current default prep payload for a repo.
 
-Each claimed attempt creates a `prep_runs` row with `status=PrepRunning`.
+## Recovery Candidate Validation States
 
-Attempt completion updates the same attempt row to terminal status:
-- success path writes `PrepReady`
-- failure path writes `PrepFailed`
+During infra healing flows, candidate validation status is recorded in gate recovery metadata:
+- `missing` — expected candidate artifact not found
+- `unavailable` — candidate artifact exists but cannot be read
+- `invalid` — schema parse/validation/stack-match failure
+- `valid` — schema-valid and stack-compatible candidate payload
 
-`prep_runs.status` is attempt-local evidence, while `mig_repos.prep_status` is the repo lifecycle state.
+Candidate metadata fields:
+- `candidate_schema_id`
+- `candidate_artifact_path`
+- `candidate_validation_status`
+- `candidate_validation_error`
+- `candidate_prep_profile` (set only when status is `valid`)
+- `candidate_promoted` (set `true` only after successful promotion)
 
-## Retry Policy (As-Built)
+## Candidate Lifecycle Transitions
 
-Configured by scheduler settings:
-- `prep_max_attempts`
-- `prep_retry_delay`
+1. Failed gate classified as `infra` with candidate expectation.
+2. Heal job emits candidate artifact.
+3. Server validates candidate and records validation status.
+4. Valid candidate is merged into re-gate prep override.
+5. If re-gate succeeds, candidate is promoted to repo default prep profile and `candidate_promoted=true`.
 
-Retry selection rule:
-- only repos in `PrepRetryScheduled` with `prep_updated_at <= now()-prep_retry_delay` are eligible.
+If re-gate fails or candidate is not valid, promotion does not occur.
 
-## Scheduling Gate Dependency
+## Recovery Loop Context
 
-Run scheduling queries require `mig_repos.prep_status='PrepReady'`.
+Shared loop metadata fields:
+- `loop_kind` (`healing`)
+- `error_kind` (`infra|code|mixed|unknown`)
+- optional router details: `strategy_id`, `confidence`, `reason`, `expectations`
 
-Repos not in `PrepReady` remain queued at run-repo level and do not materialize job chains.
+Stopping policy:
+- `mixed` and `unknown` stop progression
+- `infra` and `code` continue through configured healing actions
 
-## API Visibility
+## Scheduling Dependency
 
-State and evidence are exposed via:
-- `GET /v1/repos` (status summary)
-- `GET /v1/repos/{repo_id}/prep` (full prep status, profile, artifacts, attempt history)
+Run scheduling and job materialization are not gated by prep lifecycle status.
 
-## Gate-Recovery State Context (As-Built for Track 2)
+Prep profile is consumed opportunistically at job claim/re-gate time when available.
 
-Gate-loop metadata carries explicit context:
-- `loop_kind`: current value `healing` (reserved as extension point for future loop families)
-- `error_kind`: `infra|code|mixed|unknown` (router output per failed gate)
-- optional classifier details: `strategy_id`, `confidence`, `reason`, `expectations`
-- per-iteration history: router + healer summaries
+## Visibility
 
-Routing and stopping policy:
-- any gate fail enters the same loop mechanism (`agent -> re_gate`)
-- `error_kind` selects strategy from `build_gate.healing.by_error_kind`
-- heal claims receive server-injected `build_gate.healing.selected_error_kind`
-- `re_gate` fail continues using stored loop context
-- `mixed` or `unknown` classification stops further mig progression for the repo attempt
+Repo-level visibility is through:
+- `GET /v1/repos`
+- `GET /v1/repos/{repo_id}/runs`
+
+There is no dedicated prep state endpoint.
 
 ## Cross References
 
-- `design/prep-impl.md`
 - `design/prep.md`
-- `roadmap/prep/track-1-minimal-e2e.md`
+- `design/prep-impl.md`
+- `design/prep-simple.md`
+- `docs/migs-lifecycle.md`
