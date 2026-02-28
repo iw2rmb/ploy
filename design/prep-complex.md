@@ -52,7 +52,6 @@ Classification outcomes:
 - `code`
 - `mixed`
 - `unknown`
-- `custom`
 
 Stopping rule (current decision):
 - `mixed` or `unknown` is terminal for the repo attempt (stop mig progression)

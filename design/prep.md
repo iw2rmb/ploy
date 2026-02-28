@@ -35,7 +35,7 @@ Not implemented yet:
 The next gate-recovery design is fixed as:
 - keep one recovery loop path (`agent -> re_gate`) for all gate failures
 - keep `loop_kind` in metadata for future extensibility; current value is `healing`
-- drive strategy by router `error_kind` (`infra|code|mixed|unknown|custom`)
+- drive strategy by router `error_kind` (`infra|code|mixed|unknown`)
 - run router on every gate failure, including failed `re_gate`
 - include gate phase as router input signal
 - stop mig progression when router classification is `mixed` or `unknown`

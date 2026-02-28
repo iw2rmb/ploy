@@ -96,7 +96,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'TestBuildRouterManifest|TestRunRouterForGateFailure'` — router receives phase + loop env.
 
 ## Phase 4: Control-Plane Strategy Application
-- [ ] Use persisted `error_kind` to select healing strategy in chain rewiring — make `maybeCreateHealingJobs(...)` router-driven instead of static image-only.
+- [x] Use persisted `error_kind` to select healing strategy in chain rewiring — make `maybeCreateHealingJobs(...)` router-driven instead of static image-only.
   - Repository: `ploy`
   - Component: server job completion/healing insertion
   - Scope: Update `internal/server/handlers/nodes_complete_healing.go` to parse failed gate `jobs.meta` via `contracts.UnmarshalJobMeta(...)`, resolve strategy from `job_meta.gate.recovery.error_kind`, select heal image/contract, and persist selected strategy metadata into created `heal` and `re_gate` jobs.
@@ -108,7 +108,7 @@ Legend: [ ] todo, [x] done.
     ```
   - Tests: `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs'` — inserted jobs reflect router-driven strategy selection.
 
-- [ ] Enforce conservative stop for `mixed|unknown` classifications — stop progression deterministically per adopted design.
+- [x] Enforce conservative stop for `mixed|unknown` classifications — stop progression deterministically per adopted design.
   - Repository: `ploy`
   - Component: server healing insertion + cancellation policy
   - Scope: In `internal/server/handlers/nodes_complete_healing.go`, when failed gate classification is `mixed` or `unknown`, skip creating heal/re-gate jobs and call `cancelRemainingJobsAfterFailure(...)`; ensure this applies to initial gate and failed `re_gate`.

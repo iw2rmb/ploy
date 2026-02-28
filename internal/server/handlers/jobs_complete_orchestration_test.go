@@ -195,7 +195,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{}`)
+	f.Job.Meta = []byte(`{"kind":"mig"}`)
 
 	// Jobs: pre-gate succeeded, mig failed, post-gate created.
 	jobs := []store.Job{
@@ -362,7 +362,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{}`)
+	f.Job.Meta = []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`)
 
 	specBytes, err := json.Marshal(map[string]any{
 		"steps": []any{
@@ -444,5 +444,82 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	}
 	if st.updateJobNextIDParams[0].ID != f.Job.ID || st.updateJobNextIDParams[0].NextID == nil || *st.updateJobNextIDParams[0].NextID != heal.ID {
 		t.Fatalf("expected failed job rewired to heal")
+	}
+}
+
+func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	repoID := domaintypes.NewMigRepoID()
+	specID := domaintypes.NewSpecID()
+	f.Job.RepoID = repoID
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Meta = []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`)
+
+	specBytes, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": 1,
+				"image":   "migs-codex:latest",
+			},
+			"router": map[string]any{
+				"image": "migs-router:latest",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal spec: %v", err)
+	}
+
+	successor := store.Job{
+		ID:          domaintypes.NewJobID(),
+		RunID:       f.RunID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		Name:        "mig-0",
+		Status:      store.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod.String(),
+		Meta:        []byte(`{"kind":"mig"}`),
+	}
+	f.Job.NextID = &successor.ID
+
+	jobs := []store.Job{f.Job, successor}
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:     f.RunID,
+			SpecID: specID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:                   f.Job,
+		getSpecResult:                  store.Spec{ID: specID, Spec: specBytes},
+		listJobsByRunResult:            jobs,
+		listJobsByRunRepoAttemptResult: jobs,
+	}
+
+	handler := completeJobHandler(st, nil)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":    "Fail",
+		"exit_code": 1,
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no healing insertion jobs, got %d", st.createJobCallCount)
+	}
+	if len(st.updateJobStatusCalls) != 1 {
+		t.Fatalf("expected one cancellation call, got %d", len(st.updateJobStatusCalls))
+	}
+	if st.updateJobStatusCalls[0].ID != successor.ID || st.updateJobStatusCalls[0].Status != store.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation call: %+v", st.updateJobStatusCalls[0])
 	}
 }

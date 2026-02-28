@@ -130,7 +130,7 @@ Prep-related recovery design introduces a dedicated `router/` folder for router 
 Router design expectations:
 - run router after every gate failure (including failed `re_gate`)
 - provide gate phase and prior loop history as input
-- emit one of: `infra|code|mixed|unknown|custom`
+- emit one of: `infra|code|mixed|unknown`
 - `mixed` and `unknown` are treated as terminal stop signals for mig progression
 - strategy contracts can require typed artifacts (for example infra profile candidates) for downstream validation/promotion
 

@@ -1199,7 +1199,7 @@ RepoJobItem:
           description: Loop kind (currently `healing`)
         error_kind:
           type: string
-          description: Router classification kind (`infra|code|mixed|unknown|custom`)
+          description: Router classification kind (`infra|code|mixed|unknown`)
         strategy_id:
           type: string
           description: Selected strategy identifier when available

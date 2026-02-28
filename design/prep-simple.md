@@ -72,7 +72,7 @@ Planned gate-recovery behavior for simple-profile runs:
 - one loop path is used (`agent -> re_gate`) with `loop_kind=healing` for now
 - router runs on every gate failure, including failed `re_gate`
 - router receives gate phase as signal (`pre_gate` has stronger infra prior)
-- strategy is selected by `error_kind` (`infra|code|mixed|unknown|custom`)
+- strategy is selected by `error_kind` (`infra|code|mixed|unknown`)
 - if router classification is `mixed` or `unknown`, mig progression stops for that repo attempt
 - `infra` strategy may emit a profile candidate artifact that can become repo default only after schema validation + successful re-gate
 
