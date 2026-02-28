@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -93,6 +94,9 @@ type BuildGateRecoveryMetadata struct {
 	StrategyID string   `json:"strategy_id,omitempty"`
 	Confidence *float64 `json:"confidence,omitempty"`
 	Reason     string   `json:"reason,omitempty"`
+	// Expectations carries strategy-specific structured expectations emitted by
+	// router classification. Reserved for downstream strategy/artifact handling.
+	Expectations json.RawMessage `json:"expectations,omitempty"`
 }
 
 // Validate ensures recovery metadata entries are well formed.
@@ -135,6 +139,18 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 		}
 		if utf8.RuneCountInString(m.Reason) > 200 {
 			return fmt.Errorf("reason: must be at most 200 characters, got %d", utf8.RuneCountInString(m.Reason))
+		}
+	}
+	if len(m.Expectations) > 0 {
+		var raw any
+		if err := json.Unmarshal(m.Expectations, &raw); err != nil {
+			return fmt.Errorf("expectations: invalid JSON: %w", err)
+		}
+		switch raw.(type) {
+		case map[string]any, []any:
+			// allowed
+		default:
+			return fmt.Errorf("expectations: must be object or array JSON")
 		}
 	}
 	return nil

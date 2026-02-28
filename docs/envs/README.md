@@ -141,6 +141,10 @@ Server connection details:
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
 - `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
 
+Router runtime context (injected for `build_gate.router` executions):
+- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
+- `PLOY_LOOP_KIND` — loop context (`healing`)
+
 See `docs/build-gate/README.md` for Build Gate configuration and execution details.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this

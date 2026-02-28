@@ -271,7 +271,7 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 
 // buildRouterManifest constructs a StepManifest for the router container that
 // produces bug_summary before healing begins.
-func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack contracts.ModStack) (contracts.StepManifest, error) {
+func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack contracts.ModStack, gatePhase types.JobType, loopKind string) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
@@ -288,6 +288,8 @@ func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack con
 		env[k] = v
 	}
 	injectRepoMetadataEnv(env, req)
+	env["PLOY_GATE_PHASE"] = gatePhase.String()
+	env["PLOY_LOOP_KIND"] = loopKind
 
 	routerStepID := types.StepID(fmt.Sprintf("%s-router", req.JobID))
 

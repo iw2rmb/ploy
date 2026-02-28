@@ -355,10 +355,29 @@ func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 			StrategyID: "infra-default",
 			Confidence: confidencePtr(0.8),
 			Reason:     "pre_gate network timeout",
+			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`),
 		},
 	}
 	if err := meta.Validate(); err != nil {
 		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_InvalidExpectationsType(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:     "healing",
+			ErrorKind:    "infra",
+			Expectations: json.RawMessage(`"scalar"`),
+		},
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for scalar expectations")
+	}
+	if !strings.Contains(err.Error(), "expectations") {
+		t.Fatalf("error = %q, want substring %q", err.Error(), "expectations")
 	}
 }
 
@@ -486,6 +505,7 @@ func TestBuildGateStageMetadata_Recovery_JSONRoundTrip(t *testing.T) {
 			StrategyID: "infra-default",
 			Confidence: confidencePtr(0.75),
 			Reason:     "docker daemon unavailable",
+			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`),
 		},
 	}
 	data, err := json.Marshal(original)
@@ -513,5 +533,8 @@ func TestBuildGateStageMetadata_Recovery_JSONRoundTrip(t *testing.T) {
 	}
 	if decoded.Recovery.Reason != "docker daemon unavailable" {
 		t.Fatalf("Reason = %q, want %q", decoded.Recovery.Reason, "docker daemon unavailable")
+	}
+	if string(decoded.Recovery.Expectations) != `{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}` {
+		t.Fatalf("Expectations = %s, want artifact expectation payload", string(decoded.Recovery.Expectations))
 	}
 }

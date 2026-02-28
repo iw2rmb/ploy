@@ -1210,6 +1210,11 @@ RepoJobItem:
         reason:
           type: string
           description: Short classifier rationale
+        expectations:
+          oneOf:
+            - type: object
+            - type: array
+          description: Strategy-specific structured expectations from router classification
   required:
     - job_id
     - name

@@ -208,6 +208,10 @@ func (r *runController) runRouterForGateFailure(
 	if typedOpts.Router == nil || typedOpts.Router.Image.IsEmpty() {
 		return
 	}
+	gateResult.Recovery = &contracts.BuildGateRecoveryMetadata{
+		LoopKind:  "healing",
+		ErrorKind: "unknown",
+	}
 
 	// Create temp /in and /out for router.
 	routerInDir, err := os.MkdirTemp("", "ploy-gate-router-in-*")
@@ -245,7 +249,7 @@ func (r *runController) runRouterForGateFailure(
 		stack = contracts.ModStackUnknown
 	}
 
-	routerManifest, buildErr := buildRouterManifest(req, *typedOpts.Router, stack)
+	routerManifest, buildErr := buildRouterManifest(req, *typedOpts.Router, stack, req.JobType, "healing")
 	if buildErr != nil {
 		slog.Warn("failed to build router manifest", "run_id", req.RunID, "job_id", req.JobID, "error", buildErr)
 		return
@@ -270,6 +274,7 @@ func (r *runController) runRouterForGateFailure(
 		gateResult.BugSummary = bugSummary
 		slog.Info("router produced bug_summary", "run_id", req.RunID, "job_id", req.JobID, "bug_summary", bugSummary)
 	}
+	gateResult.Recovery = parseRouterDecision(routerOutDir)
 }
 
 // applyGatePhaseOverrides wires optional per-phase overrides into the gate manifest.
