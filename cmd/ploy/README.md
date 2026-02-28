@@ -586,6 +586,16 @@ build_gate:
           CODEX_PROMPT: "Fix the infra build error in /in/build-gate.log"
         env_from_file:
           CODEX_AUTH_JSON: ~/.codex/auth.json
+        expectations:
+          artifacts:
+            - path: /out/prep-profile-candidate.json
+              schema: prep_profile_v1
+      code:
+        spec_path: ./healing/code/spec.yaml
+        retries: 1
+        image: docker.io/you/migs-codex:latest
+        env:
+          CODEX_PROMPT: "Fix the code build error in /in/build-gate.log"
 ```
 
 `spec_path` is an optional CLI-side composition key for Build Gate router/healing
@@ -595,6 +605,11 @@ objects. Supported locations:
 CLI reads the referenced YAML/JSON object and deep-merges it into the target
 object. Inline fields next to `spec_path` override loaded fields. The key is
 removed before submit.
+
+For `infra` healing with `expectations.artifacts` schema `prep_profile_v1`, the
+healing container is expected to write `/out/prep-profile-candidate.json`. The
+candidate is considered for repo `prep_profile` promotion only after the immediate
+follow-up `re_gate` succeeds. Failed `re_gate` results never promote candidates.
 
 **Cross-phase inputs:**
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).

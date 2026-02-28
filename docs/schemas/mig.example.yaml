@@ -175,6 +175,16 @@ build_gate:
 #           artifacts:
 #             - path: /out/prep-profile-candidate.json
 #               schema: prep_profile_v1
+#       code:
+#         spec_path: ./healing/code/spec.yaml
+#         retries: 2
+#         image: docker.io/your-dh-user/migs-codex:latest
+#         env:
+#           CODEX_PROMPT: |-
+#             Fix code-level issue in /in/build-gate.log.
+#             Your final message MUST be one line of JSON: {"action_summary":"..."}
+#         env_from_file:
+#           CODEX_AUTH_JSON: ~/.codex/auth.json
 #
 # `spec_path` is optional preprocessing handled by CLI:
 # - CLI reads YAML/JSON object from `spec_path`
@@ -184,6 +194,9 @@ build_gate:
 # Supported under:
 # - `build_gate.router.spec_path`
 # - `build_gate.healing.by_error_kind.<error_kind>.spec_path`
+# For `infra` expectations with `schema: prep_profile_v1`, the healing job should
+# write `/out/prep-profile-candidate.json`. Promotion to repo `prep_profile` occurs
+# only when the immediate follow-up `re_gate` succeeds.
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
 gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided

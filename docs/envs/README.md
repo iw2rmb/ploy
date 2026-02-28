@@ -101,7 +101,7 @@ Role model (bearer token claims):
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
   - `migs[]` — Multi-step spec steps (each with its own image/command/env/env_from_file)
-  - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures
+  - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
@@ -111,10 +111,11 @@ Role model (bearer token claims):
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
 - `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
-  - `infra`/`code` action entries configure `retries`, `image`, `command`, `env`, `env_from_file`
+  - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `env`, `env_from_file`
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing migs
+  - For `infra` with `expectations.artifacts` schema `prep_profile_v1`, healing is expected to write `/out/prep-profile-candidate.json`; candidate promotion to repo `prep_profile` occurs only on successful follow-up `re_gate`
 - Container cleanup model:
   - Containers are retained after step/gate completion.
   - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem (`DockerRootDir`).
