@@ -43,7 +43,7 @@ services:
   node:
     build:
       context: ../..
-      dockerfile: deploy/images/node/Dockerfile.local
+      dockerfile: deploy/images/node/Dockerfile
       secrets:
         - ploy_ca_bundle
     image: ploy-node:local
