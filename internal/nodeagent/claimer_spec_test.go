@@ -8,8 +8,8 @@ import (
 )
 
 // TestParseSpec_PassesThroughBuildGateHealing verifies that the node agent
-// extracts the build_gate.healing block into typed RunOptions so executeWithHealing
-// can honor the configured heal → re-gate loop.
+// extracts the build_gate.healing block into typed RunOptions so discrete healing
+// jobs can honor the configured heal → re-gate loop.
 func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	specJSON := `{
 	        "steps": [{"image": "docker.io/test/mig:latest"}],

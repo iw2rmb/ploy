@@ -186,8 +186,7 @@ func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Conte
 }
 
 // populateHealingInDir copies the first failing gate log (when present) into
-// the healing job's /in directory as build-gate.log. This mirrors the behavior
-// of executeWithHealing, which writes a trimmed failure view for Codex healers.
+// the healing job's /in directory as build-gate.log for discrete healing jobs.
 func (r *runController) populateHealingInDir(runID types.RunID, inDir string) error {
 	if strings.TrimSpace(inDir) == "" {
 		return nil

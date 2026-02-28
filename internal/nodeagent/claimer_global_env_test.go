@@ -371,8 +371,8 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 // global env vars from the spec should still be accessible via the request.
 //
 // Note: Healing manifests are built from HealingMod.Env, not from req.Env directly.
-// However, the caller (executeWithHealing) can merge global env into HealingMod.Env
-// if needed. This test verifies the healing manifest builder does not filter env vars.
+// The caller can merge global env into HealingMod.Env if needed. This test verifies
+// the healing manifest builder does not filter env vars.
 func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	t.Parallel()
 

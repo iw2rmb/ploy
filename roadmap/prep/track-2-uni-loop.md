@@ -14,7 +14,7 @@ Documentation:
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Normalize Runtime Loop
-- [ ] Remove inline recovery runtime path and keep only the discrete jobs loop — ensure one production recovery mechanism and remove dead competing flow.
+- [x] Remove inline recovery runtime path and keep only the discrete jobs loop — ensure one production recovery mechanism and remove dead competing flow.
   - Repository: `ploy`
   - Component: `internal/nodeagent` execution orchestration
   - Scope: Remove/retire `internal/nodeagent/execution_healing.go`, `internal/nodeagent/execution_healing_loop.go`, and inline-only tests; keep dispatch in `internal/nodeagent/execution_orchestrator.go` through `executeGateJob(...)` and `executeHealingJob(...)`; update references in `internal/nodeagent/doc.go` and `docs/build-gate/README.md`.
@@ -29,7 +29,7 @@ Legend: [ ] todo, [x] done.
     ```
   - Tests: `go test ./internal/nodeagent -run 'TestExecuteRun_'` — only discrete gate/heal job execution paths compile and pass.
 
-- [ ] Keep shared recovery parsing helpers but move naming to active-loop semantics — preserve behavior while removing misleading inline-healing naming.
+- [x] Keep shared recovery parsing helpers but move naming to active-loop semantics — preserve behavior while removing misleading inline-healing naming.
   - Repository: `ploy`
   - Component: `internal/nodeagent` recovery helpers
   - Scope: Rename `internal/nodeagent/execution_healing_io.go` to recovery-oriented file naming (for example `internal/nodeagent/recovery_io.go`) and update callsites in gate/heal executors.

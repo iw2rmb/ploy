@@ -236,30 +236,6 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	return runner, diffGenerator, logStreamer, nil
 }
 
-// mergeExecutionResults aggregates gate history across phases (pre-mig + per-step)
-// while keeping the latest step.Result for terminal status reporting.
-// - PreGate is preserved from the accumulator when present (pre-mig gate).
-// - ReGates are appended in call order to accumulate healing re-gates.
-func mergeExecutionResults(acc executionResult, next executionResult) executionResult {
-	merged := executionResult{
-		Result:  next.Result,
-		PreGate: acc.PreGate,
-		ReGates: acc.ReGates,
-	}
-
-	// If there is no pre-mig gate recorded yet, fall back to the next result's PreGate.
-	if merged.PreGate == nil && next.PreGate != nil {
-		merged.PreGate = next.PreGate
-	}
-
-	// Append any re-gates from the next execution in order.
-	if len(next.ReGates) > 0 {
-		merged.ReGates = append(merged.ReGates, next.ReGates...)
-	}
-
-	return merged
-}
-
 // jobExecutionContext holds runtime components initialized for a mig/heal job.
 type jobExecutionContext struct {
 	runner        step.Runner
