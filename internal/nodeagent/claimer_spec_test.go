@@ -15,8 +15,13 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	        "steps": [{"image": "docker.io/test/mig:latest"}],
 	        "build_gate": {
 	            "healing": {
-	                "retries": 2,
-	                "image": "docker.io/test/heal:latest"
+	                "selected_error_kind": "infra",
+	                "by_error_kind": {
+	                    "infra": {
+	                        "retries": 2,
+	                        "image": "docker.io/test/heal:latest"
+	                    }
+	                }
 	            },
 	            "router": {
 	                "image": "docker.io/test/router:latest"
@@ -144,8 +149,13 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		"build_gate": {
 			"enabled": true,
 			"healing": {
-				"retries": 1,
-				"image": "docker.io/test/healer:latest"
+				"selected_error_kind": "infra",
+				"by_error_kind": {
+					"infra": {
+						"retries": 1,
+						"image": "docker.io/test/healer:latest"
+					}
+				}
 			},
 			"router": {
 				"image": "docker.io/test/router:latest"
@@ -236,9 +246,14 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"build_gate": {
 					"healing": {
-						"retries": 3,
-						"image": "docker.io/test/codex:latest",
-						"command": "fix-with-ai"
+						"selected_error_kind": "infra",
+						"by_error_kind": {
+							"infra": {
+								"retries": 3,
+								"image": "docker.io/test/codex:latest",
+								"command": "fix-with-ai"
+							}
+						}
 					},
 					"router": {
 						"image": "docker.io/test/router:latest"
@@ -282,12 +297,17 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"build_gate": {
 			"healing": {
-				"retries": 1,
-				"image": "docker.io/test/healer:v1",
-				"command": "heal.sh --fix",
-				"env": {
-					"MODE": "aggressive",
-					"DEBUG": "true"
+				"selected_error_kind": "infra",
+				"by_error_kind": {
+					"infra": {
+						"retries": 1,
+						"image": "docker.io/test/healer:v1",
+						"command": "heal.sh --fix",
+						"env": {
+							"MODE": "aggressive",
+							"DEBUG": "true"
+						}
+					}
 				}
 			},
 			"router": {

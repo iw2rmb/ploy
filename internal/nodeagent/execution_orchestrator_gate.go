@@ -202,7 +202,7 @@ func (r *runController) runRouterForGateFailure(
 	if gateResult == nil || gateResultPassed(gateResult) {
 		return
 	}
-	if typedOpts.Healing == nil || typedOpts.Healing.Mod.Image.IsEmpty() {
+	if !typedOpts.HasHealingSelector() {
 		return
 	}
 	if typedOpts.Router == nil || typedOpts.Router.Image.IsEmpty() {

@@ -144,7 +144,7 @@ func (s ModsSpec) IsSingleStep() bool {
 //
 // Validation rules:
 //   - steps must be non-empty and each step must have a non-empty image.
-//   - build_gate.healing.image must be non-empty when healing is configured.
+//   - build_gate.healing.by_error_kind must configure non-terminal kinds.
 //   - build_gate.router must be configured when healing is configured.
 //   - Retries must be non-negative.
 //   - Stack Gate phases must not be disabled with expectations set.
@@ -167,16 +167,47 @@ func (s ModsSpec) Validate() error {
 
 	// Validate healing spec.
 	if s.BuildGate != nil && s.BuildGate.Healing != nil {
-		if s.BuildGate.Healing.Retries < 0 {
-			return fmt.Errorf("build_gate.healing.retries: must be non-negative, got %d",
-				s.BuildGate.Healing.Retries)
+		if len(s.BuildGate.Healing.ByErrorKind) == 0 {
+			return fmt.Errorf("build_gate.healing.by_error_kind: required when healing is configured")
 		}
-		if s.BuildGate.Healing.Image.IsEmpty() {
-			return fmt.Errorf("build_gate.healing.image: required when healing is configured")
+		for errorKind, action := range s.BuildGate.Healing.ByErrorKind {
+			switch errorKind {
+			case "infra", "code", "mixed", "unknown":
+			default:
+				return fmt.Errorf("build_gate.healing.by_error_kind.%s: invalid error_kind key", errorKind)
+			}
+			prefix := fmt.Sprintf("build_gate.healing.by_error_kind.%s", errorKind)
+			if action.Retries < 0 {
+				return fmt.Errorf("%s.retries: must be non-negative, got %d", prefix, action.Retries)
+			}
+			if errorKind == "mixed" || errorKind == "unknown" {
+				return fmt.Errorf("%s: forbidden for terminal error_kind %q", prefix, errorKind)
+			}
+			if action.Image.IsEmpty() {
+				return fmt.Errorf("%s.image: required", prefix)
+			}
+			if action.Expectations != nil {
+				for i, artifact := range action.Expectations.Artifacts {
+					if err := ValidatePrepProfileArtifactContract(
+						artifact.Path,
+						artifact.Schema,
+						fmt.Sprintf("%s.expectations.artifacts[%d]", prefix, i),
+					); err != nil {
+						return err
+					}
+				}
+			}
 		}
 		// Healing requires a router to be configured (router runs before healing).
 		if s.BuildGate.Router == nil || s.BuildGate.Router.Image.IsEmpty() {
 			return fmt.Errorf("build_gate.router: required when healing is configured")
+		}
+		if s.BuildGate.Healing.SelectedErrorKind != "" {
+			switch s.BuildGate.Healing.SelectedErrorKind {
+			case "infra", "code", "mixed", "unknown":
+			default:
+				return fmt.Errorf("build_gate.healing.selected_error_kind: invalid value %q", s.BuildGate.Healing.SelectedErrorKind)
+			}
 		}
 	}
 

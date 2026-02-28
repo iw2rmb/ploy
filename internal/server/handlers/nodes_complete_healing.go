@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -75,7 +76,7 @@ func maybeCreateHealingJobs(
 	if spec.BuildGate != nil {
 		healing = spec.BuildGate.Healing
 	}
-	if healing == nil || healing.Image.IsEmpty() {
+	if healing == nil || len(healing.ByErrorKind) == 0 {
 		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining linked jobs",
 			"run_id", failedJob.RunID,
 			"job_id", failedJob.ID,
@@ -83,7 +84,22 @@ func maybeCreateHealingJobs(
 		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	retries := healing.Retries
+	action, ok := healing.ByErrorKind[recoveryMeta.ErrorKind]
+	if !ok {
+		slog.Info("maybeCreateHealingJobs: no healing action for error_kind, canceling remaining linked jobs",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"error_kind", recoveryMeta.ErrorKind,
+		)
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
+	}
+	if len(recoveryMeta.Expectations) == 0 && action.Expectations != nil {
+		if b, err := json.Marshal(action.Expectations); err == nil {
+			recoveryMeta.Expectations = b
+		}
+	}
+
+	retries := action.Retries
 	if retries <= 0 {
 		retries = 1
 	}
@@ -101,7 +117,7 @@ func maybeCreateHealingJobs(
 		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	healImage, err := healing.Image.ResolveImage(detectedStack)
+	healImage, err := action.Image.ResolveImage(detectedStack)
 	if err != nil {
 		return fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
 	}

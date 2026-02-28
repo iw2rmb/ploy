@@ -23,6 +23,9 @@ const (
 	PrepDockerAPIVersionEnv = "DOCKER_API_VERSION"
 
 	defaultPrepDockerHostSocket = "unix:///var/run/docker.sock"
+
+	PrepProfileCandidateArtifactPath = "/out/prep-profile-candidate.json"
+	PrepProfileCandidateSchemaID     = "prep_profile_v1"
 )
 
 type BuildGatePrepPhase string
@@ -291,4 +294,24 @@ func mergePrepEnvs(base map[string]string, override map[string]string) map[strin
 		out[k] = v
 	}
 	return out
+}
+
+func IsSupportedPrepProfileArtifactSchema(schema string) bool {
+	return strings.TrimSpace(schema) == PrepProfileCandidateSchemaID
+}
+
+func ValidatePrepProfileArtifactContract(path, schema, prefix string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("%s.path: required", prefix)
+	}
+	if strings.TrimSpace(schema) == "" {
+		return fmt.Errorf("%s.schema: required", prefix)
+	}
+	if schema == PrepProfileCandidateSchemaID && path != PrepProfileCandidateArtifactPath {
+		return fmt.Errorf("%s.path: must be %q when schema=%q", prefix, PrepProfileCandidateArtifactPath, PrepProfileCandidateSchemaID)
+	}
+	if schema != PrepProfileCandidateSchemaID {
+		return fmt.Errorf("%s.schema: unsupported value %q", prefix, schema)
+	}
+	return nil
 }

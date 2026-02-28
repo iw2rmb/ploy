@@ -199,6 +199,10 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return fmt.Errorf("merge repo prep_profile into spec: %w", err)
 	}
+	mergedSpec, err = mergeHealingSelectedKindIntoSpec(mergedSpec, job, jobType)
+	if err != nil {
+		return fmt.Errorf("merge healing selected_error_kind into spec: %w", err)
+	}
 
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
@@ -467,4 +471,75 @@ func commandSpecToWireValue(command contracts.CommandSpec) any {
 		return out
 	}
 	return command.Shell
+}
+
+func mergeHealingSelectedKindIntoSpec(spec json.RawMessage, job store.Job, jobType domaintypes.JobType) (json.RawMessage, error) {
+	if jobType != domaintypes.JobTypeHeal {
+		return spec, nil
+	}
+	if len(job.Meta) == 0 {
+		return spec, nil
+	}
+	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
+	if err != nil {
+		return spec, nil
+	}
+	if jobMeta.Recovery == nil || strings.TrimSpace(jobMeta.Recovery.ErrorKind) == "" {
+		return spec, nil
+	}
+
+	m, err := parseSpecObjectStrict(spec)
+	if err != nil {
+		return nil, err
+	}
+	buildGate, err := ensureObjectField(m, "build_gate", "spec")
+	if err != nil {
+		return nil, err
+	}
+	healing, err := ensureObjectField(buildGate, "healing", "spec.build_gate")
+	if err != nil {
+		return nil, err
+	}
+	healing["selected_error_kind"] = jobMeta.Recovery.ErrorKind
+	if len(jobMeta.Recovery.Expectations) > 0 {
+		var ex struct {
+			Artifacts []struct {
+				Path string `json:"path"`
+			} `json:"artifacts"`
+		}
+		if err := json.Unmarshal(jobMeta.Recovery.Expectations, &ex); err == nil && len(ex.Artifacts) > 0 {
+			existing := map[string]struct{}{}
+			var paths []any
+			if cur, ok := m["artifact_paths"]; ok && cur != nil {
+				switch vv := cur.(type) {
+				case []any:
+					for _, item := range vv {
+						if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+							existing[s] = struct{}{}
+							paths = append(paths, s)
+						}
+					}
+				}
+			}
+			for _, artifact := range ex.Artifacts {
+				p := strings.TrimSpace(artifact.Path)
+				if p == "" {
+					continue
+				}
+				if _, ok := existing[p]; ok {
+					continue
+				}
+				existing[p] = struct{}{}
+				paths = append(paths, p)
+			}
+			if len(paths) > 0 {
+				m["artifact_paths"] = paths
+			}
+		}
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return json.RawMessage(b), nil
 }

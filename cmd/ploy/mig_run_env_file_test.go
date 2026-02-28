@@ -340,12 +340,14 @@ steps:
   - image: docker.io/test/mig:latest
 build_gate:
   healing:
-    retries: 1
-    image: docker.io/test/healer:latest
-    env:
-      HEALER_KEY: literal
-    env_from_file:
-      HEALER_AUTH: ` + healingAuthFile + `
+    by_error_kind:
+      infra:
+        retries: 1
+        image: docker.io/test/healer:latest
+        env:
+          HEALER_KEY: literal
+        env_from_file:
+          HEALER_AUTH: ` + healingAuthFile + `
   router:
     image: docker.io/test/router:latest
 `
@@ -373,15 +375,24 @@ build_gate:
 			t.Fatalf("expected build_gate.healing in result")
 		}
 
-		// env_from_file should be removed from healing
-		if _, ok := healing["env_from_file"]; ok {
-			t.Errorf("expected env_from_file to be removed from healing")
+		byErrorKind, ok := healing["by_error_kind"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected build_gate.healing.by_error_kind in result")
+		}
+		infra, ok := byErrorKind["infra"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected build_gate.healing.by_error_kind.infra in result")
+		}
+
+		// env_from_file should be removed from healing action
+		if _, ok := infra["env_from_file"]; ok {
+			t.Errorf("expected env_from_file to be removed from healing action")
 		}
 
 		// env should contain merged values
-		env, ok := healing["env"].(map[string]any)
+		env, ok := infra["env"].(map[string]any)
 		if !ok {
-			t.Fatalf("expected env map in healing")
+			t.Fatalf("expected env map in healing action")
 		}
 		if env["HEALER_KEY"] != "literal" {
 			t.Errorf("expected env.HEALER_KEY=literal, got %v", env["HEALER_KEY"])

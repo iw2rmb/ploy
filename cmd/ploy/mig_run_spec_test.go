@@ -367,8 +367,10 @@ steps:
   - image: docker.io/test/mig:latest
 build_gate:
   healing:
-    retries: 1
-    image: docker.io/test/heal:latest
+    by_error_kind:
+      infra:
+        retries: 1
+        image: docker.io/test/heal:latest
   router:
     image: docker.io/test/router:latest
     env_from_file:
@@ -411,10 +413,12 @@ steps:
   - image: docker.io/test/mig:latest
 build_gate:
   healing:
-    retries: 1
-    image: docker.io/test/heal:latest
-    env_from_file:
-      CODEX_AUTH_JSON: SECRET_PATH
+    by_error_kind:
+      infra:
+        retries: 1
+        image: docker.io/test/heal:latest
+        env_from_file:
+          CODEX_AUTH_JSON: SECRET_PATH
   router:
     image: docker.io/test/router:latest
 `, "SECRET_PATH", secretFile)
@@ -435,7 +439,9 @@ build_gate:
 
 	bg := result["build_gate"].(map[string]any)
 	healing := bg["healing"].(map[string]any)
-	env := healing["env"].(map[string]any)
+	byErrorKind := healing["by_error_kind"].(map[string]any)
+	infra := byErrorKind["infra"].(map[string]any)
+	env := infra["env"].(map[string]any)
 	if v, ok := env["CODEX_AUTH_JSON"].(string); !ok || v != `{"key":"healing-secret"}` {
 		t.Errorf("expected CODEX_AUTH_JSON resolved, got %v", env["CODEX_AUTH_JSON"])
 	}

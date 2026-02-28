@@ -24,8 +24,12 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
-				"retries": float64(2),
-				"image":   "migs-codex:latest",
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": float64(2),
+						"image":   "migs-codex:latest",
+					},
+				},
 			},
 			"router": map[string]any{
 				"image": "migs-router:latest",
@@ -159,8 +163,12 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
-				"retries": float64(3),
-				"image":   "heal:latest",
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": float64(3),
+						"image":   "heal:latest",
+					},
+				},
 			},
 			"router": map[string]any{
 				"image": "router:latest",
@@ -269,8 +277,12 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
-				"retries": float64(2),
-				"image":   "migs-codex:latest",
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": float64(2),
+						"image":   "migs-codex:latest",
+					},
+				},
 			},
 			"router": map[string]any{
 				"image": "migs-router:latest",

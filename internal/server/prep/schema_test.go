@@ -3,6 +3,8 @@ package prep
 import (
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestValidateProfileJSON(t *testing.T) {
@@ -51,5 +53,22 @@ func TestValidateProfileJSON_SimpleRejectsOrchestrationSteps(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "prep schema validation failed") {
 		t.Fatalf("validateProfileJSON(invalid simple orchestration) error = %v, want schema validation error", err)
+	}
+}
+
+func TestValidateProfileJSONForSchema(t *testing.T) {
+	t.Parallel()
+
+	valid := []byte(validProfileJSON("repo_123"))
+	if err := ValidateProfileJSONForSchema(valid, contracts.PrepProfileCandidateSchemaID); err != nil {
+		t.Fatalf("ValidateProfileJSONForSchema(valid) error = %v", err)
+	}
+
+	err := ValidateProfileJSONForSchema(valid, "unknown_schema")
+	if err == nil {
+		t.Fatal("ValidateProfileJSONForSchema(unknown_schema) expected error")
+	}
+	if !strings.Contains(err.Error(), "unsupported schema id") {
+		t.Fatalf("ValidateProfileJSONForSchema(unknown_schema) error = %v, want unsupported schema id", err)
 	}
 }

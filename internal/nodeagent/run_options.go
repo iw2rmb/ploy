@@ -11,16 +11,17 @@ import (
 
 // RunOptions holds all typed configuration options for a run execution.
 type RunOptions struct {
-	BuildGate      BuildGateOptions
-	Healing        *HealingConfig
-	Router         *ModContainerSpec
-	MRWiring       MRWiringOptions
-	MRFlagsPresent MRFlagsPresence
-	Execution      ModContainerSpec
-	Artifacts      ArtifactOptions
-	ServerMetadata ServerMetadataOptions
-	Steps          []StepMod
-	StackGate      *contracts.StepGateStackSpec
+	BuildGate       BuildGateOptions
+	HealingSelector *contracts.HealingSpec
+	Healing         *HealingConfig
+	Router          *ModContainerSpec
+	MRWiring        MRWiringOptions
+	MRFlagsPresent  MRFlagsPresence
+	Execution       ModContainerSpec
+	Artifacts       ArtifactOptions
+	ServerMetadata  ServerMetadataOptions
+	Steps           []StepMod
+	StackGate       *contracts.StepGateStackSpec
 }
 
 // BuildGateOptions configures pre-mig build gate validation.
@@ -37,6 +38,10 @@ type BuildGateOptions struct {
 type HealingConfig struct {
 	Retries int
 	Mod     ModContainerSpec
+}
+
+func (o RunOptions) HasHealingSelector() bool {
+	return o.HealingSelector != nil && len(o.HealingSelector.ByErrorKind) > 0
 }
 
 // ModContainerSpec describes a container's image, command, and env.
@@ -100,18 +105,22 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		}
 
 		if spec.BuildGate.Healing != nil {
-			healing := &HealingConfig{
-				Retries: spec.BuildGate.Healing.Retries,
+			runOpts.HealingSelector = copyHealingSpec(spec.BuildGate.Healing)
+			selectedKind := strings.TrimSpace(spec.BuildGate.Healing.SelectedErrorKind)
+			if selectedKind != "" {
+				if action, ok := spec.BuildGate.Healing.ByErrorKind[selectedKind]; ok {
+					healing := &HealingConfig{Retries: action.Retries}
+					if healing.Retries <= 0 {
+						healing.Retries = 1
+					}
+					healing.Mod = ModContainerSpec{
+						Image:   action.Image,
+						Command: action.Command,
+						Env:     copyStringMap(action.Env),
+					}
+					runOpts.Healing = healing
+				}
 			}
-			if healing.Retries <= 0 {
-				healing.Retries = 1
-			}
-			healing.Mod = ModContainerSpec{
-				Image:   spec.BuildGate.Healing.Image,
-				Command: spec.BuildGate.Healing.Command,
-				Env:     copyStringMap(spec.BuildGate.Healing.Env),
-			}
-			runOpts.Healing = healing
 		}
 
 		if spec.BuildGate.Router != nil {
@@ -193,4 +202,29 @@ func copyBuildGatePrepOverride(in *contracts.BuildGatePrepOverride) *contracts.B
 		Command: in.Command,
 		Env:     copyStringMap(in.Env),
 	}
+}
+
+func copyHealingSpec(in *contracts.HealingSpec) *contracts.HealingSpec {
+	if in == nil {
+		return nil
+	}
+	out := &contracts.HealingSpec{
+		SelectedErrorKind: in.SelectedErrorKind,
+	}
+	if len(in.ByErrorKind) > 0 {
+		out.ByErrorKind = make(map[string]contracts.HealingActionSpec, len(in.ByErrorKind))
+		for k, v := range in.ByErrorKind {
+			item := v
+			item.Env = copyStringMap(v.Env)
+			if v.Expectations != nil {
+				exp := *v.Expectations
+				if len(v.Expectations.Artifacts) > 0 {
+					exp.Artifacts = append([]contracts.RecoveryExpectedArtifact(nil), v.Expectations.Artifacts...)
+				}
+				item.Expectations = &exp
+			}
+			out.ByErrorKind[k] = item
+		}
+	}
+	return out
 }

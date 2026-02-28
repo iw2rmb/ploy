@@ -370,8 +370,12 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
-				"retries": 1,
-				"image":   "migs-codex:latest",
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": 1,
+						"image":   "migs-codex:latest",
+					},
+				},
 			},
 			"router": map[string]any{
 				"image": "migs-router:latest",
@@ -464,8 +468,12 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 		},
 		"build_gate": map[string]any{
 			"healing": map[string]any{
-				"retries": 1,
-				"image":   "migs-codex:latest",
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": 1,
+						"image":   "migs-codex:latest",
+					},
+				},
 			},
 			"router": map[string]any{
 				"image": "migs-router:latest",

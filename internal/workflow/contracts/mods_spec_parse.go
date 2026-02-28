@@ -29,7 +29,7 @@ import (
 //
 // Errors are structured with field paths for actionable debugging:
 //   - "steps[2].image: required" — missing required field in step
-//   - "build_gate.healing.retries: must be non-negative" — invalid value
+//   - "build_gate.healing.by_error_kind.infra.retries: must be non-negative" — invalid value
 func ParseModsSpecJSON(data []byte) (*ModsSpec, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("steps: required")
@@ -293,31 +293,105 @@ func parseModStep(raw map[string]any, index int) (ModStep, error) {
 }
 
 func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
-	heal := &HealingSpec{
-		Retries: 1, // Default to 1 retry.
+	heal := &HealingSpec{}
+	forbiddenLegacyFields := []string{"retries", "image", "command", "env", "retain_container"}
+	for _, key := range forbiddenLegacyFields {
+		if _, ok := raw[key]; ok {
+			return nil, fmt.Errorf("%s.%s: forbidden (use %s.by_error_kind.<error_kind>.%s)", prefix, key, prefix, key)
+		}
 	}
+	if v, ok := raw["selected_error_kind"]; ok && v != nil {
+		s, err := expectString(v, prefix+".selected_error_kind")
+		if err != nil {
+			return nil, err
+		}
+		heal.SelectedErrorKind = strings.TrimSpace(s)
+	}
+	if v, ok := raw["by_error_kind"]; ok && v != nil {
+		kindMap, err := expectMap(v, prefix+".by_error_kind")
+		if err != nil {
+			return nil, err
+		}
+		heal.ByErrorKind = make(map[string]HealingActionSpec, len(kindMap))
+		for errorKind, item := range kindMap {
+			itemRaw, err := expectMap(item, fmt.Sprintf("%s.by_error_kind.%s", prefix, errorKind))
+			if err != nil {
+				return nil, err
+			}
+			action, err := parseHealingActionSpec(itemRaw, fmt.Sprintf("%s.by_error_kind.%s", prefix, errorKind))
+			if err != nil {
+				return nil, err
+			}
+			heal.ByErrorKind[errorKind] = *action
+		}
+	}
+	return heal, nil
+}
 
-	// Parse retries with shared numeric coercion. Preserve legacy float truncation.
+func parseHealingActionSpec(raw map[string]any, prefix string) (*HealingActionSpec, error) {
+	action := &HealingActionSpec{Retries: 1}
 	if v, ok := raw["retries"]; ok && v != nil {
 		if r, ok := intFromAny(v); ok {
-			heal.Retries = r
+			action.Retries = r
 		} else if rf, ok := v.(float64); ok {
-			heal.Retries = int(rf)
+			action.Retries = int(rf)
 		} else {
 			return nil, fmt.Errorf("%s.retries: expected number, got %T", prefix, v)
 		}
 	}
-
-	// Parse mig-like fields directly on the healing map (flattened form).
 	f, err := parseModLikeFields(raw, prefix)
 	if err != nil {
 		return nil, err
 	}
-	heal.Image = f.Image
-	heal.Command = f.Command
-	heal.Env = f.Env
+	action.Image = f.Image
+	action.Command = f.Command
+	action.Env = f.Env
+	if v, ok := raw["expectations"]; ok && v != nil {
+		exRaw, err := expectMap(v, prefix+".expectations")
+		if err != nil {
+			return nil, err
+		}
+		ex, err := parseRecoveryExpectationsSpec(exRaw, prefix+".expectations")
+		if err != nil {
+			return nil, err
+		}
+		action.Expectations = ex
+	}
+	return action, nil
+}
 
-	return heal, nil
+func parseRecoveryExpectationsSpec(raw map[string]any, prefix string) (*RecoveryExpectationsSpec, error) {
+	ex := &RecoveryExpectationsSpec{}
+	if v, ok := raw["artifacts"]; ok && v != nil {
+		items, ok := v.([]any)
+		if !ok {
+			return nil, fmt.Errorf("%s.artifacts: expected array, got %T", prefix, v)
+		}
+		ex.Artifacts = make([]RecoveryExpectedArtifact, 0, len(items))
+		for i, item := range items {
+			itemRaw, err := expectMap(item, fmt.Sprintf("%s.artifacts[%d]", prefix, i))
+			if err != nil {
+				return nil, err
+			}
+			artifact := RecoveryExpectedArtifact{}
+			if vv, ok := itemRaw["path"]; ok && vv != nil {
+				s, err := expectString(vv, fmt.Sprintf("%s.artifacts[%d].path", prefix, i))
+				if err != nil {
+					return nil, err
+				}
+				artifact.Path = strings.TrimSpace(s)
+			}
+			if vv, ok := itemRaw["schema"]; ok && vv != nil {
+				s, err := expectString(vv, fmt.Sprintf("%s.artifacts[%d].schema", prefix, i))
+				if err != nil {
+					return nil, err
+				}
+				artifact.Schema = strings.TrimSpace(s)
+			}
+			ex.Artifacts = append(ex.Artifacts, artifact)
+		}
+	}
+	return ex, nil
 }
 
 func parseRouterSpec(raw map[string]any, prefix string) (*RouterSpec, error) {

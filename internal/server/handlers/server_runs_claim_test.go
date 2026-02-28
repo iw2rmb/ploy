@@ -640,6 +640,110 @@ func TestClaimJob_InvalidPrepProfileReturnsError(t *testing.T) {
 	}
 }
 
+func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) {
+	t.Parallel()
+
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+
+	spec := []byte(`{
+		"steps":[{"image":"docker.io/acme/mod:latest"}],
+		"build_gate":{
+			"healing":{
+				"by_error_kind":{
+					"infra":{"retries":2,"image":"docker.io/acme/heal:latest"}
+				}
+			},
+			"router":{"image":"docker.io/acme/router:latest"}
+		}
+	}`)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeID,
+			Name:        "heal-1-0",
+			Status:      store.JobStatusRunning,
+			JobType:     domaintypes.JobTypeHeal.String(),
+			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+		getModRepoResult: store.MigRepo{
+			ID:      repoID,
+			RepoUrl: "https://github.com/user/repo.git",
+		},
+		getSpecResult: store.Spec{ID: specID, Spec: spec},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	specObj, ok := resp["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec object, got %T", resp["spec"])
+	}
+	bg, ok := specObj["build_gate"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate object, got %T", specObj["build_gate"])
+	}
+	healing, ok := bg["healing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing object, got %T", bg["healing"])
+	}
+	if got := healing["selected_error_kind"]; got != "infra" {
+		t.Fatalf("build_gate.healing.selected_error_kind=%v, want infra", got)
+	}
+	paths, ok := specObj["artifact_paths"].([]any)
+	if !ok {
+		t.Fatalf("expected artifact_paths array, got %T", specObj["artifact_paths"])
+	}
+	found := false
+	for _, p := range paths {
+		if s, ok := p.(string); ok && s == "/out/prep-profile-candidate.json" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected artifact_paths to include /out/prep-profile-candidate.json, got %#v", paths)
+	}
+}
+
 func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	t.Parallel()
 
