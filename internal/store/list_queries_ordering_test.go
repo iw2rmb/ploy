@@ -36,7 +36,6 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 
 		// mig_repos.sql - created_at and repo_url need id tie-breakers
 		{"ListMigReposByMig", listMigReposByMig, "ORDER BY created_at ASC, id ASC"},
-		{"ListReposByPrepStatus", listReposByPrepStatus, "ORDER BY prep_updated_at ASC, created_at ASC, id ASC"},
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY mr.repo_url ASC, mr.id ASC"},
 		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 
@@ -57,9 +56,6 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListRunReposWithURLByRun", listRunReposWithURLByRun, "ORDER BY rr.created_at ASC, rr.repo_id ASC"},
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
 		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
-
-		// prep_runs.sql - attempt is unique per repo and ordered descending for history.
-		{"ListPrepRunsByRepo", listPrepRunsByRepo, "ORDER BY attempt DESC"},
 
 		// logs.sql and events.sql already have id tie-breakers (verified in logs_sql_ordering_test.go)
 	}

@@ -142,8 +142,8 @@ Prep profile mapping for simple mode:
   - `runtime.docker.api_version` injects `DOCKER_API_VERSION=<value>` when set
   - when `DOCKER_HOST` is `unix://...`, Build Gate mounts that socket path into the gate container automatically.
 
-Prep payload visibility is available via `GET /v1/repos/{repo_id}/prep`
-(`prep_profile`, `prep_artifacts`, and prep attempt evidence).
+Prep payload visibility is available via `GET /v1/repos`
+(`prep_profile` is consumed at claim-time for gate override mapping; there is no dedicated prep endpoint).
 
 Environment precedence for gate execution:
 1. Gate env from run/spec (`spec.env` + global env injection)
@@ -155,9 +155,8 @@ When Stack Gate is enabled for a gate phase (a gate job carries `gate.stack_gate
 Build Gate resolves its runtime image from an explicit stack→image mapping.
 
 **Resolution sources and precedence (highest wins):**
-1. `PLOY_BUILDGATE_IMAGE` (single image override)
-2. Mod spec: `build_gate.images[]` (per-stack overrides)
-3. Default file: `etc/ploy/gates/build-gate-images.yaml` (installed at `/etc/ploy/gates/build-gate-images.yaml` in Docker images)
+1. Mod spec: `build_gate.images[]` (per-stack overrides)
+2. Default file: `etc/ploy/gates/build-gate-images.yaml` (installed at `/etc/ploy/gates/build-gate-images.yaml` in Docker images)
 
 **Default file shipping:**
 - The repository default lives at `etc/ploy/gates/build-gate-images.yaml`.
@@ -179,10 +178,9 @@ BuildGateImages:
 **Validation:**
 - `language`, `release`, and `image` are required; `tool` is optional.
 - Duplicate selectors within the same source are rejected.
-- When `PLOY_BUILDGATE_IMAGE` is not set, a missing default mapping file is an error.
+- A missing default mapping file is an error when no spec mapping matches.
 
 **Environment variables (on worker nodes):**
-- `PLOY_BUILDGATE_IMAGE` — Unified override for the gate container image.
 - Resource limits: `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES`, `PLOY_BUILDGATE_LIMIT_CPU_MILLIS`,
   `PLOY_BUILDGATE_LIMIT_DISK_SPACE`.
 
@@ -191,7 +189,6 @@ See `docs/envs/README.md` for the complete environment variable reference.
 ## Inputs
 
 - **Workspace mount:** `/workspace` (required, read-write). Contains the Git checkout.
-- **Optional image override:** `PLOY_BUILDGATE_IMAGE` takes precedence over image mapping.
 - **Resource limits:** Memory, CPU, and disk limits are optional and configurable via
   environment variables.
 

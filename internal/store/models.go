@@ -129,19 +129,15 @@ type Mig struct {
 }
 
 type MigRepo struct {
-	ID              types.MigRepoID    `json:"id"`
-	MigID           types.MigID        `json:"mig_id"`
-	RepoUrl         string             `json:"repo_url"`
-	BaseRef         string             `json:"base_ref"`
-	TargetRef       string             `json:"target_ref"`
-	PrepStatus      PrepStatus         `json:"prep_status"`
-	PrepAttempts    int32              `json:"prep_attempts"`
-	PrepLastError   *string            `json:"prep_last_error"`
-	PrepFailureCode *string            `json:"prep_failure_code"`
-	PrepUpdatedAt   pgtype.Timestamptz `json:"prep_updated_at"`
-	PrepProfile     []byte             `json:"prep_profile"`
-	PrepArtifacts   []byte             `json:"prep_artifacts"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ID            types.MigRepoID    `json:"id"`
+	MigID         types.MigID        `json:"mig_id"`
+	RepoUrl       string             `json:"repo_url"`
+	BaseRef       string             `json:"base_ref"`
+	TargetRef     string             `json:"target_ref"`
+	PrepUpdatedAt pgtype.Timestamptz `json:"prep_updated_at"`
+	PrepProfile   []byte             `json:"prep_profile"`
+	PrepArtifacts []byte             `json:"prep_artifacts"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type Node struct {
@@ -180,16 +176,6 @@ type NodeMetric struct {
 type PloySchemaVersion struct {
 	Version   int64              `json:"version"`
 	AppliedAt pgtype.Timestamptz `json:"applied_at"`
-}
-
-type PrepRun struct {
-	RepoID     types.MigRepoID    `json:"repo_id"`
-	Attempt    int32              `json:"attempt"`
-	Status     PrepStatus         `json:"status"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	ResultJson []byte             `json:"result_json"`
-	LogsRef    *string            `json:"logs_ref"`
 }
 
 type Run struct {

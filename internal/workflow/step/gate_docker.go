@@ -104,8 +104,7 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 // Execute runs the Build Gate inside a container image and returns
 // normalized metadata about the outcome.
 //
-// Image selection (highest wins):
-//   - `PLOY_BUILDGATE_IMAGE` (single image override)
+// Image selection:
 //   - Default mapping file (`etc/ploy/gates/build-gate-images.yaml`) + mig YAML overrides (`build_gate.images[]`)
 //
 // The workspace is mounted at /workspace and used as the working directory.
@@ -135,11 +134,10 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		return nil, nil
 	}
 
-	envImage := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_IMAGE"))
 	mappingPath := buildGateDefaultImagesFilePath()
 
 	obs, detectErr := stackdetect.Detect(ctx, workspace)
-	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, obs, detectErr, envImage, mappingPath)
+	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, obs, detectErr, mappingPath)
 	if terminal != nil {
 		if terminal.reportRuntimeImage {
 			reportGateRuntimeImage(ctx, terminal.runtimeImage)
@@ -393,14 +391,10 @@ func resolveImageForExpectation(
 }
 
 func resolveExpectedRuntimeImageForStackGate(
-	envImage string,
 	mappingPath string,
 	overrides []contracts.BuildGateImageRule,
 	expect *contracts.StackExpectation,
 ) (string, error) {
-	if envImage != "" {
-		return envImage, nil
-	}
 	if expect == nil || strings.TrimSpace(expect.Release) == "" {
 		return "", fmt.Errorf("stack gate expectation missing release")
 	}

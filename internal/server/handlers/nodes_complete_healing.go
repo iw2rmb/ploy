@@ -13,7 +13,6 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
-	"github.com/iw2rmb/ploy/internal/server/prep"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -147,6 +146,7 @@ func maybeCreateHealingJobs(
 			run.ID,
 			failedJob,
 			jobsByID,
+			detectedStack,
 			reGateRecoveryMeta,
 		)
 	}
@@ -343,6 +343,7 @@ func evaluateAndAttachInfraCandidate(
 	runID domaintypes.RunID,
 	failedJob store.Job,
 	jobsByID map[domaintypes.JobID]store.Job,
+	detectedStack contracts.ModStack,
 	meta *contracts.BuildGateRecoveryMetadata,
 ) {
 	if meta == nil {
@@ -375,14 +376,41 @@ func evaluateAndAttachInfraCandidate(
 		meta.CandidateValidationError = err.Error()
 		return
 	}
-	if err := prep.ValidateProfileJSONForSchema(raw, contracts.PrepProfileCandidateSchemaID); err != nil {
+	if err := contracts.ValidatePrepProfileJSONForSchema(raw, contracts.PrepProfileCandidateSchemaID); err != nil {
 		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
 		meta.CandidateValidationError = err.Error()
+		return
+	}
+	profile, err := contracts.ParsePrepProfileJSON(raw)
+	if err != nil {
+		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
+		meta.CandidateValidationError = err.Error()
+		return
+	}
+	if !candidateMatchesDetectedStack(profile, detectedStack) {
+		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
+		meta.CandidateValidationError = "prep_profile stack does not match detected stack"
 		return
 	}
 	meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusValid
 	meta.CandidateValidationError = ""
 	meta.CandidatePrepProfile = append([]byte(nil), raw...)
+}
+
+func candidateMatchesDetectedStack(profile *contracts.PrepProfile, stack contracts.ModStack) bool {
+	if profile == nil {
+		return false
+	}
+	switch stack {
+	case contracts.ModStackJavaMaven:
+		return contracts.PrepProfileStackMatches(profile, "java", "maven", "")
+	case contracts.ModStackJavaGradle:
+		return contracts.PrepProfileStackMatches(profile, "java", "gradle", "")
+	case contracts.ModStackJava:
+		return contracts.PrepProfileStackMatches(profile, "java", "java", "")
+	default:
+		return false
+	}
 }
 
 func resolvePreviousHealJob(

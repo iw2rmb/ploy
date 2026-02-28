@@ -120,15 +120,6 @@ type SchedulerConfig struct {
 	// NodeStaleAfter is the heartbeat age threshold after which a node is considered stale.
 	// Default: 1 minute.
 	NodeStaleAfter time.Duration `yaml:"node_stale_after"`
-	// PrepInterval is how often the prep scheduler checks for repos requiring prep.
-	// Set to 0 to disable prep orchestration. Default: 0 (disabled).
-	PrepInterval time.Duration `yaml:"prep_interval"`
-	// PrepMaxAttempts is the total number of prep attempts per repo before hard failure.
-	// Default: 3.
-	PrepMaxAttempts int `yaml:"prep_max_attempts"`
-	// PrepRetryDelay is the fixed delay before retrying repos in PrepRetryScheduled.
-	// Default: 30 seconds.
-	PrepRetryDelay time.Duration `yaml:"prep_retry_delay"`
 }
 
 // LoggingConfig configures logging destinations.

@@ -65,7 +65,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// Repo-centric endpoints
 		{"/v1/repos", "get"},
 		{"/v1/repos/{repo_id}/runs", "get"},
-		{"/v1/repos/{repo_id}/prep", "get"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management
@@ -163,8 +162,6 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"RunRepo",
 		"RepoSummary",
 		"RepoRunSummary",
-		"RepoPrepSummary",
-		"RepoPrepRunSummary",
 	}
 
 	for _, schema := range requiredSchemas {

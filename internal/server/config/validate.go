@@ -59,14 +59,5 @@ func validate(cfg *Config) error {
 	if cfg.Transfers.JanitorInterval <= 0 {
 		return errors.New("config: transfers.janitor_interval must be positive")
 	}
-	if cfg.Scheduler.PrepInterval > 0 {
-		if cfg.Scheduler.PrepMaxAttempts < 1 {
-			return errors.New("config: scheduler.prep_max_attempts must be >= 1 when prep is enabled")
-		}
-		if cfg.Scheduler.PrepRetryDelay <= 0 {
-			return errors.New("config: scheduler.prep_retry_delay must be positive when prep is enabled")
-		}
-	}
-
 	return nil
 }

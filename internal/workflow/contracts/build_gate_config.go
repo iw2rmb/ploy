@@ -45,6 +45,7 @@ type BuildGatePhaseConfig struct {
 type BuildGatePrepOverride struct {
 	Command CommandSpec       `json:"command,omitempty" yaml:"command,omitempty"`
 	Env     map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	Stack   *PrepProfileStack `json:"stack,omitempty" yaml:"stack,omitempty"`
 }
 
 // BuildGateStackConfig configures expected stack information for a gate phase.

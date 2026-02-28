@@ -466,6 +466,35 @@ func parseBuildGatePrepOverride(raw map[string]any, prefix string) (*BuildGatePr
 		}
 		prep.Env = env
 	}
+	if v, ok := raw["stack"]; ok && v != nil {
+		stackRaw, err := expectMap(v, prefix+".stack")
+		if err != nil {
+			return nil, err
+		}
+		stack := &PrepProfileStack{}
+		if vv, ok := stackRaw["language"]; ok && vv != nil {
+			s, err := expectString(vv, prefix+".stack.language")
+			if err != nil {
+				return nil, err
+			}
+			stack.Language = strings.TrimSpace(s)
+		}
+		if vv, ok := stackRaw["tool"]; ok && vv != nil {
+			s, err := expectString(vv, prefix+".stack.tool")
+			if err != nil {
+				return nil, err
+			}
+			stack.Tool = strings.TrimSpace(s)
+		}
+		if vv, ok := stackRaw["release"]; ok && vv != nil {
+			s, err := expectString(vv, prefix+".stack.release")
+			if err != nil {
+				return nil, err
+			}
+			stack.Release = strings.TrimSpace(s)
+		}
+		prep.Stack = stack
+	}
 
 	if prep.Command.IsEmpty() {
 		return nil, fmt.Errorf("%s.command: required", prefix)

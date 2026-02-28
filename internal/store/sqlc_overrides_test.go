@@ -31,8 +31,6 @@ func TestSQLCOverridesCompile(t *testing.T) {
 		GetMig(ctx context.Context, id types.MigID) (Mig, error)
 		GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 		GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
-		CreatePrepRun(ctx context.Context, arg CreatePrepRunParams) (PrepRun, error)
-		FinishPrepRun(ctx context.Context, arg FinishPrepRunParams) (PrepRun, error)
 	}
 	var _ typedIDQuerier = (Querier)(nil)
 
@@ -101,11 +99,6 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	// Verify BootstrapToken struct field types.
 	var token BootstrapToken
 	assertType[*types.NodeID](token.NodeID)
-
-	// Verify PrepRun struct field types.
-	var prepRun PrepRun
-	assertType[types.MigRepoID](prepRun.RepoID)
-	assertType[PrepStatus](prepRun.Status)
 
 	// Verify derived timing view row types preserve RunID typing.
 	var timing RunsTiming

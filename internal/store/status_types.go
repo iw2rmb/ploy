@@ -96,34 +96,3 @@ func (e *RunStatus) Scan(src interface{}) error {
 func (e RunStatus) Value() (driver.Value, error) {
 	return string(e), nil
 }
-
-type PrepStatus string
-
-const (
-	PrepStatusPending        PrepStatus = "PrepPending"
-	PrepStatusRunning        PrepStatus = "PrepRunning"
-	PrepStatusRetryScheduled PrepStatus = "PrepRetryScheduled"
-	PrepStatusReady          PrepStatus = "PrepReady"
-	PrepStatusFailed         PrepStatus = "PrepFailed"
-)
-
-func (e *PrepStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = PrepStatus(s)
-	case string:
-		*e = PrepStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for PrepStatus: %T", src)
-	}
-	switch *e {
-	case PrepStatusPending, PrepStatusRunning, PrepStatusRetryScheduled, PrepStatusReady, PrepStatusFailed:
-		return nil
-	default:
-		return fmt.Errorf("unknown PrepStatus value: %q", string(*e))
-	}
-}
-
-func (e PrepStatus) Value() (driver.Value, error) {
-	return string(e), nil
-}

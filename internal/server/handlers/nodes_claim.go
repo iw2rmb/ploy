@@ -501,6 +501,16 @@ func buildGatePrepOverrideToMap(override *contracts.BuildGatePrepOverride) map[s
 		}
 		prep["env"] = env
 	}
+	if override.Stack != nil {
+		stack := map[string]any{
+			"language": override.Stack.Language,
+			"tool":     override.Stack.Tool,
+		}
+		if strings.TrimSpace(override.Stack.Release) != "" {
+			stack["release"] = override.Stack.Release
+		}
+		prep["stack"] = stack
+	}
 	return prep
 }
 

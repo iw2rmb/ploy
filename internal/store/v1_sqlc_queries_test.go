@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"testing"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // TestV1SQLCQueries_Mods verifies that the v1 migs queries are wired and match
@@ -195,21 +193,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpsertMigRepo(insert) failed: %v", err)
 	}
-	if inserted.PrepStatus != PrepStatusPending {
-		t.Fatalf("UpsertMigRepo(insert) prep status mismatch: got=%q want=%q", inserted.PrepStatus, PrepStatusPending)
-	}
-
-	profile := []byte(`{"schema_version":1}`)
-	artifacts := []byte(`{"log_refs":["logs://prep/modrepos"]}`)
-	if err := db.SaveMigRepoPrepProfile(ctx, SaveMigRepoPrepProfileParams{
-		ID:            inserted.ID,
-		PrepProfile:   profile,
-		PrepArtifacts: artifacts,
-	}); err != nil {
-		t.Fatalf("SaveMigRepoPrepProfile() failed: %v", err)
-	}
-
-	unchanged, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
+	_, err = db.UpsertMigRepo(ctx, UpsertMigRepoParams{
 		ID:        types.NewMigRepoID(),
 		MigID:     mig.ID,
 		RepoUrl:   repoURL,
@@ -218,15 +202,6 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("UpsertMigRepo(unchanged) failed: %v", err)
-	}
-	if unchanged.PrepStatus != PrepStatusReady {
-		t.Fatalf("UpsertMigRepo(unchanged) prep status mismatch: got=%q want=%q", unchanged.PrepStatus, PrepStatusReady)
-	}
-	if !bytes.Equal(unchanged.PrepProfile, profile) {
-		t.Fatalf("UpsertMigRepo(unchanged) prep profile mismatch: got=%s want=%s", string(unchanged.PrepProfile), string(profile))
-	}
-	if !bytes.Equal(unchanged.PrepArtifacts, artifacts) {
-		t.Fatalf("UpsertMigRepo(unchanged) prep artifacts mismatch: got=%s want=%s", string(unchanged.PrepArtifacts), string(artifacts))
 	}
 
 	// Conflict path: provide a different id but same (mig_id, repo_url). ID must remain stable.
@@ -246,15 +221,6 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	}
 	if updated.BaseRef != "trunk" || updated.TargetRef != "feature-2" {
 		t.Fatalf("UpsertMigRepo(update) did not update refs: base=%q target=%q", updated.BaseRef, updated.TargetRef)
-	}
-	if updated.PrepStatus != PrepStatusPending {
-		t.Fatalf("UpsertMigRepo(update) prep status mismatch: got=%q want=%q", updated.PrepStatus, PrepStatusPending)
-	}
-	if len(updated.PrepProfile) != 0 {
-		t.Fatalf("UpsertMigRepo(update) expected prep_profile to be cleared, got=%s", string(updated.PrepProfile))
-	}
-	if len(updated.PrepArtifacts) != 0 {
-		t.Fatalf("UpsertMigRepo(update) expected prep_artifacts to be cleared, got=%s", string(updated.PrepArtifacts))
 	}
 
 	got, err := db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{
@@ -358,338 +324,5 @@ func TestV1SQLCQueries_Specs(t *testing.T) {
 	}
 	if idx2 >= idx1 {
 		t.Fatalf("expected spec2 (newer) to appear before spec1 (older): idx2=%d idx1=%d", idx2, idx1)
-	}
-}
-
-// TestV1SQLCQueries_MigRepoPrepLifecycle verifies prep claim/state/profile queries.
-//
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
-func TestV1SQLCQueries_MigRepoPrepLifecycle(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-
-	createdBy := "test-user"
-	migID := types.NewMigID()
-	mig, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        migID,
-		Name:      "v1-sqlc-prep-" + migID.String(),
-		SpecID:    nil,
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateMig() failed: %v", err)
-	}
-	defer func() { _ = db.DeleteMig(ctx, mig.ID) }()
-
-	repo1ID := types.NewMigRepoID()
-	repo1, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        repo1ID,
-		MigID:     mig.ID,
-		RepoUrl:   "https://github.com/iw2rmb/ploy-prep-1.git",
-		BaseRef:   "main",
-		TargetRef: "feature-1",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo(repo1) failed: %v", err)
-	}
-	if repo1.PrepStatus != PrepStatusPending {
-		t.Fatalf("repo1 prep status mismatch: got=%q want=%q", repo1.PrepStatus, PrepStatusPending)
-	}
-	if repo1.PrepAttempts != 0 {
-		t.Fatalf("repo1 prep attempts mismatch: got=%d want=0", repo1.PrepAttempts)
-	}
-
-	repo2ID := types.NewMigRepoID()
-	repo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        repo2ID,
-		MigID:     mig.ID,
-		RepoUrl:   "https://github.com/iw2rmb/ploy-prep-2.git",
-		BaseRef:   "main",
-		TargetRef: "feature-2",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo(repo2) failed: %v", err)
-	}
-
-	oldest := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	secondOldest := oldest.Add(time.Second)
-	if _, err := db.Pool().Exec(ctx, "UPDATE mig_repos SET prep_updated_at=$2 WHERE id=$1", repo1.ID, oldest); err != nil {
-		t.Fatalf("set repo1 prep_updated_at failed: %v", err)
-	}
-	if _, err := db.Pool().Exec(ctx, "UPDATE mig_repos SET prep_updated_at=$2 WHERE id=$1", repo2.ID, secondOldest); err != nil {
-		t.Fatalf("set repo2 prep_updated_at failed: %v", err)
-	}
-
-	claimed1, err := db.ClaimNextPrepRepo(ctx)
-	if err != nil {
-		t.Fatalf("ClaimNextPrepRepo(1) failed: %v", err)
-	}
-	if claimed1.ID != repo1.ID {
-		t.Fatalf("ClaimNextPrepRepo(1) claimed wrong repo: got=%q want=%q", claimed1.ID, repo1.ID)
-	}
-	if claimed1.PrepStatus != PrepStatusRunning {
-		t.Fatalf("claimed1 prep status mismatch: got=%q want=%q", claimed1.PrepStatus, PrepStatusRunning)
-	}
-	if claimed1.PrepAttempts != 1 {
-		t.Fatalf("claimed1 prep attempts mismatch: got=%d want=1", claimed1.PrepAttempts)
-	}
-
-	claimed2, err := db.ClaimNextPrepRepo(ctx)
-	if err != nil {
-		t.Fatalf("ClaimNextPrepRepo(2) failed: %v", err)
-	}
-	if claimed2.ID != repo2.ID {
-		t.Fatalf("ClaimNextPrepRepo(2) claimed wrong repo: got=%q want=%q", claimed2.ID, repo2.ID)
-	}
-
-	prepErr := "prep command failed"
-	failureCode := "command_not_found"
-	if err := db.UpdateMigRepoPrepState(ctx, UpdateMigRepoPrepStateParams{
-		ID:              repo1.ID,
-		PrepStatus:      PrepStatusFailed,
-		PrepLastError:   &prepErr,
-		PrepFailureCode: &failureCode,
-	}); err != nil {
-		t.Fatalf("UpdateMigRepoPrepState() failed: %v", err)
-	}
-
-	gotRepo1, err := db.GetMigRepo(ctx, repo1.ID)
-	if err != nil {
-		t.Fatalf("GetMigRepo(repo1) failed: %v", err)
-	}
-	if gotRepo1.PrepStatus != PrepStatusFailed {
-		t.Fatalf("repo1 final prep status mismatch: got=%q want=%q", gotRepo1.PrepStatus, PrepStatusFailed)
-	}
-	if gotRepo1.PrepLastError == nil || *gotRepo1.PrepLastError != prepErr {
-		t.Fatalf("repo1 prep_last_error mismatch: got=%v want=%q", gotRepo1.PrepLastError, prepErr)
-	}
-	if gotRepo1.PrepFailureCode == nil || *gotRepo1.PrepFailureCode != failureCode {
-		t.Fatalf("repo1 prep_failure_code mismatch: got=%v want=%q", gotRepo1.PrepFailureCode, failureCode)
-	}
-
-	profile := []byte(`{"schema_version":1}`)
-	artifacts := []byte(`{"log_refs":["logs://prep/run"]}`)
-	if err := db.SaveMigRepoPrepProfile(ctx, SaveMigRepoPrepProfileParams{
-		ID:            repo2.ID,
-		PrepProfile:   profile,
-		PrepArtifacts: artifacts,
-	}); err != nil {
-		t.Fatalf("SaveMigRepoPrepProfile() failed: %v", err)
-	}
-
-	gotRepo2, err := db.GetMigRepo(ctx, repo2.ID)
-	if err != nil {
-		t.Fatalf("GetMigRepo(repo2) failed: %v", err)
-	}
-	if gotRepo2.PrepStatus != PrepStatusReady {
-		t.Fatalf("repo2 final prep status mismatch: got=%q want=%q", gotRepo2.PrepStatus, PrepStatusReady)
-	}
-	if !bytes.Equal(gotRepo2.PrepProfile, profile) {
-		t.Fatalf("repo2 prep_profile mismatch: got=%s want=%s", string(gotRepo2.PrepProfile), string(profile))
-	}
-	if !bytes.Equal(gotRepo2.PrepArtifacts, artifacts) {
-		t.Fatalf("repo2 prep_artifacts mismatch: got=%s want=%s", string(gotRepo2.PrepArtifacts), string(artifacts))
-	}
-}
-
-// TestV1SQLCQueries_PrepRuns verifies attempt-level prep evidence persistence.
-//
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
-func TestV1SQLCQueries_PrepRuns(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-
-	createdBy := "test-user"
-	migID := types.NewMigID()
-	mig, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        migID,
-		Name:      "v1-sqlc-prep-runs-" + migID.String(),
-		SpecID:    nil,
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateMig() failed: %v", err)
-	}
-	defer func() { _ = db.DeleteMig(ctx, mig.ID) }()
-
-	repoID := types.NewMigRepoID()
-	repo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        repoID,
-		MigID:     mig.ID,
-		RepoUrl:   "https://github.com/iw2rmb/ploy-prep-runs.git",
-		BaseRef:   "main",
-		TargetRef: "feature",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo() failed: %v", err)
-	}
-
-	started, err := db.CreatePrepRun(ctx, CreatePrepRunParams{
-		RepoID:     repo.ID,
-		Attempt:    1,
-		Status:     PrepStatusRunning,
-		ResultJson: []byte(`{"phase":"init"}`),
-		LogsRef:    nil,
-	})
-	if err != nil {
-		t.Fatalf("CreatePrepRun() failed: %v", err)
-	}
-	if started.RepoID != repo.ID {
-		t.Fatalf("CreatePrepRun repo mismatch: got=%q want=%q", started.RepoID, repo.ID)
-	}
-	if started.Status != PrepStatusRunning {
-		t.Fatalf("CreatePrepRun status mismatch: got=%q want=%q", started.Status, PrepStatusRunning)
-	}
-	if !started.StartedAt.Valid {
-		t.Fatal("CreatePrepRun started_at must be set")
-	}
-	if started.FinishedAt.Valid {
-		t.Fatal("CreatePrepRun finished_at must be NULL")
-	}
-
-	logsRef := "logs://prep/attempt-1"
-	finishedPayload := []byte(`{"failure_code":"timeout"}`)
-	finished, err := db.FinishPrepRun(ctx, FinishPrepRunParams{
-		RepoID:     repo.ID,
-		Attempt:    1,
-		Status:     PrepStatusFailed,
-		ResultJson: finishedPayload,
-		LogsRef:    &logsRef,
-	})
-	if err != nil {
-		t.Fatalf("FinishPrepRun() failed: %v", err)
-	}
-	if finished.Status != PrepStatusFailed {
-		t.Fatalf("FinishPrepRun status mismatch: got=%q want=%q", finished.Status, PrepStatusFailed)
-	}
-	if !finished.FinishedAt.Valid {
-		t.Fatal("FinishPrepRun finished_at must be set")
-	}
-	if !bytes.Equal(finished.ResultJson, finishedPayload) {
-		t.Fatalf("FinishPrepRun result_json mismatch: got=%s want=%s", string(finished.ResultJson), string(finishedPayload))
-	}
-	if finished.LogsRef == nil || *finished.LogsRef != logsRef {
-		t.Fatalf("FinishPrepRun logs_ref mismatch: got=%v want=%q", finished.LogsRef, logsRef)
-	}
-}
-
-// TestV1SQLCQueries_ClaimNextPrepRetryRepo verifies retry-eligible prep claim ordering.
-//
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
-func TestV1SQLCQueries_ClaimNextPrepRetryRepo(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
-	}
-
-	ctx := context.Background()
-	db, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore() failed: %v", err)
-	}
-	defer db.Close()
-
-	createdBy := "test-user"
-	migID := types.NewMigID()
-	mig, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        migID,
-		Name:      "v1-sqlc-prep-retry-" + migID.String(),
-		SpecID:    nil,
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateMig() failed: %v", err)
-	}
-	defer func() { _ = db.DeleteMig(ctx, mig.ID) }()
-
-	repo1, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        types.NewMigRepoID(),
-		MigID:     mig.ID,
-		RepoUrl:   "https://github.com/iw2rmb/ploy-prep-retry-1.git",
-		BaseRef:   "main",
-		TargetRef: "feature-1",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo(repo1) failed: %v", err)
-	}
-
-	repo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        types.NewMigRepoID(),
-		MigID:     mig.ID,
-		RepoUrl:   "https://github.com/iw2rmb/ploy-prep-retry-2.git",
-		BaseRef:   "main",
-		TargetRef: "feature-2",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo(repo2) failed: %v", err)
-	}
-
-	retryErr := "retry me"
-	retryCode := "timeout"
-	if err := db.UpdateMigRepoPrepState(ctx, UpdateMigRepoPrepStateParams{
-		ID:              repo1.ID,
-		PrepStatus:      PrepStatusRetryScheduled,
-		PrepLastError:   &retryErr,
-		PrepFailureCode: &retryCode,
-	}); err != nil {
-		t.Fatalf("UpdateMigRepoPrepState(repo1) failed: %v", err)
-	}
-	if err := db.UpdateMigRepoPrepState(ctx, UpdateMigRepoPrepStateParams{
-		ID:              repo2.ID,
-		PrepStatus:      PrepStatusRetryScheduled,
-		PrepLastError:   &retryErr,
-		PrepFailureCode: &retryCode,
-	}); err != nil {
-		t.Fatalf("UpdateMigRepoPrepState(repo2) failed: %v", err)
-	}
-
-	oldest := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-	newer := oldest.Add(10 * time.Second)
-	if _, err := db.Pool().Exec(ctx, "UPDATE mig_repos SET prep_updated_at=$2 WHERE id=$1", repo1.ID, oldest); err != nil {
-		t.Fatalf("set repo1 prep_updated_at failed: %v", err)
-	}
-	if _, err := db.Pool().Exec(ctx, "UPDATE mig_repos SET prep_updated_at=$2 WHERE id=$1", repo2.ID, newer); err != nil {
-		t.Fatalf("set repo2 prep_updated_at failed: %v", err)
-	}
-
-	cutoff := pgtype.Timestamptz{Time: oldest.Add(5 * time.Second), Valid: true}
-	claimed, err := db.ClaimNextPrepRetryRepo(ctx, cutoff)
-	if err != nil {
-		t.Fatalf("ClaimNextPrepRetryRepo() failed: %v", err)
-	}
-	if claimed.ID != repo1.ID {
-		t.Fatalf("ClaimNextPrepRetryRepo() claimed wrong repo: got=%q want=%q", claimed.ID, repo1.ID)
-	}
-	if claimed.PrepStatus != PrepStatusRunning {
-		t.Fatalf("claimed status mismatch: got=%q want=%q", claimed.PrepStatus, PrepStatusRunning)
-	}
-	if claimed.PrepAttempts != 1 {
-		t.Fatalf("claimed attempts mismatch: got=%d want=1", claimed.PrepAttempts)
-	}
-
-	_, err = db.ClaimNextPrepRetryRepo(ctx, cutoff)
-	if err == nil {
-		t.Fatal("ClaimNextPrepRetryRepo() expected no eligible rows")
-	}
-	if err != pgx.ErrNoRows {
-		t.Fatalf("ClaimNextPrepRetryRepo() error = %v, want %v", err, pgx.ErrNoRows)
 	}
 }

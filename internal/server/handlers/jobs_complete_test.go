@@ -253,7 +253,7 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -292,7 +292,7 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -342,7 +342,7 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},

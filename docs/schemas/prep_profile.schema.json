@@ -7,6 +7,7 @@
     "schema_version",
     "repo_id",
     "runner_mode",
+    "stack",
     "targets",
     "orchestration",
     "tactics_used",
@@ -30,6 +31,9 @@
         "simple",
         "complex"
       ]
+    },
+    "stack": {
+      "$ref": "#/definitions/stack"
     },
     "runtime": {
       "$ref": "#/definitions/runtimeHints"
@@ -257,6 +261,27 @@
           }
         }
       ]
+    },
+    "stack": {
+      "type": "object",
+      "required": [
+        "language",
+        "tool"
+      ],
+      "properties": {
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "release": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     },
     "runtimeHints": {
       "type": "object",

@@ -242,9 +242,6 @@ SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt,
 FROM run_repos
 WHERE run_id = $1
   AND status = 'Queued'
-  AND repo_id IN (
-    SELECT id FROM mig_repos WHERE prep_status = 'PrepReady'
-  )
 ORDER BY created_at ASC, repo_id ASC
 `
 
@@ -453,10 +450,8 @@ const listRunsWithQueuedRepos = `-- name: ListRunsWithQueuedRepos :many
 SELECT DISTINCT r.id
 FROM runs r
 JOIN run_repos rr ON r.id = rr.run_id
-JOIN mig_repos mr ON rr.repo_id = mr.id
 WHERE r.status = 'Started'
   AND rr.status = 'Queued'
-  AND mr.prep_status = 'PrepReady'
 ORDER BY r.id
 `
 

@@ -283,6 +283,14 @@ func validateBuildGatePrepOverride(prep *BuildGatePrepOverride, prefix string) e
 	if prep.Command.IsEmpty() {
 		return fmt.Errorf("%s.command: required", prefix)
 	}
+	if prep.Stack != nil {
+		if strings.TrimSpace(prep.Stack.Language) == "" {
+			return fmt.Errorf("%s.stack.language: required", prefix)
+		}
+		if strings.TrimSpace(prep.Stack.Tool) == "" {
+			return fmt.Errorf("%s.stack.tool: required", prefix)
+		}
+	}
 	return nil
 }
 

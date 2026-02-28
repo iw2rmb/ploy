@@ -15,6 +15,7 @@ func TestMergeRepoPrepProfileIntoSpec(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"runtime": {
 			"docker": {
 				"mode": "host_socket"
@@ -112,6 +113,7 @@ func TestMergeRepoPrepProfileIntoSpec(t *testing.T) {
 				"schema_version": 1,
 				"repo_id": "repo_123",
 				"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 				"targets": {
 					"build": {"status": "failed", "command":"go test ./...", "env": {}, "failure_code": "unknown"},
 					"unit": {"status": "passed", "command":"go test ./... -run TestUnit", "env": {}, "failure_code": null},

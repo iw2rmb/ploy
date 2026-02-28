@@ -100,14 +100,11 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	var manifest contracts.StepManifest
 	var err error
 
-	// When build_gate_healing is configured, hydrate the healing manifest from the
-	// typed HealingConfig so that discrete healing jobs use the correct image/env.
-	if typedOpts.Healing != nil && !typedOpts.Healing.Mod.Image.IsEmpty() {
+	if typedOpts.Healing == nil || typedOpts.Healing.Mod.Image.IsEmpty() {
+		err = fmt.Errorf("healing job missing selected strategy image")
+	} else {
 		healMod := typedOpts.Healing.Mod
 		manifest, err = buildHealingManifest(req, healMod, 0, "", stack)
-	}
-	if manifest.Image == "" {
-		manifest, err = buildManifestFromRequest(req, typedOpts, 0, stack)
 	}
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)

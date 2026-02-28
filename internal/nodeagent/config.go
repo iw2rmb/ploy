@@ -32,7 +32,7 @@ type Config struct {
 	Heartbeat HeartbeatConfig `yaml:"heartbeat"`
 
 	// Note: Build Gate image selection is configured via:
-	//  1) default mapping file, 2) PLOY_BUILDGATE_IMAGE, 3) mig YAML overrides.
+	//  1) default mapping file, 2) mig YAML overrides.
 }
 
 // HTTPConfig specifies HTTP listener and TLS settings for the node agent.

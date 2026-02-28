@@ -408,6 +408,7 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"runtime": {
 			"docker": {
 				"mode": "host_socket"
@@ -586,6 +587,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"targets": {
 			"build": {"status":"passed","command":"echo repo-build","env":{},"failure_code":null},
 			"unit": {"status":"passed","command":"echo repo-unit","env":{"SRC":"repo"},"failure_code":null},
@@ -597,6 +599,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"targets": {
 			"build": {"status":"passed","command":"echo candidate-build","env":{},"failure_code":null},
 			"unit": {"status":"passed","command":"echo candidate-unit","env":{"SRC":"candidate"},"failure_code":null},

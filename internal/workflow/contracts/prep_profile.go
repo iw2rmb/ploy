@@ -39,9 +39,16 @@ type PrepProfile struct {
 	SchemaVersion int                      `json:"schema_version"`
 	RepoID        string                   `json:"repo_id"`
 	RunnerMode    string                   `json:"runner_mode"`
+	Stack         PrepProfileStack         `json:"stack"`
 	Targets       PrepProfileTargets       `json:"targets"`
 	Runtime       *PrepProfileRuntime      `json:"runtime,omitempty"`
 	Orchestration PrepProfileOrchestration `json:"orchestration"`
+}
+
+type PrepProfileStack struct {
+	Language string `json:"language"`
+	Tool     string `json:"tool"`
+	Release  string `json:"release,omitempty"`
 }
 
 type PrepProfileTargets struct {
@@ -90,6 +97,12 @@ func ParsePrepProfileJSON(raw []byte) (*PrepProfile, error) {
 	if strings.TrimSpace(profile.RunnerMode) == "" {
 		return nil, fmt.Errorf("prep_profile.runner_mode: required")
 	}
+	if strings.TrimSpace(profile.Stack.Language) == "" {
+		return nil, fmt.Errorf("prep_profile.stack.language: required")
+	}
+	if strings.TrimSpace(profile.Stack.Tool) == "" {
+		return nil, fmt.Errorf("prep_profile.stack.tool: required")
+	}
 	switch profile.RunnerMode {
 	case PrepRunnerModeSimple, PrepRunnerModeComplex:
 	default:
@@ -132,6 +145,31 @@ func ParsePrepProfileJSON(raw []byte) (*PrepProfile, error) {
 	return &profile, nil
 }
 
+func PrepProfileStackMatches(profile *PrepProfile, language, tool, release string) bool {
+	if profile == nil {
+		return false
+	}
+	pLang := strings.TrimSpace(strings.ToLower(profile.Stack.Language))
+	pTool := strings.TrimSpace(strings.ToLower(profile.Stack.Tool))
+	if pLang == "" || pTool == "" {
+		return false
+	}
+	if pLang != strings.TrimSpace(strings.ToLower(language)) {
+		return false
+	}
+	if pTool != strings.TrimSpace(strings.ToLower(tool)) {
+		return false
+	}
+	pRelease := strings.TrimSpace(profile.Stack.Release)
+	if pRelease == "" {
+		return true
+	}
+	if strings.TrimSpace(release) == "" {
+		return false
+	}
+	return pRelease == strings.TrimSpace(release)
+}
+
 func PrepProfileGateOverrideForJobType(
 	profile *PrepProfile,
 	jobType types.JobType,
@@ -164,6 +202,11 @@ func PrepProfileGateOverrideForJobType(
 	}
 	if override == nil {
 		return phase, nil, nil
+	}
+	override.Stack = &PrepProfileStack{
+		Language: profile.Stack.Language,
+		Tool:     profile.Stack.Tool,
+		Release:  profile.Stack.Release,
 	}
 	runtimeEnv, err := prepProfileRuntimeGateEnv(profile.Runtime)
 	if err != nil {

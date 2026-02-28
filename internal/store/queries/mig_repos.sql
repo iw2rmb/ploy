@@ -5,29 +5,26 @@ INSERT INTO mig_repos (
   repo_url,
   base_ref,
   target_ref,
-  prep_status,
-  prep_last_error,
-  prep_failure_code,
   prep_profile,
   prep_artifacts,
   prep_updated_at
 )
-VALUES ($1, $2, $3, $4, $5, 'PrepPending', NULL, NULL, NULL, NULL, now())
-RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at;
+VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
+RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at;
 
 -- name: GetMigRepo :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE id = $1;
 
 -- name: GetMigRepoByURL :one
 -- Gets a mod_repo by mig_id and repo_url (for uniqueness constraint enforcement).
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1 AND repo_url = $2;
 
 -- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC;
@@ -55,120 +52,16 @@ INSERT INTO mig_repos (
   repo_url,
   base_ref,
   target_ref,
-  prep_status,
-  prep_last_error,
-  prep_failure_code,
   prep_profile,
   prep_artifacts,
   prep_updated_at
 )
-VALUES ($1, $2, $3, $4, $5, 'PrepPending', NULL, NULL, NULL, NULL, now())
+VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
 ON CONFLICT (mig_id, repo_url)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
-  target_ref = EXCLUDED.target_ref,
-  prep_status = CASE
-    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
-      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
-    THEN 'PrepPending'::prep_status
-    ELSE mig_repos.prep_status
-  END,
-  prep_last_error = CASE
-    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
-      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
-    THEN NULL
-    ELSE mig_repos.prep_last_error
-  END,
-  prep_failure_code = CASE
-    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
-      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
-    THEN NULL
-    ELSE mig_repos.prep_failure_code
-  END,
-  prep_profile = CASE
-    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
-      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
-    THEN NULL
-    ELSE mig_repos.prep_profile
-  END,
-  prep_artifacts = CASE
-    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
-      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
-    THEN NULL
-    ELSE mig_repos.prep_artifacts
-  END,
-  prep_updated_at = CASE
-    WHEN mig_repos.base_ref IS DISTINCT FROM EXCLUDED.base_ref
-      OR mig_repos.target_ref IS DISTINCT FROM EXCLUDED.target_ref
-    THEN now()
-    ELSE mig_repos.prep_updated_at
-  END
-RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at;
-
--- name: ListReposByPrepStatus :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_status, prep_attempts, prep_last_error, prep_failure_code, prep_updated_at, prep_profile, prep_artifacts, created_at
-FROM mig_repos
-WHERE prep_status = $1
-ORDER BY prep_updated_at ASC, created_at ASC, id ASC;
-
--- name: ClaimNextPrepRepo :one
-WITH candidate AS (
-  SELECT mr.id
-  FROM mig_repos mr
-  WHERE mr.prep_status = 'PrepPending'
-  ORDER BY mr.prep_updated_at ASC, mr.created_at ASC, mr.id ASC
-  FOR UPDATE SKIP LOCKED
-  LIMIT 1
-)
-UPDATE mig_repos mr
-SET prep_status = 'PrepRunning',
-    prep_attempts = mr.prep_attempts + 1,
-    prep_last_error = NULL,
-    prep_failure_code = NULL,
-    prep_updated_at = now()
-FROM candidate
-WHERE mr.id = candidate.id
-  AND mr.prep_status = 'PrepPending'
-RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at;
-
--- name: ClaimNextPrepRetryRepo :one
-WITH candidate AS (
-  SELECT mr.id
-  FROM mig_repos mr
-  WHERE mr.prep_status = 'PrepRetryScheduled'
-    AND mr.prep_updated_at <= $1
-  ORDER BY mr.prep_updated_at ASC, mr.created_at ASC, mr.id ASC
-  FOR UPDATE SKIP LOCKED
-  LIMIT 1
-)
-UPDATE mig_repos mr
-SET prep_status = 'PrepRunning',
-    prep_attempts = mr.prep_attempts + 1,
-    prep_last_error = NULL,
-    prep_failure_code = NULL,
-    prep_updated_at = now()
-FROM candidate
-WHERE mr.id = candidate.id
-  AND mr.prep_status = 'PrepRetryScheduled'
-RETURNING mr.id, mr.mig_id, mr.repo_url, mr.base_ref, mr.target_ref, mr.prep_status, mr.prep_attempts, mr.prep_last_error, mr.prep_failure_code, mr.prep_updated_at, mr.prep_profile, mr.prep_artifacts, mr.created_at;
-
--- name: UpdateMigRepoPrepState :exec
-UPDATE mig_repos
-SET prep_status = $2,
-    prep_last_error = $3,
-    prep_failure_code = $4,
-    prep_updated_at = now()
-WHERE id = $1;
-
--- name: SaveMigRepoPrepProfile :exec
-UPDATE mig_repos
-SET prep_profile = $2,
-    prep_artifacts = $3,
-    prep_status = 'PrepReady',
-    prep_last_error = NULL,
-    prep_failure_code = NULL,
-    prep_updated_at = now()
-WHERE id = $1;
+  target_ref = EXCLUDED.target_ref
+RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at;
 
 -- name: PromoteReGateRecoveryCandidatePrepProfile :one
 WITH target_job AS (
@@ -196,9 +89,6 @@ updated_job AS (
 UPDATE mig_repos mr
 SET prep_profile = $3,
     prep_artifacts = $4,
-    prep_status = 'PrepReady',
-    prep_last_error = NULL,
-    prep_failure_code = NULL,
     prep_updated_at = now()
 FROM updated_job uj
 WHERE mr.id = uj.repo_id
@@ -218,10 +108,7 @@ SELECT
   mr.id AS repo_id,
   mr.repo_url,
   rr.last_run_at,
-  COALESCE(rr.last_status::text, '') AS last_status,
-  mr.prep_status,
-  mr.prep_failure_code,
-  mr.prep_updated_at
+  COALESCE(rr.last_status::text, '') AS last_status
 FROM mig_repos mr
 LEFT JOIN LATERAL (
   SELECT

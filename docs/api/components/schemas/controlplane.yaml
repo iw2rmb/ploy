@@ -968,7 +968,7 @@ RepoSummary:
   type: object
   description: |
     Repository summary returned by GET /v1/repos. Includes the repo URL
-    along with metadata from the most recent run (if any) and prep lifecycle state.
+    along with metadata from the most recent run (if any).
   properties:
     repo_id:
       type: string
@@ -985,22 +985,9 @@ RepoSummary:
       type: string
       nullable: true
       description: Status of the most recent per-repo execution (Queued, Running, Success, Fail, Cancelled)
-    prep_status:
-      type: string
-      description: Current prep lifecycle status (PrepPending, PrepRunning, PrepRetryScheduled, PrepReady, PrepFailed)
-    prep_updated_at:
-      type: string
-      format: date-time
-      nullable: true
-      description: Last prep status update timestamp
-    prep_failure_code:
-      type: string
-      nullable: true
-      description: Stable prep failure code when prep is in failed/retry state
   required:
     - repo_id
     - repo_url
-    - prep_status
 
 RepoRunSummary:
   type: object
@@ -1049,94 +1036,6 @@ RepoRunSummary:
     - base_ref
     - target_ref
     - attempt
-
-RepoPrepRunSummary:
-  type: object
-  description: |
-    One prep attempt entry for GET /v1/repos/{repo_id}/prep.
-  properties:
-    attempt:
-      type: integer
-      format: int32
-      description: 1-based prep attempt number
-    status:
-      type: string
-      description: Prep attempt status
-    started_at:
-      type: string
-      format: date-time
-      nullable: true
-      description: Attempt start timestamp
-    finished_at:
-      type: string
-      format: date-time
-      nullable: true
-      description: Attempt finish timestamp
-    result_json:
-      type: object
-      nullable: true
-      description: Result payload captured for this prep attempt
-      additionalProperties: true
-    logs_ref:
-      type: string
-      nullable: true
-      description: Logs artifact reference for this prep attempt
-  required:
-    - attempt
-    - status
-    - result_json
-
-RepoPrepSummary:
-  type: object
-  description: |
-    Repository prep lifecycle details and prep attempt evidence returned by
-    GET /v1/repos/{repo_id}/prep.
-  properties:
-    repo_id:
-      type: string
-      description: Repository identifier (mig_repos.id, NanoID string)
-    prep_status:
-      type: string
-      description: Current prep lifecycle status
-    prep_attempts:
-      type: integer
-      format: int32
-      description: Number of prep claim attempts performed for this repo
-    prep_last_error:
-      type: string
-      nullable: true
-      description: Last prep error message, if any
-    prep_failure_code:
-      type: string
-      nullable: true
-      description: Stable prep failure code, if set
-    prep_updated_at:
-      type: string
-      format: date-time
-      nullable: true
-      description: Last prep state transition timestamp
-    prep_profile:
-      type: object
-      nullable: true
-      description: Persisted prep profile payload
-      additionalProperties: true
-    prep_artifacts:
-      type: object
-      nullable: true
-      description: Persisted prep artifacts payload
-      additionalProperties: true
-    runs:
-      type: array
-      description: Prep attempt evidence ordered by attempt descending
-      items:
-        $ref: '#/RepoPrepRunSummary'
-  required:
-    - repo_id
-    - prep_status
-    - prep_attempts
-    - prep_profile
-    - prep_artifacts
-    - runs
 
 # -------------------------------------------------------------------------
 # Repo-scoped job listing — GET /v1/runs/{run_id}/repos/{repo_id}/jobs
