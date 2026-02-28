@@ -9,6 +9,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+func mustGateProfileSchemaJSON(t *testing.T) string {
+	t.Helper()
+	raw, err := contracts.ReadGateProfileSchemaJSON()
+	if err != nil {
+		t.Fatalf("ReadGateProfileSchemaJSON: %v", err)
+	}
+	return string(raw)
+}
+
 // TestPopulateHealingInDirCopiesGateLog verifies that populateHealingInDir copies
 // the persisted gate log into the healing job's /in directory as build-gate.log.
 func TestPopulateHealingInDirCopiesGateLog(t *testing.T) {
@@ -31,7 +40,7 @@ func TestPopulateHealingInDirCopiesGateLog(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	if err := rc.populateHealingInDir(runID, inDir, nil); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, nil, ""); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 
@@ -103,7 +112,8 @@ func TestPopulateHealingInDirCopiesGateProfileForInfra(t *testing.T) {
 	}
 
 	inDir := t.TempDir()
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+	schemaJSON := mustGateProfileSchemaJSON(t)
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 
@@ -118,11 +128,7 @@ func TestPopulateHealingInDirCopiesGateProfileForInfra(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read /in/gate_profile.schema.json: %v", err)
 	}
-	wantSchema, err := contracts.ReadGateProfileSchemaJSON()
-	if err != nil {
-		t.Fatalf("ReadGateProfileSchemaJSON: %v", err)
-	}
-	if got, want := string(gotSchema), string(wantSchema); got != want {
+	if got, want := string(gotSchema), schemaJSON; got != want {
 		t.Fatalf("healing /in/gate_profile.schema.json mismatch")
 	}
 }
@@ -146,7 +152,7 @@ func TestPopulateHealingInDirSkipsGateProfileForNonInfra(t *testing.T) {
 	}
 
 	inDir := t.TempDir()
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "code"}); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "code"}, ""); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.json")); !os.IsNotExist(err) {
@@ -173,7 +179,8 @@ func TestPopulateHealingInDirInfraMissingGateProfileIsAllowed(t *testing.T) {
 	}
 
 	inDir := t.TempDir()
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+	schemaJSON := mustGateProfileSchemaJSON(t)
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
@@ -194,7 +201,8 @@ func TestPopulateHealingInDirInfraMissingGateLogStillHydratesSchema(t *testing.T
 	}
 
 	inDir := t.TempDir()
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+	schemaJSON := mustGateProfileSchemaJSON(t)
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
@@ -221,7 +229,8 @@ func TestPopulateHealingInDirInfraEmptyGateLogStillHydratesSchema(t *testing.T) 
 	}
 
 	inDir := t.TempDir()
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+	schemaJSON := mustGateProfileSchemaJSON(t)
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
@@ -229,5 +238,27 @@ func TestPopulateHealingInDirInfraEmptyGateLogStillHydratesSchema(t *testing.T) 
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "build-gate.log")); !os.IsNotExist(err) {
 		t.Fatalf("build-gate.log exists for empty source log, err=%v", err)
+	}
+}
+
+func TestPopulateHealingInDirInfraMissingSchemaFails(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-missing-schema-infra")
+
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-first.log"), []byte("failure\n"), 0o644); err != nil {
+		t.Fatalf("write first gate log: %v", err)
+	}
+
+	inDir := t.TempDir()
+	err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, "")
+	if err == nil {
+		t.Fatalf("expected populateHealingInDir error for missing schema env")
 	}
 }

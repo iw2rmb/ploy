@@ -902,6 +902,102 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 	if !found {
 		t.Fatalf("expected artifact_paths to include /out/gate-profile-candidate.json, got %#v", paths)
 	}
+	envObj, ok := specObj["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec.env object, got %T", specObj["env"])
+	}
+	schemaRaw, ok := envObj[contracts.GateProfileSchemaJSONEnv].(string)
+	if !ok || strings.TrimSpace(schemaRaw) == "" {
+		t.Fatalf("expected %s in spec.env, got %v", contracts.GateProfileSchemaJSONEnv, envObj[contracts.GateProfileSchemaJSONEnv])
+	}
+	if !json.Valid([]byte(schemaRaw)) {
+		t.Fatalf("expected %s to be valid JSON", contracts.GateProfileSchemaJSONEnv)
+	}
+}
+
+func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
+	t.Parallel()
+
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+
+	spec := []byte(`{
+		"steps":[{"image":"docker.io/acme/mod:latest"}],
+		"build_gate":{
+			"healing":{
+				"by_error_kind":{
+					"infra":{"retries":2,"image":"docker.io/acme/heal:latest"},
+					"code":{"retries":1,"image":"docker.io/acme/heal:latest"}
+				}
+			}
+		}
+	}`)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeID,
+			Name:        "heal-1-0",
+			Status:      store.JobStatusRunning,
+			JobType:     domaintypes.JobTypeHeal.String(),
+			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+		getModRepoResult: store.MigRepo{
+			ID:      repoID,
+			RepoUrl: "https://github.com/user/repo.git",
+		},
+		getSpecResult: store.Spec{ID: specID, Spec: spec},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	specObj, ok := resp["spec"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected spec object, got %T", resp["spec"])
+	}
+	envObj, _ := specObj["env"].(map[string]any)
+	if envObj != nil {
+		if _, ok := envObj[contracts.GateProfileSchemaJSONEnv]; ok {
+			t.Fatalf("did not expect %s for non-infra heal", contracts.GateProfileSchemaJSONEnv)
+		}
+	}
 }
 
 func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {

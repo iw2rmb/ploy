@@ -129,6 +129,10 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		"resolved_image", manifest.Image,
 	)
 	workspacePolicy := resolveHealingWorkspacePolicy(req.TypedOptions.HealingSelector)
+	schemaJSON := ""
+	if req.Env != nil {
+		schemaJSON = strings.TrimSpace(req.Env[contracts.GateProfileSchemaJSONEnv])
+	}
 
 	cfg := standardJobConfig{
 		Manifest:      manifest,
@@ -136,7 +140,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
-			return r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector)
+			return r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, schemaJSON)
 		},
 		InjectEnv: func(m *contracts.StepManifest, ws string) {
 			r.injectHealingEnvVars(m, ws)
@@ -215,9 +219,10 @@ func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context,
 }
 
 // populateHealingInDir copies recovery context into the healing job /in directory.
-// It always attempts to hydrate build-gate.log and, for infra healing, also
+// It attempts to hydrate build-gate.log when available and, for infra healing,
+// writes gate_profile.schema.json from server-injected schema env and
 // hydrates gate_profile.json when a run-local snapshot is available.
-func (r *runController) populateHealingInDir(runID types.RunID, inDir string, healingSpec *contracts.HealingSpec) error {
+func (r *runController) populateHealingInDir(runID types.RunID, inDir string, healingSpec *contracts.HealingSpec, schemaJSON string) error {
 	if strings.TrimSpace(inDir) == "" {
 		return nil
 	}
@@ -252,9 +257,12 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string, he
 	}
 
 	if healingSpec != nil && strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
-		schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
-		if err != nil {
-			return fmt.Errorf("load gate profile schema: %w", err)
+		if strings.TrimSpace(schemaJSON) == "" {
+			return fmt.Errorf("infra healing requires %s env", contracts.GateProfileSchemaJSONEnv)
+		}
+		schemaRaw := []byte(schemaJSON)
+		if !json.Valid(schemaRaw) {
+			return fmt.Errorf("infra healing schema env %s is not valid JSON", contracts.GateProfileSchemaJSONEnv)
 		}
 		inSchemaPath := filepath.Join(inDir, "gate_profile.schema.json")
 		if err := os.WriteFile(inSchemaPath, schemaRaw, 0o644); err != nil {
@@ -462,14 +470,14 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 	outDirErr := withTempDir(cfg.OutDirPattern, func(outDir string) error {
 		if cfg.InDirPattern != "" {
-			return withTempDir(cfg.InDirPattern, func(inDir string) error {
-				if cfg.PopulateInDir != nil {
-					if err := cfg.PopulateInDir(inDir); err != nil {
-						slog.Warn("failed to populate in dir", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
+				return withTempDir(cfg.InDirPattern, func(inDir string) error {
+					if cfg.PopulateInDir != nil {
+						if err := cfg.PopulateInDir(inDir); err != nil {
+							return fmt.Errorf("populate in dir: %w", err)
+						}
 					}
-				}
-				return executeBody(outDir, inDir)
-			})
+					return executeBody(outDir, inDir)
+				})
 		}
 		return executeBody(outDir, "")
 	})

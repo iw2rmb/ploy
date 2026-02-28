@@ -26,6 +26,7 @@ const (
 
 	GateProfileCandidateArtifactPath = "/out/gate-profile-candidate.json"
 	GateProfileCandidateSchemaID     = "gate_profile_v1"
+	GateProfileSchemaJSONEnv         = "PLOY_GATE_PROFILE_SCHEMA_JSON"
 )
 
 type BuildGateProfilePhase string

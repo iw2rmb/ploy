@@ -207,6 +207,10 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return fmt.Errorf("merge healing selected_error_kind into spec: %w", err)
 	}
+	mergedSpec, err = mergeHealingSchemaIntoSpec(mergedSpec, job, jobType)
+	if err != nil {
+		return fmt.Errorf("merge healing schema into spec: %w", err)
+	}
 
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
@@ -591,6 +595,46 @@ func mergeHealingSelectedKindIntoSpec(spec json.RawMessage, job store.Job, jobTy
 			}
 		}
 	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("marshal merged spec: %w", err)
+	}
+	return json.RawMessage(b), nil
+}
+
+func mergeHealingSchemaIntoSpec(spec json.RawMessage, job store.Job, jobType domaintypes.JobType) (json.RawMessage, error) {
+	if jobType != domaintypes.JobTypeHeal {
+		return spec, nil
+	}
+	if len(job.Meta) == 0 {
+		return spec, nil
+	}
+	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
+	if err != nil || jobMeta.Recovery == nil {
+		return spec, nil
+	}
+	if strings.TrimSpace(jobMeta.Recovery.ErrorKind) != "infra" {
+		return spec, nil
+	}
+
+	schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
+	if err != nil {
+		return nil, err
+	}
+	if !json.Valid(schemaRaw) {
+		return nil, fmt.Errorf("gate profile schema JSON is invalid")
+	}
+
+	m, err := parseSpecObjectStrict(spec)
+	if err != nil {
+		return nil, err
+	}
+	env, err := ensureObjectField(m, "env", "spec")
+	if err != nil {
+		return nil, err
+	}
+	env[contracts.GateProfileSchemaJSONEnv] = string(schemaRaw)
+
 	b, err := json.Marshal(m)
 	if err != nil {
 		return nil, fmt.Errorf("marshal merged spec: %w", err)
