@@ -188,7 +188,8 @@ Healing action fields (image, command, env, env_from_file) are specified under
 `healing.by_error_kind.<error_kind>` — there is no nested `mig` key.
 `spec_path` is supported in `build_gate.router` and
 `build_gate.healing.by_error_kind.<error_kind>`; CLI deep-merges the referenced
-object and inline fields override loaded values.
+object and inline fields override loaded values. `spec_path` supports env
+expansion (`$VAR`, `${VAR}`) and `~/` home expansion.
 For `infra` recovery with `schema=prep_profile_v1`, healing is expected to emit
 `/out/prep-profile-candidate.json`. Promotion to repo `prep_profile` happens only
 when the immediate follow-up `re_gate` succeeds.

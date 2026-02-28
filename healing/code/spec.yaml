@@ -1,5 +1,5 @@
 retries: 1
 image: 127.0.0.1:5000/ploy/migs-codex:latest
 env_from_file:
-  CODEX_PROMPT: ./healing/code/prompt.md
+  CODEX_PROMPT: $PLOY_PATH/healing/code/prompt.md
   CODEX_AUTH_JSON: ~/.codex/auth.json

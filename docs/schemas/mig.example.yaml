@@ -190,6 +190,7 @@ build_gate:
 # - CLI reads YAML/JSON object from `spec_path`
 # - deep-merges loaded object with inline action object
 # - inline fields override loaded fields
+# - path supports env expansion (`$VAR`, `${VAR}`) and `~/` home expansion
 # - `spec_path` is removed before spec submission/validation
 # Supported under:
 # - `build_gate.router.spec_path`

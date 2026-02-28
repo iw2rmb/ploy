@@ -5,5 +5,5 @@ expectations:
     - path: /out/prep-profile-candidate.json
       schema: prep_profile_v1
 env_from_file:
-  CODEX_PROMPT: ./healing/infra/prompt.md
+  CODEX_PROMPT: $PLOY_PATH/healing/infra/prompt.md
   CODEX_AUTH_JSON: ~/.codex/auth.json
