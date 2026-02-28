@@ -12,6 +12,7 @@ Implemented:
 - repo-level gate profile payload persistence on `mig_repos`
 - gate profile parsing and schema validation in shared contracts
 - claim-time gate override mapping from persisted gate profile
+- pre-gate auto-bootstrap when repo gate profile is missing (detected stack + resolved command)
 - stack-bound gate_profile override propagation into gate phase config
 - recovery candidate validation (`gate_profile_v1`) during healing flow
 - candidate stack match enforcement before re-gate use
@@ -53,6 +54,12 @@ Injection guard:
 - target command must be non-empty
 - explicit `build_gate.<phase>.gate_profile` in run spec always wins
 
+Pre-gate bootstrap guard:
+- applies only to `pre_gate`
+- requires missing persisted repo `gate_profile`
+- skipped when explicit `build_gate.pre.gate_profile` is present
+- generated profile is derived from stack detection + resolved gate command/env and used in that same `pre_gate`
+
 Claim-time gate_profile override includes:
 - command
 - env
@@ -92,6 +99,10 @@ On successful `re_gate`, server promotes validated candidate into repo gate prof
 - writes `mig_repos.gate_profile` = candidate profile
 - writes `mig_repos.gate_profile_artifacts` with recovery source metadata
 - marks `candidate_promoted=true` in job recovery metadata
+
+On successful `pre_gate`, server can also persist an auto-generated bootstrap profile:
+- source metadata: `pre_gate_stack_detect`
+- write is conditional on repo `gate_profile` still being NULL (no overwrite)
 
 Implementation path:
 - promotion trigger: `internal/server/handlers/jobs_complete.go`

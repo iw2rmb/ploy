@@ -94,6 +94,23 @@ FROM updated_job uj
 WHERE mr.id = uj.repo_id
 RETURNING mr.id;
 
+-- name: PromotePreGateGeneratedGateProfile :one
+WITH target_job AS (
+  SELECT j.id, j.repo_id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.job_type = 'pre_gate'
+    AND j.status = 'Success'
+)
+UPDATE mig_repos mr
+SET gate_profile = $2,
+    gate_profile_artifacts = $3,
+    gate_profile_updated_at = now()
+FROM target_job tj
+WHERE mr.id = tj.repo_id
+  AND mr.gate_profile IS NULL
+RETURNING mr.id;
+
 -- name: HasMigRepoHistory :one
 -- Checks if a mod_repo has any historical executions (run_repos references).
 -- Returns true if the repo cannot be deleted due to history, false otherwise.

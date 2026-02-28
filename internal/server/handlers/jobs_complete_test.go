@@ -363,6 +363,83 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_PreGateSuccessPromotesGeneratedGateProfile(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Success",
+		"stats": map[string]any{
+			"job_meta": map[string]any{
+				"kind": "gate",
+				"gate": map[string]any{
+					"static_checks": []any{map[string]any{"tool": "maven", "passed": true}},
+					"generated_gate_profile": map[string]any{
+						"schema_version": 1,
+						"repo_id":        f.Job.RepoID.String(),
+						"runner_mode":    "simple",
+						"stack":          map[string]any{"language": "java", "tool": "maven", "release": "17"},
+						"targets": map[string]any{
+							"build":     map[string]any{"status": "passed", "command": "mvn test", "env": map[string]any{}},
+							"unit":      map[string]any{"status": "not_attempted", "env": map[string]any{}},
+							"all_tests": map[string]any{"status": "not_attempted", "env": map[string]any{}},
+						},
+						"orchestration": map[string]any{"pre": []any{}, "post": []any{}},
+					},
+				},
+			},
+		},
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.promotePreGateGeneratedGateProfileCalled {
+		t.Fatal("expected PromotePreGateGeneratedGateProfile to be called")
+	}
+	if st.promotePreGateGeneratedGateProfileParams.ID != f.Job.ID {
+		t.Fatalf("promotion job id mismatch: got=%s want=%s", st.promotePreGateGeneratedGateProfileParams.ID, f.Job.ID)
+	}
+}
+
+func TestCompleteJob_PreGateFailureDoesNotPromoteGeneratedGateProfile(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Fail",
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.promotePreGateGeneratedGateProfileCalled {
+		t.Fatal("did not expect pre-gate generated profile promotion on failed pre-gate")
+	}
+}
+
 // TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
 // job_meta object (even if it contains whitespace like "{ }") is treated as absent.
 func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {

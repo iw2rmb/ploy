@@ -37,6 +37,9 @@ type StartRunRequest struct {
 	JobID   types.JobID     `json:"job_id,omitempty"`   // Job ID for artifact/diff uploads
 	RepoID  types.MigRepoID `json:"repo_id,omitempty"`  // Repo ID (NanoID) for repo-scoped artifacts (diffs/logs)
 	RepoURL types.RepoURL   `json:"repo_url,omitempty"` // Repository URL for this run
+	// RepoGateProfileMissing is set by the control plane claim response when
+	// mig_repos.gate_profile is currently empty for the claimed repo.
+	RepoGateProfileMissing bool `json:"repo_gate_profile_missing,omitempty"`
 	// Name is an optional human-friendly run name provided by the control plane.
 	// When set (e.g., for batch runs), it can be used for branch naming in MR flows.
 	Name      string          `json:"name,omitempty"`

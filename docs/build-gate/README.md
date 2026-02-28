@@ -131,6 +131,11 @@ Gate command resolution uses the following precedence (highest wins):
 2. Repo gate profile mapping (claim-time injection from persisted `gate_profile`)
 3. Detected-tool fallback command (`buildCommandForTool`)
 
+Pre-gate auto-bootstrap:
+- If `pre_gate` starts with no persisted repo `gate_profile` and no explicit `build_gate.pre.gate_profile`, Build Gate auto-generates a simple gate profile from stack detection + resolved gate command and uses it in that `pre_gate`.
+- The generated profile is persisted to `mig_repos.gate_profile` only when that `pre_gate` completes with `Success`.
+- Auto-bootstrap is skipped when an explicit `build_gate.pre.gate_profile` is present.
+
 Gate profile mapping for simple mode:
 - `pre_gate` maps to `targets.build`
 - `post_gate` maps to `targets.unit`

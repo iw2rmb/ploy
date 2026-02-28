@@ -32,6 +32,9 @@ type BuildGateStageMetadata struct {
 	BugSummary string `json:"bug_summary,omitempty"`
 	// Recovery carries loop context for the universal recovery loop contract.
 	Recovery *BuildGateRecoveryMetadata `json:"recovery,omitempty"`
+	// GeneratedGateProfile stores a pre-gate auto-generated repo gate_profile
+	// payload derived from stack detection and resolved gate command.
+	GeneratedGateProfile json.RawMessage `json:"generated_gate_profile,omitempty"`
 }
 
 // DetectedStack returns the ModStack derived from the first static check's tool.
@@ -81,6 +84,14 @@ func (m BuildGateStageMetadata) Validate() error {
 	if m.Recovery != nil {
 		if err := m.Recovery.Validate(); err != nil {
 			return fmt.Errorf("recovery invalid: %w", err)
+		}
+	}
+	if len(m.GeneratedGateProfile) > 0 {
+		if !json.Valid(m.GeneratedGateProfile) {
+			return fmt.Errorf("generated_gate_profile: invalid JSON")
+		}
+		if _, err := ParseGateProfileJSON(m.GeneratedGateProfile); err != nil {
+			return fmt.Errorf("generated_gate_profile: %w", err)
 		}
 	}
 	return nil

@@ -27,7 +27,7 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PreGateProfile = preGateProfile
 		typedOpts.BuildGate.PostGateProfile = postGateProfile
 
-		applyGatePhaseOverrides(&manifest, types.JobTypePreGate, typedOpts)
+		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypePreGate}, typedOpts)
 
 		if manifest.Gate.StackDetect != pre {
 			t.Fatalf("Gate.StackDetect=%v; want pre", manifest.Gate.StackDetect)
@@ -45,7 +45,7 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PreGateProfile = preGateProfile
 		typedOpts.BuildGate.PostGateProfile = postGateProfile
 
-		applyGatePhaseOverrides(&manifest, types.JobTypePostGate, typedOpts)
+		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypePostGate}, typedOpts)
 
 		if manifest.Gate.StackDetect != post {
 			t.Fatalf("Gate.StackDetect=%v; want post", manifest.Gate.StackDetect)
@@ -63,13 +63,35 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PreGateProfile = preGateProfile
 		typedOpts.BuildGate.PostGateProfile = postGateProfile
 
-		applyGatePhaseOverrides(&manifest, types.JobTypeReGate, typedOpts)
+		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypeReGate}, typedOpts)
 
 		if manifest.Gate.StackDetect != nil {
 			t.Fatalf("Gate.StackDetect=%v; want nil", manifest.Gate.StackDetect)
 		}
 		if manifest.Gate.GateProfile != postGateProfile {
 			t.Fatalf("Gate.GateProfile=%v; want post gate_profile override", manifest.Gate.GateProfile)
+		}
+	})
+
+	t.Run("pre_gate enables bootstrap only when repo profile missing and no explicit override", func(t *testing.T) {
+		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
+		typedOpts := RunOptions{}
+		applyGatePhaseOverrides(&manifest, StartRunRequest{
+			JobType:                types.JobTypePreGate,
+			RepoGateProfileMissing: true,
+		}, typedOpts)
+		if !manifest.Gate.AutoBootstrapRepoGateProfile {
+			t.Fatal("Gate.AutoBootstrapRepoGateProfile=false; want true")
+		}
+
+		manifest = contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
+		typedOpts.BuildGate.PreGateProfile = preGateProfile
+		applyGatePhaseOverrides(&manifest, StartRunRequest{
+			JobType:                types.JobTypePreGate,
+			RepoGateProfileMissing: true,
+		}, typedOpts)
+		if manifest.Gate.AutoBootstrapRepoGateProfile {
+			t.Fatal("Gate.AutoBootstrapRepoGateProfile=true; want false when explicit override exists")
 		}
 	})
 }

@@ -211,41 +211,43 @@ func buildAndSendJobClaimResponse(
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
 	resp := struct {
-		RunID     domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
-		Name      *string               `json:"name,omitempty"`
-		RepoID    domaintypes.MigRepoID `json:"repo_id"`
-		Attempt   int32                 `json:"attempt"`
-		JobID     domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
-		JobName   string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
-		JobType   domaintypes.JobType   `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
-		JobImage  string                `json:"job_image"` // Container image for mig/heal jobs
-		NextID    *domaintypes.JobID    `json:"next_id"`
-		RepoURL   string                `json:"repo_url"`
-		Status    store.RunStatus       `json:"status"`
-		NodeID    domaintypes.NodeID    `json:"node_id"` // Node ID (NanoID-backed)
-		BaseRef   string                `json:"base_ref"`
-		TargetRef string                `json:"target_ref"`
-		StartedAt string                `json:"started_at"`
-		CreatedAt string                `json:"created_at"`
-		Spec      json.RawMessage       `json:"spec,omitempty"`
+		RunID                  domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
+		Name                   *string               `json:"name,omitempty"`
+		RepoID                 domaintypes.MigRepoID `json:"repo_id"`
+		Attempt                int32                 `json:"attempt"`
+		JobID                  domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
+		JobName                string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
+		JobType                domaintypes.JobType   `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
+		JobImage               string                `json:"job_image"` // Container image for mig/heal jobs
+		NextID                 *domaintypes.JobID    `json:"next_id"`
+		RepoURL                string                `json:"repo_url"`
+		RepoGateProfileMissing bool                  `json:"repo_gate_profile_missing"`
+		Status                 store.RunStatus       `json:"status"`
+		NodeID                 domaintypes.NodeID    `json:"node_id"` // Node ID (NanoID-backed)
+		BaseRef                string                `json:"base_ref"`
+		TargetRef              string                `json:"target_ref"`
+		StartedAt              string                `json:"started_at"`
+		CreatedAt              string                `json:"created_at"`
+		Spec                   json.RawMessage       `json:"spec,omitempty"`
 	}{
-		RunID:     run.ID,
-		Name:      nil,
-		RepoID:    job.RepoID,
-		Attempt:   job.Attempt,
-		JobID:     job.ID,
-		JobName:   job.Name,
-		JobType:   jobType,
-		JobImage:  job.JobImage,
-		NextID:    job.NextID,
-		RepoURL:   modRepo.RepoUrl,
-		Status:    run.Status,
-		NodeID:    nodeIDPtrOrZero(job.NodeID),
-		BaseRef:   job.RepoBaseRef,
-		TargetRef: runRepo.RepoTargetRef,
-		StartedAt: run.StartedAt.Time.Format(time.RFC3339),
-		CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
-		Spec:      mergedSpec,
+		RunID:                  run.ID,
+		Name:                   nil,
+		RepoID:                 job.RepoID,
+		Attempt:                job.Attempt,
+		JobID:                  job.ID,
+		JobName:                job.Name,
+		JobType:                jobType,
+		JobImage:               job.JobImage,
+		NextID:                 job.NextID,
+		RepoURL:                modRepo.RepoUrl,
+		RepoGateProfileMissing: len(bytes.TrimSpace(modRepo.GateProfile)) == 0,
+		Status:                 run.Status,
+		NodeID:                 nodeIDPtrOrZero(job.NodeID),
+		BaseRef:                job.RepoBaseRef,
+		TargetRef:              runRepo.RepoTargetRef,
+		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
+		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
+		Spec:                   mergedSpec,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

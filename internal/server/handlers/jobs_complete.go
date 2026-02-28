@@ -348,6 +348,13 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 
 		// Server-driven scheduling: after job succeeds, promote the linked successor.
 		if jobStatus == store.JobStatusSuccess {
+			if promoteErr := maybePromotePreGateGeneratedGateProfile(ctx, st, job, persistedJobMeta); promoteErr != nil {
+				slog.Error("complete job: failed to promote pre-gate generated gate_profile",
+					"job_id", jobID,
+					"repo_id", job.RepoID,
+					"err", promoteErr,
+				)
+			}
 			if promoteErr := maybePromoteReGateRecoveryCandidate(ctx, st, job, persistedJobMeta); promoteErr != nil {
 				slog.Error("complete job: failed to promote validated re-gate candidate",
 					"job_id", jobID,
@@ -466,6 +473,47 @@ func cloneRecoveryMetadataForCompletion(src *contracts.BuildGateRecoveryMetadata
 		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
 	return &out
+}
+
+func maybePromotePreGateGeneratedGateProfile(
+	ctx context.Context,
+	st store.Store,
+	job store.Job,
+	rawMeta []byte,
+) error {
+	if domaintypes.JobType(job.JobType) != domaintypes.JobTypePreGate {
+		return nil
+	}
+	meta, err := contracts.UnmarshalJobMeta(rawMeta)
+	if err != nil || meta.Gate == nil {
+		return nil
+	}
+	generated := bytes.TrimSpace(meta.Gate.GeneratedGateProfile)
+	if len(generated) == 0 {
+		return nil
+	}
+	if _, err := contracts.ParseGateProfileJSON(generated); err != nil {
+		return nil
+	}
+
+	prepArtifacts, err := json.Marshal(map[string]any{
+		"source":    "pre_gate_stack_detect",
+		"schema_id": contracts.GateProfileCandidateSchemaID,
+		"job_id":    job.ID.String(),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = st.PromotePreGateGeneratedGateProfile(ctx, store.PromotePreGateGeneratedGateProfileParams{
+		ID:                   job.ID,
+		GateProfile:          generated,
+		GateProfileArtifacts: prepArtifacts,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
 }
 
 func maybePromoteReGateRecoveryCandidate(

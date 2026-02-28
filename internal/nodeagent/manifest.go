@@ -171,6 +171,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			Enabled:        true,
 			Env:            gateEnv,
 			ImageOverrides: nil,
+			RepoID:         req.RepoID,
 			RepoURL:        types.RepoURL(strings.TrimSpace(req.RepoURL.String())),
 			Ref:            types.GitRef(strings.TrimSpace(gateRef)),
 		},

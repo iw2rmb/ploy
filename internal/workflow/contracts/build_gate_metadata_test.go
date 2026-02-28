@@ -346,6 +346,41 @@ func TestBuildGateStageMetadata_BugSummary_Multiline(t *testing.T) {
 	}
 }
 
+func TestBuildGateStageMetadata_GeneratedGateProfile_Valid(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		GeneratedGateProfile: json.RawMessage(`{
+			"schema_version": 1,
+			"repo_id": "repo_123",
+			"runner_mode": "simple",
+			"stack": {"language":"java","tool":"maven","release":"17"},
+			"targets": {
+				"build": {"status":"passed","command":"mvn test","env":{},"failure_code":null},
+				"unit": {"status":"not_attempted","env":{}},
+				"all_tests": {"status":"not_attempted","env":{}}
+			},
+			"orchestration": {"pre": [], "post": []}
+		}`),
+	}
+	if err := meta.Validate(); err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+}
+
+func TestBuildGateStageMetadata_GeneratedGateProfile_Invalid(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		GeneratedGateProfile: json.RawMessage(`{"schema_version":1}`),
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(err.Error(), "generated_gate_profile") {
+		t.Fatalf("error=%q, want generated_gate_profile", err.Error())
+	}
+}
+
 func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 	t.Parallel()
 	meta := BuildGateStageMetadata{
