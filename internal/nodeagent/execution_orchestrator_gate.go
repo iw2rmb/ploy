@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -141,6 +142,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
+	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
 
 	// When gate fails and healing is configured, run the router once to produce
 	// bug_summary and attach it to the gate job metadata before uploading status.
@@ -447,6 +449,188 @@ func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *cont
 	}
 
 	slog.Info("persisted first build gate failure log", "run_id", runID, "path", logPath)
+}
+
+func (r *runController) persistGateProfileSnapshot(
+	runID types.RunID,
+	jobType types.JobType,
+	gateSpec *contracts.StepGateSpec,
+	meta *contracts.BuildGateStageMetadata,
+) {
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
+	}
+	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		slog.Warn("failed to create run dir for gate profile snapshot", "run_id", runID, "error", err)
+		return
+	}
+	profilePath := filepath.Join(runDir, "build-gate-profile.json")
+
+	raw := resolveGateProfileSnapshotRaw(jobType, gateSpec, meta)
+	if len(raw) == 0 {
+		if err := os.Remove(profilePath); err != nil && !os.IsNotExist(err) {
+			slog.Warn("failed to remove stale gate profile snapshot", "run_id", runID, "path", profilePath, "error", err)
+		}
+		return
+	}
+
+	if err := os.WriteFile(profilePath, raw, 0o644); err != nil {
+		slog.Warn("failed to persist gate profile snapshot", "run_id", runID, "path", profilePath, "error", err)
+		return
+	}
+	slog.Info("persisted gate profile snapshot", "run_id", runID, "path", profilePath)
+}
+
+func resolveGateProfileSnapshotRaw(
+	jobType types.JobType,
+	gateSpec *contracts.StepGateSpec,
+	meta *contracts.BuildGateStageMetadata,
+) json.RawMessage {
+	if meta != nil {
+		generated := strings.TrimSpace(string(meta.GeneratedGateProfile))
+		if generated != "" {
+			raw := json.RawMessage(generated)
+			if _, err := contracts.ParseGateProfileJSON(raw); err == nil {
+				return raw
+			}
+		}
+	}
+	if gateSpec == nil || gateSpec.GateProfile == nil || gateSpec.RepoID.IsZero() {
+		return nil
+	}
+	raw, err := deriveGateProfileSnapshotFromOverride(gateSpec.RepoID.String(), gateSpec.GateProfile, jobType, meta)
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
+func deriveGateProfileSnapshotFromOverride(
+	repoID string,
+	override *contracts.BuildGateProfileOverride,
+	jobType types.JobType,
+	meta *contracts.BuildGateStageMetadata,
+) (json.RawMessage, error) {
+	if override == nil || override.Command.IsEmpty() {
+		return nil, fmt.Errorf("gate override unavailable")
+	}
+	command, ok := gateProfileCommandFromOverride(override.Command)
+	if !ok {
+		return nil, fmt.Errorf("unsupported command form")
+	}
+	stack := resolveGateProfileSnapshotStack(override, meta)
+	if strings.TrimSpace(stack.Language) == "" || strings.TrimSpace(stack.Tool) == "" {
+		return nil, fmt.Errorf("stack metadata unavailable")
+	}
+
+	targetPassed := &contracts.GateProfileTarget{
+		Status:  contracts.PrepTargetStatusPassed,
+		Command: command,
+		Env:     copySnapshotEnv(override.Env),
+	}
+	targetNotAttempted := func() *contracts.GateProfileTarget {
+		return &contracts.GateProfileTarget{
+			Status: contracts.PrepTargetStatusNotAttempted,
+			Env:    map[string]string{},
+		}
+	}
+	profile := contracts.GateProfile{
+		SchemaVersion: 1,
+		RepoID:        strings.TrimSpace(repoID),
+		RunnerMode:    contracts.PrepRunnerModeSimple,
+		Stack:         stack,
+		Targets: contracts.GateProfileTargets{
+			Build:    targetNotAttempted(),
+			Unit:     targetNotAttempted(),
+			AllTests: targetNotAttempted(),
+		},
+		Orchestration: contracts.GateProfileOrchestration{
+			Pre:  []json.RawMessage{},
+			Post: []json.RawMessage{},
+		},
+	}
+	switch jobType {
+	case types.JobTypePreGate:
+		profile.Targets.Build = targetPassed
+	case types.JobTypePostGate, types.JobTypeReGate:
+		profile.Targets.Unit = targetPassed
+	default:
+		return nil, fmt.Errorf("unsupported job type %q", jobType)
+	}
+	raw, err := json.Marshal(profile)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := contracts.ParseGateProfileJSON(raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+func resolveGateProfileSnapshotStack(
+	override *contracts.BuildGateProfileOverride,
+	meta *contracts.BuildGateStageMetadata,
+) contracts.GateProfileStack {
+	if override != nil && override.Stack != nil {
+		return contracts.GateProfileStack{
+			Language: strings.TrimSpace(override.Stack.Language),
+			Tool:     strings.TrimSpace(override.Stack.Tool),
+			Release:  strings.TrimSpace(override.Stack.Release),
+		}
+	}
+
+	stack := contracts.ModStackUnknown
+	if meta != nil {
+		stack = meta.DetectedStack()
+	}
+	switch stack {
+	case contracts.ModStackJavaMaven:
+		return contracts.GateProfileStack{Language: "java", Tool: "maven"}
+	case contracts.ModStackJavaGradle:
+		return contracts.GateProfileStack{Language: "java", Tool: "gradle"}
+	case contracts.ModStackJava:
+		return contracts.GateProfileStack{Language: "java", Tool: "java"}
+	default:
+		return contracts.GateProfileStack{}
+	}
+}
+
+func gateProfileCommandFromOverride(command contracts.CommandSpec) (string, bool) {
+	if shell := strings.TrimSpace(command.Shell); shell != "" {
+		return shell, true
+	}
+	if len(command.Exec) == 0 {
+		return "", false
+	}
+	parts := make([]string, 0, len(command.Exec))
+	for _, part := range command.Exec {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		if strings.ContainsAny(trimmed, " \t\n\r\"'\\$`") {
+			parts = append(parts, strconv.Quote(trimmed))
+			continue
+		}
+		parts = append(parts, trimmed)
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	return strings.Join(parts, " "), true
+}
+
+func copySnapshotEnv(env map[string]string) map[string]string {
+	if len(env) == 0 {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(env))
+	for k, v := range env {
+		out[k] = v
+	}
+	return out
 }
 
 // buildGateJobStats constructs stats payload for gate job completion.

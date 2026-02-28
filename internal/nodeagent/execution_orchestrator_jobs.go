@@ -126,7 +126,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
-			return r.populateHealingInDir(req.RunID, inDir)
+			return r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector)
 		},
 		InjectEnv: func(m *contracts.StepManifest, ws string) {
 			r.injectHealingEnvVars(m, ws)
@@ -182,9 +182,10 @@ func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Conte
 	slog.Info("healing job failed (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "exit_code", 1, "duration", duration)
 }
 
-// populateHealingInDir copies the first failing gate log (when present) into
-// the healing job's /in directory as build-gate.log for discrete healing jobs.
-func (r *runController) populateHealingInDir(runID types.RunID, inDir string) error {
+// populateHealingInDir copies recovery context into the healing job /in directory.
+// It always attempts to hydrate build-gate.log and, for infra healing, also
+// hydrates gate_profile.json when a run-local snapshot is available.
+func (r *runController) populateHealingInDir(runID types.RunID, inDir string, healingSpec *contracts.HealingSpec) error {
 	if strings.TrimSpace(inDir) == "" {
 		return nil
 	}
@@ -213,6 +214,26 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string) er
 	}
 
 	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
+
+	if healingSpec != nil && strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
+		profilePath := filepath.Join(runDir, "build-gate-profile.json")
+		profileRaw, err := os.ReadFile(profilePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("read gate profile snapshot: %w", err)
+		}
+		if len(strings.TrimSpace(string(profileRaw))) == 0 {
+			return nil
+		}
+		inProfilePath := filepath.Join(inDir, "gate_profile.json")
+		if err := os.WriteFile(inProfilePath, profileRaw, 0o644); err != nil {
+			return fmt.Errorf("write /in/gate_profile.json: %w", err)
+		}
+		slog.Info("hydrated /in/gate_profile.json for healing job", "run_id", runID, "path", inProfilePath)
+	}
+
 	return nil
 }
 
