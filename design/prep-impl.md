@@ -1,143 +1,236 @@
-# Prep Implementation Outline
+# Prep Implementation (As-Built + Next Tracks)
 
-## Goal
+## Purpose
 
-Define a pragmatic implementation path for prep with fast end-to-end value first, then progressive hardening.
+This document describes the current prep implementation in Ploy and the next tracks after Track 1.
 
-## Implementation Tracks
+Prep is a control-plane stage that discovers and persists repo-specific build/test execution settings before run scheduling is allowed for that repo.
 
-## 1. Minimal but E2E Process
+Track 1 from `roadmap/prep/track-1-minimal-e2e.md` is implemented.
 
-Objective:
-- Ship the smallest complete flow that can prep a new repo and unblock migration.
+## Scope
 
-Scope:
-- Trigger prep on new repo registration.
-- Run one non-interactive prep session with default prompt.
-- Validate output against prep profile schema.
-- Persist profile + prep result.
-- Gate next stage on `PrepReady`.
+In scope (implemented):
+- repo-level prep lifecycle state machine
+- scheduler-driven prep attempts
+- non-interactive Codex runner execution
+- schema validation of produced prep profile JSON
+- persistence of prep attempts and repo prep profile
+- run scheduling gate on `PrepReady`
+- build-gate claim-time prep-profile mapping for simple mode
 
-Tactics:
-- Support `simple` mode first.
-- Record `complex` findings as failure evidence (no orchestration execution yet).
-- Add one reproducibility rerun before marking success.
-- In simple mode, allow minimal runtime hints (`runtime.docker.mode`) without orchestration.
+Out of scope (not implemented yet):
+- execution of complex orchestration steps from prep profile
+- automatic feedback-loop promotion of prompt/tactics deltas
 
-Deliverables:
-- Repo prep state transitions wired to lifecycle.
-- Prep run artifact storage (attempt logs + diagnostics).
-- Build gate planner reads profile commands/env when present.
+## Implemented Architecture
 
-Acceptance:
-- New repo can go `PrepPending -> PrepRunning -> PrepReady` with persisted profile.
-- Failed prep lands in `PrepFailed` with actionable failure codes and logs.
+### Data Model
 
-## 2. Simple Schema Hardening
+Prep state is persisted on `mig_repos` and prep attempts are persisted in `prep_runs`.
 
-Objective:
-- Make simple-mode outputs strict, stable, and easy to validate.
+`mig_repos` prep fields:
+- `prep_status`
+- `prep_attempts`
+- `prep_last_error`
+- `prep_failure_code`
+- `prep_updated_at`
+- `prep_profile`
+- `prep_artifacts`
 
-Scope:
-- Tighten `docs/schemas/prep_profile.schema.json` invariants for simple flows.
-- Add semantic checks beyond JSON shape.
+`prep_runs` captures per-attempt evidence:
+- `repo_id`
+- `attempt`
+- `status`
+- `started_at`
+- `finished_at`
+- `result_json`
+- `logs_ref`
 
-Tactics:
-- Enforce target/result consistency:
-  - `passed` requires command and null failure code.
-  - `failed` requires command and concrete failure code.
-- Split simple profiles into:
-  - `simple_core` (command/env only)
-  - `simple_runtime` (command/env + runtime hints)
-- Enforce simple-mode orchestration constraints:
-  - `orchestration.pre` and `orchestration.post` must be empty.
-- Enforce runtime hint constraints:
-  - `runtime.docker.mode` enum (`none|host_socket|tcp`)
-  - `runtime.docker.host` required only for `tcp`.
-- Enforce stable enums for status and failure taxonomy.
-- Add schema versioning policy (`schema_version` required; additive changes only for v1).
-- Add CI validation fixture set:
-  - valid simple profile(s)
-  - invalid profile samples for each invariant
+### Scheduler Task
 
-Deliverables:
-- Hardened schema and test fixtures.
-- Validation utility used by prep orchestrator before persistence.
+Prep runs in `internal/server/prep/task.go` as `prep-orchestrator`.
 
-Acceptance:
-- Invalid simple profiles are rejected deterministically with clear reason.
-- Backward-compatible v1 profiles continue to validate.
+Cycle behavior:
+1. Claim next `PrepPending` repo (`ClaimNextPrepRepo`).
+2. If none, claim eligible retry repo (`ClaimNextPrepRetryRepo`) using `prep_retry_delay` cutoff.
+3. Create `prep_runs` row with status `PrepRunning`.
+4. Execute runner.
+5. Validate output against `docs/schemas/prep_profile.schema.json`.
+6. Persist success (`PrepReady`) or failure (`PrepRetryScheduled` / `PrepFailed`).
 
-## 3. Complex Schema
+### Runner
 
-Objective:
-- Support repos that require orchestration (daemon/service/auth/trust lifecycle) without ad-hoc scripts.
+Current runner is `internal/server/prep/runner_codex.go`.
 
-Scope:
-- Extend schema to represent complex orchestration declaratively.
-- Execute orchestration steps via controlled runner primitives.
+Execution model:
+- clone repo into temp workspace
+- load prompt from `design/prep-prompt.md` (fallback to builtin prompt if file missing)
+- run `codex exec --json-output --non-interactive`
+- extract JSON object from output
+- return profile/result/log reference to task
 
-Tactics:
-- Keep orchestration primitive whitelist only:
-  - `docker_network`
-  - `docker_network_remove`
-  - `docker_container`
-  - `docker_remove`
-  - `wait_for_log`
-  - `health_check`
-- Require explicit cleanup in post-steps.
-- Require rerun from fresh orchestration lifecycle before success.
-- Store capability requirements in profile (`runner_mode=complex`, required envs).
+Runner errors are normalized to prep failure taxonomy in `internal/server/prep/runner.go`.
 
-Deliverables:
-- Complex profile validation + runner adapter.
-- Deterministic orchestration logs and step-level statuses.
+### Schema Validation
 
-Acceptance:
-- Complex scenario can pass end-to-end using declarative profile only.
-- Cleanup always runs, including failure paths.
+`internal/server/prep/schema.go` validates runner JSON output against `docs/schemas/prep_profile.schema.json` before profile persistence.
 
-## 4. Feedback Loop Hardening
+Validation is mandatory for success transition.
 
-Objective:
-- Improve default prompt/tactics from successful prep runs without destabilizing behavior.
+## Repo Lifecycle Integration
 
-Scope:
-- Collect reusable findings from successful runs.
-- Propose and roll out prompt/tactics updates safely.
+### Initial State
 
-Tactics:
-- Store `prompt_delta_suggestion` from prep outputs.
-- Add adjudication step before global prompt/tactic updates:
-  - deduplicate
-  - classify as repo-local vs cross-repo
-  - require evidence quality threshold
-- Roll out updates via canary:
-  - apply to subset of new repos
-  - monitor failure-code drift and success rate
-- Redact secrets from all harvested artifacts.
+Repo creation/upsert paths initialize prep state as `PrepPending`.
 
-Deliverables:
-- Prompt/tactics candidate queue.
-- Review and rollout policy with metrics.
-- Regression guardrails (automatic rollback on degradation).
+### Run Scheduling Gate
 
-Acceptance:
-- Feedback loop improves prep success rate without increasing false-success profiles.
-- Prompt/tactics updates are auditable and reversible.
+Queued run_repos are eligible for job materialization only when repo prep status is `PrepReady`.
 
-## Suggested Delivery Order
+Eligibility is enforced in store queries (`ListQueuedRunReposByRun`, `ListRunsWithQueuedRepos`) via `mig_repos.prep_status = 'PrepReady'`.
 
-1. Track 1 (E2E minimal)
-2. Track 2 (simple hardening)
-3. Track 3 (complex orchestration)
-4. Track 4 (feedback hardening)
+### Visibility
 
-## Cross References
+Prep status and evidence are exposed via:
+- `GET /v1/repos`
+- `GET /v1/repos/{repo_id}/prep`
 
+## Build Gate Integration From Prep Profile
+
+Prep profile is merged at claim time in `internal/server/handlers/nodes_claim.go`.
+
+Mapping for simple mode gate override:
+- `pre_gate` uses `targets.build`
+- `post_gate` uses `targets.unit`
+- `re_gate` uses `targets.unit`
+
+Mapping is injected only when target status is `passed` and command is non-empty.
+
+Command precedence:
+1. explicit `build_gate.<phase>.prep` in run spec
+2. prep-profile mapped override (claim-time)
+3. Build Gate fallback command by detected tool
+
+Runtime hint env mapping from prep profile:
+- `runtime.docker.mode=host_socket` -> `DOCKER_HOST=unix:///var/run/docker.sock`
+- `runtime.docker.mode=tcp` -> `DOCKER_HOST=<runtime.docker.host>`
+- `runtime.docker.api_version` -> `DOCKER_API_VERSION=<value>`
+
+## Operational Configuration
+
+Prep task settings are in server scheduler config:
+- `scheduler.prep_interval` (0 disables prep task)
+- `scheduler.prep_max_attempts`
+- `scheduler.prep_retry_delay`
+
+Task is wired in `cmd/ployd/server.go`.
+
+## Failure Handling
+
+Failure paths:
+- runner failure
+- schema validation failure
+- persistence failure
+
+State outcomes:
+- retryable: `PrepRetryScheduled` when attempt < `prep_max_attempts`
+- terminal: `PrepFailed` when retries exhausted
+
+Attempt evidence (`prep_runs.result_json`, `logs_ref`) is persisted on failure and success paths where available.
+
+## Known Gaps and Next Tracks
+
+### Next Track: Universal Recovery Loop Contract
+
+Adopted design:
+- keep one recovery loop mechanism (`agent -> re_gate`) for all gate failures
+- keep `loop_kind` in metadata as an extension point; current runtime value is `healing`
+- do not split runtime flow into separate preparing/healing loops yet
+- router `error_kind` selects strategy and artifact expectations
+
+### Next Track: Router-Driven Recovery Policy
+
+Adopted design:
+- run router after every gate failure, including every failed `re_gate`
+- pass phase signal to router (`pre_gate`, `post_gate`, `re_gate`) so it can use phase priors
+- persist router classification and confidence in loop history
+
+Classification contract:
+- `infra`
+- `code`
+- `mixed`
+- `unknown`
+- `custom` (user-defined kinds via strategy registry)
+
+Current decision for conservative stopping:
+- if router returns `mixed` or `unknown`, stop the loop and stop remaining mig progression
+
+### Next Track: Error-Kind Strategy Registry
+
+Adopted design:
+- define strategy by `error_kind` in config, not by branching code paths
+- strategy fields include:
+  - prompt template id
+  - allowed tool/capability set
+  - expected output artifacts and schemas
+  - retry and stop policy
+  - whether output can be promoted to repo defaults
+
+`infra` strategy expectation:
+- agent emits typed artifact (for example `/out/prep-profile-candidate.json`)
+- control plane validates candidate against prep profile schema
+- candidate is persisted as repo `prep_profile` only if subsequent re-gate succeeds
+
+### Next Track: Recovery History Input
+
+Adopted design:
+- provide router and healer with loop history on each attempt (for example `/in/recovery-history.json`)
+- include:
+  - gate phase and attempt number
+  - current failure summary/fingerprint
+  - router classification/confidence/reason
+  - previous healing action summaries
+  - re-gate outcomes
+
+### Next Track: Router Prompt Packaging
+
+Adopted design:
+- introduce a dedicated `router/` folder for router prompt assets and strategy variants
+- keep classification and prompt selection templates versioned together in that folder
+
+### Next Track: Complex Execution
+
+Goal:
+- execute `runner_mode=complex` orchestration declaratively from profile
+
+Current status:
+- schema contract exists
+- runtime executor for orchestration primitives is not implemented
+
+### Next Track: Prompt/Tactics Feedback Loop
+
+Goal:
+- collect, review, and safely promote reusable prompt/tactic improvements
+
+Current status:
+- profile schema contains `prompt_delta_suggestion`
+- no automatic adjudication/rollout pipeline yet
+
+### Related Gate-Healing Continuity Gap (Outside Prep Track 1)
+
+Build-gate healing currently runs as discrete jobs. Session-resume mechanics present in inline healing code paths are not used by the active discrete healing flow.
+
+This is a build-gate/healing workflow concern, not a prep orchestrator concern, but it affects end-to-end Codex continuity expectations.
+
+## References
+
+- `roadmap/prep/track-1-minimal-e2e.md`
 - `design/prep.md`
-- `design/prep-states.md`
 - `design/prep-simple.md`
 - `design/prep-complex.md`
+- `design/prep-states.md`
 - `design/prep-prompt.md`
 - `docs/schemas/prep_profile.schema.json`
+- `docs/build-gate/README.md`
+- `docs/migs-lifecycle.md`

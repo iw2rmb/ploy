@@ -1,160 +1,72 @@
-# Prep Stage for Repo Build Readiness
+# Prep Stage Overview
 
 ## Goal
 
-Add a mandatory `prep` stage for every repository newly added to Ploy.
+Prep establishes repo-specific build gate execution settings before the repo enters normal run scheduling.
 
-The stage discovers reproducible build settings with strict priority:
-1. `build`
-2. `unit tests`
-3. `all tests`
+Prep is mandatory for newly registered repos in current implementation: run scheduling is gated on `PrepReady`.
 
-If prep succeeds, the repository proceeds to normal migration flow with a persisted repo-specific build profile.
+## What Prep Produces
 
-## Problem
+Prep persists a repo-scoped `prep_profile` (schema v1) plus attempt evidence.
 
-Repositories in scope are heterogeneous:
-- different tools and runtime versions
-- different test partitioning conventions
-- different container/runtime assumptions
-- different internal registry and certificate requirements
+Profile carries:
+- runner mode (`simple` or `complex`)
+- per-target outcomes for `build`, `unit`, `all_tests`
+- optional runtime hints
+- orchestration declarations
 
-Default build gate commands fail for many repos, blocking migration even when a valid build path exists.
+Attempt evidence is stored per try in `prep_runs`.
 
-## Scope
+## Current Runtime Model
 
-In scope:
-- non-interactive discovery of executable build/test setup
-- persistence of repo-specific instructions
-- global tactics feedback loop from successful discoveries
+Implemented now:
+- scheduler claims repos in prep states and runs non-interactive Codex prep
+- output is schema-validated before success persistence
+- repo transitions to `PrepReady` only after valid profile persistence
+- claim-time mapping injects simple prep target overrides into Build Gate phase prep config
 
-Out of scope:
-- changing repository source code during prep
-- long-running human-in-the-loop debugging in prep
-- replacing build gate itself
+Not implemented yet:
+- complex orchestration execution engine
+- feedback-loop rollout for prompt/tactics evolution
 
-## High-Level Design
+## Adopted Next-Step Recovery Design
 
-### Components
-
-1. Prep Orchestrator
-- Runs before first migration for a repo.
-- Executes a bounded non-interactive prep session.
-- Produces normalized result artifacts.
-
-2. Prep Agent Session (Codex non-interactive)
-- Receives a fixed prompt and tool budget.
-- Attempts tactics in priority order.
-- Returns structured output with evidence.
-
-3. Repo Build Profile Store
-- Stores per-repo resolved commands, env, and orchestration requirements.
-- Used by build gate and migration pipeline.
-
-4. Global Tactics Catalog
-- Shared ordered tactics list.
-- Updated from successful prep outcomes after validation.
-
-### Execution Flow
-
-1. Repo is marked `PrepPending` when first registered.
-2. Orchestrator starts prep session with default prompt + latest tactics catalog.
-3. Session attempts to satisfy targets in order: `build`, `unit`, `all`.
-4. Session emits:
-- resolved configuration
-- command log with exit statuses
-- failure taxonomy for unresolved targets
-5. Orchestrator validates reproducibility with one clean rerun.
-6. On success:
-- persist repo profile
-- mark repo `PrepReady`
-- enqueue normal next step
-7. On failure:
-- persist evidence
-- mark repo `PrepFailed`
-- require manual action or retry policy
-
-## Data Contract
-
-Prep output must be machine-readable and stable.
-
-Canonical schema:
-- `docs/schemas/prep_profile.schema.json`
-
-Minimum fields:
-- `repo_id`
-- `targets`:
-  - `build`: `passed|failed|not_attempted`
-  - `unit`: `passed|failed|not_attempted`
-  - `all_tests`: `passed|failed|not_attempted`
-- `runner_mode`: `simple|complex`
-- `targets.<target>.command` and `targets.<target>.env`
-- `runtime`: optional minimal runtime hints for simple mode (e.g. `runtime.docker.mode`)
-- `orchestration`: required object; empty arrays for simple mode, populated lifecycle steps for complex mode
-- `evidence`: references to logs and key diagnostics
-- `tactics_used`: ordered identifiers
-- `notes`: short operational caveats
-
-## Readiness Semantics
-
-A repo is considered prep-ready when:
-- `build` passes, and
-- `unit` passes if unit target is discoverable, and
-- resolved configuration reruns successfully once in clean environment
-
-`all_tests` is best-effort in prep. Failure here must not block migration when `build` + `unit` are stable, but must be recorded.
-
-## Failure Taxonomy
-
-Store standardized failure codes to support automation and reporting:
-- `tool_not_detected`
-- `runtime_version_mismatch`
-- `docker_api_mismatch`
-- `registry_auth_failed`
-- `registry_ca_trust_failed`
-- `external_service_unreachable`
-- `command_not_found`
-- `timeout`
-- `unknown`
+The next gate-recovery design is fixed as:
+- keep one recovery loop path (`agent -> re_gate`) for all gate failures
+- keep `loop_kind` in metadata for future extensibility; current value is `healing`
+- drive strategy by router `error_kind` (`infra|code|mixed|unknown|custom`)
+- run router on every gate failure, including failed `re_gate`
+- include gate phase as router input signal
+- stop mig progression when router classification is `mixed` or `unknown`
+- preserve per-attempt router/healer history for subsequent loop iterations
+- introduce a dedicated `router/` folder for router prompt assets and classification strategies
+- for `infra`, expect a typed profile candidate artifact (for example `prep-profile-candidate.json`) and persist as repo `prep_profile` only after validation + successful re-gate
 
 ## Integration Points
 
-1. Control Plane
-- Add repo prep state and prep result metadata.
+1. Control plane state and storage
+- `mig_repos` prep fields
+- `prep_runs` attempt records
 
-2. Build Gate Planner
-- Prefer repo profile over generic default commands when present.
+2. Scheduling gate
+- queued run repos are eligible only for repos in `PrepReady`
 
-3. Node Agent
-- Execute orchestration pre-hooks and post-hooks for complex profiles.
+3. Build gate command/env derivation
+- uses explicit `build_gate.<phase>.prep` first
+- then mapped repo `prep_profile`
+- then default tool-based gate command
 
-4. Docs and Ops
-- Expose prep profile and last prep evidence in run diagnostics.
+4. API visibility
+- `GET /v1/repos`
+- `GET /v1/repos/{repo_id}/prep`
 
-## Security and Guardrails
+## Related Docs
 
-- Redact secrets from stored logs and prompts.
-- Enforce hard timeout and max attempts.
-- Restrict allowed orchestration operations to approved templates.
-- Keep prep non-interactive by default.
-
-## Rollout
-
-1. Phase 1: Passive mode
-- Run prep, store results, do not gate migration.
-
-2. Phase 2: Soft gate
-- Require successful prep for new repos, with manual override.
-
-3. Phase 3: Strict gate
-- Prep mandatory for all newly onboarded repos.
-
-## Cross References
-
+- `design/prep-impl.md`
 - `design/prep-simple.md`
 - `design/prep-complex.md`
-- `design/prep-prompt.md`
 - `design/prep-states.md`
+- `design/prep-prompt.md`
+- `roadmap/prep/track-1-minimal-e2e.md`
 - `docs/schemas/prep_profile.schema.json`
-- `docs/build-gate/README.md`
-- `docs/migs-lifecycle.md`
