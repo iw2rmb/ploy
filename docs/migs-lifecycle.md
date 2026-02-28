@@ -224,8 +224,9 @@ Implementation references:
 - Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`, `RouterConfig`).
 - Spec parsing: `internal/workflow/contracts/mods_spec_parse.go` (`parseHealingSpec`, `parseRouterSpec`).
 - Spec conversion: `internal/nodeagent/run_options.go` (`modsSpecToRunOptions`).
-- Router/healing execution: `internal/nodeagent/execution_healing.go` (`runGateWithHealing`).
-- Summary parsing: `internal/nodeagent/execution_healing.go` (`parseBugSummary`, `parseActionSummary`).
+- Router execution: `internal/nodeagent/execution_orchestrator_gate.go` (`runRouterForGateFailure`).
+- Healing execution: `internal/nodeagent/execution_orchestrator_jobs.go` (`executeHealingJob`).
+- Summary parsing: `internal/nodeagent/recovery_io.go` (`parseBugSummary`, `parseActionSummary`).
 - Metadata types: `internal/workflow/contracts/build_gate_metadata.go` (`BugSummary`),
   `internal/workflow/contracts/job_meta.go` (`ActionSummary`).
 - Schema example: `docs/schemas/mig.example.yaml`.
@@ -296,7 +297,8 @@ Key invariants:
 ### Implementation references
 
 - Gate executor: `internal/workflow/step/gate_docker.go` (`GateExecutor`).
-- Gate+healing orchestration: `internal/nodeagent/execution_healing.go`.
+- Gate job execution: `internal/nodeagent/execution_orchestrator_gate.go`.
+- Healing job execution: `internal/nodeagent/execution_orchestrator_jobs.go`.
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
 - Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).
 - Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
@@ -1370,7 +1372,9 @@ Code paths most relevant for Mods:
   - `internal/store/queries/jobs.sql` — job queries including `ClaimJob` (claims `Queued` jobs) and `ScheduleNextJob` (transitions next `Created` job to `Queued`)
 - Nodeagent:
   - `internal/nodeagent/execution_orchestrator.go`
-  - `internal/nodeagent/execution_healing.go`
+  - `internal/nodeagent/execution_orchestrator_gate.go`
+  - `internal/nodeagent/execution_orchestrator_jobs.go`
+  - `internal/nodeagent/recovery_io.go`
   - `internal/workflow/step/*`
 
 For concrete end-to-end scenarios and sample specs see:

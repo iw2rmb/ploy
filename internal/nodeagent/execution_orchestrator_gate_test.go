@@ -14,186 +14,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-// Verify gate stats shape includes an explicit final_gate key when only a final
-// gate run is present (no pre_gate/regates), and does not replace the root map.
-func TestBuildGateStats_FinalOnlyShape(t *testing.T) {
-	rc := &runController{cfg: Config{}}
-	result := step.Result{
-		BuildGate: &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}}},
-		Timings:   step.StageTiming{BuildGateDuration: 123},
-	}
-	execRes := executionResult{}
-
-	got := rc.buildGateStats(types.RunID("run-x"), types.JobID("stage-y"), result, execRes)
-	if got == nil || got.FinalGate == nil {
-		t.Fatalf("missing final_gate in gate stats")
-	}
-	if got.FinalGate.Passed != true {
-		t.Fatalf("final_gate passed=%v, want true", got.FinalGate.Passed)
-	}
-}
-
-// TestMergeExecutionResults_PreservesPreModGate verifies that when a pre-mig gate
-// has already been recorded in the accumulator, merging a per-step execution
-// result keeps the original PreGate and appends new ReGates in order.
-func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
-	preModMeta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "pre-mig", Passed: true},
-		},
-	}
-	preModGate := &gateRunMetadata{
-		Metadata:   preModMeta,
-		DurationMs: 100,
-	}
-	preReGate := gateRunMetadata{
-		Metadata: &contracts.BuildGateStageMetadata{
-			StaticChecks: []contracts.BuildGateStaticCheckReport{
-				{Tool: "pre-regate", Passed: true},
-			},
-		},
-		DurationMs: 200,
-	}
-
-	acc := executionResult{
-		PreGate: preModGate,
-		ReGates: []gateRunMetadata{preReGate},
-	}
-
-	stepPreGate := &gateRunMetadata{
-		Metadata: &contracts.BuildGateStageMetadata{
-			StaticChecks: []contracts.BuildGateStaticCheckReport{
-				{Tool: "step-pre", Passed: false},
-			},
-		},
-		DurationMs: 50,
-	}
-	stepReGate := gateRunMetadata{
-		Metadata: &contracts.BuildGateStageMetadata{
-			StaticChecks: []contracts.BuildGateStaticCheckReport{
-				{Tool: "step-regate", Passed: true},
-			},
-		},
-		DurationMs: 300,
-	}
-
-	next := executionResult{
-		Result:  step.Result{ExitCode: 0},
-		PreGate: stepPreGate,
-		ReGates: []gateRunMetadata{stepReGate},
-	}
-
-	merged := mergeExecutionResults(acc, next)
-
-	// PreGate should remain the pre-mig gate from the accumulator.
-	if merged.PreGate != preModGate {
-		t.Fatalf("merged.PreGate = %#v, want accumulator pre-mig gate %#v", merged.PreGate, preModGate)
-	}
-
-	// ReGates should contain accumulator re-gates followed by next re-gates.
-	if len(merged.ReGates) != 2 {
-		t.Fatalf("len(merged.ReGates) = %d, want 2", len(merged.ReGates))
-	}
-	if merged.ReGates[0] != preReGate {
-		t.Errorf("merged.ReGates[0] = %#v, want preReGate %#v", merged.ReGates[0], preReGate)
-	}
-	if merged.ReGates[1] != stepReGate {
-		t.Errorf("merged.ReGates[1] = %#v, want stepReGate %#v", merged.ReGates[1], stepReGate)
-	}
-
-	// Result should come from the next execution result.
-	if merged.ExitCode != 0 {
-		t.Errorf("merged.ExitCode = %d, want 0", merged.ExitCode)
-	}
-}
-
-// TestBuildGateStats_PreGateFallbackToFinalGate verifies that when no post-mig gate
-// (result.BuildGate) exists but a pre-mig gate was recorded, buildGateStats populates
-// final_gate from the pre-mig gate. This ensures CLI/API gate summaries always have
-// a final_gate to report on, even when no migs executed.
-func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
-	rc := &runController{cfg: Config{}}
-
-	// Pre-mig gate only — simulates a run that terminated before any mig execution.
-	preGateMeta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "maven", Passed: true},
-		},
-	}
-	execRes := executionResult{
-		PreGate: &gateRunMetadata{
-			Metadata:   preGateMeta,
-			DurationMs: 500,
-		},
-	}
-
-	// No BuildGate in result (no migs executed).
-	result := step.Result{}
-
-	got := rc.buildGateStats(types.RunID("run-fallback"), types.JobID("stage-fallback"), result, execRes)
-	if got == nil {
-		t.Fatalf("expected gate stats, got nil")
-	}
-	if got.PreGate == nil {
-		t.Fatalf("expected pre_gate in gate stats")
-	}
-	if got.FinalGate == nil {
-		t.Fatalf("expected final_gate to be populated from pre-mig gate fallback")
-	}
-
-	// Verify final_gate content matches pre-mig gate.
-	if got.FinalGate.Passed != true {
-		t.Errorf("final_gate passed=%v, want true", got.FinalGate.Passed)
-	}
-	if got.FinalGate.DurationMs != int64(500) {
-		t.Errorf("final_gate duration_ms=%d, want 500", got.FinalGate.DurationMs)
-	}
-}
-
-// TestBuildGateStats_PostGateTakesPrecedence verifies that when both pre-mig gate
-// and post-mig gate (result.BuildGate) exist, final_gate uses the post-mig gate,
-// not the pre-mig gate fallback.
-func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
-	rc := &runController{cfg: Config{}}
-
-	// Both pre-mig and post-mig gates present.
-	preGateMeta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "maven", Passed: true},
-		},
-	}
-	postGateMeta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "gradle", Passed: false},
-		},
-	}
-
-	execRes := executionResult{
-		PreGate: &gateRunMetadata{
-			Metadata:   preGateMeta,
-			DurationMs: 300,
-		},
-	}
-
-	result := step.Result{
-		BuildGate: postGateMeta,
-		Timings:   step.StageTiming{BuildGateDuration: types.Duration(700 * time.Millisecond)},
-	}
-
-	got := rc.buildGateStats(types.RunID("run-precedence"), types.JobID("stage-precedence"), result, execRes)
-
-	// Verify final_gate uses the post-mig gate (result.BuildGate), not the pre-mig fallback.
-	if got == nil || got.FinalGate == nil {
-		t.Fatalf("expected final_gate in gate stats")
-	}
-
-	// Post-mig gate had passed=false, duration=700ms.
-	if got.FinalGate.Passed != false {
-		t.Errorf("final_gate passed=%v, want false (from post-mig gate)", got.FinalGate.Passed)
-	}
-	if got.FinalGate.DurationMs != int64(700) {
-		t.Errorf("final_gate duration_ms=%d, want 700 (from post-mig gate)", got.FinalGate.DurationMs)
-	}
+func testLogDigest(n int) types.Sha256Digest {
+	suffix := string(rune('a' + (n % 6)))
+	return types.Sha256Digest("sha256:" + strings.Repeat("0", 63) + suffix)
 }
 
 // TestPersistFirstGateFailureLog_UsesTrimmedFinding verifies that the first failing
@@ -234,35 +57,6 @@ func TestPersistFirstGateFailureLog_UsesTrimmedFinding(t *testing.T) {
 	}
 }
 
-// TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator verifies that when
-// there is no pre-mig gate recorded yet, mergeExecutionResults falls back to
-// the next execution's PreGate.
-func TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator(t *testing.T) {
-	nextPreGate := &gateRunMetadata{
-		Metadata: &contracts.BuildGateStageMetadata{
-			StaticChecks: []contracts.BuildGateStaticCheckReport{
-				{Tool: "step-pre", Passed: true},
-			},
-		},
-		DurationMs: 42,
-	}
-
-	acc := executionResult{}
-	next := executionResult{
-		Result:  step.Result{ExitCode: 0},
-		PreGate: nextPreGate,
-	}
-
-	merged := mergeExecutionResults(acc, next)
-
-	if merged.PreGate != nextPreGate {
-		t.Fatalf("merged.PreGate = %#v, want nextPreGate %#v", merged.PreGate, nextPreGate)
-	}
-	if merged.ExitCode != 0 {
-		t.Errorf("merged.ExitCode = %d, want 0", merged.ExitCode)
-	}
-}
-
 // TestPersistGateStack_WritesStack verifies that persistGateStack writes the
 // detected stack to a file under the run directory for later retrieval.
 func TestPersistGateStack_WritesStack(t *testing.T) {
@@ -273,14 +67,11 @@ func TestPersistGateStack_WritesStack(t *testing.T) {
 	runID := types.RunID("run-stack-persist")
 
 	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Language: "java", Tool: "maven", Passed: true},
-		},
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "maven", Passed: true}},
 	}
 
 	rc.persistGateStack(runID, meta)
 
-	// Verify the stack file was created with the correct content.
 	stackPath := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-stack.txt")
 	data, err := os.ReadFile(stackPath)
 	if err != nil {
@@ -302,23 +93,9 @@ func TestPersistGateStack_Idempotent(t *testing.T) {
 	rc := &runController{cfg: Config{}}
 	runID := types.RunID("run-stack-idempotent")
 
-	// First persist: Maven.
-	metaMaven := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Language: "java", Tool: "maven", Passed: true},
-		},
-	}
-	rc.persistGateStack(runID, metaMaven)
+	rc.persistGateStack(runID, &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "maven", Passed: true}}})
+	rc.persistGateStack(runID, &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "gradle", Passed: true}}})
 
-	// Second persist: Gradle (should be ignored).
-	metaGradle := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Language: "java", Tool: "gradle", Passed: true},
-		},
-	}
-	rc.persistGateStack(runID, metaGradle)
-
-	// Verify the first stack is preserved.
 	stackPath := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-stack.txt")
 	data, err := os.ReadFile(stackPath)
 	if err != nil {
@@ -340,7 +117,6 @@ func TestLoadPersistedStack_ReturnsStack(t *testing.T) {
 	rc := &runController{cfg: Config{}}
 	runID := types.RunID("run-stack-load")
 
-	// Seed the stack file manually.
 	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		t.Fatalf("mkdir runDir: %v", err)
@@ -380,17 +156,12 @@ func TestPersistAndLoadGateStack_RoundTrip(t *testing.T) {
 	rc := &runController{cfg: Config{}}
 	runID := types.RunID("run-stack-roundtrip")
 
-	// Simulate gate execution result.
 	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Language: "java", Tool: "gradle", Passed: false},
-		},
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "gradle", Passed: false}},
 	}
 
-	// Persist during gate job.
 	rc.persistGateStack(runID, meta)
 
-	// Load during mig/healing job.
 	got := rc.loadPersistedStack(runID)
 	if got != contracts.ModStackJavaGradle {
 		t.Errorf("round-trip stack = %q, want %q", got, contracts.ModStackJavaGradle)
@@ -413,8 +184,6 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 
 	stats := rc.buildGateJobStats(gateMeta, 250*time.Millisecond)
 
-	// RunStats is now json.RawMessage-backed. Decode to access job_meta.
-	// Parse the stats as JSON and extract the job_meta field.
 	var decoded struct {
 		JobMeta *contracts.JobMeta `json:"job_meta"`
 	}
@@ -442,13 +211,12 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 
 	const wantBugSummary = "javac: cannot find symbol FooBar"
 
-	mc := noopContainer()
+	mc := &mockRouterContainerRuntime{}
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		if strings.Contains(spec.Image, "router") {
 			for _, m := range spec.Mounts {
 				if m.Target == "/out" {
-					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"),
-						[]byte(`{"bug_summary":"`+wantBugSummary+`"}`+"\n"), 0o644)
+					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"bug_summary":"`+wantBugSummary+`"}`+"\n"), 0o644)
 				}
 			}
 		}
@@ -485,4 +253,47 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 	if gateResult.BugSummary != wantBugSummary {
 		t.Fatalf("gateResult.BugSummary = %q, want %q", gateResult.BugSummary, wantBugSummary)
 	}
+}
+
+type mockRouterContainerRuntime struct {
+	createFn func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error)
+	startFn  func(ctx context.Context, handle step.ContainerHandle) error
+	waitFn   func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error)
+	logsFn   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error)
+	removeFn func(ctx context.Context, handle step.ContainerHandle) error
+}
+
+func (m *mockRouterContainerRuntime) Create(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, spec)
+	}
+	return step.ContainerHandle("mock"), nil
+}
+
+func (m *mockRouterContainerRuntime) Start(ctx context.Context, handle step.ContainerHandle) error {
+	if m.startFn != nil {
+		return m.startFn(ctx, handle)
+	}
+	return nil
+}
+
+func (m *mockRouterContainerRuntime) Wait(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+	if m.waitFn != nil {
+		return m.waitFn(ctx, handle)
+	}
+	return step.ContainerResult{ExitCode: 0}, nil
+}
+
+func (m *mockRouterContainerRuntime) Logs(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+	if m.logsFn != nil {
+		return m.logsFn(ctx, handle)
+	}
+	return []byte{}, nil
+}
+
+func (m *mockRouterContainerRuntime) Remove(ctx context.Context, handle step.ContainerHandle) error {
+	if m.removeFn != nil {
+		return m.removeFn(ctx, handle)
+	}
+	return nil
 }
