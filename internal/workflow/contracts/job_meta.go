@@ -72,7 +72,14 @@ type JobMeta struct {
 	// produced by the healing container. Only allowed for mig jobs (kind="mig").
 	// Max 200 chars, no newlines.
 	ActionSummary string `json:"action_summary,omitempty"`
+
+	// Recovery stores universal recovery loop metadata.
+	// Allowed for gate and mig jobs; rejected for build jobs.
+	Recovery *RecoveryJobMetadata `json:"recovery,omitempty"`
 }
+
+// RecoveryJobMetadata captures loop context persisted at job level.
+type RecoveryJobMetadata = BuildGateRecoveryMetadata
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
 // This consolidates fields previously tracked in the separate builds table.
@@ -104,6 +111,15 @@ func (m JobMeta) Validate() error {
 	if m.Gate != nil {
 		if err := m.Gate.Validate(); err != nil {
 			return fmt.Errorf("gate metadata invalid: %w", err)
+		}
+	}
+	// Recovery metadata is allowed for gate and mig jobs only.
+	if m.Recovery != nil {
+		if m.Kind != JobKindGate && m.Kind != JobKindMod {
+			return fmt.Errorf("recovery metadata present but kind is %q (only allowed for %q or %q)", m.Kind, JobKindGate, JobKindMod)
+		}
+		if err := m.Recovery.Validate(); err != nil {
+			return fmt.Errorf("recovery metadata invalid: %w", err)
 		}
 	}
 	// ActionSummary is only valid for mig jobs.

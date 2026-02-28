@@ -1189,6 +1189,27 @@ RepoJobItem:
       type: string
       nullable: true
       description: User-friendly step name from spec (for mig jobs)
+    recovery:
+      type: object
+      nullable: true
+      description: Universal recovery loop metadata when present in job metadata
+      properties:
+        loop_kind:
+          type: string
+          description: Loop kind (currently `healing`)
+        error_kind:
+          type: string
+          description: Router classification kind (`infra|code|mixed|unknown|custom`)
+        strategy_id:
+          type: string
+          description: Selected strategy identifier when available
+        confidence:
+          type: number
+          format: double
+          description: Router confidence score in range [0,1]
+        reason:
+          type: string
+          description: Short classifier rationale
   required:
     - job_id
     - name
