@@ -183,7 +183,7 @@ Adopted design:
 ### Next Track: Router Prompt Packaging
 
 Adopted design:
-- introduce a dedicated `router/` folder for router prompt assets and strategy variants
+- introduce a dedicated `healing/` folder for recovery prompt assets and strategy variants
 - keep classification and prompt selection templates versioned together in that folder
 
 ### Next Track: Complex Execution

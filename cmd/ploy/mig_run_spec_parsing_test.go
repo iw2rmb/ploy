@@ -879,3 +879,231 @@ steps:
 		t.Errorf("expected top-level retain_container to be absent")
 	}
 }
+
+func TestBuildSpecPayload_HealingSpecPathMerge(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentPath := filepath.Join(tmpDir, "infra-fragment.yaml")
+	fragment := `
+retries: 2
+image: docker.io/test/healer:latest
+env:
+  A: from-fragment
+  B: from-fragment
+expectations:
+  artifacts:
+    - path: /out/prep-profile-candidate.json
+      schema: prep_profile_v1
+`
+	if err := os.WriteFile(fragmentPath, []byte(fragment), 0o644); err != nil {
+		t.Fatalf("write fragment file: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := fmt.Sprintf(`
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  healing:
+    by_error_kind:
+      infra:
+        spec_path: %s
+        retries: 1
+        env:
+          B: inline-override
+          C: inline-only
+  router:
+    image: docker.io/test/router:latest
+`, fragmentPath)
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	buildGate := result["build_gate"].(map[string]any)
+	healing := buildGate["healing"].(map[string]any)
+	byErrorKind := healing["by_error_kind"].(map[string]any)
+	infra := byErrorKind["infra"].(map[string]any)
+
+	if _, ok := infra["spec_path"]; ok {
+		t.Fatalf("expected spec_path to be removed after merge")
+	}
+	if got, ok := infra["retries"].(float64); !ok || got != 1 {
+		t.Fatalf("expected retries=1 (inline override), got %v", infra["retries"])
+	}
+	if got, ok := infra["image"].(string); !ok || got != "docker.io/test/healer:latest" {
+		t.Fatalf("expected image from fragment, got %v", infra["image"])
+	}
+
+	env := infra["env"].(map[string]any)
+	if got, _ := env["A"].(string); got != "from-fragment" {
+		t.Fatalf("expected env.A from fragment, got %v", env["A"])
+	}
+	if got, _ := env["B"].(string); got != "inline-override" {
+		t.Fatalf("expected env.B inline override, got %v", env["B"])
+	}
+	if got, _ := env["C"].(string); got != "inline-only" {
+		t.Fatalf("expected env.C inline value, got %v", env["C"])
+	}
+
+	expectations := infra["expectations"].(map[string]any)
+	artifacts := expectations["artifacts"].([]any)
+	if len(artifacts) != 1 {
+		t.Fatalf("expected one expectations artifact, got %d", len(artifacts))
+	}
+}
+
+func TestBuildSpecPayload_HealingSpecPathInvalidType(t *testing.T) {
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  healing:
+    by_error_kind:
+      infra:
+        spec_path: 123
+  router:
+    image: docker.io/test/router:latest
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err == nil {
+		t.Fatal("expected error for non-string spec_path")
+	}
+}
+
+func TestNormalizeModsSpecToJSON_HealingSpecPathMerge(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentPath := filepath.Join(tmpDir, "infra-fragment.yaml")
+	fragment := `
+retries: 2
+image: docker.io/test/healer:latest
+env:
+  FRAGMENT_ONLY: yes
+`
+	if err := os.WriteFile(fragmentPath, []byte(fragment), 0o644); err != nil {
+		t.Fatalf("write fragment file: %v", err)
+	}
+
+	spec := []byte(fmt.Sprintf(`
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  healing:
+    by_error_kind:
+      infra:
+        spec_path: %s
+        env:
+          INLINE_ONLY: "true"
+  router:
+    image: docker.io/test/router:latest
+`, fragmentPath))
+
+	normalized, err := normalizeModsSpecToJSON(spec)
+	if err != nil {
+		t.Fatalf("normalizeModsSpecToJSON error: %v", err)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(normalized, &out); err != nil {
+		t.Fatalf("unmarshal normalized spec: %v", err)
+	}
+	infra := out["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
+	if _, ok := infra["spec_path"]; ok {
+		t.Fatalf("expected spec_path removed in normalized output")
+	}
+	env := infra["env"].(map[string]any)
+	if _, ok := env["FRAGMENT_ONLY"]; !ok {
+		t.Fatalf("expected FRAGMENT_ONLY from fragment")
+	}
+	if _, ok := env["INLINE_ONLY"]; !ok {
+		t.Fatalf("expected INLINE_ONLY from inline override")
+	}
+}
+
+func TestBuildSpecPayload_RouterSpecPathMerge(t *testing.T) {
+	tmpDir := t.TempDir()
+	fragmentPath := filepath.Join(tmpDir, "router-fragment.yaml")
+	fragment := `
+image: docker.io/test/router:latest
+env:
+  A: from-fragment
+  B: from-fragment
+`
+	if err := os.WriteFile(fragmentPath, []byte(fragment), 0o644); err != nil {
+		t.Fatalf("write fragment file: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := fmt.Sprintf(`
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  router:
+    spec_path: %s
+    env:
+      B: inline-override
+      C: inline-only
+`, fragmentPath)
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
+	if _, ok := router["spec_path"]; ok {
+		t.Fatalf("expected router.spec_path to be removed after merge")
+	}
+	if got, ok := router["image"].(string); !ok || got != "docker.io/test/router:latest" {
+		t.Fatalf("expected router image from fragment, got %v", router["image"])
+	}
+	env := router["env"].(map[string]any)
+	if got, _ := env["A"].(string); got != "from-fragment" {
+		t.Fatalf("expected env.A from fragment, got %v", env["A"])
+	}
+	if got, _ := env["B"].(string); got != "inline-override" {
+		t.Fatalf("expected env.B inline override, got %v", env["B"])
+	}
+	if got, _ := env["C"].(string); got != "inline-only" {
+		t.Fatalf("expected env.C inline value, got %v", env["C"])
+	}
+}
+
+func TestBuildSpecPayload_RouterSpecPathInvalidType(t *testing.T) {
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  router:
+    spec_path: 123
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err == nil {
+		t.Fatal("expected error for non-string router spec_path")
+	}
+}

@@ -29,6 +29,9 @@ func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
 			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 		}
 	}
+	if err := resolveBuildGateSpecPathInPlace(raw); err != nil {
+		return nil, fmt.Errorf("resolve spec_path (build_gate): %w", err)
+	}
 
 	jsonBytes, err := json.Marshal(raw)
 	if err != nil {
@@ -42,16 +45,132 @@ func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
 	return jsonBytes, nil
 }
 
+func resolvePath(path string) (string, error) {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return "", fmt.Errorf("path is empty")
+	}
+	if strings.HasPrefix(trimmed, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve home dir for path %s: %w", trimmed, err)
+		}
+		return filepath.Join(home, trimmed[2:]), nil
+	}
+	return trimmed, nil
+}
+
+func parseSpecObject(data []byte) (map[string]any, error) {
+	var obj map[string]any
+	if err := json.Unmarshal(data, &obj); err != nil {
+		if err := yaml.Unmarshal(data, &obj); err != nil {
+			return nil, fmt.Errorf("parse (not valid JSON or YAML): %w", err)
+		}
+	}
+	if obj == nil {
+		return nil, fmt.Errorf("expected object, got empty")
+	}
+	return obj, nil
+}
+
+func readSpecObjectFromPath(path string) (map[string]any, error) {
+	resolved, err := resolvePath(path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return nil, fmt.Errorf("read file %s: %w", resolved, err)
+	}
+	obj, err := parseSpecObject(data)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", resolved, err)
+	}
+	return obj, nil
+}
+
+func deepMergeObjects(base, overlay map[string]any) map[string]any {
+	if base == nil {
+		base = map[string]any{}
+	}
+	out := make(map[string]any, len(base))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range overlay {
+		if existing, ok := out[k]; ok {
+			existingMap, existingOK := existing.(map[string]any)
+			overlayMap, overlayOK := v.(map[string]any)
+			if existingOK && overlayOK {
+				out[k] = deepMergeObjects(existingMap, overlayMap)
+				continue
+			}
+		}
+		out[k] = v
+	}
+	return out
+}
+
+func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
+	bg, ok := spec["build_gate"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	if healing, ok := bg["healing"].(map[string]any); ok {
+		if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+			for errorKind, item := range byErrorKind {
+				action, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				specPathValue, hasSpecPath := action["spec_path"]
+				if !hasSpecPath {
+					continue
+				}
+				specPath, ok := specPathValue.(string)
+				if !ok {
+					return fmt.Errorf("%s.spec_path: expected string path, got %T", errorKind, specPathValue)
+				}
+				fragment, err := readSpecObjectFromPath(specPath)
+				if err != nil {
+					return fmt.Errorf("%s.spec_path: %w", errorKind, err)
+				}
+
+				// spec_path is a preprocessing-only key; it must not reach canonical validation.
+				delete(action, "spec_path")
+				byErrorKind[errorKind] = deepMergeObjects(fragment, action)
+			}
+		}
+	}
+
+	router, ok := bg["router"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	specPathValue, hasSpecPath := router["spec_path"]
+	if !hasSpecPath {
+		return nil
+	}
+	specPath, ok := specPathValue.(string)
+	if !ok {
+		return fmt.Errorf("router.spec_path: expected string path, got %T", specPathValue)
+	}
+	fragment, err := readSpecObjectFromPath(specPath)
+	if err != nil {
+		return fmt.Errorf("router.spec_path: %w", err)
+	}
+	delete(router, "spec_path")
+	bg["router"] = deepMergeObjects(fragment, router)
+	return nil
+}
+
 // resolveEnvFromFile reads a file path (expanding ~) and returns its content as a string.
 // File content is treated as sensitive, so any errors redact the file path for security.
 func resolveEnvFromFile(path string) (string, error) {
-	// Expand ~ to user home directory
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("resolve home dir for path %s: %w", path, err)
-		}
-		path = filepath.Join(home, path[2:])
+	path, err := resolvePath(path)
+	if err != nil {
+		return "", err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -199,6 +318,10 @@ func buildSpecPayload(
 		}
 	} else {
 		base = make(map[string]any)
+	}
+
+	if err := resolveBuildGateSpecPathInPlace(base); err != nil {
+		return nil, fmt.Errorf("resolve spec_path (build_gate): %w", err)
 	}
 
 	// Resolve env_from_file references in the canonical top-level env block.

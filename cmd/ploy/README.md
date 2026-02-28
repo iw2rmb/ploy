@@ -573,9 +573,12 @@ reporting.
 **Spec format (healing under Build Gate):**
 ```yaml
 build_gate:
+  router:
+    spec_path: ./healing/router/spec.yaml
   healing:
     by_error_kind:
       infra:
+        spec_path: ./healing/infra/spec.yaml
         retries: 1
         image: docker.io/you/migs-codex:latest
         command: ["mig-codex", "--input", "/workspace", "--out", "/out"]
@@ -584,6 +587,14 @@ build_gate:
         env_from_file:
           CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
+
+`spec_path` is an optional CLI-side composition key for Build Gate router/healing
+objects. Supported locations:
+- `build_gate.router.spec_path`
+- `build_gate.healing.by_error_kind.<error_kind>.spec_path`
+CLI reads the referenced YAML/JSON object and deep-merges it into the target
+object. Inline fields next to `spec_path` override loaded fields. The key is
+removed before submit.
 
 **Cross-phase inputs:**
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).

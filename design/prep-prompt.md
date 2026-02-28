@@ -125,7 +125,7 @@ Validation:
 
 ## Router Prompt Consolidation and Recovery Contract
 
-Prep-related recovery design introduces a dedicated `router/` folder for router prompts and classification contracts.
+Prep-related recovery design introduces a dedicated `healing/` folder for recovery prompts and classification contracts.
 
 Router design expectations:
 - run router after every gate failure (including failed `re_gate`)

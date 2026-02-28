@@ -67,7 +67,7 @@ Strategy routing policy:
 
 ## Router Prompt Packaging (Adopted)
 
-Introduce `router/` folder for router assets:
+Introduce `healing/` folder for recovery assets:
 - phase-aware classification prompts
 - strategy templates for `infra` and `code` routing
 - schema/contracts for router JSON output and strategy artifacts
