@@ -114,6 +114,17 @@ func TestPopulateHealingInDirCopiesGateProfileForInfra(t *testing.T) {
 	if got := string(data); got != profile {
 		t.Fatalf("healing /in/gate_profile.json = %q, want %q", got, profile)
 	}
+	gotSchema, err := os.ReadFile(filepath.Join(inDir, "gate_profile.schema.json"))
+	if err != nil {
+		t.Fatalf("failed to read /in/gate_profile.schema.json: %v", err)
+	}
+	wantSchema, err := contracts.ReadGateProfileSchemaJSON()
+	if err != nil {
+		t.Fatalf("ReadGateProfileSchemaJSON: %v", err)
+	}
+	if got, want := string(gotSchema), string(wantSchema); got != want {
+		t.Fatalf("healing /in/gate_profile.schema.json mismatch")
+	}
 }
 
 func TestPopulateHealingInDirSkipsGateProfileForNonInfra(t *testing.T) {
@@ -141,6 +152,9 @@ func TestPopulateHealingInDirSkipsGateProfileForNonInfra(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.json")); !os.IsNotExist(err) {
 		t.Fatalf("gate_profile.json exists for non-infra healing, err=%v", err)
 	}
+	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); !os.IsNotExist(err) {
+		t.Fatalf("gate_profile.schema.json exists for non-infra healing, err=%v", err)
+	}
 }
 
 func TestPopulateHealingInDirInfraMissingGateProfileIsAllowed(t *testing.T) {
@@ -161,5 +175,8 @@ func TestPopulateHealingInDirInfraMissingGateProfileIsAllowed(t *testing.T) {
 	inDir := t.TempDir()
 	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
+		t.Fatalf("expected /in/gate_profile.schema.json for infra healing, err=%v", err)
 	}
 }

@@ -7,11 +7,12 @@ Goal:
 Hard rules:
 - Read `/in/build-gate.log` first.
 - Read `/in/gate_profile.json` when present and use it as gate-profile context.
+- Read `/in/gate_profile.schema.json` and treat it as the required output contract.
 - DO NOT modify `/workspace` (no create/edit/delete/rename).
 - If `/workspace` was modified accidentally, revert all workspace changes before finishing.
 - Do not run build tools or tests inside this container; gate validation runs externally.
 - Write only `/out/gate-profile-candidate.json` for the candidate artifact.
-- Candidate must be compatible with schema `gate_profile_v1`.
+- Candidate must validate against `/in/gate_profile.schema.json`.
 - Keep output deterministic and machine-readable.
 - Your final message MUST be exactly one line of JSON:
   `{"action_summary":"<<=200 chars, single line>"}`
@@ -26,5 +27,5 @@ Task:
 1. Diagnose infra/toolchain failure from `/in/build-gate.log`.
 2. Use `/in/gate_profile.json` (if provided) to keep command/env/runtime context aligned with the gate profile used by the failed gate.
 3. Choose tactic per policy (unit-focused vs container-requirements-aware) using log evidence.
-4. Generate `/out/gate-profile-candidate.json` (`gate_profile_v1`) with consistent stack identity, deterministic commands/env, and honest target statuses.
+4. Generate `/out/gate-profile-candidate.json` that validates against `/in/gate_profile.schema.json`, with consistent stack identity, deterministic commands/env, and honest target statuses.
 5. End with the required one-line `action_summary` JSON.

@@ -51,21 +51,28 @@ func ValidateGateProfileJSONForSchema(raw []byte, schemaID string) error {
 	}
 }
 
+func ReadGateProfileSchemaJSON() ([]byte, error) {
+	path, err := gateProfileSchemaPath()
+	if err != nil {
+		return nil, err
+	}
+	schemaBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read prep schema %q: %w", path, err)
+	}
+	return schemaBytes, nil
+}
+
 func loadGateProfileSchema() error {
 	gateProfileSchemaOnce.Do(func() {
-		path, err := gateProfileSchemaPath()
+		schemaBytes, err := ReadGateProfileSchemaJSON()
 		if err != nil {
 			gateProfileSchemaErr = err
 			return
 		}
-		schemaBytes, err := os.ReadFile(path)
-		if err != nil {
-			gateProfileSchemaErr = fmt.Errorf("read prep schema %q: %w", path, err)
-			return
-		}
 		gateProfileSchemaObj, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(schemaBytes))
 		if err != nil {
-			gateProfileSchemaErr = fmt.Errorf("compile prep schema %q: %w", path, err)
+			gateProfileSchemaErr = fmt.Errorf("compile prep schema: %w", err)
 			return
 		}
 	})

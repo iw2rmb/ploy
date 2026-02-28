@@ -248,6 +248,16 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string, he
 	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
 
 	if healingSpec != nil && strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
+		schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
+		if err != nil {
+			return fmt.Errorf("load gate profile schema: %w", err)
+		}
+		inSchemaPath := filepath.Join(inDir, "gate_profile.schema.json")
+		if err := os.WriteFile(inSchemaPath, schemaRaw, 0o644); err != nil {
+			return fmt.Errorf("write /in/gate_profile.schema.json: %w", err)
+		}
+		slog.Info("hydrated /in/gate_profile.schema.json for healing job", "run_id", runID, "path", inSchemaPath)
+
 		profilePath := filepath.Join(runDir, "build-gate-profile.json")
 		profileRaw, err := os.ReadFile(profilePath)
 		if err != nil {
