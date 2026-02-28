@@ -346,14 +346,18 @@ fi
 }
 
 // buildCommandForTool returns the appropriate build command for the given tool.
-func buildCommandForTool(tool string) ([]string, error) {
+func buildCommandForTool(workspace string, tool string) ([]string, error) {
 	preamble := caPreambleScript()
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
 		script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
 		return []string{"/bin/sh", "-lc", script}, nil
 	case "gradle":
-		script := preamble + "gradle -q --stacktrace --build-cache test -p /workspace"
+		gradleExec := "gradle"
+		if hasGradleWrapperSpecified(workspace) {
+			gradleExec = "./gradlew"
+		}
+		script := preamble + gradleExec + " -q --stacktrace --build-cache test -p /workspace"
 		return []string{"/bin/sh", "-lc", script}, nil
 	case "go":
 		script := preamble + "go test ./..."
@@ -367,6 +371,14 @@ func buildCommandForTool(tool string) ([]string, error) {
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}
+}
+
+func hasGradleWrapperSpecified(workspace string) bool {
+	workspace = strings.TrimSpace(workspace)
+	if workspace == "" {
+		return false
+	}
+	return fsutil.FileExists(filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties"))
 }
 
 // --- Image selection helpers (merged from gate_docker_image_selection.go) ---
