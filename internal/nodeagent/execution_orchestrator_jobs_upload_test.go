@@ -1,8 +1,12 @@
 package nodeagent
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -123,7 +127,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			// Execute upload with typed RunOptions.
 			ctx := context.Background()
-			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
+			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace, "")
 
 			// Verify upload call.
 			if uploadCalled != tt.wantUpload {
@@ -170,12 +174,18 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			t.Parallel()
 
 			uploadCalled := false
+			var uploadedBundle []byte
 
 			// Mock server (job-scoped endpoint).
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
 				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
 					uploadCalled = true
+					var payload struct {
+						Bundle []byte `json:"bundle"`
+					}
+					_ = json.NewDecoder(r.Body).Decode(&payload)
+					uploadedBundle = payload.Bundle
 					w.WriteHeader(http.StatusCreated)
 					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
 				}
@@ -225,6 +235,15 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			// Verify upload call.
 			if uploadCalled != tt.wantUpload {
 				t.Errorf("uploadCalled = %v, want %v", uploadCalled, tt.wantUpload)
+			}
+			if tt.wantUpload && len(tt.createFiles) > 0 {
+				headers := tarHeadersFromBundle(t, uploadedBundle)
+				if _, ok := headers["out/result.txt"]; !ok {
+					t.Fatalf("expected /out upload to include out/result.txt, got headers=%v", keys(headers))
+				}
+				if _, ok := headers["out/subdir/output.log"]; !ok {
+					t.Fatalf("expected /out upload to include out/subdir/output.log, got headers=%v", keys(headers))
+				}
 			}
 		})
 	}
@@ -619,7 +638,7 @@ func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 
 			// Execute upload with typed RunOptions.
 			ctx := context.Background()
-			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace)
+			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace, "")
 
 			// Verify upload call matches expectation.
 			if uploadCalled != tt.wantUpload {
@@ -627,4 +646,98 @@ func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunController_uploadConfiguredArtifacts_ResolvesOutPathDeterministically(t *testing.T) {
+	t.Parallel()
+
+	uploadCalled := false
+	var uploadedBundle []byte
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/runs/test-run-out/jobs/test-job-out/artifact" {
+			uploadCalled = true
+			var payload struct {
+				Bundle []byte `json:"bundle"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&payload)
+			uploadedBundle = payload.Bundle
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"artifact_bundle_id": "test-id",
+				"cid":                "test-cid",
+			})
+		}
+	}))
+	defer server.Close()
+
+	workspace := t.TempDir()
+	outDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outDir, "prep-profile-candidate.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+		t.Fatalf("write candidate: %v", err)
+	}
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := &runController{cfg: cfg}
+
+	typedOpts := RunOptions{
+		Artifacts: ArtifactOptions{
+			Paths: []string{"/out/prep-profile-candidate.json"},
+			Name:  "test-artifact",
+		},
+	}
+	req := StartRunRequest{
+		RunID:        "test-run-out",
+		JobID:        "test-job-out",
+		TypedOptions: typedOpts,
+	}
+	manifest := contracts.StepManifest{
+		Image:   "test-image",
+		Command: []string{"test"},
+	}
+
+	controller.uploadConfiguredArtifacts(context.Background(), req, typedOpts, manifest, workspace, outDir)
+	if !uploadCalled {
+		t.Fatal("expected upload to be called for /out artifact path")
+	}
+
+	headers := tarHeadersFromBundle(t, uploadedBundle)
+	if _, ok := headers["out/prep-profile-candidate.json"]; !ok {
+		t.Fatalf("expected header out/prep-profile-candidate.json, got %v", keys(headers))
+	}
+}
+
+func tarHeadersFromBundle(t *testing.T, bundle []byte) map[string]struct{} {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(bundle))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer func() { _ = gz.Close() }()
+
+	tr := tar.NewReader(gz)
+	headers := map[string]struct{}{}
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar read: %v", err)
+		}
+		headers[hdr.Name] = struct{}{}
+	}
+	return headers
+}
+
+func keys(m map[string]struct{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

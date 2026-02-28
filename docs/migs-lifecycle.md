@@ -1225,6 +1225,10 @@ Mods container images are standard OCI images with the following expectations:
 - **Execution**
   - Entry point should read/modify the repo under `/workspace`.
   - Output artifacts, logs and plans should be written under `/out`.
+  - For healing artifact ingestion, `/out` uploads are archived under stable
+    tar paths rooted at `out/` (for example
+    `out/prep-profile-candidate.json`). Recovery candidate lookup uses this
+    path strictly; missing entries are treated as missing candidates (no fallback).
   - Exit code `0` signals success. Non-zero exit code is treated as failure and
     surfaces in:
     -  run `state=failed`,

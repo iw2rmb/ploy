@@ -15,7 +15,7 @@ Documentation:
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Candidate Artifact Ingestion
-- [ ] Capture expected recovery artifacts from heal outputs at job completion.
+- [x] Capture expected recovery artifacts from heal outputs at job completion.
   - Repository: `ploy`
   - Component: nodeagent artifact upload + server job completion metadata
   - Scope:
@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent -run 'TestUpload|TestExecuteHealingJob'`
     - `go test ./internal/server/handlers -run 'TestCompleteJob_'`
 
-- [ ] Resolve candidate artifact bytes for server-side validation flow.
+- [x] Resolve candidate artifact bytes for server-side validation flow.
   - Repository: `ploy`
   - Component: server artifact retrieval boundary
   - Scope:
@@ -164,4 +164,3 @@ Legend: [ ] todo, [x] done.
     - `make staticcheck`
   - Snippets: `N/A`
   - Tests: All commands above pass.
-

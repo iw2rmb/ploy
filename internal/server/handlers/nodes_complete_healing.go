@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -382,4 +383,17 @@ func cancelRemainingJobsAfterFailure(
 	}
 
 	return nil
+}
+
+func loadRecoveryArtifact(
+	ctx context.Context,
+	bp *blobpersist.Service,
+	runID domaintypes.RunID,
+	healJobID domaintypes.JobID,
+	artifactPath string,
+) ([]byte, error) {
+	if bp == nil {
+		return nil, fmt.Errorf("load recovery artifact: blobpersist service is required")
+	}
+	return bp.LoadRecoveryArtifact(ctx, runID, healJobID, artifactPath)
 }
