@@ -603,7 +603,8 @@ objects. Supported locations:
 - `build_gate.router.spec_path`
 - `build_gate.healing.by_error_kind.<error_kind>.spec_path`
 CLI reads the referenced YAML/JSON object and deep-merges it into the target
-object. Inline fields next to `spec_path` override loaded fields. The key is
+object. Inline fields next to `spec_path` override loaded fields. `spec_path`
+supports env expansion (`$VAR`, `${VAR}`) and `~/` home expansion. The key is
 removed before submit.
 
 For `infra` healing with `expectations.artifacts` schema `prep_profile_v1`, the

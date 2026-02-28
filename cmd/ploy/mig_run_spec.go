@@ -50,14 +50,18 @@ func resolvePath(path string) (string, error) {
 	if trimmed == "" {
 		return "", fmt.Errorf("path is empty")
 	}
-	if strings.HasPrefix(trimmed, "~/") {
+	expanded := strings.TrimSpace(os.ExpandEnv(trimmed))
+	if expanded == "" {
+		return "", fmt.Errorf("path is empty")
+	}
+	if strings.HasPrefix(expanded, "~/") {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", fmt.Errorf("resolve home dir for path %s: %w", trimmed, err)
+			return "", fmt.Errorf("resolve home dir for path %s: %w", expanded, err)
 		}
-		return filepath.Join(home, trimmed[2:]), nil
+		return filepath.Join(home, expanded[2:]), nil
 	}
-	return trimmed, nil
+	return expanded, nil
 }
 
 func parseSpecObject(data []byte) (map[string]any, error) {
