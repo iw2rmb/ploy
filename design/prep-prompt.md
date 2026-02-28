@@ -123,7 +123,7 @@ Validation:
 - Keep prompt output deterministic and machine-readable.
 - `prompt_delta_suggestion` is stored but not yet automatically promoted.
 
-## Planned Router Prompt Consolidation
+## Router Prompt Consolidation and Recovery Contract
 
 Prep-related recovery design introduces a dedicated `router/` folder for router prompts and classification contracts.
 
@@ -132,7 +132,9 @@ Router design expectations:
 - provide gate phase and prior loop history as input
 - emit one of: `infra|code|mixed|unknown`
 - `mixed` and `unknown` are treated as terminal stop signals for mig progression
-- strategy contracts can require typed artifacts (for example infra profile candidates) for downstream validation/promotion
+- strategy selection is resolved through `build_gate.healing.by_error_kind.<error_kind>`
+- heal claims receive server-injected `build_gate.healing.selected_error_kind`
+- strategy contracts can require typed artifacts (for example `path=/out/prep-profile-candidate.json`, `schema=prep_profile_v1`) for downstream validation/promotion
 
 ## Cross References
 

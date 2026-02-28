@@ -66,15 +66,17 @@ Simple mode is the only end-to-end execution mode currently wired into schedulin
 
 Complex orchestration remains future scope.
 
-## Planned Recovery Interaction
+## Recovery Interaction (As-Built)
 
-Planned gate-recovery behavior for simple-profile runs:
-- one loop path is used (`agent -> re_gate`) with `loop_kind=healing` for now
+Gate-recovery behavior for simple-profile runs:
+- one loop path is used (`agent -> re_gate`) with `loop_kind=healing`
 - router runs on every gate failure, including failed `re_gate`
-- router receives gate phase as signal (`pre_gate` has stronger infra prior)
-- strategy is selected by `error_kind` (`infra|code|mixed|unknown`)
+- router receives gate phase as signal (`pre_gate|post_gate|re_gate`)
+- strategy is selected by router `error_kind` (`infra|code|mixed|unknown`)
+- healing actions are configured in `build_gate.healing.by_error_kind.<error_kind>`
+- server injects `build_gate.healing.selected_error_kind` when claiming heal jobs
 - if router classification is `mixed` or `unknown`, mig progression stops for that repo attempt
-- `infra` strategy may emit a profile candidate artifact that can become repo default only after schema validation + successful re-gate
+- `infra` strategy can require artifact `path=/out/prep-profile-candidate.json`, `schema=prep_profile_v1`; promotion to repo default remains gated by validation and successful re-gate
 
 ## Cross References
 

@@ -30,18 +30,19 @@ Not implemented yet:
 - complex orchestration execution engine
 - feedback-loop rollout for prompt/tactics evolution
 
-## Adopted Next-Step Recovery Design
+## Recovery Contract (As-Built)
 
-The next gate-recovery design is fixed as:
+Track 2 recovery behavior is implemented as:
 - keep one recovery loop path (`agent -> re_gate`) for all gate failures
-- keep `loop_kind` in metadata for future extensibility; current value is `healing`
-- drive strategy by router `error_kind` (`infra|code|mixed|unknown`)
+- keep `loop_kind` in metadata as an extension point; current value is `healing`
 - run router on every gate failure, including failed `re_gate`
-- include gate phase as router input signal
-- stop mig progression when router classification is `mixed` or `unknown`
+- include gate phase as router input signal (`pre_gate|post_gate|re_gate`)
+- router classification drives strategy via `error_kind` (`infra|code|mixed|unknown`)
+- strategy config is defined under `build_gate.healing.by_error_kind.<error_kind>`
+- control plane injects `build_gate.healing.selected_error_kind` on heal job claim
+- stop mig progression when router classification is `mixed` or `unknown` (no healing branch is created)
 - preserve per-attempt router/healer history for subsequent loop iterations
-- introduce a dedicated `router/` folder for router prompt assets and classification strategies
-- for `infra`, expect a typed profile candidate artifact (for example `prep-profile-candidate.json`) and persist as repo `prep_profile` only after validation + successful re-gate
+- for `infra`, use typed artifact contract `path=/out/prep-profile-candidate.json`, `schema=prep_profile_v1`; promotion to repo `prep_profile` remains gated by validation and successful re-gate
 
 ## Integration Points
 

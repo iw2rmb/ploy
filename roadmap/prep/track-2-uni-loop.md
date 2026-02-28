@@ -124,13 +124,17 @@ Legend: [ ] todo, [x] done.
 - [x] Add recovery strategy selector schema to `build_gate` spec contract — provide typed configuration surface keyed by `error_kind`.
   - Repository: `ploy`
   - Component: workflow contracts + parser + nodeagent typed options
-  - Scope: Update `internal/workflow/contracts/build_gate_config.go`, `mods_spec.go`, `mods_spec_parse.go`, and `internal/nodeagent/run_options.go` to add `build_gate.recovery` selector contract and parse/validate mapping by `error_kind`.
+  - Scope: Update `internal/workflow/contracts/build_gate_config.go`, `mods_spec.go`, `mods_spec_parse.go`, and `internal/nodeagent/run_options.go` to use `build_gate.healing.by_error_kind` selector contract; parse/validate error-kind keyed actions and support server-injected `build_gate.healing.selected_error_kind` for heal claims.
   - Snippets:
     ```go
     type BuildGateConfig struct {
-        Healing  *HealingSpec           `json:"healing,omitempty"`
-        Router   *RouterSpec            `json:"router,omitempty"`
-        Recovery *RecoveryStrategySpec  `json:"recovery,omitempty"`
+        Healing *HealingSpec `json:"healing,omitempty"`
+        Router  *RouterSpec  `json:"router,omitempty"`
+    }
+
+    type HealingSpec struct {
+        SelectedErrorKind string                           `json:"selected_error_kind,omitempty"`
+        ByErrorKind       map[string]HealingActionSpec    `json:"by_error_kind,omitempty"`
     }
     ```
   - Tests: `go test ./internal/workflow/contracts -run 'TestParseModsSpecJSON|TestValidate'` and `go test ./internal/nodeagent -run 'TestParseSpec_ProducesTypedOptions'` — recovery selector parsed into typed options.

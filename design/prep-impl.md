@@ -139,47 +139,35 @@ State outcomes:
 
 Attempt evidence (`prep_runs.result_json`, `logs_ref`) is persisted on failure and success paths where available.
 
+## Recovery Contract (Track 2 As-Built)
+
+Implemented behavior:
+- one recovery loop mechanism (`agent -> re_gate`) is used for all gate failures
+- loop metadata carries `loop_kind=healing` and router classification context
+- router runs after every failed gate, including failed `re_gate`
+- router receives gate phase signal (`pre_gate|post_gate|re_gate`)
+- router emits `error_kind` in `infra|code|mixed|unknown` with optional `strategy_id`, `confidence`, `reason`, `expectations`
+- healing strategy is configured by `error_kind` under `build_gate.healing.by_error_kind`
+- server healing insertion selects action by persisted `job_meta.gate.recovery.error_kind`
+- server injects `build_gate.healing.selected_error_kind` into claimed heal spec
+- `mixed` and `unknown` are terminal classifications; remaining chain is cancelled
+
+Selector contract:
+- `build_gate.healing.by_error_kind.infra|code` define healing actions
+- `build_gate.healing.by_error_kind.mixed|unknown` are forbidden as action keys
+- action fields:
+  - `retries`
+  - `image`
+  - optional `command`
+  - optional `env`
+  - optional `expectations.artifacts[]`
+
+Infra artifact contract boundary:
+- expected artifact path: `/out/prep-profile-candidate.json`
+- expected schema id: `prep_profile_v1`
+- schema validation hook is available through prep schema boundary; promotion workflow remains a subsequent track
+
 ## Known Gaps and Next Tracks
-
-### Next Track: Universal Recovery Loop Contract
-
-Adopted design:
-- keep one recovery loop mechanism (`agent -> re_gate`) for all gate failures
-- keep `loop_kind` in metadata as an extension point; current runtime value is `healing`
-- do not split runtime flow into separate preparing/healing loops yet
-- router `error_kind` selects strategy and artifact expectations
-
-### Next Track: Router-Driven Recovery Policy
-
-Adopted design:
-- run router after every gate failure, including every failed `re_gate`
-- pass phase signal to router (`pre_gate`, `post_gate`, `re_gate`) so it can use phase priors
-- persist router classification and confidence in loop history
-
-Classification contract:
-- `infra`
-- `code`
-- `mixed`
-- `unknown`
-
-Current decision for conservative stopping:
-- if router returns `mixed` or `unknown`, stop the loop and stop remaining mig progression
-
-### Next Track: Error-Kind Strategy Registry
-
-Adopted design:
-- define strategy by `error_kind` in config, not by branching code paths
-- strategy fields include:
-  - prompt template id
-  - allowed tool/capability set
-  - expected output artifacts and schemas
-  - retry and stop policy
-  - whether output can be promoted to repo defaults
-
-`infra` strategy expectation:
-- agent emits typed artifact (for example `/out/prep-profile-candidate.json`)
-- control plane validates candidate against prep profile schema
-- candidate is persisted as repo `prep_profile` only if subsequent re-gate succeeds
 
 ### Next Track: Recovery History Input
 

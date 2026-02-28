@@ -67,16 +67,18 @@ State and evidence are exposed via:
 - `GET /v1/repos` (status summary)
 - `GET /v1/repos/{repo_id}/prep` (full prep status, profile, artifacts, attempt history)
 
-## Planned Gate-Recovery State Context
+## Gate-Recovery State Context (As-Built for Track 2)
 
-In the next recovery track, gate loops will carry explicit context:
+Gate-loop metadata carries explicit context:
 - `loop_kind`: current value `healing` (reserved as extension point for future loop families)
 - `error_kind`: `infra|code|mixed|unknown` (router output per failed gate)
-- `history`: per-iteration router + healer summaries
+- optional classifier details: `strategy_id`, `confidence`, `reason`, `expectations`
+- per-iteration history: router + healer summaries
 
 Routing and stopping policy:
 - any gate fail enters the same loop mechanism (`agent -> re_gate`)
-- `error_kind` selects strategy contract (prompt/tools/expected outputs)
+- `error_kind` selects strategy from `build_gate.healing.by_error_kind`
+- heal claims receive server-injected `build_gate.healing.selected_error_kind`
 - `re_gate` fail continues using stored loop context
 - `mixed` or `unknown` classification stops further mig progression for the repo attempt
 
