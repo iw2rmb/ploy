@@ -13,8 +13,3 @@ auth:
 
 postgres:
   dsn: ""
-
-scheduler:
-  prep_interval: 2s
-  prep_max_attempts: 1
-  prep_retry_delay: 2s
