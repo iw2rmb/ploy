@@ -58,6 +58,12 @@ type RunJobEntry struct {
 	DisplayName   string              `json:"display_name,omitempty"`
 	ActionSummary string              `json:"action_summary,omitempty"`
 	BugSummary    string              `json:"bug_summary,omitempty"`
+	Recovery      *RunJobRecovery     `json:"recovery,omitempty"`
 	BuildLogURL   string              `json:"build_log_url,omitempty"`
 	PatchURL      string              `json:"patch_url,omitempty"`
+}
+
+// RunJobRecovery projects recovery classifier fields surfaced by repo job APIs.
+type RunJobRecovery struct {
+	ErrorKind string `json:"error_kind,omitempty"`
 }

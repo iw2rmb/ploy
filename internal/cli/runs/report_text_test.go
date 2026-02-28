@@ -143,6 +143,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 						Status:     "Failed",
 						ExitCode:   &failCode,
 						DurationMs: 1500,
+						Recovery:   &RunJobRecovery{ErrorKind: "infra"},
 					},
 					{
 						JobID:         healID,
@@ -166,7 +167,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 
 	assertContains(t, out, "\x1b[91m✗\x1b[0m")
 	assertContains(t, out, "pre_gate")
-	assertContains(t, out, "└  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
+	assertContains(t, out, "\x1b[1;91m<infra>\x1b[0m └  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
 	assertContains(t, out, "✓")
 	assertContains(t, out, "Heal")
 	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
@@ -212,6 +213,7 @@ func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
 						ExitCode:   &failCode,
 						DurationMs: 750,
 						BugSummary: "missing ; in Foo.java",
+						Recovery:   &RunJobRecovery{ErrorKind: "code"},
 					},
 				},
 			},
@@ -223,8 +225,57 @@ func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
 	out := buf.String()
-	assertContains(t, out, "└  Exit 1: \x1b[91mmissing ; in Foo.java\x1b[0m")
+	assertContains(t, out, "\x1b[1;91m<code>\x1b[0m └  Exit 1: \x1b[91mmissing ; in Foo.java\x1b[0m")
 	assertContains(t, out, "0.8s")
+}
+
+func TestRenderRunReportTextGateExitOneLinerDefaultsUnknownErrorKind(t *testing.T) {
+	t.Parallel()
+
+	failCode := int32(1)
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "unknown-kind",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RepoReport{
+			{
+				RepoID:    domaintypes.NewMigRepoID(),
+				RepoURL:   "https://github.com/acme/unknown.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/unknown",
+				Status:    "Fail",
+				Attempt:   1,
+			},
+		},
+	}
+	report.Runs = []RunEntry{
+		{
+			RepoID:    report.Repos[0].RepoID,
+			RepoURL:   report.Repos[0].RepoURL,
+			BaseRef:   report.Repos[0].BaseRef,
+			TargetRef: report.Repos[0].TargetRef,
+			Status:    "Fail",
+			Attempt:   1,
+			Jobs: []RunJobEntry{
+				{
+					JobID:      domaintypes.NewJobID(),
+					JobType:    "re_gate",
+					JobImage:   "ghcr.io/acme/re-gate:1",
+					Status:     "Failed",
+					ExitCode:   &failCode,
+					DurationMs: 1000,
+					BugSummary: "re-gate failed",
+				},
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
+		t.Fatalf("RenderRunReportText error: %v", err)
+	}
+	assertContains(t, buf.String(), "\x1b[1;91m<unknown>\x1b[0m └  Exit 1: \x1b[91mre-gate failed\x1b[0m")
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
