@@ -118,7 +118,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
-	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService), auth.RoleWorker)
+	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService, bp), auth.RoleWorker)
 	// Job-level runtime image persistence — nodes persist the resolved container image name
 	// that will be used to execute a mig/heal job (stack-aware resolution).
 	s.HandleFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(st), auth.RoleWorker)

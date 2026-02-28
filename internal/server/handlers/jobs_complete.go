@@ -12,6 +12,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -41,7 +42,7 @@ type completeJobRequest struct {
 //	}
 //
 // Response: 204 No Content on success.
-func completeJobHandler(st store.Store, eventsService *server.EventsService) http.HandlerFunc {
+func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -297,7 +298,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService) htt
 						}
 					}
 				}
-				if healErr := maybeCreateHealingJobs(ctx, st, run, job); healErr != nil {
+				if healErr := maybeCreateHealingJobs(ctx, st, bp, run, job); healErr != nil {
 					slog.Error("complete job: failed to create healing jobs",
 						"job_id", jobID,
 						"next_id", job.NextID,

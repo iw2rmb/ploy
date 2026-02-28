@@ -54,7 +54,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 		},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -137,7 +137,7 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 		},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Fail",
@@ -224,7 +224,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 		},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -338,7 +338,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 		},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -382,7 +382,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -453,7 +453,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 		},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -488,7 +488,7 @@ func TestCompleteJob_RejectsV0StatusSucceeded(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// v0 status "succeeded" should be rejected in favor of v1 "Success".
 	req := f.completeJobReq(map[string]any{"status": "succeeded"})
@@ -513,7 +513,7 @@ func TestCompleteJob_RejectsV0StatusFailed(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// v0 status "failed" should be rejected in favor of v1 "Fail".
 	req := f.completeJobReq(map[string]any{"status": "failed"})
@@ -538,7 +538,7 @@ func TestCompleteJob_RejectsV0StatusCanceled(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{}
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// v0 status "canceled" (American spelling) should be rejected in favor of v1 "Cancelled".
 	req := f.completeJobReq(map[string]any{"status": "canceled"})

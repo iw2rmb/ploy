@@ -67,7 +67,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 		BufferSize:  10,
 		HistorySize: 100,
 	})
-	handler := completeJobHandler(st, eventsService)
+	handler := completeJobHandler(st, eventsService, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
@@ -133,7 +133,7 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 		promoteJobByIDIfUnblockedResult: nextJob,
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
@@ -167,7 +167,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
@@ -236,7 +236,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 		listJobsByRunRepoAttemptResult: jobs,
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
@@ -292,7 +292,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Cancelled"}))
@@ -337,7 +337,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 		promoteJobByIDIfUnblockedResult: nextJob,
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
@@ -412,7 +412,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 		listJobsByRunRepoAttemptResult: jobs,
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
@@ -510,7 +510,7 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 		listJobsByRunRepoAttemptResult: jobs,
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{

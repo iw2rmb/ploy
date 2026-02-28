@@ -540,6 +540,15 @@ Rewire example:
 - Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
+- For `infra` recovery with expected artifact `schema=prep_profile_v1`, healing insertion
+  validates candidate bytes from the previous heal artifact
+  (`/out/prep-profile-candidate.json`) and records candidate schema/path/validation
+  status in `re_gate` recovery metadata.
+- Candidate outcomes are strict and non-blocking:
+  - missing artifact -> `candidate_validation_status=missing`
+  - unreadable artifact bundle -> `candidate_validation_status=unavailable`
+  - schema/JSON validation failure -> `candidate_validation_status=invalid`
+  - valid candidate -> `candidate_validation_status=valid` with embedded candidate payload
 
 ### Parallel healing branches (Phase E)
 
@@ -715,8 +724,9 @@ Prep profile to Build Gate mapping (claim-time):
 - During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that socket path into the gate container.
 - Resolution precedence:
   1. Explicit `build_gate.<phase>.prep` in submitted run spec
-  2. Mapped repo `prep_profile` target
-  3. Default detected-tool command fallback
+  2. For `re_gate` only: validated infra recovery candidate prep override
+  3. Mapped repo `prep_profile` target
+  4. Default detected-tool command fallback
 - Gate env precedence remains:
   1. Base gate env from spec and server env injection
   2. Mapped/explicit prep env override on key conflicts

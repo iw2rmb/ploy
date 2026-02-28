@@ -363,6 +363,76 @@ func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 	}
 }
 
+func TestBuildGateStageMetadata_Recovery_CandidateValidState(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:                  "healing",
+			ErrorKind:                 "infra",
+			CandidateSchemaID:         PrepProfileCandidateSchemaID,
+			CandidateArtifactPath:     PrepProfileCandidateArtifactPath,
+			CandidateValidationStatus: RecoveryCandidateStatusValid,
+			CandidatePrepProfile: json.RawMessage(`{
+				"schema_version": 1,
+				"repo_id": "repo_123",
+				"runner_mode": "simple",
+				"targets": {
+					"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
+					"unit": {"status":"passed","command":"go test ./... -run Unit","env":{},"failure_code":null},
+					"all_tests": {"status":"not_attempted","env":{}}
+				},
+				"orchestration": {"pre": [], "post": []}
+			}`),
+		},
+	}
+	if err := meta.Validate(); err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_CandidateInvalidStateRejected(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		meta BuildGateRecoveryMetadata
+	}{
+		{
+			name: "invalid status",
+			meta: BuildGateRecoveryMetadata{
+				LoopKind:                  "healing",
+				ErrorKind:                 "infra",
+				CandidateValidationStatus: "done",
+			},
+		},
+		{
+			name: "valid status missing payload",
+			meta: BuildGateRecoveryMetadata{
+				LoopKind:                  "healing",
+				ErrorKind:                 "infra",
+				CandidateValidationStatus: RecoveryCandidateStatusValid,
+			},
+		},
+		{
+			name: "non-valid status with payload",
+			meta: BuildGateRecoveryMetadata{
+				LoopKind:                  "healing",
+				ErrorKind:                 "infra",
+				CandidateValidationStatus: RecoveryCandidateStatusInvalid,
+				CandidatePrepProfile:      json.RawMessage(`{"schema_version":1}`),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			meta := BuildGateStageMetadata{Recovery: &tt.meta}
+			if err := meta.Validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
 func TestBuildGateStageMetadata_Recovery_InvalidExpectationsType(t *testing.T) {
 	t.Parallel()
 	meta := BuildGateStageMetadata{

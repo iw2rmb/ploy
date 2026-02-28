@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 type panicInIsError struct{}
@@ -572,6 +574,155 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 			}
 			if got := env[tc.wantEnvK]; got != tc.wantEnvV {
 				t.Fatalf("build_gate.%s.prep.env[%s]=%v, want %q", tc.wantPhase, tc.wantEnvK, got, tc.wantEnvV)
+			}
+		})
+	}
+}
+
+func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
+	t.Parallel()
+
+	repoProfile := []byte(`{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"targets": {
+			"build": {"status":"passed","command":"echo repo-build","env":{},"failure_code":null},
+			"unit": {"status":"passed","command":"echo repo-unit","env":{"SRC":"repo"},"failure_code":null},
+			"all_tests": {"status":"not_attempted","env":{}}
+		},
+		"orchestration": {"pre": [], "post": []}
+	}`)
+	candidateProfile := `{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"targets": {
+			"build": {"status":"passed","command":"echo candidate-build","env":{},"failure_code":null},
+			"unit": {"status":"passed","command":"echo candidate-unit","env":{"SRC":"candidate"},"failure_code":null},
+			"all_tests": {"status":"not_attempted","env":{}}
+		},
+		"orchestration": {"pre": [], "post": []}
+	}`
+
+	tests := []struct {
+		name    string
+		spec    []byte
+		wantCmd string
+		wantSrc string
+	}{
+		{
+			name:    "candidate wins over repo prep_profile on re_gate",
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			wantCmd: "echo candidate-unit",
+			wantSrc: "candidate",
+		},
+		{
+			name: "explicit prep wins over candidate and repo",
+			spec: []byte(`{
+				"steps":[{"image":"docker.io/acme/mod:latest"}],
+				"build_gate":{"post":{"prep":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
+			}`),
+			wantCmd: "echo explicit",
+			wantSrc: "explicit",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			nodeKey := domaintypes.NewNodeKey()
+			nodeID := domaintypes.NodeID(nodeKey)
+			runID := domaintypes.NewRunID()
+			repoID := domaintypes.NewMigRepoID()
+			specID := domaintypes.NewSpecID()
+			jobID := domaintypes.NewJobID()
+			now := time.Now().UTC()
+
+			meta := fmt.Sprintf(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_prep_profile":%s}}`,
+				contracts.PrepProfileCandidateSchemaID,
+				contracts.PrepProfileCandidateArtifactPath,
+				contracts.RecoveryCandidateStatusValid,
+				candidateProfile,
+			)
+			st := &mockStore{
+				getNodeResult: store.Node{ID: nodeID},
+				claimJobResult: store.Job{
+					ID:          jobID,
+					RunID:       runID,
+					RepoID:      repoID,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					NodeID:      &nodeID,
+					Name:        "re-gate-1",
+					Status:      store.JobStatusRunning,
+					JobType:     domaintypes.JobTypeReGate.String(),
+					Meta:        []byte(meta),
+				},
+				getRunResult: store.Run{
+					ID:        runID,
+					SpecID:    specID,
+					Status:    store.RunStatusStarted,
+					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+					StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+				},
+				getRunRepoResult: store.RunRepo{
+					RunID:         runID,
+					RepoID:        repoID,
+					RepoBaseRef:   "main",
+					RepoTargetRef: "feature-branch",
+					Status:        store.RunRepoStatusQueued,
+					Attempt:       1,
+				},
+				getModRepoResult: store.MigRepo{
+					ID:          repoID,
+					RepoUrl:     "https://github.com/user/repo.git",
+					PrepProfile: repoProfile,
+				},
+				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
+			}
+
+			handler := claimJobHandler(st, &ConfigHolder{}, nil)
+			req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+			req.SetPathValue("id", nodeKey)
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			var resp map[string]any
+			if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			spec, ok := resp["spec"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected spec object, got %T", resp["spec"])
+			}
+			bg, ok := spec["build_gate"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate object, got %T", spec["build_gate"])
+			}
+			post, ok := bg["post"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate.post object, got %T", bg["post"])
+			}
+			prep, ok := post["prep"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate.post.prep object, got %T", post["prep"])
+			}
+			if got := prep["command"]; got != tc.wantCmd {
+				t.Fatalf("build_gate.post.prep.command=%v, want %q", got, tc.wantCmd)
+			}
+			env, ok := prep["env"].(map[string]any)
+			if !ok {
+				t.Fatalf("expected build_gate.post.prep.env object, got %T", prep["env"])
+			}
+			if got := env["SRC"]; got != tc.wantSrc {
+				t.Fatalf("build_gate.post.prep.env[SRC]=%v, want %q", got, tc.wantSrc)
 			}
 		})
 	}

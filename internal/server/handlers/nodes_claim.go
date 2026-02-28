@@ -195,6 +195,10 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return fmt.Errorf("merge global env into spec: %w", err)
 	}
+	mergedSpec, err = mergeRecoveryCandidatePrepIntoSpec(mergedSpec, job, jobType)
+	if err != nil {
+		return fmt.Errorf("merge recovery candidate prep into spec: %w", err)
+	}
 	mergedSpec, err = mergeRepoPrepProfileIntoSpec(mergedSpec, modRepo.PrepProfile, jobType)
 	if err != nil {
 		return fmt.Errorf("merge repo prep_profile into spec: %w", err)
@@ -394,7 +398,46 @@ func mergeRepoPrepProfileIntoSpec(spec json.RawMessage, prepProfile []byte, jobT
 	if override == nil {
 		return spec, nil
 	}
+	return mergeGatePrepOverrideIntoSpec(spec, phase, override)
+}
 
+func mergeRecoveryCandidatePrepIntoSpec(spec json.RawMessage, job store.Job, jobType domaintypes.JobType) (json.RawMessage, error) {
+	if jobType != domaintypes.JobTypeReGate {
+		return spec, nil
+	}
+	if len(job.Meta) == 0 {
+		return spec, nil
+	}
+	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
+	if err != nil || jobMeta.Recovery == nil {
+		return spec, nil
+	}
+	recovery := jobMeta.Recovery
+	if recovery.CandidateValidationStatus != contracts.RecoveryCandidateStatusValid {
+		return spec, nil
+	}
+	if len(bytes.TrimSpace(recovery.CandidatePrepProfile)) == 0 {
+		return spec, nil
+	}
+	profile, err := contracts.ParsePrepProfileJSON(recovery.CandidatePrepProfile)
+	if err != nil {
+		return nil, fmt.Errorf("parse recovery candidate prep_profile: %w", err)
+	}
+	phase, override, err := contracts.PrepProfileGateOverrideForJobType(profile, jobType)
+	if err != nil {
+		return nil, err
+	}
+	if override == nil {
+		return spec, nil
+	}
+	return mergeGatePrepOverrideIntoSpec(spec, phase, override)
+}
+
+func mergeGatePrepOverrideIntoSpec(
+	spec json.RawMessage,
+	phase contracts.BuildGatePrepPhase,
+	override *contracts.BuildGatePrepOverride,
+) (json.RawMessage, error) {
 	phaseKey := ""
 	switch phase {
 	case contracts.BuildGatePrepPhasePre:
@@ -404,7 +447,6 @@ func mergeRepoPrepProfileIntoSpec(spec json.RawMessage, prepProfile []byte, jobT
 	default:
 		return spec, nil
 	}
-
 	m, err := parseSpecObjectStrict(spec)
 	if err != nil {
 		return nil, err
