@@ -127,13 +127,14 @@ func resolveGateExecutionPlan(
 ) (gateExecutionPlan, *gateExecutionTerminal) {
 	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
 	if stackGateMode {
-		return resolveStackGateExecutionPlan(ctx, spec, obs, detectErr, mappingPath)
+		return resolveStackGateExecutionPlan(ctx, workspace, spec, obs, detectErr, mappingPath)
 	}
 	return resolveDetectedStackExecutionPlan(ctx, workspace, spec, obs, detectErr, mappingPath)
 }
 
 func resolveStackGateExecutionPlan(
 	_ context.Context,
+	workspace string,
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
 	detectErr error,
@@ -231,7 +232,7 @@ func resolveStackGateExecutionPlan(
 	}
 
 	sgResult.RuntimeImage = image
-	cmd, prepEnv, err := resolveGateCommand(language, tool, spec.StackGate.Expect.Release, spec.GateProfile)
+	cmd, prepEnv, err := resolveGateCommand(workspace, language, tool, spec.StackGate.Expect.Release, spec.GateProfile)
 	if err != nil {
 		return gateExecutionPlan{}, stackGateTerminalWithResult(
 			language,
@@ -415,7 +416,7 @@ func resolveDetectedStackExecutionPlan(
 	if exp != nil {
 		release = exp.Release
 	}
-	cmd, prepEnv, err := resolveGateCommand(language, tool, release, spec.GateProfile)
+	cmd, prepEnv, err := resolveGateCommand(workspace, language, tool, release, spec.GateProfile)
 	if err != nil {
 		return gateExecutionPlan{}, newDetectedStackFailureTerminal(
 			language,
@@ -518,6 +519,7 @@ func commandSliceToShellCommand(cmd []string) (string, bool) {
 }
 
 func resolveGateCommand(
+	workspace string,
 	language string,
 	tool string,
 	release string,
@@ -539,7 +541,7 @@ func resolveGateCommand(
 		return prep.Command.ToSlice(), copyGateEnv(prep.Env), nil
 	}
 
-	cmd, err := buildCommandForTool(tool)
+	cmd, err := buildCommandForTool(workspace, tool)
 	if err != nil {
 		return nil, nil, err
 	}

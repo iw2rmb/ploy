@@ -312,6 +312,41 @@ func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *test
 	}
 }
 
+func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedGradleStack_UsesWrapper(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createGradleWorkspaceWithWrapper(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled:                      true,
+		RepoID:                       types.MigRepoID("repo12345"),
+		AutoBootstrapRepoGateProfile: true,
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if len(meta.GeneratedGateProfile) == 0 {
+		t.Fatal("expected generated_gate_profile in metadata")
+	}
+	profile, err := contracts.ParseGateProfileJSON(meta.GeneratedGateProfile)
+	if err != nil {
+		t.Fatalf("ParseGateProfileJSON(generated): %v", err)
+	}
+	if got, want := profile.RepoID, "repo12345"; got != want {
+		t.Fatalf("generated profile repo_id=%q, want %q", got, want)
+	}
+	if got, want := profile.Stack.Tool, "gradle"; got != want {
+		t.Fatalf("generated profile stack.tool=%q, want %q", got, want)
+	}
+	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "./gradlew -q --stacktrace --build-cache") {
+		t.Fatalf("generated build command=%q, want gradle wrapper default command", profile.Targets.Build.Command)
+	}
+}
+
 func TestDockerGateExecutor_AutoBootstrapSkippedWithExplicitGateProfile(t *testing.T) {
 	t.Parallel()
 
@@ -545,6 +580,39 @@ func TestDockerGateExecutor_GradleCommandOmitsFailFast(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_GradleCommandUsesWrapperWhenSpecified(t *testing.T) {
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	tmpDir := createGradleWorkspaceWithWrapper(t, "17")
+
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+	}
+
+	if _, err := executor.Execute(context.Background(), spec, tmpDir); err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+	if len(rt.captured.Command) != 3 {
+		t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
+	}
+
+	cmd := rt.captured.Command[2]
+	if !strings.Contains(cmd, "./gradlew -q --stacktrace --build-cache") {
+		t.Fatalf("expected gradle wrapper command with -q --stacktrace --build-cache, got %q", cmd)
+	}
+	if strings.Contains(cmd, "--fail-fast") {
+		t.Fatalf("expected gradle command not to contain --fail-fast, got %q", cmd)
+	}
+	if !strings.Contains(cmd, "test -p /workspace") {
+		t.Fatalf("expected gradle command to run tests in /workspace, got %q", cmd)
+	}
+}
+
 // TestDockerGateExecutor_CAPreambleIncluded verifies that the CA bundle preamble
 // is prepended to Maven, Gradle, and plain Java build commands. This ensures that
 // CA_CERTS_PEM_BUNDLE from global config is consumed by the gate container for
@@ -739,6 +807,20 @@ java {
 `
 	if err := os.WriteFile(filepath.Join(tmpDir, "build.gradle"), []byte(gradleContent), 0o644); err != nil {
 		t.Fatalf("failed to create build.gradle: %v", err)
+	}
+	return tmpDir
+}
+
+func createGradleWorkspaceWithWrapper(t *testing.T, javaVersion string) string {
+	t.Helper()
+	tmpDir := createGradleWorkspace(t, javaVersion)
+	wrapperDir := filepath.Join(tmpDir, "gradle", "wrapper")
+	if err := os.MkdirAll(wrapperDir, 0o755); err != nil {
+		t.Fatalf("failed to create gradle wrapper directory: %v", err)
+	}
+	const wrapperProps = "distributionUrl=https\\://services.gradle.org/distributions/gradle-8.8-bin.zip\n"
+	if err := os.WriteFile(filepath.Join(wrapperDir, "gradle-wrapper.properties"), []byte(wrapperProps), 0o644); err != nil {
+		t.Fatalf("failed to create gradle-wrapper.properties: %v", err)
 	}
 	return tmpDir
 }

@@ -204,7 +204,7 @@ Gate validation behavior depends on the detected tool (from stack detection):
 | Tool    | Command                                                                                   |
 |---------|-------------------------------------------------------------------------------------------|
 | `maven` | `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install` |
-| `gradle`| `gradle -q --stacktrace test -p /workspace`                                               |
+| `gradle`| `./gradlew -q --stacktrace --build-cache test -p /workspace` when `gradle/wrapper/gradle-wrapper.properties` exists; otherwise `gradle -q --stacktrace --build-cache test -p /workspace` |
 | `go`    | `go test ./...`                                                                           |
 | `cargo` | `cargo test`                                                                              |
 | `pip` / `poetry` | `python -m compileall -q /workspace`                                               |
