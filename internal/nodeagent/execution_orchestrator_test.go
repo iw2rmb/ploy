@@ -180,3 +180,54 @@ func TestPopulateHealingInDirInfraMissingGateProfileIsAllowed(t *testing.T) {
 		t.Fatalf("expected /in/gate_profile.schema.json for infra healing, err=%v", err)
 	}
 }
+
+func TestPopulateHealingInDirInfraMissingGateLogStillHydratesSchema(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-missing-log-infra")
+
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+
+	inDir := t.TempDir()
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
+		t.Fatalf("expected /in/gate_profile.schema.json for infra healing, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "build-gate.log")); !os.IsNotExist(err) {
+		t.Fatalf("build-gate.log exists for missing source log, err=%v", err)
+	}
+}
+
+func TestPopulateHealingInDirInfraEmptyGateLogStillHydratesSchema(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-empty-log-infra")
+
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-first.log"), []byte("  \n"), 0o644); err != nil {
+		t.Fatalf("write empty first gate log: %v", err)
+	}
+
+	inDir := t.TempDir()
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
+		t.Fatalf("expected /in/gate_profile.schema.json for infra healing, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "build-gate.log")); !os.IsNotExist(err) {
+		t.Fatalf("build-gate.log exists for empty source log, err=%v", err)
+	}
+}

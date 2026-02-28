@@ -229,23 +229,27 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string, he
 	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
 	srcPath := filepath.Join(runDir, "build-gate-first.log")
 
+	gateLogAvailable := false
 	data, err := os.ReadFile(srcPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			slog.Warn("missing run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
+		} else {
+			return fmt.Errorf("read first gate log: %w", err)
 		}
-		return fmt.Errorf("read first gate log: %w", err)
-	}
-	if len(strings.TrimSpace(string(data))) == 0 {
-		return nil
-	}
-
-	destPath := filepath.Join(inDir, "build-gate.log")
-	if err := os.WriteFile(destPath, data, 0o644); err != nil {
-		return fmt.Errorf("write /in/build-gate.log: %w", err)
+	} else if len(strings.TrimSpace(string(data))) == 0 {
+		slog.Warn("empty run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
+	} else {
+		gateLogAvailable = true
 	}
 
-	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
+	if gateLogAvailable {
+		destPath := filepath.Join(inDir, "build-gate.log")
+		if err := os.WriteFile(destPath, data, 0o644); err != nil {
+			return fmt.Errorf("write /in/build-gate.log: %w", err)
+		}
+		slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
+	}
 
 	if healingSpec != nil && strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
 		schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
