@@ -383,6 +383,60 @@ func (q *Queries) ListReposByPrepStatus(ctx context.Context, prepStatus PrepStat
 	return items, nil
 }
 
+const promoteReGateRecoveryCandidatePrepProfile = `-- name: PromoteReGateRecoveryCandidatePrepProfile :one
+WITH target_job AS (
+  SELECT j.id, j.repo_id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.job_type = 're_gate'
+    AND j.status = 'Success'
+    AND (
+      CASE
+        WHEN jsonb_typeof(j.meta->'recovery'->'candidate_promoted') = 'boolean'
+        THEN (j.meta->'recovery'->>'candidate_promoted')::boolean
+        ELSE false
+      END
+    ) = false
+  FOR UPDATE
+),
+updated_job AS (
+  UPDATE jobs j
+  SET meta = $2
+  FROM target_job tj
+  WHERE j.id = tj.id
+  RETURNING tj.repo_id
+)
+UPDATE mig_repos mr
+SET prep_profile = $3,
+    prep_artifacts = $4,
+    prep_status = 'PrepReady',
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+FROM updated_job uj
+WHERE mr.id = uj.repo_id
+RETURNING mr.id
+`
+
+type PromoteReGateRecoveryCandidatePrepProfileParams struct {
+	ID            types.JobID `json:"id"`
+	Meta          []byte      `json:"meta"`
+	PrepProfile   []byte      `json:"prep_profile"`
+	PrepArtifacts []byte      `json:"prep_artifacts"`
+}
+
+func (q *Queries) PromoteReGateRecoveryCandidatePrepProfile(ctx context.Context, arg PromoteReGateRecoveryCandidatePrepProfileParams) (types.MigRepoID, error) {
+	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidatePrepProfile,
+		arg.ID,
+		arg.Meta,
+		arg.PrepProfile,
+		arg.PrepArtifacts,
+	)
+	var id types.MigRepoID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const saveMigRepoPrepProfile = `-- name: SaveMigRepoPrepProfile :exec
 UPDATE mig_repos
 SET prep_profile = $2,

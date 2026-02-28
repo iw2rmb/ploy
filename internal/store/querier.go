@@ -235,6 +235,7 @@ type Querier interface {
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
+	PromoteReGateRecoveryCandidatePrepProfile(ctx context.Context, arg PromoteReGateRecoveryCandidatePrepProfileParams) (types.MigRepoID, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	SaveMigRepoPrepProfile(ctx context.Context, arg SaveMigRepoPrepProfileParams) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.

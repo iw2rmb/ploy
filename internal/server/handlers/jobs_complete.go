@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -14,6 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // completeJobRequest represents the request body for job completion.
@@ -197,18 +200,29 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 
 		// Use the validated job status directly (already a JobStatus type).
 		jobStatus := normalizedStatus
+		persistedJobMeta := append([]byte(nil), job.Meta...)
 
 		// Transition job status to terminal state.
 		// Sets finished_at timestamp, duration_ms, and exit_code.
 		// When job_meta is present in stats, persist it into jobs.meta JSONB.
 		// The job_meta has already been validated via ValidateJobMeta() above.
 		if statsPayload.HasJobMeta() {
+			mergedMeta, mergeErr := mergeCompletionJobMeta(job.Meta, statsPayload.JobMeta)
+			if mergeErr != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to merge job metadata: %v", mergeErr)
+				slog.Error("complete job: merge metadata failed",
+					"job_id", jobID,
+					"err", mergeErr,
+				)
+				return
+			}
 			err = st.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
 				ID:       job.ID,
 				Status:   jobStatus,
 				ExitCode: req.ExitCode,
-				Meta:     statsPayload.JobMeta,
+				Meta:     mergedMeta,
 			})
+			persistedJobMeta = mergedMeta
 		} else {
 			err = st.UpdateJobCompletion(ctx, store.UpdateJobCompletionParams{
 				ID:       job.ID,
@@ -283,19 +297,17 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 				)
 			case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
 				// Set last_error for Stack Gate failures
-				if statsPayload.HasJobMeta() {
-					if errMsg := formatStackGateError(jobType, statsPayload.JobMeta); errMsg != nil {
-						if updateErr := st.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
-							RunID:     job.RunID,
-							RepoID:    job.RepoID,
-							LastError: errMsg,
-						}); updateErr != nil {
-							slog.Error("complete job: failed to set repo last_error",
-								"job_id", jobID,
-								"repo_id", job.RepoID,
-								"err", updateErr,
-							)
-						}
+				if errMsg := formatStackGateError(jobType, persistedJobMeta); errMsg != nil {
+					if updateErr := st.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
+						RunID:     job.RunID,
+						RepoID:    job.RepoID,
+						LastError: errMsg,
+					}); updateErr != nil {
+						slog.Error("complete job: failed to set repo last_error",
+							"job_id", jobID,
+							"repo_id", job.RepoID,
+							"err", updateErr,
+						)
 					}
 				}
 				if healErr := maybeCreateHealingJobs(ctx, st, bp, run, job); healErr != nil {
@@ -336,6 +348,13 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 
 		// Server-driven scheduling: after job succeeds, promote the linked successor.
 		if jobStatus == store.JobStatusSuccess {
+			if promoteErr := maybePromoteReGateRecoveryCandidate(ctx, st, job, persistedJobMeta); promoteErr != nil {
+				slog.Error("complete job: failed to promote validated re-gate candidate",
+					"job_id", jobID,
+					"repo_id", job.RepoID,
+					"err", promoteErr,
+				)
+			}
 			if job.NextID != nil {
 				if _, err := st.PromoteJobByIDIfUnblocked(ctx, *job.NextID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to promote next linked job",
@@ -399,4 +418,119 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func mergeCompletionJobMeta(existingRaw, incomingRaw []byte) ([]byte, error) {
+	incoming, err := contracts.UnmarshalJobMeta(incomingRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	existing, err := contracts.UnmarshalJobMeta(existingRaw)
+	if err != nil {
+		return incomingRaw, nil
+	}
+
+	merged := false
+	if incoming.Recovery == nil && existing.Recovery != nil {
+		incoming.Recovery = cloneRecoveryMetadataForCompletion(existing.Recovery)
+		merged = true
+	}
+	if incoming.Gate != nil && incoming.Gate.Recovery == nil && existing.Gate != nil && existing.Gate.Recovery != nil {
+		incoming.Gate.Recovery = cloneRecoveryMetadataForCompletion(existing.Gate.Recovery)
+		merged = true
+	}
+	if !merged {
+		return incomingRaw, nil
+	}
+	return contracts.MarshalJobMeta(incoming)
+}
+
+func cloneRecoveryMetadataForCompletion(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
+	if src == nil {
+		return nil
+	}
+	out := *src
+	if src.Confidence != nil {
+		v := *src.Confidence
+		out.Confidence = &v
+	}
+	if src.CandidatePromoted != nil {
+		v := *src.CandidatePromoted
+		out.CandidatePromoted = &v
+	}
+	if len(src.Expectations) > 0 {
+		out.Expectations = append([]byte(nil), src.Expectations...)
+	}
+	if len(src.CandidatePrepProfile) > 0 {
+		out.CandidatePrepProfile = append([]byte(nil), src.CandidatePrepProfile...)
+	}
+	return &out
+}
+
+func maybePromoteReGateRecoveryCandidate(
+	ctx context.Context,
+	st store.Store,
+	job store.Job,
+	rawMeta []byte,
+) error {
+	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeReGate {
+		return nil
+	}
+	meta, err := contracts.UnmarshalJobMeta(rawMeta)
+	if err != nil {
+		return nil
+	}
+	recovery := meta.Recovery
+	if recovery == nil && meta.Gate != nil {
+		recovery = meta.Gate.Recovery
+	}
+	if recovery == nil {
+		return nil
+	}
+	if recovery.CandidateValidationStatus != contracts.RecoveryCandidateStatusValid {
+		return nil
+	}
+	if len(bytes.TrimSpace(recovery.CandidatePrepProfile)) == 0 {
+		return nil
+	}
+	if recovery.CandidatePromoted != nil && *recovery.CandidatePromoted {
+		return nil
+	}
+
+	candidatePromoted := true
+	recovery.CandidatePromoted = &candidatePromoted
+	promotedMeta, err := contracts.MarshalJobMeta(meta)
+	if err != nil {
+		return err
+	}
+
+	artifactPath := strings.TrimSpace(recovery.CandidateArtifactPath)
+	if artifactPath == "" {
+		artifactPath = contracts.PrepProfileCandidateArtifactPath
+	}
+	schemaID := strings.TrimSpace(recovery.CandidateSchemaID)
+	if schemaID == "" {
+		schemaID = contracts.PrepProfileCandidateSchemaID
+	}
+	prepArtifacts, err := json.Marshal(map[string]any{
+		"source":        "recovery_candidate",
+		"schema_id":     schemaID,
+		"artifact_path": artifactPath,
+		"job_id":        job.ID.String(),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = st.PromoteReGateRecoveryCandidatePrepProfile(ctx, store.PromoteReGateRecoveryCandidatePrepProfileParams{
+		ID:            job.ID,
+		Meta:          promotedMeta,
+		PrepProfile:   recovery.CandidatePrepProfile,
+		PrepArtifacts: prepArtifacts,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	return err
 }

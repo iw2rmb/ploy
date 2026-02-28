@@ -549,6 +549,11 @@ Rewire example:
   - unreadable artifact bundle -> `candidate_validation_status=unavailable`
   - schema/JSON validation failure -> `candidate_validation_status=invalid`
   - valid candidate -> `candidate_validation_status=valid` with embedded candidate payload
+- On successful `re_gate`, a validated candidate is promoted to `mig_repos.prep_profile`
+  and `candidate_promoted=true` is persisted in `re_gate` recovery metadata.
+- Promotion is strict:
+  - never runs on failed `re_gate`
+  - idempotent across retries/replays (already promoted candidates are skipped)
 
 ### Parallel healing branches (Phase E)
 

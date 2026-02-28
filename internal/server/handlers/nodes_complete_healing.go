@@ -266,6 +266,10 @@ func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.
 		v := *src.Confidence
 		out.Confidence = &v
 	}
+	if src.CandidatePromoted != nil {
+		v := *src.CandidatePromoted
+		out.CandidatePromoted = &v
+	}
 	if len(src.Expectations) > 0 {
 		out.Expectations = append([]byte(nil), src.Expectations...)
 	}
@@ -344,6 +348,8 @@ func evaluateAndAttachInfraCandidate(
 	if meta == nil {
 		return
 	}
+	candidatePromoted := false
+	meta.CandidatePromoted = &candidatePromoted
 	path := strings.TrimSpace(meta.CandidateArtifactPath)
 	if path == "" {
 		path = contracts.PrepProfileCandidateArtifactPath

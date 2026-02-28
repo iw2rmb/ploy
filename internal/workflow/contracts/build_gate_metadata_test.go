@@ -365,6 +365,7 @@ func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 
 func TestBuildGateStageMetadata_Recovery_CandidateValidState(t *testing.T) {
 	t.Parallel()
+	promoted := true
 	meta := BuildGateStageMetadata{
 		Recovery: &BuildGateRecoveryMetadata{
 			LoopKind:                  "healing",
@@ -372,6 +373,7 @@ func TestBuildGateStageMetadata_Recovery_CandidateValidState(t *testing.T) {
 			CandidateSchemaID:         PrepProfileCandidateSchemaID,
 			CandidateArtifactPath:     PrepProfileCandidateArtifactPath,
 			CandidateValidationStatus: RecoveryCandidateStatusValid,
+			CandidatePromoted:         &promoted,
 			CandidatePrepProfile: json.RawMessage(`{
 				"schema_version": 1,
 				"repo_id": "repo_123",
@@ -419,6 +421,18 @@ func TestBuildGateStageMetadata_Recovery_CandidateInvalidStateRejected(t *testin
 				ErrorKind:                 "infra",
 				CandidateValidationStatus: RecoveryCandidateStatusInvalid,
 				CandidatePrepProfile:      json.RawMessage(`{"schema_version":1}`),
+			},
+		},
+		{
+			name: "promoted true with non-valid status",
+			meta: BuildGateRecoveryMetadata{
+				LoopKind:                  "healing",
+				ErrorKind:                 "infra",
+				CandidateValidationStatus: RecoveryCandidateStatusInvalid,
+				CandidatePromoted: func() *bool {
+					v := true
+					return &v
+				}(),
 			},
 		},
 	}

@@ -220,11 +220,11 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 		Jobs []struct {
 			BugSummary string `json:"bug_summary"`
 			Recovery   *struct {
-				LoopKind   string   `json:"loop_kind"`
-				ErrorKind  string   `json:"error_kind"`
-				StrategyID string   `json:"strategy_id"`
-				Confidence *float64 `json:"confidence"`
-				Reason     string   `json:"reason"`
+				LoopKind     string   `json:"loop_kind"`
+				ErrorKind    string   `json:"error_kind"`
+				StrategyID   string   `json:"strategy_id"`
+				Confidence   *float64 `json:"confidence"`
+				Reason       string   `json:"reason"`
 				Expectations struct {
 					Artifacts []struct {
 						Path   string `json:"path"`
@@ -330,6 +330,79 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	}
 	if got, want := resp.Jobs[0].Recovery.ErrorKind, "code"; got != want {
 		t.Fatalf("recovery.error_kind = %q, want %q", got, want)
+	}
+}
+
+func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:      jobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				Name:    "re-gate-1",
+				JobType: "re_gate",
+				Status:  store.JobStatusSuccess,
+				Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`),
+			},
+		},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Jobs []struct {
+			Recovery *struct {
+				CandidateSchemaID         string `json:"candidate_schema_id"`
+				CandidateArtifactPath     string `json:"candidate_artifact_path"`
+				CandidateValidationStatus string `json:"candidate_validation_status"`
+				CandidateValidationError  string `json:"candidate_validation_error"`
+				CandidatePromoted         *bool  `json:"candidate_promoted"`
+			} `json:"recovery"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
+	}
+	if resp.Jobs[0].Recovery == nil {
+		t.Fatal("expected recovery field")
+	}
+	if got, want := resp.Jobs[0].Recovery.CandidateSchemaID, "prep_profile_v1"; got != want {
+		t.Fatalf("candidate_schema_id = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Recovery.CandidateArtifactPath, "/out/prep-profile-candidate.json"; got != want {
+		t.Fatalf("candidate_artifact_path = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Recovery.CandidateValidationStatus, "invalid"; got != want {
+		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
+	}
+	if got := resp.Jobs[0].Recovery.CandidatePromoted; got == nil || *got {
+		t.Fatalf("candidate_promoted = %#v, want false", got)
 	}
 }
 

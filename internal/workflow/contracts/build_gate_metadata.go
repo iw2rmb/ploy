@@ -107,6 +107,9 @@ type BuildGateRecoveryMetadata struct {
 	CandidateValidationError string `json:"candidate_validation_error,omitempty"`
 	// CandidatePrepProfile stores validated candidate payload used for re-gate override.
 	CandidatePrepProfile json.RawMessage `json:"candidate_prep_profile,omitempty"`
+	// CandidatePromoted reports whether a validated candidate has been promoted
+	// into repo prep_profile after successful re-gate completion.
+	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
 }
 
 const (
@@ -201,6 +204,14 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 	}
 	if m.CandidateValidationStatus != RecoveryCandidateStatusValid && len(m.CandidatePrepProfile) > 0 {
 		return fmt.Errorf("candidate_prep_profile: forbidden when candidate_validation_status=%q", m.CandidateValidationStatus)
+	}
+	if m.CandidatePromoted != nil && *m.CandidatePromoted {
+		if m.CandidateValidationStatus != RecoveryCandidateStatusValid {
+			return fmt.Errorf("candidate_promoted: true requires candidate_validation_status=%q", RecoveryCandidateStatusValid)
+		}
+		if len(m.CandidatePrepProfile) == 0 {
+			return fmt.Errorf("candidate_promoted: true requires candidate_prep_profile")
+		}
 	}
 	return nil
 }
