@@ -162,10 +162,10 @@ func GateProfileStackMatches(profile *GateProfile, language, tool, release strin
 		return false
 	}
 	pRelease := strings.TrimSpace(profile.Stack.Release)
-	if pRelease == "" {
+	if strings.TrimSpace(release) == "" {
 		return true
 	}
-	if strings.TrimSpace(release) == "" {
+	if pRelease == "" {
 		return false
 	}
 	return pRelease == strings.TrimSpace(release)

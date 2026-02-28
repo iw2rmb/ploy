@@ -14,6 +14,10 @@ import (
 type BuildGateStageMetadata struct {
 	LogDigest    types.Sha256Digest           `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
+	// Detected captures the resolved gate stack identity used for this
+	// gate execution. It is the canonical source for stack-aware recovery
+	// validation, including optional release matching.
+	Detected *StackExpectation `json:"detected_stack,omitempty"`
 	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
 	// RuntimeImage is the container image name used to run the gate container.
 	// Not serialized in JSON APIs.
@@ -50,14 +54,56 @@ type BuildGateStageMetadata struct {
 // This method ensures the same stack value is visible to both mig and healing
 // executions, enabling consistent image resolution across re-gates.
 func (m BuildGateStageMetadata) DetectedStack() ModStack {
+	if m.Detected != nil && strings.TrimSpace(m.Detected.Tool) != "" {
+		return ToolToModStack(m.Detected.Tool)
+	}
 	if len(m.StaticChecks) == 0 {
 		return ModStackUnknown
 	}
 	return ToolToModStack(m.StaticChecks[0].Tool)
 }
 
+// DetectedStackExpectation returns the normalized detected stack expectation.
+// For backward compatibility with older metadata payloads, it falls back to
+// static_checks[0] when detected_stack is absent.
+func (m BuildGateStageMetadata) DetectedStackExpectation() *StackExpectation {
+	if m.Detected != nil {
+		language := strings.TrimSpace(m.Detected.Language)
+		tool := strings.TrimSpace(m.Detected.Tool)
+		release := strings.TrimSpace(m.Detected.Release)
+		if language == "" || tool == "" {
+			return nil
+		}
+		return &StackExpectation{
+			Language: language,
+			Tool:     tool,
+			Release:  release,
+		}
+	}
+	if len(m.StaticChecks) == 0 {
+		return nil
+	}
+	language := strings.TrimSpace(m.StaticChecks[0].Language)
+	tool := strings.TrimSpace(m.StaticChecks[0].Tool)
+	if language == "" || tool == "" {
+		return nil
+	}
+	return &StackExpectation{
+		Language: language,
+		Tool:     tool,
+	}
+}
+
 // Validate ensures build gate metadata entries are well formed.
 func (m BuildGateStageMetadata) Validate() error {
+	if m.Detected != nil {
+		if strings.TrimSpace(m.Detected.Language) == "" {
+			return fmt.Errorf("detected_stack.language: required")
+		}
+		if strings.TrimSpace(m.Detected.Tool) == "" {
+			return fmt.Errorf("detected_stack.tool: required")
+		}
+	}
 	for i, check := range m.StaticChecks {
 		if err := check.Validate(); err != nil {
 			return fmt.Errorf("static check %d invalid: %w", i, err)

@@ -57,7 +57,7 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	recoveryMeta, detectedStack := resolveFailedGateRecoveryContext(failedJob)
+	recoveryMeta, detectedStack, detectedExpectation := resolveFailedGateRecoveryContext(failedJob)
 	if recoveryMeta.ErrorKind == "mixed" || recoveryMeta.ErrorKind == "unknown" {
 		slog.Info("maybeCreateHealingJobs: terminal recovery classification, canceling remaining linked jobs",
 			"run_id", failedJob.RunID,
@@ -146,7 +146,7 @@ func maybeCreateHealingJobs(
 			run.ID,
 			failedJob,
 			jobsByID,
-			detectedStack,
+			detectedExpectation,
 			reGateRecoveryMeta,
 		)
 	}
@@ -221,15 +221,16 @@ func maybeCreateHealingJobs(
 	return nil
 }
 
-func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.ModStack) {
+func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.ModStack, *contracts.StackExpectation) {
 	meta := &contracts.BuildGateRecoveryMetadata{
 		LoopKind:  "healing",
 		ErrorKind: "unknown",
 	}
 	detectedStack := contracts.ModStackUnknown
+	var detectedExpectation *contracts.StackExpectation
 
 	if len(failedJob.Meta) == 0 {
-		return meta, detectedStack
+		return meta, detectedStack, detectedExpectation
 	}
 
 	jobMeta, err := contracts.UnmarshalJobMeta(failedJob.Meta)
@@ -239,14 +240,18 @@ func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGate
 			"job_id", failedJob.ID,
 			"error", err,
 		)
-		return meta, detectedStack
+		return meta, detectedStack, detectedExpectation
 	}
 
 	if jobMeta.Gate != nil {
 		detectedStack = jobMeta.Gate.DetectedStack()
+		detectedExpectation = jobMeta.Gate.DetectedStackExpectation()
 		if jobMeta.Gate.Recovery != nil {
 			meta = cloneRecoveryMetadata(jobMeta.Gate.Recovery)
 		}
+	}
+	if detectedExpectation == nil {
+		detectedExpectation = stackExpectationFromModStack(detectedStack)
 	}
 	if meta.ErrorKind == "unknown" && jobMeta.Recovery != nil {
 		meta = cloneRecoveryMetadata(jobMeta.Recovery)
@@ -254,7 +259,20 @@ func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGate
 	if meta.StrategyID == "" {
 		meta.StrategyID = fmt.Sprintf("%s-default", meta.ErrorKind)
 	}
-	return meta, detectedStack
+	return meta, detectedStack, detectedExpectation
+}
+
+func stackExpectationFromModStack(stack contracts.ModStack) *contracts.StackExpectation {
+	switch stack {
+	case contracts.ModStackJavaMaven:
+		return &contracts.StackExpectation{Language: "java", Tool: "maven"}
+	case contracts.ModStackJavaGradle:
+		return &contracts.StackExpectation{Language: "java", Tool: "gradle"}
+	case contracts.ModStackJava:
+		return &contracts.StackExpectation{Language: "java", Tool: "java"}
+	default:
+		return nil
+	}
 }
 
 func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
@@ -343,7 +361,7 @@ func evaluateAndAttachInfraCandidate(
 	runID domaintypes.RunID,
 	failedJob store.Job,
 	jobsByID map[domaintypes.JobID]store.Job,
-	detectedStack contracts.ModStack,
+	detectedExpectation *contracts.StackExpectation,
 	meta *contracts.BuildGateRecoveryMetadata,
 ) {
 	if meta == nil {
@@ -387,7 +405,7 @@ func evaluateAndAttachInfraCandidate(
 		meta.CandidateValidationError = err.Error()
 		return
 	}
-	if !candidateMatchesDetectedStack(profile, detectedStack) {
+	if !candidateMatchesDetectedStack(profile, detectedExpectation) {
 		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
 		meta.CandidateValidationError = "gate_profile stack does not match detected stack"
 		return
@@ -397,20 +415,11 @@ func evaluateAndAttachInfraCandidate(
 	meta.CandidateGateProfile = append([]byte(nil), raw...)
 }
 
-func candidateMatchesDetectedStack(profile *contracts.GateProfile, stack contracts.ModStack) bool {
-	if profile == nil {
+func candidateMatchesDetectedStack(profile *contracts.GateProfile, detected *contracts.StackExpectation) bool {
+	if profile == nil || detected == nil {
 		return false
 	}
-	switch stack {
-	case contracts.ModStackJavaMaven:
-		return contracts.GateProfileStackMatches(profile, "java", "maven", "")
-	case contracts.ModStackJavaGradle:
-		return contracts.GateProfileStackMatches(profile, "java", "gradle", "")
-	case contracts.ModStackJava:
-		return contracts.GateProfileStackMatches(profile, "java", "java", "")
-	default:
-		return false
-	}
+	return contracts.GateProfileStackMatches(profile, detected.Language, detected.Tool, detected.Release)
 }
 
 func resolvePreviousHealJob(

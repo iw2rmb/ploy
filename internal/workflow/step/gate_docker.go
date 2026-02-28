@@ -181,7 +181,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	}
 	logs, _ := e.rt.Logs(ctx, h)
 
-	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.image, res, logs)
+	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
 	if len(plan.generatedGateProfile) > 0 {
 		meta.GeneratedGateProfile = append([]byte(nil), plan.generatedGateProfile...)
@@ -422,6 +422,7 @@ func buildGateExecutionMetadata(
 	workspace string,
 	language string,
 	tool string,
+	release string,
 	image string,
 	res ContainerResult,
 	logs []byte,
@@ -433,6 +434,11 @@ func buildGateExecutionMetadata(
 			Tool:     tool,
 			Passed:   passed,
 		}},
+		Detected: &contracts.StackExpectation{
+			Language: strings.TrimSpace(language),
+			Tool:     strings.TrimSpace(tool),
+			Release:  strings.TrimSpace(release),
+		},
 		RuntimeImage: image,
 	}
 	if passed && strings.EqualFold(tool, "gradle") {

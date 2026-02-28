@@ -78,6 +78,20 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 			},
 			want: ModStackJavaMaven, // First check's tool is used.
 		},
+		{
+			name: "detected_stack tool takes precedence",
+			meta: BuildGateStageMetadata{
+				Detected: &StackExpectation{
+					Language: "java",
+					Tool:     "gradle",
+					Release:  "11",
+				},
+				StaticChecks: []BuildGateStaticCheckReport{
+					{Language: "java", Tool: "maven", Passed: true},
+				},
+			},
+			want: ModStackJavaGradle,
+		},
 	}
 
 	for _, tt := range tests {
@@ -108,6 +122,93 @@ func TestBuildGateStageMetadata_DetectedStack_Stability(t *testing.T) {
 		if got != ModStackJavaMaven {
 			t.Errorf("DetectedStack() call %d = %q, want %q", i, got, ModStackJavaMaven)
 		}
+	}
+}
+
+func TestBuildGateStageMetadata_DetectedStackExpectation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("from detected_stack", func(t *testing.T) {
+		t.Parallel()
+		meta := BuildGateStageMetadata{
+			Detected: &StackExpectation{
+				Language: "java",
+				Tool:     "gradle",
+				Release:  "11",
+			},
+		}
+		got := meta.DetectedStackExpectation()
+		if got == nil {
+			t.Fatal("DetectedStackExpectation() = nil, want non-nil")
+		}
+		if got.Language != "java" || got.Tool != "gradle" || got.Release != "11" {
+			t.Fatalf("DetectedStackExpectation() = %+v, want java/gradle/11", *got)
+		}
+	})
+
+	t.Run("fallback to static checks", func(t *testing.T) {
+		t.Parallel()
+		meta := BuildGateStageMetadata{
+			StaticChecks: []BuildGateStaticCheckReport{
+				{Language: "java", Tool: "maven", Passed: true},
+			},
+		}
+		got := meta.DetectedStackExpectation()
+		if got == nil {
+			t.Fatal("DetectedStackExpectation() = nil, want non-nil")
+		}
+		if got.Language != "java" || got.Tool != "maven" || got.Release != "" {
+			t.Fatalf("DetectedStackExpectation() = %+v, want java/maven/\"\"", *got)
+		}
+	})
+}
+
+func TestBuildGateStageMetadata_Validate_DetectedStack(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		meta    BuildGateStageMetadata
+		wantErr string
+	}{
+		{
+			name: "valid detected stack",
+			meta: BuildGateStageMetadata{
+				Detected: &StackExpectation{Language: "java", Tool: "gradle", Release: "11"},
+			},
+		},
+		{
+			name: "missing detected language",
+			meta: BuildGateStageMetadata{
+				Detected: &StackExpectation{Tool: "gradle", Release: "11"},
+			},
+			wantErr: "detected_stack.language",
+		},
+		{
+			name: "missing detected tool",
+			meta: BuildGateStageMetadata{
+				Detected: &StackExpectation{Language: "java", Release: "11"},
+			},
+			wantErr: "detected_stack.tool",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := tt.meta.Validate()
+			if tt.wantErr == "" && err != nil {
+				t.Fatalf("Validate() unexpected error: %v", err)
+			}
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("Validate() expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("Validate() error = %q, want substring %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
 	}
 }
 
@@ -246,6 +347,11 @@ func TestBuildGateStageMetadata_StackGate_JSONRoundtrip(t *testing.T) {
 			Tool:     "stack-gate",
 			Passed:   true,
 		}},
+		Detected: &StackExpectation{
+			Language: "java",
+			Tool:     "maven",
+			Release:  "17",
+		},
 		StackGate: &StackGateResult{
 			Enabled: true,
 			Expected: &StackExpectation{
@@ -272,6 +378,7 @@ func TestBuildGateStageMetadata_StackGate_JSONRoundtrip(t *testing.T) {
 	// Verify expected fields are present.
 	jsonStr := string(data)
 	expectedFields := []string{
+		`"detected_stack":{`,
 		`"enabled":true`,
 		`"expected":{`,
 		`"detected":{`,
@@ -305,6 +412,9 @@ func TestBuildGateStageMetadata_StackGate_JSONRoundtrip(t *testing.T) {
 	}
 	if decoded.StackGate.Expected == nil || decoded.StackGate.Expected.Release != "17" {
 		t.Errorf("Expected.Release: got %v, want 17", decoded.StackGate.Expected)
+	}
+	if decoded.Detected == nil || decoded.Detected.Release != "17" {
+		t.Errorf("Detected.Release: got %v, want 17", decoded.Detected)
 	}
 }
 

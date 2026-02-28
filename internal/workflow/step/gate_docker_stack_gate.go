@@ -17,6 +17,7 @@ type gateExecutionPlan struct {
 	env                  map[string]string
 	language             string
 	tool                 string
+	release              string
 	stackGate            *contracts.StackGateResult
 	generatedGateProfile json.RawMessage
 }
@@ -253,6 +254,7 @@ func resolveStackGateExecutionPlan(
 		env:       prepEnv,
 		language:  language,
 		tool:      tool,
+		release:   strings.TrimSpace(spec.StackGate.Expect.Release),
 		stackGate: sgResult,
 	}, nil
 }
@@ -439,6 +441,7 @@ func resolveDetectedStackExecutionPlan(
 		env:                  prepEnv,
 		language:             language,
 		tool:                 tool,
+		release:              strings.TrimSpace(release),
 		generatedGateProfile: generatedGateProfile,
 	}, nil
 }
