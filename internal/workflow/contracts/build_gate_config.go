@@ -34,18 +34,18 @@ type BuildGatePhaseConfig struct {
 	// Stack configures stack detection behavior for this gate phase.
 	Stack *BuildGateStackConfig `json:"stack,omitempty" yaml:"stack,omitempty"`
 
-	// Prep configures prep-derived command/env overrides for this gate phase.
-	Prep *BuildGatePrepOverride `json:"prep,omitempty" yaml:"prep,omitempty"`
+	// GateProfile configures gate_profile-derived command/env overrides for this phase.
+	GateProfile *BuildGateProfileOverride `json:"gate_profile,omitempty" yaml:"gate_profile,omitempty"`
 }
 
-// BuildGatePrepOverride configures a prep-derived command/env override.
+// BuildGateProfileOverride configures a gate_profile-derived command/env override.
 //
 // Command is required when this object is present. Env is optional and merged
 // into gate environment (override wins on key conflicts).
-type BuildGatePrepOverride struct {
+type BuildGateProfileOverride struct {
 	Command CommandSpec       `json:"command,omitempty" yaml:"command,omitempty"`
 	Env     map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
-	Stack   *PrepProfileStack `json:"stack,omitempty" yaml:"stack,omitempty"`
+	Stack   *GateProfileStack `json:"stack,omitempty" yaml:"stack,omitempty"`
 }
 
 // BuildGateStackConfig configures expected stack information for a gate phase.

@@ -673,7 +673,7 @@ func TestRunController_uploadConfiguredArtifacts_ResolvesOutPathDeterministicall
 
 	workspace := t.TempDir()
 	outDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(outDir, "prep-profile-candidate.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(outDir, "gate-profile-candidate.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
 		t.Fatalf("write candidate: %v", err)
 	}
 
@@ -686,7 +686,7 @@ func TestRunController_uploadConfiguredArtifacts_ResolvesOutPathDeterministicall
 
 	typedOpts := RunOptions{
 		Artifacts: ArtifactOptions{
-			Paths: []string{"/out/prep-profile-candidate.json"},
+			Paths: []string{"/out/gate-profile-candidate.json"},
 			Name:  "test-artifact",
 		},
 	}
@@ -706,8 +706,8 @@ func TestRunController_uploadConfiguredArtifacts_ResolvesOutPathDeterministicall
 	}
 
 	headers := tarHeadersFromBundle(t, uploadedBundle)
-	if _, ok := headers["out/prep-profile-candidate.json"]; !ok {
-		t.Fatalf("expected header out/prep-profile-candidate.json, got %v", keys(headers))
+	if _, ok := headers["out/gate-profile-candidate.json"]; !ok {
+		t.Fatalf("expected header out/gate-profile-candidate.json, got %v", keys(headers))
 	}
 }
 

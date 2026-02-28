@@ -26,12 +26,12 @@ type RunOptions struct {
 
 // BuildGateOptions configures pre-mig build gate validation.
 type BuildGateOptions struct {
-	Enabled   bool
-	Images    []contracts.BuildGateImageRule
-	PreStack  *contracts.BuildGateStackConfig
-	PostStack *contracts.BuildGateStackConfig
-	PrePrep   *contracts.BuildGatePrepOverride
-	PostPrep  *contracts.BuildGatePrepOverride
+	Enabled         bool
+	Images          []contracts.BuildGateImageRule
+	PreStack        *contracts.BuildGateStackConfig
+	PostStack       *contracts.BuildGateStackConfig
+	PreGateProfile  *contracts.BuildGateProfileOverride
+	PostGateProfile *contracts.BuildGateProfileOverride
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
@@ -97,11 +97,11 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		runOpts.BuildGate.Images = spec.BuildGate.Images
 		if spec.BuildGate.Pre != nil {
 			runOpts.BuildGate.PreStack = spec.BuildGate.Pre.Stack
-			runOpts.BuildGate.PrePrep = copyBuildGatePrepOverride(spec.BuildGate.Pre.Prep)
+			runOpts.BuildGate.PreGateProfile = copyBuildGateProfileOverride(spec.BuildGate.Pre.GateProfile)
 		}
 		if spec.BuildGate.Post != nil {
 			runOpts.BuildGate.PostStack = spec.BuildGate.Post.Stack
-			runOpts.BuildGate.PostPrep = copyBuildGatePrepOverride(spec.BuildGate.Post.Prep)
+			runOpts.BuildGate.PostGateProfile = copyBuildGateProfileOverride(spec.BuildGate.Post.GateProfile)
 		}
 
 		if spec.BuildGate.Healing != nil {
@@ -194,11 +194,11 @@ func copyStringMap(m map[string]string) map[string]string {
 	return out
 }
 
-func copyBuildGatePrepOverride(in *contracts.BuildGatePrepOverride) *contracts.BuildGatePrepOverride {
+func copyBuildGateProfileOverride(in *contracts.BuildGateProfileOverride) *contracts.BuildGateProfileOverride {
 	if in == nil {
 		return nil
 	}
-	return &contracts.BuildGatePrepOverride{
+	return &contracts.BuildGateProfileOverride{
 		Command: in.Command,
 		Env:     copyStringMap(in.Env),
 	}

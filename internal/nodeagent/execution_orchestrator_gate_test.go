@@ -222,7 +222,7 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 			}
 			for _, m := range spec.Mounts {
 				if m.Target == "/out" {
-					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"bug_summary":"`+wantBugSummary+`","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}`+"\n"), 0o644)
+					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"bug_summary":"`+wantBugSummary+`","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}`+"\n"), 0o644)
 				}
 			}
 		}

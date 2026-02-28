@@ -174,8 +174,8 @@ build_gate:
           CODEX_PROMPT: "Fix infra/toolchain issue in /in/build-gate.log"
         expectations:
           artifacts:
-            - path: /out/prep-profile-candidate.json
-              schema: prep_profile_v1
+            - path: /out/gate-profile-candidate.json
+              schema: gate_profile_v1
       code:
         spec_path: ./healing/code/spec.yaml
         retries: 2
@@ -190,8 +190,8 @@ Healing action fields (image, command, env, env_from_file) are specified under
 `build_gate.healing.by_error_kind.<error_kind>`; CLI deep-merges the referenced
 object and inline fields override loaded values. `spec_path` supports env
 expansion (`$VAR`, `${VAR}`) and `~/` home expansion.
-For `infra` recovery with `schema=prep_profile_v1`, healing is expected to emit
-`/out/prep-profile-candidate.json`. Promotion to repo `prep_profile` happens only
+For `infra` recovery with `schema=gate_profile_v1`, healing is expected to emit
+`/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` happens only
 when the immediate follow-up `re_gate` succeeds.
 
 **Router** runs once per gate failure that triggers healing (each iteration),
@@ -554,16 +554,16 @@ Rewire example:
 - Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
-- For `infra` recovery with expected artifact `schema=prep_profile_v1`, healing insertion
+- For `infra` recovery with expected artifact `schema=gate_profile_v1`, healing insertion
   validates candidate bytes from the previous heal artifact
-  (`/out/prep-profile-candidate.json`) and records candidate schema/path/validation
+  (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
   status in `re_gate` recovery metadata.
 - Candidate outcomes are strict and non-blocking:
   - missing artifact -> `candidate_validation_status=missing`
   - unreadable artifact bundle -> `candidate_validation_status=unavailable`
   - schema/JSON validation failure -> `candidate_validation_status=invalid`
   - valid candidate -> `candidate_validation_status=valid` with embedded candidate payload
-- On successful `re_gate`, a validated candidate is promoted to `mig_repos.prep_profile`
+- On successful `re_gate`, a validated candidate is promoted to `mig_repos.gate_profile`
   and `candidate_promoted=true` is persisted in `re_gate` recovery metadata.
 - Promotion is strict:
   - never runs on failed `re_gate`
@@ -707,19 +707,19 @@ insert `heal-*` + `re-gate-*` jobs by rewiring `next_id` links.
 The background scheduler ensures queued repos have jobs and promotes the next job for a
 repo attempt. It does not create per-repo child runs.
 
-### Prep profile usage (current)
+### Gate profile usage (current)
 
 There is no standalone prep scheduler loop and no `prep_runs` table.
-Prep profiles are persisted on `mig_repos` and consumed at claim-time:
+Gate profiles are persisted on `mig_repos` and consumed at claim-time:
 - `GET /v1/repos` surfaces repo-level summary and latest run metadata.
-- `prep_profile` is mapped into gate phase prep overrides when present.
-- Infra healing may provide a candidate prep profile artifact
-  (`/out/prep-profile-candidate.json`, schema `prep_profile_v1`).
-- Candidate promotion to repo `prep_profile` happens only after successful `re_gate`.
+- `gate_profile` is mapped into gate phase prep overrides when present.
+- Infra healing may provide a candidate gate profile artifact
+  (`/out/gate-profile-candidate.json`, schema `gate_profile_v1`).
+- Candidate promotion to repo `gate_profile` happens only after successful `re_gate`.
 
-Prep profile to Build Gate mapping (claim-time):
-- `pre_gate` maps to `prep_profile.targets.build`.
-- `post_gate` and `re_gate` map to `prep_profile.targets.unit`.
+Gate profile to Build Gate mapping (claim-time):
+- `pre_gate` maps to `gate_profile.targets.build`.
+- `post_gate` and `re_gate` map to `gate_profile.targets.unit`.
 - Mapping injects a gate prep override only when the mapped target has
   `status=passed` and non-empty `command`.
 - Simple runtime hints are also mapped:
@@ -728,9 +728,9 @@ Prep profile to Build Gate mapping (claim-time):
   - `runtime.docker.api_version` -> `DOCKER_API_VERSION=<value>`
 - During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that socket path into the gate container.
 - Resolution precedence:
-  1. Explicit `build_gate.<phase>.prep` in submitted run spec
+  1. Explicit `build_gate.<phase>.gate_profile` in submitted run spec
   2. For `re_gate` only: validated infra recovery candidate prep override
-  3. Mapped repo `prep_profile` target
+  3. Mapped repo `gate_profile` target
   4. Default detected-tool command fallback
 - Gate env precedence remains:
   1. Base gate env from spec and server env injection
@@ -1094,12 +1094,12 @@ Current stale-heartbeat recovery behavior:
 - When recovery finalizes a run, the server publishes the same terminal SSE
   sequence as normal completion: a terminal `run` snapshot followed by `done`.
 
-Prep profile behavior:
-- `mig_repos.prep_profile` and `mig_repos.prep_artifacts` remain the persisted
-  prep payload storage.
-- Infra healing candidate validation uses `docs/schemas/prep_profile.schema.json`
+Gate profile behavior:
+- `mig_repos.gate_profile` and `mig_repos.gate_profile_artifacts` remain the persisted
+  gate profile payload storage.
+- Infra healing candidate validation uses `docs/schemas/gate_profile.schema.json`
   plus contract parsing.
-- A validated candidate can be promoted into `mig_repos.prep_profile` only after
+- A validated candidate can be promoted into `mig_repos.gate_profile` only after
   successful `re_gate`.
 
 Node startup crash reconciliation behavior:
@@ -1233,7 +1233,7 @@ Mods container images are standard OCI images with the following expectations:
   - Output artifacts, logs and plans should be written under `/out`.
   - For healing artifact ingestion, `/out` uploads are archived under stable
     tar paths rooted at `out/` (for example
-    `out/prep-profile-candidate.json`). Recovery candidate lookup uses this
+    `out/gate-profile-candidate.json`). Recovery candidate lookup uses this
     path strictly; missing entries are treated as missing candidates (no fallback).
   - Exit code `0` signals success. Non-zero exit code is treated as failure and
     surfaces in:

@@ -1,6 +1,6 @@
 # Prep Track 3: Infra Candidate Wiring
 
-Scope: Wire the `infra` recovery candidate artifact (`/out/prep-profile-candidate.json`, schema `prep_profile_v1`) into control-plane behavior so it is validated, consumed by the immediate follow-up `re_gate`, and promoted to repo `prep_profile` only on successful `re_gate`, without compatibility shims.
+Scope: Wire the `infra` recovery candidate artifact (`/out/gate-profile-candidate.json`, schema `gate_profile_v1`) into control-plane behavior so it is validated, consumed by the immediate follow-up `re_gate`, and promoted to repo `gate_profile` only on successful `re_gate`, without compatibility shims.
 
 Documentation:
 - `design/prep-impl.md`
@@ -20,7 +20,7 @@ Legend: [ ] todo, [x] done.
   - Component: nodeagent artifact upload + server job completion metadata
   - Scope:
     - Ensure `heal` completion uploads expected artifact files referenced by merged `artifact_paths` (already merged from expectations on claim).
-    - Add deterministic extraction path for `/out/prep-profile-candidate.json` in job artifacts for downstream server-side resolution.
+    - Add deterministic extraction path for `/out/gate-profile-candidate.json` in job artifacts for downstream server-side resolution.
     - Keep behavior strict: missing expected artifact is treated as missing candidate (no fallback).
   - Primary files:
     - `internal/nodeagent/execution_orchestrator_jobs.go`
@@ -29,7 +29,7 @@ Legend: [ ] todo, [x] done.
   - Snippets:
     ```go
     // heal completion path
-    artifactRef := findArtifactPath("/out/prep-profile-candidate.json")
+    artifactRef := findArtifactPath("/out/gate-profile-candidate.json")
     ```
   - Tests:
     - `go test ./internal/nodeagent -run 'TestUpload|TestExecuteHealingJob'`
@@ -46,7 +46,7 @@ Legend: [ ] todo, [x] done.
     - `internal/server/handlers/nodes_complete_healing.go`
   - Snippets:
     ```go
-    rawCandidate, err := loadRecoveryArtifact(ctx, healJobID, "/out/prep-profile-candidate.json")
+    rawCandidate, err := loadRecoveryArtifact(ctx, healJobID, "/out/gate-profile-candidate.json")
     ```
   - Tests:
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs'`
@@ -56,8 +56,8 @@ Legend: [ ] todo, [x] done.
   - Repository: `ploy`
   - Component: server healing insertion + prep schema validator
   - Scope:
-    - In `maybeCreateHealingJobs(...)`, when `error_kind=infra` and expectations declare `prep_profile_v1`, resolve candidate artifact from previous `heal` output.
-    - Validate candidate via `prep.ValidateProfileJSONForSchema(raw, "prep_profile_v1")`.
+    - In `maybeCreateHealingJobs(...)`, when `error_kind=infra` and expectations declare `gate_profile_v1`, resolve candidate artifact from previous `heal` output.
+    - Validate candidate via `prep.ValidateProfileJSONForSchema(raw, "gate_profile_v1")`.
     - Persist validation status and candidate payload reference in `re_gate` job metadata.
     - No fallback behavior; invalid candidate is recorded and treated as unusable for promotion/override.
   - Primary files:
@@ -66,7 +66,7 @@ Legend: [ ] todo, [x] done.
     - `internal/workflow/contracts/job_meta.go`
   - Snippets:
     ```go
-    if err := prep.ValidateProfileJSONForSchema(rawCandidate, contracts.PrepProfileCandidateSchemaID); err != nil {
+    if err := prep.ValidateProfileJSONForSchema(rawCandidate, contracts.GateProfileCandidateSchemaID); err != nil {
         recoveryMeta.CandidateValidationError = err.Error()
     }
     ```
@@ -79,28 +79,28 @@ Legend: [ ] todo, [x] done.
   - Component: claim-time spec merge for gate jobs
   - Scope:
     - Extend claim merge pipeline for `re_gate` jobs:
-      1. explicit `build_gate.<phase>.prep` from spec
+      1. explicit `build_gate.<phase>.gate_profile` from spec
       2. validated infra candidate override (from recovery metadata)
-      3. persisted repo `prep_profile`
+      3. persisted repo `gate_profile`
       4. default tool command
     - Candidate only affects `re_gate`; do not alter `pre_gate`/`post_gate` claim logic in this track.
   - Primary files:
     - `internal/server/handlers/nodes_claim.go`
-    - `internal/workflow/contracts/prep_profile.go`
+    - `internal/workflow/contracts/gate_profile.go`
   - Snippets:
     ```go
     mergedSpec = mergeRecoveryCandidateIntoSpec(mergedSpec, reGateRecoveryMeta, jobType)
     ```
   - Tests:
     - `go test ./internal/server/handlers -run 'TestClaimJob_'`
-    - `go test ./internal/workflow/contracts -run 'TestPrepProfile'`
+    - `go test ./internal/workflow/contracts -run 'TestGateProfile'`
 
 ## Phase 3: Promotion on Successful Re-Gate
-- [x] Promote validated infra candidate to repo `prep_profile` only when corresponding `re_gate` succeeds.
+- [x] Promote validated infra candidate to repo `gate_profile` only when corresponding `re_gate` succeeds.
   - Repository: `ploy`
   - Component: server job completion + repo profile persistence
   - Scope:
-    - On successful `re_gate` completion, if recovery metadata contains validated infra candidate payload, persist it to `mig_repos.prep_profile` (+ optional artifact metadata update) transactionally.
+    - On successful `re_gate` completion, if recovery metadata contains validated infra candidate payload, persist it to `mig_repos.gate_profile` (+ optional artifact metadata update) transactionally.
     - Never promote on failed `re_gate`.
     - Promotion is idempotent for retries/replays by guarding on job id + status.
   - Primary files:
@@ -110,7 +110,7 @@ Legend: [ ] todo, [x] done.
   - Snippets:
     ```go
     if jobType == re_gate && status == Success && candidate.Validated {
-        st.UpdateMigRepoPrepProfile(ctx, ...)
+        st.UpdateMigRepoGateProfile(ctx, ...)
     }
     ```
   - Tests:
@@ -139,7 +139,7 @@ Legend: [ ] todo, [x] done.
   - Repository: `ploy`
   - Component: CLI docs + examples
   - Scope:
-    - Document end-to-end expectation that infra healing writes `/out/prep-profile-candidate.json`.
+    - Document end-to-end expectation that infra healing writes `/out/gate-profile-candidate.json`.
     - Document that candidate promotion is conditional on successful `re_gate`.
   - Primary files:
     - `cmd/ploy/README.md`
@@ -154,7 +154,7 @@ Legend: [ ] todo, [x] done.
   - Repository: `ploy`
   - Component: CI/local validation
   - Scope: Execute:
-    - `go test ./internal/workflow/contracts -run 'TestBuildGate|TestJobMeta|TestPrepProfile|TestParseModsSpec'`
+    - `go test ./internal/workflow/contracts -run 'TestBuildGate|TestJobMeta|TestGateProfile|TestParseModsSpec'`
     - `go test ./internal/nodeagent -run 'TestExecuteHealingJob|TestUpload|TestParseSpec_ProducesTypedOptions'`
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs|TestCompleteJob_|TestClaimJob_|TestListRunRepoJobs'`
     - `go test ./internal/server/prep`

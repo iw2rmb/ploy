@@ -425,31 +425,31 @@ func parseBuildGatePhaseConfig(raw map[string]any, prefix string) (*BuildGatePha
 		phase.Stack = stack
 	}
 
-	if v, ok := raw["prep"]; ok && v != nil {
-		prepRaw, err := expectMap(v, prefix+".prep")
+	if v, ok := raw["gate_profile"]; ok && v != nil {
+		prepRaw, err := expectMap(v, prefix+".gate_profile")
 		if err != nil {
 			return nil, err
 		}
-		prep, err := parseBuildGatePrepOverride(prepRaw, prefix+".prep")
+		prep, err := parseBuildGateProfileOverride(prepRaw, prefix+".gate_profile")
 		if err != nil {
 			return nil, err
 		}
-		phase.Prep = prep
+		phase.GateProfile = prep
 	}
 
-	if phase.Stack == nil && phase.Prep == nil {
+	if phase.Stack == nil && phase.GateProfile == nil {
 		return nil, nil
 	}
 
 	return phase, nil
 }
 
-func parseBuildGatePrepOverride(raw map[string]any, prefix string) (*BuildGatePrepOverride, error) {
+func parseBuildGateProfileOverride(raw map[string]any, prefix string) (*BuildGateProfileOverride, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
 
-	prep := &BuildGatePrepOverride{}
+	prep := &BuildGateProfileOverride{}
 
 	if v, ok := raw["command"]; ok && v != nil {
 		cmd, err := ParseCommandSpec(v)
@@ -471,7 +471,7 @@ func parseBuildGatePrepOverride(raw map[string]any, prefix string) (*BuildGatePr
 		if err != nil {
 			return nil, err
 		}
-		stack := &PrepProfileStack{}
+		stack := &GateProfileStack{}
 		if vv, ok := stackRaw["language"]; ok && vv != nil {
 			s, err := expectString(vv, prefix+".stack.language")
 			if err != nil {

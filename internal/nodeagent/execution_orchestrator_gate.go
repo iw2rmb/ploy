@@ -286,9 +286,9 @@ func (r *runController) runRouterForGateFailure(
 //     stackdetect output to select the runtime image/tool.
 //
 // Prep override semantics:
-//   - pre_gate may use build_gate.pre.prep command/env override.
-//   - post_gate may use build_gate.post.prep command/env override.
-//   - re_gate reuses build_gate.post.prep command/env override.
+//   - pre_gate may use build_gate.pre.gate_profile command/env override.
+//   - post_gate may use build_gate.post.gate_profile command/env override.
+//   - re_gate reuses build_gate.post.gate_profile command/env override.
 func applyGatePhaseOverrides(manifest *contracts.StepManifest, jobType types.JobType, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
@@ -299,14 +299,14 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, jobType types.Job
 		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
 		}
-		manifest.Gate.Prep = typedOpts.BuildGate.PrePrep
+		manifest.Gate.GateProfile = typedOpts.BuildGate.PreGateProfile
 	case types.JobTypePostGate:
 		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
 		}
-		manifest.Gate.Prep = typedOpts.BuildGate.PostPrep
+		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
 	case types.JobTypeReGate:
-		manifest.Gate.Prep = typedOpts.BuildGate.PostPrep
+		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
 	}
 }
 

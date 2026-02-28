@@ -1,25 +1,25 @@
-# Prep Candidate Prompt Contract (Future/Strategy Asset)
+# Gate Profile Candidate Prompt Contract (Future/Strategy Asset)
 
 ## Status
 
 There is no active standalone prep runner that loads this file at runtime.
 
-This document defines a prompt contract for recovery strategies that generate prep profile candidates (typically `infra` healing).
+This document defines a prompt contract for recovery strategies that generate gate profile candidates (typically `infra` healing).
 
 ## Intended Use
 
-Use this prompt shape when a healing strategy needs to emit a candidate prep profile artifact:
-- output path: `/out/prep-profile-candidate.json`
-- schema id: `prep_profile_v1`
+Use this prompt shape when a healing strategy needs to emit a candidate gate profile artifact:
+- output path: `/out/gate-profile-candidate.json`
+- schema id: `gate_profile_v1`
 
 The candidate is consumed by server validation and re-gate integration.
 
 ## Prompt Body (Template)
 
-You are generating a deterministic prep profile candidate for Build Gate recovery.
+You are generating a deterministic gate profile candidate for Build Gate recovery.
 
 Goal:
-Produce a schema-valid prep profile that improves gate command/runtime configuration for this repository.
+Produce a schema-valid gate profile that improves gate command/runtime configuration for this repository.
 
 Constraints:
 - Do not modify repository source code.
@@ -114,7 +114,7 @@ Output format (JSON only, no prose):
 ```
 
 Validation:
-- output must validate against `docs/schemas/prep_profile.schema.json`
+- output must validate against `docs/schemas/gate_profile.schema.json`
 
 ## Recovery Contract Context
 
@@ -128,12 +128,12 @@ Router and healing expectations:
 Infra candidate handling:
 - candidate is validated against schema and stack compatibility
 - valid candidate can be used in re-gate override
-- promotion to repo `prep_profile` occurs only when re-gate succeeds
+- promotion to repo `gate_profile` occurs only when re-gate succeeds
 
 ## Cross References
 
-- `design/prep.md`
-- `design/prep-impl.md`
-- `design/prep-simple.md`
-- `design/prep-complex.md`
-- `docs/schemas/prep_profile.schema.json`
+- `design/gate-profile.md`
+- `design/gate-profile-impl.md`
+- `design/gate-profile-simple.md`
+- `design/gate-profile-complex.md`
+- `docs/schemas/gate_profile.schema.json`

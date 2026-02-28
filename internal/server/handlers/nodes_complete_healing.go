@@ -134,11 +134,11 @@ func maybeCreateHealingJobs(
 				ErrorKind: recoveryMeta.ErrorKind,
 			}
 		}
-		artifactPath := contracts.PrepProfileCandidateArtifactPath
+		artifactPath := contracts.GateProfileCandidateArtifactPath
 		if p, ok := resolveRecoveryCandidateArtifactPath(recoveryMeta.Expectations); ok {
 			artifactPath = p
 		}
-		reGateRecoveryMeta.CandidateSchemaID = contracts.PrepProfileCandidateSchemaID
+		reGateRecoveryMeta.CandidateSchemaID = contracts.GateProfileCandidateSchemaID
 		reGateRecoveryMeta.CandidateArtifactPath = artifactPath
 		evaluateAndAttachInfraCandidate(
 			ctx,
@@ -273,8 +273,8 @@ func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.
 	if len(src.Expectations) > 0 {
 		out.Expectations = append([]byte(nil), src.Expectations...)
 	}
-	if len(src.CandidatePrepProfile) > 0 {
-		out.CandidatePrepProfile = append([]byte(nil), src.CandidatePrepProfile...)
+	if len(src.CandidateGateProfile) > 0 {
+		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
 	return &out
 }
@@ -304,7 +304,7 @@ func shouldEvaluateInfraCandidate(
 		return false
 	}
 	for _, artifact := range action.Expectations.Artifacts {
-		if strings.TrimSpace(artifact.Schema) == contracts.PrepProfileCandidateSchemaID {
+		if strings.TrimSpace(artifact.Schema) == contracts.GateProfileCandidateSchemaID {
 			return true
 		}
 	}
@@ -325,7 +325,7 @@ func resolveRecoveryCandidateArtifactPath(expectations json.RawMessage) (string,
 		return "", false
 	}
 	for _, artifact := range ex.Artifacts {
-		if strings.TrimSpace(artifact.Schema) != contracts.PrepProfileCandidateSchemaID {
+		if strings.TrimSpace(artifact.Schema) != contracts.GateProfileCandidateSchemaID {
 			continue
 		}
 		path := strings.TrimSpace(artifact.Path)
@@ -353,7 +353,7 @@ func evaluateAndAttachInfraCandidate(
 	meta.CandidatePromoted = &candidatePromoted
 	path := strings.TrimSpace(meta.CandidateArtifactPath)
 	if path == "" {
-		path = contracts.PrepProfileCandidateArtifactPath
+		path = contracts.GateProfileCandidateArtifactPath
 		meta.CandidateArtifactPath = path
 	}
 	prevHeal := resolvePreviousHealJob(failedJob, jobsByID)
@@ -376,12 +376,12 @@ func evaluateAndAttachInfraCandidate(
 		meta.CandidateValidationError = err.Error()
 		return
 	}
-	if err := contracts.ValidatePrepProfileJSONForSchema(raw, contracts.PrepProfileCandidateSchemaID); err != nil {
+	if err := contracts.ValidateGateProfileJSONForSchema(raw, contracts.GateProfileCandidateSchemaID); err != nil {
 		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
 		meta.CandidateValidationError = err.Error()
 		return
 	}
-	profile, err := contracts.ParsePrepProfileJSON(raw)
+	profile, err := contracts.ParseGateProfileJSON(raw)
 	if err != nil {
 		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
 		meta.CandidateValidationError = err.Error()
@@ -389,25 +389,25 @@ func evaluateAndAttachInfraCandidate(
 	}
 	if !candidateMatchesDetectedStack(profile, detectedStack) {
 		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
-		meta.CandidateValidationError = "prep_profile stack does not match detected stack"
+		meta.CandidateValidationError = "gate_profile stack does not match detected stack"
 		return
 	}
 	meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusValid
 	meta.CandidateValidationError = ""
-	meta.CandidatePrepProfile = append([]byte(nil), raw...)
+	meta.CandidateGateProfile = append([]byte(nil), raw...)
 }
 
-func candidateMatchesDetectedStack(profile *contracts.PrepProfile, stack contracts.ModStack) bool {
+func candidateMatchesDetectedStack(profile *contracts.GateProfile, stack contracts.ModStack) bool {
 	if profile == nil {
 		return false
 	}
 	switch stack {
 	case contracts.ModStackJavaMaven:
-		return contracts.PrepProfileStackMatches(profile, "java", "maven", "")
+		return contracts.GateProfileStackMatches(profile, "java", "maven", "")
 	case contracts.ModStackJavaGradle:
-		return contracts.PrepProfileStackMatches(profile, "java", "gradle", "")
+		return contracts.GateProfileStackMatches(profile, "java", "gradle", "")
 	case contracts.ModStackJava:
-		return contracts.PrepProfileStackMatches(profile, "java", "java", "")
+		return contracts.GateProfileStackMatches(profile, "java", "java", "")
 	default:
 		return false
 	}

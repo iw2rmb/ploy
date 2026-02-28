@@ -19,12 +19,12 @@ INSERT INTO mig_repos (
   repo_url,
   base_ref,
   target_ref,
-  prep_profile,
-  prep_artifacts,
-  prep_updated_at
+  gate_profile,
+  gate_profile_artifacts,
+  gate_profile_updated_at
 )
 VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
-RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+RETURNING id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 `
 
 type CreateMigRepoParams struct {
@@ -50,9 +50,9 @@ func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (M
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.PrepUpdatedAt,
-		&i.PrepProfile,
-		&i.PrepArtifacts,
+		&i.GateProfileUpdatedAt,
+		&i.GateProfile,
+		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -72,7 +72,7 @@ func (q *Queries) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
 }
 
 const getMigRepo = `-- name: GetMigRepo :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 FROM mig_repos
 WHERE id = $1
 `
@@ -86,16 +86,16 @@ func (q *Queries) GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, 
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.PrepUpdatedAt,
-		&i.PrepProfile,
-		&i.PrepArtifacts,
+		&i.GateProfileUpdatedAt,
+		&i.GateProfile,
+		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getMigRepoByURL = `-- name: GetMigRepoByURL :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1 AND repo_url = $2
 `
@@ -115,9 +115,9 @@ func (q *Queries) GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.PrepUpdatedAt,
-		&i.PrepProfile,
-		&i.PrepArtifacts,
+		&i.GateProfileUpdatedAt,
+		&i.GateProfile,
+		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -193,7 +193,7 @@ func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListD
 }
 
 const listMigReposByMig = `-- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC
@@ -214,9 +214,9 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 			&i.RepoUrl,
 			&i.BaseRef,
 			&i.TargetRef,
-			&i.PrepUpdatedAt,
-			&i.PrepProfile,
-			&i.PrepArtifacts,
+			&i.GateProfileUpdatedAt,
+			&i.GateProfile,
+			&i.GateProfileArtifacts,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -229,7 +229,7 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 	return items, nil
 }
 
-const promoteReGateRecoveryCandidatePrepProfile = `-- name: PromoteReGateRecoveryCandidatePrepProfile :one
+const promoteReGateRecoveryCandidateGateProfile = `-- name: PromoteReGateRecoveryCandidateGateProfile :one
 WITH target_job AS (
   SELECT j.id, j.repo_id
   FROM jobs j
@@ -253,27 +253,27 @@ updated_job AS (
   RETURNING tj.repo_id
 )
 UPDATE mig_repos mr
-SET prep_profile = $3,
-    prep_artifacts = $4,
-    prep_updated_at = now()
+SET gate_profile = $3,
+    gate_profile_artifacts = $4,
+    gate_profile_updated_at = now()
 FROM updated_job uj
 WHERE mr.id = uj.repo_id
 RETURNING mr.id
 `
 
-type PromoteReGateRecoveryCandidatePrepProfileParams struct {
-	ID            types.JobID `json:"id"`
-	Meta          []byte      `json:"meta"`
-	PrepProfile   []byte      `json:"prep_profile"`
-	PrepArtifacts []byte      `json:"prep_artifacts"`
+type PromoteReGateRecoveryCandidateGateProfileParams struct {
+	ID                   types.JobID `json:"id"`
+	Meta                 []byte      `json:"meta"`
+	GateProfile          []byte      `json:"gate_profile"`
+	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
 }
 
-func (q *Queries) PromoteReGateRecoveryCandidatePrepProfile(ctx context.Context, arg PromoteReGateRecoveryCandidatePrepProfileParams) (types.MigRepoID, error) {
-	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidatePrepProfile,
+func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {
+	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidateGateProfile,
 		arg.ID,
 		arg.Meta,
-		arg.PrepProfile,
-		arg.PrepArtifacts,
+		arg.GateProfile,
+		arg.GateProfileArtifacts,
 	)
 	var id types.MigRepoID
 	err := row.Scan(&id)
@@ -305,16 +305,16 @@ INSERT INTO mig_repos (
   repo_url,
   base_ref,
   target_ref,
-  prep_profile,
-  prep_artifacts,
-  prep_updated_at
+  gate_profile,
+  gate_profile_artifacts,
+  gate_profile_updated_at
 )
 VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
 ON CONFLICT (mig_id, repo_url)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
   target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+RETURNING id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 `
 
 type UpsertMigRepoParams struct {
@@ -343,9 +343,9 @@ func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (M
 		&i.RepoUrl,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.PrepUpdatedAt,
-		&i.PrepProfile,
-		&i.PrepArtifacts,
+		&i.GateProfileUpdatedAt,
+		&i.GateProfile,
+		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err

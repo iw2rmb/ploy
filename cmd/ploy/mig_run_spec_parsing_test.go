@@ -891,8 +891,8 @@ env:
   B: from-fragment
 expectations:
   artifacts:
-    - path: /out/prep-profile-candidate.json
-      schema: prep_profile_v1
+    - path: /out/gate-profile-candidate.json
+      schema: gate_profile_v1
 `
 	if err := os.WriteFile(fragmentPath, []byte(fragment), 0o644); err != nil {
 		t.Fatalf("write fragment file: %v", err)

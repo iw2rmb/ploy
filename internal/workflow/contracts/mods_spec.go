@@ -188,7 +188,7 @@ func (s ModsSpec) Validate() error {
 			}
 			if action.Expectations != nil {
 				for i, artifact := range action.Expectations.Artifacts {
-					if err := ValidatePrepProfileArtifactContract(
+					if err := ValidateGateProfileArtifactContract(
 						artifact.Path,
 						artifact.Schema,
 						fmt.Sprintf("%s.expectations.artifacts[%d]", prefix, i),
@@ -233,8 +233,8 @@ func (s ModsSpec) Validate() error {
 				return err
 			}
 		}
-		if s.BuildGate.Pre != nil && s.BuildGate.Pre.Prep != nil {
-			if err := validateBuildGatePrepOverride(s.BuildGate.Pre.Prep, "build_gate.pre.prep"); err != nil {
+		if s.BuildGate.Pre != nil && s.BuildGate.Pre.GateProfile != nil {
+			if err := validateBuildGateProfileOverride(s.BuildGate.Pre.GateProfile, "build_gate.pre.gate_profile"); err != nil {
 				return err
 			}
 		}
@@ -243,8 +243,8 @@ func (s ModsSpec) Validate() error {
 				return err
 			}
 		}
-		if s.BuildGate.Post != nil && s.BuildGate.Post.Prep != nil {
-			if err := validateBuildGatePrepOverride(s.BuildGate.Post.Prep, "build_gate.post.prep"); err != nil {
+		if s.BuildGate.Post != nil && s.BuildGate.Post.GateProfile != nil {
+			if err := validateBuildGateProfileOverride(s.BuildGate.Post.GateProfile, "build_gate.post.gate_profile"); err != nil {
 				return err
 			}
 		}
@@ -276,7 +276,7 @@ func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) er
 	return nil
 }
 
-func validateBuildGatePrepOverride(prep *BuildGatePrepOverride, prefix string) error {
+func validateBuildGateProfileOverride(prep *BuildGateProfileOverride, prefix string) error {
 	if prep == nil {
 		return nil
 	}

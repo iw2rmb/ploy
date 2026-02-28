@@ -2,8 +2,8 @@ retries: 1
 image: 127.0.0.1:5000/ploy/migs-codex:latest
 expectations:
   artifacts:
-    - path: /out/prep-profile-candidate.json
-      schema: prep_profile_v1
+    - path: /out/gate-profile-candidate.json
+      schema: gate_profile_v1
 env_from_file:
   CODEX_PROMPT: $PLOY_PATH/healing/infra/prompt.md
   CODEX_AUTH_JSON: ~/.codex/auth.json

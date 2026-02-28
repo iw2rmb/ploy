@@ -1,8 +1,8 @@
-# Prep Simple Mode (Implemented)
+# Gate Profile Simple Mode (Implemented)
 
 ## Definition
 
-Simple mode is the active prep profile execution contract.
+Simple mode is the active gate profile execution contract.
 
 A profile is simple when it provides deterministic target command/env outcomes without orchestration steps.
 
@@ -39,20 +39,20 @@ Mapped runtime hints:
 
 ## Stack-Bound Enforcement
 
-Claim-time prep override carries profile stack into `build_gate.<phase>.prep.stack`.
+Claim-time gate_profile override carries profile stack into `build_gate.<phase>.gate_profile.stack`.
 
-Gate runtime enforces prep stack compatibility. If prep stack mismatches the gate stack context, gate command resolution fails instead of executing stale prep commands.
+Gate runtime enforces gate_profile stack compatibility. If gate_profile stack mismatches the gate stack context, gate command resolution fails instead of executing stale gate_profile commands.
 
 ## Command and Env Precedence
 
 Gate command precedence:
-1. explicit `build_gate.<phase>.prep` in submitted spec
-2. mapped prep profile override
+1. explicit `build_gate.<phase>.gate_profile` in submitted spec
+2. mapped gate profile override
 3. default tool command
 
 Env precedence:
 1. base gate env from spec/global injection
-2. prep override env (explicit or mapped)
+2. gate_profile override env (explicit or mapped)
 
 ## Recovery Interaction
 
@@ -63,19 +63,19 @@ Simple-mode profile participates in the shared recovery loop:
 - `mixed` and `unknown` are terminal
 
 Infra path contract:
-- expected candidate artifact: `/out/prep-profile-candidate.json`
-- expected schema id: `prep_profile_v1`
+- expected candidate artifact: `/out/gate-profile-candidate.json`
+- expected schema id: `gate_profile_v1`
 - candidate can be promoted only after successful follow-up `re_gate`
 
 ## Notes
 
-Simple mode is the only fully wired prep profile mode in runtime execution paths.
+Simple mode is the only fully wired gate profile mode in runtime execution paths.
 
 ## Cross References
 
-- `design/prep.md`
-- `design/prep-impl.md`
-- `design/prep-states.md`
-- `design/prep-complex.md`
-- `docs/schemas/prep_profile.schema.json`
+- `design/gate-profile.md`
+- `design/gate-profile-impl.md`
+- `design/gate-profile-states.md`
+- `design/gate-profile-complex.md`
+- `docs/schemas/gate_profile.schema.json`
 - `docs/build-gate/README.md`

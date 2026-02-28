@@ -61,7 +61,7 @@ These scenarios assert that repo jobs are not created before `PrepReady`, and th
 failure metadata/evidence is exposed through `GET /v1/repos/{repo_id}/prep`.
 Local deploy uses a deterministic prep fixture in the server image (`codex` stub):
 - refs containing `fail` force prep failure
-- all other refs emit a valid prep profile and transition to `PrepReady`
+- all other refs emit a valid gate profile and transition to `PrepReady`
 - scripts submit via `ploy run --spec` (single-repo run API surface)
 - default repo/refs are public and deterministic:
   - ready: `https://github.com/octocat/Hello-World.git`, `master -> master`

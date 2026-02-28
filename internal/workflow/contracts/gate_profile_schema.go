@@ -13,22 +13,22 @@ import (
 )
 
 var (
-	prepProfileSchemaOnce sync.Once
-	prepProfileSchemaObj  *gojsonschema.Schema
-	prepProfileSchemaErr  error
+	gateProfileSchemaOnce sync.Once
+	gateProfileSchemaObj  *gojsonschema.Schema
+	gateProfileSchemaErr  error
 )
 
-func validatePrepProfileJSON(raw []byte) error {
+func validateGateProfileJSON(raw []byte) error {
 	if len(raw) == 0 {
 		return fmt.Errorf("prep schema validation failed: empty output")
 	}
 	if !json.Valid(raw) {
 		return fmt.Errorf("prep schema validation failed: output is not valid JSON")
 	}
-	if err := loadPrepProfileSchema(); err != nil {
+	if err := loadGateProfileSchema(); err != nil {
 		return err
 	}
-	result, err := prepProfileSchemaObj.Validate(gojsonschema.NewBytesLoader(raw))
+	result, err := gateProfileSchemaObj.Validate(gojsonschema.NewBytesLoader(raw))
 	if err != nil {
 		return fmt.Errorf("prep schema validation failed: %w", err)
 	}
@@ -42,48 +42,48 @@ func validatePrepProfileJSON(raw []byte) error {
 	return fmt.Errorf("prep schema validation failed: %s", strings.Join(msgs, "; "))
 }
 
-func ValidatePrepProfileJSONForSchema(raw []byte, schemaID string) error {
+func ValidateGateProfileJSONForSchema(raw []byte, schemaID string) error {
 	switch strings.TrimSpace(schemaID) {
-	case PrepProfileCandidateSchemaID:
-		return validatePrepProfileJSON(raw)
+	case GateProfileCandidateSchemaID:
+		return validateGateProfileJSON(raw)
 	default:
 		return fmt.Errorf("prep schema validation failed: unsupported schema id %q", schemaID)
 	}
 }
 
-func loadPrepProfileSchema() error {
-	prepProfileSchemaOnce.Do(func() {
-		path, err := prepProfileSchemaPath()
+func loadGateProfileSchema() error {
+	gateProfileSchemaOnce.Do(func() {
+		path, err := gateProfileSchemaPath()
 		if err != nil {
-			prepProfileSchemaErr = err
+			gateProfileSchemaErr = err
 			return
 		}
 		schemaBytes, err := os.ReadFile(path)
 		if err != nil {
-			prepProfileSchemaErr = fmt.Errorf("read prep schema %q: %w", path, err)
+			gateProfileSchemaErr = fmt.Errorf("read prep schema %q: %w", path, err)
 			return
 		}
-		prepProfileSchemaObj, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(schemaBytes))
+		gateProfileSchemaObj, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(schemaBytes))
 		if err != nil {
-			prepProfileSchemaErr = fmt.Errorf("compile prep schema %q: %w", path, err)
+			gateProfileSchemaErr = fmt.Errorf("compile prep schema %q: %w", path, err)
 			return
 		}
 	})
-	if prepProfileSchemaErr != nil {
-		return fmt.Errorf("prep schema validation unavailable: %w", prepProfileSchemaErr)
+	if gateProfileSchemaErr != nil {
+		return fmt.Errorf("prep schema validation unavailable: %w", gateProfileSchemaErr)
 	}
 	return nil
 }
 
-func prepProfileSchemaPath() (string, error) {
+func gateProfileSchemaPath() (string, error) {
 	candidates := make([]string, 0, 3)
 	_, file, _, ok := runtime.Caller(0)
 	if ok {
-		candidates = append(candidates, filepath.Join(filepath.Dir(file), "..", "..", "..", "docs", "schemas", "prep_profile.schema.json"))
+		candidates = append(candidates, filepath.Join(filepath.Dir(file), "..", "..", "..", "docs", "schemas", "gate_profile.schema.json"))
 	}
 	candidates = append(candidates,
-		filepath.Join("docs", "schemas", "prep_profile.schema.json"),
-		filepath.Join("/etc", "ploy", "schemas", "prep_profile.schema.json"),
+		filepath.Join("docs", "schemas", "gate_profile.schema.json"),
+		filepath.Join("/etc", "ploy", "schemas", "gate_profile.schema.json"),
 	)
 	var errs []string
 	for _, path := range candidates {

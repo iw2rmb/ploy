@@ -135,7 +135,7 @@ func (s *Service) CreateArtifactBundle(ctx context.Context, params store.CreateA
 
 // LoadRecoveryArtifact resolves and reads a specific artifact path from persisted
 // job artifact bundles. expectedPath must use absolute wire form (for example
-// "/out/prep-profile-candidate.json").
+// "/out/gate-profile-candidate.json").
 func (s *Service) LoadRecoveryArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, expectedPath string) ([]byte, error) {
 	if err := s.validate(); err != nil {
 		return nil, err

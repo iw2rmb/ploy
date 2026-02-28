@@ -588,8 +588,8 @@ build_gate:
           CODEX_AUTH_JSON: ~/.codex/auth.json
         expectations:
           artifacts:
-            - path: /out/prep-profile-candidate.json
-              schema: prep_profile_v1
+            - path: /out/gate-profile-candidate.json
+              schema: gate_profile_v1
       code:
         spec_path: ./healing/code/spec.yaml
         retries: 1
@@ -607,9 +607,9 @@ object. Inline fields next to `spec_path` override loaded fields. `spec_path`
 supports env expansion (`$VAR`, `${VAR}`) and `~/` home expansion. The key is
 removed before submit.
 
-For `infra` healing with `expectations.artifacts` schema `prep_profile_v1`, the
-healing container is expected to write `/out/prep-profile-candidate.json`. The
-candidate is considered for repo `prep_profile` promotion only after the immediate
+For `infra` healing with `expectations.artifacts` schema `gate_profile_v1`, the
+healing container is expected to write `/out/gate-profile-candidate.json`. The
+candidate is considered for repo `gate_profile` promotion only after the immediate
 follow-up `re_gate` succeeds. Failed `re_gate` results never promote candidates.
 
 **Cross-phase inputs:**

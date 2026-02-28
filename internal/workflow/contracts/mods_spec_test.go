@@ -337,14 +337,14 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_BuildGatePrepOverride(t *testing.T) {
+func TestParseModsSpecJSON_BuildGateProfileOverride(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": "docker.io/user/mig:latest"
 		}],
 		"build_gate": {
 			"pre": {
-				"prep": {
+				"gate_profile": {
 					"command": "go test ./...",
 					"env": {
 						"GOFLAGS": "-mod=readonly"
@@ -352,7 +352,7 @@ func TestParseModsSpecJSON_BuildGatePrepOverride(t *testing.T) {
 				}
 			},
 			"post": {
-				"prep": {
+				"gate_profile": {
 					"command": ["go", "test", "./...", "-run", "TestUnit"],
 					"env": {
 						"CGO_ENABLED": "0"
@@ -366,54 +366,54 @@ func TestParseModsSpecJSON_BuildGatePrepOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
-	if spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Prep == nil {
-		t.Fatal("build_gate.pre.prep is nil")
+	if spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.GateProfile == nil {
+		t.Fatal("build_gate.pre.gate_profile is nil")
 	}
-	if spec.BuildGate.Pre.Prep.Command.Shell != "go test ./..." {
-		t.Fatalf("build_gate.pre.prep.command.shell = %q, want %q", spec.BuildGate.Pre.Prep.Command.Shell, "go test ./...")
+	if spec.BuildGate.Pre.GateProfile.Command.Shell != "go test ./..." {
+		t.Fatalf("build_gate.pre.gate_profile.command.shell = %q, want %q", spec.BuildGate.Pre.GateProfile.Command.Shell, "go test ./...")
 	}
-	if got := spec.BuildGate.Pre.Prep.Env["GOFLAGS"]; got != "-mod=readonly" {
-		t.Fatalf("build_gate.pre.prep.env[GOFLAGS] = %q, want %q", got, "-mod=readonly")
+	if got := spec.BuildGate.Pre.GateProfile.Env["GOFLAGS"]; got != "-mod=readonly" {
+		t.Fatalf("build_gate.pre.gate_profile.env[GOFLAGS] = %q, want %q", got, "-mod=readonly")
 	}
 
-	if spec.BuildGate.Post == nil || spec.BuildGate.Post.Prep == nil {
-		t.Fatal("build_gate.post.prep is nil")
+	if spec.BuildGate.Post == nil || spec.BuildGate.Post.GateProfile == nil {
+		t.Fatal("build_gate.post.gate_profile is nil")
 	}
 	wantPost := []string{"go", "test", "./...", "-run", "TestUnit"}
-	if len(spec.BuildGate.Post.Prep.Command.Exec) != len(wantPost) {
-		t.Fatalf("build_gate.post.prep.command.exec length = %d, want %d", len(spec.BuildGate.Post.Prep.Command.Exec), len(wantPost))
+	if len(spec.BuildGate.Post.GateProfile.Command.Exec) != len(wantPost) {
+		t.Fatalf("build_gate.post.gate_profile.command.exec length = %d, want %d", len(spec.BuildGate.Post.GateProfile.Command.Exec), len(wantPost))
 	}
 	for i, v := range wantPost {
-		if got := spec.BuildGate.Post.Prep.Command.Exec[i]; got != v {
-			t.Fatalf("build_gate.post.prep.command.exec[%d] = %q, want %q", i, got, v)
+		if got := spec.BuildGate.Post.GateProfile.Command.Exec[i]; got != v {
+			t.Fatalf("build_gate.post.gate_profile.command.exec[%d] = %q, want %q", i, got, v)
 		}
 	}
-	if got := spec.BuildGate.Post.Prep.Env["CGO_ENABLED"]; got != "0" {
-		t.Fatalf("build_gate.post.prep.env[CGO_ENABLED] = %q, want %q", got, "0")
+	if got := spec.BuildGate.Post.GateProfile.Env["CGO_ENABLED"]; got != "0" {
+		t.Fatalf("build_gate.post.gate_profile.env[CGO_ENABLED] = %q, want %q", got, "0")
 	}
 }
 
-func TestParseModsSpecJSON_BuildGatePrepOverride_Invalid(t *testing.T) {
+func TestParseModsSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
 		wantErr string
 	}{
 		{
-			name: "pre prep missing command",
+			name: "pre gate_profile missing command",
 			input: `{
 				"steps": [{"image": "docker.io/user/mig:latest"}],
-				"build_gate": {"pre": {"prep": {"env": {"A": "B"}}}}
+				"build_gate": {"pre": {"gate_profile": {"env": {"A": "B"}}}}
 			}`,
-			wantErr: "build_gate.pre.prep.command: required",
+			wantErr: "build_gate.pre.gate_profile.command: required",
 		},
 		{
-			name: "post prep command wrong type",
+			name: "post gate_profile command wrong type",
 			input: `{
 				"steps": [{"image": "docker.io/user/mig:latest"}],
-				"build_gate": {"post": {"prep": {"command": {"bad": true}}}}
+				"build_gate": {"post": {"gate_profile": {"command": {"bad": true}}}}
 			}`,
-			wantErr: "build_gate.post.prep.command",
+			wantErr: "build_gate.post.gate_profile.command",
 		},
 	}
 

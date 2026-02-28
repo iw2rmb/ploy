@@ -367,8 +367,8 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 						"expectations": map[string]any{
 							"artifacts": []any{
 								map[string]any{
-									"path":   "/out/prep-profile-candidate.json",
-									"schema": "prep_profile_v1",
+									"path":   "/out/gate-profile-candidate.json",
+									"schema": "gate_profile_v1",
 								},
 							},
 						},
@@ -421,7 +421,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypeReGate.String(),
-				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}}`),
+				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`),
 			},
 			{
 				ID:          mig0ID,
@@ -461,7 +461,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	}`)
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
-		"out/prep-profile-candidate.json": candidateJSON,
+		"out/gate-profile-candidate.json": candidateJSON,
 	})
 	if _, err := bs.Put(ctx, objKey, "application/gzip", bundle); err != nil {
 		t.Fatalf("put blob: %v", err)
@@ -484,17 +484,17 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	if reGateMeta.Recovery == nil {
 		t.Fatal("expected recovery metadata")
 	}
-	if got, want := reGateMeta.Recovery.CandidateSchemaID, contracts.PrepProfileCandidateSchemaID; got != want {
+	if got, want := reGateMeta.Recovery.CandidateSchemaID, contracts.GateProfileCandidateSchemaID; got != want {
 		t.Fatalf("candidate_schema_id = %q, want %q", got, want)
 	}
-	if got, want := reGateMeta.Recovery.CandidateArtifactPath, contracts.PrepProfileCandidateArtifactPath; got != want {
+	if got, want := reGateMeta.Recovery.CandidateArtifactPath, contracts.GateProfileCandidateArtifactPath; got != want {
 		t.Fatalf("candidate_artifact_path = %q, want %q", got, want)
 	}
 	if got, want := reGateMeta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
 		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, reGateMeta.Recovery.CandidateValidationError)
 	}
-	if len(reGateMeta.Recovery.CandidatePrepProfile) == 0 {
-		t.Fatal("expected candidate_prep_profile to be stored")
+	if len(reGateMeta.Recovery.CandidateGateProfile) == 0 {
+		t.Fatal("expected candidate_gate_profile to be stored")
 	}
 }
 
@@ -520,8 +520,8 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 						"expectations": map[string]any{
 							"artifacts": []any{
 								map[string]any{
-									"path":   "/out/prep-profile-candidate.json",
-									"schema": "prep_profile_v1",
+									"path":   "/out/gate-profile-candidate.json",
+									"schema": "gate_profile_v1",
 								},
 							},
 						},
@@ -628,14 +628,14 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
-		"out/prep-profile-candidate.json": []byte(`{"schema_version":1}`),
+		"out/gate-profile-candidate.json": []byte(`{"schema_version":1}`),
 	})
 	if _, err := bs.Put(context.Background(), objKey, "application/gzip", bundle); err != nil {
 		t.Fatalf("put blob: %v", err)
 	}
 
 	bp := blobpersist.New(st, bs)
-	raw, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/prep-profile-candidate.json")
+	raw, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/gate-profile-candidate.json")
 	if err != nil {
 		t.Fatalf("loadRecoveryArtifact error: %v", err)
 	}
@@ -651,7 +651,7 @@ func TestLoadRecoveryArtifact_TypedErrors(t *testing.T) {
 	st := &mockStore{}
 	bp := blobpersist.New(st, bsmock.New())
 
-	_, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/prep-profile-candidate.json")
+	_, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/gate-profile-candidate.json")
 	if !errors.Is(err, blobpersist.ErrRecoveryArtifactNotFound) {
 		t.Fatalf("expected ErrRecoveryArtifactNotFound, got %v", err)
 	}
