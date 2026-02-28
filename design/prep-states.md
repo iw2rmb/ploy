@@ -71,7 +71,7 @@ State and evidence are exposed via:
 
 In the next recovery track, gate loops will carry explicit context:
 - `loop_kind`: current value `healing` (reserved as extension point for future loop families)
-- `error_kind`: `infra|code|mixed|unknown|custom` (router output per failed gate)
+- `error_kind`: `infra|code|mixed|unknown` (router output per failed gate)
 - `history`: per-iteration router + healer summaries
 
 Routing and stopping policy:

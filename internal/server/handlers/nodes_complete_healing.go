@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -53,6 +52,16 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
+	recoveryMeta, detectedStack := resolveFailedGateRecoveryContext(failedJob)
+	if recoveryMeta.ErrorKind == "mixed" || recoveryMeta.ErrorKind == "unknown" {
+		slog.Info("maybeCreateHealingJobs: terminal recovery classification, canceling remaining linked jobs",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"error_kind", recoveryMeta.ErrorKind,
+		)
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
+	}
+
 	specRow, err := st.GetSpec(ctx, run.SpecID)
 	if err != nil {
 		return fmt.Errorf("get spec: %w", err)
@@ -92,9 +101,24 @@ func maybeCreateHealingJobs(
 		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	healImage := ""
-	if healing.Image.Universal != "" {
-		healImage = strings.TrimSpace(healing.Image.Universal)
+	healImage, err := healing.Image.ResolveImage(detectedStack)
+	if err != nil {
+		return fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
+	}
+
+	reGateMetaBytes, err := contracts.MarshalJobMeta(&contracts.JobMeta{
+		Kind:     contracts.JobKindGate,
+		Recovery: cloneRecoveryMetadata(recoveryMeta),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal re-gate job meta: %w", err)
+	}
+	healMetaBytes, err := contracts.MarshalJobMeta(&contracts.JobMeta{
+		Kind:     contracts.JobKindMod,
+		Recovery: cloneRecoveryMetadata(recoveryMeta),
+	})
+	if err != nil {
+		return fmt.Errorf("marshal heal job meta: %w", err)
 	}
 
 	oldNext := failedJob.NextID
@@ -112,7 +136,7 @@ func maybeCreateHealingJobs(
 		JobImage:    "",
 		Status:      store.JobStatusCreated,
 		NextID:      oldNext,
-		Meta:        []byte(`{}`),
+		Meta:        reGateMetaBytes,
 	})
 	if err != nil {
 		return fmt.Errorf("create re-gate job: %w", err)
@@ -129,7 +153,7 @@ func maybeCreateHealingJobs(
 		JobImage:    healImage,
 		Status:      store.JobStatusQueued,
 		NextID:      &reGateID,
-		Meta:        []byte(`{}`),
+		Meta:        healMetaBytes,
 	})
 	if err != nil {
 		return fmt.Errorf("create heal job: %w", err)
@@ -146,8 +170,61 @@ func maybeCreateHealingJobs(
 		"re_gate_job_id", reGateID,
 		"old_next", oldNext,
 		"attempt", healingAttemptNumber,
+		"error_kind", recoveryMeta.ErrorKind,
+		"strategy_id", recoveryMeta.StrategyID,
 	)
 	return nil
+}
+
+func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.ModStack) {
+	meta := &contracts.BuildGateRecoveryMetadata{
+		LoopKind:  "healing",
+		ErrorKind: "unknown",
+	}
+	detectedStack := contracts.ModStackUnknown
+
+	if len(failedJob.Meta) == 0 {
+		return meta, detectedStack
+	}
+
+	jobMeta, err := contracts.UnmarshalJobMeta(failedJob.Meta)
+	if err != nil {
+		slog.Warn("maybeCreateHealingJobs: failed to parse failed gate job meta; defaulting recovery classification",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"error", err,
+		)
+		return meta, detectedStack
+	}
+
+	if jobMeta.Gate != nil {
+		detectedStack = jobMeta.Gate.DetectedStack()
+		if jobMeta.Gate.Recovery != nil {
+			meta = cloneRecoveryMetadata(jobMeta.Gate.Recovery)
+		}
+	}
+	if meta.ErrorKind == "unknown" && jobMeta.Recovery != nil {
+		meta = cloneRecoveryMetadata(jobMeta.Recovery)
+	}
+	if meta.StrategyID == "" {
+		meta.StrategyID = fmt.Sprintf("%s-default", meta.ErrorKind)
+	}
+	return meta, detectedStack
+}
+
+func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
+	if src == nil {
+		return nil
+	}
+	out := *src
+	if src.Confidence != nil {
+		v := *src.Confidence
+		out.Confidence = &v
+	}
+	if len(src.Expectations) > 0 {
+		out.Expectations = append([]byte(nil), src.Expectations...)
+	}
+	return &out
 }
 
 func isGateJobType(jobType domaintypes.JobType) bool {

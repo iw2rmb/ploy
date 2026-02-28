@@ -350,11 +350,11 @@ func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 	t.Parallel()
 	meta := BuildGateStageMetadata{
 		Recovery: &BuildGateRecoveryMetadata{
-			LoopKind:   "healing",
-			ErrorKind:  "infra",
-			StrategyID: "infra-default",
-			Confidence: confidencePtr(0.8),
-			Reason:     "pre_gate network timeout",
+			LoopKind:     "healing",
+			ErrorKind:    "infra",
+			StrategyID:   "infra-default",
+			Confidence:   confidencePtr(0.8),
+			Reason:       "pre_gate network timeout",
 			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`),
 		},
 	}
@@ -409,6 +409,23 @@ func TestBuildGateStageMetadata_Recovery_InvalidErrorKind(t *testing.T) {
 	err := meta.Validate()
 	if err == nil {
 		t.Fatal("expected validation error for invalid error_kind")
+	}
+	if !strings.Contains(err.Error(), "error_kind") {
+		t.Fatalf("error = %q, want substring %q", err.Error(), "error_kind")
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_CustomErrorKindRejected(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:  "healing",
+			ErrorKind: "custom",
+		},
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for custom error_kind")
 	}
 	if !strings.Contains(err.Error(), "error_kind") {
 		t.Fatalf("error = %q, want substring %q", err.Error(), "error_kind")
@@ -500,11 +517,11 @@ func TestBuildGateStageMetadata_Recovery_JSONRoundTrip(t *testing.T) {
 	original := BuildGateStageMetadata{
 		BugSummary: "Missing semicolon on line 42",
 		Recovery: &BuildGateRecoveryMetadata{
-			LoopKind:   "healing",
-			ErrorKind:  "infra",
-			StrategyID: "infra-default",
-			Confidence: confidencePtr(0.75),
-			Reason:     "docker daemon unavailable",
+			LoopKind:     "healing",
+			ErrorKind:    "infra",
+			StrategyID:   "infra-default",
+			Confidence:   confidencePtr(0.75),
+			Reason:       "docker daemon unavailable",
 			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`),
 		},
 	}

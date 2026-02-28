@@ -117,3 +117,21 @@ func TestParseRouterDecision_InvalidErrorKindDefaultsToUnknown(t *testing.T) {
 		t.Fatalf("ErrorKind = %q, want %q", got.ErrorKind, "unknown")
 	}
 }
+
+func TestParseRouterDecision_CustomErrorKindDefaultsToUnknown(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	payload := `{"error_kind":"custom"}` + "\n"
+	if err := os.WriteFile(filepath.Join(outDir, "codex-last.txt"), []byte(payload), 0o644); err != nil {
+		t.Fatalf("write codex-last: %v", err)
+	}
+
+	got := parseRouterDecision(outDir)
+	if got == nil {
+		t.Fatal("parseRouterDecision() returned nil")
+	}
+	if got.ErrorKind != "unknown" {
+		t.Fatalf("ErrorKind = %q, want %q", got.ErrorKind, "unknown")
+	}
+}

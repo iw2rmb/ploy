@@ -40,7 +40,7 @@ func parseRouterDecision(outDir string) *contracts.BuildGateRecoveryMetadata {
 
 	if val, ok := obj["error_kind"].(string); ok {
 		switch strings.TrimSpace(val) {
-		case "infra", "code", "mixed", "unknown", "custom":
+		case "infra", "code", "mixed", "unknown":
 			decision.ErrorKind = strings.TrimSpace(val)
 		}
 	}
@@ -91,12 +91,12 @@ func parseCodexLastField(outDir, field string) string {
 		if err := json.Unmarshal([]byte(line), &obj); err != nil {
 			continue
 		}
-			if val, ok := obj[field]; ok {
-				if s, ok := val.(string); ok {
-					return truncateOneLine(s, 200)
-				}
+		if val, ok := obj[field]; ok {
+			if s, ok := val.(string); ok {
+				return truncateOneLine(s, 200)
 			}
 		}
+	}
 
 	// If line-by-line didn't work, try the entire content as a single JSON object
 	// (in case the file is a single-line JSON without trailing newline).

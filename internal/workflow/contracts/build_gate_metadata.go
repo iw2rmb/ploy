@@ -110,7 +110,7 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 		return fmt.Errorf("loop_kind invalid: %q", m.LoopKind)
 	}
 	switch m.ErrorKind {
-	case "infra", "code", "mixed", "unknown", "custom":
+	case "infra", "code", "mixed", "unknown":
 		// valid
 	case "":
 		return fmt.Errorf("error_kind is required")

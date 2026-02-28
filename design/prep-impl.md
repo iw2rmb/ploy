@@ -161,7 +161,6 @@ Classification contract:
 - `code`
 - `mixed`
 - `unknown`
-- `custom` (user-defined kinds via strategy registry)
 
 Current decision for conservative stopping:
 - if router returns `mixed` or `unknown`, stop the loop and stop remaining mig progression

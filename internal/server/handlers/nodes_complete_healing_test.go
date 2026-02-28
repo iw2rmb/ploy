@@ -7,6 +7,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
@@ -47,7 +48,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
-				Meta:        []byte(`{}`),
+				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing"}}}`),
 			},
 			{
 				ID:          domaintypes.NewJobID(),
@@ -123,6 +124,25 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if st.updateJobNextIDParams[0].NextID == nil || *st.updateJobNextIDParams[0].NextID != healJob.ID {
 		t.Fatalf("expected failed job to point to heal job %s", healJob.ID)
 	}
+
+	reGateMeta, err := contracts.UnmarshalJobMeta(reGateJob.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal re-gate meta: %v", err)
+	}
+	if reGateMeta.Recovery == nil || reGateMeta.Recovery.ErrorKind != "infra" {
+		t.Fatalf("expected re-gate recovery.error_kind=infra, got %#v", reGateMeta.Recovery)
+	}
+	if got, want := reGateMeta.Recovery.StrategyID, "infra-default"; got != want {
+		t.Fatalf("re-gate recovery.strategy_id = %q, want %q", got, want)
+	}
+
+	healMeta, err := contracts.UnmarshalJobMeta(healJob.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal heal meta: %v", err)
+	}
+	if healMeta.Recovery == nil || healMeta.Recovery.ErrorKind != "infra" {
+		t.Fatalf("expected heal recovery.error_kind=infra, got %#v", healMeta.Recovery)
+	}
 }
 
 func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) {
@@ -163,7 +183,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
-				Meta:        []byte(`{}`),
+				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
 			{
 				ID:          domaintypes.NewJobID(),
@@ -185,7 +205,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypeReGate.String(),
-				Meta:        []byte(`{}`),
+				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
 			{
 				ID:          domaintypes.NewJobID(),
@@ -231,6 +251,79 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	}
 	if st.createJobParams[0].NextID == nil || *st.createJobParams[0].NextID != mod0ID {
 		t.Fatalf("expected re-gate-2 to link back to original successor %s", mod0ID)
+	}
+}
+
+func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	specID := domaintypes.NewSpecID()
+	successorID := domaintypes.NewJobID()
+
+	specBytes, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"retries": float64(2),
+				"image":   "migs-codex:latest",
+			},
+			"router": map[string]any{
+				"image": "migs-router:latest",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal spec: %v", err)
+	}
+
+	failedID := domaintypes.NewJobID()
+	st := &mockStore{
+		getSpecResult: store.Spec{ID: specID, Spec: specBytes},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          failedID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "pre-gate",
+				Status:      store.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate.String(),
+				NextID:      &successorID,
+				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`),
+			},
+			{
+				ID:          successorID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mig-0",
+				Status:      store.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod.String(),
+				Meta:        []byte(`{"kind":"mig"}`),
+			},
+		},
+	}
+
+	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	failed := st.listJobsByRunRepoAttemptResult[0]
+	if err := maybeCreateHealingJobs(ctx, st, run, failed); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no healing jobs for mixed classification, got %d CreateJob calls", st.createJobCallCount)
+	}
+	if len(st.updateJobStatusCalls) != 1 {
+		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
+	}
+	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != store.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
 	}
 }
 
