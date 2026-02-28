@@ -1097,6 +1097,10 @@ Current stale-heartbeat recovery behavior:
 Gate profile behavior:
 - `mig_repos.gate_profile` and `mig_repos.gate_profile_artifacts` remain the persisted
   gate profile payload storage.
+- During `pre_gate`, when repo `gate_profile` is absent and the run spec does not define
+  explicit `build_gate.pre.gate_profile`, the node auto-generates a simple profile from
+  stack detection and resolved gate command, uses it in that `pre_gate`, and persists it
+  only if the `pre_gate` job succeeds.
 - Infra healing candidate validation uses `docs/schemas/gate_profile.schema.json`
   plus contract parsing.
 - A validated candidate can be promoted into `mig_repos.gate_profile` only after

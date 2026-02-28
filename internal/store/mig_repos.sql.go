@@ -280,6 +280,37 @@ func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context,
 	return id, err
 }
 
+const promotePreGateGeneratedGateProfile = `-- name: PromotePreGateGeneratedGateProfile :one
+WITH target_job AS (
+  SELECT j.id, j.repo_id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.job_type = 'pre_gate'
+    AND j.status = 'Success'
+)
+UPDATE mig_repos mr
+SET gate_profile = $2,
+    gate_profile_artifacts = $3,
+    gate_profile_updated_at = now()
+FROM target_job tj
+WHERE mr.id = tj.repo_id
+  AND mr.gate_profile IS NULL
+RETURNING mr.id
+`
+
+type PromotePreGateGeneratedGateProfileParams struct {
+	ID                   types.JobID `json:"id"`
+	GateProfile          []byte      `json:"gate_profile"`
+	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
+}
+
+func (q *Queries) PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error) {
+	row := q.db.QueryRow(ctx, promotePreGateGeneratedGateProfile, arg.ID, arg.GateProfile, arg.GateProfileArtifacts)
+	var id types.MigRepoID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const updateMigRepoRefs = `-- name: UpdateMigRepoRefs :exec
 UPDATE mig_repos
 SET base_ref = $2,

@@ -75,7 +75,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		return
 	}
 
-	applyGatePhaseOverrides(&manifest, req.JobType, typedOpts)
+	applyGatePhaseOverrides(&manifest, req, typedOpts)
 
 	// Rehydrate workspace from base + diffs.
 	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest)
@@ -289,17 +289,21 @@ func (r *runController) runRouterForGateFailure(
 //   - pre_gate may use build_gate.pre.gate_profile command/env override.
 //   - post_gate may use build_gate.post.gate_profile command/env override.
 //   - re_gate reuses build_gate.post.gate_profile command/env override.
-func applyGatePhaseOverrides(manifest *contracts.StepManifest, jobType types.JobType, typedOpts RunOptions) {
+func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
+	manifest.Gate.AutoBootstrapRepoGateProfile = false
 
-	switch jobType {
+	switch req.JobType {
 	case types.JobTypePreGate:
 		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
 		}
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PreGateProfile
+		if req.RepoGateProfileMissing && typedOpts.BuildGate.PreGateProfile == nil {
+			manifest.Gate.AutoBootstrapRepoGateProfile = true
+		}
 	case types.JobTypePostGate:
 		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack

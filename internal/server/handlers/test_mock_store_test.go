@@ -304,6 +304,12 @@ type mockStore struct {
 	promoteJobByIDIfUnblockedResult store.Job
 	promoteJobByIDIfUnblockedErr    error
 
+	// PromotePreGateGeneratedGateProfile tracking
+	promotePreGateGeneratedGateProfileCalled bool
+	promotePreGateGeneratedGateProfileParams store.PromotePreGateGeneratedGateProfileParams
+	promotePreGateGeneratedGateProfileResult types.MigRepoID
+	promotePreGateGeneratedGateProfileErr    error
+
 	// PromoteReGateRecoveryCandidateGateProfile tracking
 	promoteReGateRecoveryCandidateGateProfileCalled bool
 	promoteReGateRecoveryCandidateGateProfileParams store.PromoteReGateRecoveryCandidateGateProfileParams
@@ -1086,6 +1092,21 @@ func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobI
 		return m.listJobsByRunResult[i], nil
 	}
 	return store.Job{}, pgx.ErrNoRows
+}
+
+func (m *mockStore) PromotePreGateGeneratedGateProfile(ctx context.Context, arg store.PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error) {
+	m.promotePreGateGeneratedGateProfileCalled = true
+	m.promotePreGateGeneratedGateProfileParams = arg
+	if m.promotePreGateGeneratedGateProfileErr != nil {
+		return "", m.promotePreGateGeneratedGateProfileErr
+	}
+	if !m.promotePreGateGeneratedGateProfileResult.IsZero() {
+		return m.promotePreGateGeneratedGateProfileResult, nil
+	}
+	if !m.getJobResult.RepoID.IsZero() {
+		return m.getJobResult.RepoID, nil
+	}
+	return "", pgx.ErrNoRows
 }
 
 func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {

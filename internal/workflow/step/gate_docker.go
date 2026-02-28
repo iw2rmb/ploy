@@ -183,6 +183,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 
 	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)
+	if len(plan.generatedGateProfile) > 0 {
+		meta.GeneratedGateProfile = append([]byte(nil), plan.generatedGateProfile...)
+	}
 
 	if plan.stackGate != nil {
 		meta.StackGate = plan.stackGate

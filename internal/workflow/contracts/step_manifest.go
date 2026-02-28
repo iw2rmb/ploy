@@ -100,6 +100,10 @@ type StepGateSpec struct {
 	// Populated from StartRunRequest.RepoURL when building manifests.
 	RepoURL types.RepoURL
 
+	// RepoID is the repo identifier for this execution.
+	// Used by pre-gate auto-bootstrap to build a persisted gate_profile payload.
+	RepoID types.MigRepoID
+
 	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
 	// Derived from CommitSHA > TargetRef > BaseRef precedence when building manifests.
 	Ref types.GitRef
@@ -118,6 +122,10 @@ type StepGateSpec struct {
 
 	// GateProfile holds optional gate_profile-derived command/env overrides for this gate phase.
 	GateProfile *BuildGateProfileOverride
+
+	// AutoBootstrapRepoGateProfile enables pre-gate auto-generation of gate_profile
+	// from detected stack and resolved gate command when the repo has no persisted profile.
+	AutoBootstrapRepoGateProfile bool
 }
 
 // StepGateStackSpec holds the effective Stack Gate configuration for a gate phase.

@@ -2,6 +2,7 @@ package step
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -273,6 +274,70 @@ func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 	}
 	if got := rt.captured.Env["C"]; got != "prep" {
 		t.Fatalf("env[C] = %q, want %q", got, "prep")
+	}
+}
+
+func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled:                      true,
+		RepoID:                       types.MigRepoID("repo12345"),
+		AutoBootstrapRepoGateProfile: true,
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if len(meta.GeneratedGateProfile) == 0 {
+		t.Fatal("expected generated_gate_profile in metadata")
+	}
+	profile, err := contracts.ParseGateProfileJSON(meta.GeneratedGateProfile)
+	if err != nil {
+		t.Fatalf("ParseGateProfileJSON(generated): %v", err)
+	}
+	if got, want := profile.RepoID, "repo12345"; got != want {
+		t.Fatalf("generated profile repo_id=%q, want %q", got, want)
+	}
+	if got, want := profile.Stack.Tool, "maven"; got != want {
+		t.Fatalf("generated profile stack.tool=%q, want %q", got, want)
+	}
+	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "mvn --ff -B -q -e") {
+		t.Fatalf("generated build command=%q, want maven default command", profile.Targets.Build.Command)
+	}
+}
+
+func TestDockerGateExecutor_AutoBootstrapSkippedWithExplicitGateProfile(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{
+		Enabled:                      true,
+		RepoID:                       types.MigRepoID("repo12345"),
+		AutoBootstrapRepoGateProfile: true,
+		GateProfile: &contracts.BuildGateProfileOverride{
+			Command: contracts.CommandSpec{Shell: "echo explicit"},
+		},
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if len(meta.GeneratedGateProfile) != 0 {
+		t.Fatalf("generated_gate_profile unexpectedly present: %s", string(meta.GeneratedGateProfile))
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(meta.GeneratedGateProfile, &payload); err == nil && len(payload) > 0 {
+		t.Fatalf("generated_gate_profile unexpectedly decodes to non-empty payload: %v", payload)
 	}
 }
 

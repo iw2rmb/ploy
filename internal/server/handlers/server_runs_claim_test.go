@@ -113,6 +113,9 @@ func TestClaimJob_Success(t *testing.T) {
 	if resp["target_ref"] != "feature-branch" {
 		t.Fatalf("expected target_ref feature-branch, got %v", resp["target_ref"])
 	}
+	if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || !got {
+		t.Fatalf("expected repo_gate_profile_missing=true, got %v", resp["repo_gate_profile_missing"])
+	}
 	// v1: run status should be "Started" (not HEAD literals like "assigned"/"running").
 	// v1 run status values are Started, Cancelled, or Finished.
 	if resp["status"] != "Started" {
@@ -549,6 +552,9 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 			var resp map[string]any
 			if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 				t.Fatalf("decode response: %v", err)
+			}
+			if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || got {
+				t.Fatalf("expected repo_gate_profile_missing=false, got %v", resp["repo_gate_profile_missing"])
 			}
 			spec, ok := resp["spec"].(map[string]any)
 			if !ok {
