@@ -2,16 +2,19 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -360,6 +363,185 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	}
 	if st.promoteReGateRecoveryCandidateGateProfileCalled {
 		t.Fatal("did not expect promotion call on failed re-gate")
+	}
+}
+
+func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypeHeal.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	reGateID := domaintypes.NewJobID()
+	f.Job.NextID = &reGateID
+	f.Job.Meta = []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`)
+
+	failedGateID := domaintypes.NewJobID()
+	failedGate := store.Job{
+		ID:          failedGateID,
+		RunID:       f.RunID,
+		RepoID:      f.Job.RepoID,
+		RepoBaseRef: f.Job.RepoBaseRef,
+		Attempt:     f.Job.Attempt,
+		Name:        "pre-gate",
+		Status:      store.JobStatusFail,
+		JobType:     domaintypes.JobTypePreGate.String(),
+		NextID:      &f.Job.ID,
+		Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":true}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
+	}
+	reGate := store.Job{
+		ID:          reGateID,
+		RunID:       f.RunID,
+		RepoID:      f.Job.RepoID,
+		RepoBaseRef: f.Job.RepoBaseRef,
+		Attempt:     f.Job.Attempt,
+		Name:        "re-gate-1",
+		Status:      store.JobStatusCreated,
+		JobType:     domaintypes.JobTypeReGate.String(),
+		Meta:        []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"missing"}}`),
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+		getJobResults: map[domaintypes.JobID]store.Job{
+			reGateID: reGate,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{failedGate, f.Job, reGate},
+		listArtifactBundlesMetaByRunAndJobResult: []store.ArtifactBundle{
+			{
+				RunID:     f.RunID,
+				JobID:     &f.Job.ID,
+				ObjectKey: strPtr("artifacts/run/" + f.RunID.String() + "/bundle/heal.tar.gz"),
+			},
+		},
+	}
+	if _, stack := resolveFailedGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
+		t.Fatal("expected failed gate metadata to expose detected stack")
+	}
+
+	bs := bsmock.New()
+	candidateJSON := []byte(`{
+  "schema_version":1,
+  "repo_id":"` + f.Job.RepoID.String() + `",
+  "runner_mode":"simple",
+  "stack":{"language":"java","tool":"maven"},
+  "targets":{
+    "build":{"status":"passed","command":"mvn test","env":{},"failure_code":null},
+    "unit":{"status":"not_attempted","env":{}},
+    "all_tests":{"status":"not_attempted","env":{}}
+  },
+  "orchestration":{"pre":[],"post":[]},
+  "tactics_used":["unit_test_focused_profile"],
+  "attempts":[],
+  "evidence":{"log_refs":["/in/build-gate.log"],"diagnostics":[]},
+  "repro_check":{"status":"failed","details":"not run"},
+  "prompt_delta_suggestion":{"status":"none","summary":"","candidate_lines":[]}
+}`)
+	bundle := mustTarGzPayload(t, map[string][]byte{
+		"out/gate-profile-candidate.json": candidateJSON,
+	})
+	if _, err := bs.Put(context.Background(), "artifacts/run/"+f.RunID.String()+"/bundle/heal.tar.gz", "application/gzip", bundle); err != nil {
+		t.Fatalf("put blob: %v", err)
+	}
+	bp := blobpersist.New(st, bs)
+
+	handler := completeJobHandler(st, nil, bp)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobMetaCalled {
+		t.Fatal("expected UpdateJobMeta to be called for next re-gate")
+	}
+	if st.updateJobMetaParams.ID != reGateID {
+		t.Fatalf("updated meta job_id = %s, want %s", st.updateJobMetaParams.ID, reGateID)
+	}
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal updated re-gate meta: %v", err)
+	}
+	if meta.Recovery == nil {
+		t.Fatal("expected recovery metadata")
+	}
+	if got, want := meta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
+		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, meta.Recovery.CandidateValidationError)
+	}
+	if len(meta.Recovery.CandidateGateProfile) == 0 {
+		t.Fatal("expected candidate_gate_profile payload")
+	}
+}
+
+func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypeHeal.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	reGateID := domaintypes.NewJobID()
+	f.Job.NextID = &reGateID
+
+	failedGateID := domaintypes.NewJobID()
+	failedGate := store.Job{
+		ID:          failedGateID,
+		RunID:       f.RunID,
+		RepoID:      f.Job.RepoID,
+		RepoBaseRef: f.Job.RepoBaseRef,
+		Attempt:     f.Job.Attempt,
+		Name:        "pre-gate",
+		Status:      store.JobStatusFail,
+		JobType:     domaintypes.JobTypePreGate.String(),
+		NextID:      &f.Job.ID,
+		Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":true}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
+	}
+	reGate := store.Job{
+		ID:          reGateID,
+		RunID:       f.RunID,
+		RepoID:      f.Job.RepoID,
+		RepoBaseRef: f.Job.RepoBaseRef,
+		Attempt:     f.Job.Attempt,
+		Name:        "re-gate-1",
+		Status:      store.JobStatusCreated,
+		JobType:     domaintypes.JobTypeReGate.String(),
+		Meta:        []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"missing"}}`),
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+		getJobResults: map[domaintypes.JobID]store.Job{
+			reGateID: reGate,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{failedGate, f.Job, reGate},
+	}
+	bp := blobpersist.New(st, bsmock.New())
+
+	handler := completeJobHandler(st, nil, bp)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobMetaCalled {
+		t.Fatal("expected UpdateJobMeta to be called for next re-gate")
+	}
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal updated re-gate meta: %v", err)
+	}
+	if meta.Recovery == nil {
+		t.Fatal("expected recovery metadata")
+	}
+	if got, want := meta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusMissing; got != want {
+		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
+	}
+	if meta.Recovery.CandidateValidationError == "" {
+		t.Fatal("expected candidate_validation_error for missing artifact")
 	}
 }
 

@@ -362,6 +362,13 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 					"err", promoteErr,
 				)
 			}
+			if refreshErr := maybeRefreshNextReGateRecoveryCandidate(ctx, st, bp, job); refreshErr != nil {
+				slog.Error("complete job: failed to refresh next re-gate recovery candidate",
+					"job_id", jobID,
+					"repo_id", job.RepoID,
+					"err", refreshErr,
+				)
+			}
 			if job.NextID != nil {
 				if _, err := st.PromoteJobByIDIfUnblocked(ctx, *job.NextID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to promote next linked job",
@@ -581,4 +588,86 @@ func maybePromoteReGateRecoveryCandidate(
 		return nil
 	}
 	return err
+}
+
+func maybeRefreshNextReGateRecoveryCandidate(
+	ctx context.Context,
+	st store.Store,
+	bp *blobpersist.Service,
+	healJob store.Job,
+) error {
+	if domaintypes.JobType(healJob.JobType) != domaintypes.JobTypeHeal {
+		return nil
+	}
+	if bp == nil || healJob.NextID == nil {
+		return nil
+	}
+
+	reGateJob, err := st.GetJob(ctx, *healJob.NextID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if domaintypes.JobType(reGateJob.JobType) != domaintypes.JobTypeReGate {
+		return nil
+	}
+
+	meta, err := contracts.UnmarshalJobMeta(reGateJob.Meta)
+	if err != nil {
+		return nil
+	}
+	recovery := meta.Recovery
+	if recovery == nil && meta.Gate != nil {
+		recovery = meta.Gate.Recovery
+	}
+	if recovery == nil || strings.TrimSpace(recovery.ErrorKind) != "infra" {
+		return nil
+	}
+
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   reGateJob.RunID,
+		RepoID:  reGateJob.RepoID,
+		Attempt: reGateJob.Attempt,
+	})
+	if err != nil {
+		return err
+	}
+
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
+	for _, item := range jobs {
+		jobsByID[item.ID] = item
+	}
+	if refreshed, ok := jobsByID[reGateJob.ID]; ok {
+		reGateJob = refreshed
+	}
+
+	detectedStack := contracts.ModStackUnknown
+	if prevHeal := predecessorOf(reGateJob.ID, jobsByID); prevHeal != nil {
+		if failedGate := predecessorOf(prevHeal.ID, jobsByID); failedGate != nil {
+			_, detectedStack = resolveFailedGateRecoveryContext(*failedGate)
+		}
+	}
+
+	updatedRecovery := cloneRecoveryMetadata(recovery)
+	evaluateAndAttachInfraCandidate(ctx, bp, reGateJob.RunID, reGateJob, jobsByID, detectedStack, updatedRecovery)
+	if meta.Recovery != nil {
+		meta.Recovery = updatedRecovery
+	}
+	if meta.Gate != nil && meta.Gate.Recovery != nil {
+		meta.Gate.Recovery = updatedRecovery
+	}
+	if meta.Recovery == nil && (meta.Gate == nil || meta.Gate.Recovery == nil) {
+		meta.Recovery = updatedRecovery
+	}
+
+	updatedMeta, err := contracts.MarshalJobMeta(meta)
+	if err != nil {
+		return err
+	}
+	return st.UpdateJobMeta(ctx, store.UpdateJobMetaParams{
+		ID:   reGateJob.ID,
+		Meta: updatedMeta,
+	})
 }
