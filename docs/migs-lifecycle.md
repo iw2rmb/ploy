@@ -215,6 +215,9 @@ Router runtime environment:
 - **Linear execution**: The healing mig runs, then the gate is re-run.
 - **Retries**: If the gate still fails, the selected healing action may be retried up to configured `retries`.
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
+- **Workspace policy by error kind**:
+  - `infra` healing must leave `/workspace` unchanged; if files are changed, the heal job fails with `healing_warning=unexpected_workspace_changes`.
+  - non-`infra` healing must change `/workspace`; if no files are changed, the heal job fails with `healing_warning=no_workspace_changes`.
 - **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
   `jobs.meta.action_summary` for mig jobs.

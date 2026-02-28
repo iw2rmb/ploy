@@ -89,3 +89,51 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 		t.Fatalf("stats.healing_warning = %v, want %q", statsObj["healing_warning"], "no_workspace_changes")
 	}
 }
+
+func TestUploadHealingWorkspacePolicyFailure_UnexpectedChanges_UploadsFailedStatus(t *testing.T) {
+	tokenDir := t.TempDir()
+	tokenPath := filepath.Join(tokenDir, "bearer-token")
+	if err := os.WriteFile(tokenPath, []byte("test-token"), 0o600); err != nil {
+		t.Fatalf("write bearer token: %v", err)
+	}
+	t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
+
+	var mu sync.Mutex
+	var capturedPayload map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		_ = json.NewDecoder(r.Body).Decode(&capturedPayload)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: server.URL,
+			NodeID:    types.NodeID("node123"),
+			HTTP: HTTPConfig{
+				TLS: TLSConfig{Enabled: false},
+			},
+		},
+	}
+
+	req := StartRunRequest{
+		RunID: types.RunID("run-heal-unexpected-change"),
+		JobID: types.JobID("job-heal-unexpected-change"),
+	}
+
+	rc.uploadHealingWorkspacePolicyFailure(context.Background(), req, "unexpected_workspace_changes", 123*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	statsObj, ok := capturedPayload["stats"].(map[string]any)
+	if !ok {
+		t.Fatalf("stats = %T, want object", capturedPayload["stats"])
+	}
+	if got, _ := statsObj["healing_warning"].(string); got != "unexpected_workspace_changes" {
+		t.Fatalf("stats.healing_warning = %v, want %q", statsObj["healing_warning"], "unexpected_workspace_changes")
+	}
+}
