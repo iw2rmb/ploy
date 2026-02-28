@@ -78,10 +78,11 @@ Gate profile runtime hints mapped to gate env:
 
 For gate failure with `error_kind=infra` and artifact expectation `schema=gate_profile_v1`:
 1. Healing strategy emits `/out/gate-profile-candidate.json`.
-2. Server loads candidate artifact from prior heal job outputs.
-3. Candidate is validated against gate profile schema.
-4. Candidate is parsed and stack-matched to detected gate stack.
-5. On valid candidate, re-gate spec receives candidate-derived gate_profile override.
+2. Healing insertion initializes `re_gate` candidate metadata from prior heal outputs when available.
+3. On `heal` success, server refreshes linked `re_gate` candidate metadata from the just-finished heal artifact.
+4. Candidate is validated against gate profile schema.
+5. Candidate is parsed and stack-matched to detected gate stack.
+6. On valid candidate, re-gate spec receives candidate-derived gate_profile override.
 
 Validation status is persisted in recovery metadata:
 - `missing`
@@ -91,6 +92,7 @@ Validation status is persisted in recovery metadata:
 
 Implementation path:
 - validation/attach: `internal/server/handlers/nodes_complete_healing.go`
+- heal-complete refresh: `internal/server/handlers/jobs_complete.go`
 - claim-time candidate merge for `re_gate`: `internal/server/handlers/nodes_claim.go`
 
 ## Promotion on Successful Re-Gate

@@ -132,10 +132,11 @@ type mockStore struct {
 	createEventResult store.Event
 	createEventErr    error
 
-	getJobCalled bool
-	getJobParams string
-	getJobResult store.Job
-	getJobErr    error
+	getJobCalled  bool
+	getJobParams  string
+	getJobResult  store.Job
+	getJobResults map[types.JobID]store.Job
+	getJobErr     error
 
 	createDiffCalled bool
 	createDiffParams store.CreateDiffParams
@@ -281,6 +282,11 @@ type mockStore struct {
 	updateJobCompletionWithMetaCalled bool
 	updateJobCompletionWithMetaParams store.UpdateJobCompletionWithMetaParams
 	updateJobCompletionWithMetaErr    error
+
+	// UpdateJobMeta tracking
+	updateJobMetaCalled bool
+	updateJobMetaParams store.UpdateJobMetaParams
+	updateJobMetaErr    error
 
 	// UpsertJobMetric tracking
 	upsertJobMetricCalled bool
@@ -803,6 +809,11 @@ func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventPar
 func (m *mockStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
 	m.getJobCalled = true
 	m.getJobParams = id.String()
+	if len(m.getJobResults) > 0 {
+		if result, ok := m.getJobResults[id]; ok {
+			return result, m.getJobErr
+		}
+	}
 	return m.getJobResult, m.getJobErr
 }
 
@@ -1035,6 +1046,12 @@ func (m *mockStore) UpdateJobCompletionWithMeta(ctx context.Context, params stor
 	m.updateJobCompletionWithMetaCalled = true
 	m.updateJobCompletionWithMetaParams = params
 	return m.updateJobCompletionWithMetaErr
+}
+
+func (m *mockStore) UpdateJobMeta(ctx context.Context, params store.UpdateJobMetaParams) error {
+	m.updateJobMetaCalled = true
+	m.updateJobMetaParams = params
+	return m.updateJobMetaErr
 }
 
 func (m *mockStore) UpsertJobMetric(ctx context.Context, params store.UpsertJobMetricParams) error {

@@ -562,6 +562,10 @@ Rewire example:
   validates candidate bytes from the previous heal artifact
   (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
   status in `re_gate` recovery metadata.
+- On `heal` success, before promoting the linked `re_gate`, the server refreshes that
+  `re_gate` recovery candidate metadata from the just-finished heal artifact. This
+  makes first-attempt `heal -> re_gate` use the current attempt candidate instead of
+  waiting for the next retry chain.
 - Candidate outcomes are strict and non-blocking:
   - missing artifact -> `candidate_validation_status=missing`
   - unreadable artifact bundle -> `candidate_validation_status=unavailable`
