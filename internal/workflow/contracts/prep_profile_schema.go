@@ -1,4 +1,4 @@
-package prep
+package contracts
 
 import (
 	"encoding/json"
@@ -9,36 +9,32 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/xeipuuv/gojsonschema"
 )
 
 var (
-	schemaOnce sync.Once
-	schemaObj  *gojsonschema.Schema
-	schemaErr  error
+	prepProfileSchemaOnce sync.Once
+	prepProfileSchemaObj  *gojsonschema.Schema
+	prepProfileSchemaErr  error
 )
 
-func validateProfileJSON(raw []byte) error {
+func validatePrepProfileJSON(raw []byte) error {
 	if len(raw) == 0 {
 		return fmt.Errorf("prep schema validation failed: empty output")
 	}
 	if !json.Valid(raw) {
 		return fmt.Errorf("prep schema validation failed: output is not valid JSON")
 	}
-
-	if err := loadSchema(); err != nil {
+	if err := loadPrepProfileSchema(); err != nil {
 		return err
 	}
-
-	result, err := schemaObj.Validate(gojsonschema.NewBytesLoader(raw))
+	result, err := prepProfileSchemaObj.Validate(gojsonschema.NewBytesLoader(raw))
 	if err != nil {
 		return fmt.Errorf("prep schema validation failed: %w", err)
 	}
 	if result.Valid() {
 		return nil
 	}
-
 	msgs := make([]string, 0, len(result.Errors()))
 	for _, e := range result.Errors() {
 		msgs = append(msgs, e.String())
@@ -46,53 +42,49 @@ func validateProfileJSON(raw []byte) error {
 	return fmt.Errorf("prep schema validation failed: %s", strings.Join(msgs, "; "))
 }
 
-func ValidateProfileJSONForSchema(raw []byte, schemaID string) error {
+func ValidatePrepProfileJSONForSchema(raw []byte, schemaID string) error {
 	switch strings.TrimSpace(schemaID) {
-	case contracts.PrepProfileCandidateSchemaID:
-		return validateProfileJSON(raw)
+	case PrepProfileCandidateSchemaID:
+		return validatePrepProfileJSON(raw)
 	default:
 		return fmt.Errorf("prep schema validation failed: unsupported schema id %q", schemaID)
 	}
 }
 
-func loadSchema() error {
-	schemaOnce.Do(func() {
+func loadPrepProfileSchema() error {
+	prepProfileSchemaOnce.Do(func() {
 		path, err := prepProfileSchemaPath()
 		if err != nil {
-			schemaErr = err
+			prepProfileSchemaErr = err
 			return
 		}
 		schemaBytes, err := os.ReadFile(path)
 		if err != nil {
-			schemaErr = fmt.Errorf("read prep schema %q: %w", path, err)
+			prepProfileSchemaErr = fmt.Errorf("read prep schema %q: %w", path, err)
 			return
 		}
-		schemaObj, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(schemaBytes))
+		prepProfileSchemaObj, err = gojsonschema.NewSchema(gojsonschema.NewBytesLoader(schemaBytes))
 		if err != nil {
-			schemaErr = fmt.Errorf("compile prep schema %q: %w", path, err)
+			prepProfileSchemaErr = fmt.Errorf("compile prep schema %q: %w", path, err)
 			return
 		}
 	})
-	if schemaErr != nil {
-		return fmt.Errorf("prep schema validation unavailable: %w", schemaErr)
+	if prepProfileSchemaErr != nil {
+		return fmt.Errorf("prep schema validation unavailable: %w", prepProfileSchemaErr)
 	}
 	return nil
 }
 
 func prepProfileSchemaPath() (string, error) {
 	candidates := make([]string, 0, 3)
-
 	_, file, _, ok := runtime.Caller(0)
 	if ok {
 		candidates = append(candidates, filepath.Join(filepath.Dir(file), "..", "..", "..", "docs", "schemas", "prep_profile.schema.json"))
 	}
-
-	// Fall back to repository-relative and image-provisioned locations.
 	candidates = append(candidates,
 		filepath.Join("docs", "schemas", "prep_profile.schema.json"),
 		filepath.Join("/etc", "ploy", "schemas", "prep_profile.schema.json"),
 	)
-
 	var errs []string
 	for _, path := range candidates {
 		_, err := os.Stat(path)

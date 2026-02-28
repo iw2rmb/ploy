@@ -37,8 +37,6 @@ func TestDockerGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
 }
 
 func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.T) {
-	t.Setenv("PLOY_BUILDGATE_IMAGE", "docker.io/example/gate:latest")
-
 	var (
 		observerCalled bool
 		observedImage  string
@@ -69,8 +67,8 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 	if !observerCalled {
 		t.Fatalf("expected runtime image observer to be called")
 	}
-	if observedImage != "docker.io/example/gate:latest" {
-		t.Fatalf("observed image = %q, want %q", observedImage, "docker.io/example/gate:latest")
+	if observedImage == "" {
+		t.Fatalf("observed image is empty")
 	}
 }
 
@@ -1143,14 +1141,9 @@ func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 	}
 }
 
-// TestGateDocker_StackGate_UsesBuildgateImageEnv verifies that PLOY_BUILDGATE_IMAGE
-// is honored in Stack Gate mode.
-func TestGateDocker_StackGate_UsesBuildgateImageEnv(t *testing.T) {
-	// Cannot use t.Parallel() with t.Setenv.
-
+func TestGateDocker_StackGate_UsesStackMappedImage(t *testing.T) {
+	t.Parallel()
 	workspace := createMavenWorkspace(t, "17")
-
-	t.Setenv("PLOY_BUILDGATE_IMAGE", "override:latest")
 
 	rt := &testContainerRuntime{}
 	executor := NewDockerGateExecutor(rt)
@@ -1176,13 +1169,13 @@ func TestGateDocker_StackGate_UsesBuildgateImageEnv(t *testing.T) {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
 
-	if rt.captured.Image != "override:latest" {
-		t.Errorf("Image = %q, want %q", rt.captured.Image, "override:latest")
+	if rt.captured.Image != "resolved-from-mapping:17" {
+		t.Errorf("Image = %q, want %q", rt.captured.Image, "resolved-from-mapping:17")
 	}
 
 	// Verify RuntimeImage in metadata.
-	if meta.StackGate.RuntimeImage != "override:latest" {
-		t.Errorf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "override:latest")
+	if meta.StackGate.RuntimeImage != "resolved-from-mapping:17" {
+		t.Errorf("RuntimeImage = %q, want %q", meta.StackGate.RuntimeImage, "resolved-from-mapping:17")
 	}
 }
 

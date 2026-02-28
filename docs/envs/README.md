@@ -54,9 +54,6 @@ defaults change, or components adopt additional configuration.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
   default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
   descriptor specifies HTTPS.
-- `PLOY_BUILDGATE_IMAGE` — Optional unified override for the Docker image used by the
-  Build Gate executor for any stack. When set, it takes precedence over language‑specific
-  defaults. Commands still auto‑select by workspace (Maven vs Gradle).
 - `PLOY_BUILDGATE_TIMEOUT` — Optional maximum duration for Build Gate HTTP polling (e.g., `5m`). When the request
   context has no deadline, HTTP-based gate executors use this value as the polling timeout; defaults to `10m` when unset or invalid.
 - `PLOY_CONFIG_HOME` — Optional override for the base directory where cluster descriptors
@@ -152,15 +149,6 @@ See `docs/build-gate/README.md` for Build Gate configuration and execution detai
   Relevant `ployd.yaml` scheduler keys for stale-job recovery:
   - `scheduler.stale_job_recovery_interval` (default `30s`; set `0` to disable recovery)
   - `scheduler.node_stale_after` (default `1m`; stale cutoff for node heartbeats)
-  Relevant `ployd.yaml` scheduler keys for prep orchestration:
-  - `scheduler.prep_interval` (default `0`; set `>0` to enable prep scheduler)
-  - `scheduler.prep_max_attempts` (default `3`; total attempts before `PrepFailed`)
-  - `scheduler.prep_retry_delay` (default `30s`; fixed delay before retry claims)
-  Local Docker cluster note (`deploy/local/server/ployd.yaml`):
-  - Prep scheduler is enabled for deterministic prep E2E with:
-    - `scheduler.prep_interval: 2s`
-    - `scheduler.prep_max_attempts: 1`
-    - `scheduler.prep_retry_delay: 2s`
   Recovery observability and troubleshooting:
   - Recovery emits structured logs (`stale-job-recovery: cycle completed`) with
     `stale_nodes`, `stale_attempts`, `repos_updated`, `jobs_cancelled`, and
@@ -587,5 +575,4 @@ The Build Gate executor supports optional resource limits via environment variab
 - `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU limit in millicores (e.g., `500` = 0.5 CPU, `1500` = 1.5 CPU).
 
 Notes:
-- When both `PLOY_BUILDGATE_IMAGE` and a language default apply, `PLOY_BUILDGATE_IMAGE` wins.
 - Memory and disk limits accept human‑friendly suffixes; CPU uses numeric millicores only.

@@ -2,7 +2,7 @@ services:
   server:
     build:
       context: ../..
-      dockerfile: deploy/images/server/Dockerfile.local
+      dockerfile: deploy/images/server/Dockerfile
       secrets:
         - ploy_ca_bundle
     image: ploy-server:local

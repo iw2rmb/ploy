@@ -68,7 +68,7 @@ No flags means full deploy (server + node + garage + registry services).
   - `dist/ployd-linux -> /usr/local/bin/ployd`
   - `dist/ployd-node-linux -> /usr/local/bin/ployd-node`
 - Runtime images are built from:
-  - `deploy/images/server/Dockerfile.local`
+  - `deploy/images/server/Dockerfile`
   - `deploy/images/node/Dockerfile.local`
   - `deploy/local/garage/Dockerfile.init` (bootstrap helper image with `/garage` + shell)
 - No Go compilation happens in container builds.

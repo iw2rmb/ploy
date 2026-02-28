@@ -14,6 +14,7 @@ func TestPrepProfileParseAndMapToGate(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"runtime": {
 			"docker": {
 				"mode": "host_socket",
@@ -127,32 +128,32 @@ func TestPrepProfileParseRejectsInvalidPayload(t *testing.T) {
 		},
 		{
 			name:    "missing schema version",
-			raw:     []byte(`{"repo_id":"repo_123","runner_mode":"simple","targets":{},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.schema_version",
 		},
 		{
 			name:    "invalid target status",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"bad","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"bad","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.targets.build.status",
 		},
 		{
 			name:    "passed missing command",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"passed","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.targets.build.command",
 		},
 		{
 			name:    "simple mode rejects orchestration steps",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[{"id":"x"}],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[{"id":"x"}],"post":[]}}`),
 			wantErr: "simple mode must not define pre/post steps",
 		},
 		{
 			name:    "runtime tcp requires host",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","runtime":{"docker":{"mode":"tcp"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"runtime":{"docker":{"mode":"tcp"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.runtime.docker.host",
 		},
 		{
 			name:    "runtime host forbidden for host_socket",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","runtime":{"docker":{"mode":"host_socket","host":"tcp://docker:2375"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"runtime":{"docker":{"mode":"host_socket","host":"tcp://docker:2375"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "prep_profile.runtime.docker.host: forbidden",
 		},
 	}
@@ -177,6 +178,7 @@ func TestPrepProfileMapToGateSkipsWhenNotPassedOrMissingCommand(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"targets": {
 			"build": {"status":"not_attempted","env":{}},
 			"unit": {"status":"failed","command":"go test ./... -run TestUnit","env":{},"failure_code":"unknown"},
@@ -212,6 +214,7 @@ func TestPrepProfileRuntimeTCPMapsToGateEnv(t *testing.T) {
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
 		"runtime": {
 			"docker": {
 				"mode": "tcp",

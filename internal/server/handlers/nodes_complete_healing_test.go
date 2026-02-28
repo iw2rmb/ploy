@@ -421,7 +421,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypeReGate.String(),
-				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}}`),
+				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}}`),
 			},
 			{
 				ID:          mig0ID,
@@ -446,6 +446,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 		"schema_version": 1,
 		"repo_id": "repo_123",
 		"runner_mode": "simple",
+		"stack": {"language":"java","tool":"maven"},
 		"targets": {
 			"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
 			"unit": {"status":"not_attempted","env":{}},
@@ -490,7 +491,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 		t.Fatalf("candidate_artifact_path = %q, want %q", got, want)
 	}
 	if got, want := reGateMeta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
-		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
+		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, reGateMeta.Recovery.CandidateValidationError)
 	}
 	if len(reGateMeta.Recovery.CandidatePrepProfile) == 0 {
 		t.Fatal("expected candidate_prep_profile to be stored")

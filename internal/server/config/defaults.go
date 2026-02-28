@@ -22,8 +22,6 @@ const (
 	defaultBatchSchedulerInterval = 5 * time.Second
 	defaultStaleJobRecovery       = 30 * time.Second
 	defaultNodeStaleAfter         = time.Minute
-	defaultPrepMaxAttempts        = 3
-	defaultPrepRetryDelay         = 30 * time.Second
 )
 
 // defaultConfig returns the baseline configuration with baked-in defaults.
@@ -50,8 +48,6 @@ func defaultConfig() Config {
 			BatchSchedulerInterval:   defaultBatchSchedulerInterval,
 			StaleJobRecoveryInterval: defaultStaleJobRecovery,
 			NodeStaleAfter:           defaultNodeStaleAfter,
-			PrepMaxAttempts:          defaultPrepMaxAttempts,
-			PrepRetryDelay:           defaultPrepRetryDelay,
 		},
 		Worker: WorkerConfig{
 			TaskConcurrency: defaultTaskConcurrency,
@@ -165,17 +161,6 @@ func applyDefaults(cfg *Config) {
 	if cfg.Scheduler.NodeStaleAfter <= 0 {
 		cfg.Scheduler.NodeStaleAfter = defaultNodeStaleAfter
 	}
-	// Prep scheduler interval: 0 disables prep orchestration, negative is normalized to disabled.
-	if cfg.Scheduler.PrepInterval < 0 {
-		cfg.Scheduler.PrepInterval = 0
-	}
-	if cfg.Scheduler.PrepMaxAttempts <= 0 {
-		cfg.Scheduler.PrepMaxAttempts = defaultPrepMaxAttempts
-	}
-	if cfg.Scheduler.PrepRetryDelay <= 0 {
-		cfg.Scheduler.PrepRetryDelay = defaultPrepRetryDelay
-	}
-
 	normalizeRuntimeConfig(&cfg.Runtime)
 	cfg.rawPlugins = make(map[string]struct{}, len(cfg.Runtime.Plugins))
 	for _, plugin := range cfg.Runtime.Plugins {

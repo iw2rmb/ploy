@@ -707,29 +707,15 @@ insert `heal-*` + `re-gate-*` jobs by rewiring `next_id` links.
 The background scheduler ensures queued repos have jobs and promotes the next job for a
 repo attempt. It does not create per-repo child runs.
 
-### Prep scheduler (track 1)
+### Prep profile usage (current)
 
-The prep scheduler claims repos in `PrepPending` and due repos in
-`PrepRetryScheduled`, runs one non-interactive prep attempt, validates the profile
-against `docs/schemas/prep_profile.schema.json`, and persists attempt evidence in
-`prep_runs`.
-
-Failure handling:
-- attempt row is finalized as `PrepFailed`
-- repo state transitions to `PrepRetryScheduled` while attempts remain
-- repo transitions to `PrepFailed` when attempts are exhausted
-
-Current defaults:
-- `scheduler.prep_interval`: `0` (disabled)
-- `scheduler.prep_max_attempts`: `3`
-- `scheduler.prep_retry_delay`: `30s`
-
-Prep observability endpoints:
-- `GET /v1/repos` includes repo-level prep summary fields:
-  `prep_status`, `prep_updated_at`, `prep_failure_code`.
-- `GET /v1/repos/{repo_id}/prep` returns full prep state for one repo:
-  `prep_attempts`, `prep_last_error`, `prep_profile`, `prep_artifacts`,
-  plus `prep_runs` evidence (`attempt`, `status`, timestamps, `result_json`, `logs_ref`).
+There is no standalone prep scheduler loop and no `prep_runs` table.
+Prep profiles are persisted on `mig_repos` and consumed at claim-time:
+- `GET /v1/repos` surfaces repo-level summary and latest run metadata.
+- `prep_profile` is mapped into gate phase prep overrides when present.
+- Infra healing may provide a candidate prep profile artifact
+  (`/out/prep-profile-candidate.json`, schema `prep_profile_v1`).
+- Candidate promotion to repo `prep_profile` happens only after successful `re_gate`.
 
 Prep profile to Build Gate mapping (claim-time):
 - `pre_gate` maps to `prep_profile.targets.build`.
@@ -756,16 +742,10 @@ Prep profile to Build Gate mapping (claim-time):
 |-------------|--------------------------------------------|-------------------------------------------|
 | `specs`     | Append-only spec dictionary                | referenced by `migs.spec_id`, `runs.spec_id` |
 | `migs`      | Mod projects                               | `migs` → `mig_repos` (1:N), `migs` → `runs` (1:N) |
-| `mig_repos` | Managed repo set for a mig                 | `mig_repos` → `run_repos` (1:N), `mig_repos` → `jobs` (1:N), `mig_repos` → `prep_runs` (1:N) |
+| `mig_repos` | Managed repo set for a mig                 | `mig_repos` → `run_repos` (1:N), `mig_repos` → `jobs` (1:N) |
 | `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
 | `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id)` → `jobs` (1:N)        |
-| `prep_runs` | Per-attempt prep evidence for a repo       | `(repo_id, attempt)` with `repo_id` → `mig_repos.id` |
 | `jobs`      | Execution units (pre-gate, mig, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
-
-Prep lifecycle persistence in `mig_repos`:
-- `prep_status`: `PrepPending | PrepRunning | PrepRetryScheduled | PrepReady | PrepFailed`
-- `prep_attempts`, `prep_last_error`, `prep_failure_code`, `prep_updated_at`
-- `prep_profile` and `prep_artifacts` JSON payloads
 
 ### Pulling Diffs Locally (`run pull` / `mig pull`)
 
@@ -882,7 +862,7 @@ See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
 - Run repos queries: `internal/store/queries/run_repos.sql`.
 - Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
 - CLI subcommands: `cmd/ploy/mod_run_repo.go`.
-- Schema: `internal/store/schema.sql` (see `mig_repos`, `prep_runs`, `runs`, `run_repos`, `jobs` tables).
+- Schema: `internal/store/schema.sql` (see `mig_repos`, `runs`, `run_repos`, `jobs` tables).
 
 ## 2. Data Model
 
@@ -1040,8 +1020,7 @@ value is a `StageStatus` object describing that job's execution state.
   - Behaviour (single source of truth for Mods execution):
     - Creates a spec (`specs`), a mig project (`migs`), a managed repo (`mod_repos`),
       a run (`runs`, `status=Started`), and a run repo (`run_repos`, `status=Queued`).
-    - Jobs are materialized by the scheduler/start path only when the repo prep state
-      is `PrepReady`.
+    - Jobs are materialized by the scheduler/start path for queued repos.
     - The run repo transitions to `Running` when the first job is claimed.
     - Publishes an initial `RunSummary` snapshot via `events.Service.PublishRun`
       (this run_id is used by SSE, diffs, and logs APIs).
@@ -1115,15 +1094,13 @@ Current stale-heartbeat recovery behavior:
 - When recovery finalizes a run, the server publishes the same terminal SSE
   sequence as normal completion: a terminal `run` snapshot followed by `done`.
 
-Current prep scheduler behavior:
-- Prep orchestration runs every `scheduler.prep_interval` (`0` disables).
-- Retry claims are eligible when `prep_updated_at <= now() - scheduler.prep_retry_delay`.
-- Each claim increments `mig_repos.prep_attempts` and clears last error/failure code.
-- Prep clone uses `mig_repos.base_ref` as the workspace base snapshot (same as run hydration).
-  `target_ref` is not used for prep checkout.
-- Success persists `prep_profile` + `prep_artifacts` and transitions repo to `PrepReady`.
-- Queued run repos are eligible for job materialization only when
-  `mig_repos.prep_status='PrepReady'`.
+Prep profile behavior:
+- `mig_repos.prep_profile` and `mig_repos.prep_artifacts` remain the persisted
+  prep payload storage.
+- Infra healing candidate validation uses `docs/schemas/prep_profile.schema.json`
+  plus contract parsing.
+- A validated candidate can be promoted into `mig_repos.prep_profile` only after
+  successful `re_gate`.
 
 Node startup crash reconciliation behavior:
 - On node process startup, the node agent runs one startup reconciliation pass
@@ -1165,7 +1142,7 @@ For a spec without `migs[]` (single-step top-level `image`/`command`/`env`):
    - Creates `runs` + `run_repos` rows.
    - Publishes an initial `RunSummary` over SSE.
 3. Scheduler/start path materializes jobs (pre-gate, mig, post-gate) as a
-   `next_id`-linked chain only after prep is `PrepReady`.
+   `next_id`-linked chain.
 4. A node:
    - Claims jobs via `/v1/nodes/{id}/claim` (jobs are claimed from a unified queue; within a repo attempt, the server promotes the next job only after prior jobs succeed).
    - For each claimed job:
@@ -1185,7 +1162,7 @@ For a spec with `migs[]`:
 2. `POST /v1/runs`:
    - Creates `runs` + `run_repos` rows.
 3. Scheduler and nodeagents:
-   - Scheduler/start path creates jobs for pre-gate, each mig, and post-gates as a linked chain after prep is `PrepReady`.
+   - Scheduler/start path creates jobs for pre-gate, each mig, and post-gates as a linked chain.
    - Job creation persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
    - Each job row includes `job_type` (pre_gate, mig, post_gate, heal, re_gate)
      and `job_image` (saved by the executing node before the container starts).

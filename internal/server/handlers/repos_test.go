@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -53,25 +52,19 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	failureCode := "BUILD_FAILED"
 	st := &mockStore{
 		listDistinctReposResult: []store.ListDistinctReposRow{
 			{
-				RepoID:        "repo0001",
-				RepoUrl:       "https://github.com/org/repo1.git",
-				LastRunAt:     pgtype.Timestamptz{Time: now, Valid: true},
-				LastStatus:    "Success",
-				PrepStatus:    store.PrepStatusReady,
-				PrepUpdatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true},
+				RepoID:     "repo0001",
+				RepoUrl:    "https://github.com/org/repo1.git",
+				LastRunAt:  pgtype.Timestamptz{Time: now, Valid: true},
+				LastStatus: "Success",
 			},
 			{
-				RepoID:          "repo0002",
-				RepoUrl:         "https://github.com/org/repo2.git",
-				LastRunAt:       pgtype.Timestamptz{Valid: false},
-				LastStatus:      "",
-				PrepStatus:      store.PrepStatusFailed,
-				PrepFailureCode: &failureCode,
-				PrepUpdatedAt:   pgtype.Timestamptz{Time: now, Valid: true},
+				RepoID:     "repo0002",
+				RepoUrl:    "https://github.com/org/repo2.git",
+				LastRunAt:  pgtype.Timestamptz{Valid: false},
+				LastStatus: "",
 			},
 		},
 	}
@@ -104,13 +97,6 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	if resp.Repos[0].LastStatus == nil || *resp.Repos[0].LastStatus != "Success" {
 		t.Fatalf("expected last_status Success, got %v", resp.Repos[0].LastStatus)
 	}
-	if resp.Repos[0].PrepStatus != string(store.PrepStatusReady) {
-		t.Fatalf("expected prep_status %q, got %q", store.PrepStatusReady, resp.Repos[0].PrepStatus)
-	}
-	if resp.Repos[0].PrepUpdatedAt == nil {
-		t.Fatalf("expected prep_updated_at to be set for repo[0]")
-	}
-
 	if resp.Repos[1].RepoID.String() != "repo0002" || resp.Repos[1].RepoURL != "https://github.com/org/repo2.git" {
 		t.Fatalf("unexpected repo[1]: %+v", resp.Repos[1])
 	}
@@ -119,12 +105,6 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	}
 	if resp.Repos[1].LastStatus != nil {
 		t.Fatalf("expected last_status to be nil for repo[1], got %v", resp.Repos[1].LastStatus)
-	}
-	if resp.Repos[1].PrepStatus != string(store.PrepStatusFailed) {
-		t.Fatalf("expected prep_status %q, got %q", store.PrepStatusFailed, resp.Repos[1].PrepStatus)
-	}
-	if resp.Repos[1].PrepFailureCode == nil || *resp.Repos[1].PrepFailureCode != "BUILD_FAILED" {
-		t.Fatalf("expected prep_failure_code BUILD_FAILED, got %v", resp.Repos[1].PrepFailureCode)
 	}
 }
 
@@ -312,142 +292,5 @@ func TestListRunsForRepoHandler_MissingRepoID(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", rr.Code)
-	}
-}
-
-func TestGetRepoPrepHandler_Success(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().UTC().Truncate(time.Microsecond)
-	repoID := domaintypes.MigRepoID("repo_123")
-	lastErr := "failed to compile"
-	failureCode := "BUILD_FAILED"
-	logRef := "blob://prep-run/2"
-
-	st := &mockStore{
-		getModRepoResult: store.MigRepo{
-			ID:              repoID,
-			PrepStatus:      store.PrepStatusFailed,
-			PrepAttempts:    2,
-			PrepLastError:   &lastErr,
-			PrepFailureCode: &failureCode,
-			PrepUpdatedAt:   pgtype.Timestamptz{Time: now, Valid: true},
-			PrepProfile:     []byte(`{"schema_version":1}`),
-			PrepArtifacts:   []byte(`{"logs":["blob://prep-run/2"]}`),
-		},
-		listPrepRunsByRepoResult: []store.PrepRun{
-			{
-				RepoID:     repoID,
-				Attempt:    2,
-				Status:     store.PrepStatusFailed,
-				StartedAt:  pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true},
-				FinishedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true},
-				ResultJson: []byte(`{"error":"build failed"}`),
-				LogsRef:    &logRef,
-			},
-			{
-				RepoID:     repoID,
-				Attempt:    1,
-				Status:     store.PrepStatusReady,
-				StartedAt:  pgtype.Timestamptz{Time: now.Add(-4 * time.Minute), Valid: true},
-				FinishedAt: pgtype.Timestamptz{Time: now.Add(-3 * time.Minute), Valid: true},
-				ResultJson: []byte(`{"ok":true}`),
-			},
-		},
-	}
-	handler := getRepoPrepHandler(st)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/repos/"+repoID.String()+"/prep", nil)
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp RepoPrepSummary
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-
-	if resp.RepoID != repoID {
-		t.Fatalf("unexpected repo_id: got=%q want=%q", resp.RepoID, repoID)
-	}
-	if resp.PrepStatus != string(store.PrepStatusFailed) {
-		t.Fatalf("unexpected prep_status: got=%q want=%q", resp.PrepStatus, store.PrepStatusFailed)
-	}
-	if resp.PrepAttempts != 2 {
-		t.Fatalf("unexpected prep_attempts: got=%d want=2", resp.PrepAttempts)
-	}
-	if resp.PrepFailureCode == nil || *resp.PrepFailureCode != failureCode {
-		t.Fatalf("unexpected prep_failure_code: got=%v want=%q", resp.PrepFailureCode, failureCode)
-	}
-	if string(resp.PrepProfile) != `{"schema_version":1}` {
-		t.Fatalf("unexpected prep_profile: %s", string(resp.PrepProfile))
-	}
-	if string(resp.PrepArtifacts) != `{"logs":["blob://prep-run/2"]}` {
-		t.Fatalf("unexpected prep_artifacts: %s", string(resp.PrepArtifacts))
-	}
-	if len(resp.Runs) != 2 {
-		t.Fatalf("unexpected run count: got=%d want=2", len(resp.Runs))
-	}
-	if resp.Runs[0].Attempt != 2 {
-		t.Fatalf("unexpected first run attempt: got=%d want=2", resp.Runs[0].Attempt)
-	}
-	if string(resp.Runs[0].ResultJSON) != `{"error":"build failed"}` {
-		t.Fatalf("unexpected first run result_json: %s", string(resp.Runs[0].ResultJSON))
-	}
-
-	if !st.getModRepoCalled {
-		t.Fatalf("expected GetMigRepo to be called")
-	}
-	if !st.listPrepRunsByRepoCalled {
-		t.Fatalf("expected ListPrepRunsByRepo to be called")
-	}
-	if st.listPrepRunsByRepoParam != repoID {
-		t.Fatalf("unexpected ListPrepRunsByRepo repo_id: got=%q want=%q", st.listPrepRunsByRepoParam, repoID)
-	}
-}
-
-func TestGetRepoPrepHandler_RepoNotFound(t *testing.T) {
-	t.Parallel()
-
-	st := &mockStore{getModRepoErr: pgx.ErrNoRows}
-	handler := getRepoPrepHandler(st)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/repos/repo_123/prep", nil)
-	req.SetPathValue("repo_id", "repo_123")
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rr.Code)
-	}
-	if st.listPrepRunsByRepoCalled {
-		t.Fatalf("expected ListPrepRunsByRepo not to be called")
-	}
-}
-
-func TestGetRepoPrepHandler_ListPrepRunsError(t *testing.T) {
-	t.Parallel()
-
-	repoID := domaintypes.MigRepoID("repo_123")
-	st := &mockStore{
-		getModRepoResult: store.MigRepo{
-			ID:         repoID,
-			PrepStatus: store.PrepStatusReady,
-		},
-		listPrepRunsByRepoErr: errors.New("db timeout"),
-	}
-	handler := getRepoPrepHandler(st)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/repos/repo_123/prep", nil)
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rr.Code)
 	}
 }

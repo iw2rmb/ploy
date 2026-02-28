@@ -172,8 +172,6 @@ paths:
     $ref: './paths/repos.yaml'
   /v1/repos/{repo_id}/runs:
     $ref: './paths/repos_repo_id_runs.yaml'
-  /v1/repos/{repo_id}/prep:
-    $ref: './paths/repos_repo_id_prep.yaml'
   # Job diff upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/diff:
     $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'
@@ -267,10 +265,6 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RepoSummary'
     RepoRunSummary:
       $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
-    RepoPrepSummary:
-      $ref: './components/schemas/controlplane.yaml#/RepoPrepSummary'
-    RepoPrepRunSummary:
-      $ref: './components/schemas/controlplane.yaml#/RepoPrepRunSummary'
     # Mig project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mod_id}
     CreateMigRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateMigRequest'

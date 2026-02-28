@@ -104,12 +104,11 @@ func stackGateTerminalWithResult(
 }
 
 func resolveStackGateRuntimeImageForTerminal(
-	envImage string,
 	mappingPath string,
 	overrides []contracts.BuildGateImageRule,
 	expect *contracts.StackExpectation,
 ) string {
-	img, err := resolveExpectedRuntimeImageForStackGate(envImage, mappingPath, overrides, expect)
+	img, err := resolveExpectedRuntimeImageForStackGate(mappingPath, overrides, expect)
 	if err != nil {
 		return ""
 	}
@@ -122,14 +121,13 @@ func resolveGateExecutionPlan(
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
 	detectErr error,
-	envImage string,
 	mappingPath string,
 ) (gateExecutionPlan, *gateExecutionTerminal) {
 	stackGateMode := spec.StackGate != nil && spec.StackGate.Enabled && spec.StackGate.Expect != nil
 	if stackGateMode {
-		return resolveStackGateExecutionPlan(ctx, spec, obs, detectErr, envImage, mappingPath)
+		return resolveStackGateExecutionPlan(ctx, spec, obs, detectErr, mappingPath)
 	}
-	return resolveDetectedStackExecutionPlan(ctx, workspace, spec, obs, detectErr, envImage, mappingPath)
+	return resolveDetectedStackExecutionPlan(ctx, workspace, spec, obs, detectErr, mappingPath)
 }
 
 func resolveStackGateExecutionPlan(
@@ -137,7 +135,6 @@ func resolveStackGateExecutionPlan(
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
 	detectErr error,
-	envImage string,
 	mappingPath string,
 ) (gateExecutionPlan, *gateExecutionTerminal) {
 	sgResult := &contracts.StackGateResult{
@@ -153,7 +150,7 @@ func resolveStackGateExecutionPlan(
 			reason = detErr.Message
 			evidenceStr = formatEvidenceForLog(detErr.Evidence)
 		}
-		runtimeImage := resolveStackGateRuntimeImageForTerminal(envImage, mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
+		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
 		return gateExecutionPlan{}, stackGateTerminalWithResult(
 			spec.StackGate.Expect.Language,
 			sgResult,
@@ -172,7 +169,7 @@ func resolveStackGateExecutionPlan(
 	if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
 		reason := formatMismatchReason(obs, spec.StackGate.Expect)
 		evidenceStr := formatEvidenceForLog(obs.Evidence)
-		runtimeImage := resolveStackGateRuntimeImageForTerminal(envImage, mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
+		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
 		return gateExecutionPlan{}, stackGateTerminalWithResult(
 			spec.StackGate.Expect.Language,
 			sgResult,
@@ -194,49 +191,45 @@ func resolveStackGateExecutionPlan(
 	}
 	tool := strings.TrimSpace(obs.Tool)
 
-	image := envImage
-	if image == "" {
-		if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
-			reason := "stack gate expectation missing release; cannot resolve runtime image"
-			return gateExecutionPlan{}, stackGateTerminalWithResult(
-				language,
-				sgResult,
-				"unknown",
-				reason,
-				"STACK_GATE_INVALID_EXPECTATION",
-				"",
-				"",
-				false,
-				nil,
-			)
-		}
+	if strings.TrimSpace(spec.StackGate.Expect.Release) == "" {
+		reason := "stack gate expectation missing release; cannot resolve runtime image"
+		return gateExecutionPlan{}, stackGateTerminalWithResult(
+			language,
+			sgResult,
+			"unknown",
+			reason,
+			"STACK_GATE_INVALID_EXPECTATION",
+			"",
+			"",
+			false,
+			nil,
+		)
+	}
 
-		resolvedImage, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *spec.StackGate.Expect, true)
-		if err != nil {
-			code := "STACK_GATE_IMAGE_MAPPING_ERROR"
-			prefix := "image mapping error"
-			if errors.Is(err, errBuildGateImageRuleMatch) {
-				code = "STACK_GATE_NO_IMAGE_RULE"
-				prefix = "no matching image rule"
-			}
-			reason := fmt.Sprintf("%s: %s", prefix, err.Error())
-			return gateExecutionPlan{}, stackGateTerminalWithResult(
-				language,
-				sgResult,
-				"unknown",
-				reason,
-				code,
-				"",
-				"",
-				false,
-				nil,
-			)
+	image, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *spec.StackGate.Expect, true)
+	if err != nil {
+		code := "STACK_GATE_IMAGE_MAPPING_ERROR"
+		prefix := "image mapping error"
+		if errors.Is(err, errBuildGateImageRuleMatch) {
+			code = "STACK_GATE_NO_IMAGE_RULE"
+			prefix = "no matching image rule"
 		}
-		image = resolvedImage
+		reason := fmt.Sprintf("%s: %s", prefix, err.Error())
+		return gateExecutionPlan{}, stackGateTerminalWithResult(
+			language,
+			sgResult,
+			"unknown",
+			reason,
+			code,
+			"",
+			"",
+			false,
+			nil,
+		)
 	}
 
 	sgResult.RuntimeImage = image
-	cmd, prepEnv, err := resolveGateCommand(tool, spec.Prep)
+	cmd, prepEnv, err := resolveGateCommand(language, tool, spec.StackGate.Expect.Release, spec.Prep)
 	if err != nil {
 		return gateExecutionPlan{}, stackGateTerminalWithResult(
 			language,
@@ -267,7 +260,6 @@ func resolveDetectedStackExecutionPlan(
 	spec *contracts.StepGateSpec,
 	obs *stackdetect.Observation,
 	detectErr error,
-	envImage string,
 	mappingPath string,
 ) (gateExecutionPlan, *gateExecutionTerminal) {
 	exp := observationToStackExpectation(obs)
@@ -401,27 +393,27 @@ func resolveDetectedStackExecutionPlan(
 		}
 	}
 
-	image := envImage
-	if image == "" {
-		resolvedImage, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *exp, true)
-		if err != nil {
-			code := "BUILD_GATE_IMAGE_MAPPING_ERROR"
-			if errors.Is(err, errBuildGateImageRuleMatch) {
-				code = "BUILD_GATE_NO_IMAGE_RULE"
-			}
-			return gateExecutionPlan{}, newDetectedStackFailureTerminal(
-				language,
-				tool,
-				code,
-				err.Error(),
-				"",
-				nil,
-			)
+	image, err := resolveImageForExpectation(mappingPath, spec.ImageOverrides, *exp, true)
+	if err != nil {
+		code := "BUILD_GATE_IMAGE_MAPPING_ERROR"
+		if errors.Is(err, errBuildGateImageRuleMatch) {
+			code = "BUILD_GATE_NO_IMAGE_RULE"
 		}
-		image = resolvedImage
+		return gateExecutionPlan{}, newDetectedStackFailureTerminal(
+			language,
+			tool,
+			code,
+			err.Error(),
+			"",
+			nil,
+		)
 	}
 
-	cmd, prepEnv, err := resolveGateCommand(tool, spec.Prep)
+	release := ""
+	if exp != nil {
+		release = exp.Release
+	}
+	cmd, prepEnv, err := resolveGateCommand(language, tool, release, spec.Prep)
 	if err != nil {
 		return gateExecutionPlan{}, newDetectedStackFailureTerminal(
 			language,
@@ -443,10 +435,24 @@ func resolveDetectedStackExecutionPlan(
 }
 
 func resolveGateCommand(
+	language string,
 	tool string,
+	release string,
 	prep *contracts.BuildGatePrepOverride,
 ) ([]string, map[string]string, error) {
 	if prep != nil && !prep.Command.IsEmpty() {
+		if prep.Stack != nil {
+			if !stackMatchesPrepOverride(prep.Stack, language, tool, release) {
+				return nil, nil, fmt.Errorf("prep stack mismatch: expected %s/%s/%s, got %s/%s/%s",
+					strings.TrimSpace(prep.Stack.Language),
+					strings.TrimSpace(prep.Stack.Tool),
+					strings.TrimSpace(prep.Stack.Release),
+					strings.TrimSpace(language),
+					strings.TrimSpace(tool),
+					strings.TrimSpace(release),
+				)
+			}
+		}
 		return prep.Command.ToSlice(), copyGateEnv(prep.Env), nil
 	}
 
@@ -455,6 +461,23 @@ func resolveGateCommand(
 		return nil, nil, err
 	}
 	return cmd, nil, nil
+}
+
+func stackMatchesPrepOverride(stack *contracts.PrepProfileStack, language, tool, release string) bool {
+	if stack == nil {
+		return true
+	}
+	if strings.TrimSpace(strings.ToLower(stack.Language)) != strings.TrimSpace(strings.ToLower(language)) {
+		return false
+	}
+	if strings.TrimSpace(strings.ToLower(stack.Tool)) != strings.TrimSpace(strings.ToLower(tool)) {
+		return false
+	}
+	wantRelease := strings.TrimSpace(stack.Release)
+	if wantRelease == "" {
+		return true
+	}
+	return wantRelease == strings.TrimSpace(release)
 }
 
 func copyGateEnv(env map[string]string) map[string]string {
