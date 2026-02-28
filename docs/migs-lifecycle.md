@@ -162,18 +162,23 @@ build_gate:
     env_from_file:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 
-  # Healing runs after router, retrying up to `retries` times.
+  # Healing runs after router, selected by router error_kind.
   healing:
-    retries: 2
-    image: docker.io/user/migs-codex:latest
-    env:
-      CODEX_PROMPT: "Fix the compilation error in /in/build-gate.log"
-    env_from_file:
-      CODEX_AUTH_JSON: ~/.codex/auth.json
+    by_error_kind:
+      infra:
+        retries: 2
+        image: docker.io/user/migs-codex:latest
+        env:
+          CODEX_PROMPT: "Fix infra/toolchain issue in /in/build-gate.log"
+      code:
+        retries: 2
+        image: docker.io/user/migs-codex:latest
+        env:
+          CODEX_PROMPT: "Fix code issue in /in/build-gate.log"
 ```
 
-Healing fields (image, command, env, env_from_file) are specified directly
-under `healing` — there is no nested `mig` key.
+Healing action fields (image, command, env, env_from_file) are specified under
+`healing.by_error_kind.<error_kind>` — there is no nested `mig` key.
 
 **Router** runs once per gate failure that triggers healing (each iteration),
 before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to
@@ -194,7 +199,7 @@ Router runtime environment:
 
 - **Single workspace**: Healing runs on the same workspace that the failing gate validated.
 - **Linear execution**: The healing mig runs, then the gate is re-run.
-- **Retries**: If the gate still fails, the healing mig may be retried up to `retries`.
+- **Retries**: If the gate still fails, the selected healing action may be retried up to configured `retries`.
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
 - **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
@@ -323,7 +328,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (top-level, in `migs[]`, and in `build_gate.healing`/`build_gate.router`) accepts two forms:
+The `image` field (top-level, in `migs[]`, and in `build_gate.healing.by_error_kind.<kind>`/`build_gate.router`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
@@ -1202,7 +1207,7 @@ Mods container images are standard OCI images with the following expectations:
     - Supported on:
       - top-level spec (single-step runs),
       - each `migs[]` entry (multi-step runs),
-      - `build_gate.healing` and `build_gate.router`.
+      - `build_gate.healing.by_error_kind` and `build_gate.router`.
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
     env vars are filtered by scope (`all`, `migs`, `heal`, `gate`) to match job types:

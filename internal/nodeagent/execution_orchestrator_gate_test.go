@@ -239,6 +239,11 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 	}
 
 	typedOpts := RunOptions{
+		HealingSelector: &contracts.HealingSpec{
+			ByErrorKind: map[string]contracts.HealingActionSpec{
+				"infra": {Image: contracts.JobImage{Universal: "test/healer:latest"}},
+			},
+		},
 		Healing: &HealingConfig{
 			Retries: 1,
 			Mod: ModContainerSpec{
@@ -304,6 +309,11 @@ func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing
 		JobType: types.JobTypeReGate,
 	}
 	typedOpts := RunOptions{
+		HealingSelector: &contracts.HealingSpec{
+			ByErrorKind: map[string]contracts.HealingActionSpec{
+				"infra": {Image: contracts.JobImage{Universal: "test/healer:latest"}},
+			},
+		},
 		Healing: &HealingConfig{
 			Retries: 1,
 			Mod: ModContainerSpec{

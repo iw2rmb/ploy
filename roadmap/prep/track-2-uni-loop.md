@@ -121,7 +121,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run 'TestCompleteJob_GateFailure_'` — no healing branch created for `mixed|unknown`, remaining chain cancelled.
 
 ## Phase 5: Strategy Selector Surface
-- [ ] Add recovery strategy selector schema to `build_gate` spec contract — provide typed configuration surface keyed by `error_kind`.
+- [x] Add recovery strategy selector schema to `build_gate` spec contract — provide typed configuration surface keyed by `error_kind`.
   - Repository: `ploy`
   - Component: workflow contracts + parser + nodeagent typed options
   - Scope: Update `internal/workflow/contracts/build_gate_config.go`, `mods_spec.go`, `mods_spec_parse.go`, and `internal/nodeagent/run_options.go` to add `build_gate.recovery` selector contract and parse/validate mapping by `error_kind`.
@@ -135,7 +135,7 @@ Legend: [ ] todo, [x] done.
     ```
   - Tests: `go test ./internal/workflow/contracts -run 'TestParseModsSpecJSON|TestValidate'` and `go test ./internal/nodeagent -run 'TestParseSpec_ProducesTypedOptions'` — recovery selector parsed into typed options.
 
-- [ ] Wire infra strategy artifact contract gate to prep profile validation boundary — prepare handoff for profile candidate promotion flow.
+- [x] Wire infra strategy artifact contract gate to prep profile validation boundary — prepare handoff for profile candidate promotion flow.
   - Repository: `ploy`
   - Component: nodeagent artifact expectations + server prep profile validation path
   - Scope: Define expected artifact path/schema metadata in strategy selection (for example `/out/prep-profile-candidate.json`), and wire handoff boundaries to existing prep profile parser/validator (`internal/workflow/contracts/prep_profile.go`, `internal/server/prep/schema.go`) for next-track promotion logic.
@@ -148,7 +148,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts -run 'TestPrepProfile'` and `go test ./internal/server/prep` — artifact contract references align with existing prep schema validation.
 
 ## Validation
-- [ ] Run full validation suite for this track slice — prevent regressions in contracts, nodeagent routing, and server healing orchestration.
+- [x] Run full validation suite for this track slice — prevent regressions in contracts, nodeagent routing, and server healing orchestration.
   - Repository: `ploy`
   - Component: CI/local validation
   - Scope: Execute:

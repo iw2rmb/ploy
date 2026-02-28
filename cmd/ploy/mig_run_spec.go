@@ -4,7 +4,7 @@
 // and resolves env_from_file references to inject file content as environment
 // variables. Specs use a single canonical shape:
 //   - steps[] array with one entry per step (even single-step runs)
-//   - global build gate policy under build_gate (including build_gate.healing)
+//   - global build gate policy under build_gate (including build_gate.healing.by_error_kind)
 //
 // Spec parsing includes validation and error handling for missing files.
 // Isolating spec handling from execution flow enables focused testing
@@ -156,7 +156,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // 2. Resolve env_from_file references in:
 //   - top-level env
 //   - steps[] entries
-//   - build_gate.healing (healing)
+//   - build_gate.healing.by_error_kind.* (healing actions)
 //   - build_gate.router (router)
 //
 // 3. Apply CLI flag overrides (higher precedence than spec file) to top-level fields.
@@ -206,11 +206,19 @@ func buildSpecPayload(
 		return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
 	}
 
-	// Resolve env_from_file references in build_gate.healing and build_gate.router.
+	// Resolve env_from_file references in build_gate.healing.by_error_kind.* and build_gate.router.
 	if bg, ok := base["build_gate"].(map[string]any); ok {
 		if healing, ok := bg["healing"].(map[string]any); ok {
-			if err := resolveEnvFromFileInPlace(healing); err != nil {
-				return nil, fmt.Errorf("resolve env from file (build_gate.healing): %w", err)
+			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+				for errorKind, item := range byErrorKind {
+					action, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					if err := resolveEnvFromFileInPlace(action); err != nil {
+						return nil, fmt.Errorf("resolve env from file (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
+					}
+				}
 			}
 		}
 		if router, ok := bg["router"].(map[string]any); ok {

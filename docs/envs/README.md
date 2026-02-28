@@ -101,7 +101,7 @@ Role model (bearer token claims):
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
   - `migs[]` — Multi-step spec steps (each with its own image/command/env/env_from_file)
-  - `build_gate.healing` and `build_gate.router` — Automated repair routing/healing after Build Gate failures
+  - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
@@ -110,9 +110,8 @@ Role model (bearer token claims):
   Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
-- `build_gate.healing` — Spec block defining the healing loop when Build Gate fails:
-  - `retries` — Maximum number of healing attempts (default: 1)
-  - `image`, `command`, `env`, `env_from_file` — Healing container configuration
+- `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
+  - `infra`/`code` action entries configure `retries`, `image`, `command`, `env`, `env_from_file`
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing migs

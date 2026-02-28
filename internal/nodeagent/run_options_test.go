@@ -233,10 +233,15 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 					},
 				},
 				Healing: &contracts.HealingSpec{
-					Retries: 3,
-					Image:   contracts.JobImage{Universal: "docker.io/test/heal:v1"},
-					Command: contracts.CommandSpec{Shell: "fix.sh"},
-					Env:     map[string]string{"MODE": "auto"},
+					SelectedErrorKind: "infra",
+					ByErrorKind: map[string]contracts.HealingActionSpec{
+						"infra": {
+							Retries: 3,
+							Image:   contracts.JobImage{Universal: "docker.io/test/heal:v1"},
+							Command: contracts.CommandSpec{Shell: "fix.sh"},
+							Env:     map[string]string{"MODE": "auto"},
+						},
+					},
 				},
 			},
 			GitLabPAT:     "glpat-secret",
@@ -411,8 +416,13 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
 			BuildGate: &contracts.BuildGateConfig{
 				Healing: &contracts.HealingSpec{
-					Retries: 0,
-					Image:   contracts.JobImage{Universal: "heal"},
+					SelectedErrorKind: "infra",
+					ByErrorKind: map[string]contracts.HealingActionSpec{
+						"infra": {
+							Retries: 0,
+							Image:   contracts.JobImage{Universal: "heal"},
+						},
+					},
 				},
 			},
 		}

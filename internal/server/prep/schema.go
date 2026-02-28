@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -43,6 +44,15 @@ func validateProfileJSON(raw []byte) error {
 		msgs = append(msgs, e.String())
 	}
 	return fmt.Errorf("prep schema validation failed: %s", strings.Join(msgs, "; "))
+}
+
+func ValidateProfileJSONForSchema(raw []byte, schemaID string) error {
+	switch strings.TrimSpace(schemaID) {
+	case contracts.PrepProfileCandidateSchemaID:
+		return validateProfileJSON(raw)
+	default:
+		return fmt.Errorf("prep schema validation failed: unsupported schema id %q", schemaID)
+	}
 }
 
 func loadSchema() error {

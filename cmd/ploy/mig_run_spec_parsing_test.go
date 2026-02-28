@@ -23,8 +23,10 @@ env:
   KEY2: value2
 build_gate:
   healing:
-    retries: 1
-    image: docker.io/test/healer:latest
+    by_error_kind:
+      infra:
+        retries: 1
+        image: docker.io/test/healer:latest
   router:
     image: docker.io/test/router:latest
 gitlab_domain: gitlab.example.com
@@ -110,12 +112,14 @@ steps:
   - image: docker.io/test/mig:latest
 build_gate:
   healing:
-    image: docker.io/test/heal:latest
-    retain_container: true
+    by_error_kind:
+      infra:
+        image: docker.io/test/heal:latest
+        retain_container: true
   router:
     image: docker.io/test/router:latest
 `,
-			wantErr: "validate spec: build_gate.healing.retain_container: forbidden",
+			wantErr: "validate spec: build_gate.healing.by_error_kind.infra.retain_container: forbidden",
 		},
 		{
 			name: "router retain forbidden",
@@ -233,8 +237,12 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
   },
   "build_gate": {
     "healing": {
-      "retries": 2,
-      "image": "docker.io/test/healer:latest"
+      "by_error_kind": {
+        "infra": {
+          "retries": 2,
+          "image": "docker.io/test/healer:latest"
+        }
+      }
     },
     "router": {
       "image": "docker.io/test/router:latest"
@@ -264,8 +272,16 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected build_gate.healing in payload")
 	}
-	if retries, ok := healing["retries"].(float64); !ok || retries != 2 {
-		t.Errorf("expected build_gate.healing.retries=2, got %v", healing["retries"])
+	byErrorKind, ok := healing["by_error_kind"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing.by_error_kind in payload")
+	}
+	infra, ok := byErrorKind["infra"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing.by_error_kind.infra in payload")
+	}
+	if retries, ok := infra["retries"].(float64); !ok || retries != 2 {
+		t.Errorf("expected infra.retries=2, got %v", infra["retries"])
 	}
 }
 
@@ -464,11 +480,13 @@ steps:
   - image: docker.io/test/mig:latest
 build_gate:
   healing:
-    retries: 2
-    image: docker.io/test/healer:latest
-    command: "heal.sh"
-    env:
-      HEALING_MODE: auto
+    by_error_kind:
+      infra:
+        retries: 2
+        image: docker.io/test/healer:latest
+        command: "heal.sh"
+        env:
+          HEALING_MODE: auto
   router:
     image: docker.io/test/router:latest
 `
@@ -494,20 +512,28 @@ build_gate:
 	if !ok {
 		t.Fatalf("expected build_gate.healing in payload")
 	}
+	byErrorKind, ok := healing["by_error_kind"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing.by_error_kind in payload")
+	}
+	infra, ok := byErrorKind["infra"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate.healing.by_error_kind.infra in payload")
+	}
 
 	// Verify retries
-	if retries, ok := healing["retries"].(float64); !ok || retries != 2 {
-		t.Errorf("expected build_gate.healing.retries=2, got %v", healing["retries"])
+	if retries, ok := infra["retries"].(float64); !ok || retries != 2 {
+		t.Errorf("expected infra.retries=2, got %v", infra["retries"])
 	}
 
 	// Verify flattened healing fields (no "mig" key)
-	if img, ok := healing["image"].(string); !ok || img != "docker.io/test/healer:latest" {
-		t.Errorf("expected healing.image=docker.io/test/healer:latest, got %v", healing["image"])
+	if img, ok := infra["image"].(string); !ok || img != "docker.io/test/healer:latest" {
+		t.Errorf("expected infra.image=docker.io/test/healer:latest, got %v", infra["image"])
 	}
-	if cmd, ok := healing["command"].(string); !ok || cmd != "heal.sh" {
-		t.Errorf("expected healing.command=heal.sh, got %v", healing["command"])
+	if cmd, ok := infra["command"].(string); !ok || cmd != "heal.sh" {
+		t.Errorf("expected infra.command=heal.sh, got %v", infra["command"])
 	}
-	if env, ok := healing["env"].(map[string]any); ok {
+	if env, ok := infra["env"].(map[string]any); ok {
 		if mode, _ := env["HEALING_MODE"].(string); mode != "auto" {
 			t.Errorf("expected healing.env.HEALING_MODE=auto, got %v", mode)
 		}
@@ -515,8 +541,8 @@ build_gate:
 		t.Errorf("expected healing.env to be a map")
 	}
 	// retain_container has been removed from the canonical contract.
-	if _, ok := healing["retain_container"]; ok {
-		t.Errorf("expected retain_container to be absent, got %v", healing["retain_container"])
+	if _, ok := infra["retain_container"]; ok {
+		t.Errorf("expected retain_container to be absent, got %v", infra["retain_container"])
 	}
 }
 
@@ -546,8 +572,10 @@ steps:
 build_gate:
   enabled: true
   healing:
-    retries: 1
-    image: docker.io/test/healer:latest
+    by_error_kind:
+      infra:
+        retries: 1
+        image: docker.io/test/healer:latest
   router:
     image: docker.io/test/router:latest
 `

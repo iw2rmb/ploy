@@ -95,10 +95,14 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 		"build_gate": {
 			"enabled": true,
 			"healing": {
-				"retries": 3,
-				"image": "docker.io/user/codex:latest",
-				"command": "fix-it",
-				"env": {"PROMPT": "fix the build"}
+				"by_error_kind": {
+					"infra": {
+						"retries": 3,
+						"image": "docker.io/user/codex:latest",
+						"command": "fix-it",
+						"env": {"PROMPT": "fix the build"}
+					}
+				}
 			},
 			"router": {
 				"image": "docker.io/user/router:latest"
@@ -150,16 +154,20 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
 		t.Fatal("build_gate.healing is nil")
 	}
-	if spec.BuildGate.Healing.Retries != 3 {
-		t.Errorf("build_gate.healing.retries = %d, want 3", spec.BuildGate.Healing.Retries)
+	infra, ok := spec.BuildGate.Healing.ByErrorKind["infra"]
+	if !ok {
+		t.Fatal("build_gate.healing.by_error_kind.infra is missing")
 	}
-	if spec.BuildGate.Healing.Image.Universal != "docker.io/user/codex:latest" {
-		t.Errorf("build_gate.healing.image = %q, want %q",
-			spec.BuildGate.Healing.Image.Universal, "docker.io/user/codex:latest")
+	if infra.Retries != 3 {
+		t.Errorf("build_gate.healing.by_error_kind.infra.retries = %d, want 3", infra.Retries)
 	}
-	if spec.BuildGate.Healing.Command.Shell != "fix-it" {
-		t.Errorf("build_gate.healing.command = %q, want %q",
-			spec.BuildGate.Healing.Command.Shell, "fix-it")
+	if infra.Image.Universal != "docker.io/user/codex:latest" {
+		t.Errorf("build_gate.healing.by_error_kind.infra.image = %q, want %q",
+			infra.Image.Universal, "docker.io/user/codex:latest")
+	}
+	if infra.Command.Shell != "fix-it" {
+		t.Errorf("build_gate.healing.by_error_kind.infra.command = %q, want %q",
+			infra.Command.Shell, "fix-it")
 	}
 	if spec.BuildGate.Router == nil {
 		t.Fatal("build_gate.router is nil")
@@ -188,11 +196,11 @@ func TestParseModsSpecJSON_RetainContainerForbidden(t *testing.T) {
 			input: `{
 				"steps": [{"image": "docker.io/user/mig:latest"}],
 				"build_gate": {
-					"healing": {"image": "docker.io/user/heal:latest", "retain_container": true},
+					"healing": {"by_error_kind": {"infra": {"image": "docker.io/user/heal:latest", "retain_container": true}}},
 					"router": {"image": "docker.io/user/router:latest"}
 				}
 			}`,
-			wantErr: "build_gate.healing.retain_container: forbidden",
+			wantErr: "build_gate.healing.by_error_kind.infra.retain_container: forbidden",
 		},
 		{
 			name: "router retain forbidden",
@@ -538,7 +546,7 @@ func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
 	// Healing with image but no router.
 	input := `{
 		"steps": [{"image": "test:latest"}],
-		"build_gate": {"healing": {"retries": 1, "image": "codex:latest", "command": "fix"}}
+		"build_gate": {"healing": {"by_error_kind":{"infra":{"retries": 1, "image": "codex:latest", "command": "fix"}}}}
 	}`
 	_, err := ParseModsSpecJSON([]byte(input))
 	if err == nil {
@@ -551,7 +559,7 @@ func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
 	input := `{
 		"steps": [{"image": "test:latest"}],
 		"build_gate": {
-			"healing": {"retries": 1},
+			"healing": {"by_error_kind":{"infra":{"retries": 1}}},
 			"router": {"image": "router:latest"}
 		}
 	}`
@@ -559,7 +567,7 @@ func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected validation error for healing without image")
 	}
-	if want := "build_gate.healing.image: required when healing is configured"; err.Error() != want {
+	if want := "build_gate.healing.by_error_kind.infra.image: required"; err.Error() != want {
 		t.Fatalf("error = %q, want %q", err.Error(), want)
 	}
 }
@@ -575,7 +583,7 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "int value",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"retries": 3, "image":"codex:latest"}, "router":{"image":"router:latest"}}
+				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 3, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
 			}`,
 			want: 3,
 		},
@@ -583,7 +591,7 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "float whole value",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"retries": 3.0, "image":"codex:latest"}, "router":{"image":"router:latest"}}
+				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 3.0, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
 			}`,
 			want: 3,
 		},
@@ -591,7 +599,7 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "float fraction truncates",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"retries": 1.9, "image":"codex:latest"}, "router":{"image":"router:latest"}}
+				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 1.9, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
 			}`,
 			want: 1,
 		},
@@ -599,9 +607,9 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "non-number rejected",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"retries": "nope", "image":"codex:latest"}, "router":{"image":"router:latest"}}
+				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": "nope", "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
 			}`,
-			wantErr: "build_gate.healing.retries: expected number, got string",
+			wantErr: "build_gate.healing.by_error_kind.infra.retries: expected number, got string",
 		},
 	}
 
@@ -623,8 +631,12 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
 				t.Fatal("build_gate.healing is nil")
 			}
-			if spec.BuildGate.Healing.Retries != tt.want {
-				t.Fatalf("retries = %d, want %d", spec.BuildGate.Healing.Retries, tt.want)
+			infra, ok := spec.BuildGate.Healing.ByErrorKind["infra"]
+			if !ok {
+				t.Fatal("missing build_gate.healing.by_error_kind.infra")
+			}
+			if infra.Retries != tt.want {
+				t.Fatalf("retries = %d, want %d", infra.Retries, tt.want)
 			}
 		})
 	}
@@ -688,8 +700,12 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 		},
 		BuildGate: &BuildGateConfig{
 			Healing: &HealingSpec{
-				Retries: 2,
-				Image:   JobImage{Universal: "codex:latest"},
+				ByErrorKind: map[string]HealingActionSpec{
+					"infra": {
+						Retries: 2,
+						Image:   JobImage{Universal: "codex:latest"},
+					},
+				},
 			},
 			Router: &RouterSpec{
 				Image: JobImage{Universal: "router:latest"},
@@ -723,7 +739,7 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 	if !parsed.Steps[1].Image.IsStackSpecific() {
 		t.Errorf("steps[1].image should be stack-specific")
 	}
-	if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || parsed.BuildGate.Healing.Retries != 2 {
+	if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || parsed.BuildGate.Healing.ByErrorKind["infra"].Retries != 2 {
 		t.Errorf("build_gate.healing.retries should be 2")
 	}
 }

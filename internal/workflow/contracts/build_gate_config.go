@@ -15,8 +15,8 @@ type BuildGateConfig struct {
 	// Post configures stack detection policy for the post-gate (and re-gate) phase.
 	Post *BuildGatePhaseConfig `json:"post,omitempty" yaml:"post,omitempty"`
 
-	// Healing configures the heal → re-gate loop when Build Gate fails.
-	// This is nested under build_gate to keep gate policy in one place.
+	// Healing configures the heal -> re-gate loop selector keyed by router
+	// error_kind classification.
 	Healing *HealingSpec `json:"healing,omitempty" yaml:"healing,omitempty"`
 
 	// Router configures the router container that runs on gate failure
@@ -60,18 +60,27 @@ type BuildGateStackConfig struct {
 	Default  bool   `json:"default,omitempty" yaml:"default,omitempty"`
 }
 
-// HealingSpec describes the heal → re-gate loop configuration.
-// When the build gate fails, the agent can execute a healing mig then re-run the gate.
-//
-// HealingSpec is itself mig-like: it carries Image, Command, and Env
-// directly (no nested Mod object). Retries controls the healing retry count.
+// HealingSpec describes recovery action selection keyed by router error_kind.
+// The control plane selects the action for a failed gate and injects the
+// selected kind as selected_error_kind for heal job claims.
 type HealingSpec struct {
+	// SelectedErrorKind is a server-injected selector for heal job claims.
+	// User specs should not set this field.
+	SelectedErrorKind string `json:"selected_error_kind,omitempty" yaml:"selected_error_kind,omitempty"`
+
+	// ByErrorKind defines recovery actions keyed by router classification
+	// (infra|code|mixed|unknown).
+	ByErrorKind map[string]HealingActionSpec `json:"by_error_kind,omitempty" yaml:"by_error_kind,omitempty"`
+}
+
+// HealingActionSpec describes a per-error_kind healing action.
+type HealingActionSpec struct {
 	// Retries is the maximum number of healing attempts (default: 1).
-	// Each retry executes the healing mig, then re-runs the gate.
+	// Each retry executes the healing action, then re-runs the gate.
 	Retries int `json:"retries,omitempty" yaml:"retries,omitempty"`
 
-	// Image is the container image for the healing mig (required).
-	// Supports both universal images (string) and stack-specific images (map).
+	// Image is the container image for the healing action (required for
+	// non-terminal kinds).
 	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
 
 	// Command is the container command override (optional).
@@ -79,6 +88,21 @@ type HealingSpec struct {
 
 	// Env holds environment variables to inject into the healing container.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+
+	// Expectations defines typed strategy output contracts for downstream
+	// validation/promotion boundaries.
+	Expectations *RecoveryExpectationsSpec `json:"expectations,omitempty" yaml:"expectations,omitempty"`
+}
+
+// RecoveryExpectationsSpec defines structured expectations for recovery output.
+type RecoveryExpectationsSpec struct {
+	Artifacts []RecoveryExpectedArtifact `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
+}
+
+// RecoveryExpectedArtifact defines one expected artifact path/schema pair.
+type RecoveryExpectedArtifact struct {
+	Path   string `json:"path,omitempty" yaml:"path,omitempty"`
+	Schema string `json:"schema,omitempty" yaml:"schema,omitempty"`
 }
 
 // RouterSpec describes the router container that runs on gate failure to produce
