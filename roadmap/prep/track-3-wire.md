@@ -135,7 +135,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/handlers -run 'TestListRunRepoJobs'`
 
 ## Phase 4: CLI/Docs Wiring Clarity
-- [ ] Finalize healing fragment examples for infra/code/router using `spec_path`.
+- [x] Finalize healing fragment examples for infra/code/router using `spec_path`.
   - Repository: `ploy`
   - Component: CLI docs + examples
   - Scope:

@@ -156,6 +156,7 @@ build_gate:
 
   # Router runs once after gate failure to produce bug_summary.
   router:
+    spec_path: ./healing/router/spec.yaml
     image: docker.io/user/migs-codex:latest
     env:
       CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
@@ -166,11 +167,17 @@ build_gate:
   healing:
     by_error_kind:
       infra:
+        spec_path: ./healing/infra/spec.yaml
         retries: 2
         image: docker.io/user/migs-codex:latest
         env:
           CODEX_PROMPT: "Fix infra/toolchain issue in /in/build-gate.log"
+        expectations:
+          artifacts:
+            - path: /out/prep-profile-candidate.json
+              schema: prep_profile_v1
       code:
+        spec_path: ./healing/code/spec.yaml
         retries: 2
         image: docker.io/user/migs-codex:latest
         env:
@@ -179,6 +186,12 @@ build_gate:
 
 Healing action fields (image, command, env, env_from_file) are specified under
 `healing.by_error_kind.<error_kind>` — there is no nested `mig` key.
+`spec_path` is supported in `build_gate.router` and
+`build_gate.healing.by_error_kind.<error_kind>`; CLI deep-merges the referenced
+object and inline fields override loaded values.
+For `infra` recovery with `schema=prep_profile_v1`, healing is expected to emit
+`/out/prep-profile-candidate.json`. Promotion to repo `prep_profile` happens only
+when the immediate follow-up `re_gate` succeeds.
 
 **Router** runs once per gate failure that triggers healing (each iteration),
 before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to
