@@ -39,12 +39,12 @@ When complex execution is implemented, it must guarantee:
 4. bounded retries and timeouts.
 5. no backward-compat fallback to ad-hoc orchestration formats.
 
-## Router-Guided Loop Policy (Adopted)
+## Router-Guided Loop Policy (Shared As-Built Contract)
 
-Complex recovery flow adopts a router-guided loop:
+Complex mode is not implemented yet, but gate recovery contract is already fixed and shared with simple mode:
 - router executes after every gate failure, including each failed `re_gate`
-- router classification drives prompt strategy and stopping policy
-- loop context persists across iterations (history + loop kind)
+- router classification drives strategy and stopping policy
+- loop context persists across iterations (`loop_kind` + classifier context)
 - current `loop_kind` value is `healing` for all strategies (reserved for future loop families)
 
 Classification outcomes:
@@ -57,11 +57,12 @@ Stopping rule (current decision):
 - `mixed` or `unknown` is terminal for the repo attempt (stop mig progression)
 
 Strategy routing policy:
-- `error_kind` chooses strategy (prompt/tooling/output contract)
+- `error_kind` chooses strategy (`build_gate.healing.by_error_kind.<error_kind>`)
+- server injects selected strategy via `build_gate.healing.selected_error_kind` for heal claims
 - phase is part of strategy input (pre/post/re gate signal), not a separate loop selector
 
 `infra` strategy contract:
-- expected typed artifact: profile candidate (for example `/out/prep-profile-candidate.json`)
+- expected typed artifact: profile candidate (`/out/prep-profile-candidate.json`, schema `prep_profile_v1`)
 - candidate may be promoted to repo default prep profile only after schema validation and successful re-gate
 
 ## Router Prompt Packaging (Adopted)
