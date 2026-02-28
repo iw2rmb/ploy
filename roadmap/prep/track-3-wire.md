@@ -150,7 +150,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./cmd/ploy -run 'TestBuildSpecPayload_|TestRunSubmit'`
 
 ## Validation
-- [ ] Run full validation suite for track-3 slice.
+- [x] Run full validation suite for track-3 slice.
   - Repository: `ploy`
   - Component: CI/local validation
   - Scope: Execute:
