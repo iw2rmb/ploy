@@ -30,7 +30,7 @@ func TestCompleteJob_Success(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
 
@@ -59,7 +59,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -88,7 +88,7 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -136,7 +136,7 @@ func TestCompleteJob_InvalidJobResources_RejectsRequest(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status": "Success",
@@ -173,7 +173,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -210,7 +210,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Success",
@@ -257,7 +257,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// NOTE: Do not use json.Marshal here; we need whitespace inside job_meta ("{ }").
 	rawBody := `{"status":"Success","exit_code":0,"stats":{"duration_ms":500,"job_meta": { } }}`
@@ -292,7 +292,7 @@ func TestCompleteJob_MissingJobID(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NewNodeKey()
-	handler := completeJobHandler(&mockStore{}, nil)
+	handler := completeJobHandler(&mockStore{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
@@ -316,7 +316,7 @@ func TestCompleteJob_EmptyJobID(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NewNodeKey()
-	handler := completeJobHandler(&mockStore{}, nil)
+	handler := completeJobHandler(&mockStore{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
@@ -340,7 +340,7 @@ func TestCompleteJob_NoIdentity(t *testing.T) {
 	t.Parallel()
 
 	jobID := domaintypes.NewJobID()
-	handler := completeJobHandler(&mockStore{}, nil)
+	handler := completeJobHandler(&mockStore{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
@@ -365,7 +365,7 @@ func TestCompleteJob_EmptyNodeHeader(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
@@ -397,7 +397,7 @@ func TestCompleteJob_InvalidNodeHeader(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
@@ -430,7 +430,7 @@ func TestCompleteJob_MissingNodeHeader(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
@@ -475,7 +475,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 		listJobsByRunResult: []store.Job{job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{"status": "Success"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
@@ -509,7 +509,7 @@ func TestCompleteJob_NotRunning(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
@@ -546,7 +546,7 @@ func TestCompleteJob_AlreadyTerminalConflict(t *testing.T) {
 				listJobsByRunResult: []store.Job{f.Job},
 			}
 
-			handler := completeJobHandler(st, nil)
+			handler := completeJobHandler(st, nil, nil)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
@@ -568,7 +568,7 @@ func TestCompleteJob_InvalidStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 1000)
-	handler := completeJobHandler(&mockStore{}, nil)
+	handler := completeJobHandler(&mockStore{}, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "running"}))
 
@@ -582,7 +582,7 @@ func TestCompleteJob_MissingStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 1000)
-	handler := completeJobHandler(&mockStore{}, nil)
+	handler := completeJobHandler(&mockStore{}, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{}))
 
@@ -601,7 +601,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status": "Fail",
@@ -623,7 +623,7 @@ func TestCompleteJob_JobNotFound(t *testing.T) {
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{getJobErr: pgx.ErrNoRows}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
@@ -646,7 +646,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Fail",
@@ -690,7 +690,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status":    "Fail",

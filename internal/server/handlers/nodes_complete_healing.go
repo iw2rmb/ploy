@@ -3,14 +3,17 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/prep"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -19,6 +22,7 @@ import (
 func maybeCreateHealingJobs(
 	ctx context.Context,
 	st store.Store,
+	bp *blobpersist.Service,
 	run store.Run,
 	failedJob store.Job,
 ) error {
@@ -123,9 +127,33 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
 	}
 
+	reGateRecoveryMeta := cloneRecoveryMetadata(recoveryMeta)
+	if shouldEvaluateInfraCandidate(recoveryMeta, action) {
+		if reGateRecoveryMeta == nil {
+			reGateRecoveryMeta = &contracts.BuildGateRecoveryMetadata{
+				LoopKind:  recoveryMeta.LoopKind,
+				ErrorKind: recoveryMeta.ErrorKind,
+			}
+		}
+		artifactPath := contracts.PrepProfileCandidateArtifactPath
+		if p, ok := resolveRecoveryCandidateArtifactPath(recoveryMeta.Expectations); ok {
+			artifactPath = p
+		}
+		reGateRecoveryMeta.CandidateSchemaID = contracts.PrepProfileCandidateSchemaID
+		reGateRecoveryMeta.CandidateArtifactPath = artifactPath
+		evaluateAndAttachInfraCandidate(
+			ctx,
+			bp,
+			run.ID,
+			failedJob,
+			jobsByID,
+			reGateRecoveryMeta,
+		)
+	}
+
 	reGateMetaBytes, err := contracts.MarshalJobMeta(&contracts.JobMeta{
 		Kind:     contracts.JobKindGate,
-		Recovery: cloneRecoveryMetadata(recoveryMeta),
+		Recovery: reGateRecoveryMeta,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal re-gate job meta: %w", err)
@@ -241,6 +269,9 @@ func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.
 	if len(src.Expectations) > 0 {
 		out.Expectations = append([]byte(nil), src.Expectations...)
 	}
+	if len(src.CandidatePrepProfile) > 0 {
+		out.CandidatePrepProfile = append([]byte(nil), src.CandidatePrepProfile...)
+	}
 	return &out
 }
 
@@ -256,6 +287,110 @@ func predecessorOf(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store
 		}
 	}
 	return nil
+}
+
+func shouldEvaluateInfraCandidate(
+	recoveryMeta *contracts.BuildGateRecoveryMetadata,
+	action contracts.HealingActionSpec,
+) bool {
+	if recoveryMeta == nil || recoveryMeta.ErrorKind != "infra" {
+		return false
+	}
+	if action.Expectations == nil {
+		return false
+	}
+	for _, artifact := range action.Expectations.Artifacts {
+		if strings.TrimSpace(artifact.Schema) == contracts.PrepProfileCandidateSchemaID {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveRecoveryCandidateArtifactPath(expectations json.RawMessage) (string, bool) {
+	if len(expectations) == 0 {
+		return "", false
+	}
+	var ex struct {
+		Artifacts []struct {
+			Path   string `json:"path"`
+			Schema string `json:"schema"`
+		} `json:"artifacts"`
+	}
+	if err := json.Unmarshal(expectations, &ex); err != nil {
+		return "", false
+	}
+	for _, artifact := range ex.Artifacts {
+		if strings.TrimSpace(artifact.Schema) != contracts.PrepProfileCandidateSchemaID {
+			continue
+		}
+		path := strings.TrimSpace(artifact.Path)
+		if path == "" {
+			continue
+		}
+		return path, true
+	}
+	return "", false
+}
+
+func evaluateAndAttachInfraCandidate(
+	ctx context.Context,
+	bp *blobpersist.Service,
+	runID domaintypes.RunID,
+	failedJob store.Job,
+	jobsByID map[domaintypes.JobID]store.Job,
+	meta *contracts.BuildGateRecoveryMetadata,
+) {
+	if meta == nil {
+		return
+	}
+	path := strings.TrimSpace(meta.CandidateArtifactPath)
+	if path == "" {
+		path = contracts.PrepProfileCandidateArtifactPath
+		meta.CandidateArtifactPath = path
+	}
+	prevHeal := resolvePreviousHealJob(failedJob, jobsByID)
+	if prevHeal == nil {
+		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusMissing
+		meta.CandidateValidationError = "candidate artifact unavailable: no previous heal job found"
+		return
+	}
+
+	raw, err := loadRecoveryArtifact(ctx, bp, runID, prevHeal.ID, path)
+	if err != nil {
+		switch {
+		case errors.Is(err, blobpersist.ErrRecoveryArtifactNotFound):
+			meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusMissing
+		case errors.Is(err, blobpersist.ErrRecoveryArtifactUnreadable):
+			meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusUnavailable
+		default:
+			meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
+		}
+		meta.CandidateValidationError = err.Error()
+		return
+	}
+	if err := prep.ValidateProfileJSONForSchema(raw, contracts.PrepProfileCandidateSchemaID); err != nil {
+		meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusInvalid
+		meta.CandidateValidationError = err.Error()
+		return
+	}
+	meta.CandidateValidationStatus = contracts.RecoveryCandidateStatusValid
+	meta.CandidateValidationError = ""
+	meta.CandidatePrepProfile = append([]byte(nil), raw...)
+}
+
+func resolvePreviousHealJob(
+	failedJob store.Job,
+	jobsByID map[domaintypes.JobID]store.Job,
+) *store.Job {
+	prev := predecessorOf(failedJob.ID, jobsByID)
+	if prev == nil {
+		return nil
+	}
+	if domaintypes.JobType(prev.JobType) != domaintypes.JobTypeHeal {
+		return nil
+	}
+	return prev
 }
 
 func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store.Job) domaintypes.JobID {

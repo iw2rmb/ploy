@@ -97,7 +97,24 @@ type BuildGateRecoveryMetadata struct {
 	// Expectations carries strategy-specific structured expectations emitted by
 	// router classification. Reserved for downstream strategy/artifact handling.
 	Expectations json.RawMessage `json:"expectations,omitempty"`
+	// CandidateSchemaID is the declared schema id for infra recovery candidate.
+	CandidateSchemaID string `json:"candidate_schema_id,omitempty"`
+	// CandidateArtifactPath is the artifact path declared in expectations.
+	CandidateArtifactPath string `json:"candidate_artifact_path,omitempty"`
+	// CandidateValidationStatus captures whether candidate resolution+validation passed.
+	CandidateValidationStatus string `json:"candidate_validation_status,omitempty"`
+	// CandidateValidationError captures the validation/load error when status is not valid.
+	CandidateValidationError string `json:"candidate_validation_error,omitempty"`
+	// CandidatePrepProfile stores validated candidate payload used for re-gate override.
+	CandidatePrepProfile json.RawMessage `json:"candidate_prep_profile,omitempty"`
 }
+
+const (
+	RecoveryCandidateStatusMissing     = "missing"
+	RecoveryCandidateStatusUnavailable = "unavailable"
+	RecoveryCandidateStatusInvalid     = "invalid"
+	RecoveryCandidateStatusValid       = "valid"
+)
 
 // Validate ensures recovery metadata entries are well formed.
 func (m BuildGateRecoveryMetadata) Validate() error {
@@ -152,6 +169,38 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 		default:
 			return fmt.Errorf("expectations: must be object or array JSON")
 		}
+	}
+	if m.CandidateSchemaID != "" || m.CandidateArtifactPath != "" {
+		if err := ValidatePrepProfileArtifactContract(
+			m.CandidateArtifactPath,
+			m.CandidateSchemaID,
+			"candidate",
+		); err != nil {
+			return err
+		}
+	}
+	if m.CandidateValidationStatus != "" {
+		switch m.CandidateValidationStatus {
+		case RecoveryCandidateStatusMissing, RecoveryCandidateStatusUnavailable, RecoveryCandidateStatusInvalid, RecoveryCandidateStatusValid:
+		default:
+			return fmt.Errorf("candidate_validation_status invalid: %q", m.CandidateValidationStatus)
+		}
+	}
+	if len(m.CandidatePrepProfile) > 0 {
+		if !json.Valid(m.CandidatePrepProfile) {
+			return fmt.Errorf("candidate_prep_profile: invalid JSON")
+		}
+	}
+	if m.CandidateValidationStatus == RecoveryCandidateStatusValid {
+		if len(m.CandidatePrepProfile) == 0 {
+			return fmt.Errorf("candidate_prep_profile: required when candidate_validation_status=%q", RecoveryCandidateStatusValid)
+		}
+		if strings.TrimSpace(m.CandidateValidationError) != "" {
+			return fmt.Errorf("candidate_validation_error: must be empty when candidate_validation_status=%q", RecoveryCandidateStatusValid)
+		}
+	}
+	if m.CandidateValidationStatus != RecoveryCandidateStatusValid && len(m.CandidatePrepProfile) > 0 {
+		return fmt.Errorf("candidate_prep_profile: forbidden when candidate_validation_status=%q", m.CandidateValidationStatus)
 	}
 	return nil
 }

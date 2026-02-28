@@ -31,7 +31,7 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// job_meta without required "kind" field should be rejected.
 	rr := httptest.NewRecorder()
@@ -73,7 +73,7 @@ func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// job_meta with invalid "kind" value should be rejected.
 	rr := httptest.NewRecorder()
@@ -116,7 +116,7 @@ func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// job_meta with kind="mig" but gate metadata should be rejected (structural mismatch).
 	rr := httptest.NewRecorder()
@@ -156,7 +156,7 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Valid gate job_meta with proper kind and gate metadata.
 	rr := httptest.NewRecorder()
@@ -212,7 +212,7 @@ func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Valid mig job_meta (kind only, no gate/build metadata).
 	rr := httptest.NewRecorder()
@@ -259,7 +259,7 @@ func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Valid build job_meta with kind and build metadata.
 	rr := httptest.NewRecorder()
@@ -311,7 +311,7 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Empty job_meta object should NOT trigger UpdateJobCompletionWithMeta.
 	rr := httptest.NewRecorder()
@@ -353,7 +353,7 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Null job_meta should NOT trigger UpdateJobCompletionWithMeta.
 	rr := httptest.NewRecorder()
@@ -395,7 +395,7 @@ func TestCompleteJob_ValidJobMeta_GateWithBugSummary(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Gate job_meta with bug_summary in gate metadata.
 	rr := httptest.NewRecorder()
@@ -449,7 +449,7 @@ func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
 		listJobsByRunResult: []store.Job{f.Job},
 	}
 
-	handler := completeJobHandler(st, nil)
+	handler := completeJobHandler(st, nil, nil)
 
 	// Mig job_meta with action_summary.
 	rr := httptest.NewRecorder()

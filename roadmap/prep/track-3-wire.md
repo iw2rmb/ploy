@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs'`
 
 ## Phase 2: Validation and Runtime Use in Re-Gate
-- [ ] Validate infra candidate against prep schema boundary on healing insertion.
+- [x] Validate infra candidate against prep schema boundary on healing insertion.
   - Repository: `ploy`
   - Component: server healing insertion + prep schema validator
   - Scope:
@@ -74,7 +74,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/prep`
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs'`
 
-- [ ] Apply validated candidate as highest-precedence re-gate prep override source.
+- [x] Apply validated candidate as highest-precedence re-gate prep override source.
   - Repository: `ploy`
   - Component: claim-time spec merge for gate jobs
   - Scope:
