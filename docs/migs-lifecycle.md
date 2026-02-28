@@ -1313,8 +1313,10 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
   - Repo headers render the repo URL as a hyperlink and show `<base_ref> -> <target_ref>`.
   - `Spec` renders a `Download` hyperlink to `/v1/migs/{mig_ref}/specs/latest`.
   - `Artifacts` are shown only for terminal steps; unfinished steps render `-`.
-  - Build failures/crashes and healing rows render an `Exit <code>: <one-liner>`
-    continuation line beneath the step row.
+  - Build gate failures/crashes render a bold red `<error_kind>` prefix
+    (fallback: `<unknown>`) before `Exit <code>: <one-liner>` on the
+    continuation line beneath the step row. Healing rows keep
+    `Exit <code>: <one-liner>` without the error-kind prefix.
   - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
     `auth_token` query parameters for browser/OSC8 flows.
 

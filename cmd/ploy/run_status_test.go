@@ -48,7 +48,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 	assertContains(t, out, "⣾")
 	assertContains(t, out, "\x1b[91m✗\x1b[0m")
-	assertContains(t, out, "└  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
+	assertContains(t, out, "\x1b[1;91m<infra>\x1b[0m └  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
 	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
@@ -111,6 +111,9 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"status":      "Failed",
 						"exit_code":   137,
 						"duration_ms": 1500,
+						"recovery": map[string]any{
+							"error_kind": "infra",
+						},
 					},
 					{
 						"job_id":         healID.String(),

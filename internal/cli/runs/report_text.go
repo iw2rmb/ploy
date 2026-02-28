@@ -245,6 +245,7 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 	}
 
 	msg := ""
+	prefix := ""
 	if strings.EqualFold(strings.TrimSpace(job.JobType), "heal") {
 		msg = strings.TrimSpace(job.ActionSummary)
 		if msg == "" {
@@ -258,10 +259,26 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 		if msg == "" {
 			msg = strings.ToLower(strings.TrimSpace(job.Status))
 		}
+		if isGateJobType(job.JobType) {
+			errorKind := "unknown"
+			if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
+				errorKind = strings.ToLower(strings.TrimSpace(job.Recovery.ErrorKind))
+			}
+			prefix = "\x1b[1;91m<" + errorKind + ">\x1b[0m "
+		}
 		msg = "\x1b[91m" + msg + "\x1b[0m"
 	}
 
-	return "└  Exit " + renderExitCode(job.ExitCode) + ": " + msg
+	return prefix + "└  Exit " + renderExitCode(job.ExitCode) + ": " + msg
+}
+
+func isGateJobType(jobType string) bool {
+	switch strings.ToLower(strings.TrimSpace(jobType)) {
+	case "pre_gate", "post_gate", "re_gate":
+		return true
+	default:
+		return false
+	}
 }
 
 func renderExitCode(exitCode *int32) string {

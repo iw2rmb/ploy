@@ -124,6 +124,7 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 				DisplayName:   job.DisplayName,
 				ActionSummary: job.ActionSummary,
 				BugSummary:    job.BugSummary,
+				Recovery:      job.Recovery,
 				BuildLogURL:   buildLogURL,
 				PatchURL:      jobPatchByID[job.JobID],
 			})
