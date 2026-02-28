@@ -92,6 +92,7 @@ Role model (bearer token claims):
   worker nodes via a systemd drop-in to make it available cluster-wide.
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `migs-codex`).
   - `/in/build-gate.log` — First Build Gate failure log (node persists to temp host file and mounts)
+  - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing context)
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
 - `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
@@ -111,7 +112,7 @@ Role model (bearer token claims):
   - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `env`, `env_from_file`
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
-  - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing migs
+  - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/prompt.txt`) are available to healing migs
   - For `infra` with `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json`; candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
 - Container cleanup model:
   - Containers are retained after step/gate completion.

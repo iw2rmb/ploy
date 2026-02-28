@@ -227,6 +227,7 @@ to `/in` for debugging and cross-iteration context:
 | Artifact | Description |
 |---|---|
 | `/in/build-gate.log` | Latest gate failure log (updated after each re-gate) |
+| `/in/gate_profile.json` | Gate profile used by the failed gate when available (provided for `infra` healing) |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
 | `/in/healing-log.md` | Cumulative markdown log across all iterations |

@@ -6,6 +6,7 @@ Goal:
 
 Rules:
 - Read `/in/build-gate.log` first.
+- Read `/in/gate_profile.json` when present and use it as gate-profile context.
 - Edit files only under `/workspace`.
 - Write a gate profile candidate JSON file to `/out/gate-profile-candidate.json`.
 - Keep output deterministic and machine-readable.
@@ -15,6 +16,7 @@ Rules:
 
 Task:
 1. Diagnose infra/toolchain failure from `/in/build-gate.log`.
-2. Apply minimal, correct changes under `/workspace` to resolve it.
-3. Emit `/out/gate-profile-candidate.json` compatible with schema `gate_profile_v1`.
-4. End with the required one-line `action_summary` JSON.
+2. Use `/in/gate_profile.json` (if provided) to keep command/env/runtime context aligned with the gate profile used by the failed gate.
+3. Apply minimal, correct changes under `/workspace` to resolve it.
+4. Emit `/out/gate-profile-candidate.json` compatible with schema `gate_profile_v1`.
+5. End with the required one-line `action_summary` JSON.

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // TestPopulateHealingInDirCopiesGateLog verifies that populateHealingInDir copies
@@ -30,7 +31,7 @@ func TestPopulateHealingInDirCopiesGateLog(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	if err := rc.populateHealingInDir(runID, inDir); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, nil); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 
@@ -79,5 +80,86 @@ func TestModStepIndexFromJobName_MultiStep(t *testing.T) {
 				t.Fatalf("modStepIndexFromJobName(%q,%d)=%d want %d", tc.jobName, tc.steps, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestPopulateHealingInDirCopiesGateProfileForInfra(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-copy-profile-infra")
+
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-first.log"), []byte("failure\n"), 0o644); err != nil {
+		t.Fatalf("write first gate log: %v", err)
+	}
+	const profile = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-profile.json"), []byte(profile), 0o644); err != nil {
+		t.Fatalf("write gate profile snapshot: %v", err)
+	}
+
+	inDir := t.TempDir()
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(inDir, "gate_profile.json"))
+	if err != nil {
+		t.Fatalf("failed to read /in/gate_profile.json: %v", err)
+	}
+	if got := string(data); got != profile {
+		t.Fatalf("healing /in/gate_profile.json = %q, want %q", got, profile)
+	}
+}
+
+func TestPopulateHealingInDirSkipsGateProfileForNonInfra(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-skip-profile-code")
+
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-first.log"), []byte("failure\n"), 0o644); err != nil {
+		t.Fatalf("write first gate log: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-profile.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
+		t.Fatalf("write gate profile snapshot: %v", err)
+	}
+
+	inDir := t.TempDir()
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "code"}); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.json")); !os.IsNotExist(err) {
+		t.Fatalf("gate_profile.json exists for non-infra healing, err=%v", err)
+	}
+}
+
+func TestPopulateHealingInDirInfraMissingGateProfileIsAllowed(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-missing-profile-infra")
+
+	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		t.Fatalf("mkdir runDir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(runDir, "build-gate-first.log"), []byte("failure\n"), 0o644); err != nil {
+		t.Fatalf("write first gate log: %v", err)
+	}
+
+	inDir := t.TempDir()
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 }

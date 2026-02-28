@@ -57,6 +57,96 @@ func TestPersistFirstGateFailureLog_UsesTrimmedFinding(t *testing.T) {
 	}
 }
 
+func TestPersistGateProfileSnapshot_UsesGeneratedProfile(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-profile-generated")
+	const generated = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`
+
+	rc.persistGateProfileSnapshot(
+		runID,
+		types.JobTypePreGate,
+		&contracts.StepGateSpec{RepoID: types.MigRepoID("repo_1")},
+		&contracts.BuildGateStageMetadata{GeneratedGateProfile: json.RawMessage(generated)},
+	)
+
+	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read profile snapshot: %v", err)
+	}
+	if string(data) != generated {
+		t.Fatalf("snapshot profile = %q, want %q", string(data), generated)
+	}
+}
+
+func TestPersistGateProfileSnapshot_DerivesFromOverride(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-profile-derived")
+
+	rc.persistGateProfileSnapshot(
+		runID,
+		types.JobTypePreGate,
+		&contracts.StepGateSpec{
+			RepoID: types.MigRepoID("repo_2"),
+			GateProfile: &contracts.BuildGateProfileOverride{
+				Command: contracts.CommandSpec{Shell: "mvn -q -DskipTests compile"},
+				Env:     map[string]string{"MAVEN_OPTS": "-Xmx2g"},
+				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "21"},
+			},
+		},
+		nil,
+	)
+
+	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read profile snapshot: %v", err)
+	}
+	profile, err := contracts.ParseGateProfileJSON(data)
+	if err != nil {
+		t.Fatalf("snapshot profile invalid: %v", err)
+	}
+	if got, want := profile.Stack.Language, "java"; got != want {
+		t.Fatalf("stack.language = %q, want %q", got, want)
+	}
+	if got, want := profile.Stack.Tool, "maven"; got != want {
+		t.Fatalf("stack.tool = %q, want %q", got, want)
+	}
+	if profile.Targets.Build == nil || profile.Targets.Build.Command != "mvn -q -DskipTests compile" {
+		t.Fatalf("targets.build.command = %#v, want mvn command", profile.Targets.Build)
+	}
+	if profile.Targets.Build.Env["MAVEN_OPTS"] != "-Xmx2g" {
+		t.Fatalf("targets.build.env[MAVEN_OPTS] = %q, want %q", profile.Targets.Build.Env["MAVEN_OPTS"], "-Xmx2g")
+	}
+}
+
+func TestPersistGateProfileSnapshot_RemovesStaleSnapshot(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-profile-stale")
+	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir run dir: %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"schema_version":1}`), 0o644); err != nil {
+		t.Fatalf("write stale snapshot: %v", err)
+	}
+
+	rc.persistGateProfileSnapshot(runID, types.JobTypePreGate, nil, nil)
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("expected stale snapshot removed, stat err=%v", err)
+	}
+}
+
 // TestPersistGateStack_WritesStack verifies that persistGateStack writes the
 // detected stack to a file under the run directory for later retrieval.
 func TestPersistGateStack_WritesStack(t *testing.T) {
