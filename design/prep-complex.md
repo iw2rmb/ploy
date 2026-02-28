@@ -1,28 +1,29 @@
-# Prep Complex Mode (Target Design, Not Yet Implemented)
+# Prep Complex Mode (Future Track)
 
 ## Status
 
-Complex prep profile shape is defined, but complex orchestration execution is not implemented in the current runtime.
+Complex profile shape exists in schema/contracts, but there is no active runtime executor for orchestration primitives.
 
-Current prep execution path is simple-mode Codex output validation and persistence.
+Complex mode is currently a design target layered on top of the existing gate/router/healing loop.
 
 ## Target Definition
 
-Complex mode is for repositories that cannot be prepared by command/env plus runtime hints alone, and require lifecycle orchestration around build/test execution.
+Complex mode is for repos that cannot be represented by command/env and runtime hints alone, and need explicit lifecycle orchestration.
 
 Typical triggers:
-- sidecar daemon/container lifecycle requirements
-- registry auth/trust lifecycle setup
-- pre/post execution resource provisioning and cleanup
+- sidecar daemon/container lifecycle
+- registry auth or trust bootstrapping lifecycle
+- pre/post resource provisioning and cleanup
 
 ## Contract Surface
 
 Complex profile uses:
 - `runner_mode: complex`
+- required `stack` identity
 - non-empty `orchestration.pre` and/or `orchestration.post`
 - same target result structure as simple mode
 
-Declared orchestration primitive types (schema whitelist):
+Declared orchestration primitive whitelist:
 - `docker_network`
 - `docker_network_remove`
 - `docker_container`
@@ -30,69 +31,48 @@ Declared orchestration primitive types (schema whitelist):
 - `wait_for_log`
 - `health_check`
 
-## Required Runtime Guarantees (Future Implementation)
+## Required Runtime Guarantees (When Implemented)
 
-When complex execution is implemented, it must guarantee:
 1. `pre` steps run before target command execution.
-2. `post` cleanup steps run on both success and failure paths.
+2. `post` cleanup runs on success and failure paths.
 3. step-level logging and deterministic status reporting.
-4. bounded retries and timeouts.
-5. no backward-compat fallback to ad-hoc orchestration formats.
+4. bounded retries and explicit timeouts.
+5. no fallback to ad-hoc orchestration formats.
 
-## Router-Guided Loop Policy (Shared As-Built Contract)
+## Shared Recovery Policy (Already Active)
 
-Complex mode is not implemented yet, but gate recovery contract is already fixed and shared with simple mode:
-- router executes after every gate failure, including each failed `re_gate`
-- router classification drives strategy and stopping policy
-- loop context persists across iterations (`loop_kind` + classifier context)
-- current `loop_kind` value is `healing` for all strategies (reserved for future loop families)
+Even without complex execution, recovery policy is already fixed and shared:
+- router executes after every gate failure, including failed `re_gate`
+- router emits `error_kind` in `infra|code|mixed|unknown`
+- `mixed` and `unknown` are terminal for the repo attempt
+- `infra` and `code` route to `build_gate.healing.by_error_kind.<error_kind>`
+- server injects `build_gate.healing.selected_error_kind` on heal claims
 
-Classification outcomes:
-- `infra`
-- `code`
-- `mixed`
-- `unknown`
+Infra candidate contract:
+- expected artifact path: `/out/prep-profile-candidate.json`
+- expected schema id: `prep_profile_v1`
+- candidate must pass schema and stack checks
+- promotion requires successful follow-up `re_gate`
 
-Stopping rule (current decision):
-- `mixed` or `unknown` is terminal for the repo attempt (stop mig progression)
+## Relationship to Simple Mode
 
-Strategy routing policy:
-- `error_kind` chooses strategy (`build_gate.healing.by_error_kind.<error_kind>`)
-- server injects selected strategy via `build_gate.healing.selected_error_kind` for heal claims
-- phase is part of strategy input (pre/post/re gate signal), not a separate loop selector
+`runtime.docker.mode` is a simple-mode runtime hint, not complex orchestration.
 
-`infra` strategy contract:
-- expected typed artifact: profile candidate (`/out/prep-profile-candidate.json`, schema `prep_profile_v1`)
-- candidate may be promoted to repo default prep profile only after schema validation and successful re-gate
+Complex mode starts only when orchestration primitives must be executed with deterministic lifecycle semantics.
 
-## Router Prompt Packaging (Adopted)
-
-Introduce `healing/` folder for recovery assets:
-- phase-aware classification prompts
-- strategy templates for `infra` and `code` routing
-- schema/contracts for router JSON output and strategy artifacts
-
-Goal:
-- keep router behavior versioned, explicit, and shared across all error-kind strategies.
-
-## Separation From Simple Mode
-
-`runtime.docker.mode` is simple runtime hinting, not complex orchestration by itself.
-
-Complex mode starts only when lifecycle orchestration primitives are required.
-
-## Acceptance Criteria For Complex Track
+## Acceptance Criteria for Complex Track
 
 Complex track is complete only when:
 - orchestration executor is wired in production path
-- declared primitives execute with deterministic semantics
-- cleanup is guaranteed on failure paths
-- end-to-end tests cover complex success and cleanup-failure scenarios
+- primitive semantics are deterministic
+- cleanup is guaranteed on failures
+- e2e coverage includes success and cleanup-failure cases
+- promotion/re-gate behavior remains compatible with the shared recovery contract
 
 ## Cross References
 
+- `design/prep.md`
 - `design/prep-impl.md`
 - `design/prep-simple.md`
 - `design/prep-states.md`
 - `docs/schemas/prep_profile.schema.json`
-- `roadmap/prep/track-1-minimal-e2e.md`
