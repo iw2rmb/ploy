@@ -129,15 +129,15 @@ type Mig struct {
 }
 
 type MigRepo struct {
-	ID            types.MigRepoID    `json:"id"`
-	MigID         types.MigID        `json:"mig_id"`
-	RepoUrl       string             `json:"repo_url"`
-	BaseRef       string             `json:"base_ref"`
-	TargetRef     string             `json:"target_ref"`
-	PrepUpdatedAt pgtype.Timestamptz `json:"prep_updated_at"`
-	PrepProfile   []byte             `json:"prep_profile"`
-	PrepArtifacts []byte             `json:"prep_artifacts"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	ID                   types.MigRepoID    `json:"id"`
+	MigID                types.MigID        `json:"mig_id"`
+	RepoUrl              string             `json:"repo_url"`
+	BaseRef              string             `json:"base_ref"`
+	TargetRef            string             `json:"target_ref"`
+	GateProfileUpdatedAt pgtype.Timestamptz `json:"gate_profile_updated_at"`
+	GateProfile          []byte             `json:"gate_profile"`
+	GateProfileArtifacts []byte             `json:"gate_profile_artifacts"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 }
 
 type Node struct {

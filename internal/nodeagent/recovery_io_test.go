@@ -51,7 +51,7 @@ func TestParseRouterDecision_ParsesStructuredFields(t *testing.T) {
 	t.Parallel()
 
 	outDir := t.TempDir()
-	payload := `{"bug_summary":"cannot compile","error_kind":"infra","strategy_id":"infra-default","confidence":0.7,"reason":"docker unavailable","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}` + "\n"
+	payload := `{"bug_summary":"cannot compile","error_kind":"infra","strategy_id":"infra-default","confidence":0.7,"reason":"docker unavailable","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}` + "\n"
 	if err := os.WriteFile(filepath.Join(outDir, "codex-last.txt"), []byte(payload), 0o644); err != nil {
 		t.Fatalf("write codex-last: %v", err)
 	}

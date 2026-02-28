@@ -1116,7 +1116,7 @@ RepoJobItem:
           description: Strategy-specific structured expectations from router classification
         candidate_schema_id:
           type: string
-          description: Candidate prep schema id when infra recovery expects prep_profile artifact
+          description: Candidate prep schema id when infra recovery expects gate_profile artifact
         candidate_artifact_path:
           type: string
           description: Candidate artifact path declared by recovery expectations
@@ -1128,7 +1128,7 @@ RepoJobItem:
           description: Candidate validation/load error details when status is non-valid
         candidate_promoted:
           type: boolean
-          description: True when validated candidate has been promoted to repo prep_profile
+          description: True when validated candidate has been promoted to repo gate_profile
   required:
     - job_id
     - name

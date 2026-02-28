@@ -462,8 +462,8 @@ func cloneRecoveryMetadataForCompletion(src *contracts.BuildGateRecoveryMetadata
 	if len(src.Expectations) > 0 {
 		out.Expectations = append([]byte(nil), src.Expectations...)
 	}
-	if len(src.CandidatePrepProfile) > 0 {
-		out.CandidatePrepProfile = append([]byte(nil), src.CandidatePrepProfile...)
+	if len(src.CandidateGateProfile) > 0 {
+		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
 	return &out
 }
@@ -491,7 +491,7 @@ func maybePromoteReGateRecoveryCandidate(
 	if recovery.CandidateValidationStatus != contracts.RecoveryCandidateStatusValid {
 		return nil
 	}
-	if len(bytes.TrimSpace(recovery.CandidatePrepProfile)) == 0 {
+	if len(bytes.TrimSpace(recovery.CandidateGateProfile)) == 0 {
 		return nil
 	}
 	if recovery.CandidatePromoted != nil && *recovery.CandidatePromoted {
@@ -507,11 +507,11 @@ func maybePromoteReGateRecoveryCandidate(
 
 	artifactPath := strings.TrimSpace(recovery.CandidateArtifactPath)
 	if artifactPath == "" {
-		artifactPath = contracts.PrepProfileCandidateArtifactPath
+		artifactPath = contracts.GateProfileCandidateArtifactPath
 	}
 	schemaID := strings.TrimSpace(recovery.CandidateSchemaID)
 	if schemaID == "" {
-		schemaID = contracts.PrepProfileCandidateSchemaID
+		schemaID = contracts.GateProfileCandidateSchemaID
 	}
 	prepArtifacts, err := json.Marshal(map[string]any{
 		"source":        "recovery_candidate",
@@ -523,11 +523,11 @@ func maybePromoteReGateRecoveryCandidate(
 		return err
 	}
 
-	_, err = st.PromoteReGateRecoveryCandidatePrepProfile(ctx, store.PromoteReGateRecoveryCandidatePrepProfileParams{
-		ID:            job.ID,
-		Meta:          promotedMeta,
-		PrepProfile:   recovery.CandidatePrepProfile,
-		PrepArtifacts: prepArtifacts,
+	_, err = st.PromoteReGateRecoveryCandidateGateProfile(ctx, store.PromoteReGateRecoveryCandidateGateProfileParams{
+		ID:                   job.ID,
+		Meta:                 promotedMeta,
+		GateProfile:          recovery.CandidateGateProfile,
+		GateProfileArtifacts: prepArtifacts,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil

@@ -304,11 +304,11 @@ type mockStore struct {
 	promoteJobByIDIfUnblockedResult store.Job
 	promoteJobByIDIfUnblockedErr    error
 
-	// PromoteReGateRecoveryCandidatePrepProfile tracking
-	promoteReGateRecoveryCandidatePrepProfileCalled bool
-	promoteReGateRecoveryCandidatePrepProfileParams store.PromoteReGateRecoveryCandidatePrepProfileParams
-	promoteReGateRecoveryCandidatePrepProfileResult types.MigRepoID
-	promoteReGateRecoveryCandidatePrepProfileErr    error
+	// PromoteReGateRecoveryCandidateGateProfile tracking
+	promoteReGateRecoveryCandidateGateProfileCalled bool
+	promoteReGateRecoveryCandidateGateProfileParams store.PromoteReGateRecoveryCandidateGateProfileParams
+	promoteReGateRecoveryCandidateGateProfileResult types.MigRepoID
+	promoteReGateRecoveryCandidateGateProfileErr    error
 
 	// UpdateJobNextID tracking
 	updateJobNextIDCalled bool
@@ -1088,14 +1088,14 @@ func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobI
 	return store.Job{}, pgx.ErrNoRows
 }
 
-func (m *mockStore) PromoteReGateRecoveryCandidatePrepProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidatePrepProfileParams) (types.MigRepoID, error) {
-	m.promoteReGateRecoveryCandidatePrepProfileCalled = true
-	m.promoteReGateRecoveryCandidatePrepProfileParams = arg
-	if m.promoteReGateRecoveryCandidatePrepProfileErr != nil {
-		return "", m.promoteReGateRecoveryCandidatePrepProfileErr
+func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {
+	m.promoteReGateRecoveryCandidateGateProfileCalled = true
+	m.promoteReGateRecoveryCandidateGateProfileParams = arg
+	if m.promoteReGateRecoveryCandidateGateProfileErr != nil {
+		return "", m.promoteReGateRecoveryCandidateGateProfileErr
 	}
-	if !m.promoteReGateRecoveryCandidatePrepProfileResult.IsZero() {
-		return m.promoteReGateRecoveryCandidatePrepProfileResult, nil
+	if !m.promoteReGateRecoveryCandidateGateProfileResult.IsZero() {
+		return m.promoteReGateRecoveryCandidateGateProfileResult, nil
 	}
 	// Default to the current job's repo when available to keep tests lightweight.
 	if !m.getJobResult.RepoID.IsZero() {

@@ -238,7 +238,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
 	candidate := []byte(`{"schema_version":1}`)
 	bundle := mustTarGzBundle(t, map[string][]byte{
-		"out/prep-profile-candidate.json": candidate,
+		"out/gate-profile-candidate.json": candidate,
 	})
 
 	st := &stubStore{
@@ -265,7 +265,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	}
 
 	svc := New(st, bs)
-	got, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	got, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/gate-profile-candidate.json")
 	if err != nil {
 		t.Fatalf("LoadRecoveryArtifact error: %v", err)
 	}
@@ -297,7 +297,7 @@ func TestLoadRecoveryArtifact_NotFound(t *testing.T) {
 	}
 
 	svc := New(st, bs)
-	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/gate-profile-candidate.json")
 	if !errors.Is(err, ErrRecoveryArtifactNotFound) {
 		t.Fatalf("expected ErrRecoveryArtifactNotFound, got %v", err)
 	}
@@ -323,7 +323,7 @@ func TestLoadRecoveryArtifact_Unreadable(t *testing.T) {
 	}
 
 	svc := New(st, bs)
-	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/gate-profile-candidate.json")
 	if !errors.Is(err, ErrRecoveryArtifactUnreadable) {
 		t.Fatalf("expected ErrRecoveryArtifactUnreadable, got %v", err)
 	}
@@ -336,7 +336,7 @@ func TestLoadRecoveryArtifact_InvalidJSON(t *testing.T) {
 	artifactID := pgtype.UUID{Bytes: artifactUUID, Valid: true}
 	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
 	bundle := mustTarGzBundle(t, map[string][]byte{
-		"out/prep-profile-candidate.json": []byte("not-json"),
+		"out/gate-profile-candidate.json": []byte("not-json"),
 	})
 
 	st := &stubStore{
@@ -352,7 +352,7 @@ func TestLoadRecoveryArtifact_InvalidJSON(t *testing.T) {
 	}
 
 	svc := New(st, bs)
-	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/gate-profile-candidate.json")
 	if !errors.Is(err, ErrRecoveryArtifactInvalidJSON) {
 		t.Fatalf("expected ErrRecoveryArtifactInvalidJSON, got %v", err)
 	}

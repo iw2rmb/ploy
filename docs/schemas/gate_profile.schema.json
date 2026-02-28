@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Ploy Prep Profile",
-  "description": "Schema for non-interactive prep outputs and persisted repo prep profiles. YAML is supported as a JSON superset.",
+  "description": "Schema for non-interactive gate profile outputs and persisted repo gate profiles. YAML is supported as a JSON superset.",
   "type": "object",
   "required": [
     "schema_version",

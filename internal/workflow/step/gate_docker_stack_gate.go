@@ -229,7 +229,7 @@ func resolveStackGateExecutionPlan(
 	}
 
 	sgResult.RuntimeImage = image
-	cmd, prepEnv, err := resolveGateCommand(language, tool, spec.StackGate.Expect.Release, spec.Prep)
+	cmd, prepEnv, err := resolveGateCommand(language, tool, spec.StackGate.Expect.Release, spec.GateProfile)
 	if err != nil {
 		return gateExecutionPlan{}, stackGateTerminalWithResult(
 			language,
@@ -413,7 +413,7 @@ func resolveDetectedStackExecutionPlan(
 	if exp != nil {
 		release = exp.Release
 	}
-	cmd, prepEnv, err := resolveGateCommand(language, tool, release, spec.Prep)
+	cmd, prepEnv, err := resolveGateCommand(language, tool, release, spec.GateProfile)
 	if err != nil {
 		return gateExecutionPlan{}, newDetectedStackFailureTerminal(
 			language,
@@ -438,7 +438,7 @@ func resolveGateCommand(
 	language string,
 	tool string,
 	release string,
-	prep *contracts.BuildGatePrepOverride,
+	prep *contracts.BuildGateProfileOverride,
 ) ([]string, map[string]string, error) {
 	if prep != nil && !prep.Command.IsEmpty() {
 		if prep.Stack != nil {
@@ -463,7 +463,7 @@ func resolveGateCommand(
 	return cmd, nil, nil
 }
 
-func stackMatchesPrepOverride(stack *contracts.PrepProfileStack, language, tool, release string) bool {
+func stackMatchesPrepOverride(stack *contracts.GateProfileStack, language, tool, release string) bool {
 	if stack == nil {
 		return true
 	}

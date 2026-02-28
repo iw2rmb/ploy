@@ -105,10 +105,10 @@ type BuildGateRecoveryMetadata struct {
 	CandidateValidationStatus string `json:"candidate_validation_status,omitempty"`
 	// CandidateValidationError captures the validation/load error when status is not valid.
 	CandidateValidationError string `json:"candidate_validation_error,omitempty"`
-	// CandidatePrepProfile stores validated candidate payload used for re-gate override.
-	CandidatePrepProfile json.RawMessage `json:"candidate_prep_profile,omitempty"`
+	// CandidateGateProfile stores validated candidate payload used for re-gate override.
+	CandidateGateProfile json.RawMessage `json:"candidate_gate_profile,omitempty"`
 	// CandidatePromoted reports whether a validated candidate has been promoted
-	// into repo prep_profile after successful re-gate completion.
+	// into repo gate_profile after successful re-gate completion.
 	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
 }
 
@@ -174,7 +174,7 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 		}
 	}
 	if m.CandidateSchemaID != "" || m.CandidateArtifactPath != "" {
-		if err := ValidatePrepProfileArtifactContract(
+		if err := ValidateGateProfileArtifactContract(
 			m.CandidateArtifactPath,
 			m.CandidateSchemaID,
 			"candidate",
@@ -189,28 +189,28 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 			return fmt.Errorf("candidate_validation_status invalid: %q", m.CandidateValidationStatus)
 		}
 	}
-	if len(m.CandidatePrepProfile) > 0 {
-		if !json.Valid(m.CandidatePrepProfile) {
-			return fmt.Errorf("candidate_prep_profile: invalid JSON")
+	if len(m.CandidateGateProfile) > 0 {
+		if !json.Valid(m.CandidateGateProfile) {
+			return fmt.Errorf("candidate_gate_profile: invalid JSON")
 		}
 	}
 	if m.CandidateValidationStatus == RecoveryCandidateStatusValid {
-		if len(m.CandidatePrepProfile) == 0 {
-			return fmt.Errorf("candidate_prep_profile: required when candidate_validation_status=%q", RecoveryCandidateStatusValid)
+		if len(m.CandidateGateProfile) == 0 {
+			return fmt.Errorf("candidate_gate_profile: required when candidate_validation_status=%q", RecoveryCandidateStatusValid)
 		}
 		if strings.TrimSpace(m.CandidateValidationError) != "" {
 			return fmt.Errorf("candidate_validation_error: must be empty when candidate_validation_status=%q", RecoveryCandidateStatusValid)
 		}
 	}
-	if m.CandidateValidationStatus != RecoveryCandidateStatusValid && len(m.CandidatePrepProfile) > 0 {
-		return fmt.Errorf("candidate_prep_profile: forbidden when candidate_validation_status=%q", m.CandidateValidationStatus)
+	if m.CandidateValidationStatus != RecoveryCandidateStatusValid && len(m.CandidateGateProfile) > 0 {
+		return fmt.Errorf("candidate_gate_profile: forbidden when candidate_validation_status=%q", m.CandidateValidationStatus)
 	}
 	if m.CandidatePromoted != nil && *m.CandidatePromoted {
 		if m.CandidateValidationStatus != RecoveryCandidateStatusValid {
 			return fmt.Errorf("candidate_promoted: true requires candidate_validation_status=%q", RecoveryCandidateStatusValid)
 		}
-		if len(m.CandidatePrepProfile) == 0 {
-			return fmt.Errorf("candidate_promoted: true requires candidate_prep_profile")
+		if len(m.CandidateGateProfile) == 0 {
+			return fmt.Errorf("candidate_promoted: true requires candidate_gate_profile")
 		}
 	}
 	return nil

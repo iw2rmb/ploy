@@ -139,24 +139,24 @@ Legend: [ ] todo, [x] done.
     ```
   - Tests: `go test ./internal/workflow/contracts -run 'TestParseModsSpecJSON|TestValidate'` and `go test ./internal/nodeagent -run 'TestParseSpec_ProducesTypedOptions'` — recovery selector parsed into typed options.
 
-- [x] Wire infra strategy artifact contract gate to prep profile validation boundary — prepare handoff for profile candidate promotion flow.
+- [x] Wire infra strategy artifact contract gate to gate profile validation boundary — prepare handoff for profile candidate promotion flow.
   - Repository: `ploy`
-  - Component: nodeagent artifact expectations + server prep profile validation path
-  - Scope: Define expected artifact path/schema metadata in strategy selection (for example `/out/prep-profile-candidate.json`), and wire handoff boundaries to existing prep profile parser/validator (`internal/workflow/contracts/prep_profile.go`, `internal/server/prep/schema.go`) for next-track promotion logic.
+  - Component: nodeagent artifact expectations + server gate profile validation path
+  - Scope: Define expected artifact path/schema metadata in strategy selection (for example `/out/gate-profile-candidate.json`), and wire handoff boundaries to existing gate profile parser/validator (`internal/workflow/contracts/gate_profile.go`, `internal/server/prep/schema.go`) for next-track promotion logic.
   - Snippets:
     ```go
     if strategy.ErrorKind == "infra" {
-        expectArtifact("/out/prep-profile-candidate.json", "prep_profile_v1")
+        expectArtifact("/out/gate-profile-candidate.json", "gate_profile_v1")
     }
     ```
-  - Tests: `go test ./internal/workflow/contracts -run 'TestPrepProfile'` and `go test ./internal/server/prep` — artifact contract references align with existing prep schema validation.
+  - Tests: `go test ./internal/workflow/contracts -run 'TestGateProfile'` and `go test ./internal/server/prep` — artifact contract references align with existing prep schema validation.
 
 ## Validation
 - [x] Run full validation suite for this track slice — prevent regressions in contracts, nodeagent routing, and server healing orchestration.
   - Repository: `ploy`
   - Component: CI/local validation
   - Scope: Execute:
-    - `go test ./internal/workflow/contracts -run 'TestBuildGate|TestJobMeta|TestParseModsSpec|TestPrepProfile'`
+    - `go test ./internal/workflow/contracts -run 'TestBuildGate|TestJobMeta|TestParseModsSpec|TestGateProfile'`
     - `go test ./internal/nodeagent -run 'TestRunRouterForGateFailure|TestBuildGateJobStats|TestParseSpec_ProducesTypedOptions'`
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs|TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain'`
     - `go test ./internal/server/prep`

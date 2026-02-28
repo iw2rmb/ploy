@@ -199,7 +199,7 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 				Name:    "pre-gate",
 				JobType: "pre_gate",
 				Status:  store.JobStatusFail,
-				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}}`),
+				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`),
 			},
 		},
 	}
@@ -264,7 +264,7 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	if len(resp.Jobs[0].Recovery.Expectations.Artifacts) != 1 {
 		t.Fatalf("recovery.expectations.artifacts len = %d, want 1", len(resp.Jobs[0].Recovery.Expectations.Artifacts))
 	}
-	if got, want := resp.Jobs[0].Recovery.Expectations.Artifacts[0].Path, "/out/prep-profile-candidate.json"; got != want {
+	if got, want := resp.Jobs[0].Recovery.Expectations.Artifacts[0].Path, "/out/gate-profile-candidate.json"; got != want {
 		t.Fatalf("recovery.expectations.artifacts[0].path = %q, want %q", got, want)
 	}
 }
@@ -355,7 +355,7 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 				Name:    "re-gate-1",
 				JobType: "re_gate",
 				Status:  store.JobStatusSuccess,
-				Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`),
+				Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`),
 			},
 		},
 	}
@@ -392,10 +392,10 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 	if resp.Jobs[0].Recovery == nil {
 		t.Fatal("expected recovery field")
 	}
-	if got, want := resp.Jobs[0].Recovery.CandidateSchemaID, "prep_profile_v1"; got != want {
+	if got, want := resp.Jobs[0].Recovery.CandidateSchemaID, "gate_profile_v1"; got != want {
 		t.Fatalf("candidate_schema_id = %q, want %q", got, want)
 	}
-	if got, want := resp.Jobs[0].Recovery.CandidateArtifactPath, "/out/prep-profile-candidate.json"; got != want {
+	if got, want := resp.Jobs[0].Recovery.CandidateArtifactPath, "/out/gate-profile-candidate.json"; got != want {
 		t.Fatalf("candidate_artifact_path = %q, want %q", got, want)
 	}
 	if got, want := resp.Jobs[0].Recovery.CandidateValidationStatus, "invalid"; got != want {

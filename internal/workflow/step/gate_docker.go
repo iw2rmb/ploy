@@ -230,7 +230,7 @@ func dockerHostSocketPathFromEnv(env map[string]string) string {
 	if len(env) == 0 {
 		return ""
 	}
-	dockerHost := strings.TrimSpace(env[contracts.PrepDockerHostEnv])
+	dockerHost := strings.TrimSpace(env[contracts.GateProfileDockerHostEnv])
 	if dockerHost == "" || !strings.HasPrefix(dockerHost, "unix://") {
 		return ""
 	}

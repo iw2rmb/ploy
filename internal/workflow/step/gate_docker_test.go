@@ -211,7 +211,7 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	workspace := createMavenWorkspace(t, "17")
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Prep: &contracts.BuildGatePrepOverride{
+		GateProfile: &contracts.BuildGateProfileOverride{
 			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
 		},
 	}
@@ -249,7 +249,7 @@ func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 			"A": "base",
 			"B": "base",
 		},
-		Prep: &contracts.BuildGatePrepOverride{
+		GateProfile: &contracts.BuildGateProfileOverride{
 			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
 			Env: map[string]string{
 				"B": "prep",
@@ -291,7 +291,7 @@ func TestDockerGateExecutor_MountsDockerSocketForUnixDockerHost(t *testing.T) {
 	workspace := createMavenWorkspace(t, "17")
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Prep: &contracts.BuildGatePrepOverride{
+		GateProfile: &contracts.BuildGateProfileOverride{
 			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
 			Env: map[string]string{
 				"DOCKER_HOST": "unix://" + socketPath,
@@ -328,7 +328,7 @@ func TestDockerGateExecutor_DoesNotMountDockerSocketForTCPDockerHost(t *testing.
 	workspace := createMavenWorkspace(t, "17")
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
-		Prep: &contracts.BuildGatePrepOverride{
+		GateProfile: &contracts.BuildGateProfileOverride{
 			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
 			Env: map[string]string{
 				"DOCKER_HOST": "tcp://prep-dind:2375",

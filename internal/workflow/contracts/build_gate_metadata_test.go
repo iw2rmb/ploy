@@ -355,7 +355,7 @@ func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 			StrategyID:   "infra-default",
 			Confidence:   confidencePtr(0.8),
 			Reason:       "pre_gate network timeout",
-			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`),
+			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}`),
 		},
 	}
 	if err := meta.Validate(); err != nil {
@@ -370,11 +370,11 @@ func TestBuildGateStageMetadata_Recovery_CandidateValidState(t *testing.T) {
 		Recovery: &BuildGateRecoveryMetadata{
 			LoopKind:                  "healing",
 			ErrorKind:                 "infra",
-			CandidateSchemaID:         PrepProfileCandidateSchemaID,
-			CandidateArtifactPath:     PrepProfileCandidateArtifactPath,
+			CandidateSchemaID:         GateProfileCandidateSchemaID,
+			CandidateArtifactPath:     GateProfileCandidateArtifactPath,
 			CandidateValidationStatus: RecoveryCandidateStatusValid,
 			CandidatePromoted:         &promoted,
-			CandidatePrepProfile: json.RawMessage(`{
+			CandidateGateProfile: json.RawMessage(`{
 				"schema_version": 1,
 				"repo_id": "repo_123",
 				"runner_mode": "simple",
@@ -420,7 +420,7 @@ func TestBuildGateStageMetadata_Recovery_CandidateInvalidStateRejected(t *testin
 				LoopKind:                  "healing",
 				ErrorKind:                 "infra",
 				CandidateValidationStatus: RecoveryCandidateStatusInvalid,
-				CandidatePrepProfile:      json.RawMessage(`{"schema_version":1}`),
+				CandidateGateProfile:      json.RawMessage(`{"schema_version":1}`),
 			},
 		},
 		{
@@ -606,7 +606,7 @@ func TestBuildGateStageMetadata_Recovery_JSONRoundTrip(t *testing.T) {
 			StrategyID:   "infra-default",
 			Confidence:   confidencePtr(0.75),
 			Reason:       "docker daemon unavailable",
-			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`),
+			Expectations: json.RawMessage(`{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}`),
 		},
 	}
 	data, err := json.Marshal(original)
@@ -635,7 +635,7 @@ func TestBuildGateStageMetadata_Recovery_JSONRoundTrip(t *testing.T) {
 	if decoded.Recovery.Reason != "docker daemon unavailable" {
 		t.Fatalf("Reason = %q, want %q", decoded.Recovery.Reason, "docker daemon unavailable")
 	}
-	if string(decoded.Recovery.Expectations) != `{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}` {
+	if string(decoded.Recovery.Expectations) != `{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}` {
 		t.Fatalf("Expectations = %s, want artifact expectation payload", string(decoded.Recovery.Expectations))
 	}
 }

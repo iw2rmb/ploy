@@ -199,9 +199,9 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return fmt.Errorf("merge recovery candidate prep into spec: %w", err)
 	}
-	mergedSpec, err = mergeRepoPrepProfileIntoSpec(mergedSpec, modRepo.PrepProfile, jobType)
+	mergedSpec, err = mergeRepoGateProfileIntoSpec(mergedSpec, modRepo.GateProfile, jobType)
 	if err != nil {
-		return fmt.Errorf("merge repo prep_profile into spec: %w", err)
+		return fmt.Errorf("merge repo gate_profile into spec: %w", err)
 	}
 	mergedSpec, err = mergeHealingSelectedKindIntoSpec(mergedSpec, job, jobType)
 	if err != nil {
@@ -382,16 +382,16 @@ func mergeGitLabConfigIntoSpec(spec json.RawMessage, cfg config.GitLabConfig) (j
 	return json.RawMessage(b), nil
 }
 
-func mergeRepoPrepProfileIntoSpec(spec json.RawMessage, prepProfile []byte, jobType domaintypes.JobType) (json.RawMessage, error) {
-	if len(bytes.TrimSpace(prepProfile)) == 0 {
+func mergeRepoGateProfileIntoSpec(spec json.RawMessage, gateProfile []byte, jobType domaintypes.JobType) (json.RawMessage, error) {
+	if len(bytes.TrimSpace(gateProfile)) == 0 {
 		return spec, nil
 	}
 
-	profile, err := contracts.ParsePrepProfileJSON(prepProfile)
+	profile, err := contracts.ParseGateProfileJSON(gateProfile)
 	if err != nil {
 		return nil, err
 	}
-	phase, override, err := contracts.PrepProfileGateOverrideForJobType(profile, jobType)
+	phase, override, err := contracts.GateProfileGateOverrideForJobType(profile, jobType)
 	if err != nil {
 		return nil, err
 	}
@@ -416,14 +416,14 @@ func mergeRecoveryCandidatePrepIntoSpec(spec json.RawMessage, job store.Job, job
 	if recovery.CandidateValidationStatus != contracts.RecoveryCandidateStatusValid {
 		return spec, nil
 	}
-	if len(bytes.TrimSpace(recovery.CandidatePrepProfile)) == 0 {
+	if len(bytes.TrimSpace(recovery.CandidateGateProfile)) == 0 {
 		return spec, nil
 	}
-	profile, err := contracts.ParsePrepProfileJSON(recovery.CandidatePrepProfile)
+	profile, err := contracts.ParseGateProfileJSON(recovery.CandidateGateProfile)
 	if err != nil {
-		return nil, fmt.Errorf("parse recovery candidate prep_profile: %w", err)
+		return nil, fmt.Errorf("parse recovery candidate gate_profile: %w", err)
 	}
-	phase, override, err := contracts.PrepProfileGateOverrideForJobType(profile, jobType)
+	phase, override, err := contracts.GateProfileGateOverrideForJobType(profile, jobType)
 	if err != nil {
 		return nil, err
 	}
@@ -435,14 +435,14 @@ func mergeRecoveryCandidatePrepIntoSpec(spec json.RawMessage, job store.Job, job
 
 func mergeGatePrepOverrideIntoSpec(
 	spec json.RawMessage,
-	phase contracts.BuildGatePrepPhase,
-	override *contracts.BuildGatePrepOverride,
+	phase contracts.BuildGateProfilePhase,
+	override *contracts.BuildGateProfileOverride,
 ) (json.RawMessage, error) {
 	phaseKey := ""
 	switch phase {
-	case contracts.BuildGatePrepPhasePre:
+	case contracts.BuildGateProfilePhasePre:
 		phaseKey = "pre"
-	case contracts.BuildGatePrepPhasePost:
+	case contracts.BuildGateProfilePhasePost:
 		phaseKey = "post"
 	default:
 		return spec, nil
@@ -461,10 +461,10 @@ func mergeGatePrepOverrideIntoSpec(
 		return nil, err
 	}
 
-	if existing, exists := phaseCfg["prep"]; exists && existing != nil {
+	if existing, exists := phaseCfg["gate_profile"]; exists && existing != nil {
 		return spec, nil
 	}
-	phaseCfg["prep"] = buildGatePrepOverrideToMap(override)
+	phaseCfg["gate_profile"] = buildGatePrepOverrideToMap(override)
 
 	b, err := json.Marshal(m)
 	if err != nil {
@@ -486,7 +486,7 @@ func ensureObjectField(parent map[string]any, key string, prefix string) (map[st
 	return obj, nil
 }
 
-func buildGatePrepOverrideToMap(override *contracts.BuildGatePrepOverride) map[string]any {
+func buildGatePrepOverrideToMap(override *contracts.BuildGateProfileOverride) map[string]any {
 	if override == nil {
 		return nil
 	}

@@ -112,7 +112,7 @@ Role model (bearer token claims):
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing migs
-  - For `infra` with `expectations.artifacts` schema `prep_profile_v1`, healing is expected to write `/out/prep-profile-candidate.json`; candidate promotion to repo `prep_profile` occurs only on successful follow-up `re_gate`
+  - For `infra` with `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json`; candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
 - Container cleanup model:
   - Containers are retained after step/gate completion.
   - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem (`DockerRootDir`).

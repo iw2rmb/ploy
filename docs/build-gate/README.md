@@ -115,8 +115,8 @@ build_gate:
 
 - `build_gate.pre.stack` applies to the `pre_gate` job.
 - `build_gate.post.stack` applies to the `post_gate` job.
-- `build_gate.pre.prep` applies to the `pre_gate` command/env override.
-- `build_gate.post.prep` applies to `post_gate` and `re_gate` command/env overrides.
+- `build_gate.pre.gate_profile` applies to the `pre_gate` command/env override.
+- `build_gate.post.gate_profile` applies to `post_gate` and `re_gate` command/env overrides.
 - When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
 - When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
 - When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.
@@ -127,11 +127,11 @@ build_gate:
 ### Prep Override Precedence
 
 Gate command resolution uses the following precedence (highest wins):
-1. Explicit run spec override: `build_gate.<phase>.prep`
-2. Repo prep profile mapping (claim-time injection from persisted `prep_profile`)
+1. Explicit run spec override: `build_gate.<phase>.gate_profile`
+2. Repo gate profile mapping (claim-time injection from persisted `gate_profile`)
 3. Detected-tool fallback command (`buildCommandForTool`)
 
-Prep profile mapping for simple mode:
+Gate profile mapping for simple mode:
 - `pre_gate` maps to `targets.build`
 - `post_gate` maps to `targets.unit`
 - `re_gate` maps to `targets.unit` (same as post phase)
@@ -142,12 +142,12 @@ Prep profile mapping for simple mode:
   - `runtime.docker.api_version` injects `DOCKER_API_VERSION=<value>` when set
   - when `DOCKER_HOST` is `unix://...`, Build Gate mounts that socket path into the gate container automatically.
 
-Prep payload visibility is available via `GET /v1/repos`
-(`prep_profile` is consumed at claim-time for gate override mapping; there is no dedicated prep endpoint).
+Gate profile payload visibility is available via `GET /v1/repos`
+(`gate_profile` is consumed at claim-time for gate override mapping; there is no dedicated prep endpoint).
 
 Environment precedence for gate execution:
 1. Gate env from run/spec (`spec.env` + global env injection)
-2. `build_gate.<phase>.prep.env` (override wins on key conflicts)
+2. `build_gate.<phase>.gate_profile.env` (override wins on key conflicts)
 
 ### Stack Gate: Build Gate Image Mapping
 

@@ -1,4 +1,4 @@
-# Prep Complex Mode (Future Track)
+# Gate Profile Complex Mode (Future Track)
 
 ## Status
 
@@ -49,8 +49,8 @@ Even without complex execution, recovery policy is already fixed and shared:
 - server injects `build_gate.healing.selected_error_kind` on heal claims
 
 Infra candidate contract:
-- expected artifact path: `/out/prep-profile-candidate.json`
-- expected schema id: `prep_profile_v1`
+- expected artifact path: `/out/gate-profile-candidate.json`
+- expected schema id: `gate_profile_v1`
 - candidate must pass schema and stack checks
 - promotion requires successful follow-up `re_gate`
 
@@ -71,8 +71,8 @@ Complex track is complete only when:
 
 ## Cross References
 
-- `design/prep.md`
-- `design/prep-impl.md`
-- `design/prep-simple.md`
-- `design/prep-states.md`
-- `docs/schemas/prep_profile.schema.json`
+- `design/gate-profile.md`
+- `design/gate-profile-impl.md`
+- `design/gate-profile-simple.md`
+- `design/gate-profile-states.md`
+- `docs/schemas/gate_profile.schema.json`

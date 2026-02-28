@@ -7,7 +7,7 @@ Status: implemented.
 Deliver the first end-to-end prep flow for newly registered repos:
 - detect repos that require prep
 - run one non-interactive prep attempt
-- validate and persist prep profile output
+- validate and persist gate profile output
 - gate run scheduling on `PrepReady`
 - keep the existing unified jobs pipeline
 
@@ -65,7 +65,7 @@ Primary files:
 ### 5. Build Gate Consumption of Prep Profile
 
 Delivered:
-- claim-time merge of repo `prep_profile` into run spec gate prep overrides
+- claim-time merge of repo `gate_profile` into run spec gate prep overrides
 - phase mapping:
   - `pre_gate <- targets.build`
   - `post_gate <- targets.unit`
@@ -74,7 +74,7 @@ Delivered:
 
 Primary files:
 - `internal/server/handlers/nodes_claim.go`
-- `internal/workflow/contracts/prep_profile.go`
+- `internal/workflow/contracts/gate_profile.go`
 - `internal/nodeagent/execution_orchestrator_gate.go`
 - `internal/workflow/step/gate_docker_stack_gate.go`
 
@@ -106,12 +106,12 @@ Representative test suites:
 - `go test ./internal/server/prep`
 - `go test ./internal/server/handlers`
 - `go test ./internal/store/...`
-- `go test ./internal/workflow/contracts -run 'TestPrepProfile'`
+- `go test ./internal/workflow/contracts -run 'TestGateProfile'`
 
 ## Next Tracks (Post-Track-1)
 
 Not delivered in this track:
-- complex orchestration execution from prep profiles
+- complex orchestration execution from gate profiles
 - prompt/tactics feedback-loop adjudication and rollout
 - broader healing/session continuity improvements in discrete build-gate healing jobs
 

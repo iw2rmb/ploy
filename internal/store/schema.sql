@@ -147,9 +147,9 @@ CREATE TABLE IF NOT EXISTS mig_repos (
   repo_url     TEXT NOT NULL,  -- Repository URL (normalized for matching).
   base_ref     TEXT NOT NULL,  -- Mutable base ref (e.g., main).
   target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
-  prep_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  prep_profile JSONB,
-  prep_artifacts JSONB,
+  gate_profile_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  gate_profile JSONB,
+  gate_profile_artifacts JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 -- Enforce uniqueness: one repo_url per mig.

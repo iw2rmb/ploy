@@ -75,9 +75,9 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 						"strategy_id":"infra-default",
 						"confidence":0.8,
 						"reason":"docker socket missing",
-						"expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]},
-						"candidate_schema_id":"prep_profile_v1",
-						"candidate_artifact_path":"/out/prep-profile-candidate.json",
+						"expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]},
+						"candidate_schema_id":"gate_profile_v1",
+						"candidate_artifact_path":"/out/gate-profile-candidate.json",
 						"candidate_validation_status":"valid",
 						"candidate_validation_error":"",
 						"candidate_promoted":false
@@ -120,7 +120,7 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 	if got := result.Jobs[0].Recovery.Confidence; got == nil || *got != 0.8 {
 		t.Fatalf("confidence=%v, want 0.8", got)
 	}
-	if got, want := strings.TrimSpace(string(result.Jobs[0].Recovery.Expectations)), `{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}`; got != want {
+	if got, want := strings.TrimSpace(string(result.Jobs[0].Recovery.Expectations)), `{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}`; got != want {
 		t.Fatalf("expectations=%q, want %q", got, want)
 	}
 	if got := result.Jobs[0].Recovery.CandidatePromoted; got == nil || *got {

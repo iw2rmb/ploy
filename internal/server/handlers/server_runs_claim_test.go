@@ -401,7 +401,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	}
 }
 
-func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
+func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 	t.Parallel()
 
 	profile := []byte(`{
@@ -445,7 +445,7 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 		wantEnvV  string
 	}{
 		{
-			name:      "pre_gate maps targets.build to build_gate.pre.prep",
+			name:      "pre_gate maps targets.build to build_gate.pre.gate_profile",
 			jobType:   domaintypes.JobTypePreGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "pre",
@@ -454,7 +454,7 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 			wantEnvV:  "unix:///var/run/docker.sock",
 		},
 		{
-			name:      "post_gate maps targets.unit to build_gate.post.prep",
+			name:      "post_gate maps targets.unit to build_gate.post.gate_profile",
 			jobType:   domaintypes.JobTypePostGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "post",
@@ -472,11 +472,11 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 			wantEnvV:  "0",
 		},
 		{
-			name:    "explicit spec prep wins over profile mapping",
+			name:    "explicit spec gate_profile wins over profile mapping",
 			jobType: domaintypes.JobTypePreGate,
 			spec: []byte(`{
 				"steps":[{"image":"docker.io/acme/mod:latest"}],
-				"build_gate":{"pre":{"prep":{"command":"echo explicit","env":{"X":"1"}}}}
+				"build_gate":{"pre":{"gate_profile":{"command":"echo explicit","env":{"X":"1"}}}}
 			}`),
 			wantPhase: "pre",
 			wantCmd:   "echo explicit",
@@ -530,7 +530,7 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 				getModRepoResult: store.MigRepo{
 					ID:          repoID,
 					RepoUrl:     "https://github.com/user/repo.git",
-					PrepProfile: profile,
+					GateProfile: profile,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
 			}
@@ -562,19 +562,19 @@ func TestClaimJob_MergesPrepProfileIntoGateSpec(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected build_gate.%s object, got %T", tc.wantPhase, bg[tc.wantPhase])
 			}
-			prep, ok := phase["prep"].(map[string]any)
+			prep, ok := phase["gate_profile"].(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate.%s.prep object, got %T", tc.wantPhase, phase["prep"])
+				t.Fatalf("expected build_gate.%s.gate_profile object, got %T", tc.wantPhase, phase["gate_profile"])
 			}
 			if got := prep["command"]; got != tc.wantCmd {
-				t.Fatalf("build_gate.%s.prep.command=%v, want %q", tc.wantPhase, got, tc.wantCmd)
+				t.Fatalf("build_gate.%s.gate_profile.command=%v, want %q", tc.wantPhase, got, tc.wantCmd)
 			}
 			env, ok := prep["env"].(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate.%s.prep.env object, got %T", tc.wantPhase, prep["env"])
+				t.Fatalf("expected build_gate.%s.gate_profile.env object, got %T", tc.wantPhase, prep["env"])
 			}
 			if got := env[tc.wantEnvK]; got != tc.wantEnvV {
-				t.Fatalf("build_gate.%s.prep.env[%s]=%v, want %q", tc.wantPhase, tc.wantEnvK, got, tc.wantEnvV)
+				t.Fatalf("build_gate.%s.gate_profile.env[%s]=%v, want %q", tc.wantPhase, tc.wantEnvK, got, tc.wantEnvV)
 			}
 		})
 	}
@@ -615,7 +615,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		wantSrc string
 	}{
 		{
-			name:    "candidate wins over repo prep_profile on re_gate",
+			name:    "candidate wins over repo gate_profile on re_gate",
 			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantCmd: "echo candidate-unit",
 			wantSrc: "candidate",
@@ -624,7 +624,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 			name: "explicit prep wins over candidate and repo",
 			spec: []byte(`{
 				"steps":[{"image":"docker.io/acme/mod:latest"}],
-				"build_gate":{"post":{"prep":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
+				"build_gate":{"post":{"gate_profile":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
 			}`),
 			wantCmd: "echo explicit",
 			wantSrc: "explicit",
@@ -644,9 +644,9 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 			jobID := domaintypes.NewJobID()
 			now := time.Now().UTC()
 
-			meta := fmt.Sprintf(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_prep_profile":%s}}`,
-				contracts.PrepProfileCandidateSchemaID,
-				contracts.PrepProfileCandidateArtifactPath,
+			meta := fmt.Sprintf(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_gate_profile":%s}}`,
+				contracts.GateProfileCandidateSchemaID,
+				contracts.GateProfileCandidateArtifactPath,
 				contracts.RecoveryCandidateStatusValid,
 				candidateProfile,
 			)
@@ -682,7 +682,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 				getModRepoResult: store.MigRepo{
 					ID:          repoID,
 					RepoUrl:     "https://github.com/user/repo.git",
-					PrepProfile: repoProfile,
+					GateProfile: repoProfile,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
 			}
@@ -713,25 +713,25 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected build_gate.post object, got %T", bg["post"])
 			}
-			prep, ok := post["prep"].(map[string]any)
+			prep, ok := post["gate_profile"].(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate.post.prep object, got %T", post["prep"])
+				t.Fatalf("expected build_gate.post.gate_profile object, got %T", post["gate_profile"])
 			}
 			if got := prep["command"]; got != tc.wantCmd {
-				t.Fatalf("build_gate.post.prep.command=%v, want %q", got, tc.wantCmd)
+				t.Fatalf("build_gate.post.gate_profile.command=%v, want %q", got, tc.wantCmd)
 			}
 			env, ok := prep["env"].(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate.post.prep.env object, got %T", prep["env"])
+				t.Fatalf("expected build_gate.post.gate_profile.env object, got %T", prep["env"])
 			}
 			if got := env["SRC"]; got != tc.wantSrc {
-				t.Fatalf("build_gate.post.prep.env[SRC]=%v, want %q", got, tc.wantSrc)
+				t.Fatalf("build_gate.post.gate_profile.env[SRC]=%v, want %q", got, tc.wantSrc)
 			}
 		})
 	}
 }
 
-func TestClaimJob_InvalidPrepProfileReturnsError(t *testing.T) {
+func TestClaimJob_InvalidGateProfileReturnsError(t *testing.T) {
 	t.Parallel()
 
 	nodeKey := domaintypes.NewNodeKey()
@@ -774,7 +774,7 @@ func TestClaimJob_InvalidPrepProfileReturnsError(t *testing.T) {
 		getModRepoResult: store.MigRepo{
 			ID:          repoID,
 			RepoUrl:     "https://github.com/user/repo.git",
-			PrepProfile: []byte(`{"schema_version":1}`),
+			GateProfile: []byte(`{"schema_version":1}`),
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
@@ -789,8 +789,8 @@ func TestClaimJob_InvalidPrepProfileReturnsError(t *testing.T) {
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), "prep_profile") {
-		t.Fatalf("expected prep_profile error, got %q", rr.Body.String())
+	if !strings.Contains(rr.Body.String(), "gate_profile") {
+		t.Fatalf("expected gate_profile error, got %q", rr.Body.String())
 	}
 }
 
@@ -829,7 +829,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 			Name:        "heal-1-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeHeal.String(),
-			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/prep-profile-candidate.json","schema":"prep_profile_v1"}]}}}`),
+			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`),
 		},
 		getRunResult: store.Run{
 			ID:        runID,
@@ -888,13 +888,13 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 	}
 	found := false
 	for _, p := range paths {
-		if s, ok := p.(string); ok && s == "/out/prep-profile-candidate.json" {
+		if s, ok := p.(string); ok && s == "/out/gate-profile-candidate.json" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected artifact_paths to include /out/prep-profile-candidate.json, got %#v", paths)
+		t.Fatalf("expected artifact_paths to include /out/gate-profile-candidate.json, got %#v", paths)
 	}
 }
 

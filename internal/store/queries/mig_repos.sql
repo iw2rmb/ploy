@@ -5,26 +5,26 @@ INSERT INTO mig_repos (
   repo_url,
   base_ref,
   target_ref,
-  prep_profile,
-  prep_artifacts,
-  prep_updated_at
+  gate_profile,
+  gate_profile_artifacts,
+  gate_profile_updated_at
 )
 VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
-RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at;
+RETURNING id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at;
 
 -- name: GetMigRepo :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 FROM mig_repos
 WHERE id = $1;
 
 -- name: GetMigRepoByURL :one
 -- Gets a mod_repo by mig_id and repo_url (for uniqueness constraint enforcement).
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1 AND repo_url = $2;
 
 -- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at
+SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC;
@@ -52,18 +52,18 @@ INSERT INTO mig_repos (
   repo_url,
   base_ref,
   target_ref,
-  prep_profile,
-  prep_artifacts,
-  prep_updated_at
+  gate_profile,
+  gate_profile_artifacts,
+  gate_profile_updated_at
 )
 VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
 ON CONFLICT (mig_id, repo_url)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
   target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_url, base_ref, target_ref, prep_updated_at, prep_profile, prep_artifacts, created_at;
+RETURNING id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at;
 
--- name: PromoteReGateRecoveryCandidatePrepProfile :one
+-- name: PromoteReGateRecoveryCandidateGateProfile :one
 WITH target_job AS (
   SELECT j.id, j.repo_id
   FROM jobs j
@@ -87,9 +87,9 @@ updated_job AS (
   RETURNING tj.repo_id
 )
 UPDATE mig_repos mr
-SET prep_profile = $3,
-    prep_artifacts = $4,
-    prep_updated_at = now()
+SET gate_profile = $3,
+    gate_profile_artifacts = $4,
+    gate_profile_updated_at = now()
 FROM updated_job uj
 WHERE mr.id = uj.repo_id
 RETURNING mr.id;

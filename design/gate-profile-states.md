@@ -1,19 +1,19 @@
-# Prep Profile State Model (As-Built)
+# Gate Profile State Model (As-Built)
 
 ## Scope
 
-This document describes prep-related state that still exists after prep scheduler removal.
+This document describes gate-profile-related state that still exists after prep scheduler removal.
 
 There is no repo prep lifecycle (`PrepPending/PrepReady/...`) and no `prep_runs` attempt state machine.
 
-## Persisted Repo Prep Fields
+## Persisted Repo Gate Profile Fields
 
 Stored on `mig_repos`:
-- `prep_profile`
-- `prep_artifacts`
-- `prep_updated_at`
+- `gate_profile`
+- `gate_profile_artifacts`
+- `gate_profile_updated_at`
 
-These fields represent the current default prep payload for a repo.
+These fields represent the current default gate profile payload for a repo.
 
 ## Recovery Candidate Validation States
 
@@ -28,7 +28,7 @@ Candidate metadata fields:
 - `candidate_artifact_path`
 - `candidate_validation_status`
 - `candidate_validation_error`
-- `candidate_prep_profile` (set only when status is `valid`)
+- `candidate_gate_profile` (set only when status is `valid`)
 - `candidate_promoted` (set `true` only after successful promotion)
 
 ## Candidate Lifecycle Transitions
@@ -36,8 +36,8 @@ Candidate metadata fields:
 1. Failed gate classified as `infra` with candidate expectation.
 2. Heal job emits candidate artifact.
 3. Server validates candidate and records validation status.
-4. Valid candidate is merged into re-gate prep override.
-5. If re-gate succeeds, candidate is promoted to repo default prep profile and `candidate_promoted=true`.
+4. Valid candidate is merged into re-gate gate_profile override.
+5. If re-gate succeeds, candidate is promoted to repo default gate profile and `candidate_promoted=true`.
 
 If re-gate fails or candidate is not valid, promotion does not occur.
 
@@ -56,7 +56,7 @@ Stopping policy:
 
 Run scheduling and job materialization are not gated by prep lifecycle status.
 
-Prep profile is consumed opportunistically at job claim/re-gate time when available.
+Gate profile is consumed opportunistically at job claim/re-gate time when available.
 
 ## Visibility
 
@@ -68,7 +68,7 @@ There is no dedicated prep state endpoint.
 
 ## Cross References
 
-- `design/prep.md`
-- `design/prep-impl.md`
-- `design/prep-simple.md`
+- `design/gate-profile.md`
+- `design/gate-profile-impl.md`
+- `design/gate-profile-simple.md`
 - `docs/migs-lifecycle.md`
