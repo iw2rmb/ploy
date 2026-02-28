@@ -319,7 +319,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		}
 
 		if cfg.UploadConfiguredArtifacts {
-			r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace)
+			r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace, outDir)
 		}
 
 		if cfg.CheckWorkspaceNoChange && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
@@ -511,29 +511,34 @@ func disableManifestGate(manifest *contracts.StepManifest) {
 }
 
 // uploadConfiguredArtifacts uploads artifact bundles specified in the typed RunOptions.
-// Paths are resolved relative to workspace and validated against path traversal.
-func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace string) {
+// Relative paths resolve in workspace; /out/* paths resolve from outDir and keep
+// deterministic archive names under out/.
+func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace, outDir string) {
 	if len(typedOpts.Artifacts.Paths) == 0 {
 		return
 	}
 
-	var paths []string
+	entries := make([]ArtifactBundleEntry, 0, len(typedOpts.Artifacts.Paths))
 	for _, p := range typedOpts.Artifacts.Paths {
-		if !isValidArtifactPath(p, workspace) {
-			slog.Warn("artifact path rejected: path traversal attempt or absolute path",
-				"run_id", req.RunID, "job_id", req.JobID, "path", p)
+		fullPath, archivePath, ok := resolveConfiguredArtifactPath(p, workspace, outDir)
+		if !ok {
+			slog.Warn("artifact path rejected",
+				"run_id", req.RunID, "job_id", req.JobID, "path", p,
+			)
 			continue
 		}
 
-		fullPath := filepath.Clean(filepath.Join(workspace, p))
 		if _, err := os.Stat(fullPath); err == nil {
-			paths = append(paths, fullPath)
+			entries = append(entries, ArtifactBundleEntry{
+				SourcePath:  fullPath,
+				ArchivePath: archivePath,
+			})
 		} else {
 			slog.Warn("artifact path not found", "run_id", req.RunID, "path", p)
 		}
 	}
 
-	if len(paths) == 0 {
+	if len(entries) == 0 {
 		return
 	}
 
@@ -542,11 +547,36 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 		return
 	}
 
-	if _, _, err := r.artifactUploader.UploadArtifact(ctx, req.RunID, req.JobID, paths, typedOpts.Artifacts.Name); err != nil {
+	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, req.RunID, req.JobID, entries, typedOpts.Artifacts.Name); err != nil {
 		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	} else {
-		slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "job_id", req.JobID, "paths", len(paths))
+		slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "job_id", req.JobID, "paths", len(entries))
 	}
+}
+
+func resolveConfiguredArtifactPath(rawPath, workspace, outDir string) (fullPath string, archivePath string, ok bool) {
+	p := strings.TrimSpace(rawPath)
+	if p == "" {
+		return "", "", false
+	}
+
+	if strings.HasPrefix(p, "/out/") {
+		if strings.TrimSpace(outDir) == "" {
+			return "", "", false
+		}
+		rel := strings.TrimPrefix(p, "/out/")
+		cleanRel := filepath.Clean(rel)
+		if cleanRel == "." || strings.HasPrefix(cleanRel, "..") || filepath.IsAbs(cleanRel) {
+			return "", "", false
+		}
+		return filepath.Join(outDir, cleanRel), filepath.ToSlash(filepath.Join("out", cleanRel)), true
+	}
+
+	if !isValidArtifactPath(p, workspace) {
+		return "", "", false
+	}
+
+	return filepath.Clean(filepath.Join(workspace, p)), "", true
 }
 
 // uploadOutDir bundles and uploads the /out directory when it contains files.
@@ -555,7 +585,7 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 		return nil
 	}
 
-	hasFiles, files := listFilesRecursive(outDir)
+	hasFiles, _ := listFilesRecursive(outDir)
 	if !hasFiles {
 		return nil
 	}
@@ -564,7 +594,11 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 		return fmt.Errorf("initialize uploaders: %w", err)
 	}
 
-	if _, _, err := r.artifactUploader.UploadArtifact(ctx, runID, jobID, files, "mig-out"); err != nil {
+	entries := []ArtifactBundleEntry{{
+		SourcePath:  outDir,
+		ArchivePath: "out",
+	}}
+	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, runID, jobID, entries, "mig-out"); err != nil {
 		return fmt.Errorf("upload /out bundle: %w", err)
 	}
 

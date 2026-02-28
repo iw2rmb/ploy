@@ -1,11 +1,17 @@
 package handlers
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
+	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -363,4 +369,72 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != store.RunStatusFinished {
 		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
 	}
+}
+
+func TestLoadRecoveryArtifact_Success(t *testing.T) {
+	t.Parallel()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	objKey := "artifacts/run/" + runID.String() + "/bundle/test.tar.gz"
+
+	st := &mockStore{
+		listArtifactBundlesMetaByRunAndJobResult: []store.ArtifactBundle{
+			{
+				RunID:     runID,
+				JobID:     &jobID,
+				ObjectKey: strPtr(objKey),
+			},
+		},
+	}
+	bs := bsmock.New()
+	bundle := mustTarGzPayload(t, map[string][]byte{
+		"out/prep-profile-candidate.json": []byte(`{"schema_version":1}`),
+	})
+	if _, err := bs.Put(context.Background(), objKey, "application/gzip", bundle); err != nil {
+		t.Fatalf("put blob: %v", err)
+	}
+
+	bp := blobpersist.New(st, bs)
+	raw, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/prep-profile-candidate.json")
+	if err != nil {
+		t.Fatalf("loadRecoveryArtifact error: %v", err)
+	}
+	if string(raw) != `{"schema_version":1}` {
+		t.Fatalf("unexpected payload: %s", string(raw))
+	}
+}
+
+func TestLoadRecoveryArtifact_TypedErrors(t *testing.T) {
+	t.Parallel()
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	st := &mockStore{}
+	bp := blobpersist.New(st, bsmock.New())
+
+	_, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/prep-profile-candidate.json")
+	if !errors.Is(err, blobpersist.ErrRecoveryArtifactNotFound) {
+		t.Fatalf("expected ErrRecoveryArtifactNotFound, got %v", err)
+	}
+}
+
+func mustTarGzPayload(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	tw := tar.NewWriter(gz)
+	for name, data := range files {
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(data))}); err != nil {
+			t.Fatalf("write header %q: %v", name, err)
+		}
+		if _, err := tw.Write(data); err != nil {
+			t.Fatalf("write payload %q: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return b.Bytes()
 }

@@ -3,12 +3,26 @@
 package blobpersist
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"path"
+	"strings"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+)
+
+var (
+	ErrRecoveryArtifactNotFound    = errors.New("recovery artifact not found")
+	ErrRecoveryArtifactUnreadable  = errors.New("recovery artifact unreadable")
+	ErrRecoveryArtifactInvalidJSON = errors.New("recovery artifact invalid json payload")
 )
 
 // Service coordinates database metadata and object storage writes.
@@ -117,4 +131,119 @@ func (s *Service) CreateArtifactBundle(ctx context.Context, params store.CreateA
 			return s.store.DeleteArtifactBundle(ctx, row.ID)
 		},
 	)
+}
+
+// LoadRecoveryArtifact resolves and reads a specific artifact path from persisted
+// job artifact bundles. expectedPath must use absolute wire form (for example
+// "/out/prep-profile-candidate.json").
+func (s *Service) LoadRecoveryArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, expectedPath string) ([]byte, error) {
+	if err := s.validate(); err != nil {
+		return nil, err
+	}
+	canonicalPath, err := canonicalRecoveryArtifactPath(expectedPath)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrRecoveryArtifactUnreadable, err)
+	}
+
+	bundles, err := s.store.ListArtifactBundlesMetaByRunAndJob(ctx, store.ListArtifactBundlesMetaByRunAndJobParams{
+		RunID: runID,
+		JobID: &jobID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: list artifact bundles: %v", ErrRecoveryArtifactUnreadable, err)
+	}
+
+	var firstUnreadable error
+	for _, bundle := range bundles {
+		if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
+			if firstUnreadable == nil {
+				firstUnreadable = fmt.Errorf("bundle %x has empty object key", bundle.ID.Bytes)
+			}
+			continue
+		}
+
+		rc, _, getErr := s.blobstore.Get(ctx, *bundle.ObjectKey)
+		if getErr != nil {
+			if firstUnreadable == nil {
+				firstUnreadable = fmt.Errorf("get object %q: %w", *bundle.ObjectKey, getErr)
+			}
+			continue
+		}
+
+		raw, found, readErr := readArtifactFromTarGz(rc, canonicalPath)
+		_ = rc.Close()
+		if readErr != nil {
+			if firstUnreadable == nil {
+				firstUnreadable = fmt.Errorf("read bundle %q: %w", *bundle.ObjectKey, readErr)
+			}
+			continue
+		}
+		if !found {
+			continue
+		}
+
+		if !json.Valid(raw) {
+			return nil, fmt.Errorf("%w: path=%s", ErrRecoveryArtifactInvalidJSON, expectedPath)
+		}
+		return raw, nil
+	}
+
+	if firstUnreadable != nil {
+		return nil, fmt.Errorf("%w: %v", ErrRecoveryArtifactUnreadable, firstUnreadable)
+	}
+	return nil, fmt.Errorf("%w: path=%s", ErrRecoveryArtifactNotFound, expectedPath)
+}
+
+func canonicalRecoveryArtifactPath(expectedPath string) (string, error) {
+	p := strings.TrimSpace(expectedPath)
+	if p == "" {
+		return "", fmt.Errorf("expected artifact path is required")
+	}
+	cleaned := path.Clean("/" + strings.TrimPrefix(p, "/"))
+	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
+		return "", fmt.Errorf("invalid expected artifact path %q", expectedPath)
+	}
+	return strings.TrimPrefix(cleaned, "/"), nil
+}
+
+func normalizeTarEntryPath(name string) string {
+	n := strings.TrimSpace(name)
+	if n == "" {
+		return ""
+	}
+	cleaned := path.Clean("/" + strings.TrimPrefix(n, "/"))
+	if cleaned == "/" || strings.HasPrefix(cleaned, "/../") {
+		return ""
+	}
+	return strings.TrimPrefix(cleaned, "/")
+}
+
+func readArtifactFromTarGz(r io.Reader, expectedEntry string) ([]byte, bool, error) {
+	gzReader, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, false, fmt.Errorf("open gzip: %w", err)
+	}
+	defer func() { _ = gzReader.Close() }()
+
+	tr := tar.NewReader(gzReader)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, fmt.Errorf("read tar entry: %w", err)
+		}
+		if hdr == nil || hdr.Typeflag == tar.TypeDir {
+			continue
+		}
+		if normalizeTarEntryPath(hdr.Name) != expectedEntry {
+			continue
+		}
+		data, readErr := io.ReadAll(tr)
+		if readErr != nil {
+			return nil, false, fmt.Errorf("read tar payload: %w", readErr)
+		}
+		return bytes.TrimSpace(data), true, nil
+	}
 }

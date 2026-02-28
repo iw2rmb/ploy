@@ -646,6 +646,48 @@ func TestCreateTarGzBundle_DirectoryRecursive(t *testing.T) {
 	}
 }
 
+func TestCreateTarGzBundleFromEntries_CustomArchiveRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	srcDir := filepath.Join(tmpDir, "src")
+	if err := os.MkdirAll(filepath.Join(srcDir, "nested"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "nested", "candidate.json"), []byte(`{"schema_version":1}`), 0o600); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	bundleBytes, err := createTarGzBundleFromEntries([]ArtifactBundleEntry{{
+		SourcePath:  srcDir,
+		ArchivePath: "out",
+	}})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+
+	gzReader, err := gzip.NewReader(bytes.NewReader(bundleBytes))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer func() { _ = gzReader.Close() }()
+	tr := tar.NewReader(gzReader)
+
+	names := map[string]struct{}{}
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar read: %v", err)
+		}
+		names[hdr.Name] = struct{}{}
+	}
+
+	if _, ok := names["out/nested/candidate.json"]; !ok {
+		t.Fatalf("expected out/nested/candidate.json in archive, got %v", names)
+	}
+}
+
 func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
 	// Try to bundle a non-existent file.
 	_, err := createTarGzBundle([]string{"/nonexistent/file.txt"})

@@ -11,11 +11,19 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
+
+// ArtifactBundleEntry defines one filesystem source and its archive path inside
+// an uploaded artifact bundle.
+type ArtifactBundleEntry struct {
+	SourcePath  string
+	ArchivePath string
+}
 
 // DiffUploader uploads diff and summary data to the control-plane server.
 type DiffUploader struct {
@@ -73,6 +81,23 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID
 	if err != nil {
 		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
 	}
+	return u.uploadBundle(ctx, runID, jobID, bundleBytes, name)
+}
+
+// UploadArtifactEntries creates a tar.gz bundle from explicit source->archive mappings
+// and uploads it to the server.
+func (u *ArtifactUploader) UploadArtifactEntries(ctx context.Context, runID types.RunID, jobID types.JobID, entries []ArtifactBundleEntry, name string) (string, string, error) {
+	if len(entries) == 0 {
+		return "", "", nil
+	}
+	bundleBytes, err := createTarGzBundleFromEntries(entries)
+	if err != nil {
+		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
+	}
+	return u.uploadBundle(ctx, runID, jobID, bundleBytes, name)
+}
+
+func (u *ArtifactUploader) uploadBundle(ctx context.Context, runID types.RunID, jobID types.JobID, bundleBytes []byte, name string) (string, string, error) {
 	if err := validateUploadSize(bundleBytes, "gzipped artifact bundle"); err != nil {
 		return "", "", err
 	}
@@ -101,11 +126,20 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID
 
 // createTarGzBundle creates a gzipped tar archive from the given file paths.
 func createTarGzBundle(paths []string) ([]byte, error) {
+	entries := make([]ArtifactBundleEntry, 0, len(paths))
+	for _, p := range paths {
+		entries = append(entries, ArtifactBundleEntry{SourcePath: p})
+	}
+	return createTarGzBundleFromEntries(entries)
+}
+
+func createTarGzBundleFromEntries(entries []ArtifactBundleEntry) ([]byte, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
 	tarWriter := tar.NewWriter(gzWriter)
 
-	for _, root := range paths {
+	for _, entry := range entries {
+		root := entry.SourcePath
 		// Resolve to absolute path for consistent walking; header names will be relative.
 		absRoot, err := filepath.Abs(root)
 		if err != nil {
@@ -121,7 +155,16 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 			return nil, fmt.Errorf("stat %s: %w", root, err)
 		}
 
-		base := filepath.Base(absRoot)
+		base := strings.TrimSpace(entry.ArchivePath)
+		if base == "" {
+			base = filepath.Base(absRoot)
+		}
+		base = normalizeArchivePath(base)
+		if base == "" {
+			_ = tarWriter.Close()
+			_ = gzWriter.Close()
+			return nil, fmt.Errorf("invalid archive path for %s", root)
+		}
 
 		// Write the root itself (dir or file) and recurse when directory.
 		// Use absRoot as allowed root for symlink validation.
@@ -177,6 +220,22 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func normalizeArchivePath(name string) string {
+	n := strings.TrimSpace(name)
+	if n == "" {
+		return ""
+	}
+	n = filepath.ToSlash(n)
+	n = strings.TrimPrefix(n, "./")
+	n = strings.TrimPrefix(n, "/")
+	n = path.Clean("/" + n)
+	n = strings.TrimPrefix(n, "/")
+	if n == "." || n == "" || strings.HasPrefix(n, "../") {
+		return ""
+	}
+	return n
+}
+
 // addPathToTar writes a single filesystem entry to the tar using the provided name.
 // allowedRoot is the directory that symlinks must resolve within; symlinks pointing
 // outside are logged and skipped to prevent data exfiltration.
@@ -215,7 +274,10 @@ func addPathToTar(tw *tar.Writer, fsPath, name string, info os.FileInfo, allowed
 	if err != nil {
 		return fmt.Errorf("create tar header: %w", err)
 	}
-	header.Name = name
+	header.Name = normalizeArchivePath(name)
+	if header.Name == "" {
+		return fmt.Errorf("invalid tar header name %q", name)
+	}
 
 	if err := tw.WriteHeader(header); err != nil {
 		return fmt.Errorf("write header: %w", err)

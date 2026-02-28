@@ -1,6 +1,9 @@
 package blobpersist
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"io"
@@ -17,12 +20,13 @@ import (
 type stubStore struct {
 	store.Store
 
-	createLog            func(ctx context.Context, arg store.CreateLogParams) (store.Log, error)
-	deleteLog            func(ctx context.Context, id int64) error
-	createDiff           func(ctx context.Context, arg store.CreateDiffParams) (store.Diff, error)
-	deleteDiff           func(ctx context.Context, id pgtype.UUID) error
-	createArtifactBundle func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error)
-	deleteArtifactBundle func(ctx context.Context, id pgtype.UUID) error
+	createLog                          func(ctx context.Context, arg store.CreateLogParams) (store.Log, error)
+	deleteLog                          func(ctx context.Context, id int64) error
+	createDiff                         func(ctx context.Context, arg store.CreateDiffParams) (store.Diff, error)
+	deleteDiff                         func(ctx context.Context, id pgtype.UUID) error
+	createArtifactBundle               func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error)
+	deleteArtifactBundle               func(ctx context.Context, id pgtype.UUID) error
+	listArtifactBundlesMetaByRunAndJob func(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error)
 }
 
 func (s *stubStore) CreateLog(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
@@ -49,8 +53,13 @@ func (s *stubStore) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) er
 	return s.deleteArtifactBundle(ctx, id)
 }
 
+func (s *stubStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+	return s.listArtifactBundlesMetaByRunAndJob(ctx, arg)
+}
+
 type stubBlobstore struct {
 	put func(ctx context.Context, key, contentType string, data []byte) (string, error)
+	get func(ctx context.Context, key string) (io.ReadCloser, int64, error)
 }
 
 var _ blobstore.Store = (*stubBlobstore)(nil)
@@ -59,8 +68,11 @@ func (s *stubBlobstore) Put(ctx context.Context, key, contentType string, data [
 	return s.put(ctx, key, contentType, data)
 }
 
-func (s *stubBlobstore) Get(context.Context, string) (io.ReadCloser, int64, error) {
-	return nil, 0, errors.New("not implemented")
+func (s *stubBlobstore) Get(ctx context.Context, key string) (io.ReadCloser, int64, error) {
+	if s.get == nil {
+		return nil, 0, errors.New("not implemented")
+	}
+	return s.get(ctx, key)
 }
 
 func (s *stubBlobstore) Delete(context.Context, string) error {
@@ -216,4 +228,159 @@ func TestCreateArtifactBundle_RollsBackMetadataOnUploadFailure(t *testing.T) {
 	if deleted != artifactID {
 		t.Fatalf("DeleteArtifactBundle id mismatch")
 	}
+}
+
+func TestLoadRecoveryArtifact_Success(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	artifactUUID := uuid.New()
+	artifactID := pgtype.UUID{Bytes: artifactUUID, Valid: true}
+	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
+	candidate := []byte(`{"schema_version":1}`)
+	bundle := mustTarGzBundle(t, map[string][]byte{
+		"out/prep-profile-candidate.json": candidate,
+	})
+
+	st := &stubStore{
+		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+			if arg.RunID != runID || arg.JobID == nil || *arg.JobID != jobID {
+				t.Fatalf("unexpected list params: %+v", arg)
+			}
+			return []store.ArtifactBundle{{
+				ID:        artifactID,
+				RunID:     runID,
+				JobID:     &jobID,
+				ObjectKey: &objectKey,
+			}}, nil
+		},
+	}
+	bs := &stubBlobstore{
+		put: func(context.Context, string, string, []byte) (string, error) { return "etag", nil },
+		get: func(_ context.Context, key string) (io.ReadCloser, int64, error) {
+			if key != objectKey {
+				t.Fatalf("blob key=%q want %q", key, objectKey)
+			}
+			return io.NopCloser(bytes.NewReader(bundle)), int64(len(bundle)), nil
+		},
+	}
+
+	svc := New(st, bs)
+	got, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	if err != nil {
+		t.Fatalf("LoadRecoveryArtifact error: %v", err)
+	}
+	if string(got) != string(candidate) {
+		t.Fatalf("candidate mismatch: got=%q want=%q", string(got), string(candidate))
+	}
+}
+
+func TestLoadRecoveryArtifact_NotFound(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	artifactUUID := uuid.New()
+	artifactID := pgtype.UUID{Bytes: artifactUUID, Valid: true}
+	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
+	bundle := mustTarGzBundle(t, map[string][]byte{
+		"out/something-else.json": []byte(`{"ok":true}`),
+	})
+
+	st := &stubStore{
+		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+			return []store.ArtifactBundle{{ID: artifactID, RunID: runID, JobID: &jobID, ObjectKey: &objectKey}}, nil
+		},
+	}
+	bs := &stubBlobstore{
+		put: func(context.Context, string, string, []byte) (string, error) { return "etag", nil },
+		get: func(_ context.Context, _ string) (io.ReadCloser, int64, error) {
+			return io.NopCloser(bytes.NewReader(bundle)), int64(len(bundle)), nil
+		},
+	}
+
+	svc := New(st, bs)
+	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	if !errors.Is(err, ErrRecoveryArtifactNotFound) {
+		t.Fatalf("expected ErrRecoveryArtifactNotFound, got %v", err)
+	}
+}
+
+func TestLoadRecoveryArtifact_Unreadable(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	artifactUUID := uuid.New()
+	artifactID := pgtype.UUID{Bytes: artifactUUID, Valid: true}
+	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
+
+	st := &stubStore{
+		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+			return []store.ArtifactBundle{{ID: artifactID, RunID: runID, JobID: &jobID, ObjectKey: &objectKey}}, nil
+		},
+	}
+	bs := &stubBlobstore{
+		put: func(context.Context, string, string, []byte) (string, error) { return "etag", nil },
+		get: func(_ context.Context, _ string) (io.ReadCloser, int64, error) {
+			return io.NopCloser(bytes.NewReader([]byte("not-gzip"))), int64(len("not-gzip")), nil
+		},
+	}
+
+	svc := New(st, bs)
+	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	if !errors.Is(err, ErrRecoveryArtifactUnreadable) {
+		t.Fatalf("expected ErrRecoveryArtifactUnreadable, got %v", err)
+	}
+}
+
+func TestLoadRecoveryArtifact_InvalidJSON(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	artifactUUID := uuid.New()
+	artifactID := pgtype.UUID{Bytes: artifactUUID, Valid: true}
+	objectKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactUUID.String() + ".tar.gz"
+	bundle := mustTarGzBundle(t, map[string][]byte{
+		"out/prep-profile-candidate.json": []byte("not-json"),
+	})
+
+	st := &stubStore{
+		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+			return []store.ArtifactBundle{{ID: artifactID, RunID: runID, JobID: &jobID, ObjectKey: &objectKey}}, nil
+		},
+	}
+	bs := &stubBlobstore{
+		put: func(context.Context, string, string, []byte) (string, error) { return "etag", nil },
+		get: func(_ context.Context, _ string) (io.ReadCloser, int64, error) {
+			return io.NopCloser(bytes.NewReader(bundle)), int64(len(bundle)), nil
+		},
+	}
+
+	svc := New(st, bs)
+	_, err := svc.LoadRecoveryArtifact(context.Background(), runID, jobID, "/out/prep-profile-candidate.json")
+	if !errors.Is(err, ErrRecoveryArtifactInvalidJSON) {
+		t.Fatalf("expected ErrRecoveryArtifactInvalidJSON, got %v", err)
+	}
+}
+
+func mustTarGzBundle(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	tw := tar.NewWriter(gz)
+	for name, data := range files {
+		hdr := &tar.Header{
+			Name: name,
+			Mode: 0o644,
+			Size: int64(len(data)),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("write header %q: %v", name, err)
+		}
+		if _, err := tw.Write(data); err != nil {
+			t.Fatalf("write payload %q: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return b.Bytes()
 }
