@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+func confidencePtr(v float64) *float64 {
+	return &v
+}
+
 // TestBuildGateStageMetadata_DetectedStack verifies that DetectedStack correctly
 // derives the ModStack from the first static check's tool name.
 func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
@@ -339,5 +343,175 @@ func TestBuildGateStageMetadata_BugSummary_Multiline(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "single-line") {
 		t.Errorf("error = %q, want substring 'single-line'", err.Error())
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:   "healing",
+			ErrorKind:  "infra",
+			StrategyID: "infra-default",
+			Confidence: confidencePtr(0.8),
+			Reason:     "pre_gate network timeout",
+		},
+	}
+	if err := meta.Validate(); err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_InvalidLoopKind(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:  "prepare",
+			ErrorKind: "infra",
+		},
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for invalid loop_kind")
+	}
+	if !strings.Contains(err.Error(), "loop_kind") {
+		t.Fatalf("error = %q, want substring %q", err.Error(), "loop_kind")
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_InvalidErrorKind(t *testing.T) {
+	t.Parallel()
+	meta := BuildGateStageMetadata{
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:  "healing",
+			ErrorKind: "routing",
+		},
+	}
+	err := meta.Validate()
+	if err == nil {
+		t.Fatal("expected validation error for invalid error_kind")
+	}
+	if !strings.Contains(err.Error(), "error_kind") {
+		t.Fatalf("error = %q, want substring %q", err.Error(), "error_kind")
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_InvalidConfidence(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		confidence float64
+	}{
+		{name: "below range", confidence: -0.1},
+		{name: "above range", confidence: 1.1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			meta := BuildGateStageMetadata{
+				Recovery: &BuildGateRecoveryMetadata{
+					LoopKind:   "healing",
+					ErrorKind:  "code",
+					Confidence: confidencePtr(tt.confidence),
+				},
+			}
+			err := meta.Validate()
+			if err == nil {
+				t.Fatal("expected validation error for invalid confidence")
+			}
+			if !strings.Contains(err.Error(), "confidence") {
+				t.Fatalf("error = %q, want substring %q", err.Error(), "confidence")
+			}
+		})
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_MultilineOrTooLongRejected(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		recovery BuildGateRecoveryMetadata
+	}{
+		{
+			name: "multiline strategy_id",
+			recovery: BuildGateRecoveryMetadata{
+				LoopKind:   "healing",
+				ErrorKind:  "code",
+				StrategyID: "line1\nline2",
+			},
+		},
+		{
+			name: "too long strategy_id",
+			recovery: BuildGateRecoveryMetadata{
+				LoopKind:   "healing",
+				ErrorKind:  "code",
+				StrategyID: strings.Repeat("x", 201),
+			},
+		},
+		{
+			name: "multiline reason",
+			recovery: BuildGateRecoveryMetadata{
+				LoopKind:  "healing",
+				ErrorKind: "code",
+				Reason:    "line1\nline2",
+			},
+		},
+		{
+			name: "too long reason",
+			recovery: BuildGateRecoveryMetadata{
+				LoopKind:  "healing",
+				ErrorKind: "code",
+				Reason:    strings.Repeat("x", 201),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			meta := BuildGateStageMetadata{Recovery: &tt.recovery}
+			if err := meta.Validate(); err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestBuildGateStageMetadata_Recovery_JSONRoundTrip(t *testing.T) {
+	t.Parallel()
+	original := BuildGateStageMetadata{
+		BugSummary: "Missing semicolon on line 42",
+		Recovery: &BuildGateRecoveryMetadata{
+			LoopKind:   "healing",
+			ErrorKind:  "infra",
+			StrategyID: "infra-default",
+			Confidence: confidencePtr(0.75),
+			Reason:     "docker daemon unavailable",
+		},
+	}
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("Marshal() error: %v", err)
+	}
+	var decoded BuildGateStageMetadata
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("Unmarshal() error: %v", err)
+	}
+	if decoded.Recovery == nil {
+		t.Fatal("Recovery is nil after round-trip")
+	}
+	if decoded.Recovery.LoopKind != "healing" {
+		t.Fatalf("LoopKind = %q, want %q", decoded.Recovery.LoopKind, "healing")
+	}
+	if decoded.Recovery.ErrorKind != "infra" {
+		t.Fatalf("ErrorKind = %q, want %q", decoded.Recovery.ErrorKind, "infra")
+	}
+	if decoded.Recovery.StrategyID != "infra-default" {
+		t.Fatalf("StrategyID = %q, want %q", decoded.Recovery.StrategyID, "infra-default")
+	}
+	if decoded.Recovery.Confidence == nil || *decoded.Recovery.Confidence != 0.75 {
+		t.Fatalf("Confidence = %#v, want %v", decoded.Recovery.Confidence, 0.75)
+	}
+	if decoded.Recovery.Reason != "docker daemon unavailable" {
+		t.Fatalf("Reason = %q, want %q", decoded.Recovery.Reason, "docker daemon unavailable")
 	}
 }

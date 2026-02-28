@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -28,6 +29,8 @@ type BuildGateStageMetadata struct {
 	// BugSummary is a short one-line description of the build failure produced
 	// by the router container. Max 200 chars, no newlines.
 	BugSummary string `json:"bug_summary,omitempty"`
+	// Recovery carries loop context for the universal recovery loop contract.
+	Recovery *BuildGateRecoveryMetadata `json:"recovery,omitempty"`
 }
 
 // DetectedStack returns the ModStack derived from the first static check's tool.
@@ -72,6 +75,66 @@ func (m BuildGateStageMetadata) Validate() error {
 		}
 		if utf8.RuneCountInString(m.BugSummary) > 200 {
 			return fmt.Errorf("bug_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.BugSummary))
+		}
+	}
+	if m.Recovery != nil {
+		if err := m.Recovery.Validate(); err != nil {
+			return fmt.Errorf("recovery invalid: %w", err)
+		}
+	}
+	return nil
+}
+
+// BuildGateRecoveryMetadata captures router classification and strategy context
+// for a failed gate within the universal recovery loop.
+type BuildGateRecoveryMetadata struct {
+	LoopKind   string   `json:"loop_kind"`
+	ErrorKind  string   `json:"error_kind"`
+	StrategyID string   `json:"strategy_id,omitempty"`
+	Confidence *float64 `json:"confidence,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+}
+
+// Validate ensures recovery metadata entries are well formed.
+func (m BuildGateRecoveryMetadata) Validate() error {
+	switch m.LoopKind {
+	case "healing":
+		// valid
+	case "":
+		return fmt.Errorf("loop_kind is required")
+	default:
+		return fmt.Errorf("loop_kind invalid: %q", m.LoopKind)
+	}
+	switch m.ErrorKind {
+	case "infra", "code", "mixed", "unknown", "custom":
+		// valid
+	case "":
+		return fmt.Errorf("error_kind is required")
+	default:
+		return fmt.Errorf("error_kind invalid: %q", m.ErrorKind)
+	}
+	if m.StrategyID != "" {
+		if strings.ContainsAny(m.StrategyID, "\n\r") {
+			return fmt.Errorf("strategy_id: must be single-line")
+		}
+		if utf8.RuneCountInString(m.StrategyID) > 200 {
+			return fmt.Errorf("strategy_id: must be at most 200 characters, got %d", utf8.RuneCountInString(m.StrategyID))
+		}
+	}
+	if m.Confidence != nil {
+		if math.IsNaN(*m.Confidence) || math.IsInf(*m.Confidence, 0) {
+			return fmt.Errorf("confidence: must be finite")
+		}
+		if *m.Confidence < 0 || *m.Confidence > 1 {
+			return fmt.Errorf("confidence: must be between 0 and 1, got %v", *m.Confidence)
+		}
+	}
+	if m.Reason != "" {
+		if strings.ContainsAny(m.Reason, "\n\r") {
+			return fmt.Errorf("reason: must be single-line")
+		}
+		if utf8.RuneCountInString(m.Reason) > 200 {
+			return fmt.Errorf("reason: must be at most 200 characters, got %d", utf8.RuneCountInString(m.Reason))
 		}
 	}
 	return nil

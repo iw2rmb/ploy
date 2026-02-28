@@ -33,6 +33,16 @@ type RunRepoJobResponse struct {
 	DisplayName   string              `json:"display_name,omitempty"`
 	ActionSummary string              `json:"action_summary,omitempty"`
 	BugSummary    string              `json:"bug_summary,omitempty"`
+	Recovery      *RecoveryView       `json:"recovery,omitempty"`
+}
+
+// RecoveryView projects universal recovery loop metadata in repo job APIs.
+type RecoveryView struct {
+	LoopKind   string   `json:"loop_kind"`
+	ErrorKind  string   `json:"error_kind"`
+	StrategyID string   `json:"strategy_id,omitempty"`
+	Confidence *float64 `json:"confidence,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
 }
 
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
@@ -118,10 +128,10 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				DurationMs: job.DurationMs,
 			}
 
-			// Extract display_name/action_summary from structured job metadata.
+			// Extract projection fields from structured job metadata.
 			if len(job.Meta) > 0 {
-				var meta contracts.JobMeta
-				if json.Unmarshal(job.Meta, &meta) == nil {
+				meta, err := contracts.UnmarshalJobMeta(job.Meta)
+				if err == nil {
 					if meta.ModsStepName != "" {
 						jr.DisplayName = meta.ModsStepName
 					}
@@ -130,6 +140,11 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 					}
 					if meta.Gate != nil && strings.TrimSpace(meta.Gate.BugSummary) != "" {
 						jr.BugSummary = strings.TrimSpace(meta.Gate.BugSummary)
+					}
+					if meta.Recovery != nil {
+						jr.Recovery = newRecoveryView(meta.Recovery)
+					} else if meta.Gate != nil && meta.Gate.Recovery != nil {
+						jr.Recovery = newRecoveryView(meta.Gate.Recovery)
 					}
 				}
 			}
@@ -152,5 +167,18 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			slog.Error("list run repo jobs: encode response failed", "err", err)
 		}
+	}
+}
+
+func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *RecoveryView {
+	if meta == nil {
+		return nil
+	}
+	return &RecoveryView{
+		LoopKind:   meta.LoopKind,
+		ErrorKind:  meta.ErrorKind,
+		StrategyID: meta.StrategyID,
+		Confidence: meta.Confidence,
+		Reason:     meta.Reason,
 	}
 }

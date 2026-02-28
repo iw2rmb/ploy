@@ -43,7 +43,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'TestRunRouterForGateFailure|TestExecuteHealingJob'` — parser/helper behavior unchanged.
 
 ## Phase 2: Add Loop Metadata Contract
-- [ ] Extend gate metadata with recovery context fields — make loop contract explicit and persisted on failed gates.
+- [x] Extend gate metadata with recovery context fields — make loop contract explicit and persisted on failed gates.
   - Repository: `ploy`
   - Component: workflow contracts (`build_gate` metadata)
   - Scope: Update `internal/workflow/contracts/build_gate_metadata.go` and tests to add a typed recovery block including `loop_kind`, `error_kind`, `strategy_id`, confidence, and reason; enforce validation constraints (single-line, length bounds).
@@ -56,7 +56,7 @@ Legend: [ ] todo, [x] done.
     ```
   - Tests: `go test ./internal/workflow/contracts -run 'TestBuildGateStageMetadata'` — recovery metadata validates and round-trips.
 
-- [ ] Extend `JobMeta` and API projection with recovery metadata — expose loop state in persisted job metadata and repo job views.
+- [x] Extend `JobMeta` and API projection with recovery metadata — expose loop state in persisted job metadata and repo job views.
   - Repository: `ploy`
   - Component: workflow contracts + handlers API
   - Scope: Update `internal/workflow/contracts/job_meta.go`, `internal/workflow/contracts/job_meta_test.go`, and `internal/server/handlers/runs_repo_jobs.go`; keep strict kind validation and allow recovery metadata only on gate and healing-relevant job metadata.

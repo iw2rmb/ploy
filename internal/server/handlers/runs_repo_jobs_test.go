@@ -199,7 +199,7 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 				Name:    "pre-gate",
 				JobType: "pre_gate",
 				Status:  store.JobStatusFail,
-				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java"}}`),
+				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing"}}}`),
 			},
 		},
 	}
@@ -219,6 +219,13 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	var resp struct {
 		Jobs []struct {
 			BugSummary string `json:"bug_summary"`
+			Recovery   *struct {
+				LoopKind   string   `json:"loop_kind"`
+				ErrorKind  string   `json:"error_kind"`
+				StrategyID string   `json:"strategy_id"`
+				Confidence *float64 `json:"confidence"`
+				Reason     string   `json:"reason"`
+			} `json:"recovery"`
 		} `json:"jobs"`
 	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
@@ -229,5 +236,127 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	}
 	if got, want := resp.Jobs[0].BugSummary, "missing ; in Foo.java"; got != want {
 		t.Fatalf("bug_summary = %q, want %q", got, want)
+	}
+	if resp.Jobs[0].Recovery == nil {
+		t.Fatal("expected recovery field to be projected")
+	}
+	if got, want := resp.Jobs[0].Recovery.LoopKind, "healing"; got != want {
+		t.Fatalf("recovery.loop_kind = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Recovery.ErrorKind, "infra"; got != want {
+		t.Fatalf("recovery.error_kind = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Recovery.StrategyID, "infra-default"; got != want {
+		t.Fatalf("recovery.strategy_id = %q, want %q", got, want)
+	}
+	if resp.Jobs[0].Recovery.Confidence == nil || *resp.Jobs[0].Recovery.Confidence != 0.8 {
+		t.Fatalf("recovery.confidence = %#v, want %v", resp.Jobs[0].Recovery.Confidence, 0.8)
+	}
+	if got, want := resp.Jobs[0].Recovery.Reason, "docker socket missing"; got != want {
+		t.Fatalf("recovery.reason = %q, want %q", got, want)
+	}
+}
+
+func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:      jobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				Name:    "heal",
+				JobType: "heal",
+				Status:  store.JobStatusSuccess,
+				Meta:    []byte(`{"kind":"mig","action_summary":"updated deps","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default","reason":"compile failure"}}`),
+			},
+		},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Jobs []struct {
+			Recovery *struct {
+				LoopKind  string `json:"loop_kind"`
+				ErrorKind string `json:"error_kind"`
+			} `json:"recovery"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
+	}
+	if resp.Jobs[0].Recovery == nil {
+		t.Fatal("expected recovery field")
+	}
+	if got, want := resp.Jobs[0].Recovery.LoopKind, "healing"; got != want {
+		t.Fatalf("recovery.loop_kind = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Recovery.ErrorKind, "code"; got != want {
+		t.Fatalf("recovery.error_kind = %q, want %q", got, want)
+	}
+}
+
+func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:      jobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				Name:    "pre-gate",
+				JobType: "pre_gate",
+				Status:  store.JobStatusFail,
+				Meta:    []byte(`{"gate":{"bug_summary":"missing kind"}}`),
+			},
+		},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
