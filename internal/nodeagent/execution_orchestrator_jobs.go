@@ -19,6 +19,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
+type workspaceChangePolicy string
+
+const (
+	workspaceChangePolicyIgnore  workspaceChangePolicy = "ignore"
+	workspaceChangePolicyRequire workspaceChangePolicy = "require_changes"
+	workspaceChangePolicyForbid  workspaceChangePolicy = "forbid_changes"
+)
+
 // executeModJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
 //
@@ -71,6 +79,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		Manifest:                  manifest,
 		DiffType:                  DiffJobTypeMod,
 		OutDirPattern:             "ploy-mig-out-*",
+		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
 		UploadDiff:                r.uploadModDiffWithBaseline,
 		StartTime:                 startTime,
@@ -119,6 +128,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		"detected_stack", stack,
 		"resolved_image", manifest.Image,
 	)
+	workspacePolicy := resolveHealingWorkspacePolicy(req.TypedOptions.HealingSelector)
 
 	cfg := standardJobConfig{
 		Manifest:      manifest,
@@ -134,8 +144,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		MountCerts: func(m *contracts.StepManifest) {
 			r.mountHealingTLSCerts(m)
 		},
-		CheckWorkspaceNoChange: true,
-		UploadDiff:             r.uploadHealingJobDiff,
+		WorkspacePolicy: workspacePolicy,
+		UploadDiff:      r.uploadHealingJobDiff,
 		BuildJobMeta: func(outDir string) json.RawMessage {
 			actionSummary := parseActionSummary(outDir)
 			if actionSummary == "" {
@@ -158,28 +168,50 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	r.executeStandardJob(ctx, req, cfg)
 }
 
+func resolveHealingWorkspacePolicy(healingSpec *contracts.HealingSpec) workspaceChangePolicy {
+	if healingSpec == nil {
+		return workspaceChangePolicyRequire
+	}
+	if strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
+		return workspaceChangePolicyForbid
+	}
+	return workspaceChangePolicyRequire
+}
+
+func validateWorkspacePolicy(policy workspaceChangePolicy, preStatus, postStatus string) (warning string, violated bool) {
+	switch policy {
+	case workspaceChangePolicyRequire:
+		if postStatus == preStatus {
+			return "no_workspace_changes", true
+		}
+	case workspaceChangePolicyForbid:
+		if postStatus != preStatus {
+			return "unexpected_workspace_changes", true
+		}
+	}
+	return "", false
+}
+
 // uploadHealingNoWorkspaceChangesFailure uploads a terminal failure status when a healing job
 // exits 0 but produces no workspace changes.
 func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Context, req StartRunRequest, baseStats types.RunStats, duration time.Duration) {
-	// This is considered a failure: the healing mig promised to fix the issue but
-	// didn't actually change anything. Upload a failed status with exit code 1 and
-	// a stable stats marker so downstream observers can distinguish this from other
-	// failure modes.
-	//
-	// Since RunStats is now json.RawMessage-backed, we build a new stats object
-	// with the healing_warning field included.
+	r.uploadHealingWorkspacePolicyFailure(ctx, req, "no_workspace_changes", duration)
+}
+
+func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context, req StartRunRequest, warning string, duration time.Duration) {
+	logMsg := fmt.Sprintf("healing job failed (%s)", warning)
 	stats := types.NewRunStatsBuilder().
 		ExitCode(1).
 		DurationMs(duration.Milliseconds()).
-		HealingWarning("no_workspace_changes").
+		HealingWarning(warning).
 		MustBuild()
 
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	var exitCodeOne int32 = 1
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCodeOne, stats, req.JobID); uploadErr != nil {
-		slog.Error("failed to upload healing failure status (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "warning", warning, "error", uploadErr)
 	}
-	slog.Info("healing job failed (no workspace changes)", "run_id", req.RunID, "job_id", req.JobID, "exit_code", 1, "duration", duration)
+	slog.Info(logMsg, "run_id", req.RunID, "job_id", req.JobID, "exit_code", 1, "duration", duration)
 }
 
 // populateHealingInDir copies recovery context into the healing job /in directory.
@@ -248,7 +280,7 @@ type standardJobConfig struct {
 	InjectEnv     func(manifest *contracts.StepManifest, workspace string)
 	MountCerts    func(manifest *contracts.StepManifest)
 
-	CheckWorkspaceNoChange    bool
+	WorkspacePolicy           workspaceChangePolicy
 	UploadConfiguredArtifacts bool
 
 	UploadDiff   func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baselineDir, workspace string, result step.Result)
@@ -311,7 +343,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 		var preStatus string
 		var preStatusErr error
-		if cfg.CheckWorkspaceNoChange {
+		if cfg.WorkspacePolicy != workspaceChangePolicyIgnore {
 			preStatus, preStatusErr = workspaceStatus(ctx, workspace)
 			if preStatusErr != nil {
 				slog.Warn("failed to compute workspace status before execution", "run_id", req.RunID, "error", preStatusErr)
@@ -340,11 +372,13 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace, outDir)
 		}
 
-		if cfg.CheckWorkspaceNoChange && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
+		if cfg.WorkspacePolicy != workspaceChangePolicyIgnore && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
 			postStatus, postErr := workspaceStatus(ctx, workspace)
-			if postErr == nil && postStatus == preStatus {
-				r.uploadHealingNoWorkspaceChangesFailure(ctx, req, types.NewRunStatsBuilder().ExitCode(1).DurationMs(duration.Milliseconds()).HealingWarning("no_workspace_changes").MustBuild(), duration)
-				return nil
+			if postErr == nil {
+				if warning, violated := validateWorkspacePolicy(cfg.WorkspacePolicy, preStatus, postStatus); violated {
+					r.uploadHealingWorkspacePolicyFailure(ctx, req, warning, duration)
+					return nil
+				}
 			}
 		}
 

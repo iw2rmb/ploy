@@ -248,6 +248,10 @@ provide repository metadata for healing migs that need Git baseline information.
 - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing).
 - `/in/prompt.txt` — Optional prompt file when provided in spec.
 
+**Healing workspace policy:**
+- `build_gate.healing.selected_error_kind=infra`: healing is output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.
+- `build_gate.healing.selected_error_kind!=infra`: healing must modify `/workspace`; no workspace diff fails the heal job with `healing_warning=no_workspace_changes`.
+
 See `docs/envs/README.md` for the complete environment variable reference.
 
 ## Implementation References
