@@ -82,6 +82,8 @@ Gate execution planning inside `internal/workflow/step/gate_docker.go` and
    - a terminal gate result with prebuilt metadata/error for mismatch/unknown cases.
 3. If a plan is returned, Docker execution runs once and `BuildGateStageMetadata`
    is built from container result + logs.
+4. Metadata now includes `detected_stack` (`language`, `tool`, optional `release`)
+   as the canonical detected gate identity used by recovery candidate validation.
 
 The stack-gate and detected-stack branches share focused terminal-metadata builders,
 so error codes/messages and `RuntimeImage` reporting stay consistent without duplicating
@@ -217,6 +219,9 @@ The gate does not modify the repository; it validates the current working tree.
 - **Logs:** Combined stdout/stderr captured and truncated to ≤10 MiB; uploaded as
   `build-gate.log` artifact.
 - **Summary:** Pass/fail flag, duration, optional resource usage.
+- **Detected stack identity:** `BuildGateStageMetadata.detected_stack` captures
+  normalized detected stack (`language`, `tool`, optional `release`) for gate and
+  healing/re-gate stack-aware decisions.
 - **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
   - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.

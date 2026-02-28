@@ -657,6 +657,53 @@ func TestLoadRecoveryArtifact_TypedErrors(t *testing.T) {
 	}
 }
 
+func TestCandidateMatchesDetectedStack_ReleaseAware(t *testing.T) {
+	t.Parallel()
+
+	profile, err := contracts.ParseGateProfileJSON([]byte(`{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"stack": {"language":"java","tool":"gradle","release":"11"},
+		"targets": {
+			"build": {"status":"passed","command":"./gradlew test","env":{},"failure_code":null},
+			"unit": {"status":"not_attempted","env":{}},
+			"all_tests": {"status":"not_attempted","env":{}}
+		},
+		"orchestration": {"pre": [], "post": []},
+		"tactics_used": [],
+		"attempts": [],
+		"evidence": {"log_refs": [], "diagnostics": []},
+		"repro_check": {"status": "failed", "details": ""},
+		"prompt_delta_suggestion": {"status":"none","summary":"","candidate_lines":[]}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseGateProfileJSON: %v", err)
+	}
+
+	if !candidateMatchesDetectedStack(profile, &contracts.StackExpectation{
+		Language: "java",
+		Tool:     "gradle",
+		Release:  "11",
+	}) {
+		t.Fatal("expected exact release match to pass")
+	}
+	if candidateMatchesDetectedStack(profile, &contracts.StackExpectation{
+		Language: "java",
+		Tool:     "gradle",
+		Release:  "17",
+	}) {
+		t.Fatal("expected mismatched release to fail")
+	}
+	if !candidateMatchesDetectedStack(profile, &contracts.StackExpectation{
+		Language: "java",
+		Tool:     "gradle",
+		Release:  "",
+	}) {
+		t.Fatal("expected empty detected release to act as wildcard")
+	}
+}
+
 func mustTarGzPayload(t *testing.T, files map[string][]byte) []byte {
 	t.Helper()
 	var b bytes.Buffer

@@ -243,3 +243,33 @@ func TestGateProfileRuntimeTCPMapsToGateEnv(t *testing.T) {
 		t.Fatalf("env[%s]=%q, want %q", GateProfileDockerHostEnv, got, "tcp://prep-dind:2375")
 	}
 }
+
+func TestGateProfileStackMatches_ReleaseSemantics(t *testing.T) {
+	t.Parallel()
+
+	profile, err := ParseGateProfileJSON([]byte(`{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"stack": {"language":"java","tool":"gradle","release":"11"},
+		"targets": {
+			"build": {"status":"passed","command":"./gradlew test","env":{},"failure_code":null},
+			"unit": {"status":"not_attempted","env":{}},
+			"all_tests": {"status":"not_attempted","env":{}}
+		},
+		"orchestration": {"pre": [], "post": []}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseGateProfileJSON: %v", err)
+	}
+
+	if !GateProfileStackMatches(profile, "java", "gradle", "") {
+		t.Fatal("expected empty expected release to act as wildcard")
+	}
+	if !GateProfileStackMatches(profile, "java", "gradle", "11") {
+		t.Fatal("expected exact release match to pass")
+	}
+	if GateProfileStackMatches(profile, "java", "gradle", "17") {
+		t.Fatal("expected mismatched release to fail")
+	}
+}

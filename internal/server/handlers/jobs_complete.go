@@ -643,15 +643,15 @@ func maybeRefreshNextReGateRecoveryCandidate(
 		reGateJob = refreshed
 	}
 
-	detectedStack := contracts.ModStackUnknown
+	var detectedExpectation *contracts.StackExpectation
 	if prevHeal := predecessorOf(reGateJob.ID, jobsByID); prevHeal != nil {
 		if failedGate := predecessorOf(prevHeal.ID, jobsByID); failedGate != nil {
-			_, detectedStack = resolveFailedGateRecoveryContext(*failedGate)
+			_, _, detectedExpectation = resolveFailedGateRecoveryContext(*failedGate)
 		}
 	}
 
 	updatedRecovery := cloneRecoveryMetadata(recovery)
-	evaluateAndAttachInfraCandidate(ctx, bp, reGateJob.RunID, reGateJob, jobsByID, detectedStack, updatedRecovery)
+	evaluateAndAttachInfraCandidate(ctx, bp, reGateJob.RunID, reGateJob, jobsByID, detectedExpectation, updatedRecovery)
 	if meta.Recovery != nil {
 		meta.Recovery = updatedRecovery
 	}

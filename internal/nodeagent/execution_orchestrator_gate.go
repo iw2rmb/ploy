@@ -580,6 +580,15 @@ func resolveGateProfileSnapshotStack(
 			Release:  strings.TrimSpace(override.Stack.Release),
 		}
 	}
+	if meta != nil {
+		if detected := meta.DetectedStackExpectation(); detected != nil {
+			return contracts.GateProfileStack{
+				Language: strings.TrimSpace(detected.Language),
+				Tool:     strings.TrimSpace(detected.Tool),
+				Release:  strings.TrimSpace(detected.Release),
+			}
+		}
+	}
 
 	stack := contracts.ModStackUnknown
 	if meta != nil {

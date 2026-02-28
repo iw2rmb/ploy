@@ -193,6 +193,11 @@ expansion (`$VAR`, `${VAR}`) and `~/` home expansion.
 For `infra` recovery with `schema=gate_profile_v1`, healing is expected to emit
 `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` happens only
 when the immediate follow-up `re_gate` succeeds.
+Candidate stack validation uses failed-gate `BuildGateStageMetadata.detected_stack`
+as canonical expectation (`language`, `tool`, optional `release`):
+- language/tool must match exactly
+- when detected `release` is non-empty, release must match exactly
+- when detected `release` is empty, release is treated as wildcard
 
 **Router** runs once per gate failure that triggers healing (each iteration),
 before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to

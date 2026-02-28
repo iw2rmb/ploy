@@ -417,7 +417,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 			},
 		},
 	}
-	if _, stack := resolveFailedGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
+	if _, stack, _ := resolveFailedGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
 		t.Fatal("expected failed gate metadata to expose detected stack")
 	}
 

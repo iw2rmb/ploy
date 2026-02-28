@@ -81,7 +81,11 @@ For gate failure with `error_kind=infra` and artifact expectation `schema=gate_p
 2. Healing insertion initializes `re_gate` candidate metadata from prior heal outputs when available.
 3. On `heal` success, server refreshes linked `re_gate` candidate metadata from the just-finished heal artifact.
 4. Candidate is validated against gate profile schema.
-5. Candidate is parsed and stack-matched to detected gate stack.
+5. Candidate is parsed and stack-matched to failed-gate `detected_stack`
+   expectation (`BuildGateStageMetadata.detected_stack`):
+   - `language` and `tool` are strict matches
+   - `release` is strict when detected release is present
+   - empty detected release acts as wildcard
 6. On valid candidate, re-gate spec receives candidate-derived gate_profile override.
 
 Validation status is persisted in recovery metadata:
