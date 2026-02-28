@@ -7,57 +7,15 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
-
-// RunRepoJobResponse represents a job within a repo execution.
-type RunRepoJobResponse struct {
-	JobID         domaintypes.JobID   `json:"job_id"`
-	Name          string              `json:"name"`
-	JobType       string              `json:"job_type"`
-	JobImage      string              `json:"job_image"`
-	NextID        *domaintypes.JobID  `json:"next_id"`
-	NodeID        *domaintypes.NodeID `json:"node_id"`
-	Status        store.JobStatus     `json:"status"`
-	ExitCode      *int32              `json:"exit_code,omitempty"`
-	StartedAt     *time.Time          `json:"started_at,omitempty"`
-	FinishedAt    *time.Time          `json:"finished_at,omitempty"`
-	DurationMs    int64               `json:"duration_ms"`
-	DisplayName   string              `json:"display_name,omitempty"`
-	ActionSummary string              `json:"action_summary,omitempty"`
-	BugSummary    string              `json:"bug_summary,omitempty"`
-	Recovery      *RecoveryView       `json:"recovery,omitempty"`
-}
-
-// RecoveryView projects universal recovery loop metadata in repo job APIs.
-type RecoveryView struct {
-	LoopKind                  string          `json:"loop_kind"`
-	ErrorKind                 string          `json:"error_kind"`
-	StrategyID                string          `json:"strategy_id,omitempty"`
-	Confidence                *float64        `json:"confidence,omitempty"`
-	Reason                    string          `json:"reason,omitempty"`
-	Expectations              json.RawMessage `json:"expectations,omitempty"`
-	CandidateSchemaID         string          `json:"candidate_schema_id,omitempty"`
-	CandidateArtifactPath     string          `json:"candidate_artifact_path,omitempty"`
-	CandidateValidationStatus string          `json:"candidate_validation_status,omitempty"`
-	CandidateValidationError  string          `json:"candidate_validation_error,omitempty"`
-	CandidatePromoted         *bool           `json:"candidate_promoted,omitempty"`
-}
-
-// ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
-type ListRunRepoJobsResponse struct {
-	RunID   domaintypes.RunID     `json:"run_id"`
-	RepoID  domaintypes.MigRepoID `json:"repo_id"`
-	Attempt int32                 `json:"attempt"`
-	Jobs    []RunRepoJobResponse  `json:"jobs"`
-}
 
 // listRunRepoJobsHandler returns jobs for a specific repo execution within a run.
 // GET /v1/runs/{run_id}/repos/{repo_id}/jobs
@@ -114,15 +72,15 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			func(job store.Job) *domaintypes.JobID { return job.NextID },
 		)
 
-		resp := ListRunRepoJobsResponse{
+		resp := modsapi.ListRunRepoJobsResponse{
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: attempt,
-			Jobs:    make([]RunRepoJobResponse, 0, len(jobs)),
+			Jobs:    make([]modsapi.RunRepoJob, 0, len(jobs)),
 		}
 
 		for _, job := range jobs {
-			jr := RunRepoJobResponse{
+			jr := modsapi.RunRepoJob{
 				JobID:      job.ID,
 				Name:       job.Name,
 				JobType:    job.JobType,
@@ -176,11 +134,11 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *RecoveryView {
+func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *modsapi.RunRepoJobRecovery {
 	if meta == nil {
 		return nil
 	}
-	return &RecoveryView{
+	return &modsapi.RunRepoJobRecovery{
 		LoopKind:                  meta.LoopKind,
 		ErrorKind:                 meta.ErrorKind,
 		StrategyID:                meta.StrategyID,

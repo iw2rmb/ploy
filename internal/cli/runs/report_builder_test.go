@@ -92,6 +92,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"duration_ms":  5,
 						"display_name": "apply",
 						"recovery": map[string]any{
+							"loop_kind":  "healing",
 							"error_kind": "infra",
 						},
 					},

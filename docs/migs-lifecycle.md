@@ -1318,6 +1318,9 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
     (fallback: `<unknown>`) before `Exit <code>: <one-liner>` on the
     continuation line beneath the step row. Healing rows keep
     `Exit <code>: <one-liner>` without the error-kind prefix.
+  - `--json` output passes through full repo-job `recovery` payload from
+    `GET /v1/runs/{run_id}/repos/{repo_id}/jobs` (including `loop_kind`,
+    classifier fields, and candidate audit fields).
   - Artifact links are rendered as OSC8 hyperlinks in terminal mode and include
     `auth_token` query parameters for browser/OSC8 flows.
 

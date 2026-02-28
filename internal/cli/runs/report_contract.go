@@ -4,6 +4,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // RunReport is the canonical status report contract shared by all status renderers.
@@ -64,6 +65,4 @@ type RunJobEntry struct {
 }
 
 // RunJobRecovery projects recovery classifier fields surfaced by repo job APIs.
-type RunJobRecovery struct {
-	ErrorKind string `json:"error_kind,omitempty"`
-}
+type RunJobRecovery = modsapi.RunRepoJobRecovery
