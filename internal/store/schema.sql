@@ -64,11 +64,6 @@ END $$;
 
 -- PrepGate lifecycle was removed. Drop legacy prep status/runs objects.
 DROP TABLE IF EXISTS prep_runs;
-ALTER TABLE IF EXISTS mig_repos
-  DROP COLUMN IF EXISTS prep_status,
-  DROP COLUMN IF EXISTS prep_attempts,
-  DROP COLUMN IF EXISTS prep_last_error,
-  DROP COLUMN IF EXISTS prep_failure_code;
 DROP TYPE IF EXISTS prep_status;
 
 
@@ -152,6 +147,62 @@ CREATE TABLE IF NOT EXISTS mig_repos (
   gate_profile_artifacts JSONB,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Legacy migration: prep_* profile columns were renamed to gate_profile*.
+-- Keep this idempotent for databases that already have canonical columns.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'ploy' AND table_name = 'mig_repos' AND column_name = 'prep_updated_at'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'ploy' AND table_name = 'mig_repos' AND column_name = 'gate_profile_updated_at'
+  ) THEN
+    EXECUTE 'ALTER TABLE ploy.mig_repos RENAME COLUMN prep_updated_at TO gate_profile_updated_at';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'ploy' AND table_name = 'mig_repos' AND column_name = 'prep_profile'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'ploy' AND table_name = 'mig_repos' AND column_name = 'gate_profile'
+  ) THEN
+    EXECUTE 'ALTER TABLE ploy.mig_repos RENAME COLUMN prep_profile TO gate_profile';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'ploy' AND table_name = 'mig_repos' AND column_name = 'prep_artifacts'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'ploy' AND table_name = 'mig_repos' AND column_name = 'gate_profile_artifacts'
+  ) THEN
+    EXECUTE 'ALTER TABLE ploy.mig_repos RENAME COLUMN prep_artifacts TO gate_profile_artifacts';
+  END IF;
+END $$;
+
+ALTER TABLE IF EXISTS mig_repos
+  ADD COLUMN IF NOT EXISTS gate_profile_updated_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS gate_profile JSONB,
+  ADD COLUMN IF NOT EXISTS gate_profile_artifacts JSONB;
+ALTER TABLE IF EXISTS mig_repos
+  ALTER COLUMN gate_profile_updated_at SET DEFAULT now();
+UPDATE mig_repos
+SET gate_profile_updated_at = now()
+WHERE gate_profile_updated_at IS NULL;
+ALTER TABLE IF EXISTS mig_repos
+  ALTER COLUMN gate_profile_updated_at SET NOT NULL;
+ALTER TABLE IF EXISTS mig_repos
+  DROP COLUMN IF EXISTS prep_updated_at,
+  DROP COLUMN IF EXISTS prep_profile,
+  DROP COLUMN IF EXISTS prep_artifacts,
+  DROP COLUMN IF EXISTS prep_status,
+  DROP COLUMN IF EXISTS prep_attempts,
+  DROP COLUMN IF EXISTS prep_last_error,
+  DROP COLUMN IF EXISTS prep_failure_code;
+
 -- Enforce uniqueness: one repo_url per mig.
 CREATE UNIQUE INDEX IF NOT EXISTS mig_repos_mig_repo_uniq ON mig_repos(mig_id, repo_url);
 CREATE INDEX IF NOT EXISTS mig_repos_mig_created_idx ON mig_repos(mig_id, created_at);
