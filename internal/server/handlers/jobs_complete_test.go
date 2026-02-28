@@ -13,6 +13,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // ===== Job-Level Completion Tests =====
@@ -242,6 +243,123 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	}
 	if kind, ok := meta["kind"].(string); !ok || kind != "gate" {
 		t.Fatalf("expected meta.kind == \"gate\", got %#v", meta["kind"])
+	}
+}
+
+func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypeReGate.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Success",
+		"stats": map[string]any{
+			"job_meta": map[string]any{
+				"kind": "gate",
+				"gate": map[string]any{
+					"static_checks": []any{map[string]any{"tool": "maven", "passed": true}},
+				},
+			},
+		},
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.promoteReGateRecoveryCandidatePrepProfileCalled {
+		t.Fatal("expected PromoteReGateRecoveryCandidatePrepProfile to be called")
+	}
+	if st.promoteReGateRecoveryCandidatePrepProfileParams.ID != f.Job.ID {
+		t.Fatalf("promotion job id mismatch: got=%s want=%s", st.promoteReGateRecoveryCandidatePrepProfileParams.ID, f.Job.ID)
+	}
+}
+
+func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypeReGate.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Success",
+		"stats": map[string]any{
+			"job_meta": map[string]any{
+				"kind": "gate",
+				"gate": map[string]any{
+					"static_checks": []any{map[string]any{"tool": "maven", "passed": true}},
+				},
+			},
+		},
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateJobCompletionWithMetaCalled {
+		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
+	}
+
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobCompletionWithMetaParams.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal persisted meta: %v", err)
+	}
+	if meta.Recovery == nil {
+		t.Fatal("expected merged job-level recovery metadata")
+	}
+	if got, want := meta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
+		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
+	}
+	if meta.Recovery.CandidatePromoted == nil || *meta.Recovery.CandidatePromoted {
+		t.Fatalf("candidate_promoted = %#v, want false before promotion write", meta.Recovery.CandidatePromoted)
+	}
+}
+
+func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypeReGate.String(), 1000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"prep_profile_v1","candidate_artifact_path":"/out/prep-profile-candidate.json","candidate_validation_status":"valid","candidate_prep_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult: f.Job,
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Fail",
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.promoteReGateRecoveryCandidatePrepProfileCalled {
+		t.Fatal("did not expect promotion call on failed re-gate")
 	}
 }
 

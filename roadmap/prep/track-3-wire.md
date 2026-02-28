@@ -96,7 +96,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/contracts -run 'TestPrepProfile'`
 
 ## Phase 3: Promotion on Successful Re-Gate
-- [ ] Promote validated infra candidate to repo `prep_profile` only when corresponding `re_gate` succeeds.
+- [x] Promote validated infra candidate to repo `prep_profile` only when corresponding `re_gate` succeeds.
   - Repository: `ploy`
   - Component: server job completion + repo profile persistence
   - Scope:
@@ -117,7 +117,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/handlers -run 'TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain|TestCompleteJob_'`
     - `go test ./internal/store/...`
 
-- [ ] Persist promotion audit fields in job/recovery metadata.
+- [x] Persist promotion audit fields in job/recovery metadata.
   - Repository: `ploy`
   - Component: contracts + API projection
   - Scope:

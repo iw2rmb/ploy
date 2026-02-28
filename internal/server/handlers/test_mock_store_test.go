@@ -304,6 +304,12 @@ type mockStore struct {
 	promoteJobByIDIfUnblockedResult store.Job
 	promoteJobByIDIfUnblockedErr    error
 
+	// PromoteReGateRecoveryCandidatePrepProfile tracking
+	promoteReGateRecoveryCandidatePrepProfileCalled bool
+	promoteReGateRecoveryCandidatePrepProfileParams store.PromoteReGateRecoveryCandidatePrepProfileParams
+	promoteReGateRecoveryCandidatePrepProfileResult types.MigRepoID
+	promoteReGateRecoveryCandidatePrepProfileErr    error
+
 	// UpdateJobNextID tracking
 	updateJobNextIDCalled bool
 	updateJobNextIDParams []store.UpdateJobNextIDParams
@@ -1086,6 +1092,22 @@ func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobI
 		return m.listJobsByRunResult[i], nil
 	}
 	return store.Job{}, pgx.ErrNoRows
+}
+
+func (m *mockStore) PromoteReGateRecoveryCandidatePrepProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidatePrepProfileParams) (types.MigRepoID, error) {
+	m.promoteReGateRecoveryCandidatePrepProfileCalled = true
+	m.promoteReGateRecoveryCandidatePrepProfileParams = arg
+	if m.promoteReGateRecoveryCandidatePrepProfileErr != nil {
+		return "", m.promoteReGateRecoveryCandidatePrepProfileErr
+	}
+	if !m.promoteReGateRecoveryCandidatePrepProfileResult.IsZero() {
+		return m.promoteReGateRecoveryCandidatePrepProfileResult, nil
+	}
+	// Default to the current job's repo when available to keep tests lightweight.
+	if !m.getJobResult.RepoID.IsZero() {
+		return m.getJobResult.RepoID, nil
+	}
+	return "", pgx.ErrNoRows
 }
 
 func (m *mockStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {

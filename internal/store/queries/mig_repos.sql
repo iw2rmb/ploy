@@ -170,6 +170,40 @@ SET prep_profile = $2,
     prep_updated_at = now()
 WHERE id = $1;
 
+-- name: PromoteReGateRecoveryCandidatePrepProfile :one
+WITH target_job AS (
+  SELECT j.id, j.repo_id
+  FROM jobs j
+  WHERE j.id = $1
+    AND j.job_type = 're_gate'
+    AND j.status = 'Success'
+    AND (
+      CASE
+        WHEN jsonb_typeof(j.meta->'recovery'->'candidate_promoted') = 'boolean'
+        THEN (j.meta->'recovery'->>'candidate_promoted')::boolean
+        ELSE false
+      END
+    ) = false
+  FOR UPDATE
+),
+updated_job AS (
+  UPDATE jobs j
+  SET meta = $2
+  FROM target_job tj
+  WHERE j.id = tj.id
+  RETURNING tj.repo_id
+)
+UPDATE mig_repos mr
+SET prep_profile = $3,
+    prep_artifacts = $4,
+    prep_status = 'PrepReady',
+    prep_last_error = NULL,
+    prep_failure_code = NULL,
+    prep_updated_at = now()
+FROM updated_job uj
+WHERE mr.id = uj.repo_id
+RETURNING mr.id;
+
 -- name: HasMigRepoHistory :one
 -- Checks if a mod_repo has any historical executions (run_repos references).
 -- Returns true if the repo cannot be deleted due to history, false otherwise.

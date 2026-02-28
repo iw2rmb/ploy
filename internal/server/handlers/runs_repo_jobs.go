@@ -38,12 +38,17 @@ type RunRepoJobResponse struct {
 
 // RecoveryView projects universal recovery loop metadata in repo job APIs.
 type RecoveryView struct {
-	LoopKind   string   `json:"loop_kind"`
-	ErrorKind  string   `json:"error_kind"`
-	StrategyID string   `json:"strategy_id,omitempty"`
-	Confidence *float64 `json:"confidence,omitempty"`
-	Reason     string   `json:"reason,omitempty"`
-	Expectations json.RawMessage `json:"expectations,omitempty"`
+	LoopKind                  string          `json:"loop_kind"`
+	ErrorKind                 string          `json:"error_kind"`
+	StrategyID                string          `json:"strategy_id,omitempty"`
+	Confidence                *float64        `json:"confidence,omitempty"`
+	Reason                    string          `json:"reason,omitempty"`
+	Expectations              json.RawMessage `json:"expectations,omitempty"`
+	CandidateSchemaID         string          `json:"candidate_schema_id,omitempty"`
+	CandidateArtifactPath     string          `json:"candidate_artifact_path,omitempty"`
+	CandidateValidationStatus string          `json:"candidate_validation_status,omitempty"`
+	CandidateValidationError  string          `json:"candidate_validation_error,omitempty"`
+	CandidatePromoted         *bool           `json:"candidate_promoted,omitempty"`
 }
 
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.
@@ -176,11 +181,16 @@ func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *RecoveryView {
 		return nil
 	}
 	return &RecoveryView{
-		LoopKind:   meta.LoopKind,
-		ErrorKind:  meta.ErrorKind,
-		StrategyID: meta.StrategyID,
-		Confidence: meta.Confidence,
-		Reason:     meta.Reason,
-		Expectations: meta.Expectations,
+		LoopKind:                  meta.LoopKind,
+		ErrorKind:                 meta.ErrorKind,
+		StrategyID:                meta.StrategyID,
+		Confidence:                meta.Confidence,
+		Reason:                    meta.Reason,
+		Expectations:              meta.Expectations,
+		CandidateSchemaID:         meta.CandidateSchemaID,
+		CandidateArtifactPath:     meta.CandidateArtifactPath,
+		CandidateValidationStatus: meta.CandidateValidationStatus,
+		CandidateValidationError:  meta.CandidateValidationError,
+		CandidatePromoted:         meta.CandidatePromoted,
 	}
 }
