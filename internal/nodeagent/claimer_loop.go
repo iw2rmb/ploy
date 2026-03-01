@@ -204,7 +204,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JobImage:               claim.JobImage,
 		NextID:                 claim.NextID,
 		JobName:                claim.JobName, // Job name for branch identification
-		TypedOptions:           typedOpts,     // Strongly-typed run options (canonical source of truth)
+		RecoveryContext:        claim.RecoveryContext,
+		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:                    envFromSpec,
 	}
 

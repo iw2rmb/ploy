@@ -17,8 +17,8 @@ type BuildGateStageMetadata struct {
 	// Detected captures the resolved gate stack identity used for this
 	// gate execution. It is the canonical source for stack-aware recovery
 	// validation, including optional release matching.
-	Detected *StackExpectation `json:"detected_stack,omitempty"`
-	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
+	Detected    *StackExpectation     `json:"detected_stack,omitempty"`
+	LogFindings []BuildGateLogFinding `json:"log_findings,omitempty"`
 	// RuntimeImage is the container image name used to run the gate container.
 	// Not serialized in JSON APIs.
 	RuntimeImage string `json:"-"`
@@ -167,6 +167,27 @@ type BuildGateRecoveryMetadata struct {
 	// CandidatePromoted reports whether a validated candidate has been promoted
 	// into repo gate_profile after successful re-gate completion.
 	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
+}
+
+// RecoveryClaimContext carries typed recovery inputs in node claim responses
+// for healing/re-gate jobs. This payload makes recovery execution independent
+// from node-local run cache files.
+type RecoveryClaimContext struct {
+	LoopKind string `json:"loop_kind,omitempty"`
+	// SelectedErrorKind is the resolved healing error kind selected by server.
+	SelectedErrorKind string `json:"selected_error_kind,omitempty"`
+	// DetectedStack is the gate-detected stack used for image resolution.
+	DetectedStack ModStack `json:"detected_stack,omitempty"`
+	// ResolvedHealingImage is the concrete healing image selected for this chain.
+	ResolvedHealingImage string `json:"resolved_healing_image,omitempty"`
+	// Expectations carries router/recovery expectations payload.
+	Expectations json.RawMessage `json:"expectations,omitempty"`
+	// BuildGateLog is the failed gate log snippet intended for /in/build-gate.log.
+	BuildGateLog string `json:"build_gate_log,omitempty"`
+	// GateProfile carries failed gate profile JSON for infra healing context.
+	GateProfile json.RawMessage `json:"gate_profile,omitempty"`
+	// GateProfileSchemaJSON carries schema JSON for infra healing context.
+	GateProfileSchemaJSON string `json:"gate_profile_schema_json,omitempty"`
 }
 
 const (

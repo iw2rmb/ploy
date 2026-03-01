@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -117,7 +118,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Build and send response with job and run information.
-		if err := buildAndSendJobClaimResponse(w, r, configHolder, run, spec.Spec, rr, modRepo, job); err != nil {
+		if err := buildAndSendJobClaimResponse(w, r, st, configHolder, run, spec.Spec, rr, modRepo, job); err != nil {
 			slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 			httpErr(w, http.StatusInternalServerError, "failed to build claim response: %v", err)
 			return
@@ -161,6 +162,7 @@ func safeErrorString(err error) (msg string) {
 func buildAndSendJobClaimResponse(
 	w http.ResponseWriter,
 	r *http.Request,
+	st store.Store,
 	configHolder *ConfigHolder,
 	run store.Run,
 	spec []byte,
@@ -211,28 +213,33 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return fmt.Errorf("merge healing schema into spec: %w", err)
 	}
+	recoveryCtx, err := buildRecoveryClaimContext(r.Context(), st, run.ID, job, jobType)
+	if err != nil {
+		return fmt.Errorf("build recovery context: %w", err)
+	}
 
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
 	resp := struct {
-		RunID                  domaintypes.RunID     `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
-		Name                   *string               `json:"name,omitempty"`
-		RepoID                 domaintypes.MigRepoID `json:"repo_id"`
-		Attempt                int32                 `json:"attempt"`
-		JobID                  domaintypes.JobID     `json:"job_id"`    // Job ID (KSUID-backed)
-		JobName                string                `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
-		JobType                domaintypes.JobType   `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
-		JobImage               string                `json:"job_image"` // Container image for mig/heal jobs
-		NextID                 *domaintypes.JobID    `json:"next_id"`
-		RepoURL                string                `json:"repo_url"`
-		RepoGateProfileMissing bool                  `json:"repo_gate_profile_missing"`
-		Status                 store.RunStatus       `json:"status"`
-		NodeID                 domaintypes.NodeID    `json:"node_id"` // Node ID (NanoID-backed)
-		BaseRef                string                `json:"base_ref"`
-		TargetRef              string                `json:"target_ref"`
-		StartedAt              string                `json:"started_at"`
-		CreatedAt              string                `json:"created_at"`
-		Spec                   json.RawMessage       `json:"spec,omitempty"`
+		RunID                  domaintypes.RunID               `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
+		Name                   *string                         `json:"name,omitempty"`
+		RepoID                 domaintypes.MigRepoID           `json:"repo_id"`
+		Attempt                int32                           `json:"attempt"`
+		JobID                  domaintypes.JobID               `json:"job_id"`    // Job ID (KSUID-backed)
+		JobName                string                          `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
+		JobType                domaintypes.JobType             `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
+		JobImage               string                          `json:"job_image"` // Container image for mig/heal jobs
+		NextID                 *domaintypes.JobID              `json:"next_id"`
+		RepoURL                string                          `json:"repo_url"`
+		RepoGateProfileMissing bool                            `json:"repo_gate_profile_missing"`
+		Status                 store.RunStatus                 `json:"status"`
+		NodeID                 domaintypes.NodeID              `json:"node_id"` // Node ID (NanoID-backed)
+		BaseRef                string                          `json:"base_ref"`
+		TargetRef              string                          `json:"target_ref"`
+		StartedAt              string                          `json:"started_at"`
+		CreatedAt              string                          `json:"created_at"`
+		Spec                   json.RawMessage                 `json:"spec,omitempty"`
+		RecoveryContext        *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	}{
 		RunID:                  run.ID,
 		Name:                   nil,
@@ -252,6 +259,7 @@ func buildAndSendJobClaimResponse(
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   mergedSpec,
+		RecoveryContext:        recoveryCtx,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -640,4 +648,158 @@ func mergeHealingSchemaIntoSpec(spec json.RawMessage, job store.Job, jobType dom
 		return nil, fmt.Errorf("marshal merged spec: %w", err)
 	}
 	return json.RawMessage(b), nil
+}
+
+func buildRecoveryClaimContext(
+	ctx context.Context,
+	st store.Store,
+	runID domaintypes.RunID,
+	job store.Job,
+	jobType domaintypes.JobType,
+) (*contracts.RecoveryClaimContext, error) {
+	if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
+		return nil, nil
+	}
+	if len(job.Meta) == 0 {
+		return nil, nil
+	}
+	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
+	if err != nil || jobMeta.Recovery == nil {
+		return nil, nil
+	}
+
+	recovery := jobMeta.Recovery
+	selectedKind := strings.TrimSpace(recovery.ErrorKind)
+	if selectedKind == "" {
+		selectedKind = "unknown"
+	}
+	ctxPayload := &contracts.RecoveryClaimContext{
+		LoopKind:          strings.TrimSpace(recovery.LoopKind),
+		SelectedErrorKind: selectedKind,
+		Expectations:      cloneRawJSON(recovery.Expectations),
+	}
+	if strings.TrimSpace(ctxPayload.LoopKind) == "" {
+		ctxPayload.LoopKind = "healing"
+	}
+	if jobType == domaintypes.JobTypeHeal && strings.TrimSpace(job.JobImage) != "" {
+		ctxPayload.ResolvedHealingImage = strings.TrimSpace(job.JobImage)
+	}
+
+	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{
+		RunID:   runID,
+		RepoID:  job.RepoID,
+		Attempt: job.Attempt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list jobs for recovery context: %w", err)
+	}
+
+	jobsByID := make(map[domaintypes.JobID]store.Job, len(jobs))
+	for _, j := range jobs {
+		jobsByID[j.ID] = j
+	}
+
+	gateJob, healJob := resolveRecoverySourceJobs(job, jobsByID)
+	if healJob != nil && strings.TrimSpace(ctxPayload.ResolvedHealingImage) == "" {
+		ctxPayload.ResolvedHealingImage = strings.TrimSpace(healJob.JobImage)
+	}
+
+	if gateJob != nil && len(gateJob.Meta) > 0 {
+		if gateMeta, err := contracts.UnmarshalJobMeta(gateJob.Meta); err == nil && gateMeta.Gate != nil {
+			if stack := gateMeta.Gate.DetectedStack(); stack != "" && stack != contracts.ModStackUnknown {
+				ctxPayload.DetectedStack = stack
+			}
+			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.Gate); strings.TrimSpace(logPayload) != "" {
+				ctxPayload.BuildGateLog = logPayload
+			}
+			if len(gateMeta.Gate.GeneratedGateProfile) > 0 {
+				ctxPayload.GateProfile = cloneRawJSON(gateMeta.Gate.GeneratedGateProfile)
+			}
+		}
+	}
+
+	if ctxPayload.SelectedErrorKind == "infra" {
+		schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
+		if err != nil {
+			return nil, err
+		}
+		if !json.Valid(schemaRaw) {
+			return nil, fmt.Errorf("gate profile schema JSON is invalid")
+		}
+		ctxPayload.GateProfileSchemaJSON = string(schemaRaw)
+	}
+
+	return ctxPayload, nil
+}
+
+func resolveRecoverySourceJobs(
+	current store.Job,
+	jobsByID map[domaintypes.JobID]store.Job,
+) (*store.Job, *store.Job) {
+	switch domaintypes.JobType(current.JobType) {
+	case domaintypes.JobTypeHeal:
+		heal := current
+		prev := predecessorJob(current.ID, jobsByID)
+		if prev != nil && isGateJobTypeForClaim(domaintypes.JobType(prev.JobType)) {
+			return prev, &heal
+		}
+		return nil, &heal
+	case domaintypes.JobTypeReGate:
+		prev := predecessorJob(current.ID, jobsByID)
+		if prev == nil {
+			return nil, nil
+		}
+		if domaintypes.JobType(prev.JobType) == domaintypes.JobTypeHeal {
+			heal := *prev
+			prevGate := predecessorJob(prev.ID, jobsByID)
+			if prevGate != nil && isGateJobTypeForClaim(domaintypes.JobType(prevGate.JobType)) {
+				return prevGate, &heal
+			}
+			return nil, &heal
+		}
+		if isGateJobTypeForClaim(domaintypes.JobType(prev.JobType)) {
+			return prev, nil
+		}
+	}
+	return nil, nil
+}
+
+func predecessorJob(jobID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) *store.Job {
+	for _, candidate := range jobsByID {
+		if candidate.NextID != nil && *candidate.NextID == jobID {
+			c := candidate
+			return &c
+		}
+	}
+	return nil
+}
+
+func isGateJobTypeForClaim(jobType domaintypes.JobType) bool {
+	return jobType == domaintypes.JobTypePreGate ||
+		jobType == domaintypes.JobTypePostGate ||
+		jobType == domaintypes.JobTypeReGate
+}
+
+func gateLogPayloadFromClaimMetadata(gateMetadata *contracts.BuildGateStageMetadata) string {
+	if gateMetadata == nil {
+		return ""
+	}
+	if len(gateMetadata.LogFindings) == 0 {
+		return ""
+	}
+	logPayload := strings.TrimSpace(gateMetadata.LogFindings[0].Message)
+	if logPayload == "" {
+		return ""
+	}
+	if !strings.HasSuffix(logPayload, "\n") {
+		logPayload += "\n"
+	}
+	return logPayload
+}
+
+func cloneRawJSON(in json.RawMessage) json.RawMessage {
+	if len(in) == 0 {
+		return nil
+	}
+	return append(json.RawMessage(nil), in...)
 }

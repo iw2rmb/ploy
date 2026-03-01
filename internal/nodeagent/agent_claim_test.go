@@ -12,6 +12,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -407,6 +408,13 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/x"),
 		CommitSha: &commit,
+		RecoveryContext: &contracts.RecoveryClaimContext{
+			LoopKind:             "healing",
+			SelectedErrorKind:    "infra",
+			DetectedStack:        contracts.ModStackJavaMaven,
+			ResolvedHealingImage: "docker.io/acme/heal:latest",
+			BuildGateLog:         "[ERROR] build failed\n",
+		},
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -467,6 +475,12 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	}
 	if got.CommitSHA != *claim.CommitSha {
 		t.Errorf("CommitSHA=%q want %q", got.CommitSHA.String(), claim.CommitSha.String())
+	}
+	if got.RecoveryContext == nil {
+		t.Fatalf("RecoveryContext=nil, want non-nil")
+	}
+	if got.RecoveryContext.SelectedErrorKind != "infra" {
+		t.Fatalf("RecoveryContext.SelectedErrorKind=%q, want infra", got.RecoveryContext.SelectedErrorKind)
 	}
 }
 

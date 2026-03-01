@@ -40,7 +40,7 @@ func TestPopulateHealingInDirCopiesGateLog(t *testing.T) {
 
 	inDir := t.TempDir()
 
-	if err := rc.populateHealingInDir(runID, inDir, nil, ""); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, nil, nil, ""); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 
@@ -113,7 +113,7 @@ func TestPopulateHealingInDirCopiesGateProfileForInfra(t *testing.T) {
 
 	inDir := t.TempDir()
 	schemaJSON := mustGateProfileSchemaJSON(t)
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, nil, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 
@@ -152,7 +152,7 @@ func TestPopulateHealingInDirSkipsGateProfileForNonInfra(t *testing.T) {
 	}
 
 	inDir := t.TempDir()
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "code"}, ""); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "code"}, nil, ""); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.json")); !os.IsNotExist(err) {
@@ -180,7 +180,7 @@ func TestPopulateHealingInDirInfraMissingGateProfileIsAllowed(t *testing.T) {
 
 	inDir := t.TempDir()
 	schemaJSON := mustGateProfileSchemaJSON(t)
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, nil, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
@@ -202,7 +202,7 @@ func TestPopulateHealingInDirInfraMissingGateLogStillHydratesSchema(t *testing.T
 
 	inDir := t.TempDir()
 	schemaJSON := mustGateProfileSchemaJSON(t)
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, nil, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
@@ -230,7 +230,7 @@ func TestPopulateHealingInDirInfraEmptyGateLogStillHydratesSchema(t *testing.T) 
 
 	inDir := t.TempDir()
 	schemaJSON := mustGateProfileSchemaJSON(t)
-	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, schemaJSON); err != nil {
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, nil, schemaJSON); err != nil {
 		t.Fatalf("populateHealingInDir error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(inDir, "gate_profile.schema.json")); err != nil {
@@ -257,8 +257,69 @@ func TestPopulateHealingInDirInfraMissingSchemaFails(t *testing.T) {
 	}
 
 	inDir := t.TempDir()
-	err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, "")
+	err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, nil, "")
 	if err == nil {
 		t.Fatalf("expected populateHealingInDir error for missing schema env")
+	}
+}
+
+func TestPopulateHealingInDir_UsesClaimRecoveryContextLog(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-claim-log")
+	inDir := t.TempDir()
+
+	recovery := &contracts.RecoveryClaimContext{
+		BuildGateLog: "[ERROR] from claim payload\n",
+	}
+	if err := rc.populateHealingInDir(runID, inDir, nil, recovery, ""); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(inDir, "build-gate.log"))
+	if err != nil {
+		t.Fatalf("read /in/build-gate.log: %v", err)
+	}
+	if got, want := string(data), recovery.BuildGateLog; got != want {
+		t.Fatalf("/in/build-gate.log = %q, want %q", got, want)
+	}
+}
+
+func TestPopulateHealingInDirInfra_UsesClaimRecoveryContextProfileAndSchema(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-claim-profile")
+	inDir := t.TempDir()
+	profile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
+	schemaJSON := mustGateProfileSchemaJSON(t)
+
+	recovery := &contracts.RecoveryClaimContext{
+		BuildGateLog:          "claim-log\n",
+		GateProfile:           profile,
+		GateProfileSchemaJSON: schemaJSON,
+		SelectedErrorKind:     "infra",
+	}
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "infra"}, recovery, ""); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+
+	gotProfile, err := os.ReadFile(filepath.Join(inDir, "gate_profile.json"))
+	if err != nil {
+		t.Fatalf("read /in/gate_profile.json: %v", err)
+	}
+	if got := string(gotProfile); got != string(profile) {
+		t.Fatalf("/in/gate_profile.json = %q, want %q", got, string(profile))
+	}
+
+	gotSchema, err := os.ReadFile(filepath.Join(inDir, "gate_profile.schema.json"))
+	if err != nil {
+		t.Fatalf("read /in/gate_profile.schema.json: %v", err)
+	}
+	if got, want := string(gotSchema), schemaJSON; got != want {
+		t.Fatalf("/in/gate_profile.schema.json = %q, want %q", got, want)
 	}
 }

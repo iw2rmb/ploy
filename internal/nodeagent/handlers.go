@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // maxRequestBodySize limits request body size to prevent OOM from large payloads.
@@ -50,6 +51,8 @@ type StartRunRequest struct {
 	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain
 	JobName   string          `json:"job_name,omitempty"`  // Job name for branch identification (e.g., "heal-branch-a-1-0")
+	// RecoveryContext carries server-resolved recovery inputs for heal/re-gate jobs.
+	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions

@@ -240,6 +240,10 @@ to `/in` for debugging and cross-iteration context:
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
 | `/in/healing-log.md` | Cumulative markdown log across all iterations |
 
+For `heal`/`re_gate`, claim-time `recovery_context` is the primary source for
+`/in/build-gate.log`, `/in/gate_profile.json`, and `/in/gate_profile.schema.json`.
+Node-local run cache snapshots are fallback-only when claim context fields are absent.
+
 The `healing-log.md` format:
 
 ```markdown
