@@ -8,52 +8,6 @@ import (
 	"fmt"
 )
 
-// modLikeFields holds the common fields shared between ModStep, HealingSpec, and RouterSpec.
-type modLikeFields struct {
-	Image   JobImage
-	Command CommandSpec
-	Env     map[string]string
-}
-
-// parseModLikeFields parses the common fields shared by ModStep, HealingSpec, and RouterSpec.
-func parseModLikeFields(raw map[string]any, prefix string) (modLikeFields, error) {
-	var f modLikeFields
-
-	// Parse image.
-	if v, ok := raw["image"]; ok && v != nil {
-		img, err := ParseJobImage(v)
-		if err != nil {
-			return f, fmt.Errorf("%s.image: %w", prefix, err)
-		}
-		f.Image = img
-	}
-
-	// Parse command.
-	if v, ok := raw["command"]; ok && v != nil {
-		cmd, err := ParseCommandSpec(v)
-		if err != nil {
-			return f, fmt.Errorf("%s.command: %w", prefix, err)
-		}
-		f.Command = cmd
-	}
-
-	// Parse env.
-	if v, ok := raw["env"]; ok && v != nil {
-		env, err := parseEnvMap(v, prefix+".env")
-		if err != nil {
-			return f, err
-		}
-		f.Env = env
-	}
-
-	// retain_container is intentionally removed from the canonical contract.
-	if _, ok := raw["retain_container"]; ok {
-		return f, fmt.Errorf("%s.retain_container: forbidden", prefix)
-	}
-
-	return f, nil
-}
-
 // expectString asserts v is a string and returns it, or an error with field context.
 func expectString(v any, field string) (string, error) {
 	s, ok := v.(string)

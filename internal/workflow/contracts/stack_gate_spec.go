@@ -39,6 +39,26 @@ type StackExpectation struct {
 	Release string `json:"release,omitempty" yaml:"release,omitempty"`
 }
 
+// UnmarshalJSON handles numeric release values (e.g., YAML `release: 11` → JSON number).
+func (e *StackExpectation) UnmarshalJSON(data []byte) error {
+	type alias StackExpectation
+	aux := &struct {
+		Release json.RawMessage `json:"release,omitempty"`
+		*alias
+	}{alias: (*alias)(e)}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if len(aux.Release) > 0 {
+		r, err := unmarshalReleaseJSON(aux.Release)
+		if err != nil {
+			return err
+		}
+		e.Release = r
+	}
+	return nil
+}
+
 // IsEmpty returns true if no expectation fields are set.
 func (e StackExpectation) IsEmpty() bool {
 	return e.Language == "" && e.Tool == "" && e.Release == ""

@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -24,4 +25,25 @@ func ParseReleaseValue(v any, field string) (string, error) {
 	default:
 		return "", fmt.Errorf("%s: expected string or number, got %T", field, v)
 	}
+}
+
+// unmarshalReleaseJSON converts a json.RawMessage release value (string or number)
+// to a string. This handles YAML numeric release values (e.g., `release: 11`)
+// that become JSON numbers after YAML→JSON conversion.
+func unmarshalReleaseJSON(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		return strings.TrimSpace(s), nil
+	}
+	var f float64
+	if err := json.Unmarshal(raw, &f); err == nil {
+		if f == float64(int64(f)) {
+			return fmt.Sprintf("%d", int64(f)), nil
+		}
+		return fmt.Sprintf("%g", f), nil
+	}
+	return "", fmt.Errorf("release: expected string or number, got %s", string(raw))
 }

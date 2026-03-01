@@ -1,10 +1,5 @@
 // mods_spec_parse.go provides JSON parsing for Mods specifications.
 //
-// The parsing strategy handles polymorphic fields (image, command) that can appear
-// as either strings or structured objects in the spec JSON. Standard JSON unmarshaling
-// cannot handle this directly, so we parse into map[string]any first and then
-// convert to typed structures.
-//
 // Usage:
 //
 //	spec, err := contracts.ParseModsSpecJSON(jsonBytes)
@@ -20,583 +15,123 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // ParseModsSpecJSON parses a Mods specification from JSON bytes.
 // Returns a validated ModsSpec or an error for invalid/malformed input.
-//
-// Errors are structured with field paths for actionable debugging:
-//   - "steps[2].image: required" — missing required field in step
-//   - "build_gate.healing.by_error_kind.infra.retries: must be non-negative" — invalid value
 func ParseModsSpecJSON(data []byte) (*ModsSpec, error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("steps: required")
 	}
 
-	// Unmarshal into intermediate map to handle polymorphic fields.
+	// Check forbidden fields via raw map before typed unmarshaling.
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse migs spec json: %w", err)
 	}
-
-	return parseModsSpecFromMap(raw)
-}
-
-// parseModsSpecFromMap converts a raw map to a typed ModsSpec.
-// This shared implementation handles polymorphic field parsing (image, command)
-// that requires special handling beyond standard JSON/YAML unmarshaling.
-func parseModsSpecFromMap(raw map[string]any) (*ModsSpec, error) {
-	spec := &ModsSpec{}
-
-	// Parse server-injected fields.
-	if v, ok := raw["job_id"]; ok && v != nil {
-		s, err := expectString(v, "job_id")
-		if err != nil {
-			return nil, err
-		}
-		s = strings.TrimSpace(s)
-		if s != "" {
-			var id types.JobID
-			if err := id.UnmarshalText([]byte(s)); err != nil {
-				return nil, fmt.Errorf("job_id: %w", err)
-			}
-			spec.JobID = id
-		}
-	}
-	if _, ok := raw["mod_index"]; ok {
-		return nil, fmt.Errorf("mod_index: forbidden (derived internally from next_id; must not be provided)")
+	if err := checkForbiddenFields(raw); err != nil {
+		return nil, err
 	}
 
-	// Parse optional metadata fields.
-	if v, ok := raw["apiVersion"]; ok && v != nil {
-		s, err := expectString(v, "apiVersion")
-		if err != nil {
-			return nil, err
-		}
-		spec.APIVersion = strings.TrimSpace(s)
-	}
-	if v, ok := raw["kind"]; ok && v != nil {
-		s, err := expectString(v, "kind")
-		if err != nil {
-			return nil, err
-		}
-		spec.Kind = strings.TrimSpace(s)
-	}
-
-	// Parse top-level env.
-	if v, ok := raw["env"]; ok && v != nil {
-		env, err := parseEnvMap(v, "env")
-		if err != nil {
-			return nil, err
-		}
-		spec.Env = env
-	}
-
-	// Parse steps[] array (required).
-	v, ok := raw["steps"]
-	if !ok || v == nil {
-		return nil, fmt.Errorf("steps: required")
-	}
-	stepsRaw, ok := v.([]any)
-	if !ok {
-		return nil, fmt.Errorf("steps: expected array, got %T", v)
-	}
-	if len(stepsRaw) == 0 {
-		return nil, fmt.Errorf("steps: required")
-	}
-	spec.Steps = make([]ModStep, 0, len(stepsRaw))
-	for i, stepRaw := range stepsRaw {
-		stepMap, ok := stepRaw.(map[string]any)
-		if !ok {
-			return nil, fmt.Errorf("steps[%d]: expected object, got %T", i, stepRaw)
-		}
-		step, err := parseModStep(stepMap, i)
-		if err != nil {
-			return nil, err
-		}
-		spec.Steps = append(spec.Steps, step)
-	}
-
-	// Parse build_gate.
-	if v, ok := raw["build_gate"]; ok && v != nil {
-		bgRaw, err := expectMap(v, "build_gate")
-		if err != nil {
-			return nil, err
-		}
-		bg := &BuildGateConfig{}
-		if _, ok := bgRaw["profile"]; ok {
-			return nil, fmt.Errorf("build_gate.profile: forbidden")
-		}
-		if vv, ok := bgRaw["enabled"]; ok && vv != nil {
-			b, err := expectBool(vv, "build_gate.enabled")
-			if err != nil {
-				return nil, err
-			}
-			bg.Enabled = b
-		}
-		if vv, ok := bgRaw["healing"]; ok && vv != nil {
-			healRaw, err := expectMap(vv, "build_gate.healing")
-			if err != nil {
-				return nil, err
-			}
-			heal, err := parseHealingSpec(healRaw, "build_gate.healing")
-			if err != nil {
-				return nil, err
-			}
-			bg.Healing = heal
-		}
-		if vv, ok := bgRaw["router"]; ok && vv != nil {
-			routerRaw, err := expectMap(vv, "build_gate.router")
-			if err != nil {
-				return nil, err
-			}
-			router, err := parseRouterSpec(routerRaw, "build_gate.router")
-			if err != nil {
-				return nil, err
-			}
-			bg.Router = router
-		}
-		if vv, ok := bgRaw["images"]; ok && vv != nil {
-			imagesRaw, ok := vv.([]any)
-			if !ok {
-				return nil, fmt.Errorf("build_gate.images: expected array, got %T", vv)
-			}
-			images, err := parseBuildGateImageRules(imagesRaw, "build_gate.images")
-			if err != nil {
-				return nil, err
-			}
-			bg.Images = images
-		}
-		if vv, ok := bgRaw["pre"]; ok && vv != nil {
-			preRaw, err := expectMap(vv, "build_gate.pre")
-			if err != nil {
-				return nil, err
-			}
-			pre, err := parseBuildGatePhaseConfig(preRaw, "build_gate.pre")
-			if err != nil {
-				return nil, err
-			}
-			bg.Pre = pre
-		}
-		if vv, ok := bgRaw["post"]; ok && vv != nil {
-			postRaw, err := expectMap(vv, "build_gate.post")
-			if err != nil {
-				return nil, err
-			}
-			post, err := parseBuildGatePhaseConfig(postRaw, "build_gate.post")
-			if err != nil {
-				return nil, err
-			}
-			bg.Post = post
-		}
-		spec.BuildGate = bg
-	}
-
-	// Parse GitLab integration.
-	if v, ok := raw["gitlab_pat"]; ok && v != nil {
-		s, err := expectString(v, "gitlab_pat")
-		if err != nil {
-			return nil, err
-		}
-		spec.GitLabPAT = s
-	}
-	if v, ok := raw["gitlab_domain"]; ok && v != nil {
-		s, err := expectString(v, "gitlab_domain")
-		if err != nil {
-			return nil, err
-		}
-		spec.GitLabDomain = strings.TrimSpace(s)
-	}
-	if v, ok := raw["mr_on_success"]; ok && v != nil {
-		b, err := expectBool(v, "mr_on_success")
-		if err != nil {
-			return nil, err
-		}
-		spec.MROnSuccess = &b
-	}
-	if v, ok := raw["mr_on_fail"]; ok && v != nil {
-		b, err := expectBool(v, "mr_on_fail")
-		if err != nil {
-			return nil, err
-		}
-		spec.MROnFail = &b
-	}
-
-	// Parse artifact configuration.
-	if v, ok := raw["artifact_name"]; ok && v != nil {
-		s, err := expectString(v, "artifact_name")
-		if err != nil {
-			return nil, err
-		}
-		spec.ArtifactName = strings.TrimSpace(s)
-	}
-	if pathsRaw, ok := raw["artifact_paths"]; ok && pathsRaw != nil {
-		paths, err := parseStringSlice(pathsRaw, "artifact_paths")
-		if err != nil {
-			return nil, err
-		}
-		spec.ArtifactPaths = paths
+	// Unmarshal into typed struct.
+	var spec ModsSpec
+	if err := json.Unmarshal(data, &spec); err != nil {
+		return nil, fmt.Errorf("parse migs spec json: %w", err)
 	}
 
 	// Normalize defaults.
 	if strings.TrimSpace(spec.GitLabPAT) != "" && strings.TrimSpace(spec.GitLabDomain) == "" {
 		spec.GitLabDomain = "gitlab.com"
 	}
+	normalizeHealingDefaults(&spec)
 
-	// Validate the parsed spec.
 	if err := spec.Validate(); err != nil {
 		return nil, err
 	}
 
-	return spec, nil
+	return &spec, nil
 }
 
-// parseModStep parses a single mig step entry from the steps[] array.
-func parseModStep(raw map[string]any, index int) (ModStep, error) {
-	step := ModStep{}
-	prefix := fmt.Sprintf("steps[%d]", index)
-
-	// Parse optional name.
-	if v, ok := raw["name"]; ok && v != nil {
-		s, err := expectString(v, prefix+".name")
-		if err != nil {
-			return step, err
-		}
-		step.Name = strings.TrimSpace(s)
+// normalizeHealingDefaults sets default values for healing action specs
+// that cannot be expressed via JSON struct tags (e.g., Retries defaults to 1).
+func normalizeHealingDefaults(spec *ModsSpec) {
+	if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
+		return
 	}
-
-	// Parse shared mig-like fields (image, command, env).
-	f, err := parseModLikeFields(raw, prefix)
-	if err != nil {
-		return step, err
-	}
-	step.Image = f.Image
-	step.Command = f.Command
-	step.Env = f.Env
-
-	// Parse stack gate configuration.
-	if v, ok := raw["stack"]; ok && v != nil {
-		stackRaw, err := expectMap(v, prefix+".stack")
-		if err != nil {
-			return step, err
+	for kind, action := range spec.BuildGate.Healing.ByErrorKind {
+		if action.Retries == 0 {
+			action.Retries = 1
+			spec.BuildGate.Healing.ByErrorKind[kind] = action
 		}
-		stack, err := parseStackGateSpec(stackRaw, prefix+".stack")
-		if err != nil {
-			return step, err
-		}
-		step.Stack = stack
 	}
-
-	return step, nil
 }
 
-func parseHealingSpec(raw map[string]any, prefix string) (*HealingSpec, error) {
-	heal := &HealingSpec{}
-	forbiddenLegacyFields := []string{"retries", "image", "command", "env", "retain_container"}
-	for _, key := range forbiddenLegacyFields {
-		if _, ok := raw[key]; ok {
-			return nil, fmt.Errorf("%s.%s: forbidden (use %s.by_error_kind.<error_kind>.%s)", prefix, key, prefix, key)
-		}
+// checkForbiddenFields validates that no forbidden fields appear in the raw map.
+// These are fields that have been intentionally removed from the contract or
+// are derived internally and must not be user-provided.
+func checkForbiddenFields(raw map[string]any) error {
+	// Top-level forbidden fields.
+	if _, ok := raw["mod_index"]; ok {
+		return fmt.Errorf("mod_index: forbidden (derived internally from next_id; must not be provided)")
 	}
-	if v, ok := raw["selected_error_kind"]; ok && v != nil {
-		s, err := expectString(v, prefix+".selected_error_kind")
-		if err != nil {
-			return nil, err
-		}
-		heal.SelectedErrorKind = strings.TrimSpace(s)
-	}
-	if v, ok := raw["by_error_kind"]; ok && v != nil {
-		kindMap, err := expectMap(v, prefix+".by_error_kind")
-		if err != nil {
-			return nil, err
-		}
-		heal.ByErrorKind = make(map[string]HealingActionSpec, len(kindMap))
-		for errorKind, item := range kindMap {
-			itemRaw, err := expectMap(item, fmt.Sprintf("%s.by_error_kind.%s", prefix, errorKind))
-			if err != nil {
-				return nil, err
-			}
-			action, err := parseHealingActionSpec(itemRaw, fmt.Sprintf("%s.by_error_kind.%s", prefix, errorKind))
-			if err != nil {
-				return nil, err
-			}
-			heal.ByErrorKind[errorKind] = *action
-		}
-	}
-	return heal, nil
-}
 
-func parseHealingActionSpec(raw map[string]any, prefix string) (*HealingActionSpec, error) {
-	action := &HealingActionSpec{Retries: 1}
-	if v, ok := raw["retries"]; ok && v != nil {
-		if r, ok := intFromAny(v); ok {
-			action.Retries = r
-		} else if rf, ok := v.(float64); ok {
-			action.Retries = int(rf)
-		} else {
-			return nil, fmt.Errorf("%s.retries: expected number, got %T", prefix, v)
-		}
-	}
-	f, err := parseModLikeFields(raw, prefix)
-	if err != nil {
-		return nil, err
-	}
-	action.Image = f.Image
-	action.Command = f.Command
-	action.Env = f.Env
-	if v, ok := raw["expectations"]; ok && v != nil {
-		exRaw, err := expectMap(v, prefix+".expectations")
-		if err != nil {
-			return nil, err
-		}
-		ex, err := parseRecoveryExpectationsSpec(exRaw, prefix+".expectations")
-		if err != nil {
-			return nil, err
-		}
-		action.Expectations = ex
-	}
-	return action, nil
-}
-
-func parseRecoveryExpectationsSpec(raw map[string]any, prefix string) (*RecoveryExpectationsSpec, error) {
-	ex := &RecoveryExpectationsSpec{}
-	if v, ok := raw["artifacts"]; ok && v != nil {
-		items, ok := v.([]any)
-		if !ok {
-			return nil, fmt.Errorf("%s.artifacts: expected array, got %T", prefix, v)
-		}
-		ex.Artifacts = make([]RecoveryExpectedArtifact, 0, len(items))
-		for i, item := range items {
-			itemRaw, err := expectMap(item, fmt.Sprintf("%s.artifacts[%d]", prefix, i))
-			if err != nil {
-				return nil, err
-			}
-			artifact := RecoveryExpectedArtifact{}
-			if vv, ok := itemRaw["path"]; ok && vv != nil {
-				s, err := expectString(vv, fmt.Sprintf("%s.artifacts[%d].path", prefix, i))
-				if err != nil {
-					return nil, err
+	// Per-step forbidden fields.
+	if stepsRaw, ok := raw["steps"]; ok && stepsRaw != nil {
+		if steps, ok := stepsRaw.([]any); ok {
+			for i, s := range steps {
+				if sm, ok := s.(map[string]any); ok {
+					if _, ok := sm["retain_container"]; ok {
+						return fmt.Errorf("steps[%d].retain_container: forbidden", i)
+					}
 				}
-				artifact.Path = strings.TrimSpace(s)
 			}
-			if vv, ok := itemRaw["schema"]; ok && vv != nil {
-				s, err := expectString(vv, fmt.Sprintf("%s.artifacts[%d].schema", prefix, i))
-				if err != nil {
-					return nil, err
+		}
+	}
+
+	// Build gate forbidden fields.
+	bgAny, ok := raw["build_gate"]
+	if !ok || bgAny == nil {
+		return nil
+	}
+	bg, ok := bgAny.(map[string]any)
+	if !ok {
+		return nil
+	}
+	if _, ok := bg["profile"]; ok {
+		return fmt.Errorf("build_gate.profile: forbidden")
+	}
+
+	// Healing forbidden legacy fields.
+	if healAny, ok := bg["healing"]; ok && healAny != nil {
+		if heal, ok := healAny.(map[string]any); ok {
+			for _, key := range []string{"retries", "image", "command", "env", "retain_container"} {
+				if _, ok := heal[key]; ok {
+					return fmt.Errorf("build_gate.healing.%s: forbidden (use build_gate.healing.by_error_kind.<error_kind>.%s)", key, key)
 				}
-				artifact.Schema = strings.TrimSpace(s)
 			}
-			ex.Artifacts = append(ex.Artifacts, artifact)
-		}
-	}
-	return ex, nil
-}
-
-func parseRouterSpec(raw map[string]any, prefix string) (*RouterSpec, error) {
-	f, err := parseModLikeFields(raw, prefix)
-	if err != nil {
-		return nil, err
-	}
-	return &RouterSpec{
-		Image:   f.Image,
-		Command: f.Command,
-		Env:     f.Env,
-	}, nil
-}
-
-func parseBuildGatePhaseConfig(raw map[string]any, prefix string) (*BuildGatePhaseConfig, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-
-	phase := &BuildGatePhaseConfig{}
-
-	if v, ok := raw["stack"]; ok && v != nil {
-		stackRaw, err := expectMap(v, prefix+".stack")
-		if err != nil {
-			return nil, err
-		}
-		stack, err := parseBuildGateStackConfig(stackRaw, prefix+".stack")
-		if err != nil {
-			return nil, err
-		}
-		phase.Stack = stack
-	}
-
-	if v, ok := raw["gate_profile"]; ok && v != nil {
-		prepRaw, err := expectMap(v, prefix+".gate_profile")
-		if err != nil {
-			return nil, err
-		}
-		prep, err := parseBuildGateProfileOverride(prepRaw, prefix+".gate_profile")
-		if err != nil {
-			return nil, err
-		}
-		phase.GateProfile = prep
-	}
-
-	if phase.Stack == nil && phase.GateProfile == nil {
-		return nil, nil
-	}
-
-	return phase, nil
-}
-
-func parseBuildGateProfileOverride(raw map[string]any, prefix string) (*BuildGateProfileOverride, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-
-	prep := &BuildGateProfileOverride{}
-
-	if v, ok := raw["command"]; ok && v != nil {
-		cmd, err := ParseCommandSpec(v)
-		if err != nil {
-			return nil, fmt.Errorf("%s.command: %w", prefix, err)
-		}
-		prep.Command = cmd
-	}
-
-	if v, ok := raw["env"]; ok && v != nil {
-		env, err := parseEnvMap(v, prefix+".env")
-		if err != nil {
-			return nil, err
-		}
-		prep.Env = env
-	}
-	if v, ok := raw["stack"]; ok && v != nil {
-		stackRaw, err := expectMap(v, prefix+".stack")
-		if err != nil {
-			return nil, err
-		}
-		stack := &GateProfileStack{}
-		if vv, ok := stackRaw["language"]; ok && vv != nil {
-			s, err := expectString(vv, prefix+".stack.language")
-			if err != nil {
-				return nil, err
-			}
-			stack.Language = strings.TrimSpace(s)
-		}
-		if vv, ok := stackRaw["tool"]; ok && vv != nil {
-			s, err := expectString(vv, prefix+".stack.tool")
-			if err != nil {
-				return nil, err
-			}
-			stack.Tool = strings.TrimSpace(s)
-		}
-		if vv, ok := stackRaw["release"]; ok && vv != nil {
-			s, err := expectString(vv, prefix+".stack.release")
-			if err != nil {
-				return nil, err
-			}
-			stack.Release = strings.TrimSpace(s)
-		}
-		prep.Stack = stack
-	}
-
-	if prep.Command.IsEmpty() {
-		return nil, fmt.Errorf("%s.command: required", prefix)
-	}
-
-	return prep, nil
-}
-
-func parseBuildGateStackConfig(raw map[string]any, prefix string) (*BuildGateStackConfig, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-
-	stack := &BuildGateStackConfig{}
-
-	if v, ok := raw["enabled"]; ok && v != nil {
-		b, err := expectBool(v, prefix+".enabled")
-		if err != nil {
-			return nil, err
-		}
-		stack.Enabled = b
-	}
-
-	if v, ok := raw["default"]; ok && v != nil {
-		b, err := expectBool(v, prefix+".default")
-		if err != nil {
-			return nil, err
-		}
-		stack.Default = b
-	}
-
-	if v, ok := raw["language"]; ok && v != nil {
-		s, err := expectString(v, prefix+".language")
-		if err != nil {
-			return nil, err
-		}
-		stack.Language = strings.TrimSpace(s)
-	}
-
-	if v, ok := raw["tool"]; ok && v != nil {
-		s, err := expectString(v, prefix+".tool")
-		if err != nil {
-			return nil, err
-		}
-		stack.Tool = strings.TrimSpace(s)
-	}
-
-	if v, ok := raw["release"]; ok && v != nil {
-		release, err := ParseReleaseValue(v, prefix+".release")
-		if err != nil {
-			return nil, err
-		}
-		stack.Release = release
-	}
-
-	return stack, nil
-}
-
-// parseEnvMap parses an environment variable map from untyped input.
-func parseEnvMap(v any, field string) (map[string]string, error) {
-	switch e := v.(type) {
-	case map[string]any:
-		env := make(map[string]string, len(e))
-		for k, val := range e {
-			s, ok := val.(string)
-			if !ok {
-				return nil, fmt.Errorf("%s[%s]: expected string value, got %T", field, k, val)
-			}
-			env[k] = s
-		}
-		return env, nil
-	case map[string]string:
-		return e, nil
-	default:
-		return nil, fmt.Errorf("%s: expected object, got %T", field, v)
-	}
-}
-
-// parseStringSlice parses a string slice from untyped input.
-func parseStringSlice(v any, field string) ([]string, error) {
-	switch s := v.(type) {
-	case []any:
-		result := make([]string, 0, len(s))
-		for i, elem := range s {
-			str, ok := elem.(string)
-			if !ok {
-				return nil, fmt.Errorf("%s[%d]: expected string, got %T", field, i, elem)
-			}
-			if trimmed := strings.TrimSpace(str); trimmed != "" {
-				result = append(result, trimmed)
+			// Check retain_container in each by_error_kind entry.
+			if bekAny, ok := heal["by_error_kind"]; ok && bekAny != nil {
+				if bek, ok := bekAny.(map[string]any); ok {
+					for kind, entry := range bek {
+						if em, ok := entry.(map[string]any); ok {
+							if _, ok := em["retain_container"]; ok {
+								return fmt.Errorf("build_gate.healing.by_error_kind.%s.retain_container: forbidden", kind)
+							}
+						}
+					}
+				}
 			}
 		}
-		return result, nil
-	case []string:
-		result := make([]string, 0, len(s))
-		for _, str := range s {
-			if trimmed := strings.TrimSpace(str); trimmed != "" {
-				result = append(result, trimmed)
+	}
+
+	// Router forbidden fields.
+	if routerAny, ok := bg["router"]; ok && routerAny != nil {
+		if router, ok := routerAny.(map[string]any); ok {
+			if _, ok := router["retain_container"]; ok {
+				return fmt.Errorf("build_gate.router.retain_container: forbidden")
 			}
 		}
-		return result, nil
-	default:
-		return nil, fmt.Errorf("%s: expected array, got %T", field, v)
 	}
+
+	return nil
 }

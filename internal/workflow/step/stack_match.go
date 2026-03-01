@@ -23,28 +23,13 @@ func observationToStackExpectation(obs *stackdetect.Observation) *contracts.Stac
 	return exp
 }
 
-// stackMatchesExpectation compares a detected observation against expected values.
-// Returns true if all non-empty expected fields match the observation.
-func stackMatchesExpectation(obs *stackdetect.Observation, expect *contracts.StackExpectation) bool {
+// matchStack compares a detected observation against expected values.
+// Returns (true, "") if all non-empty expected fields match, or
+// (false, reason) with a human-readable mismatch explanation.
+func matchStack(obs *stackdetect.Observation, expect *contracts.StackExpectation) (bool, string) {
 	if expect == nil {
-		return true
+		return true, ""
 	}
-	if expect.Language != "" && obs.Language != expect.Language {
-		return false
-	}
-	if expect.Tool != "" && obs.Tool != expect.Tool {
-		return false
-	}
-	if expect.Release != "" {
-		if obs.Release == nil || *obs.Release != expect.Release {
-			return false
-		}
-	}
-	return true
-}
-
-// formatMismatchReason generates a human-readable explanation of stack mismatches.
-func formatMismatchReason(obs *stackdetect.Observation, expect *contracts.StackExpectation) string {
 	var mismatches []string
 	if expect.Language != "" && obs.Language != expect.Language {
 		mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expect.Language, obs.Language))
@@ -61,16 +46,17 @@ func formatMismatchReason(obs *stackdetect.Observation, expect *contracts.StackE
 			mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
 		}
 	}
+	if len(mismatches) == 0 {
+		return true, ""
+	}
 	msg := "stack mismatch: " + strings.Join(mismatches, "; ")
-
-	// Append evidence for debugging.
 	if len(obs.Evidence) > 0 {
 		msg += "\nevidence:"
 		for _, e := range obs.Evidence {
 			msg += fmt.Sprintf("\n  - %s: %s = %q", e.Path, e.Key, e.Value)
 		}
 	}
-	return msg
+	return false, msg
 }
 
 // formatEvidenceForLog formats evidence items for the LogFinding.Evidence field.

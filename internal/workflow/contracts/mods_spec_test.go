@@ -413,7 +413,7 @@ func TestParseModsSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 				"steps": [{"image": "docker.io/user/mig:latest"}],
 				"build_gate": {"post": {"gate_profile": {"command": {"bad": true}}}}
 			}`,
-			wantErr: "build_gate.post.gate_profile.command",
+			wantErr: "command: expected string or array",
 		},
 	}
 
@@ -588,20 +588,12 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			want: 3,
 		},
 		{
-			name: "float whole value",
-			input: `{
-				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 3.0, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
-			}`,
-			want: 3,
-		},
-		{
-			name: "float fraction truncates",
+			name: "float rejected",
 			input: `{
 				"steps": [{"image":"test:latest"}],
 				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 1.9, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
 			}`,
-			want: 1,
+			wantErr: "parse migs spec json",
 		},
 		{
 			name: "non-number rejected",
@@ -609,7 +601,7 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 				"steps": [{"image":"test:latest"}],
 				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": "nope", "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
 			}`,
-			wantErr: "build_gate.healing.by_error_kind.infra.retries: expected number, got string",
+			wantErr: "parse migs spec json",
 		},
 	}
 
@@ -620,8 +612,8 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 				if err == nil {
 					t.Fatal("expected error")
 				}
-				if err.Error() != tt.wantErr {
-					t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
 				}
 				return
 			}
@@ -642,8 +634,8 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 	}
 }
 
-// TestModsSpec_ToMap tests round-trip conversion via ToMap.
-func TestModsSpec_ToMap(t *testing.T) {
+// TestModsSpec_RoundTrip tests round-trip conversion via json.Marshal → ParseModsSpecJSON.
+func TestModsSpec_RoundTrip(t *testing.T) {
 	mrOnSuccess := true
 	original := &ModsSpec{
 		Steps: []ModStep{{
@@ -656,13 +648,7 @@ func TestModsSpec_ToMap(t *testing.T) {
 		MROnSuccess: &mrOnSuccess,
 	}
 
-	m, err := original.ToMap()
-	if err != nil {
-		t.Fatalf("ToMap failed: %v", err)
-	}
-
-	// Marshal to JSON and parse back.
-	data, err := json.Marshal(m)
+	data, err := json.Marshal(original)
 	if err != nil {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
@@ -672,7 +658,6 @@ func TestModsSpec_ToMap(t *testing.T) {
 		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
 
-	// Verify round-trip.
 	if parsed.Steps[0].Image.Universal != original.Steps[0].Image.Universal {
 		t.Errorf("image = %q, want %q", parsed.Steps[0].Image.Universal, original.Steps[0].Image.Universal)
 	}
@@ -687,8 +672,8 @@ func TestModsSpec_ToMap(t *testing.T) {
 	}
 }
 
-// TestModsSpec_ToMap_MultiStep tests ToMap for multi-step specs.
-func TestModsSpec_ToMap_MultiStep(t *testing.T) {
+// TestModsSpec_RoundTrip_MultiStep tests round-trip for multi-step specs.
+func TestModsSpec_RoundTrip_MultiStep(t *testing.T) {
 	original := &ModsSpec{
 		Steps: []ModStep{
 			{Name: "step-1", Image: JobImage{Universal: "mod1:latest"}},
@@ -713,13 +698,7 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 		},
 	}
 
-	m, err := original.ToMap()
-	if err != nil {
-		t.Fatalf("ToMap failed: %v", err)
-	}
-
-	// Marshal to JSON and parse back.
-	data, err := json.Marshal(m)
+	data, err := json.Marshal(original)
 	if err != nil {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
@@ -729,7 +708,6 @@ func TestModsSpec_ToMap_MultiStep(t *testing.T) {
 		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
 
-	// Verify round-trip.
 	if len(parsed.Steps) != 2 {
 		t.Fatalf("len(steps) = %d, want 2", len(parsed.Steps))
 	}
