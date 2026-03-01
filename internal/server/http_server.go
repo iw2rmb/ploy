@@ -215,12 +215,9 @@ func panicMessageSafe(recovered any) (msg string) {
 	case runtime.Error:
 		return "runtime panic"
 	case error:
-		defer func() {
-			if panicErr := recover(); panicErr != nil {
-				msg = "error string panicked"
-			}
-		}()
-		return v.Error()
+		// Avoid calling Error() in panic-recovery logging path; panicking Error()
+		// implementations should be fixed at source.
+		return fmt.Sprintf("%T", v)
 	default:
 		return fmt.Sprintf("%T", recovered)
 	}
