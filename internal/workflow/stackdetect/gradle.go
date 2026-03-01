@@ -175,16 +175,5 @@ func normalizeJavaVersion(v string) string {
 			return strconv.Itoa(n)
 		}
 	}
-	switch v {
-	case "1.8":
-		return "8"
-	case "1.7":
-		return "7"
-	case "1.6":
-		return "6"
-	case "1.5":
-		return "5"
-	default:
-		return v
-	}
+	return v
 }

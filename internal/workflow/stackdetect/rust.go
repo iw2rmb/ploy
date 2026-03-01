@@ -152,9 +152,5 @@ func extractNumericRustVersion(v string) string {
 
 // canonicalizeRustVersion normalizes "1.76.0" to "1.76".
 func canonicalizeRustVersion(v string) string {
-	matches := rustNumericVersionRegex.FindStringSubmatch(strings.TrimSpace(v))
-	if matches == nil {
-		return v
-	}
-	return matches[1]
+	return canonicalizeVersion(v, rustNumericVersionRegex, v)
 }
