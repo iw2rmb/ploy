@@ -168,8 +168,8 @@ func TestAuthorizerBearerToken_ExpiredToken(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusForbidden)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 }
 
@@ -209,8 +209,8 @@ func TestAuthorizerBearerToken_RevokedToken(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusForbidden)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 	if !contains(rr.Body.String(), "authentication failed") {
 		t.Errorf("expected generic error message, got: %s", rr.Body.String())
@@ -234,8 +234,8 @@ func TestAuthorizerBearerToken_MissingToken(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusForbidden)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 }
 
@@ -268,8 +268,8 @@ func TestAuthorizerBearerToken_InvalidFormat(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			if rr.Code != http.StatusForbidden {
-				t.Errorf("got status %d, want %d for %s", rr.Code, http.StatusForbidden, tt.name)
+			if rr.Code != http.StatusUnauthorized {
+				t.Errorf("got status %d, want %d for %s", rr.Code, http.StatusUnauthorized, tt.name)
 			}
 		})
 	}
@@ -443,8 +443,8 @@ func TestAuthorizerBearerToken_WrongSecret(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusForbidden)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 }
 
@@ -553,8 +553,8 @@ func TestAuthorizerQueryToken_RejectedWithoutContextFlag(t *testing.T) {
 		req := httptest.NewRequest(tt.method, tt.path, nil)
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusForbidden {
-			t.Fatalf("%s %s: got status %d, want %d", tt.method, tt.path, rr.Code, http.StatusForbidden)
+		if rr.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s: got status %d, want %d", tt.method, tt.path, rr.Code, http.StatusUnauthorized)
 		}
 	}
 }
@@ -582,7 +582,7 @@ func TestAuthorizerQueryToken_PostRejectedEvenWithFlag(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run-123/logs?auth_token="+tokenString, nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("POST with query token: got status %d, want %d", rr.Code, http.StatusForbidden)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("POST with query token: got status %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 }

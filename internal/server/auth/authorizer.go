@@ -162,7 +162,7 @@ func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler
 					"method", r.Method,
 					"path", r.URL.Path,
 					"error", err)
-				http.Error(w, "authentication failed", http.StatusForbidden)
+				http.Error(w, "authentication failed", http.StatusUnauthorized)
 				return
 			}
 

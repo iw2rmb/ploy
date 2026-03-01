@@ -333,8 +333,8 @@ func TestAuthorizer_DefaultConfig(t *testing.T) {
 		handler := authorizer.Middleware(auth.RoleControlPlane)(testHandler(t))
 
 		handler.ServeHTTP(rr, req)
-		if rr.Code != 403 {
-			t.Fatalf("expected 403 for insecure request, got %d", rr.Code)
+		if rr.Code != http.StatusUnauthorized {
+			t.Fatalf("expected 401 for insecure request, got %d", rr.Code)
 		}
 	})
 }
