@@ -268,7 +268,9 @@ See `docs/envs/README.md` for the complete environment variable reference.
 
 - Gate executor: `internal/workflow/step/gate_docker.go`
 - Gate job execution: `internal/nodeagent/execution_orchestrator_gate.go`
+- Router runtime: `internal/nodeagent/execution_orchestrator_router_runtime.go`
 - Healing job execution: `internal/nodeagent/execution_orchestrator_jobs.go`
+- Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go`
 - Job claiming: `internal/store/queries/jobs.sql` (`ClaimJob` query)
 - Contracts: `internal/workflow/contracts/build_gate_metadata.go`

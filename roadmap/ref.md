@@ -43,7 +43,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/handlers -run 'TestClaim|TestServerRunsClaim|TestMerge'`
 
 ## Phase 3: Split Overloaded Recovery Modules by Domain
-- [ ] Extract focused modules for gate runtime, router runtime, healing runtime, and recovery chain rewiring.
+- [x] Extract focused modules for gate runtime, router runtime, healing runtime, and recovery chain rewiring.
   - Repository: `ploy`
   - Component: `internal/nodeagent`, `internal/server/handlers`
   - Scope:
