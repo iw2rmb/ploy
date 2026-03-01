@@ -5,11 +5,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 )
 
 const goModuleFile = "go." + "mo" + "d"
+
+// fileExists returns true when path exists and is not a directory.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
 
 // scanResult holds the filesystem scan state shared between Detect and DetectTool.
 type scanResult struct {
@@ -59,23 +63,23 @@ func scanWorkspace(workspace string) scanResult {
 		workspace: workspace,
 	}
 
-	s.hasPom = fsutil.FileExists(pomPath)
-	s.hasGradleGroovy = fsutil.FileExists(gradleGroovyPath)
-	s.hasGradleKts = fsutil.FileExists(gradleKtsPath)
+	s.hasPom = fileExists(pomPath)
+	s.hasGradleGroovy = fileExists(gradleGroovyPath)
+	s.hasGradleKts = fileExists(gradleKtsPath)
 	s.hasGradle = s.hasGradleGroovy || s.hasGradleKts
 	s.hasJava = s.hasPom || s.hasGradle
 
-	s.hasGoMod = fsutil.FileExists(goModPath)
+	s.hasGoMod = fileExists(goModPath)
 	s.hasGo = s.hasGoMod
 
-	s.hasCargo = fsutil.FileExists(cargoPath)
-	hasRustToolchainToml := fsutil.FileExists(rustToolchainTomlPath)
-	s.hasRustToolchain = fsutil.FileExists(rustToolchainPath)
+	s.hasCargo = fileExists(cargoPath)
+	hasRustToolchainToml := fileExists(rustToolchainTomlPath)
+	s.hasRustToolchain = fileExists(rustToolchainPath)
 	s.hasRust = s.hasCargo || hasRustToolchainToml || s.hasRustToolchain
 
-	s.hasPyproject = fsutil.FileExists(pyprojectPath)
-	s.hasPythonVersion = fsutil.FileExists(pythonVersionPath)
-	s.hasRuntimeTxt = fsutil.FileExists(runtimeTxtPath)
+	s.hasPyproject = fileExists(pyprojectPath)
+	s.hasPythonVersion = fileExists(pythonVersionPath)
+	s.hasRuntimeTxt = fileExists(runtimeTxtPath)
 	if s.hasPyproject {
 		content, err := os.ReadFile(pyprojectPath)
 		if err == nil {

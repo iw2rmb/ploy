@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -22,39 +21,15 @@ func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 				gateExecuted = true
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
-						{
-							Tool:   "checkstyle",
-							Passed: true,
-						},
+						{Tool: "checkstyle", Passed: true},
 					},
 				}, nil
 			},
 		},
 	}
 
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
-			},
-		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := runner.Run(context.Background(), req)
+	manifest := newGateTestManifest(true)
+	result, err := runner.Run(context.Background(), newGateTestRequest(manifest))
 	if err != nil {
 		t.Fatalf("Run() unexpected error: %v", err)
 	}
@@ -62,13 +37,11 @@ func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 	if !gateExecuted {
 		t.Errorf("Run() gate executor not called when enabled")
 	}
-
 	if result.BuildGate == nil {
 		t.Errorf("Run() BuildGate metadata not captured")
 	} else if len(result.BuildGate.StaticChecks) != 1 {
 		t.Errorf("Run() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
 	}
-
 	if result.Timings.BuildGateDuration == 0 {
 		t.Errorf("Run() BuildGateDuration not captured when gate enabled")
 	}
@@ -88,29 +61,8 @@ func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 		},
 	}
 
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
-			},
-		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: false,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := runner.Run(context.Background(), req)
+	manifest := newGateTestManifest(false)
+	result, err := runner.Run(context.Background(), newGateTestRequest(manifest))
 	if err != nil {
 		t.Fatalf("Run() unexpected error: %v", err)
 	}
@@ -118,7 +70,6 @@ func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 	if gateExecuted {
 		t.Errorf("Run() gate executor called when disabled")
 	}
-
 	if result.BuildGate != nil {
 		t.Errorf("Run() BuildGate metadata should be nil when disabled")
 	}
@@ -139,33 +90,12 @@ func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 		},
 	}
 
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "test:latest",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
-			},
-		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	_, err := runner.Run(context.Background(), req)
+	manifest := newGateTestManifest(true)
+	manifest.Image = "test:latest"
+	_, err := runner.Run(context.Background(), newGateTestRequest(manifest))
 	if err == nil {
 		t.Fatalf("Run() expected error, got nil")
 	}
-
 	if !errors.Is(err, expectedErr) {
 		t.Errorf("Run() error chain doesn't include gate execution error: %v", err)
 	}
@@ -179,62 +109,31 @@ func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 		Workspace: &testWorkspaceHydrator{},
 		Gate: &testGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
-				// Simulate gate failure
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
-						{
-							Tool:   "maven",
-							Passed: false,
-						},
+						{Tool: "maven", Passed: false},
 					},
 					LogsText: "[ERROR] BUILD FAILURE\n[ERROR] Failed to compile",
 				}, nil
 			},
 		},
-		Containers: nil, // No container runtime; should not execute mig when gate fails
+		Containers: nil,
 	}
 
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
-			},
-		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
-		// No build_gate_healing configured
-		Options: map[string]any{},
-	}
+	manifest := newGateTestManifest(true)
+	manifest.Options = map[string]any{}
+	result, err := runner.Run(context.Background(), newGateTestRequest(manifest))
 
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := runner.Run(context.Background(), req)
-
-	// Should return error when gate fails without healing
 	if err == nil {
 		t.Fatalf("Run() expected error for failed pre-mig gate, got nil")
 	}
-
-	// Error should wrap the sentinel ErrBuildGateFailed
 	if !errors.Is(err, ErrBuildGateFailed) {
-		// Check error string contains expected message
 		errStr := err.Error()
 		if errStr != "build gate failed: pre-mig validation failed" {
 			t.Errorf("Run() error = %q, want error containing 'build gate failed'", errStr)
 		}
 	}
 
-	// BuildGate metadata should be populated
 	if result.BuildGate == nil {
 		t.Errorf("Run() BuildGate metadata should be populated on gate failure")
 	} else {
@@ -246,7 +145,6 @@ func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 		}
 	}
 
-	// Timings should be populated even on early failure
 	if result.Timings.BuildGateDuration == 0 {
 		t.Errorf("Run() BuildGateDuration should be captured on gate failure")
 	}
@@ -274,34 +172,13 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 		},
 	}
 
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "test:latest",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
-			},
-		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := runner.Run(context.Background(), req)
+	manifest := newGateTestManifest(true)
+	manifest.Image = "test:latest"
+	result, err := runner.Run(context.Background(), newGateTestRequest(manifest))
 	if err != nil {
 		t.Fatalf("Run() unexpected error: %v", err)
 	}
 
-	// Verify gate timing measurement is reasonable
 	if time.Duration(result.Timings.BuildGateDuration) < gateDelay {
 		t.Errorf("Run() BuildGateDuration = %v, expected >= %v", result.Timings.BuildGateDuration, gateDelay)
 	}
@@ -311,263 +188,137 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 // RunGateOnly Tests
 // -----------------------------------------------------------------------------
 
-// TestRunGateOnly_Enabled verifies that RunGateOnly invokes the gate executor
-// when the gate is enabled, populates BuildGate metadata, and does NOT invoke
-// any container runtime methods.
-func TestRunGateOnly_Enabled(t *testing.T) {
-	gateExecuted := false
-	crt := &testContainerRuntime{}
-
-	runner := &Runner{
-		Workspace: &testWorkspaceHydrator{},
-		Gate: &testGateExecutor{
+func TestRunGateOnly(t *testing.T) {
+	tests := []struct {
+		name         string
+		gateEnabled  bool
+		nilGate      bool // if true, Runner.Gate is nil
+		executeFn    func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error)
+		wantErr      error
+		assertResult func(t *testing.T, result Result, crt *testContainerRuntime)
+	}{
+		{
+			name:        "enabled",
+			gateEnabled: true,
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
-				gateExecuted = true
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
-						{
-							Tool:   "checkstyle",
-							Passed: true,
-						},
+						{Tool: "checkstyle", Passed: true},
 					},
 				}, nil
 			},
-		},
-		Containers: crt,
-	}
-
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
+			assertResult: func(t *testing.T, result Result, crt *testContainerRuntime) {
+				t.Helper()
+				if crt.createCalled {
+					t.Errorf("RunGateOnly() should not create containers")
+				}
+				if result.BuildGate == nil {
+					t.Errorf("RunGateOnly() BuildGate metadata not captured")
+				} else if len(result.BuildGate.StaticChecks) != 1 {
+					t.Errorf("RunGateOnly() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
+				}
+				if result.Timings.BuildGateDuration == 0 {
+					t.Errorf("RunGateOnly() BuildGateDuration not captured when gate enabled")
+				}
+				if result.Timings.TotalDuration == 0 {
+					t.Errorf("RunGateOnly() TotalDuration not captured")
+				}
+				if result.ExitCode != 0 {
+					t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
+				}
 			},
 		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := RunGateOnly(context.Background(), runner, req)
-	if err != nil {
-		t.Fatalf("RunGateOnly() unexpected error: %v", err)
-	}
-
-	// Verify gate was executed.
-	if !gateExecuted {
-		t.Errorf("RunGateOnly() gate executor not called when enabled")
-	}
-
-	// Verify container runtime was NOT invoked.
-	if crt.createCalled {
-		t.Errorf("RunGateOnly() should not create containers")
-	}
-
-	// Verify BuildGate metadata is populated.
-	if result.BuildGate == nil {
-		t.Errorf("RunGateOnly() BuildGate metadata not captured")
-	} else if len(result.BuildGate.StaticChecks) != 1 {
-		t.Errorf("RunGateOnly() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
-	}
-
-	// Verify timings are captured.
-	if result.Timings.BuildGateDuration == 0 {
-		t.Errorf("RunGateOnly() BuildGateDuration not captured when gate enabled")
-	}
-	if result.Timings.TotalDuration == 0 {
-		t.Errorf("RunGateOnly() TotalDuration not captured")
-	}
-
-	// Verify ExitCode is 0 (no container was executed).
-	if result.ExitCode != 0 {
-		t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
-	}
-}
-
-// TestRunGateOnly_Disabled verifies that RunGateOnly does NOT invoke the gate
-// executor when the gate is disabled in the manifest, and that no container
-// runtime methods are invoked.
-func TestRunGateOnly_Disabled(t *testing.T) {
-	gateExecuted := false
-	crt := &testContainerRuntime{}
-
-	runner := &Runner{
-		Workspace: &testWorkspaceHydrator{},
-		Gate: &testGateExecutor{
+		{
+			name:        "disabled",
+			gateEnabled: false,
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
-				gateExecuted = true
+				t.Errorf("RunGateOnly() gate executor called when disabled")
 				return nil, nil
 			},
-		},
-		Containers: crt,
-	}
-
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
+			assertResult: func(t *testing.T, result Result, crt *testContainerRuntime) {
+				t.Helper()
+				if crt.createCalled {
+					t.Errorf("RunGateOnly() should not create containers")
+				}
+				if result.BuildGate != nil {
+					t.Errorf("RunGateOnly() BuildGate metadata should be nil when disabled")
+				}
+				if result.ExitCode != 0 {
+					t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
+				}
 			},
 		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: false,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := RunGateOnly(context.Background(), runner, req)
-	if err != nil {
-		t.Fatalf("RunGateOnly() unexpected error: %v", err)
-	}
-
-	// Verify gate was NOT executed.
-	if gateExecuted {
-		t.Errorf("RunGateOnly() gate executor called when disabled")
-	}
-
-	// Verify container runtime was NOT invoked.
-	if crt.createCalled {
-		t.Errorf("RunGateOnly() should not create containers")
-	}
-
-	// Verify BuildGate metadata is nil when disabled.
-	if result.BuildGate != nil {
-		t.Errorf("RunGateOnly() BuildGate metadata should be nil when disabled")
-	}
-
-	// Verify ExitCode is 0.
-	if result.ExitCode != 0 {
-		t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
-	}
-}
-
-// TestRunGateOnly_GateFailure verifies that RunGateOnly returns ErrBuildGateFailed
-// when the gate validation fails, allowing callers to trigger healing.
-func TestRunGateOnly_GateFailure(t *testing.T) {
-	runner := &Runner{
-		Workspace: &testWorkspaceHydrator{},
-		Gate: &testGateExecutor{
+		{
+			name:        "gate failure",
+			gateEnabled: true,
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
-				// Simulate gate failure.
 				return &contracts.BuildGateStageMetadata{
 					StaticChecks: []contracts.BuildGateStaticCheckReport{
-						{
-							Tool:   "maven",
-							Passed: false,
-						},
+						{Tool: "maven", Passed: false},
 					},
 					LogsText: "[ERROR] BUILD FAILURE",
 				}, nil
 			},
-		},
-	}
-
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "maven:3-eclipse-temurin-17",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
+			wantErr: ErrBuildGateFailed,
+			assertResult: func(t *testing.T, result Result, crt *testContainerRuntime) {
+				t.Helper()
+				if result.BuildGate == nil {
+					t.Errorf("RunGateOnly() BuildGate metadata should be populated on gate failure")
+				} else if result.BuildGate.StaticChecks[0].Passed {
+					t.Errorf("RunGateOnly() BuildGate.StaticChecks[0].Passed = true, want false")
+				}
+				if result.Timings.BuildGateDuration == 0 {
+					t.Errorf("RunGateOnly() BuildGateDuration should be captured on gate failure")
+				}
+				if result.Timings.TotalDuration == 0 {
+					t.Errorf("RunGateOnly() TotalDuration should be captured on gate failure")
+				}
 			},
 		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
-	}
-
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
-
-	result, err := RunGateOnly(context.Background(), runner, req)
-
-	// Should return error when gate fails.
-	if err == nil {
-		t.Fatalf("RunGateOnly() expected error for failed gate, got nil")
-	}
-
-	// Error should wrap ErrBuildGateFailed sentinel.
-	if !errors.Is(err, ErrBuildGateFailed) {
-		t.Errorf("RunGateOnly() error should wrap ErrBuildGateFailed: %v", err)
-	}
-
-	// BuildGate metadata should be populated even on failure.
-	if result.BuildGate == nil {
-		t.Errorf("RunGateOnly() BuildGate metadata should be populated on gate failure")
-	} else if result.BuildGate.StaticChecks[0].Passed {
-		t.Errorf("RunGateOnly() BuildGate.StaticChecks[0].Passed = true, want false")
-	}
-
-	// Timings should be captured even on early failure.
-	if result.Timings.BuildGateDuration == 0 {
-		t.Errorf("RunGateOnly() BuildGateDuration should be captured on gate failure")
-	}
-	if result.Timings.TotalDuration == 0 {
-		t.Errorf("RunGateOnly() TotalDuration should be captured on gate failure")
-	}
-}
-
-// TestRunGateOnly_NilGate verifies that RunGateOnly succeeds without error
-// when no gate executor is configured.
-func TestRunGateOnly_NilGate(t *testing.T) {
-	runner := &Runner{
-		Workspace: &testWorkspaceHydrator{},
-		Gate:      nil, // No gate executor configured.
-	}
-
-	manifest := contracts.StepManifest{
-		ID:    types.StepID("test-step"),
-		Name:  "Test Step",
-		Image: "test:latest",
-		Inputs: []contracts.StepInput{
-			{
-				Name:        "source",
-				MountPath:   "/workspace",
-				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: types.CID("bafytest123"),
+		{
+			name:        "nil gate executor",
+			gateEnabled: true,
+			nilGate:     true,
+			assertResult: func(t *testing.T, result Result, crt *testContainerRuntime) {
+				t.Helper()
+				if result.BuildGate != nil {
+					t.Errorf("RunGateOnly() BuildGate should be nil when gate executor is nil")
+				}
 			},
 		},
-		Gate: &contracts.StepGateSpec{
-			Enabled: true,
-		},
 	}
 
-	req := Request{
-		Manifest:  manifest,
-		Workspace: "/tmp/test-workspace",
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crt := &testContainerRuntime{}
 
-	result, err := RunGateOnly(context.Background(), runner, req)
-	if err != nil {
-		t.Fatalf("RunGateOnly() unexpected error with nil gate: %v", err)
-	}
+			runner := &Runner{
+				Workspace:  &testWorkspaceHydrator{},
+				Containers: crt,
+			}
+			if !tt.nilGate {
+				runner.Gate = &testGateExecutor{executeFn: tt.executeFn}
+			}
 
-	// BuildGate should be nil when no executor is configured.
-	if result.BuildGate != nil {
-		t.Errorf("RunGateOnly() BuildGate should be nil when gate executor is nil")
+			manifest := newGateTestManifest(tt.gateEnabled)
+			if tt.name == "nil gate executor" {
+				manifest.Image = "test:latest"
+			}
+
+			result, err := RunGateOnly(context.Background(), runner, newGateTestRequest(manifest))
+
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Fatalf("RunGateOnly() expected error, got nil")
+				}
+				if !errors.Is(err, tt.wantErr) {
+					t.Errorf("RunGateOnly() error should wrap %v: %v", tt.wantErr, err)
+				}
+			} else if err != nil {
+				t.Fatalf("RunGateOnly() unexpected error: %v", err)
+			}
+
+			tt.assertResult(t, result, crt)
+		})
 	}
 }

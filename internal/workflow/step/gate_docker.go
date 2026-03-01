@@ -42,10 +42,15 @@ import (
 	units "github.com/docker/go-units"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 	"github.com/moby/moby/client"
 )
+
+// fileExists returns true when path exists and is not a directory.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
 
 const (
 	buildGateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
@@ -232,16 +237,16 @@ func dockerHostSocketPathFromEnv(env map[string]string) string {
 func buildGateDefaultImagesFilePath() string {
 	goModuleFile := "go." + "mo" + "d"
 	installed := "/etc/ploy/gates/build-gate-images.yaml"
-	if fsutil.FileExists(installed) {
+	if fileExists(installed) {
 		return installed
 	}
 	wd, err := os.Getwd()
 	if err == nil {
 		dir := wd
 		for {
-			if fsutil.FileExists(filepath.Join(dir, goModuleFile)) {
+			if fileExists(filepath.Join(dir, goModuleFile)) {
 				candidate := filepath.Join(dir, DefaultMappingPath)
-				if fsutil.FileExists(candidate) {
+				if fileExists(candidate) {
 					return candidate
 				}
 				break
@@ -363,7 +368,7 @@ func hasGradleWrapperSpecified(workspace string) bool {
 	if workspace == "" {
 		return false
 	}
-	return fsutil.FileExists(filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties"))
+	return fileExists(filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties"))
 }
 
 // --- Image selection helpers (merged from gate_docker_image_selection.go) ---

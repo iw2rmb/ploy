@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+func copyStackExp(e StackExpectation) *StackExpectation { return &e }
+
+// Shared test expectation values used across multiple test cases.
+var (
+	javaMaven17Exp = StackExpectation{Language: "java", Tool: "maven", Release: "17"}
+	javaMaven11Exp = StackExpectation{Language: "java", Tool: "maven", Release: "11"}
+)
+
 // TestStackExpectation_IsEmpty tests empty detection.
 func TestStackExpectation_IsEmpty(t *testing.T) {
 	tests := []struct {
@@ -34,7 +42,7 @@ func TestStackExpectation_IsEmpty(t *testing.T) {
 		},
 		{
 			name:      "all set",
-			exp:       StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			exp:       javaMaven17Exp,
 			wantEmpty: false,
 		},
 	}
@@ -64,8 +72,8 @@ func TestStackExpectation_Equal(t *testing.T) {
 		},
 		{
 			name: "identical full",
-			a:    StackExpectation{Language: "java", Tool: "maven", Release: "17"},
-			b:    StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+			a:    javaMaven17Exp,
+			b:    javaMaven17Exp,
 			want: true,
 		},
 		{
@@ -249,11 +257,11 @@ func TestStackGateSpec_RoundTrip(t *testing.T) {
 			Stack: &StackGateSpec{
 				Inbound: &StackGatePhaseSpec{
 					Enabled: true,
-					Expect:  &StackExpectation{Language: "java", Tool: "maven", Release: "11"},
+					Expect:  copyStackExp(javaMaven11Exp),
 				},
 				Outbound: &StackGatePhaseSpec{
 					Enabled: true,
-					Expect:  &StackExpectation{Language: "java", Tool: "maven", Release: "17"},
+					Expect:  copyStackExp(javaMaven17Exp),
 				},
 			},
 		}},
