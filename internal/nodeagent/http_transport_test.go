@@ -103,4 +103,3 @@ func TestBearerTokenTransportHandlesNilHeaderMap(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 }
-

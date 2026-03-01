@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	PrepTargetStatusPassed       = "passed"
-	PrepTargetStatusFailed       = "failed"
-	PrepTargetStatusNotAttempted = "not_attempted"
-	PrepRunnerModeSimple         = "simple"
-	PrepRunnerModeComplex        = "complex"
-	GateProfileDockerModeNone           = "none"
-	GateProfileDockerModeHostSocket     = "host_socket"
-	GateProfileDockerModeTCP            = "tcp"
+	PrepTargetStatusPassed          = "passed"
+	PrepTargetStatusFailed          = "failed"
+	PrepTargetStatusNotAttempted    = "not_attempted"
+	PrepRunnerModeSimple            = "simple"
+	PrepRunnerModeComplex           = "complex"
+	GateProfileDockerModeNone       = "none"
+	GateProfileDockerModeHostSocket = "host_socket"
+	GateProfileDockerModeTCP        = "tcp"
 
 	GateProfileDockerHostEnv       = "DOCKER_HOST"
 	GateProfileDockerAPIVersionEnv = "DOCKER_API_VERSION"
