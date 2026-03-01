@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +16,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+type transientGetRunStore struct {
+	*mockStore
+	failCount int
+	err       error
+	calls     int
+}
+
+func (s *transientGetRunStore) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
+	s.calls++
+	if s.calls <= s.failCount {
+		s.mockStore.getRunCalled = true
+		s.mockStore.getRunParams = id.String()
+		return store.Run{}, s.err
+	}
+	return s.mockStore.GetRun(ctx, id)
+}
 
 // ===== Side Effects & Orchestration Tests =====
 // These tests verify orchestration behavior when jobs complete:
@@ -448,6 +467,87 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	}
 	if st.updateJobNextIDParams[0].ID != f.Job.ID || st.updateJobNextIDParams[0].NextID == nil || *st.updateJobNextIDParams[0].NextID != heal.ID {
 		t.Fatalf("expected failed job rewired to heal")
+	}
+}
+
+func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	repoID := domaintypes.NewMigRepoID()
+	specID := domaintypes.NewSpecID()
+	f.Job.RepoID = repoID
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	f.Job.Meta = []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`)
+
+	specBytes, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": 1,
+						"image":   "migs-codex:latest",
+					},
+				},
+			},
+			"router": map[string]any{
+				"image": "migs-router:latest",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal spec: %v", err)
+	}
+
+	successor := store.Job{
+		ID:          domaintypes.NewJobID(),
+		RunID:       f.RunID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		Name:        "mig-0",
+		Status:      store.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod.String(),
+		Meta:        []byte(`{}`),
+	}
+	f.Job.NextID = &successor.ID
+
+	base := &mockStore{
+		getRunResult: store.Run{
+			ID:     f.RunID,
+			SpecID: specID,
+			Status: store.RunStatusStarted,
+		},
+		getJobResult:                   f.Job,
+		getSpecResult:                  store.Spec{ID: specID, Spec: specBytes},
+		listJobsByRunResult:            []store.Job{f.Job, successor},
+		listJobsByRunRepoAttemptResult: []store.Job{f.Job, successor},
+	}
+	st := &transientGetRunStore{
+		mockStore: base,
+		failCount: 1,
+		err:       errors.New("transient get run failure"),
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":    "Fail",
+		"exit_code": 1,
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.calls < 2 {
+		t.Fatalf("expected run lookup retry after transient failure, calls=%d", st.calls)
+	}
+	if base.createJobCallCount != 2 {
+		t.Fatalf("expected healing insertion to create 2 jobs after run lookup retry, got %d", base.createJobCallCount)
 	}
 }
 

@@ -1390,6 +1390,8 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 
 - Enriched fields may be empty for events not tied to a specific job (e.g.,
   hub-generated system events) or when context is unavailable.
+- The server caches job enrichment context in a bounded in-memory LRU cache to
+  avoid unbounded growth in long-running processes.
 - `next_id` in logs is optional metadata and does not drive scheduler ordering.
 - CLI consumers (`ploy run logs`) use the enriched fields
   to display contextual information in structured output format.

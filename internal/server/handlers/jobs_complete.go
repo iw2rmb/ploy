@@ -250,11 +250,42 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			"stats_size", len(statsBytes),
 		)
 
-		// Fetch the run for post-completion processing.
-		run, err := st.GetRun(ctx, runID)
-		if err != nil {
-			// Log error but don't fail the job completion (job is already marked complete).
-			slog.Error("complete job: get run failed", "job_id", jobID, "run_id", runID, "err", err)
+		// Load run details only for run-dependent follow-up operations (healing insertion
+		// and run-level terminal reconciliation). Other side effects must not be gated
+		// by run lookup failures.
+		var cachedRun store.Run
+		hasCachedRun := false
+		loadRunForPostCompletion := func(purpose string) (store.Run, bool) {
+			if hasCachedRun {
+				return cachedRun, true
+			}
+			run, runErr := st.GetRun(ctx, runID)
+			if runErr == nil {
+				cachedRun = run
+				hasCachedRun = true
+				return run, true
+			}
+
+			// Retry once for transient read failures before giving up.
+			slog.Warn("complete job: get run failed, retrying",
+				"job_id", jobID,
+				"run_id", runID,
+				"purpose", purpose,
+				"err", runErr,
+			)
+			run, retryErr := st.GetRun(ctx, runID)
+			if retryErr != nil {
+				slog.Error("complete job: get run failed",
+					"job_id", jobID,
+					"run_id", runID,
+					"purpose", purpose,
+					"err", retryErr,
+				)
+				return store.Run{}, false
+			}
+			cachedRun = run
+			hasCachedRun = true
+			return run, true
 		}
 
 		// When a job fails, either:
@@ -263,7 +294,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 		// - If it is a non-gate job (mig/heal), cancel remaining non-terminal jobs so the run
 		//   can reach a terminal state instead of leaving jobs stranded.
 		// v1 uses Fail instead of failed.
-		if jobStatus == store.JobStatusFail && err == nil {
+		if jobStatus == store.JobStatusFail {
 			if errMsg := formatExit137Error(job.Name, req.ExitCode); errMsg != nil {
 				if updateErr := st.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
 					RunID:     job.RunID,
@@ -310,12 +341,15 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 						)
 					}
 				}
-				if healErr := maybeCreateHealingJobs(ctx, st, bp, run, job); healErr != nil {
-					slog.Error("complete job: failed to create healing jobs",
-						"job_id", jobID,
-						"next_id", job.NextID,
-						"err", healErr,
-					)
+				run, ok := loadRunForPostCompletion("healing insertion")
+				if ok {
+					if healErr := maybeCreateHealingJobs(ctx, st, bp, run, job); healErr != nil {
+						slog.Error("complete job: failed to create healing jobs",
+							"job_id", jobID,
+							"next_id", job.NextID,
+							"err", healErr,
+						)
+					}
 				}
 			default:
 				if err := cancelRemainingJobsAfterFailure(ctx, st, job); err != nil {
@@ -331,7 +365,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 		// When a job is cancelled (not by explicit run cancel), ensure the repo attempt
 		// reaches a terminal state by cancelling remaining jobs after this step.
 		// This is critical for policy-driven cancellations (e.g., stack detection required).
-		if jobStatus == store.JobStatusCancelled && err == nil {
+		if jobStatus == store.JobStatusCancelled {
 			jobType := domaintypes.JobType(job.JobType)
 			if jobType.Validate() == nil && jobType == domaintypes.JobTypeMR {
 				// MR jobs are best-effort and must not affect run-level progression.
@@ -385,7 +419,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 		// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 		jobJobType := domaintypes.JobType(job.JobType)
 		isMRJob := jobJobType.Validate() == nil && jobJobType == domaintypes.JobTypeMR
-		if err == nil && !isMRJob {
+		if !isMRJob {
 			// Update run_repos.status if all jobs for this repo attempt are terminal.
 			repoUpdated, repoErr := maybeUpdateRunRepoStatus(ctx, st, job.RunID, job.RepoID, job.Attempt)
 			if repoErr != nil {
@@ -400,12 +434,15 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			// If the repo reached terminal state, check if the run should transition to Finished.
 			// runs.status becomes Finished when all repos are terminal.
 			if repoUpdated {
-				if completeErr := maybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run); completeErr != nil {
-					slog.Error("complete job: failed to check run completion",
-						"job_id", jobID,
-						"next_id", job.NextID,
-						"err", completeErr,
-					)
+				run, ok := loadRunForPostCompletion("run completion reconciliation")
+				if ok {
+					if completeErr := maybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run); completeErr != nil {
+						slog.Error("complete job: failed to check run completion",
+							"job_id", jobID,
+							"next_id", job.NextID,
+							"err", completeErr,
+						)
+					}
 				}
 			}
 		}
@@ -417,7 +454,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 		// We use the typed statsPayload.MRURL() accessor instead of map[string]any casting.
 		// Note: jobJobType and isMRJob were already computed above for repo-scoped progression.
 		mrURL := statsPayload.MRURL()
-		if err == nil && mrURL != "" && isMRJob {
+		if mrURL != "" && isMRJob {
 			if updateErr := st.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
 				ID:    runID,
 				MrUrl: mrURL,

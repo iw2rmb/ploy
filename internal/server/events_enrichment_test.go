@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -316,5 +317,80 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	// Enriched fields should be empty due to lookup failure.
 	if !rec.NodeID.IsZero() {
 		t.Errorf("node_id should be empty after lookup failure, got %q", rec.NodeID)
+	}
+}
+
+func TestStorage_LogEnrichmentJobContextCacheEvictsLRU(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	jobID1 := domaintypes.NewJobID()
+	jobID2 := domaintypes.NewJobID()
+	jobID3 := domaintypes.NewJobID()
+
+	var (
+		mu       sync.Mutex
+		getCalls = make(map[domaintypes.JobID]int)
+	)
+	mock := &mockStore{
+		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
+			mu.Lock()
+			getCalls[id]++
+			mu.Unlock()
+			return store.Job{
+				ID:      id,
+				RunID:   runID,
+				Name:    "job",
+				JobType: "mig",
+				NodeID:  &nodeID,
+				Meta:    []byte(`{}`),
+			}, nil
+		},
+	}
+
+	svc, err := NewEventsService(EventsOptions{
+		BufferSize:   4,
+		HistorySize:  8,
+		Store:        mock,
+		JobCacheSize: 2,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	gzippedLog := gzipData(t, "cached line\n")
+	ctx := context.Background()
+	publish := func(jobID domaintypes.JobID) {
+		t.Helper()
+		logRow := store.Log{
+			ID:        1,
+			RunID:     runID,
+			JobID:     &jobID,
+			ChunkNo:   1,
+			DataSize:  int64(len(gzippedLog)),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		}
+		if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
+			t.Fatalf("CreateAndPublishLog failed for job %s: %v", jobID, err)
+		}
+	}
+
+	publish(jobID1)
+	publish(jobID1) // cache hit
+	publish(jobID2)
+	publish(jobID3) // evicts least-recently-used jobID1
+	publish(jobID1) // cache miss after eviction
+
+	mu.Lock()
+	defer mu.Unlock()
+	if getCalls[jobID1] != 2 {
+		t.Fatalf("expected GetJob calls for job1 to be 2 after eviction, got %d", getCalls[jobID1])
+	}
+	if getCalls[jobID2] != 1 {
+		t.Fatalf("expected GetJob calls for job2 to be 1, got %d", getCalls[jobID2])
+	}
+	if getCalls[jobID3] != 1 {
+		t.Fatalf("expected GetJob calls for job3 to be 1, got %d", getCalls[jobID3])
 	}
 }

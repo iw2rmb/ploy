@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -19,12 +20,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const defaultEventsJobCacheSize = 4096
+
 // EventsOptions configures the events service.
 type EventsOptions struct {
 	// BufferSize controls the per-subscriber channel size.
 	BufferSize int
 	// HistorySize bounds the number of events retained for resumption.
 	HistorySize int
+	// JobCacheSize bounds the in-memory job context cache used for log enrichment.
+	// Zero applies the default size.
+	JobCacheSize int
 	// Logger for service diagnostics (optional).
 	Logger *slog.Logger
 	// Store for database persistence (optional; if nil, persistence methods will fail).
@@ -37,7 +43,73 @@ type EventsService struct {
 	hub      *logstream.Hub
 	store    store.Store
 	logger   *slog.Logger
-	jobCache sync.Map // domaintypes.JobID → eventsJobContext
+	jobCache *eventsJobContextCache
+}
+
+type jobContextCacheEntry struct {
+	jobID domaintypes.JobID
+	ctx   eventsJobContext
+}
+
+type eventsJobContextCache struct {
+	mu         sync.Mutex
+	maxEntries int
+	entries    map[domaintypes.JobID]*list.Element
+	lru        *list.List
+}
+
+func newEventsJobContextCache(maxEntries int) *eventsJobContextCache {
+	return &eventsJobContextCache{
+		maxEntries: maxEntries,
+		entries:    make(map[domaintypes.JobID]*list.Element, maxEntries),
+		lru:        list.New(),
+	}
+}
+
+func (c *eventsJobContextCache) Get(jobID domaintypes.JobID) (eventsJobContext, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	elem, ok := c.entries[jobID]
+	if !ok {
+		return eventsJobContext{}, false
+	}
+
+	c.lru.MoveToFront(elem)
+	entry := elem.Value.(jobContextCacheEntry)
+	return entry.ctx, true
+}
+
+func (c *eventsJobContextCache) Set(jobID domaintypes.JobID, ctx eventsJobContext) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if elem, ok := c.entries[jobID]; ok {
+		elem.Value = jobContextCacheEntry{
+			jobID: jobID,
+			ctx:   ctx,
+		}
+		c.lru.MoveToFront(elem)
+		return
+	}
+
+	elem := c.lru.PushFront(jobContextCacheEntry{
+		jobID: jobID,
+		ctx:   ctx,
+	})
+	c.entries[jobID] = elem
+
+	if c.lru.Len() <= c.maxEntries {
+		return
+	}
+
+	last := c.lru.Back()
+	if last == nil {
+		return
+	}
+	evicted := last.Value.(jobContextCacheEntry)
+	delete(c.entries, evicted.jobID)
+	c.lru.Remove(last)
 }
 
 // NewEventsService constructs a new events service.
@@ -47,6 +119,13 @@ func NewEventsService(opts EventsOptions) (*EventsService, error) {
 	}
 	if opts.HistorySize < 0 {
 		return nil, errors.New("events: history size must be non-negative")
+	}
+	if opts.JobCacheSize < 0 {
+		return nil, errors.New("events: job cache size must be non-negative")
+	}
+	jobCacheSize := opts.JobCacheSize
+	if jobCacheSize == 0 {
+		jobCacheSize = defaultEventsJobCacheSize
 	}
 
 	logger := opts.Logger
@@ -60,9 +139,10 @@ func NewEventsService(opts EventsOptions) (*EventsService, error) {
 	})
 
 	return &EventsService{
-		hub:    hub,
-		store:  opts.Store,
-		logger: logger,
+		hub:      hub,
+		store:    opts.Store,
+		logger:   logger,
+		jobCache: newEventsJobContextCache(jobCacheSize),
 	}, nil
 }
 
@@ -255,8 +335,8 @@ func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.J
 	}
 
 	// Check cache first to avoid redundant DB lookups during log bursts.
-	if cached, ok := s.jobCache.Load(*jobID); ok {
-		return cached.(eventsJobContext)
+	if cached, ok := s.jobCache.Get(*jobID); ok {
+		return cached
 	}
 
 	// If store is not configured, return empty context (log-only mode).
@@ -304,7 +384,7 @@ func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.J
 		JobID:   jid,
 		JobType: mt,
 	}
-	s.jobCache.Store(*jobID, jctx)
+	s.jobCache.Set(*jobID, jctx)
 	return jctx
 }
 
