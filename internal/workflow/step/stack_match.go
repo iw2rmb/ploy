@@ -30,24 +30,27 @@ func matchStack(obs *stackdetect.Observation, expect *contracts.StackExpectation
 	if expect == nil {
 		return true, ""
 	}
+	obsRelease := ""
+	if obs.Release != nil {
+		obsRelease = *obs.Release
+	}
+	if contracts.StackFieldsMatch(obs.Language, obs.Tool, obsRelease, expect.Language, expect.Tool, expect.Release) {
+		return true, ""
+	}
+	// Build detailed mismatch report for diagnostics.
 	var mismatches []string
-	if expect.Language != "" && obs.Language != expect.Language {
+	if expect.Language != "" && !contracts.StackFieldsMatch(obs.Language, "", "", expect.Language, "", "") {
 		mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expect.Language, obs.Language))
 	}
-	if expect.Tool != "" && obs.Tool != expect.Tool {
+	if expect.Tool != "" && !contracts.StackFieldsMatch("", obs.Tool, "", "", expect.Tool, "") {
 		mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expect.Tool, obs.Tool))
 	}
-	if expect.Release != "" {
+	if expect.Release != "" && (obs.Release == nil || !contracts.StackFieldsMatch("", "", obsRelease, "", "", expect.Release)) {
 		detected := "<nil>"
 		if obs.Release != nil {
 			detected = *obs.Release
 		}
-		if obs.Release == nil || *obs.Release != expect.Release {
-			mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
-		}
-	}
-	if len(mismatches) == 0 {
-		return true, ""
+		mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
 	}
 	msg := "stack mismatch: " + strings.Join(mismatches, "; ")
 	if len(obs.Evidence) > 0 {

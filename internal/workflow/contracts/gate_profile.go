@@ -150,21 +150,20 @@ func GateProfileStackMatches(profile *GateProfile, language, tool, release strin
 	if profile == nil {
 		return false
 	}
-	pLang := strings.TrimSpace(strings.ToLower(profile.Stack.Language))
-	pTool := strings.TrimSpace(strings.ToLower(profile.Stack.Tool))
+	pLang := strings.TrimSpace(profile.Stack.Language)
+	pTool := strings.TrimSpace(profile.Stack.Tool)
 	if pLang == "" || pTool == "" {
 		return false
 	}
-	if pLang != strings.TrimSpace(strings.ToLower(language)) {
+	if !StackFieldsMatch(language, tool, "", pLang, pTool, "") {
 		return false
 	}
-	if pTool != strings.TrimSpace(strings.ToLower(tool)) {
-		return false
-	}
-	pRelease := strings.TrimSpace(profile.Stack.Release)
+	// Release has special semantics here: empty input release always matches,
+	// but a non-empty input release requires the profile to have a release.
 	if strings.TrimSpace(release) == "" {
 		return true
 	}
+	pRelease := strings.TrimSpace(profile.Stack.Release)
 	if pRelease == "" {
 		return false
 	}
@@ -213,7 +212,7 @@ func GateProfileGateOverrideForJobType(
 	if err != nil {
 		return "", nil, err
 	}
-	override.Env = mergePrepEnvs(override.Env, runtimeEnv)
+	override.Env = MergeEnv(override.Env, runtimeEnv)
 	return phase, override, nil
 }
 
@@ -245,19 +244,8 @@ func gateProfileTargetToBuildGateOverride(target *GateProfileTarget) (*BuildGate
 	}
 	return &BuildGateProfileOverride{
 		Command: CommandSpec{Shell: cmd},
-		Env:     copyGateProfileEnv(target.Env),
+		Env:     CopyEnv(target.Env),
 	}, nil
-}
-
-func copyGateProfileEnv(env map[string]string) map[string]string {
-	if len(env) == 0 {
-		return nil
-	}
-	out := make(map[string]string, len(env))
-	for k, v := range env {
-		out[k] = v
-	}
-	return out
 }
 
 func validateGateProfileRuntime(runtime *GateProfileRuntime) error {
@@ -324,20 +312,6 @@ func gateProfileRuntimeGateEnv(runtime *GateProfileRuntime) (map[string]string, 
 	default:
 		return nil, fmt.Errorf("gate_profile.runtime.docker.mode: invalid value %q", runtime.Docker.Mode)
 	}
-}
-
-func mergePrepEnvs(base map[string]string, override map[string]string) map[string]string {
-	if len(base) == 0 && len(override) == 0 {
-		return nil
-	}
-	out := copyGateProfileEnv(base)
-	if out == nil {
-		out = map[string]string{}
-	}
-	for k, v := range override {
-		out[k] = v
-	}
-	return out
 }
 
 func IsSupportedGateProfileArtifactSchema(schema string) bool {

@@ -155,7 +155,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	limitDisk, storageSizeOpt := parseBytesLimitEnv(buildGateLimitDiskEnv)
 	// Copy env from gate spec and apply prep override env (if present).
 	// Prep override keys win on conflicts.
-	envCopy := mergeGateEnvs(spec.Env, plan.env)
+	envCopy := contracts.MergeEnv(spec.Env, plan.env)
 	mounts = appendDockerHostSocketMount(mounts, envCopy)
 	specC := ContainerSpec{Image: plan.image, Command: plan.cmd, WorkingDir: "/workspace", Mounts: mounts,
 		Env:              envCopy,
@@ -191,21 +191,6 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		meta.StackGate = plan.stackGate
 	}
 	return meta, nil
-}
-
-func mergeGateEnvs(base map[string]string, override map[string]string) map[string]string {
-	if len(base) == 0 && len(override) == 0 {
-		return nil
-	}
-
-	out := make(map[string]string, len(base)+len(override))
-	for k, v := range base {
-		out[k] = v
-	}
-	for k, v := range override {
-		out[k] = v
-	}
-	return out
 }
 
 func appendDockerHostSocketMount(mounts []ContainerMount, env map[string]string) []ContainerMount {
