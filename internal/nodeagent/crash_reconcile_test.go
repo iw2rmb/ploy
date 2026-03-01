@@ -3,7 +3,6 @@ package nodeagent
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -108,24 +106,8 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
 	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager() error = %v", err)
-	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
-	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
-		InitialInterval: types.Duration(10 * time.Millisecond),
-		MaxInterval:     types.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	})
+	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeCrashReconcileDockerClient{
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
@@ -158,8 +140,7 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 220*time.Millisecond)
 	defer cancel()
 
-	err = claimer.Start(ctx)
-	if !errors.Is(err, context.DeadlineExceeded) {
+	if err := claimer.Start(ctx); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Start() error = %v, want context deadline exceeded", err)
 	}
 
@@ -364,18 +345,6 @@ func TestCrashReconcile_SkipsStaleTerminalContainers_Contract(t *testing.T) {
 	}
 }
 
-func inspectWithState(running bool, status containertypes.ContainerState, finishedAt string) client.ContainerInspectResult {
-	return client.ContainerInspectResult{
-		Container: containertypes.InspectResponse{
-			State: &containertypes.State{
-				Running:    running,
-				Status:     status,
-				FinishedAt: finishedAt,
-			},
-		},
-	}
-}
-
 func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *testing.T) {
 	t.Parallel()
 
@@ -435,15 +404,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	}
 
 	controller := &mockRunController{}
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager() error = %v", err)
-	}
+	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
@@ -516,15 +477,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 	}
 
 	controller := &mockRunController{}
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager() error = %v", err)
-	}
+	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
@@ -617,15 +570,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	}
 
 	controller := &mockRunController{}
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager() error = %v", err)
-	}
+	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
@@ -656,13 +601,4 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	if controller.releaseCalls != 2 {
 		t.Fatalf("ReleaseSlot calls = %d, want 2", controller.releaseCalls)
 	}
-}
-
-func multiplexedDockerLogs(payload string, stream stdcopy.StdType) []byte {
-	data := []byte(payload)
-	frame := make([]byte, 8+len(data))
-	frame[0] = byte(stream)
-	binary.BigEndian.PutUint32(frame[4:8], uint32(len(data)))
-	copy(frame[8:], data)
-	return frame
 }

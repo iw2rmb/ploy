@@ -278,8 +278,8 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 	if _, err := stdcopy.StdCopy(&stdoutBuf, &stderrBuf, reader); err != nil {
 		// Fall back to raw bytes on demux errors (TTY mode, corruption).
 		// The reader may be partially consumed, so ReadAll gets remaining data.
-		raw, _ := io.ReadAll(reader)
-		return raw, nil
+		raw, readErr := io.ReadAll(reader)
+		return raw, readErr
 	}
 
 	// Combine stdout then stderr for consumers expecting plain text.

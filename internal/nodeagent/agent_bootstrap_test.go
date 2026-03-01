@@ -41,10 +41,7 @@ func TestRequestCertificate_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-	}
+	cfg := newTestConfig(server.URL)
 
 	agent := &Agent{cfg: cfg}
 	ctx := context.Background()
@@ -87,10 +84,7 @@ func TestRequestCertificate_RetryOnNetworkError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-	}
+	cfg := newTestConfig(server.URL)
 
 	agent := &Agent{cfg: cfg}
 	ctx := context.Background()
@@ -126,10 +120,7 @@ func TestRequestCertificate_RetryExhaustion(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-	}
+	cfg := newTestConfig(server.URL)
 
 	agent := &Agent{cfg: cfg}
 	ctx := context.Background()
@@ -173,10 +164,7 @@ func TestRequestCertificate_BackoffProgression(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-	}
+	cfg := newTestConfig(server.URL)
 
 	agent := &Agent{cfg: cfg}
 	ctx := context.Background()
@@ -231,10 +219,7 @@ func TestRequestCertificate_ContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-	}
+	cfg := newTestConfig(server.URL)
 
 	agent := &Agent{cfg: cfg}
 
@@ -276,10 +261,7 @@ func TestRequestCertificate_BearerToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-	}
+	cfg := newTestConfig(server.URL)
 
 	agent := &Agent{cfg: cfg}
 	ctx := context.Background()
@@ -368,10 +350,7 @@ func TestRequestCertificate_Non200Status(t *testing.T) {
 			}))
 			defer server.Close()
 
-			cfg := Config{
-				ServerURL: server.URL,
-				NodeID:    testNodeID,
-			}
+			cfg := newTestConfig(server.URL)
 
 			agent := &Agent{cfg: cfg}
 			ctx := context.Background()

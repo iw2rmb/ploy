@@ -11,91 +11,11 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
 
 // Note: mockRunController is defined in handlers_test.go within the same package.
-
-type preClaimCleanupFunc func(context.Context) (bool, error)
-
-func (f preClaimCleanupFunc) EnsureCapacity(ctx context.Context) (bool, error) {
-	return f(ctx)
-}
-
-// TestClaimLoop_UnifiedQueue verifies that the claim loop polls the single unified
-// jobs queue (POST /v1/nodes/{id}/claim) and properly handles 204 No Content.
-// There is no separate Build Gate queue — all job types are claimed from the same endpoint.
-func TestClaimLoop_UnifiedQueue(t *testing.T) {
-	t.Parallel()
-
-	var mu sync.Mutex
-	var claimCount int
-
-	// Create test server that tracks claim attempts on the unified queue.
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		switch r.URL.Path {
-		case "/v1/nodes/" + testNodeID + "/claim":
-			// Track unified claim attempts; return 204 (no work available).
-			claimCount++
-			w.WriteHeader(http.StatusNoContent)
-		default:
-			t.Errorf("unexpected path: %s", r.URL.Path)
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer ts.Close()
-
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
-
-	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
-	installNoopStartupReconciler(claimer)
-
-	// Override backoff policy to speed up test.
-	testPolicy := backoff.Policy{
-		InitialInterval: types.Duration(10 * time.Millisecond),
-		MaxInterval:     types.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	}
-	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
-
-	// Run the claim loop briefly.
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_ = claimer.Start(ctx)
-	}()
-	wg.Wait()
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	// Verify claim was called at least once on the unified queue.
-	if claimCount == 0 {
-		t.Error("claim not called, expected at least 1 attempt on unified queue")
-	}
-}
 
 // TestClaimLoop_OnlyUnifiedEndpoint verifies that no separate Build Gate claim
 // endpoint is called — all jobs come from the single unified queue.
@@ -106,71 +26,30 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 	var unifiedClaims int
 	var unexpectedPaths []string
 
-	// Create test server that tracks all endpoint calls.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
 		defer mu.Unlock()
 
 		switch r.URL.Path {
 		case "/v1/nodes/" + testNodeID + "/claim":
-			// This is the only claim endpoint that should be called.
 			unifiedClaims++
 			w.WriteHeader(http.StatusNoContent)
 		default:
-			// Track any unexpected paths (e.g., buildgate/claim).
 			unexpectedPaths = append(unexpectedPaths, r.URL.Path)
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
 	defer ts.Close()
 
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
-
-	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
-	installNoopStartupReconciler(claimer)
-
-	// Override backoff policy to speed up test.
-	testPolicy := backoff.Policy{
-		InitialInterval: types.Duration(10 * time.Millisecond),
-		MaxInterval:     types.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	}
-	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
-
-	// Run the claim loop briefly.
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_ = claimer.Start(ctx)
-	}()
-	wg.Wait()
+	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
+	runClaimerUntil(t, claimer, 200*time.Millisecond)
 
 	mu.Lock()
 	defer mu.Unlock()
 
-	// Verify unified claim endpoint was called.
 	if unifiedClaims == 0 {
 		t.Error("unified claim endpoint not called")
 	}
-
-	// Verify no unexpected paths were called (e.g., buildgate/claim).
 	if len(unexpectedPaths) > 0 {
 		t.Errorf("unexpected paths called: %v", unexpectedPaths)
 	}
@@ -190,18 +69,8 @@ func TestClaimAndExecute_PreClaimCleanupBlocksClaim(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
 	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
+	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.preClaimCleanup = preClaimCleanupFunc(func(context.Context) (bool, error) {
 		return false, nil
 	})
@@ -238,18 +107,8 @@ func TestClaimAndExecute_PreClaimCleanupAllowsClaim(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{Enabled: false},
-		},
-	}
 	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
+	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.preClaimCleanup = preClaimCleanupFunc(func(context.Context) (bool, error) {
 		return true, nil
 	})
@@ -303,24 +162,7 @@ func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
-	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
-		InitialInterval: types.Duration(10 * time.Millisecond),
-		MaxInterval:     types.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	})
+	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeCrashReconcileDockerClient{
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
@@ -371,39 +213,26 @@ func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
 func TestClaimLoop_StartupReconcileFailureStopsClaimLoop(t *testing.T) {
 	t.Parallel()
 
-	var calledPaths []string
-	var mu sync.Mutex
+	rec := &callRecorder{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		calledPaths = append(calledPaths, r.URL.Path)
-		mu.Unlock()
+		rec.Record(r.URL.Path)
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer ts.Close()
 
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeCrashReconcileDockerClient{
 			listErr: context.DeadlineExceeded,
 		},
 	}
 
-	err = claimer.Start(context.Background())
+	err := claimer.Start(context.Background())
 	if err == nil {
 		t.Fatal("Start() error = nil, want startup reconciliation error")
 	}
-	if len(calledPaths) != 0 {
-		body, _ := json.Marshal(calledPaths)
+	if paths := rec.All(); len(paths) != 0 {
+		body, _ := json.Marshal(paths)
 		t.Fatalf("claim loop should not run when startup reconciliation fails, got paths: %s", string(body))
 	}
 }
@@ -411,17 +240,7 @@ func TestClaimLoop_StartupReconcileFailureStopsClaimLoop(t *testing.T) {
 func TestClaimLoop_StartupReconcileRunsOncePerProcess(t *testing.T) {
 	t.Parallel()
 
-	cfg := Config{
-		ServerURL: "http://127.0.0.1:8080",
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := &mockRunController{}
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer := setupClaimer(t, newTestConfig("http://127.0.0.1:8080"), &mockRunController{})
 
 	fakeDocker := &fakeCrashReconcileDockerClient{
 		listResult: client.ContainerListResult{},

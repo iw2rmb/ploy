@@ -288,8 +288,13 @@ func parseProperties(inner []byte) map[string]string {
 }
 
 // resolveValue resolves ${property} references in a value.
-// Returns an error if a placeholder cannot be resolved.
+// Returns an error if a placeholder cannot be resolved or if circular
+// references are detected.
 func resolveValue(value string, props map[string]string) (string, error) {
+	return resolveValueVisited(value, props, make(map[string]bool))
+}
+
+func resolveValueVisited(value string, props map[string]string, visited map[string]bool) (string, error) {
 	match := propertyRegex.FindStringSubmatch(value)
 	if match == nil {
 		// No placeholder, return as-is.
@@ -297,6 +302,14 @@ func resolveValue(value string, props map[string]string) (string, error) {
 	}
 
 	propName := match[1]
+	if visited[propName] {
+		return "", &DetectionError{
+			Reason:  "unknown",
+			Message: "circular property reference: " + propName,
+		}
+	}
+	visited[propName] = true
+
 	resolved, ok := props[propName]
 	if !ok {
 		return "", &DetectionError{
@@ -306,7 +319,7 @@ func resolveValue(value string, props map[string]string) (string, error) {
 	}
 
 	// Recursively resolve in case the value also contains a placeholder.
-	return resolveValue(resolved, props)
+	return resolveValueVisited(resolved, props, visited)
 }
 
 // isValidVersion checks if the version string is a valid integer.

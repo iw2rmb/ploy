@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 )
@@ -83,7 +84,7 @@ func TestBuildURLRejectsAbsoluteOrAuthorityPath(t *testing.T) {
 				t.Fatalf("BuildURL(%q, %q) expected error, got nil", base, tt.p)
 			}
 			const want = "path must not include scheme or host"
-			if !contains(err.Error(), want) {
+			if !strings.Contains(err.Error(), want) {
 				t.Fatalf("BuildURL(%q, %q) err = %q, want substring %q", base, tt.p, err.Error(), want)
 			}
 		})
@@ -224,7 +225,7 @@ func TestSendHeartbeatHandlesServerError(t *testing.T) {
 				t.Fatal("expected error, got nil")
 			}
 
-			if !contains(err.Error(), tt.wantErr) {
+			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("error = %v, want substring %q", err, tt.wantErr)
 			}
 		})

@@ -184,6 +184,36 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 	}
 }
 
+// TestRunGateStage_NilMetadata verifies that when the gate executor returns
+// (nil, nil), the gate stage treats it as a failure without panicking.
+func TestRunGateStage_NilMetadata(t *testing.T) {
+	runner := Runner{
+		Workspace: &testWorkspaceHydrator{},
+		Gate: &testGateExecutor{
+			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+				return nil, nil
+			},
+		},
+	}
+
+	manifest := newGateTestManifest(true)
+	req := newGateTestRequest(manifest)
+	meta, dur, err := runGateStage(context.Background(), &runner, req, "test gate")
+
+	if meta != nil {
+		t.Errorf("expected nil metadata, got %+v", meta)
+	}
+	if dur == 0 {
+		t.Error("expected non-zero duration")
+	}
+	if err == nil {
+		t.Fatal("expected error for nil gate metadata (gate not passed)")
+	}
+	if !errors.Is(err, ErrBuildGateFailed) {
+		t.Errorf("expected ErrBuildGateFailed, got %v", err)
+	}
+}
+
 // -----------------------------------------------------------------------------
 // RunGateOnly Tests
 // -----------------------------------------------------------------------------
