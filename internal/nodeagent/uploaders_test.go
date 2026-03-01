@@ -123,7 +123,7 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 				},
 			}
 
-			uploader, err := NewDiffUploader(cfg)
+			uploader, err := newBaseUploader(cfg)
 			if err != nil {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
@@ -178,7 +178,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 		},
 	}
 
-	uploader, err := NewDiffUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("failed to create uploader: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestDiffUploader_Compression(t *testing.T) {
 		},
 	}
 
-	uploader, err := NewDiffUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("failed to create uploader: %v", err)
 	}
@@ -349,7 +349,7 @@ func TestBearerToken_TrimsWhitespace(t *testing.T) {
 				},
 			}
 
-			uploader, err := NewDiffUploader(cfg)
+			uploader, err := newBaseUploader(cfg)
 			if err != nil {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
@@ -412,7 +412,7 @@ func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
 		ServerURL: server.URL,
 		NodeID:    testNodeID,
 	}
-	uploader, err := NewArtifactUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("create uploader: %v", err)
 	}
@@ -444,7 +444,7 @@ func TestArtifactUploader_UploadArtifact_EmptyPaths(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 		NodeID:    testNodeID,
 	}
-	uploader, err := NewArtifactUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("create uploader: %v", err)
 	}
@@ -475,7 +475,7 @@ func TestArtifactUploader_UploadArtifact_ServerError(t *testing.T) {
 		ServerURL: server.URL,
 		NodeID:    testNodeID,
 	}
-	uploader, err := NewArtifactUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("create uploader: %v", err)
 	}
@@ -829,7 +829,7 @@ func TestArtifactUploader_SizeCap(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 		NodeID:    testNodeID,
 	}
-	uploader, err := NewArtifactUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
 		t.Fatalf("create uploader: %v", err)
 	}

@@ -183,7 +183,11 @@ func MustBuildURL(base, p string) string {
 }
 
 const (
-	MaxUploadSize  = 10 << 20 // 10 MiB
+	MaxUploadSize = 10 << 20 // 10 MiB
+
+	// SoftUploadSize is the threshold at which log chunks are flushed. The 64-byte
+	// margin accounts for gzip footer overhead when finalizing a chunk, ensuring
+	// the closed stream stays under MaxUploadSize.
 	SoftUploadSize = MaxUploadSize - 64
 )
 

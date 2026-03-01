@@ -111,6 +111,26 @@ func newTestConfig(serverURL string) Config {
 	}
 }
 
+// newTestController creates a runController with all uploaders initialized,
+// suitable for tests that call upload methods.
+func newTestController(t *testing.T, cfg Config) *runController {
+	t.Helper()
+	uploader, err := newBaseUploader(cfg)
+	if err != nil {
+		t.Fatalf("newBaseUploader: %v", err)
+	}
+	return &runController{
+		cfg:               cfg,
+		jobs:              make(map[types.JobID]*jobContext),
+		diffUploader:      uploader,
+		artifactUploader:  uploader,
+		statusUploader:    uploader,
+		jobImageNameSaver: uploader,
+		nodeEventUploader: uploader,
+		httpClient:        uploader.client,
+	}
+}
+
 // setupClaimer creates a ClaimManager ready for testing with noop pre-claim
 // cleanup, noop startup reconciler, and fast backoff policy.
 func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimManager {
@@ -119,7 +139,7 @@ func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimMana
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer.preClaimCleanup = nil // nil means always proceed
 	installNoopStartupReconciler(claimer)
 	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
 	return claimer
@@ -138,13 +158,6 @@ func runClaimerUntil(t *testing.T, claimer *ClaimManager, timeout time.Duration)
 		_ = claimer.Start(ctx)
 	}()
 	wg.Wait()
-}
-
-// preClaimCleanupFunc adapts a function into the preClaimCleaner interface.
-type preClaimCleanupFunc func(context.Context) (bool, error)
-
-func (f preClaimCleanupFunc) EnsureCapacity(ctx context.Context) (bool, error) {
-	return f(ctx)
 }
 
 // callRecorder is a thread-safe helper for tracking named call events in tests.

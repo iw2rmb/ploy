@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/nodeagent/git"
+	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -75,21 +77,13 @@ func TestBuildPushRemoteURL(t *testing.T) {
 }
 
 func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
-	// Swap in fakes and restore on exit.
-	origPusher := newPusher
-	origMRClient := newMRClient
-	defer func() {
-		newPusher = origPusher
-		newMRClient = origMRClient
-	}()
-
 	fakeP := &fakePusher{}
 	fakeMR := &fakeMRClient{url: "http://example/mr/1"}
-	newPusher = func() pusherIface { return fakeP }
-	newMRClient = func() mrCreator { return fakeMR }
 
-	// Minimal run controller.
-	r := &runController{}
+	r := &runController{
+		newPusher:   func() git.Pusher { return fakeP },
+		newMRClient: func() mrCreator { return fakeMR },
+	}
 	req := StartRunRequest{
 		RunID:        types.RunID("t-123"),
 		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
@@ -137,22 +131,14 @@ func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
 }
 
 func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
-	// Swap in fakes and restore on exit.
-	origPusher := newPusher
-	origMRClient := newMRClient
-	defer func() {
-		newPusher = origPusher
-		newMRClient = origMRClient
-	}()
-
 	fakeP := &fakePusher{}
 	fakeMR := &fakeMRClient{url: "http://example/mr/2"}
-	newPusher = func() pusherIface { return fakeP }
-	newMRClient = func() mrCreator { return fakeMR }
 
-	// Run with empty TargetRef to trigger defaulting logic.
 	runID := types.RunID("t-empty-target")
-	r := &runController{}
+	r := &runController{
+		newPusher:   func() git.Pusher { return fakeP },
+		newMRClient: func() mrCreator { return fakeMR },
+	}
 	req := StartRunRequest{
 		RunID:        runID,
 		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
@@ -191,23 +177,16 @@ func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
 }
 
 func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
-	// Swap in fakes and restore on exit.
-	origPusher := newPusher
-	origMRClient := newMRClient
-	defer func() {
-		newPusher = origPusher
-		newMRClient = origMRClient
-	}()
-
 	fakeP := &fakePusher{}
 	fakeMR := &fakeMRClient{url: "http://example/mr/3"}
-	newPusher = func() pusherIface { return fakeP }
-	newMRClient = func() mrCreator { return fakeMR }
 
 	runID := types.RunID("t-named-run")
 	runName := "batch-foo"
 
-	r := &runController{}
+	r := &runController{
+		newPusher:   func() git.Pusher { return fakeP },
+		newMRClient: func() mrCreator { return fakeMR },
+	}
 	req := StartRunRequest{
 		RunID:        runID,
 		Name:         runName,
@@ -247,16 +226,16 @@ func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
 }
 
 // fakes
-type fakePusher struct{ opts pushOptions }
+type fakePusher struct{ opts git.PushOptions }
 
-func (f *fakePusher) Push(_ context.Context, opts pushOptions) error { f.opts = opts; return nil }
+func (f *fakePusher) Push(_ context.Context, opts git.PushOptions) error { f.opts = opts; return nil }
 
 type fakeMRClient struct {
 	url string
-	req mrCreateReq
+	req gitlab.MRCreateRequest
 }
 
-func (f *fakeMRClient) CreateMR(_ context.Context, req mrCreateReq) (string, error) {
+func (f *fakeMRClient) CreateMR(_ context.Context, req gitlab.MRCreateRequest) (string, error) {
 	f.req = req
 	return f.url, nil
 }

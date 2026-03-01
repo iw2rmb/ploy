@@ -38,27 +38,10 @@ func shouldCreateMR(terminalStatus string, manifest contracts.StepManifest) bool
 	return false
 }
 
-// Abstraction seams for testing. These are narrow wrappers we can swap in tests.
-type (
-	// pusherIface aliases the git.Pusher interface for local indirection in tests.
-	pusherIface = git.Pusher
-	// pushOptions aliases git.PushOptions for test fakes without importing git.
-	pushOptions = git.PushOptions
-
-	// mrCreateReq is an alias for the GitLab MR create DTO.
-	mrCreateReq = gitlab.MRCreateRequest
-	// mrCreator captures just the CreateMR method used by this file.
-	mrCreator interface {
-		CreateMR(ctx context.Context, req gitlab.MRCreateRequest) (string, error)
-	}
-)
-
-var (
-	// newPusher is a factory function for creating git pushers.
-	// Indirection allows test mocking of git.NewPusher.
-	newPusher   = git.NewPusher
-	newMRClient = func() mrCreator { return gitlab.NewMRClient() }
-)
+// mrCreator captures just the CreateMR method used by this file.
+type mrCreator interface {
+	CreateMR(ctx context.Context, req gitlab.MRCreateRequest) (string, error)
+}
 
 // createMR pushes the branch and creates a GitLab merge request.
 // This method performs the following steps:
@@ -94,7 +77,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	}
 
 	// Extract project ID from repo URL.
-	projectID, err := extractProjectIDFromRepoURL(req.RepoURL.String())
+	projectID, err := gitlab.ExtractProjectIDFromURL(req.RepoURL.String())
 	if err != nil {
 		return "", fmt.Errorf("extract project id: %w", err)
 	}
@@ -117,7 +100,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 
 	// Create a commit with any workspace changes before pushing.
 	if committed, cerr := git.EnsureCommit(ctx, workspaceRoot, "ploy-bot", "ploy-bot@ploy.local", fmt.Sprintf("Ploy: apply changes for run %s", req.RunID)); cerr != nil {
-		slog.Error("git commit failed", "run_id", req.RunID, "error", cerr)
+		return "", fmt.Errorf("git commit: %w", cerr)
 	} else if !committed {
 		slog.Info("no changes detected; proceeding to push branch without commit", "run_id", req.RunID)
 	}
@@ -131,7 +114,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	}
 
 	// Push branch to origin using git push (Phase E).
-	pusher := newPusher()
+	pusher := r.newPusher()
 	pushOpts := git.PushOptions{
 		RepoDir:   workspaceRoot,
 		TargetRef: sourceBranch,
@@ -147,7 +130,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	}
 
 	// Create MR via GitLab API.
-	mrClient := newMRClient()
+	mrClient := r.newMRClient()
 	mrReq := gitlab.MRCreateRequest{
 		Domain:       gitlabDomain,
 		ProjectID:    projectID,
@@ -166,12 +149,6 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	}
 
 	return mrURL, nil
-}
-
-// extractProjectIDFromRepoURL extracts the URL-encoded project ID from a GitLab repo URL.
-// This delegates to the gitlab package's URL parsing logic to maintain consistency.
-func extractProjectIDFromRepoURL(repoURL string) (string, error) {
-	return gitlab.ExtractProjectIDFromURL(repoURL)
 }
 
 // buildPushRemoteURL returns the HTTPS remote used for pushing branches with PAT auth.

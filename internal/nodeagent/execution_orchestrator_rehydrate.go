@@ -10,6 +10,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
@@ -57,7 +58,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 
 	// Initialize git fetcher for repository hydration. The fetcher is responsible for
 	// reusing cached clones when PLOYD_CACHE_HOME is configured.
-	gitFetcher, err := r.createGitFetcher()
+	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
+		CacheDir: os.Getenv("PLOYD_CACHE_HOME"),
+	})
 	if err != nil {
 		return "", fmt.Errorf("create git fetcher: %w", err)
 	}
@@ -205,13 +208,6 @@ func (r *runController) uploadModDiffWithBaseline(
 			time.Duration(result.Timings.TotalDuration).Milliseconds(),
 		).
 		MustBuild()
-
-	// Ensure uploaders are initialized (lazy init for backward compatibility with tests).
-	// In production, uploaders are pre-initialized at agent startup.
-	if err := r.ensureUploaders(); err != nil {
-		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		slog.Error("failed to upload mig diff", "run_id", runID, "job_id", jobID, "error", err)

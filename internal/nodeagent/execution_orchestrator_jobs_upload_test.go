@@ -94,14 +94,14 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			}
 
 			// Initialize test infrastructure.
-			// Uploaders are lazily initialized by ensureUploaders() when needed.
+			// Uploaders are eagerly initialized; tests must set them explicitly.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller := &runController{cfg: cfg}
+			controller := newTestController(t, cfg)
 
 			typedOpts := RunOptions{
 				Artifacts: ArtifactOptions{
@@ -214,14 +214,14 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			}
 
 			// Initialize test infrastructure.
-			// Uploaders are lazily initialized by ensureUploaders() when needed.
+			// Uploaders are eagerly initialized; tests must set them explicitly.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller := &runController{cfg: cfg}
+			controller := newTestController(t, cfg)
 
 			// Execute upload.
 			ctx := context.Background()
@@ -288,14 +288,14 @@ func TestRunController_uploadStatus(t *testing.T) {
 			defer server.Close()
 
 			// Initialize test infrastructure.
-			// Uploaders are lazily initialized by ensureUploaders() when needed.
+			// Uploaders are eagerly initialized; tests must set them explicitly.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller := &runController{cfg: cfg}
+			controller := newTestController(t, cfg)
 
 			// Execute upload with job_id.
 			// v1 uses capitalized job status values: Success, Fail, Cancelled.
@@ -378,14 +378,14 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			defer server.Close()
 
 			// Initialize test infrastructure.
-			// Uploaders are lazily initialized by ensureUploaders() when needed.
+			// Uploaders are eagerly initialized; tests must set them explicitly.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller := &runController{cfg: cfg}
+			controller := newTestController(t, cfg)
 
 			phase := &types.RunStatsGatePhase{}
 
@@ -605,14 +605,14 @@ func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
 			}
 
 			// Initialize test infrastructure.
-			// Uploaders are lazily initialized by ensureUploaders() when needed.
+			// Uploaders are eagerly initialized; tests must set them explicitly.
 			cfg := Config{
 				ServerURL: server.URL,
 				NodeID:    testNodeID,
 				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 			}
 
-			controller := &runController{cfg: cfg}
+			controller := newTestController(t, cfg)
 
 			typedOpts := RunOptions{
 				Artifacts: ArtifactOptions{
@@ -682,7 +682,7 @@ func TestRunController_uploadConfiguredArtifacts_ResolvesOutPathDeterministicall
 		NodeID:    testNodeID,
 		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 	}
-	controller := &runController{cfg: cfg}
+	controller := newTestController(t, cfg)
 
 	typedOpts := RunOptions{
 		Artifacts: ArtifactOptions{

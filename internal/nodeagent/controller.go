@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/nodeagent/git"
 )
 
 const MaxConcurrency = 64
@@ -22,11 +24,22 @@ type runController struct {
 	jobs   map[types.JobID]*jobContext
 	jobSem chan struct{}
 
-	diffUploader      *DiffUploader
-	artifactUploader  *ArtifactUploader
+	// uploader is the shared HTTP uploader used for all upload operations.
+	// Individual fields exist for clarity at call sites but point to the same instance.
+	diffUploader      *baseUploader
+	artifactUploader  *baseUploader
 	statusUploader    *baseUploader
-	jobImageNameSaver *JobImageNameSaver
-	nodeEventUploader *NodeEventUploader
+	jobImageNameSaver *baseUploader
+	nodeEventUploader *baseUploader
+
+	// httpClient is the shared HTTP client for components created during job execution
+	// (e.g., log streamer). Created once at init to avoid duplicate TLS/token I/O.
+	httpClient *http.Client
+
+	// Factory functions for MR creation dependencies.
+	// Defaults are set in New(); tests can override.
+	newPusher   func() git.Pusher
+	newMRClient func() mrCreator
 }
 
 type jobContext struct {
@@ -94,51 +107,6 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 	}
 
 	go r.executeRun(runCtx, req)
-
-	return nil
-}
-
-// ensureUploaders lazily initializes the shared HTTP uploaders.
-func (r *runController) ensureUploaders() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	var err error
-
-	if r.diffUploader == nil {
-		r.diffUploader, err = NewDiffUploader(r.cfg)
-		if err != nil {
-			return fmt.Errorf("create diff uploader: %w", err)
-		}
-	}
-
-	if r.artifactUploader == nil {
-		r.artifactUploader, err = NewArtifactUploader(r.cfg)
-		if err != nil {
-			return fmt.Errorf("create artifact uploader: %w", err)
-		}
-	}
-
-	if r.statusUploader == nil {
-		r.statusUploader, err = newBaseUploader(r.cfg)
-		if err != nil {
-			return fmt.Errorf("create status uploader: %w", err)
-		}
-	}
-
-	if r.jobImageNameSaver == nil {
-		r.jobImageNameSaver, err = NewJobImageNameSaver(r.cfg)
-		if err != nil {
-			return fmt.Errorf("create job image name saver: %w", err)
-		}
-	}
-
-	if r.nodeEventUploader == nil {
-		r.nodeEventUploader, err = NewNodeEventUploader(r.cfg)
-		if err != nil {
-			return fmt.Errorf("create node event uploader: %w", err)
-		}
-	}
 
 	return nil
 }

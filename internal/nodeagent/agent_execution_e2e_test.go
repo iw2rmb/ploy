@@ -88,10 +88,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 
 		// Create the run controller with typed JobID keys.
-		rc := &runController{
-			cfg:  cfg,
-			jobs: make(map[types.JobID]*jobContext),
-		}
+		rc := newTestController(t, cfg)
 
 		// Create a simple StartRunRequest that will execute quickly.
 		// We use a tiny command that exits immediately to avoid long test runs.

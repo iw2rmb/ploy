@@ -79,7 +79,12 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 // Note: Returns true if a job was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
 func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
-	ok, err := c.preClaimCleanup.EnsureCapacity(ctx)
+	// Run pre-claim cleanup if configured; nil means always proceed.
+	ok := true
+	var err error
+	if c.preClaimCleanup != nil {
+		ok, err = c.preClaimCleanup(ctx)
+	}
 	if err != nil {
 		return false, err
 	}

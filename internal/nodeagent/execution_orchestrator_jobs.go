@@ -492,11 +492,6 @@ func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req Start
 		return
 	}
 
-	if err := r.ensureUploaders(); err != nil {
-		slog.Error("failed to initialize uploaders", "run_id", req.RunID, "error", err)
-		return
-	}
-
 	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, req.RunID, req.JobID, entries, typedOpts.Artifacts.Name); err != nil {
 		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	} else {
@@ -540,10 +535,6 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 		return nil
 	}
 
-	if err := r.ensureUploaders(); err != nil {
-		return fmt.Errorf("initialize uploaders: %w", err)
-	}
-
 	entries := []ArtifactBundleEntry{{
 		SourcePath:  outDir,
 		ArchivePath: "out",
@@ -558,10 +549,6 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // Uses a detached context to ensure reporting even if the run context is cancelled.
 func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, jobID types.JobID) error {
-	if err := r.ensureUploaders(); err != nil {
-		return fmt.Errorf("initialize uploaders: %w", err)
-	}
-
 	var loggedExitCode any
 	if exitCode != nil {
 		loggedExitCode = *exitCode
@@ -582,11 +569,6 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 // artifact IDs to the gate stats payload.
 func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.JobID, logsText, artifactNameSuffix string, phase *types.RunStatsGatePhase) {
 	if phase == nil {
-		return
-	}
-
-	if err := r.ensureUploaders(); err != nil {
-		slog.Warn("failed to initialize uploaders, skipping gate logs upload", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
@@ -655,11 +637,6 @@ func (r *runController) uploadHealingJobDiff(
 			time.Duration(result.Timings.TotalDuration).Milliseconds(),
 		).
 		MustBuild()
-
-	if err := r.ensureUploaders(); err != nil {
-		slog.Error("failed to initialize uploaders", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		slog.Error("failed to upload healing job diff", "run_id", runID, "job_id", jobID, "error", err)

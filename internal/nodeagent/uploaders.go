@@ -25,22 +25,8 @@ type ArtifactBundleEntry struct {
 	ArchivePath string
 }
 
-// DiffUploader uploads diff and summary data to the control-plane server.
-type DiffUploader struct {
-	*baseUploader
-}
-
-// NewDiffUploader creates a new diff uploader.
-func NewDiffUploader(cfg Config) (*DiffUploader, error) {
-	base, err := newBaseUploader(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &DiffUploader{baseUploader: base}, nil
-}
-
 // UploadDiff compresses and uploads a diff to the server.
-func (u *DiffUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
+func (u *baseUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
 	gzippedDiff, err := gzipCompress(diffBytes, "gzipped diff")
 	if err != nil {
 		return err
@@ -58,22 +44,8 @@ func (u *DiffUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID 
 	return nil
 }
 
-// ArtifactUploader uploads artifact bundles (tar.gz) to the control-plane server.
-type ArtifactUploader struct {
-	*baseUploader
-}
-
-// NewArtifactUploader creates a new artifact uploader.
-func NewArtifactUploader(cfg Config) (*ArtifactUploader, error) {
-	base, err := newBaseUploader(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &ArtifactUploader{baseUploader: base}, nil
-}
-
 // UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
-func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
+func (u *baseUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
 	if len(paths) == 0 {
 		return "", "", nil
 	}
@@ -86,7 +58,7 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID
 
 // UploadArtifactEntries creates a tar.gz bundle from explicit source->archive mappings
 // and uploads it to the server.
-func (u *ArtifactUploader) UploadArtifactEntries(ctx context.Context, runID types.RunID, jobID types.JobID, entries []ArtifactBundleEntry, name string) (string, string, error) {
+func (u *baseUploader) UploadArtifactEntries(ctx context.Context, runID types.RunID, jobID types.JobID, entries []ArtifactBundleEntry, name string) (string, string, error) {
 	if len(entries) == 0 {
 		return "", "", nil
 	}
@@ -97,7 +69,7 @@ func (u *ArtifactUploader) UploadArtifactEntries(ctx context.Context, runID type
 	return u.uploadBundle(ctx, runID, jobID, bundleBytes, name)
 }
 
-func (u *ArtifactUploader) uploadBundle(ctx context.Context, runID types.RunID, jobID types.JobID, bundleBytes []byte, name string) (string, string, error) {
+func (u *baseUploader) uploadBundle(ctx context.Context, runID types.RunID, jobID types.JobID, bundleBytes []byte, name string) (string, string, error) {
 	if err := validateUploadSize(bundleBytes, "gzipped artifact bundle"); err != nil {
 		return "", "", err
 	}
@@ -122,6 +94,82 @@ func (u *ArtifactUploader) uploadBundle(ctx context.Context, runID types.RunID, 
 		return "", "", fmt.Errorf("server returned empty artifact_bundle_id")
 	}
 	return out.ArtifactBundleID, out.CID, nil
+}
+
+// SaveJobImageName persists the resolved container image name for a job.
+func (u *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, image string) error {
+	image = strings.TrimSpace(image)
+	if image == "" {
+		return fmt.Errorf("image is empty")
+	}
+	return u.postJSONWithRetry(
+		ctx,
+		fmt.Sprintf("/v1/jobs/%s/image", jobID.String()),
+		map[string]any{"image": image},
+		"save job image name",
+		postJSONRetryModeDefault,
+	)
+}
+
+// UploadRunEvent posts a single structured event for a run.
+func (u *baseUploader) UploadRunEvent(
+	ctx context.Context,
+	runID types.RunID,
+	jobID *types.JobID,
+	level string,
+	message string,
+	meta map[string]any,
+) error {
+	if runID.IsZero() {
+		return fmt.Errorf("run_id is required")
+	}
+
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return fmt.Errorf("event message is required")
+	}
+
+	level = strings.ToLower(strings.TrimSpace(level))
+	if level == "" {
+		level = "error"
+	}
+
+	timeValue := nodeEventTimeNow()
+	payload := struct {
+		RunID  types.RunID `json:"run_id"`
+		Events []struct {
+			JobID   *types.JobID   `json:"job_id,omitempty"`
+			Time    *string        `json:"time,omitempty"`
+			Level   string         `json:"level"`
+			Message string         `json:"message"`
+			Meta    map[string]any `json:"meta,omitempty"`
+		} `json:"events"`
+	}{
+		RunID: runID,
+		Events: []struct {
+			JobID   *types.JobID   `json:"job_id,omitempty"`
+			Time    *string        `json:"time,omitempty"`
+			Level   string         `json:"level"`
+			Message string         `json:"message"`
+			Meta    map[string]any `json:"meta,omitempty"`
+		}{
+			{
+				JobID:   jobID,
+				Time:    &timeValue,
+				Level:   level,
+				Message: message,
+				Meta:    meta,
+			},
+		},
+	}
+
+	apiPath := fmt.Sprintf("/v1/nodes/%s/events", u.cfg.NodeID.String())
+	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload node event")
+	if err != nil {
+		return err
+	}
+	_ = resp.Body.Close()
+	return nil
 }
 
 // createTarGzBundle creates a gzipped tar archive from the given file paths.

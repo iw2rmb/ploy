@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -15,14 +13,6 @@ import (
 )
 
 func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T) {
-	// uploadStatus -> newBaseUploader -> createHTTPClient reads the bearer token file.
-	tokenDir := t.TempDir()
-	tokenPath := filepath.Join(tokenDir, "bearer-token")
-	if err := os.WriteFile(tokenPath, []byte("test-token"), 0o600); err != nil {
-		t.Fatalf("write bearer token: %v", err)
-	}
-	t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
-
 	var mu sync.Mutex
 	var capturedPath string
 	var capturedHeaderNodeID string
@@ -40,15 +30,15 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 	}))
 	defer server.Close()
 
-	rc := &runController{
-		cfg: Config{
-			ServerURL: server.URL,
-			NodeID:    types.NodeID("node123"),
-			HTTP: HTTPConfig{
-				TLS: TLSConfig{Enabled: false},
-			},
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    types.NodeID("node123"),
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{Enabled: false},
 		},
 	}
+
+	rc := newTestController(t, cfg)
 
 	req := StartRunRequest{
 		RunID: types.RunID("run-heal-nochange"),
@@ -91,13 +81,6 @@ func TestUploadHealingNoWorkspaceChangesFailure_UploadsFailedStatus(t *testing.T
 }
 
 func TestUploadHealingWorkspacePolicyFailure_UnexpectedChanges_UploadsFailedStatus(t *testing.T) {
-	tokenDir := t.TempDir()
-	tokenPath := filepath.Join(tokenDir, "bearer-token")
-	if err := os.WriteFile(tokenPath, []byte("test-token"), 0o600); err != nil {
-		t.Fatalf("write bearer token: %v", err)
-	}
-	t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
-
 	var mu sync.Mutex
 	var capturedPayload map[string]any
 
@@ -109,15 +92,15 @@ func TestUploadHealingWorkspacePolicyFailure_UnexpectedChanges_UploadsFailedStat
 	}))
 	defer server.Close()
 
-	rc := &runController{
-		cfg: Config{
-			ServerURL: server.URL,
-			NodeID:    types.NodeID("node123"),
-			HTTP: HTTPConfig{
-				TLS: TLSConfig{Enabled: false},
-			},
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    types.NodeID("node123"),
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{Enabled: false},
 		},
 	}
+
+	rc := newTestController(t, cfg)
 
 	req := StartRunRequest{
 		RunID: types.RunID("run-heal-unexpected-change"),
