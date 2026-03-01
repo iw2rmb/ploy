@@ -9,7 +9,8 @@ This folder groups the server-side packages that make up the control plane.
 - metrics: Prometheus metrics HTTP server.
 - scheduler: Background tasks and TTL worker orchestration.
 - status: Health/status providers for diagnostics.
-- config: Server configuration types, defaults, loader, and watcher.
+- config: Server-only configuration types, defaults, loader, and watcher.
+  Node-agent configuration lives under `internal/nodeagent/config.go`.
 
 Related packages
 - internal/stream: Shared SSE hub and HTTP helpers for event streaming.

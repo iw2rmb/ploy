@@ -19,11 +19,6 @@ http:
     enabled: true
     cert: /etc/ploy/pki/server.crt
     key: /etc/ploy/pki/server.key
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.crt
-  certificate: /etc/ploy/pki/node.crt
-  key: /etc/ploy/pki/node.key
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
