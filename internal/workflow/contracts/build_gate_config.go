@@ -4,6 +4,8 @@
 // and how healing operates when the gate fails.
 package contracts
 
+import "encoding/json"
+
 // BuildGateConfig configures Build Gate validation for a Mods run.
 type BuildGateConfig struct {
 	// Enabled controls whether the build gate runs before/after mig execution.
@@ -59,6 +61,26 @@ type BuildGateStackConfig struct {
 	Tool     string `json:"tool,omitempty" yaml:"tool,omitempty"`
 	Release  string `json:"release,omitempty" yaml:"release,omitempty"`
 	Default  bool   `json:"default,omitempty" yaml:"default,omitempty"`
+}
+
+// UnmarshalJSON handles numeric release values (e.g., YAML `release: 11` → JSON number).
+func (s *BuildGateStackConfig) UnmarshalJSON(data []byte) error {
+	type alias BuildGateStackConfig
+	aux := &struct {
+		Release json.RawMessage `json:"release,omitempty"`
+		*alias
+	}{alias: (*alias)(s)}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if len(aux.Release) > 0 {
+		r, err := unmarshalReleaseJSON(aux.Release)
+		if err != nil {
+			return err
+		}
+		s.Release = r
+	}
+	return nil
 }
 
 // HealingSpec describes recovery action selection keyed by router error_kind.

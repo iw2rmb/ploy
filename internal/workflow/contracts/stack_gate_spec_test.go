@@ -259,14 +259,8 @@ func TestStackGateSpec_RoundTrip(t *testing.T) {
 		}},
 	}
 
-	// Convert to map.
-	m, err := original.ToMap()
-	if err != nil {
-		t.Fatalf("ToMap failed: %v", err)
-	}
-
 	// Marshal to JSON and parse back.
-	data, err := json.Marshal(m)
+	data, err := json.Marshal(original)
 	if err != nil {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
@@ -591,9 +585,13 @@ func TestStackGateWire_EmptyOmitted(t *testing.T) {
 		}},
 	}
 
-	m, err := spec.ToMap()
+	data, err := json.Marshal(spec)
 	if err != nil {
-		t.Fatalf("ToMap failed: %v", err)
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
 	}
 	stepsRaw, ok := m["steps"].([]any)
 	if !ok {
@@ -620,9 +618,13 @@ func TestStackGateWire_DisabledOmitted(t *testing.T) {
 		}},
 	}
 
-	m, err := spec.ToMap()
+	data, err := json.Marshal(spec)
 	if err != nil {
-		t.Fatalf("ToMap failed: %v", err)
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
 	}
 	stepsRaw, ok := m["steps"].([]any)
 	if !ok {

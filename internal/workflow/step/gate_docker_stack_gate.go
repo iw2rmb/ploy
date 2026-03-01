@@ -170,8 +170,7 @@ func resolveStackGateExecutionPlan(
 
 	sgResult.Detected = observationToStackExpectation(obs)
 
-	if !stackMatchesExpectation(obs, spec.StackGate.Expect) {
-		reason := formatMismatchReason(obs, spec.StackGate.Expect)
+	if matched, reason := matchStack(obs, spec.StackGate.Expect); !matched {
 		evidenceStr := formatEvidenceForLog(obs.Evidence)
 		runtimeImage := resolveStackGateRuntimeImageForTerminal(mappingPath, spec.ImageOverrides, spec.StackGate.Expect)
 		return gateExecutionPlan{}, stackGateTerminalWithResult(

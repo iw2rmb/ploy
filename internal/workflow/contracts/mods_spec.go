@@ -16,8 +16,7 @@
 //   - mods_spec.go: Core types (ModsSpec, ModStep) and validation
 //   - command_spec.go: Polymorphic command handling (CommandSpec)
 //   - build_gate_config.go: Build gate and healing configuration types
-//   - mods_spec_parse.go: JSON/map parsing functions
-//   - mods_spec_wire.go: Wire serialization (ToMap)
+//   - mods_spec_parse.go: JSON parsing functions
 //
 // ## Usage
 //
@@ -225,23 +224,20 @@ func (s ModsSpec) Validate() error {
 
 	// Validate build gate stack configuration (pre/post).
 	if s.BuildGate != nil {
-		if s.BuildGate.Pre != nil && s.BuildGate.Pre.Stack != nil {
-			if err := validateBuildGateStackConfig(s.BuildGate.Pre.Stack, "build_gate.pre.stack"); err != nil {
+		for _, pair := range []struct {
+			phase  *BuildGatePhaseConfig
+			prefix string
+		}{
+			{s.BuildGate.Pre, "build_gate.pre"},
+			{s.BuildGate.Post, "build_gate.post"},
+		} {
+			if pair.phase == nil {
+				continue
+			}
+			if err := validateBuildGateStackConfig(pair.phase.Stack, pair.prefix+".stack"); err != nil {
 				return err
 			}
-		}
-		if s.BuildGate.Pre != nil && s.BuildGate.Pre.GateProfile != nil {
-			if err := validateBuildGateProfileOverride(s.BuildGate.Pre.GateProfile, "build_gate.pre.gate_profile"); err != nil {
-				return err
-			}
-		}
-		if s.BuildGate.Post != nil && s.BuildGate.Post.Stack != nil {
-			if err := validateBuildGateStackConfig(s.BuildGate.Post.Stack, "build_gate.post.stack"); err != nil {
-				return err
-			}
-		}
-		if s.BuildGate.Post != nil && s.BuildGate.Post.GateProfile != nil {
-			if err := validateBuildGateProfileOverride(s.BuildGate.Post.GateProfile, "build_gate.post.gate_profile"); err != nil {
+			if err := validateBuildGateProfileOverride(pair.phase.GateProfile, pair.prefix+".gate_profile"); err != nil {
 				return err
 			}
 		}
