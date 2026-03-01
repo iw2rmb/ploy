@@ -622,7 +622,11 @@ func maybeRefreshNextReGateRecoveryCandidate(
 	if recovery == nil && meta.Gate != nil {
 		recovery = meta.Gate.Recovery
 	}
-	if recovery == nil || strings.TrimSpace(recovery.ErrorKind) != "infra" {
+	if recovery == nil {
+		return nil
+	}
+	kind, ok := contracts.ParseRecoveryErrorKind(recovery.ErrorKind)
+	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
 		return nil
 	}
 

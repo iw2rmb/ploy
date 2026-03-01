@@ -199,20 +199,16 @@ const (
 
 // Validate ensures recovery metadata entries are well formed.
 func (m BuildGateRecoveryMetadata) Validate() error {
-	switch m.LoopKind {
-	case "healing":
-		// valid
-	case "":
+	if strings.TrimSpace(m.LoopKind) == "" {
 		return fmt.Errorf("loop_kind is required")
-	default:
+	}
+	if _, ok := ParseRecoveryLoopKind(m.LoopKind); !ok {
 		return fmt.Errorf("loop_kind invalid: %q", m.LoopKind)
 	}
-	switch m.ErrorKind {
-	case "infra", "code", "mixed", "unknown":
-		// valid
-	case "":
+	if strings.TrimSpace(m.ErrorKind) == "" {
 		return fmt.Errorf("error_kind is required")
-	default:
+	}
+	if _, ok := ParseRecoveryErrorKind(m.ErrorKind); !ok {
 		return fmt.Errorf("error_kind invalid: %q", m.ErrorKind)
 	}
 	if m.StrategyID != "" {

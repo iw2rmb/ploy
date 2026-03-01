@@ -66,7 +66,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs|TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining'`
 
 ## Phase 4: Normalize Recovery Contracts and Remove Legacy Paths
-- [ ] Replace stringly-typed recovery fields with typed constants/helpers and remove obsolete loop paths.
+- [x] Replace stringly-typed recovery fields with typed constants/helpers and remove obsolete loop paths.
   - Repository: `ploy`
   - Component: `internal/workflow/contracts`, `internal/nodeagent`, docs/e2e
   - Scope:

@@ -268,17 +268,20 @@ func buildRecoveryClaimContext(
 	}
 
 	recovery := jobMeta.Recovery
-	selectedKind := strings.TrimSpace(recovery.ErrorKind)
-	if selectedKind == "" {
-		selectedKind = "unknown"
+	kind, ok := contracts.ParseRecoveryErrorKind(recovery.ErrorKind)
+	if !ok {
+		kind = contracts.DefaultRecoveryErrorKind()
 	}
+	selectedKind := kind.String()
 	ctxPayload := &contracts.RecoveryClaimContext{
 		LoopKind:          strings.TrimSpace(recovery.LoopKind),
 		SelectedErrorKind: selectedKind,
 		Expectations:      cloneRawJSON(recovery.Expectations),
 	}
-	if strings.TrimSpace(ctxPayload.LoopKind) == "" {
-		ctxPayload.LoopKind = "healing"
+	if loopKind, ok := contracts.ParseRecoveryLoopKind(ctxPayload.LoopKind); ok {
+		ctxPayload.LoopKind = loopKind.String()
+	} else {
+		ctxPayload.LoopKind = contracts.DefaultRecoveryLoopKind().String()
 	}
 	if jobType == domaintypes.JobTypeHeal && strings.TrimSpace(job.JobImage) != "" {
 		ctxPayload.ResolvedHealingImage = strings.TrimSpace(job.JobImage)
@@ -317,7 +320,7 @@ func buildRecoveryClaimContext(
 		}
 	}
 
-	if ctxPayload.SelectedErrorKind == "infra" {
+	if kind, ok := contracts.ParseRecoveryErrorKind(ctxPayload.SelectedErrorKind); ok && contracts.IsInfraRecoveryErrorKind(kind) {
 		schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
 		if err != nil {
 			return nil, err

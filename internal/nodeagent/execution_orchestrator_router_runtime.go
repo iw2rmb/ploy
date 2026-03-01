@@ -34,8 +34,8 @@ func (r *runController) runRouterForGateFailure(
 		return
 	}
 	gateResult.Recovery = &contracts.BuildGateRecoveryMetadata{
-		LoopKind:  "healing",
-		ErrorKind: "unknown",
+		LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
+		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
 	}
 
 	// Create temp /in and /out for router.
@@ -74,7 +74,7 @@ func (r *runController) runRouterForGateFailure(
 		stack = contracts.ModStackUnknown
 	}
 
-	routerManifest, buildErr := buildRouterManifest(req, *typedOpts.Router, stack, req.JobType, "healing")
+	routerManifest, buildErr := buildRouterManifest(req, *typedOpts.Router, stack, req.JobType, contracts.RecoveryLoopKindHealing.String())
 	if buildErr != nil {
 		slog.Warn("failed to build router manifest", "run_id", req.RunID, "job_id", req.JobID, "error", buildErr)
 		return

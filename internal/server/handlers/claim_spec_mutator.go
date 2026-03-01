@@ -407,7 +407,11 @@ func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType do
 	if err != nil {
 		return err
 	}
-	healing["selected_error_kind"] = jobMeta.Recovery.ErrorKind
+	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.Recovery.ErrorKind)
+	if !ok {
+		kind = contracts.DefaultRecoveryErrorKind()
+	}
+	healing["selected_error_kind"] = kind.String()
 	if len(jobMeta.Recovery.Expectations) > 0 {
 		var ex struct {
 			Artifacts []struct {
@@ -478,7 +482,8 @@ func applyHealingSchemaMutator(m map[string]any, job store.Job, jobType domainty
 	if err != nil || jobMeta.Recovery == nil {
 		return nil
 	}
-	if strings.TrimSpace(jobMeta.Recovery.ErrorKind) != "infra" {
+	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.Recovery.ErrorKind)
+	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
 		return nil
 	}
 

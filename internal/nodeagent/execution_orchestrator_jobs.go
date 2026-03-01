@@ -131,7 +131,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	cfg := standardJobConfig{
 		Manifest:      manifest,
-		DiffType:      DiffJobTypeHealing,
+		DiffType:      DiffJobTypeMod,
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {

@@ -3,7 +3,7 @@
 #
 # This script demonstrates submission of a multi-step mig spec with sequential
 # transformation steps (Java 8 → Java 11 → Java 17). The spec uses the migs[]
-# array format with global build_gate and build_gate_healing policy.
+# array format with global build_gate router/healing policy.
 #
 # Prerequisites:
 # - ploy binary available at dist/ploy or ./dist/ploy

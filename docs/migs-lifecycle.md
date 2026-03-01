@@ -146,8 +146,8 @@ Stack Gate enforces stack expectations at gate boundaries. When failures occur:
 
 ### Router and healing configuration
 
-When the Build Gate fails and healing is configured, the node agent runs an
-optional **router** (to summarize the failure) followed by a **healing** loop
+When the Build Gate fails and healing is configured, the node agent runs a
+required **router** (to summarize the failure) followed by a **healing** loop
 (to fix the failure). Both are specified under `build_gate`:
 
 ```yaml

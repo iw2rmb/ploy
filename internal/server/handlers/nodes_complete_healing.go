@@ -53,7 +53,11 @@ func maybeCreateHealingJobs(
 	}
 
 	recoveryMeta, detectedStack, detectedExpectation := resolveFailedGateRecoveryContext(failedJob)
-	if recoveryMeta.ErrorKind == "mixed" || recoveryMeta.ErrorKind == "unknown" {
+	recoveryKind, ok := contracts.ParseRecoveryErrorKind(recoveryMeta.ErrorKind)
+	if !ok {
+		recoveryKind = contracts.DefaultRecoveryErrorKind()
+	}
+	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
 		slog.Info("maybeCreateHealingJobs: terminal recovery classification, canceling remaining linked jobs",
 			"run_id", failedJob.RunID,
 			"job_id", failedJob.ID,
@@ -83,7 +87,7 @@ func maybeCreateHealingJobs(
 		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	action, ok := healing.ByErrorKind[recoveryMeta.ErrorKind]
+	action, ok := healing.ByErrorKind[recoveryKind.String()]
 	if !ok {
 		slog.Info("maybeCreateHealingJobs: no healing action for error_kind, canceling remaining linked jobs",
 			"run_id", failedJob.RunID,

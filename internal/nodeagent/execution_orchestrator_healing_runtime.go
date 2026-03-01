@@ -26,7 +26,7 @@ func resolveHealingWorkspacePolicy(healingSpec *contracts.HealingSpec) workspace
 	if healingSpec == nil {
 		return workspaceChangePolicyRequire
 	}
-	if strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
+	if kind, ok := contracts.ParseRecoveryErrorKind(healingSpec.SelectedErrorKind); ok && contracts.IsInfraRecoveryErrorKind(kind) {
 		return workspaceChangePolicyForbid
 	}
 	return workspaceChangePolicyRequire
@@ -119,7 +119,11 @@ func (r *runController) populateHealingInDir(
 		slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
 	}
 
-	if healingSpec != nil && strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
+	if healingSpec != nil {
+		kind, ok := contracts.ParseRecoveryErrorKind(healingSpec.SelectedErrorKind)
+		if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
+			return nil
+		}
 		effectiveSchema := schemaJSON
 		if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.GateProfileSchemaJSON) != "" {
 			effectiveSchema = recoveryCtx.GateProfileSchemaJSON

@@ -30,8 +30,8 @@ func parseActionSummary(outDir string) string {
 // with deterministic fallback values for loop/error kinds.
 func parseRouterDecision(outDir string) *contracts.BuildGateRecoveryMetadata {
 	decision := &contracts.BuildGateRecoveryMetadata{
-		LoopKind:  "healing",
-		ErrorKind: "unknown",
+		LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
+		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
 	}
 	obj, ok := parseCodexLastJSONObject(outDir)
 	if !ok {
@@ -39,9 +39,8 @@ func parseRouterDecision(outDir string) *contracts.BuildGateRecoveryMetadata {
 	}
 
 	if val, ok := obj["error_kind"].(string); ok {
-		switch strings.TrimSpace(val) {
-		case "infra", "code", "mixed", "unknown":
-			decision.ErrorKind = strings.TrimSpace(val)
+		if kind, ok := contracts.ParseRecoveryErrorKind(val); ok {
+			decision.ErrorKind = kind.String()
 		}
 	}
 	if val, ok := obj["strategy_id"].(string); ok {
@@ -62,7 +61,7 @@ func parseRouterDecision(outDir string) *contracts.BuildGateRecoveryMetadata {
 		}
 	}
 	if err := decision.Validate(); err != nil {
-		decision.ErrorKind = "unknown"
+		decision.ErrorKind = contracts.DefaultRecoveryErrorKind().String()
 		decision.StrategyID = ""
 		decision.Confidence = nil
 		decision.Reason = ""
