@@ -128,16 +128,6 @@ type ModStep struct {
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
 }
 
-// IsMultiStep returns true if this spec defines more than one step.
-func (s ModsSpec) IsMultiStep() bool {
-	return len(s.Steps) > 1
-}
-
-// IsSingleStep returns true if this spec defines exactly one step.
-func (s ModsSpec) IsSingleStep() bool {
-	return len(s.Steps) == 1
-}
-
 // Validate checks that the spec is structurally valid.
 // Returns nil if valid, or a descriptive error for invalid specs.
 //

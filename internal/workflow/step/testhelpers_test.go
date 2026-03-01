@@ -2,7 +2,9 @@ package step
 
 import (
 	"context"
+	"testing"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -105,4 +107,43 @@ func (m *testGitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterial
 		return m.fetchFn(ctx, repo, dest)
 	}
 	return nil
+}
+
+// newGateTestManifest returns a StepManifest with a single read-only input and
+// the given gate-enabled flag. Tests that need different fields can override
+// after calling this helper.
+func newGateTestManifest(gateEnabled bool) contracts.StepManifest {
+	return contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "maven:3-eclipse-temurin-17",
+		Inputs: []contracts.StepInput{{
+			Name:        "source",
+			MountPath:   "/workspace",
+			Mode:        contracts.StepInputModeReadOnly,
+			SnapshotCID: types.CID("bafytest123"),
+		}},
+		Gate: &contracts.StepGateSpec{
+			Enabled: gateEnabled,
+		},
+	}
+}
+
+// newGateTestRequest wraps a manifest into a Request with a fixed workspace path.
+func newGateTestRequest(m contracts.StepManifest) Request {
+	return Request{
+		Manifest:  m,
+		Workspace: "/tmp/test-workspace",
+	}
+}
+
+// newDockerGateTestHarness creates a DockerGateExecutor backed by a
+// testContainerRuntime and a temporary Maven workspace. Returns the executor,
+// the runtime (for assertions), and the workspace path.
+func newDockerGateTestHarness(t *testing.T) (GateExecutor, *testContainerRuntime, string) {
+	t.Helper()
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+	workspace := createMavenWorkspace(t, "17")
+	return executor, rt, workspace
 }

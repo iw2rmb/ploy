@@ -26,14 +26,6 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 		t.Fatalf("ParseModsSpecJSON failed: %v", err)
 	}
 
-	// Verify single-step detection.
-	if !spec.IsSingleStep() {
-		t.Errorf("expected IsSingleStep() = true")
-	}
-	if spec.IsMultiStep() {
-		t.Errorf("expected IsMultiStep() = false")
-	}
-
 	if len(spec.Steps) != 1 {
 		t.Fatalf("len(steps) = %d, want 1", len(spec.Steps))
 	}
@@ -116,14 +108,6 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	}
 
 	// Verify multi-step detection.
-	if spec.IsSingleStep() {
-		t.Errorf("expected IsSingleStep() = false")
-	}
-	if !spec.IsMultiStep() {
-		t.Errorf("expected IsMultiStep() = true")
-	}
-
-	// Verify steps array.
 	if len(spec.Steps) != 2 {
 		t.Fatalf("len(steps) = %d, want 2", len(spec.Steps))
 	}

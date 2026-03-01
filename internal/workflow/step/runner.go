@@ -30,10 +30,6 @@ import (
 //     ContainerRuntime. Logs are forwarded to LogWriter if present.
 //     Container cleanup is owned by node-runtime pre-claim disk-pressure flow.
 //
-//  4. Diff Generation — Generate a unified diff of workspace changes via
-//     DiffGenerator. The diff is not published here; the node agent
-//     uploads artifacts independently.
-//
 // # Gate Ownership Contract
 //
 // Runner supports an optional pre-mig gate when Manifest.Gate.Enabled=true.
@@ -53,7 +49,6 @@ import (
 type Runner struct {
 	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
-	Diffs      DiffGenerator
 	Gate       GateExecutor
 	LogWriter  io.Writer // Optional: streams logs to server as gzipped chunks.
 }
@@ -160,17 +155,6 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 
 	}
-
-	// Stage 4: Generate diff.
-	diffStart := time.Now()
-	if r.Diffs != nil {
-		diffBytes, err := r.Diffs.Generate(ctx, req.Workspace)
-		if err != nil {
-			return Result{}, fmt.Errorf("diff generation failed: %w", err)
-		}
-		_ = diffBytes
-	}
-	result.Timings.DiffDuration = types.Duration(time.Since(diffStart))
 
 	result.Timings.TotalDuration = types.Duration(time.Since(totalStart))
 	return result, nil

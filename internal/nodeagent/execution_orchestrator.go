@@ -228,7 +228,6 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	runner := step.Runner{
 		Workspace:  workspaceHydrator,
 		Containers: containerRuntime,
-		Diffs:      diffGenerator,
 		Gate:       gateExecutor,
 		LogWriter:  logStreamer,
 	}

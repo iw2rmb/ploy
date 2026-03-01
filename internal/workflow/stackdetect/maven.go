@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/workflow/fsutil"
 )
 
 // pomProject represents the relevant portions of a Maven pom.xml.
@@ -185,7 +183,7 @@ func buildPropertyMap(workspace, pomPath string, pom *pomProject, visited map[st
 	// First, load parent properties (if local).
 	if pom.Parent != nil {
 		parentPath := resolveParentPath(workspace, pomPath, pom.Parent.RelativePath)
-		if parentPath != "" && isWithinWorkspace(workspace, parentPath) && fsutil.FileExists(parentPath) {
+		if parentPath != "" && isWithinWorkspace(workspace, parentPath) && fileExists(parentPath) {
 			parentPom, err := parsePom(parentPath)
 			if err == nil {
 				parentProps := buildPropertyMap(workspace, parentPath, parentPom, visited)

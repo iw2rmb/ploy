@@ -211,7 +211,7 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 	}
 	drafts := []draft{{name: "pre-gate", jobType: "pre_gate"}}
 
-	if modsSpec.IsMultiStep() {
+	if len(modsSpec.Steps) > 1 {
 		for i, mig := range modsSpec.Steps {
 			jobImage := ""
 			if mig.Image.Universal != "" {

@@ -1,11 +1,11 @@
 // stack_gate_spec_parse.go provides parsing functions for Stack Gate configuration.
 //
 // These functions parse Stack Gate specs from map[string]any intermediate
-// representations (from JSON/YAML input). They use the existing expect*
-// helpers from parse_helpers.go for consistent error handling.
+// representations (from JSON/YAML input).
 package contracts
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -20,9 +20,9 @@ func parseStackGateSpec(raw map[string]any, prefix string) (*StackGateSpec, erro
 
 	// Parse inbound.
 	if v, ok := raw["inbound"]; ok && v != nil {
-		inboundRaw, err := expectMap(v, prefix+".inbound")
-		if err != nil {
-			return nil, err
+		inboundRaw, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s.inbound: expected object, got %T", prefix, v)
 		}
 		inbound, err := parseStackGatePhaseSpec(inboundRaw, prefix+".inbound")
 		if err != nil {
@@ -33,9 +33,9 @@ func parseStackGateSpec(raw map[string]any, prefix string) (*StackGateSpec, erro
 
 	// Parse outbound.
 	if v, ok := raw["outbound"]; ok && v != nil {
-		outboundRaw, err := expectMap(v, prefix+".outbound")
-		if err != nil {
-			return nil, err
+		outboundRaw, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s.outbound: expected object, got %T", prefix, v)
 		}
 		outbound, err := parseStackGatePhaseSpec(outboundRaw, prefix+".outbound")
 		if err != nil {
@@ -62,18 +62,18 @@ func parseStackGatePhaseSpec(raw map[string]any, prefix string) (*StackGatePhase
 
 	// Parse enabled.
 	if v, ok := raw["enabled"]; ok && v != nil {
-		b, err := expectBool(v, prefix+".enabled")
-		if err != nil {
-			return nil, err
+		b, ok := v.(bool)
+		if !ok {
+			return nil, fmt.Errorf("%s.enabled: expected bool, got %T", prefix, v)
 		}
 		phase.Enabled = b
 	}
 
 	// Parse expect.
 	if v, ok := raw["expect"]; ok && v != nil {
-		expectRaw, err := expectMap(v, prefix+".expect")
-		if err != nil {
-			return nil, err
+		expectRaw, ok := v.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s.expect: expected object, got %T", prefix, v)
 		}
 		exp, err := parseStackExpectation(expectRaw, prefix+".expect")
 		if err != nil {
@@ -96,18 +96,18 @@ func parseStackExpectation(raw map[string]any, prefix string) (*StackExpectation
 
 	// Parse language.
 	if v, ok := raw["language"]; ok && v != nil {
-		s, err := expectString(v, prefix+".language")
-		if err != nil {
-			return nil, err
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("%s.language: expected string, got %T", prefix, v)
 		}
 		exp.Language = strings.TrimSpace(s)
 	}
 
 	// Parse tool.
 	if v, ok := raw["tool"]; ok && v != nil {
-		s, err := expectString(v, prefix+".tool")
-		if err != nil {
-			return nil, err
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("%s.tool: expected string, got %T", prefix, v)
 		}
 		exp.Tool = strings.TrimSpace(s)
 	}

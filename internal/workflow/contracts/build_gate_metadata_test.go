@@ -196,18 +196,7 @@ func TestBuildGateStageMetadata_Validate_DetectedStack(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := tt.meta.Validate()
-			if tt.wantErr == "" && err != nil {
-				t.Fatalf("Validate() unexpected error: %v", err)
-			}
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatalf("Validate() expected error containing %q, got nil", tt.wantErr)
-				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("Validate() error = %q, want substring %q", err.Error(), tt.wantErr)
-				}
-			}
+			requireValidationErr(t, tt.meta.Validate(), tt.wantErr)
 		})
 	}
 }
@@ -269,16 +258,7 @@ func TestStackGateResult_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := tt.result.Validate()
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Validate() expected error containing %q, got nil", tt.errSubstr)
-				} else if !strings.Contains(err.Error(), tt.errSubstr) {
-					t.Errorf("Validate() error = %q, want substring %q", err.Error(), tt.errSubstr)
-				}
-			} else if err != nil {
-				t.Errorf("Validate() unexpected error: %v", err)
-			}
+			requireValidationErr(t, tt.result.Validate(), tt.errSubstr)
 		})
 	}
 }
@@ -291,7 +271,6 @@ func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
 	tests := []struct {
 		name      string
 		meta      BuildGateStageMetadata
-		wantErr   bool
 		errSubstr string
 	}{
 		{
@@ -299,7 +278,6 @@ func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
 			meta: BuildGateStageMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
 			},
-			wantErr: false,
 		},
 		{
 			name: "valid stack gate result is valid",
@@ -307,7 +285,6 @@ func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
 				StaticChecks: []BuildGateStaticCheckReport{{Tool: "stack-gate", Passed: true}},
 				StackGate:    &StackGateResult{Enabled: true, Result: "pass"},
 			},
-			wantErr: false,
 		},
 		{
 			name: "invalid stack gate result causes validation failure",
@@ -315,7 +292,6 @@ func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
 				StaticChecks: []BuildGateStaticCheckReport{{Tool: "stack-gate", Passed: false}},
 				StackGate:    &StackGateResult{Enabled: true, Result: ""},
 			},
-			wantErr:   true,
 			errSubstr: "stack_gate invalid",
 		},
 	}
@@ -323,16 +299,7 @@ func TestBuildGateStageMetadata_Validate_StackGate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := tt.meta.Validate()
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("Validate() expected error containing %q, got nil", tt.errSubstr)
-				} else if !strings.Contains(err.Error(), tt.errSubstr) {
-					t.Errorf("Validate() error = %q, want substring %q", err.Error(), tt.errSubstr)
-				}
-			} else if err != nil {
-				t.Errorf("Validate() unexpected error: %v", err)
-			}
+			requireValidationErr(t, tt.meta.Validate(), tt.errSubstr)
 		})
 	}
 }
@@ -418,76 +385,64 @@ func TestBuildGateStageMetadata_StackGate_JSONRoundtrip(t *testing.T) {
 	}
 }
 
-func TestBuildGateStageMetadata_BugSummary_Valid(t *testing.T) {
+func TestBuildGateStageMetadata_BugSummary_Validation(t *testing.T) {
 	t.Parallel()
-	meta := BuildGateStageMetadata{
-		BugSummary: "Missing semicolon on line 42 of Main.java",
+
+	tests := []struct {
+		name       string
+		bugSummary string
+		wantSubstr string
+	}{
+		{name: "valid", bugSummary: "Missing semicolon on line 42 of Main.java"},
+		{name: "too long", bugSummary: strings.Repeat("x", 201), wantSubstr: "bug_summary"},
+		{name: "multiline", bugSummary: "line one\nline two", wantSubstr: "single-line"},
 	}
-	if err := meta.Validate(); err != nil {
-		t.Errorf("Validate() unexpected error: %v", err)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			meta := BuildGateStageMetadata{BugSummary: tt.bugSummary}
+			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
+		})
 	}
 }
 
-func TestBuildGateStageMetadata_BugSummary_TooLong(t *testing.T) {
+func TestBuildGateStageMetadata_GeneratedGateProfile_Validation(t *testing.T) {
 	t.Parallel()
-	meta := BuildGateStageMetadata{
-		BugSummary: strings.Repeat("x", 201),
-	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error for >200 char bug_summary")
-	}
-	if !strings.Contains(err.Error(), "bug_summary") {
-		t.Errorf("error = %q, want substring 'bug_summary'", err.Error())
-	}
-}
 
-func TestBuildGateStageMetadata_BugSummary_Multiline(t *testing.T) {
-	t.Parallel()
-	meta := BuildGateStageMetadata{
-		BugSummary: "line one\nline two",
+	tests := []struct {
+		name       string
+		profile    json.RawMessage
+		wantSubstr string
+	}{
+		{
+			name: "valid",
+			profile: json.RawMessage(`{
+				"schema_version": 1,
+				"repo_id": "repo_123",
+				"runner_mode": "simple",
+				"stack": {"language":"java","tool":"maven","release":"17"},
+				"targets": {
+					"build": {"status":"passed","command":"mvn test","env":{},"failure_code":null},
+					"unit": {"status":"not_attempted","env":{}},
+					"all_tests": {"status":"not_attempted","env":{}}
+				},
+				"orchestration": {"pre": [], "post": []}
+			}`),
+		},
+		{
+			name:       "invalid",
+			profile:    json.RawMessage(`{"schema_version":1}`),
+			wantSubstr: "generated_gate_profile",
+		},
 	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error for multiline bug_summary")
-	}
-	if !strings.Contains(err.Error(), "single-line") {
-		t.Errorf("error = %q, want substring 'single-line'", err.Error())
-	}
-}
 
-func TestBuildGateStageMetadata_GeneratedGateProfile_Valid(t *testing.T) {
-	t.Parallel()
-	meta := BuildGateStageMetadata{
-		GeneratedGateProfile: json.RawMessage(`{
-			"schema_version": 1,
-			"repo_id": "repo_123",
-			"runner_mode": "simple",
-			"stack": {"language":"java","tool":"maven","release":"17"},
-			"targets": {
-				"build": {"status":"passed","command":"mvn test","env":{},"failure_code":null},
-				"unit": {"status":"not_attempted","env":{}},
-				"all_tests": {"status":"not_attempted","env":{}}
-			},
-			"orchestration": {"pre": [], "post": []}
-		}`),
-	}
-	if err := meta.Validate(); err != nil {
-		t.Fatalf("Validate() unexpected error: %v", err)
-	}
-}
-
-func TestBuildGateStageMetadata_GeneratedGateProfile_Invalid(t *testing.T) {
-	t.Parallel()
-	meta := BuildGateStageMetadata{
-		GeneratedGateProfile: json.RawMessage(`{"schema_version":1}`),
-	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error")
-	}
-	if !strings.Contains(err.Error(), "generated_gate_profile") {
-		t.Fatalf("error=%q, want generated_gate_profile", err.Error())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			meta := BuildGateStageMetadata{GeneratedGateProfile: tt.profile}
+			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
+		})
 	}
 }
 
@@ -592,72 +547,42 @@ func TestBuildGateStageMetadata_Recovery_CandidateInvalidStateRejected(t *testin
 	}
 }
 
-func TestBuildGateStageMetadata_Recovery_InvalidExpectationsType(t *testing.T) {
+func TestBuildGateStageMetadata_Recovery_ValidationErrors(t *testing.T) {
 	t.Parallel()
-	meta := BuildGateStageMetadata{
-		Recovery: &BuildGateRecoveryMetadata{
-			LoopKind:     "healing",
-			ErrorKind:    "infra",
-			Expectations: json.RawMessage(`"scalar"`),
-		},
-	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error for scalar expectations")
-	}
-	if !strings.Contains(err.Error(), "expectations") {
-		t.Fatalf("error = %q, want substring %q", err.Error(), "expectations")
-	}
-}
 
-func TestBuildGateStageMetadata_Recovery_InvalidLoopKind(t *testing.T) {
-	t.Parallel()
-	meta := BuildGateStageMetadata{
-		Recovery: &BuildGateRecoveryMetadata{
-			LoopKind:  "prepare",
-			ErrorKind: "infra",
+	tests := []struct {
+		name       string
+		recovery   BuildGateRecoveryMetadata
+		wantSubstr string
+	}{
+		{
+			name:       "invalid expectations type",
+			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "infra", Expectations: json.RawMessage(`"scalar"`)},
+			wantSubstr: "expectations",
+		},
+		{
+			name:       "invalid loop_kind",
+			recovery:   BuildGateRecoveryMetadata{LoopKind: "prepare", ErrorKind: "infra"},
+			wantSubstr: "loop_kind",
+		},
+		{
+			name:       "invalid error_kind",
+			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "routing"},
+			wantSubstr: "error_kind",
+		},
+		{
+			name:       "custom error_kind rejected",
+			recovery:   BuildGateRecoveryMetadata{LoopKind: "healing", ErrorKind: "custom"},
+			wantSubstr: "error_kind",
 		},
 	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error for invalid loop_kind")
-	}
-	if !strings.Contains(err.Error(), "loop_kind") {
-		t.Fatalf("error = %q, want substring %q", err.Error(), "loop_kind")
-	}
-}
 
-func TestBuildGateStageMetadata_Recovery_InvalidErrorKind(t *testing.T) {
-	t.Parallel()
-	meta := BuildGateStageMetadata{
-		Recovery: &BuildGateRecoveryMetadata{
-			LoopKind:  "healing",
-			ErrorKind: "routing",
-		},
-	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error for invalid error_kind")
-	}
-	if !strings.Contains(err.Error(), "error_kind") {
-		t.Fatalf("error = %q, want substring %q", err.Error(), "error_kind")
-	}
-}
-
-func TestBuildGateStageMetadata_Recovery_CustomErrorKindRejected(t *testing.T) {
-	t.Parallel()
-	meta := BuildGateStageMetadata{
-		Recovery: &BuildGateRecoveryMetadata{
-			LoopKind:  "healing",
-			ErrorKind: "custom",
-		},
-	}
-	err := meta.Validate()
-	if err == nil {
-		t.Fatal("expected validation error for custom error_kind")
-	}
-	if !strings.Contains(err.Error(), "error_kind") {
-		t.Fatalf("error = %q, want substring %q", err.Error(), "error_kind")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			meta := BuildGateStageMetadata{Recovery: &tt.recovery}
+			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
+		})
 	}
 }
 
@@ -680,13 +605,7 @@ func TestBuildGateStageMetadata_Recovery_InvalidConfidence(t *testing.T) {
 					Confidence: confidencePtr(tt.confidence),
 				},
 			}
-			err := meta.Validate()
-			if err == nil {
-				t.Fatal("expected validation error for invalid confidence")
-			}
-			if !strings.Contains(err.Error(), "confidence") {
-				t.Fatalf("error = %q, want substring %q", err.Error(), "confidence")
-			}
+			requireValidationErr(t, meta.Validate(), "confidence")
 		})
 	}
 }

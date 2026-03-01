@@ -15,14 +15,8 @@ import (
 )
 
 func TestDockerGateExecutor_DoesNotRemoveContainerAfterExecution(t *testing.T) {
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
-
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-	}
+	executor, rt, workspace := newDockerGateTestHarness(t)
+	spec := &contracts.StepGateSpec{Enabled: true}
 
 	_, err := executor.Execute(context.Background(), spec, workspace)
 	if err != nil {
@@ -74,10 +68,7 @@ func TestDockerGateExecutor_ReportsRuntimeImageBeforeContainerCreate(t *testing.
 }
 
 func TestDockerGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, rt, workspace := newDockerGateTestHarness(t)
 	spec := &contracts.StepGateSpec{Enabled: true}
 	ctx := WithGateContainerLabels(context.Background(), map[string]string{
 		types.LabelRunID: "run-123",
@@ -105,10 +96,7 @@ func TestDockerGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
 func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, rt, workspace := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -177,15 +165,13 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := &testContainerRuntime{}
-			executor := NewDockerGateExecutor(rt)
+			executor, rt, workspace := newDockerGateTestHarness(t)
 
 			spec := &contracts.StepGateSpec{
 				Enabled: true,
 				Env:     tc.env,
 			}
 
-			workspace := createMavenWorkspace(t, "17")
 			_, err := executor.Execute(context.Background(), spec, workspace)
 			if err != nil {
 				t.Fatalf("Execute() unexpected error: %v", err)
@@ -206,10 +192,7 @@ func TestDockerGateExecutor_EmptyEnv(t *testing.T) {
 func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, rt, workspace := newDockerGateTestHarness(t)
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		GateProfile: &contracts.BuildGateProfileOverride{
@@ -240,10 +223,7 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, rt, workspace := newDockerGateTestHarness(t)
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		Env: map[string]string{
@@ -280,10 +260,7 @@ func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, _, workspace := newDockerGateTestHarness(t)
 	spec := &contracts.StepGateSpec{
 		Enabled:                      true,
 		RepoID:                       types.MigRepoID("repo12345"),
@@ -350,10 +327,7 @@ func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedGradleStack_U
 func TestDockerGateExecutor_AutoBootstrapSkippedWithExplicitGateProfile(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, _, workspace := newDockerGateTestHarness(t)
 	spec := &contracts.StepGateSpec{
 		Enabled:                      true,
 		RepoID:                       types.MigRepoID("repo12345"),
@@ -379,8 +353,7 @@ func TestDockerGateExecutor_AutoBootstrapSkippedWithExplicitGateProfile(t *testi
 func TestDockerGateExecutor_MountsDockerSocketForUnixDockerHost(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	socketDir := t.TempDir()
 	socketPath := filepath.Join(socketDir, "docker.sock")
@@ -422,10 +395,7 @@ func TestDockerGateExecutor_MountsDockerSocketForUnixDockerHost(t *testing.T) {
 func TestDockerGateExecutor_DoesNotMountDockerSocketForTCPDockerHost(t *testing.T) {
 	t.Parallel()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createMavenWorkspace(t, "17")
+	executor, rt, workspace := newDockerGateTestHarness(t)
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		GateProfile: &contracts.BuildGateProfileOverride{
@@ -865,10 +835,7 @@ func createPythonWorkspace(t *testing.T, pythonVersion string) string {
 func TestGateDocker_StackGate_PreCheckPass(t *testing.T) {
 	t.Parallel()
 
-	workspace := createMavenWorkspace(t, "17")
-
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, workspace := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -931,8 +898,7 @@ func TestGateDocker_StackGate_PreCheckMismatch(t *testing.T) {
 	// Create workspace with Java 11, but expect Java 17.
 	workspace := createMavenWorkspace(t, "11")
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1028,8 +994,7 @@ java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }`
 		t.Fatalf("failed to create build.gradle: %v", err)
 	}
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1102,8 +1067,7 @@ func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 	// Empty workspace.
 	tmpDir := t.TempDir()
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1157,10 +1121,7 @@ func TestGateDocker_StackGate_PreCheckUnknown_NoFiles(t *testing.T) {
 func TestGateDocker_StackGate_ImageResolution(t *testing.T) {
 	t.Parallel()
 
-	workspace := createMavenWorkspace(t, "17")
-
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, workspace := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1207,8 +1168,7 @@ func TestGateDocker_StackGate_NoMatchingDefaultRule_ReturnsNoImageRule(t *testin
 
 	workspace := createPythonWorkspace(t, "3.11")
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1258,10 +1218,7 @@ func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 	t.Parallel()
 	expectedRuntimeImage := resolveContainerRegistryPrefix() + "/maven:3-eclipse-temurin-17"
 
-	workspace := createMavenWorkspace(t, "17")
-
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, workspace := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1290,10 +1247,8 @@ func TestGateDocker_StackGate_UsesDefaultMappingFileByDefault(t *testing.T) {
 
 func TestGateDocker_StackGate_UsesStackMappedImage(t *testing.T) {
 	t.Parallel()
-	workspace := createMavenWorkspace(t, "17")
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, workspace := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1331,8 +1286,7 @@ func TestGateDocker_StackDetect_DefaultTrue_FallsBackOnMissingVersion(t *testing
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
@@ -1374,8 +1328,7 @@ func TestGateDocker_StackDetect_DefaultFalse_CancelsOnDetectionFailure(t *testin
 
 	workspace := createMavenWorkspaceNoJavaVersion(t)
 
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
+	executor, rt, _ := newDockerGateTestHarness(t)
 
 	spec := &contracts.StepGateSpec{
 		Enabled: true,

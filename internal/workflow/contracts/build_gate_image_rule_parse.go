@@ -1,8 +1,7 @@
 // build_gate_image_rule_parse.go provides parsing functions for Build Gate image rules.
 //
 // These functions parse BuildGateImageRule from map[string]any intermediate
-// representations (from JSON/YAML input). They use the existing expect*
-// helpers from parse_helpers.go for consistent error handling.
+// representations (from JSON/YAML input).
 package contracts
 
 import (
@@ -22,9 +21,9 @@ func parseBuildGateImageRule(raw map[string]any, prefix string) (BuildGateImageR
 
 	// Parse stack expectation.
 	if v, ok := raw["stack"]; ok && v != nil {
-		stackRaw, err := expectMap(v, prefix+".stack")
-		if err != nil {
-			return rule, err
+		stackRaw, ok := v.(map[string]any)
+		if !ok {
+			return rule, fmt.Errorf("%s.stack: expected object, got %T", prefix, v)
 		}
 		exp, err := parseStackExpectation(stackRaw, prefix+".stack")
 		if err != nil {
@@ -37,9 +36,9 @@ func parseBuildGateImageRule(raw map[string]any, prefix string) (BuildGateImageR
 
 	// Parse image.
 	if v, ok := raw["image"]; ok && v != nil {
-		s, err := expectString(v, prefix+".image")
-		if err != nil {
-			return rule, err
+		s, ok := v.(string)
+		if !ok {
+			return rule, fmt.Errorf("%s.image: expected string, got %T", prefix, v)
 		}
 		rule.Image = strings.TrimSpace(s)
 	}
@@ -61,9 +60,9 @@ func parseBuildGateImageRules(raw []any, prefix string) ([]BuildGateImageRule, e
 
 	rules := make([]BuildGateImageRule, 0, len(raw))
 	for i, item := range raw {
-		itemMap, err := expectMap(item, fmt.Sprintf("%s[%d]", prefix, i))
-		if err != nil {
-			return nil, err
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%s[%d]: expected object, got %T", prefix, i, item)
 		}
 		rule, err := parseBuildGateImageRule(itemMap, fmt.Sprintf("%s[%d]", prefix, i))
 		if err != nil {
