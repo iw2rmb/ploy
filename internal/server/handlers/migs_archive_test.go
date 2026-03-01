@@ -111,69 +111,48 @@ func TestMods_Archive_NotFound(t *testing.T) {
 	}
 }
 
-// TestMods_Archive_RefusesWithRunningJobs verifies PATCH /v1/migs/{mig_ref}/archive
-// returns 409 when running jobs exist.
-// Archive refuses if running jobs exist.
-func TestMods_Archive_RefusesWithRunningJobs(t *testing.T) {
-	st := &mockStore{
-		getModResult: store.Mig{
-			ID:         "mod123",
-			Name:       "test-mig",
-			ArchivedAt: pgtype.Timestamptz{Valid: false},
-		},
-		// A run exists for this mig.
-		listRunsResult: []store.Run{
-			{ID: "run1", MigID: "mod123"},
-		},
-		// That run has running jobs.
-		listJobsByRunResult: []store.Job{
-			{ID: "job1", RunID: "run1", Status: store.JobStatusRunning},
-		},
-	}
-	handler := archiveMigHandler(st)
-
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
+// TestMods_Archive_RefusesWithActiveJobs verifies PATCH /v1/migs/{mig_ref}/archive
+// returns 409 when active jobs exist.
+func TestMods_Archive_RefusesWithActiveJobs(t *testing.T) {
+	tests := []struct {
+		name      string
+		jobStatus store.JobStatus
+	}{
+		{name: "running", jobStatus: store.JobStatusRunning},
+		{name: "queued", jobStatus: store.JobStatusQueued},
 	}
 
-	// ArchiveMig should not be called.
-	if st.archiveMigCalled {
-		t.Error("store.ArchiveMig should not be called when running jobs exist")
-	}
-}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			st := &mockStore{
+				getModResult: store.Mig{
+					ID:         "mod123",
+					Name:       "test-mig",
+					ArchivedAt: pgtype.Timestamptz{Valid: false},
+				},
+				listRunsResult: []store.Run{
+					{ID: "run1", MigID: "mod123"},
+				},
+				listJobsByRunResult: []store.Job{
+					{ID: "job1", RunID: "run1", Status: tt.jobStatus},
+				},
+			}
+			handler := archiveMigHandler(st)
 
-// TestMods_Archive_RefusesWithQueuedJobs verifies PATCH /v1/migs/{mig_ref}/archive
-// returns 409 when queued jobs exist (also considered "running").
-func TestMods_Archive_RefusesWithQueuedJobs(t *testing.T) {
-	st := &mockStore{
-		getModResult: store.Mig{
-			ID:         "mod123",
-			Name:       "test-mig",
-			ArchivedAt: pgtype.Timestamptz{Valid: false},
-		},
-		listRunsResult: []store.Run{
-			{ID: "run1", MigID: "mod123"},
-		},
-		listJobsByRunResult: []store.Job{
-			{ID: "job1", RunID: "run1", Status: store.JobStatusQueued},
-		},
-	}
-	handler := archiveMigHandler(st)
+			req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
+			req.SetPathValue("mig_ref", "mod123")
+			rr := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusConflict)
+			if rr.Code != http.StatusConflict {
+				t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
+			}
+			if st.archiveMigCalled {
+				t.Fatal("store.ArchiveMig should not be called when active jobs exist")
+			}
+		})
 	}
 }
 
