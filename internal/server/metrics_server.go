@@ -95,35 +95,6 @@ func (s *MetricsServer) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Reload applies new configuration by stopping and restarting with the new config.
-func (s *MetricsServer) Reload(ctx context.Context, cfg config.MetricsConfig) error {
-	s.mu.Lock()
-	wasRunning := s.running
-	s.cfg = cfg
-
-	if !wasRunning {
-		s.mu.Unlock()
-		return nil
-	}
-
-	// Stop inline while holding the lock to prevent concurrent Start/Stop.
-	server := s.server
-	s.running = false
-	s.server = nil
-	s.addr = ""
-	s.mu.Unlock()
-
-	if server != nil {
-		shutdownCtx, cancel := context.WithTimeout(ctx, metricsShutdownTimeout)
-		defer cancel()
-		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return err
-		}
-	}
-
-	return s.Start(ctx)
-}
-
 // Addr returns the listener address if running.
 func (s *MetricsServer) Addr() string {
 	s.mu.Lock()

@@ -132,7 +132,7 @@ func runMain() int {
 	defer cancel()
 
 	// Run server.
-	if err := run(ctx, cfg, configPath, st, authorizer, authSecret, bs, bp); err != nil && !errors.Is(err, context.Canceled) {
+	if err := run(ctx, cfg, st, authorizer, authSecret, bs, bp); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("server exited", "err", err)
 		return 1
 	}

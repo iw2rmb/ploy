@@ -151,12 +151,6 @@ func (s *EventsService) Hub() *logstream.Hub {
 	return s.hub
 }
 
-// Start is a no-op; the hub is ready immediately after construction.
-func (s *EventsService) Start(context.Context) error { return nil }
-
-// Stop is a no-op; the hub requires no teardown.
-func (s *EventsService) Stop(context.Context) error { return nil }
-
 // CreateAndPublishEvent persists an event to the database and publishes it to the SSE hub.
 // The runID is used as the streamID for SSE fanout.
 // Returns the created event from the database. If persistence fails, an error

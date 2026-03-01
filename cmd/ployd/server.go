@@ -22,7 +22,7 @@ import (
 )
 
 // run executes the main server loop and blocks until the context is canceled.
-func run(ctx context.Context, cfg config.Config, configPath string, st store.Store, authorizer *auth.Authorizer, tokenSecret string, bs blobstore.Store, bp *blobpersist.Service) error {
+func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *auth.Authorizer, tokenSecret string, bs blobstore.Store, bp *blobpersist.Service) error {
 	// Initialize PKI manager for certificate renewal.
 	rotator := pki.NewDefaultRotator(slog.Default())
 	pkiManager, err := pki.New(pki.Options{
@@ -32,18 +32,6 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	if err != nil {
 		return fmt.Errorf("create pki manager: %w", err)
 	}
-
-	// Initialize config watcher for hot-reload.
-	configWatcher, err := config.NewWatcher(config.WatcherOptions{
-		Path:   configPath,
-		Logger: slog.Default(),
-	})
-	if err != nil {
-		return fmt.Errorf("create config watcher: %w", err)
-	}
-
-	// Subscribe PKI manager to config changes.
-	configWatcher.Subscribe(pkiManager)
 
 	// Initialize TTL worker.
 	var ttlWorker *ttlworker.Worker
@@ -119,23 +107,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("start pki manager: %w", err)
 	}
 
-	// Start config watcher.
-	if err := configWatcher.Start(ctx); err != nil {
-		_ = pkiManager.Stop(context.Background())
-		return fmt.Errorf("start config watcher: %w", err)
-	}
-
-	// Start events service.
-	if err := eventsService.Start(ctx); err != nil {
-		_ = configWatcher.Stop(context.Background())
-		_ = pkiManager.Stop(context.Background())
-		return fmt.Errorf("start events service: %w", err)
-	}
-
 	// Start scheduler.
 	if err := sched.Start(ctx); err != nil {
-		_ = eventsService.Stop(context.Background())
-		_ = configWatcher.Stop(context.Background())
 		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start scheduler: %w", err)
 	}
@@ -179,8 +152,6 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	if err := httpSrv.Start(ctx); err != nil {
 		// Ensure background tasks are stopped on failure.
 		_ = sched.Stop(context.Background())
-		_ = eventsService.Stop(context.Background())
-		_ = configWatcher.Stop(context.Background())
 		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start http server: %w", err)
 	}
@@ -191,8 +162,6 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		_ = httpSrv.Stop(context.Background())
 		// Stop scheduler to avoid leaking background goroutines.
 		_ = sched.Stop(context.Background())
-		_ = eventsService.Stop(context.Background())
-		_ = configWatcher.Stop(context.Background())
 		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start metrics server: %w", err)
 	}
@@ -214,16 +183,6 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	// Stop scheduler.
 	if err := sched.Stop(shutdownCtx); err != nil {
 		slog.Error("stop scheduler", "err", err)
-	}
-
-	// Stop events service.
-	if err := eventsService.Stop(shutdownCtx); err != nil {
-		slog.Error("stop events service", "err", err)
-	}
-
-	// Stop config watcher.
-	if err := configWatcher.Stop(shutdownCtx); err != nil {
-		slog.Error("stop config watcher", "err", err)
 	}
 
 	// Stop PKI manager.
