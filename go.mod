@@ -8,7 +8,6 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3
 	// NOTE: github.com/docker/docker removed — use moby Engine v29 SDK modules only.
 	github.com/docker/go-units v0.5.0
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6

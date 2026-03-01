@@ -40,26 +40,6 @@ func TestManagerTriggersRenewal(t *testing.T) {
 	}
 }
 
-func TestManagerReloadUpdatesConfig(t *testing.T) {
-	manager, err := pki.New(pki.Options{
-		Config: config.PKIConfig{
-			BundleDir:   "/etc/ploy/pki",
-			RenewBefore: 10 * time.Minute,
-		},
-		Rotator: &stubRotator{ch: make(chan struct{}, 1)},
-	})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	updated := config.PKIConfig{BundleDir: "/var/lib/ploy/pki", RenewBefore: time.Hour}
-	if err := manager.Reload(context.Background(), updated); err != nil {
-		t.Fatalf("Reload() error = %v", err)
-	}
-	if manager.Config().BundleDir != "/var/lib/ploy/pki" {
-		t.Fatalf("expected bundle dir updated, got %s", manager.Config().BundleDir)
-	}
-}
-
 type stubRotator struct {
 	ch chan struct{}
 }
@@ -202,38 +182,5 @@ func TestManagerLoopWithVerySmallRenewBefore(t *testing.T) {
 	}
 	if err := manager.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop() error = %v", err)
-	}
-}
-
-func TestManagerOnConfigReload(t *testing.T) {
-	manager, err := pki.New(pki.Options{
-		Config: config.PKIConfig{
-			BundleDir:   "/etc/ploy/pki",
-			RenewBefore: 10 * time.Minute,
-		},
-		Rotator: &stubRotator{ch: make(chan struct{}, 1)},
-	})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	fullCfg := config.Config{
-		PKI: config.PKIConfig{
-			BundleDir:   "/var/lib/ploy/pki",
-			Certificate: "/var/lib/ploy/pki/cert.pem",
-			Key:         "/var/lib/ploy/pki/key.pem",
-			RenewBefore: 2 * time.Hour,
-		},
-	}
-	if err := manager.OnConfigReload(context.Background(), fullCfg); err != nil {
-		t.Fatalf("OnConfigReload() error = %v", err)
-	}
-	if manager.Config().BundleDir != "/var/lib/ploy/pki" {
-		t.Fatalf("expected bundle dir updated to /var/lib/ploy/pki, got %s", manager.Config().BundleDir)
-	}
-	if manager.Config().Certificate != "/var/lib/ploy/pki/cert.pem" {
-		t.Fatalf("expected certificate updated, got %s", manager.Config().Certificate)
-	}
-	if manager.Config().RenewBefore != 2*time.Hour {
-		t.Fatalf("expected renew before updated to 2h, got %v", manager.Config().RenewBefore)
 	}
 }

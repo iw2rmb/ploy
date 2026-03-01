@@ -82,9 +82,9 @@ func TestStorage_New(t *testing.T) {
 	}
 }
 
-// TestStorage_ServiceStartStop verifies the service lifecycle, ensuring the service
-// can be started and stopped cleanly without errors.
-func TestStorage_ServiceStartStop(t *testing.T) {
+// TestStorage_ServiceReadyImmediately verifies the service hub is usable
+// immediately after construction without a lifecycle phase.
+func TestStorage_ServiceReadyImmediately(t *testing.T) {
 	svc, err := NewEventsService(EventsOptions{
 		BufferSize:  4,
 		HistorySize: 8,
@@ -92,17 +92,8 @@ func TestStorage_ServiceStartStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create service: %v", err)
 	}
-
-	ctx := context.Background()
-
-	// Start the service.
-	if err := svc.Start(ctx); err != nil {
-		t.Fatalf("failed to start service: %v", err)
-	}
-
-	// Stop the service.
-	if err := svc.Stop(ctx); err != nil {
-		t.Fatalf("failed to stop service: %v", err)
+	if svc.Hub() == nil {
+		t.Fatal("expected hub, got nil")
 	}
 }
 

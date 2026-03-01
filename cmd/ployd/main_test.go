@@ -120,16 +120,9 @@ func TestRun_Shutdown(t *testing.T) {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-	// Create a temporary config file for the watcher.
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ployd.yaml")
-	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
-		t.Fatalf("create temp config: %v", err)
-	}
-
 	bs := bsmock.New()
 	bp := blobpersist.New(st, bs)
-	if err := run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp); err != nil {
+	if err := run(ctx, cfg, st, authorizer, "test-secret", bs, bp); err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
 }
@@ -155,13 +148,6 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-	// Create a temporary config file for the watcher.
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ployd.yaml")
-	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
-		t.Fatalf("create temp config: %v", err)
-	}
-
 	// Create mock blobstore and blobpersist
 	bs := bsmock.New()
 	bp := blobpersist.New(st, bs)
@@ -169,7 +155,7 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 	// Start run in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp)
+		errCh <- run(ctx, cfg, st, authorizer, "test-secret", bs, bp)
 	}()
 
 	// Cancel context to trigger shutdown
@@ -249,18 +235,12 @@ func TestRun_StaleRecoverySchedulerEnabled(t *testing.T) {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "ployd.yaml")
-	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
-		t.Fatalf("create temp config: %v", err)
-	}
-
 	bs := bsmock.New()
 	bp := blobpersist.New(st, bs)
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret", bs, bp)
+		errCh <- run(ctx, cfg, st, authorizer, "test-secret", bs, bp)
 	}()
 
 	deadline := time.Now().Add(2 * time.Second)
