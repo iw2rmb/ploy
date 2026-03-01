@@ -265,8 +265,9 @@ Implementation references:
 - Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`, `RouterConfig`).
 - Spec parsing: `internal/workflow/contracts/mods_spec_parse.go` (`parseHealingSpec`, `parseRouterSpec`).
 - Spec conversion: `internal/nodeagent/run_options.go` (`modsSpecToRunOptions`).
-- Router execution: `internal/nodeagent/execution_orchestrator_gate.go` (`runRouterForGateFailure`).
+- Router execution: `internal/nodeagent/execution_orchestrator_router_runtime.go` (`runRouterForGateFailure`).
 - Healing execution: `internal/nodeagent/execution_orchestrator_jobs.go` (`executeHealingJob`).
+- Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`.
 - Summary parsing: `internal/nodeagent/recovery_io.go` (`parseBugSummary`, `parseActionSummary`).
 - Metadata types: `internal/workflow/contracts/build_gate_metadata.go` (`BugSummary`),
   `internal/workflow/contracts/job_meta.go` (`ActionSummary`).
@@ -340,6 +341,8 @@ Key invariants:
 - Gate executor: `internal/workflow/step/gate_docker.go` (`GateExecutor`).
 - Gate job execution: `internal/nodeagent/execution_orchestrator_gate.go`.
 - Healing job execution: `internal/nodeagent/execution_orchestrator_jobs.go`.
+- Router runtime: `internal/nodeagent/execution_orchestrator_router_runtime.go`.
+- Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`.
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
 - Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).
 - Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
@@ -608,7 +611,10 @@ post-gate  ───────────────▶├─▶ heal-a → 
 ### Implementation references
 
 - Job ordering/claim semantics: `internal/store/queries/jobs.sql`, `internal/nodeagent/claimer.go`
-- Healing job insertion: `internal/server/handlers/nodes_complete_healing.go`
+- Healing job insertion and chain rewiring: `internal/server/handlers/nodes_complete_healing.go`
+- Recovery classification/context: `internal/server/handlers/nodes_complete_healing_recovery_context.go`
+- Infra candidate evaluation: `internal/server/handlers/nodes_complete_healing_infra_candidate.go`
+- Linked-job cancellation traversal: `internal/server/handlers/nodes_complete_healing_cancel.go`
 
 ## 1.4 Batched Mods Runs (`runs` + `run_repos`)
 
@@ -1424,6 +1430,8 @@ Code paths most relevant for Mods:
   - `internal/nodeagent/execution_orchestrator.go`
   - `internal/nodeagent/execution_orchestrator_gate.go`
   - `internal/nodeagent/execution_orchestrator_jobs.go`
+  - `internal/nodeagent/execution_orchestrator_router_runtime.go`
+  - `internal/nodeagent/execution_orchestrator_healing_runtime.go`
   - `internal/nodeagent/recovery_io.go`
   - `internal/workflow/step/*`
 
