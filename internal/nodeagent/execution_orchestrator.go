@@ -12,12 +12,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -76,12 +78,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	)
 
 	jobType := req.JobType
-	if jobType.IsZero() {
-		jobType = inferJobTypeFromJobName(req.JobName)
-		if !jobType.IsZero() {
-			slog.Warn("job_type missing; inferred from job_name", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "job_type", jobType)
-		}
-	}
 
 	// Dispatch based on job type from claim payload.
 	switch jobType {
@@ -101,26 +97,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		err := fmt.Errorf("invalid job_type %q", jobType)
 		slog.Error("cannot execute job with invalid type", "run_id", req.RunID, "job_id", req.JobID, "job_type", jobType, "error", err)
 		r.uploadFailureStatus(ctx, req, err, 0)
-	}
-}
-
-func inferJobTypeFromJobName(jobName string) types.JobType {
-	name := strings.TrimSpace(jobName)
-	switch {
-	case strings.EqualFold(name, "pre-gate"):
-		return types.JobTypePreGate
-	case strings.EqualFold(name, "post-gate"):
-		return types.JobTypePostGate
-	case strings.HasPrefix(name, "re-gate-"):
-		return types.JobTypeReGate
-	case strings.HasPrefix(name, "heal-"):
-		return types.JobTypeHeal
-	case strings.HasPrefix(name, "mig-"):
-		return types.JobTypeMod
-	case strings.EqualFold(name, "mr"):
-		return types.JobTypeMR
-	default:
-		return ""
 	}
 }
 
@@ -190,27 +166,38 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 //     only when job attribution is not available
 func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID, jobID types.JobID) (step.Runner, step.DiffGenerator, *LogStreamer, error) {
 	// Initialize git fetcher without snapshot publishing (node agent operates on ephemeral workspaces).
-	gitFetcher, err := r.createGitFetcher()
+	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
+		CacheDir: os.Getenv("PLOYD_CACHE_HOME"),
+	})
 	if err != nil {
 		return step.Runner{}, nil, nil, fmt.Errorf("create git fetcher: %w", err)
 	}
 
 	// Initialize workspace hydrator with git fetcher.
-	workspaceHydrator, err := r.createWorkspaceHydrator(gitFetcher)
+	workspaceHydrator, err := step.NewFilesystemWorkspaceHydrator(gitFetcher)
 	if err != nil {
 		return step.Runner{}, nil, nil, fmt.Errorf("create workspace hydrator: %w", err)
 	}
 
 	// Initialize container runtime with image pull enabled.
 	// Fallback to nil if Docker is unavailable (simulated execution mode).
-	containerRuntime, err := r.createContainerRuntime()
+	network := os.Getenv("PLOY_DOCKER_NETWORK")
+	registryAuthConfig := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG"))
+	if registryAuthConfig == "" {
+		registryAuthConfig = strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG"))
+	}
+	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
+		PullImage:              true,
+		Network:                network,
+		RegistryAuthConfigJSON: registryAuthConfig,
+	})
 	if err != nil {
 		slog.Warn("docker unavailable; falling back to stub runtime", "run_id", runID, "error", err)
 		containerRuntime = nil
 	}
 
 	// Initialize diff generator for workspace change detection.
-	diffGenerator := r.createDiffGenerator()
+	diffGenerator := step.NewFilesystemDiffGenerator()
 
 	// Initialize gate executor using local Docker-based execution.
 	// All gates run via the container runtime.
@@ -219,7 +206,7 @@ func (r *runController) initializeRuntime(ctx context.Context, runID types.RunID
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	// The jobID parameter associates log chunks with a specific job, enabling
 	// per-job log attribution in the control plane.
-	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID)
+	logStreamer, err := NewLogStreamer(r.cfg, runID, jobID, r.httpClient)
 	if err != nil {
 		return step.Runner{}, nil, nil, fmt.Errorf("create log streamer: %w", err)
 	}

@@ -43,9 +43,9 @@ func TestJobImageNameSaver_SaveJobImageName_RequestShape(t *testing.T) {
 		},
 	}
 
-	saver, err := NewJobImageNameSaver(cfg)
+	saver, err := newBaseUploader(cfg)
 	if err != nil {
-		t.Fatalf("NewJobImageNameSaver() error = %v", err)
+		t.Fatalf("newBaseUploader() error = %v", err)
 	}
 
 	jobID := types.JobID("test-job-id")
@@ -89,9 +89,9 @@ func TestJobImageNameSaver_SaveJobImageName_RetryOn5xx(t *testing.T) {
 		},
 	}
 
-	saver, err := NewJobImageNameSaver(cfg)
+	saver, err := newBaseUploader(cfg)
 	if err != nil {
-		t.Fatalf("NewJobImageNameSaver() error = %v", err)
+		t.Fatalf("newBaseUploader() error = %v", err)
 	}
 
 	jobID := types.JobID("test-job-id")

@@ -15,7 +15,7 @@ func TestNilLogHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestLogStreamer_WithCustomHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestLogStreamer_HookError(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestLogStreamer_HookReturnsNil(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestLogStreamer_SetHook(t *testing.T) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -190,7 +190,7 @@ func BenchmarkLogStreamer_WithNilHook(b *testing.B) {
 		NodeID:    "aB3xY9",
 	}
 
-	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""))
+	ls, err := NewLogStreamer(cfg, types.NewRunID(), types.JobID(""), nil)
 	if err != nil {
 		b.Fatalf("NewLogStreamer() failed: %v", err)
 	}

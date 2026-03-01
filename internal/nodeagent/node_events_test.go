@@ -39,9 +39,9 @@ func TestNodeEventUploader_UploadRunEvent_RequestShape(t *testing.T) {
 		},
 	}
 
-	uploader, err := NewNodeEventUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
-		t.Fatalf("NewNodeEventUploader() error = %v", err)
+		t.Fatalf("newBaseUploader() error = %v", err)
 	}
 
 	runID := types.NewRunID()
@@ -147,7 +147,7 @@ func TestClaimManager_ClaimAndExecute_EmitsRunEventWhenStartRunFails(t *testing.
 	if err != nil {
 		t.Fatalf("NewClaimManager() error = %v", err)
 	}
-	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	claimer.preClaimCleanup = nil // nil means always proceed
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

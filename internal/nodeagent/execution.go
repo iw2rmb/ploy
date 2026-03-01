@@ -13,38 +13,7 @@ import (
 	"strings"
 
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
-	"github.com/iw2rmb/ploy/internal/worker/hydration"
-	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
-
-// createGitFetcher initializes a git fetcher for repository operations.
-func (r *runController) createGitFetcher() (hydration.GitFetcher, error) {
-	cacheDir := os.Getenv("PLOYD_CACHE_HOME")
-	return hydration.NewGitFetcher(hydration.GitFetcherOptions{
-		CacheDir: cacheDir,
-	})
-}
-
-func (r *runController) createWorkspaceHydrator(fetcher hydration.GitFetcher) (step.WorkspaceHydrator, error) {
-	return step.NewFilesystemWorkspaceHydrator(fetcher)
-}
-
-func (r *runController) createContainerRuntime() (step.ContainerRuntime, error) {
-	network := os.Getenv("PLOY_DOCKER_NETWORK")
-	registryAuthConfig := strings.TrimSpace(os.Getenv("PLOY_DOCKER_AUTH_CONFIG"))
-	if registryAuthConfig == "" {
-		registryAuthConfig = strings.TrimSpace(os.Getenv("DOCKER_AUTH_CONFIG"))
-	}
-	return step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
-		PullImage:              true,
-		Network:                network,
-		RegistryAuthConfigJSON: registryAuthConfig,
-	})
-}
-
-func (r *runController) createDiffGenerator() step.DiffGenerator {
-	return step.NewFilesystemDiffGenerator()
-}
 
 // RehydrateWorkspaceFromBaseAndDiffs copies the base clone and applies ordered per-step diffs
 // to reconstruct workspace state for multi-step runs.

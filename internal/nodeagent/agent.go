@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/nodeagent/git"
+	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
@@ -31,45 +33,25 @@ type Agent struct {
 
 // New constructs a new node agent.
 func New(cfg Config) (*Agent, error) {
-	// Create shared HTTP uploaders once at initialization.
-	// These are reused across all jobs to avoid creating new HTTP clients per
-	// upload call, which enables connection pooling and reduces overhead.
+	// Create a single shared uploader (HTTP client) for all upload operations.
 	// The underlying http.Client is safe for concurrent use by multiple goroutines.
-	diffUploader, err := NewDiffUploader(cfg)
+	uploader, err := newBaseUploader(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("create diff uploader: %w", err)
-	}
-
-	artifactUploader, err := NewArtifactUploader(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create artifact uploader: %w", err)
-	}
-
-	statusUploader, err := newBaseUploader(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create status uploader: %w", err)
-	}
-
-	jobImageNameSaver, err := NewJobImageNameSaver(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create job image name saver: %w", err)
-	}
-
-	nodeEventUploader, err := NewNodeEventUploader(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create node event uploader: %w", err)
+		return nil, fmt.Errorf("create uploader: %w", err)
 	}
 
 	// Initialize controller with typed JobID keys for compile-time safety.
-	// The shared uploaders are passed in to enable HTTP client reuse.
 	controller := &runController{
 		cfg:               cfg,
 		jobs:              make(map[types.JobID]*jobContext),
-		diffUploader:      diffUploader,
-		artifactUploader:  artifactUploader,
-		statusUploader:    statusUploader,
-		jobImageNameSaver: jobImageNameSaver,
-		nodeEventUploader: nodeEventUploader,
+		diffUploader:      uploader,
+		artifactUploader:  uploader,
+		statusUploader:    uploader,
+		jobImageNameSaver: uploader,
+		nodeEventUploader: uploader,
+		httpClient:        uploader.client,
+		newPusher:         git.NewPusher,
+		newMRClient:       func() mrCreator { return gitlab.NewMRClient() },
 	}
 
 	server, err := NewServer(cfg, controller)

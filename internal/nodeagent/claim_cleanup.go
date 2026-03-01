@@ -15,6 +15,9 @@ import (
 	"github.com/moby/moby/client"
 )
 
+// minDockerFreeBytes is the minimum free disk space (1 GiB) required in the
+// Docker root directory before claiming new work. Below this threshold the
+// pre-claim cleanup removes stopped Ploy containers to reclaim space.
 const minDockerFreeBytes int64 = 1 << 30
 
 type claimCleanupDockerClient interface {
@@ -30,15 +33,16 @@ type dockerPreClaimCleanup struct {
 	freeBytes freeBytesFunc
 }
 
-func newDockerPreClaimCleanup() (preClaimCleanup, error) {
+func newDockerPreClaimCleanup() (preClaimCleanupFunc, error) {
 	dockerClient, err := client.New(client.FromEnv)
 	if err != nil {
 		return nil, fmt.Errorf("create docker client: %w", err)
 	}
-	return &dockerPreClaimCleanup{
+	cleanup := &dockerPreClaimCleanup{
 		docker:    dockerClient,
 		freeBytes: dockerRootFreeBytes,
-	}, nil
+	}
+	return cleanup.EnsureCapacity, nil
 }
 
 func (c *dockerPreClaimCleanup) EnsureCapacity(ctx context.Context) (bool, error) {

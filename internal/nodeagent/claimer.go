@@ -24,11 +24,11 @@ type ClaimManager struct {
 	statusUploader     *baseUploader
 	statusUploaderOnce sync.Once
 	statusUploaderErr  error
-	eventUploader      *NodeEventUploader
+	eventUploader      *baseUploader
 	eventUploaderOnce  sync.Once
 	eventUploaderErr   error
 	controller         RunController
-	preClaimCleanup    preClaimCleanup
+	preClaimCleanup    preClaimCleanupFunc
 	startupReconciler  *startupCrashReconciler
 	startupOnce        sync.Once
 	startupErr         error

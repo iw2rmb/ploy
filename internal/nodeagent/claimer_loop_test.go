@@ -71,9 +71,9 @@ func TestClaimAndExecute_PreClaimCleanupBlocksClaim(t *testing.T) {
 
 	controller := &mockRunController{}
 	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
-	claimer.preClaimCleanup = preClaimCleanupFunc(func(context.Context) (bool, error) {
+	claimer.preClaimCleanup = func(context.Context) (bool, error) {
 		return false, nil
-	})
+	}
 
 	claimed, err := claimer.claimAndExecute(context.Background())
 	if err != nil {
@@ -109,9 +109,9 @@ func TestClaimAndExecute_PreClaimCleanupAllowsClaim(t *testing.T) {
 
 	controller := &mockRunController{}
 	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
-	claimer.preClaimCleanup = preClaimCleanupFunc(func(context.Context) (bool, error) {
+	claimer.preClaimCleanup = func(context.Context) (bool, error) {
 		return true, nil
-	})
+	}
 
 	claimed, err := claimer.claimAndExecute(context.Background())
 	if err != nil {

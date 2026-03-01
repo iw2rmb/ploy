@@ -49,8 +49,9 @@ type LogStreamer struct {
 }
 
 // NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
+// When client is non-nil it is reused; otherwise a new HTTP client is created.
 // Returns an error if HTTP client creation fails (e.g., missing bearer token).
-func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) (*LogStreamer, error) {
+func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID, client *http.Client) (*LogStreamer, error) {
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
@@ -61,14 +62,15 @@ func NewLogStreamer(cfg Config, runID types.RunID, jobID types.JobID) (*LogStrea
 	}
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
 
-	// Initialize HTTP client (honors mTLS when enabled in cfg).
-	// Fail hard if client creation fails - a fallback to unauthenticated client
-	// would silently fail all uploads, causing log data loss.
-	client, err := createHTTPClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create HTTP client for log streamer: %w", err)
+	if client != nil {
+		ls.httpClient = client
+	} else {
+		c, err := createHTTPClient(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("create HTTP client for log streamer: %w", err)
+		}
+		ls.httpClient = c
 	}
-	ls.httpClient = client
 
 	// Start background flusher.
 	go ls.periodicFlush()

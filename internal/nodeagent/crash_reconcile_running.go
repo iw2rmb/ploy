@@ -119,7 +119,7 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 }
 
 func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID, logs []byte) error {
-	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID)
+	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID, nil)
 	if err != nil {
 		return fmt.Errorf("create recovered log streamer: %w", err)
 	}

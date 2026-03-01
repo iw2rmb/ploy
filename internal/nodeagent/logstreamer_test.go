@@ -52,7 +52,7 @@ func TestLogStreamer_Write(t *testing.T) {
 			}
 			runID := types.NewRunID()
 			jobID := types.NewJobID()
-			ls, err := NewLogStreamer(cfg, runID, jobID)
+			ls, err := NewLogStreamer(cfg, runID, jobID, nil)
 			if err != nil {
 				t.Fatalf("NewLogStreamer() failed: %v", err)
 			}
@@ -81,7 +81,7 @@ func TestLogStreamer_SizeCap(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestLogStreamer_Close(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestLogStreamer_FlushInterval(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestLogStreamer_ChunkNumbering(t *testing.T) {
 		ServerURL: "http://localhost:8443",
 	}
 	runID := types.NewRunID()
-	ls, err := NewLogStreamer(cfg, runID, types.JobID(""))
+	ls, err := NewLogStreamer(cfg, runID, types.JobID(""), nil)
 	if err != nil {
 		t.Fatalf("NewLogStreamer() failed: %v", err)
 	}
@@ -340,7 +340,7 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 				NodeID:    "aB3xY9",
 				ServerURL: server.URL,
 			}
-			ls, err := NewLogStreamer(cfg, runID, tt.jobID)
+			ls, err := NewLogStreamer(cfg, runID, tt.jobID, nil)
 			if err != nil {
 				t.Fatalf("NewLogStreamer() failed: %v", err)
 			}

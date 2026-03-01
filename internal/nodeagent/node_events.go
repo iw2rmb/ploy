@@ -3,87 +3,15 @@ package nodeagent
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
-	"net/http"
-	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// NodeEventUploader posts run-scoped node events to the control plane.
-type NodeEventUploader struct {
-	*baseUploader
-}
-
-func NewNodeEventUploader(cfg Config) (*NodeEventUploader, error) {
-	base, err := newBaseUploader(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &NodeEventUploader{baseUploader: base}, nil
-}
-
-// UploadRunEvent posts a single structured event for a run.
-func (u *NodeEventUploader) UploadRunEvent(
-	ctx context.Context,
-	runID types.RunID,
-	jobID *types.JobID,
-	level string,
-	message string,
-	meta map[string]any,
-) error {
-	if runID.IsZero() {
-		return fmt.Errorf("run_id is required")
-	}
-
-	message = strings.TrimSpace(message)
-	if message == "" {
-		return fmt.Errorf("event message is required")
-	}
-
-	level = strings.ToLower(strings.TrimSpace(level))
-	if level == "" {
-		level = "error"
-	}
-
-	timeValue := time.Now().UTC().Format(time.RFC3339Nano)
-	payload := struct {
-		RunID  types.RunID `json:"run_id"`
-		Events []struct {
-			JobID   *types.JobID   `json:"job_id,omitempty"`
-			Time    *string        `json:"time,omitempty"`
-			Level   string         `json:"level"`
-			Message string         `json:"message"`
-			Meta    map[string]any `json:"meta,omitempty"`
-		} `json:"events"`
-	}{
-		RunID: runID,
-		Events: []struct {
-			JobID   *types.JobID   `json:"job_id,omitempty"`
-			Time    *string        `json:"time,omitempty"`
-			Level   string         `json:"level"`
-			Message string         `json:"message"`
-			Meta    map[string]any `json:"meta,omitempty"`
-		}{
-			{
-				JobID:   jobID,
-				Time:    &timeValue,
-				Level:   level,
-				Message: message,
-				Meta:    meta,
-			},
-		},
-	}
-
-	apiPath := fmt.Sprintf("/v1/nodes/%s/events", u.cfg.NodeID.String())
-	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload node event")
-	if err != nil {
-		return err
-	}
-	_ = resp.Body.Close()
-	return nil
+// nodeEventTimeNow returns the current time formatted for node event payloads.
+func nodeEventTimeNow() string {
+	return time.Now().UTC().Format(time.RFC3339Nano)
 }
 
 func eventLevelFromErr(err error) string {
@@ -117,10 +45,6 @@ func (r *runController) emitRunEvent(runID types.RunID, jobID *types.JobID, leve
 		return
 	}
 
-	if err := r.ensureUploaders(); err != nil {
-		slog.Warn("failed to initialize node event uploader", "run_id", runID, "error", err)
-		return
-	}
 	if r.nodeEventUploader == nil {
 		slog.Warn("node event uploader is not initialized", "run_id", runID)
 		return
@@ -156,9 +80,9 @@ func (c *ClaimManager) emitRunException(runID types.RunID, jobID *types.JobID, m
 	}
 }
 
-func (c *ClaimManager) ensureNodeEventUploader() (*NodeEventUploader, error) {
+func (c *ClaimManager) ensureNodeEventUploader() (*baseUploader, error) {
 	c.eventUploaderOnce.Do(func() {
-		c.eventUploader, c.eventUploaderErr = NewNodeEventUploader(c.cfg)
+		c.eventUploader, c.eventUploaderErr = newBaseUploader(c.cfg)
 	})
 	if c.eventUploaderErr != nil {
 		return nil, c.eventUploaderErr
