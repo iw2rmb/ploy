@@ -39,4 +39,3 @@ func TestParseReleaseValue(t *testing.T) {
 		})
 	}
 }
-

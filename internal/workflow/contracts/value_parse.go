@@ -25,4 +25,3 @@ func ParseReleaseValue(v any, field string) (string, error) {
 		return "", fmt.Errorf("%s: expected string or number, got %T", field, v)
 	}
 }
-

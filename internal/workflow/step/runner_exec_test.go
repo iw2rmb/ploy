@@ -110,10 +110,10 @@ func TestRunner_Run_DoesNotRemoveContainerAfterCompletion(t *testing.T) {
 		},
 	}
 	req := Request{
-		RunID:      types.RunID("run-123"),
-		Manifest:   manifest,
-		Workspace:  "/tmp/test-workspace",
-		OutDir:     "/tmp/test-out",
+		RunID:     types.RunID("run-123"),
+		Manifest:  manifest,
+		Workspace: "/tmp/test-workspace",
+		OutDir:    "/tmp/test-out",
 	}
 
 	if _, err := runner.Run(context.Background(), req); err != nil {

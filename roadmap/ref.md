@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/server/handlers -run 'TestMaybeCreateHealingJobs|TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain'`
 
 ## Phase 2: Consolidate Claim Spec Mutation to One Typed Pass
-- [ ] Replace repeated parse/marshal spec mutations in claim path with a single typed mutator pipeline.
+- [x] Replace repeated parse/marshal spec mutations in claim path with a single typed mutator pipeline.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope:
