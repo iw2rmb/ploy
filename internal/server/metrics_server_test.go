@@ -11,7 +11,7 @@ import (
 )
 
 func TestServerStartStop(t *testing.T) {
-	srv := server.NewMetricsServer(server.MetricsOptions{Listen: "127.0.0.1:0"})
+	srv := server.NewMetricsServer("127.0.0.1:0")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {
@@ -28,7 +28,7 @@ func TestServerStartStop(t *testing.T) {
 }
 
 func TestServerReload(t *testing.T) {
-	srv := server.NewMetricsServer(server.MetricsOptions{Listen: "127.0.0.1:0"})
+	srv := server.NewMetricsServer("127.0.0.1:0")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {
@@ -47,7 +47,7 @@ func TestServerReload(t *testing.T) {
 }
 
 func TestServerStopTimeout(t *testing.T) {
-	srv := server.NewMetricsServer(server.MetricsOptions{Listen: "127.0.0.1:0"})
+	srv := server.NewMetricsServer("127.0.0.1:0")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := srv.Start(ctx); err != nil {

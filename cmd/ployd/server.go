@@ -173,9 +173,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)
 
 	// Initialize metrics server.
-	metricsSrv := server.NewMetricsServer(server.MetricsOptions{
-		Listen: cfg.Metrics.Listen,
-	})
+	metricsSrv := server.NewMetricsServer(cfg.Metrics.Listen)
 
 	// Start HTTP server.
 	if err := httpSrv.Start(ctx); err != nil {

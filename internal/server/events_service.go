@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -33,9 +34,10 @@ type EventsOptions struct {
 // EventsService wraps the logstream hub for server-side event streaming
 // and coordinates database persistence with SSE fanout.
 type EventsService struct {
-	hub    *logstream.Hub
-	store  store.Store
-	logger *slog.Logger
+	hub      *logstream.Hub
+	store    store.Store
+	logger   *slog.Logger
+	jobCache sync.Map // domaintypes.JobID → eventsJobContext
 }
 
 // NewEventsService constructs a new events service.
@@ -69,17 +71,11 @@ func (s *EventsService) Hub() *logstream.Hub {
 	return s.hub
 }
 
-// Start is a no-op for now; the hub is ready immediately.
-func (s *EventsService) Start(ctx context.Context) error {
-	s.logger.Info("events service started")
-	return nil
-}
+// Start is a no-op; the hub is ready immediately after construction.
+func (s *EventsService) Start(context.Context) error { return nil }
 
-// Stop gracefully stops the events service.
-func (s *EventsService) Stop(ctx context.Context) error {
-	s.logger.Info("events service stopped")
-	return nil
-}
+// Stop is a no-op; the hub requires no teardown.
+func (s *EventsService) Stop(context.Context) error { return nil }
 
 // CreateAndPublishEvent persists an event to the database and publishes it to the SSE hub.
 // The runID is used as the streamID for SSE fanout.
@@ -133,9 +129,10 @@ func (s *EventsService) CreateAndPublishLog(ctx context.Context, log store.Log, 
 	}
 
 	// Fan out to SSE hub with the provided data bytes.
+	// SSE fanout is best-effort; log errors but don't fail the operation
+	// since the blob is already persisted and is the source of truth.
 	if err := s.publishLogToHubWithBytes(ctx, runID, log, data); err != nil {
 		s.logger.Error("SSE fanout failed", "log_id", log.ID, "error", err)
-		return err
 	}
 
 	return nil
@@ -256,6 +253,12 @@ func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.J
 	if jobID == nil || jobID.IsZero() {
 		return eventsJobContext{}
 	}
+
+	// Check cache first to avoid redundant DB lookups during log bursts.
+	if cached, ok := s.jobCache.Load(*jobID); ok {
+		return cached.(eventsJobContext)
+	}
+
 	// If store is not configured, return empty context (log-only mode).
 	if s.store == nil {
 		return eventsJobContext{}
@@ -296,11 +299,13 @@ func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.J
 		}
 	}
 
-	return eventsJobContext{
+	jctx := eventsJobContext{
 		NodeID:  nid,
 		JobID:   jid,
 		JobType: mt,
 	}
+	s.jobCache.Store(*jobID, jctx)
+	return jctx
 }
 
 // timestampToString converts a pgtype.Timestamptz to RFC3339 string.

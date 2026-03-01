@@ -400,7 +400,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			// If the repo reached terminal state, check if the run should transition to Finished.
 			// runs.status becomes Finished when all repos are terminal.
 			if repoUpdated {
-				if completeErr := maybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run, runID); completeErr != nil {
+				if completeErr := maybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run); completeErr != nil {
 					slog.Error("complete job: failed to check run completion",
 						"job_id", jobID,
 						"next_id", job.NextID,

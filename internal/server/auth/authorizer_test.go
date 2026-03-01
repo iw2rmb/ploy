@@ -179,7 +179,7 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 			hasTLS:        false,
 			wantCode:      http.StatusForbidden,
 			wantCalled:    false,
-			wantErrorMsg:  "authentication required: provide Bearer token",
+			wantErrorMsg:  "authentication failed",
 		},
 		{
 			name:          "insecure mode allows request without authentication",

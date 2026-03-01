@@ -19,16 +19,16 @@ package auth
 import (
 	"context"
 	"crypto/x509"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5"
 )
 
 // Role represents an authentication role for access control.
@@ -40,6 +40,13 @@ const (
 	RoleWorker       Role = "worker"
 	RoleCLIAdmin     Role = "cli-admin"
 )
+
+// roleIncludes defines the role hierarchy. Each key role is implicitly
+// granted access to routes that allow any of its included roles.
+// For example, cli-admin is a superset of control-plane.
+var roleIncludes = map[Role][]Role{
+	RoleCLIAdmin: {RoleControlPlane},
+}
 
 // Options configure the Authorizer.
 //
@@ -59,9 +66,10 @@ type Options struct {
 type Authorizer struct {
 	allowInsecure bool
 	defaultRole   Role
-	tokenSecret   string        // JWT signing secret
-	querier       store.Querier // Database for token validation
-	logger        *slog.Logger  // Structured logger
+	tokenSecret   string         // JWT signing secret
+	querier       store.Querier  // Database for token validation
+	logger        *slog.Logger   // Structured logger
+	wg            sync.WaitGroup // tracks in-flight background work (e.g. token last-used updates)
 }
 
 // Identity describes the caller extracted from the TLS certificate.
@@ -72,6 +80,22 @@ type Identity struct {
 }
 
 type identityKey struct{}
+type queryTokenAllowedKey struct{}
+
+// WithQueryTokenAllowed wraps a handler to indicate that query-parameter
+// token authentication is permitted on this route. The flag is read by
+// identityFromRequest to decide whether to accept auth_token query params.
+func WithQueryTokenAllowed(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), queryTokenAllowedKey{}, true)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func isQueryTokenAllowed(r *http.Request) bool {
+	v, _ := r.Context().Value(queryTokenAllowedKey{}).(bool)
+	return v
+}
 
 // NewAuthorizer constructs an Authorizer.
 func NewAuthorizer(opts Options) *Authorizer {
@@ -88,6 +112,10 @@ func NewAuthorizer(opts Options) *Authorizer {
 		logger:        logger,
 	}
 }
+
+// Wait blocks until all in-flight background work (e.g. token last-used
+// updates) completes. Call during server shutdown for graceful drain.
+func (a *Authorizer) Wait() { a.wg.Wait() }
 
 // IdentityFromContext returns the previously extracted identity, if any.
 func IdentityFromContext(ctx context.Context) (Identity, bool) {
@@ -111,11 +139,14 @@ func ContextWithIdentity(ctx context.Context, identity Identity) context.Context
 // Middleware enforces the provided role allowlist (empty slice permits any role while still requiring TLS).
 func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler {
 	normalized := allowlist(allowed)
-	// Treat cli-admin as a superset of control-plane for authorization purposes.
-	// If a route allows control-plane, cli-admin should also be allowed.
-	if normalized != nil {
-		if _, ok := normalized[RoleControlPlane]; ok {
-			normalized[RoleCLIAdmin] = struct{}{}
+	// Expand the allowlist using the role hierarchy so that superroles
+	// (e.g. cli-admin) are automatically permitted on routes that allow
+	// any of their included roles (e.g. control-plane).
+	for superRole, includes := range roleIncludes {
+		for _, included := range includes {
+			if _, ok := normalized[included]; ok {
+				normalized[superRole] = struct{}{}
+			}
 		}
 	}
 	return func(next http.Handler) http.Handler {
@@ -127,34 +158,12 @@ func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			identity, err := a.identityFromRequest(r)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusForbidden)
+				a.logger.Warn("auth: request denied",
+					"method", r.Method,
+					"path", r.URL.Path,
+					"error", err)
+				http.Error(w, "authentication failed", http.StatusForbidden)
 				return
-			}
-
-			// For worker-role callers using mutating methods, require explicit
-			// node ID header so node identity is always available to downstream
-			// handlers regardless of auth mechanism (mTLS or bearer). Skip this
-			// enforcement in insecure mode to preserve local test behaviors.
-			// Note: Node IDs are now NanoID(6) strings (6 characters from URL-safe alphabet).
-			if !a.allowInsecure &&
-				identity.Role == RoleWorker &&
-				(r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodDelete) &&
-				(strings.HasPrefix(r.URL.Path, "/v1/nodes/") ||
-					strings.HasPrefix(r.URL.Path, "/v1/jobs/") ||
-					strings.HasPrefix(r.URL.Path, "/v1/runs/")) {
-				nodeHeader := strings.TrimSpace(r.Header.Get("PLOY_NODE_UUID"))
-				if nodeHeader == "" {
-					http.Error(w, "PLOY_NODE_UUID header is required", http.StatusBadRequest)
-					return
-				}
-				// Validate NanoID format: must be non-empty string.
-				// NanoID(6) uses URL-safe alphabet (A-Za-z0-9_-) but we don't
-				// enforce strict character validation here since the store layer
-				// will reject invalid node IDs on lookup.
-				if len(nodeHeader) == 0 {
-					http.Error(w, "invalid PLOY_NODE_UUID header: empty value", http.StatusBadRequest)
-					return
-				}
 			}
 
 			if len(normalized) > 0 {
@@ -183,8 +192,9 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 	}
 
 	// Fallback for browser/OSC8 artifact links:
-	// allow auth_token query parameter on explicit GET artifact endpoints.
-	if queryTokenAuthAllowed(r) {
+	// allow auth_token query parameter on routes registered with
+	// HandleFuncAllowQueryToken (indicated via context flag).
+	if r.Method == http.MethodGet && isQueryTokenAllowed(r) {
 		if token := strings.TrimSpace(r.URL.Query().Get("auth_token")); token != "" {
 			a.logger.Debug("auth: attempting query token authentication",
 				"method", r.Method,
@@ -231,34 +241,6 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 		CommonName: cert.Subject.CommonName,
 		Serial:     cert.SerialNumber.String(),
 	}, nil
-}
-
-func queryTokenAuthAllowed(r *http.Request) bool {
-	if r == nil || r.URL == nil {
-		return false
-	}
-	if r.Method != http.MethodGet {
-		return false
-	}
-
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	// /v1/runs/{id}/logs
-	if len(parts) == 4 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "logs" && parts[2] != "" {
-		return true
-	}
-	// /v1/runs/{run_id}/repos/{repo_id}/logs
-	if len(parts) == 6 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "repos" && parts[5] == "logs" && parts[2] != "" && parts[4] != "" {
-		return true
-	}
-	// /v1/runs/{run_id}/repos/{repo_id}/diffs (download links).
-	if len(parts) == 6 && parts[0] == "v1" && parts[1] == "runs" && parts[3] == "repos" && parts[5] == "diffs" && parts[2] != "" && parts[4] != "" {
-		return true
-	}
-	// /v1/migs/{mig_ref}/specs/latest (spec download link).
-	if len(parts) == 5 && parts[0] == "v1" && parts[1] == "migs" && parts[3] == "specs" && parts[4] == "latest" && parts[2] != "" {
-		return true
-	}
-	return false
 }
 
 func extractRole(cert *x509.Certificate) Role {
@@ -327,7 +309,12 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 	}
 
 	// Update last_used_at/used_at asynchronously for all token types.
-	go a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
+	// Tracked via WaitGroup so Wait() can drain in-flight updates on shutdown.
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
+	}()
 
 	a.logger.Info("auth: bearer token validated successfully",
 		"token_id", claims.ID,
@@ -360,16 +347,7 @@ func (a *Authorizer) isTokenRevoked(ctx context.Context, tokenID, tokenType stri
 	}
 
 	if err != nil {
-		// If the query returns no rows, the token is not revoked
-		if err == sql.ErrNoRows {
-			return false, nil
-		}
-		// Check for pgx "no rows" error
-		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "02000" {
-			return false, nil
-		}
-		// Check for pgx "no rows in result set" error (returned by QueryRow().Scan())
-		if strings.Contains(err.Error(), "no rows in result set") {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
 		return false, fmt.Errorf("query token revocation: %w", err)
@@ -408,6 +386,14 @@ func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType
 // NormalizeRole normalizes a role string to one of the standard role constants.
 // It accepts common aliases and returns the canonical role name.
 // Returns empty Role if the value doesn't match any known role.
+//
+// Aliases exist because certificate OUs and CNs may use different naming
+// conventions depending on when they were issued:
+//
+//	control-plane: "beacon" (legacy agent name), "control", "controlplane",
+//	               "client" (generic TLS client)
+//	worker:        "node" (cert CN prefix for node agents)
+//	cli-admin:     "cliadmin", "admin"
 func NormalizeRole(value string) Role {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "beacon", "control", "control-plane", "controlplane", "client":

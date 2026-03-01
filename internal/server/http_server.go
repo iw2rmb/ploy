@@ -16,6 +16,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
+const (
+	// httpReadHeaderTimeout caps how long the server waits for request headers
+	// after accepting a connection. Protects against slowloris-style attacks.
+	httpReadHeaderTimeout = 10 * time.Second
+
+	// httpShutdownTimeout bounds the graceful shutdown drain period.
+	httpShutdownTimeout = 10 * time.Second
+)
+
 // HTTPOptions configure the HTTP server.
 type HTTPOptions struct {
 	Config     config.HTTPConfig
@@ -62,23 +71,12 @@ func (s *HTTPServer) Start(ctx context.Context) error {
 
 	srv := &http.Server{
 		Handler:           s.mux,
-		ReadHeaderTimeout: 10 * time.Second,
+		ReadHeaderTimeout: httpReadHeaderTimeout,
 		ReadTimeout:       s.cfg.ReadTimeout,
 		WriteTimeout:      s.cfg.WriteTimeout,
 		IdleTimeout:       s.cfg.IdleTimeout,
 		// Propagate the provided context to all connections/requests.
 		BaseContext: func(net.Listener) context.Context { return ctx },
-	}
-
-	// Apply sensible defaults if not configured.
-	if srv.ReadTimeout == 0 {
-		srv.ReadTimeout = 30 * time.Second
-	}
-	if srv.WriteTimeout == 0 {
-		srv.WriteTimeout = 30 * time.Second
-	}
-	if srv.IdleTimeout == 0 {
-		srv.IdleTimeout = 120 * time.Second
 	}
 
 	s.httpServer = srv
@@ -116,7 +114,7 @@ func (s *HTTPServer) Stop(ctx context.Context) error {
 	s.mu.Unlock()
 
 	if srv != nil {
-		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(ctx, httpShutdownTimeout)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("httpserver: shutdown: %w", err)
@@ -137,32 +135,45 @@ func (s *HTTPServer) Addr() string {
 	return s.cfg.Listen
 }
 
-// Handle registers a handler for the given pattern with optional middleware.
-// The authorizer middleware will be applied if roles are provided.
-func (s *HTTPServer) Handle(pattern string, handler http.Handler, roles ...auth.Role) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+// handle is the internal registration method. It applies panic recovery, auth
+// middleware, and optional pre-auth wrappers in the correct order:
+//
+//	panicRecovery → preAuth wrappers → auth → handler
+func (s *HTTPServer) handle(pattern string, handler http.Handler, roles []auth.Role, preAuth ...func(http.Handler) http.Handler) {
 	if len(roles) > 0 {
 		handler = s.authorizer.Middleware(roles...)(handler)
 	}
+	for i := len(preAuth) - 1; i >= 0; i-- {
+		handler = preAuth[i](handler)
+	}
 	handler = withPanicRecovery(handler)
-
 	s.mux.Handle(pattern, handler)
+}
+
+// Handle registers a handler for the given pattern with optional middleware.
+// The authorizer middleware will be applied if roles are provided.
+func (s *HTTPServer) Handle(pattern string, handler http.Handler, roles ...auth.Role) {
+	s.handle(pattern, handler, roles)
 }
 
 // HandleFunc registers a handler function for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
 func (s *HTTPServer) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
-	s.Handle(pattern, handlerFunc, roles...)
+	s.handle(pattern, handlerFunc, roles)
+}
+
+// HandleFuncAllowQueryToken registers a handler that also accepts auth_token
+// query parameters for authentication. This is intended for GET endpoints
+// serving downloadable content (logs, diffs, specs) where browser/OSC8
+// links cannot set Authorization headers.
+func (s *HTTPServer) HandleFuncAllowQueryToken(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
+	s.handle(pattern, handlerFunc, roles, auth.WithQueryTokenAllowed)
 }
 
 // Handler returns the underlying HTTP handler (ServeMux) used by the server.
 // This is primarily intended for tests that need to exercise the registered
 // routes without starting a real listener.
 func (s *HTTPServer) Handler() http.Handler {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.mux
 }
 
@@ -199,8 +210,6 @@ func withPanicRecovery(next http.Handler) http.Handler {
 
 func panicMessageSafe(recovered any) (msg string) {
 	switch v := recovered.(type) {
-	case nil:
-		return ""
 	case string:
 		return v
 	case runtime.Error:

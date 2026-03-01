@@ -155,7 +155,7 @@ func (t *StaleJobRecoveryTask) Run(ctx context.Context) error {
 			continue
 		}
 
-		finalized, err := MaybeCompleteRunIfAllReposTerminal(ctx, t.store, t.eventsService, run, stale.RunID)
+		finalized, err := MaybeCompleteRunIfAllReposTerminal(ctx, t.store, t.eventsService, run)
 		if err != nil {
 			t.logger.Error("stale-job-recovery: reconcile run status failed",
 				"run_id", stale.RunID,
