@@ -1093,7 +1093,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	}
 }
 
-func TestClaimJob_ClaimErrorWithPanickingIs_DoesNotPanic(t *testing.T) {
+func TestClaimJob_ClaimErrorWithPanickingIs_Panics(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
@@ -1106,12 +1106,13 @@ func TestClaimJob_ClaimErrorWithPanickingIs_DoesNotPanic(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatalf("expected panic from error Is implementation")
+		}
+	}()
 
 	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rr.Code)
-	}
 }
 
 func TestClaimJob_ClaimErrorWithPanickingErrorString_DoesNotPanic(t *testing.T) {

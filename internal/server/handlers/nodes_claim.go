@@ -139,9 +139,6 @@ func isNoRowsError(err error) bool {
 	if err == pgx.ErrNoRows {
 		return true
 	}
-	defer func() {
-		_ = recover()
-	}()
 	return errors.Is(err, pgx.ErrNoRows)
 }
 
