@@ -43,12 +43,15 @@ func MaybeUpdateRunRepoStatus(
 		return false, fmt.Errorf("list jobs by repo attempt: %w", err)
 	}
 
+	// Collect candidates for "last job" with priority:
+	//   1. Highest next_id from job metadata (explicit ordering)
+	//   2. Tail job (NextID is nil/zero — end of chain), latest by ID
+	//   3. Fallback: latest job by ID
 	var (
-		tailJobs         []store.Job
-		fallback         *store.Job
-		lastByNextIDMeta *store.Job
-		maxNextIDMeta    float64
-		hasNextIDMeta    bool
+		byNextIDMeta  *store.Job
+		maxNextIDMeta int64
+		bestTail      *store.Job
+		bestFallback  *store.Job
 	)
 	for i := range jobs {
 		job := &jobs[i]
@@ -65,38 +68,33 @@ func MaybeUpdateRunRepoStatus(
 			return false, nil
 		}
 
-		if fallback == nil || job.ID.String() > fallback.ID.String() {
-			fallback = job
+		if bestFallback == nil || job.ID.String() > bestFallback.ID.String() {
+			bestFallback = job
 		}
 		if nextID, ok := nextIDFromMeta(job.Meta); ok {
-			if !hasNextIDMeta || nextID > maxNextIDMeta || (nextID == maxNextIDMeta && (lastByNextIDMeta == nil || job.ID.String() > lastByNextIDMeta.ID.String())) {
+			if byNextIDMeta == nil || nextID > maxNextIDMeta || (nextID == maxNextIDMeta && job.ID.String() > byNextIDMeta.ID.String()) {
 				maxNextIDMeta = nextID
-				lastByNextIDMeta = job
-				hasNextIDMeta = true
+				byNextIDMeta = job
 			}
 		}
 		if job.NextID == nil || job.NextID.IsZero() {
-			tailJobs = append(tailJobs, *job)
+			if bestTail == nil || job.ID.String() > bestTail.ID.String() {
+				bestTail = job
+			}
 		}
 	}
 
-	if fallback == nil {
+	if bestFallback == nil {
 		return false, nil
 	}
-	lastJob := fallback
-	if hasNextIDMeta && lastByNextIDMeta != nil {
-		lastJob = lastByNextIDMeta
+
+	// Select last job by priority.
+	lastJob := bestFallback
+	if bestTail != nil {
+		lastJob = bestTail
 	}
-	if len(tailJobs) > 0 {
-		lastJob = &tailJobs[0]
-		for i := 1; i < len(tailJobs); i++ {
-			if tailJobs[i].ID.String() > lastJob.ID.String() {
-				lastJob = &tailJobs[i]
-			}
-		}
-		if hasNextIDMeta && lastByNextIDMeta != nil {
-			lastJob = lastByNextIDMeta
-		}
+	if byNextIDMeta != nil {
+		lastJob = byNextIDMeta
 	}
 
 	var repoStatus store.RunRepoStatus
@@ -129,28 +127,17 @@ func MaybeUpdateRunRepoStatus(
 	return true, nil
 }
 
-func nextIDFromMeta(meta []byte) (float64, bool) {
+func nextIDFromMeta(meta []byte) (int64, bool) {
 	if len(meta) == 0 {
 		return 0, false
 	}
-	var raw map[string]any
-	if err := json.Unmarshal(meta, &raw); err != nil {
+	var m struct {
+		NextID *int64 `json:"next_id"`
+	}
+	if err := json.Unmarshal(meta, &m); err != nil || m.NextID == nil {
 		return 0, false
 	}
-	v, ok := raw["next_id"]
-	if !ok {
-		return 0, false
-	}
-	switch n := v.(type) {
-	case float64:
-		return n, true
-	case int:
-		return float64(n), true
-	case int64:
-		return float64(n), true
-	default:
-		return 0, false
-	}
+	return *m.NextID, true
 }
 
 // MaybeCompleteRunIfAllReposTerminal transitions runs.status to Finished only when
@@ -158,7 +145,8 @@ func nextIDFromMeta(meta []byte) (float64, bool) {
 // done SSE events.
 //
 // Returns true when the run transitions to terminal in this call.
-func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run, runID domaintypes.RunID) (bool, error) {
+func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run) (bool, error) {
+	runID := run.ID
 	if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
 		return false, nil
 	}

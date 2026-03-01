@@ -21,7 +21,7 @@ func maybeUpdateRunRepoStatus(
 }
 
 // maybeCompleteRunIfAllReposTerminal delegates to the canonical recovery reconciliation path.
-func maybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run, runID domaintypes.RunID) error {
-	_, err := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run, runID)
+func maybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run) error {
+	_, err := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run)
 	return err
 }

@@ -599,7 +599,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	}
 
 	run := store.Run{ID: runID, Status: store.RunStatusStarted}
-	if err := maybeCompleteRunIfAllReposTerminal(ctx, st, nil, run, runID); err != nil {
+	if err := maybeCompleteRunIfAllReposTerminal(ctx, st, nil, run); err != nil {
 		t.Fatalf("maybeCompleteRunIfAllReposTerminal returned error: %v", err)
 	}
 

@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -37,7 +37,7 @@ func (m *mockQuerier) CheckAPITokenRevoked(ctx context.Context, tokenID string) 
 		return m.checkAPITokenRevokedFunc(ctx, tokenID)
 	}
 	// Default: token not revoked (return no rows error)
-	return pgtype.Timestamptz{}, sql.ErrNoRows
+	return pgtype.Timestamptz{}, pgx.ErrNoRows
 }
 
 func (m *mockQuerier) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
@@ -45,7 +45,7 @@ func (m *mockQuerier) CheckBootstrapTokenRevoked(ctx context.Context, tokenID st
 		return m.checkBootstrapTokenRevokedFunc(ctx, tokenID)
 	}
 	// Default: token not revoked
-	return pgtype.Timestamptz{}, sql.ErrNoRows
+	return pgtype.Timestamptz{}, pgx.ErrNoRows
 }
 
 func (m *mockQuerier) UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error {
@@ -212,8 +212,8 @@ func TestAuthorizerBearerToken_RevokedToken(t *testing.T) {
 	if rr.Code != http.StatusForbidden {
 		t.Errorf("got status %d, want %d", rr.Code, http.StatusForbidden)
 	}
-	if !contains(rr.Body.String(), "revoked") {
-		t.Errorf("expected error message to mention 'revoked', got: %s", rr.Body.String())
+	if !contains(rr.Body.String(), "authentication failed") {
+		t.Errorf("expected generic error message, got: %s", rr.Body.String())
 	}
 }
 
@@ -489,7 +489,7 @@ func TestAuthorizerBearerToken_InsecureModeWithToken(t *testing.T) {
 	}
 }
 
-func TestAuthorizerQueryToken_AllowedArtifactPaths(t *testing.T) {
+func TestAuthorizerQueryToken_AllowedWhenContextFlagSet(t *testing.T) {
 	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
 	clusterID := "test-cluster"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -498,33 +498,28 @@ func TestAuthorizerQueryToken_AllowedArtifactPaths(t *testing.T) {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
 
-	auth := NewAuthorizer(Options{
+	a := NewAuthorizer(Options{
 		AllowInsecure: false,
 		TokenSecret:   secret,
 		Querier:       &mockQuerier{},
 	})
 
-	tests := []string{
-		"/v1/runs/run-123/logs?auth_token=" + tokenString,
-		"/v1/runs/run-123/repos/repo-123/logs?auth_token=" + tokenString,
-		"/v1/runs/run-123/repos/repo-123/diffs?download=true&diff_id=diff-1&auth_token=" + tokenString,
-		"/v1/migs/mig-123/specs/latest?auth_token=" + tokenString,
-	}
+	// Simulate the registration pattern: WithQueryTokenAllowed wraps
+	// the auth middleware, which mirrors HandleFuncAllowQueryToken.
+	inner := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	handler := WithQueryTokenAllowed(inner)
 
-	for _, path := range tests {
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		rr := httptest.NewRecorder()
-		handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
-		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatalf("path %s: got status %d, want %d; body=%q", path, rr.Code, http.StatusOK, rr.Body.String())
-		}
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run-123/logs?auth_token="+tokenString, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d; body=%q", rr.Code, http.StatusOK, rr.Body.String())
 	}
 }
 
-func TestAuthorizerQueryToken_DisallowedPathOrMethod(t *testing.T) {
+func TestAuthorizerQueryToken_RejectedWithoutContextFlag(t *testing.T) {
 	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
 	clusterID := "test-cluster"
 	expiresAt := time.Now().Add(24 * time.Hour)
@@ -533,29 +528,61 @@ func TestAuthorizerQueryToken_DisallowedPathOrMethod(t *testing.T) {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
 
-	auth := NewAuthorizer(Options{
+	a := NewAuthorizer(Options{
 		AllowInsecure: false,
 		TokenSecret:   secret,
 		Querier:       &mockQuerier{},
 	})
+
+	// Without WithQueryTokenAllowed wrapping, query token should be rejected.
+	handler := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
 
 	tests := []struct {
 		method string
 		path   string
 	}{
-		{http.MethodGet, "/v1/runs/run-123?auth_token=" + tokenString},
+		// GET with query token but no context flag
+		{http.MethodGet, "/v1/runs/run-123/logs?auth_token=" + tokenString},
+		// POST should never accept query token even with flag
 		{http.MethodPost, "/v1/runs/run-123/logs?auth_token=" + tokenString},
 	}
 
 	for _, tt := range tests {
 		req := httptest.NewRequest(tt.method, tt.path, nil)
 		rr := httptest.NewRecorder()
-		handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		}))
 		handler.ServeHTTP(rr, req)
 		if rr.Code != http.StatusForbidden {
 			t.Fatalf("%s %s: got status %d, want %d", tt.method, tt.path, rr.Code, http.StatusForbidden)
 		}
+	}
+}
+
+func TestAuthorizerQueryToken_PostRejectedEvenWithFlag(t *testing.T) {
+	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
+	clusterID := "test-cluster"
+	expiresAt := time.Now().Add(24 * time.Hour)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(RoleControlPlane), expiresAt)
+	if err != nil {
+		t.Fatalf("GenerateAPIToken error: %v", err)
+	}
+
+	a := NewAuthorizer(Options{
+		AllowInsecure: false,
+		TokenSecret:   secret,
+		Querier:       &mockQuerier{},
+	})
+
+	inner := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	handler := WithQueryTokenAllowed(inner)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run-123/logs?auth_token="+tokenString, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("POST with query token: got status %d, want %d", rr.Code, http.StatusForbidden)
 	}
 }

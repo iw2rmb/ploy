@@ -11,7 +11,7 @@ import (
 // RegisterRoutes mounts all HTTP endpoints on the given server.
 func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *server.EventsService, configHolder *ConfigHolder, tokenSecret string) {
 	// Health
-	s.HandleFunc("/health", healthHandler)
+	s.HandleFunc("/health", healthHandler(st))
 
 	// Config — GitLab
 	s.HandleFunc("GET /v1/config/gitlab", getGitLabConfigHandler(configHolder), auth.RoleCLIAdmin)
@@ -45,7 +45,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("PATCH /v1/migs/{mig_ref}/unarchive", unarchiveMigHandler(st), auth.RoleControlPlane)
 	// Set mig spec (append-only specs + migs.spec_id pointer).
 	s.HandleFunc("POST /v1/migs/{mig_ref}/specs", setMigSpecHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/migs/{mig_ref}/specs/latest", getMigLatestSpecHandler(st), auth.RoleControlPlane)
+	s.HandleFuncAllowQueryToken("GET /v1/migs/{mig_ref}/specs/latest", getMigLatestSpecHandler(st), auth.RoleControlPlane)
 	// Mig repo set management (add/list/delete + bulk CSV upsert).
 	s.HandleFunc("POST /v1/migs/{mig_id}/repos", addMigRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/migs/{mig_id}/repos", listMigReposHandler(st), auth.RoleControlPlane)
@@ -64,7 +64,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/status", getRunStatusHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/runs/{id}/logs", getRunLogsHandler(st, eventsService), auth.RoleControlPlane)
+	s.HandleFuncAllowQueryToken("GET /v1/runs/{id}/logs", getRunLogsHandler(st, eventsService), auth.RoleControlPlane)
 	// v1 API: POST /v1/runs/{id}/cancel — cancels the run, all repos (Queued/Running → Cancelled), and cancels/removes Created/Queued/Running jobs.
 	s.HandleFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
@@ -74,9 +74,9 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("GET /v1/runs/{id}/repos", listRunReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/repos/{repo_id}/restart", restartRunRepoHandler(st), auth.RoleControlPlane)
 	// Repo-scoped diffs listing.
-	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st, bs), auth.RoleControlPlane, auth.RoleWorker)
+	s.HandleFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st, bs), auth.RoleControlPlane, auth.RoleWorker)
 	// Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
-	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
+	s.HandleFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
 	// Repo-scoped artifact listing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(st), auth.RoleControlPlane)
 	// Repo-scoped job listing for --follow mode.

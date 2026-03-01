@@ -15,16 +15,19 @@ import (
 // It verifies default timeout application and custom timeout override behavior.
 func TestHTTPServer_Timeouts(t *testing.T) {
 	t.Run("default_timeouts", func(t *testing.T) {
-		// Verify server applies safe default timeouts when not configured.
-		// Timeouts are mandatory for production servers.
+		// Verify server uses config defaults (applied by config.Load / applyDefaults).
+		// HTTPServer itself does not apply fallbacks — config loading is the
+		// single source of truth for default timeouts.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
 		opts := HTTPOptions{
 			Config: config.HTTPConfig{
-				Listen: "127.0.0.1:0",
-				// No timeouts set - defaults should be applied.
+				Listen:       "127.0.0.1:0",
+				ReadTimeout:  15 * time.Second,
+				WriteTimeout: 15 * time.Second,
+				IdleTimeout:  60 * time.Second,
 			},
 			Authorizer: authorizer,
 		}
@@ -39,23 +42,21 @@ func TestHTTPServer_Timeouts(t *testing.T) {
 		}
 		defer func() { _ = srv.Stop(ctx) }()
 
-		// Verify default timeouts were applied.
 		srv.mu.Lock()
 		httpSrv := srv.httpServer
 		srv.mu.Unlock()
 
-		// ReadHeaderTimeout default is 10s per server implementation.
-		if httpSrv.ReadHeaderTimeout != 10*time.Second {
-			t.Errorf("expected ReadHeaderTimeout 10s, got %v", httpSrv.ReadHeaderTimeout)
+		if httpSrv.ReadHeaderTimeout != httpReadHeaderTimeout {
+			t.Errorf("expected ReadHeaderTimeout %v, got %v", httpReadHeaderTimeout, httpSrv.ReadHeaderTimeout)
 		}
-		if httpSrv.ReadTimeout != 30*time.Second {
-			t.Errorf("expected ReadTimeout 30s, got %v", httpSrv.ReadTimeout)
+		if httpSrv.ReadTimeout != 15*time.Second {
+			t.Errorf("expected ReadTimeout 15s, got %v", httpSrv.ReadTimeout)
 		}
-		if httpSrv.WriteTimeout != 30*time.Second {
-			t.Errorf("expected WriteTimeout 30s, got %v", httpSrv.WriteTimeout)
+		if httpSrv.WriteTimeout != 15*time.Second {
+			t.Errorf("expected WriteTimeout 15s, got %v", httpSrv.WriteTimeout)
 		}
-		if httpSrv.IdleTimeout != 120*time.Second {
-			t.Errorf("expected IdleTimeout 120s, got %v", httpSrv.IdleTimeout)
+		if httpSrv.IdleTimeout != 60*time.Second {
+			t.Errorf("expected IdleTimeout 60s, got %v", httpSrv.IdleTimeout)
 		}
 	})
 

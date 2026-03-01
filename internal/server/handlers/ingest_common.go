@@ -20,17 +20,6 @@ func requiredPathParam(r *http.Request, key string) (string, error) {
 	return val, nil
 }
 
-// optionalPathParam extracts an optional path parameter from the request.
-// Returns nil if the parameter is missing or empty, otherwise returns a pointer
-// to the trimmed value.
-func optionalPathParam(r *http.Request, key string) *string {
-	val := strings.TrimSpace(r.PathValue(key))
-	if val == "" {
-		return nil
-	}
-	return &val
-}
-
 // httpErr writes a plain-text HTTP error response. It accepts printf-style
 // formatting for the message body.
 func httpErr(w http.ResponseWriter, code int, msg string, args ...any) {

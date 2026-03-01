@@ -3,9 +3,9 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,32 +14,28 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// MetricsOptions configure the metrics server.
-type MetricsOptions struct {
-	Listen string
-}
+const (
+	// metricsReadHeaderTimeout caps header read time on the metrics endpoint.
+	metricsReadHeaderTimeout = 5 * time.Second
+	metricsReadTimeout       = 10 * time.Second
+	metricsWriteTimeout      = 10 * time.Second
+	metricsIdleTimeout       = 60 * time.Second
+	metricsShutdownTimeout   = 5 * time.Second
+)
 
 // MetricsServer exposes Prometheus metrics.
 type MetricsServer struct {
-	mu       sync.Mutex
-	cfg      config.MetricsConfig
-	listen   string
-	server   *http.Server
-	listener net.Listener
-	running  bool
-	addr     string
-	parent   context.Context
+	mu      sync.Mutex
+	cfg     config.MetricsConfig
+	server  *http.Server
+	running bool
+	addr    string
 }
 
 // NewMetricsServer constructs the metrics server.
-func NewMetricsServer(opts MetricsOptions) *MetricsServer {
-	listen := opts.Listen
-	if listen == "" {
-		listen = ":9100"
-	}
+func NewMetricsServer(listen string) *MetricsServer {
 	return &MetricsServer{
-		cfg:    config.MetricsConfig{Listen: listen},
-		listen: listen,
+		cfg: config.MetricsConfig{Listen: listen},
 	}
 }
 
@@ -51,32 +47,27 @@ func (s *MetricsServer) Start(ctx context.Context) error {
 		return nil
 	}
 	listen := s.cfg.Listen
-	if listen == "" {
-		listen = ":9100"
-	}
-	// Use ListenConfig with context to satisfy lint/noctx and enable cancellation.
 	lc := net.ListenConfig{}
 	ln, err := lc.Listen(ctx, "tcp", listen)
 	if err != nil {
 		return err
 	}
-	// Expose Prometheus metrics strictly under /metrics.
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{
 		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: metricsReadHeaderTimeout,
+		ReadTimeout:       metricsReadTimeout,
+		WriteTimeout:      metricsWriteTimeout,
+		IdleTimeout:       metricsIdleTimeout,
 	}
-	s.listener = ln
 	s.server = server
 	s.addr = ln.Addr().String()
 	s.running = true
-	s.parent = ctx
 	go func() {
-		_ = server.Serve(ln)
+		if err := server.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
+			slog.Error("metrics server stopped unexpectedly", "err", err)
+		}
 	}()
 	return nil
 }
@@ -89,42 +80,48 @@ func (s *MetricsServer) Stop(ctx context.Context) error {
 		return nil
 	}
 	server := s.server
-	listener := s.listener
 	s.running = false
 	s.server = nil
-	s.listener = nil
 	s.addr = ""
 	s.mu.Unlock()
 
-	if listener != nil {
-		_ = listener.Close()
-	}
 	if server != nil {
-		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(ctx, metricsShutdownTimeout)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			// Some platforms return a net.OpError wrapping "use of closed network connection"
-			// when the listener has already been closed. Treat it as benign.
-			if !strings.Contains(err.Error(), "use of closed network connection") {
-				return err
-			}
+			return err
 		}
 	}
 	return nil
 }
 
-// Reload applies new configuration.
+// Reload applies new configuration by stopping and restarting with the new config.
 func (s *MetricsServer) Reload(ctx context.Context, cfg config.MetricsConfig) error {
 	s.mu.Lock()
+	wasRunning := s.running
 	s.cfg = cfg
+
+	if !wasRunning {
+		s.mu.Unlock()
+		return nil
+	}
+
+	// Stop inline while holding the lock to prevent concurrent Start/Stop.
+	server := s.server
+	s.running = false
+	s.server = nil
+	s.addr = ""
 	s.mu.Unlock()
-	if s.running {
-		if err := s.Stop(ctx); err != nil {
+
+	if server != nil {
+		shutdownCtx, cancel := context.WithTimeout(ctx, metricsShutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
-		return s.Start(s.parent)
 	}
-	return nil
+
+	return s.Start(ctx)
 }
 
 // Addr returns the listener address if running.

@@ -53,6 +53,10 @@ func (s *Service) validate() error {
 }
 
 // persistBlob is the shared insert→upload→rollback helper.
+//
+// Note: if the upload succeeds but a higher-level operation subsequently fails,
+// the uploaded blob becomes orphaned. The DB metadata is rolled back only when
+// the upload itself fails.
 func persistBlob[T any](
 	ctx context.Context,
 	s *Service,
