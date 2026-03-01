@@ -101,6 +101,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
 	// ModStackUnknown which falls back to "default" in stack maps.
 	stack := r.loadPersistedStack(req.RunID)
+	if req.RecoveryContext != nil && req.RecoveryContext.DetectedStack != "" {
+		stack = req.RecoveryContext.DetectedStack
+	}
 
 	// Build manifest with stack-aware image resolution using typed options.
 	// stepIndex=0 is used for manifest building; job configuration comes from req.TypedOptions.
@@ -140,7 +143,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
-			return r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, schemaJSON)
+			return r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, req.RecoveryContext, schemaJSON)
 		},
 		InjectEnv: func(m *contracts.StepManifest, ws string) {
 			r.injectHealingEnvVars(m, ws)
@@ -222,7 +225,13 @@ func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context,
 // It attempts to hydrate build-gate.log when available and, for infra healing,
 // writes gate_profile.schema.json from server-injected schema env and
 // hydrates gate_profile.json when a run-local snapshot is available.
-func (r *runController) populateHealingInDir(runID types.RunID, inDir string, healingSpec *contracts.HealingSpec, schemaJSON string) error {
+func (r *runController) populateHealingInDir(
+	runID types.RunID,
+	inDir string,
+	healingSpec *contracts.HealingSpec,
+	recoveryCtx *contracts.RecoveryClaimContext,
+	schemaJSON string,
+) error {
 	if strings.TrimSpace(inDir) == "" {
 		return nil
 	}
@@ -235,17 +244,24 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string, he
 	srcPath := filepath.Join(runDir, "build-gate-first.log")
 
 	gateLogAvailable := false
-	data, err := os.ReadFile(srcPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			slog.Warn("missing run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
-		} else {
-			return fmt.Errorf("read first gate log: %w", err)
-		}
-	} else if len(strings.TrimSpace(string(data))) == 0 {
-		slog.Warn("empty run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
-	} else {
+	var data []byte
+	if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.BuildGateLog) != "" {
+		data = []byte(recoveryCtx.BuildGateLog)
 		gateLogAvailable = true
+	} else {
+		var err error
+		data, err = os.ReadFile(srcPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				slog.Warn("missing run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
+			} else {
+				return fmt.Errorf("read first gate log: %w", err)
+			}
+		} else if len(strings.TrimSpace(string(data))) == 0 {
+			slog.Warn("empty run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
+		} else {
+			gateLogAvailable = true
+		}
 	}
 
 	if gateLogAvailable {
@@ -257,10 +273,14 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string, he
 	}
 
 	if healingSpec != nil && strings.TrimSpace(healingSpec.SelectedErrorKind) == "infra" {
-		if strings.TrimSpace(schemaJSON) == "" {
+		effectiveSchema := schemaJSON
+		if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.GateProfileSchemaJSON) != "" {
+			effectiveSchema = recoveryCtx.GateProfileSchemaJSON
+		}
+		if strings.TrimSpace(effectiveSchema) == "" {
 			return fmt.Errorf("infra healing requires %s env", contracts.GateProfileSchemaJSONEnv)
 		}
-		schemaRaw := []byte(schemaJSON)
+		schemaRaw := []byte(effectiveSchema)
 		if !json.Valid(schemaRaw) {
 			return fmt.Errorf("infra healing schema env %s is not valid JSON", contracts.GateProfileSchemaJSONEnv)
 		}
@@ -270,16 +290,25 @@ func (r *runController) populateHealingInDir(runID types.RunID, inDir string, he
 		}
 		slog.Info("hydrated /in/gate_profile.schema.json for healing job", "run_id", runID, "path", inSchemaPath)
 
-		profilePath := filepath.Join(runDir, "build-gate-profile.json")
-		profileRaw, err := os.ReadFile(profilePath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return nil
+		var profileRaw []byte
+		var err error
+		if recoveryCtx != nil && len(recoveryCtx.GateProfile) > 0 {
+			profileRaw = append([]byte(nil), recoveryCtx.GateProfile...)
+		} else {
+			profilePath := filepath.Join(runDir, "build-gate-profile.json")
+			profileRaw, err = os.ReadFile(profilePath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return fmt.Errorf("read gate profile snapshot: %w", err)
 			}
-			return fmt.Errorf("read gate profile snapshot: %w", err)
 		}
 		if len(strings.TrimSpace(string(profileRaw))) == 0 {
 			return nil
+		}
+		if _, err := contracts.ParseGateProfileJSON(profileRaw); err != nil {
+			return fmt.Errorf("parse gate profile snapshot: %w", err)
 		}
 		inProfilePath := filepath.Join(inDir, "gate_profile.json")
 		if err := os.WriteFile(inProfilePath, profileRaw, 0o644); err != nil {
@@ -470,14 +499,14 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 	outDirErr := withTempDir(cfg.OutDirPattern, func(outDir string) error {
 		if cfg.InDirPattern != "" {
-				return withTempDir(cfg.InDirPattern, func(inDir string) error {
-					if cfg.PopulateInDir != nil {
-						if err := cfg.PopulateInDir(inDir); err != nil {
-							return fmt.Errorf("populate in dir: %w", err)
-						}
+			return withTempDir(cfg.InDirPattern, func(inDir string) error {
+				if cfg.PopulateInDir != nil {
+					if err := cfg.PopulateInDir(inDir); err != nil {
+						return fmt.Errorf("populate in dir: %w", err)
 					}
-					return executeBody(outDir, inDir)
-				})
+				}
+				return executeBody(outDir, inDir)
+			})
 		}
 		return executeBody(outDir, "")
 	})

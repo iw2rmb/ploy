@@ -142,6 +142,11 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
+	if len(gateResult.GeneratedGateProfile) == 0 {
+		if raw := resolveGateProfileSnapshotRaw(req.JobType, manifest.Gate, gateResult); len(raw) > 0 {
+			gateResult.GeneratedGateProfile = raw
+		}
+	}
 	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
 
 	// When gate fails and healing is configured, run the router once to produce

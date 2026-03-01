@@ -642,6 +642,33 @@ NodeClaimResponse:
         If the persisted spec in the DB is invalid or non-object, the server returns 500.
       type: object
       additionalProperties: true
+    recovery_context:
+      type: object
+      nullable: true
+      description: |
+        Typed recovery context for `heal` and `re_gate` claims.
+        Carries server-resolved recovery inputs so healing/re-gate execution does
+        not depend on node-local run cache files.
+      properties:
+        loop_kind:
+          type: string
+        selected_error_kind:
+          type: string
+        detected_stack:
+          type: string
+        resolved_healing_image:
+          type: string
+        expectations:
+          oneOf:
+            - type: object
+            - type: array
+        build_gate_log:
+          type: string
+        gate_profile:
+          type: object
+          additionalProperties: true
+        gate_profile_schema_json:
+          type: string
   required:
     - id
     - repo_id

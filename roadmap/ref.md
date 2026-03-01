@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `internal/nodeagent/execution_orchestrator_gate.go`;
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Remove Node-Local Recovery Coupling
-- [ ] Make heal/re-gate execution independent from node-local run cache files.
+- [x] Make heal/re-gate execution independent from node-local run cache files.
   - Repository: `ploy`
   - Component: `internal/nodeagent`, `internal/server/handlers`
   - Scope:

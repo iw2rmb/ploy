@@ -835,6 +835,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 			Name:        "heal-1-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeHeal.String(),
+			JobImage:    "docker.io/acme/heal:latest",
 			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`),
 		},
 		getRunResult: store.Run{
@@ -913,6 +914,19 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 	if !json.Valid([]byte(schemaRaw)) {
 		t.Fatalf("expected %s to be valid JSON", contracts.GateProfileSchemaJSONEnv)
 	}
+	rc, ok := resp["recovery_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
+	}
+	if got := rc["selected_error_kind"]; got != "infra" {
+		t.Fatalf("recovery_context.selected_error_kind=%v, want infra", got)
+	}
+	if got := rc["resolved_healing_image"]; got != "docker.io/acme/heal:latest" {
+		t.Fatalf("recovery_context.resolved_healing_image=%v, want docker.io/acme/heal:latest", got)
+	}
+	if _, ok := rc["gate_profile_schema_json"].(string); !ok {
+		t.Fatalf("expected recovery_context.gate_profile_schema_json string, got %T", rc["gate_profile_schema_json"])
+	}
 }
 
 func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
@@ -950,6 +964,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 			Name:        "heal-1-0",
 			Status:      store.JobStatusRunning,
 			JobType:     domaintypes.JobTypeHeal.String(),
+			JobImage:    "docker.io/acme/heal:latest",
 			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
 		},
 		getRunResult: store.Run{
@@ -997,6 +1012,16 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 		if _, ok := envObj[contracts.GateProfileSchemaJSONEnv]; ok {
 			t.Fatalf("did not expect %s for non-infra heal", contracts.GateProfileSchemaJSONEnv)
 		}
+	}
+	rc, ok := resp["recovery_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
+	}
+	if got := rc["selected_error_kind"]; got != "code" {
+		t.Fatalf("recovery_context.selected_error_kind=%v, want code", got)
+	}
+	if _, ok := rc["gate_profile_schema_json"]; ok {
+		t.Fatalf("did not expect recovery_context.gate_profile_schema_json for non-infra heal")
 	}
 }
 
