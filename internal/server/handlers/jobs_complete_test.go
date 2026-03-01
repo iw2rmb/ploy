@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -293,6 +294,33 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error to contain %q, got: %s", want, msg)
 		}
+	}
+}
+
+func TestCompleteJob_Exit137SetsLastError_WhenRunLookupFails(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig", 2000)
+	f.Job.RepoID = domaintypes.NewMigRepoID()
+
+	st := &mockStore{
+		getRunErr:           errors.New("transient run lookup failure"),
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":    "Fail",
+		"exit_code": 137,
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateRunRepoErrorCalled {
+		t.Fatal("expected UpdateRunRepoError to be called despite run lookup failure")
 	}
 }
 

@@ -49,6 +49,15 @@ func TestStorage_New(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "negative job cache size",
+			opts: EventsOptions{
+				BufferSize:   32,
+				HistorySize:  256,
+				JobCacheSize: -1,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
