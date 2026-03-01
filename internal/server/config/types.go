@@ -2,8 +2,6 @@ package config
 
 import (
 	"time"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // HTTPConfig configures the HTTP server.
@@ -36,22 +34,6 @@ type AdminConfig struct {
 	Listen string `yaml:"listen"`
 }
 
-// ControlPlaneConfig configures the control-plane integration.
-type ControlPlaneConfig struct {
-	Endpoint               string             `yaml:"endpoint"`
-	NodeID                 domaintypes.NodeID `yaml:"node_id"`
-	CAPath                 string             `yaml:"ca"`
-	Certificate            string             `yaml:"certificate"`
-	Key                    string             `yaml:"key"`
-	HeartbeatInterval      time.Duration      `yaml:"heartbeat_interval"`
-	AssignmentPollInterval time.Duration      `yaml:"assignment_poll_interval"`
-	StatusPublishInterval  time.Duration      `yaml:"status_publish_interval"`
-	AssignmentBatchSize    int                `yaml:"assignment_batch_size"`
-	MaxBackoff             time.Duration      `yaml:"max_backoff"`
-	InitialBackoff         time.Duration      `yaml:"initial_backoff"`
-	// Legacy endpoint fields removed; server exposes fixed routes.
-}
-
 // PKIConfig configures PKI renewal.
 type PKIConfig struct {
 	BundleDir   string        `yaml:"bundle_dir"`
@@ -59,44 +41,6 @@ type PKIConfig struct {
 	Key         string        `yaml:"key"`
 	RenewBefore time.Duration `yaml:"renew_before"`
 	CAEndpoint  string        `yaml:"ca_endpoint"`
-}
-
-// BootstrapConfig configures bootstrap mode.
-type BootstrapConfig struct {
-	Enabled        bool          `yaml:"enabled"`
-	Steps          []string      `yaml:"steps"`
-	ScriptPath     string        `yaml:"script_path"`
-	ReportInterval time.Duration `yaml:"report_interval"`
-}
-
-// WorkerConfig configures worker mode.
-type WorkerConfig struct {
-	ArtifactDir     string `yaml:"artifact_dir"`
-	LogDir          string `yaml:"log_dir"`
-	RuntimeAdapter  string `yaml:"runtime_adapter"`
-	TaskConcurrency int    `yaml:"task_concurrency"`
-}
-
-// BeaconConfig configures beacon mode specifics.
-type BeaconConfig struct {
-	Enabled         bool          `yaml:"enabled"`
-	DNSZone         string        `yaml:"dns_zone"`
-	PublishInterval time.Duration `yaml:"publish_interval"`
-}
-
-// RuntimeConfig configures runtime plugins.
-type RuntimeConfig struct {
-	DefaultAdapter string                `yaml:"default_adapter"`
-	Plugins        []RuntimePluginConfig `yaml:"plugins"`
-	FeatureFlags   map[string]bool       `yaml:"feature_flags"`
-}
-
-// RuntimePluginConfig describes a runtime plugin.
-type RuntimePluginConfig struct {
-	Name    string         `yaml:"name"`
-	Module  string         `yaml:"module"`
-	Enabled *bool          `yaml:"enabled"`
-	Config  map[string]any `yaml:"config"`
 }
 
 // SchedulerConfig configures background task scheduling.
@@ -131,13 +75,6 @@ type LoggingConfig struct {
 	MaxAgeDays   int               `yaml:"max_age_days"`
 	JSON         bool              `yaml:"json"`
 	StaticFields map[string]string `yaml:"static_fields"`
-}
-
-// TransfersConfig configures transfer guard and janitor behaviour.
-type TransfersConfig struct {
-	BaseDir         string        `yaml:"base_dir"`
-	GuardBinary     string        `yaml:"guard_binary"`
-	JanitorInterval time.Duration `yaml:"janitor_interval"`
 }
 
 // PostgresConfig configures PostgreSQL connection.

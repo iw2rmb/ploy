@@ -14,7 +14,7 @@ func TestConfig_ListenAddressValidation(t *testing.T) {
 	t.Run("defaults_preserved", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "ployd.yaml")
-		raw := "\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\n"
+		raw := "\nlogging:\n  level: info\n"
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 			t.Fatalf("write config: %v", err)
 		}
@@ -33,7 +33,7 @@ func TestConfig_ListenAddressValidation(t *testing.T) {
 	t.Run("invalid_http_listen", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "ployd.yaml")
-		raw := "\nhttp:\n  listen: 127.0.0.1\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\n"
+		raw := "\nhttp:\n  listen: 127.0.0.1\n"
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 			t.Fatalf("write config: %v", err)
 		}
@@ -45,7 +45,7 @@ func TestConfig_ListenAddressValidation(t *testing.T) {
 	t.Run("invalid_metrics_listen", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "ployd.yaml")
-		raw := "\nmetrics:\n  listen: 127.0.0.1:99999\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\n"
+		raw := "\nmetrics:\n  listen: 127.0.0.1:99999\n"
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 			t.Fatalf("write config: %v", err)
 		}
@@ -57,7 +57,7 @@ func TestConfig_ListenAddressValidation(t *testing.T) {
 	t.Run("valid_ipv6_and_ephemeral", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "ployd.yaml")
-		raw := "\nhttp:\n  listen: \"[::1]:8443\"\nmetrics:\n  listen: 127.0.0.1:0\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\n"
+		raw := "\nhttp:\n  listen: \"[::1]:8443\"\nmetrics:\n  listen: 127.0.0.1:0\n"
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 			t.Fatalf("write config: %v", err)
 		}
@@ -69,7 +69,7 @@ func TestConfig_ListenAddressValidation(t *testing.T) {
 	t.Run("invalid_admin_listen", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "ployd.yaml")
-		raw := "\nadmin:\n  listen: 127.0.0.1\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\n"
+		raw := "\nadmin:\n  listen: 127.0.0.1\n"
 		if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 			t.Fatalf("write config: %v", err)
 		}

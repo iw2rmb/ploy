@@ -15,17 +15,8 @@ func TestLoadConfigDefaults(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ployd.yaml")
 	raw := `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
-runtime:
-  plugins:
-    - name: local
-      module: internal
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -44,12 +35,6 @@ runtime:
 	if cfg.Admin.Socket == "" {
 		t.Fatal("Admin.Socket should default to non-empty path")
 	}
-	if cfg.ControlPlane.HeartbeatInterval != 10*time.Second {
-		t.Fatalf("HeartbeatInterval = %v, want 10s", cfg.ControlPlane.HeartbeatInterval)
-	}
-	if cfg.ControlPlane.AssignmentPollInterval != 5*time.Second {
-		t.Fatalf("AssignmentPollInterval = %v, want 5s", cfg.ControlPlane.AssignmentPollInterval)
-	}
 	if cfg.Scheduler.StaleJobRecoveryInterval != 30*time.Second {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 30s", cfg.Scheduler.StaleJobRecoveryInterval)
 	}
@@ -61,15 +46,6 @@ runtime:
 	}
 	if cfg.PKI.RenewBefore != time.Hour {
 		t.Fatalf("PKI.RenewBefore = %v, want 1h", cfg.PKI.RenewBefore)
-	}
-	if cfg.Runtime.DefaultAdapter != "local" {
-		t.Fatalf("Runtime.DefaultAdapter = %q, want local", cfg.Runtime.DefaultAdapter)
-	}
-	if len(cfg.Runtime.Plugins) != 1 {
-		t.Fatalf("Runtime.Plugins length = %d, want 1", len(cfg.Runtime.Plugins))
-	}
-	if cfg.Runtime.Plugins[0].Name != "local" {
-		t.Fatalf("Runtime.Plugins[0].Name = %q, want local", cfg.Runtime.Plugins[0].Name)
 	}
 }
 
@@ -85,23 +61,9 @@ metrics:
   listen: 127.0.0.1:19100
 admin:
   socket: /run/custom-ployd.sock
-control_plane:
-  endpoint: https://beacon.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/beacon.pem
-  key: /etc/ploy/pki/beacon-key.pem
-  heartbeat_interval: 2s
-  assignment_poll_interval: 3s
 pki:
   bundle_dir: /var/lib/ploy/pki
   renew_before: 12m
-runtime:
-  default_adapter: k8s
-  plugins:
-    - name: k8s
-      module: github.com/example/ployd-k8s
-      config:
-        address: https://k8s.example.com
 scheduler:
   stale_job_recovery_interval: 0s
   node_stale_after: 2m
@@ -123,29 +85,11 @@ scheduler:
 	if cfg.Admin.Socket != "/run/custom-ployd.sock" {
 		t.Fatalf("Admin.Socket = %q", cfg.Admin.Socket)
 	}
-	if cfg.ControlPlane.HeartbeatInterval != 2*time.Second {
-		t.Fatalf("HeartbeatInterval = %v", cfg.ControlPlane.HeartbeatInterval)
-	}
-	if cfg.ControlPlane.AssignmentPollInterval != 3*time.Second {
-		t.Fatalf("AssignmentPollInterval = %v", cfg.ControlPlane.AssignmentPollInterval)
-	}
 	if cfg.PKI.BundleDir != "/var/lib/ploy/pki" {
 		t.Fatalf("PKI.BundleDir = %q", cfg.PKI.BundleDir)
 	}
 	if cfg.PKI.RenewBefore != 12*time.Minute {
 		t.Fatalf("PKI.RenewBefore = %v", cfg.PKI.RenewBefore)
-	}
-	if cfg.Runtime.DefaultAdapter != "k8s" {
-		t.Fatalf("Runtime.DefaultAdapter = %q", cfg.Runtime.DefaultAdapter)
-	}
-	if len(cfg.Runtime.Plugins) != 1 {
-		t.Fatalf("Runtime.Plugins length = %d", len(cfg.Runtime.Plugins))
-	}
-	if cfg.Runtime.Plugins[0].Module != "github.com/example/ployd-k8s" {
-		t.Fatalf("Runtime.Plugins[0].Module = %q", cfg.Runtime.Plugins[0].Module)
-	}
-	if cfg.Runtime.Plugins[0].Config["address"] != "https://k8s.example.com" {
-		t.Fatalf("Runtime.Plugins[0].Config[address] = %v", cfg.Runtime.Plugins[0].Config["address"])
 	}
 	if cfg.Scheduler.StaleJobRecoveryInterval != 0 {
 		t.Fatalf("StaleJobRecoveryInterval = %v, want 0", cfg.Scheduler.StaleJobRecoveryInterval)
@@ -166,10 +110,6 @@ func TestLoadConfigValidation(t *testing.T) {
 	raw := `
 http:
   listen: :8443
-control_plane:
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 `
 	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -192,11 +132,6 @@ func TestLoadConfigGitLab(t *testing.T) {
 		{
 			name: "gitlab_with_domain_and_token",
 			yaml: `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
 gitlab:
@@ -209,11 +144,6 @@ gitlab:
 		{
 			name: "gitlab_with_domain_only",
 			yaml: `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
 gitlab:
@@ -225,11 +155,6 @@ gitlab:
 		{
 			name: "gitlab_empty",
 			yaml: `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
 `,
@@ -267,11 +192,6 @@ func TestLoadConfigGitLabUnknownFieldFails(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ployd.yaml")
 	raw := `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
 gitlab:
@@ -284,6 +204,57 @@ gitlab:
 
 	if _, err := config.Load(path); err == nil {
 		t.Fatal("Load() succeeded, want error for unknown gitlab.extra field")
+	}
+}
+
+func TestLoadConfig_NodeSectionsRejectedForServer(t *testing.T) {
+	t.Helper()
+
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "control_plane_section",
+			raw: `
+control_plane:
+  endpoint: https://control.example.com
+`,
+		},
+		{
+			name: "worker_section",
+			raw: `
+worker:
+  task_concurrency: 8
+`,
+		},
+		{
+			name: "runtime_section",
+			raw: `
+runtime:
+  default_adapter: local
+`,
+		},
+		{
+			name: "transfers_section",
+			raw: `
+transfers:
+  base_dir: /tmp/transfers
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "ployd.yaml")
+			if err := os.WriteFile(path, []byte(tt.raw), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+			if _, err := config.Load(path); err == nil {
+				t.Fatalf("Load() succeeded, want error for node section %q", tt.name)
+			}
+		})
 	}
 }
 
@@ -353,11 +324,6 @@ func TestLoadConfigGitLabTokenFile(t *testing.T) {
 
 			// Create config with token_file
 			configYAML := `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
 gitlab:
@@ -402,11 +368,6 @@ func TestLoadConfigGitLabTokenPrecedence(t *testing.T) {
 
 	// Config with both token and token_file: token should take precedence
 	configYAML := `
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
 pki:
   bundle_dir: /etc/ploy/pki
 gitlab:
@@ -441,7 +402,7 @@ func TestLoadConfigGitLabTokenFile_AbsolutePath(t *testing.T) {
 		t.Fatalf("write token file: %v", err)
 	}
 
-	configYAML := "\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\npki:\n  bundle_dir: /etc/ploy/pki\ngitlab:\n  domain: https://gitlab.example.com\n  token_file: " + tokenPath + "\n"
+	configYAML := "\npki:\n  bundle_dir: /etc/ploy/pki\ngitlab:\n  domain: https://gitlab.example.com\n  token_file: " + tokenPath + "\n"
 	if err := os.WriteFile(configPath, []byte(configYAML), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}

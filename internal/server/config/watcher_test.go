@@ -22,11 +22,6 @@ func TestWatcherNotifiesSubscribersOnConfigChange(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	initialContent := "" +
-		"control_plane:\n" +
-		"  endpoint: https://control.example.com\n" +
-		"  ca: /etc/ploy/pki/ca.pem\n" +
-		"  certificate: /etc/ploy/pki/node.pem\n" +
-		"  key: /etc/ploy/pki/node-key.pem\n" +
 		"logging:\n" +
 		"  level: info\n"
 	if err := os.WriteFile(configPath, []byte(initialContent), 0644); err != nil {
@@ -56,11 +51,6 @@ func TestWatcherNotifiesSubscribersOnConfigChange(t *testing.T) {
 
 	// Modify the config file.
 	updatedContent := "" +
-		"control_plane:\n" +
-		"  endpoint: https://control.example.com\n" +
-		"  ca: /etc/ploy/pki/ca.pem\n" +
-		"  certificate: /etc/ploy/pki/node.pem\n" +
-		"  key: /etc/ploy/pki/node-key.pem\n" +
 		"logging:\n" +
 		"  level: debug\n"
 	if err := os.WriteFile(configPath, []byte(updatedContent), 0644); err != nil {
@@ -82,11 +72,6 @@ func TestWatcherStartAlreadyRunning(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	if err := os.WriteFile(configPath, []byte(""+
-		"control_plane:\n"+
-		"  endpoint: https://control.example.com\n"+
-		"  ca: /etc/ploy/pki/ca.pem\n"+
-		"  certificate: /etc/ploy/pki/node.pem\n"+
-		"  key: /etc/ploy/pki/node-key.pem\n"+
 		"logging:\n"+
 		"  level: info\n"), 0644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
@@ -117,11 +102,6 @@ func TestWatcherStopNotRunning(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	if err := os.WriteFile(configPath, []byte(""+
-		"control_plane:\n"+
-		"  endpoint: https://control.example.com\n"+
-		"  ca: /etc/ploy/pki/ca.pem\n"+
-		"  certificate: /etc/ploy/pki/node.pem\n"+
-		"  key: /etc/ploy/pki/node-key.pem\n"+
 		"logging:\n"+
 		"  level: info\n"), 0644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
@@ -143,11 +123,6 @@ func TestWatcherMultipleSubscribers(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	if err := os.WriteFile(configPath, []byte(""+
-		"control_plane:\n"+
-		"  endpoint: https://control.example.com\n"+
-		"  ca: /etc/ploy/pki/ca.pem\n"+
-		"  certificate: /etc/ploy/pki/node.pem\n"+
-		"  key: /etc/ploy/pki/node-key.pem\n"+
 		"logging:\n"+
 		"  level: info\n"), 0644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
@@ -177,11 +152,6 @@ func TestWatcherMultipleSubscribers(t *testing.T) {
 
 	// Modify config.
 	if err := os.WriteFile(configPath, []byte(""+
-		"control_plane:\n"+
-		"  endpoint: https://control.example.com\n"+
-		"  ca: /etc/ploy/pki/ca.pem\n"+
-		"  certificate: /etc/ploy/pki/node.pem\n"+
-		"  key: /etc/ploy/pki/node-key.pem\n"+
 		"logging:\n"+
 		"  level: error\n"), 0644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
@@ -206,11 +176,6 @@ func TestWatcherHandlesInvalidConfigGracefully(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	if err := os.WriteFile(configPath, []byte(""+
-		"control_plane:\n"+
-		"  endpoint: https://control.example.com\n"+
-		"  ca: /etc/ploy/pki/ca.pem\n"+
-		"  certificate: /etc/ploy/pki/node.pem\n"+
-		"  key: /etc/ploy/pki/node-key.pem\n"+
 		"logging:\n"+
 		"  level: info\n"), 0644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
