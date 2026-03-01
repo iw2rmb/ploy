@@ -93,7 +93,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./tests/guards -run 'TestDocsGuard'`
 
 ## Phase 5: Integrated Validation and Documentation Sync
-- [ ] Validate the full recovery loop and keep docs synchronized with the implemented behavior.
+- [x] Validate the full recovery loop and keep docs synchronized with the implemented behavior.
   - Repository: `ploy`
   - Component: nodeagent + server handlers + contracts + docs
   - Scope:
