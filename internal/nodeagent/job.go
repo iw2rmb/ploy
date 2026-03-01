@@ -25,8 +25,7 @@ func (s JobStatus) String() string { return string(s) }
 type DiffJobType string
 
 const (
-	DiffJobTypeMod     DiffJobType = "mig"
-	DiffJobTypeHealing DiffJobType = "healing"
+	DiffJobTypeMod DiffJobType = "mig"
 )
 
 func (t DiffJobType) String() string { return string(t) }

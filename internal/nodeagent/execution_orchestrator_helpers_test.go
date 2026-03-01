@@ -112,7 +112,7 @@ func TestSnapshotWorkspaceForNoIndexDiff_CleanupWorks(t *testing.T) {
 	runID := types.RunID("test-run")
 	jobID := types.JobID("test-job")
 
-	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffJobTypeHealing, workspace)
+	result := snapshotWorkspaceForNoIndexDiff(runID, jobID, DiffJobTypeMod, workspace)
 
 	// Capture the snapshot directory path.
 	snapshotDir := result.dir

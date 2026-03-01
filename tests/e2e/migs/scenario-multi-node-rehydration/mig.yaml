@@ -83,32 +83,47 @@ steps:
 build_gate:
   enabled: true
 
+  # Router emits bug_summary + error_kind before healing selection.
+  router:
+    image: localhost:5000/ploy/migs-codex:latest
+    env:
+      CODEX_PROMPT: |-
+        Rules:
+        - Read /in/build-gate.log.
+        - Do not edit /workspace.
+        - Your final message MUST be EXACTLY one line of JSON:
+          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
+
+        Task:
+        Summarize the failure and classify it for healing selection.
+
   ################################################################################
   # HEALING POLICY (optional for E2E)
   ################################################################################
   # Include basic healing to validate that healing also works with rehydration.
   # If any step's build gate fails, the healing mig runs on the same rehydrated workspace.
   healing:
-    retries: 1
-    mig:
-      # Codex healing container using the workspace diff handshake.
-      # Codex edits the workspace and exits when done; the node agent inspects
-      # the workspace for diffs and re-runs the Build Gate externally when changes exist.
-      # Codex never runs the gate itself.
-      image: localhost:5000/ploy/migs-codex:latest
-      env:
-        CODEX_PROMPT: |-
-          Rules:
-          - Use /workspace and /in/build-gate.log to understand the compile error.
-          - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, stop editing and end the session.
+    by_error_kind:
+      code:
+        retries: 1
+        # Codex healing container using the workspace diff handshake.
+        # Codex edits the workspace and exits when done; the node agent inspects
+        # the workspace for diffs and re-runs the Build Gate externally when changes exist.
+        # Codex never runs the gate itself.
+        image: localhost:5000/ploy/migs-codex:latest
+        env:
+          CODEX_PROMPT: |-
+            Rules:
+            - Use /workspace and /in/build-gate.log to understand the compile error.
+            - Edit files under /workspace as needed to fix the error.
+            - When you believe the code is ready for a full build validation, stop editing and end the session.
 
-          Task:
-          Fix the compilation error described in /in/build-gate.log.
-        E2E_STEP_NAME: "healing-codex"
-      # Uncomment if you have Codex auth configured:
-      # env_from_file:
-      #   CODEX_AUTH_JSON: ~/.codex/auth.json
+            Task:
+            Fix the compilation error described in /in/build-gate.log.
+          E2E_STEP_NAME: "healing-codex"
+        # Uncomment if you have Codex auth configured:
+        # env_from_file:
+        #   CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION

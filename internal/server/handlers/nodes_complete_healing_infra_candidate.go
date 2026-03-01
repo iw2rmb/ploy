@@ -17,7 +17,11 @@ func shouldEvaluateInfraCandidate(
 	recoveryMeta *contracts.BuildGateRecoveryMetadata,
 	action contracts.HealingActionSpec,
 ) bool {
-	if recoveryMeta == nil || recoveryMeta.ErrorKind != "infra" {
+	if recoveryMeta == nil {
+		return false
+	}
+	kind, ok := contracts.ParseRecoveryErrorKind(recoveryMeta.ErrorKind)
+	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
 		return false
 	}
 	if action.Expectations == nil {

@@ -82,7 +82,7 @@ Example spec:
 The `--spec` flag accepts a YAML or JSON file defining:
 - **Main mig configuration** (`image`, `command`, `env`, `env_from_file`)
 - **Build Gate settings** (`build_gate.enabled`, `build_gate.images`)
-- **Healing configuration** (`build_gate_healing.retries`, `build_gate_healing.mig`)
+- **Healing configuration** (`build_gate.router`, `build_gate.healing.by_error_kind`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
 
 CLI flags override spec values when both are present. For example:
@@ -93,12 +93,13 @@ This uses `mig.yaml` as the base but overrides the image and PAT.
 
 **Build Gate Healing:**
 
-When `build_gate_healing` is configured in the spec:
+When `build_gate.healing.by_error_kind` is configured in the spec:
 1. The node runs the Build Gate before the main mig.
-2. If the gate fails, the healing `mig` under `build_gate_healing.mig` executes.
-3. After the healing mig completes, the gate is re-run. If it passes, the main mig proceeds.
-4. The loop retries up to `build_gate_healing.retries` times (default: 1).
-5. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
+2. If the gate fails, router runs first and emits `bug_summary` + `error_kind`.
+3. The selected healing action under `build_gate.healing.by_error_kind.<error_kind>` executes.
+4. After the healing mig completes, the gate is re-run. If it passes, the main mig proceeds.
+5. The loop retries up to `build_gate.healing.by_error_kind.<error_kind>.retries` (default: 1).
+6. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
 
 **Repo+Diff Verification Semantics:**
 
@@ -108,8 +109,6 @@ Healing verification uses the same repo+diff semantics as the unified jobs-based
 - **Healing modifications**: Healing migs modify the workspace in-place. Changes accumulate as diffs on top of the repo baseline.
 - **Re-gate verification**: After healing, the gate re-runs against `workspace = repo_url+ref + healing changes` using the local Docker gate executor (no HTTP Build Gate API call).
 - **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
-
-Historically, this repo+diff model was exposed via the HTTP Build Gate API (`POST /v1/buildgate/validate` with `diff_patch`); that API has been removed in favor of the unified jobs pipeline.
 
 **Codex Healing Handshake (workspace diff):**
 
@@ -153,38 +152,34 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 - `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
 - `PLOY_BUILDGATE_REF` — Git ref for Build Gate baseline (base_ref or commit_sha)
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
-- `PLOY_SERVER_URL` — ploy server URL for Build Gate HTTP API
+- `PLOY_SERVER_URL` — ploy control plane base URL
 
-**Generating diff patches for Build Gate verification (legacy healers only):**
-
-Legacy (non-Codex) healing migs may optionally generate unified diff patches and
-use the repo+diff Build Gate API for mid-healing verification. This avoids
-shipping full workspace archives over HTTP:
-
-1. Generate a unified diff of healing changes:
-   ```bash
-   cd /workspace && git diff > /out/heal.patch
-   ```
-
-2. Optionally call the Build Gate HTTP API directly (for non-Codex healers) using the injected `PLOY_*` env vars if you need mid-healing verification.
-
-Example healing spec block (Codex workspace diff handshake, single mig):
+Example healing spec block (router + by_error_kind + Codex workspace diff handshake):
 ```yaml
-build_gate_healing:
-  retries: 1
-  mig:
+build_gate:
+  enabled: true
+  router:
     image: docker.io/you/migs-codex:latest
     env:
       CODEX_PROMPT: |-
-        Rules:
-        - Use /workspace and /in/build-gate.log to understand the compile error.
-        - Edit files under /workspace as needed to fix the error.
-        - When you believe the code is ready for a full build validation, stop editing and end the session.
+        Output exactly one JSON line:
+        {"bug_summary":"<<=200 chars>","error_kind":"code"}
+  healing:
+    by_error_kind:
+      code:
+        retries: 1
+        image: docker.io/you/migs-codex:latest
+        env:
+          CODEX_PROMPT: |-
+            Rules:
+            - Use /workspace and /in/build-gate.log to understand the compile error.
+            - Edit files under /workspace as needed to fix the error.
+            - When ready, stop editing and end the session.
 
-        Task:
-        Fix the compilation error described in /in/build-gate.log.
-    env_from_file:
-      CODEX_AUTH_JSON: ~/.codex/auth.json
+            Task:
+            Fix the compilation error described in /in/build-gate.log.
+        env_from_file:
+          CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
 
 See `docs/schemas/mig.example.yaml` for the full spec schema.

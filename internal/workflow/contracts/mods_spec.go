@@ -171,16 +171,15 @@ func (s ModsSpec) Validate() error {
 			return fmt.Errorf("build_gate.healing.by_error_kind: required when healing is configured")
 		}
 		for errorKind, action := range s.BuildGate.Healing.ByErrorKind {
-			switch errorKind {
-			case "infra", "code", "mixed", "unknown":
-			default:
+			parsedKind, ok := ParseRecoveryErrorKind(errorKind)
+			if !ok {
 				return fmt.Errorf("build_gate.healing.by_error_kind.%s: invalid error_kind key", errorKind)
 			}
 			prefix := fmt.Sprintf("build_gate.healing.by_error_kind.%s", errorKind)
 			if action.Retries < 0 {
 				return fmt.Errorf("%s.retries: must be non-negative, got %d", prefix, action.Retries)
 			}
-			if errorKind == "mixed" || errorKind == "unknown" {
+			if IsTerminalRecoveryErrorKind(parsedKind) {
 				return fmt.Errorf("%s: forbidden for terminal error_kind %q", prefix, errorKind)
 			}
 			if action.Image.IsEmpty() {
@@ -203,9 +202,7 @@ func (s ModsSpec) Validate() error {
 			return fmt.Errorf("build_gate.router: required when healing is configured")
 		}
 		if s.BuildGate.Healing.SelectedErrorKind != "" {
-			switch s.BuildGate.Healing.SelectedErrorKind {
-			case "infra", "code", "mixed", "unknown":
-			default:
+			if _, ok := ParseRecoveryErrorKind(s.BuildGate.Healing.SelectedErrorKind); !ok {
 				return fmt.Errorf("build_gate.healing.selected_error_kind: invalid value %q", s.BuildGate.Healing.SelectedErrorKind)
 			}
 		}

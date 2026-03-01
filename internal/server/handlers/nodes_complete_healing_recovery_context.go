@@ -10,8 +10,8 @@ import (
 
 func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.ModStack, *contracts.StackExpectation) {
 	meta := &contracts.BuildGateRecoveryMetadata{
-		LoopKind:  "healing",
-		ErrorKind: "unknown",
+		LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
+		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
 	}
 	detectedStack := contracts.ModStackUnknown
 	var detectedExpectation *contracts.StackExpectation
@@ -40,8 +40,18 @@ func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGate
 	if detectedExpectation == nil {
 		detectedExpectation = stackExpectationFromModStack(detectedStack)
 	}
-	if meta.ErrorKind == "unknown" && jobMeta.Recovery != nil {
+	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); (!ok || kind == contracts.RecoveryErrorKindUnknown) && jobMeta.Recovery != nil {
 		meta = cloneRecoveryMetadata(jobMeta.Recovery)
+	}
+	if loopKind, ok := contracts.ParseRecoveryLoopKind(meta.LoopKind); ok {
+		meta.LoopKind = loopKind.String()
+	} else {
+		meta.LoopKind = contracts.DefaultRecoveryLoopKind().String()
+	}
+	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); ok {
+		meta.ErrorKind = kind.String()
+	} else {
+		meta.ErrorKind = contracts.DefaultRecoveryErrorKind().String()
 	}
 	if meta.StrategyID == "" {
 		meta.StrategyID = fmt.Sprintf("%s-default", meta.ErrorKind)

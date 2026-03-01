@@ -81,6 +81,20 @@ steps:
 build_gate:
   enabled: true
 
+  # Router emits bug_summary + error_kind before healing selection.
+  router:
+    image: localhost:5000/ploy/migs-codex:latest
+    env:
+      CODEX_PROMPT: |-
+        Rules:
+        - Read /in/build-gate.log.
+        - Do not edit /workspace.
+        - Your final message MUST be EXACTLY one line of JSON:
+          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
+
+        Task:
+        Summarize the failure and classify it for healing selection.
+
   ################################################################################
   # HEALING POLICY FOR POST-MOD FAILURES
   ################################################################################
@@ -92,29 +106,30 @@ build_gate:
   #    diffs are present. This tests the critical gate-heal-regate flow for
   #    post-mig failures using the workspace diff handshake.
   healing:
-    retries: 2 # Allow multiple healing attempts for complex errors
-    mig:
-      # Codex healing container using the workspace diff handshake.
-      # For this E2E, Codex will analyze the compile error (missing class) and
-      # create the necessary stub class to fix the build.
-      image: localhost:5000/ploy/migs-codex:latest
-      env:
-        CODEX_PROMPT: |-
-          Rules:
-          - Use /workspace and /in/build-gate.log to understand the compile error.
-          - The error is likely a missing class reference (UnknownClass or similar).
-          - Create the missing class in the appropriate package under /workspace.
-          - The class should have a minimal implementation (empty constructor, toString).
-          - Edit files under /workspace as needed to fix the error.
-          - When you believe the code is ready for a full build validation, stop editing and end the session.
+    by_error_kind:
+      code:
+        retries: 2 # Allow multiple healing attempts for complex errors
+        # Codex healing container using the workspace diff handshake.
+        # For this E2E, Codex will analyze the compile error (missing class) and
+        # create the necessary stub class to fix the build.
+        image: localhost:5000/ploy/migs-codex:latest
+        env:
+          CODEX_PROMPT: |-
+            Rules:
+            - Use /workspace and /in/build-gate.log to understand the compile error.
+            - The error is likely a missing class reference (UnknownClass or similar).
+            - Create the missing class in the appropriate package under /workspace.
+            - The class should have a minimal implementation (empty constructor, toString).
+            - Edit files under /workspace as needed to fix the error.
+            - When you believe the code is ready for a full build validation, stop editing and end the session.
 
-          Task:
-          Fix the compilation error described in /in/build-gate.log.
-          This is a post-mig gate failure (the mig transformation broke the build).
-          Create any missing classes or fix any syntax errors introduced by the transformation.
-      # Uncomment if you have Codex auth configured:
-      env_from_file:
-        CODEX_AUTH_JSON: ~/.codex/auth.json
+            Task:
+            Fix the compilation error described in /in/build-gate.log.
+            This is a post-mig gate failure (the mig transformation broke the build).
+            Create any missing classes or fix any syntax errors introduced by the transformation.
+        # Uncomment if you have Codex auth configured:
+        env_from_file:
+          CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION

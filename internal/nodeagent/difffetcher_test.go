@@ -79,13 +79,14 @@ func TestDiffFetcher_FetchDiffsForJobRepo_FilterAndOrder(t *testing.T) {
 	t1 := t0.Add(time.Minute)
 
 	diffs := []diffListItem{
-		{ID: "healing", JobID: jobA, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeHealing.String()).MustBuild()},
+		{ID: "healing", JobID: jobA, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType("healing").MustBuild()},
 		{ID: "later", JobID: jobB, CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeMod.String()).MustBuild()},
 		{ID: "self", JobID: currentJobID, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeMod.String()).MustBuild()},
 		{ID: "earlier", JobID: jobA, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeMod.String()).MustBuild()},
 	}
 	patches := map[string][]byte{
 		"earlier": gzipBytes(t, []byte("p-earlier")),
+		"healing": gzipBytes(t, []byte("p-healing")),
 		"later":   gzipBytes(t, []byte("p-later")),
 	}
 
@@ -110,10 +111,10 @@ func TestDiffFetcher_FetchDiffsForJobRepo_FilterAndOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchDiffsForJobRepo: %v", err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("patch count=%d want 2", len(got))
+	if len(got) != 3 {
+		t.Fatalf("patch count=%d want 3", len(got))
 	}
-	if len(fetched) != 2 || fetched[0] != "earlier" || fetched[1] != "later" {
+	if len(fetched) != 3 || fetched[0] != "earlier" || fetched[1] != "healing" || fetched[2] != "later" {
 		t.Fatalf("fetched order=%v", fetched)
 	}
 }

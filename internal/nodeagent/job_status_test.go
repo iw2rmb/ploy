@@ -33,7 +33,6 @@ func TestDiffJobTypeConstants(t *testing.T) {
 		expected string
 	}{
 		{"Mod", DiffJobTypeMod, "mig"},
-		{"Healing", DiffJobTypeHealing, "healing"},
 	}
 
 	for _, tt := range tests {
