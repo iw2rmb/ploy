@@ -15,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -421,7 +422,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 		isMRJob := jobJobType.Validate() == nil && jobJobType == domaintypes.JobTypeMR
 		if !isMRJob {
 			// Update run_repos.status if all jobs for this repo attempt are terminal.
-			repoUpdated, repoErr := maybeUpdateRunRepoStatus(ctx, st, job.RunID, job.RepoID, job.Attempt)
+			repoUpdated, repoErr := recovery.MaybeUpdateRunRepoStatus(ctx, st, job.RunID, job.RepoID, job.Attempt)
 			if repoErr != nil {
 				slog.Error("complete job: failed to check repo completion",
 					"job_id", jobID,
@@ -436,7 +437,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			if repoUpdated {
 				run, ok := loadRunForPostCompletion("run completion reconciliation")
 				if ok {
-					if completeErr := maybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run); completeErr != nil {
+					if _, completeErr := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, eventsService, run); completeErr != nil {
 						slog.Error("complete job: failed to check run completion",
 							"job_id", jobID,
 							"next_id", job.NextID,

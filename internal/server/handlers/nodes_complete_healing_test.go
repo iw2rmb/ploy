@@ -12,6 +12,7 @@ import (
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -599,7 +600,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	}
 
 	run := store.Run{ID: runID, Status: store.RunStatusStarted}
-	if err := maybeCompleteRunIfAllReposTerminal(ctx, st, nil, run); err != nil {
+	if _, err := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, nil, run); err != nil {
 		t.Fatalf("maybeCompleteRunIfAllReposTerminal returned error: %v", err)
 	}
 
