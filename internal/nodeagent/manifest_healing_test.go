@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -271,7 +272,7 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			if !contains(err.Error(), tc.wantErr) {
+			if !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("error = %q, want to contain %q", err.Error(), tc.wantErr)
 			}
 		})

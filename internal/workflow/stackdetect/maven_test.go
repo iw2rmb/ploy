@@ -1,6 +1,8 @@
 package stackdetect
 
 import (
+	"errors"
+	"strings"
 	"testing"
 )
 
@@ -116,6 +118,42 @@ func TestResolveValue(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestResolveValue_CircularReference(t *testing.T) {
+	props := map[string]string{
+		"a": "${b}",
+		"b": "${a}",
+	}
+
+	_, err := resolveValue("${a}", props)
+	if err == nil {
+		t.Fatal("expected error for circular property reference, got nil")
+	}
+
+	var detErr *DetectionError
+	if !errors.As(err, &detErr) {
+		t.Fatalf("expected *DetectionError, got %T", err)
+	}
+	if !strings.Contains(detErr.Message, "circular") {
+		t.Errorf("expected error message to mention 'circular', got %q", detErr.Message)
+	}
+}
+
+func TestResolveValue_DeepChain(t *testing.T) {
+	props := map[string]string{
+		"a": "${b}",
+		"b": "${c}",
+		"c": "42",
+	}
+
+	result, err := resolveValue("${a}", props)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "42" {
+		t.Errorf("expected %q, got %q", "42", result)
 	}
 }
 

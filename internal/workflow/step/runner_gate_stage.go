@@ -32,7 +32,7 @@ func runGateStage(ctx context.Context, r *Runner, req Request, failMsg string) (
 	}
 
 	gatePassed := false
-	if len(gateMetadata.StaticChecks) > 0 {
+	if gateMetadata != nil && len(gateMetadata.StaticChecks) > 0 {
 		gatePassed = gateMetadata.StaticChecks[0].Passed
 	}
 	if !gatePassed {

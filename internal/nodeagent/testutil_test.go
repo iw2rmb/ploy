@@ -3,13 +3,20 @@ package nodeagent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"encoding/binary"
 	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	containertypes "github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // testBackoffPolicy returns a fast backoff policy suitable for tests.
@@ -87,15 +94,104 @@ func generateTestCerts(t *testing.T) (certPEM, keyPEM, caPEM []byte) {
 	return certPEM, keyPEM, caPEM
 }
 
-// contains checks if s contains substr.
-func contains(s, substr string) bool {
-	return bytes.Contains([]byte(s), []byte(substr))
-}
-
 // containsError checks if an error message contains a substring.
 func containsError(err error, substr string) bool {
 	if err == nil {
 		return false
 	}
-	return contains(err.Error(), substr)
+	return strings.Contains(err.Error(), substr)
+}
+
+// newTestConfig returns a Config with sensible test defaults (TLS disabled).
+func newTestConfig(serverURL string) Config {
+	return Config{
+		ServerURL: serverURL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+}
+
+// setupClaimer creates a ClaimManager ready for testing with noop pre-claim
+// cleanup, noop startup reconciler, and fast backoff policy.
+func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimManager {
+	t.Helper()
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = noopPreClaimCleanup{}
+	installNoopStartupReconciler(claimer)
+	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
+	return claimer
+}
+
+// runClaimerUntil runs the claim loop in a background goroutine and blocks
+// until the timeout expires.
+func runClaimerUntil(t *testing.T, claimer *ClaimManager, timeout time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = claimer.Start(ctx)
+	}()
+	wg.Wait()
+}
+
+// preClaimCleanupFunc adapts a function into the preClaimCleaner interface.
+type preClaimCleanupFunc func(context.Context) (bool, error)
+
+func (f preClaimCleanupFunc) EnsureCapacity(ctx context.Context) (bool, error) {
+	return f(ctx)
+}
+
+// callRecorder is a thread-safe helper for tracking named call events in tests.
+type callRecorder struct {
+	mu    sync.Mutex
+	calls []string
+}
+
+func (r *callRecorder) Record(name string) {
+	r.mu.Lock()
+	r.calls = append(r.calls, name)
+	r.mu.Unlock()
+}
+
+func (r *callRecorder) Count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.calls)
+}
+
+func (r *callRecorder) All() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]string, len(r.calls))
+	copy(out, r.calls)
+	return out
+}
+
+// inspectWithState builds a ContainerInspectResult with the given state fields.
+func inspectWithState(running bool, status containertypes.ContainerState, finishedAt string) client.ContainerInspectResult {
+	return client.ContainerInspectResult{
+		Container: containertypes.InspectResponse{
+			State: &containertypes.State{
+				Running:    running,
+				Status:     status,
+				FinishedAt: finishedAt,
+			},
+		},
+	}
+}
+
+// multiplexedDockerLogs builds Docker stdcopy-framed log output for testing.
+func multiplexedDockerLogs(payload string, stream stdcopy.StdType) []byte {
+	data := []byte(payload)
+	frame := make([]byte, 8+len(data))
+	frame[0] = byte(stream)
+	binary.BigEndian.PutUint32(frame[4:8], uint32(len(data)))
+	copy(frame[8:], data)
+	return frame
 }
