@@ -16,12 +16,8 @@ const testLogDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 // These tests verify that job_meta payloads are validated via contracts.UnmarshalJobMeta
 // before persisting to jobs.meta JSONB.
 
-// TestCompleteJob_InvalidJobMeta_MissingKind returns 400 when job_meta lacks required kind field.
-func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
-	t.Parallel()
-
+func newCompleteJobMetaFixture() (jobTestFixture, *mockStore, http.Handler) {
 	f := newJobFixture("", 1000)
-
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
@@ -30,141 +26,80 @@ func TestCompleteJob_InvalidJobMeta_MissingKind(t *testing.T) {
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
+	return f, st, completeJobHandler(st, nil, nil)
+}
 
-	handler := completeJobHandler(st, nil, nil)
+func TestCompleteJob_InvalidJobMeta(t *testing.T) {
+	t.Parallel()
 
-	// job_meta without required "kind" field should be rejected.
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"job_meta": map[string]any{
+	tests := []struct {
+		name               string
+		jobMeta            map[string]any
+		expectBodyContains string
+	}{
+		{
+			name: "missing_kind",
+			jobMeta: map[string]any{
 				"gate": map[string]any{"log_digest": testLogDigest},
 			},
+			expectBodyContains: "job_meta",
 		},
-	}))
-
-	// Expect 400 Bad Request for invalid job_meta (missing kind field).
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
-	if !strings.Contains(rr.Body.String(), "job_meta") {
-		t.Errorf("expected error message to mention job_meta, got: %s", rr.Body.String())
-	}
-	// Verify job completion was NOT called.
-	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
-		t.Fatal("did not expect job completion to be called for invalid job_meta")
-	}
-}
-
-// TestCompleteJob_InvalidJobMeta_InvalidKind returns 400 when job_meta has unrecognized kind.
-func TestCompleteJob_InvalidJobMeta_InvalidKind(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("", 1000)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
-
-	handler := completeJobHandler(st, nil, nil)
-
-	// job_meta with invalid "kind" value should be rejected.
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"job_meta": map[string]any{
+		{
+			name: "invalid_kind",
+			jobMeta: map[string]any{
 				"kind": "invalid_kind",
 			},
+			expectBodyContains: "job_meta",
 		},
-	}))
-
-	// Expect 400 Bad Request for invalid kind.
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
-	if !strings.Contains(rr.Body.String(), "job_meta") {
-		t.Errorf("expected error message to mention job_meta, got: %s", rr.Body.String())
-	}
-	// Verify job completion was NOT called.
-	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
-		t.Fatal("did not expect job completion to be called for invalid job_meta")
-	}
-}
-
-// TestCompleteJob_InvalidJobMeta_GateMetaOnModKind returns 400 when job_meta has
-// gate metadata but kind is "mig" (structural mismatch).
-func TestCompleteJob_InvalidJobMeta_GateMetaOnModKind(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("", 1000)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
-
-	handler := completeJobHandler(st, nil, nil)
-
-	// job_meta with kind="mig" but gate metadata should be rejected (structural mismatch).
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"job_meta": map[string]any{
+		{
+			name: "gate_meta_on_mig_kind",
+			jobMeta: map[string]any{
 				"kind": "mig",
 				"gate": map[string]any{"log_digest": testLogDigest},
 			},
 		},
-	}))
-
-	// Expect 400 Bad Request for structural mismatch.
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
 	}
-	// Verify job completion was NOT called.
-	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
-		t.Fatal("did not expect job completion to be called for invalid job_meta")
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f, st, handler := newCompleteJobMetaFixture()
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":    "Success",
+				"exit_code": 0,
+				"stats": map[string]any{
+					"job_meta": tt.jobMeta,
+				},
+			}))
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+			}
+			if tt.expectBodyContains != "" && !strings.Contains(rr.Body.String(), tt.expectBodyContains) {
+				t.Fatalf("expected response body to contain %q, got: %s", tt.expectBodyContains, rr.Body.String())
+			}
+			if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
+				t.Fatal("did not expect job completion to be called for invalid job_meta")
+			}
+		})
 	}
 }
 
-// TestCompleteJob_ValidJobMeta_GateKind verifies that valid gate job_meta is accepted and persisted.
-func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
+func TestCompleteJob_ValidJobMetaKinds(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("", 1000)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
-
-	handler := completeJobHandler(st, nil, nil)
-
-	// Valid gate job_meta with proper kind and gate metadata.
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"job_meta": map[string]any{
+	tests := []struct {
+		name         string
+		jobMeta      map[string]any
+		expectedKind string
+	}{
+		{
+			name: "gate",
+			jobMeta: map[string]any{
 				"kind": "gate",
 				"gate": map[string]any{
 					"log_digest": testLogDigest,
@@ -173,125 +108,62 @@ func TestCompleteJob_ValidJobMeta_GateKind(t *testing.T) {
 					},
 				},
 			},
+			expectedKind: "gate",
 		},
-	}))
-
-	// Expect 204 No Content for valid job_meta.
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
-	// Verify UpdateJobCompletionWithMeta was called (not UpdateJobCompletion).
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
-	if st.updateJobCompletionCalled {
-		t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
-	}
-	// Validate the persisted meta contains expected kind.
-	var meta map[string]any
-	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
-		t.Fatalf("failed to unmarshal persisted meta: %v", err)
-	}
-	if kind, ok := meta["kind"].(string); !ok || kind != "gate" {
-		t.Fatalf("expected meta.kind == \"gate\", got %#v", meta["kind"])
-	}
-}
-
-// TestCompleteJob_ValidJobMeta_ModKind verifies that valid mig job_meta is accepted.
-func TestCompleteJob_ValidJobMeta_ModKind(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("", 2000)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
-
-	handler := completeJobHandler(st, nil, nil)
-
-	// Valid mig job_meta (kind only, no gate/build metadata).
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"job_meta": map[string]any{
+		{
+			name: "mig",
+			jobMeta: map[string]any{
 				"kind": "mig",
 			},
+			expectedKind: "mig",
 		},
-	}))
-
-	// Expect 204 No Content for valid mig job_meta.
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
-	// Verify UpdateJobCompletionWithMeta was called.
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
-	// Validate the persisted meta contains expected kind.
-	var meta map[string]any
-	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
-		t.Fatalf("failed to unmarshal persisted meta: %v", err)
-	}
-	if kind, ok := meta["kind"].(string); !ok || kind != "mig" {
-		t.Fatalf("expected meta.kind == \"mig\", got %#v", meta["kind"])
-	}
-}
-
-// TestCompleteJob_ValidJobMeta_BuildKind verifies that valid build job_meta is accepted.
-func TestCompleteJob_ValidJobMeta_BuildKind(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("", 1500)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: store.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
-
-	handler := completeJobHandler(st, nil, nil)
-
-	// Valid build job_meta with kind and build metadata.
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-		"stats": map[string]any{
-			"job_meta": map[string]any{
+		{
+			name: "build",
+			jobMeta: map[string]any{
 				"kind": "build",
 				"build": map[string]any{
 					"tool":    "maven",
 					"command": "mvn clean install",
 				},
 			},
+			expectedKind: "build",
 		},
-	}))
+	}
 
-	// Expect 204 No Content for valid build job_meta.
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
-	// Verify UpdateJobCompletionWithMeta was called.
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
-	// Validate the persisted meta contains expected kind.
-	var meta map[string]any
-	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
-		t.Fatalf("failed to unmarshal persisted meta: %v", err)
-	}
-	if kind, ok := meta["kind"].(string); !ok || kind != "build" {
-		t.Fatalf("expected meta.kind == \"build\", got %#v", meta["kind"])
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f, st, handler := newCompleteJobMetaFixture()
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":    "Success",
+				"exit_code": 0,
+				"stats": map[string]any{
+					"job_meta": tt.jobMeta,
+				},
+			}))
+
+			if rr.Code != http.StatusNoContent {
+				t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+			}
+			if !st.updateJobCompletionWithMetaCalled {
+				t.Fatal("expected UpdateJobCompletionWithMeta to be called")
+			}
+			if st.updateJobCompletionCalled {
+				t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
+			}
+
+			var meta map[string]any
+			if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
+				t.Fatalf("failed to unmarshal persisted meta: %v", err)
+			}
+			if kind, ok := meta["kind"].(string); !ok || kind != tt.expectedKind {
+				t.Fatalf("expected meta.kind == %q, got %#v", tt.expectedKind, meta["kind"])
+			}
+		})
 	}
 }
 
