@@ -77,7 +77,7 @@ Legend: [ ] todo, [x] done.
   - Tests: jobs completion negative tests — expect 4xx on malformed or missing SHA data.
 
 ## Phase 6: Gate Profile Resolution Service
-- [ ] Implement lookup/copy/insert profile resolution pipeline — always resolve to exact `(repo_id, repo_sha_in, stack_id)` row.
+- [x] Implement lookup/copy/insert profile resolution pipeline — always resolve to exact `(repo_id, repo_sha_in, stack_id)` row.
   - Repository: ploy
   - Component: gate claim-time orchestration
   - Scope: add service for 3-step lookup order (exact -> repo+stack -> default stack); copy garage object on fallback; insert exact row; return `profile_id`.

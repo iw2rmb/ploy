@@ -10,6 +10,11 @@ import (
 
 // RegisterRoutes mounts all HTTP endpoints on the given server.
 func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp *blobpersist.Service, eventsService *server.EventsService, configHolder *ConfigHolder, tokenSecret string) {
+	var gateProfileResolver GateProfileResolver
+	if _, ok := st.(*store.PgStore); ok && bs != nil {
+		gateProfileResolver = NewDBGateProfileResolver(st, bs)
+	}
+
 	// Health
 	s.HandleFunc("/health", healthHandler(st))
 
@@ -105,7 +110,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
 	// NOTE: The ack endpoint (/v1/nodes/{id}/ack) has been removed. Claim is the
 	// canonical endpoint for pulling work from the unified jobs queue.
-	s.HandleFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, configHolder, eventsService), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, configHolder, eventsService, gateProfileResolver), auth.RoleWorker)
 	// NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
 	// Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
