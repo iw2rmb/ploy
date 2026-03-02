@@ -106,7 +106,7 @@ func TestPopulateHealingInDirCopiesGateProfileForInfra(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(runDir, "build-gate-first.log"), []byte("failure\n"), 0o644); err != nil {
 		t.Fatalf("write first gate log: %v", err)
 	}
-	const profile = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`
+	const profile = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"active":"build","build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`
 	if err := os.WriteFile(filepath.Join(runDir, "build-gate-profile.json"), []byte(profile), 0o644); err != nil {
 		t.Fatalf("write gate profile snapshot: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestPopulateHealingInDirInfra_UsesClaimRecoveryContextProfileAndSchema(t *t
 	rc := &runController{cfg: Config{}}
 	runID := types.RunID("run-claim-profile")
 	inDir := t.TempDir()
-	profile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
+	profile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"active":"build","build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
 	schemaJSON := mustGateProfileSchemaJSON(t)
 
 	recovery := &contracts.RecoveryClaimContext{

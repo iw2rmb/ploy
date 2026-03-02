@@ -86,7 +86,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/nodeagent -run 'TestPersistGateProfileSnapshot_'` — snapshot payload remains valid and active-target aligned.
 
 ## Phase 4: Infra Prompt Output Contract
-- [ ] Update infra-healing prompt to require candidate output to set `targets.active` directly — candidate must tell gate which target to run next.
+- [x] Update infra-healing prompt to require candidate output to set `targets.active` directly — candidate must tell gate which target to run next.
   - Repository: `ploy`
   - Component: healing strategy prompt asset
   - Scope:
