@@ -87,3 +87,13 @@ func NewMigRepoID() MigRepoID {
 	}
 	return MigRepoID(id)
 }
+
+// NewRepoID generates a new unique global RepoID using NanoID.
+// Uses an 8-character NanoID with the URL-safe alphabet.
+func NewRepoID() RepoID {
+	id, err := gonanoid.Generate(alphabet, 8)
+	if err != nil {
+		panic("idgen: failed to generate NanoID: " + err.Error())
+	}
+	return RepoID(id)
+}

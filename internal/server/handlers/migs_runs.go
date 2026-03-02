@@ -210,7 +210,7 @@ func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.Mi
 		}
 
 		// Build a set of failed repo IDs for efficient lookup.
-		failedSet := make(map[domaintypes.MigRepoID]bool, len(failedRepoIDs))
+		failedSet := make(map[domaintypes.RepoID]bool, len(failedRepoIDs))
 		for _, repoID := range failedRepoIDs {
 			failedSet[repoID] = true
 		}

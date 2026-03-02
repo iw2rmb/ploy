@@ -44,7 +44,7 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	var job Job
 	assertType[types.JobID](job.ID)
 	assertType[types.RunID](job.RunID)
-	assertType[types.MigRepoID](job.RepoID)
+	assertType[types.RepoID](job.RepoID)
 	assertType[*types.JobID](job.NextID)
 	assertType[*types.NodeID](job.NodeID)
 
@@ -70,7 +70,7 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	var runRepo RunRepo
 	assertType[types.MigID](runRepo.MigID)
 	assertType[types.RunID](runRepo.RunID)
-	assertType[types.MigRepoID](runRepo.RepoID)
+	assertType[types.RepoID](runRepo.RepoID)
 
 	// Verify Event struct field types.
 	var event Event

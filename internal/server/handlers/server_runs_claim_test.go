@@ -32,7 +32,7 @@ func TestClaimJob_Success(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -67,7 +67,7 @@ func TestClaimJob_Success(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
@@ -140,7 +140,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -175,7 +175,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		// Spec is sourced from the DB at claim time; it must be a JSON object.
@@ -200,7 +200,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -235,7 +235,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
@@ -318,7 +318,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -355,7 +355,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: runSpec},
@@ -456,7 +456,7 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 			nodeKey := domaintypes.NewNodeKey()
 			nodeID := domaintypes.NodeID(nodeKey)
 			runID := domaintypes.NewRunID()
-			repoID := domaintypes.NewMigRepoID()
+			repoID := domaintypes.NewRepoID()
 			specID := domaintypes.NewSpecID()
 			jobID := domaintypes.NewJobID()
 			now := time.Now().UTC()
@@ -491,7 +491,7 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 					Attempt:       1,
 				},
 				getModRepoResult: store.MigRepo{
-					ID:     repoID,
+					ID:     domaintypes.NewMigRepoID(),
 					RepoID: repoID,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
@@ -576,21 +576,21 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		"orchestration": {"pre": [], "post": []}
 	}`
 
-		tests := []struct {
-			name    string
-			spec    []byte
+	tests := []struct {
+		name    string
+		spec    []byte
 		wantCmd string
 		wantSrc string
-		}{
-			{
-				name:    "candidate wins on re_gate",
-				spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
-				wantCmd: "echo candidate-unit",
-				wantSrc: "candidate",
-			},
-			{
-				name: "explicit prep wins over candidate",
-				spec: []byte(`{
+	}{
+		{
+			name:    "candidate wins on re_gate",
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			wantCmd: "echo candidate-unit",
+			wantSrc: "candidate",
+		},
+		{
+			name: "explicit prep wins over candidate",
+			spec: []byte(`{
 					"steps":[{"image":"docker.io/acme/mod:latest"}],
 					"build_gate":{"post":{"gate_profile":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
 			}`),
@@ -607,7 +607,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 			nodeKey := domaintypes.NewNodeKey()
 			nodeID := domaintypes.NodeID(nodeKey)
 			runID := domaintypes.NewRunID()
-			repoID := domaintypes.NewMigRepoID()
+			repoID := domaintypes.NewRepoID()
 			specID := domaintypes.NewSpecID()
 			jobID := domaintypes.NewJobID()
 			now := time.Now().UTC()
@@ -648,7 +648,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 					Attempt:       1,
 				},
 				getModRepoResult: store.MigRepo{
-					ID:     repoID,
+					ID:     domaintypes.NewMigRepoID(),
 					RepoID: repoID,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
@@ -704,7 +704,7 @@ func TestClaimJob_InvalidRecoveryCandidateGateProfileReturnsError(t *testing.T) 
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -744,7 +744,7 @@ func TestClaimJob_InvalidRecoveryCandidateGateProfileReturnsError(t *testing.T) 
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:     repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
@@ -771,7 +771,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -819,7 +819,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: spec},
@@ -900,7 +900,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -948,7 +948,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: spec},
@@ -996,7 +996,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	nodeKey := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeKey)
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
@@ -1031,7 +1031,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
+			ID:     domaintypes.NewMigRepoID(),
 			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},

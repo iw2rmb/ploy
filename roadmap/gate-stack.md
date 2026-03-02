@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
   - Tests: transactional tests in handler/store integration — expect no partial updates on injected failures.
 
 ## Phase 4: sqlc And Domain Type Migration
-- [ ] Introduce global `RepoID` domain type and remap sqlc columns — remove ambiguity between mig membership and global repo identity.
+- [x] Introduce global `RepoID` domain type and remap sqlc columns — remove ambiguity between mig membership and global repo identity.
   - Repository: ploy
   - Component: domain types; sqlc overrides; generated models
   - Scope: add `RepoID` type in `internal/domain/types/ids.go`; update `sqlc.yaml` overrides for `repos.id`, `jobs.repo_id`, `run_repos.repo_id`, `mig_repos.repo_id`; regenerate store code.

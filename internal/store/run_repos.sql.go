@@ -68,13 +68,13 @@ RETURNING mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit
 `
 
 type CreateRunRepoParams struct {
-	MigID           types.MigID     `json:"mig_id"`
-	RunID           types.RunID     `json:"run_id"`
-	RepoID          types.MigRepoID `json:"repo_id"`
-	RepoBaseRef     string          `json:"repo_base_ref"`
-	RepoTargetRef   string          `json:"repo_target_ref"`
-	SourceCommitSha string          `json:"source_commit_sha"`
-	RepoSha0        string          `json:"repo_sha0"`
+	MigID           types.MigID  `json:"mig_id"`
+	RunID           types.RunID  `json:"run_id"`
+	RepoID          types.RepoID `json:"repo_id"`
+	RepoBaseRef     string       `json:"repo_base_ref"`
+	RepoTargetRef   string       `json:"repo_target_ref"`
+	SourceCommitSha string       `json:"source_commit_sha"`
+	RepoSha0        string       `json:"repo_sha0"`
 }
 
 // v1: Creates a new run_repos row scoped to (run_id, repo_id).
@@ -114,8 +114,8 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type DeleteRunRepoParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
 }
 
 func (q *Queries) DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error {
@@ -135,15 +135,15 @@ LIMIT 1
 `
 
 type GetLatestRunRepoByMigAndRepoStatusParams struct {
-	MigID  types.MigID     `json:"mig_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
-	Status RunRepoStatus   `json:"status"`
+	MigID  types.MigID   `json:"mig_id"`
+	RepoID types.RepoID  `json:"repo_id"`
+	Status RunRepoStatus `json:"status"`
 }
 
 type GetLatestRunRepoByMigAndRepoStatusRow struct {
-	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.MigRepoID `json:"repo_id"`
-	RepoTargetRef string          `json:"repo_target_ref"`
+	RunID         types.RunID  `json:"run_id"`
+	RepoID        types.RepoID `json:"repo_id"`
+	RepoTargetRef string       `json:"repo_target_ref"`
 }
 
 // v1: Gets the newest run_repos row for a specific repo_id in a mig,
@@ -164,8 +164,8 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type GetRunRepoParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
 }
 
 func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error) {
@@ -200,8 +200,8 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type IncrementRunRepoAttemptParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
 }
 
 // Increments attempt and resets status/timing for a fresh repo execution attempt.
@@ -225,15 +225,15 @@ WHERE status = 'Fail'
 // "Last terminal state" per repo_id is determined by looking at the newest run_repos
 // row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 // Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
-func (q *Queries) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.MigRepoID, error) {
+func (q *Queries) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error) {
 	rows, err := q.db.Query(ctx, listFailedRepoIDsByMig, migID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []types.MigRepoID{}
+	items := []types.RepoID{}
 	for rows.Next() {
-		var repo_id types.MigRepoID
+		var repo_id types.RepoID
 		if err := rows.Scan(&repo_id); err != nil {
 			return nil, err
 		}
@@ -343,7 +343,7 @@ ORDER BY rr.created_at ASC, rr.repo_id ASC
 type ListRunReposWithURLByRunRow struct {
 	MigID           types.MigID        `json:"mig_id"`
 	RunID           types.RunID        `json:"run_id"`
-	RepoID          types.MigRepoID    `json:"repo_id"`
+	RepoID          types.RepoID       `json:"repo_id"`
 	RepoBaseRef     string             `json:"repo_base_ref"`
 	RepoTargetRef   string             `json:"repo_target_ref"`
 	SourceCommitSha string             `json:"source_commit_sha"`
@@ -415,9 +415,9 @@ LIMIT $2 OFFSET $3
 `
 
 type ListRunsForRepoParams struct {
-	RepoID types.MigRepoID `json:"repo_id"`
-	Limit  int32           `json:"limit"`
-	Offset int32           `json:"offset"`
+	RepoID types.RepoID `json:"repo_id"`
+	Limit  int32        `json:"limit"`
+	Offset int32        `json:"offset"`
 }
 
 type ListRunsForRepoRow struct {
@@ -500,9 +500,9 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoErrorParams struct {
-	RunID     types.RunID     `json:"run_id"`
-	RepoID    types.MigRepoID `json:"repo_id"`
-	LastError *string         `json:"last_error"`
+	RunID     types.RunID  `json:"run_id"`
+	RepoID    types.RepoID `json:"repo_id"`
+	LastError *string      `json:"last_error"`
 }
 
 func (q *Queries) UpdateRunRepoError(ctx context.Context, arg UpdateRunRepoErrorParams) error {
@@ -518,10 +518,10 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoRefsParams struct {
-	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.MigRepoID `json:"repo_id"`
-	RepoBaseRef   string          `json:"repo_base_ref"`
-	RepoTargetRef string          `json:"repo_target_ref"`
+	RunID         types.RunID  `json:"run_id"`
+	RepoID        types.RepoID `json:"repo_id"`
+	RepoBaseRef   string       `json:"repo_base_ref"`
+	RepoTargetRef string       `json:"repo_target_ref"`
 }
 
 // Updates snapshot refs for the run repo (used when restarting with new refs).
@@ -544,9 +544,9 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoStatusParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
-	Status RunRepoStatus   `json:"status"`
+	RunID  types.RunID   `json:"run_id"`
+	RepoID types.RepoID  `json:"repo_id"`
+	Status RunRepoStatus `json:"status"`
 }
 
 // Updates repo status + timing fields.

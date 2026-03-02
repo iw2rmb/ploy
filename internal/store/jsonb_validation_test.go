@@ -60,7 +60,7 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 		_, err := store.CreateJob(ctx, CreateJobParams{
 			ID:     types.NewJobID(),
 			RunID:  types.NewRunID(),
-			RepoID: types.NewMigRepoID(),
+			RepoID: types.NewRepoID(),
 			NextID: nil,
 			Meta:   invalidJSON,
 		})

@@ -24,7 +24,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	diffID := uuid.New()
 	patch := []byte{0x1f, 0x8b, 0x08, 0x00}
-	repoIDTyped := domaintypes.MigRepoID(repoID)
+	repoIDTyped := domaintypes.RepoID(repoID)
 	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
 	st.getDiffResult = store.Diff{
@@ -75,7 +75,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoAID := "repoAAAA" // NanoID-backed
 	repoBID := "repoBBBB" // NanoID-backed
-	repoBIDTyped := domaintypes.MigRepoID(repoBID)
+	repoBIDTyped := domaintypes.RepoID(repoBID)
 
 	// Setup: diff for repo A (via job_id -> jobs.repo_id join)
 	jobAID := domaintypes.NewJobID()

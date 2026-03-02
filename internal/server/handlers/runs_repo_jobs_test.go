@@ -14,7 +14,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 	nextID := domaintypes.NewJobID()
 
@@ -83,7 +83,7 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	st := &mockStore{
 		getRunRepoResult: store.RunRepo{
@@ -114,7 +114,7 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	pre := domaintypes.NewJobID()
 	mig0 := domaintypes.NewJobID()
 	mig1 := domaintypes.NewJobID()
@@ -181,7 +181,7 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	st := &mockStore{
@@ -273,7 +273,7 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	st := &mockStore{
@@ -337,7 +337,7 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	st := &mockStore{
@@ -410,7 +410,7 @@ func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
 	st := &mockStore{

@@ -422,7 +422,7 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 			"mod1": {{ID: "repo1", MigID: "mod1", RepoID: "repo1"}},
 			"mod2": {{ID: "repo2", MigID: "mod2", RepoID: "repo2"}},
 		},
-		repoByID: map[types.MigRepoID]store.Repo{
+		repoByID: map[types.RepoID]store.Repo{
 			"repo1": {ID: "repo1", Url: "https://github.com/org/repo"},
 			"repo2": {ID: "repo2", Url: "https://github.com/org/other"},
 		},
@@ -469,7 +469,7 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 			"modB": {{ID: "repoB", MigID: "modB", RepoID: "repoB"}},
 			"modC": {{ID: "repoC", MigID: "modC", RepoID: "repoC"}},
 		},
-		repoByID: map[types.MigRepoID]store.Repo{
+		repoByID: map[types.RepoID]store.Repo{
 			"repoA": {ID: "repoA", Url: "https://github.com/org/repo"},
 			"repoB": {ID: "repoB", Url: "https://github.com/org/repo"},
 			"repoC": {ID: "repoC", Url: "https://github.com/org/repo"},

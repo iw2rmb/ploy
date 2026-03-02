@@ -31,7 +31,7 @@ func MaybeUpdateRunRepoStatus(
 	ctx context.Context,
 	st store.Store,
 	runID domaintypes.RunID,
-	repoID domaintypes.MigRepoID,
+	repoID domaintypes.RepoID,
 	attempt int32,
 ) (bool, error) {
 	jobs, err := st.ListJobsByRunRepoAttempt(ctx, store.ListJobsByRunRepoAttemptParams{

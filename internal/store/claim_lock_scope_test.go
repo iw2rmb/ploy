@@ -36,7 +36,7 @@ func TestClaimJobLocksJobOnly(t *testing.T) {
 	createdJob, err := db.CreateJob(ctx, CreateJobParams{
 		ID:          jobID,
 		RunID:       fx.Run.ID,
-		RepoID:      fx.MigRepo.ID,
+		RepoID:      fx.MigRepo.RepoID,
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-lock",

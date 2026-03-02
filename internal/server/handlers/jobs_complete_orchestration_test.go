@@ -48,7 +48,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	f := newJobFixture("mig", 1000)
 	now := time.Now()
 
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
@@ -208,7 +208,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.JobTypeMod.String(), 2000)
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	postJobID := domaintypes.NewJobID()
 
 	f.Job.RepoID = repoID
@@ -334,7 +334,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	nextJob := store.Job{
 		ID:          domaintypes.NewJobID(),
 		RunID:       f.RunID,
-		RepoID:      domaintypes.NewMigRepoID(),
+		RepoID:      domaintypes.NewRepoID(),
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Status:      store.JobStatusCreated,
@@ -376,7 +376,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
@@ -474,7 +474,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"
@@ -555,7 +555,7 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 	t.Parallel()
 
 	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
 	f.Job.RepoBaseRef = "main"

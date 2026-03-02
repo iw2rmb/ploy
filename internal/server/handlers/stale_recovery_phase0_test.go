@@ -15,7 +15,7 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	st := &mockStore{
 		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
@@ -83,7 +83,7 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 
 	st := &mockStore{
 		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{

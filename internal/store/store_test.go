@@ -196,7 +196,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 
 	// Add a second repo for the mig and run.
 	modRepo2ID := types.NewMigRepoID()
-	_, err = db.CreateMigRepo(ctx, CreateMigRepoParams{
+	modRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
 		MigID:     fx.Mig.ID,
 		Url:       "https://github.com/org/repo-b",
@@ -209,7 +209,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	rr2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
 		MigID:           fx.Mig.ID,
 		RunID:           fx.Run.ID,
-		RepoID:          modRepo2ID,
+		RepoID:          modRepo2.RepoID,
 		RepoBaseRef:     "main",
 		RepoTargetRef:   "feature/b",
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
@@ -350,12 +350,12 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		t.Fatalf("expected 2 run repos with urls, got %d", len(rows))
 	}
 
-	expectedURLByRepoID := map[types.MigRepoID]string{
+	expectedURLByRepoID := map[types.RepoID]string{
 		fx.MigRepo.RepoID: "https://github.com/org/repo-a",
 		modRepo2.RepoID:   "https://github.com/org/repo-b",
 	}
 
-	seen := map[types.MigRepoID]bool{}
+	seen := map[types.RepoID]bool{}
 	for i, row := range rows {
 		if row.RunID != fx.Run.ID {
 			t.Fatalf("row[%d] run_id=%q, want %q", i, row.RunID, fx.Run.ID)
@@ -385,10 +385,10 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 		}
 	}
 
-	if !seen[fx.MigRepo.ID] {
-		t.Fatalf("expected repo_id %q in results", fx.MigRepo.ID)
+	if !seen[fx.MigRepo.RepoID] {
+		t.Fatalf("expected repo_id %q in results", fx.MigRepo.RepoID)
 	}
-	if !seen[modRepo2.ID] {
-		t.Fatalf("expected repo_id %q in results", modRepo2.ID)
+	if !seen[modRepo2.RepoID] {
+		t.Fatalf("expected repo_id %q in results", modRepo2.RepoID)
 	}
 }

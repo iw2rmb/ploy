@@ -28,10 +28,10 @@ import (
 // RepoSummary represents a repository with its last run metadata.
 // Used in the GET /v1/repos response to show known repositories.
 type RepoSummary struct {
-	RepoID     domaintypes.MigRepoID `json:"repo_id"`
-	RepoURL    string                `json:"repo_url"`
-	LastRunAt  *time.Time            `json:"last_run_at,omitempty"`
-	LastStatus *string               `json:"last_status,omitempty"`
+	RepoID     domaintypes.RepoID `json:"repo_id"`
+	RepoURL    string             `json:"repo_url"`
+	LastRunAt  *time.Time         `json:"last_run_at,omitempty"`
+	LastStatus *string            `json:"last_status,omitempty"`
 }
 
 // RepoRunSummary represents a run for a specific repository.
@@ -123,7 +123,7 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 //   - offset: number of runs to skip (default 0)
 func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

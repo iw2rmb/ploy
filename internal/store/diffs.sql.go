@@ -101,8 +101,8 @@ ORDER BY
 `
 
 type ListDiffsByRunRepoParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
 }
 
 // Returns diffs for a specific repo execution within a run.
@@ -185,8 +185,8 @@ ORDER BY
 `
 
 type ListDiffsMetaByRunRepoParams struct {
-	RunID  types.RunID     `json:"run_id"`
-	RepoID types.MigRepoID `json:"repo_id"`
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
 }
 
 // Returns diff metadata for a specific repo within a run.
