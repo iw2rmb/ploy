@@ -263,6 +263,63 @@ func TestCompleteJob_InvalidRepoSHAOut(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_MissingRepoSHAOutForSuccessfulLinkedJob(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig", 1000)
+	nextID := domaintypes.NewJobID()
+	f.Job.NextID = &nextID
+	f.Job.RepoShaIn = "0123456789abcdef0123456789abcdef01234567"
+
+	st := &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status": "Success",
+	}))
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
+		t.Fatal("did not expect completion persistence when repo_sha_out is missing")
+	}
+}
+
+func TestCompleteJob_InvalidRepoSHAInForSuccessfulLinkedJob(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig", 1000)
+	nextID := domaintypes.NewJobID()
+	f.Job.NextID = &nextID
+	f.Job.RepoShaIn = ""
+
+	st := &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":       "Success",
+		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
+	}))
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
+		t.Fatal("did not expect completion persistence when repo_sha_in is invalid")
+	}
+}
+
 func TestCompleteJob_MissingStatus(t *testing.T) {
 	t.Parallel()
 

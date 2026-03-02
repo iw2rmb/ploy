@@ -79,13 +79,14 @@ func newJobFixture(jobType string, _ float64) jobTestFixture {
 		RunID:     runID,
 		JobID:     jobID,
 		Job: store.Job{
-			ID:      jobID,
-			RunID:   runID,
-			NodeID:  &nodeID,
-			Name:    jobType + "-0",
-			Status:  store.JobStatusRunning,
-			JobType: jobType,
-			Meta:    []byte(`{}`),
+			ID:        jobID,
+			RunID:     runID,
+			NodeID:    &nodeID,
+			Name:      jobType + "-0",
+			Status:    store.JobStatusRunning,
+			JobType:   jobType,
+			RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
+			Meta:      []byte(`{}`),
 		},
 	}
 }

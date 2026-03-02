@@ -155,7 +155,10 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":       "Success",
+		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
+	}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
@@ -359,7 +362,10 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	handler := completeJobHandler(st, nil, nil)
 
 	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Success"}))
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":       "Success",
+		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
+	}))
 
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())

@@ -189,6 +189,17 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			return
 		}
 
+		if normalizedStatus == store.JobStatusSuccess && job.NextID != nil {
+			if !sha40Pattern.MatchString(job.RepoShaIn) {
+				httpErr(w, http.StatusConflict, "job repo_sha_in must match ^[0-9a-f]{40}$ for chain progression")
+				return
+			}
+			if repoSHAOut == "" {
+				httpErr(w, http.StatusBadRequest, "repo_sha_out is required for successful jobs with next_id")
+				return
+			}
+		}
+
 		// Persist per-job resource consumption metrics when provided.
 		if statsPayload.HasJobResources() {
 			res := statsPayload.JobResources
