@@ -43,7 +43,7 @@ func PrefixedScript(env map[string]string) string {
 		b.WriteString("export ")
 		b.WriteString(k)
 		b.WriteString("=")
-		b.WriteString(singleQuote(v))
+		b.WriteString(shellQuote(v))
 		b.WriteString("\n")
 	}
 	// Separator between exports and script body
@@ -311,15 +311,4 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("echo '========================================'\n")
 
 	return b.String()
-}
-
-// singleQuote returns a shell-safe single-quoted literal. Empty becomes ”.
-func singleQuote(s string) string {
-	if s == "" {
-		return "''"
-	}
-	if !strings.Contains(s, "'") {
-		return "'" + s + "'"
-	}
-	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }

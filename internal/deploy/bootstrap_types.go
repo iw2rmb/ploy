@@ -5,12 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"time"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// This file defines bootstrap constants plus helper types shared across splits.
 
 const (
 	// DefaultRemoteUser is applied when no remote user is provided.
@@ -20,32 +15,6 @@ const (
 	// remotePloydBinaryPath is where the ployd binary is installed on the target host.
 	remotePloydBinaryPath = "/usr/local/bin/ployd"
 )
-
-// Options configure bootstrap execution.
-// Uses domain types (ClusterID, NodeID) for type-safe identification.
-type Options struct {
-	Host                   string
-	Address                string
-	User                   string
-	Port                   int
-	IdentityFile           string
-	Stdout                 io.Writer
-	Stderr                 io.Writer
-	Runner                 Runner
-	PloydBinaryPath        string
-	ControlPlaneURL        string
-	Clock                  func() time.Time
-	Stdin                  io.Reader
-	WorkstationOS          string
-	DescriptorID           string
-	DescriptorAddress      string
-	DescriptorIdentityPath string
-	ClusterID              domaintypes.ClusterID `yaml:"cluster_id"` // Cluster ID
-	InitialWorkers         []string
-	Primary                bool
-	NodeID                 domaintypes.NodeID `yaml:"node_id"` // Node ID (NanoID-backed)
-	NodeAddress            string
-}
 
 // IOStreams represents command IO endpoints.
 type IOStreams struct {
@@ -90,6 +59,3 @@ func (SystemRunner) Run(ctx context.Context, command string, args []string, stdi
 	}
 	return cmd.Run()
 }
-
-// systemRunner is an internal alias for backward compatibility.
-type systemRunner = SystemRunner

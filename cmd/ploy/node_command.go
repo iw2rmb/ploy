@@ -171,10 +171,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  Binary: %s\n", ploydNodeBinaryPath)
 
 	// Generate node ID
-	nodeID, err := deploy.GenerateNodeID()
-	if err != nil {
-		return fmt.Errorf("node add: generate node ID: %w", err)
-	}
+	nodeID := deploy.GenerateNodeID()
 	_, _ = fmt.Fprintf(stderr, "Generated node ID: %s\n", nodeID)
 
 	serverURL := strings.TrimSpace(cfg.ServerURL)

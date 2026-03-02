@@ -53,23 +53,16 @@ func TestGenerateClusterID(t *testing.T) {
 }
 
 // nanoIDAlphabet is the URL-safe alphabet used by NewNodeKey().
-// Matches the alphabet defined in internal/domain/types/idgen.go.
 const nanoIDAlphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
 
 func TestGenerateNodeID(t *testing.T) {
 	t.Run("generates valid node ID", func(t *testing.T) {
-		id, err := GenerateNodeID()
-		if err != nil {
-			t.Fatalf("GenerateNodeID() error = %v, want nil", err)
-		}
+		id := GenerateNodeID()
 
-		// NanoID(6) format: 6 characters from URL-safe alphabet.
-		// Total length should be exactly 6.
 		if len(id) != 6 {
 			t.Errorf("GenerateNodeID() length = %d, want 6", len(id))
 		}
 
-		// Validate all characters are from the NanoID URL-safe alphabet.
 		for _, c := range id {
 			if !strings.ContainsRune(nanoIDAlphabet, c) {
 				t.Errorf("invalid character %q in node ID %q; expected URL-safe alphabet", c, id)
@@ -78,15 +71,8 @@ func TestGenerateNodeID(t *testing.T) {
 	})
 
 	t.Run("generates unique IDs", func(t *testing.T) {
-		id1, err := GenerateNodeID()
-		if err != nil {
-			t.Fatalf("GenerateNodeID() error = %v", err)
-		}
-
-		id2, err := GenerateNodeID()
-		if err != nil {
-			t.Fatalf("GenerateNodeID() error = %v", err)
-		}
+		id1 := GenerateNodeID()
+		id2 := GenerateNodeID()
 
 		if id1 == id2 {
 			t.Errorf("GenerateNodeID() generated duplicate IDs: %q", id1)
@@ -100,31 +86,11 @@ func TestRandomHexString(t *testing.T) {
 		length  int
 		wantErr bool
 	}{
-		{
-			name:    "valid length 8",
-			length:  8,
-			wantErr: false,
-		},
-		{
-			name:    "valid length 16",
-			length:  16,
-			wantErr: false,
-		},
-		{
-			name:    "valid length 32",
-			length:  32,
-			wantErr: false,
-		},
-		{
-			name:    "zero length",
-			length:  0,
-			wantErr: true,
-		},
-		{
-			name:    "negative length",
-			length:  -1,
-			wantErr: true,
-		},
+		{name: "valid length 8", length: 8},
+		{name: "valid length 16", length: 16},
+		{name: "valid length 32", length: 32},
+		{name: "zero length", length: 0, wantErr: true},
+		{name: "negative length", length: -1, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -142,7 +108,6 @@ func TestRandomHexString(t *testing.T) {
 				t.Errorf("RandomHexString(%d) length = %d, want %d", tt.length, len(got), tt.length)
 			}
 
-			// Validate all characters are hex
 			for _, c := range got {
 				if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 					t.Errorf("invalid hex character %q in result %q", c, got)
