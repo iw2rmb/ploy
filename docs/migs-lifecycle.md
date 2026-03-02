@@ -1101,6 +1101,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
     `mem_consumed_bytes`), the server upserts a row in `job_metrics`.
   - Nodes may report `repo_sha_out`; the server accepts only lowercase 40-hex
     values and persists the full and short (`repo_sha_out8`) forms on `jobs`.
+  - The completion update atomically propagates `repo_sha_out` to the linked
+    successor job as `repo_sha_in`/`repo_sha_in8` when `next_id` is present.
 - `POST /v1/nodes/{id}/events` — publish run-scoped node exceptions/events
   (for example claim/start failures and runtime panics) into the run SSE stream.
 - `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.

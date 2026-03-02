@@ -47,7 +47,7 @@ Legend: [ ] todo, [x] done.
   - Scope: add `jobs.repo_sha_in`, `jobs.repo_sha_out`, `jobs.repo_sha_in8`, `jobs.repo_sha_out8`; enforce lowercase 40-hex format validation at boundary.
   - Snippets: regex validation `^[0-9a-f]{40}$`
   - Tests: completion payload tests in `internal/server/handlers/jobs_complete*_test.go` — expect invalid SHA format rejection.
-- [ ] Implement atomic propagation `repo_sha_out -> next.repo_sha_in` — keep chain consistent under concurrency.
+- [x] Implement atomic propagation `repo_sha_out -> next.repo_sha_in` — keep chain consistent under concurrency.
   - Repository: ploy
   - Component: jobs completion transaction
   - Scope: update completion query/logic to write current `repo_sha_out` and successor `repo_sha_in` in one DB transaction keyed by `next_id`.

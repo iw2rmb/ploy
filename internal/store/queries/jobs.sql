@@ -362,20 +362,34 @@ SELECT COUNT(*) FROM jobs
 WHERE run_id = $1 AND status = $2;
 
 -- name: UpdateJobCompletion :exec
-UPDATE jobs
-SET status = sqlc.arg(status),
-    exit_code = sqlc.arg(exit_code),
-    repo_sha_out = CASE
-      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out
-      ELSE sqlc.arg(repo_sha_out)::TEXT
+WITH completed AS (
+  UPDATE jobs
+  SET status = sqlc.arg(status),
+      exit_code = sqlc.arg(exit_code),
+      repo_sha_out = CASE
+        WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out
+        ELSE sqlc.arg(repo_sha_out)::TEXT
+      END,
+      repo_sha_out8 = CASE
+        WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out8
+        ELSE SUBSTRING(sqlc.arg(repo_sha_out)::TEXT, 1, 8)
+      END,
+      finished_at = now(),
+      duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
+  WHERE jobs.id = sqlc.arg(id)
+  RETURNING next_id, repo_sha_out
+)
+UPDATE jobs AS next_job
+SET repo_sha_in = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in
+      ELSE completed.repo_sha_out
     END,
-    repo_sha_out8 = CASE
-      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out8
-      ELSE SUBSTRING(sqlc.arg(repo_sha_out)::TEXT, 1, 8)
-    END,
-    finished_at = now(),
-    duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
-WHERE id = sqlc.arg(id);
+    repo_sha_in8 = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in8
+      ELSE SUBSTRING(completed.repo_sha_out, 1, 8)
+    END
+FROM completed
+WHERE next_job.id = completed.next_id;
 
 -- name: UpdateJobMeta :exec
 UPDATE jobs
@@ -390,21 +404,35 @@ SET job_image = $2
 WHERE id = $1;
 
 -- name: UpdateJobCompletionWithMeta :exec
-UPDATE jobs
-SET status = sqlc.arg(status),
-    exit_code = sqlc.arg(exit_code),
-    repo_sha_out = CASE
-      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out
-      ELSE sqlc.arg(repo_sha_out)::TEXT
+WITH completed AS (
+  UPDATE jobs
+  SET status = sqlc.arg(status),
+      exit_code = sqlc.arg(exit_code),
+      repo_sha_out = CASE
+        WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out
+        ELSE sqlc.arg(repo_sha_out)::TEXT
+      END,
+      repo_sha_out8 = CASE
+        WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out8
+        ELSE SUBSTRING(sqlc.arg(repo_sha_out)::TEXT, 1, 8)
+      END,
+      finished_at = now(),
+      duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
+      meta = sqlc.arg(meta)
+  WHERE jobs.id = sqlc.arg(id)
+  RETURNING next_id, repo_sha_out
+)
+UPDATE jobs AS next_job
+SET repo_sha_in = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in
+      ELSE completed.repo_sha_out
     END,
-    repo_sha_out8 = CASE
-      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out8
-      ELSE SUBSTRING(sqlc.arg(repo_sha_out)::TEXT, 1, 8)
-    END,
-    finished_at = now(),
-    duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
-    meta = sqlc.arg(meta)
-WHERE id = sqlc.arg(id);
+    repo_sha_in8 = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in8
+      ELSE SUBSTRING(completed.repo_sha_out, 1, 8)
+    END
+FROM completed
+WHERE next_job.id = completed.next_id;
 
 -- name: CountJobsByRunRepoAttemptGroupByStatus :many
 -- Counts jobs by status for a specific repo attempt, excluding MR jobs.
