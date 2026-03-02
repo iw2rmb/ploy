@@ -46,7 +46,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/contracts -run 'TestGateProfile'` — parser rejects missing/invalid `targets.active`; active target and unsupported-terminal validation is enforced.
 
 ## Phase 2: Claim-Time Target Mapping by Active Target
-- [ ] Switch gate override mapping from phase-specific targets to `targets.active` — ensures all gate phases use the selected profile target consistently.
+- [x] Switch gate override mapping from phase-specific targets to `targets.active` — ensures all gate phases use the selected profile target consistently.
   - Repository: `ploy`
   - Component: claim-time spec mutators + gate profile mapping
   - Scope:

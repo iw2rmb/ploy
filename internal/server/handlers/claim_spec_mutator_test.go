@@ -17,11 +17,11 @@ func TestMutateClaimSpec_ReGateCandidateWinsOverRepoProfile(t *testing.T) {
 
 	jobID := domaintypes.NewJobID()
 	job := testMutatorJobWithRecoveryMeta(jobID, fmt.Sprintf(
-		`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_validation_status":"%s","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"unit":{"status":"passed","command":"echo candidate","env":{"SRC":"candidate"}},"build":{"status":"passed","command":"echo candidate build","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`,
+		`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_validation_status":"%s","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"unit","unit":{"status":"passed","command":"echo candidate","env":{"SRC":"candidate"}},"build":{"status":"passed","command":"echo candidate build","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`,
 		contracts.RecoveryCandidateStatusValid,
 	))
 
-	repoProfile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"unit":{"status":"passed","command":"echo repo","env":{"SRC":"repo"}},"build":{"status":"passed","command":"echo repo build","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
+	repoProfile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"unit","unit":{"status":"passed","command":"echo repo","env":{"SRC":"repo"}},"build":{"status":"passed","command":"echo repo build","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
 
 	merged, err := mutateClaimSpec(claimSpecMutatorInput{
 		spec:            []byte(`{"env":{"EXISTING":"1"}}`),
@@ -76,7 +76,7 @@ func TestMutateClaimSpec_ExplicitGateProfileWins(t *testing.T) {
 
 	jobID := domaintypes.NewJobID()
 	job := testMutatorJobWithRecoveryMeta(jobID, "{}")
-	profile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"echo repo","env":{}},"unit":{"status":"passed","command":"echo repo unit","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
+	profile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"echo repo","env":{}},"unit":{"status":"passed","command":"echo repo unit","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
 
 	merged, err := mutateClaimSpec(claimSpecMutatorInput{
 		spec:            []byte(`{"build_gate":{"pre":{"gate_profile":{"command":"echo explicit","env":{"SRC":"explicit"}}}}}`),

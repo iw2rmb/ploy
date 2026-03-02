@@ -84,11 +84,11 @@ func TestGateProfileParseAndMapToGate(t *testing.T) {
 	if override == nil {
 		t.Fatal("post override=nil, want non-nil")
 	}
-	if override.Command.Shell != "go test ./... -run TestUnit" {
-		t.Fatalf("post command=%q, want %q", override.Command.Shell, "go test ./... -run TestUnit")
+	if override.Command.Shell != "go test ./..." {
+		t.Fatalf("post command=%q, want %q", override.Command.Shell, "go test ./...")
 	}
-	if got := override.Env["CGO_ENABLED"]; got != "0" {
-		t.Fatalf("post env[CGO_ENABLED]=%q, want %q", got, "0")
+	if got := override.Env["GOFLAGS"]; got != "-mod=readonly" {
+		t.Fatalf("post env[GOFLAGS]=%q, want %q", got, "-mod=readonly")
 	}
 	if got := override.Env[GateProfileDockerHostEnv]; got != "unix:///var/run/docker.sock" {
 		t.Fatalf("post env[%s]=%q, want %q", GateProfileDockerHostEnv, got, "unix:///var/run/docker.sock")
@@ -101,8 +101,8 @@ func TestGateProfileParseAndMapToGate(t *testing.T) {
 	if phase != BuildGateProfilePhasePost {
 		t.Fatalf("phase=%q, want %q", phase, BuildGateProfilePhasePost)
 	}
-	if override == nil || override.Command.Shell != "go test ./... -run TestUnit" {
-		t.Fatalf("re_gate override=%v, want unit command override", override)
+	if override == nil || override.Command.Shell != "go test ./..." {
+		t.Fatalf("re_gate override=%v, want active target command override", override)
 	}
 
 	phase, override, err = GateProfileGateOverrideForJobType(profile, types.JobTypeMod)
@@ -206,7 +206,7 @@ func TestGateProfileMapToGateUsesCommandsRegardlessOfTargetStatus(t *testing.T) 
 		"runner_mode": "simple",
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
-			"active": "build",
+			"active": "unit",
 			"build": {"status":"not_attempted","command":"go test ./...","env":{}},
 			"unit": {"status":"failed","command":"go test ./... -run TestUnit","env":{},"failure_code":"unknown"},
 			"all_tests": {"status":"not_attempted","env":{}}
@@ -224,7 +224,7 @@ func TestGateProfileMapToGateUsesCommandsRegardlessOfTargetStatus(t *testing.T) 
 	if preOverride == nil {
 		t.Fatal("pre override=nil, want non-nil")
 	}
-	if got, want := preOverride.Command.Shell, "go test ./..."; got != want {
+	if got, want := preOverride.Command.Shell, "go test ./... -run TestUnit"; got != want {
 		t.Fatalf("pre command=%q, want %q", got, want)
 	}
 
@@ -240,7 +240,7 @@ func TestGateProfileMapToGateUsesCommandsRegardlessOfTargetStatus(t *testing.T) 
 	}
 }
 
-func TestGateProfileMapToGateSkipsWhenMappedTargetHasNoCommand(t *testing.T) {
+func TestGateProfileMapToGateSkipsWhenActiveTargetUnsupported(t *testing.T) {
 	t.Parallel()
 
 	profile, err := ParseGateProfileJSON([]byte(`{
@@ -249,10 +249,10 @@ func TestGateProfileMapToGateSkipsWhenMappedTargetHasNoCommand(t *testing.T) {
 		"runner_mode": "simple",
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
-			"active": "all_tests",
-			"build": {"status":"not_attempted","env":{}},
+			"active": "unsupported",
+			"build": {"status":"failed","command":"go test ./...","env":{},"failure_code":"infra_support"},
 			"unit": {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","command":"go test ./...","env":{}}
+			"all_tests": {"status":"not_attempted","env":{}}
 		},
 		"orchestration": {"pre": [], "post": []}
 	}`))

@@ -22,6 +22,7 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 			}
 		},
 		"targets": {
+			"active": "unit",
 			"build": {
 				"status": "passed",
 				"command": "go test ./...",
@@ -57,17 +58,17 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 		wantErr   string
 	}{
 		{
-			name:      "injects pre_gate from build target",
+			name:      "injects pre_gate from active target",
 			jobType:   domaintypes.JobTypePreGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			profile:   profile,
 			wantPhase: "pre",
-			wantCmd:   "go test ./...",
-			wantEnvK:  "DOCKER_HOST",
-			wantEnvV:  "unix:///var/run/docker.sock",
+			wantCmd:   "go test ./... -run TestUnit",
+			wantEnvK:  "CGO_ENABLED",
+			wantEnvV:  "0",
 		},
 		{
-			name:      "injects post_gate from unit target",
+			name:      "injects post_gate from active target",
 			jobType:   domaintypes.JobTypePostGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			profile:   profile,
@@ -77,7 +78,7 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 			wantEnvV:  "0",
 		},
 		{
-			name:      "injects re_gate from unit target",
+			name:      "injects re_gate from active target",
 			jobType:   domaintypes.JobTypeReGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			profile:   profile,
@@ -117,9 +118,28 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 				"runner_mode": "simple",
 				"stack": {"language":"go","tool":"go"},
 				"targets": {
+					"active": "build",
 					"build": {"status": "failed", "command":"go test ./...", "env": {}, "failure_code": "unknown"},
 					"unit": {"status": "passed", "command":"go test ./... -run TestUnit", "env": {}, "failure_code": null},
 					"all_tests": {"status": "not_attempted", "env": {}}
+				},
+				"orchestration": {"pre": [], "post": []}
+			}`),
+		},
+		{
+			name:    "unsupported active target is terminal and does not inject",
+			jobType: domaintypes.JobTypePostGate,
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			profile: []byte(`{
+				"schema_version": 1,
+				"repo_id": "repo_123",
+				"runner_mode": "simple",
+				"stack": {"language":"go","tool":"go"},
+				"targets": {
+					"active": "unsupported",
+					"build": {"status":"failed","command":"go test ./...","env":{},"failure_code":"infra_support"},
+					"unit": {"status":"not_attempted","env":{}},
+					"all_tests": {"status":"not_attempted","env":{}}
 				},
 				"orchestration": {"pre": [], "post": []}
 			}`),
