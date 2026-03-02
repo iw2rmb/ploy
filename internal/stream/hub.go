@@ -16,12 +16,27 @@ var ErrStreamClosed = errors.New("logstream: stream closed")
 // ErrInvalidRunID indicates a blank or whitespace-only run ID was provided.
 var ErrInvalidRunID = errors.New("logstream: invalid run ID (blank or whitespace)")
 
+// ErrInvalidEventType indicates an unknown SSE event type was provided.
+var ErrInvalidEventType = errors.New("logstream: invalid event type")
+
 // Options configures the hub.
 type Options struct {
-	// BufferSize controls the per-subscriber channel size.
+	// BufferSize controls the per-subscriber channel size (default: 32).
 	BufferSize int
-	// HistorySize bounds the number of events retained for resumption.
+	// HistorySize bounds the number of events retained for resumption (default: 256, min: BufferSize).
 	HistorySize int
+}
+
+func (o *Options) normalize() {
+	if o.BufferSize <= 0 {
+		o.BufferSize = 32
+	}
+	if o.HistorySize <= 0 {
+		o.HistorySize = 256
+	}
+	if o.HistorySize < o.BufferSize {
+		o.HistorySize = o.BufferSize
+	}
 }
 
 // LogRecord represents a structured log frame.
@@ -85,14 +100,15 @@ func (s Subscription) Cancel() {
 type Hub struct {
 	mu      sync.RWMutex
 	streams map[domaintypes.RunID]*stream
-	opts    normalizedOptions
+	opts    Options
 }
 
 // NewHub constructs a log stream hub.
 func NewHub(opts Options) *Hub {
+	opts.normalize()
 	return &Hub{
 		streams: make(map[domaintypes.RunID]*stream),
-		opts:    normalizeOptions(opts),
+		opts:    opts,
 	}
 }
 
@@ -109,7 +125,7 @@ func (h *Hub) Ensure(runID domaintypes.RunID) error {
 	runID = normalizeRunID(runID)
 	h.mu.Lock()
 	if _, exists := h.streams[runID]; !exists {
-		h.streams[runID] = newStream(runID, h.opts)
+		h.streams[runID] = newStream(h.opts)
 	}
 	h.mu.Unlock()
 	return nil
@@ -118,33 +134,25 @@ func (h *Hub) Ensure(runID domaintypes.RunID) error {
 // PublishLog appends a log record to a stream.
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func (h *Hub) PublishLog(ctx context.Context, runID domaintypes.RunID, record LogRecord) error {
-	return h.publish(ctx, runID, domaintypes.SSEEventLog, record)
+	_, err := h.publish(ctx, runID, domaintypes.SSEEventLog, record)
+	return err
 }
 
 // PublishRetention appends a retention hint to a stream.
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func (h *Hub) PublishRetention(ctx context.Context, runID domaintypes.RunID, hint RetentionHint) error {
-	return h.publish(ctx, runID, domaintypes.SSEEventRetention, hint)
+	_, err := h.publish(ctx, runID, domaintypes.SSEEventRetention, hint)
+	return err
 }
 
-// PublishStatus appends a terminal status event to a stream.
-// Event types emitted by the hub are:
-//   - "log": LogRecord {Timestamp, Stream, Line, NodeID, JobID, JobType}
-//   - "retention": RetentionHint {Retained, TTL, Expires, Bundle}
-//   - "run": api.RunSummary snapshot
-//   - "stage": stage status update
-//   - "done": Status {Status: "done"} sentinel for stream completion.
-//
+// PublishStatus appends a terminal status event and closes the stream.
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func (h *Hub) PublishStatus(ctx context.Context, runID domaintypes.RunID, status Status) error {
-	if err := h.publish(ctx, runID, domaintypes.SSEEventDone, status); err != nil {
+	s, err := h.publish(ctx, runID, domaintypes.SSEEventDone, status)
+	if err != nil {
 		return err
 	}
-	runID = normalizeRunID(runID)
-	stream := h.getStream(runID)
-	if stream != nil {
-		stream.finish()
-	}
+	s.finish()
 	return nil
 }
 
@@ -157,32 +165,27 @@ func (h *Hub) PublishStatus(ctx context.Context, runID domaintypes.RunID, status
 //
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func (h *Hub) PublishRun(ctx context.Context, runID domaintypes.RunID, run api.RunSummary) error {
-	return h.publish(ctx, runID, domaintypes.SSEEventRun, run)
+	_, err := h.publish(ctx, runID, domaintypes.SSEEventRun, run)
+	return err
 }
 
-// ErrInvalidEventType indicates an unknown SSE event type was provided.
-var ErrInvalidEventType = errors.New("logstream: invalid event type")
-
-func (h *Hub) publish(ctx context.Context, runID domaintypes.RunID, eventType domaintypes.SSEEventType, payload any) error {
+func (h *Hub) publish(ctx context.Context, runID domaintypes.RunID, eventType domaintypes.SSEEventType, payload any) (*stream, error) {
 	if runID.IsZero() {
-		return ErrInvalidRunID
+		return nil, ErrInvalidRunID
 	}
 	runID = normalizeRunID(runID)
 	if err := eventType.Validate(); err != nil {
-		return ErrInvalidEventType
+		return nil, ErrInvalidEventType
 	}
-	if ctx != nil && ctx.Err() != nil {
-		return ctx.Err()
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
-	stream := h.getOrCreate(runID)
-	if stream == nil {
-		return nil
-	}
+	s := h.getOrCreate(runID)
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return stream.publish(Event{Type: eventType, Data: data})
+	return s, s.publish(Event{Type: eventType, Data: data})
 }
 
 // Subscribe registers a consumer for the stream starting after the provided id.
@@ -196,18 +199,15 @@ func (h *Hub) Subscribe(ctx context.Context, runID domaintypes.RunID, sinceID do
 	if !sinceID.Valid() {
 		return Subscription{}, errors.New("logstream: invalid since id")
 	}
-	if ctx != nil && ctx.Err() != nil {
+	if ctx.Err() != nil {
 		return Subscription{}, ctx.Err()
 	}
-	stream := h.getOrCreate(runID)
-	if stream == nil {
-		return Subscription{}, errors.New("logstream: stream unavailable")
-	}
-	sub, history, closed := stream.subscribe(sinceID)
+	s := h.getOrCreate(runID)
+	sub, history, closed := s.subscribe(sinceID)
 	for _, evt := range history {
 		if !sub.send(evt) {
 			if sub.id >= 0 {
-				stream.drop(sub.id)
+				s.drop(sub.id)
 			}
 			break
 		}
@@ -222,50 +222,64 @@ func (h *Hub) Subscribe(ctx context.Context, runID domaintypes.RunID, sinceID do
 	return Subscription{
 		Events: sub.ch,
 		cancel: func() {
-			stream.drop(sub.id)
+			s.drop(sub.id)
 		},
 	}, nil
 }
 
-// Close tears down the stream. No-op if the run ID is blank.
+// Close tears down the stream and removes it from the hub. No-op if the run ID is blank.
 func (h *Hub) Close(runID domaintypes.RunID) {
 	if runID.IsZero() {
 		return
 	}
 	runID = normalizeRunID(runID)
 	h.mu.Lock()
-	stream, ok := h.streams[runID]
+	s, ok := h.streams[runID]
 	if ok {
 		delete(h.streams, runID)
 	}
 	h.mu.Unlock()
 	if ok {
-		stream.finish()
+		s.finish()
+	}
+}
+
+// CloseAll tears down all streams and clears the hub. Safe for graceful shutdown.
+func (h *Hub) CloseAll() {
+	h.mu.Lock()
+	streams := make([]*stream, 0, len(h.streams))
+	for id, s := range h.streams {
+		streams = append(streams, s)
+		delete(h.streams, id)
+	}
+	h.mu.Unlock()
+	for _, s := range streams {
+		s.finish()
 	}
 }
 
 func (h *Hub) getOrCreate(runID domaintypes.RunID) *stream {
 	h.mu.RLock()
-	stream := h.streams[runID]
+	s := h.streams[runID]
 	h.mu.RUnlock()
-	if stream != nil {
-		return stream
+	if s != nil {
+		return s
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	stream = h.streams[runID]
-	if stream == nil {
-		stream = newStream(runID, h.opts)
-		h.streams[runID] = stream
+	s = h.streams[runID]
+	if s == nil {
+		s = newStream(h.opts)
+		h.streams[runID] = s
 	}
-	return stream
+	return s
 }
 
 func (h *Hub) getStream(runID domaintypes.RunID) *stream {
 	h.mu.RLock()
-	stream := h.streams[runID]
+	s := h.streams[runID]
 	h.mu.RUnlock()
-	return stream
+	return s
 }
 
 // Snapshot returns a copy of buffered events for the stream.
@@ -275,41 +289,96 @@ func (h *Hub) Snapshot(runID domaintypes.RunID) []Event {
 		return nil
 	}
 	runID = normalizeRunID(runID)
-	stream := h.getStream(runID)
-	if stream == nil {
+	s := h.getStream(runID)
+	if s == nil {
 		return nil
 	}
-	return stream.snapshot()
+	return s.snapshot()
 }
 
-type normalizedOptions struct {
-	buffer  int
-	history int
+// ---------------------------------------------------------------------------
+// ring is a fixed-capacity circular buffer of Events.
+// ---------------------------------------------------------------------------
+
+type ring struct {
+	items []Event
+	head  int // next write index
+	len   int
+	cap   int
 }
 
-func normalizeOptions(opts Options) normalizedOptions {
-	buffer := opts.BufferSize
-	if buffer <= 0 {
-		buffer = 32
+func newRing(capacity int) ring {
+	if capacity <= 0 {
+		capacity = 1
 	}
-	history := opts.HistorySize
-	if history <= 0 {
-		history = 256
-	}
-	if history < buffer {
-		history = buffer
-	}
-	return normalizedOptions{
-		buffer:  buffer,
-		history: history,
+	return ring{
+		items: make([]Event, capacity),
+		cap:   capacity,
 	}
 }
+
+func (r *ring) push(evt Event) {
+	r.items[r.head] = evt
+	r.head = (r.head + 1) % r.cap
+	if r.len < r.cap {
+		r.len++
+	}
+}
+
+// oldest returns the index of the oldest element.
+func (r *ring) oldest() int {
+	return (r.head - r.len + r.cap) % r.cap
+}
+
+// slice returns all elements in insertion order.
+func (r *ring) slice() []Event {
+	if r.len == 0 {
+		return nil
+	}
+	out := make([]Event, r.len)
+	start := r.oldest()
+	if start+r.len <= r.cap {
+		copy(out, r.items[start:start+r.len])
+	} else {
+		n := r.cap - start
+		copy(out, r.items[start:])
+		copy(out[n:], r.items[:r.len-n])
+	}
+	return out
+}
+
+// after returns elements with ID > since in insertion order.
+func (r *ring) after(since domaintypes.EventID) []Event {
+	if r.len == 0 {
+		return nil
+	}
+	if since <= 0 {
+		return r.slice()
+	}
+	// Walk the ring from oldest to newest, collecting matches.
+	var out []Event
+	idx := r.oldest()
+	for i := 0; i < r.len; i++ {
+		evt := r.items[idx]
+		if evt.ID > since {
+			if out == nil {
+				out = make([]Event, 0, r.len-i)
+			}
+			out = append(out, evt)
+		}
+		idx = (idx + 1) % r.cap
+	}
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// stream is the internal per-run event manager.
+// ---------------------------------------------------------------------------
 
 type stream struct {
-	id          domaintypes.RunID
-	opts        normalizedOptions
+	opts        Options
 	mu          sync.Mutex
-	history     []Event
+	history     ring
 	subscribers map[int]*subscriber
 	nextEventID domaintypes.EventID
 	nextSubID   int
@@ -319,19 +388,13 @@ type stream struct {
 func (s *stream) snapshot() []Event {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.history) == 0 {
-		return nil
-	}
-	out := make([]Event, len(s.history))
-	copy(out, s.history)
-	return out
+	return s.history.slice()
 }
 
-func newStream(id domaintypes.RunID, opts normalizedOptions) *stream {
+func newStream(opts Options) *stream {
 	return &stream{
-		id:          id,
 		opts:        opts,
-		history:     make([]Event, 0, opts.history),
+		history:     newRing(opts.HistorySize),
 		subscribers: make(map[int]*subscriber),
 	}
 }
@@ -344,15 +407,8 @@ func (s *stream) publish(evt Event) error {
 	}
 	s.nextEventID++
 	evt.ID = s.nextEventID
-	if s.opts.history > 0 {
-		s.history = append(s.history, evt)
-		if len(s.history) > s.opts.history {
-			start := len(s.history) - s.opts.history
-			copied := make([]Event, s.opts.history)
-			copy(copied, s.history[start:])
-			s.history = copied
-		}
-	}
+	s.history.push(evt)
+
 	snapshot := make([]*subscriber, 0, len(s.subscribers))
 	for _, sub := range s.subscribers {
 		snapshot = append(snapshot, sub)
@@ -379,13 +435,9 @@ func (s *stream) publish(evt Event) error {
 }
 
 func (s *stream) subscribe(sinceID domaintypes.EventID) (*subscriber, []Event, bool) {
-	buffer := s.opts.buffer
-	if buffer <= 0 {
-		buffer = 1
-	}
-	sub := newSubscriber(-1, buffer)
+	sub := newSubscriber(-1, s.opts.BufferSize)
 	s.mu.Lock()
-	history := s.historyAfterLocked(sinceID)
+	history := s.history.after(sinceID)
 	if s.closed {
 		s.mu.Unlock()
 		return sub, history, true
@@ -428,19 +480,6 @@ func (s *stream) finish() {
 	for _, sub := range snapshot {
 		sub.close()
 	}
-}
-
-func (s *stream) historyAfterLocked(since domaintypes.EventID) []Event {
-	if since <= 0 {
-		return append([]Event(nil), s.history...)
-	}
-	out := make([]Event, 0, len(s.history))
-	for _, evt := range s.history {
-		if evt.ID > since {
-			out = append(out, evt)
-		}
-	}
-	return out
 }
 
 type subscriber struct {
