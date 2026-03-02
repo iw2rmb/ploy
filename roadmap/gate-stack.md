@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
   - Tests: image build + startup smoke in local deploy — expect server boot with no reads of `/etc/ploy/gates/build-gate-images.yaml`.
 
 ## Phase 2: Storage Schema Refactor
-- [ ] Add new canonical tables: `repos`, `stacks`, `gate_profiles`, `gates` — establish normalized identities and execution links.
+- [x] Add new canonical tables: `repos`, `stacks`, `gate_profiles`, `gates` — establish normalized identities and execution links.
   - Repository: ploy
   - Component: store schema and constraints
   - Scope: update `internal/store/schema.sql` with new tables/FKs/uniques; enforce `gate_profiles(repo_id, repo_sha, stack_id)` uniqueness; enforce `gates(job_id)` uniqueness.
