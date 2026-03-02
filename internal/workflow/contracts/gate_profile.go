@@ -247,21 +247,23 @@ func GateProfileGateOverrideForJobType(
 	}
 
 	var phase BuildGateProfilePhase
-	var target *GateProfileTarget
 
 	switch jobType {
 	case types.JobTypePreGate:
 		phase = BuildGateProfilePhasePre
-		target = profile.Targets.Build
 	case types.JobTypePostGate, types.JobTypeReGate:
 		phase = BuildGateProfilePhasePost
-		target = profile.Targets.Unit
 	default:
 		return "", nil, nil
 	}
 
+	active := strings.TrimSpace(profile.Targets.Active)
+	if active == GateProfileTargetUnsupported {
+		return phase, nil, nil
+	}
+	target := profile.Targets.TargetByName(active)
 	if target == nil {
-		return "", nil, fmt.Errorf("gate_profile: missing mapped target for job_type %q", jobType)
+		return "", nil, fmt.Errorf("gate_profile: missing active target %q for job_type %q", active, jobType)
 	}
 
 	override, err := gateProfileTargetToBuildGateOverride(target)

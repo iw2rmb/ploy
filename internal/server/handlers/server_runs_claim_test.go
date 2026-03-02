@@ -418,6 +418,7 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 			}
 		},
 		"targets": {
+			"active": "unit",
 			"build": {
 				"status": "passed",
 				"command": "go test ./...",
@@ -448,16 +449,16 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 		wantEnvV  string
 	}{
 		{
-			name:      "pre_gate maps targets.build to build_gate.pre.gate_profile",
+			name:      "pre_gate maps targets.active to build_gate.pre.gate_profile",
 			jobType:   domaintypes.JobTypePreGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "pre",
-			wantCmd:   "go test ./...",
-			wantEnvK:  "DOCKER_HOST",
-			wantEnvV:  "unix:///var/run/docker.sock",
+			wantCmd:   "go test ./... -run TestUnit",
+			wantEnvK:  "CGO_ENABLED",
+			wantEnvV:  "0",
 		},
 		{
-			name:      "post_gate maps targets.unit to build_gate.post.gate_profile",
+			name:      "post_gate maps targets.active to build_gate.post.gate_profile",
 			jobType:   domaintypes.JobTypePostGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "post",
@@ -466,7 +467,7 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 			wantEnvV:  "0",
 		},
 		{
-			name:      "re_gate reuses post phase mapping from targets.unit",
+			name:      "re_gate reuses post phase mapping from targets.active",
 			jobType:   domaintypes.JobTypeReGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "post",
@@ -595,6 +596,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		"runner_mode": "simple",
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
+			"active": "unit",
 			"build": {"status":"passed","command":"echo repo-build","env":{},"failure_code":null},
 			"unit": {"status":"passed","command":"echo repo-unit","env":{"SRC":"repo"},"failure_code":null},
 			"all_tests": {"status":"not_attempted","env":{}}
@@ -607,6 +609,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		"runner_mode": "simple",
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
+			"active": "unit",
 			"build": {"status":"passed","command":"echo candidate-build","env":{},"failure_code":null},
 			"unit": {"status":"passed","command":"echo candidate-unit","env":{"SRC":"candidate"},"failure_code":null},
 			"all_tests": {"status":"not_attempted","env":{}}
