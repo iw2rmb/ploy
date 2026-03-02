@@ -1,19 +1,18 @@
 package lifecycle
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
 
 // TestCacheStoreAndCopy verifies that Cache stores and returns typed NodeStatus correctly.
-// The cache should return a copy of the stored status, not a reference.
 func TestCacheStoreAndCopy(t *testing.T) {
 	c := NewCache()
 
-	// Create a typed NodeStatus with nested resources.
 	now := time.Now().UTC()
 	src := NodeStatus{
-		State:     "ok",
+		State:     StateOK,
 		Timestamp: now,
 		Heartbeat: now,
 		Role:      "node",
@@ -37,7 +36,6 @@ func TestCacheStoreAndCopy(t *testing.T) {
 					WriteMBPerSec: 5.2,
 					ReadIOPS:      100.0,
 					WriteIOPS:     50.0,
-					InitialSample: false,
 				},
 			},
 			Network: NetworkResources{
@@ -45,19 +43,16 @@ func TestCacheStoreAndCopy(t *testing.T) {
 				TXBytesPerSec:   500000.0,
 				RXPacketsPerSec: 1000.0,
 				TXPacketsPerSec: 500.0,
-				InitialSample:   false,
 			},
 		},
 		Components: NodeComponents{
-			Docker: ComponentStatus{State: "ok", CheckedAt: now},
-			Gate:   ComponentStatus{State: "ok", CheckedAt: now},
+			Docker: ComponentStatus{State: StateOK, CheckedAt: now},
+			Gate:   ComponentStatus{State: StateOK, CheckedAt: now},
 		},
 	}
 
-	// Store the status.
 	c.Store(src)
 
-	// Retrieve the status and verify it matches what was stored.
 	got, ok := c.LatestStatus()
 	if !ok {
 		t.Fatal("expected cached status available")
@@ -65,16 +60,22 @@ func TestCacheStoreAndCopy(t *testing.T) {
 	if got.Resources.CPU.FreeMCores != 2000.0 {
 		t.Fatalf("unexpected cpu.free_mcores: got %v, want 2000.0", got.Resources.CPU.FreeMCores)
 	}
-	if got.State != "ok" {
+	if got.State != StateOK {
 		t.Fatalf("unexpected state: got %v, want ok", got.State)
 	}
 	if got.NodeID != "abc123" {
 		t.Fatalf("unexpected node_id: got %v, want abc123", got.NodeID)
 	}
 
-	// Verify ToMap() produces the expected wire format for JSON serialization.
-	// ToMap() is called at serialization boundaries (e.g., in status.Provider.Snapshot).
-	gotMap := got.ToMap()
+	// Verify JSON serialization produces expected wire format.
+	data, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("json.Marshal failed: %v", err)
+	}
+	var gotMap map[string]any
+	if err := json.Unmarshal(data, &gotMap); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
 	resources, ok := gotMap["resources"].(map[string]any)
 	if !ok {
 		t.Fatal("expected resources to be map[string]any")

@@ -85,12 +85,9 @@ func NewDockerChecker(opts DockerCheckerOptions) (*DockerChecker, error) {
 	}, nil
 }
 
-// Close releases the underlying Docker client when it implements Close.
+// Close releases the underlying Docker client.
 func (c *DockerChecker) Close() error {
-	if closer, ok := c.client.(interface{ Close() error }); ok {
-		return closer.Close()
-	}
-	return nil
+	return c.client.Close()
 }
 
 // Check reports Docker health by issuing ping and info calls.
@@ -112,7 +109,7 @@ func (c *DockerChecker) Close() error {
 // Version is set from system.Info.ServerVersion (e.g., "29.0.0").
 func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 	if c == nil || c.client == nil {
-		return ComponentStatus{State: stateUnknown, CheckedAt: time.Now().UTC(), Message: "docker client unavailable"}
+		return ComponentStatus{State: StateUnknown, CheckedAt: time.Now().UTC(), Message: "docker client unavailable"}
 	}
 	checkCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
@@ -124,7 +121,7 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 	// These fields are stable across Engine v28.x and v29.x.
 	ping, pingErr := c.client.Ping(checkCtx, client.PingOptions{})
 	status := ComponentStatus{
-		State:     stateOK,
+		State:     StateOK,
 		CheckedAt: c.now(),
 		Details: map[string]any{
 			// api_version: stable across Engine v28/v29; identifies negotiated API level.
@@ -134,7 +131,7 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 		},
 	}
 	if pingErr != nil {
-		status.State = stateError
+		status.State = StateError
 		status.Message = pingErr.Error()
 		return status
 	}
@@ -147,7 +144,7 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 	// These fields are stable across Engine v28.x and v29.x.
 	infoResult, infoErr := c.client.Info(checkCtx, client.InfoOptions{})
 	if infoErr != nil {
-		status.State = stateDegraded
+		status.State = StateDegraded
 		status.Message = infoErr.Error()
 		return status
 	}
@@ -160,12 +157,4 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 	// driver: stable field; storage driver in use (overlay2, vfs, etc.).
 	status.Details["driver"] = strings.TrimSpace(info.Driver)
 	return status
-}
-
-func extractFirstLine(output string) string {
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	if len(lines) == 0 {
-		return ""
-	}
-	return strings.TrimSpace(lines[0])
 }

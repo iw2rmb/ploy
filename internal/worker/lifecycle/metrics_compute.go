@@ -104,8 +104,8 @@ func computeDiskMetrics(prev, cur map[string]disk.IOCountersStat, elapsed float6
 
 	metrics := diskIOMetrics{}
 	if elapsed > 0 {
-		metrics.ReadMBps = bytesToMB(readBytes) / elapsed
-		metrics.WriteMBps = bytesToMB(writeBytes) / elapsed
+		metrics.ReadMBps = bytesToMBUint64(readBytes) / elapsed
+		metrics.WriteMBps = bytesToMBUint64(writeBytes) / elapsed
 		metrics.ReadIOPS = float64(readCount) / elapsed
 		metrics.WriteIOPS = float64(writeCount) / elapsed
 	}

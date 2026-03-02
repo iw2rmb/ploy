@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"github.com/shirou/gopsutil/v4/disk"
-	"github.com/shirou/gopsutil/v4/load"
-	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/net"
 )
 
@@ -60,10 +58,7 @@ type resourceSnapshot struct {
 	NetworkInterfaces    map[string]networkInterfaceSnapshot
 }
 
-// toNodeResources converts the internal resourceSnapshot to the typed NodeResources struct.
-// This eliminates map[string]any casts by providing a strongly-typed representation.
 func (r resourceSnapshot) toNodeResources() NodeResources {
-	// Convert network interfaces from internal snapshot format to typed format.
 	interfaces := make(map[string]NetworkInterface, len(r.NetworkInterfaces))
 	for name, iface := range r.NetworkInterfaces {
 		interfaces[name] = NetworkInterface(iface)
@@ -76,12 +71,12 @@ func (r resourceSnapshot) toNodeResources() NodeResources {
 			Load1:       r.CPULoad1,
 		},
 		Memory: MemoryResources{
-			TotalMB: bytesToMBInt64(r.MemoryTotalBytes),
-			FreeMB:  bytesToMBInt64(r.MemoryFreeBytes),
+			TotalMB: bytesToMB(r.MemoryTotalBytes),
+			FreeMB:  bytesToMB(r.MemoryFreeBytes),
 		},
 		Disk: DiskResources{
-			TotalMB: bytesToMBInt64(r.DiskTotalBytes),
-			FreeMB:  bytesToMBInt64(r.DiskFreeBytes),
+			TotalMB: bytesToMB(r.DiskTotalBytes),
+			FreeMB:  bytesToMB(r.DiskFreeBytes),
 			IO: DiskIO{
 				ReadMBPerSec:  r.DiskReadMBps,
 				WriteMBPerSec: r.DiskWriteMBps,
@@ -132,17 +127,7 @@ func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, err
 	}
 	totalMillis64 = int64(snapshot.CPUTotalMillis)
 
-	if c.loadFunc != nil {
-		if avg, err := c.loadFunc(ctx); err == nil {
-			snapshot.CPULoad1 = avg.Load1
-			snapshot.CPUFreeMillis = cpuFreeMillis(avg.Load1, totalMillis64)
-		} else if !errors.Is(err, context.Canceled) {
-			snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
-			errs = append(errs, "load:"+err.Error())
-		} else {
-			snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
-		}
-	} else if avg, err := load.AvgWithContext(ctx); err == nil {
+	if avg, err := c.loadFunc(ctx); err == nil {
 		snapshot.CPULoad1 = avg.Load1
 		snapshot.CPUFreeMillis = cpuFreeMillis(avg.Load1, totalMillis64)
 	} else if !errors.Is(err, context.Canceled) {
@@ -152,28 +137,14 @@ func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, err
 		snapshot.CPUFreeMillis = snapshot.CPUTotalMillis
 	}
 
-	if c.memFunc != nil {
-		if vm, err := c.memFunc(ctx); err == nil {
-			snapshot.MemoryTotalBytes = uint64ToInt64(vm.Total)
-			snapshot.MemoryFreeBytes = uint64ToInt64(vm.Available)
-		} else if !errors.Is(err, context.Canceled) {
-			errs = append(errs, "memory:"+err.Error())
-		}
-	} else if vm, err := mem.VirtualMemoryWithContext(ctx); err == nil {
+	if vm, err := c.memFunc(ctx); err == nil {
 		snapshot.MemoryTotalBytes = uint64ToInt64(vm.Total)
 		snapshot.MemoryFreeBytes = uint64ToInt64(vm.Available)
-	} else {
+	} else if !errors.Is(err, context.Canceled) {
 		errs = append(errs, "memory:"+err.Error())
 	}
 
-	if c.diskUsageFunc != nil {
-		if du, err := c.diskUsageFunc(ctx, "/"); err == nil {
-			snapshot.DiskTotalBytes = uint64ToInt64(du.Total)
-			snapshot.DiskFreeBytes = uint64ToInt64(du.Free)
-		} else if !errors.Is(err, context.Canceled) {
-			errs = append(errs, "disk:"+err.Error())
-		}
-	} else if du, err := disk.UsageWithContext(ctx, "/"); err == nil {
+	if du, err := c.diskUsageFunc(ctx, "/"); err == nil {
 		snapshot.DiskTotalBytes = uint64ToInt64(du.Total)
 		snapshot.DiskFreeBytes = uint64ToInt64(du.Free)
 	} else if !errors.Is(err, context.Canceled) {
@@ -214,21 +185,16 @@ func (c *Collector) collectIOMetrics(ctx context.Context) (diskIOMetrics, networ
 		netStats  []net.IOCountersStat
 	)
 
-	if c.diskCountersFunc != nil {
-		stats, err := c.diskCountersFunc(ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			errs = append(errs, "disk_io:"+err.Error())
-		} else {
-			diskStats = stats
-		}
+	if stats, err := c.diskCountersFunc(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		errs = append(errs, "disk_io:"+err.Error())
+	} else {
+		diskStats = stats
 	}
-	if c.netCountersFunc != nil {
-		stats, err := c.netCountersFunc(ctx)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			errs = append(errs, "net_io:"+err.Error())
-		} else {
-			netStats = stats
-		}
+
+	if stats, err := c.netCountersFunc(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		errs = append(errs, "net_io:"+err.Error())
+	} else {
+		netStats = stats
 	}
 
 	filteredNet := c.filterInterfaces(netStats)
@@ -240,16 +206,17 @@ func (c *Collector) collectIOMetrics(ctx context.Context) (diskIOMetrics, networ
 	return diskMetrics, networkMetrics, nil
 }
 
-func bytesToMB(value uint64) float64 {
+func bytesToMB(value int64) float64 {
+	if value <= 0 {
+		return 0
+	}
 	const mb = 1024 * 1024
 	return float64(value) / mb
 }
 
-func bytesToMBInt64(value int64) float64 {
-	if value <= 0 {
-		return 0
-	}
-	return bytesToMB(uint64(value))
+func bytesToMBUint64(value uint64) float64 {
+	const mb = 1024 * 1024
+	return float64(value) / mb
 }
 
 func uint64ToInt64(value uint64) int64 {
@@ -305,16 +272,14 @@ func normalizePatterns(patterns []string) []string {
 	return out
 }
 
+// shouldIgnoreInterface checks if a lowercased interface name matches any ignore pattern.
+// Patterns are already lowercased by normalizePatterns.
 func shouldIgnoreInterface(name string, patterns []string) bool {
 	if len(patterns) == 0 || name == "" {
 		return false
 	}
 	for _, pattern := range patterns {
-		if pattern == "" {
-			continue
-		}
-		p := strings.ToLower(pattern)
-		if matched, err := path.Match(p, name); err == nil && matched {
+		if matched, err := path.Match(pattern, name); err == nil && matched {
 			return true
 		}
 	}

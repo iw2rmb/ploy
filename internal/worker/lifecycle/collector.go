@@ -14,22 +14,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-const (
-	stateOK       = "ok"
-	stateDegraded = "degraded"
-	stateError    = "error"
-	stateUnknown  = "unknown"
-)
-
-// ComponentStatus describes the outcome of a subsystem health probe.
-type ComponentStatus struct {
-	State     string
-	Message   string
-	Version   string
-	Details   map[string]any
-	CheckedAt time.Time
-}
-
 // HealthChecker reports the current state of a subsystem.
 type HealthChecker interface {
 	Check(ctx context.Context) ComponentStatus
@@ -47,17 +31,15 @@ type Options struct {
 }
 
 // Snapshot aggregates typed status and capacity payloads.
-// Replaces map[string]any with strongly-typed NodeStatus and NodeCapacity.
 type Snapshot struct {
 	Status   NodeStatus
 	Capacity NodeCapacity
 }
 
 // Collector gathers node lifecycle data for status endpoints and heartbeats.
-// Uses domain type (NodeID) for type-safe identification.
 type Collector struct {
 	role             string
-	nodeID           domaintypes.NodeID // Node ID (NanoID-backed)
+	nodeID           domaintypes.NodeID
 	hostname         func() (string, error)
 	docker           HealthChecker
 	gate             HealthChecker
@@ -108,7 +90,6 @@ func NewCollector(opts Options) (*Collector, error) {
 }
 
 // Collect builds the latest status and capacity payloads.
-// Returns typed NodeStatus and NodeCapacity instead of map[string]any.
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	now := c.now()
 	host, err := c.hostname()
@@ -118,7 +99,6 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 
 	resources, resErr := c.collectResources(ctx)
 
-	// Build typed component status (no more map[string]ComponentStatus).
 	dockerStatus := c.checkComponent(ctx, c.docker)
 	gateStatus := c.checkComponent(ctx, c.gate)
 	components := NodeComponents{
@@ -126,10 +106,8 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 		Gate:   gateStatus,
 	}
 
-	// Aggregate state from typed components.
 	statusState := aggregateComponentState(dockerStatus, gateStatus, resErr)
 
-	// Build typed NodeStatus.
 	status := NodeStatus{
 		State:      statusState,
 		Timestamp:  now,
@@ -144,7 +122,6 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 		status.ResourceWarning = resErr.Error()
 	}
 
-	// Build typed NodeCapacity.
 	capacity := NodeCapacity{
 		CPUFreeMillis:  domaintypes.CPUmilli(resources.CPUFreeMillis),
 		CPUTotalMillis: domaintypes.CPUmilli(resources.CPUTotalMillis),
@@ -167,11 +144,11 @@ func (c *Collector) roleOrDefault() string {
 
 func (c *Collector) checkComponent(ctx context.Context, checker HealthChecker) ComponentStatus {
 	if checker == nil {
-		return ComponentStatus{State: stateUnknown, CheckedAt: c.now()}
+		return ComponentStatus{State: StateUnknown, CheckedAt: c.now()}
 	}
 	status := checker.Check(ctx)
 	if status.State == "" {
-		status.State = stateUnknown
+		status.State = StateUnknown
 	}
 	if status.CheckedAt.IsZero() {
 		status.CheckedAt = c.now()
@@ -180,28 +157,26 @@ func (c *Collector) checkComponent(ctx context.Context, checker HealthChecker) C
 }
 
 // statePriority returns the severity level for a state (higher = worse).
-var statePriority = map[string]int{
-	stateOK:       0,
-	stateUnknown:  1,
-	stateDegraded: 2,
-	stateError:    3,
+var statePriority = map[ComponentState]int{
+	StateOK:       0,
+	StateUnknown:  1,
+	StateDegraded: 2,
+	StateError:    3,
 }
 
 // worstState returns the more severe of two states.
-func worstState(current, component string) string {
-	componentNorm := strings.ToLower(component)
-	if statePriority[componentNorm] > statePriority[current] {
-		return componentNorm
+func worstState(current, component ComponentState) ComponentState {
+	if statePriority[component] > statePriority[current] {
+		return component
 	}
 	return current
 }
 
 // aggregateComponentState computes the overall node state from individual component statuses.
-// Returns the worst state across resource errors and component health.
-func aggregateComponentState(docker, gate ComponentStatus, resErr error) string {
-	state := stateOK
+func aggregateComponentState(docker, gate ComponentStatus, resErr error) ComponentState {
+	state := StateOK
 	if resErr != nil {
-		state = stateDegraded
+		state = StateDegraded
 	}
 	state = worstState(state, docker.State)
 	state = worstState(state, gate.State)

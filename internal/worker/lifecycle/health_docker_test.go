@@ -45,7 +45,7 @@ func TestDockerChecker_PingError(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := c.Check(context.Background())
-	if st.State != stateError {
+	if st.State != StateError {
 		t.Fatalf("want error, got %s", st.State)
 	}
 }
@@ -60,7 +60,7 @@ func TestDockerChecker_InfoError(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := c.Check(context.Background())
-	if st.State != stateDegraded {
+	if st.State != StateDegraded {
 		t.Fatalf("want degraded, got %s", st.State)
 	}
 }
@@ -80,7 +80,7 @@ func TestDockerChecker_OK(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := c.Check(context.Background())
-	if st.State != stateOK {
+	if st.State != StateOK {
 		t.Fatalf("want ok, got %s", st.State)
 	}
 	if st.Version != "25.0.0" {
@@ -116,7 +116,7 @@ func TestDockerChecker_NilClient(t *testing.T) {
 	// Manually construct a checker with nil client to test nil guard.
 	c := &DockerChecker{client: nil, timeout: 50 * time.Millisecond}
 	st := c.Check(context.Background())
-	if st.State != stateUnknown {
+	if st.State != StateUnknown {
 		t.Fatalf("want unknown for nil client, got %s", st.State)
 	}
 	if st.Message != "docker client unavailable" {
@@ -128,7 +128,7 @@ func TestDockerChecker_NilClient(t *testing.T) {
 func TestDockerChecker_NilChecker(t *testing.T) {
 	var c *DockerChecker
 	st := c.Check(context.Background())
-	if st.State != stateUnknown {
+	if st.State != StateUnknown {
 		t.Fatalf("want unknown for nil checker, got %s", st.State)
 	}
 }
@@ -151,7 +151,7 @@ func TestDockerChecker_ContextCanceled(t *testing.T) {
 	cancel() // Cancel immediately before check.
 	st := c.Check(ctx)
 	// Should get error state from canceled context.
-	if st.State != stateError {
+	if st.State != StateError {
 		t.Fatalf("want error for canceled context, got %s", st.State)
 	}
 }
@@ -238,7 +238,7 @@ func TestDockerChecker_DetailsFields(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := c.Check(context.Background())
-	if st.State != stateOK {
+	if st.State != StateOK {
 		t.Fatalf("want ok, got %s", st.State)
 	}
 	// Verify api_version from PingResult.
@@ -329,7 +329,7 @@ func TestDockerChecker_EngineVersionCompatibility(t *testing.T) {
 				t.Fatal(err)
 			}
 			st := c.Check(context.Background())
-			if st.State != stateOK {
+			if st.State != StateOK {
 				t.Fatalf("want ok, got %s", st.State)
 			}
 			// Verify Version from system.Info.ServerVersion.
@@ -405,7 +405,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 		info    system.Info
 		infoErr error
 		// expected output
-		wantState      string
+		wantState      ComponentState
 		wantVersion    string
 		wantAPIVersion string
 		wantOSType     string
@@ -418,7 +418,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v28.0.0 healthy linux overlay2",
 			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
 			info:           system.Info{ServerVersion: "28.0.0", Driver: "overlay2", ContainersRunning: 0},
-			wantState:      stateOK,
+			wantState:      StateOK,
 			wantVersion:    "28.0.0",
 			wantAPIVersion: "1.44",
 			wantOSType:     "linux",
@@ -429,7 +429,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v28.1.3 healthy linux with running containers",
 			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
 			info:           system.Info{ServerVersion: "28.1.3", Driver: "overlay2", ContainersRunning: 42},
-			wantState:      stateOK,
+			wantState:      StateOK,
 			wantVersion:    "28.1.3",
 			wantAPIVersion: "1.44",
 			wantOSType:     "linux",
@@ -440,7 +440,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v28.0.5 healthy linux vfs driver",
 			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
 			info:           system.Info{ServerVersion: "28.0.5", Driver: "vfs", ContainersRunning: 1},
-			wantState:      stateOK,
+			wantState:      StateOK,
 			wantVersion:    "28.0.5",
 			wantAPIVersion: "1.44",
 			wantOSType:     "linux",
@@ -452,7 +452,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v29.0.0 healthy linux overlay2",
 			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
 			info:           system.Info{ServerVersion: "29.0.0", Driver: "overlay2", ContainersRunning: 0},
-			wantState:      stateOK,
+			wantState:      StateOK,
 			wantVersion:    "29.0.0",
 			wantAPIVersion: "1.45",
 			wantOSType:     "linux",
@@ -463,7 +463,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v29.0.3 healthy linux with many containers",
 			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
 			info:           system.Info{ServerVersion: "29.0.3", Driver: "overlay2", ContainersRunning: 100},
-			wantState:      stateOK,
+			wantState:      StateOK,
 			wantVersion:    "29.0.3",
 			wantAPIVersion: "1.45",
 			wantOSType:     "linux",
@@ -474,7 +474,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v29.1.0 healthy windows windowsfilter",
 			ping:           client.PingResult{APIVersion: "1.45", OSType: "windows"},
 			info:           system.Info{ServerVersion: "29.1.0", Driver: "windowsfilter", ContainersRunning: 5},
-			wantState:      stateOK,
+			wantState:      StateOK,
 			wantVersion:    "29.1.0",
 			wantAPIVersion: "1.45",
 			wantOSType:     "windows",
@@ -487,7 +487,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v28 degraded info error",
 			ping:           client.PingResult{APIVersion: "1.44", OSType: "linux"},
 			infoErr:        errors.New("daemon busy"),
-			wantState:      stateDegraded,
+			wantState:      StateDegraded,
 			wantAPIVersion: "1.44",
 			wantOSType:     "linux",
 			wantHasMessage: true,
@@ -496,7 +496,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			name:           "v29 degraded info error",
 			ping:           client.PingResult{APIVersion: "1.45", OSType: "linux"},
 			infoErr:        errors.New("info unavailable"),
-			wantState:      stateDegraded,
+			wantState:      StateDegraded,
 			wantAPIVersion: "1.45",
 			wantOSType:     "linux",
 			wantHasMessage: true,
@@ -506,13 +506,13 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 		{
 			name:           "v28 error ping fails",
 			pingErr:        errors.New("cannot connect to docker daemon"),
-			wantState:      stateError,
+			wantState:      StateError,
 			wantHasMessage: true,
 		},
 		{
 			name:           "v29 error ping fails",
 			pingErr:        errors.New("connection refused"),
-			wantState:      stateError,
+			wantState:      StateError,
 			wantHasMessage: true,
 		},
 	}
@@ -546,7 +546,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			}
 
 			// For non-error states, verify Version and Details.
-			if tc.wantState == stateOK {
+			if tc.wantState == StateOK {
 				if st.Version != tc.wantVersion {
 					t.Errorf("Version: got %q, want %q", st.Version, tc.wantVersion)
 				}
@@ -565,7 +565,7 @@ func TestDockerChecker_MixedDaemonVersionHealth(t *testing.T) {
 			}
 
 			// For degraded states, verify partial Details (api_version, os_type from Ping).
-			if tc.wantState == stateDegraded {
+			if tc.wantState == StateDegraded {
 				if v, ok := st.Details["api_version"]; !ok || v.(string) != tc.wantAPIVersion {
 					t.Errorf("degraded api_version: got %v, want %q", st.Details["api_version"], tc.wantAPIVersion)
 				}
@@ -651,8 +651,8 @@ func TestDockerChecker_VersionStringEdgeCases(t *testing.T) {
 
 			st := c.Check(context.Background())
 
-			if st.State != stateOK {
-				t.Fatalf("State: got %q, want %q", st.State, stateOK)
+			if st.State != StateOK {
+				t.Fatalf("State: got %q, want %q", st.State, StateOK)
 			}
 			// Verify trimmed version.
 			if st.Version != tc.wantVersion {
@@ -737,8 +737,8 @@ func TestDockerChecker_APIVersionNegotiationRange(t *testing.T) {
 
 			st := c.Check(context.Background())
 
-			if st.State != stateOK {
-				t.Fatalf("State: got %q, want %q", st.State, stateOK)
+			if st.State != StateOK {
+				t.Fatalf("State: got %q, want %q", st.State, StateOK)
 			}
 			if v := st.Details["api_version"]; v.(string) != tc.wantAPI {
 				t.Errorf("api_version: got %q, want %q", v, tc.wantAPI)

@@ -83,7 +83,6 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 
 	url := strings.TrimSpace(string(repo.URL))
 	baseRef := strings.TrimSpace(string(repo.BaseRef))
-	_ = strings.TrimSpace(string(repo.TargetRef)) // targetRef is intentionally unused during hydration
 	commitSHA := strings.TrimSpace(string(repo.Commit))
 
 	// If destination already looks like a hydrated clone of this repo, skip re-clone.
@@ -203,45 +202,24 @@ func validateCloneOrigin(ctx context.Context, dest, expectedURL string) bool {
 }
 
 // copyGitClone creates a copy of a git repository from src to dest.
-// This uses rsync for efficient copying of git repositories, including the .git directory.
 func copyGitClone(src, dest string) error {
-	// Ensure src is a git repository.
 	if _, err := os.Stat(filepath.Join(src, ".git")); err != nil {
 		return fmt.Errorf("source is not a git repository: %w", err)
 	}
 
-	// Use rsync for efficient recursive copy. rsync is required; do not fall back
-	// to cp to avoid diverging semantics between environments.
-	if _, err := exec.LookPath("rsync"); err != nil {
-		return fmt.Errorf("rsync not available for git clone copy: %w", err)
-	}
-
-	// rsync -a preserves permissions, timestamps, and copies recursively.
-	// Trailing slash on src ensures contents are copied, not the directory itself.
-	//
-	// Capture output to a temp file (instead of CombinedOutput) to keep this path
-	// resilient under heavy concurrent process execution in long-running nodes.
-	logFile, err := os.CreateTemp("", "ploy-rsync-*.log")
-	if err != nil {
-		return fmt.Errorf("create rsync log file: %w", err)
-	}
-	logPath := logFile.Name()
-	defer func() {
-		_ = logFile.Close()
-		_ = os.Remove(logPath)
-	}()
-
-	cmd := exec.Command("rsync", "-a", src+"/", dest)
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	if err := cmd.Run(); err != nil {
-		out, readErr := os.ReadFile(logPath)
-		if readErr != nil {
-			return fmt.Errorf("rsync failed: %w (failed to read output: %v)", err, readErr)
+	// Prefer rsync, fall back to cp.
+	if _, err := exec.LookPath("rsync"); err == nil {
+		out, err := exec.Command("rsync", "-a", src+"/", dest).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("rsync failed: %w (output: %s)", err, string(out))
 		}
-		return fmt.Errorf("rsync failed: %w (output: %s)", err, string(out))
+		return nil
 	}
 
+	out, err := exec.Command("cp", "-a", src+"/.", dest).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cp failed: %w (output: %s)", err, string(out))
+	}
 	return nil
 }
 
