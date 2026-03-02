@@ -47,6 +47,7 @@ type StartRunRequest struct {
 	BaseRef   types.GitRef    `json:"base_ref,omitempty"`
 	TargetRef types.GitRef    `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA `json:"commit_sha,omitempty"`
+	RepoSHAIn types.CommitSHA `json:"repo_sha_in,omitempty"`
 	JobType   types.JobType   `json:"job_type,omitempty"`  // Job type: pre_gate, mig, post_gate, heal, re_gate
 	JobImage  string          `json:"job_image,omitempty"` // Container image for this job (for heal job dispatch)
 	NextID    *types.JobID    `json:"next_id,omitempty"`   // Linked successor in run chain

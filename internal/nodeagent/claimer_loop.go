@@ -205,6 +205,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		BaseRef:                claim.BaseRef,
 		TargetRef:              claim.TargetRef,
 		CommitSHA:              derefCommitSHA(claim.CommitSha),
+		RepoSHAIn:              derefCommitSHA(claim.RepoShaIn),
 		JobType:                claim.JobType,
 		JobImage:               claim.JobImage,
 		NextID:                 claim.NextID,
