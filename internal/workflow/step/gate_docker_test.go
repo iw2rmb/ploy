@@ -284,8 +284,11 @@ func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *test
 	if got, want := profile.Stack.Tool, "maven"; got != want {
 		t.Fatalf("generated profile stack.tool=%q, want %q", got, want)
 	}
-	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "mvn --ff -B -q -e") {
-		t.Fatalf("generated build command=%q, want maven default command", profile.Targets.Build.Command)
+	if got, want := profile.Targets.Active, contracts.GateProfileTargetAllTests; got != want {
+		t.Fatalf("generated profile targets.active=%q, want %q", got, want)
+	}
+	if profile.Targets.AllTests == nil || !strings.Contains(profile.Targets.AllTests.Command, "mvn --ff -B -q -e") {
+		t.Fatalf("generated all_tests command=%q, want maven default command", profile.Targets.AllTests.Command)
 	}
 }
 
@@ -319,8 +322,11 @@ func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedGradleStack_U
 	if got, want := profile.Stack.Tool, "gradle"; got != want {
 		t.Fatalf("generated profile stack.tool=%q, want %q", got, want)
 	}
-	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "./gradlew -q --stacktrace --build-cache") {
-		t.Fatalf("generated build command=%q, want gradle wrapper default command", profile.Targets.Build.Command)
+	if got, want := profile.Targets.Active, contracts.GateProfileTargetAllTests; got != want {
+		t.Fatalf("generated profile targets.active=%q, want %q", got, want)
+	}
+	if profile.Targets.AllTests == nil || !strings.Contains(profile.Targets.AllTests.Command, "./gradlew -q --stacktrace --build-cache") {
+		t.Fatalf("generated all_tests command=%q, want gradle wrapper default command", profile.Targets.AllTests.Command)
 	}
 }
 

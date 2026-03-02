@@ -67,7 +67,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/contracts -run 'TestGateProfileParseAndMapToGate'` — pre/post/re mappings use active target command and unsupported is treated terminally.
 
 ## Phase 3: Auto-Bootstrap + Snapshot Alignment
-- [ ] Make generated default profile select `all_tests` and persist active-target semantics — required for new repos with missing stored profiles.
+- [x] Make generated default profile select `all_tests` and persist active-target semantics — required for new repos with missing stored profiles.
   - Repository: `ploy`
   - Component: gate execution planning + snapshot derivation
   - Scope:

@@ -456,6 +456,7 @@ func deriveGateProfileSnapshotFromOverride(
 		RunnerMode:    contracts.PrepRunnerModeSimple,
 		Stack:         stack,
 		Targets: contracts.GateProfileTargets{
+			Active:   contracts.GateProfileTargetAllTests,
 			Build:    targetNotAttempted(),
 			Unit:     targetNotAttempted(),
 			AllTests: targetNotAttempted(),
@@ -466,10 +467,8 @@ func deriveGateProfileSnapshotFromOverride(
 		},
 	}
 	switch jobType {
-	case types.JobTypePreGate:
-		profile.Targets.Build = targetPassed
-	case types.JobTypePostGate, types.JobTypeReGate:
-		profile.Targets.Unit = targetPassed
+	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
+		profile.Targets.AllTests = targetPassed
 	default:
 		return nil, fmt.Errorf("unsupported job type %q", jobType)
 	}
