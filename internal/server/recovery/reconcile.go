@@ -196,10 +196,8 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 
 	if eventsService != nil {
 		repoURL := ""
-		if repos, err := st.ListRunReposByRun(ctx, runID); err == nil && len(repos) > 0 {
-			if mr, err := st.GetMigRepo(ctx, repos[0].RepoID); err == nil {
-				repoURL = mr.RepoUrl
-			}
+		if repos, err := st.ListRunReposWithURLByRun(ctx, runID); err == nil && len(repos) > 0 {
+			repoURL = repos[0].RepoUrl
 		}
 
 		runState := modsapi.RunStateSucceeded

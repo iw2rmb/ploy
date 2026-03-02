@@ -199,7 +199,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	_, err = db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
 		MigID:     fx.Mig.ID,
-		RepoUrl:   "https://github.com/org/repo-b",
+		Url:   "https://github.com/org/repo-b",
 		BaseRef:   "main",
 		TargetRef: "feature/b",
 	})
@@ -319,7 +319,7 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	modRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
 		MigID:     fx.Mig.ID,
-		RepoUrl:   "https://github.com/org/repo-b",
+		Url:   "https://github.com/org/repo-b",
 		BaseRef:   "main",
 		TargetRef: "feature/b",
 	})
@@ -347,8 +347,8 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	}
 
 	expectedURLByRepoID := map[types.MigRepoID]string{
-		fx.MigRepo.ID: fx.MigRepo.RepoUrl,
-		modRepo2.ID:   modRepo2.RepoUrl,
+		fx.MigRepo.RepoID: "https://github.com/org/repo-a",
+		modRepo2.RepoID:   "https://github.com/org/repo-b",
 	}
 
 	seen := map[types.MigRepoID]bool{}

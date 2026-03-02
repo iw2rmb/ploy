@@ -13,24 +13,41 @@ import (
 )
 
 const createMigRepo = `-- name: CreateMigRepo :one
+WITH existing_repo AS (
+  SELECT id
+  FROM repos
+  WHERE repos.url = $3
+),
+inserted_repo AS (
+  INSERT INTO repos (id, url)
+  SELECT $1, $3
+  WHERE NOT EXISTS (SELECT 1 FROM existing_repo)
+  ON CONFLICT (url) DO NOTHING
+  RETURNING id
+),
+resolved_repo AS (
+  SELECT id FROM inserted_repo
+  UNION ALL
+  SELECT id FROM existing_repo
+  UNION ALL
+  SELECT id FROM repos WHERE repos.url = $3
+  LIMIT 1
+)
 INSERT INTO mig_repos (
   id,
   mig_id,
-  repo_url,
+  repo_id,
   base_ref,
-  target_ref,
-  gate_profile,
-  gate_profile_artifacts,
-  gate_profile_updated_at
+  target_ref
 )
-VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
-RETURNING id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
+VALUES ($1, $2, (SELECT id FROM resolved_repo), $4, $5)
+RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at
 `
 
 type CreateMigRepoParams struct {
 	ID        types.MigRepoID `json:"id"`
 	MigID     types.MigID     `json:"mig_id"`
-	RepoUrl   string          `json:"repo_url"`
+	Url       string          `json:"url"`
 	BaseRef   string          `json:"base_ref"`
 	TargetRef string          `json:"target_ref"`
 }
@@ -39,7 +56,7 @@ func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (M
 	row := q.db.QueryRow(ctx, createMigRepo,
 		arg.ID,
 		arg.MigID,
-		arg.RepoUrl,
+		arg.Url,
 		arg.BaseRef,
 		arg.TargetRef,
 	)
@@ -47,12 +64,9 @@ func (q *Queries) CreateMigRepo(ctx context.Context, arg CreateMigRepoParams) (M
 	err := row.Scan(
 		&i.ID,
 		&i.MigID,
-		&i.RepoUrl,
+		&i.RepoID,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.GateProfileUpdatedAt,
-		&i.GateProfile,
-		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -63,16 +77,15 @@ DELETE FROM mig_repos
 WHERE id = $1
 `
 
-// Deletes a mod_repo by id.
-// Note: mig_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
-// This DELETE will fail if any run_repos/jobs rows still reference the repo.
+// Deletes a mig_repo by id.
+// Note: mig_repos.id remains referenced by API-level repo membership records.
 func (q *Queries) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
 	_, err := q.db.Exec(ctx, deleteMigRepo, id)
 	return err
 }
 
 const getMigRepo = `-- name: GetMigRepo :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
+SELECT id, mig_id, repo_id, base_ref, target_ref, created_at
 FROM mig_repos
 WHERE id = $1
 `
@@ -83,41 +96,36 @@ func (q *Queries) GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, 
 	err := row.Scan(
 		&i.ID,
 		&i.MigID,
-		&i.RepoUrl,
+		&i.RepoID,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.GateProfileUpdatedAt,
-		&i.GateProfile,
-		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getMigRepoByURL = `-- name: GetMigRepoByURL :one
-SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
-FROM mig_repos
-WHERE mig_id = $1 AND repo_url = $2
+SELECT mr.id, mr.mig_id, mr.repo_id, mr.base_ref, mr.target_ref, mr.created_at
+FROM mig_repos mr
+JOIN repos r ON r.id = mr.repo_id
+WHERE mr.mig_id = $1 AND r.url = $2
 `
 
 type GetMigRepoByURLParams struct {
-	MigID   types.MigID `json:"mig_id"`
-	RepoUrl string      `json:"repo_url"`
+	MigID types.MigID `json:"mig_id"`
+	Url   string      `json:"url"`
 }
 
-// Gets a mod_repo by mig_id and repo_url (for uniqueness constraint enforcement).
+// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 func (q *Queries) GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error) {
-	row := q.db.QueryRow(ctx, getMigRepoByURL, arg.MigID, arg.RepoUrl)
+	row := q.db.QueryRow(ctx, getMigRepoByURL, arg.MigID, arg.Url)
 	var i MigRepo
 	err := row.Scan(
 		&i.ID,
 		&i.MigID,
-		&i.RepoUrl,
+		&i.RepoID,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.GateProfileUpdatedAt,
-		&i.GateProfile,
-		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -129,9 +137,8 @@ SELECT EXISTS(
 ) AS has_history
 `
 
-// Checks if a mod_repo has any historical executions (run_repos references).
+// Checks if a mig_repo has any historical executions (run_repos references).
 // Returns true if the repo cannot be deleted due to history, false otherwise.
-// Deletion is refused if the repo has historical executions.
 func (q *Queries) HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasMigRepoHistory, repoID)
 	var has_history bool
@@ -141,22 +148,24 @@ func (q *Queries) HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID)
 
 const listDistinctRepos = `-- name: ListDistinctRepos :many
 SELECT
-  mr.id AS repo_id,
-  mr.repo_url,
+  mr.repo_id,
+  r.url AS repo_url,
   rr.last_run_at,
   COALESCE(rr.last_status::text, '') AS last_status
 FROM mig_repos mr
+JOIN repos r ON r.id = mr.repo_id
 LEFT JOIN LATERAL (
   SELECT
     rrr.started_at AS last_run_at,
     rrr.status AS last_status
   FROM run_repos rrr
-  WHERE rrr.repo_id = mr.id
+  WHERE rrr.repo_id = mr.repo_id
+    AND rrr.mig_id = mr.mig_id
   ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC
   LIMIT 1
 ) rr ON true
-WHERE ($1::text IS NULL OR $1 = '' OR mr.repo_url ILIKE '%' || $1 || '%')
-ORDER BY mr.repo_url ASC, mr.id ASC
+WHERE ($1::text IS NULL OR $1 = '' OR r.url ILIKE '%' || $1 || '%')
+ORDER BY r.url ASC, mr.repo_id ASC
 `
 
 type ListDistinctReposRow struct {
@@ -166,7 +175,8 @@ type ListDistinctReposRow struct {
 	LastStatus interface{}        `json:"last_status"`
 }
 
-// v1: Lists distinct repos (mig_repos) with last known run metadata, optionally filtered by repo_url substring.
+// Lists distinct repos for a mig with last known run metadata,
+// optionally filtered by repo_url substring.
 func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error) {
 	rows, err := q.db.Query(ctx, listDistinctRepos, filter)
 	if err != nil {
@@ -193,7 +203,7 @@ func (q *Queries) ListDistinctRepos(ctx context.Context, filter string) ([]ListD
 }
 
 const listMigReposByMig = `-- name: ListMigReposByMig :many
-SELECT id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
+SELECT id, mig_id, repo_id, base_ref, target_ref, created_at
 FROM mig_repos
 WHERE mig_id = $1
 ORDER BY created_at ASC, id ASC
@@ -211,12 +221,9 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 		if err := rows.Scan(
 			&i.ID,
 			&i.MigID,
-			&i.RepoUrl,
+			&i.RepoID,
 			&i.BaseRef,
 			&i.TargetRef,
-			&i.GateProfileUpdatedAt,
-			&i.GateProfile,
-			&i.GateProfileArtifacts,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -229,73 +236,18 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 	return items, nil
 }
 
-const promoteReGateRecoveryCandidateGateProfile = `-- name: PromoteReGateRecoveryCandidateGateProfile :one
-WITH target_job AS (
-  SELECT j.id, j.repo_id
-  FROM jobs j
-  WHERE j.id = $1
-    AND j.job_type = 're_gate'
-    AND j.status = 'Success'
-    AND (
-      CASE
-        WHEN jsonb_typeof(j.meta->'recovery'->'candidate_promoted') = 'boolean'
-        THEN (j.meta->'recovery'->>'candidate_promoted')::boolean
-        ELSE false
-      END
-    ) = false
-  FOR UPDATE
-),
-updated_job AS (
-  UPDATE jobs j
-  SET meta = $2
-  FROM target_job tj
-  WHERE j.id = tj.id
-  RETURNING tj.repo_id
-)
-UPDATE mig_repos mr
-SET gate_profile = $3,
-    gate_profile_artifacts = $4,
-    gate_profile_updated_at = now()
-FROM updated_job uj
-WHERE mr.id = uj.repo_id
-RETURNING mr.id
-`
-
-type PromoteReGateRecoveryCandidateGateProfileParams struct {
-	ID                   types.JobID `json:"id"`
-	Meta                 []byte      `json:"meta"`
-	GateProfile          []byte      `json:"gate_profile"`
-	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
-}
-
-func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {
-	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidateGateProfile,
-		arg.ID,
-		arg.Meta,
-		arg.GateProfile,
-		arg.GateProfileArtifacts,
-	)
-	var id types.MigRepoID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const promotePreGateGeneratedGateProfile = `-- name: PromotePreGateGeneratedGateProfile :one
-WITH target_job AS (
-  SELECT j.id, j.repo_id
-  FROM jobs j
-  WHERE j.id = $1
-    AND j.job_type = 'pre_gate'
-    AND j.status = 'Success'
+WITH compat_args AS (
+  SELECT
+    $2::jsonb AS gate_profile,
+    $3::jsonb AS gate_profile_artifacts
 )
-UPDATE mig_repos mr
-SET gate_profile = $2,
-    gate_profile_artifacts = $3,
-    gate_profile_updated_at = now()
-FROM target_job tj
-WHERE mr.id = tj.repo_id
-  AND mr.gate_profile IS NULL
-RETURNING mr.id
+SELECT j.repo_id
+FROM jobs j, compat_args
+WHERE j.id = $1
+  AND j.job_type = 'pre_gate'
+  AND j.status = 'Success'
+LIMIT 1
 `
 
 type PromotePreGateGeneratedGateProfileParams struct {
@@ -304,11 +256,56 @@ type PromotePreGateGeneratedGateProfileParams struct {
 	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
 }
 
+// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
+// Returns target repo_id for callers that still rely on this method's result.
 func (q *Queries) PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error) {
 	row := q.db.QueryRow(ctx, promotePreGateGeneratedGateProfile, arg.ID, arg.GateProfile, arg.GateProfileArtifacts)
-	var id types.MigRepoID
-	err := row.Scan(&id)
-	return id, err
+	var repo_id types.MigRepoID
+	err := row.Scan(&repo_id)
+	return repo_id, err
+}
+
+const promoteReGateRecoveryCandidateGateProfile = `-- name: PromoteReGateRecoveryCandidateGateProfile :one
+WITH compat_args AS (
+  SELECT
+    $2::jsonb AS job_meta,
+    $3::jsonb AS gate_profile,
+    $4::jsonb AS gate_profile_artifacts
+)
+SELECT j.repo_id
+FROM jobs j, compat_args
+WHERE j.id = $1
+  AND j.job_type = 're_gate'
+  AND j.status = 'Success'
+  AND (
+    CASE
+      WHEN jsonb_typeof(j.meta->'recovery'->'candidate_promoted') = 'boolean'
+      THEN (j.meta->'recovery'->>'candidate_promoted')::boolean
+      ELSE false
+    END
+  ) = false
+LIMIT 1
+`
+
+type PromoteReGateRecoveryCandidateGateProfileParams struct {
+	ID                   types.JobID `json:"id"`
+	JobMeta              []byte      `json:"job_meta"`
+	GateProfile          []byte      `json:"gate_profile"`
+	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
+}
+
+// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
+// Returns target repo_id for callers that still rely on this method's result.
+func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {
+	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidateGateProfile,
+		arg.ID,
+		arg.JobMeta,
+		arg.GateProfile,
+		arg.GateProfileArtifacts,
+	)
+	var repo_id types.MigRepoID
+	err := row.Scan(&repo_id)
+	return repo_id, err
 }
 
 const updateMigRepoRefs = `-- name: UpdateMigRepoRefs :exec
@@ -330,40 +327,56 @@ func (q *Queries) UpdateMigRepoRefs(ctx context.Context, arg UpdateMigRepoRefsPa
 }
 
 const upsertMigRepo = `-- name: UpsertMigRepo :one
+WITH existing_repo AS (
+  SELECT id
+  FROM repos
+  WHERE repos.url = $3
+),
+inserted_repo AS (
+  INSERT INTO repos (id, url)
+  SELECT $1, $3
+  WHERE NOT EXISTS (SELECT 1 FROM existing_repo)
+  ON CONFLICT (url) DO NOTHING
+  RETURNING id
+),
+resolved_repo AS (
+  SELECT id FROM inserted_repo
+  UNION ALL
+  SELECT id FROM existing_repo
+  UNION ALL
+  SELECT id FROM repos WHERE repos.url = $3
+  LIMIT 1
+)
 INSERT INTO mig_repos (
   id,
   mig_id,
-  repo_url,
+  repo_id,
   base_ref,
-  target_ref,
-  gate_profile,
-  gate_profile_artifacts,
-  gate_profile_updated_at
+  target_ref
 )
-VALUES ($1, $2, $3, $4, $5, NULL, NULL, now())
-ON CONFLICT (mig_id, repo_url)
+VALUES ($1, $2, (SELECT id FROM resolved_repo), $4, $5)
+ON CONFLICT (mig_id, repo_id)
 DO UPDATE SET
   base_ref = EXCLUDED.base_ref,
   target_ref = EXCLUDED.target_ref
-RETURNING id, mig_id, repo_url, base_ref, target_ref, gate_profile_updated_at, gate_profile, gate_profile_artifacts, created_at
+RETURNING id, mig_id, repo_id, base_ref, target_ref, created_at
 `
 
 type UpsertMigRepoParams struct {
 	ID        types.MigRepoID `json:"id"`
 	MigID     types.MigID     `json:"mig_id"`
-	RepoUrl   string          `json:"repo_url"`
+	Url       string          `json:"url"`
 	BaseRef   string          `json:"base_ref"`
 	TargetRef string          `json:"target_ref"`
 }
 
-// Bulk upsert a mod_repo by normalized repo_url.
-// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
-// If a row exists, update refs; otherwise insert.
+// Bulk upsert a mig_repo by normalized repo_url.
+// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error) {
 	row := q.db.QueryRow(ctx, upsertMigRepo,
 		arg.ID,
 		arg.MigID,
-		arg.RepoUrl,
+		arg.Url,
 		arg.BaseRef,
 		arg.TargetRef,
 	)
@@ -371,12 +384,9 @@ func (q *Queries) UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (M
 	err := row.Scan(
 		&i.ID,
 		&i.MigID,
-		&i.RepoUrl,
+		&i.RepoID,
 		&i.BaseRef,
 		&i.TargetRef,
-		&i.GateProfileUpdatedAt,
-		&i.GateProfile,
-		&i.GateProfileArtifacts,
 		&i.CreatedAt,
 	)
 	return i, err

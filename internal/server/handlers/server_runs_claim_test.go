@@ -68,7 +68,7 @@ func TestClaimJob_Success(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
@@ -176,7 +176,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		// Spec is sourced from the DB at claim time; it must be a JSON object.
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`[]`)},
@@ -236,7 +236,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
@@ -356,7 +356,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: runSpec},
 	}
@@ -533,7 +533,7 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 				},
 				getModRepoResult: store.MigRepo{
 					ID:          repoID,
-					RepoUrl:     "https://github.com/user/repo.git",
+					Url:     "https://github.com/user/repo.git",
 					GateProfile: profile,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
@@ -690,7 +690,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 				},
 				getModRepoResult: store.MigRepo{
 					ID:          repoID,
-					RepoUrl:     "https://github.com/user/repo.git",
+					Url:     "https://github.com/user/repo.git",
 					GateProfile: repoProfile,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
@@ -782,7 +782,7 @@ func TestClaimJob_InvalidGateProfileReturnsError(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:          repoID,
-			RepoUrl:     "https://github.com/user/repo.git",
+			Url:     "https://github.com/user/repo.git",
 			GateProfile: []byte(`{"schema_version":1}`),
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
@@ -858,7 +858,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: spec},
 	}
@@ -987,7 +987,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: spec},
 	}
@@ -1070,7 +1070,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/user/repo.git",
+			Url: "https://github.com/user/repo.git",
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}

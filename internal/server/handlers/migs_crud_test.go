@@ -418,8 +418,8 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 			{ID: "mod2", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
 		},
 		listMigReposByModResults: map[string][]store.MigRepo{
-			"mod1": {{ID: "repo1", MigID: "mod1", RepoUrl: "https://github.com/org/repo"}},
-			"mod2": {{ID: "repo2", MigID: "mod2", RepoUrl: "https://github.com/org/other"}},
+			"mod1": {{ID: "repo1", MigID: "mod1", Url: "https://github.com/org/repo"}},
+			"mod2": {{ID: "repo2", MigID: "mod2", Url: "https://github.com/org/other"}},
 		},
 	}
 	handler := listMigsHandler(st)
@@ -460,9 +460,9 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 			{ID: "modC", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
 		},
 		listMigReposByModResults: map[string][]store.MigRepo{
-			"modA": {{ID: "repoA", MigID: "modA", RepoUrl: "https://github.com/org/repo"}},
-			"modB": {{ID: "repoB", MigID: "modB", RepoUrl: "https://github.com/org/repo"}},
-			"modC": {{ID: "repoC", MigID: "modC", RepoUrl: "https://github.com/org/repo"}},
+			"modA": {{ID: "repoA", MigID: "modA", Url: "https://github.com/org/repo"}},
+			"modB": {{ID: "repoB", MigID: "modB", Url: "https://github.com/org/repo"}},
+			"modC": {{ID: "repoC", MigID: "modC", Url: "https://github.com/org/repo"}},
 		},
 	}
 	handler := listMigsHandler(st)

@@ -102,7 +102,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        modRepoID,
 			MigID:     modID,
-			RepoUrl:   normalizedRepoURL,
+			Url:       normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
 		})
@@ -130,13 +130,13 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			MigID:         modID,
 			RunID:         run.ID,
-			RepoID:        modRepo.ID,
+			RepoID:        modRepo.RepoID,
 			RepoBaseRef:   modRepo.BaseRef,
 			RepoTargetRef: modRepo.TargetRef,
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", modRepo.ID, "err", err)
+			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", modRepo.RepoID, "err", err)
 			return
 		}
 
@@ -159,7 +159,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 				RunID:      run.ID,
 				State:      modsapi.RunStatusFromStore(run.Status),
 				Submitter:  "",
-				Repository: modRepo.RepoUrl,
+				Repository: normalizedRepoURL,
 				Metadata: map[string]string{
 					"repo_base_ref":   modRepo.BaseRef,
 					"repo_target_ref": modRepo.TargetRef,

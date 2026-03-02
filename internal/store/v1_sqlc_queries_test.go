@@ -186,7 +186,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	inserted, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
 		ID:        repoID1,
 		MigID:     mig.ID,
-		RepoUrl:   repoURL,
+		Url:   repoURL,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -196,7 +196,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	_, err = db.UpsertMigRepo(ctx, UpsertMigRepoParams{
 		ID:        types.NewMigRepoID(),
 		MigID:     mig.ID,
-		RepoUrl:   repoURL,
+		Url:   repoURL,
 		BaseRef:   "main",
 		TargetRef: "feature",
 	})
@@ -209,7 +209,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	updated, err := db.UpsertMigRepo(ctx, UpsertMigRepoParams{
 		ID:        repoID2,
 		MigID:     mig.ID,
-		RepoUrl:   repoURL,
+		Url:   repoURL,
 		BaseRef:   "trunk",
 		TargetRef: "feature-2",
 	})
@@ -225,7 +225,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 
 	got, err := db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{
 		MigID:   mig.ID,
-		RepoUrl: repoURL,
+		Url: repoURL,
 	})
 	if err != nil {
 		t.Fatalf("GetMigRepoByURL() failed: %v", err)
@@ -240,7 +240,7 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 
 	_, err = db.GetMigRepoByURL(ctx, GetMigRepoByURLParams{
 		MigID:   mig.ID,
-		RepoUrl: repoURL,
+		Url: repoURL,
 	})
 	if err == nil {
 		t.Fatal("expected GetMigRepoByURL() after DeleteMigRepo to fail, but it succeeded")

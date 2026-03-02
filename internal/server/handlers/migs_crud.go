@@ -231,7 +231,13 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 						return
 					}
 					for _, mr := range repos {
-						if domaintypes.NormalizeRepoURL(mr.RepoUrl) == repoURLFilter {
+						repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
+						if err != nil {
+							httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+							slog.Error("list migs: get repo failed", "mig_id", mig.ID, "repo_id", mr.RepoID, "err", err)
+							return
+						}
+						if domaintypes.NormalizeRepoURL(repoURL) == repoURLFilter {
 							filtered = append(filtered, mig)
 							break
 						}

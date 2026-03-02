@@ -614,7 +614,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		listRunReposByRunResult: []store.RunRepo{
 			{RunID: runID, RepoID: "repo_123", RepoBaseRef: "main", RepoTargetRef: "feature"},
 		},
-		getModRepoResult: store.MigRepo{ID: "repo_123", RepoUrl: "https://github.com/user/repo.git"},
+		getModRepoResult: store.MigRepo{ID: "repo_123", Url: "https://github.com/user/repo.git"},
 		listJobsByRunResult: []store.Job{
 			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		},

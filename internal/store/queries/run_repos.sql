@@ -84,7 +84,7 @@ WHERE r.status = 'Started'
 ORDER BY r.id;
 
 -- name: ListRunsForRepo :many
--- Lists runs for a given repo_id (mig_repos.id).
+-- Lists runs for a given repo_id (repos.id).
 SELECT
   r.id AS run_id,
   r.mig_id,
@@ -116,15 +116,15 @@ SELECT repo_id FROM (
 WHERE status = 'Fail';
 
 -- name: ListRunReposWithURLByRun :many
--- v1: Lists all run_repos for a run with their repo_url (from mig_repos).
+-- Lists all run_repos for a run with their repo_url (from repos).
 -- Used by:
 -- - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
 -- - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
 SELECT rr.mig_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
        rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
-       mr.repo_url
+       r.url AS repo_url
 FROM run_repos rr
-JOIN mig_repos mr ON rr.repo_id = mr.id
+JOIN repos r ON rr.repo_id = r.id
 WHERE rr.run_id = $1
 ORDER BY rr.created_at ASC, rr.repo_id ASC;
 

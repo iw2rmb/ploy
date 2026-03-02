@@ -176,8 +176,8 @@ func TestListModReposHandler(t *testing.T) {
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 				m.listMigReposByModResult = []store.MigRepo{
-					{ID: "repo0001", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo0002", MigID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
+					{ID: "repo0001", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo0002", MigID: "mod123", Url: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
 				}
 			},
 			wantStatus: http.StatusOK,

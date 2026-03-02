@@ -320,9 +320,9 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]R
 const listRunReposWithURLByRun = `-- name: ListRunReposWithURLByRun :many
 SELECT rr.mig_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
        rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
-       mr.repo_url
+       r.url AS repo_url
 FROM run_repos rr
-JOIN mig_repos mr ON rr.repo_id = mr.id
+JOIN repos r ON rr.repo_id = r.id
 WHERE rr.run_id = $1
 ORDER BY rr.created_at ASC, rr.repo_id ASC
 `
@@ -342,7 +342,7 @@ type ListRunReposWithURLByRunRow struct {
 	RepoUrl       string             `json:"repo_url"`
 }
 
-// v1: Lists all run_repos for a run with their repo_url (from mig_repos).
+// Lists all run_repos for a run with their repo_url (from repos).
 // Used by:
 // - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
 // - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
@@ -415,7 +415,7 @@ type ListRunsForRepoRow struct {
 	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
 }
 
-// Lists runs for a given repo_id (mig_repos.id).
+// Lists runs for a given repo_id (repos.id).
 func (q *Queries) ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error) {
 	rows, err := q.db.Query(ctx, listRunsForRepo, arg.RepoID, arg.Limit, arg.Offset)
 	if err != nil {

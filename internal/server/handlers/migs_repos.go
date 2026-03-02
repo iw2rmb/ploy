@@ -88,7 +88,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		repo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        repoID,
 			MigID:     modID,
-			RepoUrl:   normalizedURL,
+			Url:       normalizedURL,
 			BaseRef:   req.BaseRef,
 			TargetRef: req.TargetRef,
 		})
@@ -115,7 +115,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		}{
 			ID:        repo.ID,
 			MigID:     repo.MigID,
-			RepoURL:   repo.RepoUrl,
+			RepoURL:   normalizedURL,
 			BaseRef:   repo.BaseRef,
 			TargetRef: repo.TargetRef,
 			CreatedAt: repo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
@@ -176,10 +176,16 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 
 		items := make([]repoItem, 0, len(repos))
 		for _, repo := range repos {
+			repoURL, err := repoURLForID(r.Context(), st, repo.RepoID)
+			if err != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+				slog.Error("list mig repos: get repo failed", "mig_id", modID, "repo_id", repo.RepoID, "err", err)
+				return
+			}
 			items = append(items, repoItem{
 				ID:        repo.ID,
 				MigID:     repo.MigID,
-				RepoURL:   repo.RepoUrl,
+				RepoURL:   repoURL,
 				BaseRef:   repo.BaseRef,
 				TargetRef: repo.TargetRef,
 				CreatedAt: repo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
@@ -402,8 +408,8 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 
 			// Check if repo already exists to determine if this is create or update.
 			_, err = st.GetMigRepoByURL(r.Context(), store.GetMigRepoByURLParams{
-				MigID:   modID,
-				RepoUrl: normalizedURL,
+				MigID: modID,
+				Url:   normalizedURL,
 			})
 			isUpdate := err == nil
 			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -416,7 +422,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			_, err = st.UpsertMigRepo(r.Context(), store.UpsertMigRepoParams{
 				ID:        domaintypes.NewMigRepoID(), // Only used for insert
 				MigID:     modID,
-				RepoUrl:   normalizedURL,
+				Url:       normalizedURL,
 				BaseRef:   baseRef,
 				TargetRef: targetRef,
 			})

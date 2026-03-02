@@ -46,7 +46,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	modRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepoID,
 		MigID:     modID,
-		RepoUrl:   repoURL,
+		Url:   repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})

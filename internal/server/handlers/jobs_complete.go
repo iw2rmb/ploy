@@ -618,7 +618,7 @@ func maybePromoteReGateRecoveryCandidate(
 
 	_, err = st.PromoteReGateRecoveryCandidateGateProfile(ctx, store.PromoteReGateRecoveryCandidateGateProfileParams{
 		ID:                   job.ID,
-		Meta:                 promotedMeta,
+		JobMeta:              promotedMeta,
 		GateProfile:          recovery.CandidateGateProfile,
 		GateProfileArtifacts: prepArtifacts,
 	})
