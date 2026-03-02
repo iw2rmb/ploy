@@ -34,6 +34,10 @@ type stubGateProfileResolverStore struct {
 	upsertRepoSHA    string
 	upsertStackID    int64
 	upsertObjectKey  string
+	linkErr          error
+	linkCalled       bool
+	linkJobID        types.JobID
+	linkProfileID    int64
 	resolveImageCall string
 }
 
@@ -86,6 +90,13 @@ func (s *stubGateProfileResolverStore) UpsertExactGateProfile(_ context.Context,
 		return gateProfileRow{}, s.upsertErr
 	}
 	return s.upsertRow, nil
+}
+
+func (s *stubGateProfileResolverStore) UpsertGateJobProfileLink(_ context.Context, jobID types.JobID, profileID int64) error {
+	s.linkCalled = true
+	s.linkJobID = jobID
+	s.linkProfileID = profileID
+	return s.linkErr
 }
 
 type stubBlobStore struct {
@@ -161,6 +172,12 @@ func TestGateProfileResolver_ExactHit(t *testing.T) {
 	if st.upsertCalled {
 		t.Fatal("did not expect exact upsert on exact hit")
 	}
+	if !st.linkCalled {
+		t.Fatal("expected gate link upsert on exact hit")
+	}
+	if st.linkJobID != job.ID || st.linkProfileID != 11 {
+		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
+	}
 }
 
 func TestGateProfileResolver_FallbackRepoStackCopiesAndUpsertsExact(t *testing.T) {
@@ -219,6 +236,12 @@ func TestGateProfileResolver_FallbackRepoStackCopiesAndUpsertsExact(t *testing.T
 	if st.upsertObjectKey == "" || !strings.HasPrefix(st.upsertObjectKey, "gate-profiles/repos/") {
 		t.Fatalf("unexpected upsert object key %q", st.upsertObjectKey)
 	}
+	if !st.linkCalled {
+		t.Fatal("expected gate link upsert after fallback upsert")
+	}
+	if st.linkJobID != job.ID || st.linkProfileID != 22 {
+		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
+	}
 }
 
 func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
@@ -271,5 +294,11 @@ func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
 	}
 	if !st.upsertCalled {
 		t.Fatal("expected exact upsert after default fallback copy")
+	}
+	if !st.linkCalled {
+		t.Fatal("expected gate link upsert after default fallback upsert")
+	}
+	if st.linkJobID != job.ID || st.linkProfileID != 32 {
+		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
 	}
 }

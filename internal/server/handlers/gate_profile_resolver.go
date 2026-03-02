@@ -26,6 +26,7 @@ type gateProfileResolverStore interface {
 	GetLatestRepoGateProfile(ctx context.Context, repoID domaintypes.RepoID, stackID int64) (gateProfileRow, error)
 	GetDefaultGateProfile(ctx context.Context, stackID int64) (gateProfileRow, error)
 	UpsertExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64, objectKey string) (gateProfileRow, error)
+	UpsertGateJobProfileLink(ctx context.Context, jobID domaintypes.JobID, profileID int64) error
 }
 
 type gateProfileRow struct {
@@ -72,6 +73,9 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 		if loadErr != nil {
 			return 0, nil, fmt.Errorf("load exact gate profile %d: %w", exact.ID, loadErr)
 		}
+		if linkErr := r.st.UpsertGateJobProfileLink(ctx, job.ID, exact.ID); linkErr != nil {
+			return 0, nil, fmt.Errorf("upsert gates link: %w", linkErr)
+		}
 		return exact.ID, payload, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -108,6 +112,9 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 	exact, err = r.st.UpsertExactGateProfile(ctx, job.RepoID, repoSHAIn, stackID, objectKey)
 	if err != nil {
 		return 0, nil, fmt.Errorf("upsert exact gate profile: %w", err)
+	}
+	if linkErr := r.st.UpsertGateJobProfileLink(ctx, job.ID, exact.ID); linkErr != nil {
+		return 0, nil, fmt.Errorf("upsert gates link: %w", linkErr)
 	}
 	return exact.ID, payload, nil
 }
@@ -248,4 +255,14 @@ RETURNING id, COALESCE(repo_id, ''), COALESCE(repo_sha, ''), COALESCE(repo_sha8,
 		&row.ObjectKey,
 	)
 	return row, err
+}
+
+func (s *sqlGateProfileResolverStore) UpsertGateJobProfileLink(ctx context.Context, jobID domaintypes.JobID, profileID int64) error {
+	_, err := s.st.Pool().Exec(ctx, `
+INSERT INTO gates (job_id, profile_id)
+VALUES ($1, $2)
+ON CONFLICT (job_id)
+DO UPDATE SET profile_id = EXCLUDED.profile_id
+`, jobID, profileID)
+	return err
 }

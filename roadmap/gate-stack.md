@@ -83,7 +83,7 @@ Legend: [ ] todo, [x] done.
   - Scope: add service for 3-step lookup order (exact -> repo+stack -> default stack); copy garage object on fallback; insert exact row; return `profile_id`.
   - Snippets: fallback copy inserts new `gate_profiles` row with concrete `repo_id` + `repo_sha`.
   - Tests: service tests for all lookup branches and object-copy behavior.
-- [ ] Persist job-to-profile mapping in `gates` — make gate/profile relation auditable.
+- [x] Persist job-to-profile mapping in `gates` — make gate/profile relation auditable.
   - Repository: ploy
   - Component: claim and completion persistence
   - Scope: insert `gates(job_id, profile_id)` at gate job claim/start; enforce one row per gate job.
