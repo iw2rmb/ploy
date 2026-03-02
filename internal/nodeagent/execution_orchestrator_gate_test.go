@@ -63,7 +63,7 @@ func TestPersistGateProfileSnapshot_UsesGeneratedProfile(t *testing.T) {
 
 	rc := &runController{cfg: Config{}}
 	runID := types.RunID("run-profile-generated")
-	const generated = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"build":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`
+	const generated = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"active":"all_tests","build":{"status":"not_attempted","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}}},"orchestration":{"pre":[],"post":[]}}`
 
 	rc.persistGateProfileSnapshot(
 		runID,
@@ -118,11 +118,14 @@ func TestPersistGateProfileSnapshot_DerivesFromOverride(t *testing.T) {
 	if got, want := profile.Stack.Tool, "maven"; got != want {
 		t.Fatalf("stack.tool = %q, want %q", got, want)
 	}
-	if profile.Targets.Build == nil || profile.Targets.Build.Command != "mvn -q -DskipTests compile" {
-		t.Fatalf("targets.build.command = %#v, want mvn command", profile.Targets.Build)
+	if got, want := profile.Targets.Active, contracts.GateProfileTargetAllTests; got != want {
+		t.Fatalf("targets.active = %q, want %q", got, want)
 	}
-	if profile.Targets.Build.Env["MAVEN_OPTS"] != "-Xmx2g" {
-		t.Fatalf("targets.build.env[MAVEN_OPTS] = %q, want %q", profile.Targets.Build.Env["MAVEN_OPTS"], "-Xmx2g")
+	if profile.Targets.AllTests == nil || profile.Targets.AllTests.Command != "mvn -q -DskipTests compile" {
+		t.Fatalf("targets.all_tests.command = %#v, want mvn command", profile.Targets.AllTests)
+	}
+	if profile.Targets.AllTests.Env["MAVEN_OPTS"] != "-Xmx2g" {
+		t.Fatalf("targets.all_tests.env[MAVEN_OPTS] = %q, want %q", profile.Targets.AllTests.Env["MAVEN_OPTS"], "-Xmx2g")
 	}
 }
 
