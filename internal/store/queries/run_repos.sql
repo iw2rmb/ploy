@@ -1,18 +1,18 @@
 -- name: CreateRunRepo :one
 -- v1: Creates a new run_repos row scoped to (run_id, repo_id).
 -- Note: attempt defaults to 1; status defaults to 'Queued'.
-INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at;
+INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at;
 
 -- name: GetRunRepo :one
-SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1 AND repo_id = $2;
 
 -- name: ListRunReposByRun :many
 -- Lists all repos associated with a run, ordered by creation time.
-SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
 ORDER BY created_at ASC, repo_id ASC;
@@ -68,7 +68,7 @@ DELETE FROM run_repos
 WHERE run_id = $1 AND repo_id = $2;
 
 -- name: ListQueuedRunReposByRun :many
-SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
   AND status = 'Queued'
@@ -121,6 +121,7 @@ WHERE status = 'Fail';
 -- - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
 -- - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
 SELECT rr.mig_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
+       rr.source_commit_sha, rr.repo_sha0,
        rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
        r.url AS repo_url
 FROM run_repos rr

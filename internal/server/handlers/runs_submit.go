@@ -127,12 +127,26 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		}
 
 		// Create run_repo entry
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), normalizedRepoURL, modRepo.BaseRef)
+		if seedErr != nil {
+			httpErr(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, modRepo.BaseRef, seedErr)
+			slog.Error("create single-repo run: resolve source commit failed",
+				"run_id", run.ID,
+				"repo_id", modRepo.RepoID,
+				"repo_url", normalizedRepoURL,
+				"base_ref", modRepo.BaseRef,
+				"err", seedErr,
+			)
+			return
+		}
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			MigID:         modID,
-			RunID:         run.ID,
-			RepoID:        modRepo.RepoID,
-			RepoBaseRef:   modRepo.BaseRef,
-			RepoTargetRef: modRepo.TargetRef,
+			MigID:           modID,
+			RunID:           run.ID,
+			RepoID:          modRepo.RepoID,
+			RepoBaseRef:     modRepo.BaseRef,
+			RepoTargetRef:   modRepo.TargetRef,
+			SourceCommitSha: sourceCommitSHA,
+			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)

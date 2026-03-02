@@ -253,6 +253,8 @@ CREATE TABLE IF NOT EXISTS run_repos (
   repo_id          TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,  -- FK to repos.id.
   repo_base_ref    TEXT NOT NULL,  -- Snapshot of mig_repos.base_ref at run creation time.
   repo_target_ref  TEXT NOT NULL,  -- Snapshot of mig_repos.target_ref at run creation time.
+  source_commit_sha TEXT NOT NULL DEFAULT '',  -- Immutable source commit resolved at run start.
+  repo_sha0        TEXT NOT NULL DEFAULT '',   -- Initial SHA seed for deterministic job SHA chain.
   status           run_repo_status NOT NULL DEFAULT 'Queued',
   attempt          INTEGER NOT NULL DEFAULT 1 CHECK (attempt >= 1),
   last_error       TEXT,
@@ -266,6 +268,9 @@ ALTER TABLE IF EXISTS run_repos
 ALTER TABLE IF EXISTS run_repos
   ADD CONSTRAINT run_repos_repo_id_fkey
   FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE RESTRICT;
+ALTER TABLE IF EXISTS run_repos
+  ADD COLUMN IF NOT EXISTS source_commit_sha TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS repo_sha0 TEXT NOT NULL DEFAULT '';
 DO $$
 BEGIN
   IF NOT EXISTS (

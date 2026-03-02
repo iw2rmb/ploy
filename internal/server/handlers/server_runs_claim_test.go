@@ -68,7 +68,7 @@ func TestClaimJob_Success(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
@@ -176,7 +176,7 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		// Spec is sourced from the DB at claim time; it must be a JSON object.
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`[]`)},
@@ -236,7 +236,7 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
@@ -356,7 +356,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: runSpec},
 	}
@@ -404,40 +404,8 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	}
 }
 
-func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
+func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 	t.Parallel()
-
-	profile := []byte(`{
-		"schema_version": 1,
-		"repo_id": "repo_123",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"runtime": {
-			"docker": {
-				"mode": "host_socket"
-			}
-		},
-		"targets": {
-			"active": "unit",
-			"build": {
-				"status": "passed",
-				"command": "go test ./...",
-				"env": {"GOFLAGS":"-mod=readonly"},
-				"failure_code": null
-			},
-			"unit": {
-				"status": "passed",
-				"command": "go test ./... -run TestUnit",
-				"env": {"CGO_ENABLED":"0"},
-				"failure_code": null
-			},
-			"all_tests": {
-				"status": "not_attempted",
-				"env": {}
-			}
-		},
-		"orchestration": {"pre": [], "post": []}
-	}`)
 
 	tests := []struct {
 		name      string
@@ -449,34 +417,25 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 		wantEnvV  string
 	}{
 		{
-			name:      "pre_gate maps targets.active to build_gate.pre.gate_profile",
+			name:      "pre_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypePreGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "pre",
-			wantCmd:   "go test ./... -run TestUnit",
-			wantEnvK:  "CGO_ENABLED",
-			wantEnvV:  "0",
 		},
 		{
-			name:      "post_gate maps targets.active to build_gate.post.gate_profile",
+			name:      "post_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypePostGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "post",
-			wantCmd:   "go test ./... -run TestUnit",
-			wantEnvK:  "CGO_ENABLED",
-			wantEnvV:  "0",
 		},
 		{
-			name:      "re_gate reuses post phase mapping from targets.active",
+			name:      "re_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypeReGate,
 			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
 			wantPhase: "post",
-			wantCmd:   "go test ./... -run TestUnit",
-			wantEnvK:  "CGO_ENABLED",
-			wantEnvV:  "0",
 		},
 		{
-			name:    "explicit spec gate_profile wins over profile mapping",
+			name:    "explicit spec gate_profile is preserved",
 			jobType: domaintypes.JobTypePreGate,
 			spec: []byte(`{
 				"steps":[{"image":"docker.io/acme/mod:latest"}],
@@ -532,9 +491,8 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 					Attempt:       1,
 				},
 				getModRepoResult: store.MigRepo{
-					ID:          repoID,
-					Url:     "https://github.com/user/repo.git",
-					GateProfile: profile,
+					ID:     repoID,
+					RepoID: repoID,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
 			}
@@ -554,14 +512,24 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 			if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || got {
-				t.Fatalf("expected repo_gate_profile_missing=false, got %v", resp["repo_gate_profile_missing"])
+			if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || !got {
+				t.Fatalf("expected repo_gate_profile_missing=true, got %v", resp["repo_gate_profile_missing"])
 			}
 			spec, ok := resp["spec"].(map[string]any)
 			if !ok {
 				t.Fatalf("expected spec object, got %T", resp["spec"])
 			}
 			bg, ok := spec["build_gate"].(map[string]any)
+			if tc.wantCmd == "" {
+				if ok {
+					if phase, phaseOK := bg[tc.wantPhase].(map[string]any); phaseOK {
+						if _, exists := phase["gate_profile"]; exists {
+							t.Fatalf("did not expect build_gate.%s.gate_profile", tc.wantPhase)
+						}
+					}
+				}
+				return
+			}
 			if !ok {
 				t.Fatalf("expected build_gate object, got %T", spec["build_gate"])
 			}
@@ -569,9 +537,13 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected build_gate.%s object, got %T", tc.wantPhase, bg[tc.wantPhase])
 			}
-			prep, ok := phase["gate_profile"].(map[string]any)
+			prepRaw, exists := phase["gate_profile"]
+			if !exists {
+				t.Fatalf("expected build_gate.%s.gate_profile", tc.wantPhase)
+			}
+			prep, ok := prepRaw.(map[string]any)
 			if !ok {
-				t.Fatalf("expected build_gate.%s.gate_profile object, got %T", tc.wantPhase, phase["gate_profile"])
+				t.Fatalf("expected build_gate.%s.gate_profile object, got %T", tc.wantPhase, prepRaw)
 			}
 			if got := prep["command"]; got != tc.wantCmd {
 				t.Fatalf("build_gate.%s.gate_profile.command=%v, want %q", tc.wantPhase, got, tc.wantCmd)
@@ -590,19 +562,6 @@ func TestClaimJob_MergesGateProfileIntoGateSpec(t *testing.T) {
 func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 	t.Parallel()
 
-	repoProfile := []byte(`{
-		"schema_version": 1,
-		"repo_id": "repo_123",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"targets": {
-			"active": "unit",
-			"build": {"status":"passed","command":"echo repo-build","env":{},"failure_code":null},
-			"unit": {"status":"passed","command":"echo repo-unit","env":{"SRC":"repo"},"failure_code":null},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre": [], "post": []}
-	}`)
 	candidateProfile := `{
 		"schema_version": 1,
 		"repo_id": "repo_123",
@@ -617,23 +576,23 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 		"orchestration": {"pre": [], "post": []}
 	}`
 
-	tests := []struct {
-		name    string
-		spec    []byte
+		tests := []struct {
+			name    string
+			spec    []byte
 		wantCmd string
 		wantSrc string
-	}{
-		{
-			name:    "candidate wins over repo gate_profile on re_gate",
-			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
-			wantCmd: "echo candidate-unit",
-			wantSrc: "candidate",
-		},
-		{
-			name: "explicit prep wins over candidate and repo",
-			spec: []byte(`{
-				"steps":[{"image":"docker.io/acme/mod:latest"}],
-				"build_gate":{"post":{"gate_profile":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
+		}{
+			{
+				name:    "candidate wins on re_gate",
+				spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+				wantCmd: "echo candidate-unit",
+				wantSrc: "candidate",
+			},
+			{
+				name: "explicit prep wins over candidate",
+				spec: []byte(`{
+					"steps":[{"image":"docker.io/acme/mod:latest"}],
+					"build_gate":{"post":{"gate_profile":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
 			}`),
 			wantCmd: "echo explicit",
 			wantSrc: "explicit",
@@ -689,9 +648,8 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 					Attempt:       1,
 				},
 				getModRepoResult: store.MigRepo{
-					ID:          repoID,
-					Url:     "https://github.com/user/repo.git",
-					GateProfile: repoProfile,
+					ID:     repoID,
+					RepoID: repoID,
 				},
 				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
 			}
@@ -740,7 +698,7 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 	}
 }
 
-func TestClaimJob_InvalidGateProfileReturnsError(t *testing.T) {
+func TestClaimJob_InvalidRecoveryCandidateGateProfileReturnsError(t *testing.T) {
 	t.Parallel()
 
 	nodeKey := domaintypes.NewNodeKey()
@@ -760,10 +718,15 @@ func TestClaimJob_InvalidGateProfileReturnsError(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			NodeID:      &nodeID,
-			Name:        "pre-gate-0",
+			Name:        "re-gate-0",
 			Status:      store.JobStatusRunning,
-			JobType:     domaintypes.JobTypePreGate.String(),
-			Meta:        []byte(`{}`),
+			JobType:     domaintypes.JobTypeReGate.String(),
+			Meta: []byte(fmt.Sprintf(
+				`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_gate_profile":{"schema_version":1}}}`,
+				contracts.GateProfileCandidateSchemaID,
+				contracts.GateProfileCandidateArtifactPath,
+				contracts.RecoveryCandidateStatusValid,
+			)),
 		},
 		getRunResult: store.Run{
 			ID:        runID,
@@ -781,9 +744,8 @@ func TestClaimJob_InvalidGateProfileReturnsError(t *testing.T) {
 			Attempt:       1,
 		},
 		getModRepoResult: store.MigRepo{
-			ID:          repoID,
-			Url:     "https://github.com/user/repo.git",
-			GateProfile: []byte(`{"schema_version":1}`),
+			ID:     repoID,
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}
@@ -858,7 +820,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: spec},
 	}
@@ -987,7 +949,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: spec},
 	}
@@ -1070,7 +1032,7 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 		},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			Url: "https://github.com/user/repo.git",
+			RepoID: repoID,
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 	}

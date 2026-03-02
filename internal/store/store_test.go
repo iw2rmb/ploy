@@ -199,7 +199,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	_, err = db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
 		MigID:     fx.Mig.ID,
-		Url:   "https://github.com/org/repo-b",
+		Url:       "https://github.com/org/repo-b",
 		BaseRef:   "main",
 		TargetRef: "feature/b",
 	})
@@ -207,11 +207,13 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 		t.Fatalf("CreateMigRepo() for repo-b failed: %v", err)
 	}
 	rr2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         fx.Mig.ID,
-		RunID:         fx.Run.ID,
-		RepoID:        modRepo2ID,
-		RepoBaseRef:   "main",
-		RepoTargetRef: "feature/b",
+		MigID:           fx.Mig.ID,
+		RunID:           fx.Run.ID,
+		RepoID:          modRepo2ID,
+		RepoBaseRef:     "main",
+		RepoTargetRef:   "feature/b",
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo() for repo-b failed: %v", err)
@@ -319,7 +321,7 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	modRepo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepo2ID,
 		MigID:     fx.Mig.ID,
-		Url:   "https://github.com/org/repo-b",
+		Url:       "https://github.com/org/repo-b",
 		BaseRef:   "main",
 		TargetRef: "feature/b",
 	})
@@ -328,11 +330,13 @@ func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
 	}
 
 	_, err = db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         fx.Mig.ID,
-		RunID:         fx.Run.ID,
-		RepoID:        modRepo2.ID,
-		RepoBaseRef:   modRepo2.BaseRef,
-		RepoTargetRef: modRepo2.TargetRef,
+		MigID:           fx.Mig.ID,
+		RunID:           fx.Run.ID,
+		RepoID:          modRepo2.RepoID,
+		RepoBaseRef:     modRepo2.BaseRef,
+		RepoTargetRef:   modRepo2.TargetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo() for repo-b failed: %v", err)

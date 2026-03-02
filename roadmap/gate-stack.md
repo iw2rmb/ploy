@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/store -run MigRepo|RunRepo|Job` — expect creation/listing paths to preserve run/mig scoping.
 
 ## Phase 3: SHA Chain Persistence
-- [ ] Add run-repo seed SHA fields and pinning model — make run input commit immutable.
+- [x] Add run-repo seed SHA fields and pinning model — make run input commit immutable.
   - Repository: ploy
   - Component: run creation and scheduling
   - Scope: add `run_repos.source_commit_sha`, `run_repos.repo_sha0`; set them at run start; fail repo queueing when seed SHA cannot be resolved.

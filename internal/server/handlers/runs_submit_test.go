@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -171,8 +172,8 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	}
 	// types.NormalizeRepoURL trims trailing "/" and ".git".
 	expectedURL := "https://github.com/org/repo"
-	if st.createMigRepoParams.RepoUrl != expectedURL {
-		t.Errorf("mod_repo URL = %q, want %q (normalized)", st.createMigRepoParams.RepoUrl, expectedURL)
+	if st.createMigRepoParams.Url != expectedURL {
+		t.Errorf("mod_repo URL = %q, want %q (normalized)", st.createMigRepoParams.Url, expectedURL)
 	}
 }
 
@@ -601,5 +602,40 @@ func TestRunsCreateSingleRepo_CreateRunRepoError(t *testing.T) {
 
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
+	st := &mockStore{}
+	eventsService, _ := createTestEventsService()
+	handler := createSingleRepoRunHandler(st, eventsService)
+
+	spec := map[string]any{
+		"version": "0.2.0",
+		"env":     map[string]any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
+	}
+	reqBody := map[string]any{
+		"repo_url":   "https://github.com/org/repo",
+		"base_ref":   "main",
+		"target_ref": "feature",
+		"spec":       spec,
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(withSourceCommitSHAResolver(req.Context(), func(_ context.Context, _, _ string) (string, error) {
+		return "", errors.New("seed lookup failed")
+	}))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
+	}
+	if st.createRunRepoCalled {
+		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
 	}
 }

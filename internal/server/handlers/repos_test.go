@@ -56,13 +56,13 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 		listDistinctReposResult: []store.ListDistinctReposRow{
 			{
 				RepoID:     "repo0001",
-				Url:    "https://github.com/org/repo1.git",
+				RepoUrl:    "https://github.com/org/repo1.git",
 				LastRunAt:  pgtype.Timestamptz{Time: now, Valid: true},
 				LastStatus: "Success",
 			},
 			{
 				RepoID:     "repo0002",
-				Url:    "https://github.com/org/repo2.git",
+				RepoUrl:    "https://github.com/org/repo2.git",
 				LastRunAt:  pgtype.Timestamptz{Valid: false},
 				LastStatus: "",
 			},
