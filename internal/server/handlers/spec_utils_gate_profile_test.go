@@ -106,14 +106,16 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 			profile: profile,
 		},
 		{
-			name:    "skip mapping when target not passed",
-			jobType: domaintypes.JobTypePreGate,
-			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			name:      "maps even when target status is failed",
+			jobType:   domaintypes.JobTypePreGate,
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			wantPhase: "pre",
+			wantCmd:   "go test ./...",
 			profile: []byte(`{
 				"schema_version": 1,
 				"repo_id": "repo_123",
 				"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
+				"stack": {"language":"go","tool":"go"},
 				"targets": {
 					"build": {"status": "failed", "command":"go test ./...", "env": {}, "failure_code": "unknown"},
 					"unit": {"status": "passed", "command":"go test ./... -run TestUnit", "env": {}, "failure_code": null},

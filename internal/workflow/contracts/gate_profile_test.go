@@ -171,7 +171,49 @@ func TestGateProfileParseRejectsInvalidPayload(t *testing.T) {
 	}
 }
 
-func TestGateProfileMapToGateSkipsWhenNotPassedOrMissingCommand(t *testing.T) {
+func TestGateProfileMapToGateUsesCommandsRegardlessOfTargetStatus(t *testing.T) {
+	t.Parallel()
+
+	profile, err := ParseGateProfileJSON([]byte(`{
+		"schema_version": 1,
+		"repo_id": "repo_123",
+		"runner_mode": "simple",
+		"stack": {"language":"go","tool":"go"},
+		"targets": {
+			"build": {"status":"not_attempted","command":"go test ./...","env":{}},
+			"unit": {"status":"failed","command":"go test ./... -run TestUnit","env":{},"failure_code":"unknown"},
+			"all_tests": {"status":"not_attempted","env":{}}
+		},
+		"orchestration": {"pre": [], "post": []}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseGateProfileJSON: %v", err)
+	}
+
+	_, preOverride, err := GateProfileGateOverrideForJobType(profile, types.JobTypePreGate)
+	if err != nil {
+		t.Fatalf("GateProfileGateOverrideForJobType(pre_gate): %v", err)
+	}
+	if preOverride == nil {
+		t.Fatal("pre override=nil, want non-nil")
+	}
+	if got, want := preOverride.Command.Shell, "go test ./..."; got != want {
+		t.Fatalf("pre command=%q, want %q", got, want)
+	}
+
+	_, postOverride, err := GateProfileGateOverrideForJobType(profile, types.JobTypePostGate)
+	if err != nil {
+		t.Fatalf("GateProfileGateOverrideForJobType(post_gate): %v", err)
+	}
+	if postOverride == nil {
+		t.Fatal("post override=nil, want non-nil")
+	}
+	if got, want := postOverride.Command.Shell, "go test ./... -run TestUnit"; got != want {
+		t.Fatalf("post command=%q, want %q", got, want)
+	}
+}
+
+func TestGateProfileMapToGateSkipsWhenMappedTargetHasNoCommand(t *testing.T) {
 	t.Parallel()
 
 	profile, err := ParseGateProfileJSON([]byte(`{
@@ -181,7 +223,7 @@ func TestGateProfileMapToGateSkipsWhenNotPassedOrMissingCommand(t *testing.T) {
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
 			"build": {"status":"not_attempted","env":{}},
-			"unit": {"status":"failed","command":"go test ./... -run TestUnit","env":{},"failure_code":"unknown"},
+			"unit": {"status":"not_attempted","env":{}},
 			"all_tests": {"status":"not_attempted","env":{}}
 		},
 		"orchestration": {"pre": [], "post": []}
@@ -198,12 +240,12 @@ func TestGateProfileMapToGateSkipsWhenNotPassedOrMissingCommand(t *testing.T) {
 		t.Fatalf("pre override=%v, want nil", preOverride)
 	}
 
-	_, postOverride, err := GateProfileGateOverrideForJobType(profile, types.JobTypePostGate)
+	_, reOverride, err := GateProfileGateOverrideForJobType(profile, types.JobTypeReGate)
 	if err != nil {
-		t.Fatalf("GateProfileGateOverrideForJobType(post_gate): %v", err)
+		t.Fatalf("GateProfileGateOverrideForJobType(re_gate): %v", err)
 	}
-	if postOverride != nil {
-		t.Fatalf("post override=%v, want nil", postOverride)
+	if reOverride != nil {
+		t.Fatalf("re_gate override=%v, want nil", reOverride)
 	}
 }
 
