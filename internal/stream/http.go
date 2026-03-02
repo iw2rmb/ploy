@@ -10,56 +10,14 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-var errNoHub = errors.New("logstream: hub unavailable")
+// ErrNoHub indicates the hub is nil.
+var ErrNoHub = errors.New("logstream: hub unavailable")
 
 // Serve streams events for the provided stream over SSE.
 // sinceID must be a valid EventID (non-negative); callers should validate before calling.
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, runID domaintypes.RunID, sinceID domaintypes.EventID) error {
-	if hub == nil {
-		return errNoHub
-	}
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		return errors.New("logstream: response does not support streaming")
-	}
-
-	if err := hub.Ensure(runID); err != nil {
-		return err
-	}
-	sub, err := hub.Subscribe(r.Context(), runID, sinceID)
-	if err != nil {
-		return err
-	}
-	defer sub.Cancel()
-
-	headers := w.Header()
-	headers.Set("Content-Type", "text/event-stream")
-	headers.Set("Cache-Control", "no-cache")
-	headers.Set("Connection", "keep-alive")
-
-	if _, err := io.WriteString(w, ":ok\n\n"); err != nil {
-		return err
-	}
-	flusher.Flush()
-
-	for {
-		select {
-		case <-r.Context().Done():
-			return r.Context().Err()
-		case evt, ok := <-sub.Events:
-			if !ok {
-				return nil
-			}
-			if err := writeEventFrame(w, evt); err != nil {
-				return err
-			}
-			flusher.Flush()
-			if evt.Type == domaintypes.SSEEventDone {
-				return nil
-			}
-		}
-	}
+	return ServeFiltered(w, r, hub, runID, sinceID, nil)
 }
 
 // ServeFiltered streams events for the provided stream over SSE, applying an optional
@@ -70,7 +28,7 @@ func Serve(w http.ResponseWriter, r *http.Request, hub *Hub, runID domaintypes.R
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, runID domaintypes.RunID, sinceID domaintypes.EventID, filter func(Event) (Event, bool)) error {
 	if hub == nil {
-		return errNoHub
+		return ErrNoHub
 	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {

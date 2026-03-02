@@ -19,7 +19,7 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 	validRunID := domaintypes.NewRunID()
 	invalidRunID := domaintypes.NewRunID()
 
-	if err := hub.publish(ctx, validRunID, domaintypes.SSEEventLog, LogRecord{
+	if _, err := hub.publish(ctx, validRunID, domaintypes.SSEEventLog, LogRecord{
 		Timestamp: "2025-10-22T12:00:00Z",
 		Stream:    "stdout",
 		Line:      "hello",
@@ -41,7 +41,7 @@ func TestHubRejectsUnknownEventType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := hub.publish(ctx, invalidRunID, tt.eventType, Status{Status: "noop"})
+			_, err := hub.publish(ctx, invalidRunID, tt.eventType, Status{Status: "noop"})
 			if !errors.Is(err, ErrInvalidEventType) {
 				t.Fatalf("expected ErrInvalidEventType, got %v", err)
 			}
