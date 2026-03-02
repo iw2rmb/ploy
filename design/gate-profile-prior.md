@@ -3,7 +3,7 @@
 ## Goal
 
 Align gate profile behavior to a single target-selection model:
-- default target priority: `all_tests` -> `unit` -> `build`
+- default target priority: `all_tests` -> `unit` -> `build` -> `unsupported` (terminal)
 - selected target is explicit in profile as `targets.active`
 - infra healing prompt and `/in` assets explicitly drive this fallback flow
 
@@ -19,6 +19,8 @@ This document describes current gaps and required implementation changes.
   - Implemented in `GateProfileGateOverrideForJobType` in `internal/workflow/contracts/gate_profile.go`.
 - Required:
   - Gate command/env must come from `targets.active` for all gate phases.
+  - Gate runtime must ignore target `status` and `failure_code` when resolving command/env.
+  - There is no server/runtime auto-fallback across targets; only `targets.active` decides.
   - Job type should choose only phase placement (`build_gate.pre` vs `build_gate.post`), not target.
 
 2. Gate profile schema/contract has no `targets.active`.
@@ -26,7 +28,7 @@ This document describes current gaps and required implementation changes.
   - `GateProfileTargets` has `build`, `unit`, `all_tests` only.
   - JSON schema `docs/schemas/gate_profile.schema.json` has no `targets.active`.
 - Required:
-  - Add `targets.active: build|unit|all_tests`.
+  - Add `targets.active: build|unit|all_tests|unsupported`.
   - Make it required in contract parser and JSON schema.
 
 3. Infra healing prompt does not define the required fallback chain.
@@ -35,8 +37,11 @@ This document describes current gaps and required implementation changes.
   - no explicit three-step fallback chain with `targets.active`.
 - Required:
   - Prompt must explicitly enforce: try `all_tests` first, then `unit`, then `build`.
-  - Prompt must require the produced `/out/gate-profile-candidate.json` to set `targets.active` to the selected target (`all_tests|unit|build`) based on gate-error evidence.
-  - Prompt must treat `build` failure as terminal for this repo attempt.
+  - Prompt must require the produced `/out/gate-profile-candidate.json` to set `targets.active` to the selected target (`all_tests|unit|build|unsupported`) based on gate-error evidence.
+  - Prompt must encode terminal unsupported outcome as:
+    - `targets.active="unsupported"`
+    - `targets.build.status="failed"`
+    - `targets.build.failure_code="infra_support"`
 
 4. Schema guidance is not embedded in the JSON schema contract.
 - Current:
@@ -65,14 +70,17 @@ Files:
 
 Changes:
 - Extend `GateProfileTargets` with `Active string`.
-- Add constants for target IDs (`build`, `unit`, `all_tests`) and ordered priority.
+- Add constants for target IDs (`build`, `unit`, `all_tests`, `unsupported`) and ordered priority.
 - Validate:
   - `targets.active` required and enum-constrained.
-  - active target object must exist.
-  - active target must have non-empty `command`.
+  - for runnable active targets (`build|unit|all_tests`): active target object must exist and have non-empty `command`.
+  - for `targets.active="unsupported"`: parser requires terminal marker fields
+    - `targets.build.status="failed"`
+    - `targets.build.failure_code="infra_support"`
 - In JSON schema:
   - change `.title` to `"Ploy Build Gate Profile"`.
   - add `$comment` guidance for target semantics, fallback intent, runtime hints, and recovery metadata fields.
+  - add `failure_code` value `infra_support`.
 - Keep no backward-compat fallback for missing `targets.active`.
 
 ## 2) Claim-Time Gate Override Mapping
@@ -87,6 +95,8 @@ Changes:
     - `pre_gate` -> `pre`
     - `post_gate|re_gate` -> `post`
   - target selection from `profile.Targets.Active` only.
+  - ignore target status/failure_code in gate mapping.
+  - when `targets.active="unsupported"`, produce no runnable override and return terminal unsupported signal for caller flow.
 - Keep existing precedence:
   - explicit `build_gate.<phase>.gate_profile` in spec wins
   - then recovery candidate mapping for `re_gate`
@@ -121,7 +131,10 @@ Changes:
     1. default candidate sets `targets.active=all_tests`
     2. if logs prove all-tests infra is not currently satisfiable, candidate sets `targets.active=unit`
     3. if `unit` is still failing with unknown/unfixable gate errors, candidate sets `targets.active=build`
-    4. if `build` is still unknown/unfixable, mark as terminal failure state
+    4. if `build` is still unknown/unfixable, candidate sets terminal unsupported markers:
+       - `targets.active=unsupported`
+       - `targets.build.status=failed`
+       - `targets.build.failure_code=infra_support`
 
 ## 5) Documentation Alignment
 
@@ -143,11 +156,14 @@ Changes:
 
 1. `internal/workflow/contracts/gate_profile_test.go`
 - parse rejects missing/invalid `targets.active`
+- parse accepts `targets.active=unsupported` only with required terminal markers
 - active target mapping used for `pre_gate`, `post_gate`, `re_gate`
+- target status/failure_code do not affect runtime command mapping for runnable active targets
 
 2. `internal/server/handlers/server_runs_claim_test.go`
 - all gate job types map command/env from active target
 - explicit spec override still wins
+- no status-based gating in claim-time mapping
 
 3. `internal/workflow/step/gate_docker_test.go`
 - auto-bootstrap profile defaults to `targets.active=all_tests`
