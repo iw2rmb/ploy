@@ -39,7 +39,7 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 
 	runner := opts.Runner
 	if runner == nil {
-		runner = systemRunner{}
+		runner = SystemRunner{}
 	}
 
 	user := strings.TrimSpace(opts.User)

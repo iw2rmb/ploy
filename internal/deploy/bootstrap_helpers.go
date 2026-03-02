@@ -70,12 +70,6 @@ func GenerateClusterID() (string, error) {
 }
 
 // GenerateNodeID creates a new node identifier using NanoID(6).
-// Returns a 6-character NanoID string using the URL-safe alphabet.
-// The compact format balances brevity with sufficient uniqueness for
-// typical cluster sizes while being human-friendly for display in URLs
-// and CLI output.
-func GenerateNodeID() (string, error) {
-	// types.NewNodeKey() uses NanoID with a URL-safe alphabet (A-Za-z0-9_-)
-	// and generates a 6-character identifier suitable for node IDs.
-	return types.NewNodeKey(), nil
+func GenerateNodeID() string {
+	return types.NewNodeKey()
 }
