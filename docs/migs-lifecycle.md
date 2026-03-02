@@ -741,10 +741,14 @@ Gate profiles are persisted on `mig_repos` and consumed at claim-time:
 - Candidate promotion to repo `gate_profile` happens only after successful `re_gate`.
 
 Gate profile to Build Gate mapping (claim-time):
-- `pre_gate` maps to `gate_profile.targets.build`.
-- `post_gate` and `re_gate` map to `gate_profile.targets.unit`.
-- Mapping injects a gate prep override only when the mapped target has
-  `status=passed` and non-empty `command`.
+- Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
+- Command/env source is always `gate_profile.targets.<targets.active>`.
+- Mapping is status-agnostic at runtime (`status`/`failure_code` are ignored for command/env resolution).
+- There is no runtime auto-fallback across targets.
+- `targets.active=unsupported` is terminal and injects no runnable override.
+- Terminal unsupported payload contract:
+  - `targets.build.status=failed`
+  - `targets.build.failure_code=infra_support`
 - Simple runtime hints are also mapped:
   - `runtime.docker.mode=host_socket` -> `DOCKER_HOST=unix:///var/run/docker.sock`
   - `runtime.docker.mode=tcp` -> `DOCKER_HOST=<runtime.docker.host>`
@@ -1122,10 +1126,11 @@ Gate profile behavior:
   gate profile payload storage.
 - During `pre_gate`, when repo `gate_profile` is absent and the run spec does not define
   explicit `build_gate.pre.gate_profile`, the node auto-generates a simple profile from
-  stack detection and resolved gate command, uses it in that `pre_gate`, and persists it
+  stack detection and resolved gate command (`targets.active=all_tests`, command/env in `targets.all_tests`),
+  uses it in that `pre_gate`, and persists it
   only if the `pre_gate` job succeeds.
 - Infra healing candidate validation uses `docs/schemas/gate_profile.schema.json`
-  plus contract parsing.
+  (`title: Ploy Build Gate Profile`, `$comment` guidance included) plus contract parsing.
 - A validated candidate can be promoted into `mig_repos.gate_profile` only after
   successful `re_gate`.
 

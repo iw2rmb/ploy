@@ -135,14 +135,19 @@ Gate command resolution uses the following precedence (highest wins):
 
 Pre-gate auto-bootstrap:
 - If `pre_gate` starts with no persisted repo `gate_profile` and no explicit `build_gate.pre.gate_profile`, Build Gate auto-generates a simple gate profile from stack detection + resolved gate command and uses it in that `pre_gate`.
+- Generated bootstrap profile sets `targets.active=all_tests` and writes the resolved command/env to `targets.all_tests`.
 - The generated profile is persisted to `mig_repos.gate_profile` only when that `pre_gate` completes with `Success`.
 - Auto-bootstrap is skipped when an explicit `build_gate.pre.gate_profile` is present.
 
 Gate profile mapping for simple mode:
-- `pre_gate` maps to `targets.build`
-- `post_gate` maps to `targets.unit`
-- `re_gate` maps to `targets.unit` (same as post phase)
-- Mapping injects only when mapped target has `status: passed` and a non-empty `command`.
+- Gate phase still selects destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
+- Runtime command/env source is always `gate_profile.targets.<targets.active>`.
+- Runtime mapping is status-agnostic: `status`/`failure_code` do not control command/env selection.
+- Runtime does not auto-fallback across targets; only `targets.active` decides command/env source.
+- `targets.active=unsupported` is terminal for gate mapping and injects no runnable override.
+- Terminal unsupported contract requires:
+  - `targets.build.status=failed`
+  - `targets.build.failure_code=infra_support`
 - Runtime hint mapping:
   - `runtime.docker.mode=host_socket` injects `DOCKER_HOST=unix:///var/run/docker.sock`
   - `runtime.docker.mode=tcp` injects `DOCKER_HOST=<runtime.docker.host>`
@@ -251,7 +256,7 @@ provide repository metadata for healing migs that need Git baseline information.
 **Cross-phase inputs (mounted at `/in`):**
 - `/in/build-gate.log` — First Build Gate failure log (read-only).
 - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing).
-- `/in/gate_profile.schema.json` — Gate profile schema contract for infra healing.
+- `/in/gate_profile.schema.json` — Gate profile schema contract for infra healing (`title: Ploy Build Gate Profile`, includes `$comment` guidance for agent-facing fields).
 
 Primary source for these inputs is the typed `recovery_context` returned by
 `POST /v1/nodes/{id}/claim` for `heal`/`re_gate` jobs. Node-local run cache files

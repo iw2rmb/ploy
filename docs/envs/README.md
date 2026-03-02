@@ -93,7 +93,7 @@ Role model (bearer token claims):
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `migs-codex`).
   - `/in/build-gate.log` — First Build Gate failure log (primarily from claim `recovery_context`; node-local cache fallback)
   - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing context)
-  - `/in/gate_profile.schema.json` — Gate profile schema for `infra` healing context
+  - `/in/gate_profile.schema.json` — Gate profile schema for `infra` healing context (`title: Ploy Build Gate Profile`, includes `$comment` guidance for key fields)
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
 - `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
@@ -114,7 +114,8 @@ Role model (bearer token claims):
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/prompt.txt`) are available to healing migs
-  - For `infra` with `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json`; candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
+  - For `infra` with `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
+  - Terminal unsupported candidate contract: `targets.active=unsupported`, `targets.build.status=failed`, `targets.build.failure_code=infra_support`
 - Container cleanup model:
   - Containers are retained after step/gate completion.
   - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem (`DockerRootDir`).
