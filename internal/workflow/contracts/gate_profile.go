@@ -235,7 +235,7 @@ func validateGateProfileTarget(target *GateProfileTarget, prefix string) error {
 }
 
 func gateProfileTargetToBuildGateOverride(target *GateProfileTarget) (*BuildGateProfileOverride, error) {
-	if target == nil || target.Status != PrepTargetStatusPassed {
+	if target == nil {
 		return nil, nil
 	}
 	cmd := strings.TrimSpace(target.Command)
