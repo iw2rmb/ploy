@@ -1,6 +1,6 @@
 # Gate Profile Target Priority Rollout
 
-Scope: Implement active-target gate profile selection with strict priority `all_tests -> unit -> build`, require `targets.active` in schema/contract, align auto-generated defaults, and update infra prompt + docs to make candidate output set active target deterministically.
+Scope: Implement active-target gate profile selection with strict priority `all_tests -> unit -> build -> unsupported`, require `targets.active` in schema/contract, align auto-generated defaults, and update infra prompt + docs to make candidate output set active target deterministically.
 
 Documentation:
 - `design/gate-profile-prior.md`
@@ -21,13 +21,18 @@ Legend: [ ] todo, [x] done.
   - Scope:
     - Update `internal/workflow/contracts/gate_profile.go`:
       - extend `GateProfileTargets` with `Active string`
-      - add target constants (`build`, `unit`, `all_tests`)
+      - add target constants (`build`, `unit`, `all_tests`, `unsupported`)
       - validate `targets.active` is required and enum-constrained
-      - validate active target exists and has non-empty `command`
+      - for runnable active targets (`build|unit|all_tests`), validate active target exists and has non-empty `command`
+      - for terminal active target (`unsupported`), validate:
+        - `targets.build.status=failed`
+        - `targets.build.failure_code=infra_support`
     - Update `docs/schemas/gate_profile.schema.json`:
       - add required `targets.active`
+      - include `unsupported` in `targets.active` enum
       - set schema title to `Ploy Build Gate Profile`
       - add `$comment` guidance for key fields used by infra-healing agents
+      - add `infra_support` to `failure_code` enum
   - Snippets:
     ```go
     type GateProfileTargets struct {
@@ -38,7 +43,7 @@ Legend: [ ] todo, [x] done.
     }
     ```
   - Tests:
-    - `go test ./internal/workflow/contracts -run 'TestGateProfile'` — parser rejects missing/invalid `targets.active`; active target validation is enforced.
+    - `go test ./internal/workflow/contracts -run 'TestGateProfile'` — parser rejects missing/invalid `targets.active`; active target and unsupported-terminal validation is enforced.
 
 ## Phase 2: Claim-Time Target Mapping by Active Target
 - [ ] Switch gate override mapping from phase-specific targets to `targets.active` — ensures all gate phases use the selected profile target consistently.
@@ -48,6 +53,9 @@ Legend: [ ] todo, [x] done.
     - Update `GateProfileGateOverrideForJobType` in `internal/workflow/contracts/gate_profile.go`:
       - keep phase mapping (`pre` for `pre_gate`; `post` for `post_gate|re_gate`)
       - resolve command/env from `targets.active` target only
+      - ignore target `status` and `failure_code` in runtime mapping
+      - do not auto-fallback to another target when active target is not runnable
+      - treat `targets.active=unsupported` as terminal unsupported (no runnable override)
     - Keep precedence behavior unchanged in `internal/server/handlers/claim_spec_mutator.go`:
       - explicit spec override > recovery candidate (re_gate) > repo gate_profile mapping
   - Snippets:
@@ -55,8 +63,8 @@ Legend: [ ] todo, [x] done.
     target := profile.Targets.TargetByName(profile.Targets.Active)
     ```
   - Tests:
-    - `go test ./internal/server/handlers -run 'TestClaimJob_|TestMergeRepoGateProfileIntoSpec'` — all gate job types receive override from active target.
-    - `go test ./internal/workflow/contracts -run 'TestGateProfileParseAndMapToGate'` — pre/post/re mappings use active target command.
+    - `go test ./internal/server/handlers -run 'TestClaimJob_|TestMergeRepoGateProfileIntoSpec'` — all gate job types receive override from active target, independent of target status.
+    - `go test ./internal/workflow/contracts -run 'TestGateProfileParseAndMapToGate'` — pre/post/re mappings use active target command and unsupported is treated terminally.
 
 ## Phase 3: Auto-Bootstrap + Snapshot Alignment
 - [ ] Make generated default profile select `all_tests` and persist active-target semantics — required for new repos with missing stored profiles.
@@ -88,10 +96,14 @@ Legend: [ ] todo, [x] done.
         - default `all_tests`
         - downgrade to `unit` with log evidence
         - downgrade to `build` when unit remains unknown/unfixable
+        - final terminal value `unsupported` when build is unknown/unfixable
+      - require terminal payload markers for unsupported:
+        - `targets.build.status=failed`
+        - `targets.build.failure_code=infra_support`
       - keep schema contract source as `/in/gate_profile.schema.json`
   - Snippets:
     ```text
-    Candidate must set targets.active to one of: all_tests, unit, build.
+    Candidate must set targets.active to one of: all_tests, unit, build, unsupported.
     ```
   - Tests:
     - `go test ./internal/nodeagent -run 'TestPopulateHealingInDirInfra'` — still hydrates `/in/gate_profile.schema.json`.
@@ -109,6 +121,10 @@ Legend: [ ] todo, [x] done.
       - `internal/nodeagent/execution_orchestrator_gate_test.go`
       - other affected tests containing embedded gate profile JSON
     - Ensure assertions check active-target behavior explicitly.
+    - Add fixtures for terminal unsupported candidate:
+      - `targets.active=unsupported`
+      - `targets.build.status=failed`
+      - `targets.build.failure_code=infra_support`
   - Snippets:
     ```json
     "targets":{"active":"all_tests","build":{...},"unit":{...},"all_tests":{...}}
@@ -117,7 +133,7 @@ Legend: [ ] todo, [x] done.
     - `go test ./internal/workflow/contracts`
     - `go test ./internal/server/handlers`
     - `go test ./internal/nodeagent`
-    - Expect all gate-profile-related tests to pass with active-target contract.
+    - Expect all gate-profile-related tests to pass with active-target contract, status-agnostic runtime mapping, and unsupported terminal handling.
 
 ## Phase 6: Documentation Sync
 - [ ] Update runtime docs from phase-mapped targets to active-target model — docs must reflect real behavior in same change set.
@@ -133,6 +149,8 @@ Legend: [ ] todo, [x] done.
       - `design/gate-profile-simple.md`
       - `design/gate-profile-prompt.md`
     - Replace statements like `pre_gate -> build`, `post/re_gate -> unit` with active-target semantics.
+    - Document explicitly: gate runtime does not use target status for execution and does not auto-fallback across targets.
+    - Document unsupported terminal contract (`targets.active=unsupported`, `infra_support`).
     - Document schema-title change and `$comment` guidance in JSON schema.
   - Snippets:
     ```md
@@ -155,4 +173,4 @@ Legend: [ ] todo, [x] done.
     - `make vet`
     - `make staticcheck`
   - Snippets: `N/A`
-  - Tests: All commands pass; no remaining assertions or docs that rely on old phase-hardcoded target mapping.
+  - Tests: All commands pass; no remaining assertions or docs that rely on old phase-hardcoded target mapping or status-based gate command selection.
