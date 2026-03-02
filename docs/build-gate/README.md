@@ -228,8 +228,8 @@ The gate does not modify the repository; it validates the current working tree.
 
 ## Notes
 
-- When the container runtime is unavailable, the gate is skipped (no-op) and metadata
-  is empty.
+- When the container runtime is unavailable, gate execution fails immediately and
+  the run does not proceed to mig execution.
 - Disk limit is driver dependent; if unsupported, container creation may fail early.
 
 ## Healing Container Environment
