@@ -110,7 +110,7 @@ Legend: [ ] todo, [x] done.
     - Manual prompt review against `design/gate-profile-prior.md` — wording matches output-contract requirement.
 
 ## Phase 5: Test Fixture + Suite Refactor
-- [ ] Refactor fixtures and expectations to include `targets.active` everywhere — prevents false positives from legacy payloads.
+- [x] Refactor fixtures and expectations to include `targets.active` everywhere — prevents false positives from legacy payloads.
   - Repository: `ploy`
   - Component: workflow contract tests + server handler tests + nodeagent tests
   - Scope:
