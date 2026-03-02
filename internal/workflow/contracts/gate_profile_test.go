@@ -22,6 +22,7 @@ func TestGateProfileParseAndMapToGate(t *testing.T) {
 			}
 		},
 		"targets": {
+			"active": "build",
 			"build": {
 				"status": "passed",
 				"command": "go test ./...",
@@ -128,33 +129,58 @@ func TestGateProfileParseRejectsInvalidPayload(t *testing.T) {
 		},
 		{
 			name:    "missing schema version",
-			raw:     []byte(`{"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build"},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "gate_profile.schema_version",
 		},
 		{
+			name:    "missing active target",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "gate_profile.targets.active: required",
+		},
+		{
+			name:    "invalid active target",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"mod","build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "gate_profile.targets.active: invalid value",
+		},
+		{
 			name:    "invalid target status",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"bad","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"bad","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "gate_profile.targets.build.status",
 		},
 		{
 			name:    "passed missing command",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","env":{}},"unit":{"status":"passed","command":"go test ./...","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "gate_profile.targets.build.command",
 		},
 		{
+			name:    "active runnable target requires command",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"all_tests","build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"passed","command":"go test ./... -run Unit","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "gate_profile.targets.all_tests.command",
+		},
+		{
 			name:    "simple mode rejects orchestration steps",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[{"id":"x"}],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[{"id":"x"}],"post":[]}}`),
 			wantErr: "simple mode must not define pre/post steps",
 		},
 		{
 			name:    "runtime tcp requires host",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"runtime":{"docker":{"mode":"tcp"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"runtime":{"docker":{"mode":"tcp"}},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "gate_profile.runtime.docker.host",
 		},
 		{
 			name:    "runtime host forbidden for host_socket",
-			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"runtime":{"docker":{"mode":"host_socket","host":"tcp://docker:2375"}},"targets":{"build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"runtime":{"docker":{"mode":"host_socket","host":"tcp://docker:2375"}},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
 			wantErr: "gate_profile.runtime.docker.host: forbidden",
+		},
+		{
+			name:    "unsupported requires failed build status",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"unsupported","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "gate_profile.targets.build.status",
+		},
+		{
+			name:    "unsupported requires infra_support failure code",
+			raw:     []byte(`{"schema_version":1,"repo_id":"repo_123","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"unsupported","build":{"status":"failed","command":"go test ./...","env":{},"failure_code":"unknown"},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`),
+			wantErr: "gate_profile.targets.build.failure_code",
 		},
 	}
 
@@ -180,6 +206,7 @@ func TestGateProfileMapToGateUsesCommandsRegardlessOfTargetStatus(t *testing.T) 
 		"runner_mode": "simple",
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
+			"active": "build",
 			"build": {"status":"not_attempted","command":"go test ./...","env":{}},
 			"unit": {"status":"failed","command":"go test ./... -run TestUnit","env":{},"failure_code":"unknown"},
 			"all_tests": {"status":"not_attempted","env":{}}
@@ -222,9 +249,10 @@ func TestGateProfileMapToGateSkipsWhenMappedTargetHasNoCommand(t *testing.T) {
 		"runner_mode": "simple",
 		"stack": {"language":"go","tool":"go"},
 		"targets": {
+			"active": "all_tests",
 			"build": {"status":"not_attempted","env":{}},
 			"unit": {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
+			"all_tests": {"status":"not_attempted","command":"go test ./...","env":{}}
 		},
 		"orchestration": {"pre": [], "post": []}
 	}`))
@@ -264,6 +292,7 @@ func TestGateProfileRuntimeTCPMapsToGateEnv(t *testing.T) {
 			}
 		},
 		"targets": {
+			"active": "build",
 			"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
 			"unit": {"status":"not_attempted","env":{}},
 			"all_tests": {"status":"not_attempted","env":{}}
@@ -295,6 +324,7 @@ func TestGateProfileStackMatches_ReleaseSemantics(t *testing.T) {
 		"runner_mode": "simple",
 		"stack": {"language":"java","tool":"gradle","release":"11"},
 		"targets": {
+			"active": "build",
 			"build": {"status":"passed","command":"./gradlew test","env":{},"failure_code":null},
 			"unit": {"status":"not_attempted","env":{}},
 			"all_tests": {"status":"not_attempted","env":{}}

@@ -1,7 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Ploy Prep Profile",
+  "title": "Ploy Build Gate Profile",
   "description": "Schema for non-interactive gate profile outputs and persisted repo gate profiles. YAML is supported as a JSON superset.",
+  "$comment": "Infra-healing candidate payloads must set targets.active and follow terminal unsupported markers when no runnable gate target remains.",
   "type": "object",
   "required": [
     "schema_version",
@@ -39,13 +40,24 @@
       "$ref": "#/definitions/runtimeHints"
     },
     "targets": {
+      "$comment": "Gate runtime resolves command and env from the selected targets.active target.",
       "type": "object",
       "required": [
+        "active",
         "build",
         "unit",
         "all_tests"
       ],
       "properties": {
+        "active": {
+          "type": "string",
+          "enum": [
+            "build",
+            "unit",
+            "all_tests",
+            "unsupported"
+          ]
+        },
         "build": {
           "$ref": "#/definitions/targetResult"
         },
@@ -176,6 +188,7 @@
       ]
     },
     "failureCode": {
+      "$comment": "Use infra_support when targets.active=unsupported and build cannot be made runnable in this healing attempt.",
       "type": "string",
       "enum": [
         "tool_not_detected",
@@ -186,6 +199,7 @@
         "external_service_unreachable",
         "command_not_found",
         "timeout",
+        "infra_support",
         "unknown"
       ]
     },
