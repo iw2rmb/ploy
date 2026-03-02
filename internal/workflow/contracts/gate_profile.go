@@ -18,6 +18,12 @@ const (
 	GateProfileDockerModeNone       = "none"
 	GateProfileDockerModeHostSocket = "host_socket"
 	GateProfileDockerModeTCP        = "tcp"
+	GateProfileTargetBuild          = "build"
+	GateProfileTargetUnit           = "unit"
+	GateProfileTargetAllTests       = "all_tests"
+	GateProfileTargetUnsupported    = "unsupported"
+
+	GateProfileFailureCodeInfraSupport = "infra_support"
 
 	GateProfileDockerHostEnv       = "DOCKER_HOST"
 	GateProfileDockerAPIVersionEnv = "DOCKER_API_VERSION"
@@ -53,6 +59,7 @@ type GateProfileStack struct {
 }
 
 type GateProfileTargets struct {
+	Active   string             `json:"active"`
 	Build    *GateProfileTarget `json:"build"`
 	Unit     *GateProfileTarget `json:"unit"`
 	AllTests *GateProfileTarget `json:"all_tests"`
@@ -118,6 +125,15 @@ func ParseGateProfileJSON(raw []byte) (*GateProfile, error) {
 	if profile.Targets.AllTests == nil {
 		return nil, fmt.Errorf("gate_profile.targets.all_tests: required")
 	}
+	profile.Targets.Active = strings.TrimSpace(profile.Targets.Active)
+	if profile.Targets.Active == "" {
+		return nil, fmt.Errorf("gate_profile.targets.active: required")
+	}
+	switch profile.Targets.Active {
+	case GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests, GateProfileTargetUnsupported:
+	default:
+		return nil, fmt.Errorf("gate_profile.targets.active: invalid value %q", profile.Targets.Active)
+	}
 
 	if err := validateGateProfileTarget(profile.Targets.Build, "gate_profile.targets.build"); err != nil {
 		return nil, err
@@ -126,6 +142,9 @@ func ParseGateProfileJSON(raw []byte) (*GateProfile, error) {
 		return nil, err
 	}
 	if err := validateGateProfileTarget(profile.Targets.AllTests, "gate_profile.targets.all_tests"); err != nil {
+		return nil, err
+	}
+	if err := validateGateProfileActiveTarget(profile.Targets); err != nil {
 		return nil, err
 	}
 	if err := validateGateProfileRuntime(profile.Runtime); err != nil {
@@ -144,6 +163,55 @@ func ParseGateProfileJSON(raw []byte) (*GateProfile, error) {
 	}
 
 	return &profile, nil
+}
+
+func (targets GateProfileTargets) TargetByName(name string) *GateProfileTarget {
+	switch strings.TrimSpace(name) {
+	case GateProfileTargetBuild:
+		return targets.Build
+	case GateProfileTargetUnit:
+		return targets.Unit
+	case GateProfileTargetAllTests:
+		return targets.AllTests
+	default:
+		return nil
+	}
+}
+
+func validateGateProfileActiveTarget(targets GateProfileTargets) error {
+	active := strings.TrimSpace(targets.Active)
+	switch active {
+	case GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests:
+		activeTarget := targets.TargetByName(active)
+		if activeTarget == nil {
+			return fmt.Errorf("gate_profile.targets.%s: required when targets.active=%q", active, active)
+		}
+		if strings.TrimSpace(activeTarget.Command) == "" {
+			return fmt.Errorf("gate_profile.targets.%s.command: required when targets.active=%q", active, active)
+		}
+		return nil
+	case GateProfileTargetUnsupported:
+		if targets.Build == nil {
+			return fmt.Errorf("gate_profile.targets.build: required when targets.active=%q", GateProfileTargetUnsupported)
+		}
+		if targets.Build.Status != PrepTargetStatusFailed {
+			return fmt.Errorf(
+				"gate_profile.targets.build.status: must be %q when targets.active=%q",
+				PrepTargetStatusFailed,
+				GateProfileTargetUnsupported,
+			)
+		}
+		if targets.Build.FailureCode == nil || strings.TrimSpace(*targets.Build.FailureCode) != GateProfileFailureCodeInfraSupport {
+			return fmt.Errorf(
+				"gate_profile.targets.build.failure_code: must be %q when targets.active=%q",
+				GateProfileFailureCodeInfraSupport,
+				GateProfileTargetUnsupported,
+			)
+		}
+		return nil
+	default:
+		return fmt.Errorf("gate_profile.targets.active: invalid value %q", active)
+	}
 }
 
 func GateProfileStackMatches(profile *GateProfile, language, tool, release string) bool {

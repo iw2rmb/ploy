@@ -15,7 +15,7 @@ Documentation:
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Gate Profile Contract + Schema
-- [ ] Add `targets.active` to gate profile contract and enforce strict validation — required to make target selection explicit and remove hardcoded phase-target mapping.
+- [x] Add `targets.active` to gate profile contract and enforce strict validation — required to make target selection explicit and remove hardcoded phase-target mapping.
   - Repository: `ploy`
   - Component: workflow contracts + schema assets
   - Scope:
