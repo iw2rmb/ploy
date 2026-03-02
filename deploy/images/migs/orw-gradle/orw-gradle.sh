@@ -131,6 +131,49 @@ fi
 
 gradle_plugin_ver=${GRADLE_PLUGIN_VERSION:-7.21.0}
 
+version_ge() {
+  local have="$1"
+  local want="$2"
+  [[ "$(printf '%s\n%s\n' "$want" "$have" | sort -V | head -n1)" == "$want" ]]
+}
+
+current_java_major() {
+  local raw major
+  raw="$(java -version 2>&1 | awk -F '"' '/version/ {print $2; exit}')"
+  if [[ -z "$raw" ]]; then
+    echo ""
+    return
+  fi
+  major="${raw%%.*}"
+  if [[ "$major" == "1" ]]; then
+    major="$(echo "$raw" | awk -F '.' '{print $2}')"
+  fi
+  echo "$major"
+}
+
+min_gradle_for_java_major() {
+  local java_major="$1"
+  if [[ -z "$java_major" ]]; then
+    echo ""
+    return
+  fi
+  if (( java_major >= 17 )); then
+    # Gradle 7.3+ is required for running on Java 17.
+    echo "7.3"
+    return
+  fi
+  echo ""
+}
+
+parse_wrapper_gradle_version() {
+  local props_file="$1"
+  if [[ ! -f "$props_file" ]]; then
+    echo ""
+    return
+  fi
+  sed -nE 's@^distributionUrl=.*gradle-([0-9]+(\.[0-9]+){1,2})-[^/]*\.zip.*@\1@p' "$props_file" | head -n1
+}
+
 # -----------------------------------------------------------------------------
 # Validate workspace: must contain build.gradle or build.gradle.kts (Gradle).
 # -----------------------------------------------------------------------------
@@ -141,10 +184,26 @@ if [[ ! -f build.gradle && ! -f build.gradle.kts ]]; then
   exit 5
 fi
 
-# Determine Gradle command: prefer project wrapper, fall back to system gradle.
+# Determine Gradle command. Use wrapper when available and runtime-compatible;
+# otherwise fall back to system gradle.
 gradle_cmd=""
+wrapper_version=""
+java_major="$(current_java_major)"
+min_gradle_for_java="$(min_gradle_for_java_major "$java_major")"
+
 if [[ -x "./gradlew" ]]; then
-  gradle_cmd="./gradlew"
+  wrapper_version="$(parse_wrapper_gradle_version "gradle/wrapper/gradle-wrapper.properties")"
+  if [[ -n "$wrapper_version" && -n "$min_gradle_for_java" ]] && ! version_ge "$wrapper_version" "$min_gradle_for_java"; then
+    if command -v gradle >/dev/null 2>&1; then
+      echo "[orw-gradle] Wrapper Gradle ${wrapper_version} is incompatible with Java ${java_major}; using system gradle instead" >&2
+      gradle_cmd="gradle"
+    else
+      echo "error: wrapper Gradle ${wrapper_version} is incompatible with Java ${java_major}, and system gradle is not available" >&2
+      exit 127
+    fi
+  else
+    gradle_cmd="./gradlew"
+  fi
 elif command -v gradle >/dev/null 2>&1; then
   gradle_cmd="gradle"
 else

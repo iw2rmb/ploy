@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// TestOrwGradle_GradleWorkspace_UsesWrapper verifies that the orw-gradle script
-// invokes ./gradlew when present. Uses a stubbed gradlew for hermetic testing.
-func TestOrwGradle_GradleWorkspace_UsesWrapper(t *testing.T) {
+// TestOrwGradle_GradleWorkspace_UsesWrapperWhenCompatible verifies that the
+// orw-gradle script invokes ./gradlew when wrapper version is Java-compatible.
+func TestOrwGradle_GradleWorkspace_UsesWrapperWhenCompatible(t *testing.T) {
 	workspace := t.TempDir()
 
 	// Create a minimal Kotlin DSL Gradle build file.
@@ -30,6 +30,14 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 `
 	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
 		t.Fatalf("write gradlew stub: %v", err)
+	}
+	// Wrapper version compatible with Java 17.
+	wrapperProps := filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties")
+	if err := os.MkdirAll(filepath.Dir(wrapperProps), 0o755); err != nil {
+		t.Fatalf("mkdir gradle/wrapper: %v", err)
+	}
+	if err := os.WriteFile(wrapperProps, []byte("distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip\n"), 0o644); err != nil {
+		t.Fatalf("write gradle-wrapper.properties: %v", err)
 	}
 
 	outdir := t.TempDir()
@@ -77,6 +85,81 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 	}
 	if !strings.Contains(string(reportBytes), "\"success\": true") {
 		t.Fatalf("report.json does not indicate success: %s", string(reportBytes))
+	}
+}
+
+// TestOrwGradle_GradleWorkspace_FallsBackToSystemGradleForOldWrapper verifies
+// that old wrappers (e.g., 6.8.2) are bypassed on Java 17 and system gradle is used.
+func TestOrwGradle_GradleWorkspace_FallsBackToSystemGradleForOldWrapper(t *testing.T) {
+	workspace := t.TempDir()
+
+	buildGradlePath := filepath.Join(workspace, "build.gradle.kts")
+	if err := os.WriteFile(buildGradlePath, []byte(`plugins {
+}
+`), 0o644); err != nil {
+		t.Fatalf("write build.gradle.kts: %v", err)
+	}
+
+	// Wrapper stub should not be used when wrapper version is incompatible.
+	gradlewPath := filepath.Join(workspace, "gradlew")
+	gradlewScript := `#!/usr/bin/env bash
+echo "[gradlew-old-stub] should not run"
+`
+	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
+		t.Fatalf("write gradlew stub: %v", err)
+	}
+	wrapperProps := filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties")
+	if err := os.MkdirAll(filepath.Dir(wrapperProps), 0o755); err != nil {
+		t.Fatalf("mkdir gradle/wrapper: %v", err)
+	}
+	if err := os.WriteFile(wrapperProps, []byte("distributionUrl=https\\://services.gradle.org/distributions/gradle-6.8.2-all.zip\n"), 0o644); err != nil {
+		t.Fatalf("write gradle-wrapper.properties: %v", err)
+	}
+
+	// Provide system gradle stub in PATH.
+	binDir := t.TempDir()
+	gradlePath := filepath.Join(binDir, "gradle")
+	gradleScript := `#!/usr/bin/env bash
+echo "[system-gradle-stub] rewriteRun invoked with args: $@"
+`
+	if err := os.WriteFile(gradlePath, []byte(gradleScript), 0o755); err != nil {
+		t.Fatalf("write system gradle stub: %v", err)
+	}
+
+	outdir := t.TempDir()
+	scenarioPath := filepath.Join(repoRoot(t), "tests", "e2e", "migs", "scenario-orw-pass.sh")
+	scenarioBytes, err := os.ReadFile(scenarioPath)
+	if err != nil {
+		t.Fatalf("read scenario script: %v", err)
+	}
+	_, _, _, group, artifact, version, classname, _ := parseScenarioORWPass(string(scenarioBytes))
+
+	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
+	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(),
+		"RECIPE_GROUP="+group,
+		"RECIPE_ARTIFACT="+artifact,
+		"RECIPE_VERSION="+version,
+		"RECIPE_CLASSNAME="+classname,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+	)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("orw-gradle (fallback) failed: %v\nstdout/stderr:\n%s", err, string(out))
+	}
+
+	logPath := filepath.Join(outdir, "transform.log")
+	logBytes, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read transform.log: %v", err)
+	}
+	logText := string(logBytes)
+	if !strings.Contains(logText, "[system-gradle-stub] rewriteRun invoked") {
+		t.Fatalf("transform.log does not show system gradle fallback:\n%s", logText)
+	}
+	if strings.Contains(logText, "[gradlew-old-stub] should not run") {
+		t.Fatalf("transform.log shows incompatible wrapper was used:\n%s", logText)
 	}
 }
 
