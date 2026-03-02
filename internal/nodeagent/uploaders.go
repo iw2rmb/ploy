@@ -26,7 +26,7 @@ type ArtifactBundleEntry struct {
 }
 
 // UploadDiff compresses and uploads a diff to the server.
-func (u *baseUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
+func (b *baseUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
 	gzippedDiff, err := gzipCompress(diffBytes, "gzipped diff")
 	if err != nil {
 		return err
@@ -36,7 +36,7 @@ func (u *baseUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID 
 		"summary": summary,
 	}
 	apiPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/diff", runID.String(), jobID.String())
-	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload diff")
+	resp, err := b.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload diff")
 	if err != nil {
 		return err
 	}
@@ -45,7 +45,7 @@ func (u *baseUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID 
 }
 
 // UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
-func (u *baseUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
+func (b *baseUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
 	if len(paths) == 0 {
 		return "", "", nil
 	}
@@ -53,12 +53,12 @@ func (u *baseUploader) UploadArtifact(ctx context.Context, runID types.RunID, jo
 	if err != nil {
 		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
 	}
-	return u.uploadBundle(ctx, runID, jobID, bundleBytes, name)
+	return b.uploadBundle(ctx, runID, jobID, bundleBytes, name)
 }
 
 // UploadArtifactEntries creates a tar.gz bundle from explicit source->archive mappings
 // and uploads it to the server.
-func (u *baseUploader) UploadArtifactEntries(ctx context.Context, runID types.RunID, jobID types.JobID, entries []ArtifactBundleEntry, name string) (string, string, error) {
+func (b *baseUploader) UploadArtifactEntries(ctx context.Context, runID types.RunID, jobID types.JobID, entries []ArtifactBundleEntry, name string) (string, string, error) {
 	if len(entries) == 0 {
 		return "", "", nil
 	}
@@ -66,10 +66,10 @@ func (u *baseUploader) UploadArtifactEntries(ctx context.Context, runID types.Ru
 	if err != nil {
 		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
 	}
-	return u.uploadBundle(ctx, runID, jobID, bundleBytes, name)
+	return b.uploadBundle(ctx, runID, jobID, bundleBytes, name)
 }
 
-func (u *baseUploader) uploadBundle(ctx context.Context, runID types.RunID, jobID types.JobID, bundleBytes []byte, name string) (string, string, error) {
+func (b *baseUploader) uploadBundle(ctx context.Context, runID types.RunID, jobID types.JobID, bundleBytes []byte, name string) (string, string, error) {
 	if err := validateUploadSize(bundleBytes, "gzipped artifact bundle"); err != nil {
 		return "", "", err
 	}
@@ -78,7 +78,7 @@ func (u *baseUploader) uploadBundle(ctx context.Context, runID types.RunID, jobI
 		payload["name"] = name
 	}
 	apiPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID.String(), jobID.String())
-	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload artifact")
+	resp, err := b.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload artifact")
 	if err != nil {
 		return "", "", err
 	}
@@ -97,12 +97,12 @@ func (u *baseUploader) uploadBundle(ctx context.Context, runID types.RunID, jobI
 }
 
 // SaveJobImageName persists the resolved container image name for a job.
-func (u *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, image string) error {
+func (b *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, image string) error {
 	image = strings.TrimSpace(image)
 	if image == "" {
 		return fmt.Errorf("image is empty")
 	}
-	return u.postJSONWithRetry(
+	return b.postJSONWithRetry(
 		ctx,
 		fmt.Sprintf("/v1/jobs/%s/image", jobID.String()),
 		map[string]any{"image": image},
@@ -112,7 +112,7 @@ func (u *baseUploader) SaveJobImageName(ctx context.Context, jobID types.JobID, 
 }
 
 // UploadRunEvent posts a single structured event for a run.
-func (u *baseUploader) UploadRunEvent(
+func (b *baseUploader) UploadRunEvent(
 	ctx context.Context,
 	runID types.RunID,
 	jobID *types.JobID,
@@ -163,8 +163,8 @@ func (u *baseUploader) UploadRunEvent(
 		},
 	}
 
-	apiPath := fmt.Sprintf("/v1/nodes/%s/events", u.cfg.NodeID.String())
-	resp, err := u.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload node event")
+	apiPath := fmt.Sprintf("/v1/nodes/%s/events", b.cfg.NodeID.String())
+	resp, err := b.postJSON(ctx, apiPath, payload, http.StatusCreated, "upload node event")
 	if err != nil {
 		return err
 	}
