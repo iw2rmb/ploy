@@ -12,6 +12,7 @@ Simple mode requirements:
 - `runner_mode: simple`
 - non-empty `stack.language`
 - non-empty `stack.tool`
+- `targets.active: build|unit|all_tests|unsupported`
 - `orchestration.pre: []`
 - `orchestration.post: []`
 - target results for `build`, `unit`, `all_tests`
@@ -24,13 +25,13 @@ Allowed runtime hints:
 ## Build Gate Mapping (As-Built)
 
 Claim-time phase mapping:
-- `pre_gate` <- `targets.build`
-- `post_gate` <- `targets.unit`
-- `re_gate` <- `targets.unit`
-
-Mapping applies only when mapped target has:
-- `status: passed`
-- non-empty `command`
+- `pre_gate` writes override to `build_gate.pre.gate_profile`
+- `post_gate` and `re_gate` write override to `build_gate.post.gate_profile`
+- command/env source for all gate phases is `targets.<targets.active>`
+- runtime ignores target `status`/`failure_code` for command/env selection
+- runtime does not auto-fallback across targets
+- `targets.active=unsupported` is terminal and injects no runnable override
+- unsupported contract requires `targets.build.status=failed` and `targets.build.failure_code=infra_support`
 
 Mapped runtime hints:
 - host socket mode -> `DOCKER_HOST=unix:///var/run/docker.sock`

@@ -18,7 +18,7 @@ There is no repo prep lifecycle state machine and no `prep_runs` attempt table.
 ## Current Runtime Model
 
 Implemented now:
-- claim-time mapping injects repo `gate_profile` into `build_gate.<phase>.gate_profile` when target mapping is eligible
+- claim-time mapping injects repo `gate_profile` into `build_gate.<phase>.gate_profile` using `targets.active` as the command/env source
 - gate failures enter one recovery loop (`gate -> router -> healing -> re_gate`)
 - router classification selects healing strategy via `error_kind`
 - infra healing can produce typed candidate artifact `/out/gate-profile-candidate.json` (`schema=gate_profile_v1`)
@@ -47,7 +47,7 @@ Not implemented yet:
 
 2. Build Gate command/env derivation
 - explicit `build_gate.<phase>.gate_profile`
-- then mapped repo `gate_profile`
+- then mapped repo `gate_profile` via `targets.active` (no status-based runtime filter, no auto-fallback)
 - then default tool-based gate command
 
 3. Healing and promotion

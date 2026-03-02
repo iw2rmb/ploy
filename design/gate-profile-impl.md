@@ -36,29 +36,32 @@ There is no `prep_status` lifecycle and no `prep_runs` table.
 Gate profile contract and helpers live in `internal/workflow/contracts/gate_profile.go`:
 - required: `schema_version`, `repo_id`, `runner_mode`, `stack`, `targets`, `orchestration`
 - required stack fields: `stack.language`, `stack.tool`
+- required target selector: `targets.active` (`build|unit|all_tests|unsupported`)
+- runnable active target contract: selected target must exist with non-empty `command`
+- terminal unsupported contract: `targets.build.status=failed` and `targets.build.failure_code=infra_support`
 - simple-mode guard: no `orchestration.pre/post` steps
 
-Schema validation for typed recovery candidate artifacts is in `internal/workflow/contracts/gate_profile_schema.go` and uses `docs/schemas/gate_profile.schema.json`.
+Schema validation for typed recovery candidate artifacts is in `internal/workflow/contracts/gate_profile_schema.go` and uses `docs/schemas/gate_profile.schema.json` (`title: Ploy Build Gate Profile`, with `$comment` guidance for infra-healing fields).
 
 ## Claim-Time Build Gate Integration
 
 `internal/server/handlers/nodes_claim.go` merges repo gate profile into claimed specs.
 
 Mapping:
-- `pre_gate` <- `targets.build`
-- `post_gate` <- `targets.unit`
-- `re_gate` <- `targets.unit`
+- phase destination remains `pre` for `pre_gate`, `post` for `post_gate|re_gate`
+- command/env source is always `targets.<targets.active>`
 
 Injection guard:
-- target status must be `passed`
-- target command must be non-empty
+- runtime mapping ignores target `status`/`failure_code`
+- no runtime auto-fallback across targets
+- `targets.active=unsupported` is terminal and injects no runnable override
 - explicit `build_gate.<phase>.gate_profile` in run spec always wins
 
 Pre-gate bootstrap guard:
 - applies only to `pre_gate`
 - requires missing persisted repo `gate_profile`
 - skipped when explicit `build_gate.pre.gate_profile` is present
-- generated profile is derived from stack detection + resolved gate command/env and used in that same `pre_gate`
+- generated profile is derived from stack detection + resolved gate command/env with `targets.active=all_tests` and command/env in `targets.all_tests`, then used in that same `pre_gate`
 
 Claim-time gate_profile override includes:
 - command

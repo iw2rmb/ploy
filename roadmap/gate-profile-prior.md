@@ -136,7 +136,7 @@ Legend: [ ] todo, [x] done.
     - Expect all gate-profile-related tests to pass with active-target contract, status-agnostic runtime mapping, and unsupported terminal handling.
 
 ## Phase 6: Documentation Sync
-- [ ] Update runtime docs from phase-mapped targets to active-target model — docs must reflect real behavior in same change set.
+- [x] Update runtime docs from phase-mapped targets to active-target model — docs must reflect real behavior in same change set.
   - Repository: `ploy`
   - Component: docs + design references
   - Scope:

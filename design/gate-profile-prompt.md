@@ -30,9 +30,13 @@ Constraints:
 
 Required process:
 1. Detect likely stack and command family.
-2. Propose reproducible commands for build/unit/all_tests.
-3. Include runtime hints only when needed.
-4. Keep output schema-compliant.
+2. Select `targets.active` deterministically: `all_tests -> unit -> build -> unsupported`.
+3. Propose reproducible commands for build/unit/all_tests.
+4. When selecting `unsupported`, set terminal markers:
+   - `targets.build.status=failed`
+   - `targets.build.failure_code=infra_support`
+5. Include runtime hints only when needed.
+6. Keep output schema-compliant.
 
 Failure taxonomy values:
 - tool_not_detected
@@ -43,6 +47,7 @@ Failure taxonomy values:
 - external_service_unreachable
 - command_not_found
 - timeout
+- infra_support
 - unknown
 
 Output format (JSON only, no prose):
@@ -64,6 +69,7 @@ Output format (JSON only, no prose):
     }
   },
   "targets": {
+    "active": "build|unit|all_tests|unsupported",
     "build": {
       "status": "passed|failed|not_attempted",
       "command": "string",
