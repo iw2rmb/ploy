@@ -463,7 +463,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		createMigRepoResult: store.MigRepo{
 			ID:        repoID,
-			RepoUrl:   "https://github.com/org/repo.git",
+			Url:   "https://github.com/org/repo.git",
 			BaseRef:   "main",
 			TargetRef: "feature",
 		},
@@ -508,7 +508,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 				Status:        store.RunRepoStatusQueued,
 				Attempt:       1,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-				RepoUrl:       "https://github.com/org/repo.git",
+				Url:       "https://github.com/org/repo.git",
 			},
 		},
 	}
@@ -618,7 +618,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		getModRepoResult: store.MigRepo{
 			ID:      repoID,
-			RepoUrl: "https://github.com/org/repo.git",
+			Url: "https://github.com/org/repo.git",
 		},
 	}
 

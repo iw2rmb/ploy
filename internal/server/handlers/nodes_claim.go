@@ -102,10 +102,10 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 			}
 		}
 
-		modRepo, err := st.GetMigRepo(r.Context(), job.RepoID)
+		repoURL, err := repoURLForID(r.Context(), st, job.RepoID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to get repo for claimed job: %v", err)
-			slog.Error("claim: get mig repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
+			slog.Error("claim: get repo failed for job", "node_id", nodeID, "job_id", job.ID, "repo_id", job.RepoID, "err", err)
 			return
 		}
 
@@ -117,7 +117,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Build and send response with job and run information.
-		if err := buildAndSendJobClaimResponse(w, r, st, configHolder, run, spec.Spec, rr, modRepo, job); err != nil {
+		if err := buildAndSendJobClaimResponse(w, r, st, configHolder, run, spec.Spec, rr, repoURL, job); err != nil {
 			slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 			httpErr(w, http.StatusInternalServerError, "failed to build claim response: %v", err)
 			return
@@ -163,7 +163,7 @@ func buildAndSendJobClaimResponse(
 	run store.Run,
 	spec []byte,
 	runRepo store.RunRepo,
-	modRepo store.MigRepo,
+	repoURL string,
 	job store.Job,
 ) error {
 	jobType := domaintypes.JobType(job.JobType)
@@ -177,7 +177,7 @@ func buildAndSendJobClaimResponse(
 		jobType:         jobType,
 		gitLab:          configHolder.GetGitLab(),
 		globalEnv:       configHolder.GetGlobalEnv(),
-		repoGateProfile: modRepo.GateProfile,
+		repoGateProfile: nil,
 	})
 	if err != nil {
 		return err
@@ -219,8 +219,8 @@ func buildAndSendJobClaimResponse(
 		JobType:                jobType,
 		JobImage:               job.JobImage,
 		NextID:                 job.NextID,
-		RepoURL:                modRepo.RepoUrl,
-		RepoGateProfileMissing: len(bytes.TrimSpace(modRepo.GateProfile)) == 0,
+		RepoURL:                repoURL,
+		RepoGateProfileMissing: true,
 		Status:                 run.Status,
 		NodeID:                 nodeIDPtrOrZero(job.NodeID),
 		BaseRef:                job.RepoBaseRef,

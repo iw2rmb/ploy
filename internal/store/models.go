@@ -80,6 +80,23 @@ type Event struct {
 	Meta    []byte             `json:"meta"`
 }
 
+type Gate struct {
+	JobID     string             `json:"job_id"`
+	ProfileID int64              `json:"profile_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type GateProfile struct {
+	ID        int64              `json:"id"`
+	RepoID    *string            `json:"repo_id"`
+	RepoSha   *string            `json:"repo_sha"`
+	RepoSha8  *string            `json:"repo_sha8"`
+	StackID   int64              `json:"stack_id"`
+	Url       string             `json:"url"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Job struct {
 	ID          types.JobID        `json:"id"`
 	RunID       types.RunID        `json:"run_id"`
@@ -129,15 +146,12 @@ type Mig struct {
 }
 
 type MigRepo struct {
-	ID                   types.MigRepoID    `json:"id"`
-	MigID                types.MigID        `json:"mig_id"`
-	RepoUrl              string             `json:"repo_url"`
-	BaseRef              string             `json:"base_ref"`
-	TargetRef            string             `json:"target_ref"`
-	GateProfileUpdatedAt pgtype.Timestamptz `json:"gate_profile_updated_at"`
-	GateProfile          []byte             `json:"gate_profile"`
-	GateProfileArtifacts []byte             `json:"gate_profile_artifacts"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	ID        types.MigRepoID    `json:"id"`
+	MigID     types.MigID        `json:"mig_id"`
+	RepoID    types.MigRepoID    `json:"repo_id"`
+	BaseRef   string             `json:"base_ref"`
+	TargetRef string             `json:"target_ref"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Node struct {
@@ -176,6 +190,12 @@ type NodeMetric struct {
 type PloySchemaVersion struct {
 	Version   int64              `json:"version"`
 	AppliedAt pgtype.Timestamptz `json:"applied_at"`
+}
+
+type Repo struct {
+	ID        types.MigRepoID    `json:"id"`
+	Url       string             `json:"url"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Run struct {
@@ -217,4 +237,14 @@ type Spec struct {
 	CreatedBy  *string            `json:"created_by"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
+}
+
+type Stack struct {
+	ID        int64              `json:"id"`
+	Lang      string             `json:"lang"`
+	Release   string             `json:"release"`
+	Tool      *string            `json:"tool"`
+	Image     string             `json:"image"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }

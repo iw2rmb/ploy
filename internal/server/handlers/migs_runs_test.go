@@ -37,8 +37,8 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-			{ID: "repo2", MigID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "main", TargetRef: "feature2"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo2", MigID: "mod123", Url: "https://github.com/org/repo2", BaseRef: "main", TargetRef: "feature2"},
 		},
 	}
 	handler := createMigRunHandler(st)
@@ -107,9 +107,9 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-			{ID: "repo2", MigID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "main", TargetRef: "feature2"},
-			{ID: "repo3", MigID: "mod123", RepoUrl: "https://github.com/org/repo3", BaseRef: "main", TargetRef: "feature3"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo2", MigID: "mod123", Url: "https://github.com/org/repo2", BaseRef: "main", TargetRef: "feature2"},
+			{ID: "repo3", MigID: "mod123", Url: "https://github.com/org/repo3", BaseRef: "main", TargetRef: "feature3"},
 		},
 		// Only repo2 has a failed last status.
 		listFailedRepoIDsByModResult: []domaintypes.MigRepoID{"repo2"},
@@ -177,9 +177,9 @@ func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-			{ID: "repo2", MigID: "mod123", RepoUrl: "https://github.com/org/repo2", BaseRef: "main", TargetRef: "feature2"},
-			{ID: "repo3", MigID: "mod123", RepoUrl: "https://github.com/org/repo3", BaseRef: "main", TargetRef: "feature3"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo2", MigID: "mod123", Url: "https://github.com/org/repo2", BaseRef: "main", TargetRef: "feature2"},
+			{ID: "repo3", MigID: "mod123", Url: "https://github.com/org/repo3", BaseRef: "main", TargetRef: "feature3"},
 		},
 	}
 	handler := createMigRunHandler(st)
@@ -239,7 +239,7 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 	}
 	handler := createMigRunHandler(st)
@@ -284,7 +284,7 @@ func TestModRuns_Create_DoesNotCreateJobsImmediately(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 	}
 	handler := createMigRunHandler(st)
@@ -479,7 +479,7 @@ func TestModRuns_Create_NoReposSelected(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		// No failed repos.
 		listFailedRepoIDsByModResult: []domaintypes.MigRepoID{},
@@ -604,7 +604,7 @@ func TestModRuns_Create_CreateRunError(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		createRunErr: errors.New("database connection failed"),
 	}
@@ -644,7 +644,7 @@ func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		createRunRepoErr: errors.New("database connection failed"),
 	}
@@ -684,7 +684,7 @@ func TestModRuns_Create_ListFailedReposError(t *testing.T) {
 			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
 		},
 		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoUrl: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
+			{ID: "repo1", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		listFailedRepoIDsByModErr: errors.New("database connection failed"),
 	}

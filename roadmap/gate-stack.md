@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
   - Scope: update `internal/store/schema.sql` with new tables/FKs/uniques; enforce `gate_profiles(repo_id, repo_sha, stack_id)` uniqueness; enforce `gates(job_id)` uniqueness.
   - Snippets: `UNIQUE (repo_id, repo_sha, stack_id)`, `FOREIGN KEY (profile_id) REFERENCES gate_profiles(id)`
   - Tests: schema constraint tests under `internal/store/*constraints*` — expect uniqueness/FK violations on invalid inserts.
-- [ ] Rewrite repo foreign keys across execution tables — move from mig-scoped repo IDs to global repo IDs.
+- [x] Rewrite repo foreign keys across execution tables — move from mig-scoped repo IDs to global repo IDs.
   - Repository: ploy
   - Component: execution persistence model
   - Scope: rewrite `mig_repos` (`repo_url` -> `repo_id`, drop `gate_profile*`), `run_repos.repo_id -> repos.id`, `jobs.repo_id -> repos.id`; keep membership consistency with `(mig_id, repo_id)` FK.

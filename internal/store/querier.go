@@ -87,9 +87,8 @@ type Querier interface {
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// Deletes a mig. Use with caution; should only be called when safe to remove.
 	DeleteMig(ctx context.Context, id types.MigID) error
-	// Deletes a mod_repo by id.
-	// Note: mig_repos.id is referenced by run_repos.repo_id and jobs.repo_id with ON DELETE RESTRICT.
-	// This DELETE will fail if any run_repos/jobs rows still reference the repo.
+	// Deletes a mig_repo by id.
+	// Note: mig_repos.id remains referenced by API-level repo membership records.
 	DeleteMigRepo(ctx context.Context, id types.MigRepoID) error
 	DeleteNode(ctx context.Context, id types.NodeID) error
 	DeleteRun(ctx context.Context, id types.RunID) error
@@ -116,16 +115,16 @@ type Querier interface {
 	GetMig(ctx context.Context, id types.MigID) (Mig, error)
 	GetMigByName(ctx context.Context, name string) (Mig, error)
 	GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
-	// Gets a mod_repo by mig_id and repo_url (for uniqueness constraint enforcement).
+	// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
+	GetRepo(ctx context.Context, id types.MigRepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
-	// Checks if a mod_repo has any historical executions (run_repos references).
+	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
-	// Deletion is refused if the repo has historical executions.
 	HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
@@ -155,7 +154,8 @@ type Querier interface {
 	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
 	// Returns diff metadata for a specific repo within a run.
 	ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]Diff, error)
-	// v1: Lists distinct repos (mig_repos) with last known run metadata, optionally filtered by repo_url substring.
+	// Lists distinct repos for a mig with last known run metadata,
+	// optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
@@ -208,13 +208,13 @@ type Querier interface {
 	ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
 	// Lists all repos associated with a run, ordered by creation time.
 	ListRunReposByRun(ctx context.Context, runID types.RunID) ([]RunRepo, error)
-	// v1: Lists all run_repos for a run with their repo_url (from mig_repos).
+	// Lists all run_repos for a run with their repo_url (from repos).
 	// Used by:
 	// - GET  /v1/runs/{id}/repos (full repo response without N+1 lookups)
 	// - POST /v1/runs/{run_id}/pull (repo resolution by normalized URL)
 	ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]ListRunReposWithURLByRunRow, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
-	// Lists runs for a given repo_id (mig_repos.id).
+	// Lists runs for a given repo_id (repos.id).
 	ListRunsForRepo(ctx context.Context, arg ListRunsForRepoParams) ([]ListRunsForRepoRow, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	// Lists runs that have queued work (at least one Queued run_repos row).
@@ -229,7 +229,11 @@ type Querier interface {
 	// Atomically promote a specific linked successor job: Created -> Queued.
 	// The candidate is eligible only when every predecessor that points to it is Success.
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
+	// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
+	// Returns target repo_id for callers that still rely on this method's result.
 	PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error)
+	// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
+	// Returns target repo_id for callers that still rely on this method's result.
 	PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
@@ -272,9 +276,8 @@ type Querier interface {
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 	UpsertJobMetric(ctx context.Context, arg UpsertJobMetricParams) error
-	// Bulk upsert a mod_repo by normalized repo_url.
-	// Uniqueness is on (mig_id, repo_url) to prevent duplicate repo URLs per mig.
-	// If a row exists, update refs; otherwise insert.
+	// Bulk upsert a mig_repo by normalized repo_url.
+	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
 }
 

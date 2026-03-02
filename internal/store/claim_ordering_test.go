@@ -148,7 +148,7 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	repo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        repo2ID,
 		MigID:     fx.Mig.ID,
-		RepoUrl:   "https://github.com/test/scoped-order-2",
+		Url:   "https://github.com/test/scoped-order-2",
 		BaseRef:   fx.MigRepo.BaseRef,
 		TargetRef: fx.MigRepo.TargetRef,
 	})

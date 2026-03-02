@@ -32,7 +32,7 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "feature-branch",
-				RepoUrl:       "https://github.com/org/repo.git",
+				Url:       "https://github.com/org/repo.git",
 			},
 		},
 	}
@@ -90,7 +90,7 @@ func TestPullRunRepoHandler_URLNormalization(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/repo", // stored without .git
+				Url:       "https://github.com/org/repo", // stored without .git
 			},
 		},
 	}
@@ -122,7 +122,7 @@ func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/repo/",
+				Url:       "https://github.com/org/repo/",
 			},
 		},
 	}
@@ -174,7 +174,7 @@ func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/other-repo",
+				Url:       "https://github.com/org/other-repo",
 			},
 		},
 	}
@@ -208,13 +208,13 @@ func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID1,
 				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/repo",
+				Url:       "https://github.com/org/repo",
 			},
 			{
 				RunID:         runID,
 				RepoID:        repoID2,
 				RepoTargetRef: "develop",
-				RepoUrl:       "https://github.com/org/repo.git", // same after normalization
+				Url:       "https://github.com/org/repo.git", // same after normalization
 			},
 		},
 	}
@@ -306,7 +306,7 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				RepoUrl:   "https://github.com/org/repo",
+				Url:   "https://github.com/org/repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
@@ -367,7 +367,7 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				RepoUrl:   "https://github.com/org/repo",
+				Url:   "https://github.com/org/repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
@@ -418,7 +418,7 @@ func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				RepoUrl:   "https://github.com/org/repo.git", // with .git
+				Url:   "https://github.com/org/repo.git", // with .git
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
@@ -476,7 +476,7 @@ func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				RepoUrl:   "https://github.com/org/other-repo",
+				Url:   "https://github.com/org/other-repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
@@ -507,7 +507,7 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				RepoUrl:   "https://github.com/org/repo",
+				Url:   "https://github.com/org/repo",
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},

@@ -262,7 +262,7 @@ func createRunRepoForStaleRecoveryQueryTest(
 	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        repoID,
 		MigID:     migID,
-		RepoUrl:   repoURL,
+		Url:   repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})

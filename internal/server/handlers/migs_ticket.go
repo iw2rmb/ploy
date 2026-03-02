@@ -70,7 +70,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			repoBase   string
 			repoTarget string
 		)
-		runRepos, err := st.ListRunReposByRun(r.Context(), run.ID)
+		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), run.ID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
 			slog.Error("get run status: list run repos failed", "run_id", run.ID, "err", err)
@@ -80,14 +80,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			rr := runRepos[0]
 			repoBase = rr.RepoBaseRef
 			repoTarget = rr.RepoTargetRef
-
-			mr, err := st.GetMigRepo(r.Context(), rr.RepoID)
-			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-				slog.Error("get run status: get repo failed", "run_id", run.ID, "repo_id", rr.RepoID, "err", err)
-				return
-			}
-			repoURL = mr.RepoUrl
+			repoURL = rr.RepoUrl
 		}
 
 		summary := modsapi.RunSummary{

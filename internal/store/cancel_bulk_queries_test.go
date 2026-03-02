@@ -325,7 +325,7 @@ func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store,
 	mr, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        repoID,
 		MigID:     modID,
-		RepoUrl:   repoURL,
+		Url:   repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})

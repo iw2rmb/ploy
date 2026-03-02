@@ -120,7 +120,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        modRepoID,
 			MigID:     run.MigID,
-			RepoUrl:   req.RepoURL.String(),
+			Url:       req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
 		})
@@ -138,19 +138,24 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			MigID:         run.MigID,
 			RunID:         runID,
-			RepoID:        modRepo.ID,
+			RepoID:        modRepo.RepoID,
 			RepoBaseRef:   modRepo.BaseRef,
 			RepoTargetRef: modRepo.TargetRef,
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", modRepo.ID, "err", err)
+			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", modRepo.RepoID, "err", err)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, modRepo.RepoUrl))
+		repoURL, err := repoURLForID(r.Context(), st, modRepo.RepoID)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL))
 	}
 }
 
@@ -226,8 +231,8 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 		if rr.Status == store.RunRepoStatusCancelled || rr.Status == store.RunRepoStatusSuccess || rr.Status == store.RunRepoStatusFail {
 			repoURL := ""
-			if mr, err := st.GetMigRepo(r.Context(), rr.RepoID); err == nil {
-				repoURL = mr.RepoUrl
+			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
+				repoURL = resolvedURL
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -262,8 +267,8 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 
 		rr, _ = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		repoURL := ""
-		if mr, err := st.GetMigRepo(r.Context(), rr.RepoID); err == nil {
-			repoURL = mr.RepoUrl
+		if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
+			repoURL = resolvedURL
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -374,8 +379,8 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		repoURL := ""
-		if mr, err := st.GetMigRepo(r.Context(), runRepo.RepoID); err == nil {
-			repoURL = mr.RepoUrl
+		if resolvedURL, err := repoURLForID(r.Context(), st, runRepo.RepoID); err == nil {
+			repoURL = resolvedURL
 		}
 
 		w.Header().Set("Content-Type", "application/json")

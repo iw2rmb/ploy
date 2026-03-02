@@ -240,8 +240,14 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		// Find the repo_id matching the normalized URL.
 		var matchedRepoID domaintypes.MigRepoID
 		for _, mr := range modRepos {
-			if domaintypes.NormalizeRepoURL(mr.RepoUrl) == normalizedURL {
-				matchedRepoID = mr.ID
+			repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
+			if err != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+				slog.Error("pull mig repo: get repo failed", "mig_id", modID, "repo_id", mr.RepoID, "err", err)
+				return
+			}
+			if domaintypes.NormalizeRepoURL(repoURL) == normalizedURL {
+				matchedRepoID = mr.RepoID
 				break
 			}
 		}

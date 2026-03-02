@@ -119,11 +119,17 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		// Create run_repos entries for each selected repo.
 		// v1: run_repos snapshots refs from mig_repos at run creation time.
 		for _, modRepo := range selectedRepos {
+			repoURL, urlErr := repoURLForID(r.Context(), st, modRepo.RepoID)
+			if urlErr != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", urlErr)
+				slog.Error("create mig run: get repo failed", "repo_id", modRepo.RepoID, "err", urlErr)
+				return
+			}
 			// Create run_repo entry snapshotting refs.
 			_, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 				MigID:         modID,
 				RunID:         run.ID,
-				RepoID:        modRepo.ID,
+				RepoID:        modRepo.RepoID,
 				RepoBaseRef:   modRepo.BaseRef,
 				RepoTargetRef: modRepo.TargetRef,
 			})
@@ -131,8 +137,8 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 				slog.Error("create mig run: create run repo failed",
 					"run_id", run.ID,
-					"repo_id", modRepo.ID,
-					"repo_url", modRepo.RepoUrl,
+					"repo_id", modRepo.RepoID,
+					"repo_url", repoURL,
 					"err", err,
 				)
 				return
@@ -198,7 +204,7 @@ func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.Mi
 		// Filter allRepos to only include failed ones.
 		var failedRepos []store.MigRepo
 		for _, repo := range allRepos {
-			if failedSet[repo.ID] {
+			if failedSet[repo.RepoID] {
 				failedRepos = append(failedRepos, repo)
 			}
 		}
@@ -215,7 +221,11 @@ func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.Mi
 		// Filter allRepos to only include those with matching URLs.
 		var explicitRepos []store.MigRepo
 		for _, repo := range allRepos {
-			if normalizedURLs[domaintypes.NormalizeRepoURL(repo.RepoUrl)] {
+			repoURL, err := repoURLForID(ctx, st, repo.RepoID)
+			if err != nil {
+				return nil, fmt.Errorf("get repo %s: %w", repo.RepoID, err)
+			}
+			if normalizedURLs[domaintypes.NormalizeRepoURL(repoURL)] {
 				explicitRepos = append(explicitRepos, repo)
 			}
 		}

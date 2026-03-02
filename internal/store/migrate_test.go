@@ -244,7 +244,7 @@ SELECT EXISTS (
 	_, err = st.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        types.NewMigRepoID(),
 		MigID:     migID,
-		RepoUrl:   "https://example.com/org/repo.git",
+		Url:   "https://example.com/org/repo.git",
 		BaseRef:   "main",
 		TargetRef: "feature/migration-test",
 	})
