@@ -48,10 +48,7 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(c.JobID.String()), "events")
-	if err != nil {
-		return fmt.Errorf("jobs: build endpoint: %w", err)
-	}
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.JobID.String(), "logs")
 
 	// Use the shared log printer for consistent formatting across CLI commands.
 	printer := logs.NewPrinter(format, writer)
@@ -85,7 +82,7 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		return nil
 	}
 
-	if err := c.Client.Stream(ctx, endpoint, handler); err != nil {
+	if err := c.Client.Stream(ctx, endpoint.String(), handler); err != nil {
 		return err
 	}
 	printer.PrintRetentionSummary()

@@ -42,23 +42,19 @@ type FollowStepRow struct {
 	ExitOneLiner string
 }
 
-// FollowFrameOptions controls optional follow-frame rendering features.
-type FollowFrameOptions struct{}
-
 type followDynamicSectionRange struct {
 	start int
 	count int
 }
 
 // RenderFollowFrameText renders a reusable follow-style text frame and line count.
-func RenderFollowFrameText(frame FollowFrame, opts FollowFrameOptions) (string, int) {
-	layout := RenderFollowFrameTextLayout(frame, opts)
+func RenderFollowFrameText(frame FollowFrame) (string, int) {
+	layout := RenderFollowFrameTextLayout(frame)
 	return layout.Text, layout.LineCount
 }
 
 // RenderFollowFrameTextLayout renders a follow frame plus per-repo dynamic section metadata.
-func RenderFollowFrameTextLayout(frame FollowFrame, opts FollowFrameOptions) FollowFrameRender {
-	_ = opts
+func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 
 	var buf bytes.Buffer
 	lineNo := 0

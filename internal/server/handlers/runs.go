@@ -356,6 +356,11 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		summary := runToSummary(run)
+		if !run.MigID.IsZero() {
+			if mig, err := st.GetMig(r.Context(), run.MigID); err == nil {
+				summary.MigName = mig.Name
+			}
+		}
 		if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 			summary.Counts = counts
 		}

@@ -63,20 +63,9 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 				"id":         runID.String(),
 				"status":     "running",
 				"mig_id":     migID.String(),
+				"mig_name":   "java17-upgrade",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T08:00:00Z",
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/migs":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"migs": []map[string]any{
-					{
-						"id":         migID.String(),
-						"name":       "java17-upgrade",
-						"spec_id":    specID.String(),
-						"archived":   false,
-						"created_at": "2026-02-24T07:30:00Z",
-					},
-				},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos":
 			lastErr := "compile\nfailed at step 2"
@@ -184,7 +173,7 @@ func TestRunStatusJSONGate(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
 	}
-	for _, key := range []string{"mig_id", "mig_name", "repos", "runs"} {
+	for _, key := range []string{"mig_id", "mig_name", "repos"} {
 		if _, ok := parsed[key]; !ok {
 			t.Fatalf("expected %s in JSON output, got %v", key, parsed)
 		}

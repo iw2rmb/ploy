@@ -9,6 +9,7 @@ type RunSummary struct {
 	ID         RunID          `json:"id"`
 	Status     string         `json:"status"`
 	MigID      MigID          `json:"mig_id"`
+	MigName    string         `json:"mig_name,omitempty"`
 	SpecID     SpecID         `json:"spec_id"`
 	CreatedBy  *string        `json:"created_by,omitempty"`
 	CreatedAt  time.Time      `json:"created_at"`

@@ -480,20 +480,9 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 				"id":         runID.String(),
 				"status":     status,
 				"mig_id":     migID.String(),
+				"mig_name":   "java17-upgrade",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T08:00:00Z",
-			})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/migs":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"migs": []map[string]any{
-					{
-						"id":         migID.String(),
-						"name":       "java17-upgrade",
-						"spec_id":    specID.String(),
-						"archived":   false,
-						"created_at": "2026-02-24T07:30:00Z",
-					},
-				},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos":
 			repoCalls++

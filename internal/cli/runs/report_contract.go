@@ -8,30 +8,15 @@ import (
 )
 
 // RunReport is the canonical status report contract shared by all status renderers.
-// Phase 0 introduces the model only; later phases wire data assembly and rendering.
 type RunReport struct {
 	RunID   domaintypes.RunID  `json:"run_id"`
 	MigID   domaintypes.MigID  `json:"mig_id"`
 	MigName string             `json:"mig_name"`
 	SpecID  domaintypes.SpecID `json:"spec_id"`
-	Repos   []RepoReport       `json:"repos"`
-	Runs    []RunEntry         `json:"runs"`
+	Repos   []RunEntry         `json:"repos"`
 }
 
-// RepoReport captures repo-level status and report links.
-type RepoReport struct {
-	RepoID      domaintypes.MigRepoID `json:"repo_id"`
-	RepoURL     string                `json:"repo_url"`
-	BaseRef     string                `json:"base_ref"`
-	TargetRef   string                `json:"target_ref"`
-	Status      string                `json:"status"`
-	Attempt     int32                 `json:"attempt"`
-	LastError   *string               `json:"last_error,omitempty"`
-	BuildLogURL string                `json:"build_log_url,omitempty"`
-	PatchURL    string                `json:"patch_url,omitempty"`
-}
-
-// RunEntry captures follow-style graph data for a single repo attempt.
+// RunEntry captures repo-level status, job graph data, and report links for a single repo attempt.
 type RunEntry struct {
 	RepoID      domaintypes.MigRepoID `json:"repo_id"`
 	RepoURL     string                `json:"repo_url"`

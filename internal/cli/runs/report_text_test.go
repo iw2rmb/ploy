@@ -25,18 +25,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 		MigID:   migID,
 		MigName: "java17-upgrade",
 		SpecID:  specID,
-		Repos: []RepoReport{
-			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/service.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/java17",
-				Status:      "Running",
-				Attempt:     1,
-				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:      repoID,
 				RepoURL:     "https://github.com/acme/service.git",
@@ -113,19 +102,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 		MigID:   migID,
 		MigName: "healing-run",
 		SpecID:  specID,
-		Repos: []RepoReport{
-			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/heal.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/heal",
-				Status:      "Fail",
-				Attempt:     1,
-				LastError:   &errText,
-				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:      repoID,
 				RepoURL:     "https://github.com/acme/heal.git",
@@ -186,17 +163,7 @@ func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
 		MigID:   domaintypes.NewMigID(),
 		MigName: "bug-summary",
 		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RepoReport{
-			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/summary.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/summary",
-				Status:    "Fail",
-				Attempt:   1,
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:    repoID,
 				RepoURL:   "https://github.com/acme/summary.git",
@@ -238,7 +205,7 @@ func TestRenderRunReportTextGateExitOneLinerDefaultsUnknownErrorKind(t *testing.
 		MigID:   domaintypes.NewMigID(),
 		MigName: "unknown-kind",
 		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RepoReport{
+		Repos: []RunEntry{
 			{
 				RepoID:    domaintypes.NewMigRepoID(),
 				RepoURL:   "https://github.com/acme/unknown.git",
@@ -246,26 +213,16 @@ func TestRenderRunReportTextGateExitOneLinerDefaultsUnknownErrorKind(t *testing.
 				TargetRef: "ploy/unknown",
 				Status:    "Fail",
 				Attempt:   1,
-			},
-		},
-	}
-	report.Runs = []RunEntry{
-		{
-			RepoID:    report.Repos[0].RepoID,
-			RepoURL:   report.Repos[0].RepoURL,
-			BaseRef:   report.Repos[0].BaseRef,
-			TargetRef: report.Repos[0].TargetRef,
-			Status:    "Fail",
-			Attempt:   1,
-			Jobs: []RunJobEntry{
-				{
-					JobID:      domaintypes.NewJobID(),
-					JobType:    "re_gate",
-					JobImage:   "ghcr.io/acme/re-gate:1",
-					Status:     "Failed",
-					ExitCode:   &failCode,
-					DurationMs: 1000,
-					BugSummary: "re-gate failed",
+				Jobs: []RunJobEntry{
+					{
+						JobID:      domaintypes.NewJobID(),
+						JobType:    "re_gate",
+						JobImage:   "ghcr.io/acme/re-gate:1",
+						Status:     "Failed",
+						ExitCode:   &failCode,
+						DurationMs: 1000,
+						BugSummary: "re-gate failed",
+					},
 				},
 			},
 		},
@@ -296,19 +253,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		MigID:   migID,
 		MigName: "links-run",
 		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RepoReport{
-			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/links.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/links",
-				Status:      "Success",
-				Attempt:     1,
-				BuildLogURL: logURL,
-				PatchURL:    patchURL,
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:      repoID,
 				RepoURL:     "https://github.com/acme/links.git",
@@ -375,18 +320,7 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 		MigID:   domaintypes.NewMigID(),
 		MigName: "cancelled-run",
 		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RepoReport{
-			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/cancelled.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/cancelled",
-				Status:      "Cancelled",
-				Attempt:     1,
-				BuildLogURL: logURL,
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:      repoID,
 				RepoURL:     "https://github.com/acme/cancelled.git",
@@ -427,7 +361,7 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 		MigID:   migID,
 		MigName: migID.String(),
 		SpecID:  domaintypes.NewSpecID(),
-		Repos:   []RepoReport{},
+		Repos:   []RunEntry{},
 	}
 
 	var buf bytes.Buffer
@@ -453,17 +387,7 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 		MigID:   domaintypes.NewMigID(),
 		MigName: "live-run",
 		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RepoReport{
-			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/live.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/live",
-				Status:    "Running",
-				Attempt:   1,
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:    repoID,
 				RepoURL:   "https://github.com/acme/live.git",

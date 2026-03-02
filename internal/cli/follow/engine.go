@@ -333,7 +333,7 @@ func (e *Engine) render() {
 		frame.Repos = append(frame.Repos, repoFrame)
 	}
 
-	rendered, lines := runs.RenderFollowFrameText(frame, runs.FollowFrameOptions{})
+	rendered, lines := runs.RenderFollowFrameText(frame)
 
 	// In-place redraw: move cursor up over the previously rendered frame and clear.
 	// This keeps output stable (like package managers / docker build) instead of

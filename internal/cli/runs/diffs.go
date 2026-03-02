@@ -15,79 +15,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// DiffsCommand lists diffs for a run and optionally downloads the newest patch.
-// Uses domain type (RunID) for type-safe identification.
-type DiffsCommand struct {
-	Client  *http.Client
-	BaseURL *url.URL
-	RunID   domaintypes.RunID // Run ID (KSUID-backed)
-	Output  io.Writer
-
-	Download bool   // when true, download newest diff and print to stdout (gunzipped)
-	SavePath string // optional path to save the gunzipped patch
-}
-
-// Run executes the command.
-func (c DiffsCommand) Run(ctx context.Context) error {
-	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return fmt.Errorf("run diffs: %w", err)
-	}
-	// Use domain type's IsZero method for validation.
-	if c.RunID.IsZero() {
-		return errors.New("run diffs: run id required")
-	}
-	runID := c.RunID.String()
-	out := c.Output
-	if out == nil {
-		out = io.Discard
-	}
-
-	// List diffs
-	listURL := c.BaseURL.JoinPath("v1", "runs", runID, "diffs")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL.String(), nil)
-	if err != nil {
-		return err
-	}
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer httpx.DrainAndClose(resp)
-	if resp.StatusCode != http.StatusOK {
-		return httpx.WrapError("run diffs", resp.Status, resp.Body)
-	}
-	var listing struct {
-		Diffs []struct {
-			ID        domaintypes.DiffID `json:"id"`
-			JobID     domaintypes.JobID  `json:"job_id"`
-			CreatedAt string             `json:"created_at"`
-			Size      int                `json:"gzipped_size"`
-		} `json:"diffs"`
-	}
-	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
-		return err
-	}
-
-	if !c.Download {
-		for _, d := range listing.Diffs {
-			job := strings.TrimSpace(d.JobID.String())
-			if job == "" {
-				job = "-"
-			}
-			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", d.ID.String(), job, d.Size, strings.TrimSpace(d.CreatedAt))
-		}
-		return nil
-	}
-
-	if len(listing.Diffs) == 0 {
-		return errors.New("run diffs: no diffs available for this run")
-	}
-	// Diff download requires repo-scoped addressing. The legacy global diff download
-	// endpoint (`GET /v1/diffs/{id}`) is removed, and this command does not have a
-	// repo_id to scope the download.
-	return errors.New("run diffs: download is not supported; use `ploy run pull <run-id>` or `ploy mig pull`")
-}
-
 // RepoDiffsCommand lists diffs for a specific repo execution within a run and
 // optionally downloads the newest patch. This is the v1 repo-scoped version
 // that replaces the legacy run-scoped DiffsCommand.
@@ -97,8 +24,8 @@ func (c DiffsCommand) Run(ctx context.Context) error {
 type RepoDiffsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	RunID   domaintypes.RunID // Run ID (KSUID-backed)
-	RepoID  string            // Repo ID (NanoID-backed)
+	RunID   domaintypes.RunID     // Run ID (KSUID-backed)
+	RepoID  domaintypes.MigRepoID // Repo ID (NanoID-backed)
 	Output  io.Writer
 
 	Download bool   // when true, download newest diff and print to stdout (gunzipped)
@@ -113,11 +40,11 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	if c.RunID.IsZero() {
 		return errors.New("run repo diffs: run id required")
 	}
-	if strings.TrimSpace(c.RepoID) == "" {
+	if c.RepoID.IsZero() {
 		return errors.New("run repo diffs: repo id required")
 	}
 	runID := c.RunID.String()
-	repoID := c.RepoID
+	repoID := c.RepoID.String()
 	out := c.Output
 	if out == nil {
 		out = io.Discard
@@ -138,12 +65,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 		return httpx.WrapError("run repo diffs", resp.Status, resp.Body)
 	}
 	var listing struct {
-		Diffs []struct {
-			ID        domaintypes.DiffID `json:"id"`
-			JobID     domaintypes.JobID  `json:"job_id"`
-			CreatedAt string             `json:"created_at"`
-			Size      int                `json:"gzipped_size"`
-		} `json:"diffs"`
+		Diffs []repoDiffEntry `json:"diffs"`
 	}
 	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
 		return err
@@ -155,7 +77,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 			if job == "" {
 				job = "-"
 			}
-			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", d.ID.String(), job, d.Size, strings.TrimSpace(d.CreatedAt))
+			_, _ = fmt.Fprintf(out, "%s job=%s size=%d created=%s\n", d.ID.String(), job, d.Size, d.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 		}
 		return nil
 	}

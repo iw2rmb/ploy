@@ -23,19 +23,7 @@ func TestRenderRunReportJSON(t *testing.T) {
 		MigID:   migID,
 		MigName: "java17-upgrade",
 		SpecID:  specID,
-		Repos: []RepoReport{
-			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/service.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/java17",
-				Status:      "Running",
-				Attempt:     1,
-				BuildLogURL: "https://example.test/logs",
-				PatchURL:    "https://example.test/patch",
-			},
-		},
-		Runs: []RunEntry{
+		Repos: []RunEntry{
 			{
 				RepoID:      repoID,
 				RepoURL:     "https://github.com/acme/service.git",
@@ -71,7 +59,7 @@ func TestRenderRunReportJSON(t *testing.T) {
 		t.Fatalf("json unmarshal: %v", err)
 	}
 
-	for _, key := range []string{"run_id", "mig_id", "mig_name", "spec_id", "repos", "runs"} {
+	for _, key := range []string{"run_id", "mig_id", "mig_name", "spec_id", "repos"} {
 		if _, ok := parsed[key]; !ok {
 			t.Fatalf("expected key %q in payload: %v", key, parsed)
 		}
@@ -86,7 +74,7 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 		MigID:   domaintypes.NewMigID(),
 		MigName: "minimal",
 		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RepoReport{
+		Repos: []RunEntry{
 			{
 				RepoID:    domaintypes.NewMigRepoID(),
 				RepoURL:   "https://github.com/acme/minimal.git",
@@ -96,7 +84,6 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 				Attempt:   1,
 			},
 		},
-		Runs: []RunEntry{},
 	}
 
 	var buf bytes.Buffer

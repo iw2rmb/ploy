@@ -25,7 +25,7 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 		},
 	}
 
-	out, lines := RenderFollowFrameText(frame, FollowFrameOptions{})
+	out, lines := RenderFollowFrameText(frame)
 
 	if !strings.Contains(out, "Repos: 1") {
 		t.Fatalf("expected repo count in output, got %q", out)
@@ -65,7 +65,7 @@ func TestRenderFollowFrameText_RightAlignsDurationColumn(t *testing.T) {
 		},
 	}
 
-	out, _ := RenderFollowFrameText(frame, FollowFrameOptions{})
+	out, _ := RenderFollowFrameText(frame)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) < 3 {
 		t.Fatalf("expected at least header + 2 rows, got %q", out)
@@ -100,7 +100,7 @@ func TestRenderFollowFrameText_DoesNotInflatePaddingForANSIStateGlyphs(t *testin
 		},
 	}
 
-	out, _ := RenderFollowFrameText(frame, FollowFrameOptions{})
+	out, _ := RenderFollowFrameText(frame)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) < 3 {
 		t.Fatalf("expected header + 2 rows, got %q", out)
@@ -151,7 +151,7 @@ func TestRenderFollowFrameText_ExitRowsDoNotShiftColumns(t *testing.T) {
 		},
 	}
 
-	out, _ := RenderFollowFrameText(frame, FollowFrameOptions{})
+	out, _ := RenderFollowFrameText(frame)
 	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
 	if len(lines) < 5 {
 		t.Fatalf("expected header + rows + exit line, got %q", out)
@@ -192,7 +192,7 @@ func TestRenderFollowFrameText_RendersEmptyLineForRepoWithoutRows(t *testing.T) 
 		},
 	}
 
-	out, _ := RenderFollowFrameText(frame, FollowFrameOptions{})
+	out, _ := RenderFollowFrameText(frame)
 	if !strings.Contains(out, "Repo:  [1/1] example.com/acme/repo main -> feature") {
 		t.Fatalf("expected repo header, got %q", out)
 	}

@@ -51,11 +51,6 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 
 // RenderRunReportTextLayout renders run report text plus mutable per-repo row sections.
 func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunReportTextLayout, error) {
-	runByRepoID := make(map[domaintypes.MigRepoID]RunEntry, len(report.Runs))
-	for _, entry := range report.Runs {
-		runByRepoID[entry.RepoID] = entry
-	}
-
 	now := opts.Now
 	if now.IsZero() {
 		now = time.Now()
@@ -107,17 +102,16 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 			),
 		}
 
-		entry, ok := runByRepoID[repo.RepoID]
-		if !ok || len(entry.Jobs) == 0 {
+		if len(repo.Jobs) == 0 {
 			repoFrame.EmptyLine = "  Jobs: none"
 			frame.Repos = append(frame.Repos, repoFrame)
 			continue
 		}
 
 		repoFrame.Columns = []string{"", "Step", "Job", "Node", "Image", "Duration", "Artefacts"}
-		repoFrame.Rows = make([]FollowStepRow, 0, len(entry.Jobs))
-		for _, job := range entry.Jobs {
-			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(entry.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
+		repoFrame.Rows = make([]FollowStepRow, 0, len(repo.Jobs))
+		for _, job := range repo.Jobs {
+			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
 			patchURL := strings.TrimSpace(job.PatchURL)
 			state := ColoredStatusGlyph(job.Status, opts.SpinnerFrame)
 			step := renderStepName(job.JobType)
@@ -136,13 +130,13 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 					duration,
 					renderArtifactsForStatus(job.Status, buildLogURL, patchURL, opts),
 				},
-				ExitOneLiner: renderExitOneLiner(job, entry.LastError),
+				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
 			})
 		}
 		frame.Repos = append(frame.Repos, repoFrame)
 	}
 
-	frameLayout := RenderFollowFrameTextLayout(frame, FollowFrameOptions{})
+	frameLayout := RenderFollowFrameTextLayout(frame)
 
 	var out strings.Builder
 	for _, line := range headerLines {
@@ -204,8 +198,8 @@ func renderArtifacts(logURL, patchURL string, opts TextRenderOptions) string {
 }
 
 func renderArtifactsForStatus(status, logURL, patchURL string, opts TextRenderOptions) string {
-	statusNorm := strings.ToLower(strings.TrimSpace(status))
-	if statusNorm == "cancelled" || statusNorm == "canceled" || !isTerminalJobStatus(status) {
+	s := normalizeStatus(status)
+	if s == "cancelled" || s == "canceled" || !isTerminalJobStatus(status) {
 		return "-"
 	}
 	return renderArtifacts(logURL, patchURL, opts)
@@ -230,7 +224,7 @@ func appendAuthToken(rawURL, token string) string {
 }
 
 func renderStepName(jobType string) string {
-	switch strings.ToLower(strings.TrimSpace(jobType)) {
+	switch normalizeStatus(jobType) {
 	case "heal":
 		return "Heal"
 	default:
@@ -239,14 +233,14 @@ func renderStepName(jobType string) string {
 }
 
 func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
-	shouldRender := isFailedOrCrashedStatus(job.Status) || strings.EqualFold(strings.TrimSpace(job.JobType), "heal")
+	shouldRender := isFailedOrCrashedStatus(job.Status) || normalizeStatus(job.JobType) == "heal"
 	if !shouldRender {
 		return ""
 	}
 
 	msg := ""
 	prefix := ""
-	if strings.EqualFold(strings.TrimSpace(job.JobType), "heal") {
+	if normalizeStatus(job.JobType) == "heal" {
 		msg = strings.TrimSpace(job.ActionSummary)
 		if msg == "" {
 			msg = "healer output unavailable"
@@ -257,12 +251,12 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 			msg = FormatErrorOneLiner(repoLastError)
 		}
 		if msg == "" {
-			msg = strings.ToLower(strings.TrimSpace(job.Status))
+			msg = normalizeStatus(job.Status)
 		}
 		if isGateJobType(job.JobType) {
 			errorKind := "unknown"
 			if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
-				errorKind = strings.ToLower(strings.TrimSpace(job.Recovery.ErrorKind))
+				errorKind = normalizeStatus(job.Recovery.ErrorKind)
 			}
 			prefix = "\x1b[1;91m<" + errorKind + ">\x1b[0m "
 		}
@@ -273,7 +267,7 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 }
 
 func isGateJobType(jobType string) bool {
-	switch strings.ToLower(strings.TrimSpace(jobType)) {
+	switch normalizeStatus(jobType) {
 	case "pre_gate", "post_gate", "re_gate":
 		return true
 	default:
