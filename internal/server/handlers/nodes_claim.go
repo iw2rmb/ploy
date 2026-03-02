@@ -37,7 +37,11 @@ import (
 // separate Build Gate queue or claim path — all job types (pre-gate, mig, heal,
 // re-gate, post-gate) are consumed from the same queue.
 // Jobs transition directly from 'Queued' to 'Running' on claim (no intermediate state).
-func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *server.EventsService) http.HandlerFunc {
+func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *server.EventsService, gateProfileResolver ...GateProfileResolver) http.HandlerFunc {
+	var resolver GateProfileResolver
+	if len(gateProfileResolver) > 0 {
+		resolver = gateProfileResolver[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter using domain type helper.
 		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
@@ -116,7 +120,7 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, eventsService *
 		}
 
 		// Build and send response with job and run information.
-		if err := buildAndSendJobClaimResponse(w, r, st, configHolder, run, spec.Spec, rr, repoURL, job); err != nil {
+		if err := buildAndSendJobClaimResponse(w, r, st, configHolder, run, spec.Spec, rr, repoURL, job, resolver); err != nil {
 			slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
 			httpErr(w, http.StatusInternalServerError, "failed to build claim response: %v", err)
 			return
@@ -164,10 +168,19 @@ func buildAndSendJobClaimResponse(
 	runRepo store.RunRepo,
 	repoURL string,
 	job store.Job,
+	gateProfileResolver GateProfileResolver,
 ) error {
 	jobType := domaintypes.JobType(job.JobType)
 	if err := jobType.Validate(); err != nil {
 		return fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
+	}
+	var repoGateProfile []byte
+	if gateProfileResolver != nil && shouldResolveGateProfile(jobType) {
+		_, payload, err := gateProfileResolver.ResolveGateProfileForJob(r.Context(), job)
+		if err != nil {
+			return fmt.Errorf("resolve gate profile: %w", err)
+		}
+		repoGateProfile = payload
 	}
 
 	mergedSpec, err := mutateClaimSpec(claimSpecMutatorInput{
@@ -176,7 +189,7 @@ func buildAndSendJobClaimResponse(
 		jobType:         jobType,
 		gitLab:          configHolder.GetGitLab(),
 		globalEnv:       configHolder.GetGlobalEnv(),
-		repoGateProfile: nil,
+		repoGateProfile: repoGateProfile,
 	})
 	if err != nil {
 		return err
@@ -245,6 +258,15 @@ func nodeIDPtrOrZero(id *domaintypes.NodeID) domaintypes.NodeID {
 		return ""
 	}
 	return *id
+}
+
+func shouldResolveGateProfile(jobType domaintypes.JobType) bool {
+	switch jobType {
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+		return true
+	default:
+		return false
+	}
 }
 
 func buildRecoveryClaimContext(
