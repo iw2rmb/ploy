@@ -31,8 +31,6 @@ func (c *Cache) Store(status NodeStatus) {
 }
 
 // LatestStatus returns a copy of the cached NodeStatus when available.
-// This is the canonical accessor for status data; callers should use
-// NodeStatus.ToMap() only at JSON serialization boundaries.
 func (c *Cache) LatestStatus() (NodeStatus, bool) {
 	if c == nil {
 		return NodeStatus{}, false

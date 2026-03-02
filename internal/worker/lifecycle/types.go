@@ -1,271 +1,151 @@
 package lifecycle
 
 import (
+	"encoding/json"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+// ComponentState represents the health state of a subsystem.
+type ComponentState string
+
+const (
+	StateOK       ComponentState = "ok"
+	StateDegraded ComponentState = "degraded"
+	StateError    ComponentState = "error"
+	StateUnknown  ComponentState = "unknown"
+)
+
 // NodeStatus contains the complete lifecycle status snapshot for a node.
-// This type replaces untyped map[string]any usage in status reporting,
-// providing compile-time type safety for status fields.
-// Uses domain type (NodeID) for type-safe identification.
 type NodeStatus struct {
-	State           string
-	Timestamp       time.Time
-	Heartbeat       time.Time
-	Role            string
-	NodeID          domaintypes.NodeID // Node ID (NanoID-backed)
-	Hostname        string
-	Resources       NodeResources
-	Components      NodeComponents
-	ResourceWarning string // Optional error message from resource collection
+	State           ComponentState     `json:"state"`
+	Timestamp       time.Time          `json:"timestamp"`
+	Heartbeat       time.Time          `json:"heartbeat"`
+	Role            string             `json:"role"`
+	NodeID          domaintypes.NodeID `json:"node_id"`
+	Hostname        string             `json:"hostname"`
+	Resources       NodeResources      `json:"resources"`
+	Components      NodeComponents     `json:"components"`
+	ResourceWarning string             `json:"resource_warning,omitempty"`
 }
 
 // NodeCapacity represents available node resources for scheduling.
-// This type is used for heartbeat payloads and capacity tracking.
 type NodeCapacity struct {
-	CPUFreeMillis  domaintypes.CPUmilli
-	CPUTotalMillis domaintypes.CPUmilli
-	MemFreeBytes   domaintypes.Bytes
-	MemTotalBytes  domaintypes.Bytes
-	DiskFreeBytes  domaintypes.Bytes
-	DiskTotalBytes domaintypes.Bytes
-	Heartbeat      time.Time
+	CPUFreeMillis  domaintypes.CPUmilli `json:"cpu_free_millis"`
+	CPUTotalMillis domaintypes.CPUmilli `json:"cpu_total_millis"`
+	MemFreeBytes   domaintypes.Bytes    `json:"mem_free_bytes"`
+	MemTotalBytes  domaintypes.Bytes    `json:"mem_total_bytes"`
+	DiskFreeBytes  domaintypes.Bytes    `json:"disk_free_bytes"`
+	DiskTotalBytes domaintypes.Bytes    `json:"disk_total_bytes"`
+	Heartbeat      time.Time            `json:"heartbeat"`
 }
 
 // NodeResources aggregates CPU, memory, disk, and network resource snapshots.
 type NodeResources struct {
-	CPU     CPUResources
-	Memory  MemoryResources
-	Disk    DiskResources
-	Network NetworkResources
+	CPU     CPUResources     `json:"cpu"`
+	Memory  MemoryResources  `json:"memory"`
+	Disk    DiskResources    `json:"disk"`
+	Network NetworkResources `json:"network"`
 }
 
 // CPUResources contains CPU capacity and utilization metrics.
 type CPUResources struct {
-	TotalMCores float64
-	FreeMCores  float64
-	Load1       float64
+	TotalMCores float64 `json:"total_mcores"`
+	FreeMCores  float64 `json:"free_mcores"`
+	Load1       float64 `json:"load_1m"`
 }
 
 // MemoryResources contains memory capacity and utilization metrics.
 type MemoryResources struct {
-	TotalMB float64
-	FreeMB  float64
+	TotalMB float64 `json:"total_mb"`
+	FreeMB  float64 `json:"free_mb"`
 }
 
 // DiskResources contains disk capacity, utilization, and I/O metrics.
 type DiskResources struct {
-	TotalMB float64
-	FreeMB  float64
-	IO      DiskIO
+	TotalMB float64 `json:"total_mb"`
+	FreeMB  float64 `json:"free_mb"`
+	IO      DiskIO  `json:"io"`
 }
 
 // DiskIO contains disk I/O throughput and IOPS metrics.
 type DiskIO struct {
-	ReadMBPerSec  float64
-	WriteMBPerSec float64
-	ReadIOPS      float64
-	WriteIOPS     float64
-	InitialSample bool // True if metrics are from the first sample (no delta available)
+	ReadMBPerSec  float64 `json:"read_mb_per_sec"`
+	WriteMBPerSec float64 `json:"write_mb_per_sec"`
+	ReadIOPS      float64 `json:"read_iops"`
+	WriteIOPS     float64 `json:"write_iops"`
+	InitialSample bool    `json:"initial_sample,omitempty"`
 }
 
 // NetworkResources contains network throughput metrics and per-interface details.
 type NetworkResources struct {
-	RXBytesPerSec   float64
-	TXBytesPerSec   float64
-	RXPacketsPerSec float64
-	TXPacketsPerSec float64
-	InitialSample   bool // True if metrics are from the first sample (no delta available)
-	Interfaces      map[string]NetworkInterface
+	RXBytesPerSec   float64                     `json:"rx_bytes_per_sec"`
+	TXBytesPerSec   float64                     `json:"tx_bytes_per_sec"`
+	RXPacketsPerSec float64                     `json:"rx_packets_per_sec"`
+	TXPacketsPerSec float64                     `json:"tx_packets_per_sec"`
+	InitialSample   bool                        `json:"initial_sample,omitempty"`
+	Interfaces      map[string]NetworkInterface `json:"interfaces,omitempty"`
 }
 
 // NetworkInterface contains per-interface network throughput metrics.
 type NetworkInterface struct {
-	RXBytesPerSec   float64
-	TXBytesPerSec   float64
-	RXPacketsPerSec float64
-	TXPacketsPerSec float64
-	InitialSample   bool
+	RXBytesPerSec   float64 `json:"rx_bytes_per_sec"`
+	TXBytesPerSec   float64 `json:"tx_bytes_per_sec"`
+	RXPacketsPerSec float64 `json:"rx_packets_per_sec"`
+	TXPacketsPerSec float64 `json:"tx_packets_per_sec"`
+	InitialSample   bool    `json:"initial_sample,omitempty"`
 }
 
 // NodeComponents contains health status for node subsystems.
 type NodeComponents struct {
-	Docker ComponentStatus
-	Gate   ComponentStatus
+	Docker ComponentStatus `json:"docker"`
+	Gate   ComponentStatus `json:"gate"`
 }
 
-// ToMap converts NodeStatus to map[string]any for JSON serialization.
-// Called at serialization boundaries (e.g., status.Provider.Snapshot).
-func (s NodeStatus) ToMap() map[string]any {
-	status := map[string]any{
-		"state":      s.State,
-		"timestamp":  s.Timestamp.Format(time.RFC3339Nano),
-		"heartbeat":  s.Heartbeat.Format(time.RFC3339Nano),
-		"role":       s.Role,
-		"node_id":    s.NodeID,
-		"hostname":   s.Hostname,
-		"resources":  s.Resources.toMap(),
-		"components": s.Components.toMap(),
-	}
-	if s.ResourceWarning != "" {
-		status["resource_warning"] = s.ResourceWarning
-	}
-	return status
+// ComponentStatus describes the outcome of a subsystem health probe.
+type ComponentStatus struct {
+	State     ComponentState `json:"state"`
+	Message   string         `json:"message,omitempty"`
+	Version   string         `json:"version,omitempty"`
+	Details   map[string]any `json:"details,omitempty"`
+	CheckedAt time.Time      `json:"checked_at"`
 }
 
-// ToMap converts NodeCapacity to map[string]any for JSON serialization.
-func (c NodeCapacity) ToMap() map[string]any {
-	return map[string]any{
-		"cpu_free_millis":  int32(c.CPUFreeMillis),
-		"cpu_total_millis": int32(c.CPUTotalMillis),
-		"mem_free_bytes":   int64(c.MemFreeBytes),
-		"mem_total_bytes":  int64(c.MemTotalBytes),
-		"disk_free_bytes":  int64(c.DiskFreeBytes),
-		"disk_total_bytes": int64(c.DiskTotalBytes),
-		"heartbeat":        c.Heartbeat.Format(time.RFC3339Nano),
-	}
+// MarshalJSON implements encoding/json.Marshaler for NodeStatus.
+func (s NodeStatus) MarshalJSON() ([]byte, error) {
+	type Alias NodeStatus
+	return json.Marshal(&struct {
+		Alias
+		Timestamp string `json:"timestamp"`
+		Heartbeat string `json:"heartbeat"`
+	}{
+		Alias:     Alias(s),
+		Timestamp: s.Timestamp.Format(time.RFC3339Nano),
+		Heartbeat: s.Heartbeat.Format(time.RFC3339Nano),
+	})
 }
 
-// toMap converts NodeResources to map[string]any for JSON serialization.
-func (r NodeResources) toMap() map[string]any {
-	return map[string]any{
-		"cpu":     r.CPU.toMap(),
-		"memory":  r.Memory.toMap(),
-		"disk":    r.Disk.toMap(),
-		"network": r.Network.toMap(),
-	}
+// MarshalJSON implements encoding/json.Marshaler for NodeCapacity.
+func (c NodeCapacity) MarshalJSON() ([]byte, error) {
+	type Alias NodeCapacity
+	return json.Marshal(&struct {
+		Alias
+		Heartbeat string `json:"heartbeat"`
+	}{
+		Alias:     Alias(c),
+		Heartbeat: c.Heartbeat.Format(time.RFC3339Nano),
+	})
 }
 
-// toMap converts CPUResources to map[string]any for JSON serialization.
-func (c CPUResources) toMap() map[string]any {
-	return map[string]any{
-		"total_mcores": c.TotalMCores,
-		"free_mcores":  c.FreeMCores,
-		"load_1m":      c.Load1,
-	}
-}
-
-// toMap converts MemoryResources to map[string]any for JSON serialization.
-func (m MemoryResources) toMap() map[string]any {
-	return map[string]any{
-		"total_mb": m.TotalMB,
-		"free_mb":  m.FreeMB,
-	}
-}
-
-// toMap converts DiskResources to map[string]any for JSON serialization.
-func (d DiskResources) toMap() map[string]any {
-	disk := map[string]any{
-		"total_mb": d.TotalMB,
-		"free_mb":  d.FreeMB,
-	}
-
-	ioMap := map[string]any{
-		"read_mb_per_sec":  d.IO.ReadMBPerSec,
-		"write_mb_per_sec": d.IO.WriteMBPerSec,
-		"read_iops":        d.IO.ReadIOPS,
-		"write_iops":       d.IO.WriteIOPS,
-	}
-	if d.IO.InitialSample {
-		ioMap["details"] = map[string]any{"initial_sample": true}
-	}
-	disk["io"] = ioMap
-
-	return disk
-}
-
-// toMap converts NetworkResources to map[string]any for JSON serialization.
-func (n NetworkResources) toMap() map[string]any {
-	network := map[string]any{
-		"rx_bytes_per_sec":   n.RXBytesPerSec,
-		"tx_bytes_per_sec":   n.TXBytesPerSec,
-		"rx_packets_per_sec": n.RXPacketsPerSec,
-		"tx_packets_per_sec": n.TXPacketsPerSec,
-	}
-	if n.InitialSample {
-		network["details"] = map[string]any{"initial_sample": true}
-	}
-	if len(n.Interfaces) > 0 {
-		ifaces := make(map[string]any, len(n.Interfaces))
-		for name, iface := range n.Interfaces {
-			entry := map[string]any{
-				"rx_bytes_per_sec":   iface.RXBytesPerSec,
-				"tx_bytes_per_sec":   iface.TXBytesPerSec,
-				"rx_packets_per_sec": iface.RXPacketsPerSec,
-				"tx_packets_per_sec": iface.TXPacketsPerSec,
-			}
-			if iface.InitialSample {
-				entry["details"] = map[string]any{"initial_sample": true}
-			}
-			ifaces[name] = entry
-		}
-		network["interfaces"] = ifaces
-	}
-	return network
-}
-
-// toMap converts NodeComponents to map[string]any for JSON serialization.
-func (c NodeComponents) toMap() map[string]any {
-	return map[string]any{
-		"docker": componentToMap(c.Docker),
-		"gate":   componentToMap(c.Gate),
-	}
-}
-
-// componentToMap converts a single ComponentStatus to map[string]any.
-func componentToMap(status ComponentStatus) map[string]any {
-	component := map[string]any{
-		"state":      status.State,
-		"checked_at": status.CheckedAt.UTC().Format(time.RFC3339Nano),
-	}
-	if status.Message != "" {
-		component["message"] = status.Message
-	}
-	if status.Version != "" {
-		component["version"] = status.Version
-	}
-	if len(status.Details) > 0 {
-		component["details"] = cloneAnyMap(status.Details)
-	}
-	return component
-}
-
-// cloneAnyMap performs a deep copy of a map[string]any structure.
-func cloneAnyMap(src map[string]any) map[string]any {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[string]any, len(src))
-	for key, value := range src {
-		switch typed := value.(type) {
-		case map[string]any:
-			dst[key] = cloneAnyMap(typed)
-		case []any:
-			dst[key] = cloneAnySlice(typed)
-		default:
-			dst[key] = typed
-		}
-	}
-	return dst
-}
-
-// cloneAnySlice performs a deep copy of a []any slice.
-func cloneAnySlice(src []any) []any {
-	if len(src) == 0 {
-		return nil
-	}
-	out := make([]any, len(src))
-	for idx, value := range src {
-		switch typed := value.(type) {
-		case map[string]any:
-			out[idx] = cloneAnyMap(typed)
-		case []any:
-			out[idx] = cloneAnySlice(typed)
-		default:
-			out[idx] = typed
-		}
-	}
-	return out
+// MarshalJSON implements encoding/json.Marshaler for ComponentStatus.
+func (cs ComponentStatus) MarshalJSON() ([]byte, error) {
+	type Alias ComponentStatus
+	return json.Marshal(&struct {
+		Alias
+		CheckedAt string `json:"checked_at"`
+	}{
+		Alias:     Alias(cs),
+		CheckedAt: cs.CheckedAt.UTC().Format(time.RFC3339Nano),
+	})
 }
