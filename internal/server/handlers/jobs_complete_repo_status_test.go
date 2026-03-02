@@ -57,8 +57,9 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
+		"status":       "Success",
+		"exit_code":    0,
+		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
 	})
 
 	rr := httptest.NewRecorder()
@@ -227,8 +228,9 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	handler := completeJobHandler(st, nil, nil)
 
 	req := f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
+		"status":       "Success",
+		"exit_code":    0,
+		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
 	})
 
 	rr := httptest.NewRecorder()

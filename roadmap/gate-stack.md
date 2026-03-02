@@ -69,7 +69,7 @@ Legend: [ ] todo, [x] done.
   - Scope: implement `repo_sha_v1` algorithm (snapshot tree + synthetic commit hash with fixed metadata, no ref mutation); report `repo_sha_out` in completion payload.
   - Snippets: unchanged-tree fast path returns `repo_sha_in`
   - Tests: contract fixtures in nodeagent tests — expect same workspace => same sha; unchanged workspace => `sha_out == sha_in`.
-- [ ] Define server-side SHA acceptance policy — trust but verify node-reported hashes.
+- [x] Define server-side SHA acceptance policy — trust but verify node-reported hashes.
   - Repository: ploy
   - Component: completion validation
   - Scope: validate format and chain consistency before persistence; reject missing `repo_sha_out` for jobs that must advance chain.
