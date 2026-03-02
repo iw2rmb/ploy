@@ -515,7 +515,7 @@ present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
 **ORW images (`orw-maven`, `orw-gradle`)**: Similar CA bundle handling as build-gate, ensuring
 OpenRewrite can fetch dependencies from internal artifact repositories.
 
-`orw-gradle` additionally injects a Gradle init script at runtime when `PLOY_GRADLE_BUILD_CACHE_URL` is set and runs Gradle with `--build-cache`.
+`orw-gradle` additionally injects a Gradle init script at runtime when `PLOY_GRADLE_BUILD_CACHE_URL` is set and runs Gradle with `--build-cache`. When `./gradlew` exists, it is used only if its wrapper version is compatible with the container JDK (Java 17 requires Gradle >= 7.3); otherwise `orw-gradle` falls back to the system Gradle bundled in the image.
 
 ### Security Considerations
 
