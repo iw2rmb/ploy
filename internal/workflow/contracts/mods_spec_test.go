@@ -219,6 +219,8 @@ func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 		"build_gate": {
 			"enabled": true,
 			"pre": {
+				"target": "unit",
+				"always": true,
 				"stack": {
 					"enabled": true,
 					"language": "java",
@@ -227,6 +229,8 @@ func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 				}
 			},
 			"post": {
+				"target": "all_tests",
+				"always": false,
 				"stack": {
 					"enabled": true,
 					"language": "java",
@@ -261,6 +265,12 @@ func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 	if !spec.BuildGate.Pre.Stack.Default {
 		t.Errorf("build_gate.pre.stack.default = false, want true")
 	}
+	if spec.BuildGate.Pre.Target != GateProfileTargetUnit {
+		t.Errorf("build_gate.pre.target = %q, want %q", spec.BuildGate.Pre.Target, GateProfileTargetUnit)
+	}
+	if !spec.BuildGate.Pre.Always {
+		t.Errorf("build_gate.pre.always = false, want true")
+	}
 
 	if spec.BuildGate.Post == nil || spec.BuildGate.Post.Stack == nil {
 		t.Fatal("build_gate.post.stack is nil")
@@ -274,6 +284,12 @@ func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 	if spec.BuildGate.Post.Stack.Default {
 		t.Errorf("build_gate.post.stack.default = true, want false")
 	}
+	if spec.BuildGate.Post.Target != GateProfileTargetAllTests {
+		t.Errorf("build_gate.post.target = %q, want %q", spec.BuildGate.Post.Target, GateProfileTargetAllTests)
+	}
+	if spec.BuildGate.Post.Always {
+		t.Errorf("build_gate.post.always = true, want false")
+	}
 }
 
 func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
@@ -282,6 +298,14 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		input   string
 		wantErr string
 	}{
+		{
+			name: "invalid gate target",
+			input: `{
+				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"build_gate": {"pre": {"target": "unsupported"}}
+			}`,
+			wantErr: "build_gate.pre.target: invalid value",
+		},
 		{
 			name: "enabled without language",
 			input: `{

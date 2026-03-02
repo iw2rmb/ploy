@@ -100,6 +100,41 @@ func TestMutateClaimSpec_ExplicitGateProfileWins(t *testing.T) {
 	}
 }
 
+func TestMutateClaimSpec_PreservesPhaseTargetAndAlways(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	job := testMutatorJobWithRecoveryMeta(jobID, "{}")
+	profile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"echo repo","env":{}},"unit":{"status":"passed","command":"echo repo unit","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
+
+	merged, err := mutateClaimSpec(claimSpecMutatorInput{
+		spec:            []byte(`{"build_gate":{"pre":{"target":"unit","always":true}}}`),
+		job:             job,
+		jobType:         domaintypes.JobTypePreGate,
+		repoGateProfile: profile,
+	})
+	if err != nil {
+		t.Fatalf("mutateClaimSpec: %v", err)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(merged, &out); err != nil {
+		t.Fatalf("unmarshal merged: %v", err)
+	}
+	bg := out["build_gate"].(map[string]any)
+	pre := bg["pre"].(map[string]any)
+	if got := pre["target"]; got != contracts.GateProfileTargetUnit {
+		t.Fatalf("build_gate.pre.target=%v, want %q", got, contracts.GateProfileTargetUnit)
+	}
+	if got := pre["always"]; got != true {
+		t.Fatalf("build_gate.pre.always=%v, want true", got)
+	}
+	gp := pre["gate_profile"].(map[string]any)
+	if got := gp["command"]; got != "echo repo" {
+		t.Fatalf("build_gate.pre.gate_profile.command=%v, want echo repo", got)
+	}
+}
+
 func TestMutateClaimSpec_HealInfraAddsSchemaAndArtifacts(t *testing.T) {
 	t.Parallel()
 

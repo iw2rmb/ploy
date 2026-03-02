@@ -221,12 +221,16 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			BuildGate: &contracts.BuildGateConfig{
 				Enabled: true,
 				Pre: &contracts.BuildGatePhaseConfig{
+					Target: contracts.GateProfileTargetUnit,
+					Always: true,
 					GateProfile: &contracts.BuildGateProfileOverride{
 						Command: contracts.CommandSpec{Shell: "go test ./..."},
 						Env:     map[string]string{"GOFLAGS": "-mod=readonly"},
 					},
 				},
 				Post: &contracts.BuildGatePhaseConfig{
+					Target: contracts.GateProfileTargetAllTests,
+					Always: false,
 					GateProfile: &contracts.BuildGateProfileOverride{
 						Command: contracts.CommandSpec{Exec: []string{"go", "test", "./...", "-run", "TestUnit"}},
 						Env:     map[string]string{"CGO_ENABLED": "0"},
@@ -286,6 +290,12 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		if got := runOpts.BuildGate.PreGateProfile.Env["GOFLAGS"]; got != "-mod=readonly" {
 			t.Errorf("BuildGate.PreGateProfile.Env[GOFLAGS]: got %q, want %q", got, "-mod=readonly")
 		}
+		if got := runOpts.BuildGate.PreTarget; got != contracts.GateProfileTargetUnit {
+			t.Errorf("BuildGate.PreTarget: got %q, want %q", got, contracts.GateProfileTargetUnit)
+		}
+		if !runOpts.BuildGate.PreAlways {
+			t.Error("BuildGate.PreAlways: got false, want true")
+		}
 		if runOpts.BuildGate.PostGateProfile == nil {
 			t.Fatal("BuildGate.PostGateProfile: expected non-nil")
 		}
@@ -300,6 +310,12 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		}
 		if got := runOpts.BuildGate.PostGateProfile.Env["CGO_ENABLED"]; got != "0" {
 			t.Errorf("BuildGate.PostGateProfile.Env[CGO_ENABLED]: got %q, want %q", got, "0")
+		}
+		if got := runOpts.BuildGate.PostTarget; got != contracts.GateProfileTargetAllTests {
+			t.Errorf("BuildGate.PostTarget: got %q, want %q", got, contracts.GateProfileTargetAllTests)
+		}
+		if runOpts.BuildGate.PostAlways {
+			t.Error("BuildGate.PostAlways: got true, want false")
 		}
 
 		if runOpts.Healing == nil {
