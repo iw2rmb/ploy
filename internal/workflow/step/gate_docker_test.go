@@ -290,6 +290,9 @@ func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *test
 	if profile.Targets.AllTests == nil || !strings.Contains(profile.Targets.AllTests.Command, "mvn --ff -B -q -e") {
 		t.Fatalf("generated all_tests command=%q, want maven default command", profile.Targets.AllTests.Command)
 	}
+	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "mvn --ff -B -q -e -DskipTests=true") {
+		t.Fatalf("generated build command=%q, want maven no-tests command", profile.Targets.Build.Command)
+	}
 }
 
 func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedGradleStack_UsesWrapper(t *testing.T) {
@@ -327,6 +330,9 @@ func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedGradleStack_U
 	}
 	if profile.Targets.AllTests == nil || !strings.Contains(profile.Targets.AllTests.Command, "./gradlew -q --stacktrace --build-cache") {
 		t.Fatalf("generated all_tests command=%q, want gradle wrapper default command", profile.Targets.AllTests.Command)
+	}
+	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "./gradlew -q --stacktrace --build-cache build -x test") {
+		t.Fatalf("generated build command=%q, want gradle no-tests command", profile.Targets.Build.Command)
 	}
 }
 

@@ -331,20 +331,41 @@ fi
 `
 }
 
-// buildCommandForTool returns the appropriate build command for the given tool.
+// buildCommandForTool returns the default all-tests command for the given tool.
 func buildCommandForTool(workspace string, tool string) ([]string, error) {
+	return buildCommandForToolTarget(workspace, tool, contracts.GateProfileTargetAllTests)
+}
+
+// buildCommandForToolTarget returns a deterministic command for a tool/target pair.
+func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
 	preamble := caPreambleScript()
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
-		script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
-		return []string{"/bin/sh", "-lc", script}, nil
+		switch strings.TrimSpace(target) {
+		case contracts.GateProfileTargetBuild:
+			script := preamble + "mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install"
+			return []string{"/bin/sh", "-lc", script}, nil
+		case contracts.GateProfileTargetAllTests:
+			script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
+			return []string{"/bin/sh", "-lc", script}, nil
+		default:
+			return nil, fmt.Errorf("unsupported maven target: %q", target)
+		}
 	case "gradle":
 		gradleExec := "gradle"
 		if hasGradleWrapperSpecified(workspace) {
 			gradleExec = "./gradlew"
 		}
-		script := preamble + gradleExec + " -q --stacktrace --build-cache test -p /workspace"
-		return []string{"/bin/sh", "-lc", script}, nil
+		switch strings.TrimSpace(target) {
+		case contracts.GateProfileTargetBuild:
+			script := preamble + gradleExec + " -q --stacktrace --build-cache build -x test -p /workspace"
+			return []string{"/bin/sh", "-lc", script}, nil
+		case contracts.GateProfileTargetAllTests:
+			script := preamble + gradleExec + " -q --stacktrace --build-cache test -p /workspace"
+			return []string{"/bin/sh", "-lc", script}, nil
+		default:
+			return nil, fmt.Errorf("unsupported gradle target: %q", target)
+		}
 	case "go":
 		script := preamble + "go test ./..."
 		return []string{"/bin/sh", "-lc", script}, nil
