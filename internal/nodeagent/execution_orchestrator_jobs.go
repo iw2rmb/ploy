@@ -280,6 +280,8 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			}
 		}
 
+		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
+
 		statsBuilder := types.NewRunStatsBuilder().
 			ExitCode(result.ExitCode).
 			DurationMs(duration.Milliseconds()).
@@ -320,7 +322,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 					"duration_ms": duration.Milliseconds(),
 				},
 			)
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID); uploadErr != nil {
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 			}
 			slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "status", status, "duration", duration, "error", runErr)
@@ -329,7 +331,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 		if result.ExitCode != 0 {
 			exitCode := int32(result.ExitCode)
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.JobID); uploadErr != nil {
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 			}
 			slog.Info("job failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "exit_code", result.ExitCode, "duration", duration)
@@ -337,7 +339,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		}
 
 		var exitCodeZero int32 = 0
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
 			slog.Error("failed to upload success status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 		}
 		slog.Info("job succeeded", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "duration", duration)
@@ -548,20 +550,24 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // Uses a detached context to ensure reporting even if the run context is cancelled.
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, jobID types.JobID) error {
+func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, jobID types.JobID, repoSHAOut ...string) error {
 	var loggedExitCode any
 	if exitCode != nil {
 		loggedExitCode = *exitCode
+	}
+	loggedRepoSHAOut := ""
+	if len(repoSHAOut) > 0 {
+		loggedRepoSHAOut = strings.TrimSpace(repoSHAOut[0])
 	}
 
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if uploadErr := r.statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats); uploadErr != nil {
+	if uploadErr := r.statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats, loggedRepoSHAOut); uploadErr != nil {
 		return fmt.Errorf("upload job status: %w", uploadErr)
 	}
 
-	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", loggedExitCode)
+	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", loggedExitCode, "repo_sha_out", loggedRepoSHAOut)
 	return nil
 }
 
@@ -596,6 +602,20 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 
 func workspaceStatus(ctx context.Context, workspace string) (string, error) {
 	return gitpkg.WorkspaceStatus(ctx, workspace)
+}
+
+func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string) string {
+	repoSHAIn := strings.TrimSpace(req.RepoSHAIn.String())
+	if repoSHAIn == "" {
+		slog.Warn("repo_sha_in missing on claimed job; skipping repo_sha_out calculation", "run_id", req.RunID, "job_id", req.JobID)
+		return ""
+	}
+	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn)
+	if err != nil {
+		slog.Warn("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_in", repoSHAIn, "error", err)
+		return ""
+	}
+	return repoSHAOut
 }
 
 // uploadHealingJobDiff generates and uploads a diff for a discrete healing job.

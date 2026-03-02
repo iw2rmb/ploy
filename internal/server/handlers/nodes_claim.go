@@ -204,6 +204,7 @@ func buildAndSendJobClaimResponse(
 		NodeID                 domaintypes.NodeID              `json:"node_id"` // Node ID (NanoID-backed)
 		BaseRef                string                          `json:"base_ref"`
 		TargetRef              string                          `json:"target_ref"`
+		RepoSHAIn              string                          `json:"repo_sha_in,omitempty"`
 		StartedAt              string                          `json:"started_at"`
 		CreatedAt              string                          `json:"created_at"`
 		Spec                   json.RawMessage                 `json:"spec,omitempty"`
@@ -224,6 +225,7 @@ func buildAndSendJobClaimResponse(
 		NodeID:                 nodeIDPtrOrZero(job.NodeID),
 		BaseRef:                job.RepoBaseRef,
 		TargetRef:              runRepo.RepoTargetRef,
+		RepoSHAIn:              job.RepoShaIn,
 		StartedAt:              run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   mergedSpec,

@@ -56,6 +56,7 @@ type ClaimResponse struct {
 	BaseRef                types.GitRef                    `json:"base_ref"`
 	TargetRef              types.GitRef                    `json:"target_ref"`
 	CommitSha              *types.CommitSHA                `json:"commit_sha,omitempty"`
+	RepoShaIn              *types.CommitSHA                `json:"repo_sha_in,omitempty"`
 	StartedAt              string                          `json:"started_at"`
 	CreatedAt              string                          `json:"created_at"`
 	Spec                   json.RawMessage                 `json:"spec,omitempty"`

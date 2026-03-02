@@ -124,11 +124,15 @@ func (b *baseUploader) postJSONWithRetry(ctx context.Context, apiPath string, pa
 }
 
 // UploadJobStatus uploads terminal status and stats to the job-level endpoint.
-func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats) error {
+func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats, repoSHAOut ...string) error {
+	shaOut := ""
+	if len(repoSHAOut) > 0 {
+		shaOut = strings.TrimSpace(repoSHAOut[0])
+	}
 	return b.postJSONWithRetry(
 		ctx,
 		fmt.Sprintf("/v1/jobs/%s/complete", jobID),
-		buildJobStatusPayload(status, exitCode, stats),
+		buildJobStatusPayload(status, exitCode, stats, shaOut),
 		"upload job status",
 		postJSONRetryModeDefault,
 	)
@@ -136,23 +140,30 @@ func (b *baseUploader) UploadJobStatus(ctx context.Context, jobID types.JobID, s
 
 // UploadJobStatusReconcile uploads terminal status during startup crash
 // reconciliation. This mode treats 409 conflicts as successful idempotent replay.
-func (b *baseUploader) UploadJobStatusReconcile(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats) error {
+func (b *baseUploader) UploadJobStatusReconcile(ctx context.Context, jobID types.JobID, status string, exitCode *int32, stats types.RunStats, repoSHAOut ...string) error {
+	shaOut := ""
+	if len(repoSHAOut) > 0 {
+		shaOut = strings.TrimSpace(repoSHAOut[0])
+	}
 	return b.postJSONWithRetry(
 		ctx,
 		fmt.Sprintf("/v1/jobs/%s/complete", jobID),
-		buildJobStatusPayload(status, exitCode, stats),
+		buildJobStatusPayload(status, exitCode, stats, shaOut),
 		"upload reconciled job status",
 		postJSONRetryModeStartupReconcile,
 	)
 }
 
-func buildJobStatusPayload(status string, exitCode *int32, stats types.RunStats) map[string]any {
+func buildJobStatusPayload(status string, exitCode *int32, stats types.RunStats, repoSHAOut string) map[string]any {
 	payload := map[string]any{"status": status}
 	if exitCode != nil {
 		payload["exit_code"] = *exitCode
 	}
 	if stats != nil {
 		payload["stats"] = stats
+	}
+	if repoSHAOut != "" {
+		payload["repo_sha_out"] = repoSHAOut
 	}
 	return payload
 }

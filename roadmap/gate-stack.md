@@ -63,7 +63,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/domain/types ./internal/store` — expect compile-time type safety and query mapping correctness.
 
 ## Phase 5: Runtime SHA Contract (`repo_sha_v1`)
-- [ ] Implement deterministic node SHA computation contract — make `repo_sha_out` reproducible.
+- [x] Implement deterministic node SHA computation contract — make `repo_sha_out` reproducible.
   - Repository: ploy
   - Component: nodeagent execution + git helpers
   - Scope: implement `repo_sha_v1` algorithm (snapshot tree + synthetic commit hash with fixed metadata, no ref mutation); report `repo_sha_out` in completion payload.
