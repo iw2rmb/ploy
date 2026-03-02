@@ -822,20 +822,34 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 }
 
 const updateJobCompletion = `-- name: UpdateJobCompletion :exec
-UPDATE jobs
-SET status = $1,
-    exit_code = $2,
-    repo_sha_out = CASE
-      WHEN $3::TEXT = '' THEN repo_sha_out
-      ELSE $3::TEXT
+WITH completed AS (
+  UPDATE jobs
+  SET status = $1,
+      exit_code = $2,
+      repo_sha_out = CASE
+        WHEN $3::TEXT = '' THEN repo_sha_out
+        ELSE $3::TEXT
+      END,
+      repo_sha_out8 = CASE
+        WHEN $3::TEXT = '' THEN repo_sha_out8
+        ELSE SUBSTRING($3::TEXT, 1, 8)
+      END,
+      finished_at = now(),
+      duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
+  WHERE jobs.id = $4
+  RETURNING next_id, repo_sha_out
+)
+UPDATE jobs AS next_job
+SET repo_sha_in = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in
+      ELSE completed.repo_sha_out
     END,
-    repo_sha_out8 = CASE
-      WHEN $3::TEXT = '' THEN repo_sha_out8
-      ELSE SUBSTRING($3::TEXT, 1, 8)
-    END,
-    finished_at = now(),
-    duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
-WHERE id = $4
+    repo_sha_in8 = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in8
+      ELSE SUBSTRING(completed.repo_sha_out, 1, 8)
+    END
+FROM completed
+WHERE next_job.id = completed.next_id
 `
 
 type UpdateJobCompletionParams struct {
@@ -856,21 +870,35 @@ func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompleti
 }
 
 const updateJobCompletionWithMeta = `-- name: UpdateJobCompletionWithMeta :exec
-UPDATE jobs
-SET status = $1,
-    exit_code = $2,
-    repo_sha_out = CASE
-      WHEN $3::TEXT = '' THEN repo_sha_out
-      ELSE $3::TEXT
+WITH completed AS (
+  UPDATE jobs
+  SET status = $1,
+      exit_code = $2,
+      repo_sha_out = CASE
+        WHEN $3::TEXT = '' THEN repo_sha_out
+        ELSE $3::TEXT
+      END,
+      repo_sha_out8 = CASE
+        WHEN $3::TEXT = '' THEN repo_sha_out8
+        ELSE SUBSTRING($3::TEXT, 1, 8)
+      END,
+      finished_at = now(),
+      duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
+      meta = $4
+  WHERE jobs.id = $5
+  RETURNING next_id, repo_sha_out
+)
+UPDATE jobs AS next_job
+SET repo_sha_in = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in
+      ELSE completed.repo_sha_out
     END,
-    repo_sha_out8 = CASE
-      WHEN $3::TEXT = '' THEN repo_sha_out8
-      ELSE SUBSTRING($3::TEXT, 1, 8)
-    END,
-    finished_at = now(),
-    duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
-    meta = $4
-WHERE id = $5
+    repo_sha_in8 = CASE
+      WHEN completed.repo_sha_out = '' THEN next_job.repo_sha_in8
+      ELSE SUBSTRING(completed.repo_sha_out, 1, 8)
+    END
+FROM completed
+WHERE next_job.id = completed.next_id
 `
 
 type UpdateJobCompletionWithMetaParams struct {
