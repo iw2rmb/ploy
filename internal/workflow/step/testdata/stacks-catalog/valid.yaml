@@ -1,0 +1,29 @@
+# valid.yaml - Complete valid stack catalog for testing
+stacks:
+  - image: maven:3-eclipse-temurin-17
+    lang: java
+    tool: maven
+    release: "17"
+    profile: profiles/java-17-maven.yaml
+
+  - image: gradle:8.8-jdk17
+    lang: java
+    tool: gradle
+    release: "17"
+    profile: profiles/java-17-gradle.yaml
+
+  - image: eclipse-temurin:17-jdk
+    lang: java
+    release: "17"
+    profile: profiles/java-17.yaml
+
+  - image: maven:3-eclipse-temurin-11
+    lang: java
+    tool: maven
+    release: "11"
+    profile: profiles/java-11-maven.yaml
+
+  - image: eclipse-temurin:11-jdk
+    lang: java
+    release: "11"
+    profile: profiles/java-11.yaml

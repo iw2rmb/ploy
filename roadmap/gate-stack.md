@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `design/gate-stack.md`; `internal/store/schema.sql`;
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Stack Catalog And Profile Sources
-- [ ] Replace legacy stack image map with `gates/stacks.yaml` and profile references — make one canonical source for stack image + default profile path.
+- [x] Replace legacy stack image map with `gates/stacks.yaml` and profile references — make one canonical source for stack image + default profile path.
   - Repository: ploy
   - Component: gate catalog assets; build/deploy packaging
   - Scope: add `gates/stacks.yaml` schema with fields `lang`, `release`, `tool`, `image`, `profile`; generate/update `gates/profiles/{lang}-{release}{-tool}.yaml`; keep file paths deterministic and stable for CI.

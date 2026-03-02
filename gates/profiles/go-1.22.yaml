@@ -1,0 +1,24 @@
+schema_version: 1
+repo_id: default
+runner_mode: simple
+stack:
+  language: go
+  tool: go
+  release: "1.22"
+targets:
+  active: all_tests
+  build:
+    status: not_attempted
+    command: go test ./... -run '^$'
+    env: {}
+  unit:
+    status: not_attempted
+    command: go test ./...
+    env: {}
+  all_tests:
+    status: not_attempted
+    command: go test ./...
+    env: {}
+orchestration:
+  pre: []
+  post: []

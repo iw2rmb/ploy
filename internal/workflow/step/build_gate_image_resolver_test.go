@@ -9,6 +9,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+func writeDummyProfile(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir profile dir: %v", err)
+	}
+	const profile = "schema_version: 1\nrepo_id: default\nrunner_mode: simple\nstack:\n  language: java\n  tool: maven\ntargets:\n  active: build\n  build:\n    status: not_attempted\n    command: echo ok\n    env: {}\n  unit:\n    status: not_attempted\n    env: {}\n  all_tests:\n    status: not_attempted\n    env: {}\norchestration:\n  pre: []\n  post: []\n"
+	if err := os.WriteFile(path, []byte(profile), 0o644); err != nil {
+		t.Fatalf("write profile file: %v", err)
+	}
+}
+
 // TestBuildGateImageResolver_Resolve tests resolution logic.
 func TestBuildGateImageResolver_Resolve(t *testing.T) {
 	rules := []contracts.BuildGateImageRule{
@@ -158,7 +169,7 @@ func TestBuildGateImageResolver_PrecedenceLastWins(t *testing.T) {
 // TestBuildGateImageResolver_MissingFile tests error handling for missing file.
 func TestBuildGateImageResolver_MissingFile(t *testing.T) {
 	// When requireDefaultFile=true and file is missing, should error.
-	_, err := NewBuildGateImageResolver("/nonexistent/path/build-gate-images.yaml", nil, true)
+	_, err := NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, true)
 	if err == nil {
 		t.Fatal("expected error for missing file when requireDefaultFile=true")
 	}
@@ -167,7 +178,7 @@ func TestBuildGateImageResolver_MissingFile(t *testing.T) {
 	}
 
 	// When requireDefaultFile=false and file is missing, should not error.
-	resolver, err := NewBuildGateImageResolver("/nonexistent/path/build-gate-images.yaml", nil, false)
+	resolver, err := NewBuildGateImageResolver("/nonexistent/path/stacks.yaml", nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -241,7 +252,7 @@ func TestBuildGateImageResolver_DuplicateInLevel(t *testing.T) {
 
 // TestBuildGateImageResolver_LoadValidFile tests loading a valid YAML file.
 func TestBuildGateImageResolver_LoadValidFile(t *testing.T) {
-	testFile := filepath.Join("testdata", "build-gate-images", "valid.yaml")
+	testFile := filepath.Join("testdata", "stacks-catalog", "valid.yaml")
 	if _, err := os.Stat(testFile); os.IsNotExist(err) {
 		t.Skip("test data file not found")
 	}
@@ -296,19 +307,25 @@ func TestBuildGateImageResolver_LoadFile_ReleaseCoercion(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	path := filepath.Join(dir, "build-gate-images.yaml")
-	const body = `BuildGateImages:
-  - language: java
+	path := filepath.Join(dir, "stacks.yaml")
+	writeDummyProfile(t, filepath.Join(dir, "profiles", "java-maven.yaml"))
+	writeDummyProfile(t, filepath.Join(dir, "profiles", "java-gradle.yaml"))
+	writeDummyProfile(t, filepath.Join(dir, "profiles", "python.yaml"))
+	const body = `stacks:
+  - lang: java
     tool: maven
     release: 17
     image: maven:17
-  - language: java
+    profile: profiles/java-maven.yaml
+  - lang: java
     tool: gradle
     release: 17.0
     image: gradle:17
-  - language: python
+    profile: profiles/java-gradle.yaml
+  - lang: python
     release: 3.11
     image: python:3.11
+    profile: profiles/python.yaml
 `
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatalf("write mapping file: %v", err)
@@ -364,12 +381,12 @@ func TestBuildGateImageResolver_LoadInvalidFile(t *testing.T) {
 	}{
 		{
 			name:    "missing language",
-			file:    filepath.Join("testdata", "build-gate-images", "invalid-missing-language.yaml"),
-			wantErr: "stack.language: required",
+			file:    filepath.Join("testdata", "stacks-catalog", "invalid-missing-language.yaml"),
+			wantErr: "stacks[0].lang: required",
 		},
 		{
 			name:    "duplicate selector",
-			file:    filepath.Join("testdata", "build-gate-images", "invalid-duplicate.yaml"),
+			file:    filepath.Join("testdata", "stacks-catalog", "invalid-duplicate.yaml"),
 			wantErr: "duplicate selector",
 		},
 	}
@@ -439,14 +456,18 @@ func TestBuildGateImageResolver_FullPrecedenceWithFile(t *testing.T) {
 	// Create temp file for default rules.
 	tmpDir := t.TempDir()
 	defaultFile := filepath.Join(tmpDir, "default.yaml")
+	writeDummyProfile(t, filepath.Join(tmpDir, "profiles", "java17.yaml"))
+	writeDummyProfile(t, filepath.Join(tmpDir, "profiles", "java11.yaml"))
 	if err := os.WriteFile(defaultFile, []byte(`
-BuildGateImages:
+stacks:
   - image: default:17
-    language: java
+    lang: java
     release: "17"
+    profile: profiles/java17.yaml
   - image: default:11
-    language: java
+    lang: java
     release: "11"
+    profile: profiles/java11.yaml
 `), 0644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
@@ -499,4 +520,18 @@ BuildGateImages:
 			t.Errorf("Resolve() = %q, want %q (should fall back to default for java:11)", got, "default:11")
 		}
 	})
+}
+
+func TestBuildGateImageResolver_DefaultCatalogAssetsAreValid(t *testing.T) {
+	catalogPath := buildGateDefaultStacksCatalogPath()
+	resolver, err := NewBuildGateImageResolver(catalogPath, nil, true)
+	if err != nil {
+		t.Fatalf("NewBuildGateImageResolver() error: %v", err)
+	}
+	if resolver == nil {
+		t.Fatal("resolver is nil")
+	}
+	if len(resolver.rules) == 0 {
+		t.Fatal("resolver has no rules from default stacks catalog")
+	}
 }

@@ -106,7 +106,7 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 // normalized metadata about the outcome.
 //
 // Image selection:
-//   - Default mapping file (`etc/ploy/gates/build-gate-images.yaml`) + mig YAML overrides (`build_gate.images[]`)
+//   - Default stacks catalog (`gates/stacks.yaml`) + mig YAML overrides (`build_gate.images[]`)
 //
 // The workspace is mounted at /workspace and used as the working directory.
 // When stack detection fails, the gate fails with a static check report and
@@ -138,10 +138,10 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		return nil, errBuildGateRuntimeUnavailable
 	}
 
-	mappingPath := buildGateDefaultImagesFilePath()
+	catalogPath := buildGateDefaultStacksCatalogPath()
 
 	obs, detectErr := stackdetect.Detect(ctx, workspace)
-	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, obs, detectErr, mappingPath)
+	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, obs, detectErr, catalogPath)
 	if terminal != nil {
 		if terminal.reportRuntimeImage {
 			reportGateRuntimeImage(ctx, terminal.runtimeImage)
@@ -230,9 +230,9 @@ func dockerHostSocketPathFromEnv(env map[string]string) string {
 	return socketPath
 }
 
-func buildGateDefaultImagesFilePath() string {
+func buildGateDefaultStacksCatalogPath() string {
 	goModuleFile := "go." + "mo" + "d"
-	installed := "/etc/ploy/gates/build-gate-images.yaml"
+	installed := "/etc/ploy/gates/stacks.yaml"
 	if info, err := os.Stat(installed); err == nil && !info.IsDir() {
 		return installed
 	}
@@ -241,7 +241,7 @@ func buildGateDefaultImagesFilePath() string {
 		dir := wd
 		for {
 			if info, serr := os.Stat(filepath.Join(dir, goModuleFile)); serr == nil && !info.IsDir() {
-				candidate := filepath.Join(dir, DefaultMappingPath)
+				candidate := filepath.Join(dir, DefaultStacksCatalogPath)
 				if info, serr := os.Stat(candidate); serr == nil && !info.IsDir() {
 					return candidate
 				}
@@ -254,7 +254,7 @@ func buildGateDefaultImagesFilePath() string {
 			dir = parent
 		}
 	}
-	return DefaultMappingPath
+	return DefaultStacksCatalogPath
 }
 
 func parseInt64(s string) (int64, error) { return strconv.ParseInt(strings.TrimSpace(s), 10, 64) }
