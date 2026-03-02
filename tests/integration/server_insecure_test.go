@@ -43,26 +43,7 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-	// Step 3: Initialize events service for SSE fanout (required by handlers).
-	eventsService, err := server.NewEventsService(server.EventsOptions{
-		BufferSize:  32,
-		HistorySize: 256,
-		Logger:      nil,
-		Store:       db,
-	})
-	if err != nil {
-		t.Fatalf("server.NewEventsService() failed: %v", err)
-	}
-	if err := eventsService.Start(ctx); err != nil {
-		t.Fatalf("eventsService.Start() failed: %v", err)
-	}
-	defer func() {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer shutdownCancel()
-		_ = eventsService.Stop(shutdownCtx)
-	}()
-
-	// Step 4: Configure and start HTTP server without TLS.
+	// Step 3: Configure and start HTTP server without TLS.
 	httpCfg := config.HTTPConfig{
 		Listen: "127.0.0.1:0", // Use port 0 to let OS assign a free port.
 	}
@@ -100,7 +81,7 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	serverAddr := httpSrv.Addr()
 	t.Logf("Server started at %s", serverAddr)
 
-	// Step 5: Make an HTTP request to the health endpoint (no TLS required).
+	// Step 4: Make an HTTP request to the health endpoint (no TLS required).
 	// Wait a brief moment for the server to fully start.
 	time.Sleep(100 * time.Millisecond)
 
@@ -124,7 +105,7 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	}
 	t.Logf("Health check response: %s", bodyBytes)
 
-	// Step 6: Make an HTTP request to a protected endpoint (runs list).
+	// Step 5: Make an HTTP request to a protected endpoint (runs list).
 	// Since AllowInsecure is true with DefaultRole=RoleControlPlane,
 	// requests without TLS should be allowed and assigned the control-plane role.
 	runsURL := fmt.Sprintf("http://%s/v1/runs", serverAddr)
@@ -147,7 +128,7 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	}
 	t.Logf("Runs list response: %v", runsResp)
 
-	// Step 7: Stop the server gracefully.
+	// Step 6: Stop the server gracefully.
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
@@ -157,7 +138,7 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 
 	t.Log("Server stopped successfully")
 
-	// Step 8: Verify the server is no longer responding.
+	// Step 7: Verify the server is no longer responding.
 	// We expect a connection error since the server is stopped.
 	time.Sleep(100 * time.Millisecond)
 	resp3, err := http.Get(healthURL)

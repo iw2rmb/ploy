@@ -161,7 +161,7 @@ Legend: [ ] todo, [x] done.
     - Review docs for removed obsolete mapping statements.
 
 ## Validation
-- [ ] Run full local validation for this rollout slice — ensure contract/runtime/docs stay coherent.
+- [x] Run full local validation for this rollout slice — ensure contract/runtime/docs stay coherent.
   - Repository: `ploy`
   - Component: CI-equivalent local checks
   - Scope: Execute:
