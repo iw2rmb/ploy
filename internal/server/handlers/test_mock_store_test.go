@@ -313,13 +313,13 @@ type mockStore struct {
 	// PromotePreGateGeneratedGateProfile tracking
 	promotePreGateGeneratedGateProfileCalled bool
 	promotePreGateGeneratedGateProfileParams store.PromotePreGateGeneratedGateProfileParams
-	promotePreGateGeneratedGateProfileResult types.MigRepoID
+	promotePreGateGeneratedGateProfileResult types.RepoID
 	promotePreGateGeneratedGateProfileErr    error
 
 	// PromoteReGateRecoveryCandidateGateProfile tracking
 	promoteReGateRecoveryCandidateGateProfileCalled bool
 	promoteReGateRecoveryCandidateGateProfileParams store.PromoteReGateRecoveryCandidateGateProfileParams
-	promoteReGateRecoveryCandidateGateProfileResult types.MigRepoID
+	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
 	promoteReGateRecoveryCandidateGateProfileErr    error
 
 	// UpdateJobNextID tracking
@@ -457,7 +457,7 @@ type mockStore struct {
 	listMigReposByModResult  []store.MigRepo
 	listMigReposByModResults map[string][]store.MigRepo
 	listMigReposByModErr     error
-	repoByID                 map[types.MigRepoID]store.Repo
+	repoByID                 map[types.RepoID]store.Repo
 
 	// GetMigRepoByURL tracking (for bulk upsert duplicate detection)
 	getModRepoByURLCalled bool
@@ -485,7 +485,7 @@ type mockStore struct {
 	// ListFailedRepoIDsByMig tracking (for "failed" repo selection)
 	listFailedRepoIDsByModCalled bool
 	listFailedRepoIDsByModParam  string
-	listFailedRepoIDsByModResult []types.MigRepoID
+	listFailedRepoIDsByModResult []types.RepoID
 	listFailedRepoIDsByModErr    error
 
 	// ListRunReposWithURLByRun tracking (for pull resolution)
@@ -670,7 +670,7 @@ func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRep
 		result.MigID = params.MigID
 	}
 	if result.RepoID.IsZero() {
-		result.RepoID = params.ID
+		result.RepoID = types.NewRepoID()
 	}
 	if result.BaseRef == "" {
 		result.BaseRef = params.BaseRef
@@ -679,7 +679,7 @@ func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRep
 		result.TargetRef = params.TargetRef
 	}
 	if m.repoByID == nil {
-		m.repoByID = map[types.MigRepoID]store.Repo{}
+		m.repoByID = map[types.RepoID]store.Repo{}
 	}
 	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
 	return result, m.createMigRepoErr
@@ -1116,7 +1116,7 @@ func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobI
 	return store.Job{}, pgx.ErrNoRows
 }
 
-func (m *mockStore) PromotePreGateGeneratedGateProfile(ctx context.Context, arg store.PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error) {
+func (m *mockStore) PromotePreGateGeneratedGateProfile(ctx context.Context, arg store.PromotePreGateGeneratedGateProfileParams) (types.RepoID, error) {
 	m.promotePreGateGeneratedGateProfileCalled = true
 	m.promotePreGateGeneratedGateProfileParams = arg
 	if m.promotePreGateGeneratedGateProfileErr != nil {
@@ -1131,7 +1131,7 @@ func (m *mockStore) PromotePreGateGeneratedGateProfile(ctx context.Context, arg 
 	return "", pgx.ErrNoRows
 }
 
-func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {
+func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error) {
 	m.promoteReGateRecoveryCandidateGateProfileCalled = true
 	m.promoteReGateRecoveryCandidateGateProfileParams = arg
 	if m.promoteReGateRecoveryCandidateGateProfileErr != nil {
@@ -1412,7 +1412,7 @@ func (m *mockStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoPa
 		result.MigID = arg.MigID
 	}
 	if result.RepoID.IsZero() {
-		result.RepoID = arg.ID
+		result.RepoID = types.NewRepoID()
 	}
 	if result.BaseRef == "" {
 		result.BaseRef = arg.BaseRef
@@ -1421,13 +1421,13 @@ func (m *mockStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoPa
 		result.TargetRef = arg.TargetRef
 	}
 	if m.repoByID == nil {
-		m.repoByID = map[types.MigRepoID]store.Repo{}
+		m.repoByID = map[types.RepoID]store.Repo{}
 	}
 	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: arg.Url}
 	return result, m.upsertModRepoErr
 }
 
-func (m *mockStore) GetRepo(ctx context.Context, id types.MigRepoID) (store.Repo, error) {
+func (m *mockStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, error) {
 	if m.repoByID != nil {
 		if repo, ok := m.repoByID[id]; ok {
 			return repo, nil
@@ -1447,14 +1447,14 @@ func (m *mockStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error
 }
 
 // HasMigRepoHistory checks if a mod_repo has any historical executions.
-func (m *mockStore) HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error) {
+func (m *mockStore) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
 	m.hasModRepoHistoryCalled = true
 	m.hasModRepoHistoryParam = repoID.String()
 	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
 }
 
 // ListFailedRepoIDsByMig returns repo IDs whose last terminal status is 'Fail'.
-func (m *mockStore) ListFailedRepoIDsByMig(ctx context.Context, modID types.MigID) ([]types.MigRepoID, error) {
+func (m *mockStore) ListFailedRepoIDsByMig(ctx context.Context, modID types.MigID) ([]types.RepoID, error) {
 	m.listFailedRepoIDsByModCalled = true
 	m.listFailedRepoIDsByModParam = modID.String()
 	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr

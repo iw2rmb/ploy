@@ -180,7 +180,7 @@ func TestListModReposHandler(t *testing.T) {
 					{ID: "repo0001", MigID: "mod123", RepoID: "repo0001", BaseRef: "main", TargetRef: "feature1"},
 					{ID: "repo0002", MigID: "mod123", RepoID: "repo0002", BaseRef: "develop", TargetRef: "feature2"},
 				}
-				m.repoByID = map[types.MigRepoID]store.Repo{
+				m.repoByID = map[types.RepoID]store.Repo{
 					"repo0001": {ID: "repo0001", Url: "https://github.com/org/repo1"},
 					"repo0002": {ID: "repo0002", Url: "https://github.com/org/repo2"},
 				}

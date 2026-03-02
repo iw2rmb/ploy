@@ -49,9 +49,9 @@ WHERE run_id = $1
 `
 
 type CancelActiveJobsByRunRepoAttemptParams struct {
-	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.MigRepoID `json:"repo_id"`
-	Attempt int32           `json:"attempt"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+	Attempt int32        `json:"attempt"`
 }
 
 // Bulk-cancels active jobs for a specific repo attempt.
@@ -164,9 +164,9 @@ GROUP BY status
 `
 
 type CountJobsByRunRepoAttemptGroupByStatusParams struct {
-	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.MigRepoID `json:"repo_id"`
-	Attempt int32           `json:"attempt"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+	Attempt int32        `json:"attempt"`
 }
 
 type CountJobsByRunRepoAttemptGroupByStatusRow struct {
@@ -257,17 +257,17 @@ RETURNING
 `
 
 type CreateJobParams struct {
-	ID          types.JobID     `json:"id"`
-	RunID       types.RunID     `json:"run_id"`
-	RepoID      types.MigRepoID `json:"repo_id"`
-	RepoBaseRef string          `json:"repo_base_ref"`
-	Attempt     int32           `json:"attempt"`
-	Name        string          `json:"name"`
-	Status      JobStatus       `json:"status"`
-	JobType     string          `json:"job_type"`
-	JobImage    string          `json:"job_image"`
-	NextID      *types.JobID    `json:"next_id"`
-	Meta        []byte          `json:"meta"`
+	ID          types.JobID  `json:"id"`
+	RunID       types.RunID  `json:"run_id"`
+	RepoID      types.RepoID `json:"repo_id"`
+	RepoBaseRef string       `json:"repo_base_ref"`
+	Attempt     int32        `json:"attempt"`
+	Name        string       `json:"name"`
+	Status      JobStatus    `json:"status"`
+	JobType     string       `json:"job_type"`
+	JobImage    string       `json:"job_image"`
+	NextID      *types.JobID `json:"next_id"`
+	Meta        []byte       `json:"meta"`
 }
 
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -424,9 +424,9 @@ ORDER BY id ASC
 `
 
 type ListCreatedJobsByRunRepoAttemptParams struct {
-	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.MigRepoID `json:"repo_id"`
-	Attempt int32           `json:"attempt"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+	Attempt int32        `json:"attempt"`
 }
 
 func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error) {
@@ -566,9 +566,9 @@ ORDER BY id ASC
 `
 
 type ListJobsByRunRepoAttemptParams struct {
-	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.MigRepoID `json:"repo_id"`
-	Attempt int32           `json:"attempt"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+	Attempt int32        `json:"attempt"`
 }
 
 func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error) {
@@ -631,10 +631,10 @@ ORDER BY jobs.run_id ASC, jobs.repo_id ASC, jobs.attempt ASC
 `
 
 type ListStaleRunningJobsRow struct {
-	RunID       types.RunID     `json:"run_id"`
-	RepoID      types.MigRepoID `json:"repo_id"`
-	Attempt     int32           `json:"attempt"`
-	RunningJobs int32           `json:"running_jobs"`
+	RunID       types.RunID  `json:"run_id"`
+	RepoID      types.RepoID `json:"repo_id"`
+	Attempt     int32        `json:"attempt"`
+	RunningJobs int32        `json:"running_jobs"`
 }
 
 // Lists running jobs whose assigned node is stale at the provided cutoff.
@@ -786,9 +786,9 @@ RETURNING
 `
 
 type ScheduleNextJobParams struct {
-	RunID   types.RunID     `json:"run_id"`
-	RepoID  types.MigRepoID `json:"repo_id"`
-	Attempt int32           `json:"attempt"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+	Attempt int32        `json:"attempt"`
 }
 
 // Atomically promote the next unblocked job in a repo attempt: Created -> Queued.

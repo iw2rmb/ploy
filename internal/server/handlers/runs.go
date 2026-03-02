@@ -156,17 +156,17 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 // v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
 // to mig_repos.id (NanoID(8)).
 type RunRepoResponse struct {
-	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoID     domaintypes.MigRepoID `json:"repo_id"`
-	RepoURL    string                `json:"repo_url"`
-	BaseRef    string                `json:"base_ref"`
-	TargetRef  string                `json:"target_ref"`
-	Status     store.RunRepoStatus   `json:"status"`
-	Attempt    int32                 `json:"attempt"`
-	LastError  *string               `json:"last_error,omitempty"`
-	CreatedAt  time.Time             `json:"created_at"`
-	StartedAt  *time.Time            `json:"started_at,omitempty"`
-	FinishedAt *time.Time            `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID   `json:"run_id"`
+	RepoID     domaintypes.RepoID  `json:"repo_id"`
+	RepoURL    string              `json:"repo_url"`
+	BaseRef    string              `json:"base_ref"`
+	TargetRef  string              `json:"target_ref"`
+	Status     store.RunRepoStatus `json:"status"`
+	Attempt    int32               `json:"attempt"`
+	LastError  *string             `json:"last_error,omitempty"`
+	CreatedAt  time.Time           `json:"created_at"`
+	StartedAt  *time.Time          `json:"started_at,omitempty"`
+	FinishedAt *time.Time          `json:"finished_at,omitempty"`
 }
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.

@@ -254,7 +254,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if repo has historical executions (run_repos references).
-		hasHistory, err := st.HasMigRepoHistory(r.Context(), repoID)
+		hasHistory, err := st.HasMigRepoHistory(r.Context(), repo.RepoID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to check repo history: %v", err)
 			slog.Error("delete mig repo: check history failed", "repo_id", repoID, "err", err)

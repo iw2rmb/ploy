@@ -17,7 +17,7 @@ FROM repos
 WHERE id = $1
 `
 
-func (q *Queries) GetRepo(ctx context.Context, id types.MigRepoID) (Repo, error) {
+func (q *Queries) GetRepo(ctx context.Context, id types.RepoID) (Repo, error) {
 	row := q.db.QueryRow(ctx, getRepo, id)
 	var i Repo
 	err := row.Scan(&i.ID, &i.Url, &i.CreatedAt)

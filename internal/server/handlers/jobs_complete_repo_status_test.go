@@ -22,7 +22,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 
@@ -106,7 +106,7 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 
@@ -170,7 +170,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("pre_gate", 1000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 	f.Job.Name = "pre-gate"
@@ -261,7 +261,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("post_gate", 3000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 	f.Job.Name = "post-gate"
@@ -367,7 +367,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mr", 9000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 	f.Job.Name = "mr-0"
@@ -418,11 +418,11 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatusResult).
-	_ = domaintypes.NewMigRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
+	_ = domaintypes.NewRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
 
 	// Job for repo A completing (repo B still has work).
 	st := &mockStore{

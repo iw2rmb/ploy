@@ -48,7 +48,7 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 
 	type staleKey struct {
 		runID   types.RunID
-		repoID  types.MigRepoID
+		repoID  types.RepoID
 		attempt int32
 	}
 	got := make(map[staleKey]int32, len(rows))
@@ -291,7 +291,7 @@ func createJobForStaleRecoveryQueryTest(
 	ctx context.Context,
 	db Store,
 	runID types.RunID,
-	repoID types.MigRepoID,
+	repoID types.RepoID,
 	repoBaseRef string,
 	attempt int32,
 	name string,

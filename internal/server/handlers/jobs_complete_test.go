@@ -285,7 +285,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -327,7 +327,7 @@ func TestCompleteJob_Exit137SetsLastError_WhenRunLookupFails(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 
 	st := &mockStore{
 		getRunErr:           errors.New("transient run lookup failure"),
@@ -356,7 +356,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("pre_gate", 1000)
-	f.Job.RepoID = domaintypes.NewMigRepoID()
+	f.Job.RepoID = domaintypes.NewRepoID()
 
 	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},

@@ -49,9 +49,9 @@ type modPullRequest struct {
 //   - repo_id: the mig_repos.id for the matched repo
 //   - repo_target_ref: the target ref snapshot from run_repos
 type pullResponse struct {
-	RunID         domaintypes.RunID     `json:"run_id"`
-	RepoID        domaintypes.MigRepoID `json:"repo_id"`
-	RepoTargetRef string                `json:"repo_target_ref"`
+	RunID         domaintypes.RunID  `json:"run_id"`
+	RepoID        domaintypes.RepoID `json:"repo_id"`
+	RepoTargetRef string             `json:"repo_target_ref"`
 }
 
 // -------------------------------------------------------------------------
@@ -238,7 +238,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Find the repo_id matching the normalized URL.
-		var matchedRepoID domaintypes.MigRepoID
+		var matchedRepoID domaintypes.RepoID
 		for _, mr := range modRepos {
 			repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
 			if err != nil {

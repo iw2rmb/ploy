@@ -118,14 +118,14 @@ type Querier interface {
 	// Gets a mig_repo by mig_id and repo_url (for uniqueness constraint enforcement).
 	GetMigRepoByURL(ctx context.Context, arg GetMigRepoByURLParams) (MigRepo, error)
 	GetNode(ctx context.Context, id types.NodeID) (Node, error)
-	GetRepo(ctx context.Context, id types.MigRepoID) (Repo, error)
+	GetRepo(ctx context.Context, id types.RepoID) (Repo, error)
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
-	HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error)
+	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -171,7 +171,7 @@ type Querier interface {
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
 	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.
 	// Uses a subquery to get the last terminal status per repo, then filters for 'Fail'.
-	ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.MigRepoID, error)
+	ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
 	// Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
 	// Returns all global environment entries, ordered by key for consistent iteration.
@@ -231,10 +231,10 @@ type Querier interface {
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
 	// Returns target repo_id for callers that still rely on this method's result.
-	PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error)
+	PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.RepoID, error)
 	// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
 	// Returns target repo_id for callers that still rely on this method's result.
-	PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error)
+	PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.
 	// A created job is unblocked when all predecessor jobs that point to it are Success.

@@ -100,7 +100,7 @@ type GateProfile struct {
 type Job struct {
 	ID          types.JobID        `json:"id"`
 	RunID       types.RunID        `json:"run_id"`
-	RepoID      types.MigRepoID    `json:"repo_id"`
+	RepoID      types.RepoID       `json:"repo_id"`
 	RepoBaseRef string             `json:"repo_base_ref"`
 	Attempt     int32              `json:"attempt"`
 	Name        string             `json:"name"`
@@ -152,7 +152,7 @@ type Mig struct {
 type MigRepo struct {
 	ID        types.MigRepoID    `json:"id"`
 	MigID     types.MigID        `json:"mig_id"`
-	RepoID    types.MigRepoID    `json:"repo_id"`
+	RepoID    types.RepoID       `json:"repo_id"`
 	BaseRef   string             `json:"base_ref"`
 	TargetRef string             `json:"target_ref"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -197,7 +197,7 @@ type PloySchemaVersion struct {
 }
 
 type Repo struct {
-	ID        types.MigRepoID    `json:"id"`
+	ID        types.RepoID       `json:"id"`
 	Url       string             `json:"url"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
@@ -217,7 +217,7 @@ type Run struct {
 type RunRepo struct {
 	MigID           types.MigID        `json:"mig_id"`
 	RunID           types.RunID        `json:"run_id"`
-	RepoID          types.MigRepoID    `json:"repo_id"`
+	RepoID          types.RepoID       `json:"repo_id"`
 	RepoBaseRef     string             `json:"repo_base_ref"`
 	RepoTargetRef   string             `json:"repo_target_ref"`
 	SourceCommitSha string             `json:"source_commit_sha"`

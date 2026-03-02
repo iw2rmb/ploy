@@ -113,7 +113,7 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 			{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
 		},
 		// Only repo2 has a failed last status.
-		listFailedRepoIDsByModResult: []domaintypes.MigRepoID{"repo2"},
+		listFailedRepoIDsByModResult: []domaintypes.RepoID{"repo2"},
 	}
 	handler := createMigRunHandler(st)
 
@@ -182,7 +182,7 @@ func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 			{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
 			{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
 		},
-		repoByID: map[domaintypes.MigRepoID]store.Repo{
+		repoByID: map[domaintypes.RepoID]store.Repo{
 			"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},
 			"repo2": {ID: "repo2", Url: "https://github.com/org/repo2"},
 			"repo3": {ID: "repo3", Url: "https://github.com/org/repo3"},
@@ -488,7 +488,7 @@ func TestModRuns_Create_NoReposSelected(t *testing.T) {
 			{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 		// No failed repos.
-		listFailedRepoIDsByModResult: []domaintypes.MigRepoID{},
+		listFailedRepoIDsByModResult: []domaintypes.RepoID{},
 	}
 	handler := createMigRunHandler(st)
 
@@ -731,7 +731,7 @@ func TestModRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 		listMigReposByModResult: []store.MigRepo{
 			{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
-		repoByID: map[domaintypes.MigRepoID]store.Repo{
+		repoByID: map[domaintypes.RepoID]store.Repo{
 			"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},
 		},
 	}

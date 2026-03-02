@@ -52,7 +52,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          insertIDs[i],
 			RunID:       run.ID,
-			RepoID:      fx.MigRepo.ID,
+			RepoID:      fx.MigRepo.RepoID,
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-tie-" + insertIDs[i].String(),
@@ -219,27 +219,27 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	}
 
 	var repoLowStr string
-	if err := db.Pool().QueryRow(ctx, `SELECT id FROM (VALUES ($1::text), ($2::text)) v(id) ORDER BY id ASC LIMIT 1`, fx.MigRepo.ID, repo2.ID).Scan(&repoLowStr); err != nil {
+	if err := db.Pool().QueryRow(ctx, `SELECT id FROM (VALUES ($1::text), ($2::text)) v(id) ORDER BY id ASC LIMIT 1`, fx.MigRepo.RepoID, repo2.RepoID).Scan(&repoLowStr); err != nil {
 		t.Fatalf("QueryRow(repoLow) failed: %v", err)
 	}
-	repoLow := types.MigRepoID(repoLowStr)
-	repoHigh := fx.MigRepo.ID
-	if repoLowStr == fx.MigRepo.ID.String() {
-		repoHigh = repo2.ID
+	repoLow := types.RepoID(repoLowStr)
+	repoHigh := fx.MigRepo.RepoID
+	if repoLowStr == fx.MigRepo.RepoID.String() {
+		repoHigh = repo2.RepoID
 	}
 
 	type runRepoKey struct {
 		run  types.RunID
-		repo types.MigRepoID
+		repo types.RepoID
 	}
 	runRepoByKey := map[runRepoKey]RunRepo{
-		{run: fx.Run.ID, repo: fx.MigRepo.ID}: fx.RunRepo,
-		{run: fx.Run.ID, repo: repo2.ID}:      runRepo2,
-		{run: run2.ID, repo: fx.MigRepo.ID}:   run2Repo1,
-		{run: run2.ID, repo: repo2.ID}:        run2Repo2,
+		{run: fx.Run.ID, repo: fx.MigRepo.RepoID}: fx.RunRepo,
+		{run: fx.Run.ID, repo: repo2.RepoID}:      runRepo2,
+		{run: run2.ID, repo: fx.MigRepo.RepoID}:   run2Repo1,
+		{run: run2.ID, repo: repo2.RepoID}:        run2Repo2,
 	}
 
-	createJob := func(runID types.RunID, repoID types.MigRepoID, stepIndex float64) types.JobID {
+	createJob := func(runID types.RunID, repoID types.RepoID, stepIndex float64) types.JobID {
 		t.Helper()
 		rr, ok := runRepoByKey[runRepoKey{run: runID, repo: repoID}]
 		if !ok {

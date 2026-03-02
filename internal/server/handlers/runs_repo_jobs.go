@@ -27,7 +27,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
+		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
 			return

@@ -139,7 +139,7 @@ SELECT EXISTS(
 
 // Checks if a mig_repo has any historical executions (run_repos references).
 // Returns true if the repo cannot be deleted due to history, false otherwise.
-func (q *Queries) HasMigRepoHistory(ctx context.Context, repoID types.MigRepoID) (bool, error) {
+func (q *Queries) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
 	row := q.db.QueryRow(ctx, hasMigRepoHistory, repoID)
 	var has_history bool
 	err := row.Scan(&has_history)
@@ -169,7 +169,7 @@ ORDER BY r.url ASC, mr.repo_id ASC
 `
 
 type ListDistinctReposRow struct {
-	RepoID     types.MigRepoID    `json:"repo_id"`
+	RepoID     types.RepoID       `json:"repo_id"`
 	RepoUrl    string             `json:"repo_url"`
 	LastRunAt  pgtype.Timestamptz `json:"last_run_at"`
 	LastStatus interface{}        `json:"last_status"`
@@ -258,9 +258,9 @@ type PromotePreGateGeneratedGateProfileParams struct {
 
 // Legacy compatibility shim: gate profile persistence on mig_repos is removed.
 // Returns target repo_id for callers that still rely on this method's result.
-func (q *Queries) PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.MigRepoID, error) {
+func (q *Queries) PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.RepoID, error) {
 	row := q.db.QueryRow(ctx, promotePreGateGeneratedGateProfile, arg.ID, arg.GateProfile, arg.GateProfileArtifacts)
-	var repo_id types.MigRepoID
+	var repo_id types.RepoID
 	err := row.Scan(&repo_id)
 	return repo_id, err
 }
@@ -296,14 +296,14 @@ type PromoteReGateRecoveryCandidateGateProfileParams struct {
 
 // Legacy compatibility shim: gate profile persistence on mig_repos is removed.
 // Returns target repo_id for callers that still rely on this method's result.
-func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.MigRepoID, error) {
+func (q *Queries) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error) {
 	row := q.db.QueryRow(ctx, promoteReGateRecoveryCandidateGateProfile,
 		arg.ID,
 		arg.JobMeta,
 		arg.GateProfile,
 		arg.GateProfileArtifacts,
 	)
-	var repo_id types.MigRepoID
+	var repo_id types.RepoID
 	err := row.Scan(&repo_id)
 	return repo_id, err
 }

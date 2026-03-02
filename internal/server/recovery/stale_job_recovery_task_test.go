@@ -18,7 +18,7 @@ import (
 
 type staleKey struct {
 	runID   domaintypes.RunID
-	repoID  domaintypes.MigRepoID
+	repoID  domaintypes.RepoID
 	attempt int32
 }
 
@@ -60,6 +60,10 @@ type mockStore struct {
 	listRunReposByRunCalled bool
 	listRunReposByRunResult []store.RunRepo
 	listRunReposByRunErr    error
+
+	listRunReposWithURLByRunCalled bool
+	listRunReposWithURLByRunResult []store.ListRunReposWithURLByRunRow
+	listRunReposWithURLByRunErr    error
 
 	getMigRepoCalled bool
 	getMigRepoResult store.MigRepo
@@ -135,6 +139,51 @@ func (m *mockStore) ListRunReposByRun(ctx context.Context, runID domaintypes.Run
 	return m.listRunReposByRunResult, m.listRunReposByRunErr
 }
 
+func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID domaintypes.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
+	m.listRunReposWithURLByRunCalled = true
+	if m.listRunReposWithURLByRunErr != nil {
+		return nil, m.listRunReposWithURLByRunErr
+	}
+	if len(m.listRunReposWithURLByRunResult) > 0 {
+		return m.listRunReposWithURLByRunResult, nil
+	}
+	if len(m.listRunReposByRunResult) > 0 {
+		rows := make([]store.ListRunReposWithURLByRunRow, 0, len(m.listRunReposByRunResult))
+		for _, rr := range m.listRunReposByRunResult {
+			if rr.RunID != runID {
+				continue
+			}
+			rows = append(rows, store.ListRunReposWithURLByRunRow{
+				RunID:         rr.RunID,
+				RepoID:        rr.RepoID,
+				RepoBaseRef:   rr.RepoBaseRef,
+				RepoTargetRef: rr.RepoTargetRef,
+				Status:        rr.Status,
+				Attempt:       rr.Attempt,
+				CreatedAt:     rr.CreatedAt,
+				StartedAt:     rr.StartedAt,
+				FinishedAt:    rr.FinishedAt,
+				RepoUrl:       "https://github.com/user/repo.git",
+			})
+		}
+		if len(rows) > 0 {
+			return rows, nil
+		}
+	}
+	for _, stale := range m.listStaleRunningJobsResult {
+		if stale.RunID == runID {
+			return []store.ListRunReposWithURLByRunRow{
+				{
+					RunID:   runID,
+					RepoID:  stale.RepoID,
+					RepoUrl: "https://github.com/user/repo.git",
+				},
+			}, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *mockStore) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
 	m.getMigRepoCalled = true
 	return m.getMigRepoResult, m.getMigRepoErr
@@ -173,7 +222,7 @@ func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	st := &mockStore{
 		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoID, Attempt: 2, RunningJobs: 3},
@@ -263,7 +312,7 @@ func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t 
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	st := &mockStore{
 		listStaleRunningJobsResult:           []store.ListStaleRunningJobsRow{{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1}},
 		countStaleNodesWithRunningJobsResult: 1,
@@ -315,7 +364,7 @@ func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	st := &mockStore{
 		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 2},
@@ -403,8 +452,8 @@ func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	repoA := domaintypes.NewMigRepoID()
-	repoB := domaintypes.NewMigRepoID()
+	repoA := domaintypes.NewRepoID()
+	repoB := domaintypes.NewRepoID()
 	st := &mockStore{
 		listStaleRunningJobsResult: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoA, Attempt: 1, RunningJobs: 1},

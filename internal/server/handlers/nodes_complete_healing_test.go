@@ -22,7 +22,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 
 	specBytes, err := json.Marshal(map[string]any{
@@ -161,7 +161,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 
 	specBytes, err := json.Marshal(map[string]any{
@@ -274,7 +274,7 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	successorID := domaintypes.NewJobID()
 
@@ -351,7 +351,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	objKey := "artifacts/run/" + runID.String() + "/bundle/heal-1.tar.gz"
 
@@ -505,7 +505,7 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	nextID := domaintypes.NewJobID()
 
