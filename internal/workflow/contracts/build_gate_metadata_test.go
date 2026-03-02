@@ -423,6 +423,7 @@ func TestBuildGateStageMetadata_GeneratedGateProfile_Validation(t *testing.T) {
 				"runner_mode": "simple",
 				"stack": {"language":"java","tool":"maven","release":"17"},
 				"targets": {
+					"active": "build",
 					"build": {"status":"passed","command":"mvn test","env":{},"failure_code":null},
 					"unit": {"status":"not_attempted","env":{}},
 					"all_tests": {"status":"not_attempted","env":{}}
@@ -479,6 +480,7 @@ func TestBuildGateStageMetadata_Recovery_CandidateValidState(t *testing.T) {
 				"repo_id": "repo_123",
 				"runner_mode": "simple",
 				"targets": {
+					"active": "unit",
 					"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
 					"unit": {"status":"passed","command":"go test ./... -run Unit","env":{},"failure_code":null},
 					"all_tests": {"status":"not_attempted","env":{}}

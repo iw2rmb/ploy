@@ -27,7 +27,7 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -66,7 +66,7 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -116,7 +116,7 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	f.Job.RepoID = domaintypes.NewMigRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
-	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
+	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
@@ -199,6 +199,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
   "runner_mode":"simple",
   "stack":{"language":"java","tool":"maven"},
   "targets":{
+    "active":"build",
     "build":{"status":"passed","command":"mvn test","env":{},"failure_code":null},
     "unit":{"status":"not_attempted","env":{}},
     "all_tests":{"status":"not_attempted","env":{}}
@@ -344,9 +345,10 @@ func TestCompleteJob_PreGateSuccessPromotesGeneratedGateProfile(t *testing.T) {
 						"runner_mode":    "simple",
 						"stack":          map[string]any{"language": "java", "tool": "maven", "release": "17"},
 						"targets": map[string]any{
-							"build":     map[string]any{"status": "passed", "command": "mvn test", "env": map[string]any{}},
+							"active":    "all_tests",
+							"build":     map[string]any{"status": "not_attempted", "env": map[string]any{}},
 							"unit":      map[string]any{"status": "not_attempted", "env": map[string]any{}},
-							"all_tests": map[string]any{"status": "not_attempted", "env": map[string]any{}},
+							"all_tests": map[string]any{"status": "passed", "command": "mvn test", "env": map[string]any{}},
 						},
 						"orchestration": map[string]any{"pre": []any{}, "post": []any{}},
 					},

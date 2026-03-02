@@ -449,6 +449,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 		"runner_mode": "simple",
 		"stack": {"language":"java","tool":"maven"},
 		"targets": {
+			"active": "build",
 			"build": {"status":"passed","command":"go test ./...","env":{},"failure_code":null},
 			"unit": {"status":"not_attempted","env":{}},
 			"all_tests": {"status":"not_attempted","env":{}}
@@ -667,6 +668,7 @@ func TestCandidateMatchesDetectedStack_ReleaseAware(t *testing.T) {
 		"runner_mode": "simple",
 		"stack": {"language":"java","tool":"gradle","release":"11"},
 		"targets": {
+			"active": "build",
 			"build": {"status":"passed","command":"./gradlew test","env":{},"failure_code":null},
 			"unit": {"status":"not_attempted","env":{}},
 			"all_tests": {"status":"not_attempted","env":{}}
