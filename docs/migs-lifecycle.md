@@ -1099,6 +1099,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
   (canonical endpoint; node-based `/v1/nodes/{id}/complete` has been removed).
   - When stats include `job_resources` (`cpu_consumed_ns`, `disk_consumed_bytes`,
     `mem_consumed_bytes`), the server upserts a row in `job_metrics`.
+  - Nodes may report `repo_sha_out`; the server accepts only lowercase 40-hex
+    values and persists the full and short (`repo_sha_out8`) forms on `jobs`.
 - `POST /v1/nodes/{id}/events` — publish run-scoped node exceptions/events
   (for example claim/start failures and runtime panics) into the run SSE stream.
 - `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.

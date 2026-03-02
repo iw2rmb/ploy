@@ -222,6 +222,47 @@ func TestCompleteJob_InvalidStatus(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_InvalidRepoSHAOut(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		sha  string
+	}{
+		{name: "uppercase", sha: "0123456789ABCDEF0123456789ABCDEF01234567"},
+		{name: "too_short", sha: "0123456789abcdef"},
+		{name: "non_hex", sha: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newJobFixture("mig", 1000)
+			st := &mockStore{
+				getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+				getJobResult:        f.Job,
+				listJobsByRunResult: []store.Job{f.Job},
+			}
+
+			handler := completeJobHandler(st, nil, nil)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":       "Success",
+				"repo_sha_out": tt.sha,
+			}))
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+			}
+			if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
+				t.Fatal("did not expect completion persistence on invalid repo_sha_out")
+			}
+		})
+	}
+}
+
 func TestCompleteJob_MissingStatus(t *testing.T) {
 	t.Parallel()
 

@@ -87,7 +87,7 @@ UPDATE jobs
 SET status = 'Running', node_id = eligible.node_id, started_at = now()
 FROM eligible
 WHERE jobs.id = eligible.id
-RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.meta
+RETURNING jobs.id, jobs.run_id, jobs.repo_id, jobs.repo_base_ref, jobs.attempt, jobs.name, jobs.status, jobs.job_type, jobs.job_image, jobs.next_id, jobs.node_id, jobs.exit_code, jobs.started_at, jobs.finished_at, jobs.duration_ms, jobs.repo_sha_in, jobs.repo_sha_out, jobs.repo_sha_in8, jobs.repo_sha_out8, jobs.meta
 `
 
 // Atomically claim the next claimable job for a node (unified queue).
@@ -115,6 +115,10 @@ func (q *Queries) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.RepoShaIn,
+		&i.RepoShaOut,
+		&i.RepoShaIn8,
+		&i.RepoShaOut8,
 		&i.Meta,
 	)
 	return i, err
@@ -245,6 +249,10 @@ RETURNING
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 `
 
@@ -294,6 +302,10 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.RepoShaIn,
+		&i.RepoShaOut,
+		&i.RepoShaIn8,
+		&i.RepoShaOut8,
 		&i.Meta,
 	)
 	return i, err
@@ -347,6 +359,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE id = $1
@@ -371,6 +387,10 @@ func (q *Queries) GetJob(ctx context.Context, id types.JobID) (Job, error) {
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.RepoShaIn,
+		&i.RepoShaOut,
+		&i.RepoShaIn8,
+		&i.RepoShaOut8,
 		&i.Meta,
 	)
 	return i, err
@@ -393,6 +413,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
@@ -430,6 +454,10 @@ func (q *Queries) ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListC
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.RepoShaIn,
+			&i.RepoShaOut,
+			&i.RepoShaIn8,
+			&i.RepoShaOut8,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -459,6 +487,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE run_id = $1
@@ -490,6 +522,10 @@ func (q *Queries) ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, 
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.RepoShaIn,
+			&i.RepoShaOut,
+			&i.RepoShaIn8,
+			&i.RepoShaOut8,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -519,6 +555,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
@@ -556,6 +596,10 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 			&i.StartedAt,
 			&i.FinishedAt,
 			&i.DurationMs,
+			&i.RepoShaIn,
+			&i.RepoShaOut,
+			&i.RepoShaIn8,
+			&i.RepoShaOut8,
 			&i.Meta,
 		); err != nil {
 			return nil, err
@@ -655,6 +699,10 @@ RETURNING
   jobs.started_at,
   jobs.finished_at,
   jobs.duration_ms,
+  jobs.repo_sha_in,
+  jobs.repo_sha_out,
+  jobs.repo_sha_in8,
+  jobs.repo_sha_out8,
   jobs.meta
 `
 
@@ -679,6 +727,10 @@ func (q *Queries) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID)
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.RepoShaIn,
+		&i.RepoShaOut,
+		&i.RepoShaIn8,
+		&i.RepoShaOut8,
 		&i.Meta,
 	)
 	return i, err
@@ -726,6 +778,10 @@ RETURNING
   jobs.started_at,
   jobs.finished_at,
   jobs.duration_ms,
+  jobs.repo_sha_in,
+  jobs.repo_sha_out,
+  jobs.repo_sha_in8,
+  jobs.repo_sha_out8,
   jobs.meta
 `
 
@@ -756,6 +812,10 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 		&i.StartedAt,
 		&i.FinishedAt,
 		&i.DurationMs,
+		&i.RepoShaIn,
+		&i.RepoShaOut,
+		&i.RepoShaIn8,
+		&i.RepoShaOut8,
 		&i.Meta,
 	)
 	return i, err
@@ -763,47 +823,71 @@ func (q *Queries) ScheduleNextJob(ctx context.Context, arg ScheduleNextJobParams
 
 const updateJobCompletion = `-- name: UpdateJobCompletion :exec
 UPDATE jobs
-SET status = $2,
-    exit_code = $3,
+SET status = $1,
+    exit_code = $2,
+    repo_sha_out = CASE
+      WHEN $3::TEXT = '' THEN repo_sha_out
+      ELSE $3::TEXT
+    END,
+    repo_sha_out8 = CASE
+      WHEN $3::TEXT = '' THEN repo_sha_out8
+      ELSE SUBSTRING($3::TEXT, 1, 8)
+    END,
     finished_at = now(),
     duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
-WHERE id = $1
+WHERE id = $4
 `
 
 type UpdateJobCompletionParams struct {
-	ID       types.JobID `json:"id"`
-	Status   JobStatus   `json:"status"`
-	ExitCode *int32      `json:"exit_code"`
+	Status     JobStatus   `json:"status"`
+	ExitCode   *int32      `json:"exit_code"`
+	RepoShaOut string      `json:"repo_sha_out"`
+	ID         types.JobID `json:"id"`
 }
 
 func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error {
-	_, err := q.db.Exec(ctx, updateJobCompletion, arg.ID, arg.Status, arg.ExitCode)
+	_, err := q.db.Exec(ctx, updateJobCompletion,
+		arg.Status,
+		arg.ExitCode,
+		arg.RepoShaOut,
+		arg.ID,
+	)
 	return err
 }
 
 const updateJobCompletionWithMeta = `-- name: UpdateJobCompletionWithMeta :exec
 UPDATE jobs
-SET status = $2,
-    exit_code = $3,
+SET status = $1,
+    exit_code = $2,
+    repo_sha_out = CASE
+      WHEN $3::TEXT = '' THEN repo_sha_out
+      ELSE $3::TEXT
+    END,
+    repo_sha_out8 = CASE
+      WHEN $3::TEXT = '' THEN repo_sha_out8
+      ELSE SUBSTRING($3::TEXT, 1, 8)
+    END,
     finished_at = now(),
     duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
     meta = $4
-WHERE id = $1
+WHERE id = $5
 `
 
 type UpdateJobCompletionWithMetaParams struct {
-	ID       types.JobID `json:"id"`
-	Status   JobStatus   `json:"status"`
-	ExitCode *int32      `json:"exit_code"`
-	Meta     []byte      `json:"meta"`
+	Status     JobStatus   `json:"status"`
+	ExitCode   *int32      `json:"exit_code"`
+	RepoShaOut string      `json:"repo_sha_out"`
+	Meta       []byte      `json:"meta"`
+	ID         types.JobID `json:"id"`
 }
 
 func (q *Queries) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
 	_, err := q.db.Exec(ctx, updateJobCompletionWithMeta,
-		arg.ID,
 		arg.Status,
 		arg.ExitCode,
+		arg.RepoShaOut,
 		arg.Meta,
+		arg.ID,
 	)
 	return err
 }
