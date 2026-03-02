@@ -32,11 +32,7 @@ func (c CancelCommand) Run(ctx context.Context) error {
 	if c.RunID.IsZero() {
 		return errors.New("runs cancel: run id required")
 	}
-	runID := c.RunID.String()
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "cancel")
-	if err != nil {
-		return err
-	}
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "cancel")
 	payload := map[string]string{}
 	if r := strings.TrimSpace(c.Reason); r != "" {
 		payload["reason"] = r
@@ -46,7 +42,7 @@ func (c CancelCommand) Run(ctx context.Context) error {
 		b, _ := json.Marshal(payload)
 		body = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), body)
 	if err != nil {
 		return err
 	}

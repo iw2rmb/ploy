@@ -23,15 +23,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	jobID2 := domaintypes.NewJobID()
 	diffID1 := domaintypes.DiffID("11111111-1111-1111-1111-111111111111")
 	diffID2 := domaintypes.DiffID("22222222-2222-2222-2222-222222222222")
-	firstPage := make([]map[string]any, 0, migListPageSize)
-	for i := 0; i < migListPageSize; i++ {
-		firstPage = append(firstPage, map[string]any{
-			"id":         domaintypes.NewMigID().String(),
-			"name":       "other",
-			"archived":   false,
-			"created_at": "2026-02-24T07:00:00Z",
-		})
-	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -40,6 +31,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 				"id":         runID.String(),
 				"status":     "Started",
 				"mig_id":     migID.String(),
+				"mig_name":   "java17-upgrade",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T08:00:00Z",
 			})
@@ -117,31 +109,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 					},
 				},
 			})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/migs":
-			offset := r.URL.Query().Get("offset")
-			if got := r.URL.Query().Get("limit"); got != "100" {
-				t.Fatalf("expected limit=100, got %q", got)
-			}
-			switch offset {
-			case "0":
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"migs": firstPage,
-				})
-			case "100":
-				_ = json.NewEncoder(w).Encode(map[string]any{
-					"migs": []map[string]any{
-						{
-							"id":         migID.String(),
-							"name":       "java17-upgrade",
-							"spec_id":    specID.String(),
-							"archived":   false,
-							"created_at": "2026-02-24T07:30:00Z",
-						},
-					},
-				})
-			default:
-				t.Fatalf("unexpected migs offset: %s", offset)
-			}
 		default:
 			http.NotFound(w, r)
 		}
@@ -169,35 +136,31 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 		t.Fatalf("unexpected mig name: %q", report.MigName)
 	}
 	if len(report.Repos) != 1 {
-		t.Fatalf("expected 1 repo report, got %d", len(report.Repos))
-	}
-	if len(report.Runs) != 1 {
-		t.Fatalf("expected 1 run entry, got %d", len(report.Runs))
+		t.Fatalf("expected 1 repo entry, got %d", len(report.Repos))
 	}
 
-	repo := report.Repos[0]
-	if repo.PatchURL == "" {
+	entry := report.Repos[0]
+	if entry.PatchURL == "" {
 		t.Fatalf("expected repo patch URL to be populated")
 	}
-	assertURL(t, repo.BuildLogURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/logs", nil)
-	assertURL(t, repo.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
+	assertURL(t, entry.BuildLogURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/logs", nil)
+	assertURL(t, entry.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
 		"download": "true",
 		"diff_id":  diffID2.String(),
 	})
 
-	runEntry := report.Runs[0]
-	if len(runEntry.Jobs) != 2 {
-		t.Fatalf("expected 2 jobs, got %d", len(runEntry.Jobs))
+	if len(entry.Jobs) != 2 {
+		t.Fatalf("expected 2 jobs, got %d", len(entry.Jobs))
 	}
 
-	job0 := runEntry.Jobs[0]
+	job0 := entry.Jobs[0]
 	assertURL(t, job0.BuildLogURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/logs", nil)
 	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
 		"download": "true",
 		"diff_id":  diffID2.String(),
 	})
 
-	job1 := runEntry.Jobs[1]
+	job1 := entry.Jobs[1]
 	if strings.TrimSpace(job1.PatchURL) != "" {
 		t.Fatalf("expected no patch URL for job without diffs, got %q", job1.PatchURL)
 	}
@@ -222,6 +185,7 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 				"id":         runID.String(),
 				"status":     "Started",
 				"mig_id":     migID.String(),
+				"mig_name":   "empty-diffs",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T09:00:00Z",
 			})
@@ -260,17 +224,6 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"diffs": []map[string]any{}})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/migs":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"migs": []map[string]any{
-					{
-						"id":         migID.String(),
-						"name":       "empty-diffs",
-						"archived":   false,
-						"created_at": "2026-02-24T08:30:00Z",
-					},
-				},
-			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -291,16 +244,16 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 		t.Fatalf("GetRunReportCommand.Run error: %v", err)
 	}
 
-	if len(report.Repos) != 1 || len(report.Runs) != 1 {
-		t.Fatalf("expected 1 repo and 1 run entry, got repos=%d runs=%d", len(report.Repos), len(report.Runs))
+	if len(report.Repos) != 1 {
+		t.Fatalf("expected 1 repo entry, got %d", len(report.Repos))
 	}
 	if report.Repos[0].PatchURL != "" {
 		t.Fatalf("expected empty repo patch URL, got %q", report.Repos[0].PatchURL)
 	}
-	if report.Runs[0].Jobs[0].PatchURL != "" {
-		t.Fatalf("expected empty job patch URL, got %q", report.Runs[0].Jobs[0].PatchURL)
+	if report.Repos[0].Jobs[0].PatchURL != "" {
+		t.Fatalf("expected empty job patch URL, got %q", report.Repos[0].Jobs[0].PatchURL)
 	}
-	if report.Repos[0].BuildLogURL == "" || report.Runs[0].Jobs[0].BuildLogURL == "" {
+	if report.Repos[0].BuildLogURL == "" || report.Repos[0].Jobs[0].BuildLogURL == "" {
 		t.Fatalf("expected build log URLs to be populated")
 	}
 }
@@ -319,22 +272,12 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 				"id":         runID.String(),
 				"status":     "Started",
 				"mig_id":     migID.String(),
+				"mig_name":   "no-repos",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T10:00:00Z",
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
 			_ = json.NewEncoder(w).Encode(map[string]any{"repos": []map[string]any{}})
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/migs":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"migs": []map[string]any{
-					{
-						"id":         migID.String(),
-						"name":       "no-repos",
-						"archived":   false,
-						"created_at": "2026-02-24T09:30:00Z",
-					},
-				},
-			})
 		default:
 			http.NotFound(w, r)
 		}
@@ -358,11 +301,8 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 	if report.Repos == nil {
 		t.Fatal("expected repos slice to be non-nil")
 	}
-	if report.Runs == nil {
-		t.Fatal("expected runs slice to be non-nil")
-	}
-	if len(report.Repos) != 0 || len(report.Runs) != 0 {
-		t.Fatalf("expected empty repos/runs, got repos=%d runs=%d", len(report.Repos), len(report.Runs))
+	if len(report.Repos) != 0 {
+		t.Fatalf("expected empty repos, got %d", len(report.Repos))
 	}
 }
 

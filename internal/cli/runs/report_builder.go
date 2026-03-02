@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-const migListPageSize = 100
 
 // GetRunReportCommand builds the canonical RunReport payload for a run.
 type GetRunReportCommand struct {
@@ -35,11 +34,6 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 		return RunReport{}, err
 	}
 
-	migName, err := resolveMigNameByID(ctx, c.Client, c.BaseURL, summary.MigID)
-	if err != nil {
-		return RunReport{}, err
-	}
-
 	repos, err := listRunRepos(ctx, c.Client, c.BaseURL, c.RunID)
 	if err != nil {
 		return RunReport{}, err
@@ -48,92 +42,89 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 	report := RunReport{
 		RunID:   summary.ID,
 		MigID:   summary.MigID,
-		MigName: migName,
+		MigName: summary.MigName,
 		SpecID:  summary.SpecID,
-		Repos:   make([]RepoReport, 0, len(repos)),
-		Runs:    make([]RunEntry, 0, len(repos)),
+		Repos:   make([]RunEntry, len(repos)),
 	}
 
-	for _, repo := range repos {
-		jobsResult, err := ListRepoJobsCommand{
-			Client:  c.Client,
-			BaseURL: c.BaseURL,
-			RunID:   c.RunID,
-			RepoID:  repo.RepoID,
-			Attempt: &repo.Attempt,
-		}.Run(ctx)
-		if err != nil {
-			return RunReport{}, fmt.Errorf("run report: list repo jobs (%s): %w", repo.RepoID, err)
-		}
-
-		diffs, err := listRunRepoDiffs(ctx, c.Client, c.BaseURL, c.RunID, repo.RepoID)
-		if err != nil {
-			return RunReport{}, fmt.Errorf("run report: list repo diffs (%s): %w", repo.RepoID, err)
-		}
-
-		buildLogURL := buildRepoLogURL(c.BaseURL, c.RunID, repo.RepoID)
-		repoPatchURL := ""
-		if latest := latestRepoDiff(diffs); latest != nil {
-			repoPatchURL = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, latest.ID)
-		}
-
-		jobPatchByID := make(map[domaintypes.JobID]string, len(diffs))
-		for _, diff := range diffs {
-			if diff.JobID.IsZero() {
-				continue
-			}
-			jobPatchByID[diff.JobID] = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, diff.ID)
-		}
-
-		report.Repos = append(report.Repos, RepoReport{
-			RepoID:      repo.RepoID,
-			RepoURL:     repo.RepoURL,
-			BaseRef:     repo.BaseRef,
-			TargetRef:   repo.TargetRef,
-			Status:      repo.Status,
-			Attempt:     repo.Attempt,
-			LastError:   repo.LastError,
-			BuildLogURL: buildLogURL,
-			PatchURL:    repoPatchURL,
+	g, gctx := errgroup.WithContext(ctx)
+	for i, repo := range repos {
+		g.Go(func() error {
+			return c.buildRepoEntry(gctx, repo, &report.Repos[i])
 		})
-
-		runEntry := RunEntry{
-			RepoID:      repo.RepoID,
-			RepoURL:     repo.RepoURL,
-			BaseRef:     repo.BaseRef,
-			TargetRef:   repo.TargetRef,
-			Attempt:     repo.Attempt,
-			Status:      repo.Status,
-			LastError:   repo.LastError,
-			BuildLogURL: buildLogURL,
-			PatchURL:    repoPatchURL,
-			Jobs:        make([]RunJobEntry, 0, len(jobsResult.Jobs)),
-		}
-
-		for _, job := range jobsResult.Jobs {
-			runEntry.Jobs = append(runEntry.Jobs, RunJobEntry{
-				JobID:         job.JobID,
-				JobType:       job.JobType,
-				JobImage:      job.JobImage,
-				NodeID:        job.NodeID,
-				Status:        string(job.Status),
-				ExitCode:      job.ExitCode,
-				StartedAt:     job.StartedAt,
-				FinishedAt:    job.FinishedAt,
-				DurationMs:    job.DurationMs,
-				DisplayName:   job.DisplayName,
-				ActionSummary: job.ActionSummary,
-				BugSummary:    job.BugSummary,
-				Recovery:      job.Recovery,
-				BuildLogURL:   buildLogURL,
-				PatchURL:      jobPatchByID[job.JobID],
-			})
-		}
-
-		report.Runs = append(report.Runs, runEntry)
+	}
+	if err := g.Wait(); err != nil {
+		return RunReport{}, err
 	}
 
 	return report, nil
+}
+
+func (c GetRunReportCommand) buildRepoEntry(ctx context.Context, repo runRepoReportSource, out *RunEntry) error {
+	jobsResult, err := ListRepoJobsCommand{
+		Client:  c.Client,
+		BaseURL: c.BaseURL,
+		RunID:   c.RunID,
+		RepoID:  repo.RepoID,
+		Attempt: &repo.Attempt,
+	}.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("run report: list repo jobs (%s): %w", repo.RepoID, err)
+	}
+
+	diffs, err := listRunRepoDiffs(ctx, c.Client, c.BaseURL, c.RunID, repo.RepoID)
+	if err != nil {
+		return fmt.Errorf("run report: list repo diffs (%s): %w", repo.RepoID, err)
+	}
+
+	buildLogURL := buildRepoLogURL(c.BaseURL, c.RunID, repo.RepoID)
+	repoPatchURL := ""
+	if latest := latestRepoDiff(diffs); latest != nil {
+		repoPatchURL = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, latest.ID)
+	}
+
+	jobPatchByID := make(map[domaintypes.JobID]string, len(diffs))
+	for _, diff := range diffs {
+		if diff.JobID.IsZero() {
+			continue
+		}
+		jobPatchByID[diff.JobID] = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, diff.ID)
+	}
+
+	*out = RunEntry{
+		RepoID:      repo.RepoID,
+		RepoURL:     repo.RepoURL,
+		BaseRef:     repo.BaseRef,
+		TargetRef:   repo.TargetRef,
+		Attempt:     repo.Attempt,
+		Status:      repo.Status,
+		LastError:   repo.LastError,
+		BuildLogURL: buildLogURL,
+		PatchURL:    repoPatchURL,
+		Jobs:        make([]RunJobEntry, 0, len(jobsResult.Jobs)),
+	}
+
+	for _, job := range jobsResult.Jobs {
+		out.Jobs = append(out.Jobs, RunJobEntry{
+			JobID:         job.JobID,
+			JobType:       job.JobType,
+			JobImage:      job.JobImage,
+			NodeID:        job.NodeID,
+			Status:        string(job.Status),
+			ExitCode:      job.ExitCode,
+			StartedAt:     job.StartedAt,
+			FinishedAt:    job.FinishedAt,
+			DurationMs:    job.DurationMs,
+			DisplayName:   job.DisplayName,
+			ActionSummary: job.ActionSummary,
+			BugSummary:    job.BugSummary,
+			Recovery:      job.Recovery,
+			BuildLogURL:   buildLogURL,
+			PatchURL:      jobPatchByID[job.JobID],
+		})
+	}
+
+	return nil
 }
 
 type runRepoReportSource struct {
@@ -180,73 +171,6 @@ func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	return result.Repos, nil
 }
 
-type migListItem struct {
-	ID        domaintypes.MigID   `json:"id"`
-	Name      string              `json:"name"`
-	SpecID    *domaintypes.SpecID `json:"spec_id,omitempty"`
-	CreatedBy *string             `json:"created_by,omitempty"`
-	Archived  bool                `json:"archived"`
-	CreatedAt time.Time           `json:"created_at"`
-}
-
-func resolveMigNameByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL, migID domaintypes.MigID) (string, error) {
-	if migID.IsZero() {
-		return "", nil
-	}
-
-	offset := 0
-	for {
-		page, err := listMigsPage(ctx, httpClient, baseURL, migListPageSize, offset)
-		if err != nil {
-			return "", err
-		}
-		for _, mig := range page {
-			if mig.ID == migID {
-				return mig.Name, nil
-			}
-		}
-		if len(page) < migListPageSize {
-			return "", nil
-		}
-		offset += migListPageSize
-	}
-}
-
-func listMigsPage(ctx context.Context, httpClient *http.Client, baseURL *url.URL, limit int, offset int) ([]migListItem, error) {
-	endpoint := baseURL.JoinPath("v1", "migs")
-	q := endpoint.Query()
-	q.Set("limit", strconv.Itoa(limit))
-	q.Set("offset", strconv.Itoa(offset))
-	endpoint.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("run report: build migs request: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("run report: fetch migs failed: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, httpx.WrapError("run report: fetch migs", resp.Status, resp.Body)
-	}
-
-	var result struct {
-		Migs []migListItem `json:"migs"`
-	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return nil, fmt.Errorf("run report: decode migs: %w", err)
-	}
-	if result.Migs == nil {
-		result.Migs = make([]migListItem, 0)
-	}
-
-	return result.Migs, nil
-}
-
 type repoDiffEntry struct {
 	ID        domaintypes.DiffID      `json:"id"`
 	JobID     domaintypes.JobID       `json:"job_id"`
@@ -285,6 +209,8 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	return result.Diffs, nil
 }
 
+// latestRepoDiff returns the most recent diff entry.
+// The API returns diffs ordered by created_at ascending, so the last element is the latest.
 func latestRepoDiff(diffs []repoDiffEntry) *repoDiffEntry {
 	if len(diffs) == 0 {
 		return nil

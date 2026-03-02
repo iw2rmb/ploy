@@ -18,6 +18,10 @@ const (
 	ansiColorReset        = "\x1b[0m"
 )
 
+func normalizeStatus(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
 // FormatErrorOneLiner normalizes a multi-line error to a single readable line.
 func FormatErrorOneLiner(lastErr *string) string {
 	if lastErr == nil {
@@ -87,7 +91,7 @@ func FormatDurationForStatus(status string, durationMs int64, startedAt, finishe
 
 // StatusGlyph maps a status to a deterministic display glyph.
 func StatusGlyph(status string, spinnerFrame int) string {
-	switch strings.ToLower(strings.TrimSpace(status)) {
+	switch normalizeStatus(status) {
 	case "running", "started":
 		return spinnerAtFrame(spinnerFrame)
 	case "success", "succeeded", "finished", "completed":
@@ -116,7 +120,7 @@ func ColoredStatusGlyph(status string, spinnerFrame int) string {
 }
 
 func isFailedOrCrashedStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
+	switch normalizeStatus(status) {
 	case "fail", "failed", "crash", "crashed", "error":
 		return true
 	default:
@@ -125,7 +129,7 @@ func isFailedOrCrashedStatus(status string) bool {
 }
 
 func isSuccessfulStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
+	switch normalizeStatus(status) {
 	case "success", "succeeded", "finished", "completed":
 		return true
 	default:
@@ -134,7 +138,7 @@ func isSuccessfulStatus(status string) bool {
 }
 
 func isRunningStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
+	switch normalizeStatus(status) {
 	case "running", "started":
 		return true
 	default:
@@ -143,7 +147,7 @@ func isRunningStatus(status string) bool {
 }
 
 func isTerminalJobStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
+	switch normalizeStatus(status) {
 	case "success", "succeeded", "finished", "completed", "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
 		return true
 	default:

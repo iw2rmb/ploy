@@ -507,8 +507,8 @@ func deriveRunStateFromReport(report runs.RunReport) modsapi.RunState {
 	allCancelled := true
 	hasFailure := false
 
-	for _, repo := range report.Repos {
-		status := strings.ToLower(strings.TrimSpace(repo.Status))
+	for _, entry := range report.Repos {
+		status := strings.ToLower(strings.TrimSpace(entry.Status))
 		switch status {
 		case "success", "succeeded", "finished":
 			allCancelled = false
