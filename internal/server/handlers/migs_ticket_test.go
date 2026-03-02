@@ -611,10 +611,15 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 			Status:    store.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
-		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: "repo_123", RepoBaseRef: "main", RepoTargetRef: "feature"},
+		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
+			{
+				RunID:         runID,
+				RepoID:        "repo_123",
+				RepoBaseRef:   "main",
+				RepoTargetRef: "feature",
+				RepoUrl:       "https://github.com/user/repo.git",
+			},
 		},
-		getModRepoResult: store.MigRepo{ID: "repo_123", Url: "https://github.com/user/repo.git"},
 		listJobsByRunResult: []store.Job{
 			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		},
@@ -661,8 +666,8 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		t.Fatalf("expected stage next_id %s, got %v", nextJobID, got)
 	}
 
-	if !st.getRunCalled || !st.listRunReposByRunCalled || !st.getModRepoCalled || !st.listJobsByRunCalled {
-		t.Fatalf("expected run status handler to read run+repos+repo_url+jobs")
+	if !st.getRunCalled || !st.listRunReposWithURLByRunCalled || !st.listJobsByRunCalled {
+		t.Fatalf("expected run status handler to read run+repos_with_url+jobs")
 	}
 }
 

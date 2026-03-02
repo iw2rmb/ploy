@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -418,8 +419,12 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 			{ID: "mod2", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
 		},
 		listMigReposByModResults: map[string][]store.MigRepo{
-			"mod1": {{ID: "repo1", MigID: "mod1", Url: "https://github.com/org/repo"}},
-			"mod2": {{ID: "repo2", MigID: "mod2", Url: "https://github.com/org/other"}},
+			"mod1": {{ID: "repo1", MigID: "mod1", RepoID: "repo1"}},
+			"mod2": {{ID: "repo2", MigID: "mod2", RepoID: "repo2"}},
+		},
+		repoByID: map[types.MigRepoID]store.Repo{
+			"repo1": {ID: "repo1", Url: "https://github.com/org/repo"},
+			"repo2": {ID: "repo2", Url: "https://github.com/org/other"},
 		},
 	}
 	handler := listMigsHandler(st)
@@ -460,9 +465,14 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 			{ID: "modC", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
 		},
 		listMigReposByModResults: map[string][]store.MigRepo{
-			"modA": {{ID: "repoA", MigID: "modA", Url: "https://github.com/org/repo"}},
-			"modB": {{ID: "repoB", MigID: "modB", Url: "https://github.com/org/repo"}},
-			"modC": {{ID: "repoC", MigID: "modC", Url: "https://github.com/org/repo"}},
+			"modA": {{ID: "repoA", MigID: "modA", RepoID: "repoA"}},
+			"modB": {{ID: "repoB", MigID: "modB", RepoID: "repoB"}},
+			"modC": {{ID: "repoC", MigID: "modC", RepoID: "repoC"}},
+		},
+		repoByID: map[types.MigRepoID]store.Repo{
+			"repoA": {ID: "repoA", Url: "https://github.com/org/repo"},
+			"repoB": {ID: "repoB", Url: "https://github.com/org/repo"},
+			"repoC": {ID: "repoC", Url: "https://github.com/org/repo"},
 		},
 	}
 	handler := listMigsHandler(st)

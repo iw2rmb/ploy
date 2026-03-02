@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -152,8 +153,8 @@ func TestAddModRepoHandler(t *testing.T) {
 				if !ms.createMigRepoCalled {
 					t.Fatalf("expected CreateMigRepo to be called")
 				}
-				if ms.createMigRepoParams.RepoUrl != tt.wantRepoURL {
-					t.Fatalf("CreateMigRepo repo_url mismatch: got=%q want=%q", ms.createMigRepoParams.RepoUrl, tt.wantRepoURL)
+				if ms.createMigRepoParams.Url != tt.wantRepoURL {
+					t.Fatalf("CreateMigRepo repo_url mismatch: got=%q want=%q", ms.createMigRepoParams.Url, tt.wantRepoURL)
 				}
 			}
 		})
@@ -176,8 +177,12 @@ func TestListModReposHandler(t *testing.T) {
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 				m.listMigReposByModResult = []store.MigRepo{
-					{ID: "repo0001", MigID: "mod123", Url: "https://github.com/org/repo1", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo0002", MigID: "mod123", Url: "https://github.com/org/repo2", BaseRef: "develop", TargetRef: "feature2"},
+					{ID: "repo0001", MigID: "mod123", RepoID: "repo0001", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo0002", MigID: "mod123", RepoID: "repo0002", BaseRef: "develop", TargetRef: "feature2"},
+				}
+				m.repoByID = map[types.MigRepoID]store.Repo{
+					"repo0001": {ID: "repo0001", Url: "https://github.com/org/repo1"},
+					"repo0002": {ID: "repo0002", Url: "https://github.com/org/repo2"},
 				}
 			},
 			wantStatus: http.StatusOK,
@@ -431,14 +436,14 @@ https://github.com/org/new-repo2,develop,feature2`,
 				if !m.getModRepoByURLCalled {
 					t.Fatalf("expected GetMigRepoByURL to be called")
 				}
-				if m.getModRepoByURLParams.RepoUrl != "https://github.com/org/repo" {
-					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.RepoUrl, "https://github.com/org/repo")
+				if m.getModRepoByURLParams.Url != "https://github.com/org/repo" {
+					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.Url, "https://github.com/org/repo")
 				}
 				if !m.upsertModRepoCalled {
 					t.Fatalf("expected UpsertMigRepo to be called")
 				}
-				if m.upsertModRepoParams.RepoUrl != "https://github.com/org/repo" {
-					t.Fatalf("UpsertMigRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.RepoUrl, "https://github.com/org/repo")
+				if m.upsertModRepoParams.Url != "https://github.com/org/repo" {
+					t.Fatalf("UpsertMigRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.Url, "https://github.com/org/repo")
 				}
 			},
 			wantStatus:  http.StatusOK,

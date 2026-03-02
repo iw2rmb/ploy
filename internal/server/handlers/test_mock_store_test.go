@@ -457,6 +457,7 @@ type mockStore struct {
 	listMigReposByModResult  []store.MigRepo
 	listMigReposByModResults map[string][]store.MigRepo
 	listMigReposByModErr     error
+	repoByID                 map[types.MigRepoID]store.Repo
 
 	// GetMigRepoByURL tracking (for bulk upsert duplicate detection)
 	getModRepoByURLCalled bool
@@ -668,8 +669,8 @@ func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRep
 	if result.MigID.IsZero() {
 		result.MigID = params.MigID
 	}
-	if result.RepoUrl == "" {
-		result.RepoUrl = params.RepoUrl
+	if result.RepoID.IsZero() {
+		result.RepoID = params.ID
 	}
 	if result.BaseRef == "" {
 		result.BaseRef = params.BaseRef
@@ -677,6 +678,10 @@ func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRep
 	if result.TargetRef == "" {
 		result.TargetRef = params.TargetRef
 	}
+	if m.repoByID == nil {
+		m.repoByID = map[types.MigRepoID]store.Repo{}
+	}
+	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
 	return result, m.createMigRepoErr
 }
 
@@ -1406,8 +1411,8 @@ func (m *mockStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoPa
 	if result.MigID.IsZero() {
 		result.MigID = arg.MigID
 	}
-	if result.RepoUrl == "" {
-		result.RepoUrl = arg.RepoUrl
+	if result.RepoID.IsZero() {
+		result.RepoID = arg.ID
 	}
 	if result.BaseRef == "" {
 		result.BaseRef = arg.BaseRef
@@ -1415,7 +1420,23 @@ func (m *mockStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoPa
 	if result.TargetRef == "" {
 		result.TargetRef = arg.TargetRef
 	}
+	if m.repoByID == nil {
+		m.repoByID = map[types.MigRepoID]store.Repo{}
+	}
+	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: arg.Url}
 	return result, m.upsertModRepoErr
+}
+
+func (m *mockStore) GetRepo(ctx context.Context, id types.MigRepoID) (store.Repo, error) {
+	if m.repoByID != nil {
+		if repo, ok := m.repoByID[id]; ok {
+			return repo, nil
+		}
+	}
+	if !id.IsZero() {
+		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
+	}
+	return store.Repo{}, pgx.ErrNoRows
 }
 
 // DeleteMigRepo deletes a mod_repo by id.

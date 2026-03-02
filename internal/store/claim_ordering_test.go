@@ -148,7 +148,7 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	repo2, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        repo2ID,
 		MigID:     fx.Mig.ID,
-		Url:   "https://github.com/test/scoped-order-2",
+		Url:       "https://github.com/test/scoped-order-2",
 		BaseRef:   fx.MigRepo.BaseRef,
 		TargetRef: fx.MigRepo.TargetRef,
 	})
@@ -157,11 +157,13 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	}
 
 	runRepo2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         fx.Mig.ID,
-		RunID:         fx.Run.ID,
-		RepoID:        repo2.ID,
-		RepoBaseRef:   fx.RunRepo.RepoBaseRef,
-		RepoTargetRef: fx.RunRepo.RepoTargetRef,
+		MigID:           fx.Mig.ID,
+		RunID:           fx.Run.ID,
+		RepoID:          repo2.RepoID,
+		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
+		RepoTargetRef:   fx.RunRepo.RepoTargetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo(runRepo2) failed: %v", err)
@@ -180,22 +182,26 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	}
 
 	run2Repo1, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         fx.Mig.ID,
-		RunID:         run2.ID,
-		RepoID:        fx.MigRepo.ID,
-		RepoBaseRef:   fx.RunRepo.RepoBaseRef,
-		RepoTargetRef: fx.RunRepo.RepoTargetRef,
+		MigID:           fx.Mig.ID,
+		RunID:           run2.ID,
+		RepoID:          fx.MigRepo.RepoID,
+		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
+		RepoTargetRef:   fx.RunRepo.RepoTargetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo(run2Repo1) failed: %v", err)
 	}
 
 	run2Repo2, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         fx.Mig.ID,
-		RunID:         run2.ID,
-		RepoID:        repo2.ID,
-		RepoBaseRef:   fx.RunRepo.RepoBaseRef,
-		RepoTargetRef: fx.RunRepo.RepoTargetRef,
+		MigID:           fx.Mig.ID,
+		RunID:           run2.ID,
+		RepoID:          repo2.RepoID,
+		RepoBaseRef:     fx.RunRepo.RepoBaseRef,
+		RepoTargetRef:   fx.RunRepo.RepoTargetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo(run2Repo2) failed: %v", err)

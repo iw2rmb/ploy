@@ -325,7 +325,7 @@ func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store,
 	mr, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        repoID,
 		MigID:     modID,
-		Url:   repoURL,
+		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
@@ -334,11 +334,13 @@ func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store,
 	}
 
 	rr, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         modID,
-		RunID:         runID,
-		RepoID:        mr.ID,
-		RepoBaseRef:   mr.BaseRef,
-		RepoTargetRef: mr.TargetRef,
+		MigID:           modID,
+		RunID:           runID,
+		RepoID:          mr.RepoID,
+		RepoBaseRef:     mr.BaseRef,
+		RepoTargetRef:   mr.TargetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo(%s) failed: %v", repoURL, err)

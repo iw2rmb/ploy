@@ -46,7 +46,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	modRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        modRepoID,
 		MigID:     modID,
-		Url:   repoURL,
+		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
@@ -66,11 +66,13 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	}
 
 	runRepo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         modID,
-		RunID:         runID,
-		RepoID:        modRepoID,
-		RepoBaseRef:   baseRef,
-		RepoTargetRef: targetRef,
+		MigID:           modID,
+		RunID:           runID,
+		RepoID:          modRepo.RepoID,
+		RepoBaseRef:     baseRef,
+		RepoTargetRef:   targetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo() failed: %v", err)

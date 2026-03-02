@@ -62,17 +62,19 @@ func (q *Queries) CountRunReposByStatus(ctx context.Context, runID types.RunID) 
 }
 
 const createRunRepo = `-- name: CreateRunRepo :one
-INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 `
 
 type CreateRunRepoParams struct {
-	MigID         types.MigID     `json:"mig_id"`
-	RunID         types.RunID     `json:"run_id"`
-	RepoID        types.MigRepoID `json:"repo_id"`
-	RepoBaseRef   string          `json:"repo_base_ref"`
-	RepoTargetRef string          `json:"repo_target_ref"`
+	MigID           types.MigID     `json:"mig_id"`
+	RunID           types.RunID     `json:"run_id"`
+	RepoID          types.MigRepoID `json:"repo_id"`
+	RepoBaseRef     string          `json:"repo_base_ref"`
+	RepoTargetRef   string          `json:"repo_target_ref"`
+	SourceCommitSha string          `json:"source_commit_sha"`
+	RepoSha0        string          `json:"repo_sha0"`
 }
 
 // v1: Creates a new run_repos row scoped to (run_id, repo_id).
@@ -84,6 +86,8 @@ func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (R
 		arg.RepoID,
 		arg.RepoBaseRef,
 		arg.RepoTargetRef,
+		arg.SourceCommitSha,
+		arg.RepoSha0,
 	)
 	var i RunRepo
 	err := row.Scan(
@@ -92,6 +96,8 @@ func (q *Queries) CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (R
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.RepoTargetRef,
+		&i.SourceCommitSha,
+		&i.RepoSha0,
 		&i.Status,
 		&i.Attempt,
 		&i.LastError,
@@ -152,7 +158,7 @@ func (q *Queries) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg Ge
 }
 
 const getRunRepo = `-- name: GetRunRepo :one
-SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1 AND repo_id = $2
 `
@@ -171,6 +177,8 @@ func (q *Queries) GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo
 		&i.RepoID,
 		&i.RepoBaseRef,
 		&i.RepoTargetRef,
+		&i.SourceCommitSha,
+		&i.RepoSha0,
 		&i.Status,
 		&i.Attempt,
 		&i.LastError,
@@ -238,7 +246,7 @@ func (q *Queries) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID)
 }
 
 const listQueuedRunReposByRun = `-- name: ListQueuedRunReposByRun :many
-SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
   AND status = 'Queued'
@@ -260,6 +268,8 @@ func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID
 			&i.RepoID,
 			&i.RepoBaseRef,
 			&i.RepoTargetRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
 			&i.Status,
 			&i.Attempt,
 			&i.LastError,
@@ -278,7 +288,7 @@ func (q *Queries) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID
 }
 
 const listRunReposByRun = `-- name: ListRunReposByRun :many
-SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, attempt, last_error, created_at, started_at, finished_at
+SELECT mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, source_commit_sha, repo_sha0, status, attempt, last_error, created_at, started_at, finished_at
 FROM run_repos
 WHERE run_id = $1
 ORDER BY created_at ASC, repo_id ASC
@@ -300,6 +310,8 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]R
 			&i.RepoID,
 			&i.RepoBaseRef,
 			&i.RepoTargetRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
 			&i.Status,
 			&i.Attempt,
 			&i.LastError,
@@ -319,6 +331,7 @@ func (q *Queries) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]R
 
 const listRunReposWithURLByRun = `-- name: ListRunReposWithURLByRun :many
 SELECT rr.mig_id, rr.run_id, rr.repo_id, rr.repo_base_ref, rr.repo_target_ref,
+       rr.source_commit_sha, rr.repo_sha0,
        rr.status, rr.attempt, rr.last_error, rr.created_at, rr.started_at, rr.finished_at,
        r.url AS repo_url
 FROM run_repos rr
@@ -328,18 +341,20 @@ ORDER BY rr.created_at ASC, rr.repo_id ASC
 `
 
 type ListRunReposWithURLByRunRow struct {
-	MigID         types.MigID        `json:"mig_id"`
-	RunID         types.RunID        `json:"run_id"`
-	RepoID        types.MigRepoID    `json:"repo_id"`
-	RepoBaseRef   string             `json:"repo_base_ref"`
-	RepoTargetRef string             `json:"repo_target_ref"`
-	Status        RunRepoStatus      `json:"status"`
-	Attempt       int32              `json:"attempt"`
-	LastError     *string            `json:"last_error"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	StartedAt     pgtype.Timestamptz `json:"started_at"`
-	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
-	RepoUrl       string             `json:"repo_url"`
+	MigID           types.MigID        `json:"mig_id"`
+	RunID           types.RunID        `json:"run_id"`
+	RepoID          types.MigRepoID    `json:"repo_id"`
+	RepoBaseRef     string             `json:"repo_base_ref"`
+	RepoTargetRef   string             `json:"repo_target_ref"`
+	SourceCommitSha string             `json:"source_commit_sha"`
+	RepoSha0        string             `json:"repo_sha0"`
+	Status          RunRepoStatus      `json:"status"`
+	Attempt         int32              `json:"attempt"`
+	LastError       *string            `json:"last_error"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
+	RepoUrl         string             `json:"repo_url"`
 }
 
 // Lists all run_repos for a run with their repo_url (from repos).
@@ -361,6 +376,8 @@ func (q *Queries) ListRunReposWithURLByRun(ctx context.Context, runID types.RunI
 			&i.RepoID,
 			&i.RepoBaseRef,
 			&i.RepoTargetRef,
+			&i.SourceCommitSha,
+			&i.RepoSha0,
 			&i.Status,
 			&i.Attempt,
 			&i.LastError,

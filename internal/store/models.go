@@ -211,17 +211,19 @@ type Run struct {
 }
 
 type RunRepo struct {
-	MigID         types.MigID        `json:"mig_id"`
-	RunID         types.RunID        `json:"run_id"`
-	RepoID        types.MigRepoID    `json:"repo_id"`
-	RepoBaseRef   string             `json:"repo_base_ref"`
-	RepoTargetRef string             `json:"repo_target_ref"`
-	Status        RunRepoStatus      `json:"status"`
-	Attempt       int32              `json:"attempt"`
-	LastError     *string            `json:"last_error"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	StartedAt     pgtype.Timestamptz `json:"started_at"`
-	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
+	MigID           types.MigID        `json:"mig_id"`
+	RunID           types.RunID        `json:"run_id"`
+	RepoID          types.MigRepoID    `json:"repo_id"`
+	RepoBaseRef     string             `json:"repo_base_ref"`
+	RepoTargetRef   string             `json:"repo_target_ref"`
+	SourceCommitSha string             `json:"source_commit_sha"`
+	RepoSha0        string             `json:"repo_sha0"`
+	Status          RunRepoStatus      `json:"status"`
+	Attempt         int32              `json:"attempt"`
+	LastError       *string            `json:"last_error"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
 }
 
 type RunsTiming struct {

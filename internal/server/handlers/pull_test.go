@@ -32,7 +32,7 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "feature-branch",
-				Url:       "https://github.com/org/repo.git",
+				RepoUrl: "https://github.com/org/repo.git",
 			},
 		},
 	}
@@ -90,7 +90,7 @@ func TestPullRunRepoHandler_URLNormalization(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "main",
-				Url:       "https://github.com/org/repo", // stored without .git
+				RepoUrl: "https://github.com/org/repo", // stored without .git
 			},
 		},
 	}
@@ -122,7 +122,7 @@ func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "main",
-				Url:       "https://github.com/org/repo/",
+				RepoUrl: "https://github.com/org/repo/",
 			},
 		},
 	}
@@ -174,7 +174,7 @@ func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID,
 				RepoTargetRef: "main",
-				Url:       "https://github.com/org/other-repo",
+				RepoUrl: "https://github.com/org/other-repo",
 			},
 		},
 	}
@@ -208,13 +208,13 @@ func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
 				RunID:         runID,
 				RepoID:        repoID1,
 				RepoTargetRef: "main",
-				Url:       "https://github.com/org/repo",
+				RepoUrl: "https://github.com/org/repo",
 			},
 			{
 				RunID:         runID,
 				RepoID:        repoID2,
 				RepoTargetRef: "develop",
-				Url:       "https://github.com/org/repo.git", // same after normalization
+				RepoUrl: "https://github.com/org/repo.git", // same after normalization
 			},
 		},
 	}
@@ -306,10 +306,13 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				Url:   "https://github.com/org/repo",
+				RepoID:    repoID,
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
 		},
 		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
 			RunID:         runID,
@@ -367,10 +370,13 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				Url:   "https://github.com/org/repo",
+				RepoID:    repoID,
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
 		},
 		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
 			RunID:         runID,
@@ -418,10 +424,13 @@ func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				Url:   "https://github.com/org/repo.git", // with .git
+				RepoID:    repoID,
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
 		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
 			RunID:         runID,
@@ -476,10 +485,13 @@ func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				Url:   "https://github.com/org/other-repo",
+				RepoID:    repoID,
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/other-repo"},
 		},
 	}
 	handler := pullMigRepoHandler(st)
@@ -507,10 +519,13 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 			{
 				ID:        repoID,
 				MigID:     modID,
-				Url:   "https://github.com/org/repo",
+				RepoID:    repoID,
 				BaseRef:   "main",
 				TargetRef: "feature",
 			},
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
 		},
 		getLatestRunRepoByModAndRepoStatusErr: pgx.ErrNoRows,
 	}

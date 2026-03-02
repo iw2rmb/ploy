@@ -135,12 +135,32 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		repoURL, err := repoURLForID(r.Context(), st, modRepo.RepoID)
+		if err != nil {
+			httpErr(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
+			return
+		}
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, modRepo.BaseRef)
+		if seedErr != nil {
+			httpErr(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
+			slog.Error("add run repo: resolve source commit failed",
+				"run_id", runID.String(),
+				"repo_id", modRepo.RepoID,
+				"repo_url", repoURL,
+				"base_ref", modRepo.BaseRef,
+				"err", seedErr,
+			)
+			return
+		}
+
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			MigID:         run.MigID,
-			RunID:         runID,
-			RepoID:        modRepo.RepoID,
-			RepoBaseRef:   modRepo.BaseRef,
-			RepoTargetRef: modRepo.TargetRef,
+			MigID:           run.MigID,
+			RunID:           runID,
+			RepoID:          modRepo.RepoID,
+			RepoBaseRef:     modRepo.BaseRef,
+			RepoTargetRef:   modRepo.TargetRef,
+			SourceCommitSha: sourceCommitSHA,
+			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
@@ -150,11 +170,6 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		repoURL, err := repoURLForID(r.Context(), st, modRepo.RepoID)
-		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
-			return
-		}
 		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL))
 	}
 }

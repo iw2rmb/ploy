@@ -48,6 +48,7 @@ type addRunRepoStoreMock struct {
 	store.Store
 	getRunResult store.Run
 	getRunErr    error
+	repoByID     map[domaintypes.MigRepoID]store.Repo
 
 	createMigRepoCalled bool
 	createMigRepoParams store.CreateMigRepoParams
@@ -74,7 +75,18 @@ func (m *addRunRepoStoreMock) GetRun(ctx context.Context, id domaintypes.RunID) 
 func (m *addRunRepoStoreMock) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
 	m.createMigRepoCalled = true
 	m.createMigRepoParams = params
-	return m.createMigRepoResult, m.createMigRepoErr
+	result := m.createMigRepoResult
+	if result.ID.IsZero() {
+		result.ID = params.ID
+	}
+	if result.RepoID.IsZero() {
+		result.RepoID = params.ID
+	}
+	if m.repoByID == nil {
+		m.repoByID = map[domaintypes.MigRepoID]store.Repo{}
+	}
+	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
+	return result, m.createMigRepoErr
 }
 
 func (m *addRunRepoStoreMock) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
@@ -124,6 +136,18 @@ func (m *addRunRepoStoreMock) CreateJob(ctx context.Context, params store.Create
 	return store.Job{ID: domaintypes.NewJobID()}, nil
 }
 
+func (m *addRunRepoStoreMock) GetRepo(ctx context.Context, id domaintypes.MigRepoID) (store.Repo, error) {
+	if m.repoByID != nil {
+		if repo, ok := m.repoByID[id]; ok {
+			return repo, nil
+		}
+	}
+	if !id.IsZero() {
+		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
+	}
+	return store.Repo{}, pgx.ErrNoRows
+}
+
 type listRunReposStoreMock struct {
 	store.Store
 	listRunReposWithURLByRunCalled bool
@@ -146,6 +170,7 @@ type cancelRunRepoStoreMock struct {
 
 	getModRepoResult store.MigRepo
 	getModRepoErr    error
+	repoByID         map[domaintypes.MigRepoID]store.Repo
 
 	updateRunRepoStatusCalled bool
 	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
@@ -176,6 +201,18 @@ func (m *cancelRunRepoStoreMock) GetMigRepo(ctx context.Context, id domaintypes.
 	return m.getModRepoResult, m.getModRepoErr
 }
 
+func (m *cancelRunRepoStoreMock) GetRepo(ctx context.Context, id domaintypes.MigRepoID) (store.Repo, error) {
+	if m.repoByID != nil {
+		if repo, ok := m.repoByID[id]; ok {
+			return repo, nil
+		}
+	}
+	if !id.IsZero() {
+		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
+	}
+	return store.Repo{}, pgx.ErrNoRows
+}
+
 func (m *cancelRunRepoStoreMock) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
 	m.updateRunRepoStatusCalled = true
 	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
@@ -196,6 +233,7 @@ type restartRunRepoStoreMock struct {
 	store.Store
 	getRunResult store.Run
 	getRunErr    error
+	repoByID     map[domaintypes.MigRepoID]store.Repo
 
 	getRunRepoResults []store.RunRepo
 	getRunRepoErr     error
@@ -284,6 +322,18 @@ func (m *restartRunRepoStoreMock) CreateJob(ctx context.Context, params store.Cr
 
 func (m *restartRunRepoStoreMock) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
 	return m.getModRepoResult, m.getModRepoErr
+}
+
+func (m *restartRunRepoStoreMock) GetRepo(ctx context.Context, id domaintypes.MigRepoID) (store.Repo, error) {
+	if m.repoByID != nil {
+		if repo, ok := m.repoByID[id]; ok {
+			return repo, nil
+		}
+	}
+	if !id.IsZero() {
+		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
+	}
+	return store.Repo{}, pgx.ErrNoRows
 }
 
 type startRunStoreMock struct {
@@ -463,9 +513,12 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		createMigRepoResult: store.MigRepo{
 			ID:        repoID,
-			Url:   "https://github.com/org/repo.git",
+			RepoID:    repoID,
 			BaseRef:   "main",
 			TargetRef: "feature",
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
 	}
 
@@ -508,7 +561,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 				Status:        store.RunRepoStatusQueued,
 				Attempt:       1,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-				Url:       "https://github.com/org/repo.git",
+				RepoUrl:       "https://github.com/org/repo.git",
 			},
 		},
 	}
@@ -617,8 +670,11 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		getModRepoResult: store.MigRepo{
-			ID:      repoID,
-			Url: "https://github.com/org/repo.git",
+			ID:     repoID,
+			RepoID: repoID,
+		},
+		repoByID: map[domaintypes.MigRepoID]store.Repo{
+			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
 	}
 

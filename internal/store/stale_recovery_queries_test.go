@@ -262,7 +262,7 @@ func createRunRepoForStaleRecoveryQueryTest(
 	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
 		ID:        repoID,
 		MigID:     migID,
-		Url:   repoURL,
+		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
@@ -271,11 +271,13 @@ func createRunRepoForStaleRecoveryQueryTest(
 	}
 
 	runRepo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:         migID,
-		RunID:         runID,
-		RepoID:        migRepo.ID,
-		RepoBaseRef:   migRepo.BaseRef,
-		RepoTargetRef: migRepo.TargetRef,
+		MigID:           migID,
+		RunID:           runID,
+		RepoID:          migRepo.RepoID,
+		RepoBaseRef:     migRepo.BaseRef,
+		RepoTargetRef:   migRepo.TargetRef,
+		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo(%s) failed: %v", repoURL, err)
