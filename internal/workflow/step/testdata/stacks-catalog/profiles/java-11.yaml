@@ -1,0 +1,21 @@
+schema_version: 1
+repo_id: default
+runner_mode: simple
+stack:
+  language: java
+  tool: maven
+targets:
+  active: build
+  build:
+    status: not_attempted
+    command: echo ok
+    env: {}
+  unit:
+    status: not_attempted
+    env: {}
+  all_tests:
+    status: not_attempted
+    env: {}
+orchestration:
+  pre: []
+  post: []

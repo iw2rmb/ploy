@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle,req
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
 COPY --from=build /out/ployd-node /usr/local/bin/ployd-node
-COPY --chown=ploy:ploy etc/ploy/gates/build-gate-images.yaml /etc/ploy/gates/build-gate-images.yaml
+COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 USER root
 # Needs access to Docker socket; run as root inside container for docker CLI
 VOLUME ["/var/run/docker.sock"]

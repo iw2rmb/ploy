@@ -1,0 +1,24 @@
+schema_version: 1
+repo_id: default
+runner_mode: simple
+stack:
+  language: java
+  tool: gradle
+  release: "17"
+targets:
+  active: all_tests
+  build:
+    status: not_attempted
+    command: gradle -q --stacktrace --build-cache build -x test -p /workspace
+    env: {}
+  unit:
+    status: not_attempted
+    command: gradle -q --stacktrace --build-cache test -p /workspace
+    env: {}
+  all_tests:
+    status: not_attempted
+    command: gradle -q --stacktrace --build-cache test -p /workspace
+    env: {}
+orchestration:
+  pre: []
+  post: []

@@ -28,7 +28,7 @@ RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle,req
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /etc/ploy/schemas /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
 COPY --from=build /out/ployd /usr/local/bin/ployd
-COPY --chown=ploy:ploy etc/ploy/gates/build-gate-images.yaml /etc/ploy/gates/build-gate-images.yaml
+COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 COPY --chown=ploy:ploy docs/schemas/gate_profile.schema.json /etc/ploy/schemas/gate_profile.schema.json
 USER ploy
 EXPOSE 8443 9100

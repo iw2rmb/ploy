@@ -1,9 +1,11 @@
 # invalid-duplicate.yaml - Duplicate selector error
-BuildGateImages:
+stacks:
   - image: eclipse-temurin:17-jdk
-    language: java
+    lang: java
     release: "17"
+    profile: profiles/java-17.yaml
 
   - image: openjdk:17
-    language: java
+    lang: java
     release: "17"
+    profile: profiles/java-17-copy.yaml
