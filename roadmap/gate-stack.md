@@ -13,7 +13,7 @@ Legend: [ ] todo, [x] done.
   - Scope: add `gates/stacks.yaml` schema with fields `lang`, `release`, `tool`, `image`, `profile`; generate/update `gates/profiles/{lang}-{release}{-tool}.yaml`; keep file paths deterministic and stable for CI.
   - Snippets: `gates/stacks.yaml` entry: `{lang: java, release: "17", tool: maven, image: "...", profile: "gates/profiles/java-17-maven.yaml"}`
   - Tests: `go test ./internal/workflow/step -run BuildGateImageResolver` and asset validation tests — expect all catalog entries parse and referenced profile files exist.
-- [ ] Remove server dependence on `etc/ploy/gates/build-gate-images.yaml` — eliminate redundant server-local mapping file.
+- [x] Remove server dependence on `etc/ploy/gates/build-gate-images.yaml` — eliminate redundant server-local mapping file.
   - Repository: ploy
   - Component: server image packaging; resolver defaults
   - Scope: stop copying/reading legacy mapping file in server image/runtime; keep node/runtime behavior wired to new catalog-driven bootstrap data.
