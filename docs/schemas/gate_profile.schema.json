@@ -50,6 +50,7 @@
       ],
       "properties": {
         "active": {
+          "$comment": "Recovery transitions should move forward (all_tests -> unit -> build -> unsupported). external_service_unreachable and registry_auth_failed are strong signals to move off all_tests, but they are not the only possible switch condition; unit-stage occurrences suggest refining unit selection before switching to build.",
           "type": "string",
           "enum": [
             "build",
@@ -204,6 +205,7 @@
       ]
     },
     "targetResult": {
+      "$comment": "Infra-healing should always materialize command/env for the selected targets.active entry, even when missing in input context.",
       "type": "object",
       "required": [
         "status",

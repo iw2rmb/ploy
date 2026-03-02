@@ -141,12 +141,12 @@ if [[ ! -f build.gradle && ! -f build.gradle.kts ]]; then
   exit 5
 fi
 
-# Determine Gradle command: prefer system gradle, fall back to ./gradlew.
+# Determine Gradle command: prefer project wrapper, fall back to system gradle.
 gradle_cmd=""
-if command -v gradle >/dev/null 2>&1; then
-  gradle_cmd="gradle"
-elif [[ -x "./gradlew" ]]; then
+if [[ -x "./gradlew" ]]; then
   gradle_cmd="./gradlew"
+elif command -v gradle >/dev/null 2>&1; then
+  gradle_cmd="gradle"
 else
   echo "error: gradle not found in PATH and ./gradlew is missing (Gradle project required)" >&2
   exit 127
@@ -161,12 +161,6 @@ if [[ -f "build.gradle.kts" ]]; then
 elif [[ -f "build.gradle" ]]; then
   build_file="build.gradle"
   build_style="groovy"
-fi
-
-# Currently only Kotlin DSL is supported for automatic plugin injection.
-if [[ "$build_style" != "kts" ]]; then
-  echo "error: OpenRewrite Gradle injection currently supports only Kotlin DSL (build.gradle.kts)" >&2
-  exit 5
 fi
 
 # Determine rewrite configuration: prefer an existing rewrite.yml in the
