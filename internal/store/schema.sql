@@ -132,6 +132,45 @@ CREATE INDEX IF NOT EXISTS migs_name_idx ON migs(name);
 -- Optional partial index on active migs for efficient filtering.
 CREATE INDEX IF NOT EXISTS migs_active_idx ON migs(id) WHERE archived_at IS NULL;
 
+-- Repos (global repository identity, independent from mig membership).
+-- Note: id is TEXT (NanoID-backed, 8 chars); application code generates IDs.
+CREATE TABLE IF NOT EXISTS repos (
+  id           TEXT PRIMARY KEY,
+  url          TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (url)
+);
+CREATE INDEX IF NOT EXISTS repos_created_idx ON repos(created_at);
+
+-- Build stacks catalog (seeded from gates/stacks.yaml).
+CREATE TABLE IF NOT EXISTS stacks (
+  id           BIGSERIAL PRIMARY KEY,
+  lang         TEXT NOT NULL,
+  release      TEXT NOT NULL,
+  tool         TEXT,
+  image        TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (lang, release, tool)
+);
+CREATE INDEX IF NOT EXISTS stacks_lang_release_idx ON stacks(lang, release);
+
+-- Gate profiles indexed by exact execution identity (repo_id + repo_sha + stack_id).
+-- Default profiles use NULL repo_id/repo_sha and are stack-scoped only.
+CREATE TABLE IF NOT EXISTS gate_profiles (
+  id           BIGSERIAL PRIMARY KEY,
+  repo_id      TEXT REFERENCES repos(id) ON DELETE CASCADE,
+  repo_sha     TEXT,
+  repo_sha8    TEXT,
+  stack_id     BIGINT NOT NULL REFERENCES stacks(id) ON DELETE RESTRICT,
+  url          TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (repo_id, repo_sha, stack_id)
+);
+CREATE INDEX IF NOT EXISTS gate_profiles_stack_updated_idx ON gate_profiles(stack_id, updated_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS gate_profiles_repo_stack_updated_idx ON gate_profiles(repo_id, stack_id, updated_at DESC, id DESC);
+
 -- ModRepos (managed repo set for a mig project)
 -- Each row represents a repo participating in a mig, with mutable refs.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
@@ -297,6 +336,15 @@ CREATE INDEX IF NOT EXISTS jobs_next_id_idx ON jobs(next_id) WHERE next_id IS NO
 CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, attempt, next_id);
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
+
+-- Gate executions mapped to resolved gate profile rows.
+-- One gate record per job_id.
+CREATE TABLE IF NOT EXISTS gates (
+  job_id       TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+  profile_id   BIGINT NOT NULL REFERENCES gate_profiles(id) ON DELETE RESTRICT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS gates_profile_idx ON gates(profile_id);
 
 -- Events (append-only)
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
