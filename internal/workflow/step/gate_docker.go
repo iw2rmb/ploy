@@ -52,6 +52,8 @@ const (
 	buildGateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
 )
 
+var errBuildGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
+
 // dockerGateExecutor runs build validation inside language images using the
 // same container runtime as step execution, mounting the workspace at /workspace.
 //
@@ -109,9 +111,9 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 // The workspace is mounted at /workspace and used as the working directory.
 // When stack detection fails, the gate fails with a static check report and
 // a structured log finding (including evidence when available).
-// When the container runtime is nil, execution is skipped and empty metadata
-// is returned. A non-zero exit code is reported as a static check failure and
-// a single log finding containing the captured logs or a synthesized message.
+// When the container runtime is nil, execution fails immediately. A non-zero
+// exit code is reported as a static check failure and a single log finding
+// containing the captured logs or a synthesized message.
 //
 // ## Returned Metadata
 //
@@ -131,6 +133,9 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	}
 	if spec == nil || !spec.Enabled {
 		return nil, nil
+	}
+	if e.rt == nil {
+		return nil, errBuildGateRuntimeUnavailable
 	}
 
 	mappingPath := buildGateDefaultImagesFilePath()
@@ -163,9 +168,6 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis -> nanos
 		LimitDiskBytes:   limitDisk,
 		StorageSizeOpt:   storageSizeOpt,
-	}
-	if e.rt == nil {
-		return &contracts.BuildGateStageMetadata{}, nil
 	}
 	h, err := e.rt.Create(ctx, specC)
 	if err != nil {

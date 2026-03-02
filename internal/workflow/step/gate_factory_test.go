@@ -38,15 +38,15 @@ func TestNewDockerGateExecutor_NilRuntime(t *testing.T) {
 		t.Fatal("expected non-nil executor even with nil runtime")
 	}
 
-	// dockerGateExecutor with nil runtime returns empty metadata for enabled spec.
+	// dockerGateExecutor with nil runtime fails gate execution.
 	spec := &contracts.StepGateSpec{Enabled: true}
 	result, err := executor.Execute(context.Background(), spec, "/workspace")
 
-	// With nil runtime, dockerGateExecutor returns empty metadata without error.
-	if err != nil {
-		t.Errorf("expected nil error with nil runtime, got: %v", err)
+	// With nil runtime, dockerGateExecutor must return an explicit error.
+	if err == nil {
+		t.Fatal("expected error with nil runtime, got nil")
 	}
-	if result == nil {
-		t.Error("expected non-nil result (empty metadata) with nil runtime")
+	if result != nil {
+		t.Errorf("expected nil result with nil runtime error, got: %+v", result)
 	}
 }
