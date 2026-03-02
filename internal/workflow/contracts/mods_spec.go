@@ -230,6 +230,9 @@ func (s ModsSpec) Validate() error {
 			if err := validateBuildGateProfileOverride(pair.phase.GateProfile, pair.prefix+".gate_profile"); err != nil {
 				return err
 			}
+			if err := validateBuildGatePhaseTarget(pair.phase.Target, pair.prefix+".target"); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -275,6 +278,15 @@ func validateBuildGateProfileOverride(prep *BuildGateProfileOverride, prefix str
 		}
 	}
 	return nil
+}
+
+func validateBuildGatePhaseTarget(target string, prefix string) error {
+	switch strings.TrimSpace(target) {
+	case "", GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests:
+		return nil
+	default:
+		return fmt.Errorf("%s: invalid value %q (expected one of: %s|%s|%s)", prefix, target, GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests)
+	}
 }
 
 // validateStackGateSpec validates a StackGateSpec for ambiguous configuration.

@@ -38,6 +38,12 @@ type BuildGatePhaseConfig struct {
 
 	// GateProfile configures gate_profile-derived command/env overrides for this phase.
 	GateProfile *BuildGateProfileOverride `json:"gate_profile,omitempty" yaml:"gate_profile,omitempty"`
+
+	// Target pins the gate target for this phase (build|unit|all_tests).
+	Target string `json:"target,omitempty" yaml:"target,omitempty"`
+
+	// Always forces this phase to run even when an exact prior profile could skip it.
+	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
 }
 
 // BuildGateProfileOverride configures a gate_profile-derived command/env override.

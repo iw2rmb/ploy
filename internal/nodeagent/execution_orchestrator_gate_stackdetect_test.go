@@ -26,6 +26,10 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PostStack = post
 		typedOpts.BuildGate.PreGateProfile = preGateProfile
 		typedOpts.BuildGate.PostGateProfile = postGateProfile
+		typedOpts.BuildGate.PreTarget = contracts.GateProfileTargetUnit
+		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
+		typedOpts.BuildGate.PreAlways = true
+		typedOpts.BuildGate.PostAlways = false
 
 		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypePreGate}, typedOpts)
 
@@ -34,6 +38,12 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 		if manifest.Gate.GateProfile != preGateProfile {
 			t.Fatalf("Gate.GateProfile=%v; want pre gate_profile override", manifest.Gate.GateProfile)
+		}
+		if got, want := manifest.Gate.Target, contracts.GateProfileTargetUnit; got != want {
+			t.Fatalf("Gate.Target=%q; want %q", got, want)
+		}
+		if !manifest.Gate.Always {
+			t.Fatal("Gate.Always=false; want true")
 		}
 	})
 
@@ -44,6 +54,10 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PostStack = post
 		typedOpts.BuildGate.PreGateProfile = preGateProfile
 		typedOpts.BuildGate.PostGateProfile = postGateProfile
+		typedOpts.BuildGate.PreTarget = contracts.GateProfileTargetUnit
+		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
+		typedOpts.BuildGate.PreAlways = true
+		typedOpts.BuildGate.PostAlways = false
 
 		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypePostGate}, typedOpts)
 
@@ -52,6 +66,12 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 		if manifest.Gate.GateProfile != postGateProfile {
 			t.Fatalf("Gate.GateProfile=%v; want post gate_profile override", manifest.Gate.GateProfile)
+		}
+		if got, want := manifest.Gate.Target, contracts.GateProfileTargetAllTests; got != want {
+			t.Fatalf("Gate.Target=%q; want %q", got, want)
+		}
+		if manifest.Gate.Always {
+			t.Fatal("Gate.Always=true; want false")
 		}
 	})
 
@@ -62,6 +82,10 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PostStack = post
 		typedOpts.BuildGate.PreGateProfile = preGateProfile
 		typedOpts.BuildGate.PostGateProfile = postGateProfile
+		typedOpts.BuildGate.PreTarget = contracts.GateProfileTargetUnit
+		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
+		typedOpts.BuildGate.PreAlways = true
+		typedOpts.BuildGate.PostAlways = false
 
 		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypeReGate}, typedOpts)
 
@@ -70,6 +94,12 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 		if manifest.Gate.GateProfile != postGateProfile {
 			t.Fatalf("Gate.GateProfile=%v; want post gate_profile override", manifest.Gate.GateProfile)
+		}
+		if got, want := manifest.Gate.Target, contracts.GateProfileTargetAllTests; got != want {
+			t.Fatalf("Gate.Target=%q; want %q", got, want)
+		}
+		if manifest.Gate.Always {
+			t.Fatal("Gate.Always=true; want false")
 		}
 	})
 

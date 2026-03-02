@@ -126,6 +126,12 @@ type StepGateSpec struct {
 	// AutoBootstrapRepoGateProfile enables pre-gate auto-generation of gate_profile
 	// from detected stack and resolved gate command when the repo has no persisted profile.
 	AutoBootstrapRepoGateProfile bool
+
+	// Target pins build gate execution to a concrete target (build|unit|all_tests).
+	Target string
+
+	// Always forces gate execution even when skip heuristics could apply.
+	Always bool
 }
 
 // StepGateStackSpec holds the effective Stack Gate configuration for a gate phase.

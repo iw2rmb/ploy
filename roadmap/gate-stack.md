@@ -91,7 +91,7 @@ Legend: [ ] todo, [x] done.
   - Tests: claim handler tests — expect `gates` row creation for pre/post/re-gate.
 
 ## Phase 7: Build Gate Contract Changes
-- [ ] Add `build_gate.[pre|post].target` and `always` fields — expose strict skip/target behavior in spec.
+- [x] Add `build_gate.[pre|post].target` and `always` fields — expose strict skip/target behavior in spec.
   - Repository: ploy
   - Component: workflow contracts parser/validator
   - Scope: extend `BuildGatePhaseConfig`; parse/validate enums and booleans; wire through typed options and claim mutation.

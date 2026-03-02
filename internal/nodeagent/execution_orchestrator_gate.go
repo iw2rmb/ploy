@@ -207,11 +207,18 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 //   - pre_gate may use build_gate.pre.gate_profile command/env override.
 //   - post_gate may use build_gate.post.gate_profile command/env override.
 //   - re_gate reuses build_gate.post.gate_profile command/env override.
+//
+// Target/always semantics:
+//   - pre_gate uses build_gate.pre.target and build_gate.pre.always.
+//   - post_gate uses build_gate.post.target and build_gate.post.always.
+//   - re_gate reuses build_gate.post.target and build_gate.post.always.
 func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunRequest, typedOpts RunOptions) {
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
 	manifest.Gate.AutoBootstrapRepoGateProfile = false
+	manifest.Gate.Target = ""
+	manifest.Gate.Always = false
 
 	switch req.JobType {
 	case types.JobTypePreGate:
@@ -219,6 +226,8 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
 		}
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PreGateProfile
+		manifest.Gate.Target = typedOpts.BuildGate.PreTarget
+		manifest.Gate.Always = typedOpts.BuildGate.PreAlways
 		if req.RepoGateProfileMissing && typedOpts.BuildGate.PreGateProfile == nil {
 			manifest.Gate.AutoBootstrapRepoGateProfile = true
 		}
@@ -227,8 +236,12 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
 		}
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
+		manifest.Gate.Target = typedOpts.BuildGate.PostTarget
+		manifest.Gate.Always = typedOpts.BuildGate.PostAlways
 	case types.JobTypeReGate:
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
+		manifest.Gate.Target = typedOpts.BuildGate.PostTarget
+		manifest.Gate.Always = typedOpts.BuildGate.PostAlways
 	}
 }
 

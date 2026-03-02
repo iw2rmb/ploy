@@ -32,6 +32,10 @@ type BuildGateOptions struct {
 	PostStack       *contracts.BuildGateStackConfig
 	PreGateProfile  *contracts.BuildGateProfileOverride
 	PostGateProfile *contracts.BuildGateProfileOverride
+	PreTarget       string
+	PostTarget      string
+	PreAlways       bool
+	PostAlways      bool
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
@@ -98,10 +102,14 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		if spec.BuildGate.Pre != nil {
 			runOpts.BuildGate.PreStack = spec.BuildGate.Pre.Stack
 			runOpts.BuildGate.PreGateProfile = copyBuildGateProfileOverride(spec.BuildGate.Pre.GateProfile)
+			runOpts.BuildGate.PreTarget = spec.BuildGate.Pre.Target
+			runOpts.BuildGate.PreAlways = spec.BuildGate.Pre.Always
 		}
 		if spec.BuildGate.Post != nil {
 			runOpts.BuildGate.PostStack = spec.BuildGate.Post.Stack
 			runOpts.BuildGate.PostGateProfile = copyBuildGateProfileOverride(spec.BuildGate.Post.GateProfile)
+			runOpts.BuildGate.PostTarget = spec.BuildGate.Post.Target
+			runOpts.BuildGate.PostAlways = spec.BuildGate.Post.Always
 		}
 
 		if spec.BuildGate.Healing != nil {
