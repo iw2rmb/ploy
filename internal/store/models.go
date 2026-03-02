@@ -113,6 +113,10 @@ type Job struct {
 	StartedAt   pgtype.Timestamptz `json:"started_at"`
 	FinishedAt  pgtype.Timestamptz `json:"finished_at"`
 	DurationMs  int64              `json:"duration_ms"`
+	RepoShaIn   string             `json:"repo_sha_in"`
+	RepoShaOut  string             `json:"repo_sha_out"`
+	RepoShaIn8  string             `json:"repo_sha_in8"`
+	RepoShaOut8 string             `json:"repo_sha_out8"`
 	Meta        []byte             `json:"meta"`
 }
 

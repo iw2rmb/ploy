@@ -76,6 +76,32 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig", 1000)
+	st := &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+
+	handler := completeJobHandler(st, nil, nil)
+	rr := httptest.NewRecorder()
+	shaOut := "0123456789abcdef0123456789abcdef01234567"
+	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+		"status":       "Success",
+		"repo_sha_out": shaOut,
+	}))
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if st.updateJobCompletionParams.RepoShaOut != shaOut {
+		t.Fatalf("expected repo_sha_out %q, got %q", shaOut, st.updateJobCompletionParams.RepoShaOut)
+	}
+}
+
 func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	t.Parallel()
 

@@ -22,7 +22,8 @@ post:
     `Running` to a terminal status (`Success`, `Fail`, or `Cancelled`). The server:
 
     1. Validates node identity from the client certificate and enforces job ownership.
-    2. Transitions the job to terminal status with `finished_at`, `duration_ms`, and `exit_code`.
+    2. Transitions the job to terminal status with `finished_at`, `duration_ms`, `exit_code`,
+       and optional `repo_sha_out`/`repo_sha_out8`.
     3. If the job succeeded, schedules the next job in the run (server-driven scheduling).
     4. If a gate job failed, may create healing jobs and a re-gate job.
     5. Checks if all jobs are terminal and, if so, derives run status gate-aware.
@@ -87,6 +88,12 @@ post:
                       nullable: true
                       description: Build-stage metadata (only valid when kind is `build`).
                       additionalProperties: true
+            repo_sha_out:
+              type: string
+              description: |
+                Optional deterministic output repository SHA for this job.
+                Must match lowercase 40-hex format (`^[0-9a-f]{40}$`).
+              pattern: '^[0-9a-f]{40}$'
   responses:
     '204':
       description: Completed; job transitioned to terminal status
@@ -97,6 +104,7 @@ post:
         - Missing `status` or non-terminal status value
         - Malformed `stats` JSON (must be a JSON object)
         - Invalid `stats.job_meta` (missing/invalid kind or structural mismatch)
+        - Invalid `repo_sha_out` format (must be lowercase 40-hex)
     '401':
       description: Unauthorized — caller identity missing or invalid in context
     '403':

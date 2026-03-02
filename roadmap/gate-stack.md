@@ -41,7 +41,7 @@ Legend: [ ] todo, [x] done.
   - Scope: add `run_repos.source_commit_sha`, `run_repos.repo_sha0`; set them at run start; fail repo queueing when seed SHA cannot be resolved.
   - Snippets: `repo_sha0 = source_commit_sha`
   - Tests: handler tests in `internal/server/handlers/migs_runs_test.go` and `runs_submit_test.go` — expect queue rejection when SHA seed resolution fails.
-- [ ] Add per-job SHA in/out fields and short forms — persist deterministic state transitions.
+- [x] Add per-job SHA in/out fields and short forms — persist deterministic state transitions.
   - Repository: ploy
   - Component: jobs schema + completion handling
   - Scope: add `jobs.repo_sha_in`, `jobs.repo_sha_out`, `jobs.repo_sha_in8`, `jobs.repo_sha_out8`; enforce lowercase 40-hex format validation at boundary.

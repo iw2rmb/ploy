@@ -15,6 +15,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE id = $1;
@@ -36,6 +40,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE run_id = $1
@@ -58,6 +66,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3
@@ -96,6 +108,10 @@ RETURNING
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta;
 
 -- name: UpdateJobStatus :exec
@@ -230,6 +246,10 @@ SELECT
   started_at,
   finished_at,
   duration_ms,
+  repo_sha_in,
+  repo_sha_out,
+  repo_sha_in8,
+  repo_sha_out8,
   meta
 FROM jobs
 WHERE run_id = $1 AND repo_id = $2 AND attempt = $3 AND status = 'Created'
@@ -279,6 +299,10 @@ RETURNING
   jobs.started_at,
   jobs.finished_at,
   jobs.duration_ms,
+  jobs.repo_sha_in,
+  jobs.repo_sha_out,
+  jobs.repo_sha_in8,
+  jobs.repo_sha_out8,
   jobs.meta;
 
 -- name: PromoteJobByIDIfUnblocked :one
@@ -318,6 +342,10 @@ RETURNING
   jobs.started_at,
   jobs.finished_at,
   jobs.duration_ms,
+  jobs.repo_sha_in,
+  jobs.repo_sha_out,
+  jobs.repo_sha_in8,
+  jobs.repo_sha_out8,
   jobs.meta;
 
 -- name: UpdateJobNextID :exec
@@ -335,11 +363,19 @@ WHERE run_id = $1 AND status = $2;
 
 -- name: UpdateJobCompletion :exec
 UPDATE jobs
-SET status = $2,
-    exit_code = $3,
+SET status = sqlc.arg(status),
+    exit_code = sqlc.arg(exit_code),
+    repo_sha_out = CASE
+      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out
+      ELSE sqlc.arg(repo_sha_out)::TEXT
+    END,
+    repo_sha_out8 = CASE
+      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out8
+      ELSE SUBSTRING(sqlc.arg(repo_sha_out)::TEXT, 1, 8)
+    END,
     finished_at = now(),
     duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: UpdateJobMeta :exec
 UPDATE jobs
@@ -355,12 +391,20 @@ WHERE id = $1;
 
 -- name: UpdateJobCompletionWithMeta :exec
 UPDATE jobs
-SET status = $2,
-    exit_code = $3,
+SET status = sqlc.arg(status),
+    exit_code = sqlc.arg(exit_code),
+    repo_sha_out = CASE
+      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out
+      ELSE sqlc.arg(repo_sha_out)::TEXT
+    END,
+    repo_sha_out8 = CASE
+      WHEN sqlc.arg(repo_sha_out)::TEXT = '' THEN repo_sha_out8
+      ELSE SUBSTRING(sqlc.arg(repo_sha_out)::TEXT, 1, 8)
+    END,
     finished_at = now(),
     duration_ms = COALESCE(EXTRACT(EPOCH FROM (now() - started_at)) * 1000, 0)::BIGINT,
-    meta = $4
-WHERE id = $1;
+    meta = sqlc.arg(meta)
+WHERE id = sqlc.arg(id);
 
 -- name: CountJobsByRunRepoAttemptGroupByStatus :many
 -- Counts jobs by status for a specific repo attempt, excluding MR jobs.

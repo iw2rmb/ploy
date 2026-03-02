@@ -24,9 +24,10 @@ import (
 // This is a simpler contract than the node-based endpoint since job_id
 // is in the URL path and node identity comes from mTLS.
 type completeJobRequest struct {
-	Status   string          `json:"status"`              // Terminal status: Success, Fail, or Cancelled
-	ExitCode *int32          `json:"exit_code,omitempty"` // Exit code from job execution
-	Stats    json.RawMessage `json:"stats,omitempty"`     // Optional job statistics (must be JSON object)
+	Status     string          `json:"status"`                 // Terminal status: Success, Fail, or Cancelled
+	ExitCode   *int32          `json:"exit_code,omitempty"`    // Exit code from job execution
+	Stats      json.RawMessage `json:"stats,omitempty"`        // Optional job statistics (must be JSON object)
+	RepoSHAOut string          `json:"repo_sha_out,omitempty"` // Optional lowercase 40-hex output SHA reported by node.
 }
 
 // completeJobHandler marks a job as completed with terminal status and stats.
@@ -137,6 +138,15 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			}
 		}
 
+		repoSHAOut := ""
+		if candidate := strings.TrimSpace(req.RepoSHAOut); candidate != "" {
+			if !sha40Pattern.MatchString(candidate) {
+				httpErr(w, http.StatusBadRequest, "repo_sha_out must match ^[0-9a-f]{40}$")
+				return
+			}
+			repoSHAOut = candidate
+		}
+
 		// Look up the job by job_id (KSUID-backed).
 		job, err := st.GetJob(ctx, jobID)
 		if err != nil {
@@ -218,17 +228,19 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 				return
 			}
 			err = st.UpdateJobCompletionWithMeta(ctx, store.UpdateJobCompletionWithMetaParams{
-				ID:       job.ID,
-				Status:   jobStatus,
-				ExitCode: req.ExitCode,
-				Meta:     mergedMeta,
+				ID:         job.ID,
+				Status:     jobStatus,
+				ExitCode:   req.ExitCode,
+				Meta:       mergedMeta,
+				RepoShaOut: repoSHAOut,
 			})
 			persistedJobMeta = mergedMeta
 		} else {
 			err = st.UpdateJobCompletion(ctx, store.UpdateJobCompletionParams{
-				ID:       job.ID,
-				Status:   jobStatus,
-				ExitCode: req.ExitCode,
+				ID:         job.ID,
+				Status:     jobStatus,
+				ExitCode:   req.ExitCode,
+				RepoShaOut: repoSHAOut,
 			})
 		}
 		if err != nil {

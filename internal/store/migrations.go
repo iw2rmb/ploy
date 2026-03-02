@@ -11,7 +11,7 @@ import (
 // SchemaVersion is the version number for the embedded schema.sql.
 // Increment this when schema.sql changes to trigger re-application on existing databases.
 // This uses a timestamp-like versioning scheme (YYYYMMDDNN) for clarity.
-const SchemaVersion int64 = 2026030201
+const SchemaVersion int64 = 2026030202
 
 // RunMigrations ensures the database schema is present and records the version.
 // Uses execMigrationSQL for statement-by-statement execution within a transaction.

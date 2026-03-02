@@ -328,6 +328,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   started_at      TIMESTAMPTZ,
   finished_at     TIMESTAMPTZ,
   duration_ms     BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+  repo_sha_in     TEXT NOT NULL DEFAULT '',   -- Immutable input SHA for this job execution.
+  repo_sha_out    TEXT NOT NULL DEFAULT '',   -- Node-reported output SHA after this job.
+  repo_sha_in8    TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_in.
+  repo_sha_out8   TEXT NOT NULL DEFAULT '',   -- Short form of repo_sha_out.
   meta            JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
   UNIQUE (run_id, repo_id, attempt, name)  -- unique job name per repo attempt.
 );
@@ -336,6 +340,11 @@ ALTER TABLE IF EXISTS jobs
 ALTER TABLE IF EXISTS jobs
   ADD CONSTRAINT jobs_repo_id_fkey
   FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE RESTRICT;
+ALTER TABLE IF EXISTS jobs
+  ADD COLUMN IF NOT EXISTS repo_sha_in TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS repo_sha_out TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS repo_sha_in8 TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS repo_sha_out8 TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).
 CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, repo_id, attempt, id) WHERE status = 'Queued';
