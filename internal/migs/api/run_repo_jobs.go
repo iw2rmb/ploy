@@ -29,6 +29,8 @@ type RunRepoJob struct {
 	Name          string              `json:"name"`
 	JobType       string              `json:"job_type"`
 	JobImage      string              `json:"job_image"`
+	RepoShaIn     string              `json:"repo_sha_in,omitempty"`
+	RepoShaOut    string              `json:"repo_sha_out,omitempty"`
 	NextID        *domaintypes.JobID  `json:"next_id"`
 	NodeID        *domaintypes.NodeID `json:"node_id"`
 	Status        store.JobStatus     `json:"status"`

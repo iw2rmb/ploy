@@ -119,6 +119,8 @@ build_gate:
 - `build_gate.post.stack` applies to the `post_gate` job.
 - `build_gate.pre.gate_profile` applies to the `pre_gate` command/env override.
 - `build_gate.post.gate_profile` applies to `post_gate` and `re_gate` command/env overrides.
+- `build_gate.pre.target` / `build_gate.post.target` pin gate execution target (`build|unit|all_tests`).
+- `build_gate.pre.always` / `build_gate.post.always` force gate execution even when a prior exact profile would allow skip.
 - When `stack.enabled: true`, Build Gate rejects a detected stack mismatch (e.g. configured `release: "11"` but detected `"17"`).
 - When `default: true`, if stack detection cannot determine tool or release, Build Gate falls back to the configured stack. If `tool` is omitted, a detected tool is used when available.
 - When `default: false`, stack detection failures cancel execution for the repo (job status `Cancelled`), and remaining jobs are cancelled.
@@ -130,14 +132,12 @@ build_gate:
 
 Gate command resolution uses the following precedence (highest wins):
 1. Explicit run spec override: `build_gate.<phase>.gate_profile`
-2. Repo gate profile mapping (claim-time injection from persisted `gate_profile`)
-3. Detected-tool fallback command (`buildCommandForTool`)
+2. For `re_gate`: validated infra recovery candidate override
+3. Claim-time resolved gate profile from `gate_profiles` (exact `(repo_id, repo_sha_in, stack_id)` row)
+4. Detected-tool fallback command (`buildCommandForTool`)
 
-Pre-gate auto-bootstrap:
-- If `pre_gate` starts with no persisted repo `gate_profile` and no explicit `build_gate.pre.gate_profile`, Build Gate auto-generates a simple gate profile from stack detection + resolved gate command and uses it in that `pre_gate`.
-- Generated bootstrap profile sets `targets.active=all_tests` and writes the resolved command/env to `targets.all_tests`.
-- The generated profile is persisted to `mig_repos.gate_profile` only when that `pre_gate` completes with `Success`.
-- Auto-bootstrap is skipped when an explicit `build_gate.pre.gate_profile` is present.
+Default gate profiles are seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
+at server startup. Pre-gate runtime auto-bootstrap is removed.
 
 Gate profile mapping for simple mode:
 - Gate phase still selects destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
@@ -154,9 +154,6 @@ Gate profile mapping for simple mode:
   - `runtime.docker.api_version` injects `DOCKER_API_VERSION=<value>` when set
   - when `DOCKER_HOST` is `unix://...`, Build Gate mounts that socket path into the gate container automatically.
 
-Gate profile payload visibility is available via `GET /v1/repos`
-(`gate_profile` is consumed at claim-time for gate override mapping; there is no dedicated prep endpoint).
-
 Environment precedence for gate execution:
 1. Gate env from run/spec (`spec.env` + global env injection)
 2. `build_gate.<phase>.gate_profile.env` (override wins on key conflicts)
@@ -168,29 +165,26 @@ Build Gate resolves its runtime image from an explicit stack→image mapping.
 
 **Resolution sources and precedence (highest wins):**
 1. Mod spec: `build_gate.images[]` (per-stack overrides)
-2. Default file: `etc/ploy/gates/build-gate-images.yaml` (installed at `/etc/ploy/gates/build-gate-images.yaml` in Docker images)
+2. Default catalog: `gates/stacks.yaml` (installed at `/etc/ploy/gates/stacks.yaml` in Docker images)
 
-**Default file shipping:**
-- The repository default lives at `etc/ploy/gates/build-gate-images.yaml`.
-- The `ploy-node` and `ploy-server` Docker images include it at `/etc/ploy/gates/build-gate-images.yaml` by default.
+**Default catalog shipping:**
+- The repository default lives at `gates/stacks.yaml`.
+- The `ploy-node` and `ploy-server` Docker images include it at `/etc/ploy/gates/stacks.yaml` by default.
 
 **Rule format:**
 ```yaml
-BuildGateImages:
-  - image: docker.io/org/stack-gate-java-maven:17
-    language: java
+stacks:
+  - lang: java
+    release: "17"
     tool: maven
-    release: "17"
-  # tool-agnostic fallback (used only when expectations omit tool)
-  - image: docker.io/org/stack-gate-java:17
-    language: java
-    release: "17"
+    image: ${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17
+    profile: gates/profiles/java-17-maven.yaml
 ```
 
 **Validation:**
-- `language`, `release`, and `image` are required; `tool` is optional.
-- Duplicate selectors within the same source are rejected.
-- A missing default mapping file is an error when no spec mapping matches.
+- `lang`, `release`, `image`, and `profile` are required; `tool` is optional.
+- Duplicate selectors in the catalog are rejected.
+- Referenced profile files must exist.
 
 **Environment variables (on worker nodes):**
 - Resource limits: `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES`, `PLOY_BUILDGATE_LIMIT_CPU_MILLIS`,

@@ -583,11 +583,12 @@ Rewire example:
   - unreadable artifact bundle -> `candidate_validation_status=unavailable`
   - schema/JSON validation failure -> `candidate_validation_status=invalid`
   - valid candidate -> `candidate_validation_status=valid` with embedded candidate payload
-- On successful `re_gate`, a validated candidate is promoted to `mig_repos.gate_profile`
-  and `candidate_promoted=true` is persisted in `re_gate` recovery metadata.
-- Promotion is strict:
+- On successful `re_gate`, a validated candidate is marked with
+  `candidate_promoted=true` in `re_gate` recovery metadata for audit/idempotency.
+- Candidate promotion is strict:
   - never runs on failed `re_gate`
-  - idempotent across retries/replays (already promoted candidates are skipped)
+  - idempotent across retries/replays (already-promoted candidates are skipped)
+  - does not write to `mig_repos`; canonical gate profile state is stored in `gate_profiles`
 
 ### Parallel healing branches (Phase E)
 
@@ -655,15 +656,18 @@ artifacts) remain job-addressed via `job_id`.
 - **Specs (`specs`)** — Append-only spec JSON dictionary. Runs and migs reference
   a spec by ID.
 
-- **Repo set (`mod_repos`)** — Managed repositories for a mig project, each with
-  current `repo_url`, `base_ref`, and `target_ref`.
+- **Repo set (`mig_repos` + `repos`)** — Managed repositories for a mig project.
+  `repos` stores global repository identity (`repos.id`, canonical URL) and
+  `mig_repos` stores mig membership plus mutable refs (`base_ref`, `target_ref`).
 
 - **Run repos (`run_repos`)** — One row per `(run_id, repo_id)` capturing snapshot
-  `repo_base_ref`/`repo_target_ref`, per-repo status (`Queued`, `Running`, `Success`,
+  refs (`repo_base_ref`, `repo_target_ref`), immutable SHA seed
+  (`source_commit_sha`, `repo_sha0`), per-repo status (`Queued`, `Running`, `Success`,
   `Fail`, `Cancelled`), and retry `attempt`.
 
-- **Jobs (`jobs`)** — Jobs are scoped to `(run_id, repo_id, attempt)`; logs/diffs/artifacts
-  attach to `job_id`. There are no per-repo child runs in v1.
+- **Jobs (`jobs`)** — Jobs are scoped to `(run_id, repo_id, attempt)` and carry
+  deterministic chain fields (`repo_sha_in`, `repo_sha_out` and short forms).
+  Logs/diffs/artifacts attach to `job_id`. There are no per-repo child runs in v1.
 
 ### Single-repo vs batch runs
 
@@ -675,7 +679,7 @@ code paths handle both cases:
 | Aspect         | Single-repo run                 | Batch run                               |
 |----------------|----------------------------------|-----------------------------------------|
 | Run (`runs`)   | Created (`Started`)              | Created (`Started`)                     |
-| `mod_repos`    | 1 repo created/managed           | N repos created/managed                 |
+| `mig_repos`    | 1 repo membership row            | N repo membership rows                  |
 | `run_repos`    | 1 (auto-created)                 | N (added via batch creation / repo add) |
 | Spec storage   | `specs` referenced by `runs.spec_id` | Same                                |
 
@@ -733,35 +737,44 @@ repo attempt. It does not create per-repo child runs.
 ### Gate profile usage (current)
 
 There is no standalone prep scheduler loop and no `prep_runs` table.
-Gate profiles are persisted on `mig_repos` and consumed at claim-time:
-- `GET /v1/repos` surfaces repo-level summary and latest run metadata.
-- `gate_profile` is mapped into gate phase prep overrides when present.
-- Infra healing may provide a candidate gate profile artifact
-  (`/out/gate-profile-candidate.json`, schema `gate_profile_v1`).
-- Candidate promotion to repo `gate_profile` happens only after successful `re_gate`.
+Gate profiles are resolved at claim-time from canonical storage:
+- `gate_profiles` rows keyed by `(repo_id, repo_sha, stack_id)`
+- `gates(job_id, profile_id)` linkage for auditability
+- default stack profiles seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
 
-Gate profile to Build Gate mapping (claim-time):
-- Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
+Claim-time profile resolution:
+1. Exact profile lookup by `(repo_id, repo_sha_in, stack_id)`
+2. Fallback to latest repo+stack profile
+3. Fallback to default stack profile (`repo_id IS NULL`, `repo_sha IS NULL`)
+4. Fallback hits are copied to a new exact row before execution
+
+Gate profile to Build Gate mapping:
+- Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for
+  `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
 - Command/env source is always `gate_profile.targets.<targets.active>`.
-- Mapping is status-agnostic at runtime (`status`/`failure_code` are ignored for command/env resolution).
+- Mapping is status-agnostic at runtime (`status`/`failure_code` do not alter
+  command/env selection).
 - There is no runtime auto-fallback across targets.
 - `targets.active=unsupported` is terminal and injects no runnable override.
 - Terminal unsupported payload contract:
   - `targets.build.status=failed`
   - `targets.build.failure_code=infra_support`
-- Simple runtime hints are also mapped:
+- Runtime hints are mapped:
   - `runtime.docker.mode=host_socket` -> `DOCKER_HOST=unix:///var/run/docker.sock`
   - `runtime.docker.mode=tcp` -> `DOCKER_HOST=<runtime.docker.host>`
   - `runtime.docker.api_version` -> `DOCKER_API_VERSION=<value>`
-- During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that socket path into the gate container.
-- Resolution precedence:
-  1. Explicit `build_gate.<phase>.gate_profile` in submitted run spec
-  2. For `re_gate` only: validated infra recovery candidate prep override
-  3. Mapped repo `gate_profile` target
-  4. Default detected-tool command fallback
-- Gate env precedence remains:
-  1. Base gate env from spec and server env injection
-  2. Mapped/explicit prep env override on key conflicts
+- During gate execution, `DOCKER_HOST=unix://...` triggers auto-mount of that
+  socket path into the gate container.
+
+Resolution precedence:
+1. Explicit `build_gate.<phase>.gate_profile` in submitted run spec
+2. For `re_gate` only: validated infra recovery candidate prep override
+3. Resolved gate profile payload from `gate_profiles`
+4. Default detected-tool command fallback
+
+Gate env precedence:
+1. Base gate env from spec and server env injection
+2. Mapped/explicit prep env override on key conflicts
 
 ### Relationship summary (v1)
 
@@ -769,9 +782,13 @@ Gate profile to Build Gate mapping (claim-time):
 |-------------|--------------------------------------------|-------------------------------------------|
 | `specs`     | Append-only spec dictionary                | referenced by `migs.spec_id`, `runs.spec_id` |
 | `migs`      | Mod projects                               | `migs` → `mig_repos` (1:N), `migs` → `runs` (1:N) |
-| `mig_repos` | Managed repo set for a mig                 | `mig_repos` → `run_repos` (1:N), `mig_repos` → `jobs` (1:N) |
+| `repos`     | Global repository identity                 | `repos` → `mig_repos` (1:N), `repos` → `run_repos` (1:N), `repos` → `jobs` (1:N) |
+| `mig_repos` | Managed repo membership for a mig          | (`mig_id`, `repo_id`) membership + ref snapshot source |
 | `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
-| `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id)` → `jobs` (1:N)        |
+| `run_repos` | Per-repo execution state within a run      | `(run_id, repo_id, attempt)` materializes job chains |
+| `stacks`    | Canonical stack/image catalog              | `stacks` → `gate_profiles` (1:N) |
+| `gate_profiles` | Default and exact gate profiles         | keyed by `(repo_id, repo_sha, stack_id)` |
+| `gates`     | Gate job to profile linkage                | `gates.job_id -> jobs.id`, `gates.profile_id -> gate_profiles.id` |
 | `jobs`      | Execution units (pre-gate, mig, heal, etc.)| `jobs` → `diffs`/`logs`/artifacts via `job_id` |
 
 ### Pulling Diffs Locally (`run pull` / `mig pull`)
@@ -822,7 +839,8 @@ workflows.
 - **Clean working tree**: No staged or unstaged changes allowed (prevents data loss
   and ensures deterministic patch application).
 - **Resolvable remote**: The specified `--origin` remote must exist and have a URL
-  that matches the `repo_url` stored in `mod_repos` / `run_repos` (see "Repo URL rules" below).
+  that matches the canonical URL stored in `repos` and referenced by `mig_repos` / `run_repos`
+  (see "Repo URL rules" below).
 
 **Key fields used:**
 
@@ -1045,7 +1063,8 @@ value is a `StageStatus` object describing that job's execution state.
   - Shape: `{repo_url, base_ref, target_ref, spec, created_by?}`.
   - Handler: `createSingleRepoRunHandler`.
   - Behaviour (single source of truth for Mods execution):
-    - Creates a spec (`specs`), a mig project (`migs`), a managed repo (`mod_repos`),
+    - Creates a spec (`specs`), a mig project (`migs`), a managed repo membership (`mig_repos`)
+      backed by global repo identity (`repos`),
       a run (`runs`, `status=Started`), and a run repo (`run_repos`, `status=Queued`).
     - Jobs are materialized by the scheduler/start path for queued repos.
     - The run repo transitions to `Running` when the first job is claimed.
@@ -1126,17 +1145,14 @@ Current stale-heartbeat recovery behavior:
   sequence as normal completion: a terminal `run` snapshot followed by `done`.
 
 Gate profile behavior:
-- `mig_repos.gate_profile` and `mig_repos.gate_profile_artifacts` remain the persisted
-  gate profile payload storage.
-- During `pre_gate`, when repo `gate_profile` is absent and the run spec does not define
-  explicit `build_gate.pre.gate_profile`, the node auto-generates a simple profile from
-  stack detection and resolved gate command (`targets.active=all_tests`, command/env in `targets.all_tests`),
-  uses it in that `pre_gate`, and persists it
-  only if the `pre_gate` job succeeds.
+- Canonical gate profile storage is `gate_profiles` (+ `gates` linkage), not `mig_repos`.
+- During claim, the resolver targets exact identity `(repo_id, repo_sha_in, stack_id)`;
+  fallback profiles are copied into a new exact row before execution.
+- Pre-gate runtime auto-bootstrap generation/persistence has been removed.
 - Infra healing candidate validation uses `docs/schemas/gate_profile.schema.json`
   (`title: Ploy Build Gate Profile`, `$comment` guidance included) plus contract parsing.
-- A validated candidate can be promoted into `mig_repos.gate_profile` only after
-  successful `re_gate`.
+- A validated candidate is tracked in `re_gate` recovery metadata and marked
+  `candidate_promoted=true` after successful `re_gate` for idempotent audit.
 
 Node startup crash reconciliation behavior:
 - On node process startup, the node agent runs one startup reconciliation pass

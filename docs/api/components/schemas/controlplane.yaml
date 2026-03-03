@@ -125,7 +125,7 @@ RunRepo:
       description: Parent batch run ID (KSUID string).
     repo_id:
       type: string
-      description: Repository ID (mod_repos.id, NanoID string).
+      description: Repository ID (repos.id, NanoID string).
     repo_url:
       type: string
       description: Git repository URL (https, ssh, or file scheme).
@@ -602,7 +602,7 @@ NodeClaimResponse:
       description: Run ID (parent run of the claimed job, KSUID string)
     repo_id:
       type: string
-      description: Repo ID (mod_repos.id, NanoID string)
+      description: Repo ID (repos.id, NanoID string)
     attempt:
       type: integer
       format: int32
@@ -999,7 +999,7 @@ RepoSummary:
   properties:
     repo_id:
       type: string
-      description: Repository identifier (mig_repos.id, NanoID string)
+      description: Repository identifier (repos.id, NanoID string)
     repo_url:
       type: string
       description: Git repository URL (https, ssh, or file scheme)
@@ -1086,6 +1086,12 @@ RepoJobItem:
     job_image:
       type: string
       description: Container image used for this job (may be empty)
+    repo_sha_in:
+      type: string
+      description: Deterministic repository SHA before this job executes (lowercase 40-hex when present)
+    repo_sha_out:
+      type: string
+      description: Deterministic repository SHA after this job executes (lowercase 40-hex when present)
     next_id:
       type: string
       nullable: true
@@ -1155,7 +1161,7 @@ RepoJobItem:
           description: Candidate validation/load error details when status is non-valid
         candidate_promoted:
           type: boolean
-          description: True when validated candidate has been promoted to repo gate_profile
+          description: True when validated candidate has been marked as promoted in recovery metadata
   required:
     - job_id
     - name
