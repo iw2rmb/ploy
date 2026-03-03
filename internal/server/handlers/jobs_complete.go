@@ -434,7 +434,7 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 					}
 				}
 			}
-			if promoteErr := maybePromoteReGateRecoveryCandidate(ctx, st, job, persistedJobMeta); promoteErr != nil {
+			if promoteErr := maybePromoteReGateRecoveryCandidate(ctx, st, gateProfilesBS, job, persistedJobMeta); promoteErr != nil {
 				slog.Error("complete job: failed to promote validated re-gate candidate",
 					"job_id", jobID,
 					"repo_id", job.RepoID,
@@ -567,9 +567,13 @@ func cloneRecoveryMetadataForCompletion(src *contracts.BuildGateRecoveryMetadata
 func maybePromoteReGateRecoveryCandidate(
 	ctx context.Context,
 	st store.Store,
+	bs blobstore.Store,
 	job store.Job,
 	rawMeta []byte,
 ) error {
+	if bs == nil {
+		return nil
+	}
 	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeReGate {
 		return nil
 	}
@@ -593,6 +597,9 @@ func maybePromoteReGateRecoveryCandidate(
 	if recovery.CandidatePromoted != nil && *recovery.CandidatePromoted {
 		return nil
 	}
+	if err := persistReGateRecoveryCandidateProfile(ctx, st, bs, job, recovery); err != nil {
+		return err
+	}
 
 	candidatePromoted := true
 	recovery.CandidatePromoted = &candidatePromoted
@@ -600,35 +607,10 @@ func maybePromoteReGateRecoveryCandidate(
 	if err != nil {
 		return err
 	}
-
-	artifactPath := strings.TrimSpace(recovery.CandidateArtifactPath)
-	if artifactPath == "" {
-		artifactPath = contracts.GateProfileCandidateArtifactPath
-	}
-	schemaID := strings.TrimSpace(recovery.CandidateSchemaID)
-	if schemaID == "" {
-		schemaID = contracts.GateProfileCandidateSchemaID
-	}
-	prepArtifacts, err := json.Marshal(map[string]any{
-		"source":        "recovery_candidate",
-		"schema_id":     schemaID,
-		"artifact_path": artifactPath,
-		"job_id":        job.ID.String(),
+	return st.UpdateJobMeta(ctx, store.UpdateJobMetaParams{
+		ID:   job.ID,
+		Meta: promotedMeta,
 	})
-	if err != nil {
-		return err
-	}
-
-	_, err = st.PromoteReGateRecoveryCandidateGateProfile(ctx, store.PromoteReGateRecoveryCandidateGateProfileParams{
-		ID:                   job.ID,
-		JobMeta:              promotedMeta,
-		GateProfile:          recovery.CandidateGateProfile,
-		GateProfileArtifacts: prepArtifacts,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
-	return err
 }
 
 func maybeRefreshNextReGateRecoveryCandidate(
