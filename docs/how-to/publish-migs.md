@@ -26,7 +26,7 @@ deploy/images/build-and-push-migs.sh
 Sync all local workflow images (migs + build-gate base images)
 ```bash
 deploy/images/garage.sh
-# Adds build-gate images and mirrored base images required by etc/ploy/gates/build-gate-images.yaml.
+# Adds build-gate images and mirrored base images required by gates/stacks.yaml.
 # Skips refs that already exist in registry.
 # Use --force to rebuild/repush everything.
 ```

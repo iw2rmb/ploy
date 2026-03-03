@@ -127,7 +127,7 @@ Legend: [ ] todo, [x] done.
   - Scope: update repo-centric endpoints/types (`RepoID`), gate execution status payloads, build-gate docs, lifecycle docs, and schema docs.
   - Snippets: controlplane schema includes `repo_sha_in`, `repo_sha_out` where relevant.
   - Tests: `go test ./docs/api` and handler contract tests — expect schema and API behavior consistency.
-- [ ] Run full validation matrix and clean legacy references — ensure no runtime path still depends on `etc/ploy/gates/build-gate-images.yaml`.
+- [x] Run full validation matrix and clean legacy references — ensure no runtime path still depends on `etc/ploy/gates/build-gate-images.yaml`.
   - Repository: ploy
   - Component: CI/hygiene/test suites
   - Scope: run unit, vet, staticcheck, integration slices; remove stale docs/tests referring to legacy mapping file.

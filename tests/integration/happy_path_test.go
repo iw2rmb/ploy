@@ -57,11 +57,11 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	repoURL := "https://github.com/example/happy-path-test"
 	baseRef := "main"
 	targetRef := "feature/happy-path"
-	repoID := domaintypes.NewMigRepoID()
+	migRepoID := domaintypes.NewMigRepoID()
 	repo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
-		ID:        repoID,
+		ID:        migRepoID,
 		MigID:     modID,
-		RepoUrl:   repoURL,
+		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
@@ -79,11 +79,11 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%s, repo_id=%s, repo_url=%s, status=%s", run.ID, run.MigID.String(), repo.ID.String(), repo.RepoUrl, run.Status)
+	t.Logf("Created run: id=%v, mod_id=%s, mig_repo_id=%s, repo_id=%s, status=%s", run.ID, run.MigID.String(), repo.ID.String(), repo.RepoID.String(), run.Status)
 
 	// Verify the run was created with expected values.
-	if repo.RepoUrl != repoURL {
-		t.Errorf("Expected repo_url %q, got %q", repoURL, repo.RepoUrl)
+	if repo.RepoID.IsZero() {
+		t.Error("expected non-zero repo_id on mig repo")
 	}
 	if run.Status != store.RunStatusStarted {
 		t.Errorf("Expected status Started, got %s", run.Status)

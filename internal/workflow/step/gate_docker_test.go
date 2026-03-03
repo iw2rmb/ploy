@@ -689,20 +689,6 @@ func TestCAPreambleScript(t *testing.T) {
 
 // --- Stack Gate Pre-Check Tests ---
 
-// createTestMappingFile creates a temporary build gate image mapping file for tests.
-// Returns the path to the file. The file is automatically cleaned up when the test completes.
-func createTestMappingFile(t *testing.T, rules string) string {
-	t.Helper()
-	tmpDir := t.TempDir()
-	mappingPath := filepath.Join(tmpDir, "build-gate-images.yaml")
-	content := `BuildGateImages:
-` + rules
-	if err := os.WriteFile(mappingPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("failed to create mapping file: %v", err)
-	}
-	return mappingPath
-}
-
 // createMavenWorkspace creates a workspace with a valid Maven pom.xml that has Java version.
 func createMavenWorkspace(t *testing.T, javaVersion string) string {
 	t.Helper()
