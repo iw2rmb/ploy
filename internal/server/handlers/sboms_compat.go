@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"unicode"
 
+	"github.com/iw2rmb/ploy/internal/server/sbom"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -18,7 +18,7 @@ type sbomCompatSelector struct {
 
 func sbomCompatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		lang := strings.TrimSpace(r.URL.Query().Get("lang"))
+		lang := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("lang")))
 		release := strings.TrimSpace(r.URL.Query().Get("release"))
 		tool := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("tool")))
 		libsRaw := strings.TrimSpace(r.URL.Query().Get("libs"))
@@ -35,7 +35,7 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 		}
 
 		hasEvidence, err := st.HasSBOMEvidenceForStack(r.Context(), store.HasSBOMEvidenceForStackParams{
-			Lang:    strings.ToLower(lang),
+			Lang:    lang,
 			Release: release,
 			Tool:    tool,
 		})
@@ -51,7 +51,7 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 		}
 
 		rows, err := st.ListSBOMCompatRows(r.Context(), store.ListSBOMCompatRowsParams{
-			Lang:    strings.ToLower(lang),
+			Lang:    lang,
 			Release: release,
 			Tool:    tool,
 			Libs:    libs,
@@ -79,10 +79,10 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 			}
 			best := ""
 			for _, v := range versions {
-				if selector.Floor != "" && compareLooseVersions(v, selector.Floor) < 0 {
+				if selector.Floor != "" && sbom.CompareVersions(lang, tool, v, selector.Floor) < 0 {
 					continue
 				}
-				if best == "" || compareLooseVersions(v, best) < 0 {
+				if best == "" || sbom.CompareVersions(lang, tool, v, best) < 0 {
 					best = v
 				}
 			}
@@ -142,102 +142,4 @@ func parseSBOMCompatSelectors(raw string) ([]sbomCompatSelector, []string, error
 
 func errCompatSelector(item string) error {
 	return fmt.Errorf("%q", item)
-}
-
-func compareLooseVersions(a, b string) int {
-	at := tokenizeVersion(a)
-	bt := tokenizeVersion(b)
-	maxLen := len(at)
-	if len(bt) > maxLen {
-		maxLen = len(bt)
-	}
-	for i := 0; i < maxLen; i++ {
-		if i >= len(at) {
-			return -1
-		}
-		if i >= len(bt) {
-			return 1
-		}
-		av := at[i]
-		bv := bt[i]
-		aNum := isAllDigits(av)
-		bNum := isAllDigits(bv)
-		if aNum && bNum {
-			av = trimLeadingZeros(av)
-			bv = trimLeadingZeros(bv)
-			if len(av) < len(bv) {
-				return -1
-			}
-			if len(av) > len(bv) {
-				return 1
-			}
-		}
-		if av < bv {
-			return -1
-		}
-		if av > bv {
-			return 1
-		}
-	}
-	return 0
-}
-
-func tokenizeVersion(v string) []string {
-	v = strings.ToLower(strings.TrimSpace(v))
-	if v == "" {
-		return nil
-	}
-
-	tokens := make([]string, 0)
-	var current strings.Builder
-	tokenKind := 0 // 0 none, 1 digits, 2 letters
-	flush := func() {
-		if current.Len() == 0 {
-			return
-		}
-		tokens = append(tokens, current.String())
-		current.Reset()
-		tokenKind = 0
-	}
-
-	for _, r := range v {
-		switch {
-		case unicode.IsDigit(r):
-			if tokenKind != 0 && tokenKind != 1 {
-				flush()
-			}
-			tokenKind = 1
-			current.WriteRune(r)
-		case unicode.IsLetter(r):
-			if tokenKind != 0 && tokenKind != 2 {
-				flush()
-			}
-			tokenKind = 2
-			current.WriteRune(r)
-		default:
-			flush()
-		}
-	}
-	flush()
-	return tokens
-}
-
-func isAllDigits(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
-}
-
-func trimLeadingZeros(s string) string {
-	trimmed := strings.TrimLeft(s, "0")
-	if trimmed == "" {
-		return "0"
-	}
-	return trimmed
 }

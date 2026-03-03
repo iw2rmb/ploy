@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run 'Test.*SBOM.*Compat'` and store query tests — expect correct per-lib results, floor filtering, and null response semantics.
 
 ## Phase 7: Ecosystem-Aware Version Ordering
-- [ ] Implement non-lexical version ordering per ecosystem for compatibility floor queries.
+- [x] Implement non-lexical version ordering per ecosystem for compatibility floor queries.
   - Repository: `ploy`
   - Component: version comparator package + compat query integration
   - Scope: introduce ecosystem-aware version comparator(s) used by `/v1/sboms/compat` so `>=` filtering and minimum selection are semantically correct for each supported stack ecosystem.
