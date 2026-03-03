@@ -104,6 +104,49 @@ func TestPersistGateProfileSnapshot_DerivesFromOverride(t *testing.T) {
 	}
 }
 
+func TestPersistGateProfileSnapshot_UsesPinnedTarget(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-profile-pinned-target")
+
+	rc.persistGateProfileSnapshot(
+		runID,
+		types.JobTypePreGate,
+		&contracts.StepGateSpec{
+			RepoID: types.MigRepoID("repo_3"),
+			Target: contracts.GateProfileTargetBuild,
+			GateProfile: &contracts.BuildGateProfileOverride{
+				Command: contracts.CommandSpec{Shell: "mvn -q -DskipTests compile"},
+				Target:  contracts.GateProfileTargetAllTests,
+				Env:     map[string]string{"MAVEN_OPTS": "-Xmx2g"},
+				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "11"},
+			},
+		},
+		nil,
+	)
+
+	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read profile snapshot: %v", err)
+	}
+	profile, err := contracts.ParseGateProfileJSON(data)
+	if err != nil {
+		t.Fatalf("snapshot profile invalid: %v", err)
+	}
+	if got, want := profile.Targets.Active, contracts.GateProfileTargetBuild; got != want {
+		t.Fatalf("targets.active = %q, want %q", got, want)
+	}
+	if profile.Targets.Build == nil || profile.Targets.Build.Command != "mvn -q -DskipTests compile" {
+		t.Fatalf("targets.build.command = %#v, want mvn command", profile.Targets.Build)
+	}
+	if got := profile.Targets.AllTests.Command; got != "" {
+		t.Fatalf("targets.all_tests.command = %q, want empty", got)
+	}
+}
+
 func TestPersistGateProfileSnapshot_RemovesStaleSnapshot(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)

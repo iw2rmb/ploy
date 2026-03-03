@@ -402,11 +402,13 @@ func resolveDetectedStackExecutionPlan(
 			}
 		}
 		return gateExecutionPlan{}, newFailureTerminal(failureTerminalOpts{
-			language: language,
-			tool:     tool,
-			code:     code,
-			message:  err.Error(),
-			err:      terminalErr,
+			language:           language,
+			tool:               tool,
+			code:               code,
+			message:            err.Error(),
+			err:                terminalErr,
+			runtimeImage:       image,
+			reportRuntimeImage: true,
 		})
 	}
 
@@ -431,20 +433,20 @@ func resolveGateCommand(
 	wantedTarget := strings.TrimSpace(target)
 
 	if prep != nil && !prep.Command.IsEmpty() {
-		if prep.Stack != nil {
-			if !stackMatchesPrepOverride(prep.Stack, language, tool, release) {
-				return nil, nil, fmt.Errorf("prep stack mismatch: expected %s/%s/%s, got %s/%s/%s",
-					strings.TrimSpace(prep.Stack.Language),
-					strings.TrimSpace(prep.Stack.Tool),
-					strings.TrimSpace(prep.Stack.Release),
-					strings.TrimSpace(language),
-					strings.TrimSpace(tool),
-					strings.TrimSpace(release),
-				)
-			}
-		}
 		prepTarget := strings.TrimSpace(prep.Target)
 		if wantedTarget == "" || prepTarget == wantedTarget {
+			if prep.Stack != nil {
+				if !stackMatchesPrepOverride(prep.Stack, language, tool, release) {
+					return nil, nil, fmt.Errorf("prep stack mismatch: expected %s/%s/%s, got %s/%s/%s",
+						strings.TrimSpace(prep.Stack.Language),
+						strings.TrimSpace(prep.Stack.Tool),
+						strings.TrimSpace(prep.Stack.Release),
+						strings.TrimSpace(language),
+						strings.TrimSpace(tool),
+						strings.TrimSpace(release),
+					)
+				}
+			}
 			return prep.Command.ToSlice(), contracts.CopyEnv(prep.Env), nil
 		}
 	}
