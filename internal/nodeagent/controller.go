@@ -106,7 +106,11 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 		cancel: cancel,
 	}
 
-	go r.executeRun(runCtx, req)
+	r.startRemoteCancellationWatch(runCtx, req, cancel)
+	go func() {
+		defer cancel()
+		r.executeRun(runCtx, req)
+	}()
 
 	return nil
 }
