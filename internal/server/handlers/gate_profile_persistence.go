@@ -67,26 +67,7 @@ func persistSuccessfulGateProfile(
 	if err != nil {
 		return err
 	}
-
-	objectKey := fmt.Sprintf(
-		"gate-profiles/repos/%s/%s/stack-%d/profile-%d.json",
-		job.RepoID.String(),
-		repoSHA,
-		stackRow.ID,
-		time.Now().UTC().UnixNano(),
-	)
-	if _, err := bs.Put(ctx, objectKey, "application/json", payload); err != nil {
-		return fmt.Errorf("put gate profile blob: %w", err)
-	}
-
-	profileID, err := upsertSuccessfulGateProfileRow(ctx, st, job.RepoID, repoSHA, stackRow.ID, objectKey)
-	if err != nil {
-		return err
-	}
-	if err := upsertSuccessfulGateJobProfileLink(ctx, st, job.ID, profileID); err != nil {
-		return err
-	}
-	return nil
+	return persistGateProfilePayload(ctx, st, bs, job, repoSHA, stackRow.ID, payload)
 }
 
 func resolveGateProfileRepoSHA(job store.Job) (string, error) {
@@ -381,23 +362,7 @@ func persistReGateRecoveryCandidateProfile(
 	if err != nil {
 		return err
 	}
-
-	objectKey := fmt.Sprintf(
-		"gate-profiles/repos/%s/%s/stack-%d/profile-%d.json",
-		job.RepoID.String(),
-		repoSHA,
-		stackRow.ID,
-		time.Now().UTC().UnixNano(),
-	)
-	if _, err := bs.Put(ctx, objectKey, "application/json", candidateRaw); err != nil {
-		return fmt.Errorf("put candidate gate profile blob: %w", err)
-	}
-
-	profileID, err := upsertSuccessfulGateProfileRow(ctx, st, job.RepoID, repoSHA, stackRow.ID, objectKey)
-	if err != nil {
-		return err
-	}
-	return upsertSuccessfulGateJobProfileLink(ctx, st, job.ID, profileID)
+	return persistGateProfilePayload(ctx, st, bs, job, repoSHA, stackRow.ID, candidateRaw)
 }
 
 func resolveStackRowForProfile(ctx context.Context, st store.Store, profile *contracts.GateProfile) (gateProfileStackRow, error) {
@@ -429,4 +394,31 @@ func resolveStackRowForProfile(ctx context.Context, st store.Store, profile *con
 		return gateProfileStackRow{}, err
 	}
 	return row, nil
+}
+
+func persistGateProfilePayload(
+	ctx context.Context,
+	st store.Store,
+	bs blobstore.Store,
+	job store.Job,
+	repoSHA string,
+	stackID int64,
+	payload []byte,
+) error {
+	objectKey := fmt.Sprintf(
+		"gate-profiles/repos/%s/%s/stack-%d/profile-%d.json",
+		job.RepoID.String(),
+		repoSHA,
+		stackID,
+		time.Now().UTC().UnixNano(),
+	)
+	if _, err := bs.Put(ctx, objectKey, "application/json", payload); err != nil {
+		return fmt.Errorf("put gate profile blob: %w", err)
+	}
+
+	profileID, err := upsertSuccessfulGateProfileRow(ctx, st, job.RepoID, repoSHA, stackID, objectKey)
+	if err != nil {
+		return err
+	}
+	return upsertSuccessfulGateJobProfileLink(ctx, st, job.ID, profileID)
 }
