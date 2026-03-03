@@ -1,0 +1,73 @@
+get:
+  summary: Query stack-scoped SBOM compatibility evidence
+  description: |
+    Returns minimum successful versions observed in persisted SBOM rows for the
+    requested stack (`lang`, `release`, `tool`).
+
+    Query semantics:
+    - `libs=name` => minimum observed successful version for `name`
+    - `libs=name:ver` => minimum observed successful version for `name` that is `>= ver`
+
+    Response semantics:
+    - Object payload `{ "<lib>": "<version>", ... }` when evidence exists.
+    - `null` when the resolved stack has no successful SBOM evidence.
+  operationId: getSbomCompat
+  tags:
+    - Artifacts
+  security:
+    - mtls: []
+  parameters:
+    - name: lang
+      in: query
+      required: true
+      description: Stack language identity.
+      schema:
+        type: string
+        minLength: 1
+    - name: release
+      in: query
+      required: true
+      description: Stack release identity.
+      schema:
+        type: string
+        minLength: 1
+    - name: tool
+      in: query
+      required: true
+      description: Stack tool identity.
+      schema:
+        type: string
+        minLength: 1
+    - name: libs
+      in: query
+      required: true
+      description: |
+        Comma-separated dependency selectors. Selector forms:
+        - `<name>` (minimum successful version)
+        - `<name>:<version>` (minimum successful version with floor)
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    '200':
+      description: Compatibility mapping object or null when no stack evidence exists.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                additionalProperties:
+                  type: string
+              - type: 'null'
+    '400':
+      description: Invalid query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

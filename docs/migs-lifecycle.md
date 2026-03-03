@@ -226,6 +226,11 @@ Router runtime environment:
 - **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
   `jobs.meta.action_summary` for mig jobs.
+- **`deps` compatibility hints**: for `selected_error_kind=deps`, claim-time
+  `recovery_context` may include a stack-prefilled SBOM compatibility endpoint:
+  `/v1/sboms/compat?lang=<...>&release=<...>&tool=<...>&libs=...`.
+  Node hydration may expose this contract to healing containers via `/in/deps-compat-url.txt`
+  and prior cumulative bump state via `/in/deps-bumps.json`.
 
 ### Per-iteration artifacts and healing log
 
