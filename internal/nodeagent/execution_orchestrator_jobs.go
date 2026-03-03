@@ -300,6 +300,13 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				statsBuilder.JobMeta(meta)
 			}
 		}
+		if orwMeta, orwErr := parseORWFailureMetadata(outDir); orwErr != nil {
+			slog.Warn("failed to parse ORW report metadata", "run_id", req.RunID, "job_id", req.JobID, "error", orwErr)
+		} else {
+			for k, v := range orwMeta {
+				statsBuilder.MetadataEntry(k, v)
+			}
+		}
 
 		stats := statsBuilder.MustBuild()
 

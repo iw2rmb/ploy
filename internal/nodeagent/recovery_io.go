@@ -3,12 +3,19 @@ package nodeagent
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
+
+const (
+	orwStatsMetadataErrorKind = "orw_error_kind"
+	orwStatsMetadataReason    = "orw_reason"
 )
 
 // parseBugSummary reads /out/codex-last.txt and extracts the "bug_summary" field
@@ -23,6 +30,34 @@ func parseBugSummary(outDir string) string {
 // unreadable, or does not contain an action_summary field.
 func parseActionSummary(outDir string) string {
 	return parseCodexLastField(outDir, "action_summary")
+}
+
+// parseORWFailureMetadata reads /out/report.json and extracts deterministic ORW
+// failure fields for run stats metadata. Missing report.json returns (nil, nil).
+func parseORWFailureMetadata(outDir string) (map[string]string, error) {
+	data, err := os.ReadFile(filepath.Join(outDir, contracts.ORWCLIReportFileName))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read %s: %w", contracts.ORWCLIReportFileName, err)
+	}
+
+	report, err := contracts.ParseORWCLIReport(data)
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", contracts.ORWCLIReportFileName, err)
+	}
+	if report.Success {
+		return nil, nil
+	}
+
+	meta := map[string]string{
+		orwStatsMetadataErrorKind: string(report.ErrorKind),
+	}
+	if strings.TrimSpace(report.Reason) != "" {
+		meta[orwStatsMetadataReason] = strings.TrimSpace(report.Reason)
+	}
+	return meta, nil
 }
 
 // parseRouterDecision reads /out/codex-last.txt and extracts structured
