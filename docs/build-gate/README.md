@@ -249,6 +249,17 @@ The gate does not modify the repository; it validates the current working tree.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
   - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.
 
+### `/out` Artifact Contract
+
+- Gate-generated files must be written under `/out/*` (no repository writes required for artifacts).
+- Node artifact upload treats gate `/out/*` as first-class output and preserves deterministic `out/` archive-relative paths.
+- SBOM files found in uploaded gate artifacts are parsed into normalized package rows (`lib`, `ver`) keyed by producing `job_id` and `repo_id`.
+- SBOM rows are persisted only for successful gate jobs (`pre_gate`, `post_gate`, `re_gate`).
+- Compatibility lookup contract for `deps` healing:
+  - `GET /v1/sboms/compat?lang=<lang>&release=<release>&tool=<tool>&libs=<name>:<ver>,<name>`
+  - Returns per-lib minimum successful version evidence for the resolved stack.
+  - Returns `null` when no successful SBOM evidence exists for the requested stack.
+
 ## Notes
 
 - When the container runtime is unavailable, gate execution fails immediately and

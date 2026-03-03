@@ -23,6 +23,7 @@ info:
       - `/cancel` — cancel a repo execution within a run.
       - `/restart` — restart a repo execution within a run.
     - `/v1/runs/{run_id}/pull` — resolve repo execution for `ploy run pull`.
+    - `/v1/sboms/compat` — SBOM-backed compatibility hints for `deps` healing.
 
     Type semantics and labels:
     - The server and node use strong domain types in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `RunID`, resource units). On the wire these remain JSON strings; run, job, and build IDs are KSUID-backed strings, repo and node IDs use NanoID, and only selected resources (diffs, artifact bundles, API/bootstrap tokens) remain UUID-backed.
@@ -175,6 +176,9 @@ paths:
     $ref: './paths/repos.yaml'
   /v1/repos/{repo_id}/runs:
     $ref: './paths/repos_repo_id_runs.yaml'
+  # SBOM compatibility hints (stack-scoped evidence for deps healing)
+  /v1/sboms/compat:
+    $ref: './paths/sboms_compat.yaml'
   # Job diff upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/diff:
     $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'

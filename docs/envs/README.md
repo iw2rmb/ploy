@@ -120,6 +120,11 @@ Role model (bearer token claims):
   - Containers are retained after step/gate completion.
   - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem (`DockerRootDir`).
 - Gate status visibility: Use `GET /v1/runs/{id}/status` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`) via `Metadata["gate_summary"]`.
+- SBOM compatibility contract for `deps` healing:
+  - Successful gate outputs under `/out/*` are the evidence source for SBOM persistence and compatibility lookup.
+  - Healing claims may provide stack-prefilled compatibility endpoint input (`/v1/sboms/compat?...`) to `deps` strategies.
+  - No dedicated SBOM environment variables exist in this slice; stack identity comes from gate metadata (`lang`, `release`, `tool`) and claim context.
+  - TODO: if future slices add query limits/timeouts as env/config knobs, document them here.
 
 ## Healing Container Environment
 
