@@ -7,7 +7,7 @@ Documentation: `AGENTS.md`; `design/orw-cli.md`; `deploy/images/migs/orw-gradle/
 Legend: [ ] todo, [x] done.
 
 ## Phase 1: Lock `orw-cli` Runtime Contract
-- [ ] Define and codify `orw-cli` input/output contract and failure taxonomy — make runtime behavior deterministic before implementation.
+- [x] Define and codify `orw-cli` input/output contract and failure taxonomy — make runtime behavior deterministic before implementation.
   - Repository: ploy
   - Component: workflow contracts; runtime docs
   - Scope: formalize required envs (`RECIPE_*`), repository resolution envs (`ORW_REPOS`, credentials), `report.json` schema (`success`, `error_kind`, `reason`, `message`), and unsupported attribution semantics in docs and contract structs/constants used by runtime consumers.

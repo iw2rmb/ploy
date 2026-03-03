@@ -498,6 +498,51 @@ The `scope` parameter controls which job types receive each variable:
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle), `orw-gradle` | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle), `orw-gradle` | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
 
+### ORW CLI Contract (Typed)
+
+The shared ORW runtime contract is codified in `internal/workflow/contracts/orw_cli_contract.go`.
+This contract is consumed by runtime and node parsing code to keep ORW behavior deterministic.
+
+Required recipe coordinates:
+
+| Variable | Description |
+|----------|-------------|
+| `RECIPE_GROUP` | Recipe artifact group ID |
+| `RECIPE_ARTIFACT` | Recipe artifact ID |
+| `RECIPE_VERSION` | Recipe artifact version |
+| `RECIPE_CLASSNAME` | Fully qualified recipe class name |
+
+Optional repository and execution controls:
+
+| Variable | Description |
+|----------|-------------|
+| `ORW_REPOS` | Comma-separated Maven repository URLs |
+| `ORW_REPO_USERNAME` | Repository username (must be paired with `ORW_REPO_PASSWORD`) |
+| `ORW_REPO_PASSWORD` | Repository password (must be paired with `ORW_REPO_USERNAME`) |
+| `ORW_ACTIVE_RECIPES` | Comma-separated override list of active recipes |
+| `ORW_FAIL_ON_UNSUPPORTED` | Boolean flag, default `true` |
+
+`report.json` contract (`/out/report.json`):
+
+```json
+{
+  "success": false,
+  "error_kind": "unsupported",
+  "reason": "type-attribution-unavailable",
+  "message": "Type attribution is unavailable for this repository"
+}
+```
+
+Failure taxonomy (`error_kind`):
+- `input` — Invalid or missing runtime input.
+- `resolution` — Dependency or repository resolution failure.
+- `execution` — OpenRewrite CLI execution failure.
+- `unsupported` — Deterministic unsupported mode.
+- `internal` — Unexpected runtime internal failure.
+
+Unsupported reason contract:
+- `error_kind=unsupported` requires `reason=type-attribution-unavailable`.
+
 ### How Official Images Consume These Variables
 
 **Codex images (`mig-codex`)**: The entrypoint script checks for `CODEX_AUTH_JSON` and, when
