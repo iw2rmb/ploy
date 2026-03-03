@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Tests: script smoke runs in local env (`build`, `tag`, `push` dry checks) — expect no references to removed ORW images.
 
 ## Phase 4: Switch Java Stack Image Mapping To `orw-cli`
-- [ ] Route both Java stacks (`java-maven`, `java-gradle`) to `orw-cli` — enforce one execution engine across Java repos.
+- [x] Route both Java stacks (`java-maven`, `java-gradle`) to `orw-cli` — enforce one execution engine across Java repos.
   - Repository: ploy
   - Component: workflow config samples, stack-aware image tests
   - Scope: update stack-aware image examples and fixtures in `docs/schemas/mig.example.yaml`, `docs/migs-lifecycle.md`, `tests/e2e/migs/scenario-stack-aware-images/*.yaml`, and contract tests in `internal/workflow/contracts/mod_image_test.go` and nodeagent tests expecting legacy image names.
