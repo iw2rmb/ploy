@@ -741,6 +741,8 @@ Gate profiles are resolved at claim-time from canonical storage:
 - `gate_profiles` rows keyed by `(repo_id, repo_sha, stack_id)`
 - `gates(job_id, profile_id)` linkage for auditability
 - default stack profiles seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
+- default Gradle profiles are wrapper-aware for runnable targets (`build`, `unit`,
+  `all_tests`): use `./gradlew` when wrapper files are present; otherwise `gradle`
 
 Claim-time profile resolution:
 1. Exact profile lookup by `(repo_id, repo_sha_in, stack_id)`

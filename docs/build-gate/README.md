@@ -138,6 +138,9 @@ Gate command resolution uses the following precedence (highest wins):
 
 Default gate profiles are seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
 at server startup. Pre-gate runtime auto-bootstrap is removed.
+Seeded Gradle profiles are wrapper-aware for runnable targets (`build`, `unit`,
+`all_tests`): they use `./gradlew` when `/workspace/gradlew` is executable and
+`/workspace/gradle/wrapper/gradle-wrapper.properties` exists; otherwise they use `gradle`.
 
 Gate profile mapping for simple mode:
 - Gate phase still selects destination override slot (`build_gate.pre.gate_profile` for `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
