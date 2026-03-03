@@ -17,6 +17,7 @@ type RecoveryErrorKind string
 const (
 	RecoveryErrorKindInfra   RecoveryErrorKind = "infra"
 	RecoveryErrorKindCode    RecoveryErrorKind = "code"
+	RecoveryErrorKindDeps    RecoveryErrorKind = "deps"
 	RecoveryErrorKindMixed   RecoveryErrorKind = "mixed"
 	RecoveryErrorKindUnknown RecoveryErrorKind = "unknown"
 )
@@ -50,6 +51,8 @@ func ParseRecoveryErrorKind(raw string) (RecoveryErrorKind, bool) {
 		return RecoveryErrorKindInfra, true
 	case RecoveryErrorKindCode.String():
 		return RecoveryErrorKindCode, true
+	case RecoveryErrorKindDeps.String():
+		return RecoveryErrorKindDeps, true
 	case RecoveryErrorKindMixed.String():
 		return RecoveryErrorKindMixed, true
 	case RecoveryErrorKindUnknown.String():
@@ -74,6 +77,7 @@ func RecoveryErrorKinds() []RecoveryErrorKind {
 	return []RecoveryErrorKind{
 		RecoveryErrorKindInfra,
 		RecoveryErrorKindCode,
+		RecoveryErrorKindDeps,
 		RecoveryErrorKindMixed,
 		RecoveryErrorKindUnknown,
 	}

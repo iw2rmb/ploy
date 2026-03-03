@@ -65,4 +65,7 @@ func TestIsTerminalRecoveryErrorKind(t *testing.T) {
 	if IsTerminalRecoveryErrorKind(RecoveryErrorKindCode) {
 		t.Fatal("code must be non-terminal")
 	}
+	if IsTerminalRecoveryErrorKind(RecoveryErrorKindDeps) {
+		t.Fatal("deps must be non-terminal")
+	}
 }

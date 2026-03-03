@@ -60,7 +60,7 @@ func handleRun(args []string, stderr io.Writer) error {
 func handleRunStatus(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("run status", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	jsonOut := fs.Bool("json", false, "print machine-readable JSON report")
+	jsonOut := fs.Bool("json", false, "print machine-readable JSON report with links and per-job artifacts")
 
 	if err := fs.Parse(args); err != nil {
 		printRunUsage(stderr)

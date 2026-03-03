@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // GetRunReportCommand builds the canonical RunReport payload for a run.
@@ -38,6 +41,10 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 	if err != nil {
 		return RunReport{}, err
 	}
+	stageArtifacts, err := listRunStageArtifacts(ctx, c.Client, c.BaseURL, c.RunID)
+	if err != nil {
+		return RunReport{}, err
+	}
 
 	report := RunReport{
 		RunID:   summary.ID,
@@ -50,7 +57,7 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 	g, gctx := errgroup.WithContext(ctx)
 	for i, repo := range repos {
 		g.Go(func() error {
-			return c.buildRepoEntry(gctx, repo, &report.Repos[i])
+			return c.buildRepoEntry(gctx, repo, stageArtifacts, &report.Repos[i])
 		})
 	}
 	if err := g.Wait(); err != nil {
@@ -60,7 +67,12 @@ func (c GetRunReportCommand) Run(ctx context.Context) (RunReport, error) {
 	return report, nil
 }
 
-func (c GetRunReportCommand) buildRepoEntry(ctx context.Context, repo runRepoReportSource, out *RunEntry) error {
+func (c GetRunReportCommand) buildRepoEntry(
+	ctx context.Context,
+	repo runRepoReportSource,
+	stageArtifacts map[domaintypes.JobID]map[string]string,
+	out *RunEntry,
+) error {
 	jobsResult, err := ListRepoJobsCommand{
 		Client:  c.Client,
 		BaseURL: c.BaseURL,
@@ -119,6 +131,7 @@ func (c GetRunReportCommand) buildRepoEntry(ctx context.Context, repo runRepoRep
 			ActionSummary: job.ActionSummary,
 			BugSummary:    job.BugSummary,
 			Recovery:      job.Recovery,
+			Artifacts:     buildJobArtifacts(c.BaseURL, stageArtifacts[job.JobID]),
 			BuildLogURL:   buildLogURL,
 			PatchURL:      jobPatchByID[job.JobID],
 		})
@@ -169,6 +182,54 @@ func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	}
 
 	return result.Repos, nil
+}
+
+func listRunStageArtifacts(
+	ctx context.Context,
+	httpClient *http.Client,
+	baseURL *url.URL,
+	runID domaintypes.RunID,
+) (map[domaintypes.JobID]map[string]string, error) {
+	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "status")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("run report: build run stage artifacts request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("run report: fetch run stage artifacts failed: %w", err)
+	}
+	defer httpx.DrainAndClose(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpx.WrapError("run report: fetch run stage artifacts", resp.Status, resp.Body)
+	}
+
+	var summary modsapi.RunSummary
+	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
+		return nil, fmt.Errorf("run report: decode run stage artifacts: %w", err)
+	}
+
+	artifacts := make(map[domaintypes.JobID]map[string]string, len(summary.Stages))
+	for jobID, stage := range summary.Stages {
+		if len(stage.Artifacts) == 0 {
+			continue
+		}
+		copied := make(map[string]string, len(stage.Artifacts))
+		for name, cid := range stage.Artifacts {
+			name = strings.TrimSpace(name)
+			cid = strings.TrimSpace(cid)
+			if name == "" || cid == "" {
+				continue
+			}
+			copied[name] = cid
+		}
+		if len(copied) > 0 {
+			artifacts[jobID] = copied
+		}
+	}
+	return artifacts, nil
 }
 
 type repoDiffEntry struct {
@@ -228,6 +289,46 @@ func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaint
 	q := u.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", diffID.String())
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func buildJobArtifacts(baseURL *url.URL, stageArtifacts map[string]string) []RunJobArtifact {
+	if len(stageArtifacts) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(stageArtifacts))
+	for name := range stageArtifacts {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	items := make([]RunJobArtifact, 0, len(names))
+	for _, name := range names {
+		cid := strings.TrimSpace(stageArtifacts[name])
+		if cid == "" {
+			continue
+		}
+		items = append(items, RunJobArtifact{
+			Name:      strings.TrimSpace(name),
+			CID:       cid,
+			LookupURL: buildArtifactLookupURL(baseURL, cid),
+		})
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return items
+}
+
+func buildArtifactLookupURL(baseURL *url.URL, cid string) string {
+	if baseURL == nil || strings.TrimSpace(cid) == "" {
+		return ""
+	}
+	u := baseURL.JoinPath("v1", "artifacts")
+	q := u.Query()
+	q.Set("cid", strings.TrimSpace(cid))
 	u.RawQuery = q.Encode()
 	return u.String()
 }

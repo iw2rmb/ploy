@@ -101,7 +101,7 @@ type HealingSpec struct {
 	SelectedErrorKind string `json:"selected_error_kind,omitempty" yaml:"selected_error_kind,omitempty"`
 
 	// ByErrorKind defines recovery actions keyed by router classification
-	// (infra|code|mixed|unknown).
+	// (infra|code|deps|mixed|unknown).
 	ByErrorKind map[string]HealingActionSpec `json:"by_error_kind,omitempty" yaml:"by_error_kind,omitempty"`
 }
 

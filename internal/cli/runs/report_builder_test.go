@@ -35,6 +35,29 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T08:00:00Z",
 			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id": runID.String(),
+				"state":  "running",
+				"stages": map[string]any{
+					jobID1.String(): map[string]any{
+						"state":        "succeeded",
+						"attempts":     1,
+						"max_attempts": 1,
+						"artifacts": map[string]any{
+							"diff": "bafy-step-1",
+						},
+					},
+					jobID2.String(): map[string]any{
+						"state":        "running",
+						"attempts":     1,
+						"max_attempts": 1,
+						"artifacts": map[string]any{
+							"logs": "bafy-step-2",
+						},
+					},
+				},
+			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repos": []map[string]any{
@@ -159,6 +182,15 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 		"download": "true",
 		"diff_id":  diffID2.String(),
 	})
+	if len(job0.Artifacts) != 1 {
+		t.Fatalf("expected one artifact for job0, got %d", len(job0.Artifacts))
+	}
+	if job0.Artifacts[0].Name != "diff" || job0.Artifacts[0].CID != "bafy-step-1" {
+		t.Fatalf("unexpected job0 artifact payload: %#v", job0.Artifacts[0])
+	}
+	assertURL(t, job0.Artifacts[0].LookupURL, "/api/v1/artifacts", map[string]string{
+		"cid": "bafy-step-1",
+	})
 
 	job1 := entry.Jobs[1]
 	if strings.TrimSpace(job1.PatchURL) != "" {
@@ -167,6 +199,15 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	if job1.Recovery == nil || job1.Recovery.ErrorKind != "infra" {
 		t.Fatalf("expected recovery.error_kind to propagate, got %#v", job1.Recovery)
 	}
+	if len(job1.Artifacts) != 1 {
+		t.Fatalf("expected one artifact for job1, got %d", len(job1.Artifacts))
+	}
+	if job1.Artifacts[0].Name != "logs" || job1.Artifacts[0].CID != "bafy-step-2" {
+		t.Fatalf("unexpected job1 artifact payload: %#v", job1.Artifacts[0])
+	}
+	assertURL(t, job1.Artifacts[0].LookupURL, "/api/v1/artifacts", map[string]string{
+		"cid": "bafy-step-2",
+	})
 }
 
 func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
@@ -188,6 +229,12 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 				"mig_name":   "empty-diffs",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T09:00:00Z",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id": runID.String(),
+				"state":  "queued",
+				"stages": map[string]any{},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -275,6 +322,12 @@ func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {
 				"mig_name":   "no-repos",
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T10:00:00Z",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/status":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id": runID.String(),
+				"state":  "running",
+				"stages": map[string]any{},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/"+runID.String()+"/repos":
 			_ = json.NewEncoder(w).Encode(map[string]any{"repos": []map[string]any{}})

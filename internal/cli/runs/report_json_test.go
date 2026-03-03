@@ -41,6 +41,13 @@ func TestRenderRunReportJSON(t *testing.T) {
 						Status:      "Running",
 						DurationMs:  1234,
 						DisplayName: "step-1",
+						Artifacts: []RunJobArtifact{
+							{
+								Name:      "gate-report",
+								CID:       "bafy-gate-report",
+								LookupURL: "https://example.test/v1/artifacts?cid=bafy-gate-report",
+							},
+						},
 						BuildLogURL: "https://example.test/logs",
 						PatchURL:    "https://example.test/patch",
 					},
@@ -63,6 +70,26 @@ func TestRenderRunReportJSON(t *testing.T) {
 		if _, ok := parsed[key]; !ok {
 			t.Fatalf("expected key %q in payload: %v", key, parsed)
 		}
+	}
+	repos, ok := parsed["repos"].([]any)
+	if !ok || len(repos) != 1 {
+		t.Fatalf("expected one repo in payload: %v", parsed["repos"])
+	}
+	repo0, ok := repos[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected repo object, got %T", repos[0])
+	}
+	jobs, ok := repo0["jobs"].([]any)
+	if !ok || len(jobs) != 1 {
+		t.Fatalf("expected one job in payload: %v", repo0["jobs"])
+	}
+	job0, ok := jobs[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected job object, got %T", jobs[0])
+	}
+	artifacts, ok := job0["artifacts"].([]any)
+	if !ok || len(artifacts) != 1 {
+		t.Fatalf("expected one artifact in payload: %v", job0["artifacts"])
 	}
 }
 
@@ -100,6 +127,9 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	}
 	if strings.Contains(out, "\"last_error\"") {
 		t.Fatalf("expected last_error omitted for empty optional fields; got %q", out)
+	}
+	if strings.Contains(out, "\"artifacts\"") {
+		t.Fatalf("expected artifacts omitted for empty optional fields; got %q", out)
 	}
 }
 
