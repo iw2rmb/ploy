@@ -563,11 +563,11 @@ present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
 
 **Build Gate Gradle images (`ploy-gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
-**ORW image (`orw-cli`)**: Similar CA bundle handling as build-gate, ensuring
+**ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Similar CA bundle handling as build-gate, ensuring
 OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.
 
-`orw-cli` ships a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
+Both images ship a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
 by an embedded standalone runner JAR. `ORW_CLI_BIN` defaults to this bundled
 binary and should only be overridden for controlled debugging. Recipes are
 resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION`; no

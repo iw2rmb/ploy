@@ -33,11 +33,6 @@
     </dependency>
     <dependency>
       <groupId>org.openrewrite</groupId>
-      <artifactId>rewrite-maven</artifactId>
-      <version>${rewrite.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.openrewrite</groupId>
       <artifactId>rewrite-gradle</artifactId>
       <version>${rewrite.version}</version>
     </dependency>
