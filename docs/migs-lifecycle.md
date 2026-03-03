@@ -208,9 +208,6 @@ The `bug_summary` (max 200 chars, single-line) is persisted in
 `jobs.meta.gate.bug_summary`.
 Classifier metadata is persisted in `jobs.meta.gate.recovery`.
 If router output is missing/invalid for classification, `error_kind` defaults to `unknown`.
-Server-side normalization reclassifies
-`reason` containing `Unsupported class file major version` from `infra` to `deps`
-to avoid infra-candidate retry loops for Gradle/JDK toolchain incompatibilities.
 Router is required when healing is configured.
 
 Router runtime environment:

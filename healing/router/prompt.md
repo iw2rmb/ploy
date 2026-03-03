@@ -8,6 +8,17 @@ Kinds:
 - `code`: source compile/test defect in repository code or tests.
 - `deps`: dependency/version/coordinates/repository-resolution issue in build configuration.
 
+Classification guidance:
+- Classify as `deps` when failure indicates dependency/toolchain version incompatibility in build config, for example:
+  - `Unsupported class file major version`
+  - Gradle/Groovy runtime too old for Java bytecode level required by init/settings/build logic
+  - wrapper/toolchain/plugin version mismatch requiring build configuration change
+- Classify as `infra` for execution environment problems that are not solved by changing build/dependency configuration, for example:
+  - network/connectivity outages
+  - registry/auth/permission failures
+  - missing runtime services/sockets/container capabilities
+- Prefer `deps` over `infra` for deterministic version-mismatch signals in the log.
+
 Rules:
 - Read `/in/build-gate.log`.
 - Do not edit `/workspace`.
