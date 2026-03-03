@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run 'Test.*Claim.*Deps.*Compat'` and `go test ./internal/nodeagent -run 'Test.*Deps.*Compat.*Hydration'` — expect claim payload and hydrated `/in` files to match contract.
 
 ## Phase 9: Validation Matrix
-- [ ] Run full validation for changed modules and hygiene checks.
+- [x] Run full validation for changed modules and hygiene checks.
   - Repository: `ploy`
   - Component: nodeagent + handlers + store + docs
   - Scope: execute unit tests for touched packages and project hygiene commands.
