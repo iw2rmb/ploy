@@ -274,6 +274,12 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 				slog.Warn("failed to compute workspace status before execution", "run_id", req.RunID, "error", preStatusErr)
 			}
 		}
+		preWorkspaceTree := ""
+		if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
+			slog.Warn("failed to compute pre-execution workspace tree", "run_id", req.RunID, "job_id", req.JobID, "error", treeErr)
+		} else {
+			preWorkspaceTree = tree
+		}
 
 		result, runErr := execCtx.runner.Run(ctx, step.Request{
 			RunID:     req.RunID,
@@ -307,7 +313,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			}
 		}
 
-		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
+		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, preWorkspaceTree)
 
 		statsBuilder := types.NewRunStatsBuilder().
 			ExitCode(result.ExitCode).
@@ -638,13 +644,17 @@ func workspaceStatus(ctx context.Context, workspace string) (string, error) {
 	return gitpkg.WorkspaceStatus(ctx, workspace)
 }
 
-func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string) string {
+func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree ...string) string {
 	repoSHAIn := strings.TrimSpace(req.RepoSHAIn.String())
 	if repoSHAIn == "" {
 		slog.Warn("repo_sha_in missing on claimed job; skipping repo_sha_out calculation", "run_id", req.RunID, "job_id", req.JobID)
 		return ""
 	}
-	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn)
+	preTree := ""
+	if len(inputTree) > 0 {
+		preTree = strings.TrimSpace(inputTree[0])
+	}
+	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn, preTree)
 	if err != nil {
 		slog.Warn("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_in", repoSHAIn, "error", err)
 		return ""
