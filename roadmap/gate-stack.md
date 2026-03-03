@@ -105,7 +105,7 @@ Legend: [ ] todo, [x] done.
   - Tests: handler tests for skip and unsupported paths; healing tests for target-lock enforcement.
 
 ## Phase 8: Remove Legacy Auto-Bootstrap Profile Persistence
-- [ ] Delete pre-gate runtime auto-generator fallback path — defaults must come from catalog-generated profiles and DB bootstrap.
+- [x] Delete pre-gate runtime auto-generator fallback path — defaults must come from catalog-generated profiles and DB bootstrap.
   - Repository: ploy
   - Component: nodeagent gate execution; server promotion logic
   - Scope: remove auto-generated pre-gate profile creation/promotion (`generated_gate_profile` bootstrap flow); keep infra candidate artifact flow for healing only.

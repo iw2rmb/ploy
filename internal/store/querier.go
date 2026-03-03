@@ -231,9 +231,6 @@ type Querier interface {
 	PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (Job, error)
 	// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
 	// Returns target repo_id for callers that still rely on this method's result.
-	PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.RepoID, error)
-	// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
-	// Returns target repo_id for callers that still rely on this method's result.
 	PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error)
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	// Atomically promote the next unblocked job in a repo attempt: Created -> Queued.

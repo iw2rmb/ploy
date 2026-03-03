@@ -142,25 +142,4 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 	})
 
-	t.Run("pre_gate enables bootstrap only when repo profile missing and no explicit override", func(t *testing.T) {
-		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
-		typedOpts := RunOptions{}
-		applyGatePhaseOverrides(&manifest, StartRunRequest{
-			JobType:                types.JobTypePreGate,
-			RepoGateProfileMissing: true,
-		}, typedOpts)
-		if !manifest.Gate.AutoBootstrapRepoGateProfile {
-			t.Fatal("Gate.AutoBootstrapRepoGateProfile=false; want true")
-		}
-
-		manifest = contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
-		typedOpts.BuildGate.PreGateProfile = preGateProfile
-		applyGatePhaseOverrides(&manifest, StartRunRequest{
-			JobType:                types.JobTypePreGate,
-			RepoGateProfileMissing: true,
-		}, typedOpts)
-		if manifest.Gate.AutoBootstrapRepoGateProfile {
-			t.Fatal("Gate.AutoBootstrapRepoGateProfile=true; want false when explicit override exists")
-		}
-	})
 }

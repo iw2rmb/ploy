@@ -236,35 +236,6 @@ func (q *Queries) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]M
 	return items, nil
 }
 
-const promotePreGateGeneratedGateProfile = `-- name: PromotePreGateGeneratedGateProfile :one
-WITH compat_args AS (
-  SELECT
-    $2::jsonb AS gate_profile,
-    $3::jsonb AS gate_profile_artifacts
-)
-SELECT j.repo_id
-FROM jobs j, compat_args
-WHERE j.id = $1
-  AND j.job_type = 'pre_gate'
-  AND j.status = 'Success'
-LIMIT 1
-`
-
-type PromotePreGateGeneratedGateProfileParams struct {
-	ID                   types.JobID `json:"id"`
-	GateProfile          []byte      `json:"gate_profile"`
-	GateProfileArtifacts []byte      `json:"gate_profile_artifacts"`
-}
-
-// Legacy compatibility shim: gate profile persistence on mig_repos is removed.
-// Returns target repo_id for callers that still rely on this method's result.
-func (q *Queries) PromotePreGateGeneratedGateProfile(ctx context.Context, arg PromotePreGateGeneratedGateProfileParams) (types.RepoID, error) {
-	row := q.db.QueryRow(ctx, promotePreGateGeneratedGateProfile, arg.ID, arg.GateProfile, arg.GateProfileArtifacts)
-	var repo_id types.RepoID
-	err := row.Scan(&repo_id)
-	return repo_id, err
-}
-
 const promoteReGateRecoveryCandidateGateProfile = `-- name: PromoteReGateRecoveryCandidateGateProfile :one
 WITH compat_args AS (
   SELECT

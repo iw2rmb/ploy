@@ -143,11 +143,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if !gateResultPassed(gateResult) {
 		r.persistFirstGateFailureLog(req.RunID, gateResult)
 	}
-	if len(gateResult.GeneratedGateProfile) == 0 {
-		if raw := resolveGateProfileSnapshotRaw(req.JobType, manifest.Gate, gateResult); len(raw) > 0 {
-			gateResult.GeneratedGateProfile = raw
-		}
-	}
 	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
 
 	// When gate fails and healing is configured, run the router once to produce
@@ -216,7 +211,6 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 	if manifest == nil || manifest.Gate == nil {
 		return
 	}
-	manifest.Gate.AutoBootstrapRepoGateProfile = false
 	manifest.Gate.Target = ""
 	manifest.Gate.Always = false
 	manifest.Gate.Skip = nil
@@ -231,9 +225,6 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 		manifest.Gate.Target = typedOpts.BuildGate.PreTarget
 		manifest.Gate.Always = typedOpts.BuildGate.PreAlways
 		manifest.Gate.Skip = req.GateSkip
-		if req.RepoGateProfileMissing && typedOpts.BuildGate.PreGateProfile == nil {
-			manifest.Gate.AutoBootstrapRepoGateProfile = true
-		}
 	case types.JobTypePostGate:
 		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
 			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
@@ -429,15 +420,6 @@ func resolveGateProfileSnapshotRaw(
 	gateSpec *contracts.StepGateSpec,
 	meta *contracts.BuildGateStageMetadata,
 ) json.RawMessage {
-	if meta != nil {
-		generated := strings.TrimSpace(string(meta.GeneratedGateProfile))
-		if generated != "" {
-			raw := json.RawMessage(generated)
-			if _, err := contracts.ParseGateProfileJSON(raw); err == nil {
-				return raw
-			}
-		}
-	}
 	if gateSpec == nil || gateSpec.GateProfile == nil || gateSpec.RepoID.IsZero() {
 		return nil
 	}
