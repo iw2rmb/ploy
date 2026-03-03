@@ -250,6 +250,29 @@ func (q *Queries) ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackI
 	return stack_id, err
 }
 
+const resolveStackIDByRequiredStack = `-- name: ResolveStackIDByRequiredStack :one
+SELECT id
+FROM stacks
+WHERE lang = $1::text
+  AND release = $2::text
+  AND ($3::text = '' OR COALESCE(tool, '') = $3::text)
+ORDER BY id ASC
+LIMIT 1
+`
+
+type ResolveStackIDByRequiredStackParams struct {
+	Lang    string `json:"lang"`
+	Release string `json:"release"`
+	Tool    string `json:"tool"`
+}
+
+func (q *Queries) ResolveStackIDByRequiredStack(ctx context.Context, arg ResolveStackIDByRequiredStackParams) (int64, error) {
+	row := q.db.QueryRow(ctx, resolveStackIDByRequiredStack, arg.Lang, arg.Release, arg.Tool)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const resolveStackRowByImage = `-- name: ResolveStackRowByImage :one
 SELECT id,
        lang,

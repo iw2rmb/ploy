@@ -243,6 +243,7 @@ type Querier interface {
 	ResolveReusableStepByHash(ctx context.Context, arg ResolveReusableStepByHashParams) (ResolveReusableStepByHashRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
+	ResolveStackIDByRequiredStack(ctx context.Context, arg ResolveStackIDByRequiredStackParams) (int64, error)
 	ResolveStackRowByImage(ctx context.Context, image string) (ResolveStackRowByImageRow, error)
 	ResolveStackRowByLangTool(ctx context.Context, arg ResolveStackRowByLangToolParams) (ResolveStackRowByLangToolRow, error)
 	ResolveStackRowByLangToolRelease(ctx context.Context, arg ResolveStackRowByLangToolReleaseParams) (ResolveStackRowByLangToolReleaseRow, error)

@@ -14,9 +14,12 @@ import (
 )
 
 type stubGateProfileResolverStore struct {
-	stackByImage map[string]int64
-	anyStackID   int64
-	anyStackErr  error
+	stackByImage    map[string]int64
+	stackByRequired map[string]int64
+	anyStackID      int64
+	anyStackErr     error
+	repoSHAStackID  int64
+	repoSHAErr      error
 
 	exactRow gateProfileRow
 	exactErr error
@@ -39,6 +42,10 @@ type stubGateProfileResolverStore struct {
 	linkJobID        types.JobID
 	linkProfileID    int64
 	resolveImageCall string
+	resolveRepoCall  bool
+	resolveAnyCall   bool
+	resolveExactCall bool
+	resolveRequired  *GateProfileLookupStack
 }
 
 func (s *stubGateProfileResolverStore) ResolveStackIDByImage(_ context.Context, image string) (int64, error) {
@@ -49,11 +56,35 @@ func (s *stubGateProfileResolverStore) ResolveStackIDByImage(_ context.Context, 
 	return 0, pgx.ErrNoRows
 }
 
+func strictStackKey(language, tool, release string) string {
+	return strings.TrimSpace(language) + "|" + strings.TrimSpace(tool) + "|" + strings.TrimSpace(release)
+}
+
+func (s *stubGateProfileResolverStore) ResolveStackIDByRequiredStack(_ context.Context, language, tool, release string) (int64, error) {
+	s.resolveRequired = &GateProfileLookupStack{
+		Language: language,
+		Tool:     tool,
+		Release:  release,
+	}
+	if stackID, ok := s.stackByRequired[strictStackKey(language, tool, release)]; ok {
+		return stackID, nil
+	}
+	return 0, pgx.ErrNoRows
+}
+
 func (s *stubGateProfileResolverStore) ResolveStackIDByRepoSHA(_ context.Context, _ types.RepoID, _ string) (int64, error) {
+	s.resolveRepoCall = true
+	if s.repoSHAErr != nil {
+		return 0, s.repoSHAErr
+	}
+	if s.repoSHAStackID != 0 {
+		return s.repoSHAStackID, nil
+	}
 	return 0, pgx.ErrNoRows
 }
 
 func (s *stubGateProfileResolverStore) ResolveAnyStackID(_ context.Context) (int64, error) {
+	s.resolveAnyCall = true
 	if s.anyStackErr != nil {
 		return 0, s.anyStackErr
 	}
@@ -64,6 +95,7 @@ func (s *stubGateProfileResolverStore) ResolveAnyStackID(_ context.Context) (int
 }
 
 func (s *stubGateProfileResolverStore) GetExactGateProfile(_ context.Context, _ types.RepoID, _ string, _ int64) (gateProfileRow, error) {
+	s.resolveExactCall = true
 	if s.exactErr != nil {
 		return gateProfileRow{}, s.exactErr
 	}
@@ -160,7 +192,7 @@ func TestGateProfileResolver_ExactHit(t *testing.T) {
 	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
 	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job)
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
 	if err != nil {
 		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
 	}
@@ -226,7 +258,7 @@ func TestGateProfileResolver_FallbackRepoStackCopiesAndUpsertsExact(t *testing.T
 	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
 	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job)
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
 	if err != nil {
 		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
 	}
@@ -299,7 +331,7 @@ func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
 	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
 	job := store.Job{RepoID: repoID, RepoShaIn: shaIn}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job)
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
 	if err != nil {
 		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
 	}
@@ -328,5 +360,103 @@ func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
 	}
 	if resolution.ExactHit {
 		t.Fatal("ExactHit=true, want false on default fallback")
+	}
+}
+
+func TestGateProfileResolver_StrictStackUsesRequiredLookup(t *testing.T) {
+	t.Parallel()
+
+	repoID := types.NewRepoID()
+	const shaIn = "1234567890abcdef1234567890abcdef12345678"
+	exactKey := "gate-profiles/strict.json"
+	exactPayload := []byte(`{"schema_version":1}`)
+
+	st := &stubGateProfileResolverStore{
+		stackByImage:    map[string]int64{"docker.io/stack:latest": 3},
+		stackByRequired: map[string]int64{strictStackKey("java", "maven", "17"): 11},
+		exactRow: gateProfileRow{
+			ID:        81,
+			RepoID:    repoID,
+			RepoSHA:   shaIn,
+			RepoSHA8:  shaIn[:8],
+			StackID:   11,
+			ObjectKey: exactKey,
+		},
+	}
+	bs := &stubBlobStore{
+		getPayloadByKey: map[string][]byte{
+			exactKey: exactPayload,
+		},
+	}
+	resolver := &dbGateProfileResolver{st: st, bs: bs}
+	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
+
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{
+		StrictStack: &GateProfileLookupStack{
+			Language: "java",
+			Tool:     "maven",
+			Release:  "17",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
+	}
+	if resolution == nil {
+		t.Fatal("expected non-nil gate profile resolution")
+	}
+	if resolution.ProfileID != 81 {
+		t.Fatalf("profile_id = %d, want 81", resolution.ProfileID)
+	}
+	if st.resolveRequired == nil {
+		t.Fatal("expected required-stack lookup")
+	}
+	if st.resolveImageCall != "" {
+		t.Fatalf("unexpected image stack lookup %q", st.resolveImageCall)
+	}
+	if st.resolveRepoCall {
+		t.Fatal("unexpected repo-sha stack fallback")
+	}
+	if st.resolveAnyCall {
+		t.Fatal("unexpected any-stack fallback")
+	}
+}
+
+func TestGateProfileResolver_StrictStackNoMatchSkipsFallbacks(t *testing.T) {
+	t.Parallel()
+
+	repoID := types.NewRepoID()
+	const shaIn = "89abcdef0123456789abcdef0123456789abcdef"
+
+	st := &stubGateProfileResolverStore{
+		repoSHAStackID: 7,
+		anyStackID:     9,
+	}
+	resolver := &dbGateProfileResolver{st: st, bs: &stubBlobStore{}}
+	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
+
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{
+		StrictStack: &GateProfileLookupStack{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  "17",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
+	}
+	if resolution != nil {
+		t.Fatalf("expected nil resolution, got %+v", resolution)
+	}
+	if st.resolveRequired == nil {
+		t.Fatal("expected required-stack lookup")
+	}
+	if st.resolveRepoCall {
+		t.Fatal("unexpected repo-sha stack fallback")
+	}
+	if st.resolveAnyCall {
+		t.Fatal("unexpected any-stack fallback")
+	}
+	if st.resolveExactCall {
+		t.Fatal("unexpected profile lookup when strict stack is unresolved")
 	}
 }

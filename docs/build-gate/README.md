@@ -136,6 +136,12 @@ Gate command resolution uses the following precedence (highest wins):
 3. Claim-time resolved gate profile from `gate_profiles` (exact `(repo_id, repo_sha_in, stack_id)` row)
 4. Detected-tool fallback command (`buildCommandForTool`)
 
+Claim-time gate profile lookup honors strict phase stack requirements:
+- When `build_gate.<phase>.stack` is strict (`enabled: true` and `default: false`),
+  profile resolution filters by required stack (`language`, `release`, optional `tool`)
+  before image/repo-sha/any-stack fallback paths.
+- If no stack row matches those required parameters, no gate profile is resolved for that gate claim.
+
 Successful gate profile persistence:
 - On successful `pre_gate`, `post_gate`, or `re_gate`, the server persists an exact
   profile row keyed by `(repo_id, repo_sha_out, stack_id)` (falling back to

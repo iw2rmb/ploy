@@ -9,8 +9,9 @@ import (
 )
 
 type gatePhasePolicy struct {
-	Target string
-	Always bool
+	Target            string
+	Always            bool
+	LookupConstraints GateProfileLookupConstraints
 }
 
 func gatePhasePolicyForJobSpec(rawSpec []byte, jobType domaintypes.JobType) (gatePhasePolicy, error) {
@@ -37,9 +38,18 @@ func gatePhasePolicyForJobSpec(rawSpec []byte, jobType domaintypes.JobType) (gat
 	if phase == nil {
 		return gatePhasePolicy{}, nil
 	}
+	lookupConstraints := GateProfileLookupConstraints{}
+	if phase.Stack != nil && phase.Stack.Enabled && !phase.Stack.Default {
+		lookupConstraints.StrictStack = &GateProfileLookupStack{
+			Language: strings.TrimSpace(phase.Stack.Language),
+			Tool:     strings.TrimSpace(phase.Stack.Tool),
+			Release:  strings.TrimSpace(phase.Stack.Release),
+		}
+	}
 	return gatePhasePolicy{
-		Target: strings.TrimSpace(phase.Target),
-		Always: phase.Always,
+		Target:            strings.TrimSpace(phase.Target),
+		Always:            phase.Always,
+		LookupConstraints: lookupConstraints,
 	}, nil
 }
 
