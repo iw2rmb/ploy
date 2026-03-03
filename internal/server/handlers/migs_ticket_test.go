@@ -35,6 +35,8 @@ func createJobsByName(params []store.CreateJobParams) map[string]store.CreateJob
 	return byName
 }
 
+const testRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
+
 func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
 
@@ -114,7 +116,7 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 
 	spec := []byte(`{"steps":[{"image":"mod1:v1"}]}`)
 
-	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
+	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, testRepoSHA0, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
@@ -161,6 +163,12 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 		if got.RunID != runID {
 			t.Errorf("job %q: expected run_id %q, got %q", exp.name, runID, got.RunID)
 		}
+		if exp.name == "pre-gate" && got.RepoShaIn != testRepoSHA0 {
+			t.Errorf("job %q: expected repo_sha_in %q, got %q", exp.name, testRepoSHA0, got.RepoShaIn)
+		}
+		if exp.name != "pre-gate" && got.RepoShaIn != "" {
+			t.Errorf("job %q: expected empty repo_sha_in, got %q", exp.name, got.RepoShaIn)
+		}
 	}
 }
 
@@ -185,7 +193,7 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		]
 	}`)
 
-	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
+	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, testRepoSHA0, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
@@ -238,6 +246,23 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 		if got.RunID != runID {
 			t.Errorf("job %q: expected run_id %q, got %q", exp.name, runID, got.RunID)
 		}
+		if exp.name == "pre-gate" && got.RepoShaIn != testRepoSHA0 {
+			t.Errorf("job %q: expected repo_sha_in %q, got %q", exp.name, testRepoSHA0, got.RepoShaIn)
+		}
+		if exp.name != "pre-gate" && got.RepoShaIn != "" {
+			t.Errorf("job %q: expected empty repo_sha_in, got %q", exp.name, got.RepoShaIn)
+		}
+	}
+}
+
+func TestCreateJobsFromSpec_InvalidRepoSHA0(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{}
+	spec := []byte(`{"steps":[{"image":"a"}]}`)
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, "not-a-sha", spec)
+	if err == nil || !strings.Contains(err.Error(), "repo_sha0 must match") {
+		t.Fatalf("expected repo_sha0 validation error, got %v", err)
 	}
 }
 
@@ -270,7 +295,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			st := &mockStore{}
 
-			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, tc.spec)
+			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, tc.spec)
 			if err != nil {
 				t.Fatalf("createJobsFromSpec failed: %v", err)
 			}
@@ -322,7 +347,7 @@ func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
 	st := &mockStore{}
 	spec := []byte(`{"steps":[{"image":"a"}]}`)
 
-	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, spec)
+	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, testRepoSHA0, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
@@ -350,7 +375,7 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 	st := &mockStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, spec)
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
@@ -382,7 +407,7 @@ func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) 
 	st := &mockStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, spec)
+	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
 	if err != nil {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}

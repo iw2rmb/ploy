@@ -395,7 +395,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			httpErr(w, http.StatusInternalServerError, "failed to load spec: %v", err)
 			return
 		}
-		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, spec.Spec); err != nil {
+		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, runRepo.RepoSha0, spec.Spec); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
 			return
 		}

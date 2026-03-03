@@ -567,6 +567,10 @@ by rewiring `next_id` links:
 Rewire example:
 - Before failure handling: `failed.next_id = old_next`
 - After insertion: `failed.next_id = heal.id`, `heal.next_id = re_gate.id`, `re_gate.next_id = old_next`
+- Healing SHA seeding: inserted `heal` jobs inherit `repo_sha_in` from the
+  failed gate job.
+- If failed gate `repo_sha_in` is missing/invalid, remaining linked jobs are
+  cancelled instead of inserting heal/re-gate jobs.
 - Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
@@ -1122,6 +1126,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
     `mem_consumed_bytes`), the server upserts a row in `job_metrics`.
   - Nodes may report `repo_sha_out`; the server accepts only lowercase 40-hex
     values and persists the full and short (`repo_sha_out8`) forms on `jobs`.
+  - For successful jobs with `next_id`, chain progression requires a valid
+    40-hex `repo_sha_in` on the completed job and a reported `repo_sha_out`.
   - The completion update atomically propagates `repo_sha_out` to the linked
     successor job as `repo_sha_in`/`repo_sha_in8` when `next_id` is present.
 - `POST /v1/nodes/{id}/events` — publish run-scoped node exceptions/events
@@ -1218,6 +1224,8 @@ For a spec with `migs[]`:
 3. Scheduler and nodeagents:
    - Scheduler/start path creates jobs for pre-gate, each mig, and post-gates as a linked chain.
    - Job creation persists chain rows tail-to-head so each non-null `next_id` already exists when inserted (`jobs.next_id -> jobs.id` FK).
+   - Chain head seeding: `pre-gate` is created with
+     `repo_sha_in = run_repos.repo_sha0`.
    - Each job row includes `job_type` (pre_gate, mig, post_gate, heal, re_gate)
      and `job_image` (saved by the executing node before the container starts).
    - ClaimJob returns queued jobs from the unified queue, and the server promotes

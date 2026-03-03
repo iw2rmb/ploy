@@ -8,6 +8,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+const testRunRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
+
 func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	t.Parallel()
 
@@ -20,10 +22,10 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listQueuedRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{},
 	}
@@ -62,10 +64,10 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listQueuedRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},

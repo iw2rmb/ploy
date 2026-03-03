@@ -179,21 +179,35 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 }
 
 type plannedJob struct {
-	ID       domaintypes.JobID
-	Name     string
-	JobType  string
-	JobImage string
-	Status   store.JobStatus
-	StepName string
-	NextID   *domaintypes.JobID
+	ID        domaintypes.JobID
+	Name      string
+	JobType   string
+	JobImage  string
+	Status    store.JobStatus
+	StepName  string
+	NextID    *domaintypes.JobID
+	RepoSHAIn string
 }
 
 // createJobsFromSpec parses the run spec and creates an explicit next_id-linked job chain.
 // Queue semantics are head-only: the first job is Queued, all successors are Created.
-func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.RunID, repoID domaintypes.RepoID, repoBaseRef string, attempt int32, spec []byte) error {
+func createJobsFromSpec(
+	ctx context.Context,
+	st store.Store,
+	runID domaintypes.RunID,
+	repoID domaintypes.RepoID,
+	repoBaseRef string,
+	attempt int32,
+	repoSHA0 string,
+	spec []byte,
+) error {
 	modsSpec, err := contracts.ParseModsSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse migs spec: %w", err)
+	}
+	repoSHA0 = strings.TrimSpace(strings.ToLower(repoSHA0))
+	if !sha40Pattern.MatchString(repoSHA0) {
+		return fmt.Errorf("repo_sha0 must match ^[0-9a-f]{40}$")
 	}
 
 	type draft struct {
@@ -250,6 +264,8 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID domaintypes.R
 			StepName: d.stepName,
 		})
 	}
+	// Seed deterministic SHA chain from run_repos.repo_sha0 at chain head.
+	planned[0].RepoSHAIn = repoSHA0
 	for i := range planned {
 		if i+1 < len(planned) {
 			nextID := planned[i+1].ID
@@ -291,6 +307,7 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 		JobImage:    planned.JobImage,
 		NextID:      planned.NextID,
 		Meta:        metaBytes,
+		RepoShaIn:   planned.RepoSHAIn,
 	})
 	return err
 }

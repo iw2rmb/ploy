@@ -938,6 +938,7 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 	result.JobType = params.JobType
 	result.JobImage = params.JobImage
 	result.NextID = params.NextID
+	result.RepoShaIn = params.RepoShaIn
 	result.Meta = params.Meta
 	return result, m.createJobErr
 }

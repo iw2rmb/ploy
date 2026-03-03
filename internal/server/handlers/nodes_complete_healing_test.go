@@ -17,6 +17,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+const healingTestRepoSHAIn = "0123456789abcdef0123456789abcdef01234567"
+
 func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	t.Parallel()
 
@@ -59,6 +61,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing"}}}`),
 			},
 			{
@@ -111,6 +114,9 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	}
 	if healJob.NextID == nil {
 		t.Fatalf("expected heal-1-0 next_id to be set")
+	}
+	if healJob.RepoShaIn != healingTestRepoSHAIn {
+		t.Fatalf("expected heal-1-0 repo_sha_in=%q, got %q", healingTestRepoSHAIn, healJob.RepoShaIn)
 	}
 
 	reGateJob, ok := jobsByName["re-gate-1"]
@@ -198,6 +204,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
 			{
@@ -220,6 +227,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypeReGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
 			{
@@ -313,6 +321,7 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 				NextID:      &successorID,
 				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`),
 			},
@@ -337,6 +346,82 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 	}
 	if st.createJobCallCount != 0 {
 		t.Fatalf("expected no healing jobs for mixed classification, got %d CreateJob calls", st.createJobCallCount)
+	}
+	if len(st.updateJobStatusCalls) != 1 {
+		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
+	}
+	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != store.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
+	}
+}
+
+func TestMaybeCreateHealingJobs_InvalidRepoSHAInCancelsRemaining(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	specID := domaintypes.NewSpecID()
+	successorID := domaintypes.NewJobID()
+
+	specBytes, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": float64(2),
+						"image":   "migs-codex:latest",
+					},
+				},
+			},
+			"router": map[string]any{"image": "migs-router:latest"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal spec: %v", err)
+	}
+
+	failedID := domaintypes.NewJobID()
+	st := &mockStore{
+		getSpecResult: store.Spec{ID: specID, Spec: specBytes},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          failedID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "pre-gate",
+				Status:      store.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate.String(),
+				RepoShaIn:   "invalid",
+				NextID:      &successorID,
+				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
+			},
+			{
+				ID:          successorID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mig-0",
+				Status:      store.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod.String(),
+				Meta:        []byte(`{"kind":"mig"}`),
+			},
+		},
+	}
+
+	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	failed := st.listJobsByRunRepoAttemptResult[0]
+	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no healing jobs when repo_sha_in invalid, got %d CreateJob calls", st.createJobCallCount)
 	}
 	if len(st.updateJobStatusCalls) != 1 {
 		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
@@ -401,6 +486,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 			},
 			{
 				ID:          heal1ID,
@@ -422,6 +508,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				Name:        "re-gate-1",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypeReGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`),
 			},
 			{
@@ -550,6 +637,7 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 				Name:        "pre-gate",
 				Status:      store.JobStatusFail,
 				JobType:     domaintypes.JobTypePreGate.String(),
+				RepoShaIn:   healingTestRepoSHAIn,
 				NextID:      &nextID,
 				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
