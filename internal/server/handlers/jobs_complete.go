@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -47,7 +48,11 @@ type completeJobRequest struct {
 //	}
 //
 // Response: 204 No Content on success.
-func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service) http.HandlerFunc {
+func completeJobHandler(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service, gateProfileBlobstore ...blobstore.Store) http.HandlerFunc {
+	var gateProfilesBS blobstore.Store
+	if len(gateProfileBlobstore) > 0 {
+		gateProfilesBS = gateProfileBlobstore[0]
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
@@ -406,6 +411,29 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 
 		// Server-driven scheduling: after job succeeds, promote the linked successor.
 		if jobStatus == store.JobStatusSuccess {
+			if _, isPgStore := st.(*store.PgStore); isPgStore && gateProfilesBS != nil {
+				jobType := domaintypes.JobType(job.JobType)
+				if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
+					run, ok := loadRunForPostCompletion("gate profile persistence")
+					if ok {
+						specRow, specErr := st.GetSpec(ctx, run.SpecID)
+						if specErr != nil {
+							slog.Error("complete job: failed to load spec for gate profile persistence",
+								"job_id", jobID,
+								"run_id", run.ID,
+								"spec_id", run.SpecID,
+								"err", specErr,
+							)
+						} else if persistErr := persistSuccessfulGateProfile(ctx, st, gateProfilesBS, job, persistedJobMeta, specRow.Spec); persistErr != nil {
+							slog.Error("complete job: failed to persist successful gate profile",
+								"job_id", jobID,
+								"repo_id", job.RepoID,
+								"err", persistErr,
+							)
+						}
+					}
+				}
+			}
 			if promoteErr := maybePromoteReGateRecoveryCandidate(ctx, st, job, persistedJobMeta); promoteErr != nil {
 				slog.Error("complete job: failed to promote validated re-gate candidate",
 					"job_id", jobID,

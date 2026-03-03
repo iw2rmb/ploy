@@ -136,6 +136,13 @@ Gate command resolution uses the following precedence (highest wins):
 3. Claim-time resolved gate profile from `gate_profiles` (exact `(repo_id, repo_sha_in, stack_id)` row)
 4. Detected-tool fallback command (`buildCommandForTool`)
 
+Successful gate profile persistence:
+- On successful `pre_gate`, `post_gate`, or `re_gate`, the server persists an exact
+  profile row keyed by `(repo_id, repo_sha_out, stack_id)` (falling back to
+  `repo_sha_in` when `repo_sha_out` is unavailable).
+- The persisted payload marks the active gate target as `passed` and updates
+  `gates(job_id, profile_id)` for auditability.
+
 Target pin behavior:
 - If `build_gate.<phase>.target` is set and differs from a prep override target, Build Gate ignores that prep override and runs the pinned target command.
 - Prep stack validation (`prep stack mismatch`) is evaluated only when the prep override is actually selected for execution.

@@ -754,6 +754,13 @@ Claim-time profile resolution:
 3. Fallback to default stack profile (`repo_id IS NULL`, `repo_sha IS NULL`)
 4. Fallback hits are copied to a new exact row before execution
 
+Successful gate profile persistence:
+- After successful `pre_gate`, `post_gate`, or `re_gate`, the server persists
+  an exact profile keyed by `(repo_id, repo_sha_out, stack_id)` (with
+  `repo_sha_in` fallback when `repo_sha_out` is unavailable).
+- The persisted profile marks the selected gate target as `passed` and refreshes
+  the `gates(job_id, profile_id)` link.
+
 Gate profile to Build Gate mapping:
 - Gate phase chooses destination override slot (`build_gate.pre.gate_profile` for
   `pre_gate`; `build_gate.post.gate_profile` for `post_gate` and `re_gate`).
@@ -1156,7 +1163,8 @@ Gate profile behavior:
 - Canonical gate profile storage is `gate_profiles` (+ `gates` linkage), not `mig_repos`.
 - During claim, the resolver targets exact identity `(repo_id, repo_sha_in, stack_id)`;
   fallback profiles are copied into a new exact row before execution.
-- Pre-gate runtime auto-bootstrap generation/persistence has been removed.
+- Successful gate jobs (`pre_gate|post_gate|re_gate`) persist refreshed exact
+  profiles keyed by `(repo_id, repo_sha, stack_id)`.
 - Infra healing candidate validation uses `docs/schemas/gate_profile.schema.json`
   (`title: Ploy Build Gate Profile`, `$comment` guidance included) plus contract parsing.
 - A validated candidate is tracked in `re_gate` recovery metadata and marked
