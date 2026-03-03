@@ -63,7 +63,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/... -run 'Test.*Version.*Compare|Test.*Compat.*Floor'` — expect correct ordering for semantic versions and non-semver edge cases per supported ecosystems.
 
 ## Phase 8: `deps` Healing Integration And Documentation Sync
-- [ ] Wire compatibility endpoint exposure to `deps` healing claims and synchronize docs.
+- [x] Wire compatibility endpoint exposure to `deps` healing claims and synchronize docs.
   - Repository: `ploy`
   - Component: `internal/server/handlers/nodes_claim.go`; nodeagent recovery input hydration; docs
   - Scope: include prefilled compatibility endpoint in `deps` recovery context, ensure healing receives prior `deps_bumps` from metadata, and update docs to reflect final SBOM + compatibility behavior.

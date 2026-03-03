@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -323,6 +324,9 @@ func buildRecoveryClaimContext(
 		SelectedErrorKind: selectedKind,
 		Expectations:      cloneRawJSON(recovery.Expectations),
 	}
+	if kind == contracts.RecoveryErrorKindDeps && recovery.DepsBumps != nil {
+		ctxPayload.DepsBumps = cloneDepsBumpsMap(recovery.DepsBumps)
+	}
 	if loopKind, ok := contracts.ParseRecoveryLoopKind(ctxPayload.LoopKind); ok {
 		ctxPayload.LoopKind = loopKind.String()
 	} else {
@@ -351,15 +355,29 @@ func buildRecoveryClaimContext(
 		ctxPayload.ResolvedHealingImage = strings.TrimSpace(healJob.JobImage)
 	}
 
+	var detectedExpectation *contracts.StackExpectation
 	if gateJob != nil && len(gateJob.Meta) > 0 {
 		if gateMeta, err := contracts.UnmarshalJobMeta(gateJob.Meta); err == nil && gateMeta.Gate != nil {
 			if stack := gateMeta.Gate.DetectedStack(); stack != "" && stack != contracts.ModStackUnknown {
 				ctxPayload.DetectedStack = stack
 			}
+			if expectation := gateMeta.Gate.DetectedStackExpectation(); expectation != nil {
+				detectedExpectation = &contracts.StackExpectation{
+					Language: strings.TrimSpace(expectation.Language),
+					Release:  strings.TrimSpace(expectation.Release),
+					Tool:     strings.TrimSpace(expectation.Tool),
+				}
+			}
 			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.Gate); strings.TrimSpace(logPayload) != "" {
 				ctxPayload.BuildGateLog = logPayload
 			}
 		}
+	}
+	if detectedExpectation == nil {
+		detectedExpectation = stackExpectationFromModStack(ctxPayload.DetectedStack)
+	}
+	if kind == contracts.RecoveryErrorKindDeps {
+		ctxPayload.DepsCompatEndpoint = buildDepsCompatEndpoint(detectedExpectation)
 	}
 
 	if kind, ok := contracts.ParseRecoveryErrorKind(ctxPayload.SelectedErrorKind); ok && contracts.IsInfraRecoveryErrorKind(kind) {
@@ -446,4 +464,22 @@ func cloneRawJSON(in json.RawMessage) json.RawMessage {
 		return nil
 	}
 	return append(json.RawMessage(nil), in...)
+}
+
+func buildDepsCompatEndpoint(stack *contracts.StackExpectation) string {
+	if stack == nil {
+		return ""
+	}
+	lang := strings.ToLower(strings.TrimSpace(stack.Language))
+	release := strings.TrimSpace(stack.Release)
+	tool := strings.ToLower(strings.TrimSpace(stack.Tool))
+	if lang == "" || release == "" || tool == "" {
+		return ""
+	}
+	return fmt.Sprintf(
+		"/v1/sboms/compat?lang=%s&release=%s&tool=%s&libs=",
+		url.QueryEscape(lang),
+		url.QueryEscape(release),
+		url.QueryEscape(tool),
+	)
 }

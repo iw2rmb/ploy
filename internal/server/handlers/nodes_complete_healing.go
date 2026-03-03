@@ -250,7 +250,26 @@ func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.
 	if len(src.CandidateGateProfile) > 0 {
 		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
+	if src.DepsBumps != nil {
+		out.DepsBumps = cloneDepsBumpsMap(src.DepsBumps)
+	}
 	return &out
+}
+
+func cloneDepsBumpsMap(src map[string]*string) map[string]*string {
+	if src == nil {
+		return nil
+	}
+	out := make(map[string]*string, len(src))
+	for k, v := range src {
+		if v == nil {
+			out[k] = nil
+			continue
+		}
+		ver := *v
+		out[k] = &ver
+	}
+	return out
 }
 
 func isGateJobType(jobType domaintypes.JobType) bool {

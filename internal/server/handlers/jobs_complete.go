@@ -593,6 +593,9 @@ func cloneRecoveryMetadataForCompletion(src *contracts.BuildGateRecoveryMetadata
 	if len(src.CandidateGateProfile) > 0 {
 		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
+	if src.DepsBumps != nil {
+		out.DepsBumps = cloneDepsBumpsMap(src.DepsBumps)
+	}
 	return &out
 }
 

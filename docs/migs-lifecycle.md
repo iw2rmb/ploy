@@ -227,10 +227,13 @@ Router runtime environment:
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
   `jobs.meta.action_summary` for mig jobs.
 - **`deps` compatibility hints**: for `selected_error_kind=deps`, claim-time
-  `recovery_context` may include a stack-prefilled SBOM compatibility endpoint:
-  `/v1/sboms/compat?lang=<...>&release=<...>&tool=<...>&libs=...`.
-  Node hydration may expose this contract to healing containers via `/in/deps-compat-url.txt`
-  and prior cumulative bump state via `/in/deps-bumps.json`.
+  `recovery_context` includes:
+  - `deps_compat_endpoint`: stack-prefilled SBOM endpoint
+    `/v1/sboms/compat?lang=<...>&release=<...>&tool=<...>&libs=...`.
+  - `deps_bumps`: prior cumulative dependency bump state.
+  Node hydration writes these into healing `/in` as:
+  - `/in/deps-compat-url.txt`
+  - `/in/deps-bumps.json`
 
 ### Per-iteration artifacts and healing log
 
@@ -244,6 +247,8 @@ to `/in` for debugging and cross-iteration context:
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
 | `/in/healing-log.md` | Cumulative markdown log across all iterations |
+| `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for `deps` healing |
+| `/in/deps-bumps.json` | Prior cumulative dependency bump map for `deps` healing |
 
 For `heal`/`re_gate`, claim-time `recovery_context` is the primary source for
 `/in/build-gate.log`, `/in/gate_profile.json`, and `/in/gate_profile.schema.json`.
