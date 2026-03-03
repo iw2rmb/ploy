@@ -58,18 +58,27 @@ func handleRun(args []string, stderr io.Writer) error {
 }
 
 func handleRunStatus(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printRunStatusUsage(stderr)
+		return nil
+	}
+
 	fs := flag.NewFlagSet("run status", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	jsonOut := fs.Bool("json", false, "print machine-readable JSON report with links and per-job artifacts")
 
 	if err := fs.Parse(args); err != nil {
-		printRunUsage(stderr)
+		if errors.Is(err, flag.ErrHelp) {
+			printRunStatusUsage(stderr)
+			return nil
+		}
+		printRunStatusUsage(stderr)
 		return err
 	}
 
 	rest := fs.Args()
 	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
-		printRunUsage(stderr)
+		printRunStatusUsage(stderr)
 		return errors.New("run id required")
 	}
 	runID := strings.TrimSpace(rest[0])
@@ -125,6 +134,11 @@ func runStatusSupportsOSC8(w io.Writer) bool {
 }
 
 func handleRunLogs(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printRunLogsUsage(stderr)
+		return nil
+	}
+
 	fs := flag.NewFlagSet("run logs", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	format := fs.String("format", string(logs.FormatStructured), "output format (raw|structured)")
@@ -132,22 +146,26 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
 	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
 	if err := fs.Parse(args); err != nil {
-		printRunUsage(stderr)
+		if errors.Is(err, flag.ErrHelp) {
+			printRunLogsUsage(stderr)
+			return nil
+		}
+		printRunLogsUsage(stderr)
 		return err
 	}
 
 	runIDArgs := fs.Args()
 	if len(runIDArgs) == 0 {
-		printRunUsage(stderr)
+		printRunLogsUsage(stderr)
 		return errors.New("run id required")
 	}
 	runID := strings.TrimSpace(runIDArgs[0])
 	if runID == "" {
-		printRunUsage(stderr)
+		printRunLogsUsage(stderr)
 		return errors.New("run id required")
 	}
 	if *maxRetries < -1 {
-		printRunUsage(stderr)
+		printRunLogsUsage(stderr)
 		return fmt.Errorf("max retries must be >= -1")
 	}
 
@@ -175,9 +193,26 @@ func handleRunLogs(args []string, stderr io.Writer) error {
 	}
 	if err := cmd.Run(ctx); err != nil {
 		if errors.Is(err, migs.ErrInvalidFormat) {
-			printRunUsage(stderr)
+			printRunLogsUsage(stderr)
 		}
 		return err
 	}
 	return nil
+}
+
+func printRunStatusUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy run status [--json] <run-id>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --json   Print machine-readable JSON report with links and per-job artifacts")
+}
+
+func printRunLogsUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy run logs [--format <raw|structured>] [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --format <raw|structured>   Output format (default: structured)")
+	_, _ = fmt.Fprintln(w, "  --max-retries <n>           Max reconnect attempts (-1 for unlimited, default: 3)")
+	_, _ = fmt.Fprintln(w, "  --idle-timeout <duration>   Cancel if no events arrive (0=off, default: 45s)")
+	_, _ = fmt.Fprintln(w, "  --timeout <duration>        Overall stream timeout (0=off)")
 }
