@@ -484,6 +484,22 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 				"spec_id":    specID.String(),
 				"created_at": "2026-02-24T08:00:00Z",
 			})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/status":
+			stageState := "running"
+			if repoCalls >= 2 {
+				stageState = "succeeded"
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"run_id": runID.String(),
+				"state":  stageState,
+				"stages": map[string]any{
+					jobID.String(): map[string]any{
+						"state":        stageState,
+						"attempts":     1,
+						"max_attempts": 1,
+					},
+				},
+			})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID.String()+"/repos":
 			repoCalls++
 			repoStatus := "Running"

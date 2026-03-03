@@ -45,9 +45,18 @@ type RunJobEntry struct {
 	ActionSummary string              `json:"action_summary,omitempty"`
 	BugSummary    string              `json:"bug_summary,omitempty"`
 	Recovery      *RunJobRecovery     `json:"recovery,omitempty"`
+	Artifacts     []RunJobArtifact    `json:"artifacts,omitempty"`
 	BuildLogURL   string              `json:"build_log_url,omitempty"`
 	PatchURL      string              `json:"patch_url,omitempty"`
 }
 
 // RunJobRecovery projects recovery classifier fields surfaced by repo job APIs.
 type RunJobRecovery = modsapi.RunRepoJobRecovery
+
+// RunJobArtifact is the per-job artifact view emitted by run status JSON.
+// It includes the CID plus a lookup URL that resolves artifact bundle metadata.
+type RunJobArtifact struct {
+	Name      string `json:"name"`
+	CID       string `json:"cid"`
+	LookupURL string `json:"lookup_url,omitempty"`
+}
