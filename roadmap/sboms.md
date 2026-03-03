@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'Test.*SBOM.*Detect|Test.*SBOM.*Parse'` and parser unit tests — expect normalized rows and graceful handling of unsupported files.
 
 ## Phase 4: SBOM Storage Model And Write Path
-- [ ] Introduce `sboms(job_id, repo_id, lib, ver)` persistence and write queries.
+- [x] Introduce `sboms(job_id, repo_id, lib, ver)` persistence and write queries.
   - Repository: `ploy`
   - Component: `internal/store`
   - Scope: extend `internal/store/schema.sql` with `sboms` table, add sqlc queries for insert/select operations, and ensure stack/time are derived via joins (no duplicated stack/time columns in `sboms`).

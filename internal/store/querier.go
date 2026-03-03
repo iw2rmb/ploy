@@ -93,6 +93,7 @@ type Querier interface {
 	DeleteNode(ctx context.Context, id types.NodeID) error
 	DeleteRun(ctx context.Context, id types.RunID) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
+	DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
 	// Transitional: returns current job id and linked successor id.
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
@@ -224,6 +225,7 @@ type Querier interface {
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	// Lists runs that have queued work (at least one Queued run_repos row).
 	ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error)
+	ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]Sbom, error)
 	// Lists specs ordered by created_at descending (most recent first).
 	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
@@ -293,6 +295,7 @@ type Querier interface {
 	// Bulk upsert a mig_repo by normalized repo_url.
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
+	UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
 	UpsertStep(ctx context.Context, arg UpsertStepParams) error
 }
 
