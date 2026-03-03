@@ -7,7 +7,8 @@ post:
 
     Behavior:
     - Request provides repo_url.
-    - Server matches by joining run_repos to mod_repos and comparing normalized repo URLs.
+    - Server matches by joining run_repos -> repos (with mig membership in `mig_repos`)
+      and comparing normalized repo URLs.
     - Errors if no repo matches or multiple repos match.
   parameters:
     - in: path

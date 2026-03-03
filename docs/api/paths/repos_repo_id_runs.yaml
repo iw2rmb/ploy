@@ -1,7 +1,7 @@
 get:
   summary: List runs for a repository
   description: |
-    Returns the run history for a specific repository identified by `mig_repos.id`.
+    Returns the run history for a specific repository identified by `repos.id`.
     Results include both the parent run status and the per-repo status within each batch.
   operationId: listRunsForRepo
   tags:
@@ -12,7 +12,7 @@ get:
     - name: repo_id
       in: path
       required: true
-      description: Repository identifier (mig_repos.id, NanoID string)
+      description: Repository identifier (repos.id, NanoID string)
       schema:
         type: string
     - name: limit

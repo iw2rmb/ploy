@@ -26,16 +26,18 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
 			{
-				ID:       jobID,
-				RunID:    runID,
-				RepoID:   repoID,
-				Attempt:  1,
-				Name:     "mig-0",
-				JobType:  "mig",
-				JobImage: "docker.io/example/mig:latest",
-				NextID:   &nextID,
-				Status:   store.JobStatusQueued,
-				Meta:     []byte(`{"kind":"mig","mods_step_name":"hello"}`),
+				ID:         jobID,
+				RunID:      runID,
+				RepoID:     repoID,
+				Attempt:    1,
+				Name:       "mig-0",
+				JobType:    "mig",
+				JobImage:   "docker.io/example/mig:latest",
+				RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+				RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
+				NextID:     &nextID,
+				Status:     store.JobStatusQueued,
+				Meta:       []byte(`{"kind":"mig","mods_step_name":"hello"}`),
 			},
 		},
 	}
@@ -73,6 +75,12 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	}
 	if got := job["job_image"]; got != "docker.io/example/mig:latest" {
 		t.Fatalf("job_image = %v, want %q", got, "docker.io/example/mig:latest")
+	}
+	if got := job["repo_sha_in"]; got != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("repo_sha_in = %v, want %q", got, "0123456789abcdef0123456789abcdef01234567")
+	}
+	if got := job["repo_sha_out"]; got != "89abcdef0123456789abcdef0123456789abcdef" {
+		t.Fatalf("repo_sha_out = %v, want %q", got, "89abcdef0123456789abcdef0123456789abcdef")
 	}
 	if got := job["next_id"]; got != nextID.String() {
 		t.Fatalf("next_id = %v, want %q", got, nextID.String())

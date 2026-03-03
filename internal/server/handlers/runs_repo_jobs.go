@@ -85,6 +85,8 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				Name:       job.Name,
 				JobType:    job.JobType,
 				JobImage:   job.JobImage,
+				RepoShaIn:  job.RepoShaIn,
+				RepoShaOut: job.RepoShaOut,
 				NextID:     job.NextID,
 				NodeID:     job.NodeID,
 				Status:     job.Status,

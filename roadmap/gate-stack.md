@@ -121,7 +121,7 @@ Legend: [ ] todo, [x] done.
   - Tests: local deploy smoke + idempotent reseed tests — expect no duplicate rows and stable object paths.
 
 ## Phase 10: API, Docs, And Regression Matrix
-- [ ] Update API surfaces and docs to global repos model and SHA chain fields — align contracts with new persistence model.
+- [x] Update API surfaces and docs to global repos model and SHA chain fields — align contracts with new persistence model.
   - Repository: ploy
   - Component: handlers + OpenAPI + docs
   - Scope: update repo-centric endpoints/types (`RepoID`), gate execution status payloads, build-gate docs, lifecycle docs, and schema docs.
