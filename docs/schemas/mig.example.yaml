@@ -41,7 +41,7 @@ kind: MigRunSpec
 # The universal string form ignores stack detection and always uses the same image.
 image: docker.io/your-dh-user/migs-openrewrite:latest
 # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
-# command: ["/bin/sh", "-lc", "migs-orw --apply --dir /workspace --out /out"]
+# command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
 # Environment variables passed into the mig container
 #   - use `env` for literal values
 #   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
@@ -50,7 +50,9 @@ env:
   RECIPE_ARTIFACT: rewrite-migrate-java
   RECIPE_VERSION: "3.20.0"
   RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-  MAVEN_PLUGIN_VERSION: "6.18.0"
+  # Optional ORW runtime controls:
+  # ORW_REPOS: "https://repo1.maven.org/maven2,https://repo.internal/maven"
+  # ORW_FAIL_ON_UNSUPPORTED: "true"
 env_from_file:
   # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
   # CODEX_AUTH_JSON: ~/.codex/auth.json

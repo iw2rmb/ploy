@@ -544,6 +544,11 @@ Failure taxonomy (`error_kind`):
 Unsupported reason contract:
 - `error_kind=unsupported` requires `reason=type-attribution-unavailable`.
 
+Run/API metadata propagation:
+- When `report.json` contains `success=false`, node uploads:
+  - `metadata.orw_error_kind = report.json.error_kind`
+  - `metadata.orw_reason = report.json.reason` (when present)
+
 ### How Official Images Consume These Variables
 
 **Codex images (`mig-codex`)**: The entrypoint script checks for `CODEX_AUTH_JSON` and, when
