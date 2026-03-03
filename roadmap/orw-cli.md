@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts ./internal/nodeagent -run 'Test.*Image|Test.*Stack'` — expect stack resolution unchanged, image names updated.
 
 ## Phase 5: Update Runtime Consumption Of ORW Reports
-- [ ] Consume richer `report.json` contract in node execution path — surface deterministic failure kinds from `orw-cli`.
+- [x] Consume richer `report.json` contract in node execution path — surface deterministic failure kinds from `orw-cli`.
   - Repository: ploy
   - Component: nodeagent execution and status upload
   - Scope: update ORW result parsing/upload logic in `internal/nodeagent/execution_orchestrator_jobs.go` and related types to propagate `error_kind/reason` from `report.json` into job metadata/stats when present.

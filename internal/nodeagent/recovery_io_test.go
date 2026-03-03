@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 func TestExecuteHealingJob_ParseActionSummary(t *testing.T) {
@@ -133,5 +135,75 @@ func TestParseRouterDecision_CustomErrorKindDefaultsToUnknown(t *testing.T) {
 	}
 	if got.ErrorKind != "unknown" {
 		t.Fatalf("ErrorKind = %q, want %q", got.ErrorKind, "unknown")
+	}
+}
+
+func TestParseORWFailureMetadata_Unsupported(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	payload := `{"success":false,"error_kind":"unsupported","reason":"type-attribution-unavailable","message":"Type attribution is unavailable for this repository"}`
+	if err := os.WriteFile(filepath.Join(outDir, contracts.ORWCLIReportFileName), []byte(payload), 0o644); err != nil {
+		t.Fatalf("write report.json: %v", err)
+	}
+
+	meta, err := parseORWFailureMetadata(outDir)
+	if err != nil {
+		t.Fatalf("parseORWFailureMetadata() error: %v", err)
+	}
+	if got := meta[orwStatsMetadataErrorKind]; got != "unsupported" {
+		t.Fatalf("%s=%q, want unsupported", orwStatsMetadataErrorKind, got)
+	}
+	if got := meta[orwStatsMetadataReason]; got != "type-attribution-unavailable" {
+		t.Fatalf("%s=%q, want type-attribution-unavailable", orwStatsMetadataReason, got)
+	}
+}
+
+func TestParseORWFailureMetadata_SuccessReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	payload := `{"success":true,"message":"ok"}`
+	if err := os.WriteFile(filepath.Join(outDir, contracts.ORWCLIReportFileName), []byte(payload), 0o644); err != nil {
+		t.Fatalf("write report.json: %v", err)
+	}
+
+	meta, err := parseORWFailureMetadata(outDir)
+	if err != nil {
+		t.Fatalf("parseORWFailureMetadata() error: %v", err)
+	}
+	if len(meta) != 0 {
+		t.Fatalf("expected empty metadata for success report, got %#v", meta)
+	}
+}
+
+func TestParseORWFailureMetadata_MissingReportReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	meta, err := parseORWFailureMetadata(outDir)
+	if err != nil {
+		t.Fatalf("parseORWFailureMetadata() error: %v", err)
+	}
+	if len(meta) != 0 {
+		t.Fatalf("expected empty metadata when report is missing, got %#v", meta)
+	}
+}
+
+func TestParseORWFailureMetadata_InvalidReportReturnsError(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	payload := `{"success":false,"error_kind":"unsupported"}`
+	if err := os.WriteFile(filepath.Join(outDir, contracts.ORWCLIReportFileName), []byte(payload), 0o644); err != nil {
+		t.Fatalf("write report.json: %v", err)
+	}
+
+	_, err := parseORWFailureMetadata(outDir)
+	if err == nil {
+		t.Fatal("expected parse error for invalid report contract")
+	}
+	if !strings.Contains(err.Error(), "parse report.json") {
+		t.Fatalf("error=%q, want parse report.json", err.Error())
 	}
 }

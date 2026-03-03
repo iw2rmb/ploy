@@ -517,6 +517,11 @@ The ORW Mods honor an existing `rewrite.yml` in the workspace:
 - If no `rewrite.yml` exists, ORW Mods fall back to running the class recipe
   directly using `RECIPE_CLASSNAME` and the artifact coordinates.
 
+When `/out/report.json` contains an ORW failure payload (`success=false`), the
+node agent propagates deterministic failure fields into run stats metadata:
+- `metadata.orw_error_kind` from `report.json.error_kind`
+- `metadata.orw_reason` from `report.json.reason` (when present)
+
 ### Implementation references
 
 - Image type and resolution: `internal/workflow/contracts/job_image.go`
