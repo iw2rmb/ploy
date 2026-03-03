@@ -64,6 +64,34 @@ func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
 	}
 }
 
+func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: true,
+		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
+			{Lib: "lib-a", Ver: "1.2.0"},
+			{Lib: "lib-a", Ver: "1.10.0"},
+			{Lib: "lib-a", Ver: "2.0.0"},
+		},
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.3.0", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
+	}
+	var got map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["lib-a"] != "1.10.0" {
+		t.Fatalf("lib-a = %q, want 1.10.0", got["lib-a"])
+	}
+}
+
 func TestSBOMCompatHandler_ValidatesInput(t *testing.T) {
 	t.Parallel()
 
