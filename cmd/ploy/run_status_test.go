@@ -48,7 +48,8 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 	assertContains(t, out, "⣾")
 	assertContains(t, out, "\x1b[91m✗\x1b[0m")
-	assertContains(t, out, "\x1b[1;91m<infra>\x1b[0m └  Exit 137: \x1b[91mcompile failed at step 2\x1b[0m")
+	assertContains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
+	assertNotContains(t, out, "<infra>")
 	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
