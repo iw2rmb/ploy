@@ -568,6 +568,15 @@ func resolveConfiguredArtifactPath(rawPath, workspace, outDir string) (fullPath 
 
 // uploadOutDir bundles and uploads the /out directory when it contains files.
 func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, jobID types.JobID, outDir string) error {
+	return r.uploadOutDirBundle(ctx, runID, jobID, outDir, "mig-out")
+}
+
+// uploadOutDirBundle bundles and uploads the /out directory when it contains files.
+// Archive paths are rooted at out/ to preserve deterministic in-container paths.
+func (r *runController) uploadOutDirBundle(ctx context.Context, runID types.RunID, jobID types.JobID, outDir, artifactName string) error {
+	if r.artifactUploader == nil {
+		return nil
+	}
 	if outDir == "" {
 		return nil
 	}
@@ -576,12 +585,16 @@ func (r *runController) uploadOutDir(ctx context.Context, runID types.RunID, job
 	if !hasFiles {
 		return nil
 	}
+	name := strings.TrimSpace(artifactName)
+	if name == "" {
+		name = "mig-out"
+	}
 
 	entries := []ArtifactBundleEntry{{
 		SourcePath:  outDir,
 		ArchivePath: "out",
 	}}
-	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, runID, jobID, entries, "mig-out"); err != nil {
+	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, runID, jobID, entries, name); err != nil {
 		return fmt.Errorf("upload /out bundle: %w", err)
 	}
 

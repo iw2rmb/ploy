@@ -251,6 +251,62 @@ func TestRunController_uploadOutDir(t *testing.T) {
 	}
 }
 
+func TestRunController_uploadOutDirBundle_CustomName(t *testing.T) {
+	t.Parallel()
+
+	var (
+		uploadCalled bool
+		uploadedName string
+		uploadedBody []byte
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/runs/test-run/jobs/test-stage/artifact" {
+			return
+		}
+		uploadCalled = true
+		var payload struct {
+			Name   string `json:"name"`
+			Bundle []byte `json:"bundle"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		uploadedName = payload.Name
+		uploadedBody = payload.Bundle
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := newTestController(t, cfg)
+
+	outDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(outDir, "nested"), 0o755); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "nested", "artifact.txt"), []byte("ok"), 0o644); err != nil {
+		t.Fatalf("write out file: %v", err)
+	}
+
+	if err := controller.uploadOutDirBundle(context.Background(), "test-run", "test-stage", outDir, "build-gate-out"); err != nil {
+		t.Fatalf("uploadOutDirBundle() error = %v", err)
+	}
+	if !uploadCalled {
+		t.Fatal("expected upload to be called")
+	}
+	if uploadedName != "build-gate-out" {
+		t.Fatalf("artifact name = %q, want %q", uploadedName, "build-gate-out")
+	}
+	headers := tarHeadersFromBundle(t, uploadedBody)
+	if _, ok := headers["out/nested/artifact.txt"]; !ok {
+		t.Fatalf("expected out/nested/artifact.txt in bundle, got headers=%v", keys(headers))
+	}
+}
+
 // TestRunController_uploadStatus verifies status upload with retry logic.
 func TestRunController_uploadStatus(t *testing.T) {
 	t.Parallel()

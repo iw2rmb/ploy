@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./docs/...` and docs guard tests — expect docs consistency and no missing env documentation references.
 
 ## Phase 2: Gate `/out/*` Artifact Persistence
-- [ ] Persist all gate `/out/*` files as first-class artifacts with deterministic `out/` archive paths.
+- [x] Persist all gate `/out/*` files as first-class artifacts with deterministic `out/` archive paths.
   - Repository: `ploy`
   - Component: `internal/nodeagent`
   - Scope: update gate artifact upload path handling to archive every `/out/*` file (not only tool-specific paths), preserving relative path fidelity for downstream SBOM discovery.
