@@ -15,6 +15,7 @@ import org.eclipse.aether.util.artifact.JavaScopes;
 import org.eclipse.aether.util.filter.DependencyFilterUtils;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.eclipse.aether.supplier.RepositorySystemSupplier;
+import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -194,7 +195,9 @@ public final class RewriteCliMain {
         String repoPassword
     ) throws DependencyResolutionException {
         RepositorySystem repoSystem = newRepositorySystem();
-        DefaultRepositorySystemSession session = new DefaultRepositorySystemSession();
+        DefaultRepositorySystemSession session = MavenRepositorySystemUtils.newSession();
+        session.setSystemProperties(System.getProperties());
+        session.setUserProperties(new Properties());
         Path localM2 = Paths.get(System.getProperty("user.home"), ".m2", "repository");
         session.setLocalRepositoryManager(repoSystem.newLocalRepositoryManager(session, new LocalRepository(localM2.toFile())));
 
