@@ -255,7 +255,10 @@ SELECT id
 FROM stacks
 WHERE lang = $1::text
   AND release = $2::text
-  AND ($3::text = '' OR COALESCE(tool, '') = $3::text)
+  AND (
+    ($3::text <> '' AND COALESCE(tool, '') = $3::text) OR
+    ($3::text = '' AND tool IS NULL)
+  )
 ORDER BY id ASC
 LIMIT 1
 `
