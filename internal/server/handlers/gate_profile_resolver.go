@@ -38,6 +38,7 @@ type GateProfileLookupStack struct {
 type gateProfileResolverStore interface {
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRequiredStack(ctx context.Context, language, tool, release string) (int64, error)
+	ResolveStackRowByImage(ctx context.Context, image string) (gateProfileResolverStackRow, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, repoID domaintypes.RepoID, repoSHA string) (int64, error)
 	ResolveAnyStackID(ctx context.Context) (int64, error)
 	GetExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64) (gateProfileRow, error)
@@ -54,6 +55,13 @@ type gateProfileRow struct {
 	RepoSHA8  string
 	StackID   int64
 	ObjectKey string
+}
+
+type gateProfileResolverStackRow struct {
+	ID       int64
+	Language string
+	Tool     string
+	Release  string
 }
 
 type dbGateProfileResolver struct {
@@ -161,9 +169,54 @@ func normalizeStrictStackLookup(constraints GateProfileLookupConstraints) *GateP
 	}
 }
 
+func (r *dbGateProfileResolver) fillStrictStackFromJobImage(
+	ctx context.Context,
+	job store.Job,
+	strict *GateProfileLookupStack,
+) (*GateProfileLookupStack, error) {
+	if strict == nil {
+		return nil, nil
+	}
+	filled := &GateProfileLookupStack{
+		Language: strict.Language,
+		Tool:     strict.Tool,
+		Release:  strict.Release,
+	}
+	image := strings.TrimSpace(job.JobImage)
+	if image == "" {
+		return filled, nil
+	}
+
+	stack, err := r.st.ResolveStackRowByImage(ctx, image)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return filled, nil
+		}
+		return nil, err
+	}
+	stackLanguage := strings.TrimSpace(stack.Language)
+	stackTool := strings.TrimSpace(stack.Tool)
+	stackRelease := strings.TrimSpace(stack.Release)
+
+	if stackLanguage != filled.Language || stackRelease != filled.Release {
+		return nil, pgx.ErrNoRows
+	}
+	if filled.Tool != "" && stackTool != filled.Tool {
+		return nil, pgx.ErrNoRows
+	}
+	if filled.Tool == "" {
+		filled.Tool = stackTool
+	}
+	return filled, nil
+}
+
 func (r *dbGateProfileResolver) resolveStackID(ctx context.Context, job store.Job, constraints GateProfileLookupConstraints) (int64, error) {
 	if strict := normalizeStrictStackLookup(constraints); strict != nil {
-		stackID, err := r.st.ResolveStackIDByRequiredStack(ctx, strict.Language, strict.Tool, strict.Release)
+		filled, err := r.fillStrictStackFromJobImage(ctx, job, strict)
+		if err != nil {
+			return 0, err
+		}
+		stackID, err := r.st.ResolveStackIDByRequiredStack(ctx, filled.Language, filled.Tool, filled.Release)
 		if err == nil {
 			return stackID, nil
 		}
@@ -213,6 +266,19 @@ func (s *sqlGateProfileResolverStore) ResolveStackIDByRequiredStack(ctx context.
 		Tool:    tool,
 		Release: release,
 	})
+}
+
+func (s *sqlGateProfileResolverStore) ResolveStackRowByImage(ctx context.Context, image string) (gateProfileResolverStackRow, error) {
+	got, err := s.st.ResolveStackRowByImage(ctx, image)
+	if err != nil {
+		return gateProfileResolverStackRow{}, err
+	}
+	return gateProfileResolverStackRow{
+		ID:       got.ID,
+		Language: got.Lang,
+		Tool:     got.Tool,
+		Release:  got.Release,
+	}, nil
 }
 
 func (s *sqlGateProfileResolverStore) ResolveStackIDByRepoSHA(ctx context.Context, repoID domaintypes.RepoID, repoSHA string) (int64, error) {

@@ -10,7 +10,10 @@ SELECT id
 FROM stacks
 WHERE lang = sqlc.arg(lang)::text
   AND release = sqlc.arg(release)::text
-  AND (sqlc.arg(tool)::text = '' OR COALESCE(tool, '') = sqlc.arg(tool)::text)
+  AND (
+    (sqlc.arg(tool)::text <> '' AND COALESCE(tool, '') = sqlc.arg(tool)::text) OR
+    (sqlc.arg(tool)::text = '' AND tool IS NULL)
+  )
 ORDER BY id ASC
 LIMIT 1;
 
