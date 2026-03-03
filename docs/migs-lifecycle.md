@@ -1143,6 +1143,9 @@ Nodeagents use `/v1/nodes/*` to execute work:
     `mem_consumed_bytes`), the server upserts a row in `job_metrics`.
   - Nodes may report `repo_sha_out`; the server accepts only lowercase 40-hex
     values and persists the full and short (`repo_sha_out8`) forms on `jobs`.
+  - Nodeagents compute `repo_sha_out` from workspace tree snapshots and fixed
+    synthetic-commit metadata; this works even when `repo_sha_in` is synthetic
+    and not present in the local git object database.
   - For successful jobs with `next_id`, chain progression requires a valid
     40-hex `repo_sha_in` on the completed job and a reported `repo_sha_out`.
   - The completion update atomically propagates `repo_sha_out` to the linked

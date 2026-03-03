@@ -64,6 +64,58 @@ func TestComputeRepoSHAV1_DeterministicForSameWorkspace(t *testing.T) {
 	}
 }
 
+func TestComputeRepoSHAV1_SyntheticParentWithoutObject_UnchangedWorkspace(t *testing.T) {
+	t.Parallel()
+
+	repoDir := initTestRepoWithSingleCommit(t)
+	ctx := context.Background()
+
+	headSHA := gitStdout(t, repoDir, "rev-parse", "HEAD")
+	inputTree := gitStdout(t, repoDir, "rev-parse", "HEAD^{tree}")
+	syntheticSHA := syntheticCommitHashOnly(t, repoDir, headSHA, inputTree)
+
+	repoSHAOut, err := ComputeRepoSHAV1(ctx, repoDir, syntheticSHA)
+	if err != nil {
+		t.Fatalf("ComputeRepoSHAV1() error = %v", err)
+	}
+	if repoSHAOut != syntheticSHA {
+		t.Fatalf("repo_sha_out = %q, want %q", repoSHAOut, syntheticSHA)
+	}
+}
+
+func TestComputeRepoSHAV1_SyntheticParentWithInputTree_ChangedWorkspace(t *testing.T) {
+	t.Parallel()
+
+	repoDir := initTestRepoWithSingleCommit(t)
+	ctx := context.Background()
+
+	headSHA := gitStdout(t, repoDir, "rev-parse", "HEAD")
+	inputTree := gitStdout(t, repoDir, "rev-parse", "HEAD^{tree}")
+	syntheticSHA := syntheticCommitHashOnly(t, repoDir, headSHA, inputTree)
+
+	if err := os.WriteFile(filepath.Join(repoDir, "main.txt"), []byte("mutated\n"), 0o644); err != nil {
+		t.Fatalf("write main.txt: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "new.txt"), []byte("new file\n"), 0o644); err != nil {
+		t.Fatalf("write new.txt: %v", err)
+	}
+
+	out1, err := ComputeRepoSHAV1(ctx, repoDir, syntheticSHA, inputTree)
+	if err != nil {
+		t.Fatalf("ComputeRepoSHAV1(first) error = %v", err)
+	}
+	out2, err := ComputeRepoSHAV1(ctx, repoDir, syntheticSHA, inputTree)
+	if err != nil {
+		t.Fatalf("ComputeRepoSHAV1(second) error = %v", err)
+	}
+	if out1 == syntheticSHA {
+		t.Fatalf("expected changed workspace to produce different sha, got same %q", out1)
+	}
+	if out1 != out2 {
+		t.Fatalf("expected deterministic sha, got %q vs %q", out1, out2)
+	}
+}
+
 func initTestRepoWithSingleCommit(t *testing.T) string {
 	t.Helper()
 
@@ -99,4 +151,25 @@ func gitStdout(t *testing.T, repoDir string, args ...string) string {
 		t.Fatalf("git %v: %v", args, err)
 	}
 	return out
+}
+
+func syntheticCommitHashOnly(t *testing.T, repoDir, parentSHA, treeSHA string) string {
+	t.Helper()
+
+	commitData := "tree " + treeSHA + "\n" +
+		"parent " + parentSHA + "\n" +
+		repoSHAV1AuthorLine + "\n" +
+		repoSHAV1CommitLine + "\n\n" +
+		repoSHAV1CommitTitle + "\n"
+	syntheticSHA, err := runGitOutput(context.Background(), repoDir, nil, []byte(commitData), "hash-object", "-t", "commit", "--stdin")
+	if err != nil {
+		t.Fatalf("hash synthetic commit: %v", err)
+	}
+
+	// hash-object without -w only computes the hash; object should not exist.
+	if _, err := runGitOutput(context.Background(), repoDir, nil, nil, "cat-file", "-e", syntheticSHA+"^{commit}"); err == nil {
+		t.Fatalf("expected synthetic commit object %q to be absent", syntheticSHA)
+	}
+
+	return syntheticSHA
 }
