@@ -215,6 +215,26 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 				)
 				return
 			}
+
+			sbomRowsPersisted, sbomErr := maybePersistGateSuccessSBOMRows(ctx, st, bp, job, normalizedStatus)
+			if sbomErr != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to persist gate sbom rows: %v", sbomErr)
+				slog.Error("complete job: persist gate sbom rows failed",
+					"job_id", jobID,
+					"repo_id", job.RepoID,
+					"job_type", job.JobType,
+					"err", sbomErr,
+				)
+				return
+			}
+			if sbomRowsPersisted > 0 {
+				slog.Info("complete job: persisted gate sbom rows",
+					"job_id", jobID,
+					"repo_id", job.RepoID,
+					"job_type", job.JobType,
+					"row_count", sbomRowsPersisted,
+				)
+			}
 		}
 
 		// Persist per-job resource consumption metrics when provided.
