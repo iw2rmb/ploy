@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
   - Tests: docs guard + schema checks — expect no stale runtime names and consistent examples.
 
 ## Phase 9: End-To-End Validation And Cutover
-- [ ] Run full validation matrix and ship one-cut replacement — enforce no fallback and no compatibility mode.
+- [x] Run full validation matrix and ship one-cut replacement — enforce no fallback and no compatibility mode.
   - Repository: ploy
   - Component: CI and local validation workflow
   - Scope: run unit/integration/e2e checks for workflow, nodeagent, server handlers, contracts, and docs; verify `orw-cli` handles Java Maven and Java Gradle repos through same runtime and old images are absent from build/publish flow.
