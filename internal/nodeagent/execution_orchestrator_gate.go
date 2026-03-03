@@ -156,6 +156,9 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if !gateResultPassed(gateResult) {
 		r.runRouterForGateFailure(ctx, runner, req, typedOpts, workspace, gateResult)
 	}
+	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, filepath.Join(workspace, step.BuildGateWorkspaceOutDir), "build-gate-out"); err != nil {
+		slog.Warn("failed to upload gate /out bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+	}
 	r.uploadGateReportArtifacts(ctx, req.RunID, req.JobID, workspace, gateResult)
 	r.cleanupGateOutDir(workspace)
 
