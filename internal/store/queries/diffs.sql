@@ -50,3 +50,10 @@ ORDER BY
   END ASC,
   d.created_at ASC,
   d.id ASC;
+
+-- name: GetLatestDiffByJob :one
+SELECT id, run_id, job_id, patch_size, object_key, summary, created_at
+FROM diffs
+WHERE job_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1;

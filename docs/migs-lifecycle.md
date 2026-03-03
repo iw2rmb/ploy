@@ -328,6 +328,11 @@ Key invariants:
 - `rehydrateWorkspaceForStep` fetches diffs for steps `0..k-1` before executing step `k`.
 - A baseline commit is created after rehydration (via `ensureBaselineCommitForRehydration`)
   so that `git diff HEAD` produces only the changes from step k, not cumulative changes.
+- Step cache reuse is keyed by `(repo_id, repo_sha_in, step_ops_hash)` using
+  canonicalized step ops persisted in `steps(job_id, ops, hash, ref_job_id)`.
+  When a cache hit is found and `steps[].always` is not `true`, the node skips
+  container execution and the control plane clones the referenced diff into the
+  current job before promoting the successor job.
 
 #### Summary table
 

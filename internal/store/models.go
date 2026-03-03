@@ -254,3 +254,11 @@ type Stack struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
+
+type Step struct {
+	JobID     string             `json:"job_id"`
+	Ops       []byte             `json:"ops"`
+	Hash      string             `json:"hash"`
+	RefJobID  *string            `json:"ref_job_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}

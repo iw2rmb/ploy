@@ -81,8 +81,8 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	input := `{
 		"steps": [
-			{"name": "step-1", "image": "docker.io/user/mod1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}},
-			{"name": "step-2", "image": "docker.io/user/mod2:latest", "env": {"STEP": "2"}}
+			{"name": "step-1", "image": "docker.io/user/mod1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}, "always": true},
+			{"name": "step-2", "image": "docker.io/user/mod2:latest", "env": {"STEP": "2"}, "always": false}
 		],
 		"build_gate": {
 			"enabled": true,
@@ -127,11 +127,17 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	if mod1.Env["STEP"] != "1" {
 		t.Errorf("steps[0].env[STEP] = %q, want %q", mod1.Env["STEP"], "1")
 	}
+	if !mod1.Always {
+		t.Errorf("steps[0].always = false, want true")
+	}
 
 	// Verify second step.
 	mod2 := spec.Steps[1]
 	if mod2.Name != "step-2" {
 		t.Errorf("steps[1].name = %q, want %q", mod2.Name, "step-2")
+	}
+	if mod2.Always {
+		t.Errorf("steps[1].always = true, want false")
 	}
 
 	// Verify healing.

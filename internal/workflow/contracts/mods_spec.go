@@ -126,6 +126,10 @@ type ModStep struct {
 	// Stack configures Stack Gate validation for this step.
 	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
 	Stack *StackGateSpec `json:"stack,omitempty" yaml:"stack,omitempty"`
+
+	// Always forces this step to run even when a cache hit exists for the same
+	// repo_sha_in and canonicalized step operations hash.
+	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
 }
 
 // Validate checks that the spec is structurally valid.

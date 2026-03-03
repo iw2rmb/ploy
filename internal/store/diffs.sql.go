@@ -87,6 +87,29 @@ func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 	return i, err
 }
 
+const getLatestDiffByJob = `-- name: GetLatestDiffByJob :one
+SELECT id, run_id, job_id, patch_size, object_key, summary, created_at
+FROM diffs
+WHERE job_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error) {
+	row := q.db.QueryRow(ctx, getLatestDiffByJob, jobID)
+	var i Diff
+	err := row.Scan(
+		&i.ID,
+		&i.RunID,
+		&i.JobID,
+		&i.PatchSize,
+		&i.ObjectKey,
+		&i.Summary,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
 SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
 JOIN jobs j ON j.id = d.job_id

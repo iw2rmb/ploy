@@ -212,6 +212,7 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		JobName:                claim.JobName, // Job name for branch identification
 		RecoveryContext:        claim.RecoveryContext,
 		GateSkip:               claim.GateSkip,
+		StepSkip:               claim.StepSkip,
 		TypedOptions:           typedOpts, // Strongly-typed run options (canonical source of truth)
 		Env:                    envFromSpec,
 	}

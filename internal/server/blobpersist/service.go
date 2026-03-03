@@ -17,6 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -119,6 +120,64 @@ func (s *Service) CreateDiff(ctx context.Context, params store.CreateDiffParams,
 		"diff",
 		func(ctx context.Context, row store.Diff) error { return s.store.DeleteDiff(ctx, row.ID) },
 	)
+}
+
+// CloneLatestDiffByJob clones the latest diff produced by sourceJobID into
+// (targetRunID, targetJobID). The operation is idempotent:
+// - If target job already has a diff, it is a no-op.
+// - If source job has no diff, it is a no-op.
+func (s *Service) CloneLatestDiffByJob(ctx context.Context, sourceJobID, targetRunID, targetJobID string) error {
+	if err := s.validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(sourceJobID) == "" || strings.TrimSpace(targetRunID) == "" || strings.TrimSpace(targetJobID) == "" {
+		return fmt.Errorf("clone latest diff: source_job_id, target_run_id, and target_job_id are required")
+	}
+
+	targetID := types.JobID(targetJobID)
+	if _, err := s.store.GetLatestDiffByJob(ctx, &targetID); err == nil {
+		return nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("clone latest diff: lookup target diff: %w", err)
+	}
+
+	sourceID := types.JobID(sourceJobID)
+	sourceDiff, err := s.store.GetLatestDiffByJob(ctx, &sourceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("clone latest diff: lookup source diff: %w", err)
+	}
+	if sourceDiff.ObjectKey == nil || strings.TrimSpace(*sourceDiff.ObjectKey) == "" {
+		return nil
+	}
+
+	rc, _, err := s.blobstore.Get(ctx, *sourceDiff.ObjectKey)
+	if err != nil {
+		return fmt.Errorf("clone latest diff: read source blob: %w", err)
+	}
+	defer rc.Close()
+
+	patch, err := io.ReadAll(rc)
+	if err != nil {
+		return fmt.Errorf("clone latest diff: read source patch: %w", err)
+	}
+	if len(patch) == 0 {
+		return nil
+	}
+
+	targetRun := types.RunID(targetRunID)
+	targetJob := types.JobID(targetJobID)
+	_, err = s.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:   targetRun,
+		JobID:   &targetJob,
+		Summary: sourceDiff.Summary,
+	}, patch)
+	if err != nil {
+		return fmt.Errorf("clone latest diff: create target diff: %w", err)
+	}
+	return nil
 }
 
 // CreateArtifactBundle creates an artifact bundle entry in the database and uploads the bundle to object storage.
