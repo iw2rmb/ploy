@@ -14,6 +14,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
+	"github.com/iw2rmb/ploy/internal/server/sbom"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -154,6 +155,26 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			slog.Error("artifact: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return
 		}
+		if isGateArtifactJobType(domaintypes.JobType(job.JobType)) {
+			rows, parseErr := sbom.ExtractRowsFromBundle(req.Bundle, job.ID, job.RepoID)
+			if parseErr != nil {
+				slog.Warn("artifact: sbom parse failed",
+					"run_id", runID.String(),
+					"job_id", jobID.String(),
+					"job_type", job.JobType,
+					"artifact_bundle_id", artifact.ID.Bytes,
+					"error", parseErr,
+				)
+			}
+			if len(rows) > 0 {
+				slog.Info("artifact: extracted sbom package rows from gate artifacts",
+					"run_id", runID.String(),
+					"job_id", jobID.String(),
+					"job_type", job.JobType,
+					"row_count", len(rows),
+				)
+			}
+		}
 
 		// Return success response with artifact_bundle_id.
 		// artifact_bundles.id is still UUID.
@@ -172,5 +193,14 @@ func createJobArtifactHandler(st store.Store, bp *blobpersist.Service) http.Hand
 			"job_id", jobID.String(),
 			"artifact_bundle_id", artifact.ID.Bytes,
 		)
+	}
+}
+
+func isGateArtifactJobType(jobType domaintypes.JobType) bool {
+	switch jobType {
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+		return true
+	default:
+		return false
 	}
 }

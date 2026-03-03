@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'Test.*Gate.*Artifact|Test.*Out.*Upload'` — expect complete `/out/*` upload and stable archive paths.
 
 ## Phase 3: SBOM Discovery And Parsing Pipeline
-- [ ] Add SBOM detector/parser pipeline over uploaded gate artifacts.
+- [x] Add SBOM detector/parser pipeline over uploaded gate artifacts.
   - Repository: `ploy`
   - Component: `internal/nodeagent` + `internal/server/handlers` (or shared parser package)
   - Scope: detect supported SBOM files in gate artifacts, parse formats, flatten package entries into normalized `(lib, ver)` tuples, and attach provenance (`job_id`, `repo_id`).
