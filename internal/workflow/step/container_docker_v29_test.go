@@ -239,25 +239,21 @@ func TestDockerContainerLifecycleV29_ContextCancellation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel() // Cancel immediately.
 
-		// fakeDockerClient.ContainerWait sends on channels synchronously, so we
-		// test that the runtime doesn't block when context is already cancelled.
 		fake := &fakeDockerClient{
-			waitStatusCode: 0,
-			inspectResult: client.ContainerInspectResult{
-				Container: container.InspectResponse{
-					State: &container.State{
-						StartedAt:  "2024-06-01T10:00:00.000000000Z",
-						FinishedAt: "2024-06-01T10:00:01.000000000Z",
-					},
-				},
-			},
+			waitErr: context.Canceled,
 		}
 		rt := newDockerContainerRuntimeWithClient(fake, DockerContainerRuntimeOptions{})
 
-		// With our fake, Wait should still complete since channels are pre-filled.
-		// In production, context cancellation would cause the daemon call to abort.
-		_, _ = rt.Wait(ctx, ContainerHandle("cancel-test"))
-		// No assertion on error since fake doesn't simulate blocking wait.
+		_, err := rt.Wait(ctx, ContainerHandle("cancel-test"))
+		if err == nil {
+			t.Fatal("Wait() error = nil, want context cancellation error")
+		}
+		if !fake.removeCalled {
+			t.Fatal("expected Wait() to force-remove container on cancellation")
+		}
+		if fake.removeID != "cancel-test" {
+			t.Fatalf("remove ID = %q, want %q", fake.removeID, "cancel-test")
+		}
 	})
 }
 

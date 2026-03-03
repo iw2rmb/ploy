@@ -29,6 +29,11 @@ type baseUploader struct {
 	client *http.Client
 }
 
+type getJobStatusResponse struct {
+	JobID  types.JobID `json:"job_id"`
+	Status string      `json:"status"`
+}
+
 func newBaseUploader(cfg Config) (*baseUploader, error) {
 	client, err := createHTTPClient(cfg)
 	if err != nil {
@@ -166,6 +171,36 @@ func buildJobStatusPayload(status string, exitCode *int32, stats types.RunStats,
 		payload["repo_sha_out"] = repoSHAOut
 	}
 	return payload
+}
+
+// GetJobStatus returns canonical control-plane status for a claimed job.
+func (b *baseUploader) GetJobStatus(ctx context.Context, jobID types.JobID) (string, error) {
+	u := MustBuildURL(b.cfg.ServerURL, fmt.Sprintf("/v1/jobs/%s/status", jobID))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("send request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("get job status failed: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var payload getJobStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+	status := strings.TrimSpace(payload.Status)
+	if status == "" {
+		return "", errors.New("get job status failed: empty status")
+	}
+	return status, nil
 }
 
 // BuildURL resolves a base URL and a path-only reference, preserving scheme/host.

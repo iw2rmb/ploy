@@ -212,6 +212,9 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 	select {
 	case err := <-waitResult.Error:
 		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				r.forceRemoveOnWaitCancel(handle)
+			}
 			return ContainerResult{}, fmt.Errorf("step: wait container: %w", err)
 		}
 	case status := <-waitResult.Result:
@@ -225,7 +228,28 @@ func (r *DockerContainerRuntime) Wait(ctx context.Context, handle ContainerHandl
 		}
 		return res, nil
 	}
+	if ctx.Err() != nil {
+		r.forceRemoveOnWaitCancel(handle)
+	}
 	return ContainerResult{}, errors.New("step: container wait interrupted")
+}
+
+func (r *DockerContainerRuntime) forceRemoveOnWaitCancel(handle ContainerHandle) {
+	cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := r.client.ContainerRemove(cleanupCtx, string(handle), client.ContainerRemoveOptions{Force: true})
+	if err != nil && !isContainerNotFound(err) {
+		// Best effort cleanup: cancellation must return promptly even when remove fails.
+		// Errors are intentionally ignored to preserve Wait() behavior contract.
+		return
+	}
+}
+
+func isContainerNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return cerrdefs.IsNotFound(err)
 }
 
 // Logs returns combined stdout/stderr from the container using the moby client

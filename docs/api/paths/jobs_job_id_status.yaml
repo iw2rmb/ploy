@@ -1,0 +1,65 @@
+# Job-level status polling endpoint.
+# Workers call this endpoint to detect remote cancellation while a job is running.
+get:
+  operationId: getJobStatus
+  tags: [ Jobs ]
+  summary: Get current status for a claimed job
+  description: |
+    Returns the canonical job status from the control plane for a specific `job_id`.
+
+    Ownership is enforced: only the worker node currently assigned to the job
+    can read the status. Workers use this to stop local execution when the job
+    is cancelled remotely (for example, after `POST /v1/runs/{id}/cancel`).
+  parameters:
+    - in: path
+      name: job_id
+      required: true
+      schema:
+        type: string
+      description: Job ID (KSUID string)
+    - in: header
+      name: PLOY_NODE_UUID
+      required: true
+      schema:
+        type: string
+      description: Worker node ID (NanoID 6-character string)
+  responses:
+    '200':
+      description: Current job status
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ job_id, status ]
+            properties:
+              job_id:
+                type: string
+              status:
+                type: string
+                description: Canonical job status enum value
+                enum: [ Created, Queued, Running, Success, Fail, Cancelled ]
+    '400':
+      description: Bad request (missing/invalid `job_id` or node header)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '403':
+      description: Job is not assigned to the calling node
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Job not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

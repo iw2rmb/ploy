@@ -76,6 +76,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/nodes/{id}/claim", "post"},
 		// Job-level completion (node-based /v1/nodes/{id}/complete has been removed)
 		{"/v1/jobs/{job_id}/complete", "post"},
+		// Job-level status polling for worker-side cancellation detection
+		{"/v1/jobs/{job_id}/status", "get"},
 		// Job-level runtime image persistence
 		{"/v1/jobs/{job_id}/image", "post"},
 		// Node events
