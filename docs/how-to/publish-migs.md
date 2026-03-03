@@ -43,6 +43,7 @@ Publish a single Mods image (example: orw-cli)
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   docker buildx build --platform linux/amd64 \
   -t "${IMAGE_PREFIX}/orw-cli:latest" \
+  ${PLOY_CA_CERTS:+--secret id=ploy_ca_bundle,src=${PLOY_CA_CERTS}} \
   --push "deploy/images/mig/orw-cli"
 ```
 
