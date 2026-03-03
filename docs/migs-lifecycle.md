@@ -369,8 +369,8 @@ image: docker.io/user/migs-openrewrite:latest
 ```yaml
 image:
   default: docker.io/user/migs-openrewrite:latest
-  java-maven: docker.io/user/orw-cli:latest
-  java-gradle: docker.io/user/orw-cli:latest
+  java-maven: docker.io/user/orw-cli-maven:latest
+  java-gradle: docker.io/user/orw-cli-gradle:latest
 ```
 
 ### Stack detection via Build Gate
@@ -448,21 +448,21 @@ A common use case is dedicated OpenRewrite images for Maven and Gradle:
 ```yaml
 image:
   default: docker.io/user/migs-openrewrite:latest
-  java-maven: docker.io/user/orw-cli:latest
-  java-gradle: docker.io/user/orw-cli:latest
+  java-maven: docker.io/user/orw-cli-maven:latest
+  java-gradle: docker.io/user/orw-cli-gradle:latest
 env:
   RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
 When this spec runs against a Maven project (`pom.xml` present):
 - Build Gate detects `java-maven` stack.
-- Image resolves to `orw-cli:latest`.
-- The same `orw-cli` runtime executes OpenRewrite without invoking Maven tasks.
+- Image resolves to `orw-cli-maven:latest`.
+- The `orw-cli-maven` runtime executes OpenRewrite without invoking Maven tasks.
 
 When the same spec runs against a Gradle project (`build.gradle` present):
 - Build Gate detects `java-gradle` stack.
-- Image resolves to `orw-cli:latest`.
-- The same `orw-cli` runtime executes OpenRewrite without invoking Gradle tasks.
+- Image resolves to `orw-cli-gradle:latest`.
+- The `orw-cli-gradle` runtime executes OpenRewrite without invoking Gradle tasks.
 
 ### Example: Parameterized OpenRewrite via rewrite.yml
 
@@ -500,8 +500,8 @@ migs:
       MOD_SHELL_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite
     image:
-      java-maven: docker.io/user/orw-cli:latest
-      java-gradle: docker.io/user/orw-cli:latest
+      java-maven: docker.io/user/orw-cli-maven:latest
+      java-gradle: docker.io/user/orw-cli-gradle:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

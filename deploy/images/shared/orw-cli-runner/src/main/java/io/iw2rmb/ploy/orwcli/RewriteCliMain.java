@@ -26,23 +26,19 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.maven.MavenParser;
 import org.openrewrite.polyglot.OmniParser;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
-import java.nio.file.FileVisitResult;
-import java.nio.file.SimpleFileVisitor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,14 +51,15 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 
 public final class RewriteCliMain {
     private static final String DEFAULT_REPO = "https://repo1.maven.org/maven2/";
-    private static final Pattern GRADLE_STATIC_IMPORT = Pattern.compile("(?m)^\\s*import\\s+static\\s+org\\.gradle\\.api\\.JavaVersion\\.VERSION_\\d+\\s*\\R?");
-    private static final Pattern SOURCE_COMPAT = Pattern.compile("(?m)^\\s*sourceCompatibility\\s*=\\s*VERSION_(\\d+)\\s*$");
-    private static final Pattern TARGET_COMPAT = Pattern.compile("(?m)^\\s*targetCompatibility\\s*=\\s*VERSION_(\\d+)\\s*$");
+    private static final String BUILD_SYSTEM_GRADLE = "gradle";
+    private static final String BUILD_SYSTEM_MAVEN = "maven";
+    private static final String BUILD_SYSTEM_PROP = "orw.build.system";
+    private static final String BUILD_SYSTEM_ENV = "ORW_BUILD_SYSTEM";
+    private static final String GRADLE_PARSER_CLASS = "org.openrewrite.gradle.GradleParser";
+    private static final String MAVEN_PARSER_CLASS = "org.openrewrite.maven.MavenParser";
 
     private RewriteCliMain() {
     }
@@ -101,11 +98,7 @@ public final class RewriteCliMain {
             throw new RuntimeException(t);
         });
 
-        if (requiresGradleStaticImportNormalization(opts.recipes)) {
-            normalizeGradleJavaVersionStaticImports(workspace);
-        }
-
-        List<SourceFile> sourceFiles = parseWorkspace(workspace, ctx);
+        List<SourceFile> sourceFiles = parseWorkspace(workspace, ctx, opts.buildSystem);
         InMemoryLargeSourceSet before = new InMemoryLargeSourceSet(sourceFiles, recipeClassLoader);
 
         RecipeRun run = recipe.run(before, ctx);
@@ -142,10 +135,9 @@ public final class RewriteCliMain {
         return recipe;
     }
 
-    private static List<SourceFile> parseWorkspace(Path workspace, ExecutionContext ctx) {
+    private static List<SourceFile> parseWorkspace(Path workspace, ExecutionContext ctx, String requestedBuildSystem) {
         List<Parser> parsers = new ArrayList<>();
-        parsers.add(MavenParser.builder().build());
-        parsers.add(GradleParser.builder().build());
+        parsers.add(newBuildSystemParser(requestedBuildSystem));
         parsers.add(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build());
         parsers.addAll(OmniParser.defaultResourceParsers());
 
@@ -154,45 +146,79 @@ public final class RewriteCliMain {
         return parser.parse(accepted, workspace, ctx).collect(Collectors.toList());
     }
 
-    private static boolean requiresGradleStaticImportNormalization(List<String> activeRecipes) {
-        for (String recipe : activeRecipes) {
-            if ("org.openrewrite.java.migrate.UpgradeToJava17".equals(recipe)
-                || "org.openrewrite.java.migrate.UpgradeBuildToJava17".equals(recipe)) {
-                return true;
-            }
+    private static Parser newBuildSystemParser(String requestedBuildSystem) {
+        String buildSystem = resolveBuildSystem(requestedBuildSystem);
+        if (BUILD_SYSTEM_GRADLE.equals(buildSystem)) {
+            return instantiateParser(GRADLE_PARSER_CLASS, BUILD_SYSTEM_GRADLE);
         }
-        return false;
+        return instantiateParser(MAVEN_PARSER_CLASS, BUILD_SYSTEM_MAVEN);
     }
 
-    private static void normalizeGradleJavaVersionStaticImports(Path workspace) throws IOException {
-        Files.walkFileTree(workspace, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                if (!file.getFileName().toString().equals("build.gradle")) {
-                    return FileVisitResult.CONTINUE;
-                }
-                String content = Files.readString(file, StandardCharsets.UTF_8);
-                String updated = GRADLE_STATIC_IMPORT.matcher(content).replaceAll("");
-                updated = rewriteCompatibilityAssignment(updated, SOURCE_COMPAT, "sourceCompatibility");
-                updated = rewriteCompatibilityAssignment(updated, TARGET_COMPAT, "targetCompatibility");
-                if (!updated.equals(content)) {
-                    Files.writeString(file, updated, StandardCharsets.UTF_8);
-                }
-                return FileVisitResult.CONTINUE;
-            }
-        });
+    private static String resolveBuildSystem(String requestedBuildSystem) {
+        if (requestedBuildSystem != null && !requestedBuildSystem.isBlank()) {
+            return normalizeBuildSystem(requestedBuildSystem, "--build-system");
+        }
+        String fromProp = System.getProperty(BUILD_SYSTEM_PROP);
+        if (fromProp != null && !fromProp.isBlank()) {
+            return normalizeBuildSystem(fromProp, "-D" + BUILD_SYSTEM_PROP);
+        }
+        String fromEnv = System.getenv(BUILD_SYSTEM_ENV);
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return normalizeBuildSystem(fromEnv, BUILD_SYSTEM_ENV);
+        }
+
+        boolean hasGradleParser = classAvailable(GRADLE_PARSER_CLASS);
+        boolean hasMavenParser = classAvailable(MAVEN_PARSER_CLASS);
+
+        if (hasGradleParser && !hasMavenParser) {
+            return BUILD_SYSTEM_GRADLE;
+        }
+        if (hasMavenParser && !hasGradleParser) {
+            return BUILD_SYSTEM_MAVEN;
+        }
+        if (hasGradleParser) {
+            throw new InputException(
+                "Both Gradle and Maven parsers are available; set --build-system gradle|maven"
+            );
+        }
+        throw new InputException(
+            "No build parser is available; include rewrite-gradle or rewrite-maven dependency"
+        );
     }
 
-    private static String rewriteCompatibilityAssignment(String content, Pattern pattern, String key) {
-        Matcher matcher = pattern.matcher(content);
-        StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
-            String version = matcher.group(1);
-            String replacement = key + " = JavaVersion.VERSION_" + version;
-            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+    private static String normalizeBuildSystem(String raw, String source) {
+        String normalized = raw.trim().toLowerCase(Locale.ROOT);
+        if (BUILD_SYSTEM_GRADLE.equals(normalized) || BUILD_SYSTEM_MAVEN.equals(normalized)) {
+            return normalized;
         }
-        matcher.appendTail(sb);
-        return sb.toString();
+        throw new InputException(source + " must be 'gradle' or 'maven'");
+    }
+
+    private static boolean classAvailable(String className) {
+        try {
+            Class.forName(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+
+    private static Parser instantiateParser(String className, String buildSystem) {
+        try {
+            Class<?> parserClass = Class.forName(className);
+            Method builderMethod = parserClass.getMethod("builder");
+            Object builder = builderMethod.invoke(null);
+            Method buildMethod = builder.getClass().getMethod("build");
+            Object parser = buildMethod.invoke(builder);
+            if (parser instanceof Parser) {
+                return (Parser) parser;
+            }
+            throw new InputException("Parser for build system '" + buildSystem + "' is invalid: " + className);
+        } catch (ClassNotFoundException e) {
+            throw new InputException("Parser class not found for build system '" + buildSystem + "': " + className);
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            throw new IllegalStateException("Failed to construct parser for build system '" + buildSystem + "'", e);
+        }
     }
 
     private static void applyResults(Path workspace, List<Result> results) throws IOException {
@@ -377,6 +403,7 @@ public final class RewriteCliMain {
         private final List<String> repos;
         private final String repoUsername;
         private final String repoPassword;
+        private final String buildSystem;
 
         private CliOptions(
             Path dir,
@@ -385,7 +412,8 @@ public final class RewriteCliMain {
             Path config,
             List<String> repos,
             String repoUsername,
-            String repoPassword
+            String repoPassword,
+            String buildSystem
         ) {
             this.dir = dir;
             this.recipes = recipes;
@@ -394,6 +422,7 @@ public final class RewriteCliMain {
             this.repos = repos;
             this.repoUsername = repoUsername;
             this.repoPassword = repoPassword;
+            this.buildSystem = buildSystem;
         }
 
         private static CliOptions parse(String[] args) {
@@ -404,6 +433,7 @@ public final class RewriteCliMain {
             List<String> repos = new ArrayList<>();
             String repoUsername = null;
             String repoPassword = null;
+            String buildSystem = null;
             boolean apply = false;
 
             for (int i = 0; i < args.length; i++) {
@@ -433,6 +463,9 @@ public final class RewriteCliMain {
                     case "--repo-password":
                         repoPassword = requireValue(args, ++i, "--repo-password");
                         break;
+                    case "--build-system":
+                        buildSystem = requireValue(args, ++i, "--build-system");
+                        break;
                     default:
                         throw new InputException("unknown arg: " + arg);
                 }
@@ -461,7 +494,8 @@ public final class RewriteCliMain {
                 config,
                 Collections.unmodifiableList(repos),
                 repoUsername,
-                repoPassword
+                repoPassword,
+                buildSystem
             );
         }
 

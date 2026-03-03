@@ -210,7 +210,6 @@ mig_repo_name() {
   local entry="$1"
   local name="${entry##*/}"
   case "$name" in
-    orw-cli) echo "orw-cli" ;;
     mig-*) echo "migs-${name#mig-}" ;;
     *) echo "$name" ;;
   esac
@@ -242,6 +241,18 @@ build_push_mig_image() {
       "${extra_args[@]}" \
       --provenance=false --sbom=false --pull --progress=plain \
       -f deploy/images/migs/mig-codex/Dockerfile \
+      -t "$ref" \
+      --push \
+      "$context"
+  elif [[ "$source_group" == "mig" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
+    context="."
+    run_with_retries \
+      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/mig/${dir}/Dockerfile)" \
+      docker buildx build \
+      --platform "$PLATFORM" \
+      "${extra_args[@]}" \
+      --provenance=false --sbom=false --pull --progress=plain \
+      -f "deploy/images/mig/${dir}/Dockerfile" \
       -t "$ref" \
       --push \
       "$context"
