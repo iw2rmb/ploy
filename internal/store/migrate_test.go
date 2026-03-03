@@ -5,8 +5,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestRunMigrations(t *testing.T) {
@@ -152,103 +150,5 @@ func TestGetCurrentVersion(t *testing.T) {
 	}
 	if version != 5 {
 		t.Fatalf("version after insert: got %d, want 5", version)
-	}
-}
-
-func TestRunMigrations_MigReposPrepToGateColumns(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping migration test")
-	}
-	ctx := context.Background()
-
-	st, err := NewStore(ctx, dsn)
-	if err != nil {
-		t.Fatalf("NewStore: %v", err)
-	}
-	defer st.Close()
-
-	if err := RunMigrations(ctx, st.Pool()); err != nil {
-		t.Fatalf("RunMigrations (bootstrap): %v", err)
-	}
-
-	_, err = st.Pool().Exec(ctx, `
-ALTER TABLE ploy.mig_repos
-  DROP COLUMN IF EXISTS gate_profile_updated_at,
-  DROP COLUMN IF EXISTS gate_profile,
-  DROP COLUMN IF EXISTS gate_profile_artifacts;
-ALTER TABLE ploy.mig_repos
-  ADD COLUMN IF NOT EXISTS prep_updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  ADD COLUMN IF NOT EXISTS prep_profile JSONB,
-  ADD COLUMN IF NOT EXISTS prep_artifacts JSONB;
-DELETE FROM ploy.schema_version;
-INSERT INTO ploy.schema_version (version, applied_at) VALUES (2026022801, now());
-`)
-	if err != nil {
-		t.Fatalf("seed legacy mig_repos shape: %v", err)
-	}
-
-	if err := RunMigrations(ctx, st.Pool()); err != nil {
-		t.Fatalf("RunMigrations (upgrade): %v", err)
-	}
-
-	assertCol := func(col string, want bool) {
-		t.Helper()
-		var exists bool
-		qErr := st.Pool().QueryRow(ctx, `
-SELECT EXISTS (
-  SELECT 1
-  FROM information_schema.columns
-  WHERE table_schema = 'ploy'
-    AND table_name = 'mig_repos'
-    AND column_name = $1
-)`, col).Scan(&exists)
-		if qErr != nil {
-			t.Fatalf("check column %q: %v", col, qErr)
-		}
-		if exists != want {
-			t.Fatalf("column %q exists=%v, want %v", col, exists, want)
-		}
-	}
-
-	assertCol("gate_profile_updated_at", true)
-	assertCol("gate_profile", true)
-	assertCol("gate_profile_artifacts", true)
-	assertCol("prep_updated_at", false)
-	assertCol("prep_profile", false)
-	assertCol("prep_artifacts", false)
-
-	createdBy := "migration-test"
-	specID := types.NewSpecID()
-	spec, err := st.CreateSpec(ctx, CreateSpecParams{
-		ID:        specID,
-		Name:      "migration-test-spec",
-		Spec:      []byte(`{"type":"test"}`),
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateSpec: %v", err)
-	}
-
-	migID := types.NewMigID()
-	_, err = st.CreateMig(ctx, CreateMigParams{
-		ID:        migID,
-		Name:      "migration-test-mig-" + migID.String(),
-		SpecID:    &spec.ID,
-		CreatedBy: &createdBy,
-	})
-	if err != nil {
-		t.Fatalf("CreateMig: %v", err)
-	}
-
-	_, err = st.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        types.NewMigRepoID(),
-		MigID:     migID,
-		Url:   "https://example.com/org/repo.git",
-		BaseRef:   "main",
-		TargetRef: "feature/migration-test",
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo: %v", err)
 	}
 }

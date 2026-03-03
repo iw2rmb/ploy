@@ -270,6 +270,26 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 	}
 }
 
+func TestCleanupGateOutDir_RemovesWorkspaceOutputDir(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	if err := os.MkdirAll(gateOutDir, 0o755); err != nil {
+		t.Fatalf("mkdir gate out dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(gateOutDir, "test.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatalf("write gate out file: %v", err)
+	}
+
+	rc := &runController{cfg: Config{}}
+	rc.cleanupGateOutDir(workspace)
+
+	if _, err := os.Stat(gateOutDir); !os.IsNotExist(err) {
+		t.Fatalf("expected gate out dir removed, stat err=%v", err)
+	}
+}
+
 func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 	t.Parallel()
 

@@ -156,4 +156,50 @@ func TestBuildGateMetadataValidateRejectsInvalidLogFinding(t *testing.T) {
 	}
 }
 
+func TestBuildGateMetadataValidate_AcceptsReportLinks(t *testing.T) {
+	meta := BuildGateStageMetadata{
+		StaticChecks: []BuildGateStaticCheckReport{{
+			Tool:   "gradle",
+			Passed: true,
+		}},
+		ReportLinks: []BuildGateReportLink{
+			{
+				Type:        BuildGateReportTypeGradleJUnitXML,
+				Path:        "/out/gradle-test-results",
+				ArtifactID:  "017f22f9-9a5f-4b39-88c1-3894f0f4c04d",
+				BundleCID:   "bafybeigdyrzt2qlr5l4ck2u6m3m3nv2tj7kq6ejm2lqk2ccx7lyy6ebmvu",
+				URL:         "http://localhost:8080/v1/artifacts/017f22f9-9a5f-4b39-88c1-3894f0f4c04d",
+				DownloadURL: "http://localhost:8080/v1/artifacts/017f22f9-9a5f-4b39-88c1-3894f0f4c04d?download=true",
+			},
+			{
+				Type:       BuildGateReportTypeGradleHTML,
+				Path:       "/out/gradle-test-report",
+				ArtifactID: "7bb10136-151d-4665-82cd-6404f37ea3ca",
+				URL:        "http://localhost:8080/v1/artifacts/7bb10136-151d-4665-82cd-6404f37ea3ca",
+			},
+		},
+	}
+	if err := meta.Validate(); err != nil {
+		t.Fatalf("expected report links to validate, got %v", err)
+	}
+}
+
+func TestBuildGateMetadataValidate_RejectsInvalidReportLinks(t *testing.T) {
+	meta := BuildGateStageMetadata{
+		StaticChecks: []BuildGateStaticCheckReport{{
+			Tool:   "gradle",
+			Passed: true,
+		}},
+		ReportLinks: []BuildGateReportLink{{
+			Type:       "unknown",
+			Path:       "relative/path",
+			ArtifactID: "",
+			URL:        "http://localhost:8080/v1/artifacts/x",
+		}},
+	}
+	if err := meta.Validate(); err == nil {
+		t.Fatal("expected validation error for invalid report link")
+	}
+}
+
 // TestBuildGateValidateRequestValidate tests the ref-only BuildGateValidateRequest validation.

@@ -398,6 +398,33 @@ func TestDockerGateExecutor_DoesNotMountDockerSocketForTCPDockerHost(t *testing.
 	}
 }
 
+func TestDockerGateExecutor_MountsOutDir(t *testing.T) {
+	t.Parallel()
+
+	executor, rt, workspace := newDockerGateTestHarness(t)
+	spec := &contracts.StepGateSpec{Enabled: true}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	wantSource := filepath.Join(workspace, BuildGateWorkspaceOutDir)
+	found := false
+	for _, mount := range rt.captured.Mounts {
+		if mount.Source == wantSource && mount.Target == BuildGateContainerOutDir && !mount.ReadOnly {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected /out mount %q -> %q in mounts=%+v", wantSource, BuildGateContainerOutDir, rt.captured.Mounts)
+	}
+}
+
 func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 	memHuman, err := units.RAMInBytes("1GiB")
 	if err != nil {

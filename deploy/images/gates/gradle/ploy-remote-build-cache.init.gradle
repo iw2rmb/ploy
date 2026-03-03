@@ -46,3 +46,16 @@ if (_ployCacheURL != null && !_ployCacheURL.trim().isEmpty()) {
     }
   }
 }
+
+// Force Gradle test reports into the gate /out mount so nodeagent can upload
+// them as gate artifacts without repository-level build script changes.
+allprojects {
+  tasks.withType(Test).configureEach {
+    reports {
+      junitXml.required = true
+      junitXml.outputLocation = file("/out/gradle-test-results")
+      html.required = true
+      html.outputLocation = file("/out/gradle-test-report")
+    }
+  }
+}
