@@ -93,6 +93,9 @@ exit 67
 	if strings.Contains(logText, "[mvn-stub] should not run") || strings.Contains(logText, "[gradle-stub] should not run") {
 		t.Fatalf("transform.log shows build-tool invocation:\n%s", logText)
 	}
+	if strings.Contains(logText, "rewriteRun") || strings.Contains(logText, "rewrite-maven-plugin:run") {
+		t.Fatalf("transform.log shows plugin-coupled execution path:\n%s", logText)
+	}
 
 	reportBytes, err := os.ReadFile(filepath.Join(outdir, contracts.ORWCLIReportFileName))
 	if err != nil {

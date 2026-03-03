@@ -47,7 +47,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/nodeagent -run 'Test.*Execute.*|Test.*Status.*|Test.*OutDir.*'` — expect preserved artifact upload plus enriched failure metadata.
 
 ## Phase 6: Replace Integration And E2E ORW Coverage
-- [ ] Replace plugin-specific tests with `orw-cli` tests — validate isolation guarantees and new runtime contract.
+- [x] Replace plugin-specific tests with `orw-cli` tests — validate isolation guarantees and new runtime contract.
   - Repository: ploy
   - Component: integration/e2e tests
   - Scope: replace `tests/integration/migs/orw_maven_test.go` and `tests/integration/migs/orw_gradle_test.go` with `orw_cli_test.go`; update `tests/e2e/migs/README.md` and scenarios to build/use `orw-cli` image and assert no plugin-task coupling assumptions.

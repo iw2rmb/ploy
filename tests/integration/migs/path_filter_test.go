@@ -45,7 +45,7 @@ func repoRoot(t *testing.T) string {
 
 // parseScenarioORWPass extracts values from tests/e2e/migs/scenario-orw-pass.sh.
 // Defaults align with the scenario script; parsing overrides them if found.
-func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, artifact, version, classname, plugin string) {
+func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, artifact, version, classname string) {
 	repoURL = "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"
 	baseRef = "main"
 	targetRef = "e2e/success"
@@ -53,7 +53,6 @@ func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, a
 	artifact = "rewrite-migrate-java"
 	version = "3.20.0"
 	classname = "org.openrewrite.java.migrate.UpgradeToJava17"
-	plugin = "6.18.0"
 
 	// Parse overrides from the scenario script content.
 	if m := regexp.MustCompile(`(?m)^REPO=\$\{[^:]+:-([^}]+)\}`).FindStringSubmatch(content); len(m) == 2 {
@@ -73,9 +72,6 @@ func parseScenarioORWPass(content string) (repoURL, baseRef, targetRef, group, a
 	}
 	if m := regexp.MustCompile(`(?m)^RECIPE_CLASSNAME=([^\n]+)$`).FindStringSubmatch(content); len(m) == 2 {
 		classname = strings.TrimSpace(m[1])
-	}
-	if m := regexp.MustCompile(`(?m)^MAVEN_PLUGIN_VERSION=([^\n]+)$`).FindStringSubmatch(content); len(m) == 2 {
-		plugin = strings.TrimSpace(m[1])
 	}
 	_ = repoURL
 	_ = baseRef
