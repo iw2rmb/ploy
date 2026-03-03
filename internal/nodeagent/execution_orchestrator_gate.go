@@ -431,7 +431,13 @@ func resolveGateProfileSnapshotRaw(
 	if gateSpec == nil || gateSpec.GateProfile == nil || gateSpec.RepoID.IsZero() {
 		return nil
 	}
-	raw, err := deriveGateProfileSnapshotFromOverride(gateSpec.RepoID.String(), gateSpec.GateProfile, jobType, meta)
+	raw, err := deriveGateProfileSnapshotFromOverride(
+		gateSpec.RepoID.String(),
+		gateSpec.GateProfile,
+		strings.TrimSpace(gateSpec.Target),
+		jobType,
+		meta,
+	)
 	if err != nil {
 		return nil
 	}
@@ -441,6 +447,7 @@ func resolveGateProfileSnapshotRaw(
 func deriveGateProfileSnapshotFromOverride(
 	repoID string,
 	override *contracts.BuildGateProfileOverride,
+	target string,
 	jobType types.JobType,
 	meta *contracts.BuildGateStageMetadata,
 ) (json.RawMessage, error) {
@@ -473,7 +480,7 @@ func deriveGateProfileSnapshotFromOverride(
 		RunnerMode:    contracts.PrepRunnerModeSimple,
 		Stack:         stack,
 		Targets: contracts.GateProfileTargets{
-			Active:   contracts.GateProfileTargetAllTests,
+			Active:   resolveGateProfileSnapshotTarget(target, override.Target),
 			Build:    targetNotAttempted(),
 			Unit:     targetNotAttempted(),
 			AllTests: targetNotAttempted(),
@@ -485,7 +492,14 @@ func deriveGateProfileSnapshotFromOverride(
 	}
 	switch jobType {
 	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
-		profile.Targets.AllTests = targetPassed
+		switch profile.Targets.Active {
+		case contracts.GateProfileTargetBuild:
+			profile.Targets.Build = targetPassed
+		case contracts.GateProfileTargetUnit:
+			profile.Targets.Unit = targetPassed
+		default:
+			profile.Targets.AllTests = targetPassed
+		}
 	default:
 		return nil, fmt.Errorf("unsupported job type %q", jobType)
 	}
@@ -497,6 +511,18 @@ func deriveGateProfileSnapshotFromOverride(
 		return nil, err
 	}
 	return raw, nil
+}
+
+func resolveGateProfileSnapshotTarget(explicit, fallback string) string {
+	switch strings.TrimSpace(explicit) {
+	case contracts.GateProfileTargetBuild, contracts.GateProfileTargetUnit, contracts.GateProfileTargetAllTests:
+		return strings.TrimSpace(explicit)
+	}
+	switch strings.TrimSpace(fallback) {
+	case contracts.GateProfileTargetBuild, contracts.GateProfileTargetUnit, contracts.GateProfileTargetAllTests:
+		return strings.TrimSpace(fallback)
+	}
+	return contracts.GateProfileTargetAllTests
 }
 
 func resolveGateProfileSnapshotStack(

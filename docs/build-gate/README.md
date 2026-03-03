@@ -136,6 +136,10 @@ Gate command resolution uses the following precedence (highest wins):
 3. Claim-time resolved gate profile from `gate_profiles` (exact `(repo_id, repo_sha_in, stack_id)` row)
 4. Detected-tool fallback command (`buildCommandForTool`)
 
+Target pin behavior:
+- If `build_gate.<phase>.target` is set and differs from a prep override target, Build Gate ignores that prep override and runs the pinned target command.
+- Prep stack validation (`prep stack mismatch`) is evaluated only when the prep override is actually selected for execution.
+
 Default gate profiles are seeded from `gates/stacks.yaml` + `gates/profiles/*.yaml`
 at server startup. Pre-gate runtime auto-bootstrap is removed.
 Seeded Gradle profiles are wrapper-aware for runnable targets (`build`, `unit`,
