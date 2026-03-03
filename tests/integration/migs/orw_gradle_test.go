@@ -9,9 +9,9 @@ import (
 	"testing"
 )
 
-// TestOrwGradle_GradleWorkspace_UsesWrapperWhenCompatible verifies that the
-// orw-gradle script invokes ./gradlew when wrapper version is Java-compatible.
-func TestOrwGradle_GradleWorkspace_UsesWrapperWhenCompatible(t *testing.T) {
+// TestOrwGradle_GradleWorkspace_UsesSystemGradle verifies that the
+// orw-gradle script always invokes system gradle even when ./gradlew exists.
+func TestOrwGradle_GradleWorkspace_UsesSystemGradle(t *testing.T) {
 	workspace := t.TempDir()
 
 	// Create a minimal Kotlin DSL Gradle build file.
@@ -23,21 +23,31 @@ plugins {
 		t.Fatalf("write build.gradle.kts: %v", err)
 	}
 
-	// Stub ./gradlew so the script can invoke it without requiring real Gradle.
+	// Stub ./gradlew and verify it is ignored.
 	gradlewPath := filepath.Join(workspace, "gradlew")
 	gradlewScript := `#!/usr/bin/env bash
-echo "[gradle-stub] rewriteRun invoked with args: $@"
+echo "[gradlew-stub] should not run"
 `
 	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
 		t.Fatalf("write gradlew stub: %v", err)
 	}
-	// Wrapper version compatible with Java 17.
+	// Wrapper files may exist, but must not affect command selection.
 	wrapperProps := filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties")
 	if err := os.MkdirAll(filepath.Dir(wrapperProps), 0o755); err != nil {
 		t.Fatalf("mkdir gradle/wrapper: %v", err)
 	}
 	if err := os.WriteFile(wrapperProps, []byte("distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip\n"), 0o644); err != nil {
 		t.Fatalf("write gradle-wrapper.properties: %v", err)
+	}
+
+	// Provide system gradle stub in PATH.
+	binDir := t.TempDir()
+	gradlePath := filepath.Join(binDir, "gradle")
+	gradleScript := `#!/usr/bin/env bash
+echo "[system-gradle-stub] rewriteRun invoked with args: $@"
+`
+	if err := os.WriteFile(gradlePath, []byte(gradleScript), 0o755); err != nil {
+		t.Fatalf("write system gradle stub: %v", err)
 	}
 
 	outdir := t.TempDir()
@@ -52,29 +62,32 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 
 	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
-	// Remove system gradle from PATH so the script uses ./gradlew.
 	filteredPath := filterPath("gradle")
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP="+group,
 		"RECIPE_ARTIFACT="+artifact,
 		"RECIPE_VERSION="+version,
 		"RECIPE_CLASSNAME="+classname,
-		"PATH="+filteredPath,
+		"PATH="+binDir+string(os.PathListSeparator)+filteredPath,
 	)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("orw-gradle (wrapper) failed: %v\nstdout/stderr:\n%s", err, string(out))
+		t.Fatalf("orw-gradle (system gradle) failed: %v\nstdout/stderr:\n%s", err, string(out))
 	}
 
-	// Verify that transform.log contains the gradle stub marker.
+	// Verify that transform.log contains the system gradle marker.
 	logPath := filepath.Join(outdir, "transform.log")
 	logBytes, err := os.ReadFile(logPath)
 	if err != nil {
 		t.Fatalf("read transform.log: %v", err)
 	}
-	if !strings.Contains(string(logBytes), "[gradle-stub] rewriteRun invoked") {
-		t.Fatalf("transform.log does not contain gradle stub marker:\n%s", string(logBytes))
+	logText := string(logBytes)
+	if !strings.Contains(logText, "[system-gradle-stub] rewriteRun invoked") {
+		t.Fatalf("transform.log does not contain system gradle stub marker:\n%s", logText)
+	}
+	if strings.Contains(logText, "[gradlew-stub] should not run") {
+		t.Fatalf("transform.log shows gradlew was used:\n%s", logText)
 	}
 
 	// Verify the report.json exists and indicates success.
@@ -88,9 +101,9 @@ echo "[gradle-stub] rewriteRun invoked with args: $@"
 	}
 }
 
-// TestOrwGradle_GradleWorkspace_FallsBackToSystemGradleForOldWrapper verifies
-// that old wrappers (e.g., 6.8.2) are bypassed on Java 17 and system gradle is used.
-func TestOrwGradle_GradleWorkspace_FallsBackToSystemGradleForOldWrapper(t *testing.T) {
+// TestOrwGradle_GradleWorkspace_IgnoresWrapperVersion verifies that wrapper
+// version metadata does not affect command selection.
+func TestOrwGradle_GradleWorkspace_IgnoresWrapperVersion(t *testing.T) {
 	workspace := t.TempDir()
 
 	buildGradlePath := filepath.Join(workspace, "build.gradle.kts")
@@ -100,7 +113,7 @@ func TestOrwGradle_GradleWorkspace_FallsBackToSystemGradleForOldWrapper(t *testi
 		t.Fatalf("write build.gradle.kts: %v", err)
 	}
 
-	// Wrapper stub should not be used when wrapper version is incompatible.
+	// Wrapper stub must never be used regardless of wrapper version.
 	gradlewPath := filepath.Join(workspace, "gradlew")
 	gradlewScript := `#!/usr/bin/env bash
 echo "[gradlew-old-stub] should not run"
@@ -146,7 +159,7 @@ echo "[system-gradle-stub] rewriteRun invoked with args: $@"
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("orw-gradle (fallback) failed: %v\nstdout/stderr:\n%s", err, string(out))
+		t.Fatalf("orw-gradle (system gradle) failed: %v\nstdout/stderr:\n%s", err, string(out))
 	}
 
 	logPath := filepath.Join(outdir, "transform.log")
@@ -156,10 +169,13 @@ echo "[system-gradle-stub] rewriteRun invoked with args: $@"
 	}
 	logText := string(logBytes)
 	if !strings.Contains(logText, "[system-gradle-stub] rewriteRun invoked") {
-		t.Fatalf("transform.log does not show system gradle fallback:\n%s", logText)
+		t.Fatalf("transform.log does not show system gradle usage:\n%s", logText)
 	}
 	if strings.Contains(logText, "[gradlew-old-stub] should not run") {
-		t.Fatalf("transform.log shows incompatible wrapper was used:\n%s", logText)
+		t.Fatalf("transform.log shows gradlew was used:\n%s", logText)
+	}
+	if strings.Contains(string(out), "Wrapper Gradle") {
+		t.Fatalf("output contains wrapper-selection log unexpectedly:\n%s", string(out))
 	}
 }
 
@@ -176,13 +192,23 @@ func TestOrwGradle_UsesExistingRewriteYAML(t *testing.T) {
 		t.Fatalf("write build.gradle.kts: %v", err)
 	}
 
-	// Stub ./gradlew so the script can invoke it without requiring real Gradle.
+	// Stub ./gradlew and verify it is ignored.
 	gradlewPath := filepath.Join(workspace, "gradlew")
 	gradlewScript := `#!/usr/bin/env bash
-echo "[gradle-stub] rewriteRun invoked with args: $@"
+echo "[gradlew-stub] should not run"
 `
 	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
 		t.Fatalf("write gradlew stub: %v", err)
+	}
+
+	// Provide system gradle stub in PATH.
+	binDir := t.TempDir()
+	gradlePath := filepath.Join(binDir, "gradle")
+	gradleScript := `#!/usr/bin/env bash
+echo "[system-gradle-stub] rewriteRun invoked with args: $@"
+`
+	if err := os.WriteFile(gradlePath, []byte(gradleScript), 0o755); err != nil {
+		t.Fatalf("write system gradle stub: %v", err)
 	}
 
 	// Provide rewrite.yml with a named recipe.
@@ -208,14 +234,13 @@ recipeList:
 
 	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
-	// Remove system gradle from PATH so the script uses ./gradlew.
 	filteredPath := filterPath("gradle")
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP="+group,
 		"RECIPE_ARTIFACT="+artifact,
 		"RECIPE_VERSION="+version,
 		"RECIPE_CLASSNAME="+classname,
-		"PATH="+filteredPath,
+		"PATH="+binDir+string(os.PathListSeparator)+filteredPath,
 	)
 
 	out, err := cmd.CombinedOutput()
@@ -229,8 +254,15 @@ recipeList:
 	if err != nil {
 		t.Fatalf("read transform.log: %v", err)
 	}
-	if !strings.Contains(string(logBytes), "-Drewrite.activeRecipes=PloyYamlRecipe") {
-		t.Fatalf("transform.log does not show YAML recipe as active:\n%s", string(logBytes))
+	logText := string(logBytes)
+	if !strings.Contains(logText, "[system-gradle-stub] rewriteRun invoked") {
+		t.Fatalf("transform.log does not show system gradle usage:\n%s", logText)
+	}
+	if strings.Contains(logText, "[gradlew-stub] should not run") {
+		t.Fatalf("transform.log shows gradlew was used:\n%s", logText)
+	}
+	if !strings.Contains(logText, "-Drewrite.activeRecipes=PloyYamlRecipe") {
+		t.Fatalf("transform.log does not show YAML recipe as active:\n%s", logText)
 	}
 }
 
@@ -272,22 +304,22 @@ func TestOrwGradle_NonGradleWorkspace_Fails(t *testing.T) {
 	}
 }
 
-// TestOrwGradle_GroovyDSL_Fails verifies that orw-gradle fails with exit 5
-// when the workspace contains build.gradle (Groovy DSL) instead of Kotlin DSL.
-func TestOrwGradle_GroovyDSL_Fails(t *testing.T) {
+// TestOrwGradle_GradlewOnly_Fails verifies that orw-gradle requires system
+// gradle even when ./gradlew exists.
+func TestOrwGradle_GradlewOnly_Fails(t *testing.T) {
 	workspace := t.TempDir()
 	outdir := t.TempDir()
 
-	// Create a Groovy DSL build file.
-	buildGradlePath := filepath.Join(workspace, "build.gradle")
-	if err := os.WriteFile(buildGradlePath, []byte("// Groovy DSL\n"), 0o644); err != nil {
-		t.Fatalf("write build.gradle: %v", err)
+	// Create a Kotlin DSL build file and an executable gradlew script.
+	buildGradlePath := filepath.Join(workspace, "build.gradle.kts")
+	if err := os.WriteFile(buildGradlePath, []byte("// Kotlin DSL\n"), 0o644); err != nil {
+		t.Fatalf("write build.gradle.kts: %v", err)
 	}
 
-	// Stub ./gradlew so the script finds a Gradle command before checking DSL style.
+	// gradlew must not be considered as a command source.
 	gradlewPath := filepath.Join(workspace, "gradlew")
 	gradlewScript := `#!/usr/bin/env bash
-echo "[gradle-stub] invoked"
+echo "[gradlew-stub] should not run"
 `
 	if err := os.WriteFile(gradlewPath, []byte(gradlewScript), 0o755); err != nil {
 		t.Fatalf("write gradlew stub: %v", err)
@@ -295,7 +327,7 @@ echo "[gradle-stub] invoked"
 
 	modScript := filepath.Join(repoRoot(t), "deploy", "images", "migs", "orw-gradle", "orw-gradle.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
-	// Remove system gradle from PATH so the script uses ./gradlew.
+	// Remove system gradle from PATH and verify hard failure.
 	filteredPath := filterPath("gradle")
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
@@ -309,16 +341,19 @@ echo "[gradle-stub] invoked"
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err == nil {
-		t.Fatal("expected orw-gradle to fail on Groovy DSL workspace")
+		t.Fatal("expected orw-gradle to fail when system gradle is absent")
 	}
 
 	exitErr, ok := err.(*exec.ExitError)
 	if !ok {
 		t.Fatalf("expected ExitError, got %T: %v", err, err)
 	}
-	// Exit code 5 indicates unsupported build style (Groovy).
-	if exitErr.ExitCode() != 5 {
-		t.Fatalf("expected exit code 5, got %d\nstderr: %s", exitErr.ExitCode(), stderr.String())
+	// Exit code 127 indicates missing system gradle.
+	if exitErr.ExitCode() != 127 {
+		t.Fatalf("expected exit code 127, got %d\nstderr: %s", exitErr.ExitCode(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "system gradle is required") {
+		t.Fatalf("expected missing system gradle error, got: %s", stderr.String())
 	}
 }
 
