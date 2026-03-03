@@ -507,6 +507,8 @@ MigsRunSummary:
         - `repo_target_ref`: Target Git ref for the run (e.g., "feature-branch").
         - `mr_url`: Merge request URL when available (GitLab/GitHub).
         - `gate_summary`: Build Gate health summary from run stats.
+        - `orw_error_kind`: ORW runtime failure kind from `/out/report.json` when ORW fails.
+        - `orw_reason`: ORW deterministic failure reason (for example `type-attribution-unavailable`).
         - `node_id`: ID of the node that claimed/executed the run.
         - `reason`: Terminal failure/cancellation reason when available.
         - `resume_count`, `last_resumed_at`: Resume history when present.

@@ -63,7 +63,7 @@ Legend: [ ] todo, [x] done.
   - Tests: repository-wide grep guard + targeted test updates — expect zero active references to removed images.
 
 ## Phase 8: Documentation And API Contract Sync
-- [ ] Sync user-facing docs and API behavior notes with `orw-cli` rollout — make operational guidance match implementation.
+- [x] Sync user-facing docs and API behavior notes with `orw-cli` rollout — make operational guidance match implementation.
   - Repository: ploy
   - Component: docs/api/docs/envs
   - Scope: update `docs/envs/README.md` with `orw-cli` env contract; update `docs/migs-lifecycle.md` and `docs/how-to/publish-migs.md` examples; add/refresh failure taxonomy text where run/job reporting surfaces unsupported attribution.
