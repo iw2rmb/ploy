@@ -16,7 +16,13 @@ import (
 )
 
 type GateProfileResolver interface {
-	ResolveGateProfileForJob(ctx context.Context, job store.Job) (int64, []byte, error)
+	ResolveGateProfileForJob(ctx context.Context, job store.Job) (*GateProfileResolution, error)
+}
+
+type GateProfileResolution struct {
+	ProfileID int64
+	Payload   []byte
+	ExactHit  bool
 }
 
 type gateProfileResolverStore interface {
@@ -53,33 +59,37 @@ func NewDBGateProfileResolver(st store.Store, bs blobstore.Store) GateProfileRes
 	}
 }
 
-func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, job store.Job) (int64, []byte, error) {
+func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, job store.Job) (*GateProfileResolution, error) {
 	repoSHAIn := strings.TrimSpace(job.RepoShaIn)
 	if !sha40Pattern.MatchString(repoSHAIn) {
-		return 0, nil, nil
+		return nil, nil
 	}
 
 	stackID, err := r.resolveStackID(ctx, job.JobImage)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, nil, nil
+			return nil, nil
 		}
-		return 0, nil, fmt.Errorf("resolve stack id: %w", err)
+		return nil, fmt.Errorf("resolve stack id: %w", err)
 	}
 
 	exact, err := r.st.GetExactGateProfile(ctx, job.RepoID, repoSHAIn, stackID)
 	if err == nil {
 		payload, loadErr := r.loadObject(ctx, exact.ObjectKey)
 		if loadErr != nil {
-			return 0, nil, fmt.Errorf("load exact gate profile %d: %w", exact.ID, loadErr)
+			return nil, fmt.Errorf("load exact gate profile %d: %w", exact.ID, loadErr)
 		}
 		if linkErr := r.st.UpsertGateJobProfileLink(ctx, job.ID, exact.ID); linkErr != nil {
-			return 0, nil, fmt.Errorf("upsert gates link: %w", linkErr)
+			return nil, fmt.Errorf("upsert gates link: %w", linkErr)
 		}
-		return exact.ID, payload, nil
+		return &GateProfileResolution{
+			ProfileID: exact.ID,
+			Payload:   payload,
+			ExactHit:  true,
+		}, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return 0, nil, fmt.Errorf("lookup exact gate profile: %w", err)
+		return nil, fmt.Errorf("lookup exact gate profile: %w", err)
 	}
 
 	fallback, err := r.st.GetLatestRepoGateProfile(ctx, job.RepoID, stackID)
@@ -88,14 +98,14 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 	}
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, nil, nil
+			return nil, nil
 		}
-		return 0, nil, fmt.Errorf("lookup fallback gate profile: %w", err)
+		return nil, fmt.Errorf("lookup fallback gate profile: %w", err)
 	}
 
 	payload, err := r.loadObject(ctx, fallback.ObjectKey)
 	if err != nil {
-		return 0, nil, fmt.Errorf("load fallback gate profile %d: %w", fallback.ID, err)
+		return nil, fmt.Errorf("load fallback gate profile %d: %w", fallback.ID, err)
 	}
 
 	objectKey := fmt.Sprintf(
@@ -106,17 +116,21 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 		time.Now().UTC().UnixNano(),
 	)
 	if _, err := r.bs.Put(ctx, objectKey, "application/json", payload); err != nil {
-		return 0, nil, fmt.Errorf("copy fallback gate profile blob: %w", err)
+		return nil, fmt.Errorf("copy fallback gate profile blob: %w", err)
 	}
 
 	exact, err = r.st.UpsertExactGateProfile(ctx, job.RepoID, repoSHAIn, stackID, objectKey)
 	if err != nil {
-		return 0, nil, fmt.Errorf("upsert exact gate profile: %w", err)
+		return nil, fmt.Errorf("upsert exact gate profile: %w", err)
 	}
 	if linkErr := r.st.UpsertGateJobProfileLink(ctx, job.ID, exact.ID); linkErr != nil {
-		return 0, nil, fmt.Errorf("upsert gates link: %w", linkErr)
+		return nil, fmt.Errorf("upsert gates link: %w", linkErr)
 	}
-	return exact.ID, payload, nil
+	return &GateProfileResolution{
+		ProfileID: exact.ID,
+		Payload:   payload,
+		ExactHit:  false,
+	}, nil
 }
 
 func (r *dbGateProfileResolver) resolveStackID(ctx context.Context, image string) (int64, error) {

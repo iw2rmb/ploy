@@ -156,10 +156,15 @@ func TestGateProfileResolver_ExactHit(t *testing.T) {
 	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
 	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	profileID, profilePayload, err := resolver.ResolveGateProfileForJob(context.Background(), job)
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job)
 	if err != nil {
 		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
 	}
+	if resolution == nil {
+		t.Fatal("expected non-nil gate profile resolution")
+	}
+	profileID := resolution.ProfileID
+	profilePayload := resolution.Payload
 	if profileID != 11 {
 		t.Fatalf("profile_id = %d, want 11", profileID)
 	}
@@ -177,6 +182,9 @@ func TestGateProfileResolver_ExactHit(t *testing.T) {
 	}
 	if st.linkJobID != job.ID || st.linkProfileID != 11 {
 		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
+	}
+	if !resolution.ExactHit {
+		t.Fatal("ExactHit=false, want true")
 	}
 }
 
@@ -214,10 +222,15 @@ func TestGateProfileResolver_FallbackRepoStackCopiesAndUpsertsExact(t *testing.T
 	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
 	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	profileID, profilePayload, err := resolver.ResolveGateProfileForJob(context.Background(), job)
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job)
 	if err != nil {
 		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
 	}
+	if resolution == nil {
+		t.Fatal("expected non-nil gate profile resolution")
+	}
+	profileID := resolution.ProfileID
+	profilePayload := resolution.Payload
 	if profileID != 22 {
 		t.Fatalf("profile_id = %d, want 22", profileID)
 	}
@@ -241,6 +254,9 @@ func TestGateProfileResolver_FallbackRepoStackCopiesAndUpsertsExact(t *testing.T
 	}
 	if st.linkJobID != job.ID || st.linkProfileID != 22 {
 		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
+	}
+	if resolution.ExactHit {
+		t.Fatal("ExactHit=true, want false on fallback")
 	}
 }
 
@@ -279,10 +295,15 @@ func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
 	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
 	job := store.Job{RepoID: repoID, RepoShaIn: shaIn}
-	profileID, profilePayload, err := resolver.ResolveGateProfileForJob(context.Background(), job)
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job)
 	if err != nil {
 		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
 	}
+	if resolution == nil {
+		t.Fatal("expected non-nil gate profile resolution")
+	}
+	profileID := resolution.ProfileID
+	profilePayload := resolution.Payload
 	if profileID != 32 {
 		t.Fatalf("profile_id = %d, want 32", profileID)
 	}
@@ -300,5 +321,8 @@ func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
 	}
 	if st.linkJobID != job.ID || st.linkProfileID != 32 {
 		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
+	}
+	if resolution.ExactHit {
+		t.Fatal("ExactHit=true, want false on default fallback")
 	}
 }

@@ -206,9 +206,16 @@ func copyBuildGateProfileOverride(in *contracts.BuildGateProfileOverride) *contr
 	if in == nil {
 		return nil
 	}
+	var stack *contracts.GateProfileStack
+	if in.Stack != nil {
+		copied := *in.Stack
+		stack = &copied
+	}
 	return &contracts.BuildGateProfileOverride{
 		Command: in.Command,
 		Env:     copyStringMap(in.Env),
+		Stack:   stack,
+		Target:  in.Target,
 	}
 }
 

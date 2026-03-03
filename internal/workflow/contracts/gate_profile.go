@@ -273,6 +273,7 @@ func GateProfileGateOverrideForJobType(
 	if override == nil {
 		return phase, nil, nil
 	}
+	override.Target = active
 	override.Stack = &GateProfileStack{
 		Language: profile.Stack.Language,
 		Tool:     profile.Stack.Tool,

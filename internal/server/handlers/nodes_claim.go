@@ -175,12 +175,25 @@ func buildAndSendJobClaimResponse(
 		return fmt.Errorf("invalid claimed job job_type %q for job_id=%s: %w", job.JobType, job.ID, err)
 	}
 	var repoGateProfile []byte
+	var gateSkip *contracts.BuildGateSkipMetadata
 	if gateProfileResolver != nil && shouldResolveGateProfile(jobType) {
-		_, payload, err := gateProfileResolver.ResolveGateProfileForJob(r.Context(), job)
+		phasePolicy, policyErr := gatePhasePolicyForJobSpec(spec, jobType)
+		if policyErr != nil {
+			return policyErr
+		}
+		resolution, err := gateProfileResolver.ResolveGateProfileForJob(r.Context(), job)
 		if err != nil {
 			return fmt.Errorf("resolve gate profile: %w", err)
 		}
-		repoGateProfile = payload
+		if resolution != nil {
+			repoGateProfile = resolution.Payload
+			if resolution.ExactHit && !phasePolicy.Always {
+				gateSkip, err = resolveGateSkipMetadata(resolution.Payload, phasePolicy.Target, resolution.ProfileID)
+				if err != nil {
+					return fmt.Errorf("resolve gate skip metadata: %w", err)
+				}
+			}
+		}
 	}
 
 	mergedSpec, err := mutateClaimSpec(claimSpecMutatorInput{
@@ -202,26 +215,27 @@ func buildAndSendJobClaimResponse(
 	// Response uses domain types for type-safe API output.
 	// RunID uses JSON key "id" for wire compatibility with existing clients.
 	resp := struct {
-		RunID                  domaintypes.RunID               `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
-		Name                   *string                         `json:"name,omitempty"`
-		RepoID                 domaintypes.RepoID              `json:"repo_id"`
-		Attempt                int32                           `json:"attempt"`
-		JobID                  domaintypes.JobID               `json:"job_id"`    // Job ID (KSUID-backed)
-		JobName                string                          `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
-		JobType                domaintypes.JobType             `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
-		JobImage               string                          `json:"job_image"` // Container image for mig/heal jobs
-		NextID                 *domaintypes.JobID              `json:"next_id"`
-		RepoURL                string                          `json:"repo_url"`
-		RepoGateProfileMissing bool                            `json:"repo_gate_profile_missing"`
-		Status                 store.RunStatus                 `json:"status"`
-		NodeID                 domaintypes.NodeID              `json:"node_id"` // Node ID (NanoID-backed)
-		BaseRef                string                          `json:"base_ref"`
-		TargetRef              string                          `json:"target_ref"`
-		RepoSHAIn              string                          `json:"repo_sha_in,omitempty"`
-		StartedAt              string                          `json:"started_at"`
-		CreatedAt              string                          `json:"created_at"`
-		Spec                   json.RawMessage                 `json:"spec,omitempty"`
-		RecoveryContext        *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
+		RunID                  domaintypes.RunID                `json:"id"` // Run ID (KSUID); JSON key stays "id" for wire compatibility
+		Name                   *string                          `json:"name,omitempty"`
+		RepoID                 domaintypes.RepoID               `json:"repo_id"`
+		Attempt                int32                            `json:"attempt"`
+		JobID                  domaintypes.JobID                `json:"job_id"`    // Job ID (KSUID-backed)
+		JobName                string                           `json:"job_name"`  // Job name (e.g., "pre-gate", "mig-0")
+		JobType                domaintypes.JobType              `json:"job_type"`  // Job phase: pre_gate, mig, post_gate, heal, re_gate
+		JobImage               string                           `json:"job_image"` // Container image for mig/heal jobs
+		NextID                 *domaintypes.JobID               `json:"next_id"`
+		RepoURL                string                           `json:"repo_url"`
+		RepoGateProfileMissing bool                             `json:"repo_gate_profile_missing"`
+		Status                 store.RunStatus                  `json:"status"`
+		NodeID                 domaintypes.NodeID               `json:"node_id"` // Node ID (NanoID-backed)
+		BaseRef                string                           `json:"base_ref"`
+		TargetRef              string                           `json:"target_ref"`
+		RepoSHAIn              string                           `json:"repo_sha_in,omitempty"`
+		StartedAt              string                           `json:"started_at"`
+		CreatedAt              string                           `json:"created_at"`
+		Spec                   json.RawMessage                  `json:"spec,omitempty"`
+		RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
+		GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	}{
 		RunID:                  run.ID,
 		Name:                   nil,
@@ -243,6 +257,7 @@ func buildAndSendJobClaimResponse(
 		CreatedAt:              run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:                   mergedSpec,
 		RecoveryContext:        recoveryCtx,
+		GateSkip:               gateSkip,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

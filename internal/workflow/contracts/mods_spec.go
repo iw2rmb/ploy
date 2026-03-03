@@ -269,6 +269,9 @@ func validateBuildGateProfileOverride(prep *BuildGateProfileOverride, prefix str
 	if prep.Command.IsEmpty() {
 		return fmt.Errorf("%s.command: required", prefix)
 	}
+	if err := validateBuildGatePhaseTarget(prep.Target, prefix+".target"); err != nil {
+		return err
+	}
 	if prep.Stack != nil {
 		if strings.TrimSpace(prep.Stack.Language) == "" {
 			return fmt.Errorf("%s.stack.language: required", prefix)
