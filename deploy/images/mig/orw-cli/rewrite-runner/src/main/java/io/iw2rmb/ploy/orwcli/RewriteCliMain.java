@@ -26,6 +26,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.maven.MavenParser;
@@ -36,8 +37,12 @@ import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
+import java.nio.file.FileVisitResult;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,9 +55,14 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 public final class RewriteCliMain {
     private static final String DEFAULT_REPO = "https://repo1.maven.org/maven2/";
+    private static final Pattern GRADLE_STATIC_IMPORT = Pattern.compile("(?m)^\\s*import\\s+static\\s+org\\.gradle\\.api\\.JavaVersion\\.VERSION_\\d+\\s*\\R?");
+    private static final Pattern SOURCE_COMPAT = Pattern.compile("(?m)^\\s*sourceCompatibility\\s*=\\s*VERSION_(\\d+)\\s*$");
+    private static final Pattern TARGET_COMPAT = Pattern.compile("(?m)^\\s*targetCompatibility\\s*=\\s*VERSION_(\\d+)\\s*$");
 
     private RewriteCliMain() {
     }
@@ -91,6 +101,10 @@ public final class RewriteCliMain {
             throw new RuntimeException(t);
         });
 
+        if (requiresGradleStaticImportNormalization(opts.recipes)) {
+            normalizeGradleJavaVersionStaticImports(workspace);
+        }
+
         List<SourceFile> sourceFiles = parseWorkspace(workspace, ctx);
         InMemoryLargeSourceSet before = new InMemoryLargeSourceSet(sourceFiles, recipeClassLoader);
 
@@ -105,7 +119,11 @@ public final class RewriteCliMain {
 
     private static Recipe loadRecipe(CliOptions opts, Resolution resolution, ClassLoader recipeClassLoader) throws IOException {
         Properties properties = new Properties();
-        Environment.Builder builder = Environment.builder(properties).scanRuntimeClasspath();
+        Environment.Builder builder = Environment.builder(properties);
+
+        if (resolution.rootArtifact != null) {
+            builder.scanJar(resolution.rootArtifact, resolution.dependencyJars, recipeClassLoader);
+        }
 
         if (opts.config != null) {
             Path configPath = opts.config.toAbsolutePath().normalize();
@@ -115,10 +133,6 @@ public final class RewriteCliMain {
             try (InputStream is = Files.newInputStream(configPath)) {
                 builder.load(new YamlResourceLoader(is, configPath.toUri(), properties));
             }
-        }
-
-        if (resolution.rootArtifact != null) {
-            builder.scanJar(resolution.rootArtifact, resolution.dependencyJars, recipeClassLoader);
         }
 
         Recipe recipe = builder.build().activateRecipes(opts.recipes);
@@ -131,12 +145,54 @@ public final class RewriteCliMain {
     private static List<SourceFile> parseWorkspace(Path workspace, ExecutionContext ctx) {
         List<Parser> parsers = new ArrayList<>();
         parsers.add(MavenParser.builder().build());
+        parsers.add(GradleParser.builder().build());
         parsers.add(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build());
         parsers.addAll(OmniParser.defaultResourceParsers());
 
         OmniParser parser = OmniParser.builder(parsers).build();
         List<Path> accepted = parser.acceptedPaths(workspace);
         return parser.parse(accepted, workspace, ctx).collect(Collectors.toList());
+    }
+
+    private static boolean requiresGradleStaticImportNormalization(List<String> activeRecipes) {
+        for (String recipe : activeRecipes) {
+            if ("org.openrewrite.java.migrate.UpgradeToJava17".equals(recipe)
+                || "org.openrewrite.java.migrate.UpgradeBuildToJava17".equals(recipe)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static void normalizeGradleJavaVersionStaticImports(Path workspace) throws IOException {
+        Files.walkFileTree(workspace, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                if (!file.getFileName().toString().equals("build.gradle")) {
+                    return FileVisitResult.CONTINUE;
+                }
+                String content = Files.readString(file, StandardCharsets.UTF_8);
+                String updated = GRADLE_STATIC_IMPORT.matcher(content).replaceAll("");
+                updated = rewriteCompatibilityAssignment(updated, SOURCE_COMPAT, "sourceCompatibility");
+                updated = rewriteCompatibilityAssignment(updated, TARGET_COMPAT, "targetCompatibility");
+                if (!updated.equals(content)) {
+                    Files.writeString(file, updated, StandardCharsets.UTF_8);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
+    private static String rewriteCompatibilityAssignment(String content, Pattern pattern, String key) {
+        Matcher matcher = pattern.matcher(content);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String version = matcher.group(1);
+            String replacement = key + " = JavaVersion.VERSION_" + version;
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 
     private static void applyResults(Path workspace, List<Result> results) throws IOException {
