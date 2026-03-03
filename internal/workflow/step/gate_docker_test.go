@@ -257,6 +257,78 @@ func TestDockerGateExecutor_PrepOverrideEnvPrecedence(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_SkipShortCircuitsExecution(t *testing.T) {
+	t.Parallel()
+
+	executor, rt, _ := newDockerGateTestHarness(t)
+	spec := &contracts.StepGateSpec{
+		Enabled: true,
+		Skip: &contracts.BuildGateSkipMetadata{
+			Enabled:         true,
+			SourceProfileID: 55,
+			MatchedTarget:   contracts.GateProfileTargetBuild,
+		},
+		GateProfile: &contracts.BuildGateProfileOverride{
+			Stack: &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "17"},
+		},
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, "")
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if rt.createCalled || rt.startCalled || rt.waitCalled {
+		t.Fatalf("expected no container execution for skip, got runtime=%+v", rt)
+	}
+	if meta == nil || meta.Skip == nil {
+		t.Fatal("expected skip metadata in gate result")
+	}
+	if got, want := meta.Skip.SourceProfileID, int64(55); got != want {
+		t.Fatalf("skip.source_profile_id=%d, want %d", got, want)
+	}
+	if got, want := meta.Skip.MatchedTarget, contracts.GateProfileTargetBuild; got != want {
+		t.Fatalf("skip.matched_target=%q, want %q", got, want)
+	}
+	if meta.Detected == nil || meta.Detected.Tool != "maven" {
+		t.Fatalf("expected detected stack from gate profile stack, got %+v", meta.Detected)
+	}
+	if len(meta.StaticChecks) == 0 || !meta.StaticChecks[0].Passed {
+		t.Fatalf("expected passing static check metadata, got %+v", meta.StaticChecks)
+	}
+}
+
+func TestDockerGateExecutor_TargetLockUnsupportedCancels(t *testing.T) {
+	t.Parallel()
+
+	executor, rt, workspace := newDockerGateTestHarness(t)
+	spec := &contracts.StepGateSpec{
+		Enabled:           true,
+		Target:            contracts.GateProfileTargetUnit,
+		EnforceTargetLock: true,
+		GateProfile: &contracts.BuildGateProfileOverride{
+			Command: contracts.CommandSpec{Shell: "echo candidate"},
+			Target:  contracts.GateProfileTargetAllTests,
+		},
+	}
+
+	meta, err := executor.Execute(context.Background(), spec, workspace)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !errors.Is(err, ErrRepoCancelled) {
+		t.Fatalf("error=%v, want ErrRepoCancelled", err)
+	}
+	if rt.createCalled {
+		t.Fatal("expected container Create NOT to be called")
+	}
+	if meta == nil || len(meta.LogFindings) == 0 {
+		t.Fatal("expected log findings in metadata")
+	}
+	if got, want := meta.LogFindings[0].Code, "BUILD_GATE_TARGET_UNSUPPORTED"; got != want {
+		t.Fatalf("log_findings[0].code=%q, want %q", got, want)
+	}
+}
+
 func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *testing.T) {
 	t.Parallel()
 

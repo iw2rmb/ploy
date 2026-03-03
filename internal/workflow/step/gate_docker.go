@@ -134,6 +134,33 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	if spec == nil || !spec.Enabled {
 		return nil, nil
 	}
+	if spec.Skip != nil && spec.Skip.Enabled {
+		meta := &contracts.BuildGateStageMetadata{
+			StaticChecks: []contracts.BuildGateStaticCheckReport{
+				{Tool: "skip", Passed: true},
+			},
+			Skip: &contracts.BuildGateSkipMetadata{
+				Enabled:         true,
+				SourceProfileID: spec.Skip.SourceProfileID,
+				MatchedTarget:   spec.Skip.MatchedTarget,
+			},
+		}
+		if spec.GateProfile != nil && spec.GateProfile.Stack != nil {
+			stack := spec.GateProfile.Stack
+			meta.Detected = &contracts.StackExpectation{
+				Language: strings.TrimSpace(stack.Language),
+				Tool:     strings.TrimSpace(stack.Tool),
+				Release:  strings.TrimSpace(stack.Release),
+			}
+			if meta.Detected.Tool != "" {
+				meta.StaticChecks[0].Tool = meta.Detected.Tool
+			}
+			if meta.Detected.Language != "" {
+				meta.StaticChecks[0].Language = meta.Detected.Language
+			}
+		}
+		return meta, nil
+	}
 	if e.rt == nil {
 		return nil, errBuildGateRuntimeUnavailable
 	}

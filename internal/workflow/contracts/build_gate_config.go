@@ -54,6 +54,9 @@ type BuildGateProfileOverride struct {
 	Command CommandSpec       `json:"command,omitempty" yaml:"command,omitempty"`
 	Env     map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 	Stack   *GateProfileStack `json:"stack,omitempty" yaml:"stack,omitempty"`
+	// Target is the source gate profile target (build|unit|all_tests).
+	// This field is server-injected for repo/candidate profile overrides.
+	Target string `json:"target,omitempty" yaml:"target,omitempty"`
 }
 
 // BuildGateStackConfig configures expected stack information for a gate phase.

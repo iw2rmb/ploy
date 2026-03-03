@@ -350,6 +350,9 @@ func buildGatePrepOverrideToMap(override *contracts.BuildGateProfileOverride) ma
 		}
 		prep["stack"] = stack
 	}
+	if target := strings.TrimSpace(override.Target); target != "" {
+		prep["target"] = target
+	}
 	return prep
 }
 

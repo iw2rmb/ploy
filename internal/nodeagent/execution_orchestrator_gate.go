@@ -219,6 +219,8 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 	manifest.Gate.AutoBootstrapRepoGateProfile = false
 	manifest.Gate.Target = ""
 	manifest.Gate.Always = false
+	manifest.Gate.Skip = nil
+	manifest.Gate.EnforceTargetLock = false
 
 	switch req.JobType {
 	case types.JobTypePreGate:
@@ -228,6 +230,7 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PreGateProfile
 		manifest.Gate.Target = typedOpts.BuildGate.PreTarget
 		manifest.Gate.Always = typedOpts.BuildGate.PreAlways
+		manifest.Gate.Skip = req.GateSkip
 		if req.RepoGateProfileMissing && typedOpts.BuildGate.PreGateProfile == nil {
 			manifest.Gate.AutoBootstrapRepoGateProfile = true
 		}
@@ -238,10 +241,19 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
 		manifest.Gate.Target = typedOpts.BuildGate.PostTarget
 		manifest.Gate.Always = typedOpts.BuildGate.PostAlways
+		manifest.Gate.Skip = req.GateSkip
 	case types.JobTypeReGate:
 		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
 		manifest.Gate.Target = typedOpts.BuildGate.PostTarget
 		manifest.Gate.Always = typedOpts.BuildGate.PostAlways
+		manifest.Gate.Skip = req.GateSkip
+		if req.RecoveryContext != nil {
+			if kind, ok := contracts.ParseRecoveryErrorKind(req.RecoveryContext.SelectedErrorKind); ok &&
+				contracts.IsInfraRecoveryErrorKind(kind) &&
+				strings.TrimSpace(manifest.Gate.Target) != "" {
+				manifest.Gate.EnforceTargetLock = true
+			}
+		}
 	}
 }
 

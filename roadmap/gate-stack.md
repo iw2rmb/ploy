@@ -97,7 +97,7 @@ Legend: [ ] todo, [x] done.
   - Scope: extend `BuildGatePhaseConfig`; parse/validate enums and booleans; wire through typed options and claim mutation.
   - Snippets: `target: all_tests|unit|build`, `always: true`
   - Tests: `go test ./internal/workflow/contracts -run BuildGate` — expect strict validation errors for invalid target values.
-- [ ] Implement gate skip logic and infra target locking — enforce deterministic healing behavior.
+- [x] Implement gate skip logic and infra target locking — enforce deterministic healing behavior.
   - Repository: ploy
   - Component: claim mutation + healing orchestration
   - Scope: skip gate when prior exact profile qualifies and `always` is not set; during infra healing, prohibit target hopping when target is pinned; return/record `unsupported` and stop run when lock cannot be healed.

@@ -22,6 +22,8 @@ type gateExecutionPlan struct {
 	generatedGateProfile json.RawMessage
 }
 
+var errGateTargetUnsupported = errors.New("gate target unsupported")
+
 type gateExecutionTerminal struct {
 	meta               *contracts.BuildGateStageMetadata
 	err                error
@@ -206,14 +208,23 @@ func resolveStackGateExecutionPlan(
 	}
 
 	sgResult.RuntimeImage = image
-	cmd, prepEnv, err := resolveGateCommand(workspace, language, tool, spec.StackGate.Expect.Release, spec.GateProfile)
+	cmd, prepEnv, err := resolveGateCommand(workspace, language, tool, spec.StackGate.Expect.Release, spec.GateProfile, spec.Target)
 	if err != nil {
+		code := "STACK_GATE_UNKNOWN"
+		terminalErr := error(nil)
+		if errors.Is(err, errGateTargetUnsupported) {
+			code = "STACK_GATE_TARGET_UNSUPPORTED"
+			if spec.EnforceTargetLock {
+				terminalErr = fmt.Errorf("%w: %s", ErrRepoCancelled, err.Error())
+			}
+		}
 		return gateExecutionPlan{}, newFailureTerminal(failureTerminalOpts{
 			language:           language,
 			stackGate:          sgResult,
 			stackGateResult:    "unknown",
 			message:            err.Error(),
-			code:               "STACK_GATE_UNKNOWN",
+			code:               code,
+			err:                terminalErr,
 			runtimeImage:       image,
 			reportRuntimeImage: true,
 		})
@@ -382,13 +393,22 @@ func resolveDetectedStackExecutionPlan(
 	if exp != nil {
 		release = exp.Release
 	}
-	cmd, prepEnv, err := resolveGateCommand(workspace, language, tool, release, spec.GateProfile)
+	cmd, prepEnv, err := resolveGateCommand(workspace, language, tool, release, spec.GateProfile, spec.Target)
 	if err != nil {
+		code := "BUILD_GATE_UNKNOWN_TOOL"
+		terminalErr := error(nil)
+		if errors.Is(err, errGateTargetUnsupported) {
+			code = "BUILD_GATE_TARGET_UNSUPPORTED"
+			if spec.EnforceTargetLock {
+				terminalErr = fmt.Errorf("%w: %s", ErrRepoCancelled, err.Error())
+			}
+		}
 		return gateExecutionPlan{}, newFailureTerminal(failureTerminalOpts{
 			language: language,
 			tool:     tool,
-			code:     "BUILD_GATE_UNKNOWN_TOOL",
+			code:     code,
 			message:  err.Error(),
+			err:      terminalErr,
 		})
 	}
 
@@ -498,7 +518,10 @@ func resolveGateCommand(
 	tool string,
 	release string,
 	prep *contracts.BuildGateProfileOverride,
+	target string,
 ) ([]string, map[string]string, error) {
+	wantedTarget := strings.TrimSpace(target)
+
 	if prep != nil && !prep.Command.IsEmpty() {
 		if prep.Stack != nil {
 			if !stackMatchesPrepOverride(prep.Stack, language, tool, release) {
@@ -512,7 +535,18 @@ func resolveGateCommand(
 				)
 			}
 		}
-		return prep.Command.ToSlice(), contracts.CopyEnv(prep.Env), nil
+		prepTarget := strings.TrimSpace(prep.Target)
+		if wantedTarget == "" || prepTarget == wantedTarget {
+			return prep.Command.ToSlice(), contracts.CopyEnv(prep.Env), nil
+		}
+	}
+
+	if wantedTarget != "" {
+		cmd, err := buildCommandForToolTarget(workspace, tool, wantedTarget)
+		if err != nil {
+			return nil, nil, fmt.Errorf("%w: %s", errGateTargetUnsupported, err.Error())
+		}
+		return cmd, nil, nil
 	}
 
 	cmd, err := buildCommandForTool(workspace, tool)

@@ -31,7 +31,11 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PreAlways = true
 		typedOpts.BuildGate.PostAlways = false
 
-		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypePreGate}, typedOpts)
+		skip := &contracts.BuildGateSkipMetadata{Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit}
+		applyGatePhaseOverrides(&manifest, StartRunRequest{
+			JobType:  types.JobTypePreGate,
+			GateSkip: skip,
+		}, typedOpts)
 
 		if manifest.Gate.StackDetect != pre {
 			t.Fatalf("Gate.StackDetect=%v; want pre", manifest.Gate.StackDetect)
@@ -44,6 +48,9 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 		if !manifest.Gate.Always {
 			t.Fatal("Gate.Always=false; want true")
+		}
+		if manifest.Gate.Skip != skip {
+			t.Fatalf("Gate.Skip=%v; want skip payload", manifest.Gate.Skip)
 		}
 	})
 
@@ -59,7 +66,11 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PreAlways = true
 		typedOpts.BuildGate.PostAlways = false
 
-		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypePostGate}, typedOpts)
+		skip := &contracts.BuildGateSkipMetadata{Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests}
+		applyGatePhaseOverrides(&manifest, StartRunRequest{
+			JobType:  types.JobTypePostGate,
+			GateSkip: skip,
+		}, typedOpts)
 
 		if manifest.Gate.StackDetect != post {
 			t.Fatalf("Gate.StackDetect=%v; want post", manifest.Gate.StackDetect)
@@ -72,6 +83,9 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 		if manifest.Gate.Always {
 			t.Fatal("Gate.Always=true; want false")
+		}
+		if manifest.Gate.Skip != skip {
+			t.Fatalf("Gate.Skip=%v; want skip payload", manifest.Gate.Skip)
 		}
 	})
 
@@ -87,7 +101,12 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		typedOpts.BuildGate.PreAlways = true
 		typedOpts.BuildGate.PostAlways = false
 
-		applyGatePhaseOverrides(&manifest, StartRunRequest{JobType: types.JobTypeReGate}, typedOpts)
+		applyGatePhaseOverrides(&manifest, StartRunRequest{
+			JobType: types.JobTypeReGate,
+			RecoveryContext: &contracts.RecoveryClaimContext{
+				SelectedErrorKind: "infra",
+			},
+		}, typedOpts)
 
 		if manifest.Gate.StackDetect != nil {
 			t.Fatalf("Gate.StackDetect=%v; want nil", manifest.Gate.StackDetect)
@@ -100,6 +119,26 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 		}
 		if manifest.Gate.Always {
 			t.Fatal("Gate.Always=true; want false")
+		}
+		if !manifest.Gate.EnforceTargetLock {
+			t.Fatal("Gate.EnforceTargetLock=false; want true for infra re_gate with pinned target")
+		}
+	})
+
+	t.Run("re_gate does not enforce target lock for non-infra recovery", func(t *testing.T) {
+		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
+		typedOpts := RunOptions{}
+		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
+
+		applyGatePhaseOverrides(&manifest, StartRunRequest{
+			JobType: types.JobTypeReGate,
+			RecoveryContext: &contracts.RecoveryClaimContext{
+				SelectedErrorKind: "code",
+			},
+		}, typedOpts)
+
+		if manifest.Gate.EnforceTargetLock {
+			t.Fatal("Gate.EnforceTargetLock=true; want false for non-infra re_gate")
 		}
 	})
 

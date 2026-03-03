@@ -39,6 +39,15 @@ type BuildGateStageMetadata struct {
 	// GeneratedGateProfile stores a pre-gate auto-generated repo gate_profile
 	// payload derived from stack detection and resolved gate command.
 	GeneratedGateProfile json.RawMessage `json:"generated_gate_profile,omitempty"`
+	// Skip captures claim-time gate skip decision details.
+	Skip *BuildGateSkipMetadata `json:"skip,omitempty"`
+}
+
+// BuildGateSkipMetadata records why a gate execution was skipped.
+type BuildGateSkipMetadata struct {
+	Enabled         bool   `json:"enabled"`
+	SourceProfileID int64  `json:"source_profile_id,omitempty"`
+	MatchedTarget   string `json:"matched_target,omitempty"`
 }
 
 // DetectedStack returns the ModStack derived from the first static check's tool.
@@ -138,6 +147,19 @@ func (m BuildGateStageMetadata) Validate() error {
 		}
 		if _, err := ParseGateProfileJSON(m.GeneratedGateProfile); err != nil {
 			return fmt.Errorf("generated_gate_profile: %w", err)
+		}
+	}
+	if m.Skip != nil {
+		if !m.Skip.Enabled {
+			return fmt.Errorf("skip.enabled: must be true when skip metadata is present")
+		}
+		if m.Skip.SourceProfileID <= 0 {
+			return fmt.Errorf("skip.source_profile_id: must be > 0")
+		}
+		switch strings.TrimSpace(m.Skip.MatchedTarget) {
+		case GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests:
+		default:
+			return fmt.Errorf("skip.matched_target: invalid value %q", m.Skip.MatchedTarget)
 		}
 	}
 	return nil
