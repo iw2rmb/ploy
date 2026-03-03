@@ -198,6 +198,7 @@ See `docs/envs/README.md` for the complete environment variable reference.
 ## Inputs
 
 - **Workspace mount:** `/workspace` (required, read-write). Contains the Git checkout.
+- **Output mount:** `/out` (read-write), backed by a workspace-local host directory for gate artifacts.
 - **Resource limits:** Memory, CPU, and disk limits are optional and configurable via
   environment variables.
 
@@ -224,6 +225,9 @@ The gate does not modify the repository; it validates the current working tree.
 - **Detected stack identity:** `BuildGateStageMetadata.detected_stack` captures
   normalized detected stack (`language`, `tool`, optional `release`) for gate and
   healing/re-gate stack-aware decisions.
+- **Gradle test reports:** Gate Gradle images force test reports into `/out/gradle-test-results` (JUnit XML)
+  and `/out/gradle-test-report` (HTML) via image init script. Node uploads these bundles to object storage
+  and records artifact links in `BuildGateStageMetadata.report_links`.
 - **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
   - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.

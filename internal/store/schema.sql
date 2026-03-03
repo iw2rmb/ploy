@@ -62,12 +62,6 @@ BEGIN
   END IF;
 END $$;
 
--- PrepGate lifecycle was removed. Drop legacy prep status/runs objects.
-DROP TABLE IF EXISTS prep_runs;
-DROP TYPE IF EXISTS prep_status;
-
-
-
 -- Nodes (no labels; each node must have an IP address).
 -- Note: id is TEXT (NanoID-backed, 6 chars) for compact, human-friendly node identifiers.
 -- Application code generates IDs via types.NewNodeKey() before insertion.
@@ -181,45 +175,10 @@ CREATE TABLE IF NOT EXISTS mig_repos (
   repo_id      TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
   base_ref     TEXT NOT NULL,  -- Mutable base ref (e.g., main).
   target_ref   TEXT NOT NULL,  -- Mutable target ref (e.g., feature-branch).
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- Enforce uniqueness: one repo membership per mig.
+  UNIQUE (mig_id, repo_id)
 );
-
-ALTER TABLE IF EXISTS mig_repos
-  ADD COLUMN IF NOT EXISTS repo_id TEXT;
-ALTER TABLE IF EXISTS mig_repos
-  DROP COLUMN IF EXISTS repo_url,
-  DROP COLUMN IF EXISTS gate_profile_updated_at,
-  DROP COLUMN IF EXISTS gate_profile,
-  DROP COLUMN IF EXISTS gate_profile_artifacts,
-  DROP COLUMN IF EXISTS prep_updated_at,
-  DROP COLUMN IF EXISTS prep_profile,
-  DROP COLUMN IF EXISTS prep_artifacts,
-  DROP COLUMN IF EXISTS prep_status,
-  DROP COLUMN IF EXISTS prep_attempts,
-  DROP COLUMN IF EXISTS prep_last_error,
-  DROP COLUMN IF EXISTS prep_failure_code;
-ALTER TABLE IF EXISTS mig_repos
-  ALTER COLUMN repo_id SET NOT NULL;
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint c
-    JOIN pg_class t ON t.oid = c.conrelid
-    JOIN pg_namespace n ON n.oid = t.relnamespace
-    WHERE n.nspname = 'ploy'
-      AND t.relname = 'mig_repos'
-      AND c.conname = 'mig_repos_repo_id_fkey'
-  ) THEN
-    ALTER TABLE ploy.mig_repos
-      ADD CONSTRAINT mig_repos_repo_id_fkey
-      FOREIGN KEY (repo_id) REFERENCES ploy.repos(id) ON DELETE RESTRICT;
-  END IF;
-END $$;
-
-DROP INDEX IF EXISTS mig_repos_mig_repo_uniq;
--- Enforce uniqueness: one repo membership per mig.
-CREATE UNIQUE INDEX IF NOT EXISTS mig_repos_mig_repo_uniq ON mig_repos(mig_id, repo_id);
 CREATE INDEX IF NOT EXISTS mig_repos_mig_created_idx ON mig_repos(mig_id, created_at);
 
 -- Runs (execution of one spec_id over a specific set of repos)
@@ -261,34 +220,12 @@ CREATE TABLE IF NOT EXISTS run_repos (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   started_at       TIMESTAMPTZ,  -- Set when status changes Queued → Running.
   finished_at      TIMESTAMPTZ,  -- Set when status changes to terminal (Fail, Success, Cancelled).
+  CONSTRAINT run_repos_mig_repo_membership_fkey
+    FOREIGN KEY (mig_id, repo_id)
+    REFERENCES mig_repos(mig_id, repo_id)
+    ON DELETE RESTRICT,
   PRIMARY KEY (run_id, repo_id)  -- Composite PK: one row per repo per run.
 );
-ALTER TABLE IF EXISTS run_repos
-  DROP CONSTRAINT IF EXISTS run_repos_repo_id_fkey;
-ALTER TABLE IF EXISTS run_repos
-  ADD CONSTRAINT run_repos_repo_id_fkey
-  FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE RESTRICT;
-ALTER TABLE IF EXISTS run_repos
-  ADD COLUMN IF NOT EXISTS source_commit_sha TEXT NOT NULL DEFAULT '',
-  ADD COLUMN IF NOT EXISTS repo_sha0 TEXT NOT NULL DEFAULT '';
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint c
-    JOIN pg_class t ON t.oid = c.conrelid
-    JOIN pg_namespace n ON n.oid = t.relnamespace
-    WHERE n.nspname = 'ploy'
-      AND t.relname = 'run_repos'
-      AND c.conname = 'run_repos_mig_repo_membership_fkey'
-  ) THEN
-    ALTER TABLE ploy.run_repos
-      ADD CONSTRAINT run_repos_mig_repo_membership_fkey
-      FOREIGN KEY (mig_id, repo_id)
-      REFERENCES ploy.mig_repos(mig_id, repo_id)
-      ON DELETE RESTRICT;
-  END IF;
-END $$;
 -- Index for listing repos by run (batch lookups).
 CREATE INDEX IF NOT EXISTS run_repos_run_idx ON run_repos(run_id);
 -- Partial index for scheduling: find Queued/Running repos efficiently (v1 status values).
@@ -335,16 +272,6 @@ CREATE TABLE IF NOT EXISTS jobs (
   meta            JSONB NOT NULL DEFAULT '{}'::jsonb,  -- Structured metadata; see JobMeta type docs above.
   UNIQUE (run_id, repo_id, attempt, name)  -- unique job name per repo attempt.
 );
-ALTER TABLE IF EXISTS jobs
-  DROP CONSTRAINT IF EXISTS jobs_repo_id_fkey;
-ALTER TABLE IF EXISTS jobs
-  ADD CONSTRAINT jobs_repo_id_fkey
-  FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE RESTRICT;
-ALTER TABLE IF EXISTS jobs
-  ADD COLUMN IF NOT EXISTS repo_sha_in TEXT NOT NULL DEFAULT '',
-  ADD COLUMN IF NOT EXISTS repo_sha_out TEXT NOT NULL DEFAULT '',
-  ADD COLUMN IF NOT EXISTS repo_sha_in8 TEXT NOT NULL DEFAULT '',
-  ADD COLUMN IF NOT EXISTS repo_sha_out8 TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS jobs_run_idx ON jobs(run_id);
 -- 'Queued' is the claimable job status (jobs transition Created → Queued when ready to claim).
 CREATE INDEX IF NOT EXISTS jobs_pending_idx ON jobs(run_id, repo_id, attempt, id) WHERE status = 'Queued';

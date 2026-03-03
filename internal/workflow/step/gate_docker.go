@@ -50,6 +50,13 @@ const (
 	buildGateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
 	buildGateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
 	buildGateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
+
+	// BuildGateWorkspaceOutDir is a workspace-local host directory mounted
+	// into gate containers as /out for deterministic artifact collection.
+	BuildGateWorkspaceOutDir = ".ploy-gate-out"
+	// BuildGateContainerOutDir is the writable output mount path inside gate
+	// containers used by runtime-generated artifacts (for example Gradle reports).
+	BuildGateContainerOutDir = "/out"
 )
 
 var errBuildGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
@@ -178,8 +185,15 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 
 	reportGateRuntimeImage(ctx, plan.image)
 
-	// Build container spec with workspace mount.
-	mounts := []ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}
+	// Build container spec with workspace + /out mounts.
+	gateOutDir := filepath.Join(workspace, BuildGateWorkspaceOutDir)
+	if err := os.MkdirAll(gateOutDir, 0o755); err != nil {
+		return nil, fmt.Errorf("prepare build gate out dir: %w", err)
+	}
+	mounts := []ContainerMount{
+		{Source: workspace, Target: "/workspace", ReadOnly: false},
+		{Source: gateOutDir, Target: BuildGateContainerOutDir, ReadOnly: false},
+	}
 	// Optional limits via env (human suffixes supported for memory/disk). 0 => unlimited.
 	limitMem, _ := parseBytesLimitEnv(buildGateLimitMemoryEnv)
 	limitCPUMillis := parseInt64LimitEnv(buildGateLimitCPUEnv)

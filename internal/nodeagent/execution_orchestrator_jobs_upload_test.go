@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // TestRunController_uploadConfiguredArtifacts verifies artifact path resolution and upload.
@@ -406,6 +408,171 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
+	t.Parallel()
+
+	type uploadCall struct {
+		name    string
+		headers map[string]struct{}
+	}
+
+	var calls []uploadCall
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/runs/test-run/jobs/test-gate/artifact" {
+			return
+		}
+		var payload struct {
+			Name   string `json:"name"`
+			Bundle []byte `json:"bundle"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		calls = append(calls, uploadCall{
+			name:    payload.Name,
+			headers: tarHeadersFromBundle(t, payload.Bundle),
+		})
+
+		n := len(calls)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"artifact_bundle_id": fmt.Sprintf("artifact-id-%d", n),
+			"cid":                fmt.Sprintf("bafy-test-cid-%d", n),
+		})
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := newTestController(t, cfg)
+
+	workspace := t.TempDir()
+	outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	if err := os.MkdirAll(filepath.Join(outDir, "gradle-test-results"), 0o755); err != nil {
+		t.Fatalf("mkdir junit dir: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(outDir, "gradle-test-report"), 0o755); err != nil {
+		t.Fatalf("mkdir html dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "gradle-test-results", "TEST-Example.xml"), []byte(`<testsuite/>`), 0o644); err != nil {
+		t.Fatalf("write junit xml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(outDir, "gradle-test-report", "index.html"), []byte(`<html/>`), 0o644); err != nil {
+		t.Fatalf("write html report: %v", err)
+	}
+
+	meta := &contracts.BuildGateStageMetadata{
+		Detected: &contracts.StackExpectation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  "17",
+		},
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{
+			Language: "java",
+			Tool:     "gradle",
+			Passed:   true,
+		}},
+	}
+
+	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", workspace, meta)
+
+	if len(calls) != 2 {
+		t.Fatalf("upload call count = %d, want 2", len(calls))
+	}
+	if len(meta.ReportLinks) != 2 {
+		t.Fatalf("report_links count = %d, want 2", len(meta.ReportLinks))
+	}
+
+	wantNames := map[string]bool{
+		"build-gate-gradle-junit-xml":   false,
+		"build-gate-gradle-html-report": false,
+	}
+	for _, c := range calls {
+		if _, ok := wantNames[c.name]; !ok {
+			t.Fatalf("unexpected artifact name %q", c.name)
+		}
+		wantNames[c.name] = true
+		if c.name == "build-gate-gradle-junit-xml" {
+			if _, ok := c.headers["out/gradle-test-results/TEST-Example.xml"]; !ok {
+				t.Fatalf("junit bundle missing expected file, headers=%v", keys(c.headers))
+			}
+		}
+		if c.name == "build-gate-gradle-html-report" {
+			if _, ok := c.headers["out/gradle-test-report/index.html"]; !ok {
+				t.Fatalf("html bundle missing expected file, headers=%v", keys(c.headers))
+			}
+		}
+	}
+	for name, seen := range wantNames {
+		if !seen {
+			t.Fatalf("expected artifact upload name %q", name)
+		}
+	}
+
+	foundJUnit := false
+	foundHTML := false
+	for _, link := range meta.ReportLinks {
+		if link.Type == contracts.BuildGateReportTypeGradleJUnitXML {
+			foundJUnit = true
+			if link.Path != "/out/gradle-test-results" {
+				t.Fatalf("junit link path = %q, want /out/gradle-test-results", link.Path)
+			}
+		}
+		if link.Type == contracts.BuildGateReportTypeGradleHTML {
+			foundHTML = true
+			if link.Path != "/out/gradle-test-report" {
+				t.Fatalf("html link path = %q, want /out/gradle-test-report", link.Path)
+			}
+		}
+		if link.ArtifactID == "" || link.BundleCID == "" || link.URL == "" || link.DownloadURL == "" {
+			t.Fatalf("expected populated link fields, got %+v", link)
+		}
+	}
+	if !foundJUnit || !foundHTML {
+		t.Fatalf("missing expected report link types: %+v", meta.ReportLinks)
+	}
+}
+
+func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) {
+	t.Parallel()
+
+	uploadCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/runs/test-run/jobs/test-gate/artifact" {
+			uploadCalled = true
+		}
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    testNodeID,
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	controller := newTestController(t, cfg)
+
+	meta := &contracts.BuildGateStageMetadata{
+		Detected: &contracts.StackExpectation{
+			Language: "java",
+			Tool:     "maven",
+		},
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{
+			Tool:   "maven",
+			Passed: true,
+		}},
+	}
+
+	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", t.TempDir(), meta)
+
+	if uploadCalled {
+		t.Fatal("expected no upload for non-gradle gate")
+	}
+	if len(meta.ReportLinks) != 0 {
+		t.Fatalf("expected no report links for non-gradle gate, got %+v", meta.ReportLinks)
 	}
 }
 

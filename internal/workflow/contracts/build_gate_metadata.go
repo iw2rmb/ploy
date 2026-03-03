@@ -38,6 +38,9 @@ type BuildGateStageMetadata struct {
 	Recovery *BuildGateRecoveryMetadata `json:"recovery,omitempty"`
 	// Skip captures claim-time gate skip decision details.
 	Skip *BuildGateSkipMetadata `json:"skip,omitempty"`
+	// ReportLinks captures uploaded gate report artifact references, including
+	// per-report artifact links that can be surfaced by API clients.
+	ReportLinks []BuildGateReportLink `json:"report_links,omitempty"`
 }
 
 // BuildGateSkipMetadata records why a gate execution was skipped.
@@ -45,6 +48,27 @@ type BuildGateSkipMetadata struct {
 	Enabled         bool   `json:"enabled"`
 	SourceProfileID int64  `json:"source_profile_id,omitempty"`
 	MatchedTarget   string `json:"matched_target,omitempty"`
+}
+
+const (
+	BuildGateReportTypeGradleJUnitXML = "gradle_junit_xml"
+	BuildGateReportTypeGradleHTML     = "gradle_html"
+)
+
+// BuildGateReportLink points to an uploaded gate report artifact bundle.
+type BuildGateReportLink struct {
+	Type string `json:"type"`
+	// Path is the in-container report path (for example /out/gradle-test-results).
+	Path string `json:"path"`
+	// ArtifactID is the artifact bundle identifier returned by artifact upload.
+	ArtifactID string `json:"artifact_id"`
+	// BundleCID is the immutable content identifier of the uploaded bundle.
+	BundleCID string `json:"bundle_cid,omitempty"`
+	// URL is an artifact metadata URL (GET /v1/artifacts/{id}).
+	URL string `json:"url"`
+	// DownloadURL is a direct artifact bundle download URL
+	// (GET /v1/artifacts/{id}?download=true).
+	DownloadURL string `json:"download_url,omitempty"`
 }
 
 // DetectedStack returns the ModStack derived from the first static check's tool.
@@ -149,6 +173,11 @@ func (m BuildGateStageMetadata) Validate() error {
 		case GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests:
 		default:
 			return fmt.Errorf("skip.matched_target: invalid value %q", m.Skip.MatchedTarget)
+		}
+	}
+	for i, link := range m.ReportLinks {
+		if err := link.Validate(); err != nil {
+			return fmt.Errorf("report link %d invalid: %w", i, err)
 		}
 	}
 	return nil
@@ -371,6 +400,33 @@ type BuildGateLogFinding struct {
 	Severity string `json:"severity"`
 	Message  string `json:"message"`
 	Evidence string `json:"evidence,omitempty"`
+}
+
+// Validate ensures report link entries include required artifact link details.
+func (l BuildGateReportLink) Validate() error {
+	switch strings.TrimSpace(l.Type) {
+	case BuildGateReportTypeGradleJUnitXML, BuildGateReportTypeGradleHTML:
+	default:
+		return fmt.Errorf("type invalid: %q", l.Type)
+	}
+	if path := strings.TrimSpace(l.Path); path == "" {
+		return fmt.Errorf("path is required")
+	} else if !strings.HasPrefix(path, "/out/") {
+		return fmt.Errorf("path must start with /out/: %q", l.Path)
+	}
+	if strings.TrimSpace(l.ArtifactID) == "" {
+		return fmt.Errorf("artifact_id is required")
+	}
+	if strings.TrimSpace(l.URL) == "" {
+		return fmt.Errorf("url is required")
+	}
+	if strings.ContainsAny(l.URL, "\n\r") {
+		return fmt.Errorf("url must be single-line")
+	}
+	if l.DownloadURL != "" && strings.ContainsAny(l.DownloadURL, "\n\r") {
+		return fmt.Errorf("download_url must be single-line")
+	}
+	return nil
 }
 
 // Validate ensures log finding entries include required guidance details.

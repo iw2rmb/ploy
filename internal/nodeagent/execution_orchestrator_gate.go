@@ -17,6 +17,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
+const (
+	gateGradleJUnitXMLReportPath = "/out/gradle-test-results"
+	gateGradleHTMLReportPath     = "/out/gradle-test-report"
+)
+
 // executeGateJob runs a build gate validation job.
 // Reports pass/fail status to server. On failure with reason="build-gate",
 // the server will create healing jobs if configured.
@@ -105,6 +110,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// attempt so the control plane cancels remaining jobs without scheduling heal/re-gate.
 	if gateErr != nil || gateResult == nil {
 		duration := time.Since(startTime)
+		r.cleanupGateOutDir(workspace)
 		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
 		errMsg := gateErr
 		if errMsg == nil {
@@ -150,6 +156,8 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if !gateResultPassed(gateResult) {
 		r.runRouterForGateFailure(ctx, runner, req, typedOpts, workspace, gateResult)
 	}
+	r.uploadGateReportArtifacts(ctx, req.RunID, req.JobID, workspace, gateResult)
+	r.cleanupGateOutDir(workspace)
 
 	duration := time.Since(startTime)
 	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
@@ -562,6 +570,125 @@ func copySnapshotEnv(env map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+func (r *runController) cleanupGateOutDir(workspace string) {
+	outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
+		slog.Warn("failed to remove gate out dir", "path", outDir, "error", err)
+	}
+}
+
+type gateReportUploadSpec struct {
+	reportType   string
+	reportPath   string
+	relativePath string
+	artifactName string
+}
+
+func (r *runController) uploadGateReportArtifacts(
+	ctx context.Context,
+	runID types.RunID,
+	jobID types.JobID,
+	workspace string,
+	gateResult *contracts.BuildGateStageMetadata,
+) {
+	if r.artifactUploader == nil || gateResult == nil {
+		return
+	}
+	if !isGradleGateResult(gateResult) {
+		return
+	}
+
+	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+	reportSpecs := []gateReportUploadSpec{
+		{
+			reportType:   contracts.BuildGateReportTypeGradleJUnitXML,
+			reportPath:   gateGradleJUnitXMLReportPath,
+			relativePath: strings.TrimPrefix(gateGradleJUnitXMLReportPath, "/out/"),
+			artifactName: "build-gate-gradle-junit-xml",
+		},
+		{
+			reportType:   contracts.BuildGateReportTypeGradleHTML,
+			reportPath:   gateGradleHTMLReportPath,
+			relativePath: strings.TrimPrefix(gateGradleHTMLReportPath, "/out/"),
+			artifactName: "build-gate-gradle-html-report",
+		},
+	}
+
+	for _, spec := range reportSpecs {
+		sourcePath := filepath.Join(gateOutDir, spec.relativePath)
+		if _, err := os.Stat(sourcePath); err != nil {
+			continue
+		}
+
+		hasFiles, _ := listFilesRecursive(sourcePath)
+		if !hasFiles {
+			continue
+		}
+
+		archivePath := filepath.ToSlash(filepath.Join("out", spec.relativePath))
+		artifactID, bundleCID, err := r.artifactUploader.UploadArtifactEntries(
+			ctx,
+			runID,
+			jobID,
+			[]ArtifactBundleEntry{{
+				SourcePath:  sourcePath,
+				ArchivePath: archivePath,
+			}},
+			spec.artifactName,
+		)
+		if err != nil {
+			slog.Warn(
+				"failed to upload gate report artifact",
+				"run_id", runID,
+				"job_id", jobID,
+				"path", spec.reportPath,
+				"error", err,
+			)
+			continue
+		}
+
+		artifactURL := gateArtifactURL(r.cfg.ServerURL, artifactID, false)
+		downloadURL := gateArtifactURL(r.cfg.ServerURL, artifactID, true)
+		gateResult.ReportLinks = append(gateResult.ReportLinks, contracts.BuildGateReportLink{
+			Type:        spec.reportType,
+			Path:        spec.reportPath,
+			ArtifactID:  artifactID,
+			BundleCID:   bundleCID,
+			URL:         artifactURL,
+			DownloadURL: downloadURL,
+		})
+	}
+}
+
+func isGradleGateResult(meta *contracts.BuildGateStageMetadata) bool {
+	if meta == nil {
+		return false
+	}
+	if meta.Detected != nil && strings.EqualFold(strings.TrimSpace(meta.Detected.Tool), "gradle") {
+		return true
+	}
+	if len(meta.StaticChecks) == 0 {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(meta.StaticChecks[0].Tool), "gradle")
+}
+
+func gateArtifactURL(serverURL, artifactID string, download bool) string {
+	trimmedID := strings.TrimSpace(artifactID)
+	if trimmedID == "" {
+		return ""
+	}
+	artifactPath := "/v1/artifacts/" + trimmedID
+	if download {
+		artifactPath += "?download=true"
+	}
+	u, err := BuildURL(serverURL, artifactPath)
+	if err != nil {
+		return artifactPath
+	}
+	return u
 }
 
 // buildGateJobStats constructs stats payload for gate job completion.
