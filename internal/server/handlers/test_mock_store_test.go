@@ -236,6 +236,16 @@ type mockStore struct {
 	listSBOMRowsByJobResult []store.Sbom
 	listSBOMRowsByJobErr    error
 
+	hasSBOMEvidenceForStackCalled bool
+	hasSBOMEvidenceForStackParams store.HasSBOMEvidenceForStackParams
+	hasSBOMEvidenceForStackResult bool
+	hasSBOMEvidenceForStackErr    error
+
+	listSBOMCompatRowsCalled bool
+	listSBOMCompatRowsParams store.ListSBOMCompatRowsParams
+	listSBOMCompatRowsResult []store.ListSBOMCompatRowsRow
+	listSBOMCompatRowsErr    error
+
 	// CreateJob tracking
 	createJobCalled    bool
 	createJobCallCount int
@@ -960,6 +970,18 @@ func (m *mockStore) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([
 	m.listSBOMRowsByJobCalled = true
 	m.listSBOMRowsByJobParam = jobID
 	return m.listSBOMRowsByJobResult, m.listSBOMRowsByJobErr
+}
+
+func (m *mockStore) HasSBOMEvidenceForStack(ctx context.Context, arg store.HasSBOMEvidenceForStackParams) (bool, error) {
+	m.hasSBOMEvidenceForStackCalled = true
+	m.hasSBOMEvidenceForStackParams = arg
+	return m.hasSBOMEvidenceForStackResult, m.hasSBOMEvidenceForStackErr
+}
+
+func (m *mockStore) ListSBOMCompatRows(ctx context.Context, arg store.ListSBOMCompatRowsParams) ([]store.ListSBOMCompatRowsRow, error) {
+	m.listSBOMCompatRowsCalled = true
+	m.listSBOMCompatRowsParams = arg
+	return m.listSBOMCompatRowsResult, m.listSBOMCompatRowsErr
 }
 
 func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
