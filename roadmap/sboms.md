@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/store -run 'Test.*SBOM.*(Insert|Query|Constraint)'` — expect valid writes, stable reads, and correct FK/uniqueness behavior.
 
 ## Phase 5: Successful-Gate-Only Ingestion Wiring
-- [ ] Persist SBOM rows only for successful `pre_gate`, `post_gate`, `re_gate` jobs.
+- [x] Persist SBOM rows only for successful `pre_gate`, `post_gate`, `re_gate` jobs.
   - Repository: `ploy`
   - Component: `internal/server/handlers`
   - Scope: wire ingestion into gate completion flow; guard by job type/status so failed/canceled gates do not write SBOM rows.

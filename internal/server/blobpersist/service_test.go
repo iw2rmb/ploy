@@ -441,6 +441,101 @@ func TestLoadRecoveryArtifact_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestExtractSBOMRowsForJob_Success(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	repoID := types.NewRepoID()
+
+	objKey1 := "artifacts/run/" + runID.String() + "/bundle/one.tar.gz"
+	objKey2 := "artifacts/run/" + runID.String() + "/bundle/two.tar.gz"
+
+	bundleOne := mustTarGzBundle(t, map[string][]byte{
+		"out/sbom.spdx.json": []byte(`{
+  "spdxVersion":"SPDX-2.3",
+  "packages":[
+    {"name":"org.example:lib-a","versionInfo":"1.0.0"},
+    {"name":"org.example:lib-b","versionInfo":"2.0.0"}
+  ]
+}`),
+	})
+	bundleTwo := mustTarGzBundle(t, map[string][]byte{
+		"out/cyclonedx.json": []byte(`{
+  "bomFormat":"CycloneDX",
+  "components":[
+    {"name":"org.example:lib-b","version":"2.0.0"},
+    {"name":"org.example:lib-c","version":"3.0.0"}
+  ]
+}`),
+	})
+
+	st := &stubStore{
+		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+			if arg.RunID != runID || arg.JobID == nil || *arg.JobID != jobID {
+				t.Fatalf("unexpected list params: %+v", arg)
+			}
+			return []store.ArtifactBundle{
+				{RunID: runID, JobID: &jobID, ObjectKey: &objKey1},
+				{RunID: runID, JobID: &jobID, ObjectKey: &objKey2},
+			}, nil
+		},
+	}
+	bs := &stubBlobstore{
+		put: func(context.Context, string, string, []byte) (string, error) { return "etag", nil },
+		get: func(_ context.Context, key string) (io.ReadCloser, int64, error) {
+			switch key {
+			case objKey1:
+				return io.NopCloser(bytes.NewReader(bundleOne)), int64(len(bundleOne)), nil
+			case objKey2:
+				return io.NopCloser(bytes.NewReader(bundleTwo)), int64(len(bundleTwo)), nil
+			default:
+				t.Fatalf("unexpected blob key %q", key)
+				return nil, 0, errors.New("unexpected key")
+			}
+		},
+	}
+
+	svc := New(st, bs)
+	rows, err := svc.ExtractSBOMRowsForJob(context.Background(), runID, jobID, repoID)
+	if err != nil {
+		t.Fatalf("ExtractSBOMRowsForJob error: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("row count = %d, want 3", len(rows))
+	}
+	for _, row := range rows {
+		if row.JobID != jobID {
+			t.Fatalf("row job_id=%q, want %q", row.JobID, jobID)
+		}
+		if row.RepoID != repoID {
+			t.Fatalf("row repo_id=%q, want %q", row.RepoID, repoID)
+		}
+	}
+}
+
+func TestExtractSBOMRowsForJob_BlobReadError(t *testing.T) {
+	runID := types.NewRunID()
+	jobID := types.NewJobID()
+	repoID := types.NewRepoID()
+	objKey := "artifacts/run/" + runID.String() + "/bundle/one.tar.gz"
+
+	st := &stubStore{
+		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+			return []store.ArtifactBundle{{RunID: runID, JobID: &jobID, ObjectKey: &objKey}}, nil
+		},
+	}
+	bs := &stubBlobstore{
+		put: func(context.Context, string, string, []byte) (string, error) { return "etag", nil },
+		get: func(_ context.Context, _ string) (io.ReadCloser, int64, error) {
+			return nil, 0, errors.New("blob missing")
+		},
+	}
+
+	svc := New(st, bs)
+	if _, err := svc.ExtractSBOMRowsForJob(context.Background(), runID, jobID, repoID); err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func mustTarGzBundle(t *testing.T, files map[string][]byte) []byte {
 	t.Helper()
 	var b bytes.Buffer

@@ -230,6 +230,12 @@ type mockStore struct {
 	listArtifactBundlesMetaByRunAndJobResult []store.ArtifactBundle
 	listArtifactBundlesMetaByRunAndJobErr    error
 
+	// SBOM row query tracking
+	listSBOMRowsByJobCalled bool
+	listSBOMRowsByJobParam  types.JobID
+	listSBOMRowsByJobResult []store.Sbom
+	listSBOMRowsByJobErr    error
+
 	// CreateJob tracking
 	createJobCalled    bool
 	createJobCallCount int
@@ -287,6 +293,15 @@ type mockStore struct {
 	updateJobMetaCalled bool
 	updateJobMetaParams store.UpdateJobMetaParams
 	updateJobMetaErr    error
+
+	// SBOM mutation tracking
+	deleteSBOMRowsByJobCalled bool
+	deleteSBOMRowsByJobParam  types.JobID
+	deleteSBOMRowsByJobErr    error
+
+	upsertSBOMRowCalled bool
+	upsertSBOMRowParams []store.UpsertSBOMRowParams
+	upsertSBOMRowErr    error
 
 	// UpsertJobMetric tracking
 	upsertJobMetricCalled bool
@@ -941,6 +956,12 @@ func (m *mockStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg 
 	return m.listArtifactBundlesMetaByRunAndJobResult, m.listArtifactBundlesMetaByRunAndJobErr
 }
 
+func (m *mockStore) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]store.Sbom, error) {
+	m.listSBOMRowsByJobCalled = true
+	m.listSBOMRowsByJobParam = jobID
+	return m.listSBOMRowsByJobResult, m.listSBOMRowsByJobErr
+}
+
 func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
 	m.createJobCalled = true
 	m.createJobCallCount++
@@ -1076,6 +1097,18 @@ func (m *mockStore) UpdateJobMeta(ctx context.Context, params store.UpdateJobMet
 	m.updateJobMetaCalled = true
 	m.updateJobMetaParams = params
 	return m.updateJobMetaErr
+}
+
+func (m *mockStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error {
+	m.deleteSBOMRowsByJobCalled = true
+	m.deleteSBOMRowsByJobParam = jobID
+	return m.deleteSBOMRowsByJobErr
+}
+
+func (m *mockStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
+	m.upsertSBOMRowCalled = true
+	m.upsertSBOMRowParams = append(m.upsertSBOMRowParams, arg)
+	return m.upsertSBOMRowErr
 }
 
 func (m *mockStore) UpsertJobMetric(ctx context.Context, params store.UpsertJobMetricParams) error {
