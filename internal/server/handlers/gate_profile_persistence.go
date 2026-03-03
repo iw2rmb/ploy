@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type gateProfileStackRow struct {
@@ -123,7 +123,6 @@ func resolveGateProfileStackRow(
 	job store.Job,
 	gateMeta *contracts.BuildGateStageMetadata,
 ) (gateProfileStackRow, error) {
-	pool := st.Pool()
 	exp := gateMeta.DetectedStackExpectation()
 
 	if exp != nil {
@@ -131,7 +130,7 @@ func resolveGateProfileStackRow(
 		tool := strings.TrimSpace(exp.Tool)
 		release := strings.TrimSpace(exp.Release)
 		if lang != "" && tool != "" && release != "" {
-			row, err := queryStackRowByExpectation(ctx, pool, lang, tool, release)
+			row, err := queryStackRowByExpectation(ctx, st, lang, tool, release)
 			if err == nil {
 				return row, nil
 			}
@@ -140,7 +139,7 @@ func resolveGateProfileStackRow(
 			}
 		}
 		if lang != "" && tool != "" {
-			row, err := queryStackRowByLangTool(ctx, pool, lang, tool)
+			row, err := queryStackRowByLangTool(ctx, st, lang, tool)
 			if err == nil {
 				return row, nil
 			}
@@ -151,7 +150,7 @@ func resolveGateProfileStackRow(
 	}
 
 	if image := strings.TrimSpace(job.JobImage); image != "" {
-		row, err := queryStackRowByImage(ctx, pool, image)
+		row, err := queryStackRowByImage(ctx, st, image)
 		if err == nil {
 			return row, nil
 		}
@@ -163,58 +162,50 @@ func resolveGateProfileStackRow(
 	return gateProfileStackRow{}, fmt.Errorf("unable to resolve stack for successful gate profile persistence")
 }
 
-func queryStackRowByExpectation(ctx context.Context, pool *pgxpool.Pool, lang, tool, release string) (gateProfileStackRow, error) {
-	var row gateProfileStackRow
-	err := pool.QueryRow(ctx, `
-SELECT id, lang, COALESCE(tool, ''), release
-FROM ploy.stacks
-WHERE lang = $1
-  AND COALESCE(tool, '') = $2
-  AND release = $3
-ORDER BY id ASC
-LIMIT 1
-`, lang, tool, release).Scan(
-		&row.ID,
-		&row.Lang,
-		&row.Tool,
-		&row.Release,
-	)
-	return row, err
+func queryStackRowByExpectation(ctx context.Context, st store.Store, lang, tool, release string) (gateProfileStackRow, error) {
+	got, err := st.ResolveStackRowByLangToolRelease(ctx, store.ResolveStackRowByLangToolReleaseParams{
+		Lang:    lang,
+		Tool:    tool,
+		Release: release,
+	})
+	if err != nil {
+		return gateProfileStackRow{}, err
+	}
+	return gateProfileStackRow{
+		ID:      got.ID,
+		Lang:    got.Lang,
+		Tool:    got.Tool,
+		Release: got.Release,
+	}, nil
 }
 
-func queryStackRowByLangTool(ctx context.Context, pool *pgxpool.Pool, lang, tool string) (gateProfileStackRow, error) {
-	var row gateProfileStackRow
-	err := pool.QueryRow(ctx, `
-SELECT id, lang, COALESCE(tool, ''), release
-FROM ploy.stacks
-WHERE lang = $1
-  AND COALESCE(tool, '') = $2
-ORDER BY id ASC
-LIMIT 1
-`, lang, tool).Scan(
-		&row.ID,
-		&row.Lang,
-		&row.Tool,
-		&row.Release,
-	)
-	return row, err
+func queryStackRowByLangTool(ctx context.Context, st store.Store, lang, tool string) (gateProfileStackRow, error) {
+	got, err := st.ResolveStackRowByLangTool(ctx, store.ResolveStackRowByLangToolParams{
+		Lang: lang,
+		Tool: tool,
+	})
+	if err != nil {
+		return gateProfileStackRow{}, err
+	}
+	return gateProfileStackRow{
+		ID:      got.ID,
+		Lang:    got.Lang,
+		Tool:    got.Tool,
+		Release: got.Release,
+	}, nil
 }
 
-func queryStackRowByImage(ctx context.Context, pool *pgxpool.Pool, image string) (gateProfileStackRow, error) {
-	var row gateProfileStackRow
-	err := pool.QueryRow(ctx, `
-SELECT id, lang, COALESCE(tool, ''), release
-FROM ploy.stacks
-WHERE image = $1
-ORDER BY id ASC
-LIMIT 1
-`, image).Scan(
-		&row.ID,
-		&row.Lang,
-		&row.Tool,
-		&row.Release,
-	)
-	return row, err
+func queryStackRowByImage(ctx context.Context, st store.Store, image string) (gateProfileStackRow, error) {
+	got, err := st.ResolveStackRowByImage(ctx, image)
+	if err != nil {
+		return gateProfileStackRow{}, err
+	}
+	return gateProfileStackRow{
+		ID:      got.ID,
+		Lang:    got.Lang,
+		Tool:    got.Tool,
+		Release: got.Release,
+	}, nil
 }
 
 func buildSuccessfulGateProfilePayload(
@@ -338,42 +329,104 @@ func upsertSuccessfulGateProfileRow(
 	stackID int64,
 	objectKey string,
 ) (int64, error) {
-	var profileID int64
-	err := st.Pool().QueryRow(ctx, `
-INSERT INTO ploy.gate_profiles (
-  repo_id,
-  repo_sha,
-  repo_sha8,
-  stack_id,
-  url
-)
-VALUES ($1, $2, SUBSTRING($2, 1, 8), $3, $4)
-ON CONFLICT (repo_id, repo_sha, stack_id)
-DO UPDATE SET
-  url = EXCLUDED.url,
-  repo_sha8 = EXCLUDED.repo_sha8,
-  updated_at = now()
-RETURNING id
-`, repoID, repoSHA, stackID, objectKey).Scan(&profileID)
+	got, err := st.UpsertExactGateProfile(ctx, store.UpsertExactGateProfileParams{
+		RepoID:  repoID.String(),
+		RepoSha: repoSHA,
+		StackID: stackID,
+		Url:     objectKey,
+	})
 	if err != nil {
 		return 0, fmt.Errorf("upsert successful gate profile row: %w", err)
 	}
-	return profileID, nil
+	return got.ID, nil
 }
 
 func upsertSuccessfulGateJobProfileLink(ctx context.Context, st store.Store, jobID domaintypes.JobID, profileID int64) error {
-	_, err := st.Pool().Exec(ctx, `
-INSERT INTO ploy.gates (
-  job_id,
-  profile_id
-)
-VALUES ($1, $2)
-ON CONFLICT (job_id)
-DO UPDATE SET
-  profile_id = EXCLUDED.profile_id
-`, jobID, profileID)
+	err := st.UpsertGateJobProfileLink(ctx, store.UpsertGateJobProfileLinkParams{
+		JobID:     jobID.String(),
+		ProfileID: profileID,
+	})
 	if err != nil {
 		return fmt.Errorf("upsert gate job profile link: %w", err)
 	}
 	return nil
+}
+
+func persistReGateRecoveryCandidateProfile(
+	ctx context.Context,
+	st store.Store,
+	bs blobstore.Store,
+	job store.Job,
+	recovery *contracts.BuildGateRecoveryMetadata,
+) error {
+	if bs == nil || recovery == nil {
+		return nil
+	}
+	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeReGate {
+		return nil
+	}
+
+	candidateRaw := append([]byte(nil), recovery.CandidateGateProfile...)
+	profile, err := contracts.ParseGateProfileJSON(candidateRaw)
+	if err != nil {
+		return fmt.Errorf("parse candidate gate profile: %w", err)
+	}
+
+	repoSHA, err := resolveGateProfileRepoSHA(job)
+	if err != nil {
+		return err
+	}
+
+	stackRow, err := resolveStackRowForProfile(ctx, st, profile)
+	if err != nil {
+		return err
+	}
+
+	objectKey := fmt.Sprintf(
+		"gate-profiles/repos/%s/%s/stack-%d/profile-%d.json",
+		job.RepoID.String(),
+		repoSHA,
+		stackRow.ID,
+		time.Now().UTC().UnixNano(),
+	)
+	if _, err := bs.Put(ctx, objectKey, "application/json", candidateRaw); err != nil {
+		return fmt.Errorf("put candidate gate profile blob: %w", err)
+	}
+
+	profileID, err := upsertSuccessfulGateProfileRow(ctx, st, job.RepoID, repoSHA, stackRow.ID, objectKey)
+	if err != nil {
+		return err
+	}
+	return upsertSuccessfulGateJobProfileLink(ctx, st, job.ID, profileID)
+}
+
+func resolveStackRowForProfile(ctx context.Context, st store.Store, profile *contracts.GateProfile) (gateProfileStackRow, error) {
+	if profile == nil {
+		return gateProfileStackRow{}, fmt.Errorf("candidate gate profile is required")
+	}
+	lang := strings.TrimSpace(profile.Stack.Language)
+	tool := strings.TrimSpace(profile.Stack.Tool)
+	release := strings.TrimSpace(profile.Stack.Release)
+	if lang == "" || tool == "" {
+		return gateProfileStackRow{}, fmt.Errorf("candidate gate profile stack requires language and tool")
+	}
+
+	if release != "" {
+		row, err := queryStackRowByExpectation(ctx, st, lang, tool, release)
+		if err == nil {
+			return row, nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return gateProfileStackRow{}, err
+		}
+	}
+
+	row, err := queryStackRowByLangTool(ctx, st, lang, tool)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return gateProfileStackRow{}, fmt.Errorf("resolve stack for candidate gate profile: %w", err)
+		}
+		return gateProfileStackRow{}, err
+	}
+	return row, nil
 }

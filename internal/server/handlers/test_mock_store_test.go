@@ -316,6 +316,30 @@ type mockStore struct {
 	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
 	promoteReGateRecoveryCandidateGateProfileErr    error
 
+	resolveStackRowByImageCalled bool
+	resolveStackRowByImageParam  string
+	resolveStackRowByImageResult store.ResolveStackRowByImageRow
+	resolveStackRowByImageErr    error
+
+	resolveStackRowByLangToolCalled bool
+	resolveStackRowByLangToolParam  store.ResolveStackRowByLangToolParams
+	resolveStackRowByLangToolResult store.ResolveStackRowByLangToolRow
+	resolveStackRowByLangToolErr    error
+
+	resolveStackRowByLangToolReleaseCalled bool
+	resolveStackRowByLangToolReleaseParam  store.ResolveStackRowByLangToolReleaseParams
+	resolveStackRowByLangToolReleaseResult store.ResolveStackRowByLangToolReleaseRow
+	resolveStackRowByLangToolReleaseErr    error
+
+	upsertExactGateProfileCalled bool
+	upsertExactGateProfileParam  store.UpsertExactGateProfileParams
+	upsertExactGateProfileResult store.UpsertExactGateProfileRow
+	upsertExactGateProfileErr    error
+
+	upsertGateJobProfileLinkCalled bool
+	upsertGateJobProfileLinkParam  store.UpsertGateJobProfileLinkParams
+	upsertGateJobProfileLinkErr    error
+
 	// UpdateJobNextID tracking
 	updateJobNextIDCalled bool
 	updateJobNextIDParams []store.UpdateJobNextIDParams
@@ -1125,6 +1149,67 @@ func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Contex
 		return m.getJobResult.RepoID, nil
 	}
 	return "", pgx.ErrNoRows
+}
+
+func (m *mockStore) ResolveStackRowByImage(ctx context.Context, image string) (store.ResolveStackRowByImageRow, error) {
+	m.resolveStackRowByImageCalled = true
+	m.resolveStackRowByImageParam = image
+	if m.resolveStackRowByImageErr != nil {
+		return store.ResolveStackRowByImageRow{}, m.resolveStackRowByImageErr
+	}
+	if m.resolveStackRowByImageResult.ID == 0 {
+		return store.ResolveStackRowByImageRow{}, pgx.ErrNoRows
+	}
+	return m.resolveStackRowByImageResult, nil
+}
+
+func (m *mockStore) ResolveStackRowByLangTool(ctx context.Context, arg store.ResolveStackRowByLangToolParams) (store.ResolveStackRowByLangToolRow, error) {
+	m.resolveStackRowByLangToolCalled = true
+	m.resolveStackRowByLangToolParam = arg
+	if m.resolveStackRowByLangToolErr != nil {
+		return store.ResolveStackRowByLangToolRow{}, m.resolveStackRowByLangToolErr
+	}
+	if m.resolveStackRowByLangToolResult.ID == 0 {
+		return store.ResolveStackRowByLangToolRow{}, pgx.ErrNoRows
+	}
+	return m.resolveStackRowByLangToolResult, nil
+}
+
+func (m *mockStore) ResolveStackRowByLangToolRelease(ctx context.Context, arg store.ResolveStackRowByLangToolReleaseParams) (store.ResolveStackRowByLangToolReleaseRow, error) {
+	m.resolveStackRowByLangToolReleaseCalled = true
+	m.resolveStackRowByLangToolReleaseParam = arg
+	if m.resolveStackRowByLangToolReleaseErr != nil {
+		return store.ResolveStackRowByLangToolReleaseRow{}, m.resolveStackRowByLangToolReleaseErr
+	}
+	if m.resolveStackRowByLangToolReleaseResult.ID == 0 {
+		return store.ResolveStackRowByLangToolReleaseRow{}, pgx.ErrNoRows
+	}
+	return m.resolveStackRowByLangToolReleaseResult, nil
+}
+
+func (m *mockStore) UpsertExactGateProfile(ctx context.Context, arg store.UpsertExactGateProfileParams) (store.UpsertExactGateProfileRow, error) {
+	m.upsertExactGateProfileCalled = true
+	m.upsertExactGateProfileParam = arg
+	if m.upsertExactGateProfileErr != nil {
+		return store.UpsertExactGateProfileRow{}, m.upsertExactGateProfileErr
+	}
+	if m.upsertExactGateProfileResult.ID != 0 {
+		return m.upsertExactGateProfileResult, nil
+	}
+	return store.UpsertExactGateProfileRow{
+		ID:       1,
+		RepoID:   arg.RepoID,
+		RepoSha:  arg.RepoSha,
+		RepoSha8: "",
+		StackID:  arg.StackID,
+		Url:      arg.Url,
+	}, nil
+}
+
+func (m *mockStore) UpsertGateJobProfileLink(ctx context.Context, arg store.UpsertGateJobProfileLinkParams) error {
+	m.upsertGateJobProfileLinkCalled = true
+	m.upsertGateJobProfileLinkParam = arg
+	return m.upsertGateJobProfileLinkErr
 }
 
 func (m *mockStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {

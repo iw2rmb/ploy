@@ -32,9 +32,15 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{ID: f.RunID, Status: store.RunStatusStarted},
 		getJobResult: f.Job,
+		resolveStackRowByLangToolResult: store.ResolveStackRowByLangToolRow{
+			ID:      7,
+			Lang:    "go",
+			Tool:    "go",
+			Release: "",
+		},
 	}
 
-	handler := completeJobHandler(st, nil, nil)
+	handler := completeJobHandler(st, nil, nil, bsmock.New())
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
 		"status": "Success",
@@ -51,11 +57,21 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !st.promoteReGateRecoveryCandidateGateProfileCalled {
-		t.Fatal("expected PromoteReGateRecoveryCandidateGateProfile to be called")
+	if !st.upsertExactGateProfileCalled {
+		t.Fatal("expected UpsertExactGateProfile to be called")
 	}
-	if st.promoteReGateRecoveryCandidateGateProfileParams.ID != f.Job.ID {
-		t.Fatalf("promotion job id mismatch: got=%s want=%s", st.promoteReGateRecoveryCandidateGateProfileParams.ID, f.Job.ID)
+	if !st.upsertGateJobProfileLinkCalled {
+		t.Fatal("expected UpsertGateJobProfileLink to be called")
+	}
+	if !st.updateJobMetaCalled {
+		t.Fatal("expected UpdateJobMeta to be called")
+	}
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
+	if err != nil {
+		t.Fatalf("unmarshal promoted meta: %v", err)
+	}
+	if meta.Recovery == nil || meta.Recovery.CandidatePromoted == nil || !*meta.Recovery.CandidatePromoted {
+		t.Fatalf("candidate_promoted = %#v, want true", meta.Recovery)
 	}
 }
 
@@ -132,8 +148,8 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if st.promoteReGateRecoveryCandidateGateProfileCalled {
-		t.Fatal("did not expect promotion call on failed re-gate")
+	if st.upsertExactGateProfileCalled {
+		t.Fatal("did not expect gate profile persistence on failed re-gate")
 	}
 }
 
