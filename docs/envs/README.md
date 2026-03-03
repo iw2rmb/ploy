@@ -569,7 +569,9 @@ staying isolated from Maven/Gradle project task execution.
 
 `orw-cli` ships a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
 by an embedded standalone runner JAR. `ORW_CLI_BIN` defaults to this bundled
-binary and should only be overridden for controlled debugging.
+binary and should only be overridden for controlled debugging. Recipes are
+resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION`; no
+per-recipe image rebuild is required.
 
 ### Security Considerations
 
