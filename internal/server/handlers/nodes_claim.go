@@ -207,6 +207,14 @@ func buildAndSendJobClaimResponse(
 	if err != nil {
 		return err
 	}
+
+	var stepSkip *contracts.ModStepSkipMetadata
+	if jobType == domaintypes.JobTypeMod {
+		stepSkip, err = resolveAndPersistModStepSkip(r.Context(), st, job, mergedSpec)
+		if err != nil {
+			return fmt.Errorf("resolve step skip metadata: %w", err)
+		}
+	}
 	recoveryCtx, err := buildRecoveryClaimContext(r.Context(), st, run.ID, job, jobType)
 	if err != nil {
 		return fmt.Errorf("build recovery context: %w", err)
@@ -236,6 +244,7 @@ func buildAndSendJobClaimResponse(
 		Spec                   json.RawMessage                  `json:"spec,omitempty"`
 		RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 		GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
+		StepSkip               *contracts.ModStepSkipMetadata   `json:"step_skip,omitempty"`
 	}{
 		RunID:                  run.ID,
 		Name:                   nil,
@@ -258,6 +267,7 @@ func buildAndSendJobClaimResponse(
 		Spec:                   mergedSpec,
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
+		StepSkip:               stepSkip,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

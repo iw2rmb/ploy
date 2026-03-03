@@ -85,7 +85,8 @@ type ServerMetadataOptions struct {
 // Each step has its own container spec and optional Stack Gate validation.
 type StepMod struct {
 	ModContainerSpec
-	Stack *contracts.StackGateSpec
+	Stack  *contracts.StackGateSpec
+	Always bool
 }
 
 // modsSpecToRunOptions converts contracts.ModsSpec directly to RunOptions.
@@ -167,7 +168,8 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 					Command: step.Command,
 					Env:     copyStringMap(step.Env),
 				},
-				Stack: step.Stack,
+				Stack:  step.Stack,
+				Always: step.Always,
 			})
 		}
 	}

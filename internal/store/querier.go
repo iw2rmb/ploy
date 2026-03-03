@@ -107,6 +107,7 @@ type Querier interface {
 	// Returns pgx.ErrNoRows if the key does not exist.
 	GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
+	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
 	GetLatestRepoGateProfile(ctx context.Context, arg GetLatestRepoGateProfileParams) (GetLatestRepoGateProfileRow, error)
 	// v1: Gets the newest run_repos row for a specific repo_id in a mig,
 	// filtered by terminal status (Success or Fail).
@@ -126,6 +127,7 @@ type Querier interface {
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
+	GetStepByJob(ctx context.Context, jobID string) (Step, error)
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
@@ -238,6 +240,7 @@ type Querier interface {
 	ResolveAnyStackID(ctx context.Context) (int64, error)
 	ResolvePreGateCreationBindingByRepoSHA(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAParams) (ResolvePreGateCreationBindingByRepoSHARow, error)
 	ResolvePreGateCreationBindingByRepoSHAAndStack(ctx context.Context, arg ResolvePreGateCreationBindingByRepoSHAAndStackParams) (ResolvePreGateCreationBindingByRepoSHAAndStackRow, error)
+	ResolveReusableStepByHash(ctx context.Context, arg ResolveReusableStepByHashParams) (ResolveReusableStepByHashRow, error)
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
 	ResolveStackIDByRepoSHA(ctx context.Context, arg ResolveStackIDByRepoSHAParams) (int64, error)
 	ResolveStackRowByImage(ctx context.Context, image string) (ResolveStackRowByImageRow, error)
@@ -289,6 +292,7 @@ type Querier interface {
 	// Bulk upsert a mig_repo by normalized repo_url.
 	// Uniqueness is on (mig_id, repo_id) to prevent duplicate repo membership per mig.
 	UpsertMigRepo(ctx context.Context, arg UpsertMigRepoParams) (MigRepo, error)
+	UpsertStep(ctx context.Context, arg UpsertStepParams) error
 }
 
 var _ Querier = (*Queries)(nil)

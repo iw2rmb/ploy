@@ -282,6 +282,19 @@ CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, 
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
 
+-- Steps cache metadata keyed by execution job.
+-- Stores canonicalized step ops payload, deterministic hash, and optional reference
+-- to a previously successful job whose diff can be reused.
+CREATE TABLE IF NOT EXISTS steps (
+  job_id       TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+  ops          JSONB NOT NULL DEFAULT '{}'::jsonb,
+  hash         TEXT NOT NULL CHECK (hash ~ '^[0-9a-f]{64}$'),
+  ref_job_id   TEXT REFERENCES jobs(id) ON DELETE SET NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS steps_hash_idx ON steps(hash);
+CREATE INDEX IF NOT EXISTS steps_ref_job_idx ON steps(ref_job_id) WHERE ref_job_id IS NOT NULL;
+
 -- Gate executions mapped to resolved gate profile rows.
 -- One gate record per job_id.
 CREATE TABLE IF NOT EXISTS gates (

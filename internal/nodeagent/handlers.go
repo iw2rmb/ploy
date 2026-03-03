@@ -56,6 +56,8 @@ type StartRunRequest struct {
 	RecoveryContext *contracts.RecoveryClaimContext `json:"recovery_context,omitempty"`
 	// GateSkip carries optional skip metadata for gate jobs.
 	GateSkip *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
+	// StepSkip carries optional cache-hit skip metadata for mig jobs.
+	StepSkip *contracts.ModStepSkipMetadata `json:"step_skip,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions

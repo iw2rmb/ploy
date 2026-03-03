@@ -205,6 +205,18 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 			}
 		}
 
+		if normalizedStatus == store.JobStatusSuccess {
+			if err := maybeCloneSkippedStepDiffBeforeCompletion(ctx, st, bp, job); err != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to clone skipped step diff: %v", err)
+				slog.Error("complete job: clone skipped step diff failed",
+					"job_id", jobID,
+					"repo_id", job.RepoID,
+					"err", err,
+				)
+				return
+			}
+		}
+
 		// Persist per-job resource consumption metrics when provided.
 		if statsPayload.HasJobResources() {
 			res := statsPayload.JobResources

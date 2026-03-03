@@ -28,6 +28,33 @@ import (
 func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
+	if req.StepSkip != nil {
+		if err := req.StepSkip.Validate(); err != nil {
+			err = fmt.Errorf("invalid step_skip metadata: %w", err)
+			slog.Error("failed to apply step skip", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+			return
+		}
+
+		duration := time.Since(startTime)
+		statsBuilder := types.NewRunStatsBuilder().
+			ExitCode(0).
+			DurationMs(duration.Milliseconds()).
+			MetadataEntry("step_skip", "true").
+			MetadataEntry("step_skip_ref_job_id", req.StepSkip.RefJobID.String())
+		if strings.TrimSpace(req.StepSkip.Hash) != "" {
+			statsBuilder.MetadataEntry("step_skip_hash", strings.TrimSpace(req.StepSkip.Hash))
+		}
+		stats := statsBuilder.MustBuild()
+
+		var exitCodeZero int32 = 0
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, strings.TrimSpace(req.StepSkip.RefRepoSHAOut)); uploadErr != nil {
+			slog.Error("failed to upload step-skip success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		}
+		slog.Info("mig job skipped via step cache", "run_id", req.RunID, "job_id", req.JobID, "ref_job_id", req.StepSkip.RefJobID, "repo_sha_out", req.StepSkip.RefRepoSHAOut)
+		return
+	}
+
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
 	// ModStackUnknown which falls back to "default" in stack maps.

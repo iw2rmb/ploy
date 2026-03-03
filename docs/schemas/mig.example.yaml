@@ -70,6 +70,7 @@ env_from_file:
 # - All migs share the same repository, base_ref, target_ref, and global gate policy.
 # - Each mig step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
+# - Optional `always: true` on a step disables step-cache reuse for that step.
 #
 # Each entry in migs[] supports the same `image` field as the single-step spec:
 # - String form: `image: docker.io/user/mig:latest` (universal, any stack)
@@ -87,6 +88,7 @@ env_from_file:
 #     env:
 #       MIGRATION_TARGET: java17
 #       RECIPE_VERSION: "3.20.0"
+#     always: true
 #
 # Example with stack-specific images (for dedicated Maven/Gradle containers):
 # migs:

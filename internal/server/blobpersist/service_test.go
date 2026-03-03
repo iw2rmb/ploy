@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
@@ -24,6 +25,7 @@ type stubStore struct {
 	deleteLog                          func(ctx context.Context, id int64) error
 	createDiff                         func(ctx context.Context, arg store.CreateDiffParams) (store.Diff, error)
 	deleteDiff                         func(ctx context.Context, id pgtype.UUID) error
+	getLatestDiffByJob                 func(ctx context.Context, jobID *types.JobID) (store.Diff, error)
 	createArtifactBundle               func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error)
 	deleteArtifactBundle               func(ctx context.Context, id pgtype.UUID) error
 	listArtifactBundlesMetaByRunAndJob func(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error)
@@ -43,6 +45,10 @@ func (s *stubStore) CreateDiff(ctx context.Context, arg store.CreateDiffParams) 
 
 func (s *stubStore) DeleteDiff(ctx context.Context, id pgtype.UUID) error {
 	return s.deleteDiff(ctx, id)
+}
+
+func (s *stubStore) GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (store.Diff, error) {
+	return s.getLatestDiffByJob(ctx, jobID)
 }
 
 func (s *stubStore) CreateArtifactBundle(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
@@ -227,6 +233,83 @@ func TestCreateArtifactBundle_RollsBackMetadataOnUploadFailure(t *testing.T) {
 	}
 	if deleted != artifactID {
 		t.Fatalf("DeleteArtifactBundle id mismatch")
+	}
+}
+
+func TestCloneLatestDiffByJob_ClonesSourceDiff(t *testing.T) {
+	sourceJobID := types.JobID("source-job")
+	targetJobID := types.JobID("target-job")
+	runID := types.NewRunID()
+
+	sourceDiffID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	targetDiffID := pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	sourceObjectKey := "diffs/source.patch.gz"
+	patch := []byte("gzipped-source-patch")
+
+	var created store.CreateDiffParams
+	st := &stubStore{
+		getLatestDiffByJob: func(_ context.Context, jobID *types.JobID) (store.Diff, error) {
+			if jobID != nil && *jobID == targetJobID {
+				return store.Diff{}, pgx.ErrNoRows
+			}
+			if jobID != nil && *jobID == sourceJobID {
+				return store.Diff{
+					ID:        sourceDiffID,
+					RunID:     runID,
+					JobID:     &sourceJobID,
+					PatchSize: int64(len(patch)),
+					ObjectKey: &sourceObjectKey,
+					Summary:   []byte(`{"job_type":"mig"}`),
+				}, nil
+			}
+			return store.Diff{}, pgx.ErrNoRows
+		},
+		createDiff: func(_ context.Context, arg store.CreateDiffParams) (store.Diff, error) {
+			created = arg
+			targetObjectKey := "diffs/target.patch.gz"
+			return store.Diff{
+				ID:        targetDiffID,
+				RunID:     arg.RunID,
+				JobID:     arg.JobID,
+				PatchSize: arg.PatchSize,
+				ObjectKey: &targetObjectKey,
+				Summary:   arg.Summary,
+			}, nil
+		},
+		deleteDiff: func(context.Context, pgtype.UUID) error { return nil },
+	}
+
+	bs := &stubBlobstore{
+		get: func(_ context.Context, key string) (io.ReadCloser, int64, error) {
+			if key != sourceObjectKey {
+				t.Fatalf("Get key=%q, want %q", key, sourceObjectKey)
+			}
+			return io.NopCloser(bytes.NewReader(patch)), int64(len(patch)), nil
+		},
+		put: func(_ context.Context, key, contentType string, payload []byte) (string, error) {
+			if contentType != "application/gzip" {
+				t.Fatalf("Put contentType=%q, want application/gzip", contentType)
+			}
+			if !bytes.Equal(payload, patch) {
+				t.Fatalf("Put payload mismatch: got %q want %q", payload, patch)
+			}
+			return "etag", nil
+		},
+	}
+
+	svc := New(st, bs)
+	if err := svc.CloneLatestDiffByJob(context.Background(), sourceJobID.String(), runID.String(), targetJobID.String()); err != nil {
+		t.Fatalf("CloneLatestDiffByJob() error = %v", err)
+	}
+
+	if created.RunID != runID {
+		t.Fatalf("created.RunID=%q, want %q", created.RunID, runID)
+	}
+	if created.JobID == nil || *created.JobID != targetJobID {
+		t.Fatalf("created.JobID=%v, want %q", created.JobID, targetJobID)
+	}
+	if string(created.Summary) != `{"job_type":"mig"}` {
+		t.Fatalf("created.Summary=%s, want source summary", string(created.Summary))
 	}
 }
 

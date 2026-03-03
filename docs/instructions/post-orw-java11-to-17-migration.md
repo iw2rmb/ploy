@@ -54,6 +54,8 @@ Actions:
   - `gradle.properties`
   - `buildSrc` or convention plugins
   - Any `jvmTarget`, `javaVersion`, `javaLanguageVersion`, or similar keys.
+- In Gradle build files, replace JavaVersion short constants:
+  - `= VERSION_11` → `= VERSION_17`
 - For each constant that is wired into **both**:
   - `JavaPluginExtension` (`sourceCompatibility`, `targetCompatibility`), and
   - Kotlin compile tasks (`kotlinOptions.jvmTarget` or `jvmToolchain`),
