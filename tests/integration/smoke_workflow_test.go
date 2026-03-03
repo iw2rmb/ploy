@@ -51,7 +51,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	modRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
 		ID:        modRepoID,
 		MigID:     modID,
-		RepoUrl:   repoURL,
+		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
@@ -73,7 +73,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
 		MigID:         modID,
 		RunID:         run.ID,
-		RepoID:        modRepo.ID,
+		RepoID:        modRepo.RepoID,
 		RepoBaseRef:   baseRef,
 		RepoTargetRef: targetRef,
 	})

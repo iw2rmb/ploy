@@ -64,7 +64,7 @@ func TestLabSmoke(t *testing.T) {
 	modRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
 		ID:        modRepoID,
 		MigID:     modID,
-		RepoUrl:   repoURL,
+		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
 	})
@@ -87,7 +87,7 @@ func TestLabSmoke(t *testing.T) {
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
 		MigID:         modID,
 		RunID:         run.ID,
-		RepoID:        modRepo.ID,
+		RepoID:        modRepo.RepoID,
 		RepoBaseRef:   modRepo.BaseRef,
 		RepoTargetRef: modRepo.TargetRef,
 	})
