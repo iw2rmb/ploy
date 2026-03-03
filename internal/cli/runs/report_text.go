@@ -239,7 +239,7 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 	}
 
 	msg := ""
-	prefix := ""
+	colorizeContent := false
 	if normalizeStatus(job.JobType) == "heal" {
 		msg = strings.TrimSpace(job.ActionSummary)
 		if msg == "" {
@@ -258,12 +258,53 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 			if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
 				errorKind = normalizeStatus(job.Recovery.ErrorKind)
 			}
-			prefix = "\x1b[1;91m<" + errorKind + ">\x1b[0m "
+			msg = errorKind + " " + msg
 		}
-		msg = "\x1b[91m" + msg + "\x1b[0m"
+		colorizeContent = true
 	}
 
-	return prefix + "└  Exit " + renderExitCode(job.ExitCode) + ": " + msg
+	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, colorizeContent)
+}
+
+func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) string {
+	const wrapWidth = 100
+
+	content = strings.Join(strings.Fields(strings.TrimSpace(content)), " ")
+	prefix := "└  Exit " + exitCode + ": "
+	indent := strings.Repeat(" ", len(prefix))
+	wrapped := wrapFixedWidth(content, wrapWidth)
+	lines := make([]string, 0, len(wrapped))
+	for i, line := range wrapped {
+		if colorizeContent {
+			line = ansiErrorLightRed + line + ansiColorReset
+		}
+		if i == 0 {
+			lines = append(lines, prefix+line)
+			continue
+		}
+		lines = append(lines, indent+line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func wrapFixedWidth(content string, width int) []string {
+	if width <= 0 {
+		return []string{content}
+	}
+	runes := []rune(content)
+	if len(runes) == 0 {
+		return []string{""}
+	}
+	lines := make([]string, 0, (len(runes)+width-1)/width)
+	for len(runes) > 0 {
+		chunkLen := width
+		if len(runes) < width {
+			chunkLen = len(runes)
+		}
+		lines = append(lines, string(runes[:chunkLen]))
+		runes = runes[chunkLen:]
+	}
+	return lines
 }
 
 func isGateJobType(jobType string) bool {

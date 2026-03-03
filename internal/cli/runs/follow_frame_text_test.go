@@ -50,6 +50,37 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 	}
 }
 
+func TestRenderFollowFrameText_RendersMultiLineExitOneLiner(t *testing.T) {
+	t.Parallel()
+
+	frame := FollowFrame{
+		Repos: []FollowRepoFrame{
+			{
+				Columns: []string{"", "Step"},
+				Rows: []FollowStepRow{
+					{
+						Cells:        []string{"✗", "pre_gate"},
+						ExitOneLiner: "└  Exit 1: first line\n             second line",
+					},
+				},
+			},
+		},
+	}
+
+	out, lines := RenderFollowFrameText(frame)
+	assertContains := func(needle string) {
+		t.Helper()
+		if !strings.Contains(out, needle) {
+			t.Fatalf("expected output to contain %q, got %q", needle, out)
+		}
+	}
+	assertContains("└  Exit 1: first line")
+	assertContains("             second line")
+	if lines != strings.Count(out, "\n") {
+		t.Fatalf("line count mismatch: got %d want %d", lines, strings.Count(out, "\n"))
+	}
+}
+
 func TestRenderFollowFrameText_RightAlignsDurationColumn(t *testing.T) {
 	t.Parallel()
 

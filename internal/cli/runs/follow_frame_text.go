@@ -103,7 +103,9 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 			if strings.TrimSpace(row.ExitOneLiner) == "" {
 				continue
 			}
-			appendLine(row.ExitOneLiner)
+			for _, exitLine := range strings.Split(row.ExitOneLiner, "\n") {
+				appendLine(exitLine)
+			}
 		}
 		sectionRanges[i] = followDynamicSectionRange{start: sectionStart, count: lineNo - sectionStart}
 	}
