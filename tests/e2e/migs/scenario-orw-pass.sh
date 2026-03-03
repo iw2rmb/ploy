@@ -18,12 +18,11 @@ RECIPE_GROUP=org.openrewrite.recipe
 RECIPE_ARTIFACT=rewrite-migrate-java
 RECIPE_VERSION=3.20.0
 RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17
-MAVEN_PLUGIN_VERSION=6.18.0
 
-# Artifacts directory: default to ./tmp/migs/orw-maven/<YYMMDDHHmmss>/
+# Artifacts directory: default to ./tmp/migs/orw-cli/<YYMMDDHHmmss>/
 # override with PLOY_E2E_ARTIFACT_DIR or PLOY_E2E_ARTIFACT_BASE.
 TS=$(date +%y%m%d%H%M%S)
-ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/orw-maven}
+ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/migs/orw-cli}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
@@ -41,12 +40,11 @@ RUN=("$REPO_ROOT/dist/ploy" mig run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
-  --job-image "${PLOY_CONTAINER_REGISTRY}/migs-orw-maven:latest" \
+  --job-image "${PLOY_CONTAINER_REGISTRY}/orw-cli:latest" \
   --job-env RECIPE_GROUP="$RECIPE_GROUP" \
   --job-env RECIPE_ARTIFACT="$RECIPE_ARTIFACT" \
   --job-env RECIPE_VERSION="$RECIPE_VERSION" \
   --job-env RECIPE_CLASSNAME="$RECIPE_CLASSNAME" \
-  --job-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
   --mr-success \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \

@@ -33,13 +33,12 @@ kind: MigRunSpec
 steps:
   # Step 0: Migrate to Java 8
   # This step establishes the base transformation. Any node can claim this step.
-  - image: localhost:5000/ploy/migs-orw-maven:latest
+  - image: localhost:5000/ploy/orw-cli:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.Java8
-      MAVEN_PLUGIN_VERSION: "6.18.0"
       MIGRATION_STEP: "0"
       # Add marker environment variable to identify this step in logs
       E2E_STEP_NAME: "java8-migration"
@@ -49,13 +48,12 @@ steps:
   # 1. Copy base clone
   # 2. Fetch and apply diff from step 0
   # 3. Run this transformation on the rehydrated workspace
-  - image: localhost:5000/ploy/migs-orw-maven:latest
+  - image: localhost:5000/ploy/orw-cli:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava11
-      MAVEN_PLUGIN_VERSION: "6.18.0"
       MIGRATION_STEP: "1"
       E2E_STEP_NAME: "java11-migration"
 
@@ -64,13 +62,12 @@ steps:
   # 1. Copy base clone
   # 2. Fetch and apply diffs from steps 0 and 1 in order
   # 3. Run this transformation on the rehydrated workspace
-  - image: localhost:5000/ploy/migs-orw-maven:latest
+  - image: localhost:5000/ploy/orw-cli:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-      MAVEN_PLUGIN_VERSION: "6.18.0"
       MIGRATION_STEP: "2"
       E2E_STEP_NAME: "java17-migration"
 

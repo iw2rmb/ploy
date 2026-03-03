@@ -23,33 +23,30 @@ kind: MigRunSpec
 # next step begins.
 steps:
   # Step 1: Migrate to Java 8
-  - image: localhost:5000/ploy/migs-orw-maven:latest
+  - image: localhost:5000/ploy/orw-cli:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.Java8
-      MAVEN_PLUGIN_VERSION: "6.18.0"
       MIGRATION_STEP: "1"
 
   # Step 2: Migrate to Java 11
-  - image: localhost:5000/ploy/migs-orw-maven:latest
+  - image: localhost:5000/ploy/orw-cli:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava11
-      MAVEN_PLUGIN_VERSION: "6.18.0"
       MIGRATION_STEP: "2"
 
   # Step 3: Migrate to Java 17
-  - image: localhost:5000/ploy/migs-orw-maven:latest
+  - image: localhost:5000/ploy/orw-cli:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-      MAVEN_PLUGIN_VERSION: "6.18.0"
       MIGRATION_STEP: "3"
 
 ################################################################################

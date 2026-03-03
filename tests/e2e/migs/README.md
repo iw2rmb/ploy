@@ -18,8 +18,7 @@
 **Build + Publish Mods Images (Local Garage Registry)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite Maven: `docker buildx build --platform linux/amd64 -t migs-orw-maven:e2e deploy/images/migs/orw-maven`
-  - OpenRewrite Gradle: `docker buildx build --platform linux/amd64 -t migs-orw-gradle:e2e deploy/images/migs/orw-gradle`
+  - OpenRewrite CLI: `docker buildx build --platform linux/amd64 -t orw-cli:e2e deploy/images/mig/orw-cli`
   - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f deploy/images/migs/mig-codex/Dockerfile -t migs-codex:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local Garage-backed registry using the helper script:
@@ -28,10 +27,10 @@
   - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Notes:
-- Directory→repo mapping: `mig-foo` (folder) corresponds to registry repo `ploy/migs-foo`; `orw-maven` → `migs-orw-maven`; `orw-gradle` → `migs-orw-gradle`.
-- OpenRewrite coordinates are passed via environment: set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
+- Directory→repo mapping: `mig-foo` (folder) corresponds to registry repo `ploy/migs-foo`; `orw-cli` → `orw-cli`.
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 - The Codex healer now uses a **workspace diff handshake**: Codex edits the workspace and exits when done. The node agent then inspects the workspace via `git status --porcelain` and only re-runs the Build Gate externally when changes are present. Codex no longer invokes Build Gate tooling directly from inside the container.
+- ORW runtime isolation contract: OpenRewrite runs through `orw-cli` only; `transform.log` must not contain `rewriteRun` or `rewrite-maven-plugin:run`.
 
 See also:
 - `docs/how-to/publish-migs.md` for end-to-end Mods image publishing via CLI.
@@ -321,9 +320,9 @@ Example stack-aware spec:
 ```yaml
 mig:
   image:
-    default: docker.io/user/migs-orw-maven:latest
-    java-maven: docker.io/user/migs-orw-maven:latest
-    java-gradle: docker.io/user/migs-orw-gradle:latest
+    default: docker.io/user/orw-cli:latest
+    java-maven: docker.io/user/orw-cli:latest
+    java-gradle: docker.io/user/orw-cli:latest
   env:
     RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
