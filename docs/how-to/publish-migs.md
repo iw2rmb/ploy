@@ -1,9 +1,8 @@
 Publish Mods Images to a Garage-Backed Registry
 
 Overview
-- Mods images live under `deploy/images/migs/`:
-  - `orw-maven` -> `migs-orw-maven`
-  - `orw-gradle` -> `migs-orw-gradle`
+- Mods images live under `deploy/images/migs/` and `deploy/images/mig/`:
+  - `orw-cli` (`deploy/images/mig/orw-cli`) -> `orw-cli`
   - `mig-codex` -> `migs-codex`
   - `mig-llm` -> `migs-llm`
   - `mig-plan` -> `migs-plan`
@@ -19,7 +18,8 @@ Local Registry Prerequisites
 Publish all Mods images
 ```bash
 deploy/images/build-and-push-migs.sh
-# Discovers deploy/images/migs/* and pushes :latest tags.
+# Discovers deploy/images/migs/* and deploy/images/mig/* and pushes :latest tags.
+# Legacy ORW directories (orw-maven/orw-gradle) are skipped.
 # Defaults to IMAGE_PREFIX=${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}.
 ```
 
@@ -39,13 +39,12 @@ export PLOY_CA_CERTS=/absolute/path/to/ca-bundle.pem
 `deploy/images/garage.sh` passes this bundle as a BuildKit secret (`ploy_ca_bundle`)
 so mig images can trust internal TLS endpoints.
 
-Publish a single Mods image (example: orw-maven)
+Publish a single Mods image (example: orw-cli)
 ```bash
-name=orw-maven
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   docker buildx build --platform linux/amd64 \
-  -t "${IMAGE_PREFIX}/migs-orw-maven:latest" \
-  --push "deploy/images/migs/${name}"
+  -t "${IMAGE_PREFIX}/orw-cli:latest" \
+  --push "deploy/images/mig/orw-cli"
 ```
 
 Publish `migs-codex` (manual one-off)
@@ -61,16 +60,15 @@ docker buildx build \
 Stack-aware image mapping example
 ```yaml
 image:
-  default: ${PLOY_CONTAINER_REGISTRY}/migs-orw-maven:latest
-  java-maven: ${PLOY_CONTAINER_REGISTRY}/migs-orw-maven:latest
-  java-gradle: ${PLOY_CONTAINER_REGISTRY}/migs-orw-gradle:latest
+  default: ${PLOY_CONTAINER_REGISTRY}/orw-cli:latest
+  java-maven: ${PLOY_CONTAINER_REGISTRY}/orw-cli:latest
+  java-gradle: ${PLOY_CONTAINER_REGISTRY}/orw-cli:latest
 ```
 
 Notes
 - Directory mapping:
   - `mig-foo` -> `migs-foo`
-  - `orw-maven` -> `migs-orw-maven`
-  - `orw-gradle` -> `migs-orw-gradle`
+  - `orw-cli` -> `orw-cli`
 - To use a different registry/namespace, override:
   - `IMAGE_PREFIX=... deploy/images/build-and-push-migs.sh`
 
@@ -81,7 +79,6 @@ PLATFORM=linux/amd64,linux/arm64 deploy/images/build-and-push-migs.sh
 
 Verification
 ```bash
-docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/migs-orw-maven:latest"
-docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/migs-orw-gradle:latest"
+docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/orw-cli:latest"
 docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/migs-codex:latest"
 ```
