@@ -27,6 +27,7 @@ type GateProfileResolution struct {
 
 type gateProfileResolverStore interface {
 	ResolveStackIDByImage(ctx context.Context, image string) (int64, error)
+	ResolveStackIDByRepoSHA(ctx context.Context, repoID domaintypes.RepoID, repoSHA string) (int64, error)
 	ResolveAnyStackID(ctx context.Context) (int64, error)
 	GetExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64) (gateProfileRow, error)
 	GetLatestRepoGateProfile(ctx context.Context, repoID domaintypes.RepoID, stackID int64) (gateProfileRow, error)
@@ -65,7 +66,7 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 		return nil, nil
 	}
 
-	stackID, err := r.resolveStackID(ctx, job.JobImage)
+	stackID, err := r.resolveStackID(ctx, job)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
@@ -133,9 +134,17 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 	}, nil
 }
 
-func (r *dbGateProfileResolver) resolveStackID(ctx context.Context, image string) (int64, error) {
-	if trimmed := strings.TrimSpace(image); trimmed != "" {
+func (r *dbGateProfileResolver) resolveStackID(ctx context.Context, job store.Job) (int64, error) {
+	if trimmed := strings.TrimSpace(job.JobImage); trimmed != "" {
 		if stackID, err := r.st.ResolveStackIDByImage(ctx, trimmed); err == nil {
+			return stackID, nil
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return 0, err
+		}
+	}
+	repoSHAIn := strings.TrimSpace(job.RepoShaIn)
+	if repoSHAIn != "" {
+		if stackID, err := r.st.ResolveStackIDByRepoSHA(ctx, job.RepoID, repoSHAIn); err == nil {
 			return stackID, nil
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return 0, err
@@ -160,123 +169,95 @@ type sqlGateProfileResolverStore struct {
 }
 
 func (s *sqlGateProfileResolverStore) ResolveStackIDByImage(ctx context.Context, image string) (int64, error) {
-	var id int64
-	err := s.st.Pool().QueryRow(ctx, `
-SELECT id
-FROM stacks
-WHERE image = $1
-ORDER BY id ASC
-LIMIT 1
-`, image).Scan(&id)
-	return id, err
+	return s.st.ResolveStackIDByImage(ctx, image)
+}
+
+func (s *sqlGateProfileResolverStore) ResolveStackIDByRepoSHA(ctx context.Context, repoID domaintypes.RepoID, repoSHA string) (int64, error) {
+	return s.st.ResolveStackIDByRepoSHA(ctx, store.ResolveStackIDByRepoSHAParams{
+		RepoID:  repoID.String(),
+		RepoSha: repoSHA,
+	})
 }
 
 func (s *sqlGateProfileResolverStore) ResolveAnyStackID(ctx context.Context) (int64, error) {
-	var id int64
-	err := s.st.Pool().QueryRow(ctx, `
-SELECT id
-FROM stacks
-ORDER BY id ASC
-LIMIT 1
-`).Scan(&id)
-	return id, err
+	return s.st.ResolveAnyStackID(ctx)
 }
 
 func (s *sqlGateProfileResolverStore) GetExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64) (gateProfileRow, error) {
-	var row gateProfileRow
-	err := s.st.Pool().QueryRow(ctx, `
-SELECT id, COALESCE(repo_id, ''), COALESCE(repo_sha, ''), COALESCE(repo_sha8, ''), stack_id, url
-FROM gate_profiles
-WHERE repo_id = $1
-  AND repo_sha = $2
-  AND stack_id = $3
-LIMIT 1
-`, repoID, repoSHA, stackID).Scan(
-		&row.ID,
-		&row.RepoID,
-		&row.RepoSHA,
-		&row.RepoSHA8,
-		&row.StackID,
-		&row.ObjectKey,
-	)
-	return row, err
+	got, err := s.st.GetExactGateProfile(ctx, store.GetExactGateProfileParams{
+		RepoID:  repoID.String(),
+		RepoSha: repoSHA,
+		StackID: stackID,
+	})
+	if err != nil {
+		return gateProfileRow{}, err
+	}
+	return gateProfileRow{
+		ID:        got.ID,
+		RepoID:    domaintypes.RepoID(got.RepoID),
+		RepoSHA:   got.RepoSha,
+		RepoSHA8:  got.RepoSha8,
+		StackID:   got.StackID,
+		ObjectKey: got.Url,
+	}, nil
 }
 
 func (s *sqlGateProfileResolverStore) GetLatestRepoGateProfile(ctx context.Context, repoID domaintypes.RepoID, stackID int64) (gateProfileRow, error) {
-	var row gateProfileRow
-	err := s.st.Pool().QueryRow(ctx, `
-SELECT id, COALESCE(repo_id, ''), COALESCE(repo_sha, ''), COALESCE(repo_sha8, ''), stack_id, url
-FROM gate_profiles
-WHERE repo_id = $1
-  AND stack_id = $2
-ORDER BY updated_at DESC, id DESC
-LIMIT 1
-`, repoID, stackID).Scan(
-		&row.ID,
-		&row.RepoID,
-		&row.RepoSHA,
-		&row.RepoSHA8,
-		&row.StackID,
-		&row.ObjectKey,
-	)
-	return row, err
+	got, err := s.st.GetLatestRepoGateProfile(ctx, store.GetLatestRepoGateProfileParams{
+		RepoID:  repoID.String(),
+		StackID: stackID,
+	})
+	if err != nil {
+		return gateProfileRow{}, err
+	}
+	return gateProfileRow{
+		ID:        got.ID,
+		RepoID:    domaintypes.RepoID(got.RepoID),
+		RepoSHA:   got.RepoSha,
+		RepoSHA8:  got.RepoSha8,
+		StackID:   got.StackID,
+		ObjectKey: got.Url,
+	}, nil
 }
 
 func (s *sqlGateProfileResolverStore) GetDefaultGateProfile(ctx context.Context, stackID int64) (gateProfileRow, error) {
-	var row gateProfileRow
-	err := s.st.Pool().QueryRow(ctx, `
-SELECT id, COALESCE(repo_id, ''), COALESCE(repo_sha, ''), COALESCE(repo_sha8, ''), stack_id, url
-FROM gate_profiles
-WHERE repo_id IS NULL
-  AND repo_sha IS NULL
-  AND stack_id = $1
-ORDER BY updated_at DESC, id DESC
-LIMIT 1
-`, stackID).Scan(
-		&row.ID,
-		&row.RepoID,
-		&row.RepoSHA,
-		&row.RepoSHA8,
-		&row.StackID,
-		&row.ObjectKey,
-	)
-	return row, err
+	got, err := s.st.GetDefaultGateProfile(ctx, stackID)
+	if err != nil {
+		return gateProfileRow{}, err
+	}
+	return gateProfileRow{
+		ID:        got.ID,
+		RepoID:    domaintypes.RepoID(got.RepoID),
+		RepoSHA:   got.RepoSha,
+		RepoSHA8:  got.RepoSha8,
+		StackID:   got.StackID,
+		ObjectKey: got.Url,
+	}, nil
 }
 
 func (s *sqlGateProfileResolverStore) UpsertExactGateProfile(ctx context.Context, repoID domaintypes.RepoID, repoSHA string, stackID int64, objectKey string) (gateProfileRow, error) {
-	var row gateProfileRow
-	err := s.st.Pool().QueryRow(ctx, `
-INSERT INTO gate_profiles (
-  repo_id,
-  repo_sha,
-  repo_sha8,
-  stack_id,
-  url
-)
-VALUES ($1, $2, SUBSTRING($2, 1, 8), $3, $4)
-ON CONFLICT (repo_id, repo_sha, stack_id)
-DO UPDATE SET
-  url = EXCLUDED.url,
-  repo_sha8 = EXCLUDED.repo_sha8,
-  updated_at = NOW()
-RETURNING id, COALESCE(repo_id, ''), COALESCE(repo_sha, ''), COALESCE(repo_sha8, ''), stack_id, url
-`, repoID, repoSHA, stackID, objectKey).Scan(
-		&row.ID,
-		&row.RepoID,
-		&row.RepoSHA,
-		&row.RepoSHA8,
-		&row.StackID,
-		&row.ObjectKey,
-	)
-	return row, err
+	got, err := s.st.UpsertExactGateProfile(ctx, store.UpsertExactGateProfileParams{
+		RepoID:  repoID.String(),
+		RepoSha: repoSHA,
+		StackID: stackID,
+		Url:     objectKey,
+	})
+	if err != nil {
+		return gateProfileRow{}, err
+	}
+	return gateProfileRow{
+		ID:        got.ID,
+		RepoID:    domaintypes.RepoID(got.RepoID),
+		RepoSHA:   got.RepoSha,
+		RepoSHA8:  got.RepoSha8,
+		StackID:   got.StackID,
+		ObjectKey: got.Url,
+	}, nil
 }
 
 func (s *sqlGateProfileResolverStore) UpsertGateJobProfileLink(ctx context.Context, jobID domaintypes.JobID, profileID int64) error {
-	_, err := s.st.Pool().Exec(ctx, `
-INSERT INTO gates (job_id, profile_id)
-VALUES ($1, $2)
-ON CONFLICT (job_id)
-DO UPDATE SET profile_id = EXCLUDED.profile_id
-`, jobID, profileID)
-	return err
+	return s.st.UpsertGateJobProfileLink(ctx, store.UpsertGateJobProfileLinkParams{
+		JobID:     jobID.String(),
+		ProfileID: profileID,
+	})
 }
