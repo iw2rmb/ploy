@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./tests/integration/migs -run 'TestOrwCLI'` and selected e2e scenarios — expect recipe application and deterministic unsupported behavior where attribution is unavailable.
 
 ## Phase 7: Remove Legacy ORW Images And References
-- [ ] Delete old plugin-based ORW runtime assets and stale references — complete non-backward-compatible replacement.
+- [x] Delete old plugin-based ORW runtime assets and stale references — complete non-backward-compatible replacement.
   - Repository: ploy
   - Component: image sources, docs, tests
   - Scope: remove `deploy/images/migs/orw-maven/` and `deploy/images/migs/orw-gradle/`; remove references from docs/tests/scripts (`docs/how-to/publish-migs.md`, `docs/envs/README.md`, `docs/migs-lifecycle.md`, e2e fixtures) and ensure no runtime path depends on legacy names.

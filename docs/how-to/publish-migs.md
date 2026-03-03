@@ -19,7 +19,6 @@ Publish all Mods images
 ```bash
 deploy/images/build-and-push-migs.sh
 # Discovers deploy/images/migs/* and deploy/images/mig/* and pushes :latest tags.
-# Legacy ORW directories (orw-maven/orw-gradle) are skipped.
 # Defaults to IMAGE_PREFIX=${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}.
 ```
 

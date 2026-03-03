@@ -193,11 +193,6 @@ discover_mig_dirs() {
     if [[ -d "$root_migs" ]]; then
       find "$root_migs" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
         name="$(basename "$d")"
-        case "$name" in
-          orw-maven|orw-gradle)
-            continue
-            ;;
-        esac
         printf 'migs/%s\n' "$name"
       done
     fi
