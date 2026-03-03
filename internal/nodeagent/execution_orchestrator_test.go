@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -321,5 +322,51 @@ func TestPopulateHealingInDirInfra_UsesClaimRecoveryContextProfileAndSchema(t *t
 	}
 	if got, want := string(gotSchema), schemaJSON; got != want {
 		t.Fatalf("/in/gate_profile.schema.json = %q, want %q", got, want)
+	}
+}
+
+func TestPopulateHealingInDir_DepsCompatHydrationWritesInputs(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	rc := &runController{cfg: Config{}}
+	runID := types.RunID("run-claim-deps-hydration")
+	inDir := t.TempDir()
+
+	ver := "2.0.13"
+	recovery := &contracts.RecoveryClaimContext{
+		SelectedErrorKind:  "deps",
+		DepsCompatEndpoint: "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=",
+		DepsBumps: map[string]*string{
+			"org.slf4j:slf4j-api": &ver,
+			"legacy:shim":         nil,
+		},
+	}
+
+	if err := rc.populateHealingInDir(runID, inDir, &contracts.HealingSpec{SelectedErrorKind: "deps"}, recovery, ""); err != nil {
+		t.Fatalf("populateHealingInDir error: %v", err)
+	}
+
+	gotCompat, err := os.ReadFile(filepath.Join(inDir, "deps-compat-url.txt"))
+	if err != nil {
+		t.Fatalf("read /in/deps-compat-url.txt: %v", err)
+	}
+	if got, want := string(gotCompat), recovery.DepsCompatEndpoint; got != want {
+		t.Fatalf("/in/deps-compat-url.txt = %q, want %q", got, want)
+	}
+
+	gotBumpsRaw, err := os.ReadFile(filepath.Join(inDir, "deps-bumps.json"))
+	if err != nil {
+		t.Fatalf("read /in/deps-bumps.json: %v", err)
+	}
+	var gotBumps map[string]any
+	if err := json.Unmarshal(gotBumpsRaw, &gotBumps); err != nil {
+		t.Fatalf("decode /in/deps-bumps.json: %v", err)
+	}
+	if got := gotBumps["org.slf4j:slf4j-api"]; got != "2.0.13" {
+		t.Fatalf("deps-bumps.org.slf4j:slf4j-api = %v, want 2.0.13", got)
+	}
+	if got, ok := gotBumps["legacy:shim"]; !ok || got != nil {
+		t.Fatalf("deps-bumps.legacy:shim = %v (present=%v), want null", got, ok)
 	}
 }

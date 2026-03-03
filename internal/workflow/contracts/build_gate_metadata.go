@@ -194,6 +194,9 @@ type BuildGateRecoveryMetadata struct {
 	// Expectations carries strategy-specific structured expectations emitted by
 	// router classification. Reserved for downstream strategy/artifact handling.
 	Expectations json.RawMessage `json:"expectations,omitempty"`
+	// DepsBumps carries cumulative dependency bump state for deps healing loops.
+	// Values are non-empty versions or nil (meaning dependency disable/remove).
+	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
 	// CandidateSchemaID is the declared schema id for infra recovery candidate.
 	CandidateSchemaID string `json:"candidate_schema_id,omitempty"`
 	// CandidateArtifactPath is the artifact path declared in expectations.
@@ -222,6 +225,10 @@ type RecoveryClaimContext struct {
 	ResolvedHealingImage string `json:"resolved_healing_image,omitempty"`
 	// Expectations carries router/recovery expectations payload.
 	Expectations json.RawMessage `json:"expectations,omitempty"`
+	// DepsBumps carries cumulative dependency bump state for deps healing.
+	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
+	// DepsCompatEndpoint is a stack-prefilled SBOM compatibility endpoint.
+	DepsCompatEndpoint string `json:"deps_compat_endpoint,omitempty"`
 	// BuildGateLog is the failed gate log snippet intended for /in/build-gate.log.
 	BuildGateLog string `json:"build_gate_log,omitempty"`
 	// GateProfile carries failed gate profile JSON for infra healing context.
@@ -285,6 +292,16 @@ func (m BuildGateRecoveryMetadata) Validate() error {
 			// allowed
 		default:
 			return fmt.Errorf("expectations: must be object or array JSON")
+		}
+	}
+	if m.DepsBumps != nil {
+		for lib, ver := range m.DepsBumps {
+			if strings.TrimSpace(lib) == "" {
+				return fmt.Errorf("deps_bumps: key must be non-empty")
+			}
+			if ver != nil && strings.TrimSpace(*ver) == "" {
+				return fmt.Errorf("deps_bumps[%q]: version must be non-empty when present", lib)
+			}
 		}
 	}
 	if m.CandidateSchemaID != "" || m.CandidateArtifactPath != "" {

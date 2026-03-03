@@ -990,6 +990,120 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 	}
 }
 
+func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T) {
+	t.Parallel()
+
+	nodeKey := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeKey)
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	specID := domaintypes.NewSpecID()
+	jobID := domaintypes.NewJobID()
+	gateJobID := domaintypes.NewJobID()
+	now := time.Now().UTC()
+
+	spec := []byte(`{
+		"steps":[{"image":"docker.io/acme/mod:latest"}],
+		"build_gate":{
+			"healing":{
+				"by_error_kind":{
+					"deps":{"retries":2,"image":"docker.io/acme/heal:latest"}
+				}
+			}
+		}
+	}`)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: nodeID},
+		claimJobResult: store.Job{
+			ID:          jobID,
+			RunID:       runID,
+			RepoID:      repoID,
+			RepoBaseRef: "main",
+			Attempt:     1,
+			NodeID:      &nodeID,
+			Name:        "heal-1-0",
+			Status:      store.JobStatusRunning,
+			JobType:     domaintypes.JobTypeHeal.String(),
+			JobImage:    "docker.io/acme/heal:latest",
+			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"deps","strategy_id":"deps-default","deps_bumps":{"org.slf4j:slf4j-api":"2.0.13","legacy:shim":null}}}`),
+		},
+		getRunResult: store.Run{
+			ID:        runID,
+			SpecID:    specID,
+			Status:    store.RunStatusStarted,
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		getRunRepoResult: store.RunRepo{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Status:        store.RunRepoStatusQueued,
+			Attempt:       1,
+		},
+		getModRepoResult: store.MigRepo{
+			ID:     domaintypes.NewMigRepoID(),
+			RepoID: repoID,
+		},
+		getSpecResult: store.Spec{ID: specID, Spec: spec},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:      gateJobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				JobType: domaintypes.JobTypePreGate.String(),
+				NextID:  &jobID,
+				Meta:    []byte(`{"kind":"gate","gate":{"detected_stack":{"language":"java","release":"17","tool":"maven"}}}`),
+			},
+			{
+				ID:      jobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				JobType: domaintypes.JobTypeHeal.String(),
+			},
+		},
+	}
+
+	handler := claimJobHandler(st, &ConfigHolder{}, nil)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
+	req.SetPathValue("id", nodeKey)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	rc, ok := resp["recovery_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
+	}
+	if got := rc["selected_error_kind"]; got != "deps" {
+		t.Fatalf("recovery_context.selected_error_kind=%v, want deps", got)
+	}
+	if got := rc["deps_compat_endpoint"]; got != "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=" {
+		t.Fatalf("recovery_context.deps_compat_endpoint=%v, want stack-prefilled endpoint", got)
+	}
+	depsBumps, ok := rc["deps_bumps"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected recovery_context.deps_bumps object, got %T", rc["deps_bumps"])
+	}
+	if got := depsBumps["org.slf4j:slf4j-api"]; got != "2.0.13" {
+		t.Fatalf("deps_bumps[org.slf4j:slf4j-api]=%v, want 2.0.13", got)
+	}
+	if got, ok := depsBumps["legacy:shim"]; !ok || got != nil {
+		t.Fatalf("deps_bumps[legacy:shim]=%v (present=%v), want null", got, ok)
+	}
+}
+
 func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	t.Parallel()
 

@@ -286,10 +286,15 @@ provide repository metadata for healing migs that need Git baseline information.
 - `/in/build-gate.log` — First Build Gate failure log (read-only).
 - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing).
 - `/in/gate_profile.schema.json` — Gate profile schema contract for infra healing (`title: Ploy Build Gate Profile`, includes `$comment` guidance for agent-facing fields).
+- `/in/deps-compat-url.txt` — Stack-prefilled SBOM compatibility endpoint (provided for `deps` healing).
+- `/in/deps-bumps.json` — Prior cumulative dependency bump state (provided for `deps` healing).
 
 Primary source for these inputs is the typed `recovery_context` returned by
 `POST /v1/nodes/{id}/claim` for `heal`/`re_gate` jobs. Node-local run cache files
 remain an optional fallback optimization when claim context fields are absent.
+- For `selected_error_kind=deps`, claim `recovery_context` carries:
+  - `deps_compat_endpoint`
+  - `deps_bumps`
 - `/in/prompt.txt` — Optional prompt file when provided in spec.
 
 **Healing workspace policy:**

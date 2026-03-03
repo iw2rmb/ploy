@@ -119,54 +119,91 @@ func (r *runController) populateHealingInDir(
 		slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
 	}
 
-	if healingSpec != nil {
-		kind, ok := contracts.ParseRecoveryErrorKind(healingSpec.SelectedErrorKind)
-		if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
-			return nil
-		}
-		effectiveSchema := schemaJSON
-		if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.GateProfileSchemaJSON) != "" {
-			effectiveSchema = recoveryCtx.GateProfileSchemaJSON
-		}
-		if strings.TrimSpace(effectiveSchema) == "" {
-			return fmt.Errorf("infra healing requires %s env", contracts.GateProfileSchemaJSONEnv)
-		}
-		schemaRaw := []byte(effectiveSchema)
-		if !json.Valid(schemaRaw) {
-			return fmt.Errorf("infra healing schema env %s is not valid JSON", contracts.GateProfileSchemaJSONEnv)
-		}
-		inSchemaPath := filepath.Join(inDir, "gate_profile.schema.json")
-		if err := os.WriteFile(inSchemaPath, schemaRaw, 0o644); err != nil {
-			return fmt.Errorf("write /in/gate_profile.schema.json: %w", err)
-		}
-		slog.Info("hydrated /in/gate_profile.schema.json for healing job", "run_id", runID, "path", inSchemaPath)
-
-		var profileRaw []byte
-		var err error
-		if recoveryCtx != nil && len(recoveryCtx.GateProfile) > 0 {
-			profileRaw = append([]byte(nil), recoveryCtx.GateProfile...)
-		} else {
-			profilePath := filepath.Join(runDir, "build-gate-profile.json")
-			profileRaw, err = os.ReadFile(profilePath)
+	kind, ok := resolveRecoveryKindForHealingHydration(healingSpec, recoveryCtx)
+	if ok && kind == contracts.RecoveryErrorKindDeps && recoveryCtx != nil {
+		if recoveryCtx.DepsBumps != nil {
+			depsBumpsRaw, err := json.Marshal(recoveryCtx.DepsBumps)
 			if err != nil {
-				if os.IsNotExist(err) {
-					return nil
-				}
-				return fmt.Errorf("read gate profile snapshot: %w", err)
+				return fmt.Errorf("marshal recovery_context.deps_bumps: %w", err)
 			}
+			inDepsBumpsPath := filepath.Join(inDir, "deps-bumps.json")
+			if err := os.WriteFile(inDepsBumpsPath, depsBumpsRaw, 0o644); err != nil {
+				return fmt.Errorf("write /in/deps-bumps.json: %w", err)
+			}
+			slog.Info("hydrated /in/deps-bumps.json for deps healing job", "run_id", runID, "path", inDepsBumpsPath)
 		}
-		if len(strings.TrimSpace(string(profileRaw))) == 0 {
-			return nil
+		if endpoint := strings.TrimSpace(recoveryCtx.DepsCompatEndpoint); endpoint != "" {
+			inDepsCompatPath := filepath.Join(inDir, "deps-compat-url.txt")
+			if err := os.WriteFile(inDepsCompatPath, []byte(endpoint), 0o644); err != nil {
+				return fmt.Errorf("write /in/deps-compat-url.txt: %w", err)
+			}
+			slog.Info("hydrated /in/deps-compat-url.txt for deps healing job", "run_id", runID, "path", inDepsCompatPath)
 		}
-		if _, err := contracts.ParseGateProfileJSON(profileRaw); err != nil {
-			return fmt.Errorf("parse gate profile snapshot: %w", err)
-		}
-		inProfilePath := filepath.Join(inDir, "gate_profile.json")
-		if err := os.WriteFile(inProfilePath, profileRaw, 0o644); err != nil {
-			return fmt.Errorf("write /in/gate_profile.json: %w", err)
-		}
-		slog.Info("hydrated /in/gate_profile.json for healing job", "run_id", runID, "path", inProfilePath)
 	}
 
+	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
+		return nil
+	}
+
+	effectiveSchema := schemaJSON
+	if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.GateProfileSchemaJSON) != "" {
+		effectiveSchema = recoveryCtx.GateProfileSchemaJSON
+	}
+	if strings.TrimSpace(effectiveSchema) == "" {
+		return fmt.Errorf("infra healing requires %s env", contracts.GateProfileSchemaJSONEnv)
+	}
+	schemaRaw := []byte(effectiveSchema)
+	if !json.Valid(schemaRaw) {
+		return fmt.Errorf("infra healing schema env %s is not valid JSON", contracts.GateProfileSchemaJSONEnv)
+	}
+	inSchemaPath := filepath.Join(inDir, "gate_profile.schema.json")
+	if err := os.WriteFile(inSchemaPath, schemaRaw, 0o644); err != nil {
+		return fmt.Errorf("write /in/gate_profile.schema.json: %w", err)
+	}
+	slog.Info("hydrated /in/gate_profile.schema.json for healing job", "run_id", runID, "path", inSchemaPath)
+
+	var profileRaw []byte
+	var err error
+	if recoveryCtx != nil && len(recoveryCtx.GateProfile) > 0 {
+		profileRaw = append([]byte(nil), recoveryCtx.GateProfile...)
+	} else {
+		profilePath := filepath.Join(runDir, "build-gate-profile.json")
+		profileRaw, err = os.ReadFile(profilePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return fmt.Errorf("read gate profile snapshot: %w", err)
+		}
+	}
+	if len(strings.TrimSpace(string(profileRaw))) == 0 {
+		return nil
+	}
+	if _, err := contracts.ParseGateProfileJSON(profileRaw); err != nil {
+		return fmt.Errorf("parse gate profile snapshot: %w", err)
+	}
+	inProfilePath := filepath.Join(inDir, "gate_profile.json")
+	if err := os.WriteFile(inProfilePath, profileRaw, 0o644); err != nil {
+		return fmt.Errorf("write /in/gate_profile.json: %w", err)
+	}
+	slog.Info("hydrated /in/gate_profile.json for healing job", "run_id", runID, "path", inProfilePath)
+
 	return nil
+}
+
+func resolveRecoveryKindForHealingHydration(
+	healingSpec *contracts.HealingSpec,
+	recoveryCtx *contracts.RecoveryClaimContext,
+) (contracts.RecoveryErrorKind, bool) {
+	if healingSpec != nil {
+		if kind, ok := contracts.ParseRecoveryErrorKind(healingSpec.SelectedErrorKind); ok {
+			return kind, true
+		}
+	}
+	if recoveryCtx != nil {
+		if kind, ok := contracts.ParseRecoveryErrorKind(recoveryCtx.SelectedErrorKind); ok {
+			return kind, true
+		}
+	}
+	return "", false
 }
