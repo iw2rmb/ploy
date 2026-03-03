@@ -9,7 +9,7 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <rewrite.version>8.74.3</rewrite.version>
+    <rewrite.version>8.67.0</rewrite.version>
     <rewrite.polyglot.version>2.9.6</rewrite.polyglot.version>
     <maven.resolver.version>1.9.22</maven.resolver.version>
     <maven.version>3.9.11</maven.version>
@@ -34,6 +34,26 @@
     <dependency>
       <groupId>org.openrewrite</groupId>
       <artifactId>rewrite-maven</artifactId>
+      <version>${rewrite.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrewrite</groupId>
+      <artifactId>rewrite-gradle</artifactId>
+      <version>${rewrite.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrewrite</groupId>
+      <artifactId>rewrite-groovy</artifactId>
+      <version>${rewrite.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrewrite</groupId>
+      <artifactId>rewrite-kotlin</artifactId>
+      <version>${rewrite.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openrewrite</groupId>
+      <artifactId>rewrite-toml</artifactId>
       <version>${rewrite.version}</version>
     </dependency>
     <dependency>

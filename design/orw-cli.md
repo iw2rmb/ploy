@@ -48,7 +48,7 @@ Key properties:
 - one runtime image name: `orw-cli`
 - one execution engine: OpenRewrite CLI (standalone), not Gradle/Maven plugin goals
 - bundled CLI binary `rewrite` built from in-image `orw-cli-runner` (pinned OpenRewrite libs:
-  `rewrite-core/rewrite-java/rewrite-maven` `8.74.3`, `rewrite-polyglot` `2.9.6`)
+  `rewrite-core/rewrite-java/rewrite-maven/rewrite-gradle` `8.67.0`, `rewrite-polyglot` `2.9.6`)
 - no project task execution by migration runtime
 - stable `/workspace` and `/out` contract unchanged
 
@@ -73,20 +73,30 @@ Result:
 - prefer repository `rewrite.yml` when present
 - otherwise generate deterministic temporary config from requested recipe
 
-3. Artifact resolution
+3. Gradle static-import normalization (Java 17 upgrade recipes only)
+- before recipe execution, normalize `build.gradle` assignments from:
+  - `sourceCompatibility = VERSION_<n>`
+  - `targetCompatibility = VERSION_<n>`
+  to:
+  - `sourceCompatibility = JavaVersion.VERSION_<n>`
+  - `targetCompatibility = JavaVersion.VERSION_<n>`
+- remove `import static org.gradle.api.JavaVersion.VERSION_<n>` lines
+- this pre-step is applied only for `UpgradeToJava17` / `UpgradeBuildToJava17`
+
+4. Artifact resolution
 - resolve recipe artifacts from configured Maven repositories
 - use explicit credential and CA inputs from env
 
-4. CLI run
+5. CLI run
 - execute OpenRewrite CLI directly against `/workspace`
 - emit full transform logs to `/out/transform.log`
 
-5. Output contract
+6. Output contract
 - write `/out/report.json`
 - success payload includes recipe and coordinates
 - failure payload includes explicit `error_kind`, message, and non-zero exit code
 
-6. Cleanup
+7. Cleanup
 - remove temporary config/cache paths created by runtime
 - keep workspace content only as transformed source state
 
