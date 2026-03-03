@@ -495,8 +495,8 @@ The `scope` parameter controls which job types receive each variable:
 | `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
 | `CODEX_AUTH_JSON` | `mig-codex` | JSON credentials written to `/root/.codex/auth.json` at container startup |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
-| `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle), `orw-gradle` | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
-| `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle), `orw-gradle` | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
+| `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
+| `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
 
 ### ORW CLI Contract (Typed)
 
@@ -558,10 +558,9 @@ present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
 
 **Build Gate Gradle images (`ploy-gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
-**ORW images (`orw-maven`, `orw-gradle`)**: Similar CA bundle handling as build-gate, ensuring
-OpenRewrite can fetch dependencies from internal artifact repositories.
-
-`orw-gradle` additionally injects a Gradle init script at runtime when `PLOY_GRADLE_BUILD_CACHE_URL` is set and runs system `gradle` with `--build-cache`. `./gradlew` is ignored by design.
+**ORW image (`orw-cli`)**: Similar CA bundle handling as build-gate, ensuring
+OpenRewrite can fetch dependencies from internal artifact repositories while
+staying isolated from Maven/Gradle project task execution.
 
 ### Security Considerations
 
