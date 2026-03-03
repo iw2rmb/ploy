@@ -116,6 +116,11 @@ func runMain() int {
 		slog.Error("initialize object store", "err", err)
 		return 1
 	}
+	catalogPath := resolveStacksCatalogPath()
+	if err := seedGateCatalogDefaults(ctx, newSQLGateCatalogSeedStore(st.Pool()), bs, catalogPath); err != nil {
+		slog.Error("seed gate catalog defaults", "err", err, "catalog", catalogPath)
+		return 1
+	}
 
 	// Initialize blobpersist service for coordinated DB + object store writes.
 	bp := blobpersist.New(st, bs)

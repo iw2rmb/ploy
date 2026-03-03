@@ -113,7 +113,7 @@ Legend: [ ] todo, [x] done.
   - Tests: update gate tests to assert no auto-bootstrap persistence behavior remains.
 
 ## Phase 9: Deploy Seeding Pipeline
-- [ ] Seed `stacks` and default `gate_profiles` from `gates/stacks.yaml` on deploy/startup — make defaults explicit and reproducible.
+- [x] Seed `stacks` and default `gate_profiles` from `gates/stacks.yaml` on deploy/startup — make defaults explicit and reproducible.
   - Repository: ploy
   - Component: deploy bootstrap and server startup tasks
   - Scope: parse catalog, verify profile file presence, upload profile objects to garage, upsert DB rows for stacks/default profiles.
