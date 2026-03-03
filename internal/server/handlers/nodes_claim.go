@@ -349,9 +349,6 @@ func buildRecoveryClaimContext(
 			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.Gate); strings.TrimSpace(logPayload) != "" {
 				ctxPayload.BuildGateLog = logPayload
 			}
-			if len(gateMeta.Gate.GeneratedGateProfile) > 0 {
-				ctxPayload.GateProfile = cloneRawJSON(gateMeta.Gate.GeneratedGateProfile)
-			}
 		}
 	}
 

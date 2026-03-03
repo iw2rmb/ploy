@@ -123,10 +123,6 @@ type StepGateSpec struct {
 	// GateProfile holds optional gate_profile-derived command/env overrides for this gate phase.
 	GateProfile *BuildGateProfileOverride
 
-	// AutoBootstrapRepoGateProfile enables pre-gate auto-generation of gate_profile
-	// from detected stack and resolved gate command when the repo has no persisted profile.
-	AutoBootstrapRepoGateProfile bool
-
 	// Target pins build gate execution to a concrete target (build|unit|all_tests).
 	Target string
 

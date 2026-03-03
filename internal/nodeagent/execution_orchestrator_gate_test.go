@@ -57,31 +57,6 @@ func TestPersistFirstGateFailureLog_UsesTrimmedFinding(t *testing.T) {
 	}
 }
 
-func TestPersistGateProfileSnapshot_UsesGeneratedProfile(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-profile-generated")
-	const generated = `{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"java","tool":"maven"},"targets":{"active":"all_tests","build":{"status":"not_attempted","env":{}},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"passed","command":"mvn -q -DskipTests compile","env":{}}},"orchestration":{"pre":[],"post":[]}}`
-
-	rc.persistGateProfileSnapshot(
-		runID,
-		types.JobTypePreGate,
-		&contracts.StepGateSpec{RepoID: types.MigRepoID("repo_1")},
-		&contracts.BuildGateStageMetadata{GeneratedGateProfile: json.RawMessage(generated)},
-	)
-
-	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("failed to read profile snapshot: %v", err)
-	}
-	if string(data) != generated {
-		t.Fatalf("snapshot profile = %q, want %q", string(data), generated)
-	}
-}
-
 func TestPersistGateProfileSnapshot_DerivesFromOverride(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)

@@ -2,7 +2,6 @@ package step
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -326,111 +325,6 @@ func TestDockerGateExecutor_TargetLockUnsupportedCancels(t *testing.T) {
 	}
 	if got, want := meta.LogFindings[0].Code, "BUILD_GATE_TARGET_UNSUPPORTED"; got != want {
 		t.Fatalf("log_findings[0].code=%q, want %q", got, want)
-	}
-}
-
-func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedStack(t *testing.T) {
-	t.Parallel()
-
-	executor, _, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{
-		Enabled:                      true,
-		RepoID:                       types.MigRepoID("repo12345"),
-		AutoBootstrapRepoGateProfile: true,
-	}
-
-	meta, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if len(meta.GeneratedGateProfile) == 0 {
-		t.Fatal("expected generated_gate_profile in metadata")
-	}
-	profile, err := contracts.ParseGateProfileJSON(meta.GeneratedGateProfile)
-	if err != nil {
-		t.Fatalf("ParseGateProfileJSON(generated): %v", err)
-	}
-	if got, want := profile.RepoID, "repo12345"; got != want {
-		t.Fatalf("generated profile repo_id=%q, want %q", got, want)
-	}
-	if got, want := profile.Stack.Tool, "maven"; got != want {
-		t.Fatalf("generated profile stack.tool=%q, want %q", got, want)
-	}
-	if got, want := profile.Targets.Active, contracts.GateProfileTargetAllTests; got != want {
-		t.Fatalf("generated profile targets.active=%q, want %q", got, want)
-	}
-	if profile.Targets.AllTests == nil || !strings.Contains(profile.Targets.AllTests.Command, "mvn --ff -B -q -e") {
-		t.Fatalf("generated all_tests command=%q, want maven default command", profile.Targets.AllTests.Command)
-	}
-	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "mvn --ff -B -q -e -DskipTests=true") {
-		t.Fatalf("generated build command=%q, want maven no-tests command", profile.Targets.Build.Command)
-	}
-}
-
-func TestDockerGateExecutor_AutoBootstrapPreGateProfileFromDetectedGradleStack_UsesWrapper(t *testing.T) {
-	t.Parallel()
-
-	rt := &testContainerRuntime{}
-	executor := NewDockerGateExecutor(rt)
-
-	workspace := createGradleWorkspaceWithWrapper(t, "17")
-	spec := &contracts.StepGateSpec{
-		Enabled:                      true,
-		RepoID:                       types.MigRepoID("repo12345"),
-		AutoBootstrapRepoGateProfile: true,
-	}
-
-	meta, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if len(meta.GeneratedGateProfile) == 0 {
-		t.Fatal("expected generated_gate_profile in metadata")
-	}
-	profile, err := contracts.ParseGateProfileJSON(meta.GeneratedGateProfile)
-	if err != nil {
-		t.Fatalf("ParseGateProfileJSON(generated): %v", err)
-	}
-	if got, want := profile.RepoID, "repo12345"; got != want {
-		t.Fatalf("generated profile repo_id=%q, want %q", got, want)
-	}
-	if got, want := profile.Stack.Tool, "gradle"; got != want {
-		t.Fatalf("generated profile stack.tool=%q, want %q", got, want)
-	}
-	if got, want := profile.Targets.Active, contracts.GateProfileTargetAllTests; got != want {
-		t.Fatalf("generated profile targets.active=%q, want %q", got, want)
-	}
-	if profile.Targets.AllTests == nil || !strings.Contains(profile.Targets.AllTests.Command, "./gradlew -q --stacktrace --build-cache") {
-		t.Fatalf("generated all_tests command=%q, want gradle wrapper default command", profile.Targets.AllTests.Command)
-	}
-	if profile.Targets.Build == nil || !strings.Contains(profile.Targets.Build.Command, "./gradlew -q --stacktrace --build-cache build -x test") {
-		t.Fatalf("generated build command=%q, want gradle no-tests command", profile.Targets.Build.Command)
-	}
-}
-
-func TestDockerGateExecutor_AutoBootstrapSkippedWithExplicitGateProfile(t *testing.T) {
-	t.Parallel()
-
-	executor, _, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{
-		Enabled:                      true,
-		RepoID:                       types.MigRepoID("repo12345"),
-		AutoBootstrapRepoGateProfile: true,
-		GateProfile: &contracts.BuildGateProfileOverride{
-			Command: contracts.CommandSpec{Shell: "echo explicit"},
-		},
-	}
-
-	meta, err := executor.Execute(context.Background(), spec, workspace)
-	if err != nil {
-		t.Fatalf("Execute() unexpected error: %v", err)
-	}
-	if len(meta.GeneratedGateProfile) != 0 {
-		t.Fatalf("generated_gate_profile unexpectedly present: %s", string(meta.GeneratedGateProfile))
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(meta.GeneratedGateProfile, &payload); err == nil && len(payload) > 0 {
-		t.Fatalf("generated_gate_profile unexpectedly decodes to non-empty payload: %v", payload)
 	}
 }
 

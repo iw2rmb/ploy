@@ -407,46 +407,6 @@ func TestBuildGateStageMetadata_BugSummary_Validation(t *testing.T) {
 	}
 }
 
-func TestBuildGateStageMetadata_GeneratedGateProfile_Validation(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		profile    json.RawMessage
-		wantSubstr string
-	}{
-		{
-			name: "valid",
-			profile: json.RawMessage(`{
-				"schema_version": 1,
-				"repo_id": "repo_123",
-				"runner_mode": "simple",
-				"stack": {"language":"java","tool":"maven","release":"17"},
-				"targets": {
-					"active": "build",
-					"build": {"status":"passed","command":"mvn test","env":{},"failure_code":null},
-					"unit": {"status":"not_attempted","env":{}},
-					"all_tests": {"status":"not_attempted","env":{}}
-				},
-				"orchestration": {"pre": [], "post": []}
-			}`),
-		},
-		{
-			name:       "invalid",
-			profile:    json.RawMessage(`{"schema_version":1}`),
-			wantSubstr: "generated_gate_profile",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			meta := BuildGateStageMetadata{GeneratedGateProfile: tt.profile}
-			requireValidationErr(t, meta.Validate(), tt.wantSubstr)
-		})
-	}
-}
-
 func TestBuildGateStageMetadata_Recovery_Valid(t *testing.T) {
 	t.Parallel()
 	meta := BuildGateStageMetadata{

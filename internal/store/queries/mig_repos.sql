@@ -119,21 +119,6 @@ WHERE j.id = @id
   ) = false
 LIMIT 1;
 
--- name: PromotePreGateGeneratedGateProfile :one
--- Legacy compatibility shim: gate profile persistence on mig_repos is removed.
--- Returns target repo_id for callers that still rely on this method's result.
-WITH compat_args AS (
-  SELECT
-    @gate_profile::jsonb AS gate_profile,
-    @gate_profile_artifacts::jsonb AS gate_profile_artifacts
-)
-SELECT j.repo_id
-FROM jobs j, compat_args
-WHERE j.id = @id
-  AND j.job_type = 'pre_gate'
-  AND j.status = 'Success'
-LIMIT 1;
-
 -- name: HasMigRepoHistory :one
 -- Checks if a mig_repo has any historical executions (run_repos references).
 -- Returns true if the repo cannot be deleted due to history, false otherwise.
