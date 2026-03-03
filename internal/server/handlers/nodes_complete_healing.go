@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -168,6 +169,15 @@ func maybeCreateHealingJobs(
 	oldNext := failedJob.NextID
 	healID := domaintypes.NewJobID()
 	reGateID := domaintypes.NewJobID()
+	healRepoSHAIn := strings.TrimSpace(strings.ToLower(failedJob.RepoShaIn))
+	if !sha40Pattern.MatchString(healRepoSHAIn) {
+		slog.Error("maybeCreateHealingJobs: invalid failed job repo_sha_in; canceling remaining linked jobs",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"repo_sha_in", failedJob.RepoShaIn,
+		)
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
+	}
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		ID:          reGateID,
@@ -198,6 +208,7 @@ func maybeCreateHealingJobs(
 		Status:      store.JobStatusQueued,
 		NextID:      &reGateID,
 		Meta:        healMetaBytes,
+		RepoShaIn:   healRepoSHAIn,
 	})
 	if err != nil {
 		return fmt.Errorf("create heal job: %w", err)

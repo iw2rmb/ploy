@@ -17,6 +17,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+const testRunRepoSHASeed = "0123456789abcdef0123456789abcdef01234567"
+
 type cancelRunStoreMock struct {
 	store.Store
 	getRunResult store.Run
@@ -666,6 +668,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 				RepoID:        repoID,
 				RepoBaseRef:   "main",
 				RepoTargetRef: "feature",
+				RepoSha0:      testRunRepoSHASeed,
 				Attempt:       1,
 				Status:        store.RunRepoStatusFail,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -675,6 +678,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 				RepoID:        repoID,
 				RepoBaseRef:   "develop",
 				RepoTargetRef: "feature-2",
+				RepoSha0:      testRunRepoSHASeed,
 				Attempt:       2,
 				Status:        store.RunRepoStatusQueued,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -731,6 +735,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 		RepoID:        repoID,
 		RepoBaseRef:   "main",
 		RepoTargetRef: "feature",
+		RepoSha0:      testRunRepoSHASeed,
 		Attempt:       1,
 		Status:        store.RunRepoStatusQueued,
 		CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},

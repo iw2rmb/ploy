@@ -229,9 +229,12 @@ INSERT INTO jobs (
   job_type,
   job_image,
   next_id,
-  meta
+  meta,
+  repo_sha_in,
+  repo_sha_in8
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+  CASE WHEN $12::TEXT = '' THEN '' ELSE SUBSTRING($12::TEXT, 1, 8) END
 )
 RETURNING
   id,
@@ -268,6 +271,7 @@ type CreateJobParams struct {
 	JobImage    string       `json:"job_image"`
 	NextID      *types.JobID `json:"next_id"`
 	Meta        []byte       `json:"meta"`
+	RepoShaIn   string       `json:"repo_sha_in"`
 }
 
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -284,6 +288,7 @@ func (q *Queries) CreateJob(ctx context.Context, arg CreateJobParams) (Job, erro
 		arg.JobImage,
 		arg.NextID,
 		arg.Meta,
+		arg.RepoShaIn,
 	)
 	var i Job
 	err := row.Scan(

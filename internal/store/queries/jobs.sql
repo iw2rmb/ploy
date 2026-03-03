@@ -88,9 +88,12 @@ INSERT INTO jobs (
   job_type,
   job_image,
   next_id,
-  meta
+  meta,
+  repo_sha_in,
+  repo_sha_in8
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+  CASE WHEN sqlc.arg(repo_sha_in)::TEXT = '' THEN '' ELSE SUBSTRING(sqlc.arg(repo_sha_in)::TEXT, 1, 8) END
 )
 RETURNING
   id,
