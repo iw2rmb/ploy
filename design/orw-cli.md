@@ -47,6 +47,8 @@ Observed failure class:
 Key properties:
 - one runtime image name: `orw-cli`
 - one execution engine: OpenRewrite CLI (standalone), not Gradle/Maven plugin goals
+- bundled CLI binary `rewrite` built from in-image `orw-cli-runner` (pinned OpenRewrite libs:
+  `rewrite-core/rewrite-java/rewrite-maven` `8.74.3`, `rewrite-polyglot` `2.9.6`)
 - no project task execution by migration runtime
 - stable `/workspace` and `/out` contract unchanged
 
@@ -198,7 +200,6 @@ No compatibility mode and no fallback path.
 
 ## Open Questions
 
-- Which exact OpenRewrite CLI distribution/version will be pinned in `orw-cli` image?
 - Should `ORW_REPOS` default to Maven Central only, or require explicit repository configuration per cluster?
 - Should unsupported attribution be terminal by default in all environments, or configurable only in local dev?
 

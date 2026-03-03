@@ -567,6 +567,10 @@ present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
 OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.
 
+`orw-cli` ships a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
+by an embedded standalone runner JAR. `ORW_CLI_BIN` defaults to this bundled
+binary and should only be overridden for controlled debugging.
+
 ### Security Considerations
 
 - **Secrets flag**: Variables marked with `--secret=true` (the default) are redacted in
