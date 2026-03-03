@@ -3,7 +3,6 @@ package handlers
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -54,41 +53,10 @@ func resolveFailedGateRecoveryContext(failedJob store.Job) (*contracts.BuildGate
 	} else {
 		meta.ErrorKind = contracts.DefaultRecoveryErrorKind().String()
 	}
-	normalizeRecoveryErrorKind(meta)
 	if meta.StrategyID == "" {
 		meta.StrategyID = fmt.Sprintf("%s-default", meta.ErrorKind)
 	}
 	return meta, detectedStack, detectedExpectation
-}
-
-func normalizeRecoveryErrorKind(meta *contracts.BuildGateRecoveryMetadata) {
-	if meta == nil {
-		return
-	}
-	kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind)
-	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
-		return
-	}
-	if !isDependencyToolchainMismatchReason(meta.Reason) {
-		return
-	}
-	meta.ErrorKind = contracts.RecoveryErrorKindDeps.String()
-	strategyID := strings.TrimSpace(meta.StrategyID)
-	if strategyID == "" || strategyID == fmt.Sprintf("%s-default", contracts.RecoveryErrorKindInfra.String()) {
-		meta.StrategyID = fmt.Sprintf("%s-default", contracts.RecoveryErrorKindDeps.String())
-	}
-}
-
-func isDependencyToolchainMismatchReason(reason string) bool {
-	reason = strings.ToLower(strings.TrimSpace(reason))
-	if reason == "" {
-		return false
-	}
-	// Gradle/Groovy classloader failures on JDK-compiled bytecode are dependency/toolchain issues.
-	if strings.Contains(reason, "unsupported class file major version") {
-		return true
-	}
-	return false
 }
 
 func stackExpectationFromModStack(stack contracts.ModStack) *contracts.StackExpectation {
