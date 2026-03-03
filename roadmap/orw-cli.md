@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/workflow/contracts -run 'Test.*Mod|Test.*Spec|Test.*Parse'` — expect strict parsing/validation for new runtime fields.
 
 ## Phase 2: Implement `orw-cli` Image And Entrypoint
-- [ ] Add standalone OpenRewrite CLI runner image — remove build-tool execution from ORW runtime path.
+- [x] Add standalone OpenRewrite CLI runner image — remove build-tool execution from ORW runtime path.
   - Repository: ploy
   - Component: image assets
   - Scope: add `deploy/images/mig/orw-cli/Dockerfile` and `deploy/images/mig/orw-cli/orw-cli.sh`; implement CA import, recipe/config resolution, CLI invocation, `transform.log` and `report.json` writing, self-test mode, and explicit non-use of `gradle/mvn` execution.

@@ -521,6 +521,7 @@ Optional repository and execution controls:
 | `ORW_REPO_PASSWORD` | Repository password (must be paired with `ORW_REPO_USERNAME`) |
 | `ORW_ACTIVE_RECIPES` | Comma-separated override list of active recipes |
 | `ORW_FAIL_ON_UNSUPPORTED` | Boolean flag, default `true` |
+| `ORW_CLI_BIN` | OpenRewrite CLI executable name/path (default: `rewrite`) |
 
 `report.json` contract (`/out/report.json`):
 
