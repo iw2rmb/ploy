@@ -49,6 +49,10 @@ func (s *stubGateProfileResolverStore) ResolveStackIDByImage(_ context.Context, 
 	return 0, pgx.ErrNoRows
 }
 
+func (s *stubGateProfileResolverStore) ResolveStackIDByRepoSHA(_ context.Context, _ types.RepoID, _ string) (int64, error) {
+	return 0, pgx.ErrNoRows
+}
+
 func (s *stubGateProfileResolverStore) ResolveAnyStackID(_ context.Context) (int64, error) {
 	if s.anyStackErr != nil {
 		return 0, s.anyStackErr
