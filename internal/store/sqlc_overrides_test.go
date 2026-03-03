@@ -31,6 +31,9 @@ func TestSQLCOverridesCompile(t *testing.T) {
 		GetMig(ctx context.Context, id types.MigID) (Mig, error)
 		GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 		GetMigRepo(ctx context.Context, id types.MigRepoID) (MigRepo, error)
+		DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
+		ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]Sbom, error)
+		UpsertSBOMRow(ctx context.Context, arg UpsertSBOMRowParams) error
 	}
 	var _ typedIDQuerier = (Querier)(nil)
 
@@ -91,6 +94,16 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	var bundle ArtifactBundle
 	assertType[types.RunID](bundle.RunID)
 	assertType[*types.JobID](bundle.JobID)
+
+	// Verify SBOM struct field types.
+	var sbom Sbom
+	assertType[types.JobID](sbom.JobID)
+	assertType[types.RepoID](sbom.RepoID)
+
+	// Verify SBOM upsert param field types.
+	var sbomUpsert UpsertSBOMRowParams
+	assertType[types.JobID](sbomUpsert.JobID)
+	assertType[types.RepoID](sbomUpsert.RepoID)
 
 	// Verify NodeMetric struct field types.
 	var metric NodeMetric

@@ -304,6 +304,21 @@ CREATE TABLE IF NOT EXISTS gates (
 );
 CREATE INDEX IF NOT EXISTS gates_profile_idx ON gates(profile_id);
 
+-- SBOM package rows extracted from successful gate artifact bundles.
+-- Stack/time attribution is resolved via joins:
+--   sboms.job_id -> jobs -> (created_at)
+--   sboms.job_id -> gates -> gate_profiles -> stacks
+CREATE TABLE IF NOT EXISTS sboms (
+  job_id      TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  repo_id     TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
+  lib         TEXT NOT NULL,
+  ver         TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (job_id, repo_id, lib, ver)
+);
+CREATE INDEX IF NOT EXISTS sboms_repo_lib_ver_idx ON sboms(repo_id, lib, ver);
+CREATE INDEX IF NOT EXISTS sboms_job_idx ON sboms(job_id);
+
 -- Events (append-only)
 -- Note: run_id and job_id are TEXT (KSUID-backed) to match runs.id and jobs.id.
 -- events.id is BIGSERIAL for monotonic cursor semantics (since-id pagination).
