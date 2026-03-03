@@ -19,7 +19,7 @@ type stubGateProfileResolver struct {
 	err        error
 }
 
-func (s *stubGateProfileResolver) ResolveGateProfileForJob(_ context.Context, _ store.Job) (*GateProfileResolution, error) {
+func (s *stubGateProfileResolver) ResolveGateProfileForJob(_ context.Context, _ store.Job, _ GateProfileLookupConstraints) (*GateProfileResolution, error) {
 	return s.resolution, s.err
 }
 

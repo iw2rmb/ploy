@@ -5,6 +5,15 @@ WHERE image = sqlc.arg(image)
 ORDER BY id ASC
 LIMIT 1;
 
+-- name: ResolveStackIDByRequiredStack :one
+SELECT id
+FROM stacks
+WHERE lang = sqlc.arg(lang)::text
+  AND release = sqlc.arg(release)::text
+  AND (sqlc.arg(tool)::text = '' OR COALESCE(tool, '') = sqlc.arg(tool)::text)
+ORDER BY id ASC
+LIMIT 1;
+
 -- name: ResolveStackRowByImage :one
 SELECT id,
        lang,

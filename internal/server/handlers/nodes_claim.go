@@ -181,7 +181,7 @@ func buildAndSendJobClaimResponse(
 		if policyErr != nil {
 			return policyErr
 		}
-		resolution, err := gateProfileResolver.ResolveGateProfileForJob(r.Context(), job)
+		resolution, err := gateProfileResolver.ResolveGateProfileForJob(r.Context(), job, phasePolicy.LookupConstraints)
 		if err != nil {
 			return fmt.Errorf("resolve gate profile: %w", err)
 		}
