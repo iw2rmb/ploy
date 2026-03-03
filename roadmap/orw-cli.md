@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Tests: new integration tests under `tests/integration/migs/orw_cli_test.go` — expect recipe application and report contract output with no build-tool task invocation.
 
 ## Phase 3: Wire Build/Publish Tooling To `orw-cli`
-- [ ] Update image build and local registry tooling to publish `orw-cli` only — make release pipeline consistent with new runtime.
+- [x] Update image build and local registry tooling to publish `orw-cli` only — make release pipeline consistent with new runtime.
   - Repository: ploy
   - Component: image build scripts
   - Scope: update `deploy/images/build-and-push-migs.sh` and `deploy/images/garage.sh` to add `orw-cli` mapping and remove `orw-maven`/`orw-gradle` mappings; adjust directory resolution logic for new image path.

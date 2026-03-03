@@ -35,26 +35,45 @@ with_timeout() {
 }
 
 discover_images() {
-  local root="deploy/images/migs"
-  [[ -d "$root" ]] || return 0
-  find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
+  local root_migs="deploy/images/migs"
+  local root_mig="deploy/images/mig"
+  {
+    if [[ -d "$root_migs" ]]; then
+      find "$root_migs" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+        name="$(basename "$d")"
+        case "$name" in
+          orw-maven|orw-gradle)
+            continue
+            ;;
+        esac
+        printf 'migs/%s\n' "$name"
+      done
+    fi
+
+    if [[ -d "$root_mig" ]]; then
+      find "$root_mig" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+        name="$(basename "$d")"
+        printf 'mig/%s\n' "$name"
+      done
+    fi
+  } | sort
 }
 
 images=( $(discover_images) )
 if [[ ${#images[@]} -eq 0 ]]; then
-  echo "no images discovered under migs" >&2
+  echo "no images discovered under deploy/images/migs or deploy/images/mig" >&2
   exit 1
 fi
 
-for name in "${images[@]}"; do
+for entry in "${images[@]}"; do
+  name="${entry##*/}"
+  source_group="${entry%%/*}"
+
   # Map directory name to repo image name.
   image_name="$name"
   case "$name" in
-    orw-maven)
-      image_name="migs-orw-maven"
-      ;;
-    orw-gradle)
-      image_name="migs-orw-gradle"
+    orw-cli)
+      image_name="orw-cli"
       ;;
     mig-*)
       image_name="migs-${name#mig-}"
@@ -64,14 +83,14 @@ for name in "${images[@]}"; do
   ref="${IMAGE_PREFIX}/${image_name}:latest"
 
   # Build context rules:
-  # - Default: use "deploy/images/migs/<dir>"
+  # - Default: use deploy/images/<group>/<dir>
   # - Special-case mig-codex: Dockerfile expects repo-root context (COPY go.* and internal/ ...)
   build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "--progress=plain" "-t" "$ref" "--push")
-  if [[ "$name" == "mig-codex" ]]; then
+  if [[ "$source_group" == "migs" && "$name" == "mig-codex" ]]; then
     context="."
     build_args+=("-f" "deploy/images/migs/mig-codex/Dockerfile" "$context")
   else
-    context="deploy/images/migs/${name}"
+    context="deploy/images/${source_group}/${name}"
     build_args+=("$context")
   fi
 

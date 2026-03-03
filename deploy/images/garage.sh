@@ -187,26 +187,47 @@ should_push() {
 }
 
 discover_mig_dirs() {
-  local root="deploy/images/migs"
-  [[ -d "$root" ]] || return 0
-  find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
+  local root_migs="deploy/images/migs"
+  local root_mig="deploy/images/mig"
+  {
+    if [[ -d "$root_migs" ]]; then
+      find "$root_migs" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+        name="$(basename "$d")"
+        case "$name" in
+          orw-maven|orw-gradle)
+            continue
+            ;;
+        esac
+        printf 'migs/%s\n' "$name"
+      done
+    fi
+
+    if [[ -d "$root_mig" ]]; then
+      find "$root_mig" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+        name="$(basename "$d")"
+        printf 'mig/%s\n' "$name"
+      done
+    fi
+  } | sort
 }
 
 mig_repo_name() {
-  local dir="$1"
-  case "$dir" in
-    orw-maven) echo "migs-orw-maven" ;;
-    orw-gradle) echo "migs-orw-gradle" ;;
-    mig-*) echo "migs-${dir#mig-}" ;;
-    *) echo "$dir" ;;
+  local entry="$1"
+  local name="${entry##*/}"
+  case "$name" in
+    orw-cli) echo "orw-cli" ;;
+    mig-*) echo "migs-${name#mig-}" ;;
+    *) echo "$name" ;;
   esac
 }
 
 build_push_mig_image() {
-  local dir="$1"
+  local entry="$1"
+  local dir="${entry##*/}"
+  local source_group="${entry%%/*}"
   local image_name ref context
   local -a extra_args=()
-  image_name="$(mig_repo_name "$dir")"
+  image_name="$(mig_repo_name "$entry")"
   ref="${IMAGE_PREFIX}/${image_name}:latest"
 
   if [[ -n "$CA_CERTS_PATH" ]]; then
@@ -217,7 +238,7 @@ build_push_mig_image() {
     return 0
   fi
 
-  if [[ "$dir" == "mig-codex" ]]; then
+  if [[ "$source_group" == "migs" && "$dir" == "mig-codex" ]]; then
     context="."
     run_with_retries \
       "buildx push ${ref} (context=${context}, dockerfile=deploy/images/migs/mig-codex/Dockerfile)" \
@@ -230,7 +251,7 @@ build_push_mig_image() {
       --push \
       "$context"
   else
-    context="deploy/images/migs/${dir}"
+    context="deploy/images/${source_group}/${dir}"
     run_with_retries \
       "buildx push ${ref} (context=${context})" \
       docker buildx build \
@@ -309,7 +330,7 @@ main() {
   local mig_dirs_raw
   mig_dirs_raw="$(discover_mig_dirs)"
   if [[ -z "$mig_dirs_raw" ]]; then
-    echo "error: no mig image directories found under deploy/images/migs" >&2
+    echo "error: no mig image directories found under deploy/images/migs or deploy/images/mig" >&2
     exit 1
   fi
   local d
