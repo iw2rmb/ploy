@@ -22,7 +22,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM alpine:${ALPINE_VERSION}
 RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle,required=false \
     if [ -s /run/secrets/ploy_ca_bundle ]; then mkdir -p /etc/ssl/certs && cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; fi && \
-    apk add --no-cache ca-certificates bash tzdata curl jq && \
+    apk add --no-cache ca-certificates bash tzdata curl jq git && \
     if [ -s /run/secrets/ploy_ca_bundle ]; then cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; fi && \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /etc/ploy/schemas /var/lib/ploy && \
