@@ -47,7 +47,7 @@ Legend: [ ] todo, [x] done.
   - Tests: `go test ./internal/server/handlers -run 'Test.*Gate.*SBOM.*Success|Test.*Gate.*SBOM.*NoPersistOnFailure'` — expect writes only on successful gate completions.
 
 ## Phase 6: Compatibility API (`/v1/sboms/compat`)
-- [ ] Implement compatibility lookup endpoint backed by successful SBOM evidence.
+- [x] Implement compatibility lookup endpoint backed by successful SBOM evidence.
   - Repository: `ploy`
   - Component: `internal/server/handlers` + `internal/store/queries`
   - Scope: add handler and queries for stack-filtered lookup by `lang/release/tool`; for each requested lib return minimum successful version, or minimum successful version `>=` requested floor when `name:ver` is provided; return `null` when no stack evidence exists.

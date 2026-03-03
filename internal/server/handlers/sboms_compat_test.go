@@ -1,0 +1,100 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: false,
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rr.Code)
+	}
+	if body := rr.Body.String(); body != "null" {
+		t.Fatalf("body = %q, want null", body)
+	}
+	if st.listSBOMCompatRowsCalled {
+		t.Fatal("expected ListSBOMCompatRows not to be called without stack evidence")
+	}
+}
+
+func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: true,
+		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
+			{Lib: "lib-a", Ver: "1.0.0"},
+			{Lib: "lib-a", Ver: "1.2.0"},
+			{Lib: "lib-a", Ver: "2.0.0"},
+			{Lib: "lib-b", Ver: "3.5.1"},
+		},
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.1.0,lib-b", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["lib-a"] != "1.2.0" {
+		t.Fatalf("lib-a = %q, want 1.2.0", got["lib-a"])
+	}
+	if got["lib-b"] != "3.5.1" {
+		t.Fatalf("lib-b = %q, want 3.5.1", got["lib-b"])
+	}
+}
+
+func TestSBOMCompatHandler_ValidatesInput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{
+			name: "missing libs",
+			url:  "/v1/sboms/compat?lang=java&release=17&tool=maven",
+		},
+		{
+			name: "invalid floor selector",
+			url:  "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:",
+		},
+		{
+			name: "duplicate selector with conflicting floor",
+			url:  "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.0.0,lib-a:2.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			handler := sbomCompatHandler(&mockStore{})
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400", rr.Code)
+			}
+		})
+	}
+}

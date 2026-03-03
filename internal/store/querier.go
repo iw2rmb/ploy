@@ -132,6 +132,7 @@ type Querier interface {
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
 	HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error)
+	HasSBOMEvidenceForStack(ctx context.Context, arg HasSBOMEvidenceForStackParams) (bool, error)
 	// Increments attempt and resets status/timing for a fresh repo execution attempt.
 	IncrementRunRepoAttempt(ctx context.Context, arg IncrementRunRepoAttemptParams) error
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -225,6 +226,7 @@ type Querier interface {
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	// Lists runs that have queued work (at least one Queued run_repos row).
 	ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error)
+	ListSBOMCompatRows(ctx context.Context, arg ListSBOMCompatRowsParams) ([]ListSBOMCompatRowsRow, error)
 	ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]Sbom, error)
 	// Lists specs ordered by created_at descending (most recent first).
 	// There is an index on created_at to optimize this query.

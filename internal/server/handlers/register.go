@@ -94,6 +94,8 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// Repos — repo-centric view: list repos and show runs for a given repo.
 	s.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/repos/{repo_id}/runs", listRunsForRepoHandler(st), auth.RoleControlPlane)
+	// SBOM compatibility hints for deps healing.
+	s.HandleFunc("GET /v1/sboms/compat", sbomCompatHandler(st), auth.RoleControlPlane)
 
 	// Runs (control plane) — legacy write/management endpoints
 	s.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
