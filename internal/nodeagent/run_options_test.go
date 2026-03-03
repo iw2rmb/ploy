@@ -131,8 +131,8 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 		"steps": [{
 			"image": {
 				"default": "docker.io/user/migs-orw:latest",
-				"java-maven": "docker.io/user/migs-orw-maven:latest",
-				"java-gradle": "docker.io/user/migs-orw-gradle:latest"
+				"java-maven": "docker.io/user/orw-cli:latest",
+				"java-gradle": "docker.io/user/orw-cli:latest"
 			}
 		}]
 	}`
@@ -144,7 +144,7 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving maven image: %v", err)
 	}
-	if mavenImg != "docker.io/user/migs-orw-maven:latest" {
+	if mavenImg != "docker.io/user/orw-cli:latest" {
 		t.Errorf("expected maven image, got %q", mavenImg)
 	}
 }

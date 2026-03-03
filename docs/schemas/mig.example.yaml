@@ -21,8 +21,8 @@ kind: MigRunSpec
 # 2. **Stack-specific images (map)** — Different images per Build Gate stack:
 #    image:
 #      default: docker.io/your-dh-user/migs-openrewrite:latest
-#      java-maven: docker.io/your-dh-user/migs-orw-maven:latest
-#      java-gradle: docker.io/your-dh-user/migs-orw-gradle:latest
+#      java-maven: docker.io/your-dh-user/orw-cli:latest
+#      java-gradle: docker.io/your-dh-user/orw-cli:latest
 #
 # Stack Resolution Rules (for map form):
 #   1. Exact match: If the detected stack matches a key (e.g., "java-maven"),
@@ -90,8 +90,8 @@ env_from_file:
 # migs:
 #   - image:
 #       default: docker.io/your-dh-user/migs-openrewrite:latest
-#       java-maven: docker.io/your-dh-user/migs-orw-maven:latest
-#       java-gradle: docker.io/your-dh-user/migs-orw-gradle:latest
+#       java-maven: docker.io/your-dh-user/orw-cli:latest
+#       java-gradle: docker.io/your-dh-user/orw-cli:latest
 #     env:
 #       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 

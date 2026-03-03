@@ -67,8 +67,8 @@ const (
 //	# Stack-specific images (map form) — per-stack optimization:
 //	image:
 //	  default: docker.io/user/migs-openrewrite:latest
-//	  java-maven: docker.io/user/migs-orw-maven:latest
-//	  java-gradle: docker.io/user/migs-orw-gradle:latest
+//	  java-maven: docker.io/user/orw-cli:latest
+//	  java-gradle: docker.io/user/orw-cli:latest
 type JobImage struct {
 	// Universal holds the image when specified as a single string.
 	// When non-empty, this image is used regardless of detected stack.

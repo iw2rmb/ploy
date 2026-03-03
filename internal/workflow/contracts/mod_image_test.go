@@ -65,8 +65,8 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 	stackMap := JobImage{
 		ByStack: map[ModStack]string{
 			ModStackDefault:    "docker.io/user/migs-orw:latest",
-			ModStackJavaMaven:  "docker.io/user/migs-orw-maven:latest",
-			ModStackJavaGradle: "docker.io/user/migs-orw-gradle:latest",
+			ModStackJavaMaven:  "docker.io/user/orw-cli:latest",
+			ModStackJavaGradle: "docker.io/user/orw-cli:latest",
 		},
 	}
 
@@ -80,13 +80,13 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 			name:  "exact match java-maven",
 			image: stackMap,
 			stack: ModStackJavaMaven,
-			want:  "docker.io/user/migs-orw-maven:latest",
+			want:  "docker.io/user/orw-cli:latest",
 		},
 		{
 			name:  "exact match java-gradle",
 			image: stackMap,
 			stack: ModStackJavaGradle,
-			want:  "docker.io/user/migs-orw-gradle:latest",
+			want:  "docker.io/user/orw-cli:latest",
 		},
 		{
 			name:  "fallback to default for java stack",
@@ -136,7 +136,7 @@ func TestJobImage_ResolveImage_NoDefault(t *testing.T) {
 	// Stack map without default key.
 	stackMap := JobImage{
 		ByStack: map[ModStack]string{
-			ModStackJavaMaven: "docker.io/user/migs-orw-maven:latest",
+			ModStackJavaMaven: "docker.io/user/orw-cli:latest",
 		},
 	}
 
@@ -237,8 +237,8 @@ func TestParseJobImage_Map(t *testing.T) {
 		t.Parallel()
 		input := map[string]any{
 			"default":     "docker.io/user/migs-orw:latest",
-			"java-maven":  "docker.io/user/migs-orw-maven:latest",
-			"java-gradle": "docker.io/user/migs-orw-gradle:latest",
+			"java-maven":  "docker.io/user/orw-cli:latest",
+			"java-gradle": "docker.io/user/orw-cli:latest",
 		}
 
 		got, err := ParseJobImage(input)
@@ -254,10 +254,10 @@ func TestParseJobImage_Map(t *testing.T) {
 		if got.ByStack[ModStackDefault] != "docker.io/user/migs-orw:latest" {
 			t.Errorf("default image mismatch: %q", got.ByStack[ModStackDefault])
 		}
-		if got.ByStack[ModStackJavaMaven] != "docker.io/user/migs-orw-maven:latest" {
+		if got.ByStack[ModStackJavaMaven] != "docker.io/user/orw-cli:latest" {
 			t.Errorf("java-maven image mismatch: %q", got.ByStack[ModStackJavaMaven])
 		}
-		if got.ByStack[ModStackJavaGradle] != "docker.io/user/migs-orw-gradle:latest" {
+		if got.ByStack[ModStackJavaGradle] != "docker.io/user/orw-cli:latest" {
 			t.Errorf("java-gradle image mismatch: %q", got.ByStack[ModStackJavaGradle])
 		}
 	})

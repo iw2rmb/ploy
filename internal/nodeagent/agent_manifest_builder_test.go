@@ -676,8 +676,8 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 				{ModContainerSpec: ModContainerSpec{
 					Image: contracts.JobImage{
 						ByStack: map[contracts.ModStack]string{
-							contracts.ModStackJavaMaven:  "docker.io/example/migs-orw-maven:latest",
-							contracts.ModStackJavaGradle: "docker.io/example/migs-orw-gradle:latest",
+							contracts.ModStackJavaMaven:  "docker.io/example/orw-cli:latest",
+							contracts.ModStackJavaGradle: "docker.io/example/orw-cli:latest",
 						},
 					},
 				}},
