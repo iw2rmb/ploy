@@ -59,3 +59,35 @@ allprojects {
     }
   }
 }
+
+// Best-effort SBOM wiring for Gradle builds:
+// - If CycloneDX plugin task `cyclonedxBom` exists, force JSON output into /out.
+// - Ensure it runs after gate entry tasks (`build` and `test`) so `build -x test`
+//   can still produce SBOM evidence without test execution.
+allprojects { project ->
+  project.tasks.matching { it.name == "cyclonedxBom" }.configureEach { sbomTask ->
+    try {
+      if (sbomTask.hasProperty("destination")) {
+        sbomTask.destination = new File("/out")
+      }
+      if (sbomTask.hasProperty("outputName")) {
+        sbomTask.outputName = "sbom.cyclonedx"
+      }
+      if (sbomTask.hasProperty("outputFormat")) {
+        sbomTask.outputFormat = "json"
+      }
+      if (sbomTask.hasProperty("jsonOutput")) {
+        sbomTask.jsonOutput = true
+      }
+      if (sbomTask.hasProperty("xmlOutput")) {
+        sbomTask.xmlOutput = false
+      }
+    } catch (Throwable ignored) {
+      // Keep gate execution resilient when plugin API differs across versions.
+    }
+
+    project.tasks.matching { it.name == "build" || it.name == "test" }.configureEach { gateTask ->
+      gateTask.finalizedBy(sbomTask)
+    }
+  }
+}
