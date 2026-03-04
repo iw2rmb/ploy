@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -116,10 +117,10 @@ func TestMods_Archive_NotFound(t *testing.T) {
 func TestMods_Archive_RefusesWithActiveJobs(t *testing.T) {
 	tests := []struct {
 		name      string
-		jobStatus store.JobStatus
+		jobStatus domaintypes.JobStatus
 	}{
-		{name: "running", jobStatus: store.JobStatusRunning},
-		{name: "queued", jobStatus: store.JobStatusQueued},
+		{name: "running", jobStatus: domaintypes.JobStatusRunning},
+		{name: "queued", jobStatus: domaintypes.JobStatusQueued},
 	}
 
 	for _, tt := range tests {
@@ -169,8 +170,8 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 			{ID: "run1", MigID: "mod123"},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: "job1", RunID: "run1", Status: store.JobStatusSuccess},
-			{ID: "job2", RunID: "run1", Status: store.JobStatusFail},
+			{ID: "job1", RunID: "run1", Status: domaintypes.JobStatusSuccess},
+			{ID: "job2", RunID: "run1", Status: domaintypes.JobStatusFail},
 		},
 	}
 	handler := archiveMigHandler(st)

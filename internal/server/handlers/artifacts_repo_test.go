@@ -49,7 +49,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 		getRunRepoResult: store.RunRepo{
 			RunID:   runIDTyped,
 			RepoID:  repoIDTyped,
-			Status:  store.RunRepoStatusRunning,
+			Status:  domaintypes.RunRepoStatusRunning,
 			Attempt: 1,
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{

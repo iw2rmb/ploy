@@ -58,7 +58,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 			Name:        "job-tie-" + insertIDs[i].String(),
 			JobType:     "",
 			JobImage:    "",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
@@ -256,7 +256,7 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 			Name:        "job-scoped-" + jobID.String(),
 			JobType:     "",
 			JobImage:    "",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			NextID:      nil,
 			Meta:        []byte(`{}`),
 		}); err != nil {

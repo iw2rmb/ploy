@@ -7,12 +7,13 @@ import (
 	"time"
 
 	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestResolveControlPlaneHTTP_PlainWithHTTPDescriptor(t *testing.T) {
 	// Descriptor with http scheme should yield a plain client.
 	// Isolate config home to ensure tests never touch the real default.
-	IsolatePloyConfigHomeAllowDefault(t)
+	clienv.IsolateConfigHomeAllowDefault(t)
 
 	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: cliconfig.ClusterID("c1"), Address: "http://127.0.0.1:9094"}); err != nil {
 		t.Fatalf("SaveDescriptor: %v", err)

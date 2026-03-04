@@ -126,10 +126,10 @@ func modStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
 // Uses exit code -1 to indicate pre-execution infrastructure failures.
 // v1 uses capitalized job status values: Success, Fail, Cancelled.
 func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
-	status := JobStatusFail
+	status := types.JobStatusFail
 	var exitCode *int32
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		status = JobStatusCancelled
+		status = types.JobStatusCancelled
 	} else {
 		var preExecutionExitCode int32 = -1 // -1 indicates pre-execution failure
 		exitCode = &preExecutionExitCode

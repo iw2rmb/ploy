@@ -25,12 +25,12 @@ import (
 // Only boolean true values trigger MR creation; non-boolean values are ignored.
 // v1 uses capitalized job status values: Success, Fail, Cancelled.
 func shouldCreateMR(terminalStatus string, manifest contracts.StepManifest) bool {
-	if terminalStatus == JobStatusSuccess.String() {
+	if terminalStatus == types.JobStatusSuccess.String() {
 		if mrOnSuccess, ok := manifest.OptionBool("mr_on_success"); ok && mrOnSuccess {
 			return true
 		}
 	}
-	if terminalStatus == JobStatusFail.String() {
+	if terminalStatus == types.JobStatusFail.String() {
 		if mrOnFail, ok := manifest.OptionBool("mr_on_fail"); ok && mrOnFail {
 			return true
 		}
@@ -218,7 +218,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		stats := builder.MustBuild()
 
 		if errors.Is(mrErr, context.Canceled) || errors.Is(mrErr, context.DeadlineExceeded) {
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusCancelled.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusCancelled.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload MR job cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 			}
 			slog.Info("MR job cancelled", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
@@ -226,7 +226,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		}
 
 		var exitCode int32 = -1
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 			slog.Error("failed to upload MR job failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
 		slog.Warn("MR job failed", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
@@ -235,7 +235,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 
 	stats := builder.MustBuild()
 	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
 		slog.Error("failed to upload MR job success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("MR job succeeded", "run_id", req.RunID, "job_id", req.JobID, "mr_url", mrURL, "duration", duration)

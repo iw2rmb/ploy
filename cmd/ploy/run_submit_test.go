@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 // TestRunSubmitCallsControlPlane validates `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
@@ -60,7 +61,7 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{
@@ -195,7 +196,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 		http.NotFound(w, r)
 	}))
 	defer server.Close()
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	oldStdin := os.Stdin
 	r, w, err := os.Pipe()
@@ -270,7 +271,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{
@@ -376,7 +377,7 @@ env:
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{
@@ -550,7 +551,7 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{

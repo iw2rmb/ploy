@@ -111,7 +111,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 			ctx := context.Background()
 			jobID := types.JobID("test-job-id")
 			// v1 uses capitalized job status values: Success, Fail, Cancelled.
-			err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+			err = uploader.UploadJobStatus(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -142,7 +142,7 @@ func TestStatusUploader_ReconcileConflictHandling(t *testing.T) {
 			name:      "reconcile accepts conflict",
 			responses: []int{http.StatusConflict},
 			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
-				return uploader.UploadJobStatusReconcile(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+				return uploader.UploadJobStatusReconcile(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 			},
 			wantErr:      false,
 			wantAttempts: 1,
@@ -151,7 +151,7 @@ func TestStatusUploader_ReconcileConflictHandling(t *testing.T) {
 			name:      "reconcile retries on 5xx then accepts conflict",
 			responses: []int{http.StatusInternalServerError, http.StatusConflict},
 			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
-				return uploader.UploadJobStatusReconcile(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+				return uploader.UploadJobStatusReconcile(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 			},
 			wantErr:      false,
 			wantAttempts: 2,
@@ -160,7 +160,7 @@ func TestStatusUploader_ReconcileConflictHandling(t *testing.T) {
 			name:      "reconcile keeps non conflict 4xx permanent",
 			responses: []int{http.StatusForbidden},
 			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
-				return uploader.UploadJobStatusReconcile(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+				return uploader.UploadJobStatusReconcile(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 			},
 			wantErr:      true,
 			wantAttempts: 1,
@@ -169,7 +169,7 @@ func TestStatusUploader_ReconcileConflictHandling(t *testing.T) {
 			name:      "default upload keeps conflict permanent",
 			responses: []int{http.StatusConflict},
 			upload: func(uploader *baseUploader, ctx context.Context, jobID types.JobID) error {
-				return uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+				return uploader.UploadJobStatus(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 			},
 			wantErr:      true,
 			wantAttempts: 1,
@@ -255,7 +255,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 	jobID := types.JobID("test-job-id")
 	start := time.Now()
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+	err = uploader.UploadJobStatus(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -309,7 +309,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 
 	jobID := types.JobID("test-job-id")
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), nil, nil)
+	err = uploader.UploadJobStatus(ctx, jobID, types.JobStatusSuccess.String(), nil, nil)
 
 	if err == nil {
 		t.Error("expected context cancellation error")
@@ -365,14 +365,14 @@ func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 
 	// Upload status via job-level endpoint.
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, JobStatusFail.String(), exitCode, stats)
+	err = uploader.UploadJobStatus(ctx, jobID, types.JobStatusFail.String(), exitCode, stats)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
 	// Verify status uses v1 capitalized value.
-	if receivedPayload["status"] != JobStatusFail.String() {
-		t.Errorf("expected status=%s, got %v", JobStatusFail.String(), receivedPayload["status"])
+	if receivedPayload["status"] != types.JobStatusFail.String() {
+		t.Errorf("expected status=%s, got %v", types.JobStatusFail.String(), receivedPayload["status"])
 	}
 
 	// Verify exit_code is present.
@@ -445,13 +445,13 @@ func TestStatusUploader_UploadJobStatus_UsesJobEndpointAndPayloadShape(t *testin
 		MustBuild()
 
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	err = uploader.UploadJobStatus(ctx, jobID, JobStatusSuccess.String(), &exitCode, stats)
+	err = uploader.UploadJobStatus(ctx, jobID, types.JobStatusSuccess.String(), &exitCode, stats)
 	if err != nil {
 		t.Fatalf("unexpected error uploading job status: %v", err)
 	}
 
-	if receivedPayload["status"] != JobStatusSuccess.String() {
-		t.Errorf("expected status=%s, got %v", JobStatusSuccess.String(), receivedPayload["status"])
+	if receivedPayload["status"] != types.JobStatusSuccess.String() {
+		t.Errorf("expected status=%s, got %v", types.JobStatusSuccess.String(), receivedPayload["status"])
 	}
 
 	if ec, ok := receivedPayload["exit_code"].(float64); !ok || ec != 0 {

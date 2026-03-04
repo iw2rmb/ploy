@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/golden"
 )
 
 // executeCmd is a test helper that creates a root cobra command, sets the provided
@@ -36,7 +36,7 @@ func TestExecuteHelpMatchesGolden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute help: %v", err)
 	}
-	expect := loadGolden(t, "help.txt")
+	expect := golden.LoadString(t, "testdata", "help.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("help output mismatch:\n%s", diff)
 	}
@@ -55,7 +55,7 @@ func TestExecuteHelpForMigMatchesGolden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute help mig: %v", err)
 	}
-	expect := loadGolden(t, "help_mig.txt")
+	expect := golden.LoadString(t, "testdata", "help_mig.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("help mig output mismatch:\n%s", diff)
 	}
@@ -109,16 +109,6 @@ func TestExecuteLegacyGridCommandIsUnknown(t *testing.T) {
 	if !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("expected 'unknown command' error, got %v", err)
 	}
-}
-
-func loadGolden(t *testing.T, name string) string {
-	t.Helper()
-	path := filepath.Join("testdata", name)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read golden %s: %v", name, err)
-	}
-	return string(data)
 }
 
 func diffStrings(expect, actual string) string {

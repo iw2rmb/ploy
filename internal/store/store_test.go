@@ -141,8 +141,8 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	if run.Status != RunStatusStarted {
-		t.Fatalf("CreateRun() status=%q, want %q", run.Status, RunStatusStarted)
+	if run.Status != types.RunStatusStarted {
+		t.Fatalf("CreateRun() status=%q, want %q", run.Status, types.RunStatusStarted)
 	}
 
 	fetched, err := db.GetRun(ctx, run.ID)
@@ -187,8 +187,8 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/org/repo-a", "main", "feature/a", []byte(`{"type":"batch"}`))
 
-	if fx.RunRepo.Status != RunRepoStatusQueued {
-		t.Fatalf("CreateRunRepo() status=%q, want %q", fx.RunRepo.Status, RunRepoStatusQueued)
+	if fx.RunRepo.Status != types.RunRepoStatusQueued {
+		t.Fatalf("CreateRunRepo() status=%q, want %q", fx.RunRepo.Status, types.RunRepoStatusQueued)
 	}
 	if fx.RunRepo.Attempt != 1 {
 		t.Fatalf("CreateRunRepo() attempt=%d, want 1", fx.RunRepo.Attempt)
@@ -231,7 +231,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
 		RunID:  rr2.RunID,
 		RepoID: rr2.RepoID,
-		Status: RunRepoStatusRunning,
+		Status: types.RunRepoStatusRunning,
 	}); err != nil {
 		t.Fatalf("UpdateRunRepoStatus() to Running failed: %v", err)
 	}
@@ -239,8 +239,8 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo() failed: %v", err)
 	}
-	if updated.Status != RunRepoStatusRunning {
-		t.Fatalf("run_repo status=%q, want %q", updated.Status, RunRepoStatusRunning)
+	if updated.Status != types.RunRepoStatusRunning {
+		t.Fatalf("run_repo status=%q, want %q", updated.Status, types.RunRepoStatusRunning)
 	}
 	if !updated.StartedAt.Valid {
 		t.Fatal("expected started_at to be set for Running repo")
@@ -248,7 +248,7 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
 		RunID:  rr2.RunID,
 		RepoID: rr2.RepoID,
-		Status: RunRepoStatusSuccess,
+		Status: types.RunRepoStatusSuccess,
 	}); err != nil {
 		t.Fatalf("UpdateRunRepoStatus() to Success failed: %v", err)
 	}
@@ -256,8 +256,8 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo() failed: %v", err)
 	}
-	if final.Status != RunRepoStatusSuccess {
-		t.Fatalf("run_repo status=%q, want %q", final.Status, RunRepoStatusSuccess)
+	if final.Status != types.RunRepoStatusSuccess {
+		t.Fatalf("run_repo status=%q, want %q", final.Status, types.RunRepoStatusSuccess)
 	}
 	if !final.FinishedAt.Valid {
 		t.Fatal("expected finished_at to be set for terminal repo")
@@ -274,8 +274,8 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 	if retry.Attempt != 2 {
 		t.Fatalf("attempt=%d, want 2", retry.Attempt)
 	}
-	if retry.Status != RunRepoStatusQueued {
-		t.Fatalf("status=%q, want %q", retry.Status, RunRepoStatusQueued)
+	if retry.Status != types.RunRepoStatusQueued {
+		t.Fatalf("status=%q, want %q", retry.Status, types.RunRepoStatusQueued)
 	}
 
 	msg := "boom"

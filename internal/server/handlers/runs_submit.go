@@ -169,9 +169,14 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		if eventsService != nil {
 			// Build a minimal run summary for the event using modsapi.RunSummary
 			// (matching the event structure expected by eventsService.PublishRun)
+			runState, convErr := modsapi.RunStatusFromDomain(run.Status)
+			if convErr != nil {
+				slog.Error("create single-repo run: invalid run status for publish payload", "run_id", run.ID, "status", run.Status, "err", convErr)
+				runState = modsapi.RunStateRunning
+			}
 			summary := modsapi.RunSummary{
 				RunID:      run.ID,
-				State:      modsapi.RunStatusFromStore(run.Status),
+				State:      runState,
 				Submitter:  "",
 				Repository: normalizedRepoURL,
 				Metadata: map[string]string{

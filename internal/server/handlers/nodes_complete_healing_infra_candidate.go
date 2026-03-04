@@ -132,7 +132,7 @@ func resolvePreviousHealJob(
 	failedJob store.Job,
 	jobsByID map[domaintypes.JobID]store.Job,
 ) *store.Job {
-	prev := predecessorOf(failedJob.ID, jobsByID)
+	prev := recoveryChainPredecessor(failedJob.ID, jobsByID)
 	if prev == nil {
 		return nil
 	}

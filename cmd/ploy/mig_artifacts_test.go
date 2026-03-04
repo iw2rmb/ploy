@@ -9,6 +9,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestModArtifactsListsStageArtifacts(t *testing.T) {
@@ -33,7 +34,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "artifacts", runID}, buf)
 	if err != nil {

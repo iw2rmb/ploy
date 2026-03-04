@@ -14,12 +14,12 @@ func TestIsTerminalRunStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		status store.RunStatus
+		status domaintypes.RunStatus
 		want   bool
 	}{
-		{store.RunStatusStarted, false},
-		{store.RunStatusFinished, true},
-		{store.RunStatusCancelled, true},
+		{domaintypes.RunStatusStarted, false},
+		{domaintypes.RunStatusFinished, true},
+		{domaintypes.RunStatusCancelled, true},
 	}
 
 	for _, tc := range tests {
@@ -36,14 +36,14 @@ func TestIsTerminalRunRepoStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		status store.RunRepoStatus
+		status domaintypes.RunRepoStatus
 		want   bool
 	}{
-		{store.RunRepoStatusQueued, false},
-		{store.RunRepoStatusRunning, false},
-		{store.RunRepoStatusSuccess, true},
-		{store.RunRepoStatusFail, true},
-		{store.RunRepoStatusCancelled, true},
+		{domaintypes.RunRepoStatusQueued, false},
+		{domaintypes.RunRepoStatusRunning, false},
+		{domaintypes.RunRepoStatusSuccess, true},
+		{domaintypes.RunRepoStatusFail, true},
+		{domaintypes.RunRepoStatusCancelled, true},
 	}
 
 	for _, tc := range tests {
@@ -71,9 +71,9 @@ func TestGetRunRepoCounts(t *testing.T) {
 		{
 			name: "cancelled takes precedence",
 			rows: []store.CountRunReposByStatusRow{
-				{Status: store.RunRepoStatusQueued, Count: 1},
-				{Status: store.RunRepoStatusRunning, Count: 1},
-				{Status: store.RunRepoStatusCancelled, Count: 1},
+				{Status: domaintypes.RunRepoStatusQueued, Count: 1},
+				{Status: domaintypes.RunRepoStatusRunning, Count: 1},
+				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: DerivedStatusCancelled,
@@ -81,8 +81,8 @@ func TestGetRunRepoCounts(t *testing.T) {
 		{
 			name: "running when any running",
 			rows: []store.CountRunReposByStatusRow{
-				{Status: store.RunRepoStatusQueued, Count: 2},
-				{Status: store.RunRepoStatusRunning, Count: 1},
+				{Status: domaintypes.RunRepoStatusQueued, Count: 2},
+				{Status: domaintypes.RunRepoStatusRunning, Count: 1},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: DerivedStatusRunning,
@@ -90,8 +90,8 @@ func TestGetRunRepoCounts(t *testing.T) {
 		{
 			name: "failed when any fail and none running/cancelled",
 			rows: []store.CountRunReposByStatusRow{
-				{Status: store.RunRepoStatusSuccess, Count: 2},
-				{Status: store.RunRepoStatusFail, Count: 1},
+				{Status: domaintypes.RunRepoStatusSuccess, Count: 2},
+				{Status: domaintypes.RunRepoStatusFail, Count: 1},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: DerivedStatusFailed,
@@ -99,14 +99,14 @@ func TestGetRunRepoCounts(t *testing.T) {
 		{
 			name: "completed when all terminal and no fail/cancelled",
 			rows: []store.CountRunReposByStatusRow{
-				{Status: store.RunRepoStatusSuccess, Count: 3},
+				{Status: domaintypes.RunRepoStatusSuccess, Count: 3},
 			},
 			wantTotal:         3,
 			wantDerivedStatus: DerivedStatusCompleted,
 		},
 		{
 			name:              "pending when queued only",
-			rows:              []store.CountRunReposByStatusRow{{Status: store.RunRepoStatusQueued, Count: 2}},
+			rows:              []store.CountRunReposByStatusRow{{Status: domaintypes.RunRepoStatusQueued, Count: 2}},
 			wantTotal:         2,
 			wantDerivedStatus: DerivedStatusPending,
 		},

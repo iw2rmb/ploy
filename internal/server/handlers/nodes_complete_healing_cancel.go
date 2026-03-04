@@ -53,7 +53,7 @@ func cancelRemainingJobsAfterFailure(
 		nextID = job.NextID
 
 		switch job.Status {
-		case store.JobStatusSuccess, store.JobStatusFail, store.JobStatusCancelled:
+		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
 			continue
 		}
 
@@ -69,7 +69,7 @@ func cancelRemainingJobsAfterFailure(
 		finishedAt := pgtype.Timestamptz{Time: now, Valid: true}
 		if err := st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
 			ID:         job.ID,
-			Status:     store.JobStatusCancelled,
+			Status:     domaintypes.JobStatusCancelled,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
 			DurationMs: durationMs,

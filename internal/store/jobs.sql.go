@@ -142,8 +142,8 @@ WHERE run_id = $1 AND status = $2
 `
 
 type CountJobsByRunAndStatusParams struct {
-	RunID  types.RunID `json:"run_id"`
-	Status JobStatus   `json:"status"`
+	RunID  types.RunID     `json:"run_id"`
+	Status types.JobStatus `json:"status"`
 }
 
 func (q *Queries) CountJobsByRunAndStatus(ctx context.Context, arg CountJobsByRunAndStatusParams) (int64, error) {
@@ -170,8 +170,8 @@ type CountJobsByRunRepoAttemptGroupByStatusParams struct {
 }
 
 type CountJobsByRunRepoAttemptGroupByStatusRow struct {
-	Status JobStatus `json:"status"`
-	Count  int32     `json:"count"`
+	Status types.JobStatus `json:"status"`
+	Count  int32           `json:"count"`
 }
 
 // Counts jobs by status for a specific repo attempt, excluding MR jobs.
@@ -260,18 +260,18 @@ RETURNING
 `
 
 type CreateJobParams struct {
-	ID          types.JobID  `json:"id"`
-	RunID       types.RunID  `json:"run_id"`
-	RepoID      types.RepoID `json:"repo_id"`
-	RepoBaseRef string       `json:"repo_base_ref"`
-	Attempt     int32        `json:"attempt"`
-	Name        string       `json:"name"`
-	Status      JobStatus    `json:"status"`
-	JobType     string       `json:"job_type"`
-	JobImage    string       `json:"job_image"`
-	NextID      *types.JobID `json:"next_id"`
-	Meta        []byte       `json:"meta"`
-	RepoShaIn   string       `json:"repo_sha_in"`
+	ID          types.JobID     `json:"id"`
+	RunID       types.RunID     `json:"run_id"`
+	RepoID      types.RepoID    `json:"repo_id"`
+	RepoBaseRef string          `json:"repo_base_ref"`
+	Attempt     int32           `json:"attempt"`
+	Name        string          `json:"name"`
+	Status      types.JobStatus `json:"status"`
+	JobType     types.JobType   `json:"job_type"`
+	JobImage    string          `json:"job_image"`
+	NextID      *types.JobID    `json:"next_id"`
+	Meta        []byte          `json:"meta"`
+	RepoShaIn   string          `json:"repo_sha_in"`
 }
 
 // Note: `id` is a required TEXT parameter (KSUID-backed); caller generates via types.NewJobID().
@@ -858,10 +858,10 @@ WHERE next_job.id = completed.next_id
 `
 
 type UpdateJobCompletionParams struct {
-	Status     JobStatus   `json:"status"`
-	ExitCode   *int32      `json:"exit_code"`
-	RepoShaOut string      `json:"repo_sha_out"`
-	ID         types.JobID `json:"id"`
+	Status     types.JobStatus `json:"status"`
+	ExitCode   *int32          `json:"exit_code"`
+	RepoShaOut string          `json:"repo_sha_out"`
+	ID         types.JobID     `json:"id"`
 }
 
 func (q *Queries) UpdateJobCompletion(ctx context.Context, arg UpdateJobCompletionParams) error {
@@ -907,11 +907,11 @@ WHERE next_job.id = completed.next_id
 `
 
 type UpdateJobCompletionWithMetaParams struct {
-	Status     JobStatus   `json:"status"`
-	ExitCode   *int32      `json:"exit_code"`
-	RepoShaOut string      `json:"repo_sha_out"`
-	Meta       []byte      `json:"meta"`
-	ID         types.JobID `json:"id"`
+	Status     types.JobStatus `json:"status"`
+	ExitCode   *int32          `json:"exit_code"`
+	RepoShaOut string          `json:"repo_sha_out"`
+	Meta       []byte          `json:"meta"`
+	ID         types.JobID     `json:"id"`
 }
 
 func (q *Queries) UpdateJobCompletionWithMeta(ctx context.Context, arg UpdateJobCompletionWithMetaParams) error {
@@ -991,7 +991,7 @@ WHERE id = $1
 
 type UpdateJobStatusParams struct {
 	ID         types.JobID        `json:"id"`
-	Status     JobStatus          `json:"status"`
+	Status     types.JobStatus    `json:"status"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 	DurationMs int64              `json:"duration_ms"`

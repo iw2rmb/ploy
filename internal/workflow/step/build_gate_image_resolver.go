@@ -11,6 +11,7 @@
 package step
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -32,6 +33,39 @@ const (
 	containerRegistryEnvKey    = "PLOY_CONTAINER_REGISTRY"
 	defaultRegistryImagePrefix = "127.0.0.1:5000/ploy"
 )
+
+var (
+	errBuildGateImageMapping   = errors.New("build gate image mapping")
+	errBuildGateImageRuleMatch = errors.New("build gate image rule match")
+)
+
+func resolveImageForExpectation(
+	mappingPath string,
+	overrides []contracts.BuildGateImageRule,
+	exp contracts.StackExpectation,
+	required bool,
+) (string, error) {
+	resolver, err := NewBuildGateImageResolver(mappingPath, overrides, required)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errBuildGateImageMapping, err)
+	}
+	resolved, err := resolver.Resolve(exp)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", errBuildGateImageRuleMatch, err)
+	}
+	return resolved, nil
+}
+
+func resolveExpectedRuntimeImageForStackGate(
+	mappingPath string,
+	overrides []contracts.BuildGateImageRule,
+	expect *contracts.StackExpectation,
+) (string, error) {
+	if expect == nil || strings.TrimSpace(expect.Release) == "" {
+		return "", fmt.Errorf("stack gate expectation missing release")
+	}
+	return resolveImageForExpectation(mappingPath, overrides, *expect, true)
+}
 
 // BuildGateImageResolver resolves stack expectations to container images.
 // Rules are merged from multiple sources with higher-precedence sources

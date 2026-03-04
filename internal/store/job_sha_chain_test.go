@@ -37,7 +37,7 @@ func TestUpdateJobCompletion_PropagatesRepoSHAOutToNextJob(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "sha-chain-next",
-		Status:      JobStatusCreated,
+		Status:      types.JobStatusCreated,
 		JobType:     "mig",
 		JobImage:    "img",
 		Meta:        []byte(`{}`),
@@ -55,7 +55,7 @@ func TestUpdateJobCompletion_PropagatesRepoSHAOutToNextJob(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "sha-chain-current",
-		Status:      JobStatusRunning,
+		Status:      types.JobStatusRunning,
 		JobType:     "mig",
 		JobImage:    "img",
 		NextID:      &nextJobID,
@@ -70,7 +70,7 @@ func TestUpdateJobCompletion_PropagatesRepoSHAOutToNextJob(t *testing.T) {
 	exitCode := int32(0)
 	if err := db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 		ID:         currJob.ID,
-		Status:     JobStatusSuccess,
+		Status:     types.JobStatusSuccess,
 		ExitCode:   &exitCode,
 		RepoShaOut: shaOut,
 	}); err != nil {
@@ -128,7 +128,7 @@ func TestUpdateJobCompletion_PropagationIsAtomic(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "sha-atomic-next",
-		Status:      JobStatusCreated,
+		Status:      types.JobStatusCreated,
 		JobType:     "mig",
 		JobImage:    "img",
 		Meta:        []byte(`{}`),
@@ -146,7 +146,7 @@ func TestUpdateJobCompletion_PropagationIsAtomic(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "sha-atomic-current",
-		Status:      JobStatusRunning,
+		Status:      types.JobStatusRunning,
 		JobType:     "mig",
 		JobImage:    "img",
 		NextID:      &nextJobID,
@@ -176,7 +176,7 @@ func TestUpdateJobCompletion_PropagationIsAtomic(t *testing.T) {
 	exitCode := int32(0)
 	err = db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 		ID:         currJob.ID,
-		Status:     JobStatusSuccess,
+		Status:     types.JobStatusSuccess,
 		ExitCode:   &exitCode,
 		RepoShaOut: shaOut,
 	})

@@ -42,7 +42,6 @@ import (
 	units "github.com/docker/go-units"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 	"github.com/moby/moby/client"
 )
 
@@ -174,8 +173,7 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 
 	catalogPath := buildGateDefaultStacksCatalogPath()
 
-	obs, detectErr := stackdetect.Detect(ctx, workspace)
-	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, obs, detectErr, catalogPath)
+	plan, terminal := resolveGateExecutionPlan(ctx, workspace, spec, catalogPath)
 	if terminal != nil {
 		if terminal.reportRuntimeImage {
 			reportGateRuntimeImage(ctx, terminal.runtimeImage)
@@ -426,41 +424,6 @@ func hasGradleWrapperSpecified(workspace string) bool {
 	p := filepath.Join(workspace, "gradle", "wrapper", "gradle-wrapper.properties")
 	info, err := os.Stat(p)
 	return err == nil && !info.IsDir()
-}
-
-// --- Image selection helpers (merged from gate_docker_image_selection.go) ---
-
-var (
-	errBuildGateImageMapping   = errors.New("build gate image mapping")
-	errBuildGateImageRuleMatch = errors.New("build gate image rule match")
-)
-
-func resolveImageForExpectation(
-	mappingPath string,
-	overrides []contracts.BuildGateImageRule,
-	exp contracts.StackExpectation,
-	required bool,
-) (string, error) {
-	resolver, err := NewBuildGateImageResolver(mappingPath, overrides, required)
-	if err != nil {
-		return "", fmt.Errorf("%w: %w", errBuildGateImageMapping, err)
-	}
-	resolved, err := resolver.Resolve(exp)
-	if err != nil {
-		return "", fmt.Errorf("%w: %w", errBuildGateImageRuleMatch, err)
-	}
-	return resolved, nil
-}
-
-func resolveExpectedRuntimeImageForStackGate(
-	mappingPath string,
-	overrides []contracts.BuildGateImageRule,
-	expect *contracts.StackExpectation,
-) (string, error) {
-	if expect == nil || strings.TrimSpace(expect.Release) == "" {
-		return "", fmt.Errorf("stack gate expectation missing release")
-	}
-	return resolveImageForExpectation(mappingPath, overrides, *expect, true)
 }
 
 // --- Metadata helpers (merged from gate_docker_metadata.go) ---

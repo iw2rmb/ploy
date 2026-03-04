@@ -102,10 +102,10 @@ func (s *PgStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
 		return fmt.Errorf("cancel run v1: get run: %w", err)
 	}
 
-	if run.Status != RunStatusFinished && run.Status != RunStatusCancelled {
+	if run.Status != types.RunStatusFinished && run.Status != types.RunStatusCancelled {
 		if err := qtx.UpdateRunStatus(ctx, UpdateRunStatusParams{
 			ID:     runID,
-			Status: RunStatusCancelled,
+			Status: types.RunStatusCancelled,
 		}); err != nil {
 			return fmt.Errorf("cancel run v1: update run status: %w", err)
 		}

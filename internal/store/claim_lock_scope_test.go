@@ -42,7 +42,7 @@ func TestClaimJobLocksJobOnly(t *testing.T) {
 		Name:        "job-lock",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})

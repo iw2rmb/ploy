@@ -42,7 +42,7 @@ func runToSummary(run store.Run) domaintypes.RunSummary {
 	summary := domaintypes.RunSummary{
 		// run.ID is now a string (KSUID); cast directly to domain type.
 		ID:        run.ID,
-		Status:    string(run.Status),
+		Status:    run.Status,
 		MigID:     run.MigID,
 		SpecID:    run.SpecID,
 		CreatedBy: run.CreatedBy,
@@ -71,15 +71,15 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 	for _, row := range rows {
 		counts.Total += row.Count
 		switch row.Status {
-		case store.RunRepoStatusQueued:
+		case domaintypes.RunRepoStatusQueued:
 			counts.Queued = row.Count
-		case store.RunRepoStatusRunning:
+		case domaintypes.RunRepoStatusRunning:
 			counts.Running = row.Count
-		case store.RunRepoStatusSuccess:
+		case domaintypes.RunRepoStatusSuccess:
 			counts.Success = row.Count
-		case store.RunRepoStatusFail:
+		case domaintypes.RunRepoStatusFail:
 			counts.Fail = row.Count
-		case store.RunRepoStatusCancelled:
+		case domaintypes.RunRepoStatusCancelled:
 			counts.Cancelled = row.Count
 		}
 	}
@@ -132,9 +132,9 @@ func deriveBatchStatus(counts *domaintypes.RunRepoCounts) string {
 }
 
 // isTerminalRunStatus returns true if the run status is terminal (no further transitions).
-func isTerminalRunStatus(status store.RunStatus) bool {
+func isTerminalRunStatus(status domaintypes.RunStatus) bool {
 	switch status {
-	case store.RunStatusFinished, store.RunStatusCancelled:
+	case domaintypes.RunStatusFinished, domaintypes.RunStatusCancelled:
 		return true
 	default:
 		return false
@@ -142,9 +142,9 @@ func isTerminalRunStatus(status store.RunStatus) bool {
 }
 
 // isTerminalRunRepoStatus returns true if the run repo status is terminal.
-func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
+func isTerminalRunRepoStatus(status domaintypes.RunRepoStatus) bool {
 	switch status {
-	case store.RunRepoStatusSuccess, store.RunRepoStatusFail, store.RunRepoStatusCancelled:
+	case domaintypes.RunRepoStatusSuccess, domaintypes.RunRepoStatusFail, domaintypes.RunRepoStatusCancelled:
 		return true
 	default:
 		return false
@@ -156,17 +156,17 @@ func isTerminalRunRepoStatus(status store.RunRepoStatus) bool {
 // v1 model: run_repos uses composite PK (run_id, repo_id), where repo_id refers
 // to mig_repos.id (NanoID(8)).
 type RunRepoResponse struct {
-	RunID      domaintypes.RunID   `json:"run_id"`
-	RepoID     domaintypes.RepoID  `json:"repo_id"`
-	RepoURL    string              `json:"repo_url"`
-	BaseRef    string              `json:"base_ref"`
-	TargetRef  string              `json:"target_ref"`
-	Status     store.RunRepoStatus `json:"status"`
-	Attempt    int32               `json:"attempt"`
-	LastError  *string             `json:"last_error,omitempty"`
-	CreatedAt  time.Time           `json:"created_at"`
-	StartedAt  *time.Time          `json:"started_at,omitempty"`
-	FinishedAt *time.Time          `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID         `json:"run_id"`
+	RepoID     domaintypes.RepoID        `json:"repo_id"`
+	RepoURL    string                    `json:"repo_url"`
+	BaseRef    string                    `json:"base_ref"`
+	TargetRef  string                    `json:"target_ref"`
+	Status     domaintypes.RunRepoStatus `json:"status"`
+	Attempt    int32                     `json:"attempt"`
+	LastError  *string                   `json:"last_error,omitempty"`
+	CreatedAt  time.Time                 `json:"created_at"`
+	StartedAt  *time.Time                `json:"started_at,omitempty"`
+	FinishedAt *time.Time                `json:"finished_at,omitempty"`
 }
 
 // runRepoToResponse converts a store.RunRepo to a RunRepoResponse.

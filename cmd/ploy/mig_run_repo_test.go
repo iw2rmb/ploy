@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 // TestModRunRepoRouting verifies that `mig run repo` dispatches to the correct handler.
@@ -118,7 +120,7 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-id argument for flag parsing.
@@ -158,7 +160,7 @@ func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{
@@ -208,7 +210,7 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-id argument for flag parsing.
@@ -256,7 +258,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-id argument for flag parsing.
@@ -306,7 +308,7 @@ func TestModRunRepoAddServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	// Note: Flags must come before the positional run-id argument for flag parsing.
@@ -342,7 +344,7 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{
@@ -371,7 +373,7 @@ func TestModRunRepoRestartServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{
@@ -398,7 +400,7 @@ func TestModRunRepoStatusServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"mig", "run", "repo", "status", "unknown-batch"}, buf)
@@ -441,7 +443,7 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{
@@ -488,7 +490,7 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{

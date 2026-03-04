@@ -104,8 +104,8 @@ type Job struct {
 	RepoBaseRef string             `json:"repo_base_ref"`
 	Attempt     int32              `json:"attempt"`
 	Name        string             `json:"name"`
-	Status      JobStatus          `json:"status"`
-	JobType     string             `json:"job_type"`
+	Status      types.JobStatus    `json:"status"`
+	JobType     types.JobType      `json:"job_type"`
 	JobImage    string             `json:"job_image"`
 	NextID      *types.JobID       `json:"next_id"`
 	NodeID      *types.NodeID      `json:"node_id"`
@@ -207,7 +207,7 @@ type Run struct {
 	MigID      types.MigID        `json:"mig_id"`
 	SpecID     types.SpecID       `json:"spec_id"`
 	CreatedBy  *string            `json:"created_by"`
-	Status     RunStatus          `json:"status"`
+	Status     types.RunStatus    `json:"status"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
@@ -215,19 +215,19 @@ type Run struct {
 }
 
 type RunRepo struct {
-	MigID           types.MigID        `json:"mig_id"`
-	RunID           types.RunID        `json:"run_id"`
-	RepoID          types.RepoID       `json:"repo_id"`
-	RepoBaseRef     string             `json:"repo_base_ref"`
-	RepoTargetRef   string             `json:"repo_target_ref"`
-	SourceCommitSha string             `json:"source_commit_sha"`
-	RepoSha0        string             `json:"repo_sha0"`
-	Status          RunRepoStatus      `json:"status"`
-	Attempt         int32              `json:"attempt"`
-	LastError       *string            `json:"last_error"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	StartedAt       pgtype.Timestamptz `json:"started_at"`
-	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
+	MigID           types.MigID         `json:"mig_id"`
+	RunID           types.RunID         `json:"run_id"`
+	RepoID          types.RepoID        `json:"repo_id"`
+	RepoBaseRef     string              `json:"repo_base_ref"`
+	RepoTargetRef   string              `json:"repo_target_ref"`
+	SourceCommitSha string              `json:"source_commit_sha"`
+	RepoSha0        string              `json:"repo_sha0"`
+	Status          types.RunRepoStatus `json:"status"`
+	Attempt         int32               `json:"attempt"`
+	LastError       *string             `json:"last_error"`
+	CreatedAt       pgtype.Timestamptz  `json:"created_at"`
+	StartedAt       pgtype.Timestamptz  `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz  `json:"finished_at"`
 }
 
 type RunsTiming struct {

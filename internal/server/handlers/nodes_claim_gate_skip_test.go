@@ -53,14 +53,14 @@ func TestBuildAndSendJobClaimResponse_ExactHitAddsGateSkipMetadata(t *testing.T)
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Name:        "pre-gate",
-		JobType:     domaintypes.JobTypePreGate.String(),
+		JobType:     domaintypes.JobTypePreGate,
 		RepoShaIn:   "0123456789abcdef0123456789abcdef01234567",
 		NodeID:      &nodeID,
 	}
 	run := store.Run{
 		ID:        runID,
 		SpecID:    specID,
-		Status:    store.RunStatusStarted,
+		Status:    domaintypes.RunStatusStarted,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}
@@ -132,14 +132,14 @@ func TestBuildAndSendJobClaimResponse_GateSkipScenarios(t *testing.T) {
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Name:        "pre-gate",
-		JobType:     domaintypes.JobTypePreGate.String(),
+		JobType:     domaintypes.JobTypePreGate,
 		RepoShaIn:   "0123456789abcdef0123456789abcdef01234567",
 		NodeID:      &nodeID,
 	}
 	baseRun := store.Run{
 		ID:        runID,
 		SpecID:    specID,
-		Status:    store.RunStatusStarted,
+		Status:    domaintypes.RunStatusStarted,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	}

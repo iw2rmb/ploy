@@ -74,7 +74,7 @@ func handleMigStatus(args []string, stderr io.Writer) error {
 	_, _ = fmt.Fprintln(tw, "Run\tSuccess\tFail")
 	for _, run := range runs {
 		success, fail := runSuccessFail(run.Counts)
-		_, _ = fmt.Fprintf(tw, "%s  %s\t%d\t%d\n", migStatusGlyph(run.Status), run.ID.String(), success, fail)
+		_, _ = fmt.Fprintf(tw, "%s  %s\t%d\t%d\n", migStatusGlyph(run.Status.String()), run.ID.String(), success, fail)
 	}
 	_ = tw.Flush()
 

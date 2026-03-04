@@ -11,7 +11,7 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 
 steps:
-  - image: localhost:5000/ploy/orw-cli:latest
+  - image: localhost:5000/ploy/orw-cli-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

@@ -59,8 +59,8 @@ func TestRunController_uploadFailureStatus_UsesCancelledOnContextCanceled(t *tes
 		t.Fatalf("status path = %q, want %q", statusPath, wantPath)
 	}
 
-	if statusPayload["status"] != JobStatusCancelled.String() {
-		t.Fatalf("status = %v, want %q", statusPayload["status"], JobStatusCancelled.String())
+	if statusPayload["status"] != types.JobStatusCancelled.String() {
+		t.Fatalf("status = %v, want %q", statusPayload["status"], types.JobStatusCancelled.String())
 	}
 
 	if _, ok := statusPayload["exit_code"]; ok {

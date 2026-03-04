@@ -19,7 +19,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // Config holds follow engine configuration.
@@ -30,17 +29,17 @@ type Config struct {
 
 // RepoEntry represents a repo in the run.
 type RepoEntry struct {
-	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoID     domaintypes.MigRepoID `json:"repo_id"`
-	RepoURL    string                `json:"repo_url"`
-	BaseRef    string                `json:"base_ref"`
-	TargetRef  string                `json:"target_ref"`
-	Status     store.RunRepoStatus   `json:"status"`
-	Attempt    int32                 `json:"attempt"`
-	LastError  *string               `json:"last_error,omitempty"`
-	CreatedAt  time.Time             `json:"created_at"`
-	StartedAt  *time.Time            `json:"started_at,omitempty"`
-	FinishedAt *time.Time            `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID         `json:"run_id"`
+	RepoID     domaintypes.MigRepoID     `json:"repo_id"`
+	RepoURL    string                    `json:"repo_url"`
+	BaseRef    string                    `json:"base_ref"`
+	TargetRef  string                    `json:"target_ref"`
+	Status     domaintypes.RunRepoStatus `json:"status"`
+	Attempt    int32                     `json:"attempt"`
+	LastError  *string                   `json:"last_error,omitempty"`
+	CreatedAt  time.Time                 `json:"created_at"`
+	StartedAt  *time.Time                `json:"started_at,omitempty"`
+	FinishedAt *time.Time                `json:"finished_at,omitempty"`
 }
 
 // Engine manages the follow mode rendering loop.
@@ -310,7 +309,7 @@ func (e *Engine) render() {
 			row := runs.FollowStepRow{
 				Cells: []string{
 					glyph,
-					job.JobType,
+					job.JobType.String(),
 					job.JobID.String(),
 					nodeID,
 					image,

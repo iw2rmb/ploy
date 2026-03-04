@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestRunCancelCallsControlPlane(t *testing.T) {
@@ -21,7 +23,7 @@ func TestRunCancelCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"run", "cancel", "run-7", "--reason", "cleanup"}, buf)
 	if err != nil {

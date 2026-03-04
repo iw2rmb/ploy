@@ -8,6 +8,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
 
 func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
@@ -66,22 +67,22 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
-	assertContains(t, out, "   Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
-	assertContains(t, out, "   Repos: 1")
-	assertContains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertContains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
-	assertContains(t, out, "Artefacts")
-	assertNotContains(t, out, "State")
+	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
+	assertx.Contains(t, out, "   Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
+	assertx.Contains(t, out, "   Repos: 1")
+	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
+	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertx.Contains(t, out, "Artefacts")
+	assertx.NotContains(t, out, "State")
 	if strings.Count(out, "Logs (https://example.test/v1/runs/") != 1 {
 		t.Fatalf("expected exactly one logs link in output, got: %q", out)
 	}
 	if strings.Count(out, "Patch (https://example.test/v1/runs/") != 1 {
 		t.Fatalf("expected exactly one patch link in output, got: %q", out)
 	}
-	assertContains(t, out, "Logs (https://example.test/v1/runs/")
-	assertContains(t, out, " | Patch (https://example.test/v1/runs/")
-	assertContains(t, out, "⣾")
+	assertx.Contains(t, out, "Logs (https://example.test/v1/runs/")
+	assertx.Contains(t, out, " | Patch (https://example.test/v1/runs/")
+	assertx.Contains(t, out, "⣾")
 }
 
 func TestRenderRunReportTextExitOneLiners(t *testing.T) {
@@ -142,13 +143,13 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	}
 	out := buf.String()
 
-	assertContains(t, out, "\x1b[91m✗\x1b[0m")
-	assertContains(t, out, "pre_gate")
-	assertContains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
-	assertNotContains(t, out, "<infra>")
-	assertContains(t, out, "✓")
-	assertContains(t, out, "Heal")
-	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
+	assertx.Contains(t, out, "\x1b[91m✗\x1b[0m")
+	assertx.Contains(t, out, "pre_gate")
+	assertx.Contains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
+	assertx.NotContains(t, out, "<infra>")
+	assertx.Contains(t, out, "✓")
+	assertx.Contains(t, out, "Heal")
+	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
 func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
@@ -193,9 +194,9 @@ func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
 	out := buf.String()
-	assertContains(t, out, "└  Exit 1: \x1b[91mcode missing ; in Foo.java\x1b[0m")
-	assertNotContains(t, out, "<code>")
-	assertContains(t, out, "0.8s")
+	assertx.Contains(t, out, "└  Exit 1: \x1b[91mcode missing ; in Foo.java\x1b[0m")
+	assertx.NotContains(t, out, "<code>")
+	assertx.Contains(t, out, "0.8s")
 }
 
 func TestRenderRunReportTextGateExitOneLinerDefaultsUnknownErrorKind(t *testing.T) {
@@ -234,8 +235,8 @@ func TestRenderRunReportTextGateExitOneLinerDefaultsUnknownErrorKind(t *testing.
 	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
-	assertContains(t, buf.String(), "└  Exit 1: \x1b[91munknown re-gate failed\x1b[0m")
-	assertNotContains(t, buf.String(), "<unknown>")
+	assertx.Contains(t, buf.String(), "└  Exit 1: \x1b[91munknown re-gate failed\x1b[0m")
+	assertx.NotContains(t, buf.String(), "<unknown>")
 }
 
 func TestRenderRunReportTextExitOneLinerWrapsAt100Symbols(t *testing.T) {
@@ -281,7 +282,7 @@ func TestRenderRunReportTextExitOneLinerWrapsAt100Symbols(t *testing.T) {
 	expected := prefix + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
 		indent + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
 		indent + "\x1b[91m" + strings.Repeat("x", 10) + "\x1b[0m"
-	assertContains(t, buf.String(), expected)
+	assertx.Contains(t, buf.String(), expected)
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
@@ -332,14 +333,14 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		t.Fatalf("RenderRunReportText plain error: %v", err)
 	}
 	plainOut := plain.String()
-	assertContains(t, plainOut, "Logs ("+logURL+"?auth_token=test-token)")
-	assertContains(t, plainOut, "Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
-	assertContains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
-	assertNotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
-	assertContains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
-	assertContains(t, plainOut, "auth_token=test-token")
-	assertContains(t, plainOut, "diff_id=abc")
-	assertContains(t, plainOut, "download=true")
+	assertx.Contains(t, plainOut, "Logs ("+logURL+"?auth_token=test-token)")
+	assertx.Contains(t, plainOut, "Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
+	assertx.Contains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
+	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
+	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
+	assertx.Contains(t, plainOut, "auth_token=test-token")
+	assertx.Contains(t, plainOut, "diff_id=abc")
+	assertx.Contains(t, plainOut, "download=true")
 	if strings.Contains(plainOut, "\x1b]8;;") {
 		t.Fatalf("plain output unexpectedly contains OSC8 sequence: %q", plainOut)
 	}
@@ -349,12 +350,12 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		t.Fatalf("RenderRunReportText linked error: %v", err)
 	}
 	linkedOut := linked.String()
-	assertContains(t, linkedOut, "\x1b]8;;"+logURL+"?auth_token=test-token")
-	assertContains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
-	assertContains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
-	assertNotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
-	assertContains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
-	assertContains(t, linkedOut, "auth_token=test-token")
+	assertx.Contains(t, linkedOut, "\x1b]8;;"+logURL+"?auth_token=test-token")
+	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
+	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
+	assertx.NotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
+	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")
+	assertx.Contains(t, linkedOut, "auth_token=test-token")
 }
 
 func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
@@ -398,7 +399,7 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 	}
 	out := buf.String()
 
-	assertNotContains(t, out, "Logs (")
+	assertx.NotContains(t, out, "Logs (")
 }
 
 func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
@@ -418,9 +419,9 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 		t.Fatalf("RenderRunReportText error: %v", err)
 	}
 	out := buf.String()
-	assertContains(t, out, "   Mig:   "+migID.String()+"\n")
+	assertx.Contains(t, out, "   Mig:   "+migID.String()+"\n")
 	firstLine := strings.SplitN(out, "\n", 2)[0]
-	assertNotContains(t, firstLine, "|")
+	assertx.NotContains(t, firstLine, "|")
 }
 
 func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
@@ -469,8 +470,8 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 		t.Fatalf("RenderRunReportText frame0 error: %v", err)
 	}
 	out0 := frame0.String()
-	assertContains(t, out0, "⣾")
-	assertContains(t, out0, "5.0s")
+	assertx.Contains(t, out0, "⣾")
+	assertx.Contains(t, out0, "5.0s")
 
 	var frame1 bytes.Buffer
 	if err := RenderRunReportText(&frame1, report, TextRenderOptions{
@@ -482,20 +483,6 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 		t.Fatalf("RenderRunReportText frame1 error: %v", err)
 	}
 	out1 := frame1.String()
-	assertContains(t, out1, "⣷")
-	assertContains(t, out1, "5.0s")
-}
-
-func assertContains(t *testing.T, haystack string, needle string) {
-	t.Helper()
-	if !strings.Contains(haystack, needle) {
-		t.Fatalf("expected output to contain %q, got: %q", needle, haystack)
-	}
-}
-
-func assertNotContains(t *testing.T, haystack string, needle string) {
-	t.Helper()
-	if strings.Contains(haystack, needle) {
-		t.Fatalf("expected output not to contain %q, got: %q", needle, haystack)
-	}
+	assertx.Contains(t, out1, "⣷")
+	assertx.Contains(t, out1, "5.0s")
 }

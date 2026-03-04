@@ -50,7 +50,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-1",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
@@ -70,7 +70,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		exitCode := int32(0)
 		err = db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 			ID:       job.ID,
-			Status:   JobStatusSuccess,
+			Status:   types.JobStatusSuccess,
 			ExitCode: &exitCode,
 		})
 		if err != nil {
@@ -104,7 +104,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-2",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
@@ -124,7 +124,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		exitCode := int32(0)
 		err = db.UpdateJobCompletionWithMeta(ctx, UpdateJobCompletionWithMetaParams{
 			ID:       job.ID,
-			Status:   JobStatusSuccess,
+			Status:   types.JobStatusSuccess,
 			ExitCode: &exitCode,
 			Meta:     []byte(`{"completed": true}`),
 		})
@@ -158,7 +158,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-running-started-at",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
@@ -175,7 +175,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 
 		if err := db.UpdateJobStatus(ctx, UpdateJobStatusParams{
 			ID:         job.ID,
-			Status:     JobStatusRunning,
+			Status:     types.JobStatusRunning,
 			StartedAt:  pgtype.Timestamptz{}, // invalid/null input; store should set now() on transition
 			FinishedAt: pgtype.Timestamptz{},
 			DurationMs: 0,
@@ -187,8 +187,8 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetJob() failed: %v", err)
 		}
-		if running.Status != JobStatusRunning {
-			t.Fatalf("status=%q, want %q", running.Status, JobStatusRunning)
+		if running.Status != types.JobStatusRunning {
+			t.Fatalf("status=%q, want %q", running.Status, types.JobStatusRunning)
 		}
 		if !running.StartedAt.Valid {
 			t.Fatal("expected started_at to be set after UpdateJobStatus(Running)")
@@ -205,7 +205,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 			RepoBaseRef: fixture.RunRepo.RepoBaseRef,
 			Attempt:     fixture.RunRepo.Attempt,
 			Name:        "test-job-completion-3",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			JobType:     "mig",
 			JobImage:    "test-image",
 			NextID:      nil,
@@ -247,7 +247,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 		exitCode := int32(0)
 		err = db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 			ID:       claimed.ID,
-			Status:   JobStatusSuccess,
+			Status:   types.JobStatusSuccess,
 			ExitCode: &exitCode,
 		})
 		if err != nil {

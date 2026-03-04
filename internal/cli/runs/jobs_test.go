@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
@@ -22,10 +21,10 @@ func TestOrderRepoJobsByChain_ReconstructsLinkedOrder(t *testing.T) {
 
 	jobs := []RepoJobEntry{
 		// Deliberately out of chain order (mirrors current broken render shape).
-		{JobID: post, JobType: "post_gate", Status: store.JobStatusCreated, NextID: nil},
-		{JobID: mig1, JobType: "mig", Status: store.JobStatusCreated, NextID: &post},
-		{JobID: mig0, JobType: "mig", Status: store.JobStatusCreated, NextID: &mig1},
-		{JobID: pre, JobType: "pre_gate", Status: store.JobStatusRunning, NextID: &mig0},
+		{JobID: post, JobType: "post_gate", Status: domaintypes.JobStatusCreated, NextID: nil},
+		{JobID: mig1, JobType: "mig", Status: domaintypes.JobStatusCreated, NextID: &post},
+		{JobID: mig0, JobType: "mig", Status: domaintypes.JobStatusCreated, NextID: &mig1},
+		{JobID: pre, JobType: "pre_gate", Status: domaintypes.JobStatusRunning, NextID: &mig0},
 	}
 
 	got := orderRepoJobsByChain(jobs)

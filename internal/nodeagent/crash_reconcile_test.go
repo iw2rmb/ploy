@@ -369,8 +369,8 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 				t.Fatalf("decode complete payload: %v", err)
 			}
-			if payload.Status != JobStatusSuccess.String() {
-				t.Fatalf("status = %q, want %q", payload.Status, JobStatusSuccess.String())
+			if payload.Status != types.JobStatusSuccess.String() {
+				t.Fatalf("status = %q, want %q", payload.Status, types.JobStatusSuccess.String())
 			}
 			if payload.ExitCode != 0 {
 				t.Fatalf("exit_code = %d, want 0", payload.ExitCode)

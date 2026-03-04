@@ -24,7 +24,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 		ID:      jobID,
 		RunID:   runID,
 		NodeID:  &nodeID,
-		Status:  store.JobStatusRunning,
+		Status:  domaintypes.JobStatusRunning,
 		JobType: "mig",
 	}
 
@@ -100,7 +100,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 		ID:      jobID,
 		RunID:   runID,
 		NodeID:  &otherNode,
-		Status:  store.JobStatusRunning,
+		Status:  domaintypes.JobStatusRunning,
 		JobType: "mig",
 	}
 
@@ -139,7 +139,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 		ID:      jobID,
 		RunID:   runID,
 		NodeID:  &nodeID,
-		Status:  store.JobStatusQueued,
+		Status:  domaintypes.JobStatusQueued,
 		JobType: "mig",
 	}
 
@@ -175,7 +175,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 		ID:      jobID,
 		RunID:   runID,
 		NodeID:  &nodeID,
-		Status:  store.JobStatusRunning,
+		Status:  domaintypes.JobStatusRunning,
 		JobType: "pre_gate",
 	}
 
@@ -211,7 +211,7 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 		ID:      jobID,
 		RunID:   runID,
 		NodeID:  &nodeID,
-		Status:  store.JobStatusRunning,
+		Status:  domaintypes.JobStatusRunning,
 		JobType: "mr",
 	}
 

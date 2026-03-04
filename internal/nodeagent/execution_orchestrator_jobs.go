@@ -48,7 +48,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		stats := statsBuilder.MustBuild()
 
 		var exitCodeZero int32 = 0
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, strings.TrimSpace(req.StepSkip.RefRepoSHAOut)); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, strings.TrimSpace(req.StepSkip.RefRepoSHAOut)); uploadErr != nil {
 			slog.Error("failed to upload step-skip success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
 		slog.Info("mig job skipped via step cache", "run_id", req.RunID, "job_id", req.JobID, "ref_job_id", req.StepSkip.RefJobID, "repo_sha_out", req.StepSkip.RefRepoSHAOut)
@@ -96,7 +96,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 	cfg := standardJobConfig{
 		Manifest:                  manifest,
-		DiffType:                  DiffJobTypeMod,
+		DiffType:                  types.DiffJobTypeMod,
 		OutDirPattern:             "ploy-mig-out-*",
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
@@ -158,7 +158,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	cfg := standardJobConfig{
 		Manifest:      manifest,
-		DiffType:      DiffJobTypeMod,
+		DiffType:      types.DiffJobTypeHealing,
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
@@ -197,7 +197,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 // standardJobConfig configures the execution of a standard container job (mig/heal).
 type standardJobConfig struct {
 	Manifest      contracts.StepManifest
-	DiffType      DiffJobType
+	DiffType      types.DiffJobType
 	OutDirPattern string
 	InDirPattern  string
 
@@ -344,10 +344,10 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		stats := statsBuilder.MustBuild()
 
 		if runErr != nil {
-			status := JobStatusFail
+			status := types.JobStatusFail
 			var exitCode *int32
 			if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
-				status = JobStatusCancelled
+				status = types.JobStatusCancelled
 			} else {
 				var runtimeExitCode int32 = -1
 				exitCode = &runtimeExitCode
@@ -371,7 +371,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 		if result.ExitCode != 0 {
 			exitCode := int32(result.ExitCode)
-			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 			}
 			slog.Info("job failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "exit_code", result.ExitCode, "duration", duration)
@@ -379,7 +379,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		}
 
 		var exitCodeZero int32 = 0
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
 			slog.Error("failed to upload success status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 		}
 		slog.Info("job succeeded", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "duration", duration)
@@ -428,7 +428,7 @@ type snapshotResult struct {
 }
 
 // snapshotWorkspaceForNoIndexDiff creates a snapshot of the workspace for baseline comparison.
-func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffType DiffJobType, workspace string) snapshotResult {
+func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffType types.DiffJobType, workspace string) snapshotResult {
 	jobTypeStr := diffType.String()
 	prefix := fmt.Sprintf("ploy-%s-base-*", jobTypeStr)
 	snapshotDir, err := os.MkdirTemp("", prefix)
@@ -705,7 +705,7 @@ func (r *runController) uploadHealingJobDiff(
 	}
 
 	summary := types.NewDiffSummaryBuilder().
-		JobType(DiffJobTypeMod.String()).
+		JobType(types.DiffJobTypeHealing.String()).
 		ExitCode(result.ExitCode).
 		Timings(
 			time.Duration(result.Timings.HydrationDuration).Milliseconds(),

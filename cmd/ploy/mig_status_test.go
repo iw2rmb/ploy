@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestMigStatusPrintsMigrationSummary(t *testing.T) {
@@ -99,7 +100,7 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"mig", "status", migID.String()}, &buf)
@@ -120,7 +121,7 @@ func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 
 func TestMigStatusRequiresMigID(t *testing.T) {
 	t.Helper()
-	useServerDescriptor(t, "http://example.test")
+	clienv.UseServerDescriptor(t, "http://example.test")
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"mig", "status"}, &buf)

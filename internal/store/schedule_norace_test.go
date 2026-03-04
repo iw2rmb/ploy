@@ -51,7 +51,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 			Name:        "job-norace-" + jobID.String(),
 			JobType:     "",
 			JobImage:    "",
-			Status:      JobStatusCreated, // Created, not Queued
+			Status:      types.JobStatusCreated, // Created, not Queued
 			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
@@ -127,8 +127,8 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetJob(%s) failed: %v", id, err)
 		}
-		if job.Status != JobStatusQueued {
-			t.Fatalf("job %s status=%s, want %s", id, job.Status, JobStatusQueued)
+		if job.Status != types.JobStatusQueued {
+			t.Fatalf("job %s status=%s, want %s", id, job.Status, types.JobStatusQueued)
 		}
 	}
 
@@ -141,14 +141,14 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CountJobsByRunRepoAttemptGroupByStatus() failed: %v", err)
 	}
-	counts := make(map[JobStatus]int32, len(rows))
+	counts := make(map[types.JobStatus]int32, len(rows))
 	for _, r := range rows {
 		counts[r.Status] = r.Count
 	}
-	if got := counts[JobStatusQueued]; got != numJobs {
+	if got := counts[types.JobStatusQueued]; got != numJobs {
 		t.Fatalf("Queued jobs=%d, want %d", got, numJobs)
 	}
-	if got := counts[JobStatusCreated]; got != 0 {
+	if got := counts[types.JobStatusCreated]; got != 0 {
 		t.Fatalf("Created jobs=%d, want 0", got)
 	}
 
@@ -189,7 +189,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 			Name:        "job-seq-" + jobIDs[i].String(),
 			JobType:     "",
 			JobImage:    "",
-			Status:      JobStatusCreated,
+			Status:      types.JobStatusCreated,
 			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})

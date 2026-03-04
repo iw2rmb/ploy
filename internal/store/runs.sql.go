@@ -179,9 +179,9 @@ WHERE id = $1
 `
 
 type UpdateRunCompletionParams struct {
-	ID     types.RunID `json:"id"`
-	Status RunStatus   `json:"status"`
-	Stats  []byte      `json:"stats"`
+	ID     types.RunID     `json:"id"`
+	Status types.RunStatus `json:"status"`
+	Stats  []byte          `json:"stats"`
 }
 
 func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
@@ -237,8 +237,8 @@ WHERE id = $1
 `
 
 type UpdateRunStatusParams struct {
-	ID     types.RunID `json:"id"`
-	Status RunStatus   `json:"status"`
+	ID     types.RunID     `json:"id"`
+	Status types.RunStatus `json:"status"`
 }
 
 func (q *Queries) UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error {

@@ -15,15 +15,15 @@ ensure_local_descriptor() {
   local token=""
   local generated_tokens=""
 
-  if descriptor_marker_valid "$marker" "$clusters_dir"; then
-    descriptor_path="$(resolve_descriptor_path "$marker" "$clusters_dir")"
-    server_url="$(descriptor_value "$descriptor_path" "address")"
-    token="$(descriptor_value "$descriptor_path" "token")"
+  if e2e_descriptor_marker_valid "$marker" "$clusters_dir"; then
+    descriptor_path="$(e2e_resolve_descriptor_path "$marker" "$clusters_dir")"
+    server_url="$(e2e_descriptor_value "$descriptor_path" "address")"
+    token="$(e2e_descriptor_value "$descriptor_path" "token")"
     if token_works "$server_url" "$token"; then
       return 0
     fi
     echo "[e2e] Existing descriptor token is invalid; attempting recovery..." >&2
-    cluster_id="$(descriptor_value "$descriptor_path" "cluster_id")"
+    cluster_id="$(e2e_descriptor_value "$descriptor_path" "cluster_id")"
     if [[ -z "$cluster_id" ]]; then
       cluster_id="local"
     fi
@@ -56,7 +56,7 @@ ensure_local_descriptor() {
   return 1
 }
 
-descriptor_marker_valid() {
+e2e_descriptor_marker_valid() {
   local marker="$1"
   local clusters_dir="$2"
 
@@ -82,7 +82,7 @@ descriptor_marker_valid() {
   [[ -f "${clusters_dir}/${target}" ]]
 }
 
-resolve_descriptor_path() {
+e2e_resolve_descriptor_path() {
   local marker="$1"
   local clusters_dir="$2"
   local target=""
@@ -100,7 +100,7 @@ resolve_descriptor_path() {
   printf '%s\n' "$marker"
 }
 
-descriptor_value() {
+e2e_descriptor_value() {
   local descriptor_path="$1"
   local key="$2"
   python3 - "$descriptor_path" "$key" <<'PY'

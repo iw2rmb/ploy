@@ -59,8 +59,8 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypePreGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing"}}}`),
 			},
@@ -71,8 +71,8 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{}`),
 			},
 		},
@@ -80,7 +80,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	successorID := st.listJobsByRunRepoAttemptResult[1].ID
 	st.listJobsByRunRepoAttemptResult[0].NextID = &successorID
 
-	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	failed := st.listJobsByRunRepoAttemptResult[0]
 
 	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
@@ -106,7 +106,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected heal-1-0 job to be created")
 	}
-	if healJob.Status != store.JobStatusQueued {
+	if healJob.Status != domaintypes.JobStatusQueued {
 		t.Fatalf("expected heal-1-0 status=Queued, got %s", healJob.Status)
 	}
 	if healJob.JobImage != "migs-codex:latest" {
@@ -123,7 +123,7 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected re-gate-1 job to be created")
 	}
-	if reGateJob.Status != store.JobStatusCreated {
+	if reGateJob.Status != domaintypes.JobStatusCreated {
 		t.Fatalf("expected re-gate-1 status=Created, got %s", reGateJob.Status)
 	}
 	if healJob.NextID == nil || *healJob.NextID != reGateJob.ID {
@@ -202,8 +202,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypePreGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
@@ -214,8 +214,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "heal-1-0",
-				Status:      store.JobStatusSuccess,
-				JobType:     domaintypes.JobTypeHeal.String(),
+				Status:      domaintypes.JobStatusSuccess,
+				JobType:     domaintypes.JobTypeHeal,
 				Meta:        []byte(`{}`),
 			},
 			{
@@ -225,8 +225,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "re-gate-1",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypeReGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypeReGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
@@ -237,8 +237,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{}`),
 			},
 		},
@@ -250,7 +250,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	st.listJobsByRunRepoAttemptResult[1].NextID = &reGate1ID
 	st.listJobsByRunRepoAttemptResult[2].NextID = &mod0ID
 
-	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	failed := st.listJobsByRunRepoAttemptResult[2]
 
 	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
@@ -263,13 +263,13 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	if st.createJobParams[0].Name != "re-gate-2" {
 		t.Fatalf("expected first healing job name re-gate-2, got %q", st.createJobParams[0].Name)
 	}
-	if st.createJobParams[0].JobType != domaintypes.JobTypeReGate.String() {
+	if st.createJobParams[0].JobType != domaintypes.JobTypeReGate {
 		t.Fatalf("expected first job JobType=re_gate, got %q", st.createJobParams[0].JobType)
 	}
 	if st.createJobParams[1].Name != "heal-2-0" {
 		t.Fatalf("expected second healing job name heal-2-0, got %q", st.createJobParams[1].Name)
 	}
-	if st.createJobParams[1].JobType != domaintypes.JobTypeHeal.String() {
+	if st.createJobParams[1].JobType != domaintypes.JobTypeHeal {
 		t.Fatalf("expected second job JobType=heal, got %q", st.createJobParams[1].JobType)
 	}
 	if st.createJobParams[0].NextID == nil || *st.createJobParams[0].NextID != mod0ID {
@@ -319,8 +319,8 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypePreGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 				NextID:      &successorID,
 				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`),
@@ -332,14 +332,14 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{"kind":"mig"}`),
 			},
 		},
 	}
 
-	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	failed := st.listJobsByRunRepoAttemptResult[0]
 	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
@@ -350,7 +350,7 @@ func TestMaybeCreateHealingJobs_MixedClassificationCancelsRemaining(t *testing.T
 	if len(st.updateJobStatusCalls) != 1 {
 		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
 	}
-	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != store.JobStatusCancelled {
+	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
 		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
 	}
 }
@@ -395,8 +395,8 @@ func TestMaybeCreateHealingJobs_InvalidRepoSHAInCancelsRemaining(t *testing.T) {
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypePreGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
 				RepoShaIn:   "invalid",
 				NextID:      &successorID,
 				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
@@ -408,14 +408,14 @@ func TestMaybeCreateHealingJobs_InvalidRepoSHAInCancelsRemaining(t *testing.T) {
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{"kind":"mig"}`),
 			},
 		},
 	}
 
-	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	failed := st.listJobsByRunRepoAttemptResult[0]
 	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
@@ -426,7 +426,7 @@ func TestMaybeCreateHealingJobs_InvalidRepoSHAInCancelsRemaining(t *testing.T) {
 	if len(st.updateJobStatusCalls) != 1 {
 		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
 	}
-	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != store.JobStatusCancelled {
+	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
 		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
 	}
 }
@@ -484,8 +484,8 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypePreGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 			},
 			{
@@ -495,8 +495,8 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "heal-1-0",
-				Status:      store.JobStatusSuccess,
-				JobType:     domaintypes.JobTypeHeal.String(),
+				Status:      domaintypes.JobStatusSuccess,
+				JobType:     domaintypes.JobTypeHeal,
 				Meta:        []byte(`{"kind":"mig"}`),
 			},
 			{
@@ -506,8 +506,8 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "re-gate-1",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypeReGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypeReGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 				Meta:        []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`),
 			},
@@ -518,8 +518,8 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
 			},
 		},
 		listArtifactBundlesMetaByRunAndJobResult: []store.ArtifactBundle{
@@ -557,7 +557,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	}
 	bp := blobpersist.New(st, bs)
 
-	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	failed := st.listJobsByRunRepoAttemptResult[2]
 	if err := maybeCreateHealingJobs(ctx, st, bp, run, failed); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
@@ -635,8 +635,8 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "pre-gate",
-				Status:      store.JobStatusFail,
-				JobType:     domaintypes.JobTypePreGate.String(),
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
 				RepoShaIn:   healingTestRepoSHAIn,
 				NextID:      &nextID,
 				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
@@ -648,13 +648,13 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusCreated,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{"kind":"mig"}`),
 			},
 		},
 	}
-	run := store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	failed := st.listJobsByRunRepoAttemptResult[0]
 	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
@@ -683,12 +683,12 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 
 	st := &mockStore{
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
-			{Status: store.RunRepoStatusSuccess, Count: 1},
-			{Status: store.RunRepoStatusFail, Count: 1},
+			{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
+			{Status: domaintypes.RunRepoStatusFail, Count: 1},
 		},
 	}
 
-	run := store.Run{ID: runID, Status: store.RunStatusStarted}
+	run := store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	if _, err := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, nil, run); err != nil {
 		t.Fatalf("maybeCompleteRunIfAllReposTerminal returned error: %v", err)
 	}
@@ -696,7 +696,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	if !st.updateRunStatusCalled {
 		t.Fatalf("expected UpdateRunStatus to be called")
 	}
-	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != store.RunStatusFinished {
+	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != domaintypes.RunStatusFinished {
 		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
 	}
 }

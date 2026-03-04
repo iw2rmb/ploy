@@ -114,7 +114,7 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 	t.Run("UpdateJobCompletionWithMeta/invalid_meta", func(t *testing.T) {
 		err := store.UpdateJobCompletionWithMeta(ctx, UpdateJobCompletionWithMetaParams{
 			ID:     types.NewJobID(),
-			Status: JobStatusSuccess,
+			Status: types.JobStatusSuccess,
 			Meta:   invalidJSON,
 		})
 		if err == nil {
@@ -128,7 +128,7 @@ func TestRejectsInvalidJSONBPayloads(t *testing.T) {
 	t.Run("UpdateRunCompletion/invalid_stats", func(t *testing.T) {
 		err := store.UpdateRunCompletion(ctx, UpdateRunCompletionParams{
 			ID:     types.NewRunID(),
-			Status: RunStatusFinished,
+			Status: types.RunStatusFinished,
 			Stats:  invalidJSON,
 		})
 		if err == nil {

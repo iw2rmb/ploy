@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
+	"github.com/iw2rmb/ploy/internal/testutil/stdcapture"
 )
 
 // TestHandleConfigGitLabShowSuccess verifies the 'show' subcommand retrieves and displays
@@ -30,11 +33,11 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigGitLabShow(nil, buf)
 	})
 
@@ -69,11 +72,11 @@ func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	out := captureStdout(t, func() {
+	out := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigGitLabShow(nil, buf)
 	})
 
@@ -117,11 +120,11 @@ func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigGitLabSet([]string{"--file", configPath}, buf)
 	})
 
@@ -210,7 +213,7 @@ func TestHandleConfigGitLabValidateSuccess(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigGitLabValidate([]string{"--file", configPath}, buf)
 	})
 
@@ -312,7 +315,7 @@ func TestHandleConfigGitLabSetServerError(t *testing.T) {
 		http.Error(w, "bad", http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigGitLabSet([]string{"--file", configPath}, buf)

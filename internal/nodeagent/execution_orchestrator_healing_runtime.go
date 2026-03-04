@@ -62,7 +62,7 @@ func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context,
 
 	// v1 uses capitalized job status values: Success, Fail, Cancelled.
 	var exitCodeOne int32 = 1
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), JobStatusFail.String(), &exitCodeOne, stats, req.JobID); uploadErr != nil {
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusFail.String(), &exitCodeOne, stats, req.JobID); uploadErr != nil {
 		slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "warning", warning, "error", uploadErr)
 	}
 	slog.Info(logMsg, "run_id", req.RunID, "job_id", req.JobID, "exit_code", 1, "duration", duration)

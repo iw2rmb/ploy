@@ -92,7 +92,7 @@ func TestCompleteJob_BadNodeHeader(t *testing.T) {
 
 			f := newJobFixture("mig", 1000)
 			st := &mockStore{
-				getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+				getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 				getJobResult:        f.Job,
 				listJobsByRunResult: []store.Job{f.Job},
 			}
@@ -136,7 +136,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 		ID:     jobID,
 		RunID:  runID,
 		NodeID: &ownerNodeID,
-		Status: store.JobStatusRunning,
+		Status: domaintypes.JobStatusRunning,
 		Meta:   withNextIDMeta([]byte(`{}`), 1000),
 	}
 
@@ -172,12 +172,12 @@ func TestCompleteJob_NonRunningConflict(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		jobStatus store.JobStatus
+		jobStatus domaintypes.JobStatus
 	}{
-		{name: "created", jobStatus: store.JobStatusCreated},
-		{name: "success", jobStatus: store.JobStatusSuccess},
-		{name: "fail", jobStatus: store.JobStatusFail},
-		{name: "cancelled", jobStatus: store.JobStatusCancelled},
+		{name: "created", jobStatus: domaintypes.JobStatusCreated},
+		{name: "success", jobStatus: domaintypes.JobStatusSuccess},
+		{name: "fail", jobStatus: domaintypes.JobStatusFail},
+		{name: "cancelled", jobStatus: domaintypes.JobStatusCancelled},
 	}
 
 	for _, tt := range tests {
@@ -241,7 +241,7 @@ func TestCompleteJob_InvalidRepoSHAOut(t *testing.T) {
 
 			f := newJobFixture("mig", 1000)
 			st := &mockStore{
-				getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+				getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 				getJobResult:        f.Job,
 				listJobsByRunResult: []store.Job{f.Job},
 			}
@@ -272,7 +272,7 @@ func TestCompleteJob_MissingRepoSHAOutForSuccessfulLinkedJob(t *testing.T) {
 	f.Job.RepoShaIn = "0123456789abcdef0123456789abcdef01234567"
 
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -300,7 +300,7 @@ func TestCompleteJob_InvalidRepoSHAInForSuccessfulLinkedJob(t *testing.T) {
 	f.Job.RepoShaIn = ""
 
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -377,7 +377,7 @@ func TestCompleteJob_InvalidJobResources_RejectsRequest(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}

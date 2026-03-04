@@ -58,6 +58,8 @@ Environment:
   PLOY_REGISTRY_PORT Host port for local Garage-backed OCI registry (default: 5000)
   PLOY_CONTAINER_REGISTRY Registry prefix used for local image sync (default: 127.0.0.1:<PLOY_REGISTRY_PORT>/ploy)
   PLOY_GARAGE_FORCE_IMAGES Set to 1/true to force rebuild+repush in deploy/images/garage.sh
+  PLOY_GARAGE_SKIP_MIRRORS Set to 1/true to skip upstream base-image mirror pulls in deploy/images/garage.sh
+  PLOY_SKIP_BUILD        Set to 1/true to skip `make build` and reuse existing dist binaries
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
 }
@@ -444,19 +446,32 @@ build_runtime_images() {
 sync_garage_registry_images() {
   local -a args=()
   local force_images="${PLOY_GARAGE_FORCE_IMAGES:-0}"
+  local skip_mirrors="${PLOY_GARAGE_SKIP_MIRRORS:-0}"
+  local skip_mirrors_flag=0
 
   case "$force_images" in
     1|true|TRUE|True|yes|YES|Yes|on|ON|On)
       args+=(--force)
       ;;
   esac
+  case "$skip_mirrors" in
+    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+      skip_mirrors_flag=1
+      ;;
+  esac
 
   log "Syncing mig/build-gate images into ${PLOY_CONTAINER_REGISTRY} ..."
+  if (( skip_mirrors_flag )); then
+    log "Skipping upstream mirror sync (PLOY_GARAGE_SKIP_MIRRORS=${PLOY_GARAGE_SKIP_MIRRORS})"
+  fi
+
   if [[ ${#args[@]} -gt 0 ]]; then
     IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
+    SKIP_UPSTREAM_MIRRORS="$skip_mirrors" \
       ./deploy/images/garage.sh "${args[@]}"
   else
     IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
+    SKIP_UPSTREAM_MIRRORS="$skip_mirrors" \
       ./deploy/images/garage.sh
   fi
 }
@@ -786,6 +801,8 @@ main() {
   local admin_pg_dsn
   local target_server=0
   local target_node=0
+  local skip_build="${PLOY_SKIP_BUILD:-0}"
+  local skip_build_flag=0
   local -a runtime_build_services=(garage-init)
   local -a compose_services=(garage garage-init registry gradle-build-cache)
 
@@ -821,15 +838,29 @@ main() {
     ensure_ploy_db_exists "$admin_pg_dsn"
   fi
 
-  log "Building CLI/binaries (make build)..."
-  make build
+  case "$skip_build" in
+    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+      skip_build_flag=1
+      ;;
+  esac
 
+  if (( skip_build_flag )); then
+    log "Skipping build step and reusing dist binaries (PLOY_SKIP_BUILD=${PLOY_SKIP_BUILD})..."
+  else
+    log "Building CLI/binaries (make build)..."
+    make build
+  fi
+
+  if [[ ! -f "dist/ploy" ]]; then
+    echo "error: dist/ploy not found; run make build or unset PLOY_SKIP_BUILD" >&2
+    exit 1
+  fi
   if [[ ! -f "dist/ployd-linux" ]]; then
-    echo "error: dist/ployd-linux not found after build" >&2
+    echo "error: dist/ployd-linux not found; run make build or unset PLOY_SKIP_BUILD" >&2
     exit 1
   fi
   if [[ ! -f "dist/ployd-node-linux" ]]; then
-    echo "error: dist/ployd-node-linux not found after build" >&2
+    echo "error: dist/ployd-node-linux not found; run make build or unset PLOY_SKIP_BUILD" >&2
     exit 1
   fi
 

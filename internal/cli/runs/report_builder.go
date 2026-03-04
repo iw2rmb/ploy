@@ -122,7 +122,7 @@ func (c GetRunReportCommand) buildRepoEntry(
 			JobType:       job.JobType,
 			JobImage:      job.JobImage,
 			NodeID:        job.NodeID,
-			Status:        string(job.Status),
+			Status:        job.Status,
 			ExitCode:      job.ExitCode,
 			StartedAt:     job.StartedAt,
 			FinishedAt:    job.FinishedAt,
@@ -141,17 +141,17 @@ func (c GetRunReportCommand) buildRepoEntry(
 }
 
 type runRepoReportSource struct {
-	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoID     domaintypes.MigRepoID `json:"repo_id"`
-	RepoURL    string                `json:"repo_url"`
-	BaseRef    string                `json:"base_ref"`
-	TargetRef  string                `json:"target_ref"`
-	Status     string                `json:"status"`
-	Attempt    int32                 `json:"attempt"`
-	LastError  *string               `json:"last_error,omitempty"`
-	CreatedAt  time.Time             `json:"created_at"`
-	StartedAt  *time.Time            `json:"started_at,omitempty"`
-	FinishedAt *time.Time            `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID         `json:"run_id"`
+	RepoID     domaintypes.MigRepoID     `json:"repo_id"`
+	RepoURL    string                    `json:"repo_url"`
+	BaseRef    string                    `json:"base_ref"`
+	TargetRef  string                    `json:"target_ref"`
+	Status     domaintypes.RunRepoStatus `json:"status"`
+	Attempt    int32                     `json:"attempt"`
+	LastError  *string                   `json:"last_error,omitempty"`
+	CreatedAt  time.Time                 `json:"created_at"`
+	StartedAt  *time.Time                `json:"started_at,omitempty"`
+	FinishedAt *time.Time                `json:"finished_at,omitempty"`
 }
 
 func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]runRepoReportSource, error) {

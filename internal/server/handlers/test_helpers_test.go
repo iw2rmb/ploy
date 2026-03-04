@@ -64,14 +64,14 @@ type jobTestFixture struct {
 }
 
 // newJobFixture creates a running job fixture with default values.
-// jobType defaults to "mig".
-func newJobFixture(jobType string, _ float64) jobTestFixture {
+// jobType defaults to domaintypes.JobTypeMod.
+func newJobFixture(jobType domaintypes.JobType, _ float64) jobTestFixture {
 	nodeIDStr := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	if jobType == "" {
-		jobType = "mig"
+		jobType = domaintypes.JobTypeMod
 	}
 	return jobTestFixture{
 		NodeIDStr: nodeIDStr,
@@ -82,8 +82,8 @@ func newJobFixture(jobType string, _ float64) jobTestFixture {
 			ID:        jobID,
 			RunID:     runID,
 			NodeID:    &nodeID,
-			Name:      jobType + "-0",
-			Status:    store.JobStatusRunning,
+			Name:      jobType.String() + "-0",
+			Status:    domaintypes.JobStatusRunning,
 			JobType:   jobType,
 			RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
 			Meta:      []byte(`{}`),

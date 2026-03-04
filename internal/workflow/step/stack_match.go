@@ -8,6 +8,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/stackdetect"
 )
 
+type stackMatchOptions struct {
+	includeEvidence                 bool
+	requireDetectedToolForToolMatch bool
+}
+
 // observationToStackExpectation converts a stackdetect.Observation to a StackExpectation.
 func observationToStackExpectation(obs *stackdetect.Observation) *contracts.StackExpectation {
 	if obs == nil {
@@ -27,25 +32,54 @@ func observationToStackExpectation(obs *stackdetect.Observation) *contracts.Stac
 // Returns (true, "") if all non-empty expected fields match, or
 // (false, reason) with a human-readable mismatch explanation.
 func matchStack(obs *stackdetect.Observation, expect *contracts.StackExpectation) (bool, string) {
+	return matchStackWithOptions(obs, expect, stackMatchOptions{
+		includeEvidence:                 true,
+		requireDetectedToolForToolMatch: false,
+	})
+}
+
+func matchStackForStackDetectConfig(obs *stackdetect.Observation, expect *contracts.StackExpectation) (bool, string) {
+	return matchStackWithOptions(obs, expect, stackMatchOptions{
+		includeEvidence:                 false,
+		requireDetectedToolForToolMatch: true,
+	})
+}
+
+func matchStackWithOptions(obs *stackdetect.Observation, expect *contracts.StackExpectation, opts stackMatchOptions) (bool, string) {
 	if expect == nil {
 		return true, ""
+	}
+	if obs == nil {
+		return false, "stack mismatch: detected stack is unavailable"
 	}
 	obsRelease := ""
 	if obs.Release != nil {
 		obsRelease = *obs.Release
 	}
-	if contracts.StackFieldsMatch(obs.Language, obs.Tool, obsRelease, expect.Language, expect.Tool, expect.Release) {
+	languageMismatch := expect.Language != "" &&
+		!contracts.StackFieldsMatch(obs.Language, "", "", expect.Language, "", "")
+	toolMismatch := expect.Tool != ""
+	if opts.requireDetectedToolForToolMatch && strings.TrimSpace(obs.Tool) == "" {
+		toolMismatch = false
+	} else {
+		toolMismatch = toolMismatch && !contracts.StackFieldsMatch("", obs.Tool, "", "", expect.Tool, "")
+	}
+	releaseMismatch := expect.Release != "" &&
+		(obs.Release == nil || !contracts.StackFieldsMatch("", "", obsRelease, "", "", expect.Release))
+
+	if !languageMismatch && !toolMismatch && !releaseMismatch {
 		return true, ""
 	}
+
 	// Build detailed mismatch report for diagnostics.
 	var mismatches []string
-	if expect.Language != "" && !contracts.StackFieldsMatch(obs.Language, "", "", expect.Language, "", "") {
+	if languageMismatch {
 		mismatches = append(mismatches, fmt.Sprintf("language: expected %q, detected %q", expect.Language, obs.Language))
 	}
-	if expect.Tool != "" && !contracts.StackFieldsMatch("", obs.Tool, "", "", expect.Tool, "") {
+	if toolMismatch {
 		mismatches = append(mismatches, fmt.Sprintf("tool: expected %q, detected %q", expect.Tool, obs.Tool))
 	}
-	if expect.Release != "" && (obs.Release == nil || !contracts.StackFieldsMatch("", "", obsRelease, "", "", expect.Release)) {
+	if releaseMismatch {
 		detected := "<nil>"
 		if obs.Release != nil {
 			detected = *obs.Release
@@ -53,7 +87,7 @@ func matchStack(obs *stackdetect.Observation, expect *contracts.StackExpectation
 		mismatches = append(mismatches, fmt.Sprintf("release: expected %q, detected %q", expect.Release, detected))
 	}
 	msg := "stack mismatch: " + strings.Join(mismatches, "; ")
-	if len(obs.Evidence) > 0 {
+	if opts.includeEvidence && len(obs.Evidence) > 0 {
 		msg += "\nevidence:"
 		for _, e := range obs.Evidence {
 			msg += fmt.Sprintf("\n  - %s: %s = %q", e.Path, e.Key, e.Value)

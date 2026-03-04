@@ -34,7 +34,7 @@ func TestClaimJob_Basic(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/repo", "main", "feature", []byte(`{"type":"test"}`))
 	run := fx.Run
 
-	if run.Status != RunStatusStarted {
+	if run.Status != types.RunStatusStarted {
 		t.Errorf("expected status Started, got %s", run.Status)
 	}
 
@@ -49,7 +49,7 @@ func TestClaimJob_Basic(t *testing.T) {
 		Name:        "test-job",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -79,7 +79,7 @@ func TestClaimJob_Basic(t *testing.T) {
 		t.Errorf("Expected job ID %v, got %v", job.ID, claimedJob.ID)
 	}
 
-	if claimedJob.Status != JobStatusRunning {
+	if claimedJob.Status != types.JobStatusRunning {
 		t.Errorf("Expected status assigned, got %s", claimedJob.Status)
 	}
 
@@ -126,7 +126,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		Name:        "job-1",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -143,7 +143,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		Name:        "job-2",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -160,7 +160,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		Name:        "job-3",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -253,7 +253,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 			Name:        "job-" + strconv.Itoa(i),
 			JobType:     "",
 			JobImage:    "",
-			Status:      JobStatusQueued,
+			Status:      types.JobStatusQueued,
 			NextID:      nil,
 			Meta:        []byte(`{}`),
 		})
@@ -314,7 +314,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 			claimedIDs[jobID] = true
 
 			// Additional invariants for claimed jobs.
-			if claimedJobs[i].Status != JobStatusRunning {
+			if claimedJobs[i].Status != types.JobStatusRunning {
 				t.Errorf("claimed job %v status = %s, want assigned", claimedJobs[i].ID, claimedJobs[i].Status)
 			}
 			if !claimedJobs[i].StartedAt.Valid {
@@ -395,7 +395,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 		Name:        "test-job",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -465,7 +465,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 		Name:        "test-job",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -493,7 +493,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	if claimedJob.ID != job.ID {
 		t.Errorf("Expected job ID %v, got %v", job.ID, claimedJob.ID)
 	}
-	if claimedJob.Status != JobStatusRunning {
+	if claimedJob.Status != types.JobStatusRunning {
 		t.Errorf("Expected status assigned, got %s", claimedJob.Status)
 	}
 	if claimedJob.NodeID == nil || *claimedJob.NodeID != node.ID {
@@ -544,7 +544,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		Name:        "job-3",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -561,7 +561,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		Name:        "job-1",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -578,7 +578,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		Name:        "job-2",
 		JobType:     "",
 		JobImage:    "",
-		Status:      JobStatusQueued,
+		Status:      types.JobStatusQueued,
 		NextID:      nil,
 		Meta:        []byte(`{}`),
 	})
@@ -648,7 +648,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "running-job",
-		Status:      JobStatusRunning,
+		Status:      types.JobStatusRunning,
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,

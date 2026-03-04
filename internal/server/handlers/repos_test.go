@@ -156,8 +156,8 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 			{
 				RunID:         runID,
 				MigID:         modID,
-				RunStatus:     store.RunStatusFinished,
-				RepoStatus:    store.RunRepoStatusSuccess,
+				RunStatus:     domaintypes.RunStatusFinished,
+				RepoStatus:    domaintypes.RunRepoStatusSuccess,
 				RepoBaseRef:   "main",
 				RepoTargetRef: "feature-branch",
 				Attempt:       1,

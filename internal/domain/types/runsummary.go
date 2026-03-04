@@ -7,7 +7,7 @@ import "time"
 // summary responses and is shared between server handlers, CLI, and OpenAPI.
 type RunSummary struct {
 	ID         RunID          `json:"id"`
-	Status     string         `json:"status"`
+	Status     RunStatus      `json:"status"`
 	MigID      MigID          `json:"mig_id"`
 	MigName    string         `json:"mig_name,omitempty"`
 	SpecID     SpecID         `json:"spec_id"`
