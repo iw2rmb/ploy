@@ -1,69 +1,39 @@
 package api
 
 import (
-	"github.com/iw2rmb/ploy/internal/store"
+	"fmt"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// StageStatusFromStore converts store.JobStatus to migs API StageState.
-func StageStatusFromStore(status store.JobStatus) StageState {
+// StageStatusFromDomain converts domain JobStatus to migs API StageState.
+func StageStatusFromDomain(status domaintypes.JobStatus) (StageState, error) {
 	switch status {
-	case store.JobStatusCreated, store.JobStatusQueued:
-		return StageStatePending
-	case store.JobStatusRunning:
-		return StageStateRunning
-	case store.JobStatusSuccess:
-		return StageStateSucceeded
-	case store.JobStatusFail:
-		return StageStateFailed
-	case store.JobStatusCancelled:
-		return StageStateCancelled
+	case domaintypes.JobStatusCreated, domaintypes.JobStatusQueued:
+		return StageStatePending, nil
+	case domaintypes.JobStatusRunning:
+		return StageStateRunning, nil
+	case domaintypes.JobStatusSuccess:
+		return StageStateSucceeded, nil
+	case domaintypes.JobStatusFail:
+		return StageStateFailed, nil
+	case domaintypes.JobStatusCancelled:
+		return StageStateCancelled, nil
 	default:
-		return StageStatePending
+		return "", fmt.Errorf("unknown domain job status %q", status)
 	}
 }
 
-// RunStatusFromStore converts store.RunStatus to migs API RunState.
-func RunStatusFromStore(status store.RunStatus) RunState {
+// RunStatusFromDomain converts domain RunStatus to migs API RunState.
+func RunStatusFromDomain(status domaintypes.RunStatus) (RunState, error) {
 	switch status {
-	case store.RunStatusStarted:
-		return RunStateRunning
-	case store.RunStatusFinished:
-		return RunStateSucceeded
-	case store.RunStatusCancelled:
-		return RunStateCancelled
+	case domaintypes.RunStatusStarted:
+		return RunStateRunning, nil
+	case domaintypes.RunStatusFinished:
+		return RunStateSucceeded, nil
+	case domaintypes.RunStatusCancelled:
+		return RunStateCancelled, nil
 	default:
-		return RunStateRunning
-	}
-}
-
-// StageStatusToStore converts migs API StageState to store.JobStatus.
-func StageStatusToStore(state StageState) store.JobStatus {
-	switch state {
-	case StageStatePending, StageStateQueued:
-		return store.JobStatusCreated
-	case StageStateRunning:
-		return store.JobStatusRunning
-	case StageStateSucceeded:
-		return store.JobStatusSuccess
-	case StageStateFailed:
-		return store.JobStatusFail
-	case StageStateCancelling, StageStateCancelled:
-		return store.JobStatusCancelled
-	default:
-		return store.JobStatusCreated
-	}
-}
-
-// RunStatusToStore converts migs API RunState to store.RunStatus.
-func RunStatusToStore(state RunState) store.RunStatus {
-	switch state {
-	case RunStatePending, RunStateRunning:
-		return store.RunStatusStarted
-	case RunStateSucceeded, RunStateFailed:
-		return store.RunStatusFinished
-	case RunStateCancelling, RunStateCancelled:
-		return store.RunStatusCancelled
-	default:
-		return store.RunStatusStarted
+		return "", fmt.Errorf("unknown domain run status %q", status)
 	}
 }

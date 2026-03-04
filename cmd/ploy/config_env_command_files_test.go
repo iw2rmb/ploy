@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
+	"github.com/iw2rmb/ploy/internal/testutil/stdcapture"
 )
 
 // TestHandleConfigEnvListSuccess verifies that the 'list' subcommand retrieves
@@ -31,11 +34,11 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvList(nil, buf)
 	})
 
@@ -74,11 +77,11 @@ func TestHandleConfigEnvListEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvList(nil, buf)
 	})
 
@@ -110,11 +113,11 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvShow([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
 	})
 
@@ -153,11 +156,11 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvShow([]string{"--key", "SECRET_KEY", "--raw"}, buf)
 	})
 
@@ -178,7 +181,7 @@ func TestHandleConfigEnvShowNotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigEnvShow([]string{"--key", "MISSING_KEY"}, buf)
@@ -210,11 +213,11 @@ func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvSet([]string{"--key", "OPENAI_API_KEY", "--value", "sk-test-12345"}, buf)
 	})
 
@@ -273,11 +276,11 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	captureStdout(t, func() {
+	stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvSet([]string{"--key", "CA_CERTS_PEM_BUNDLE", "--file", filePath, "--scope", "all"}, buf)
 	})
 
@@ -307,11 +310,11 @@ func TestHandleConfigEnvSetCustomScope(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	captureStdout(t, func() {
+	stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvSet([]string{
 			"--key", "CODEX_AUTH_JSON",
 			"--value", "{}",
@@ -344,11 +347,11 @@ func TestHandleConfigEnvSetSecretFalse(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	captureStdout(t, func() {
+	stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvSet([]string{
 			"--key", "DEBUG_MODE",
 			"--value", "true",
@@ -373,7 +376,7 @@ func TestHandleConfigEnvSetServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar"}, buf)
@@ -396,11 +399,11 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvUnset([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
 	})
 
@@ -427,11 +430,11 @@ func TestHandleConfigEnvUnsetNotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvUnset([]string{"--key", "MISSING_KEY"}, buf)
 	})
 
@@ -452,7 +455,7 @@ func TestHandleConfigEnvUnsetServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigEnvUnset([]string{"--key", "FOO"}, buf)
@@ -471,7 +474,7 @@ func TestHandleConfigEnvListServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigEnvList(nil, buf)
@@ -490,7 +493,7 @@ func TestHandleConfigEnvShowServerError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigEnvShow([]string{"--key", "FOO"}, buf)
@@ -515,11 +518,11 @@ func TestHandleConfigEnvShowRedactsShortSecrets(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	useServerDescriptor(t, srv.URL)
+	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	var err error
-	output := captureStdout(t, func() {
+	output := stdcapture.CaptureStdout(t, func() {
 		err = handleConfigEnvShow([]string{"--key", "SHORT"}, buf)
 	})
 

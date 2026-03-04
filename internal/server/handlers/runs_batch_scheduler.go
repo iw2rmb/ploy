@@ -54,7 +54,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domainty
 			result.AlreadyDone++
 			continue
 		}
-		if rr.Status == store.RunRepoStatusQueued {
+		if rr.Status == domaintypes.RunRepoStatusQueued {
 			result.Pending++
 		}
 	}
@@ -93,7 +93,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domainty
 
 		hasActive := false
 		for _, j := range jobs {
-			if j.Status == store.JobStatusQueued || j.Status == store.JobStatusRunning {
+			if j.Status == domaintypes.JobStatusQueued || j.Status == domaintypes.JobStatusRunning {
 				hasActive = true
 				break
 			}

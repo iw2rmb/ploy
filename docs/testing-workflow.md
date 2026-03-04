@@ -115,6 +115,15 @@ func TestRepoHandler(t *testing.T) {
 
 - Location: `internal/testutil/` or `<package>/testutil_test.go`
 - Examples: `cmd/ploy/test_support_test.go`
+- Put reusable test helpers under `internal/testutil/*` (for example: `gitrepo`, `clienv`, `stdcapture`, `golden`, `assertx`, `workspace`).
+- If a shared helper already exists, do not add a duplicated local helper.
+- Keep `internal/testutil` packages dependency-light to avoid import cycles.
+
+### Oversized Test Files
+
+- Split oversized test files by behavior domain instead of keeping multi-domain monoliths.
+- Prefer one domain per file (for example: runtime, profile-target, mounts-limits, recovery, error-path).
+- Move shared fixtures/builders into dedicated `*_fixture_test.go` files and reuse them across domain files.
 
 ```go
 // internal/testutil/testutil.go

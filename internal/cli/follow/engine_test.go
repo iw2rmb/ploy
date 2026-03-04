@@ -12,7 +12,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 var ansiCSI = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
@@ -93,7 +92,7 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 		JobType:     "mig",
 		JobImage:    "ubuntu:latest",
 		NodeID:      &nodeID,
-		Status:      store.JobStatusRunning,
+		Status:      domaintypes.JobStatusRunning,
 		StartedAt:   &started,
 		DisplayName: "human-label-should-not-render",
 	}}
@@ -164,7 +163,7 @@ func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 		JobID:   jobID,
 		Name:    "pre-gate",
 		JobType: "pre_gate",
-		Status:  store.JobStatusFail,
+		Status:  domaintypes.JobStatusFail,
 	}}
 
 	// Set Stack Gate failure message
@@ -206,7 +205,7 @@ func TestEngine_render_DisplaysRepoLastError_WithFailedStatusAlias(t *testing.T)
 		JobID:   jobID,
 		Name:    "mig-0",
 		JobType: "mig",
-		Status:  store.JobStatus("failed"),
+		Status:  domaintypes.JobStatus("failed"),
 	}}
 
 	errMsg := "build failed: missing config"

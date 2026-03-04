@@ -15,10 +15,10 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-repos-a", "main", "feature", []byte(`{"type":"cancel-repos"}`))
 
-	runningRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-running", "main", "feature-running", RunRepoStatusRunning)
-	successRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-success", "main", "feature-success", RunRepoStatusSuccess)
-	failRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-fail", "main", "feature-fail", RunRepoStatusFail)
-	cancelledRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-cancelled", "main", "feature-cancelled", RunRepoStatusCancelled)
+	runningRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-running", "main", "feature-running", types.RunRepoStatusRunning)
+	successRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-success", "main", "feature-success", types.RunRepoStatusSuccess)
+	failRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-fail", "main", "feature-fail", types.RunRepoStatusFail)
+	cancelledRepo := createRunRepoForCancelBulkTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/cancel-repos-cancelled", "main", "feature-cancelled", types.RunRepoStatusCancelled)
 
 	successBefore, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fx.Run.ID, RepoID: successRepo.RepoID})
 	if err != nil {
@@ -45,8 +45,8 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo(queued after) failed: %v", err)
 	}
-	if queuedAfter.Status != RunRepoStatusCancelled {
-		t.Fatalf("queued repo status=%q, want %q", queuedAfter.Status, RunRepoStatusCancelled)
+	if queuedAfter.Status != types.RunRepoStatusCancelled {
+		t.Fatalf("queued repo status=%q, want %q", queuedAfter.Status, types.RunRepoStatusCancelled)
 	}
 	if !queuedAfter.FinishedAt.Valid {
 		t.Fatal("queued repo finished_at must be set")
@@ -56,8 +56,8 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo(running after) failed: %v", err)
 	}
-	if runningAfter.Status != RunRepoStatusCancelled {
-		t.Fatalf("running repo status=%q, want %q", runningAfter.Status, RunRepoStatusCancelled)
+	if runningAfter.Status != types.RunRepoStatusCancelled {
+		t.Fatalf("running repo status=%q, want %q", runningAfter.Status, types.RunRepoStatusCancelled)
 	}
 	if !runningAfter.FinishedAt.Valid {
 		t.Fatal("running repo finished_at must be set")
@@ -67,8 +67,8 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo(success after) failed: %v", err)
 	}
-	if successAfter.Status != RunRepoStatusSuccess {
-		t.Fatalf("success repo status=%q, want %q", successAfter.Status, RunRepoStatusSuccess)
+	if successAfter.Status != types.RunRepoStatusSuccess {
+		t.Fatalf("success repo status=%q, want %q", successAfter.Status, types.RunRepoStatusSuccess)
 	}
 	if successAfter.FinishedAt != successBefore.FinishedAt {
 		t.Fatalf("success repo finished_at changed: before=%v after=%v", successBefore.FinishedAt, successAfter.FinishedAt)
@@ -78,8 +78,8 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo(fail after) failed: %v", err)
 	}
-	if failAfter.Status != RunRepoStatusFail {
-		t.Fatalf("fail repo status=%q, want %q", failAfter.Status, RunRepoStatusFail)
+	if failAfter.Status != types.RunRepoStatusFail {
+		t.Fatalf("fail repo status=%q, want %q", failAfter.Status, types.RunRepoStatusFail)
 	}
 	if failAfter.FinishedAt != failBefore.FinishedAt {
 		t.Fatalf("fail repo finished_at changed: before=%v after=%v", failBefore.FinishedAt, failAfter.FinishedAt)
@@ -89,8 +89,8 @@ func TestCancelActiveRunReposByRun_TransitionsOnlyQueuedRunning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo(cancelled after) failed: %v", err)
 	}
-	if cancelledAfter.Status != RunRepoStatusCancelled {
-		t.Fatalf("cancelled repo status=%q, want %q", cancelledAfter.Status, RunRepoStatusCancelled)
+	if cancelledAfter.Status != types.RunRepoStatusCancelled {
+		t.Fatalf("cancelled repo status=%q, want %q", cancelledAfter.Status, types.RunRepoStatusCancelled)
 	}
 	if cancelledAfter.FinishedAt != cancelledBefore.FinishedAt {
 		t.Fatalf("cancelled repo finished_at changed: before=%v after=%v", cancelledBefore.FinishedAt, cancelledAfter.FinishedAt)
@@ -102,40 +102,40 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-jobs-a", "main", "feature", []byte(`{"type":"cancel-jobs"}`))
 
-	createdJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "created", JobStatusCreated)
-	queuedJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "queued", JobStatusQueued)
-	runningJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "running", JobStatusQueued)
+	createdJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "created", types.JobStatusCreated)
+	queuedJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "queued", types.JobStatusQueued)
+	runningJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "running", types.JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, runningJob.ID)
 
 	if _, err := db.Pool().Exec(ctx, `UPDATE jobs SET started_at = now() - interval '3 seconds' WHERE id = $1`, runningJob.ID); err != nil {
 		t.Fatalf("set running started_at failed: %v", err)
 	}
 
-	successJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "success", JobStatusQueued)
+	successJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "success", types.JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, successJob.ID)
 	if err := db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 		ID:       successJob.ID,
-		Status:   JobStatusSuccess,
+		Status:   types.JobStatusSuccess,
 		ExitCode: ptrInt32ForCancelBulkTest(0),
 	}); err != nil {
 		t.Fatalf("UpdateJobCompletion(success) failed: %v", err)
 	}
 
-	failJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "fail", JobStatusQueued)
+	failJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "fail", types.JobStatusQueued)
 	setJobRunningForCancelBulkTest(t, ctx, db, failJob.ID)
 	if err := db.UpdateJobCompletion(ctx, UpdateJobCompletionParams{
 		ID:       failJob.ID,
-		Status:   JobStatusFail,
+		Status:   types.JobStatusFail,
 		ExitCode: ptrInt32ForCancelBulkTest(1),
 	}); err != nil {
 		t.Fatalf("UpdateJobCompletion(fail) failed: %v", err)
 	}
 
-	cancelledJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "cancelled", JobStatusQueued)
+	cancelledJob := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "cancelled", types.JobStatusQueued)
 	cancelledFinishedAt := pgtype.Timestamptz{Time: time.Now().UTC().Add(-1 * time.Minute), Valid: true}
 	if err := db.UpdateJobStatus(ctx, UpdateJobStatusParams{
 		ID:         cancelledJob.ID,
-		Status:     JobStatusCancelled,
+		Status:     types.JobStatusCancelled,
 		StartedAt:  pgtype.Timestamptz{Time: cancelledFinishedAt.Time.Add(-1 * time.Second), Valid: true},
 		FinishedAt: cancelledFinishedAt,
 		DurationMs: 1000,
@@ -168,8 +168,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetJob(created after) failed: %v", err)
 	}
-	if createdAfter.Status != JobStatusCancelled {
-		t.Fatalf("created job status=%q, want %q", createdAfter.Status, JobStatusCancelled)
+	if createdAfter.Status != types.JobStatusCancelled {
+		t.Fatalf("created job status=%q, want %q", createdAfter.Status, types.JobStatusCancelled)
 	}
 	if !createdAfter.FinishedAt.Valid {
 		t.Fatal("created job finished_at must be set")
@@ -182,8 +182,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetJob(queued after) failed: %v", err)
 	}
-	if queuedAfter.Status != JobStatusCancelled {
-		t.Fatalf("queued job status=%q, want %q", queuedAfter.Status, JobStatusCancelled)
+	if queuedAfter.Status != types.JobStatusCancelled {
+		t.Fatalf("queued job status=%q, want %q", queuedAfter.Status, types.JobStatusCancelled)
 	}
 	if !queuedAfter.FinishedAt.Valid {
 		t.Fatal("queued job finished_at must be set")
@@ -196,8 +196,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetJob(running after) failed: %v", err)
 	}
-	if runningAfter.Status != JobStatusCancelled {
-		t.Fatalf("running job status=%q, want %q", runningAfter.Status, JobStatusCancelled)
+	if runningAfter.Status != types.JobStatusCancelled {
+		t.Fatalf("running job status=%q, want %q", runningAfter.Status, types.JobStatusCancelled)
 	}
 	if !runningAfter.FinishedAt.Valid {
 		t.Fatal("running job finished_at must be set")
@@ -210,8 +210,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetJob(success after) failed: %v", err)
 	}
-	if successAfter.Status != JobStatusSuccess {
-		t.Fatalf("success job status=%q, want %q", successAfter.Status, JobStatusSuccess)
+	if successAfter.Status != types.JobStatusSuccess {
+		t.Fatalf("success job status=%q, want %q", successAfter.Status, types.JobStatusSuccess)
 	}
 	if successAfter.DurationMs != successBefore.DurationMs {
 		t.Fatalf("success job duration_ms changed: before=%d after=%d", successBefore.DurationMs, successAfter.DurationMs)
@@ -221,8 +221,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetJob(fail after) failed: %v", err)
 	}
-	if failAfter.Status != JobStatusFail {
-		t.Fatalf("fail job status=%q, want %q", failAfter.Status, JobStatusFail)
+	if failAfter.Status != types.JobStatusFail {
+		t.Fatalf("fail job status=%q, want %q", failAfter.Status, types.JobStatusFail)
 	}
 	if failAfter.DurationMs != failBefore.DurationMs {
 		t.Fatalf("fail job duration_ms changed: before=%d after=%d", failBefore.DurationMs, failAfter.DurationMs)
@@ -232,8 +232,8 @@ func TestCancelActiveJobsByRun_TransitionsOnlyCreatedQueuedRunning(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetJob(cancelled after) failed: %v", err)
 	}
-	if cancelledAfter.Status != JobStatusCancelled {
-		t.Fatalf("cancelled job status=%q, want %q", cancelledAfter.Status, JobStatusCancelled)
+	if cancelledAfter.Status != types.JobStatusCancelled {
+		t.Fatalf("cancelled job status=%q, want %q", cancelledAfter.Status, types.JobStatusCancelled)
 	}
 	if cancelledAfter.DurationMs != cancelledBefore.DurationMs {
 		t.Fatalf("cancelled job duration_ms changed: before=%d after=%d", cancelledBefore.DurationMs, cancelledAfter.DurationMs)
@@ -246,8 +246,8 @@ func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-a", "main", "feature-a", []byte(`{"type":"cancel-scope-a"}`))
 	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-scope-b", "main", "feature-b", []byte(`{"type":"cancel-scope-b"}`))
 
-	jobA := createJobForCancelBulkTest(t, ctx, db, fxA.Run.ID, fxA.MigRepo.RepoID, fxA.RunRepo.RepoBaseRef, "run-a-created", JobStatusCreated)
-	jobB := createJobForCancelBulkTest(t, ctx, db, fxB.Run.ID, fxB.MigRepo.RepoID, fxB.RunRepo.RepoBaseRef, "run-b-created", JobStatusCreated)
+	jobA := createJobForCancelBulkTest(t, ctx, db, fxA.Run.ID, fxA.MigRepo.RepoID, fxA.RunRepo.RepoBaseRef, "run-a-created", types.JobStatusCreated)
+	jobB := createJobForCancelBulkTest(t, ctx, db, fxB.Run.ID, fxB.MigRepo.RepoID, fxB.RunRepo.RepoBaseRef, "run-b-created", types.JobStatusCreated)
 
 	affectedRepos, err := db.CancelActiveRunReposByRun(ctx, fxA.Run.ID)
 	if err != nil {
@@ -269,32 +269,32 @@ func TestCancelBulkQueries_AreScopedToRunID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRunRepo(run A) failed: %v", err)
 	}
-	if runARepoAfter.Status != RunRepoStatusCancelled {
-		t.Fatalf("run A repo status=%q, want %q", runARepoAfter.Status, RunRepoStatusCancelled)
+	if runARepoAfter.Status != types.RunRepoStatusCancelled {
+		t.Fatalf("run A repo status=%q, want %q", runARepoAfter.Status, types.RunRepoStatusCancelled)
 	}
 
 	runBRepoAfter, err := db.GetRunRepo(ctx, GetRunRepoParams{RunID: fxB.Run.ID, RepoID: fxB.RunRepo.RepoID})
 	if err != nil {
 		t.Fatalf("GetRunRepo(run B) failed: %v", err)
 	}
-	if runBRepoAfter.Status != RunRepoStatusQueued {
-		t.Fatalf("run B repo status=%q, want %q", runBRepoAfter.Status, RunRepoStatusQueued)
+	if runBRepoAfter.Status != types.RunRepoStatusQueued {
+		t.Fatalf("run B repo status=%q, want %q", runBRepoAfter.Status, types.RunRepoStatusQueued)
 	}
 
 	jobAAfter, err := db.GetJob(ctx, jobA.ID)
 	if err != nil {
 		t.Fatalf("GetJob(run A) failed: %v", err)
 	}
-	if jobAAfter.Status != JobStatusCancelled {
-		t.Fatalf("run A job status=%q, want %q", jobAAfter.Status, JobStatusCancelled)
+	if jobAAfter.Status != types.JobStatusCancelled {
+		t.Fatalf("run A job status=%q, want %q", jobAAfter.Status, types.JobStatusCancelled)
 	}
 
 	jobBAfter, err := db.GetJob(ctx, jobB.ID)
 	if err != nil {
 		t.Fatalf("GetJob(run B) failed: %v", err)
 	}
-	if jobBAfter.Status != JobStatusCreated {
-		t.Fatalf("run B job status=%q, want %q", jobBAfter.Status, JobStatusCreated)
+	if jobBAfter.Status != types.JobStatusCreated {
+		t.Fatalf("run B job status=%q, want %q", jobBAfter.Status, types.JobStatusCreated)
 	}
 }
 
@@ -318,7 +318,7 @@ func openStoreForCancelBulkTests(t *testing.T) (context.Context, Store) {
 	return ctx, db
 }
 
-func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store, modID types.MigID, runID types.RunID, repoURL, baseRef, targetRef string, status RunRepoStatus) RunRepo {
+func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store, modID types.MigID, runID types.RunID, repoURL, baseRef, targetRef string, status types.RunRepoStatus) RunRepo {
 	t.Helper()
 
 	repoID := types.NewMigRepoID()
@@ -346,7 +346,7 @@ func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store,
 		t.Fatalf("CreateRunRepo(%s) failed: %v", repoURL, err)
 	}
 
-	if status != RunRepoStatusQueued {
+	if status != types.RunRepoStatusQueued {
 		if err := db.UpdateRunRepoStatus(ctx, UpdateRunRepoStatusParams{
 			RunID:  runID,
 			RepoID: rr.RepoID,
@@ -363,7 +363,7 @@ func createRunRepoForCancelBulkTest(t *testing.T, ctx context.Context, db Store,
 	return out
 }
 
-func createJobForCancelBulkTest(t *testing.T, ctx context.Context, db Store, runID types.RunID, repoID types.RepoID, repoBaseRef, name string, status JobStatus) Job {
+func createJobForCancelBulkTest(t *testing.T, ctx context.Context, db Store, runID types.RunID, repoID types.RepoID, repoBaseRef, name string, status types.JobStatus) Job {
 	t.Helper()
 
 	job, err := db.CreateJob(ctx, CreateJobParams{
@@ -390,7 +390,7 @@ func setJobRunningForCancelBulkTest(t *testing.T, ctx context.Context, db Store,
 
 	if err := db.UpdateJobStatus(ctx, UpdateJobStatusParams{
 		ID:         jobID,
-		Status:     JobStatusRunning,
+		Status:     types.JobStatusRunning,
 		StartedAt:  pgtype.Timestamptz{},
 		FinishedAt: pgtype.Timestamptz{},
 		DurationMs: 0,

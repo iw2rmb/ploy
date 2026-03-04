@@ -17,10 +17,10 @@ import (
 
 // Row is one normalized SBOM package row bound to producer identity.
 type Row struct {
-	JobID types.JobID
+	JobID  types.JobID
 	RepoID types.RepoID
-	Lib   string
-	Ver   string
+	Lib    string
+	Ver    string
 }
 
 // ExtractRowsFromBundle parses supported SBOM files from a gzipped tar bundle

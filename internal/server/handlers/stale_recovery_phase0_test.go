@@ -28,8 +28,8 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 				RunID:       runID,
 				RepoID:      repoID,
 				Attempt:     1,
-				Status:      store.JobStatusCancelled,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCancelled,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{"next_id":1000}`),
 				NextID:      nil,
 				Name:        "mig-0",
@@ -37,9 +37,9 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 			},
 		},
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
-			{Status: store.RunRepoStatusCancelled, Count: 1},
+			{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
 		},
-		getRunResult: store.Run{ID: runID, Status: store.RunStatusStarted},
+		getRunResult: store.Run{ID: runID, Status: domaintypes.RunStatusStarted},
 	}
 
 	task, err := recovery.NewStaleJobRecoveryTask(recovery.Options{
@@ -70,11 +70,11 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 	if len(st.updateRunRepoStatusParams) == 0 {
 		t.Fatal("expected at least one UpdateRunRepoStatus call")
 	}
-	if got := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1].Status; got != store.RunRepoStatusCancelled {
-		t.Fatalf("run repo status=%q, want %q", got, store.RunRepoStatusCancelled)
+	if got := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1].Status; got != domaintypes.RunRepoStatusCancelled {
+		t.Fatalf("run repo status=%q, want %q", got, domaintypes.RunRepoStatusCancelled)
 	}
-	if st.updateRunStatusParams.Status != store.RunStatusFinished {
-		t.Fatalf("run status=%q, want %q", st.updateRunStatusParams.Status, store.RunStatusFinished)
+	if st.updateRunStatusParams.Status != domaintypes.RunStatusFinished {
+		t.Fatalf("run status=%q, want %q", st.updateRunStatusParams.Status, domaintypes.RunStatusFinished)
 	}
 }
 
@@ -96,8 +96,8 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 				RunID:       runID,
 				RepoID:      repoID,
 				Attempt:     1,
-				Status:      store.JobStatusCancelled,
-				JobType:     domaintypes.JobTypeMod.String(),
+				Status:      domaintypes.JobStatusCancelled,
+				JobType:     domaintypes.JobTypeMod,
 				Meta:        []byte(`{"next_id":1000}`),
 				NextID:      nil,
 				Name:        "mig-0",
@@ -105,10 +105,10 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 			},
 		},
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
-			{Status: store.RunRepoStatusCancelled, Count: 1},
-			{Status: store.RunRepoStatusRunning, Count: 1},
+			{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
+			{Status: domaintypes.RunRepoStatusRunning, Count: 1},
 		},
-		getRunResult: store.Run{ID: runID, Status: store.RunStatusStarted},
+		getRunResult: store.Run{ID: runID, Status: domaintypes.RunStatusStarted},
 	}
 
 	task, err := recovery.NewStaleJobRecoveryTask(recovery.Options{

@@ -21,7 +21,7 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 		ID:      jobID,
 		RunID:   runID,
 		RepoID:  repoID,
-		JobType: domaintypes.JobTypePreGate.String(),
+		JobType: domaintypes.JobTypePreGate,
 	}
 
 	st := &mockStore{
@@ -41,7 +41,7 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	}
 	bp := blobpersist.New(st, bs)
 
-	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, bp, job, store.JobStatusSuccess)
+	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, bp, job, domaintypes.JobStatusSuccess)
 	if err != nil {
 		t.Fatalf("maybePersistGateSuccessSBOMRows error: %v", err)
 	}
@@ -70,11 +70,11 @@ func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) 
 		ID:      domaintypes.NewJobID(),
 		RunID:   domaintypes.NewRunID(),
 		RepoID:  domaintypes.NewRepoID(),
-		JobType: domaintypes.JobTypeMod.String(),
+		JobType: domaintypes.JobTypeMod,
 	}
 	st := &mockStore{}
 
-	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, store.JobStatusSuccess)
+	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, domaintypes.JobStatusSuccess)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) 
 		t.Fatalf("count = %d, want 0", count)
 	}
 
-	count, err = maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, store.JobStatusFail)
+	count, err = maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, domaintypes.JobStatusFail)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

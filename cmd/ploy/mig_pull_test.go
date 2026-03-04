@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 )
 
 // =============================================================================
@@ -217,7 +219,7 @@ func TestHandleModPull_DirtyWorkingTree(t *testing.T) {
 	}
 
 	// Create a git repository with uncommitted changes.
-	repoDir := setupTestGitRepoWithRemote(t, "https://github.com/example/repo.git")
+	repoDir := gitrepo.SetupWithRemote(t, "https://github.com/example/repo.git")
 
 	// Add an untracked file to make the working tree dirty.
 	untrackedFile := repoDir + "/dirty.txt"
@@ -257,7 +259,7 @@ func TestHandleModPull_MissingRemote(t *testing.T) {
 	}
 
 	// Create a git repository with only "origin" remote.
-	repoDir := setupTestGitRepoWithRemote(t, "https://github.com/example/repo.git")
+	repoDir := gitrepo.SetupWithRemote(t, "https://github.com/example/repo.git")
 
 	// Change to the repo directory.
 	origDir, err := os.Getwd()

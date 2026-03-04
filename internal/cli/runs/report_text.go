@@ -113,10 +113,10 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 		for _, job := range repo.Jobs {
 			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
 			patchURL := strings.TrimSpace(job.PatchURL)
-			state := ColoredStatusGlyph(job.Status, opts.SpinnerFrame)
-			step := renderStepName(job.JobType)
-			duration := FormatDurationForStatus(job.Status, job.DurationMs, job.StartedAt, job.FinishedAt, now)
-			if !opts.LiveDurations && !isTerminalJobStatus(job.Status) {
+			state := ColoredStatusGlyph(job.Status.String(), opts.SpinnerFrame)
+			step := renderStepName(job.JobType.String())
+			duration := FormatDurationForStatus(job.Status.String(), job.DurationMs, job.StartedAt, job.FinishedAt, now)
+			if !opts.LiveDurations && !isTerminalJobStatus(job.Status.String()) {
 				duration = FormatDurationCompact(job.DurationMs)
 			}
 
@@ -128,7 +128,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 					FormatNodeID(job.NodeID),
 					valueOrDash(strings.TrimSpace(job.JobImage)),
 					duration,
-					renderArtifactsForStatus(job.Status, buildLogURL, patchURL, opts),
+					renderArtifactsForStatus(job.Status.String(), buildLogURL, patchURL, opts),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
 			})
@@ -233,14 +233,14 @@ func renderStepName(jobType string) string {
 }
 
 func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
-	shouldRender := isFailedOrCrashedStatus(job.Status) || normalizeStatus(job.JobType) == "heal"
+	shouldRender := isFailedOrCrashedStatus(job.Status.String()) || normalizeStatus(job.JobType.String()) == "heal"
 	if !shouldRender {
 		return ""
 	}
 
 	msg := ""
 	colorizeContent := false
-	if normalizeStatus(job.JobType) == "heal" {
+	if normalizeStatus(job.JobType.String()) == "heal" {
 		msg = strings.TrimSpace(job.ActionSummary)
 		if msg == "" {
 			msg = "healer output unavailable"
@@ -251,9 +251,9 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 			msg = FormatErrorOneLiner(repoLastError)
 		}
 		if msg == "" {
-			msg = normalizeStatus(job.Status)
+			msg = normalizeStatus(job.Status.String())
 		}
-		if isGateJobType(job.JobType) {
+		if isGateJobType(job.JobType.String()) {
 			errorKind := "unknown"
 			if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
 				errorKind = normalizeStatus(job.Recovery.ErrorKind)

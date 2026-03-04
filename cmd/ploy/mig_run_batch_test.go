@@ -10,6 +10,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 // TestRunListCallsControlPlane validates list command calls the API.
@@ -95,7 +96,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "list", "--limit", "10", "--offset", "5"}, &buf)
@@ -139,7 +140,7 @@ func TestRunListEmptyResult(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "list"}, &buf)
@@ -209,7 +210,7 @@ func TestModRunBatchStatusNotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "status", runID}, &buf)

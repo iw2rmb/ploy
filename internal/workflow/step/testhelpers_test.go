@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	workspaceutil "github.com/iw2rmb/ploy/internal/testutil/workspace"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -146,4 +147,39 @@ func newDockerGateTestHarness(t *testing.T) (GateExecutor, *testContainerRuntime
 	executor := NewDockerGateExecutor(rt)
 	workspace := createMavenWorkspace(t, "17")
 	return executor, rt, workspace
+}
+
+func createMavenWorkspace(t *testing.T, javaVersion string) string {
+	t.Helper()
+	return workspaceutil.Maven(t, javaVersion)
+}
+
+func createMavenWorkspaceNoJavaVersion(t *testing.T) string {
+	t.Helper()
+	return workspaceutil.MavenNoJavaVersion(t)
+}
+
+func createGradleWorkspace(t *testing.T, javaVersion string) string {
+	t.Helper()
+	return workspaceutil.Gradle(t, javaVersion)
+}
+
+func createGradleWorkspaceWithWrapper(t *testing.T, javaVersion string) string {
+	t.Helper()
+	return workspaceutil.GradleWithWrapper(t, javaVersion)
+}
+
+func createGoWorkspace(t *testing.T, goVersion string) string {
+	t.Helper()
+	return workspaceutil.Go(t, goVersion)
+}
+
+func createCargoWorkspace(t *testing.T, rustVersion string) string {
+	t.Helper()
+	return workspaceutil.Cargo(t, rustVersion)
+}
+
+func createPythonWorkspace(t *testing.T, pythonVersion string) string {
+	t.Helper()
+	return workspaceutil.Python(t, pythonVersion)
 }

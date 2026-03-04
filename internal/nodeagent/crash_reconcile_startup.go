@@ -81,9 +81,9 @@ func (c *ClaimManager) reconcileRecoveredTerminalContainer(ctx context.Context, 
 	}
 
 	exitCode := int32(terminal.ExitCode)
-	status := JobStatusFail
+	status := types.JobStatusFail
 	if exitCode == 0 {
-		status = JobStatusSuccess
+		status = types.JobStatusSuccess
 	}
 
 	durationMs := int64(0)

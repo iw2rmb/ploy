@@ -206,12 +206,12 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 			mode = "last-succeeded"
 		}
 
-		var targetStatus store.RunRepoStatus
+		var targetStatus domaintypes.RunRepoStatus
 		switch mode {
 		case "last-succeeded":
-			targetStatus = store.RunRepoStatusSuccess
+			targetStatus = domaintypes.RunRepoStatusSuccess
 		case "last-failed":
-			targetStatus = store.RunRepoStatusFail
+			targetStatus = domaintypes.RunRepoStatusFail
 		default:
 			httpErr(w, http.StatusBadRequest, "invalid mode: %q (must be 'last-succeeded' or 'last-failed')", mode)
 			return

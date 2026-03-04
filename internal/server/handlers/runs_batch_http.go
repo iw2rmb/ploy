@@ -41,7 +41,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 		}
 
 		// Idempotent: if already terminal, return current state.
-		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
+		if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
 			summary := runToSummary(run)
 			if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 				summary.Counts = counts
@@ -90,7 +90,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			slog.Error("add run repo: get run failed", "run_id", runID.String(), "err", err)
 			return
 		}
-		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
+		if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
 			httpErr(w, http.StatusConflict, "cannot add repos to a terminal run")
 			return
 		}
@@ -244,7 +244,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		if rr.Status == store.RunRepoStatusCancelled || rr.Status == store.RunRepoStatusSuccess || rr.Status == store.RunRepoStatusFail {
+		if rr.Status == domaintypes.RunRepoStatusCancelled || rr.Status == domaintypes.RunRepoStatusSuccess || rr.Status == domaintypes.RunRepoStatusFail {
 			repoURL := ""
 			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 				repoURL = resolvedURL
@@ -255,13 +255,13 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusCancelled})
+		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusCancelled})
 
 		now := time.Now().UTC()
 		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{RunID: runID, RepoID: repoID, Attempt: rr.Attempt})
 		if err == nil {
 			for _, job := range jobs {
-				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusQueued && job.Status != store.JobStatusRunning {
+				if job.Status != domaintypes.JobStatusCreated && job.Status != domaintypes.JobStatusQueued && job.Status != domaintypes.JobStatusRunning {
 					continue
 				}
 				dur := int64(0)
@@ -272,7 +272,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 				}
 				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
 					ID:         job.ID,
-					Status:     store.JobStatusCancelled,
+					Status:     domaintypes.JobStatusCancelled,
 					StartedAt:  job.StartedAt,
 					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 					DurationMs: dur,
@@ -351,8 +351,8 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// If the run is terminal, reopen it to Started for the restart attempt.
-		if run.Status == store.RunStatusFinished || run.Status == store.RunStatusCancelled {
-			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: store.RunStatusStarted}); err != nil {
+		if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
+			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: domaintypes.RunStatusStarted}); err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
 				return
 			}

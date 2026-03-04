@@ -44,7 +44,7 @@ kind: MigRunSpec
 steps:
   # Step 0: Apply code formatting as warmup (should pass)
   # This step uses a lightweight recipe that formats code without introducing errors.
-  - image: localhost:5000/ploy/orw-cli:latest
+  - image: localhost:5000/ploy/orw-cli-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java
@@ -54,7 +54,7 @@ steps:
   # Step 1: Migrate to Java 17 (may trigger post-gate failure on fail-missing-symbol branch)
   # This transformation may expose or interact with the UndefinedClass reference.
   # If post-gate fails, healing will create the missing UndefinedModSymbol class.
-  - image: localhost:5000/ploy/orw-cli:latest
+  - image: localhost:5000/ploy/orw-cli-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -63,7 +63,7 @@ steps:
 
   # Step 2: Apply cleanup recipe (should pass after step 1 healing)
   # This step runs after healing has fixed any post-gate failures from step 1.
-  - image: localhost:5000/ploy/orw-cli:latest
+  - image: localhost:5000/ploy/orw-cli-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-java

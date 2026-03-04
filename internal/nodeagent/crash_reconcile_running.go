@@ -71,7 +71,7 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 			MetadataEntry("container_id", recovered.ContainerID).
 			MustBuild()
 		failureExitCode := int32(-1)
-		if uploadErr := c.uploadRecoveredJobStatus(recovered.JobID, JobStatusFail, &failureExitCode, stats); uploadErr != nil {
+		if uploadErr := c.uploadRecoveredJobStatus(recovered.JobID, types.JobStatusFail, &failureExitCode, stats); uploadErr != nil {
 			return fmt.Errorf("wait container and upload failure status: %w (upload error: %v)", err, uploadErr)
 		}
 		return fmt.Errorf("wait recovered container: %w", err)
@@ -96,9 +96,9 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 	}
 
 	exitCode := int32(terminal.ExitCode)
-	status := JobStatusFail
+	status := types.JobStatusFail
 	if exitCode == 0 {
-		status = JobStatusSuccess
+		status = types.JobStatusSuccess
 	}
 
 	durationMs := int64(0)
@@ -133,7 +133,7 @@ func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID,
 	return nil
 }
 
-func (c *ClaimManager) uploadRecoveredJobStatus(jobID types.JobID, status JobStatus, exitCode *int32, stats types.RunStats) error {
+func (c *ClaimManager) uploadRecoveredJobStatus(jobID types.JobID, status types.JobStatus, exitCode *int32, stats types.RunStats) error {
 	uploader, err := c.ensureStatusUploader()
 	if err != nil {
 		return err

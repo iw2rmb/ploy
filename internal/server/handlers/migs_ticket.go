@@ -62,8 +62,12 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build RunSummary response with Stages and Artifacts.
-		// Use conversion helper to map store.RunStatus to modsapi.RunState.
-		runState := modsapi.RunStatusFromStore(run.Status)
+		runState, convErr := modsapi.RunStatusFromDomain(run.Status)
+		if convErr != nil {
+			httpErr(w, http.StatusInternalServerError, "failed to convert run status: %v", convErr)
+			slog.Error("get run status: invalid run status", "run_id", run.ID, "status", run.Status, "err", convErr)
+			return
+		}
 
 		var (
 			repoURL    string
@@ -139,8 +143,12 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		}
 		for _, job := range jobs {
 			jobIDStr := job.ID.String()
-			// Use conversion helper to map store.JobStatus -> modsapi.StageState
-			s := modsapi.StageStatusFromStore(job.Status)
+			s, convErr := modsapi.StageStatusFromDomain(job.Status)
+			if convErr != nil {
+				httpErr(w, http.StatusInternalServerError, "failed to convert stage status for job %s: %v", job.ID, convErr)
+				slog.Error("get run status: invalid stage status", "run_id", run.ID, "job_id", job.ID, "status", job.Status, "err", convErr)
+				return
+			}
 			artMap := make(map[string]string)
 			bundles, err := st.ListArtifactBundlesMetaByRunAndJob(r.Context(), store.ListArtifactBundlesMetaByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
 			if err != nil {
@@ -181,9 +189,9 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 type plannedJob struct {
 	ID        domaintypes.JobID
 	Name      string
-	JobType   string
+	JobType   domaintypes.JobType
 	JobImage  string
-	Status    store.JobStatus
+	Status    domaintypes.JobStatus
 	StepName  string
 	NextID    *domaintypes.JobID
 	RepoSHAIn string
@@ -221,11 +229,11 @@ func createJobsFromSpec(
 
 	type draft struct {
 		name     string
-		jobType  string
+		jobType  domaintypes.JobType
 		jobImage string
 		stepName string
 	}
-	drafts := []draft{{name: "pre-gate", jobType: "pre_gate"}}
+	drafts := []draft{{name: "pre-gate", jobType: domaintypes.JobTypePreGate}}
 
 	if len(modsSpec.Steps) > 1 {
 		for i, mig := range modsSpec.Steps {
@@ -235,7 +243,7 @@ func createJobsFromSpec(
 			}
 			drafts = append(drafts, draft{
 				name:     fmt.Sprintf("mig-%d", i),
-				jobType:  "mig",
+				jobType:  domaintypes.JobTypeMod,
 				jobImage: jobImage,
 				stepName: mig.Name,
 			})
@@ -251,18 +259,18 @@ func createJobsFromSpec(
 		}
 		drafts = append(drafts, draft{
 			name:     "mig-0",
-			jobType:  "mig",
+			jobType:  domaintypes.JobTypeMod,
 			jobImage: modImage,
 			stepName: stepName,
 		})
 	}
-	drafts = append(drafts, draft{name: "post-gate", jobType: "post_gate"})
+	drafts = append(drafts, draft{name: "post-gate", jobType: domaintypes.JobTypePostGate})
 
 	planned := make([]plannedJob, 0, len(drafts))
 	for i, d := range drafts {
-		status := store.JobStatusCreated
+		status := domaintypes.JobStatusCreated
 		if i == 0 {
-			status = store.JobStatusQueued
+			status = domaintypes.JobStatusQueued
 		}
 		jobImage := d.jobImage
 		if i == 0 && preGateBinding != nil && strings.TrimSpace(preGateBinding.JobImage) != "" {

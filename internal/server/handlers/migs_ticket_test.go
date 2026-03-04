@@ -43,7 +43,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	now := time.Now().UTC()
 	st := &mockStore{
 		createRunResult: store.Run{
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 	}
@@ -129,12 +129,12 @@ func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
 	// Verify job status and shape (pre-gate is Queued, rest are Created).
 	expectedJobs := []struct {
 		name    string
-		jobType string
-		status  store.JobStatus
+		jobType domaintypes.JobType
+		status  domaintypes.JobStatus
 	}{
-		{"pre-gate", "pre_gate", store.JobStatusQueued}, // First job is Queued.
-		{"mig-0", "mig", store.JobStatusCreated},        // Remaining jobs are Created.
-		{"post-gate", "post_gate", store.JobStatusCreated},
+		{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued}, // First job is Queued.
+		{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated},       // Remaining jobs are Created.
+		{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated},
 	}
 
 	byName := createJobsByName(st.createJobParams)
@@ -206,15 +206,15 @@ func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
 	// Verify job status and shape (pre-gate is Queued, rest are Created).
 	expectedJobs := []struct {
 		name     string
-		jobType  string
-		status   store.JobStatus
+		jobType  domaintypes.JobType
+		status   domaintypes.JobStatus
 		modImage string
 	}{
-		{"pre-gate", "pre_gate", store.JobStatusQueued, ""}, // First job is Queued.
-		{"mig-0", "mig", store.JobStatusCreated, "mod1:v1"}, // Remaining jobs are Created.
-		{"mig-1", "mig", store.JobStatusCreated, "mod2:v2"},
-		{"mig-2", "mig", store.JobStatusCreated, "mod3:v3"},
-		{"post-gate", "post_gate", store.JobStatusCreated, ""},
+		{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, ""},  // First job is Queued.
+		{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod1:v1"}, // Remaining jobs are Created.
+		{"mig-1", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod2:v2"},
+		{"mig-2", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod3:v3"},
+		{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, ""},
 	}
 
 	byName := createJobsByName(st.createJobParams)
@@ -307,7 +307,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 			// Count jobs with Queued status — exactly one should be Queued.
 			queuedCount := 0
 			for _, p := range st.createJobParams {
-				if p.Status == store.JobStatusQueued {
+				if p.Status == domaintypes.JobStatusQueued {
 					queuedCount++
 				}
 			}
@@ -317,7 +317,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 			}
 
 			byName := createJobsByName(st.createJobParams)
-			if byName["pre-gate"].Status != store.JobStatusQueued {
+			if byName["pre-gate"].Status != domaintypes.JobStatusQueued {
 				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 			}
 
@@ -326,7 +326,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				if p.Name == "pre-gate" {
 					continue
 				}
-				if p.Status != store.JobStatusCreated {
+				if p.Status != domaintypes.JobStatusCreated {
 					t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
 				}
 			}
@@ -526,7 +526,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	now := time.Now().UTC()
 	st := &mockStore{
 		createRunResult: store.Run{
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 	}
@@ -588,7 +588,7 @@ func TestCreateSingleRepoRunHandler_MultiStepDefersJobCreation(t *testing.T) {
 	now := time.Now().UTC()
 	st := &mockStore{
 		createRunResult: store.Run{
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 	}
@@ -633,7 +633,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
@@ -646,7 +646,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 			},
 		},
 		listJobsByRunResult: []store.Job{
-			{ID: jobID, RunID: runID, Status: store.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
+			{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		},
 	}
 

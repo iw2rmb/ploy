@@ -37,8 +37,8 @@ GROUP BY status
 `
 
 type CountRunReposByStatusRow struct {
-	Status RunRepoStatus `json:"status"`
-	Count  int32         `json:"count"`
+	Status types.RunRepoStatus `json:"status"`
+	Count  int32               `json:"count"`
 }
 
 func (q *Queries) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error) {
@@ -135,9 +135,9 @@ LIMIT 1
 `
 
 type GetLatestRunRepoByMigAndRepoStatusParams struct {
-	MigID  types.MigID   `json:"mig_id"`
-	RepoID types.RepoID  `json:"repo_id"`
-	Status RunRepoStatus `json:"status"`
+	MigID  types.MigID         `json:"mig_id"`
+	RepoID types.RepoID        `json:"repo_id"`
+	Status types.RunRepoStatus `json:"status"`
 }
 
 type GetLatestRunRepoByMigAndRepoStatusRow struct {
@@ -341,20 +341,20 @@ ORDER BY rr.created_at ASC, rr.repo_id ASC
 `
 
 type ListRunReposWithURLByRunRow struct {
-	MigID           types.MigID        `json:"mig_id"`
-	RunID           types.RunID        `json:"run_id"`
-	RepoID          types.RepoID       `json:"repo_id"`
-	RepoBaseRef     string             `json:"repo_base_ref"`
-	RepoTargetRef   string             `json:"repo_target_ref"`
-	SourceCommitSha string             `json:"source_commit_sha"`
-	RepoSha0        string             `json:"repo_sha0"`
-	Status          RunRepoStatus      `json:"status"`
-	Attempt         int32              `json:"attempt"`
-	LastError       *string            `json:"last_error"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	StartedAt       pgtype.Timestamptz `json:"started_at"`
-	FinishedAt      pgtype.Timestamptz `json:"finished_at"`
-	RepoUrl         string             `json:"repo_url"`
+	MigID           types.MigID         `json:"mig_id"`
+	RunID           types.RunID         `json:"run_id"`
+	RepoID          types.RepoID        `json:"repo_id"`
+	RepoBaseRef     string              `json:"repo_base_ref"`
+	RepoTargetRef   string              `json:"repo_target_ref"`
+	SourceCommitSha string              `json:"source_commit_sha"`
+	RepoSha0        string              `json:"repo_sha0"`
+	Status          types.RunRepoStatus `json:"status"`
+	Attempt         int32               `json:"attempt"`
+	LastError       *string             `json:"last_error"`
+	CreatedAt       pgtype.Timestamptz  `json:"created_at"`
+	StartedAt       pgtype.Timestamptz  `json:"started_at"`
+	FinishedAt      pgtype.Timestamptz  `json:"finished_at"`
+	RepoUrl         string              `json:"repo_url"`
 }
 
 // Lists all run_repos for a run with their repo_url (from repos).
@@ -421,15 +421,15 @@ type ListRunsForRepoParams struct {
 }
 
 type ListRunsForRepoRow struct {
-	RunID         types.RunID        `json:"run_id"`
-	MigID         types.MigID        `json:"mig_id"`
-	RunStatus     RunStatus          `json:"run_status"`
-	RepoStatus    RunRepoStatus      `json:"repo_status"`
-	RepoBaseRef   string             `json:"repo_base_ref"`
-	RepoTargetRef string             `json:"repo_target_ref"`
-	Attempt       int32              `json:"attempt"`
-	StartedAt     pgtype.Timestamptz `json:"started_at"`
-	FinishedAt    pgtype.Timestamptz `json:"finished_at"`
+	RunID         types.RunID         `json:"run_id"`
+	MigID         types.MigID         `json:"mig_id"`
+	RunStatus     types.RunStatus     `json:"run_status"`
+	RepoStatus    types.RunRepoStatus `json:"repo_status"`
+	RepoBaseRef   string              `json:"repo_base_ref"`
+	RepoTargetRef string              `json:"repo_target_ref"`
+	Attempt       int32               `json:"attempt"`
+	StartedAt     pgtype.Timestamptz  `json:"started_at"`
+	FinishedAt    pgtype.Timestamptz  `json:"finished_at"`
 }
 
 // Lists runs for a given repo_id (repos.id).
@@ -544,9 +544,9 @@ WHERE run_id = $1 AND repo_id = $2
 `
 
 type UpdateRunRepoStatusParams struct {
-	RunID  types.RunID   `json:"run_id"`
-	RepoID types.RepoID  `json:"repo_id"`
-	Status RunRepoStatus `json:"status"`
+	RunID  types.RunID         `json:"run_id"`
+	RepoID types.RepoID        `json:"repo_id"`
+	Status types.RunRepoStatus `json:"status"`
 }
 
 // Updates repo status + timing fields.

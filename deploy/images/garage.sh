@@ -13,12 +13,14 @@ set -Eeuo pipefail
 #   PUSH_TIMEOUT  Per-command timeout in seconds (default: 900)
 #   PUSH_RETRIES  Retries on failure (default: 1)
 #   REGISTRY_SCHEME Optional override for registry API scheme (http|https)
+#   SKIP_UPSTREAM_MIRRORS Skip mirroring upstream base images when true-like (default: 0)
 
 PLATFORM=${PLATFORM:-linux/amd64}
 PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}
 PUSH_RETRIES=${PUSH_RETRIES:-1}
 IMAGE_PREFIX="${IMAGE_PREFIX:-${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}}"
 REGISTRY_SCHEME="${REGISTRY_SCHEME:-}"
+SKIP_UPSTREAM_MIRRORS="${SKIP_UPSTREAM_MIRRORS:-0}"
 FORCE=0
 CA_CERTS_PATH=""
 
@@ -312,6 +314,13 @@ mirror_image_if_missing() {
 main() {
   parse_args "$@"
 
+  local skip_upstream_mirrors=0
+  case "$SKIP_UPSTREAM_MIRRORS" in
+    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
+      skip_upstream_mirrors=1
+      ;;
+  esac
+
   need docker
   need curl
   if ! docker buildx version >/dev/null 2>&1; then
@@ -348,11 +357,15 @@ main() {
   build_push_gate_gradle_image 11
   build_push_gate_gradle_image 17
 
-  log "Syncing mirrored upstream build-gate base images..."
-  mirror_image_if_missing "maven:3-eclipse-temurin-11" "${IMAGE_PREFIX}/maven:3-eclipse-temurin-11"
-  mirror_image_if_missing "maven:3-eclipse-temurin-17" "${IMAGE_PREFIX}/maven:3-eclipse-temurin-17"
-  mirror_image_if_missing "golang:1.22" "${IMAGE_PREFIX}/golang:1.22"
-  mirror_image_if_missing "rust:1.76" "${IMAGE_PREFIX}/rust:1.76"
+  if (( skip_upstream_mirrors )); then
+    log "Skipping upstream build-gate base image mirrors (SKIP_UPSTREAM_MIRRORS=${SKIP_UPSTREAM_MIRRORS})"
+  else
+    log "Syncing mirrored upstream build-gate base images..."
+    mirror_image_if_missing "maven:3-eclipse-temurin-11" "${IMAGE_PREFIX}/maven:3-eclipse-temurin-11"
+    mirror_image_if_missing "maven:3-eclipse-temurin-17" "${IMAGE_PREFIX}/maven:3-eclipse-temurin-17"
+    mirror_image_if_missing "golang:1.22" "${IMAGE_PREFIX}/golang:1.22"
+    mirror_image_if_missing "rust:1.76" "${IMAGE_PREFIX}/rust:1.76"
+  fi
 
   log "Garage image sync complete"
 }

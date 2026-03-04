@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -174,31 +175,26 @@ func setupTestGitRepo(t *testing.T, variant string) string {
 
 	repoDir := t.TempDir()
 
-	// Initialize git repo.
-	runCmd(t, repoDir, "git", "init")
-	// Ensure the default branch is 'main' for deterministic tests across environments.
-	runCmd(t, repoDir, "git", "checkout", "-b", "main")
-	runCmd(t, repoDir, "git", "config", "user.name", "Test User")
-	runCmd(t, repoDir, "git", "config", "user.email", "test@example.com")
+	gitrepo.InitMainBranch(t, repoDir)
 
 	// Create initial commit on main.
 	readme := filepath.Join(repoDir, "README.md")
 	if err := os.WriteFile(readme, []byte("# Test Repo\n"), 0644); err != nil {
 		t.Fatalf("failed to write README: %v", err)
 	}
-	runCmd(t, repoDir, "git", "add", "README.md")
-	runCmd(t, repoDir, "git", "commit", "-m", "Initial commit")
+	gitrepo.Run(t, repoDir, "add", "README.md")
+	gitrepo.Run(t, repoDir, "commit", "-m", "Initial commit")
 
 	// For target variant, create a feature branch.
 	if variant == "target" {
-		runCmd(t, repoDir, "git", "checkout", "-b", "feature")
+		gitrepo.Run(t, repoDir, "checkout", "-b", "feature")
 		feature := filepath.Join(repoDir, "feature.txt")
 		if err := os.WriteFile(feature, []byte("feature content\n"), 0644); err != nil {
 			t.Fatalf("failed to write feature.txt: %v", err)
 		}
-		runCmd(t, repoDir, "git", "add", "feature.txt")
-		runCmd(t, repoDir, "git", "commit", "-m", "Add feature")
-		runCmd(t, repoDir, "git", "checkout", "main")
+		gitrepo.Run(t, repoDir, "add", "feature.txt")
+		gitrepo.Run(t, repoDir, "commit", "-m", "Add feature")
+		gitrepo.Run(t, repoDir, "checkout", "main")
 	}
 
 	return repoDir
@@ -218,33 +214,29 @@ func setupTestGitRepoWithCommits(t *testing.T) string {
 
 	repoDir := t.TempDir()
 
-	// Initialize git repo.
-	runCmd(t, repoDir, "git", "init")
-	runCmd(t, repoDir, "git", "checkout", "-b", "main")
-	runCmd(t, repoDir, "git", "config", "user.name", "Test User")
-	runCmd(t, repoDir, "git", "config", "user.email", "test@example.com")
+	gitrepo.InitMainBranch(t, repoDir)
 
 	// Create first commit.
 	readme := filepath.Join(repoDir, "README.md")
 	if err := os.WriteFile(readme, []byte("# First commit\n"), 0644); err != nil {
 		t.Fatalf("failed to write README: %v", err)
 	}
-	runCmd(t, repoDir, "git", "add", "README.md")
-	runCmd(t, repoDir, "git", "commit", "-m", "First commit")
+	gitrepo.Run(t, repoDir, "add", "README.md")
+	gitrepo.Run(t, repoDir, "commit", "-m", "First commit")
 
 	// Create second commit.
 	if err := os.WriteFile(readme, []byte("# Second commit\n"), 0644); err != nil {
 		t.Fatalf("failed to update README: %v", err)
 	}
-	runCmd(t, repoDir, "git", "add", "README.md")
-	runCmd(t, repoDir, "git", "commit", "-m", "Second commit")
+	gitrepo.Run(t, repoDir, "add", "README.md")
+	gitrepo.Run(t, repoDir, "commit", "-m", "Second commit")
 
 	// Create third commit.
 	if err := os.WriteFile(readme, []byte("# Third commit\n"), 0644); err != nil {
 		t.Fatalf("failed to update README: %v", err)
 	}
-	runCmd(t, repoDir, "git", "add", "README.md")
-	runCmd(t, repoDir, "git", "commit", "-m", "Third commit")
+	gitrepo.Run(t, repoDir, "add", "README.md")
+	gitrepo.Run(t, repoDir, "commit", "-m", "Third commit")
 
 	return repoDir
 }
@@ -255,13 +247,7 @@ func setupTestGitRepoWithCommits(t *testing.T) string {
 // that might drift or be deleted.
 func getSecondCommitSHA(t *testing.T, repoDir string) string {
 	t.Helper()
-	cmd := exec.Command("git", "rev-parse", "HEAD~1")
-	cmd.Dir = repoDir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("failed to get second commit SHA: %v (output: %s)", err, string(output))
-	}
-	return strings.TrimSpace(string(output))
+	return gitrepo.RevParse(t, repoDir, "HEAD~1")
 }
 
 // runCmd executes a git command in the specified directory. This helper is used

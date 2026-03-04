@@ -203,13 +203,16 @@ func handlePull(args []string, stderr io.Writer) error {
 		return fmt.Errorf("pull: get run status: %w", err)
 	}
 
-	runState := modsapi.RunState(summary.Status)
-	_, _ = fmt.Fprintf(stderr, "pull: run status: %s\n", strings.ToLower(summary.Status))
+	runState, err := mapRunSummaryToRunState(summary)
+	if err != nil {
+		return fmt.Errorf("pull: map run status: %w", err)
+	}
+	_, _ = fmt.Fprintf(stderr, "pull: run status: %s\n", strings.ToLower(string(runState)))
 
 	// Step 9: Handle non-terminal runs.
 	if !isTerminalRunState(runState) {
 		if !*followFlag {
-			return fmt.Errorf("run %s is still %s; rerun with --follow to wait for completion", runID, strings.ToLower(summary.Status))
+			return fmt.Errorf("run %s is still %s; rerun with --follow to wait for completion", runID, strings.ToLower(string(runState)))
 		}
 
 		// Follow until terminal.
@@ -468,6 +471,31 @@ func isTerminalRunState(s modsapi.RunState) bool {
 		return true
 	}
 	return false
+}
+
+func mapRunSummaryToRunState(summary domaintypes.RunSummary) (modsapi.RunState, error) {
+	switch summary.Status {
+	case domaintypes.RunStatusStarted:
+		return modsapi.RunStateRunning, nil
+	case domaintypes.RunStatusCancelled:
+		return modsapi.RunStateCancelled, nil
+	case domaintypes.RunStatusFinished:
+		if summary.Counts != nil {
+			switch strings.ToLower(strings.TrimSpace(summary.Counts.DerivedStatus)) {
+			case "completed":
+				return modsapi.RunStateSucceeded, nil
+			case "failed":
+				return modsapi.RunStateFailed, nil
+			case "cancelled":
+				return modsapi.RunStateCancelled, nil
+			case "running", "pending":
+				return modsapi.RunStateRunning, nil
+			}
+		}
+		return modsapi.RunStateSucceeded, nil
+	default:
+		return "", fmt.Errorf("unknown run status %q", summary.Status)
+	}
 }
 
 // printPullUsage prints usage for the pull command.

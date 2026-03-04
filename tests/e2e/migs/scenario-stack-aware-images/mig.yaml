@@ -26,9 +26,9 @@ steps:
     # the appropriate image. For Maven projects, java-maven is selected.
     # For Gradle projects, java-gradle is selected. Other stacks use default.
     image:
-      default: localhost:5000/ploy/orw-cli:latest
-      java-maven: localhost:5000/ploy/orw-cli:latest
-      java-gradle: localhost:5000/ploy/orw-cli:latest
+      default: localhost:5000/ploy/orw-cli-maven:latest
+      java-maven: localhost:5000/ploy/orw-cli-maven:latest
+      java-gradle: localhost:5000/ploy/orw-cli-gradle:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java

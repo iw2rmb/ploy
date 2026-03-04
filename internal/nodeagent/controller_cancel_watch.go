@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -34,7 +36,7 @@ func (r *runController) watchRemoteCancellation(ctx context.Context, req StartRu
 		statusCtx, timeoutCancel := context.WithTimeout(ctx, remoteCancellationPollTimeout)
 		status, err := r.statusUploader.GetJobStatus(statusCtx, req.JobID)
 		timeoutCancel()
-		if err == nil && strings.EqualFold(strings.TrimSpace(status), JobStatusCancelled.String()) {
+		if err == nil && strings.EqualFold(strings.TrimSpace(status), types.JobStatusCancelled.String()) {
 			slog.Info(
 				"control plane cancelled running job; stopping local execution",
 				"run_id", req.RunID,

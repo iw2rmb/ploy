@@ -80,9 +80,9 @@ func TestDiffFetcher_FetchDiffsForJobRepo_FilterAndOrder(t *testing.T) {
 
 	diffs := []diffListItem{
 		{ID: "healing", JobID: jobA, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType("healing").MustBuild()},
-		{ID: "later", JobID: jobB, CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeMod.String()).MustBuild()},
-		{ID: "self", JobID: currentJobID, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeMod.String()).MustBuild()},
-		{ID: "earlier", JobID: jobA, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(DiffJobTypeMod.String()).MustBuild()},
+		{ID: "later", JobID: jobB, CreatedAt: t1, Summary: types.NewDiffSummaryBuilder().JobType(types.DiffJobTypeMod.String()).MustBuild()},
+		{ID: "self", JobID: currentJobID, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(types.DiffJobTypeMod.String()).MustBuild()},
+		{ID: "earlier", JobID: jobA, CreatedAt: t0, Summary: types.NewDiffSummaryBuilder().JobType(types.DiffJobTypeMod.String()).MustBuild()},
 	}
 	patches := map[string][]byte{
 		"earlier": gzipBytes(t, []byte("p-earlier")),

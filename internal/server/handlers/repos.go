@@ -37,15 +37,15 @@ type RepoSummary struct {
 // RepoRunSummary represents a run for a specific repository.
 // Used in the GET /v1/repos/{repo_id}/runs response.
 type RepoRunSummary struct {
-	RunID      domaintypes.RunID `json:"run_id"`
-	MigID      domaintypes.MigID `json:"mig_id"`
-	RunStatus  string            `json:"run_status"`
-	RepoStatus string            `json:"repo_status"`
-	BaseRef    string            `json:"base_ref"`
-	TargetRef  string            `json:"target_ref"`
-	Attempt    int32             `json:"attempt"`
-	StartedAt  *time.Time        `json:"started_at,omitempty"`
-	FinishedAt *time.Time        `json:"finished_at,omitempty"`
+	RunID      domaintypes.RunID         `json:"run_id"`
+	MigID      domaintypes.MigID         `json:"mig_id"`
+	RunStatus  domaintypes.RunStatus     `json:"run_status"`
+	RepoStatus domaintypes.RunRepoStatus `json:"repo_status"`
+	BaseRef    string                    `json:"base_ref"`
+	TargetRef  string                    `json:"target_ref"`
+	Attempt    int32                     `json:"attempt"`
+	StartedAt  *time.Time                `json:"started_at,omitempty"`
+	FinishedAt *time.Time                `json:"finished_at,omitempty"`
 }
 
 // -------------------------------------------------------------------------
@@ -173,8 +173,8 @@ func listRunsForRepoHandler(st store.Store) http.HandlerFunc {
 			summary := RepoRunSummary{
 				RunID:      run.RunID,
 				MigID:      run.MigID,
-				RunStatus:  string(run.RunStatus),
-				RepoStatus: string(run.RepoStatus),
+				RunStatus:  run.RunStatus,
+				RepoStatus: run.RepoStatus,
 				BaseRef:    run.RepoBaseRef,
 				TargetRef:  run.RepoTargetRef,
 				Attempt:    run.Attempt,

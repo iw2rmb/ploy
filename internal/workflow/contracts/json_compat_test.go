@@ -2,23 +2,12 @@ package contracts
 
 import (
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/golden"
 )
-
-func loadGolden(t *testing.T, name string) []byte {
-	t.Helper()
-	p := filepath.Join("testdata", name)
-	b, err := os.ReadFile(p)
-	if err != nil {
-		t.Fatalf("read golden %s: %v", p, err)
-	}
-	return b
-}
 
 func jsonAsInterface(t *testing.T, data []byte) any {
 	t.Helper()
@@ -46,7 +35,7 @@ func TestJSONCompatibility_WorkflowRun_Golden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal run envelope: %v", err)
 	}
-	want := loadGolden(t, "run_golden.json")
+	want := golden.LoadBytes(t, "testdata", "run_golden.json")
 	if !reflect.DeepEqual(jsonAsInterface(t, got), jsonAsInterface(t, want)) {
 		t.Fatalf("run json mismatch\n got: %s\nwant: %s", got, want)
 	}

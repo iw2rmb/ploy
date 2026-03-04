@@ -77,7 +77,7 @@ func saveJobImageNameHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Enforce "before execution starts" semantics: only allow while Running.
-		if job.Status != store.JobStatusRunning {
+		if job.Status != domaintypes.JobStatusRunning {
 			httpErr(w, http.StatusConflict, "job status is %s, expected Running", job.Status)
 			return
 		}

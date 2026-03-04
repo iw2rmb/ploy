@@ -1,12 +1,16 @@
 package store
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
+)
 
 func TestUpsertJobMetric_InsertsAndUpdatesByJobID(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/job-metrics", "main", "feature", []byte(`{"type":"job-metrics"}`))
-	job := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "job-metrics", JobStatusCreated)
+	job := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "job-metrics", types.JobStatusCreated)
 
 	nodeA := createNodeForStaleRecoveryQueryTest(t, ctx, db)
 	nodeB := createNodeForStaleRecoveryQueryTest(t, ctx, db)

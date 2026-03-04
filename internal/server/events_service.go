@@ -361,7 +361,7 @@ func (s *EventsService) loadJobContext(ctx context.Context, jobID *domaintypes.J
 		nid = *job.NodeID
 	}
 
-	mt := domaintypes.JobType(domaintypes.Normalize(job.JobType))
+	mt := domaintypes.JobType(domaintypes.Normalize(job.JobType.String()))
 	if !mt.IsZero() {
 		if err := mt.Validate(); err != nil {
 			s.logger.Debug("invalid job_type for log enrichment",

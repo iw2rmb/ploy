@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
@@ -15,12 +14,12 @@ func maybePersistGateSuccessSBOMRows(
 	st store.Store,
 	bp *blobpersist.Service,
 	job store.Job,
-	status store.JobStatus,
+	status domaintypes.JobStatus,
 ) (int, error) {
-	if bp == nil || status != store.JobStatusSuccess {
+	if bp == nil || status != domaintypes.JobStatusSuccess {
 		return 0, nil
 	}
-	if !isSBOMGateJobType(domaintypes.JobType(strings.TrimSpace(job.JobType))) {
+	if !isSBOMGateJobType(job.JobType) {
 		return 0, nil
 	}
 

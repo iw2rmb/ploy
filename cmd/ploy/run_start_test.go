@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 // TestRunStartCallsControlPlane validates `ploy run start <run-id>` calls the API.
@@ -41,7 +42,7 @@ func TestRunStartCallsControlPlane(t *testing.T) {
 	}))
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "start", runID.String()}, &buf)

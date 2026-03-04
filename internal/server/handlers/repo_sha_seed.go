@@ -10,6 +10,7 @@ import (
 )
 
 var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
 type sourceCommitSHAResolverFunc func(context.Context, string, string) (string, error)
 
 type sourceCommitSHAResolverContextKey struct{}

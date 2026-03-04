@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
+	"github.com/iw2rmb/ploy/internal/testutil/golden"
 )
 
 func TestRunLogsStructuredOutput(t *testing.T) {
@@ -38,14 +40,14 @@ func TestRunLogsStructuredOutput(t *testing.T) {
 	})
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"run", "logs", "--format", "structured", "run-123"}, buf)
 	if err != nil {
 		t.Fatalf("run logs: %v", err)
 	}
-	expect := loadGolden(t, "migs_logs_structured.txt")
+	expect := golden.LoadString(t, "testdata", "migs_logs_structured.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("migs logs structured mismatch:\n%s", diff)
 	}
@@ -64,14 +66,14 @@ func TestRunLogsRawOutput(t *testing.T) {
 	})
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"run", "logs", "--format", "raw", "run-raw"}, buf)
 	if err != nil {
 		t.Fatalf("run logs raw: %v", err)
 	}
-	expect := loadGolden(t, "migs_logs_raw.txt")
+	expect := golden.LoadString(t, "testdata", "migs_logs_raw.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("migs logs raw mismatch:\n%s", diff)
 	}
@@ -79,7 +81,7 @@ func TestRunLogsRawOutput(t *testing.T) {
 
 func TestRunLogsRequiresRunID(t *testing.T) {
 	t.Helper()
-	useServerDescriptor(t, "http://example.invalid")
+	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"run", "logs"}, buf)
@@ -93,7 +95,7 @@ func TestRunLogsRequiresRunID(t *testing.T) {
 
 func TestRunLogsInvalidFormat(t *testing.T) {
 	t.Helper()
-	useServerDescriptor(t, "http://example.invalid")
+	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"run", "logs", "--format", "yaml", "run-123"}, buf)
@@ -126,14 +128,14 @@ func TestRunLogsReconnects(t *testing.T) {
 	})
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := executeCmd([]string{"run", "logs", "job-42"}, buf)
 	if err != nil {
 		t.Fatalf("run logs reconnect: %v", err)
 	}
-	expect := loadGolden(t, "jobs_follow_structured.txt")
+	expect := golden.LoadString(t, "testdata", "jobs_follow_structured.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
 		t.Fatalf("job follow output mismatch:\n%s", diff)
 	}

@@ -114,7 +114,7 @@ func (m *addRunRepoStoreMock) CreateRunRepo(ctx context.Context, params store.Cr
 		result.RepoTargetRef = params.RepoTargetRef
 	}
 	if result.Status == "" {
-		result.Status = store.RunRepoStatusQueued
+		result.Status = domaintypes.RunRepoStatusQueued
 	}
 	if result.Attempt == 0 {
 		result.Attempt = 1
@@ -428,7 +428,7 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 	}
@@ -459,7 +459,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		cancelRunV1Err: errors.New("db exploded"),
@@ -488,7 +488,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
-			Status:    store.RunStatusCancelled,
+			Status:    domaintypes.RunStatusCancelled,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 	}
@@ -520,7 +520,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    specID,
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
@@ -571,7 +571,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 				RepoID:        repoID,
 				RepoBaseRef:   "main",
 				RepoTargetRef: "feature",
-				Status:        store.RunRepoStatusQueued,
+				Status:        domaintypes.RunRepoStatusQueued,
 				Attempt:       1,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 				RepoUrl:       "https://github.com/org/repo.git",
@@ -659,7 +659,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    specID,
-			Status:    store.RunStatusFinished,
+			Status:    domaintypes.RunStatusFinished,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getRunRepoResults: []store.RunRepo{
@@ -670,7 +670,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 				RepoTargetRef: "feature",
 				RepoSha0:      testRunRepoSHASeed,
 				Attempt:       1,
-				Status:        store.RunRepoStatusFail,
+				Status:        domaintypes.RunRepoStatusFail,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			},
 			{
@@ -680,7 +680,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 				RepoTargetRef: "feature-2",
 				RepoSha0:      testRunRepoSHASeed,
 				Attempt:       2,
-				Status:        store.RunRepoStatusQueued,
+				Status:        domaintypes.RunRepoStatusQueued,
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			},
 		},
@@ -737,7 +737,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 		RepoTargetRef: "feature",
 		RepoSha0:      testRunRepoSHASeed,
 		Attempt:       1,
-		Status:        store.RunRepoStatusQueued,
+		Status:        domaintypes.RunRepoStatusQueued,
 		CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
@@ -746,7 +746,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    specID,
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getSpecResult:                 store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
@@ -788,7 +788,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
 			SpecID:    domaintypes.NewSpecID(),
-			Status:    store.RunStatusCancelled,
+			Status:    domaintypes.RunStatusCancelled,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 	}

@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
+	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
 func TestRunStatusReportTextContract(t *testing.T) {
@@ -25,7 +27,7 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "status", runID.String()}, &buf)
@@ -34,23 +36,23 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 
 	out := buf.String()
-	assertContains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
-	assertContains(t, out, "   Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
-	assertContains(t, out, "   Repos: 1")
-	assertContains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertContains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
-	assertContains(t, out, "Artefacts")
-	assertNotContains(t, out, "State")
-	assertContains(t, out, "Logs")
-	assertContains(t, out, " | Patch")
+	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
+	assertx.Contains(t, out, "   Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
+	assertx.Contains(t, out, "   Repos: 1")
+	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
+	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertx.Contains(t, out, "Artefacts")
+	assertx.NotContains(t, out, "State")
+	assertx.Contains(t, out, "Logs")
+	assertx.Contains(t, out, " | Patch")
 	if strings.Count(out, "Patch (") != 1 {
 		t.Fatalf("expected exactly one patch link, got %q", out)
 	}
-	assertContains(t, out, "⣾")
-	assertContains(t, out, "\x1b[91m✗\x1b[0m")
-	assertContains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
-	assertNotContains(t, out, "<infra>")
-	assertContains(t, out, "└  Exit 0: Applied import fix and retried build")
+	assertx.Contains(t, out, "⣾")
+	assertx.Contains(t, out, "\x1b[91m✗\x1b[0m")
+	assertx.Contains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
+	assertx.NotContains(t, out, "<infra>")
+	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
 func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
@@ -190,7 +192,7 @@ func TestRunStatusJSONGate(t *testing.T) {
 	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
 	defer server.Close()
 
-	useServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
 	err := executeCmd([]string{"run", "status", "--json", runID.String()}, &buf)
@@ -242,19 +244,5 @@ func TestRunStatusJSONGate(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "Mig:") {
 		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
-	}
-}
-
-func assertContains(t *testing.T, output string, want string) {
-	t.Helper()
-	if !strings.Contains(output, want) {
-		t.Fatalf("expected output to contain %q, got %q", want, output)
-	}
-}
-
-func assertNotContains(t *testing.T, output string, want string) {
-	t.Helper()
-	if strings.Contains(output, want) {
-		t.Fatalf("expected output to not contain %q, got %q", want, output)
 	}
 }

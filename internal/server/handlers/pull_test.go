@@ -353,7 +353,7 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 	if !st.getLatestRunRepoByModAndRepoStatusCalled {
 		t.Fatalf("expected GetLatestRunRepoByMigAndRepoStatus to be called")
 	}
-	if st.getLatestRunRepoByModAndRepoStatusParams.Status != store.RunRepoStatusSuccess {
+	if st.getLatestRunRepoByModAndRepoStatusParams.Status != domaintypes.RunRepoStatusSuccess {
 		t.Fatalf("expected status filter 'Success', got %q", st.getLatestRunRepoByModAndRepoStatusParams.Status)
 	}
 }
@@ -408,7 +408,7 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 	}
 
 	// Verify the store call used the correct status filter
-	if st.getLatestRunRepoByModAndRepoStatusParams.Status != store.RunRepoStatusFail {
+	if st.getLatestRunRepoByModAndRepoStatusParams.Status != domaintypes.RunRepoStatusFail {
 		t.Fatalf("expected status filter 'Fail', got %q", st.getLatestRunRepoByModAndRepoStatusParams.Status)
 	}
 }

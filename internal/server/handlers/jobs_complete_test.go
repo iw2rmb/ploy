@@ -23,7 +23,7 @@ func TestCompleteJob_Success(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -52,7 +52,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -81,7 +81,7 @@ func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -107,7 +107,7 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 
 	f := newJobFixture("mig", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -160,7 +160,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
 
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusFinished},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusFinished},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -197,7 +197,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 
 	f := newJobFixture("", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -244,7 +244,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 
 	f := newJobFixture("", 1000)
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -288,7 +288,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	f.Job.RepoID = domaintypes.NewRepoID()
 
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -359,7 +359,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	f.Job.RepoID = domaintypes.NewRepoID()
 
 	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: store.RunStatusStarted},
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}

@@ -115,7 +115,7 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 				return false, err
 			}
 			for _, job := range jobs {
-				if job.Status == store.JobStatusRunning || job.Status == store.JobStatusQueued {
+				if job.Status == domaintypes.JobStatusRunning || job.Status == domaintypes.JobStatusQueued {
 					return true, nil
 				}
 			}

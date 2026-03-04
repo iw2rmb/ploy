@@ -8,28 +8,6 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// --- Job status types ---
-
-// JobStatus represents the terminal status of a job execution.
-type JobStatus string
-
-const (
-	JobStatusSuccess   JobStatus = "Success"
-	JobStatusFail      JobStatus = "Fail"
-	JobStatusCancelled JobStatus = "Cancelled"
-)
-
-func (s JobStatus) String() string { return string(s) }
-
-// DiffJobType represents the job_type value used to tag diffs.
-type DiffJobType string
-
-const (
-	DiffJobTypeMod DiffJobType = "mig"
-)
-
-func (t DiffJobType) String() string { return string(t) }
-
 // --- Job image name persistence ---
 
 // SaveJobImageName persists the resolved container image name for a job to the control plane.

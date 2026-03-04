@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -21,7 +22,7 @@ func newCompleteJobMetaFixture() (jobTestFixture, *mockStore, http.Handler) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -177,7 +178,7 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -219,7 +220,7 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -261,7 +262,7 @@ func TestCompleteJob_ValidJobMeta_GateWithBugSummary(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -315,7 +316,7 @@ func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},

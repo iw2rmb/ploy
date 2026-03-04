@@ -19,13 +19,13 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	repoID := domaintypes.RepoID("repo_1")
 
 	st := &mockStore{
-		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
+		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listQueuedRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{},
 	}
@@ -61,17 +61,17 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	repoID := domaintypes.RepoID("repo_1")
 
 	st := &mockStore{
-		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: store.RunStatusStarted},
+		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted},
 		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
 		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listQueuedRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: store.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
-			{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: store.JobStatusCreated},
+			{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
+			{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
 		},
 	}
 
@@ -104,7 +104,7 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	runID := domaintypes.RunID("run_1")
 
 	st := &mockStore{
-		getRunResult: store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: store.RunStatusFinished},
+		getRunResult: store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.RunStatusFinished},
 	}
 
 	starter := NewBatchRepoStarter(st)

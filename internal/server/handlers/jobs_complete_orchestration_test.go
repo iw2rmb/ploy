@@ -56,7 +56,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        f.RunID,
-			Status:    store.RunStatusStarted,
+			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
 		getJobResult:        f.Job,
@@ -71,14 +71,14 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 				RepoBaseRef: "main",
 				Attempt:     1,
 				Name:        "mig-0",
-				Status:      store.JobStatusSuccess,
+				Status:      domaintypes.JobStatusSuccess,
 				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 1000),
 			},
 		},
 		// All repos terminal triggers run completion.
 		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
-			{Status: store.RunRepoStatusSuccess, Count: 1},
+			{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
 		},
 	}
 
@@ -139,13 +139,13 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	nextJob := store.Job{
 		ID:     nextJobID,
 		RunID:  f.RunID,
-		Status: store.JobStatusCreated,
+		Status: domaintypes.JobStatusCreated,
 	}
 
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:                    f.Job,
 		listJobsByRunResult:             []store.Job{f.Job, nextJob},
@@ -183,7 +183,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -210,7 +210,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeMod.String(), 2000)
+	f := newJobFixture(domaintypes.JobTypeMod, 2000)
 	repoID := domaintypes.NewRepoID()
 	postJobID := domaintypes.NewJobID()
 
@@ -228,8 +228,8 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			RepoBaseRef: "main",
 			Attempt:     1,
 			NodeID:      &f.NodeID,
-			Status:      store.JobStatusSuccess,
-			JobType:     domaintypes.JobTypePreGate.String(),
+			Status:      domaintypes.JobStatusSuccess,
+			JobType:     domaintypes.JobTypePreGate,
 			Meta:        withNextIDMeta([]byte(`{}`), 1000),
 		},
 		f.Job,
@@ -239,8 +239,8 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 			RepoID:      repoID,
 			RepoBaseRef: "main",
 			Attempt:     1,
-			Status:      store.JobStatusCreated,
-			JobType:     domaintypes.JobTypePostGate.String(),
+			Status:      domaintypes.JobStatusCreated,
+			JobType:     domaintypes.JobTypePostGate,
 			Meta:        withNextIDMeta([]byte(`{}`), 3000),
 		},
 	}
@@ -251,7 +251,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:                   jobs[1], // mig job
 		listJobsByRunResult:            jobs,
@@ -289,7 +289,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	for _, call := range st.updateJobStatusCalls {
 		if call.ID == jobs[2].ID {
 			foundPostCancel = true
-			if call.Status != store.JobStatusCancelled {
+			if call.Status != domaintypes.JobStatusCancelled {
 				t.Fatalf("expected post-gate job to be canceled, got status %s", call.Status)
 			}
 		}
@@ -308,7 +308,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
@@ -325,7 +325,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	if !st.updateJobCompletionCalled {
 		t.Fatal("expected UpdateJobCompletion to be called")
 	}
-	if st.updateJobCompletionParams.Status != store.JobStatusCancelled {
+	if st.updateJobCompletionParams.Status != domaintypes.JobStatusCancelled {
 		t.Fatalf("expected job status canceled, got %s", st.updateJobCompletionParams.Status)
 	}
 }
@@ -340,8 +340,8 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 		RepoID:      domaintypes.NewRepoID(),
 		RepoBaseRef: "main",
 		Attempt:     1,
-		Status:      store.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod.String(),
+		Status:      domaintypes.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod,
 	}
 	f.Job.RepoID = nextJob.RepoID
 	f.Job.RepoBaseRef = "main"
@@ -351,7 +351,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:     f.RunID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:                    f.Job,
 		listJobsByRunResult:             []store.Job{f.Job, nextJob},
@@ -381,7 +381,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	f := newJobFixture(domaintypes.JobTypePreGate, 1000)
 	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
@@ -418,8 +418,8 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Name:        "mig-0",
-		Status:      store.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod.String(),
+		Status:      domaintypes.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod,
 		Meta:        []byte(`{}`),
 	}
 	f.Job.NextID = &successor.ID
@@ -429,7 +429,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 		getRunResult: store.Run{
 			ID:     f.RunID,
 			SpecID: specID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:                   f.Job,
 		getSpecResult:                  store.Spec{ID: specID, Spec: specBytes},
@@ -479,7 +479,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	f := newJobFixture(domaintypes.JobTypePreGate, 1000)
 	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
@@ -516,8 +516,8 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Name:        "mig-0",
-		Status:      store.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod.String(),
+		Status:      domaintypes.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod,
 		Meta:        []byte(`{}`),
 	}
 	f.Job.NextID = &successor.ID
@@ -526,7 +526,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 		getRunResult: store.Run{
 			ID:     f.RunID,
 			SpecID: specID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:                   f.Job,
 		getSpecResult:                  store.Spec{ID: specID, Spec: specBytes},
@@ -560,7 +560,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypePreGate.String(), 1000)
+	f := newJobFixture(domaintypes.JobTypePreGate, 1000)
 	repoID := domaintypes.NewRepoID()
 	specID := domaintypes.NewSpecID()
 	f.Job.RepoID = repoID
@@ -597,8 +597,8 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Name:        "mig-0",
-		Status:      store.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod.String(),
+		Status:      domaintypes.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod,
 		Meta:        []byte(`{"kind":"mig"}`),
 	}
 	f.Job.NextID = &successor.ID
@@ -608,7 +608,7 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 		getRunResult: store.Run{
 			ID:     f.RunID,
 			SpecID: specID,
-			Status: store.RunStatusStarted,
+			Status: domaintypes.RunStatusStarted,
 		},
 		getJobResult:                   f.Job,
 		getSpecResult:                  store.Spec{ID: specID, Spec: specBytes},
@@ -633,7 +633,7 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 	if len(st.updateJobStatusCalls) != 1 {
 		t.Fatalf("expected one cancellation call, got %d", len(st.updateJobStatusCalls))
 	}
-	if st.updateJobStatusCalls[0].ID != successor.ID || st.updateJobStatusCalls[0].Status != store.JobStatusCancelled {
+	if st.updateJobStatusCalls[0].ID != successor.ID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
 		t.Fatalf("unexpected cancellation call: %+v", st.updateJobStatusCalls[0])
 	}
 }

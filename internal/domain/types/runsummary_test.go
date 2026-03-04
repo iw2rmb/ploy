@@ -20,7 +20,7 @@ func TestRunSummaryJSON(t *testing.T) {
 
 		original := RunSummary{
 			ID:         RunID("2NQPoBfVkc8dFmGAQqJnUwMu9jR"),
-			Status:     "Started",
+			Status:     RunStatusStarted,
 			MigID:      MigID("mig-x1"),
 			SpecID:     SpecID("spec-y2Z"),
 			CreatedBy:  ptr("test-user"),
@@ -165,7 +165,7 @@ func TestRunSummaryJSON(t *testing.T) {
 			ID:        RunID("run-1"),
 			MigID:     MigID("mig-1"),
 			SpecID:    SpecID("spec-1"),
-			Status:    "Started",
+			Status:    RunStatusStarted,
 			CreatedAt: time.Now(),
 		}
 

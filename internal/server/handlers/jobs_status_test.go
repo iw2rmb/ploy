@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 func TestGetJobStatusHandler_Success(t *testing.T) {
@@ -31,7 +30,7 @@ func TestGetJobStatusHandler_Success(t *testing.T) {
 		t.Fatalf("status = %d, want %d, body=%s", rr.Code, http.StatusOK, rr.Body.String())
 	}
 	assertJSONValue(t, rr.Body.String(), "job_id", f.JobID.String())
-	assertJSONValue(t, rr.Body.String(), "status", string(store.JobStatusRunning))
+	assertJSONValue(t, rr.Body.String(), "status", string(domaintypes.JobStatusRunning))
 }
 
 func TestGetJobStatusHandler_ForbiddenWhenNodeMismatched(t *testing.T) {
