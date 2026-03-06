@@ -245,9 +245,10 @@ The gate does not modify the repository; it validates the current working tree.
 - **Gradle test reports:** Gate Gradle images force test reports into `/out/gradle-test-results` (JUnit XML)
   and `/out/gradle-test-report` (HTML) via image init script. Node uploads these bundles to object storage
   and records artifact links in `BuildGateStageMetadata.report_links`.
-- **Gradle SBOM (when CycloneDX task exists):** Gate Gradle init script wires `cyclonedxBom` to run after
-  `build`/`test`, forces JSON output, and writes it under `/out` (for example `sbom.cyclonedx.json`), so
-  `build -x test` gates can still produce SBOM evidence.
+- **Gradle SBOM (always attempted):** Gate Gradle init script always attempts to write fallback SPDX output
+  to `/out/sbom.spdx.json` from resolved Gradle dependencies, independent of project plugins.
+- **Gradle CycloneDX integration (optional):** When task `cyclonedxBom` exists, the init script also wires it
+  after `build`/`test`, forces JSON output, and writes it under `/out` (for example `sbom.cyclonedx.json`).
 - **API exposure:** Gate status is surfaced via `GET /v1/runs/{id}/status` and `Metadata["gate_summary"]` on the run.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
   - Accessible via `Metadata["gate_summary"]` in `GET /v1/runs/{id}/status` responses.

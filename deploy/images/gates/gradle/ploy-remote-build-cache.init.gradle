@@ -91,3 +91,138 @@ allprojects { project ->
     }
   }
 }
+
+// Plugin-independent fallback SBOM generation:
+// - Always attempts to write SPDX JSON at /out/sbom.spdx.json from resolved
+//   Gradle dependency configurations, even when cyclonedxBom is not available.
+// - Never fails the build if dependency inspection or file write fails.
+def _ployCollectModuleCoords = { configuration, packageMap ->
+  if (configuration == null || packageMap == null) return
+  try {
+    if (!configuration.canBeResolved) return
+  } catch (Throwable ignored) {
+    return
+  }
+
+  try {
+    def deps = configuration.resolvedConfiguration?.lenientConfiguration?.allModuleDependencies
+    deps?.each { dep ->
+      def g = (dep.moduleGroup ?: "").toString().trim()
+      def n = (dep.moduleName ?: "").toString().trim()
+      def v = (dep.moduleVersion ?: "").toString().trim()
+      if (n.isEmpty() || v.isEmpty()) return
+      def lib = g.isEmpty() ? n : (g + ":" + n)
+      packageMap[lib + "@" + v] = [name: lib, versionInfo: v]
+    }
+  } catch (Throwable ignored) {
+    // Ignore unresolved/broken configurations and keep collecting from others.
+  }
+}
+
+def _ployCollectDeclaredCoords = { configuration, packageMap ->
+  if (configuration == null || packageMap == null) return
+
+  try {
+    configuration.allDependencies?.each { dep ->
+      def g = ""
+      def n = ""
+      def v = ""
+      try {
+        g = (dep.group ?: "").toString().trim()
+      } catch (Throwable ignored) {}
+      try {
+        n = (dep.name ?: "").toString().trim()
+      } catch (Throwable ignored) {}
+      try {
+        v = (dep.version ?: "").toString().trim()
+      } catch (Throwable ignored) {}
+      if (n.isEmpty() || v.isEmpty()) return
+      def lib = g.isEmpty() ? n : (g + ":" + n)
+      packageMap[lib + "@" + v] = [name: lib, versionInfo: v]
+    }
+  } catch (Throwable ignored) {
+    // Ignore malformed dependency declarations and keep collecting.
+  }
+}
+
+def _ployWriteFallbackSBOM = {
+  def packageMap = [:]
+  def preferred = [
+    "runtimeClasspath",
+    "compileClasspath",
+    "testRuntimeClasspath",
+    "testCompileClasspath",
+  ]
+
+  def projects = []
+  try {
+    projects = gradle?.rootProject?.allprojects ?: []
+  } catch (Throwable ignored) {
+    projects = []
+  }
+
+  projects.each { p ->
+    preferred.each { cfgName ->
+      _ployCollectModuleCoords(p.configurations?.findByName(cfgName), packageMap)
+    }
+  }
+
+  def preferredDeclared = [
+    "implementation",
+    "api",
+    "compileOnly",
+    "runtimeOnly",
+    "testImplementation",
+    "testRuntimeOnly",
+  ]
+  projects.each { p ->
+    preferredDeclared.each { cfgName ->
+      _ployCollectDeclaredCoords(p.configurations?.findByName(cfgName), packageMap)
+    }
+  }
+
+  if (packageMap.isEmpty()) {
+    projects.each { p ->
+      p.configurations?.each { cfg ->
+        _ployCollectModuleCoords(cfg, packageMap)
+      }
+    }
+  }
+
+  if (packageMap.isEmpty()) {
+    projects.each { p ->
+      p.configurations?.each { cfg ->
+        _ployCollectDeclaredCoords(cfg, packageMap)
+      }
+    }
+  }
+
+  def packages = packageMap.values().toList().sort { a, b ->
+    if (a.name == b.name) {
+      return a.versionInfo <=> b.versionInfo
+    }
+    return a.name <=> b.name
+  }
+
+  def outDir = new File("/out")
+  def outFile = new File(outDir, "sbom.spdx.json")
+  try {
+    outDir.mkdirs()
+    def payload = [
+      spdxVersion: "SPDX-2.3",
+      packages   : packages,
+    ]
+    outFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(payload))
+    System.err.println("[ploy-gradle-sbom] WROTE /out/sbom.spdx.json packages=" + packages.size())
+  } catch (Throwable ignored) {
+    System.err.println("[ploy-gradle-sbom] WARN failed to write fallback SPDX SBOM")
+  }
+}
+
+gradle.buildFinished {
+  try {
+    _ployWriteFallbackSBOM()
+  } catch (Throwable ignored) {
+    System.err.println("[ploy-gradle-sbom] WARN fallback SPDX SBOM collection failed")
+  }
+}
