@@ -75,6 +75,11 @@ deploy/local/node/bearer-token
 local/cli/clusters/**
 local/cli/rollout
 
+# VPS
+deploy/vps/auth-secret.txt
+deploy/vps/cli
+deploy/vps/node/bearer-token
+
 /ploy
 /ployd
 /ployd-node

@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 # orw-cli-maven: standalone OpenRewrite CLI runner for Maven repositories.
 #
 # This image runs OpenRewrite through a single CLI command path and never
