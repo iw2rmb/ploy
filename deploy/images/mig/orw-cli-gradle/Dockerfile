@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 # orw-cli-gradle: standalone OpenRewrite CLI runner for Gradle repositories.
 #
 # This image runs OpenRewrite through a single CLI command path and never
