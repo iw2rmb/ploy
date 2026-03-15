@@ -30,7 +30,7 @@ defaults change, or components adopt additional configuration.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
 - `PLOY_CA_CERTS` — Optional path to a PEM CA bundle used by
-  `deploy/local/run.sh` to configure Docker daemon trust for Docker Hub
+  `deploy/local/run.sh` and `deploy/vps/redeploy.sh` to configure Docker daemon trust for Docker Hub
   endpoints (`docker.io`, `registry-1.docker.io`, `auth.docker.io`,
   `index.docker.io`).
   The script also installs the bundle into system CA trust before restarting
@@ -83,6 +83,21 @@ Role model (bearer token claims):
   and rebuilds/repushes mig + build-gate images even if they already exist in Garage-backed registry.
 - `PLOY_REGISTRY_PORT` — Host port for the local Garage-backed OCI registry in `deploy/local/docker-compose.yml`
   (default: `5000`).
+- `PLOY_VPS_DB_DSN` — Required by `deploy/vps/redeploy.sh`. PostgreSQL DSN that must be
+  reachable from both the remote VPS host (`psql`, `pg_isready`) and the remote `server`
+  container (`PLOY_POSTGRES_DSN`). Must target the `ploy` database.
+- `PLOY_VPS_CLUSTER_ID` — Optional cluster identifier used by `deploy/vps/redeploy.sh` when
+  generating the local admin token, two worker tokens, node configs, and the local CLI
+  descriptor. Default: `local`.
+- `PLOY_VPS_NODE1_ID` / `PLOY_VPS_NODE2_ID` — Optional node IDs for the two offline VPS node
+  containers. Defaults: `local1`, `local2`.
+- `PLOY_VPS_WORKDIR_ROOT` — Optional absolute host path used by `deploy/vps/redeploy.sh` as the
+  parent directory for host-visible node workspaces. Default: `/var/tmp/ploy-vps`. The script
+  binds `${PLOY_VPS_WORKDIR_ROOT}/node1` and `${PLOY_VPS_WORKDIR_ROOT}/node2` into the two node
+  containers at identical absolute paths so host Docker can mount job workspaces correctly.
+- `PLOY_SKIP_BUILD` — Optional flag for `deploy/vps/redeploy.sh`. When set to `1`, `true`,
+  `yes`, or `on`, the script skips `make build` and reuses the existing local `dist/ploy`
+  artifact.
 - `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
   as `PLOY_CONTAINER_REGISTRY`.
 - `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by `deploy/images/build-and-push-migs.sh`.
@@ -626,6 +641,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - [docs/testing-workflow.md](../testing-workflow.md) — Go testing workflow and local validation commands
 - See `CHANGELOG.md` for migration status and recent slices
 - [docs/how-to/deploy-locally.md](../how-to/deploy-locally.md) — Local Docker cluster
+- [docs/how-to/deploy-vps-offline.md](../how-to/deploy-vps-offline.md) — Offline SSH deployment of the full local stack to a VPS
 
 ## Build Gate Limits
 
