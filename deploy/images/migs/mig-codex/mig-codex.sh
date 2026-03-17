@@ -164,20 +164,21 @@ manifest="$out_dir/codex-run.json"
 jsonl="$out_dir/codex-events.jsonl"
 
 # Initialize log file with start message; log resume mode if active.
-echo "[mig-codex] starting codex exec with repo context" > "$logfile"
+echo "[mig-codex] starting codex exec with repo context" | tee "$logfile" >&2
 if [[ -n "$resume_session" ]]; then
-  echo "[mig-codex] resume mode enabled; session=$resume_session" >> "$logfile"
+  echo "[mig-codex] resume mode enabled; session=$resume_session" | tee -a "$logfile" >&2
 fi
 set +e
 # Pipe Codex output to:
 #   1. codex.log (human-readable log, appended)
 #   2. codex-events.jsonl (JSON events for session ID extraction)
-# The tee chain ensures both files receive the same stream.
-printf "%s" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$logfile" | tee "$jsonl" >/dev/null
+#   3. stderr (captured by Docker → Ploy log streamer → SSE logs endpoint)
+# The tee chain ensures all destinations receive the same stream.
+printf "%s" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$logfile" | tee "$jsonl" >&2
 status=${PIPESTATUS[1]}
 set -e
 if [[ ! -s "$logfile" ]]; then
-  echo "[mig-codex] no output captured from codex" >> "$logfile"
+  echo "[mig-codex] no output captured from codex" | tee -a "$logfile" >&2
 fi
 
 # Extract session/thread ID from JSON events (if jq is available and events were captured).
