@@ -37,7 +37,8 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     rm -rf /root/.npm /tmp/* && \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
     chmod 700 /root/.codex && \
-    chmod 755 /etc/ploy/certs
+    chmod 755 /etc/ploy/certs && \
+    ln -sf /bin/bash /bin/sh
 
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
