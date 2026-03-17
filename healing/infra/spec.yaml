@@ -6,4 +6,5 @@ expectations:
       schema: gate_profile_v1
 env_from_file:
   CODEX_PROMPT: $PLOY_PATH/healing/infra/prompt.md
+  CODEX_CONFIG_TOML: $PLOY_PATH/tmp/j11to17/config.toml
   CODEX_AUTH_JSON: ~/.codex/auth.json

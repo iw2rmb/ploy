@@ -1,4 +1,5 @@
 image: 127.0.0.1:5000/ploy/migs-codex:latest
 env_from_file:
   CODEX_PROMPT: $PLOY_PATH/healing/router/prompt.md
+  CODEX_CONFIG_TOML: $PLOY_PATH/tmp/j11to17/config.toml
   CODEX_AUTH_JSON: ~/.codex/auth.json
