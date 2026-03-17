@@ -37,8 +37,11 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     rm -rf /root/.npm /tmp/* && \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
     chmod 700 /root/.codex && \
-    chmod 755 /etc/ploy/certs && \
-    ln -sf /bin/bash /bin/sh
+    chmod 755 /etc/ploy/certs
+
+# Codex CLI runs shell snapshots via /bin/sh; Alpine's default (busybox ash)
+# lacks bash syntax support, so point /bin/sh at bash.
+RUN ln -sf /bin/bash /bin/sh
 
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
