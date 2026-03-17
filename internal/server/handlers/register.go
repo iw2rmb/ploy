@@ -69,7 +69,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("GET /v1/runs", listRunsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/status", getRunStatusHandler(st), auth.RoleControlPlane)
-	s.HandleFuncAllowQueryToken("GET /v1/runs/{id}/logs", getRunLogsHandler(st, eventsService), auth.RoleControlPlane)
+	s.HandleFuncAllowQueryToken("GET /v1/runs/{id}/logs", getRunLogsHandler(st, bs, eventsService), auth.RoleControlPlane)
 	// v1 API: POST /v1/runs/{id}/cancel — cancels the run, all repos (Queued/Running → Cancelled), and cancels/removes Created/Queued/Running jobs.
 	s.HandleFunc("POST /v1/runs/{id}/cancel", cancelRunHandlerV1(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/start", startRunHandler(st), auth.RoleControlPlane)
@@ -81,7 +81,7 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// Repo-scoped diffs listing.
 	s.HandleFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/diffs", listRunRepoDiffsHandler(st, bs), auth.RoleControlPlane, auth.RoleWorker)
 	// Repo-scoped logs SSE stream (filtered view of GET /v1/runs/{id}/logs).
-	s.HandleFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, eventsService), auth.RoleControlPlane)
+	s.HandleFuncAllowQueryToken("GET /v1/runs/{run_id}/repos/{repo_id}/logs", getRunRepoLogsHandler(st, bs, eventsService), auth.RoleControlPlane)
 	// Repo-scoped artifact listing.
 	s.HandleFunc("GET /v1/runs/{run_id}/repos/{repo_id}/artifacts", listRunRepoArtifactsHandler(st), auth.RoleControlPlane)
 	// Repo-scoped job listing for --follow mode.
