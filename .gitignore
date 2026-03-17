@@ -79,6 +79,8 @@ local/cli/rollout
 deploy/vps/auth-secret.txt
 deploy/vps/cli
 deploy/vps/node/bearer-token
+deploy/vps/docker-compose-linux-x86_64
+deploy/vps/run.sh
 
 /ploy
 /ployd

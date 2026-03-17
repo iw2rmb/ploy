@@ -19,11 +19,11 @@ stacks:
     tool: gradle
     image: ${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk17
     profile: gates/profiles/java-17-gradle.yaml
-  - lang: go
-    release: "1.22"
-    image: ${PLOY_CONTAINER_REGISTRY}/golang:1.22
-    profile: gates/profiles/go-1.22.yaml
-  - lang: rust
-    release: "1.76"
-    image: ${PLOY_CONTAINER_REGISTRY}/rust:1.76
-    profile: gates/profiles/rust-1.76.yaml
+  # - lang: go
+  #   release: "1.22"
+  #   image: ${PLOY_CONTAINER_REGISTRY}/golang:1.22
+  #   profile: gates/profiles/go-1.22.yaml
+  # - lang: rust
+  #   release: "1.76"
+  #   image: ${PLOY_CONTAINER_REGISTRY}/rust:1.76
+  #   profile: gates/profiles/rust-1.76.yaml

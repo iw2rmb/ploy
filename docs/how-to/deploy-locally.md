@@ -70,7 +70,7 @@ No flags means full deploy (server + node + garage + registry services).
 - Runtime images are built from:
   - `deploy/images/server/Dockerfile`
   - `deploy/images/node/Dockerfile`
-  - `deploy/local/garage/Dockerfile.init` (bootstrap helper image with `/garage` + shell)
+  - `deploy/local/garage/Dockerfile` (bootstrap helper image with `/garage` + shell)
 - Runtime containers execute host-built binaries mounted from `dist/`.
 - Core Dockerfiles are used for local runtime image builds.
 

@@ -1,165 +1,102 @@
-# Deploy Full Local Stack To An Offline VPS
+# Deploy Full Local Stack To The VPS
 
-This flow mirrors the `deploy/local` topology on a remote Linux VPS over SSH:
+`deploy/vps/run.sh` deploys the same Docker topology used by `deploy/local/run.sh`
+to the fixed VPS target `s_v.v.kovalev@10.120.34.186` over SSH.
 
-- `server`
-- `node1`
-- `node2`
-- `garage`
-- `garage-init`
-- `registry`
-- `gradle-build-cache`
+The script is intentionally simple:
 
-It is intended for hosts that **cannot reach git remotes, public registries, or the internet at deploy time**. All images are built and bundled on the workstation, copied over SSH, then loaded and started remotely.
+- build binaries locally
+- build or pull all required images locally
+- copy a small runtime bundle to `/opt/ploy/current` on the VPS with `sudo`
+- load the locally prepared Docker image archive on the VPS
+- start the remote stack with `docker compose ... up --no-build`
 
-## What This Uses
+No image builds happen on the VPS.
 
-- Local build machine:
-  - `make build`
-  - `docker buildx build --load`
-  - `docker save`
-  - `ssh` / `scp`
-- Remote VPS:
-  - Docker Engine with Compose v2
-  - `psql`
-  - `pg_isready`
-  - `curl`
-  - `python3`
-  - PostgreSQL reachable from both the VPS host and the compose containers
+## Remote Requirements
 
-Docker is still required on the VPS. The worker runtime and Build Gate remain Docker-based.
+The VPS must already have:
+
+- Docker Engine with Compose v2
+- `sudo` without an interactive password
+- `psql`
+- `pg_isready`
+- `curl`
+- `python3`
+
+The PostgreSQL DSN must work both from the VPS host and from the `server`
+container. Do not use `localhost` unless the container can resolve the same
+database endpoint.
 
 ## Required Environment
 
-On the local build machine:
+On the local machine:
 
 ```bash
-export PLOY_VPS_DB_DSN='postgres://ploy:ploy@10.0.0.10:5432/ploy?sslmode=disable'
+export PLOY_DB_DSN='postgres://ploy:ploy@10.120.34.186:5432/ploy?sslmode=disable'
 ```
-
-This DSN must work:
-
-- from the VPS host for `psql`/`pg_isready`
-- from the `server` container as `PLOY_POSTGRES_DSN`
 
 Optional overrides:
 
 ```bash
-export PLOY_VPS_CLUSTER_ID='local'
-export PLOY_VPS_WORKDIR_ROOT='/var/tmp/ploy-vps'
 export PLOY_SERVER_PORT=8080
 export PLOY_REGISTRY_PORT=5000
 export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT}/ploy"
-export PLOY_CA_CERTS='/absolute/path/to/ca-bundle.pem'  # optional: custom CA for docker.io registry trust
-export PLOY_SKIP_BUILD=1
+export PLOY_CA_CERTS='/absolute/path/to/ca-bundle.pem'
+export CLUSTER_ID='local'
+export NODE_ID='local1'
+export AUTH_SECRET_PATH="$PWD/deploy/vps/auth-secret.txt"
 ```
+
+`PLOY_CA_CERT` is accepted as an alias for `PLOY_CA_CERTS`.
 
 ## Deploy
 
 From repo root:
 
 ```bash
-./deploy/vps/redeploy.sh \
-  --address 203.0.113.10 \
-  --user root \
-  --identity ~/.ssh/id_rsa
+./deploy/vps/run.sh
 ```
 
-When local disk space is tight, enable low-disk mode:
+To force fresh local binaries and image rebuilds:
 
 ```bash
-./deploy/vps/redeploy.sh \
-  --address 203.0.113.10 \
-  --user root \
-  --identity ~/.ssh/id_rsa \
-  --low-disk
+./deploy/vps/run.sh --clean
 ```
 
-To reset the `ploy` database during redeploy:
+To reset the remote `ploy` database before the deploy:
 
 ```bash
-./deploy/vps/redeploy.sh \
-  --address 203.0.113.10 \
-  --user root \
-  --identity ~/.ssh/id_rsa \
-  --drop-db
+./deploy/vps/run.sh --drop-db
 ```
 
-What the script does:
+## What The Script Does
 
-- Builds local binaries with `make build` unless `PLOY_SKIP_BUILD` is true-like.
-- In `--low-disk` mode, reuses `dist/ploy` when it already exists locally.
-- Builds runtime images locally:
-  - `ploy-server:vps`
-  - `ploy-node:vps`
-  - `ploy-garage-init:vps`
-- Builds workflow images locally under `${PLOY_CONTAINER_REGISTRY}`:
-  - mods images from `deploy/images/mig/*` and `deploy/images/migs/*`
-  - Gradle gate images
-  - mirrored base images required by `gates/stacks.yaml`
-- Pulls service images needed by the compose stack.
-- In `--low-disk` mode, reuses any already-present local Docker images for those tags instead of rebuilding or repulling them.
-- Generates one admin token and two worker tokens locally.
-- Writes a bundle with compose/config/token files plus `docker save` output.
-- In `--low-disk` mode, streams the bundle and `docker save` payload over SSH instead of writing the large archive twice on the workstation.
-- Uploads that bundle over SSH.
-- Runs the remote apply script, which:
-  - ensures the `ploy` database exists
-  - loads Docker images from the bundle
-  - starts the compose stack
-  - seeds Garage/registry readiness
-  - pushes bundled workflow images into the remote local registry
-  - inserts admin/worker tokens into `api_tokens`
-  - seeds node rows for `node1` and `node2`
-  - configures remote Gradle cache env through the server API
+- Reuses `dist/ployd-linux` and `dist/ployd-node-linux` when they already exist.
+- Reuses local Docker images when the target tags already exist.
+- Rebuilds both binaries and images when `--clean` is set.
+- Keeps the `server` and `node` binaries in the uploaded `dist/*-linux` bundle and relies on the reused compose bind mounts instead of baking those binaries into the VPS runtime images.
+- Uses `PLOY_CA_CERTS` exactly like `deploy/local/run.sh` on the local machine, and also installs that CA bundle on the VPS before Docker operations there.
+- Uploads the runtime bundle under `/opt/ploy/current` with `sudo`.
+- Creates `/private/tmp` on the VPS because the reused compose file bind-mounts that path for the node container.
+- Starts `garage`, `garage-init`, `registry`, `gradle-build-cache`, and `server` first.
+- Pushes the locally prepared workflow images into the VPS-local registry.
+- Seeds admin and worker bearer tokens in PostgreSQL.
+- Seeds the default node row and only then starts the `node` container.
 
-## Local CLI Descriptor
-
-After a successful deploy, the script writes a local cluster descriptor under:
+## Verify
 
 ```bash
-deploy/vps/cli
-```
-
-Override with:
-
-```bash
-export PLOY_CONFIG_HOME=/path/to/config-home
-```
-
-Then use the CLI against the remote stack:
-
-```bash
-PLOY_CONFIG_HOME="$PWD/deploy/vps/cli" ./dist/ploy cluster token list
-```
-
-## Runtime Layout
-
-Two node containers are started:
-
-- `node1` with `node_id=local1`
-- `node2` with `node_id=local2`
-
-Their host-visible workspace roots default to:
-
-- `/var/tmp/ploy-vps/node1`
-- `/var/tmp/ploy-vps/node2`
-
-These paths are bind-mounted at the same absolute locations inside the node containers so host Docker can mount job workspaces correctly.
-
-## Verify On The VPS
-
-```bash
-ssh -i ~/.ssh/id_rsa root@203.0.113.10 \
-  'cd /opt/ploy-vps/current && docker compose --project-name ploy-vps --env-file stack.env -f docker-compose.yml ps'
+ssh s_v.v.kovalev@10.120.34.186 \
+  'cd /opt/ploy/current && docker compose --project-name local --env-file deploy/vps/stack.env -f deploy/local/docker-compose.yml ps'
 ```
 
 ```bash
-curl -fsS http://203.0.113.10:8080/health
+curl -fsS http://10.120.34.186:8080/health
 ```
 
 ```bash
-curl -fsS http://203.0.113.10:5000/v2/
+curl -fsS http://10.120.34.186:5000/v2/
 ```
 
 ## Related
