@@ -46,6 +46,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     CODEX_MODEL="" \
     CODEX_EXTRA_DIR="" \
     CODEX_AUTH_JSON="" \
+    CODEX_CONFIG_TOML="" \
     PLOY_SERVER_URL="" \
     PLOY_API_TOKEN="" \
     PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.crt" \

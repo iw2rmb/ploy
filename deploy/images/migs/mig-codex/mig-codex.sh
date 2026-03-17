@@ -3,12 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mig-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--model <name>] [--prompt-file <file>]
+mig-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>] [--model <name>] [--prompt-file <file>]
 
 Environment:
   CODEX_PROMPT     Inline prompt text (used when --prompt-file not provided).
   CODEX_MODEL      Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
-  CODEX_AUTH_JSON  Inline JSON for auth; if set, written to ~/.codex/auth.json.
+  CODEX_AUTH_JSON   Inline JSON for auth; if set, written to ~/.codex/auth.json.
+  CODEX_CONFIG_TOML Inline TOML for config; if set, written to ~/.codex/config.toml.
   CODEX_RESUME     If set to "1" and /in/codex-session.txt exists, resume the prior
                    Codex session instead of starting fresh (for healing retries).
   PLOY_API_TOKEN   Optional bearer token for Build Gate API (unused; gate runs externally).
@@ -16,6 +17,7 @@ Environment:
 Behavior:
   - Installs Codex CLI in the image (via npm @openai/codex).
   - Places auth at /root/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
+  - Places config at /root/.codex/config.toml when --config is given or CODEX_CONFIG_TOML is set.
   - Always adds repository directory with: codex exec --add-dir <input> ...
   - Writes logs to <out>/codex.log and a small run manifest to <out>/codex-run.json.
   - When CODEX_RESUME=1 and a prior session exists, uses "codex exec resume <session>"
@@ -26,6 +28,7 @@ USAGE
 input_dir="${WORKSPACE:-/workspace}"
 out_dir="${OUTDIR:-/out}"
 auth_file=""
+config_file=""
 model="${CODEX_MODEL:-}"
 prompt_file=""
 
@@ -34,6 +37,7 @@ while [[ $# -gt 0 ]]; do
     --input) input_dir="$2"; shift 2 ;;
     --out) out_dir="$2"; shift 2 ;;
     --auth) auth_file="$2"; shift 2 ;;
+    --config) config_file="$2"; shift 2 ;;
     --model) model="$2"; shift 2 ;;
     --prompt-file) prompt_file="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -54,6 +58,17 @@ fi
 if [[ -n "${CODEX_AUTH_JSON:-}" ]]; then
   umask 077
   printf "%s" "$CODEX_AUTH_JSON" > /root/.codex/auth.json
+fi
+
+# Config via file path
+if [[ -n "$config_file" ]]; then
+  install -m 600 "$config_file" /root/.codex/config.toml
+fi
+
+# Config via env content
+if [[ -n "${CODEX_CONFIG_TOML:-}" ]]; then
+  umask 077
+  printf "%s" "$CODEX_CONFIG_TOML" > /root/.codex/config.toml
 fi
 
 # Resolve prompt
