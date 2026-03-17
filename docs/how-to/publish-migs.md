@@ -77,7 +77,7 @@ Notes
 
 Multi-arch push
 ```bash
-PLATFORM=linux/amd64,linux/arm64 deploy/images/build-and-push-migs.sh
+PLATFORM=linux/amd64 deploy/images/build-and-push-migs.sh
 ```
 
 Verification

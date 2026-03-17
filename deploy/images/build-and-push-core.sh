@@ -8,7 +8,7 @@ set -Eeuo pipefail
 #
 # Examples:
 #   deploy/images/build-and-push-core.sh
-#   PLATFORM=linux/amd64,linux/arm64 deploy/images/build-and-push-core.sh
+#   PLATFORM=linux/amd64 deploy/images/build-and-push-core.sh
 
 PLATFORM=${PLATFORM:-linux/amd64}
 IMAGE_PREFIX="ghcr.io/iw2rmb"

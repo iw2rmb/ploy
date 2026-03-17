@@ -21,16 +21,18 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_DB_DSN` — Required by `deploy/local/run.sh`.
+- `PLOY_DB_DSN` — Required by `deploy/local/run.sh` and `deploy/vps/run.sh`.
   Used both for host-side setup SQL (DB create/drop, token insert, node seed)
   and injected into the server container as `PLOY_POSTGRES_DSN`.
   Host-side DSN may use `localhost`; local deploy rewrites loopback hosts
   (`localhost`, `127.0.0.1`, `::1`) to `host.docker.internal` for container use.
+  For VPS deploy, the DSN must already be reachable from both the remote host
+  and the remote `server` container; `deploy/vps/run.sh` does not rewrite it.
   Non-loopback hosts must be reachable from inside containers.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
 - `PLOY_CA_CERTS` — Optional path to a PEM CA bundle used by
-  `deploy/local/run.sh` and `deploy/vps/redeploy.sh` to configure Docker daemon trust for Docker Hub
+  `deploy/local/run.sh` and `deploy/vps/run.sh` to configure Docker daemon trust for Docker Hub
   endpoints (`docker.io`, `registry-1.docker.io`, `auth.docker.io`,
   `index.docker.io`).
   The script also installs the bundle into system CA trust before restarting
@@ -41,9 +43,11 @@ defaults change, or components adopt additional configuration.
   Current automation targets:
   - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
   - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
+  `deploy/vps/run.sh` also accepts `PLOY_CA_CERT` as an alias for this value.
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
-  port `8080` in `deploy/local/docker-compose.yml`. Default: `8080`. Use this when host port `8080`
-  is already occupied (example: `PLOY_SERVER_PORT=18080`).
+  port `8080` in `deploy/local/docker-compose.yml`. Default: `8080`. Both local
+  and VPS deploy scripts pass it through to the compose stack. Use this when the
+  host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
 - `WORKER_TOKEN_PATH` — Optional host path used by local scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
   Default: `deploy/local/node/bearer-token` (file path). If this path is a directory, scripts
@@ -82,22 +86,18 @@ Role model (bearer token claims):
   When set to `1`, `true`, `yes`, or `on`, local deploy calls `deploy/images/garage.sh --force`
   and rebuilds/repushes mig + build-gate images even if they already exist in Garage-backed registry.
 - `PLOY_REGISTRY_PORT` — Host port for the local Garage-backed OCI registry in `deploy/local/docker-compose.yml`
-  (default: `5000`).
-- `PLOY_VPS_DB_DSN` — Required by `deploy/vps/redeploy.sh`. PostgreSQL DSN that must be
-  reachable from both the remote VPS host (`psql`, `pg_isready`) and the remote `server`
-  container (`PLOY_POSTGRES_DSN`). Must target the `ploy` database.
-- `PLOY_VPS_CLUSTER_ID` — Optional cluster identifier used by `deploy/vps/redeploy.sh` when
-  generating the local admin token, two worker tokens, node configs, and the local CLI
-  descriptor. Default: `local`.
-- `PLOY_VPS_NODE1_ID` / `PLOY_VPS_NODE2_ID` — Optional node IDs for the two offline VPS node
-  containers. Defaults: `local1`, `local2`.
-- `PLOY_VPS_WORKDIR_ROOT` — Optional absolute host path used by `deploy/vps/redeploy.sh` as the
-  parent directory for host-visible node workspaces. Default: `/var/tmp/ploy-vps`. The script
-  binds `${PLOY_VPS_WORKDIR_ROOT}/node1` and `${PLOY_VPS_WORKDIR_ROOT}/node2` into the two node
-  containers at identical absolute paths so host Docker can mount job workspaces correctly.
-- `PLOY_SKIP_BUILD` — Optional flag for `deploy/vps/redeploy.sh`. When set to `1`, `true`,
-  `yes`, or `on`, the script skips `make build` and reuses the existing local `dist/ploy`
-  artifact.
+  (default: `5000`). Both local and VPS deploy scripts pass it through to the
+  compose stack.
+- `AUTH_SECRET_PATH` — Optional path to the auth-secret file used by
+  `deploy/local/run.sh` and `deploy/vps/run.sh` for JWT signing secret reuse.
+  Defaults:
+  - local deploy: `deploy/local/auth-secret.txt`
+  - VPS deploy: `deploy/vps/auth-secret.txt`
+- `CLUSTER_ID` — Optional cluster ID used by `deploy/local/run.sh` and
+  `deploy/vps/run.sh` when generating bearer tokens. Default: `local`.
+- `NODE_ID` — Optional node ID used by `deploy/local/run.sh` and
+  `deploy/vps/run.sh` when seeding the default worker node row and worker token
+  description. Default: `local1`.
 - `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
   as `PLOY_CONTAINER_REGISTRY`.
 - `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by `deploy/images/build-and-push-migs.sh`.

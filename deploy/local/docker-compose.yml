@@ -6,6 +6,8 @@ services:
       secrets:
         - ploy_ca_bundle
     image: ploy-server:local
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
     platform: linux/amd64
     depends_on:
       garage:
@@ -84,7 +86,8 @@ services:
       - "5071:5071"
 
   garage:
-    image: dxflrs/garage:v2.2.0
+    image: dxflrs/amd64_garage:v2.2.0
+    platform: linux/amd64
     entrypoint: ["/garage"]
     command: ["-c", "/etc/garage.toml", "server"]
     restart: unless-stopped
@@ -109,8 +112,9 @@ services:
   garage-init:
     build:
       context: ../..
-      dockerfile: deploy/local/garage/Dockerfile.init
+      dockerfile: deploy/local/garage/Dockerfile
     image: ploy-garage-init:local
+    platform: linux/amd64
     depends_on:
       garage:
         condition: service_healthy
@@ -129,7 +133,8 @@ services:
     entrypoint: ["/bin/sh", "/usr/local/bin/garage-setup.sh"]
 
   registry:
-    image: registry:2.8.3
+    image: amd64/registry:3
+    platform: linux/amd64
     restart: unless-stopped
     depends_on:
       garage:
