@@ -7,7 +7,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// FuzzWriteEventFrame ensures writeEventFrame handles arbitrary data payloads
+// FuzzWriteEventFrame ensures WriteEventFrame handles arbitrary data payloads
 // (including newlines and non-UTF8) without panicking and produces a frame
 // that ends with a blank line per SSE framing rules.
 func FuzzWriteEventFrame(f *testing.F) {
@@ -18,8 +18,8 @@ func FuzzWriteEventFrame(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var buf bytes.Buffer
 		evt := Event{ID: 1, Type: domaintypes.SSEEventLog, Data: data}
-		if err := writeEventFrame(&buf, evt); err != nil {
-			t.Fatalf("writeEventFrame error: %v", err)
+		if err := WriteEventFrame(&buf, evt); err != nil {
+			t.Fatalf("WriteEventFrame error: %v", err)
 		}
 		out := buf.String()
 		if len(out) == 0 {

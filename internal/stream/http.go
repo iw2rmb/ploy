@@ -69,7 +69,7 @@ func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, runID domai
 					continue
 				}
 			}
-			if err := writeEventFrame(w, evt); err != nil {
+			if err := WriteEventFrame(w, evt); err != nil {
 				return err
 			}
 			flusher.Flush()
@@ -80,7 +80,8 @@ func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, runID domai
 	}
 }
 
-func writeEventFrame(w io.Writer, evt Event) error {
+// WriteEventFrame writes a single SSE frame (id + event + data lines) to the writer.
+func WriteEventFrame(w io.Writer, evt Event) error {
 	if evt.ID > 0 {
 		if _, err := fmt.Fprintf(w, "id: %s\n", evt.ID.String()); err != nil {
 			return err
