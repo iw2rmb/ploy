@@ -4,18 +4,20 @@ set -euo pipefail
 usage() {
   cat <<USAGE
 mig-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>] [--model <name>] [--prompt-file <file>]
+mig-codex amata run /in/amata.yaml [--set <param>=<value> ...]
 
 Environment:
-  CODEX_PROMPT     Inline prompt text (used when --prompt-file not provided).
-  CODEX_MODEL      Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
+  CODEX_PROMPT      Inline prompt text (required in direct codex mode; optional in amata mode).
+  CODEX_MODEL       Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
   CODEX_AUTH_JSON   Inline JSON for auth; if set, written to ~/.codex/auth.json.
   CODEX_CONFIG_TOML Inline TOML for config; if set, written to ~/.codex/config.toml.
-  CODEX_RESUME     If set to "1" and /in/codex-session.txt exists, resume the prior
-                   Codex session instead of starting fresh (for healing retries).
-  PLOY_API_TOKEN   Optional bearer token for Build Gate API (unused; gate runs externally).
+  CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior
+                    Codex session instead of starting fresh (for healing retries).
+  PLOY_API_TOKEN    Optional bearer token for Build Gate API (unused; gate runs externally).
 
 Behavior:
-  - Installs Codex CLI in the image (via npm @openai/codex).
+  - Amata mode (first arg "amata"): delegates to amata binary; CODEX_PROMPT not required.
+  - Direct codex mode (default): uses codex exec; CODEX_PROMPT or --prompt-file required.
   - Places auth at /root/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
   - Places config at /root/.codex/config.toml when --config is given or CODEX_CONFIG_TOML is set.
   - Always adds repository directory with: codex exec --add-dir <input> ...
@@ -24,6 +26,49 @@ Behavior:
     to continue in the same thread, preserving context across healing attempts.
 USAGE
 }
+
+# ─── Amata mode: "mig-codex amata run /in/amata.yaml [--set param=val ...]" ──
+# Invoked when the manifest command is amata-routed (amata.spec is present).
+# Auth credentials are still materialized from env vars. CODEX_PROMPT is not required.
+# Artifact contract is kept: codex.log, codex-last.txt, codex-run.json written to /out.
+if [[ "${1:-}" == "amata" ]]; then
+    shift  # drop "amata"; forward remaining args verbatim to amata binary
+
+    out_dir="${OUTDIR:-/out}"
+    model="${CODEX_MODEL:-}"
+    mkdir -p "$out_dir" /root/.codex
+
+    if [[ -n "${CODEX_AUTH_JSON:-}" ]]; then
+        umask 077
+        printf "%s" "$CODEX_AUTH_JSON" > /root/.codex/auth.json
+    fi
+    if [[ -n "${CODEX_CONFIG_TOML:-}" ]]; then
+        umask 077
+        printf "%s" "$CODEX_CONFIG_TOML" > /root/.codex/config.toml
+    fi
+
+    logfile="$out_dir/codex.log"
+    manifest_file="$out_dir/codex-run.json"
+    echo "[mig-codex] starting amata run" | tee "$logfile" >&2
+    set +e
+    amata "$@" 2>&1 | tee -a "$logfile" >&2
+    status=${PIPESTATUS[0]}
+    set -e
+    if [[ ! -s "$logfile" ]]; then
+        echo "[mig-codex] no output captured from amata" | tee -a "$logfile" >&2
+    fi
+    # Ensure codex-last.txt always exists (nodeagent parseCodexLastField relies on it).
+    if [[ ! -s "$out_dir/codex-last.txt" ]]; then
+        if [[ -s "$logfile" ]]; then
+            grep -v '^\s*$' "$logfile" | tail -1 > "$out_dir/codex-last.txt" || true
+        fi
+        [[ -s "$out_dir/codex-last.txt" ]] || touch "$out_dir/codex-last.txt"
+    fi
+    ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","session_id":"%s","resumed":%s}\n' \
+        "$ts" "${status:-0}" "${model}" "${WORKSPACE:-/workspace}" "" "false" > "$manifest_file"
+    exit "${status:-0}"
+fi
 
 input_dir="${WORKSPACE:-/workspace}"
 out_dir="${OUTDIR:-/out}"
