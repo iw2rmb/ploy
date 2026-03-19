@@ -235,6 +235,7 @@ build_push_mig_image() {
   fi
 
   if [[ "$source_group" == "migs" && "$dir" == "mig-codex" ]]; then
+    bash deploy/images/migs/mig-codex/build-amata.sh
     context="."
     run_with_retries \
       "buildx push ${ref} (context=${context}, dockerfile=deploy/images/migs/mig-codex/Dockerfile)" \

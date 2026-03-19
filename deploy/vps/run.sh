@@ -429,6 +429,7 @@ build_workflow_images() {
     dir="${entry##*/}"
     ref="${PLOY_CONTAINER_REGISTRY}/$(mig_repo_name "$entry"):latest"
     if [[ "$source_group" == "migs" && "$dir" == "mig-codex" ]]; then
+      bash deploy/images/migs/mig-codex/build-amata.sh
       maybe_run_buildx_load "deploy/images/migs/mig-codex/Dockerfile" "." "$ref" "${extra_args[@]}"
     elif [[ "$source_group" == "mig" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
       maybe_run_buildx_load "deploy/images/mig/${dir}/Dockerfile" "." "$ref" "${extra_args[@]}"
