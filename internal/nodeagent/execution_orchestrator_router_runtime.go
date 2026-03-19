@@ -91,6 +91,12 @@ func (r *runController) runRouterForGateFailure(
 	r.injectHealingEnvVars(&routerManifest, workspace)
 	r.mountHealingTLSCerts(&routerManifest)
 
+	// Record the exact argv used for the router container so E2E and downstream
+	// consumers can assert --set forwarding shape without re-deriving it.
+	if len(routerManifest.Command) > 0 {
+		gateResult.Recovery.RouterCmd = append([]string{}, routerManifest.Command...)
+	}
+
 	// Materialize any router tmp files into a staging directory.
 	// The staging dir is removed deterministically when runRouterForGateFailure returns.
 	var routerTmpStagingDir string

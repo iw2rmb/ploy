@@ -6,10 +6,12 @@ set -euo pipefail
 # Validates (strict):
 #   1. Final repo status is "Success".
 #   2. Router produced a non-empty bug_summary (deterministic router summary).
-#   3. A heal job is present (healing attempt).
-#   4. A re_gate job is present (re-gate status sequence).
-#   5. Codex handshake artifacts satisfy the metadata contract (strict mode).
-#   6. codex-last.txt satisfies the JSON schema contract: valid JSON, .error_kind == "code",
+#   3. recovery.router_cmd carries exact amata argv with ordered --set flags
+#      (proves --set forwarding shape and deterministic multi-set ordering).
+#   4. A heal job is present (healing attempt).
+#   5. A re_gate job is present (re-gate status sequence).
+#   6. Codex handshake artifacts satisfy the metadata contract (strict mode).
+#   7. codex-last.txt satisfies the JSON schema contract: valid JSON, .error_kind == "code",
 #      .bug_summary present and non-empty, no unresolved template tokens.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,7 +65,19 @@ else
   FAILED=1
 fi
 
-# 3. A heal job must be present (healing attempt).
+# 3. router_cmd must carry exact --set argv proving amata forwarding shape (roadmap 1.6.1, 1.6.3).
+# Validates: (a) literal amata run /in/amata.yaml --set ... shape, and (b) deterministic
+# ordering across two entries (error_kind before loop_kind as declared in mig.yaml).
+ROUTER_CMD="$(printf '%s' "$RUN_JSON" | jq -c '[.repos[0].jobs[] | select(.job_type == "pre_gate")] | first | .recovery.router_cmd // empty')"
+WANT_ROUTER_CMD='["amata","run","/in/amata.yaml","--set","error_kind=code","--set","loop_kind=healing"]'
+if [[ "$ROUTER_CMD" == "$WANT_ROUTER_CMD" ]]; then
+  echo "  + recovery.router_cmd: exact argv match (error_kind=code, loop_kind=healing in order)"
+else
+  echo "  ! recovery.router_cmd: expected ${WANT_ROUTER_CMD}, got '${ROUTER_CMD}'" >&2
+  FAILED=1
+fi
+
+# 4. A heal job must be present (healing attempt).
 HEAL_JOB="$(printf '%s' "$RUN_JSON" | jq -r '[.repos[0].jobs[] | select(.job_type == "heal")] | first | .job_type // empty')"
 if [[ "$HEAL_JOB" == "heal" ]]; then
   echo "  + heal job: present"
@@ -72,7 +86,7 @@ else
   FAILED=1
 fi
 
-# 4. A re_gate job must be present (re-gate after healing).
+# 5. A re_gate job must be present (re-gate after healing).
 REGATE_JOB="$(printf '%s' "$RUN_JSON" | jq -r '[.repos[0].jobs[] | select(.job_type == "re_gate")] | first | .job_type // empty')"
 if [[ "$REGATE_JOB" == "re_gate" ]]; then
   echo "  + re_gate job: present"
@@ -92,7 +106,7 @@ if ! e2e_validate_codex_handshake "$E2E_ARTIFACT_DIR" strict; then
   FAILED=1
 fi
 
-# 5. codex-last.txt must satisfy the JSON schema contract.
+# 7. codex-last.txt must satisfy the JSON schema contract.
 CODEX_LAST="${E2E_ARTIFACT_DIR}/codex-last.txt"
 if [[ -f "$CODEX_LAST" ]]; then
   if ! jq -e . "$CODEX_LAST" > /dev/null 2>&1; then

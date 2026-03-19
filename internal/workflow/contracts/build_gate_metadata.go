@@ -210,6 +210,10 @@ type BuildGateRecoveryMetadata struct {
 	// CandidatePromoted reports whether a validated candidate has been promoted
 	// into repo gate_profile after successful re-gate completion.
 	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
+	// RouterCmd is the exact argv slice used to invoke the router container,
+	// e.g. ["amata","run","/in/amata.yaml","--set","error_kind=code"].
+	// Present only when the router is amata-mode; nil for direct-Codex routers.
+	RouterCmd []string `json:"router_cmd,omitempty"`
 }
 
 // RecoveryClaimContext carries typed recovery inputs in node claim responses
