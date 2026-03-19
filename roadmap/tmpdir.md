@@ -36,7 +36,7 @@ Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.m
     2. Add tests that assert `tmpDir` survives parse-to-manifest conversion for step/heal/router.
   - Reasoning: medium
 
-- [x] 1.4 Materialize and mount tmp files at runtime.
+- [x] 1.4 Materialize and mount tmp files at runtime. (router path gap fixed)
   - Repository: `ploy`
     1. Add execution helper in `internal/nodeagent/execution_orchestrator_jobs.go` to materialize manifest tmp files into a node-local temp directory per job run.
     2. Extend `step.Request` and `buildContainerSpec` plumbing to receive tmp file staging directory.

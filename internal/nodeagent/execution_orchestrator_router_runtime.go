@@ -82,13 +82,35 @@ func (r *runController) runRouterForGateFailure(
 	r.injectHealingEnvVars(&routerManifest, workspace)
 	r.mountHealingTLSCerts(&routerManifest)
 
+	// Materialize any router tmp files into a staging directory.
+	// The staging dir is removed deterministically when runRouterForGateFailure returns.
+	var routerTmpStagingDir string
+	if len(routerManifest.TmpDir) > 0 {
+		dir, err := os.MkdirTemp("", "ploy-router-tmpfiles-*")
+		if err != nil {
+			slog.Warn("failed to create router tmp staging dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			return
+		}
+		defer func() {
+			if rmErr := os.RemoveAll(dir); rmErr != nil {
+				slog.Warn("failed to remove router tmp staging dir", "path", dir, "error", rmErr)
+			}
+		}()
+		if err := materializeTmpFiles(routerManifest.TmpDir, dir); err != nil {
+			slog.Warn("failed to materialize router tmp files", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+			return
+		}
+		routerTmpStagingDir = dir
+	}
+
 	_, runErr := runner.Run(ctx, step.Request{
-		RunID:     req.RunID,
-		JobID:     req.JobID,
-		Manifest:  routerManifest,
-		Workspace: workspace,
-		OutDir:    routerOutDir,
-		InDir:     routerInDir,
+		RunID:         req.RunID,
+		JobID:         req.JobID,
+		Manifest:      routerManifest,
+		Workspace:     workspace,
+		OutDir:        routerOutDir,
+		InDir:         routerInDir,
+		TmpStagingDir: routerTmpStagingDir,
 	})
 	if runErr != nil {
 		slog.Warn("router execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr)
