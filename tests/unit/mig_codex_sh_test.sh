@@ -732,6 +732,140 @@ MOCKAMATA
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Test: Auto amata mode when /in/amata.yaml exists and no args are passed
+# ─────────────────────────────────────────────────────────────────────────────
+test_amata_mode_autodetect_from_in_dir() {
+  run_test
+
+  local tmp_bin tmp_out tmp_in
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_in=$(mktemp -d)
+  local args_file="$tmp_out/.amata_args"
+
+  # Materialize /in/amata.yaml and call script without argv to mimic legacy runners.
+  cat > "$tmp_in/amata.yaml" <<'AMATA'
+version: amata/v1
+name: autodetect-test
+entry: main
+AMATA
+
+  cat > "$tmp_bin/amata" <<MOCKAMATA
+#!/bin/bash
+printf "%s\n" "\$@" > "$args_file"
+echo "amata auto mode ran"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    unset CODEX_PROMPT
+    bash "$tmp_script"
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    pass "auto amata mode exits 0 when /in/amata.yaml exists"
+  else
+    fail "auto amata mode exit code" "got $exit_code, want 0"
+  fi
+
+  if [[ -f "$args_file" ]]; then
+    local args
+    args=$(cat "$args_file")
+    if echo "$args" | grep -q "run" && echo "$args" | grep -q "amata.yaml"; then
+      pass "auto amata mode invokes amata run with materialized amata.yaml"
+    else
+      fail "auto amata mode args" "expected run <...>/amata.yaml in: $args"
+    fi
+  else
+    fail "auto amata mode invocation" "amata binary was not called"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_in" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Auto amata mode when direct-style args are passed but no prompt source
+# ─────────────────────────────────────────────────────────────────────────────
+test_amata_mode_autodetect_with_direct_args_and_no_prompt() {
+  run_test
+
+  local tmp_bin tmp_out tmp_in tmp_ws
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_in=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+  local args_file="$tmp_out/.amata_args"
+
+  cat > "$tmp_in/amata.yaml" <<'AMATA'
+version: amata/v1
+name: autodetect-with-direct-args
+entry: main
+AMATA
+
+  cat > "$tmp_bin/amata" <<MOCKAMATA
+#!/bin/bash
+printf "%s\n" "\$@" > "$args_file"
+echo "amata auto mode ran"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  # Mock codex should never be called in this scenario.
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
+#!/bin/bash
+echo "codex should not run here"
+exit 99
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    unset CODEX_PROMPT
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    pass "auto amata mode exits 0 with direct-style args and no prompt"
+  else
+    fail "auto amata mode with direct args exit code" "got $exit_code, want 0"
+  fi
+
+  if [[ -f "$args_file" ]]; then
+    local args
+    args=$(cat "$args_file")
+    if echo "$args" | grep -q "run" && echo "$args" | grep -q "amata.yaml"; then
+      pass "auto amata mode with direct args invokes amata run"
+    else
+      fail "auto amata mode with direct args" "expected run <...>/amata.yaml in: $args"
+    fi
+  else
+    fail "auto amata mode with direct args invocation" "amata binary was not called"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_in" "$tmp_ws" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: Amata mode - artifact files are created
 # ─────────────────────────────────────────────────────────────────────────────
 test_amata_mode_creates_artifacts() {
@@ -1070,6 +1204,14 @@ test_amata_mode_runs_amata
 echo ""
 echo "Test: Amata mode - CODEX_PROMPT not required"
 test_amata_mode_prompt_optional
+
+echo ""
+echo "Test: Amata mode auto-detect from /in/amata.yaml"
+test_amata_mode_autodetect_from_in_dir
+
+echo ""
+echo "Test: Amata mode auto-detect with direct args and no prompt"
+test_amata_mode_autodetect_with_direct_args_and_no_prompt
 
 echo ""
 echo "Test: Amata mode creates artifact files"

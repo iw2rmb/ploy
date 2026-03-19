@@ -28,6 +28,29 @@ Behavior:
 USAGE
 }
 
+# Compat routing for amata specs:
+# 1) No argv + /in/amata.yaml -> amata mode.
+# 2) Direct-mode style argv (e.g. --input/--out) with no prompt source and
+#    /in/amata.yaml present -> amata mode.
+# This covers runners that materialize amata.yaml but do not pass explicit
+# "amata run /in/amata.yaml" command.
+has_prompt_file=false
+if [[ $# -gt 0 ]]; then
+  prev=""
+  for arg in "$@"; do
+    if [[ "$prev" == "--prompt-file" ]]; then
+      has_prompt_file=true
+      break
+    fi
+    prev="$arg"
+  done
+fi
+if [[ "${1:-}" != "amata" && -s "/in/amata.yaml" ]]; then
+  if [[ $# -eq 0 || ( -z "${CODEX_PROMPT:-}" && "$has_prompt_file" == false ) ]]; then
+    set -- amata run /in/amata.yaml
+  fi
+fi
+
 # ─── Amata mode: "mig-codex amata run /in/amata.yaml [--set param=val ...]" ──
 # Invoked when the manifest command is amata-routed (amata.spec is present).
 # Auth credentials are still materialized from env vars. CODEX_PROMPT is not required.
