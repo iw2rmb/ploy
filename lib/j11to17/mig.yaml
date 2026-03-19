@@ -1,0 +1,74 @@
+# Minimal spec for the failing Build Gate → Codex heal → re-gate → ORW apply scenario.
+# Submit with:
+#   dist/ploy mig run \
+#     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
+#     --repo-base-ref e2e/fail-missing-symbol \
+#     --repo-target-ref migs-upgrade-java17-heal \
+#     --spec lib/j11to17/mig.yaml \
+#     --follow
+
+apiVersion: ploy.mig/v1alpha1
+kind: MigRunSpec
+env:
+  JAVA_TOOL_OPTIONS: "-Daether.connector.connectTimeout=10000 -Daether.connector.requestTimeout=120000"
+steps:
+  - image:
+      java-maven: 127.0.0.1:5000/ploy/orw-cli-maven:latest
+      java-gradle: 127.0.0.1:5000/ploy/orw-cli-gradle:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.28.0" # "3.22.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+      MAVEN_PLUGIN_VERSION: "6.30.0" # "6.18.0"
+      GRADLE_PLUGIN_VERSION: "7.27.0" # "7.21.0"
+      ORW_REPOS: "https://artifactory.tcsbank.ru/artifactory/maven-all/,https://repo1.maven.org/maven2"
+    env_from_file:
+      CA_CERTS_PEM_BUNDLE: $PLOY_PATH/lib/j11to17/ca-certs.pem
+  - image: 127.0.0.1:5000/ploy/migs-codex:latest
+    env:
+      CODEX_API_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50X2lkIjo0Mjg5LCJleHAiOjQ5MjU2OTM3MzcsImlhdCI6MTc3MjA5MzczNywiaWQiOjU3MjMsImlzcyI6ImxsbS1wcm94eSJ9.XEXgGs3GGcD2pSn3dgze9vgea8NlODvGV9cqehh45aI
+    env_from_file:
+      CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/config.toml
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+    amata:
+      spec: $PLOY_PATH/lib/j11to17/amata.yaml
+    tmp_dir:
+      - name: post-orw-java11-to-17-migration.md
+        path: $PLOY_PATH/lib/j11to17/post-orw-java11-to-17-migration.md
+      - name: ROADMAP.md
+        path: $PLOY_PATH/lib/j11to17/ROADMAP.md
+      - name: COSMIC.md
+        path: $PLOY_PATH/lib/j11to17/COSMIC.md
+      - name: commit.schema.json
+        path: $PLOY_PATH/lib/j11to17/commit.schema.json
+      - name: implement_result.schema.json
+        path: $PLOY_PATH/lib/j11to17/implement_result.schema.json
+      - name: roadmap-item.schema.json
+        path: $PLOY_PATH/lib/j11to17/roadmap-item.schema.json
+build_gate:
+  enabled: true
+  pre:
+    target: build
+    stack:
+      enabled: true
+      language: java
+      release: "11"
+  post:
+    target: build
+    stack:
+      enabled: true
+      language: java
+      release: "17"
+  router:
+    spec_path: $PLOY_PATH/healing/router/spec.yaml
+  healing:
+    by_error_kind:
+      infra:
+        spec_path: $PLOY_PATH/healing/infra/spec.yaml
+      code:
+        spec_path: $PLOY_PATH/healing/code/spec.yaml
+      deps:
+        spec_path: $PLOY_PATH/healing/deps/spec.yaml
+mr_on_fail: false
+mr_on_success: true
