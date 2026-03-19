@@ -5,13 +5,29 @@ set -Eeuo pipefail
 # mig-codex Docker build context so the Dockerfile can COPY it without any
 # in-image compilation.
 #
-# Output: deploy/images/migs/mig-codex/amata  (linux/amd64 ELF binary)
+# Output: deploy/images/migs/mig-codex/amata  (ELF binary for PLATFORM, default linux/amd64)
 #
 # Must be invoked from the ploy repository root, or run directly; the script
 # resolves paths from its own location.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+
+# Derive GOOS/GOARCH from PLATFORM env var (e.g. linux/amd64, linux/arm64).
+# Callers (build-and-push-migs.sh, garage.sh) expose PLATFORM; default to linux/amd64.
+_PLATFORM="${PLATFORM:-linux/amd64}"
+_GOOS="${_PLATFORM%%/*}"
+_GOARCH="${_PLATFORM##*/}"
+# Validate: only linux targets make sense for a container image.
+if [[ "$_GOOS" != "linux" ]]; then
+  echo "error: unsupported GOOS '${_GOOS}' derived from PLATFORM='${_PLATFORM}'; only linux is supported" >&2
+  exit 1
+fi
+case "$_GOARCH" in
+  amd64|arm64|arm) ;;
+  *) echo "error: unsupported GOARCH '${_GOARCH}' derived from PLATFORM='${_PLATFORM}'" >&2; exit 1 ;;
+esac
+
 AMATA_SRC_CANDIDATE="$(cd "$REPO_ROOT/../amata" 2>/dev/null && pwd)" || true
 
 if [[ -z "$AMATA_SRC_CANDIDATE" || ! -d "$AMATA_SRC_CANDIDATE" ]]; then
@@ -29,8 +45,8 @@ fi
 
 STAGED="$SCRIPT_DIR/amata"
 
-echo "==> Building amata binary (linux/amd64) from ${AMATA_SRC} ..."
-(cd "$AMATA_SRC" && GOOS=linux GOARCH=amd64 go build -o "$STAGED" ./cmd/amata)
+echo "==> Building amata binary (${_PLATFORM}) from ${AMATA_SRC} ..."
+(cd "$AMATA_SRC" && GOOS="$_GOOS" GOARCH="$_GOARCH" go build -o "$STAGED" ./cmd/amata)
 
 if [[ ! -f "$STAGED" ]]; then
   echo "error: go build succeeded but staged binary not found at ${STAGED}" >&2
