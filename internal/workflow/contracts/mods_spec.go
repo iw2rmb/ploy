@@ -208,6 +208,9 @@ func (s ModsSpec) Validate() error {
 			if err := validateTmpDir(action.TmpDir, prefix+".tmp_dir"); err != nil {
 				return err
 			}
+			if err := validateAmataRunSpec(action.Amata, prefix+".amata"); err != nil {
+				return err
+			}
 		}
 		// Healing requires a router to be configured (router runs before healing).
 		if s.BuildGate.Router == nil || s.BuildGate.Router.Image.IsEmpty() {
@@ -226,6 +229,9 @@ func (s ModsSpec) Validate() error {
 			return fmt.Errorf("build_gate.router.image: required when router is specified")
 		}
 		if err := validateTmpDir(s.BuildGate.Router.TmpDir, "build_gate.router.tmp_dir"); err != nil {
+			return err
+		}
+		if err := validateAmataRunSpec(s.BuildGate.Router.Amata, "build_gate.router.amata"); err != nil {
 			return err
 		}
 	}
@@ -262,6 +268,23 @@ func (s ModsSpec) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+// validateAmataRunSpec validates an AmataRunSpec when present.
+// When amata is nil, direct codex exec path is assumed and no error is returned.
+func validateAmataRunSpec(amata *AmataRunSpec, prefix string) error {
+	if amata == nil {
+		return nil
+	}
+	if strings.TrimSpace(amata.Spec) == "" {
+		return fmt.Errorf("%s.spec: required", prefix)
+	}
+	for i, p := range amata.Set {
+		if strings.TrimSpace(p.Param) == "" {
+			return fmt.Errorf("%s.set[%d].param: required", prefix, i)
+		}
+	}
 	return nil
 }
 

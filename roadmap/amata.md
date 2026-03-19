@@ -4,7 +4,7 @@ Scope: add a typed `amata` execution mode for Build Gate router/healing that run
 
 Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yaml`; `deploy/images/migs/README.md`; `docs/how-to/publish-migs.md`; `tests/e2e/migs/README.md`; `deploy/images/migs/mig-codex/Dockerfile`; `deploy/images/migs/mig-codex/mig-codex.sh`; `deploy/images/build-and-push-migs.sh`; `deploy/images/garage.sh`; `deploy/vps/run.sh`; `internal/workflow/contracts/build_gate_config.go`; `internal/workflow/contracts/mods_spec.go`; `internal/workflow/contracts/mods_spec_parse.go`; `internal/nodeagent/run_options.go`; `internal/nodeagent/manifest.go`; `internal/nodeagent/execution_orchestrator_jobs.go`.
 
-- [ ] 1.1 Lock `amata` spec contract and edge cases for healing/router
+- [x] 1.1 Lock `amata` spec contract and edge cases for healing/router
   - Repository: `ploy`
     1. Add `contracts.AmataRunSpec` and `contracts.AmataSetParam` in `internal/workflow/contracts/build_gate_config.go` and embed them in `contracts.RouterSpec` and `contracts.HealingActionSpec`.
     2. Extend `contracts.ModsSpec.Validate` in `internal/workflow/contracts/mods_spec.go` to treat `amata` as optional, require non-empty `amata.spec` only when `amata` block is present, validate `amata.set[].param`, and preserve direct-Codex execution semantics when `amata.spec` is absent.

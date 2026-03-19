@@ -109,13 +109,22 @@ func checkForbiddenFields(raw map[string]any) error {
 					return fmt.Errorf("build_gate.healing.%s: forbidden (use build_gate.healing.by_error_kind.<error_kind>.%s)", key, key)
 				}
 			}
-			// Check retain_container in each by_error_kind entry.
+			// Check forbidden fields in each by_error_kind entry.
 			if bekAny, ok := heal["by_error_kind"]; ok && bekAny != nil {
 				if bek, ok := bekAny.(map[string]any); ok {
 					for kind, entry := range bek {
 						if em, ok := entry.(map[string]any); ok {
 							if _, ok := em["retain_container"]; ok {
 								return fmt.Errorf("build_gate.healing.by_error_kind.%s.retain_container: forbidden", kind)
+							}
+							// Flat spec/set are forbidden; amata config must nest under amata.{spec,set}.
+							for _, key := range []string{"spec", "set"} {
+								if _, ok := em[key]; ok {
+									return fmt.Errorf(
+										"build_gate.healing.by_error_kind.%s.%s: forbidden (use build_gate.healing.by_error_kind.%s.amata.%s)",
+										kind, key, kind, key,
+									)
+								}
 							}
 						}
 					}
@@ -129,6 +138,12 @@ func checkForbiddenFields(raw map[string]any) error {
 		if router, ok := routerAny.(map[string]any); ok {
 			if _, ok := router["retain_container"]; ok {
 				return fmt.Errorf("build_gate.router.retain_container: forbidden")
+			}
+			// Flat spec/set keys are forbidden; amata config must nest under amata.{spec,set}.
+			for _, key := range []string{"spec", "set"} {
+				if _, ok := router[key]; ok {
+					return fmt.Errorf("build_gate.router.%s: forbidden (use build_gate.router.amata.%s)", key, key)
+				}
 			}
 		}
 	}
