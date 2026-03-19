@@ -303,7 +303,7 @@ Key files:
 - `docs/api/paths/repos.yaml`
 - `docs/build-gate/README.md`
 - `docs/migs-lifecycle.md`
-- `design/gate-profile*.md` (or consolidate into this design)
+- design/gate-profile docs (or consolidate into this design)
 
 ## Implementation Sequence
 

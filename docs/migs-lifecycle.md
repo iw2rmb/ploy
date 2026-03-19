@@ -246,7 +246,7 @@ to `/in` for debugging and cross-iteration context:
 | `/in/gate_profile.json` | Gate profile used by the failed gate when available (provided for `infra` healing) |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
-| `/in/healing-log.md` | Cumulative markdown log across all iterations |
+| <code>/in/healing-log.md</code> | Cumulative markdown log across all iterations |
 | `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for `deps` healing |
 | `/in/deps-bumps.json` | Prior cumulative dependency bump map for `deps` healing |
 
@@ -254,7 +254,7 @@ For `heal`/`re_gate`, claim-time `recovery_context` is the primary source for
 `/in/build-gate.log`, `/in/gate_profile.json`, and `/in/gate_profile.schema.json`.
 Node-local run cache snapshots are fallback-only when claim context fields are absent.
 
-The `healing-log.md` format:
+The <code>healing-log.md</code> format:
 
 ```markdown
 # Healing Log
@@ -1294,7 +1294,7 @@ Mods container images are standard OCI images with the following expectations:
     - initial Build Gate logs (`/in/build-gate.log`),
     - per-iteration gate logs (`/in/build-gate-iteration-N.log`),
     - per-iteration healing logs (`/in/healing-iteration-N.log`),
-    - cumulative healing log (`/in/healing-log.md`),
+    - cumulative healing log (<code>/in/healing-log.md</code>),
     - Codex session state (`/in/codex-session.txt`),
     - prompt files (`/in/prompt.txt`), etc.
 

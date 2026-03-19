@@ -30,15 +30,31 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 			expectInCmd: "gradle -q --stacktrace",
 		},
 		{
-			name:        "go",
-			workspace:   func(t *testing.T) string { return createGoWorkspace(t, "1.22") },
-			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
+			name:      "go",
+			workspace: func(t *testing.T) string { return createGoWorkspace(t, "1.22") },
+			spec: func() *contracts.StepGateSpec {
+				return &contracts.StepGateSpec{
+					Enabled: true,
+					ImageOverrides: []contracts.BuildGateImageRule{{
+						Stack: contracts.StackExpectation{Language: "go", Release: "1.22"},
+						Image: "golang:1.22",
+					}},
+				}
+			},
 			expectInCmd: "go test ./...",
 		},
 		{
-			name:        "cargo",
-			workspace:   func(t *testing.T) string { return createCargoWorkspace(t, "1.76") },
-			spec:        func() *contracts.StepGateSpec { return &contracts.StepGateSpec{Enabled: true} },
+			name:      "cargo",
+			workspace: func(t *testing.T) string { return createCargoWorkspace(t, "1.76") },
+			spec: func() *contracts.StepGateSpec {
+				return &contracts.StepGateSpec{
+					Enabled: true,
+					ImageOverrides: []contracts.BuildGateImageRule{{
+						Stack: contracts.StackExpectation{Language: "rust", Release: "1.76"},
+						Image: "rust:1.76",
+					}},
+				}
+			},
 			expectInCmd: "cargo test",
 		},
 		{

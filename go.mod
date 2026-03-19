@@ -1,8 +1,6 @@
 module github.com/iw2rmb/ploy
 
-go 1.24.0
-
-toolchain go1.25.8
+go 1.25.8
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
@@ -34,6 +32,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.8
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/containerd/errdefs v1.0.0
+	github.com/xeipuuv/gojsonschema v1.2.0
+	golang.org/x/sync v0.19.0
 )
 
 require (
@@ -85,7 +85,6 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0 // indirect
@@ -96,7 +95,6 @@ require (
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
 	golang.org/x/oauth2 v0.33.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
