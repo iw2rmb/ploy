@@ -1,10 +1,10 @@
 package step
 
 import (
-	"time"
-
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -61,7 +61,9 @@ type ContainerResult struct {
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
 // The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
-func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string) (ContainerSpec, error) {
+// tmpStagingDir is an optional path to a directory containing pre-materialized tmp
+// files; each manifest.TmpDir entry is mounted read-only at /tmp/<name>.
+func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, tmpStagingDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
@@ -82,6 +84,21 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	// Optional /in mount for cross-phase inputs (read-only)
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
+	}
+
+	// Mount each tmp file read-only at /tmp/<name> from the staging directory.
+	if strings.TrimSpace(tmpStagingDir) != "" {
+		for _, tf := range manifest.TmpDir {
+			name := strings.TrimSpace(tf.Name)
+			if name == "" {
+				continue
+			}
+			mounts = append(mounts, ContainerMount{
+				Source:   filepath.Join(tmpStagingDir, name),
+				Target:   "/tmp/" + name,
+				ReadOnly: true,
+			})
+		}
 	}
 
 	// Optional: mount host Docker socket for containers that request it via manifest options
