@@ -481,3 +481,125 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		}
 	})
 }
+
+func TestModsSpecToRunOptions_TmpDir(t *testing.T) {
+	t.Parallel()
+
+	payload := []contracts.TmpFilePayload{
+		{Name: "config.json", Content: []byte(`{"key":"value"}`)},
+		{Name: "secret.txt", Content: []byte("secret")},
+	}
+
+	t.Run("single_step_tmpdir_copied", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{
+				{
+					Image:  contracts.JobImage{Universal: "img"},
+					TmpDir: payload,
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if len(runOpts.Execution.TmpDir) != len(payload) {
+			t.Fatalf("Execution.TmpDir len: got %d, want %d", len(runOpts.Execution.TmpDir), len(payload))
+		}
+		if runOpts.Execution.TmpDir[0].Name != "config.json" {
+			t.Errorf("Execution.TmpDir[0].Name: got %q, want config.json", runOpts.Execution.TmpDir[0].Name)
+		}
+		// Ensure it's a copy, not the same slice.
+		if &runOpts.Execution.TmpDir[0] == &payload[0] {
+			t.Error("Execution.TmpDir must be a copy, not the original slice header")
+		}
+	})
+
+	t.Run("multi_step_tmpdir_copied_per_step", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{
+				{
+					Image:  contracts.JobImage{Universal: "img1"},
+					TmpDir: payload,
+				},
+				{
+					Image: contracts.JobImage{Universal: "img2"},
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if len(runOpts.Steps) != 2 {
+			t.Fatalf("Steps len: got %d, want 2", len(runOpts.Steps))
+		}
+		if len(runOpts.Steps[0].TmpDir) != len(payload) {
+			t.Fatalf("Steps[0].TmpDir len: got %d, want %d", len(runOpts.Steps[0].TmpDir), len(payload))
+		}
+		if runOpts.Steps[0].TmpDir[0].Name != "config.json" {
+			t.Errorf("Steps[0].TmpDir[0].Name: got %q, want config.json", runOpts.Steps[0].TmpDir[0].Name)
+		}
+		if len(runOpts.Steps[1].TmpDir) != 0 {
+			t.Errorf("Steps[1].TmpDir: got len %d, want 0", len(runOpts.Steps[1].TmpDir))
+		}
+	})
+
+	t.Run("healing_tmpdir_copied", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+			BuildGate: &contracts.BuildGateConfig{
+				Healing: &contracts.HealingSpec{
+					SelectedErrorKind: "code",
+					ByErrorKind: map[string]contracts.HealingActionSpec{
+						"code": {
+							Image:  contracts.JobImage{Universal: "heal-img"},
+							TmpDir: payload,
+						},
+					},
+				},
+				Router: &contracts.RouterSpec{
+					Image: contracts.JobImage{Universal: "router-img"},
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Healing == nil {
+			t.Fatal("expected Healing config")
+		}
+		if len(runOpts.Healing.Mod.TmpDir) != len(payload) {
+			t.Fatalf("Healing.Mod.TmpDir len: got %d, want %d", len(runOpts.Healing.Mod.TmpDir), len(payload))
+		}
+		if runOpts.Healing.Mod.TmpDir[0].Name != "config.json" {
+			t.Errorf("Healing.Mod.TmpDir[0].Name: got %q, want config.json", runOpts.Healing.Mod.TmpDir[0].Name)
+		}
+	})
+
+	t.Run("router_tmpdir_copied", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+			BuildGate: &contracts.BuildGateConfig{
+				Router: &contracts.RouterSpec{
+					Image:  contracts.JobImage{Universal: "router-img"},
+					TmpDir: payload,
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Router == nil {
+			t.Fatal("expected Router config")
+		}
+		if len(runOpts.Router.TmpDir) != len(payload) {
+			t.Fatalf("Router.TmpDir len: got %d, want %d", len(runOpts.Router.TmpDir), len(payload))
+		}
+		if runOpts.Router.TmpDir[0].Name != "config.json" {
+			t.Errorf("Router.TmpDir[0].Name: got %q, want config.json", runOpts.Router.TmpDir[0].Name)
+		}
+	})
+}

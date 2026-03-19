@@ -54,6 +54,7 @@ type ModContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
+	TmpDir  []contracts.TmpFilePayload
 }
 
 // MRWiringOptions configures GitLab merge request creation for run outcomes.
@@ -126,6 +127,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 						Image:   action.Image,
 						Command: action.Command,
 						Env:     copyStringMap(action.Env),
+						TmpDir:  copyTmpDir(action.TmpDir),
 					}
 					runOpts.Healing = healing
 				}
@@ -137,6 +139,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 				Image:   spec.BuildGate.Router.Image,
 				Command: spec.BuildGate.Router.Command,
 				Env:     copyStringMap(spec.BuildGate.Router.Env),
+				TmpDir:  copyTmpDir(spec.BuildGate.Router.TmpDir),
 			}
 		}
 	}
@@ -157,6 +160,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
+		runOpts.Execution.TmpDir = copyTmpDir(step.TmpDir)
 	}
 
 	if len(spec.Steps) > 1 {
@@ -167,6 +171,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 					Image:   step.Image,
 					Command: step.Command,
 					Env:     copyStringMap(step.Env),
+					TmpDir:  copyTmpDir(step.TmpDir),
 				},
 				Stack:  step.Stack,
 				Always: step.Always,
@@ -189,6 +194,17 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	}
 
 	return runOpts
+}
+
+// copyTmpDir creates a shallow copy of a TmpFilePayload slice.
+// Returns nil if the input is nil or empty.
+func copyTmpDir(entries []contracts.TmpFilePayload) []contracts.TmpFilePayload {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make([]contracts.TmpFilePayload, len(entries))
+	copy(out, entries)
+	return out
 }
 
 // copyStringMap creates a shallow copy of a string map.
