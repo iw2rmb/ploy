@@ -416,6 +416,80 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 	}
 }
 
+func TestRunRouterForGateFailure_AmataRouterCmdPersistsAfterParse(t *testing.T) {
+	t.Parallel()
+
+	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
+	workspace := t.TempDir()
+
+	mc := &mockRouterContainerRuntime{}
+	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+		if strings.Contains(spec.Image, "router") {
+			for _, m := range spec.Mounts {
+				if m.Target == "/out" {
+					payload := `{"error_kind":"infra","strategy_id":"infra-default","confidence":0.9,"reason":"docker socket missing"}` + "\n"
+					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(payload), 0o644)
+				}
+			}
+		}
+		return step.ContainerHandle("mock-" + spec.Image), nil
+	}
+
+	runner := step.Runner{Containers: mc}
+	req := StartRunRequest{
+		RunID:   types.RunID("run-router-amata-cmd"),
+		JobID:   types.JobID("job-router-amata-cmd"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		JobType: types.JobTypePreGate,
+	}
+	typedOpts := RunOptions{
+		HealingSelector: &contracts.HealingSpec{
+			ByErrorKind: map[string]contracts.HealingActionSpec{
+				"infra": {Image: contracts.JobImage{Universal: "test/healer:latest"}},
+			},
+		},
+		Healing: &HealingConfig{
+			Retries: 1,
+			Mod: ModContainerSpec{
+				Image: contracts.JobImage{Universal: "test/healer:latest"},
+			},
+		},
+		Router: &ModContainerSpec{
+			Image: contracts.JobImage{Universal: "test/router:latest"},
+			Amata: &contracts.AmataRunSpec{
+				Spec: "task: route",
+				Set: []contracts.AmataSetParam{
+					{Param: "repo", Value: "svc"},
+					{Param: "env", Value: "ci"},
+				},
+			},
+		},
+	}
+	gateResult := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
+		LogsText:     "[ERROR] build failed\n",
+	}
+
+	rc.runRouterForGateFailure(context.Background(), runner, req, typedOpts, workspace, gateResult)
+
+	if gateResult.Recovery == nil {
+		t.Fatal("gateResult.Recovery is nil")
+	}
+	if got, want := gateResult.Recovery.ErrorKind, "infra"; got != want {
+		t.Fatalf("ErrorKind = %q, want %q", got, want)
+	}
+
+	wantRouterCmd := []string{"amata", "run", "/in/amata.yaml", "--set", "repo=svc", "--set", "env=ci"}
+	if len(gateResult.Recovery.RouterCmd) != len(wantRouterCmd) {
+		t.Fatalf("RouterCmd len = %d, want %d: %v", len(gateResult.Recovery.RouterCmd), len(wantRouterCmd), gateResult.Recovery.RouterCmd)
+	}
+	for i, want := range wantRouterCmd {
+		if got := gateResult.Recovery.RouterCmd[i]; got != want {
+			t.Fatalf("RouterCmd[%d] = %q, want %q", i, got, want)
+		}
+	}
+}
+
 func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing.T) {
 	t.Parallel()
 

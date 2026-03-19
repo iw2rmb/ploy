@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/iw2rmb/ploy/schemas/mig.schema.json",
+  "title": "MIG raw contract schema",
+  "type": "object",
+  "properties": {
+    "mod_index": false,
+    "amata": false,
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/stepObject"
+      }
+    },
+    "build_gate": {
+      "$ref": "#/definitions/buildGateObject"
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "stepObject": {
+      "type": "object",
+      "properties": {
+        "retain_container": false,
+        "amata": false
+      },
+      "additionalProperties": true
+    },
+    "buildGateObject": {
+      "type": "object",
+      "properties": {
+        "profile": false,
+        "amata": false,
+        "healing": {
+          "$ref": "#/definitions/healingObject"
+        },
+        "router": {
+          "$ref": "#/definitions/routerObject"
+        },
+        "pre": {
+          "$ref": "#/definitions/preObject"
+        },
+        "post": {
+          "$ref": "#/definitions/postObject"
+        }
+      },
+      "additionalProperties": true
+    },
+    "healingObject": {
+      "type": "object",
+      "properties": {
+        "retries": false,
+        "image": false,
+        "command": false,
+        "env": false,
+        "retain_container": false,
+        "amata": false,
+        "by_error_kind": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/healingActionObject"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "healingActionObject": {
+      "type": "object",
+      "properties": {
+        "retain_container": false,
+        "spec": false,
+        "set": false
+      },
+      "additionalProperties": true
+    },
+    "routerObject": {
+      "type": "object",
+      "properties": {
+        "retain_container": false,
+        "spec": false,
+        "set": false
+      },
+      "additionalProperties": true
+    },
+    "preObject": {
+      "type": "object",
+      "properties": {
+        "amata": false
+      },
+      "additionalProperties": true
+    },
+    "postObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/postStackObject"
+      }
+    },
+    "postStackObject": {
+      "type": "object",
+      "properties": {
+        "amata": false
+      },
+      "additionalProperties": true
+    }
+  }
+}
