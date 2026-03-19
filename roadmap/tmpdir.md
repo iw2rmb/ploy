@@ -56,5 +56,5 @@ Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.m
   - Verification:
     1. `~/@iw2rmb/amata/scripts/check_docs_links.sh`
     2. `go test ./cmd/ploy ./internal/workflow/contracts ./internal/nodeagent ./internal/workflow/step`
-    3. `make test`
+    3. `GOTOOLCHAIN=go1.25.8 make test`
   - Reasoning: medium
