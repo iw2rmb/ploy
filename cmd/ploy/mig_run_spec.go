@@ -29,8 +29,8 @@ func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
 			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 		}
 	}
-	if err := resolveBuildGateSpecPathInPlace(raw); err != nil {
-		return nil, fmt.Errorf("resolve spec_path (build_gate): %w", err)
+	if err := preprocessModsSpecInPlace(raw); err != nil {
+		return nil, err
 	}
 
 	jsonBytes, err := json.Marshal(raw)
@@ -43,6 +43,83 @@ func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
 	}
 
 	return jsonBytes, nil
+}
+
+func preprocessModsSpecInPlace(spec map[string]any) error {
+	if err := resolveBuildGateSpecPathInPlace(spec); err != nil {
+		return fmt.Errorf("resolve spec_path (build_gate): %w", err)
+	}
+
+	// Resolve env_from_file references in the canonical top-level env block.
+	if err := resolveEnvFromFileInPlace(spec); err != nil {
+		return fmt.Errorf("resolve env from file (top-level): %w", err)
+	}
+
+	// Resolve env_from_file references in build_gate.healing.by_error_kind.* and build_gate.router.
+	if bg, ok := spec["build_gate"].(map[string]any); ok {
+		if healing, ok := bg["healing"].(map[string]any); ok {
+			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+				for errorKind, item := range byErrorKind {
+					action, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					if err := resolveEnvFromFileInPlace(action); err != nil {
+						return fmt.Errorf("resolve env from file (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
+					}
+				}
+			}
+		}
+		if router, ok := bg["router"].(map[string]any); ok {
+			if err := resolveEnvFromFileInPlace(router); err != nil {
+				return fmt.Errorf("resolve env from file (build_gate.router): %w", err)
+			}
+		}
+	}
+
+	// Resolve env_from_file references in steps[] array entries.
+	if steps, ok := spec["steps"].([]any); ok {
+		for i, s := range steps {
+			if stepEntry, ok := s.(map[string]any); ok {
+				if err := resolveEnvFromFileInPlace(stepEntry); err != nil {
+					return fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
+				}
+			}
+		}
+	}
+
+	// Resolve tmp_dir path references in steps[], build_gate.router, and build_gate.healing.by_error_kind.*.
+	if steps, ok := spec["steps"].([]any); ok {
+		for i, s := range steps {
+			if stepEntry, ok := s.(map[string]any); ok {
+				if err := resolveTmpDirInPlace(stepEntry, fmt.Sprintf("steps[%d].tmp_dir", i)); err != nil {
+					return fmt.Errorf("resolve tmp_dir (steps[%d]): %w", i, err)
+				}
+			}
+		}
+	}
+	if bg, ok := spec["build_gate"].(map[string]any); ok {
+		if healing, ok := bg["healing"].(map[string]any); ok {
+			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+				for errorKind, item := range byErrorKind {
+					action, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					if err := resolveTmpDirInPlace(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.tmp_dir", errorKind)); err != nil {
+						return fmt.Errorf("resolve tmp_dir (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
+					}
+				}
+			}
+		}
+		if router, ok := bg["router"].(map[string]any); ok {
+			if err := resolveTmpDirInPlace(router, "build_gate.router.tmp_dir"); err != nil {
+				return fmt.Errorf("resolve tmp_dir (build_gate.router): %w", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func resolvePath(path string) (string, error) {
@@ -365,77 +442,8 @@ func buildSpecPayload(
 		base = make(map[string]any)
 	}
 
-	if err := resolveBuildGateSpecPathInPlace(base); err != nil {
-		return nil, fmt.Errorf("resolve spec_path (build_gate): %w", err)
-	}
-
-	// Resolve env_from_file references in the canonical top-level env block.
-	if err := resolveEnvFromFileInPlace(base); err != nil {
-		return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
-	}
-
-	// Resolve env_from_file references in build_gate.healing.by_error_kind.* and build_gate.router.
-	if bg, ok := base["build_gate"].(map[string]any); ok {
-		if healing, ok := bg["healing"].(map[string]any); ok {
-			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-				for errorKind, item := range byErrorKind {
-					action, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					if err := resolveEnvFromFileInPlace(action); err != nil {
-						return nil, fmt.Errorf("resolve env from file (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
-					}
-				}
-			}
-		}
-		if router, ok := bg["router"].(map[string]any); ok {
-			if err := resolveEnvFromFileInPlace(router); err != nil {
-				return nil, fmt.Errorf("resolve env from file (build_gate.router): %w", err)
-			}
-		}
-	}
-
-	// Resolve env_from_file references in steps[] array entries.
-	if steps, ok := base["steps"].([]any); ok {
-		for i, s := range steps {
-			if stepEntry, ok := s.(map[string]any); ok {
-				if err := resolveEnvFromFileInPlace(stepEntry); err != nil {
-					return nil, fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
-				}
-			}
-		}
-	}
-
-	// Resolve tmp_dir path references in steps[], build_gate.router, and build_gate.healing.by_error_kind.*.
-	if steps, ok := base["steps"].([]any); ok {
-		for i, s := range steps {
-			if stepEntry, ok := s.(map[string]any); ok {
-				if err := resolveTmpDirInPlace(stepEntry, fmt.Sprintf("steps[%d].tmp_dir", i)); err != nil {
-					return nil, fmt.Errorf("resolve tmp_dir (steps[%d]): %w", i, err)
-				}
-			}
-		}
-	}
-	if bg, ok := base["build_gate"].(map[string]any); ok {
-		if healing, ok := bg["healing"].(map[string]any); ok {
-			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-				for errorKind, item := range byErrorKind {
-					action, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					if err := resolveTmpDirInPlace(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.tmp_dir", errorKind)); err != nil {
-						return nil, fmt.Errorf("resolve tmp_dir (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
-					}
-				}
-			}
-		}
-		if router, ok := bg["router"].(map[string]any); ok {
-			if err := resolveTmpDirInPlace(router, "build_gate.router.tmp_dir"); err != nil {
-				return nil, fmt.Errorf("resolve tmp_dir (build_gate.router): %w", err)
-			}
-		}
+	if err := preprocessModsSpecInPlace(base); err != nil {
+		return nil, err
 	}
 
 	// Merge CLI flag overrides (CLI flags take precedence)

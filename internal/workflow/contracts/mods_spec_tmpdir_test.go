@@ -53,6 +53,16 @@ func TestModsSpecValidate_TmpDirStep(t *testing.T) {
 			wantErr: `steps[0].tmp_dir[1].name: duplicate "config.json"`,
 		},
 		{
+			name: "duplicate canonical names with whitespace rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": [
+					{"name": " config.json ", "content": "aGVsbG8="},
+					{"name": "config.json", "content": "d29ybGQ="}
+				]}]
+			}`,
+			wantErr: `steps[0].tmp_dir[1].name: duplicate "config.json"`,
+		},
+		{
 			name: "path traversal rejected",
 			input: `{
 				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "../x", "content": "aGVsbG8="}]}]
@@ -155,6 +165,11 @@ func TestModsSpecValidate_TmpDirHealing(t *testing.T) {
 			tmpDir:  `[{"name": "x", "content": "aGVsbG8="}, {"name": "x", "content": "d29ybGQ="}]`,
 			wantErr: `build_gate.healing.by_error_kind.infra.tmp_dir[1].name: duplicate "x"`,
 		},
+		{
+			name:    "duplicate canonical names in healing action rejected",
+			tmpDir:  `[{"name": " x ", "content": "aGVsbG8="}, {"name": "x", "content": "d29ybGQ="}]`,
+			wantErr: `build_gate.healing.by_error_kind.infra.tmp_dir[1].name: duplicate "x"`,
+		},
 	}
 
 	for _, tc := range tests {
@@ -201,6 +216,11 @@ func TestModsSpecValidate_TmpDirRouter(t *testing.T) {
 		{
 			name:    "duplicate names in router rejected",
 			tmpDir:  `[{"name": "cfg", "content": "aGVsbG8="}, {"name": "cfg", "content": "d29ybGQ="}]`,
+			wantErr: `build_gate.router.tmp_dir[1].name: duplicate "cfg"`,
+		},
+		{
+			name:    "duplicate canonical names in router rejected",
+			tmpDir:  `[{"name": " cfg ", "content": "aGVsbG8="}, {"name": "cfg", "content": "d29ybGQ="}]`,
 			wantErr: `build_gate.router.tmp_dir[1].name: duplicate "cfg"`,
 		},
 	}
@@ -293,6 +313,14 @@ func TestStepManifestValidate_TmpDir(t *testing.T) {
 			wantErr: `tmp_dir[1].name: duplicate "same.txt"`,
 		},
 		{
+			name: "duplicate canonical names rejected",
+			tmpDir: []TmpFilePayload{
+				{Name: " same.txt ", Content: []byte("a")},
+				{Name: "same.txt", Content: []byte("b")},
+			},
+			wantErr: `tmp_dir[1].name: duplicate "same.txt"`,
+		},
+		{
 			name:    "path traversal rejected",
 			tmpDir:  []TmpFilePayload{{Name: "../x", Content: []byte("data")}},
 			wantErr: "tmp_dir[0].name: must be a plain filename with no path separators",
@@ -338,5 +366,50 @@ func TestStepManifestValidate_TmpDir(t *testing.T) {
 				t.Fatalf("Validate() error %q does not contain %q", err.Error(), tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestParseModsSpecJSON_TmpDirNameCanonicalized(t *testing.T) {
+	spec, err := ParseModsSpecJSON([]byte(`{
+		"steps": [{"image": "img:latest", "tmp_dir": [{"name": " config.json ", "content": "e30="}]}]
+	}`))
+	if err != nil {
+		t.Fatalf("ParseModsSpecJSON() unexpected error: %v", err)
+	}
+	if got, want := spec.Steps[0].TmpDir[0].Name, "config.json"; got != want {
+		t.Fatalf("tmp_dir[0].name got %q, want %q", got, want)
+	}
+}
+
+func TestStepManifestValidate_TmpDirNameCanonicalized(t *testing.T) {
+	manifest := StepManifest{
+		ID:         types.StepID("migs-sample-apply"),
+		Name:       "Sample Apply",
+		Image:      "ghcr.io/ploy/migs/runner:latest",
+		WorkingDir: "/workspace",
+		Inputs: []StepInput{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+				Mode:      StepInputModeReadWrite,
+				Hydration: &StepInputHydration{
+					Repo: &RepoMaterialization{
+						URL:       types.RepoURL("https://gitlab.example.com/group/project.git"),
+						TargetRef: types.GitRef("refs/heads/main"),
+					},
+				},
+			},
+		},
+		Gate: &StepGateSpec{Enabled: false},
+		TmpDir: []TmpFilePayload{
+			{Name: " config.json ", Content: []byte("{}")},
+		},
+	}
+
+	if err := manifest.Validate(); err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+	if got, want := manifest.TmpDir[0].Name, "config.json"; got != want {
+		t.Fatalf("tmp_dir[0].name got %q, want %q", got, want)
 	}
 }

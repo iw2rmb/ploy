@@ -431,14 +431,23 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 // Runtime hardening: verifies each resolved path stays directly under stagingDir
 // (no subdirectories, no traversal) even if validation was bypassed.
 func materializeTmpFiles(entries []contracts.TmpFilePayload, stagingDir string) error {
+	seen := make(map[string]struct{}, len(entries))
 	for _, e := range entries {
-		dst := filepath.Join(stagingDir, e.Name)
+		name, err := contracts.NormalizeTmpFileName(e.Name)
+		if err != nil {
+			return fmt.Errorf("tmp file name %q: %w", e.Name, err)
+		}
+		if _, dup := seen[name]; dup {
+			return fmt.Errorf("tmp file name duplicate %q", name)
+		}
+		seen[name] = struct{}{}
+		dst := filepath.Join(stagingDir, name)
 		rel, err := filepath.Rel(stagingDir, dst)
 		if err != nil || strings.ContainsRune(rel, filepath.Separator) || rel == "." || strings.HasPrefix(rel, "..") {
-			return fmt.Errorf("tmp file name %q would escape staging dir", e.Name)
+			return fmt.Errorf("tmp file name %q would escape staging dir", name)
 		}
 		if err := os.WriteFile(dst, e.Content, 0o444); err != nil {
-			return fmt.Errorf("write tmp file %q: %w", e.Name, err)
+			return fmt.Errorf("write tmp file %q: %w", name, err)
 		}
 	}
 	return nil

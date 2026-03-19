@@ -106,6 +106,29 @@ func TestCleanup_TmpStagingDir(t *testing.T) {
 	}
 }
 
+func TestExecute_TmpDirMaterialization_CanonicalizesNameWhitespace(t *testing.T) {
+	t.Parallel()
+
+	stagingDir := t.TempDir()
+	entries := []contracts.TmpFilePayload{
+		{Name: " config.json ", Content: []byte(`{"k":"v"}`)},
+	}
+
+	if err := materializeTmpFiles(entries, stagingDir); err != nil {
+		t.Fatalf("materializeTmpFiles() unexpected error: %v", err)
+	}
+
+	canonicalPath := filepath.Join(stagingDir, "config.json")
+	if _, err := os.Stat(canonicalPath); err != nil {
+		t.Fatalf("expected canonical tmp file %q: %v", canonicalPath, err)
+	}
+
+	nonCanonicalPath := filepath.Join(stagingDir, " config.json ")
+	if _, err := os.Stat(nonCanonicalPath); !os.IsNotExist(err) {
+		t.Fatalf("expected non-canonical tmp file path %q to be absent", nonCanonicalPath)
+	}
+}
+
 // TestRunRouterForGateFailure_TmpDirMaterialization verifies that when a router
 // spec contains tmpDir entries, runRouterForGateFailure materializes them into a
 // staging directory, mounts each file read-only at /tmp/<name>, and removes the
