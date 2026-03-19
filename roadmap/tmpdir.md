@@ -15,7 +15,7 @@ Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.m
     2. Add table-driven tests for invalid `tmpDir` payloads and duplicate names.
   - Reasoning: medium
 
-- [ ] 1.2 Resolve `tmpDir` file paths in CLI spec preprocessing.
+- [x] 1.2 Resolve `tmpDir` file paths in CLI spec preprocessing.
   - Repository: `ploy`
     1. Extend `cmd/ploy/mig_run_spec.go` to process `tmpDir` entries in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.*`.
     2. Resolve each filepath using existing path rules (`~`, env expansion) and read file content on CLI side.

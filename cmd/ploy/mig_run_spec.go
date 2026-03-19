@@ -169,6 +169,47 @@ func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
 	return nil
 }
 
+// resolveTmpDirInPlace processes tmp_dir entries in a spec section,
+// resolving "path" references to file content.
+// Each entry with a "path" key has the file read and its bytes stored in "content";
+// "path" is removed so it never reaches canonical validation.
+// Entries without "path" are passed through unchanged.
+func resolveTmpDirInPlace(spec map[string]any, prefix string) error {
+	raw, ok := spec["tmp_dir"]
+	if !ok {
+		return nil
+	}
+	entries, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("%s: expected array, got %T", prefix, raw)
+	}
+	for i, item := range entries {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s[%d]: expected object, got %T", prefix, i, item)
+		}
+		pathVal, hasPath := entry["path"]
+		if !hasPath {
+			continue
+		}
+		path, ok := pathVal.(string)
+		if !ok {
+			return fmt.Errorf("%s[%d].path: expected string path, got %T", prefix, i, pathVal)
+		}
+		resolved, err := resolvePath(path)
+		if err != nil {
+			return fmt.Errorf("%s[%d].path: %w", prefix, i, err)
+		}
+		content, err := os.ReadFile(resolved)
+		if err != nil {
+			return fmt.Errorf("%s[%d].path: read file %s: %w", prefix, i, resolved, err)
+		}
+		delete(entry, "path")
+		entry["content"] = content
+	}
+	return nil
+}
+
 // resolveEnvFromFile reads a file path (expanding ~) and returns its content as a string.
 // File content is treated as sensitive, so any errors redact the file path for security.
 func resolveEnvFromFile(path string) (string, error) {
@@ -362,6 +403,37 @@ func buildSpecPayload(
 				if err := resolveEnvFromFileInPlace(stepEntry); err != nil {
 					return nil, fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
 				}
+			}
+		}
+	}
+
+	// Resolve tmp_dir path references in steps[], build_gate.router, and build_gate.healing.by_error_kind.*.
+	if steps, ok := base["steps"].([]any); ok {
+		for i, s := range steps {
+			if stepEntry, ok := s.(map[string]any); ok {
+				if err := resolveTmpDirInPlace(stepEntry, fmt.Sprintf("steps[%d].tmp_dir", i)); err != nil {
+					return nil, fmt.Errorf("resolve tmp_dir (steps[%d]): %w", i, err)
+				}
+			}
+		}
+	}
+	if bg, ok := base["build_gate"].(map[string]any); ok {
+		if healing, ok := bg["healing"].(map[string]any); ok {
+			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+				for errorKind, item := range byErrorKind {
+					action, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					if err := resolveTmpDirInPlace(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.tmp_dir", errorKind)); err != nil {
+						return nil, fmt.Errorf("resolve tmp_dir (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
+					}
+				}
+			}
+		}
+		if router, ok := bg["router"].(map[string]any); ok {
+			if err := resolveTmpDirInPlace(router, "build_gate.router.tmp_dir"); err != nil {
+				return nil, fmt.Errorf("resolve tmp_dir (build_gate.router): %w", err)
 			}
 		}
 	}
