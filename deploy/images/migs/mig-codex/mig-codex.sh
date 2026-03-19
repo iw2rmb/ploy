@@ -9,6 +9,7 @@ mig-codex amata run /in/amata.yaml [--set <param>=<value> ...]
 Environment:
   CODEX_PROMPT      Inline prompt text (required in direct codex mode; optional in amata mode).
   CODEX_MODEL       Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
+  CODEX_API_KEY     API key for Codex/OpenAI; passed through to codex exec and amata as-is.
   CODEX_AUTH_JSON   Inline JSON for auth; if set, written to ~/.codex/auth.json.
   CODEX_CONFIG_TOML Inline TOML for config; if set, written to ~/.codex/config.toml.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior
