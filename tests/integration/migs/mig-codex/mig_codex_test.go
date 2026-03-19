@@ -12,6 +12,21 @@ import (
 
 func have(name string) bool { _, err := exec.LookPath(name); return err == nil }
 
+// realTempDir creates a temp directory under the user home directory.
+// This ensures the path is accessible to Docker Desktop on macOS, which
+// only file-shares /Users (not /tmp or /var/folders).
+func realTempDir(pattern string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	base := filepath.Join(home, ".mig-codex-test-tmp")
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return "", err
+	}
+	return os.MkdirTemp(base, pattern)
+}
+
 func mustRun(t *testing.T, name string, args ...string) (string, string) {
 	t.Helper()
 	cmd := exec.Command(name, args...)
@@ -22,6 +37,124 @@ func mustRun(t *testing.T, name string, args ...string) (string, string) {
 		t.Fatalf("run %s %v: %v\nstdout=%s\nstderr=%s", name, args, err, out.String(), errb.String())
 	}
 	return out.String(), errb.String()
+}
+
+// TestMigCodexContainer tests mig-codex.sh dual-mode routing inside the container image.
+// Amata mode: injects a mock amata binary via volume mount and verifies artifact outputs.
+// Direct codex mode: verifies CODEX_PROMPT is required when amata mode is not active.
+func TestMigCodexContainer(t *testing.T) {
+	if testing.Short() {
+		t.Skip("short mode")
+	}
+	if !have("docker") {
+		t.Skip("docker not found in PATH; skipping")
+	}
+	if out, err := exec.Command("docker", "info").CombinedOutput(); err != nil {
+		t.Skipf("docker daemon not available; skipping: %v: %s", err, strings.TrimSpace(string(out)))
+	}
+
+	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
+	repoRoot = strings.TrimSpace(repoRoot)
+
+	// Build migs-codex image once for both subtests.
+	_, _ = mustRun(t, "docker", "build", "-t", "migs-codex:test-amata",
+		"-f", repoRoot+"/deploy/images/migs/mig-codex/Dockerfile", repoRoot)
+
+	// Build a test image that includes a mock amata binary on top of the base image.
+	// This avoids volume-mount permission issues with Docker Desktop on macOS.
+	const testImageTag = "migs-codex:test-amata-with-mock"
+	mockDockerfile := "FROM migs-codex:test-amata\n" +
+		"RUN printf '#!/bin/sh\\necho amata mock ran\\nexit 0\\n' > /usr/local/bin/amata " +
+		"&& chmod +x /usr/local/bin/amata\n"
+	mockDockerfileDir := t.TempDir()
+	if err := os.WriteFile(mockDockerfileDir+"/Dockerfile", []byte(mockDockerfile), 0o644); err != nil {
+		t.Fatalf("write mock Dockerfile: %v", err)
+	}
+	mustRun(t, "docker", "build", "-t", testImageTag, mockDockerfileDir)
+
+	t.Run("amata_mode_routes_to_amata_and_writes_artifacts", func(t *testing.T) {
+		// Resolve symlinks so Docker Desktop on macOS gets the real path (e.g. /private/tmp vs /tmp).
+		outDir, err := realTempDir("mig-codex-test-out-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(outDir) })
+		inDir, err := realTempDir("mig-codex-test-in-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(inDir) })
+
+		// Write a minimal amata.yaml to /in so the path exists.
+		if err := os.WriteFile(inDir+"/amata.yaml", []byte("task: test\n"), 0o644); err != nil {
+			t.Fatalf("write amata.yaml: %v", err)
+		}
+
+		run := exec.Command("docker", "run", "--rm",
+			"-v", outDir+":/out",
+			"-v", inDir+":/in:ro",
+			testImageTag,
+			"amata", "run", "/in/amata.yaml", "--set", "key=val",
+		)
+		if out, err := run.CombinedOutput(); err != nil {
+			t.Fatalf("amata mode container failed: %v\n%s", err, string(out))
+		}
+
+		// codex.log must exist and be non-empty.
+		lb, err := os.ReadFile(outDir + "/codex.log")
+		if err != nil || len(bytes.TrimSpace(lb)) == 0 {
+			t.Fatalf("codex.log missing or empty: %v", err)
+		}
+		// codex-last.txt must exist.
+		if _, err := os.Stat(outDir + "/codex-last.txt"); err != nil {
+			t.Fatalf("codex-last.txt missing: %v", err)
+		}
+		// codex-run.json must be valid JSON with exit_code:0.
+		rb, err := os.ReadFile(outDir + "/codex-run.json")
+		if err != nil {
+			t.Fatalf("codex-run.json missing: %v", err)
+		}
+		var rj struct {
+			ExitCode int `json:"exit_code"`
+		}
+		if err := json.Unmarshal(rb, &rj); err != nil {
+			t.Fatalf("parse codex-run.json: %v", err)
+		}
+		if rj.ExitCode != 0 {
+			t.Errorf("codex-run.json exit_code = %d, want 0", rj.ExitCode)
+		}
+	})
+
+	t.Run("direct_codex_mode_requires_CODEX_PROMPT", func(t *testing.T) {
+		outDir, err := realTempDir("mig-codex-test-out2-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(outDir) })
+		wsDir, err := realTempDir("mig-codex-test-ws-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(wsDir) })
+
+		run := exec.Command("docker", "run", "--rm",
+			"-v", outDir+":/out",
+			"-v", wsDir+":/workspace",
+			// Deliberately omit CODEX_PROMPT to trigger the requirement check.
+			"migs-codex:test-amata",
+			"--input", "/workspace", "--out", "/out",
+		)
+		var outBuf bytes.Buffer
+		run.Stdout = &outBuf
+		run.Stderr = &outBuf
+		runErr := run.Run()
+		if runErr == nil {
+			t.Fatalf("expected container to fail without CODEX_PROMPT, but it succeeded")
+		}
+		if !strings.Contains(outBuf.String(), "prompt required") {
+			t.Errorf("expected 'prompt required' in output, got: %s", outBuf.String())
+		}
+	})
 }
 
 func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {

@@ -26,7 +26,7 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     2. `go test ./internal/nodeagent -run 'Test.*TmpDir|Test.*Recovery'`
   - Reasoning: xhigh
 
-- [ ] 1.3 Refactor `mig-codex` image to run `amata` and reuse existing image boundary
+- [x] 1.3 Refactor `mig-codex` image to run `amata` and reuse existing image boundary
   - Repository: `ploy`
     1. Update `deploy/images/migs/mig-codex/mig-codex.sh` to execute `amata run /in/amata.yaml` plus ordered `--set` flags when `amata.spec` is provided and keep direct `codex exec` invocation when `amata.spec` is absent.
     2. Enforce mode-specific prompt requirements in `mig-codex.sh`: `CODEX_PROMPT` optional when `amata.spec` is provided, `CODEX_PROMPT` required when `amata.spec` is absent.

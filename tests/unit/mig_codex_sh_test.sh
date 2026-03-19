@@ -631,6 +631,214 @@ MOCKCODEX
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Test: Amata mode - amata binary is called with forwarded args
+# ─────────────────────────────────────────────────────────────────────────────
+test_amata_mode_runs_amata() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  local args_file="$tmp_out/.amata_args"
+
+  # Mock amata binary that records all arguments
+  cat > "$tmp_bin/amata" <<MOCKAMATA
+#!/bin/bash
+printf "%s\n" "\$@" > "$args_file"
+echo "amata ran"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    bash "$tmp_script" amata run /in/amata.yaml --set repo=myrepo --set env=prod
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    pass "amata mode exits 0"
+  else
+    fail "amata mode exit code" "got $exit_code, want 0"
+  fi
+
+  if [[ -f "$args_file" ]]; then
+    local args
+    args=$(cat "$args_file")
+    if echo "$args" | grep -q "run" && echo "$args" | grep -q "/in/amata.yaml"; then
+      pass "amata binary called with run /in/amata.yaml"
+    else
+      fail "amata mode args" "expected 'run /in/amata.yaml' in: $args"
+    fi
+    if echo "$args" | grep -q "repo=myrepo" && echo "$args" | grep -q "env=prod"; then
+      pass "amata binary received --set flags"
+    else
+      fail "amata mode --set flags" "expected set flags in: $args"
+    fi
+  else
+    fail "amata mode invocation" "amata binary was not called"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Amata mode - CODEX_PROMPT is not required
+# ─────────────────────────────────────────────────────────────────────────────
+test_amata_mode_prompt_optional() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+
+  # Mock amata binary that succeeds without any prompt input
+  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+#!/bin/bash
+echo "amata ran"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    # Intentionally unset CODEX_PROMPT to verify it is not required in amata mode
+    unset CODEX_PROMPT
+    bash "$tmp_script" amata run /in/amata.yaml
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  if [[ $exit_code -eq 0 ]]; then
+    pass "amata mode succeeds without CODEX_PROMPT"
+  else
+    fail "amata mode prompt optional" "expected exit 0, got $exit_code"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Amata mode - artifact files are created
+# ─────────────────────────────────────────────────────────────────────────────
+test_amata_mode_creates_artifacts() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+
+  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+#!/bin/bash
+echo "amata task complete"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    unset CODEX_PROMPT
+    bash "$tmp_script" amata run /in/amata.yaml
+  ) >/dev/null 2>&1
+
+  if [[ -f "$tmp_out/codex.log" && -s "$tmp_out/codex.log" ]]; then
+    pass "amata mode creates non-empty codex.log"
+  else
+    fail "amata mode codex.log" "codex.log missing or empty"
+  fi
+
+  if [[ -f "$tmp_out/codex-last.txt" ]]; then
+    pass "amata mode creates codex-last.txt"
+  else
+    fail "amata mode codex-last.txt" "codex-last.txt not created"
+  fi
+
+  if [[ -f "$tmp_out/codex-run.json" ]]; then
+    local manifest
+    manifest=$(cat "$tmp_out/codex-run.json")
+    if echo "$manifest" | grep -q '"exit_code":0'; then
+      pass "amata mode codex-run.json has exit_code:0"
+    else
+      fail "amata mode codex-run.json" "unexpected content: $manifest"
+    fi
+    if echo "$manifest" | grep -q '"resumed":false'; then
+      pass "amata mode codex-run.json has resumed:false"
+    else
+      fail "amata mode codex-run.json resumed" "expected resumed:false in: $manifest"
+    fi
+  else
+    fail "amata mode codex-run.json" "codex-run.json not created"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Direct codex mode still requires CODEX_PROMPT
+# ─────────────────────────────────────────────────────────────────────────────
+test_direct_mode_requires_codex_prompt() {
+  run_test
+
+  local tmp_bin tmp_out tmp_ws
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+
+  # Mock codex that would succeed if called, but we expect the script to exit before that
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
+#!/bin/bash
+if [[ "$1" == "exec" && "$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo  Skip confirmations"
+  exit 0
+fi
+echo "codex ran"
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    unset CODEX_PROMPT
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    pass "direct codex mode exits non-zero without CODEX_PROMPT"
+  else
+    fail "direct mode prompt required" "expected non-zero exit without CODEX_PROMPT"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Run all tests
 # ─────────────────────────────────────────────────────────────────────────────
 echo "Running mig-codex.sh unit tests..."
@@ -674,6 +882,22 @@ test_manifest_resumed_field_false
 echo ""
 echo "Test: --output-dir flag detection"
 test_output_dir_flag_detection
+
+echo ""
+echo "Test: Amata mode runs amata with forwarded args"
+test_amata_mode_runs_amata
+
+echo ""
+echo "Test: Amata mode - CODEX_PROMPT not required"
+test_amata_mode_prompt_optional
+
+echo ""
+echo "Test: Amata mode creates artifact files"
+test_amata_mode_creates_artifacts
+
+echo ""
+echo "Test: Direct codex mode requires CODEX_PROMPT"
+test_direct_mode_requires_codex_prompt
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Summary
