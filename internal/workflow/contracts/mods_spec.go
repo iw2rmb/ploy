@@ -105,6 +105,14 @@ type ModsSpec struct {
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
 }
 
+// TmpFilePayload describes a single file to materialize under /tmp in the container.
+// Name is the destination filename (not a path); Content is the raw file bytes.
+// Both fields are required: Name must be non-empty and Content must be non-empty.
+type TmpFilePayload struct {
+	Name    string `json:"name" yaml:"name"`
+	Content []byte `json:"content" yaml:"content"`
+}
+
 // ModStep describes a single mig step in a run (steps[] array).
 // Each step has its own image, command, and environment configuration.
 // Steps execute sequentially with shared workspace, each running gate+mig.
@@ -130,6 +138,10 @@ type ModStep struct {
 	// Always forces this step to run even when a cache hit exists for the same
 	// repo_sha_in and canonicalized step operations hash.
 	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
+
+	// TmpDir lists files to materialize read-only under /tmp in the container.
+	// Each entry must have a unique non-empty name and non-empty content.
+	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
 }
 
 // Validate checks that the spec is structurally valid.
@@ -155,6 +167,9 @@ func (s ModsSpec) Validate() error {
 			if err := validateStackGateSpec(mig.Stack, fmt.Sprintf("steps[%d].stack", i)); err != nil {
 				return err
 			}
+		}
+		if err := validateTmpDir(mig.TmpDir, fmt.Sprintf("steps[%d].tmp_dir", i)); err != nil {
+			return err
 		}
 	}
 
@@ -189,6 +204,9 @@ func (s ModsSpec) Validate() error {
 					}
 				}
 			}
+			if err := validateTmpDir(action.TmpDir, prefix+".tmp_dir"); err != nil {
+				return err
+			}
 		}
 		// Healing requires a router to be configured (router runs before healing).
 		if s.BuildGate.Router == nil || s.BuildGate.Router.Image.IsEmpty() {
@@ -205,6 +223,9 @@ func (s ModsSpec) Validate() error {
 	if s.BuildGate != nil && s.BuildGate.Router != nil {
 		if s.BuildGate.Router.Image.IsEmpty() {
 			return fmt.Errorf("build_gate.router.image: required when router is specified")
+		}
+		if err := validateTmpDir(s.BuildGate.Router.TmpDir, "build_gate.router.tmp_dir"); err != nil {
+			return err
 		}
 	}
 
@@ -298,6 +319,26 @@ func validateBuildGatePhaseTarget(target string, prefix string) error {
 
 // validateStackGateSpec validates a StackGateSpec for ambiguous configuration.
 // Rejects enabled:false with expect:{...} as this is contradictory.
+// validateTmpDir checks that each TmpFilePayload has a non-empty name and
+// non-empty content, and that no two entries share the same destination name.
+func validateTmpDir(entries []TmpFilePayload, prefix string) error {
+	seen := make(map[string]struct{}, len(entries))
+	for i, e := range entries {
+		pos := fmt.Sprintf("%s[%d]", prefix, i)
+		if strings.TrimSpace(e.Name) == "" {
+			return fmt.Errorf("%s.name: required", pos)
+		}
+		if len(e.Content) == 0 {
+			return fmt.Errorf("%s.content: required", pos)
+		}
+		if _, dup := seen[e.Name]; dup {
+			return fmt.Errorf("%s.name: duplicate %q", pos, e.Name)
+		}
+		seen[e.Name] = struct{}{}
+	}
+	return nil
+}
+
 func validateStackGateSpec(spec *StackGateSpec, prefix string) error {
 	if spec == nil {
 		return nil

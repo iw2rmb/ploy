@@ -4,7 +4,7 @@ Scope: add spec-driven `tmpDir` support so each selected container step can rece
 
 Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.md`; `cmd/ploy/mig_run_spec.go`; `internal/workflow/contracts/mods_spec.go`; `internal/workflow/contracts/build_gate_config.go`; `internal/nodeagent/run_options.go`; `internal/nodeagent/manifest.go`; `internal/nodeagent/execution_orchestrator_jobs.go`; `internal/workflow/step/container_spec.go`.
 
-- [ ] 1.1 Define canonical `tmpDir` contract in shared workflow types.
+- [x] 1.1 Define canonical `tmpDir` contract in shared workflow types.
   - Repository: `ploy`
     1. Add shared tmp file payload type in `internal/workflow/contracts` with explicit `name` and `content` fields.
     2. Add `tmpDir` field to `ModStep`, `HealingActionSpec`, and `RouterSpec` so step/heal/router use the same contract.
