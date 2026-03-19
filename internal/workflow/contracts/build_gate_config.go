@@ -128,6 +128,12 @@ type HealingActionSpec struct {
 	// TmpDir lists files to materialize read-only under /tmp in the healing container.
 	// Each entry must have a unique non-empty name and non-empty content.
 	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
+
+	// Amata configures amata-mode execution for this healing action container.
+	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
+	// --set flags; CODEX_PROMPT is not required in this mode.
+	// When nil, the container uses the direct codex exec path and CODEX_PROMPT is required.
+	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
 // RecoveryExpectationsSpec defines structured expectations for recovery output.
@@ -157,4 +163,37 @@ type RouterSpec struct {
 	// TmpDir lists files to materialize read-only under /tmp in the router container.
 	// Each entry must have a unique non-empty name and non-empty content.
 	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
+
+	// Amata configures amata-mode execution for this router container.
+	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
+	// --set flags; CODEX_PROMPT is not required in this mode.
+	// When nil, the container uses the direct codex exec path and CODEX_PROMPT is required.
+	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
+}
+
+// AmataRunSpec describes an amata execution configuration for router or healing containers.
+//
+// Command mapping rules (deterministic):
+//   - When Spec is non-empty: materialize Spec as /in/amata.yaml, then run
+//     `amata run /in/amata.yaml` followed by ordered `--set '<param>=<value>'` flags
+//     from Set. CODEX_PROMPT is not required in this mode.
+//   - When AmataRunSpec is absent (nil pointer on RouterSpec or HealingActionSpec):
+//     fall through to the existing direct `codex exec` path; CODEX_PROMPT is required.
+type AmataRunSpec struct {
+	// Spec is the amata spec content materialized as /in/amata.yaml before execution.
+	// Required when AmataRunSpec is present (non-empty).
+	Spec string `json:"spec" yaml:"spec"`
+
+	// Set is an ordered list of --set parameters emitted as `--set '<param>=<value>'`
+	// flags to `amata run`. Order is preserved for deterministic CLI materialization.
+	Set []AmataSetParam `json:"set,omitempty" yaml:"set,omitempty"`
+}
+
+// AmataSetParam is a single --set parameter for amata run.
+type AmataSetParam struct {
+	// Param is the parameter name (required, non-empty).
+	Param string `json:"param" yaml:"param"`
+
+	// Value is the parameter value passed verbatim (may be empty string).
+	Value string `json:"value" yaml:"value"`
 }
