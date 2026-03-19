@@ -37,6 +37,10 @@ type StepManifest struct {
 	// assertions in callers. This field is not validated and values are never
 	// logged.
 	Options map[string]any
+
+	// TmpDir lists files to materialize read-only under /tmp in the container.
+	// Each entry must have a unique non-empty name and non-empty content.
+	TmpDir []TmpFilePayload
 }
 
 // StepInputMode describes how the input is mounted into the container.
@@ -208,6 +212,9 @@ func (m StepManifest) Validate() error {
 		return err
 	}
 	if err := m.validateResources(); err != nil {
+		return err
+	}
+	if err := validateTmpDir(m.TmpDir, "tmp_dir"); err != nil {
 		return err
 	}
 	return nil
