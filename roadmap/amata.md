@@ -56,8 +56,9 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     3. Update e2e fixture specs in `tests/e2e/migs/scenario-*/mig.yaml` to exercise both modes: `amata` in router/healing and direct-Codex fallback when `amata.spec` is undefined.
     4. Update publishing docs in `docs/how-to/publish-migs.md` with local `../amata` build prerequisite for `migs-codex` image publishing.
   - Verification:
-    1. `go test ./tests/e2e/migs/...`
-    2. `bash ~/@iw2rmb/amata/scripts/check_docs_links.sh`
+    1. `bash tests/e2e/migs/scenario-orw-fail/run.sh`
+    2. `bash tests/e2e/migs/scenario-post-mod-heal/run.sh`
+    3. `bash ~/@iw2rmb/amata/scripts/check_docs_links.sh`
   - Reasoning: medium
 
 - [ ] 1.6 Validate end-to-end healing loop with dual execution modes
