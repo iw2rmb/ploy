@@ -162,7 +162,17 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
-			return r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, req.RecoveryContext, schemaJSON)
+			if err := r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, req.RecoveryContext, schemaJSON); err != nil {
+				return err
+			}
+			// For amata-mode healing: write /in/amata.yaml with deterministic overwrite.
+			if typedOpts.Healing.Mod.Amata != nil && strings.TrimSpace(typedOpts.Healing.Mod.Amata.Spec) != "" {
+				amataPath := filepath.Join(inDir, "amata.yaml")
+				if err := os.WriteFile(amataPath, []byte(typedOpts.Healing.Mod.Amata.Spec), 0o644); err != nil {
+					return fmt.Errorf("write /in/amata.yaml: %w", err)
+				}
+			}
+			return nil
 		},
 		InjectEnv: func(m *contracts.StepManifest, ws string) {
 			r.injectHealingEnvVars(m, ws)

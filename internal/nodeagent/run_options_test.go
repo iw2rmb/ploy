@@ -603,3 +603,106 @@ func TestModsSpecToRunOptions_TmpDir(t *testing.T) {
 		}
 	})
 }
+
+func TestModsSpecToRunOptions_Amata(t *testing.T) {
+	t.Parallel()
+
+	amataSpec := &contracts.AmataRunSpec{
+		Spec: "task: fix-it\nprompt: fix the bug",
+		Set: []contracts.AmataSetParam{
+			{Param: "repo", Value: "myrepo"},
+			{Param: "env", Value: "prod"},
+		},
+	}
+
+	t.Run("router_amata_propagated", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+			BuildGate: &contracts.BuildGateConfig{
+				Router: &contracts.RouterSpec{
+					Image: contracts.JobImage{Universal: "router-img"},
+					Amata: amataSpec,
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Router == nil {
+			t.Fatal("expected Router config")
+		}
+		if runOpts.Router.Amata == nil {
+			t.Fatal("Router.Amata: expected non-nil")
+		}
+		if runOpts.Router.Amata.Spec != amataSpec.Spec {
+			t.Errorf("Router.Amata.Spec: got %q, want %q", runOpts.Router.Amata.Spec, amataSpec.Spec)
+		}
+		if len(runOpts.Router.Amata.Set) != 2 {
+			t.Fatalf("Router.Amata.Set len: got %d, want 2", len(runOpts.Router.Amata.Set))
+		}
+		if runOpts.Router.Amata.Set[0].Param != "repo" || runOpts.Router.Amata.Set[1].Param != "env" {
+			t.Errorf("Router.Amata.Set order: got %v", runOpts.Router.Amata.Set)
+		}
+	})
+
+	t.Run("healing_amata_propagated", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+			BuildGate: &contracts.BuildGateConfig{
+				Healing: &contracts.HealingSpec{
+					SelectedErrorKind: "code",
+					ByErrorKind: map[string]contracts.HealingActionSpec{
+						"code": {
+							Image: contracts.JobImage{Universal: "heal-img"},
+							Amata: amataSpec,
+						},
+					},
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Healing == nil {
+			t.Fatal("expected Healing config")
+		}
+		if runOpts.Healing.Mod.Amata == nil {
+			t.Fatal("Healing.Mod.Amata: expected non-nil")
+		}
+		if runOpts.Healing.Mod.Amata.Spec != amataSpec.Spec {
+			t.Errorf("Healing.Mod.Amata.Spec: got %q, want %q", runOpts.Healing.Mod.Amata.Spec, amataSpec.Spec)
+		}
+		if len(runOpts.Healing.Mod.Amata.Set) != 2 {
+			t.Fatalf("Healing.Mod.Amata.Set len: got %d, want 2", len(runOpts.Healing.Mod.Amata.Set))
+		}
+	})
+
+	t.Run("nil_amata_propagates_nil", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+			BuildGate: &contracts.BuildGateConfig{
+				Router: &contracts.RouterSpec{
+					Image: contracts.JobImage{Universal: "router-img"},
+				},
+				Healing: &contracts.HealingSpec{
+					SelectedErrorKind: "code",
+					ByErrorKind: map[string]contracts.HealingActionSpec{
+						"code": {Image: contracts.JobImage{Universal: "heal-img"}},
+					},
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Router != nil && runOpts.Router.Amata != nil {
+			t.Error("Router.Amata: expected nil when not configured")
+		}
+		if runOpts.Healing != nil && runOpts.Healing.Mod.Amata != nil {
+			t.Error("Healing.Mod.Amata: expected nil when not configured")
+		}
+	})
+}

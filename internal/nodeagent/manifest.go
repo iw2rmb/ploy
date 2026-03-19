@@ -224,6 +224,17 @@ func isCodexHealingImage(image string) bool {
 	return strings.Contains(strings.ToLower(image), "codex")
 }
 
+// resolveAmataCommand builds the command slice for amata-mode execution.
+// Produces ["amata", "run", "/in/amata.yaml"] followed by ordered "--set" "param=value" pairs.
+// Order follows amata.Set slice order for deterministic CLI materialization.
+func resolveAmataCommand(amata *contracts.AmataRunSpec) []string {
+	cmd := []string{"amata", "run", "/in/amata.yaml"}
+	for _, p := range amata.Set {
+		cmd = append(cmd, "--set", p.Param+"="+p.Value)
+	}
+	return cmd
+}
+
 // buildHealingManifest constructs a StepManifest from a typed ModContainerSpec.
 // The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // When codexSession is non-empty and the image is Codex-based, CODEX_RESUME=1 is injected.
@@ -237,7 +248,12 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 		return contracts.StepManifest{}, err
 	}
 
-	command := mig.Command.ToSlice()
+	var command []string
+	if mig.Amata != nil && strings.TrimSpace(mig.Amata.Spec) != "" {
+		command = resolveAmataCommand(mig.Amata)
+	} else {
+		command = mig.Command.ToSlice()
+	}
 
 	env := make(map[string]string, len(mig.Env)+4)
 	for k, v := range mig.Env {
@@ -287,7 +303,12 @@ func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack con
 		return contracts.StepManifest{}, err
 	}
 
-	command := router.Command.ToSlice()
+	var command []string
+	if router.Amata != nil && strings.TrimSpace(router.Amata.Spec) != "" {
+		command = resolveAmataCommand(router.Amata)
+	} else {
+		command = router.Command.ToSlice()
+	}
 
 	env := make(map[string]string, len(router.Env)+4)
 	for k, v := range router.Env {
