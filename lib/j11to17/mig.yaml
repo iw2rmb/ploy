@@ -31,6 +31,7 @@ steps:
     env_from_file:
       CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/config.toml
       CODEX_AUTH_JSON: ~/.codex/auth.json
+      CRUSH_JSON: $PLOY_PATH/lib/j11to17/crush.json
     amata:
       spec: $PLOY_PATH/lib/j11to17/amata.yaml
     tmp_dir:
