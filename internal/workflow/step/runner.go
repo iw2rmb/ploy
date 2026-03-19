@@ -66,6 +66,9 @@ type Request struct {
 	OutDir    string
 	// InDir is an optional read-only directory mounted at /in for cross-phase inputs.
 	InDir string
+	// TmpStagingDir is an optional path to a directory containing pre-materialized
+	// tmp files. Each manifest.TmpDir entry is mounted read-only at /tmp/<name>.
+	TmpStagingDir string
 }
 
 // Result contains the outcome of a step execution.
@@ -128,7 +131,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = 0
 		result.Timings.ExecutionDuration = types.Duration(time.Since(executionStart))
 	} else {
-		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
+		spec, err := buildContainerSpec(req.RunID, req.JobID, req.Manifest, req.Workspace, req.OutDir, req.InDir, req.TmpStagingDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}

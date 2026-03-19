@@ -281,13 +281,33 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			preWorkspaceTree = tree
 		}
 
+		// Materialize any manifest tmp files into a staging directory.
+		// The staging dir is removed deterministically when executeBody returns.
+		var tmpStagingDir string
+		if len(manifest.TmpDir) > 0 {
+			dir, err := os.MkdirTemp("", "ploy-tmpfiles-*")
+			if err != nil {
+				return fmt.Errorf("create tmp staging dir: %w", err)
+			}
+			defer func() {
+				if rmErr := os.RemoveAll(dir); rmErr != nil {
+					slog.Warn("failed to remove tmp staging dir", "path", dir, "error", rmErr)
+				}
+			}()
+			if err := materializeTmpFiles(manifest.TmpDir, dir); err != nil {
+				return fmt.Errorf("materialize tmp files: %w", err)
+			}
+			tmpStagingDir = dir
+		}
+
 		result, runErr := execCtx.runner.Run(ctx, step.Request{
-			RunID:     req.RunID,
-			JobID:     req.JobID,
-			Manifest:  manifest,
-			Workspace: workspace,
-			OutDir:    outDir,
-			InDir:     inDir,
+			RunID:         req.RunID,
+			JobID:         req.JobID,
+			Manifest:      manifest,
+			Workspace:     workspace,
+			OutDir:        outDir,
+			InDir:         inDir,
+			TmpStagingDir: tmpStagingDir,
 		})
 		duration := time.Since(startTime)
 
@@ -404,6 +424,18 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		slog.Error("failed to create temp directories", "run_id", req.RunID, "error", outDirErr)
 		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
 	}
+}
+
+// materializeTmpFiles writes each TmpFilePayload to stagingDir as a read-only file.
+// The caller owns the lifecycle of stagingDir.
+func materializeTmpFiles(entries []contracts.TmpFilePayload, stagingDir string) error {
+	for _, e := range entries {
+		dst := filepath.Join(stagingDir, e.Name)
+		if err := os.WriteFile(dst, e.Content, 0o444); err != nil {
+			return fmt.Errorf("write tmp file %q: %w", e.Name, err)
+		}
+	}
+	return nil
 }
 
 // withTempDir creates a temporary directory, calls fn, then removes the directory.
