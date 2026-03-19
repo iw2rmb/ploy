@@ -10,7 +10,10 @@ set -euo pipefail
 #   3. A heal job is present (healing attempt in direct mode).
 #   4. A re_gate job is present (re-gate status sequence).
 #   5. Codex handshake artifacts satisfy the metadata contract (strict mode).
-#   6. codex-last.txt contains valid JSON (router summary contract).
+#   6. codex-last.txt satisfies the JSON schema contract: valid JSON, .error_kind == "code",
+#      .bug_summary present and non-empty, no unresolved template tokens.
+#   7. (Negative gate) Running with direct mode but without CODEX_PROMPT fails deterministically
+#      with "prompt required" — enforcement is proven end-to-end.
 #
 # Proves: direct codex exec enforces CODEX_PROMPT end-to-end in the healing loop.
 
@@ -94,17 +97,86 @@ if ! e2e_validate_codex_handshake "$E2E_ARTIFACT_DIR" strict; then
   FAILED=1
 fi
 
-# 5. codex-last.txt must contain valid JSON (router summary contract, direct mode).
+# 5. codex-last.txt must satisfy the JSON schema contract.
 CODEX_LAST="${E2E_ARTIFACT_DIR}/codex-last.txt"
 if [[ -f "$CODEX_LAST" ]]; then
-  if jq -e . "$CODEX_LAST" > /dev/null 2>&1; then
-    echo "  + codex-last.txt: valid JSON (direct-mode router summary contract satisfied)"
-  else
+  if ! jq -e . "$CODEX_LAST" > /dev/null 2>&1; then
     echo "  ! codex-last.txt: not valid JSON — direct-mode router summary contract violated" >&2
     FAILED=1
+  else
+    echo "  + codex-last.txt: valid JSON"
+
+    ERROR_KIND="$(jq -r '.error_kind // empty' "$CODEX_LAST")"
+    if [[ "$ERROR_KIND" == "code" ]]; then
+      echo "  + codex-last.txt .error_kind: \"code\""
+    else
+      echo "  ! codex-last.txt .error_kind: expected \"code\", got \"${ERROR_KIND}\"" >&2
+      FAILED=1
+    fi
+
+    CODEX_BUG_SUMMARY="$(jq -r '.bug_summary // empty' "$CODEX_LAST")"
+    if [[ -n "$CODEX_BUG_SUMMARY" ]]; then
+      echo "  + codex-last.txt .bug_summary: present"
+    else
+      echo "  ! codex-last.txt .bug_summary: missing or empty" >&2
+      FAILED=1
+    fi
+
+    if grep -qF '{{' "$CODEX_LAST"; then
+      echo "  ! codex-last.txt: contains unresolved template tokens ({{)" >&2
+      FAILED=1
+    else
+      echo "  + codex-last.txt: no unresolved template tokens"
+    fi
   fi
 else
   echo "  ! codex-last.txt: missing" >&2
+  FAILED=1
+fi
+
+echo ""
+echo "=== Negative gate: direct mode without CODEX_PROMPT must fail deterministically ==="
+
+# 7. A spec that uses direct codex mode but omits CODEX_PROMPT must be rejected
+#    by mig-codex with "prompt required" before any healing attempt.
+_NO_PROMPT_SPEC="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-no-prompt.XXXXXX.yaml")"
+cat >"$_NO_PROMPT_SPEC" <<'YAML'
+apiVersion: ploy.mig/v1alpha1
+kind: MigRunSpec
+
+steps:
+  - image: localhost:5000/ploy/orw-cli-maven:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+
+build_gate:
+  enabled: true
+  # Router: direct Codex mode — CODEX_PROMPT intentionally omitted to prove enforcement.
+  router:
+    image: localhost:5000/ploy/migs-codex:latest
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+
+mr_on_fail: false
+mr_on_success: false
+YAML
+
+_NO_PROMPT_OUT="$(e2e_mig_run_json \
+  --repo-url "$REPO" \
+  --repo-base-ref "$BASE_REF" \
+  --repo-target-ref "$TARGET_REF" \
+  --spec "$_NO_PROMPT_SPEC" \
+  --follow 2>&1)" || true
+rm -f "$_NO_PROMPT_SPEC"
+
+if printf '%s' "$_NO_PROMPT_OUT" | grep -qF "prompt required"; then
+  echo "  + negative gate: run without CODEX_PROMPT rejected with 'prompt required' (enforcement confirmed)"
+else
+  echo "  ! negative gate: expected 'prompt required' error but got:" >&2
+  printf '%s\n' "$_NO_PROMPT_OUT" >&2
   FAILED=1
 fi
 
