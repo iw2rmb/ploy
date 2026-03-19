@@ -57,12 +57,13 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-# Copy only the mig-codex entrypoint; no Build Gate helper binary is included
-# to prevent Codex from running the gate inside the container. Build Gate
-# verification is performed externally by Ploy (docker gate) or the
-# Build Gate HTTP API.
+# Copy the mig-codex entrypoint and the prebuilt amata binary (staged by
+# deploy/images/migs/mig-codex/build-amata.sh before this build runs).
+# No Build Gate helper binary is included to prevent Codex from running the
+# gate inside the container; Build Gate verification is performed externally.
 COPY deploy/images/migs/mig-codex/mig-codex.sh /usr/local/bin/mig-codex
-RUN chmod +x /usr/local/bin/mig-codex && \
+COPY deploy/images/migs/mig-codex/amata /usr/local/bin/amata
+RUN chmod +x /usr/local/bin/mig-codex /usr/local/bin/amata && \
     ln -s /usr/local/bin/mig-codex /usr/local/bin/migs-codex
 
 WORKDIR /workspace

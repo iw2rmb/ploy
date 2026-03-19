@@ -38,7 +38,7 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     2. `go test ./tests/integration/migs/mig-codex -run TestMigCodexContainer`
   - Reasoning: high
 
-- [ ] 1.4 Build local `../amata` binary outside Dockerfile and copy into image
+- [x] 1.4 Build local `../amata` binary outside Dockerfile and copy into image
   - Repository: `ploy`
     1. Add a pre-build helper script under `deploy/images/migs/mig-codex/` that runs `go build` in `../amata` and stages the binary into ploy build context.
     2. Update `deploy/images/migs/mig-codex/Dockerfile` to `COPY` the prebuilt staged binary only and remove any in-image `amata` compilation logic.

@@ -80,6 +80,7 @@ for entry in "${images[@]}"; do
   # - Special-case orw-cli-gradle/orw-cli-maven: Dockerfile expects repo-root context (shared runner src)
   build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "--progress=plain" "-t" "$ref" "--push")
   if [[ "$source_group" == "migs" && "$name" == "mig-codex" ]]; then
+    bash deploy/images/migs/mig-codex/build-amata.sh
     context="."
     build_args+=("-f" "deploy/images/migs/mig-codex/Dockerfile" "$context")
   elif [[ "$source_group" == "mig" && ( "$name" == "orw-cli-gradle" || "$name" == "orw-cli-maven" ) ]]; then
