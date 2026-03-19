@@ -40,11 +40,15 @@ build_gate:
                   - Read /in/build-gate.log.
                   - Do not edit /workspace.
                   - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-                    {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
+                    {"bug_summary":"<<=200 chars, single line>","error_kind":"{{ .error_kind }}"}
                   - Do not output any other text in the final message.
 
                   Task:
                   Summarize the build failure in /in/build-gate.log.
+      # amata.set: exercises --set flag forwarding and template rendering in amata executor.
+      set:
+        - param: error_kind
+          value: code
     env_from_file:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 

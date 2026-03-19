@@ -1,0 +1,73 @@
+# Failing Build Gate scenario — direct Codex mode for both router and healing.
+# Proves that when amata.spec is absent, CODEX_PROMPT is required and enforced
+# end-to-end through the healing loop (router summary → healing → re-gate).
+#
+# Parity contract with scenario-orw-fail:
+#   - Same repo/branch combination (pre-gate ORW failure).
+#   - Same loop shape: Build Gate fail → router summary → heal → re-gate.
+#   - Different execution mode: direct codex exec (no amata.spec) for both
+#     router and healing; CODEX_PROMPT required for both.
+#
+# Submit with:
+#   dist/ploy run \
+#     --repo https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
+#     --base-ref e2e/fail-missing-symbol \
+#     --target-ref migs-upgrade-java17-heal \
+#     --spec tests/e2e/migs/scenario-orw-fail-direct/mig.yaml \
+#     --follow
+
+apiVersion: ploy.mig/v1alpha1
+kind: MigRunSpec
+
+steps:
+  - image: localhost:5000/ploy/orw-cli-maven:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+
+build_gate:
+  enabled: true
+
+  # Router: direct Codex mode — no amata.spec; CODEX_PROMPT required and enforced.
+  # Proves direct codex exec path for router in the failing-gate loop.
+  router:
+    image: localhost:5000/ploy/migs-codex:latest
+    env:
+      CODEX_PROMPT: |-
+        Rules:
+        - Read /in/build-gate.log.
+        - Do not edit /workspace.
+        - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
+        - Do not output any other text in the final message.
+
+        Task:
+        Summarize the build failure in /in/build-gate.log.
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+
+  healing:
+    by_error_kind:
+      code:
+        retries: 1
+        # Healing: direct Codex mode — no amata.spec; CODEX_PROMPT required and enforced.
+        image: localhost:5000/ploy/migs-codex:latest
+        env:
+          CODEX_PROMPT: |-
+            Rules:
+            - Use /workspace and /in/build-gate.log to understand the compile error.
+            - Edit files under /workspace as needed to fix the error.
+            - When you believe the code is ready for a full build validation, stop editing and end the session.
+            - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+              {"action_summary":"<<=200 chars, single line>"}
+            - Do not output any other text in the final message.
+
+            Task:
+            Fix the compilation error described in /in/build-gate.log.
+        env_from_file:
+          CODEX_AUTH_JSON: ~/.codex/auth.json
+
+mr_on_fail: false
+mr_on_success: true
