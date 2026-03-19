@@ -400,6 +400,33 @@ func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 			}`,
 			wantErr: "build_gate.healing.amata: forbidden",
 		},
+		{
+			name: "build_gate pre amata forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"pre": {
+						"amata": {"spec": "bad"}
+					}
+				}
+			}`,
+			wantErr: "build_gate.pre.amata: forbidden",
+		},
+		{
+			name: "build_gate post nested amata forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"post": {
+						"stack": {
+							"enabled": true,
+							"amata": {"spec": "bad"}
+						}
+					}
+				}
+			}`,
+			wantErr: "build_gate.post.stack.amata: forbidden",
+		},
 	}
 
 	for _, tt := range tests {

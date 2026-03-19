@@ -26,15 +26,15 @@
 #
 # Usage:
 #   # From repository root:
-#   bash tests/e2e/migs/scenario-post-mig-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
 #
 #   # With custom configuration:
 #   REPO_URL="https://gitlab.com/example/repo.git" \
 #   REPO_BASE_REF="fail-branch" \
-#   bash tests/e2e/migs/scenario-post-mig-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
 #
 #   # Skip artifact collection:
-#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mig-heal/run.sh
+#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mod-heal/run.sh
 
 set -euo pipefail
 
@@ -76,7 +76,7 @@ SPEC_FILE="${SCRIPT_DIR}/mig.yaml"
 SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
 if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   TS=$(date +%y%m%d%H%M%S)
-  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mig-heal/${TS}}"
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mod-heal/${TS}}"
   mkdir -p "${ARTIFACT_DIR}"
 fi
 
