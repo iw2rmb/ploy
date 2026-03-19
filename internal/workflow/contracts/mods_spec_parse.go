@@ -83,6 +83,9 @@ func checkForbiddenFields(raw map[string]any) error {
 					if _, ok := sm["retain_container"]; ok {
 						return fmt.Errorf("steps[%d].retain_container: forbidden", i)
 					}
+					if _, ok := sm["amata"]; ok {
+						return fmt.Errorf("steps[%d].amata: forbidden (amata is only allowed under build_gate.router and build_gate.healing.by_error_kind.<kind>)", i)
+					}
 				}
 			}
 		}
@@ -100,10 +103,16 @@ func checkForbiddenFields(raw map[string]any) error {
 	if _, ok := bg["profile"]; ok {
 		return fmt.Errorf("build_gate.profile: forbidden")
 	}
+	if _, ok := bg["amata"]; ok {
+		return fmt.Errorf("build_gate.amata: forbidden (amata is only allowed under build_gate.router and build_gate.healing.by_error_kind.<kind>)")
+	}
 
 	// Healing forbidden legacy fields.
 	if healAny, ok := bg["healing"]; ok && healAny != nil {
 		if heal, ok := healAny.(map[string]any); ok {
+			if _, ok := heal["amata"]; ok {
+				return fmt.Errorf("build_gate.healing.amata: forbidden (amata is only allowed under build_gate.healing.by_error_kind.<kind>.amata)")
+			}
 			for _, key := range []string{"retries", "image", "command", "env", "retain_container"} {
 				if _, ok := heal[key]; ok {
 					return fmt.Errorf("build_gate.healing.%s: forbidden (use build_gate.healing.by_error_kind.<error_kind>.%s)", key, key)

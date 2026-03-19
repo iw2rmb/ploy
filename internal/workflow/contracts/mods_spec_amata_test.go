@@ -360,6 +360,61 @@ func TestParseModsSpecJSON_HealingAmata(t *testing.T) {
 	}
 }
 
+// TestParseModsSpecJSON_AmataForbiddenPlacements verifies that amata is rejected
+// outside of build_gate.router.amata and build_gate.healing.by_error_kind.<kind>.amata.
+func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "steps amata forbidden",
+			input: `{
+				"steps": [{"image": "test:latest", "amata": {"spec": "bad"}}]
+			}`,
+			wantErr: "steps[0].amata: forbidden",
+		},
+		{
+			name: "build_gate amata forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"amata": {"spec": "bad"},
+					"router": {"image": "router:latest"}
+				}
+			}`,
+			wantErr: "build_gate.amata: forbidden",
+		},
+		{
+			name: "build_gate.healing amata forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"healing": {
+						"amata": {"spec": "bad"},
+						"by_error_kind": {}
+					},
+					"router": {"image": "router:latest"}
+				}
+			}`,
+			wantErr: "build_gate.healing.amata: forbidden",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseModsSpecJSON([]byte(tt.input))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 // TestParseModsSpecJSON_AmataValidateRoundtrip confirms AmataRunSpec survives
 // marshal → ParseModsSpecJSON intact.
 func TestParseModsSpecJSON_AmataValidateRoundtrip(t *testing.T) {
