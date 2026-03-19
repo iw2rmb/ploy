@@ -50,7 +50,15 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
 ```
 
 Publish `migs-codex` (manual one-off)
+
+`migs-codex` embeds a locally built `amata` binary. Build it before the Docker
+image build — the Dockerfile copies the staged binary; no in-image compilation occurs.
+
 ```bash
+# Step 1: build and stage the amata binary (requires ../amata source sibling repo)
+PLATFORM=linux/amd64 deploy/images/migs/mig-codex/build-amata.sh
+
+# Step 2: build and push the migs-codex image
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
 docker buildx build \
   --platform linux/amd64 \
@@ -58,6 +66,10 @@ docker buildx build \
   -t "${IMAGE_PREFIX}/migs-codex:latest" \
   --push .
 ```
+
+`build-amata.sh` expects the `amata` repository to be a sibling of `ploy` at
+`../amata`. It fails fast with a clear error when the source or build output is
+missing.
 
 Stack-aware image mapping example
 ```yaml

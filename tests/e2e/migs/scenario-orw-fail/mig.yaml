@@ -21,21 +21,30 @@ steps:
 build_gate:
   enabled: true
 
-  # Router runs BEFORE healing. It reads /in/build-gate.log and outputs a single-line
-  # JSON final message with {"bug_summary":"...","error_kind":"code"}.
+  # Router: amata mode — CODEX_PROMPT not required; amata spec drives the workflow.
+  # Exercises the amata execution path for router.
   router:
     image: localhost:5000/ploy/migs-codex:latest
-    env:
-      CODEX_PROMPT: |-
-        Rules:
-        - Read /in/build-gate.log.
-        - Do not edit /workspace.
-        - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
-        - Do not output any other text in the final message.
+    amata:
+      spec: |
+        version: amata/v1
+        name: bug-router
+        entry: main
+        workspace:
+          root: /workspace
+        flows:
+          main:
+            steps:
+              - codex: |
+                  Rules:
+                  - Read /in/build-gate.log.
+                  - Do not edit /workspace.
+                  - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+                    {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
+                  - Do not output any other text in the final message.
 
-        Task:
-        Summarize the build failure in /in/build-gate.log.
+                  Task:
+                  Summarize the build failure in /in/build-gate.log.
     env_from_file:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 
@@ -43,8 +52,8 @@ build_gate:
     by_error_kind:
       code:
         retries: 1
-        # Healing runs AFTER router. It edits /workspace, then outputs a single-line JSON
-        # final message with {"action_summary":"..."} used to persist jobs.meta.action_summary.
+        # Healing: direct-Codex fallback mode — CODEX_PROMPT required; no amata.spec.
+        # Exercises the direct codex exec path for healing.
         image: localhost:5000/ploy/migs-codex:latest
         env:
           CODEX_PROMPT: |-

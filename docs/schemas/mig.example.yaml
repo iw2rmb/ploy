@@ -173,6 +173,43 @@ build_gate:
 # The bug_summary is persisted in jobs.meta.gate.bug_summary and included in
 # /in/healing-log.md for healing context.
 #
+# Two execution modes:
+#
+# 1. amata mode (recommended): set `amata.spec` — CODEX_PROMPT is not required.
+#    amata materializes the spec as /in/amata.yaml and runs `amata run /in/amata.yaml`.
+#    Use `amata.set` to pass ordered --set parameters to the amata run command.
+#
+# build_gate:
+#   router:
+#     image: docker.io/your-dh-user/migs-codex:latest
+#     amata:
+#       spec: |
+#         version: amata/v1
+#         name: bug-router
+#         entry: main
+#         workspace:
+#           root: /workspace
+#         flows:
+#           main:
+#             steps:
+#               - codex: |
+#                   Rules:
+#                   - Read /in/build-gate.log.
+#                   - Do not edit /workspace.
+#                   - Your final message MUST be one line of JSON: {"bug_summary":"...","error_kind":"code"}
+#                   Task:
+#                   Summarize the build failure as a single bug_summary one-liner.
+#       # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
+#       #   - param: model
+#       #     value: gpt-4o
+#     env_from_file:
+#       CODEX_AUTH_JSON: ~/.codex/auth.json
+#     # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
+#     #   - name: router-instructions.txt
+#     #     path: ./healing/router/instructions.txt
+#
+# 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
+#
 # build_gate:
 #   router:
 #     spec_path: ./healing/router/spec.yaml
@@ -187,9 +224,6 @@ build_gate:
 #         Summarize the build failure as a single bug_summary one-liner.
 #     env_from_file:
 #       CODEX_AUTH_JSON: ~/.codex/auth.json
-#     # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
-#     #   - name: router-instructions.txt
-#     #     path: ./healing/router/instructions.txt
 
 ################################################################################
 # HEALING CONFIGURATION (build_gate.healing)
@@ -197,6 +231,46 @@ build_gate:
 # Healing runs after router (if configured) when the Build Gate fails.
 # Mod-like fields (image, command, env, env_from_file) are specified under
 # healing.by_error_kind.<error_kind> (no nested "mig" key).
+#
+# Two execution modes per error kind:
+#
+# 1. amata mode (recommended): set `amata.spec` — CODEX_PROMPT is not required.
+#
+# build_gate:
+#   healing:
+#     by_error_kind:
+#       code:
+#         spec_path: ./healing/code/spec.yaml
+#         retries: 2
+#         image: docker.io/your-dh-user/migs-codex:latest
+#         amata:
+#           spec: |
+#             version: amata/v1
+#             name: code-healer
+#             entry: main
+#             workspace:
+#               root: /workspace
+#             flows:
+#               main:
+#                 steps:
+#                   - codex: |
+#                       Rules:
+#                       - Use /workspace and /in/build-gate.log to understand the compile error.
+#                       - Edit files under /workspace as needed to fix the error.
+#                       - When ready, stop editing and end the session.
+#                       - Your final message MUST be one line of JSON: {"action_summary":"..."}
+#                       Task:
+#                       Fix the compilation error described in /in/build-gate.log.
+#           # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
+#           #   - param: model
+#           #     value: gpt-4o
+#         env_from_file:
+#           CODEX_AUTH_JSON: ~/.codex/auth.json
+#         # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
+#         #   - name: prompt-extra.txt
+#         #     path: ./healing/code/prompt-extra.txt
+#
+# 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
 #
 # build_gate:
 #   healing:
@@ -225,9 +299,6 @@ build_gate:
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
 #         env_from_file:
 #           CODEX_AUTH_JSON: ~/.codex/auth.json
-#         # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
-#         #   - name: prompt-extra.txt
-#         #     path: ./healing/code/prompt-extra.txt
 #
 # `spec_path` is optional preprocessing handled by CLI:
 # - CLI reads YAML/JSON object from `spec_path`
@@ -280,6 +351,12 @@ mr_on_fail: true
 # - The node agent consumes build_gate.healing.by_error_kind and build_gate.router to run
 #   the router → heal → re-gate loop after the first gate fail (applies to both
 #   single-step and multi-step runs).
+# - Router and healing dual-mode execution:
+#   * When `amata` block is present (amata.spec non-empty): container runs
+#     `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags.
+#     CODEX_PROMPT is not required in this mode.
+#   * When `amata` block is absent: container uses direct `codex exec` path.
+#     CODEX_PROMPT is required in this mode.
 # - Container cleanup model:
 #   * Containers are retained after step/gate completion.
 #   * Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.

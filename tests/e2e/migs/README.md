@@ -154,16 +154,42 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
 - `PLOY_SERVER_URL` — ploy control plane base URL
 
-Example healing spec block (router + by_error_kind + Codex workspace diff handshake):
+Router and healing containers support two execution modes:
+
+**amata mode** (recommended): set `amata.spec` — `CODEX_PROMPT` is not required.
+The node agent materializes the spec as `/in/amata.yaml` and runs
+`amata run /in/amata.yaml` with optional `--set` flags from `amata.set`.
+
+**Direct-Codex mode** (fallback): omit `amata` — `CODEX_PROMPT` is required.
+The container uses the direct `codex exec` path.
+
+The `scenario-orw-fail` fixture exercises amata mode for the router and
+direct-Codex mode for healing. The `scenario-post-mod-heal` fixture reverses
+this — direct-Codex for the router and amata mode for healing.
+
+Example healing spec block (router in amata mode + healing in direct-Codex mode):
 ```yaml
 build_gate:
   enabled: true
+  # amata mode: CODEX_PROMPT not required
   router:
     image: docker.io/you/migs-codex:latest
-    env:
-      CODEX_PROMPT: |-
-        Output exactly one JSON line:
-        {"bug_summary":"<<=200 chars>","error_kind":"code"}
+    amata:
+      spec: |
+        version: amata/v1
+        name: bug-router
+        entry: main
+        workspace:
+          root: /workspace
+        flows:
+          main:
+            steps:
+              - codex: |
+                  Output exactly one JSON line:
+                  {"bug_summary":"<<=200 chars>","error_kind":"code"}
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
+  # direct-Codex mode: CODEX_PROMPT required
   healing:
     by_error_kind:
       code:
