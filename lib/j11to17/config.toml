@@ -1,0 +1,16 @@
+profile = "llm-proxy"
+model = "gpt-999"
+model_reasoning_effort = "high"
+personality = "pragmatic"
+
+[projects."/workspace"]
+trust_level = "trusted"
+
+[model_providers.llm-proxy]
+name = "llm-proxy"
+env_key="CODEX_API_KEY"
+base_url = "https://llm-proxy.t-tech.team/v1"
+
+[profiles.llm-proxy]
+model = "openrouter/qwen/qwen3.5-397b-a17b"
+model_provider = "llm-proxy"

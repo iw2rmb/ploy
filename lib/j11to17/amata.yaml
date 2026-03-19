@@ -42,7 +42,7 @@ flows:
           Delete DD that is correspond to this roadmap if there is no other reference to that DD except this roadmap.
           Delete roadmap file.
         reasoning: $.params.codex_docs_reasoning
-        response: ./commit.schema.json
+        response: /tmp/commit.schema.json
         expect: $.value.ok
 
   compose_roadmap:
