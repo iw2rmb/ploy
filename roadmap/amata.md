@@ -68,7 +68,7 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     3. Verify `amata.set` values are passed exactly as `--set` CLI flags and affect rendered prompt/template output in `../amata` Codex executor.
     4. Run full hygiene/test suite and keep one image with deterministic dual-mode routing.
   - Verification:
-    1. `bash tests/e2e/migs/scenario-orw-fail/run.sh` — amata-mode router + direct-mode healing; strict assertions for repo status, bug_summary, heal job, re_gate job, codex handshake; codex-last.txt schema contract: valid JSON, `.error_kind == "code"`, `.bug_summary` non-empty, no `{{` template tokens; `amata.set` with `error_kind` param exercises `--set` flag forwarding end-to-end.
+    1. `bash tests/e2e/migs/scenario-orw-fail/run.sh` — amata-mode router + direct-mode healing; strict assertions for repo status, bug_summary, heal job, re_gate job, codex handshake; codex-last.txt schema contract: valid JSON, `.error_kind == "code"`, `.bug_summary` non-empty, no `{{` template tokens; `recovery.router_cmd` asserted against exact argv `["amata","run","/in/amata.yaml","--set","error_kind=code","--set","loop_kind=healing"]` — proves `--set` forwarding shape and deterministic ordered multi-set forwarding end-to-end.
     2. `bash tests/e2e/migs/scenario-orw-fail-direct/run.sh` — direct-mode router (CODEX_PROMPT required, no amata.spec) + direct-mode healing; same strict loop-shape and schema assertions as 1.6.1; negative gate step proves CODEX_PROMPT enforcement by running without it and asserting "prompt required" failure deterministically.
     3. `bash tests/e2e/migs/validate-hygiene.sh` — runs `make test`, `make vet`, `make staticcheck` from repo root; must pass before 1.6 is complete.
   - Reasoning: xhigh

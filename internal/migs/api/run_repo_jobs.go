@@ -20,6 +20,9 @@ type RunRepoJobRecovery struct {
 	CandidateValidationStatus string          `json:"candidate_validation_status,omitempty"`
 	CandidateValidationError  string          `json:"candidate_validation_error,omitempty"`
 	CandidatePromoted         *bool           `json:"candidate_promoted,omitempty"`
+	// RouterCmd is the exact argv slice used to invoke the router container.
+	// Present only for amata-mode routers; nil otherwise.
+	RouterCmd []string `json:"router_cmd,omitempty"`
 }
 
 // RunRepoJob represents a job within a repo execution.

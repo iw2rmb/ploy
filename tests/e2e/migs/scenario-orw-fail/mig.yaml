@@ -46,9 +46,12 @@ build_gate:
                   Task:
                   Summarize the build failure in /in/build-gate.log.
       # amata.set: exercises --set flag forwarding and template rendering in amata executor.
+      # Two entries validate deterministic ordered multi---set forwarding (roadmap 1.6.3).
       set:
         - param: error_kind
           value: code
+        - param: loop_kind
+          value: healing
     env_from_file:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 
