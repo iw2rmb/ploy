@@ -103,7 +103,7 @@ func TestLabSmoke(t *testing.T) {
 		RepoBaseRef: runRepo.RepoBaseRef,
 		Attempt:     runRepo.Attempt,
 		Name:        "build",
-		Status:      store.JobStatusRunning,
+		Status:      domaintypes.JobStatusRunning,
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,

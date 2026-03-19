@@ -49,7 +49,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		RepoBaseRef: runRepo.RepoBaseRef,
 		Attempt:     runRepo.Attempt,
 		Name:        "build-gate",
-		Status:      store.JobStatusRunning,
+		Status:      domaintypes.JobStatusRunning,
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,
@@ -68,7 +68,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		RepoBaseRef: runRepo.RepoBaseRef,
 		Attempt:     runRepo.Attempt,
 		Name:        "main",
-		Status:      store.JobStatusCreated,
+		Status:      domaintypes.JobStatusCreated,
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,
@@ -87,7 +87,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		RepoBaseRef: runRepo.RepoBaseRef,
 		Attempt:     runRepo.Attempt,
 		Name:        "post-process",
-		Status:      store.JobStatusCreated,
+		Status:      domaintypes.JobStatusCreated,
 		JobType:     "",
 		JobImage:    "",
 		NextID:      nil,
@@ -236,7 +236,7 @@ index abc1234..def5678 100644
 	// In a real workflow, the runner would update job statuses and then the run status.
 	err = db.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
 		ID:     run.ID,
-		Status: store.RunStatusFinished,
+		Status: domaintypes.RunStatusFinished,
 	})
 	if err != nil {
 		t.Fatalf("UpdateRunStatus() failed: %v", err)
@@ -249,7 +249,7 @@ index abc1234..def5678 100644
 	if err != nil {
 		t.Fatalf("GetRun() failed: %v", err)
 	}
-	if fetchedRun.Status != store.RunStatusFinished {
+	if fetchedRun.Status != domaintypes.RunStatusFinished {
 		t.Errorf("Fetched run status mismatch: expected 'Finished', got %s", fetchedRun.Status)
 	}
 	t.Logf("✓ Verified run status: %s", fetchedRun.Status)
