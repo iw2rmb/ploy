@@ -309,4 +309,4 @@ You may manually update:
 
 **Related Documentation**:
 - [Releasing Guide](./releasing.md)
-- [GoReleaser Config](../.goreleaser.yml)
+- [Testing workflow](./testing-workflow.md)
