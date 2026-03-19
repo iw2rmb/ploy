@@ -61,7 +61,7 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     3. `bash ~/@iw2rmb/amata/scripts/check_docs_links.sh`
   - Reasoning: medium
 
-- [ ] 1.6 Validate end-to-end healing loop with dual execution modes
+- [x] 1.6 Validate end-to-end healing loop with dual execution modes
   - Repository: `ploy`
     1. Run failing-gate scenario with `amata.spec` defined and without `CODEX_PROMPT` and confirm router summary, healing attempt, and re-gate flow still produce deterministic statuses and metadata.
     2. Run failing-gate scenario without `amata.spec` and confirm direct `codex exec` path still requires `CODEX_PROMPT` and preserves the same status and metadata contract.
