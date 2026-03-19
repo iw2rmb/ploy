@@ -143,6 +143,12 @@ type ModStep struct {
 	// TmpDir lists files to materialize read-only under /tmp in the container.
 	// Each entry must have a unique non-empty name and non-empty content.
 	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
+
+	// Amata configures amata-mode execution for this mig step container.
+	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
+	// --set flags; CODEX_PROMPT is not required in this mode.
+	// When nil, the container uses the direct codex exec path and CODEX_PROMPT is required.
+	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
 // Validate checks that the spec is structurally valid.
@@ -170,6 +176,9 @@ func (s ModsSpec) Validate() error {
 			}
 		}
 		if err := validateTmpDir(mig.TmpDir, fmt.Sprintf("steps[%d].tmp_dir", i)); err != nil {
+			return err
+		}
+		if err := validateAmataRunSpec(mig.Amata, fmt.Sprintf("steps[%d].amata", i)); err != nil {
 			return err
 		}
 	}

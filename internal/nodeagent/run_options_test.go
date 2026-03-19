@@ -646,6 +646,55 @@ func TestModsSpecToRunOptions_Amata(t *testing.T) {
 		}
 	})
 
+	t.Run("single_step_amata_propagated", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{
+				{
+					Image: contracts.JobImage{Universal: "step-img"},
+					Amata: amataSpec,
+				},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if runOpts.Execution.Amata == nil {
+			t.Fatal("Execution.Amata: expected non-nil")
+		}
+		if runOpts.Execution.Amata.Spec != amataSpec.Spec {
+			t.Errorf("Execution.Amata.Spec: got %q, want %q", runOpts.Execution.Amata.Spec, amataSpec.Spec)
+		}
+		if len(runOpts.Execution.Amata.Set) != 2 {
+			t.Fatalf("Execution.Amata.Set len: got %d, want 2", len(runOpts.Execution.Amata.Set))
+		}
+	})
+
+	t.Run("multi_step_amata_propagated", func(t *testing.T) {
+		t.Parallel()
+
+		spec := &contracts.ModsSpec{
+			Steps: []contracts.ModStep{
+				{Image: contracts.JobImage{Universal: "step0-img"}},
+				{Image: contracts.JobImage{Universal: "step1-img"}, Amata: amataSpec},
+			},
+		}
+		runOpts := modsSpecToRunOptions(spec)
+
+		if len(runOpts.Steps) != 2 {
+			t.Fatalf("Steps len: got %d, want 2", len(runOpts.Steps))
+		}
+		if runOpts.Steps[0].Amata != nil {
+			t.Errorf("Steps[0].Amata: got %+v, want nil", runOpts.Steps[0].Amata)
+		}
+		if runOpts.Steps[1].Amata == nil {
+			t.Fatal("Steps[1].Amata: expected non-nil")
+		}
+		if runOpts.Steps[1].Amata.Spec != amataSpec.Spec {
+			t.Errorf("Steps[1].Amata.Spec: got %q, want %q", runOpts.Steps[1].Amata.Spec, amataSpec.Spec)
+		}
+	})
+
 	t.Run("healing_amata_propagated", func(t *testing.T) {
 		t.Parallel()
 

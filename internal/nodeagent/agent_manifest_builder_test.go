@@ -383,6 +383,74 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("single-step amata uses amata command", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   types.RunID("run-single-amata"),
+			JobID:   types.JobID("job-single-amata"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+			TypedOptions: RunOptions{
+				Execution: ModContainerSpec{
+					Image: contracts.JobImage{Universal: "migs-codex:latest"},
+					Amata: &contracts.AmataRunSpec{
+						Spec: "version: amata/v1\n",
+						Set:  []contracts.AmataSetParam{{Param: "mode", Value: "step"}},
+					},
+				},
+			},
+		}
+
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+		want := []string{"amata", "run", "/in/amata.yaml", "--set", "mode=step"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("command len=%d, want %d, command=%v", len(manifest.Command), len(want), manifest.Command)
+		}
+		for i := range want {
+			if manifest.Command[i] != want[i] {
+				t.Fatalf("command[%d]=%q, want %q", i, manifest.Command[i], want[i])
+			}
+		}
+	})
+
+	t.Run("multi-step amata uses amata command for selected step", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   types.RunID("run-multi-amata"),
+			JobID:   types.JobID("job-multi-amata"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+			TypedOptions: RunOptions{
+				Steps: []StepMod{
+					{ModContainerSpec: ModContainerSpec{
+						Image:   contracts.JobImage{Universal: "migs-orw:latest"},
+						Command: contracts.CommandSpec{Shell: "echo plain"},
+					}},
+					{ModContainerSpec: ModContainerSpec{
+						Image: contracts.JobImage{Universal: "migs-codex:latest"},
+						Amata: &contracts.AmataRunSpec{
+							Spec: "version: amata/v1\n",
+							Set:  []contracts.AmataSetParam{{Param: "model", Value: "gpt-5"}},
+						},
+					}},
+				},
+			},
+		}
+
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 1, contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest(step=1) error: %v", err)
+		}
+		want := []string{"amata", "run", "/in/amata.yaml", "--set", "model=gpt-5"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("command len=%d, want %d, command=%v", len(manifest.Command), len(want), manifest.Command)
+		}
+		for i := range want {
+			if manifest.Command[i] != want[i] {
+				t.Fatalf("command[%d]=%q, want %q", i, manifest.Command[i], want[i])
+			}
+		}
+	})
+
 	t.Run("multi-step run: step env overrides base env", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("run-multi-456"),

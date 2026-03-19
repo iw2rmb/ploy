@@ -81,7 +81,11 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			}
 			image = strings.TrimSpace(resolved)
 		}
-		command = stepMod.Command.ToSlice()
+		if stepMod.Amata != nil && strings.TrimSpace(stepMod.Amata.Spec) != "" {
+			command = resolveAmataCommand(stepMod.Amata)
+		} else {
+			command = stepMod.Command.ToSlice()
+		}
 		tmpDir = stepMod.TmpDir
 
 		for k, v := range req.Env {
@@ -99,7 +103,11 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			}
 			image = strings.TrimSpace(resolved)
 		}
-		command = typedOpts.Execution.Command.ToSlice()
+		if typedOpts.Execution.Amata != nil && strings.TrimSpace(typedOpts.Execution.Amata.Spec) != "" {
+			command = resolveAmataCommand(typedOpts.Execution.Amata)
+		} else {
+			command = typedOpts.Execution.Command.ToSlice()
+		}
 		tmpDir = typedOpts.Execution.TmpDir
 
 		for k, v := range req.Env {

@@ -70,12 +70,9 @@ func (r *runController) runRouterForGateFailure(
 	}
 
 	// For amata-mode router: write /in/amata.yaml with deterministic overwrite.
-	if typedOpts.Router.Amata != nil && strings.TrimSpace(typedOpts.Router.Amata.Spec) != "" {
-		amataPath := filepath.Join(routerInDir, "amata.yaml")
-		if writeErr := os.WriteFile(amataPath, []byte(typedOpts.Router.Amata.Spec), 0o644); writeErr != nil {
-			slog.Warn("failed to write router /in/amata.yaml", "run_id", req.RunID, "job_id", req.JobID, "error", writeErr)
-			return
-		}
+	if writeErr := writeAmataSpecInDir(routerInDir, typedOpts.Router.Amata); writeErr != nil {
+		slog.Warn("failed to write router /in/amata.yaml", "run_id", req.RunID, "job_id", req.JobID, "error", writeErr)
+		return
 	}
 
 	stack := gateResult.DetectedStack()
