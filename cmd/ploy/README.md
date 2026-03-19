@@ -494,6 +494,7 @@ ploy config env unset --key OLD_VAR
 |----------|-------------|-------------------|
 | `CA_CERTS_PEM_BUNDLE` | PEM-encoded CA certificates for TLS trust | `all` |
 | `CODEX_AUTH_JSON` | Codex authentication credentials | `migs` |
+| `CRUSH_JSON` | Crush config JSON content or file path (materialized at `/root/.config/crush/crush.json`) | `migs` |
 | `OPENAI_API_KEY` | OpenAI API key for LLM-integrated migs | `all` |
 
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and

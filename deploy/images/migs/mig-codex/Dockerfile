@@ -29,9 +29,9 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     if [ -s /etc/ssl/certs/ploy-ca-bundle.pem ]; then \
       NPM_CONFIG_CAFILE=/etc/ssl/certs/ploy-ca-bundle.pem \
       NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem \
-      npm install -g @openai/codex; \
+      npm install -g @openai/codex @charmland/crush; \
     else \
-      npm install -g @openai/codex; \
+      npm install -g @openai/codex @charmland/crush; \
     fi && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
@@ -51,6 +51,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     CODEX_EXTRA_DIR="" \
     CODEX_AUTH_JSON="" \
     CODEX_CONFIG_TOML="" \
+    CRUSH_JSON="" \
     PLOY_SERVER_URL="" \
     PLOY_API_TOKEN="" \
     PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.crt" \
