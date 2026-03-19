@@ -47,7 +47,7 @@ Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.m
     2. `go test ./internal/nodeagent -run 'Test.*Execute.*TmpDir|Test.*Cleanup.*Tmp.*'`
   - Reasoning: high
 
-- [ ] 1.5 Update docs and perform validation pass.
+- [x] 1.5 Update docs and perform validation pass.
   - Repository: `ploy`
     1. Update `docs/schemas/mig.example.yaml` with `tmpDir` examples for step/healing/router blocks.
     2. Update `docs/envs/README.md` with `tmpDir` behavior and CLI preprocessing boundaries.

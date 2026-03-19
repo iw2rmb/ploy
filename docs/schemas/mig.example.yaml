@@ -58,6 +58,30 @@ env_from_file:
   # CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
+# TMP_DIR — per-step file injection
+################################################################################
+# Optional list of files to materialize read-only at /tmp/<name> inside the
+# container. Supported under steps[], build_gate.router, and
+# build_gate.healing.by_error_kind.<kind>.
+#
+# Two forms per entry:
+#  1. path  — CLI reads the file and embeds its bytes as content before submit.
+#             Supports ~ expansion and $VAR/${ VAR} env expansion.
+#  2. content — raw bytes already inlined (used when submitting via API).
+#
+# Validation rules (enforced at CLI and nodeagent layers):
+#  - name: required; must be a plain filename (no path separators, not "." or "..")
+#  - content: required and non-empty
+#  - No two entries may share the same destination name within a single block
+#
+# Example (disabled by default; remove comments to activate):
+# tmp_dir:
+#   - name: recipe.yaml
+#     path: ./recipes/migrate-java17.yaml   # CLI resolves and inlines content
+#   - name: orw-settings.xml
+#     path: ~/.m2/orw-settings.xml
+
+################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
 ################################################################################
 # When you need multiple transformation steps executed sequentially, use migs[]
@@ -81,6 +105,9 @@ env_from_file:
 #   - image: docker.io/your-dh-user/migs-migrate-java8:latest
 #     env:
 #       MIGRATION_TARGET: java8
+#     tmp_dir:
+#       - name: settings.xml
+#         path: ~/.m2/settings.xml     # CLI reads and inlines file content
 #   - image: docker.io/your-dh-user/migs-migrate-java11:latest
 #     env:
 #       MIGRATION_TARGET: java11
@@ -154,6 +181,9 @@ build_gate:
 #         Summarize the build failure as a single bug_summary one-liner.
 #     env_from_file:
 #       CODEX_AUTH_JSON: ~/.codex/auth.json
+#     # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
+#     #   - name: router-instructions.txt
+#     #     path: ./healing/router/instructions.txt
 
 ################################################################################
 # HEALING CONFIGURATION (build_gate.healing)
@@ -189,6 +219,9 @@ build_gate:
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
 #         env_from_file:
 #           CODEX_AUTH_JSON: ~/.codex/auth.json
+#         # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
+#         #   - name: prompt-extra.txt
+#         #     path: ./healing/code/prompt-extra.txt
 #
 # `spec_path` is optional preprocessing handled by CLI:
 # - CLI reads YAML/JSON object from `spec_path`
@@ -214,7 +247,7 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy run --spec mig.yaml` along with
 #   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
-# - The agent honors: image, command, env, env_from_file,
+# - The agent honors: image, command, env, env_from_file, tmp_dir,
 #   migs[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
 #

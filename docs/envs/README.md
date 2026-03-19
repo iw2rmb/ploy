@@ -114,10 +114,51 @@ Role model (bearer token claims):
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
-  - `migs[]` — Multi-step spec steps (each with its own image/command/env/env_from_file)
+  - `migs[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_dir)
+  - `tmp_dir` — Per-step file injection: CLI resolves `path` entries to file bytes before submit; node mounts each file read-only at `/tmp/<name>` inside the container. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_dir behavior](#tmp_dir-file-injection) below.
   - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
+### tmp_dir file injection
+
+`tmp_dir` is an optional list of files injected read-only into a container at `/tmp/<name>`. It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
+
+**CLI preprocessing boundary** — the CLI resolves each entry before submission:
+- `path` form: CLI reads the file (supports `~/` and `$VAR`/`${VAR}` expansion), stores raw bytes in `content`, and removes `path`.
+- `content` form: already-inlined bytes; passed through unchanged.
+
+After CLI preprocessing, every submitted entry has only `name` + `content`.
+
+**Validation** (enforced by CLI and nodeagent):
+- `name` must be a plain filename: no path separators, not `.` or `..`, non-empty.
+- `content` must be non-empty.
+- No two entries in the same block may share the same `name`.
+
+**Runtime behavior** — the node agent materializes each file into a per-job temporary staging directory on the node, then mounts it into the container as a read-only bind mount at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
+
+**Example spec fragment:**
+```yaml
+steps:
+  - image: docker.io/your-dh-user/migs-openrewrite:latest
+    tmp_dir:
+      - name: recipe.yaml
+        path: ./recipes/migrate-java17.yaml   # resolved by CLI
+
+build_gate:
+  router:
+    image: docker.io/your-dh-user/migs-codex:latest
+    tmp_dir:
+      - name: router-instructions.txt
+        path: ./healing/router/instructions.txt
+  healing:
+    by_error_kind:
+      code:
+        image: docker.io/your-dh-user/migs-codex:latest
+        tmp_dir:
+          - name: prompt-extra.txt
+            path: ./healing/code/prompt-extra.txt
+```
+
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
   Use `ploy mig run repo add` to attach multiple repositories under a shared spec, then run it via
   `ploy mig run <mig-id|name> [--follow]`.
