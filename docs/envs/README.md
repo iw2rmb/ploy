@@ -114,7 +114,7 @@ Role model (bearer token claims):
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
-  - `migs[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_dir)
+  - `steps[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_dir)
   - `tmp_dir` — Per-step file injection: CLI resolves `path` entries to file bytes before submit; node mounts each file read-only at `/tmp/<name>` inside the container. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_dir behavior](#tmp_dir-file-injection) below.
   - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
