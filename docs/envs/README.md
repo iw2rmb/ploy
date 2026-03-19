@@ -554,7 +554,8 @@ The `scope` parameter controls which job types receive each variable:
 | Variable | Consumer | Description |
 |----------|----------|-------------|
 | `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
-| `CODEX_AUTH_JSON` | `mig-codex` | JSON credentials written to `/root/.codex/auth.json` at container startup |
+| `CODEX_AUTH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.codex/auth.json` at container startup |
+| `CRUSH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
@@ -618,8 +619,13 @@ Run/API metadata propagation:
 - **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
   `CODEX_PROMPT` is required in this mode.
 
-In both modes, the entrypoint checks for `CODEX_AUTH_JSON` and, when present, writes it to
-`/root/.codex/auth.json` before invoking the CLI.
+In both modes, the entrypoint materializes config env vars before invoking the CLI:
+- `CODEX_AUTH_JSON` -> `/root/.codex/auth.json`
+- `CODEX_CONFIG_TOML` -> `/root/.codex/config.toml`
+- `CRUSH_JSON` -> `/root/.config/crush/crush.json`
+
+For each key above, if the env value points to an existing file in the container,
+that file is copied; otherwise the env value is written as inline content.
 
 **Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble that:
 1. Writes `CA_CERTS_PEM_BUNDLE` to a temp file

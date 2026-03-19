@@ -15,7 +15,7 @@ get:
       required: true
       schema:
         type: string
-      description: Environment variable key (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON).
+      description: Environment variable key (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON, CRUSH_JSON).
       example: CA_CERTS_PEM_BUNDLE
   responses:
     '200':
@@ -54,6 +54,8 @@ put:
       installed into container trust stores.
     - `CODEX_AUTH_JSON` with scope `migs` — Codex credentials written to
       `/root/.codex/auth.json` by mig-codex images.
+    - `CRUSH_JSON` with scope `migs` — Crush JSON content or file path
+      materialized to `/root/.config/crush/crush.json` by mig-codex images.
     - `OPENAI_API_KEY` with scope `all` — API key for LLM-integrated migs.
 
     Requires `cli-admin` role.

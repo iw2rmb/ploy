@@ -10,8 +10,9 @@ Environment:
   CODEX_PROMPT      Inline prompt text (required in direct codex mode; optional in amata mode).
   CODEX_MODEL       Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
   CODEX_API_KEY     API key for Codex/OpenAI; passed through to codex exec and amata as-is.
-  CODEX_AUTH_JSON   Inline JSON for auth; if set, written to ~/.codex/auth.json.
+  CODEX_AUTH_JSON   Inline JSON or file path for auth; if set, written to ~/.codex/auth.json.
   CODEX_CONFIG_TOML Inline TOML for config; if set, written to ~/.codex/config.toml.
+  CRUSH_JSON        Inline JSON or file path for Crush config; if set, written to ~/.config/crush/crush.json.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior
                     Codex session instead of starting fresh (for healing retries).
   PLOY_API_TOKEN    Optional bearer token for Build Gate API (unused; gate runs externally).
@@ -19,13 +20,47 @@ Environment:
 Behavior:
   - Amata mode (first arg "amata"): delegates to amata binary; CODEX_PROMPT not required.
   - Direct codex mode (default): uses codex exec; CODEX_PROMPT or --prompt-file required.
-  - Places auth at /root/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
-  - Places config at /root/.codex/config.toml when --config is given or CODEX_CONFIG_TOML is set.
+  - Places auth at ~/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
+  - Places config at ~/.codex/config.toml when --config is given or CODEX_CONFIG_TOML is set.
+  - Places Crush config at ~/.config/crush/crush.json when CRUSH_JSON is set.
   - Always adds repository directory with: codex exec --add-dir <input> ...
   - Writes logs to <out>/codex.log and a small run manifest to <out>/codex-run.json.
   - When CODEX_RESUME=1 and a prior session exists, uses "codex exec resume <session>"
     to continue in the same thread, preserving context across healing attempts.
 USAGE
+}
+
+home_dir="${HOME:-/root}"
+codex_config_dir="$home_dir/.codex"
+crush_config_file="$home_dir/.config/crush/crush.json"
+
+# Materialize env value to a target file. If the env value points to an existing
+# readable file, copy it; otherwise write the value as inline content.
+materialize_env_value_or_file() {
+  local env_name="$1"
+  local target_path="$2"
+  local value="${!env_name:-}"
+  if [[ -z "$value" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$(dirname "$target_path")"
+  if [[ -f "$value" && -r "$value" ]]; then
+    install -m 600 "$value" "$target_path"
+    return 0
+  fi
+
+  (
+    umask 077
+    printf "%s" "$value" > "$target_path"
+  )
+}
+
+materialize_env_configs() {
+  mkdir -p "$codex_config_dir"
+  materialize_env_value_or_file CODEX_AUTH_JSON "$codex_config_dir/auth.json"
+  materialize_env_value_or_file CODEX_CONFIG_TOML "$codex_config_dir/config.toml"
+  materialize_env_value_or_file CRUSH_JSON "$crush_config_file"
 }
 
 # Compat routing for amata specs:
@@ -60,16 +95,8 @@ if [[ "${1:-}" == "amata" ]]; then
 
     out_dir="${OUTDIR:-/out}"
     model="${CODEX_MODEL:-}"
-    mkdir -p "$out_dir" /root/.codex
-
-    if [[ -n "${CODEX_AUTH_JSON:-}" ]]; then
-        umask 077
-        printf "%s" "$CODEX_AUTH_JSON" > /root/.codex/auth.json
-    fi
-    if [[ -n "${CODEX_CONFIG_TOML:-}" ]]; then
-        umask 077
-        printf "%s" "$CODEX_CONFIG_TOML" > /root/.codex/config.toml
-    fi
+    mkdir -p "$out_dir" "$codex_config_dir"
+    materialize_env_configs
 
     logfile="$out_dir/codex.log"
     manifest_file="$out_dir/codex-run.json"
@@ -114,31 +141,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-mkdir -p "$out_dir" /root/.codex
+mkdir -p "$out_dir" "$codex_config_dir"
 
 # Auth via file path
 if [[ -n "$auth_file" ]]; then
-  install -m 600 "$auth_file" /root/.codex/auth.json
+  install -m 600 "$auth_file" "$codex_config_dir/auth.json"
 fi
 
-# Auth via env content.
-# Note: CODEX_AUTH_JSON may be injected via `ploy config env set --key CODEX_AUTH_JSON ...`
+# Auth/config via env content or file path.
+# Note: CODEX_AUTH_JSON/CODEX_CONFIG_TOML may be injected via
+# `ploy config env set --key CODEX_AUTH_JSON ...`
 # and propagated through the global config mechanism. See docs/envs/README.md#Global Env Configuration.
-if [[ -n "${CODEX_AUTH_JSON:-}" ]]; then
-  umask 077
-  printf "%s" "$CODEX_AUTH_JSON" > /root/.codex/auth.json
-fi
-
 # Config via file path
 if [[ -n "$config_file" ]]; then
-  install -m 600 "$config_file" /root/.codex/config.toml
+  install -m 600 "$config_file" "$codex_config_dir/config.toml"
 fi
-
-# Config via env content
-if [[ -n "${CODEX_CONFIG_TOML:-}" ]]; then
-  umask 077
-  printf "%s" "$CODEX_CONFIG_TOML" > /root/.codex/config.toml
-fi
+materialize_env_configs
 
 # Resolve prompt
 prompt=""

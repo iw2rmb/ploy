@@ -75,6 +75,12 @@ test_help_flag() {
     fail "help mentions CODEX_RESUME env" "expected CODEX_RESUME in output"
     return
   fi
+  if echo "$output" | grep -q "CRUSH_JSON"; then
+    pass "help mentions CRUSH_JSON env"
+  else
+    fail "help mentions CRUSH_JSON env" "expected CRUSH_JSON in output"
+    return
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -933,6 +939,35 @@ file_perms_octal() {
   stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1" 2>/dev/null
 }
 
+# Helper: assert file content and secure mode
+assert_file_content_and_mode_600() {
+  local file_path="$1"
+  local expected_content="$2"
+  local label="$3"
+
+  if [[ ! -f "$file_path" ]]; then
+    fail "$label exists" "missing file: $file_path"
+    return
+  fi
+
+  local content
+  content=$(cat "$file_path")
+  if [[ "$content" == "$expected_content" ]]; then
+    pass "$label content"
+  else
+    fail "$label content" "got: $content"
+    return
+  fi
+
+  local perms
+  perms=$(file_perms_octal "$file_path")
+  if [[ "$perms" == "600" ]]; then
+    pass "$label permissions"
+  else
+    fail "$label permissions" "got: $perms, want: 600"
+  fi
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: Amata mode - CODEX_AUTH_JSON and CODEX_CONFIG_TOML are materialized
 #       to files with correct content and secure (600) permissions
@@ -1006,6 +1041,91 @@ MOCKAMATA
   fi
 
   rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Direct mode - CRUSH_JSON inline content is materialized
+# ─────────────────────────────────────────────────────────────────────────────
+test_crush_json_materialized_direct_mode_content() {
+  run_test
+
+  local tmp_bin tmp_out tmp_ws
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
+#!/bin/bash
+if [[ "$1" == "exec" && "$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo  Skip confirmations"
+  exit 0
+fi
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+  local crush_content='{"providers":{"openai":{"api_key":"sk-test"}}}'
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export CODEX_PROMPT="test prompt"
+    export CRUSH_JSON="$crush_content"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+
+  assert_file_content_and_mode_600 \
+    "$tmp_home/.config/crush/crush.json" \
+    "$crush_content" \
+    "direct mode: CRUSH_JSON"
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Amata mode - CRUSH_JSON file path is materialized
+# ─────────────────────────────────────────────────────────────────────────────
+test_crush_json_materialized_amata_mode_file_path() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+
+  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+#!/bin/bash
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  local source_file source_content
+  source_file=$(mktemp)
+  source_content='{"default_provider":"openai","model":"gpt-5.4-mini"}'
+  printf "%s" "$source_content" > "$source_file"
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    export CRUSH_JSON="$source_file"
+    unset CODEX_PROMPT
+    bash "$tmp_script" amata run /in/amata.yaml
+  ) >/dev/null 2>&1
+
+  assert_file_content_and_mode_600 \
+    "$tmp_home/.config/crush/crush.json" \
+    "$source_content" \
+    "amata mode: CRUSH_JSON"
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script" "$source_file"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1220,6 +1340,14 @@ test_amata_mode_creates_artifacts
 echo ""
 echo "Test: Amata mode credentials materialized with secure permissions"
 test_amata_mode_credentials_materialized
+
+echo ""
+echo "Test: CRUSH_JSON materialized in direct mode from inline content"
+test_crush_json_materialized_direct_mode_content
+
+echo ""
+echo "Test: CRUSH_JSON materialized in amata mode from file path"
+test_crush_json_materialized_amata_mode_file_path
 
 echo ""
 echo "Test: CODEX_API_KEY passthrough in direct codex mode"
