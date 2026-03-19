@@ -136,5 +136,19 @@ func (r *runController) runRouterForGateFailure(
 		gateResult.BugSummary = bugSummary
 		slog.Info("router produced bug_summary", "run_id", req.RunID, "job_id", req.JobID, "bug_summary", bugSummary)
 	}
-	gateResult.Recovery = parseRouterDecision(routerOutDir)
+	parsedRecovery := parseRouterDecision(routerOutDir)
+	if parsedRecovery == nil {
+		return
+	}
+	if gateResult.Recovery == nil {
+		gateResult.Recovery = parsedRecovery
+		return
+	}
+
+	// Preserve pre-populated context (router_cmd) while applying parsed classifier fields.
+	routerCmd := append([]string{}, gateResult.Recovery.RouterCmd...)
+	*gateResult.Recovery = *parsedRecovery
+	if len(routerCmd) > 0 {
+		gateResult.Recovery.RouterCmd = routerCmd
+	}
 }

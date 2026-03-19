@@ -3,9 +3,6 @@ package contracts
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -52,13 +49,9 @@ func ValidateGateProfileJSONForSchema(raw []byte, schemaID string) error {
 }
 
 func ReadGateProfileSchemaJSON() ([]byte, error) {
-	path, err := gateProfileSchemaPath()
+	schemaBytes, err := migSchemaFS.ReadFile("schemas/gate_profile.schema.json")
 	if err != nil {
-		return nil, err
-	}
-	schemaBytes, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read prep schema %q: %w", path, err)
+		return nil, fmt.Errorf("read embedded prep schema: %w", err)
 	}
 	return schemaBytes, nil
 }
@@ -80,25 +73,4 @@ func loadGateProfileSchema() error {
 		return fmt.Errorf("prep schema validation unavailable: %w", gateProfileSchemaErr)
 	}
 	return nil
-}
-
-func gateProfileSchemaPath() (string, error) {
-	candidates := make([]string, 0, 3)
-	_, file, _, ok := runtime.Caller(0)
-	if ok {
-		candidates = append(candidates, filepath.Join(filepath.Dir(file), "..", "..", "..", "docs", "schemas", "gate_profile.schema.json"))
-	}
-	candidates = append(candidates,
-		filepath.Join("docs", "schemas", "gate_profile.schema.json"),
-		filepath.Join("/etc", "ploy", "schemas", "gate_profile.schema.json"),
-	)
-	var errs []string
-	for _, path := range candidates {
-		_, err := os.Stat(path)
-		if err == nil {
-			return path, nil
-		}
-		errs = append(errs, fmt.Sprintf("%s: %v", path, err))
-	}
-	return "", fmt.Errorf("resolve schema path: no candidates found (%s)", strings.Join(errs, "; "))
 }
