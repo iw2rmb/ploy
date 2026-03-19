@@ -793,6 +793,186 @@ MOCKAMATA
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Helper: portable octal permission check
+# ─────────────────────────────────────────────────────────────────────────────
+file_perms_octal() {
+  stat -c "%a" "$1" 2>/dev/null || stat -f "%Lp" "$1" 2>/dev/null
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Amata mode - CODEX_AUTH_JSON and CODEX_CONFIG_TOML are materialized
+#       to files with correct content and secure (600) permissions
+# ─────────────────────────────────────────────────────────────────────────────
+test_amata_mode_credentials_materialized() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+
+  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+#!/bin/bash
+echo "amata ran"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    export CODEX_AUTH_JSON='{"token":"auth_secret"}'
+    export CODEX_CONFIG_TOML='[model]'$'\n''name = "o4-mini"'
+    unset CODEX_PROMPT
+    bash "$tmp_script" amata run /in/amata.yaml
+  ) >/dev/null 2>&1
+
+  # Verify CODEX_AUTH_JSON was written with correct content
+  if [[ -f "$tmp_home/.codex/auth.json" ]]; then
+    local auth_content
+    auth_content=$(cat "$tmp_home/.codex/auth.json")
+    if [[ "$auth_content" == '{"token":"auth_secret"}' ]]; then
+      pass "amata mode: CODEX_AUTH_JSON written to auth.json with correct content"
+    else
+      fail "amata mode: CODEX_AUTH_JSON content" "got: $auth_content"
+    fi
+    local perms
+    perms=$(file_perms_octal "$tmp_home/.codex/auth.json")
+    if [[ "$perms" == "600" ]]; then
+      pass "amata mode: auth.json has secure permissions (600)"
+    else
+      fail "amata mode: auth.json permissions" "got: $perms, want: 600"
+    fi
+  else
+    fail "amata mode: CODEX_AUTH_JSON materialization" "auth.json not created"
+  fi
+
+  # Verify CODEX_CONFIG_TOML was written with correct content
+  if [[ -f "$tmp_home/.codex/config.toml" ]]; then
+    local cfg_content
+    cfg_content=$(cat "$tmp_home/.codex/config.toml")
+    if echo "$cfg_content" | grep -q 'o4-mini'; then
+      pass "amata mode: CODEX_CONFIG_TOML written to config.toml with correct content"
+    else
+      fail "amata mode: CODEX_CONFIG_TOML content" "got: $cfg_content"
+    fi
+    local perms
+    perms=$(file_perms_octal "$tmp_home/.codex/config.toml")
+    if [[ "$perms" == "600" ]]; then
+      pass "amata mode: config.toml has secure permissions (600)"
+    else
+      fail "amata mode: config.toml permissions" "got: $perms, want: 600"
+    fi
+  else
+    fail "amata mode: CODEX_CONFIG_TOML materialization" "config.toml not created"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: CODEX_API_KEY is passed through to codex exec in direct mode
+# ─────────────────────────────────────────────────────────────────────────────
+test_codex_api_key_passthrough_direct_mode() {
+  run_test
+
+  local tmp_bin tmp_out tmp_ws
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+  local env_file="$tmp_out/.codex_env"
+
+  cat > "$tmp_bin/codex" <<MOCKCODEX
+#!/bin/bash
+if [[ "\$1" == "exec" && "\$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo  Skip confirmations"
+  exit 0
+fi
+# Dump CODEX_API_KEY from the environment to verify passthrough
+echo "CODEX_API_KEY=\${CODEX_API_KEY:-}" > "$env_file"
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export CODEX_PROMPT="test prompt"
+    export CODEX_API_KEY="test_direct_api_key_xyz"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+
+  if [[ -f "$env_file" ]]; then
+    local env_content
+    env_content=$(cat "$env_file")
+    if echo "$env_content" | grep -q "CODEX_API_KEY=test_direct_api_key_xyz"; then
+      pass "CODEX_API_KEY passed through to codex in direct mode"
+    else
+      fail "CODEX_API_KEY direct mode passthrough" "got: $env_content"
+    fi
+  else
+    fail "CODEX_API_KEY direct mode passthrough" "codex env dump not created"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: CODEX_API_KEY is passed through to amata in amata mode
+# ─────────────────────────────────────────────────────────────────────────────
+test_codex_api_key_passthrough_amata_mode() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  local env_file="$tmp_out/.amata_env"
+
+  cat > "$tmp_bin/amata" <<MOCKAMATA
+#!/bin/bash
+echo "CODEX_API_KEY=\${CODEX_API_KEY:-}" > "$env_file"
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    export CODEX_API_KEY="test_amata_api_key_abc"
+    unset CODEX_PROMPT
+    bash "$tmp_script" amata run /in/amata.yaml
+  ) >/dev/null 2>&1
+
+  if [[ -f "$env_file" ]]; then
+    local env_content
+    env_content=$(cat "$env_file")
+    if echo "$env_content" | grep -q "CODEX_API_KEY=test_amata_api_key_abc"; then
+      pass "CODEX_API_KEY passed through to amata in amata mode"
+    else
+      fail "CODEX_API_KEY amata mode passthrough" "got: $env_content"
+    fi
+  else
+    fail "CODEX_API_KEY amata mode passthrough" "amata env dump not created"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: Direct codex mode still requires CODEX_PROMPT
 # ─────────────────────────────────────────────────────────────────────────────
 test_direct_mode_requires_codex_prompt() {
@@ -894,6 +1074,18 @@ test_amata_mode_prompt_optional
 echo ""
 echo "Test: Amata mode creates artifact files"
 test_amata_mode_creates_artifacts
+
+echo ""
+echo "Test: Amata mode credentials materialized with secure permissions"
+test_amata_mode_credentials_materialized
+
+echo ""
+echo "Test: CODEX_API_KEY passthrough in direct codex mode"
+test_codex_api_key_passthrough_direct_mode
+
+echo ""
+echo "Test: CODEX_API_KEY passthrough in amata mode"
+test_codex_api_key_passthrough_amata_mode
 
 echo ""
 echo "Test: Direct codex mode requires CODEX_PROMPT"
