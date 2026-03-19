@@ -2,7 +2,7 @@ module github.com/iw2rmb/ploy
 
 go 1.24.0
 
-toolchain go1.25.5
+toolchain go1.25.8
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
