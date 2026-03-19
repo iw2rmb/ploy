@@ -34,7 +34,7 @@ func validateMigSpecSchema(raw []byte) error {
 	for _, schemaErr := range result.Errors() {
 		msgs = append(msgs, formatMigSchemaError(schemaErr))
 	}
-	return fmt.Errorf("mig schema validation failed: %s", strings.Join(msgs, "; "))
+	return fmt.Errorf("%s", strings.Join(msgs, "; "))
 }
 
 func loadMigSpecSchema() error {

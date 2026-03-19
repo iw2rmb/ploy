@@ -413,6 +413,51 @@ func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 			wantErr: "build_gate.pre.amata: forbidden",
 		},
 		{
+			name: "build_gate pre stack nested amata forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"pre": {
+						"stack": {
+							"enabled": true,
+							"amata": {"spec": "bad"}
+						}
+					}
+				}
+			}`,
+			wantErr: "build_gate.pre.stack.amata: forbidden",
+		},
+		{
+			name: "build_gate pre stack flat spec forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"pre": {
+						"stack": {
+							"enabled": true,
+							"spec": "bad"
+						}
+					}
+				}
+			}`,
+			wantErr: "build_gate.pre.stack.spec: forbidden",
+		},
+		{
+			name: "build_gate pre stack flat set forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"pre": {
+						"stack": {
+							"enabled": true,
+							"set": []
+						}
+					}
+				}
+			}`,
+			wantErr: "build_gate.pre.stack.set: forbidden",
+		},
+		{
 			name: "build_gate post nested amata forbidden",
 			input: `{
 				"steps": [{"image": "test:latest"}],
@@ -426,6 +471,36 @@ func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 				}
 			}`,
 			wantErr: "build_gate.post.stack.amata: forbidden",
+		},
+		{
+			name: "build_gate post stack flat spec forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"post": {
+						"stack": {
+							"enabled": true,
+							"spec": "bad"
+						}
+					}
+				}
+			}`,
+			wantErr: "build_gate.post.stack.spec: forbidden",
+		},
+		{
+			name: "build_gate post stack flat set forbidden",
+			input: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {
+					"post": {
+						"stack": {
+							"enabled": true,
+							"set": []
+						}
+					}
+				}
+			}`,
+			wantErr: "build_gate.post.stack.set: forbidden",
 		},
 	}
 

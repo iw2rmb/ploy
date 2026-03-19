@@ -83,22 +83,29 @@
       "additionalProperties": true
     },
     "preObject": {
+      "$ref": "#/definitions/buildGatePhaseObject"
+    },
+    "postObject": {
+      "$ref": "#/definitions/buildGatePhaseObject"
+    },
+    "buildGatePhaseObject": {
       "type": "object",
       "properties": {
-        "amata": false
+        "amata": false,
+        "spec": false,
+        "set": false,
+        "stack": {
+          "$ref": "#/definitions/buildGatePhaseStackObject"
+        }
       },
       "additionalProperties": true
     },
-    "postObject": {
-      "type": "object",
-      "additionalProperties": {
-        "$ref": "#/definitions/postStackObject"
-      }
-    },
-    "postStackObject": {
+    "buildGatePhaseStackObject": {
       "type": "object",
       "properties": {
-        "amata": false
+        "amata": false,
+        "spec": false,
+        "set": false
       },
       "additionalProperties": true
     }
