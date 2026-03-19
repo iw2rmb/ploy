@@ -5,11 +5,12 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 
 ################################################################################
-# SINGLE-STEP RUNS (canonical)
+# CANONICAL MODS SHAPE (steps[])
 ################################################################################
-# Main container to run against the hydrated repository at /workspace.
-# Single-step specs use top-level fields. For multi-step workflows, use the
-# migs[] array instead (see MULTI-STEP section below).
+# Main container steps run against the hydrated repository at /workspace.
+# Canonical shape is always `steps[]`:
+# - single-step runs: one entry in `steps[]`
+# - multi-step runs: multiple ordered entries in `steps[]`
 
 # Required: image that performs the transformation (e.g., OpenRewrite).
 #
@@ -39,23 +40,24 @@ kind: MigRunSpec
 #   - "default"     — Fallback key for unrecognized stacks
 #
 # The universal string form ignores stack detection and always uses the same image.
-image: docker.io/your-dh-user/migs-openrewrite:latest
-# Optional: override command; when omitted, image CMD/ENTRYPOINT is used
-# command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
-# Environment variables passed into the mig container
-#   - use `env` for literal values
-#   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
-env:
-  RECIPE_GROUP: org.openrewrite.recipe
-  RECIPE_ARTIFACT: rewrite-migrate-java
-  RECIPE_VERSION: "3.20.0"
-  RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
-  # Optional ORW runtime controls:
-  # ORW_REPOS: "https://repo1.maven.org/maven2,https://repo.internal/maven"
-  # ORW_FAIL_ON_UNSUPPORTED: "true"
-env_from_file:
-  # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
-  # CODEX_AUTH_JSON: ~/.codex/auth.json
+steps:
+  - image: docker.io/your-dh-user/migs-openrewrite:latest
+    # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
+    # command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
+    # Environment variables passed into the mig container
+    #   - use `env` for literal values
+    #   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+      # Optional ORW runtime controls:
+      # ORW_REPOS: "https://repo1.maven.org/maven2,https://repo.internal/maven"
+      # ORW_FAIL_ON_UNSUPPORTED: "true"
+    env_from_file:
+      # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
+      # CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
 # TMP_DIR — per-step file injection
@@ -70,38 +72,42 @@ env_from_file:
 #  2. content — raw bytes already inlined (used when submitting via API).
 #
 # Validation rules (enforced at CLI and nodeagent layers):
-#  - name: required; must be a plain filename (no path separators, not "." or "..")
+#  - name: required; surrounding whitespace is trimmed, then value must be a
+#          plain filename (no path separators, not "." or "..")
 #  - content: required and non-empty
 #  - No two entries may share the same destination name within a single block
+#    after canonicalization
 #
 # Example (disabled by default; remove comments to activate):
-# tmp_dir:
-#   - name: recipe.yaml
-#     path: ./recipes/migrate-java17.yaml   # CLI resolves and inlines content
-#   - name: orw-settings.xml
-#     path: ~/.m2/orw-settings.xml
+# steps:
+#   - image: docker.io/your-dh-user/migs-openrewrite:latest
+#     tmp_dir:
+#       - name: recipe.yaml
+#         path: ./recipes/migrate-java17.yaml   # CLI resolves and inlines content
+#       - name: orw-settings.xml
+#         path: ~/.m2/orw-settings.xml
 
 ################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
 ################################################################################
-# When you need multiple transformation steps executed sequentially, use migs[]
-# instead of top-level fields. Each step runs with the same global
+# When you need multiple transformation steps executed sequentially, add
+# multiple entries to steps[]. Each step runs with the same global
 # build gate and healing policy. The diff from each step is captured before the
 # next step begins, enabling per-step rehydration and multi-node execution.
 #
 # Rules:
 # - Mods execute in array order (steps are sequential within one run).
-# - All migs share the same repository, base_ref, target_ref, and global gate policy.
-# - Each mig step produces a diff artifact before the next step starts.
+# - All steps share the same repository, base_ref, target_ref, and global gate policy.
+# - Each step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
 # - Optional `always: true` on a step disables step-cache reuse for that step.
 #
-# Each entry in migs[] supports the same `image` field as the single-step spec:
+# Each entry in steps[] supports the same `image` field as the single-step spec:
 # - String form: `image: docker.io/user/mig:latest` (universal, any stack)
 # - Map form: `image: {default: ..., java-maven: ..., java-gradle: ...}` (stack-aware)
 #
 # Example (disabled by default; remove comments to activate):
-# migs:
+# steps:
 #   - image: docker.io/your-dh-user/migs-migrate-java8:latest
 #     env:
 #       MIGRATION_TARGET: java8
@@ -118,7 +124,7 @@ env_from_file:
 #     always: true
 #
 # Example with stack-specific images (for dedicated Maven/Gradle containers):
-# migs:
+# steps:
 #   - image:
 #       default: docker.io/your-dh-user/migs-openrewrite:latest
 #       java-maven: docker.io/your-dh-user/orw-cli-maven:latest
@@ -129,7 +135,7 @@ env_from_file:
 ################################################################################
 # GLOBAL BUILD GATE AND HEALING POLICY
 ################################################################################
-# Build Gate settings apply to all migs (both single-mig and multi-step runs).
+# Build Gate settings apply to all steps (both single-step and multi-step runs).
 # The node agent reuses the same Java gate for Maven/Gradle (maven: -e; gradle:
 # --stacktrace).
 #
@@ -140,7 +146,7 @@ build_gate:
   images: [] # optional stack→image mapping overrides
 
 # Healing configuration executed when the Build Gate fails (applies globally to
-# all migs). For multi-step runs, the healing policy is shared across all mig
+# all steps). For multi-step runs, the healing policy is shared across all
 # steps. When a step's gate fails, healing runs once per the retry count, then
 # the gate is re-evaluated before proceeding to the next step.
 #
@@ -248,32 +254,32 @@ mr_on_fail: true
 #   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
 # - The agent honors: image, command, env, env_from_file, tmp_dir,
-#   migs[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
+#   steps[] (for single-step and multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
 #
 # - Single-step vs multi-step:
-#   * Single-step: Use top-level fields for one transformation.
-#   * Multi-step: Use the `migs[]` array for sequential transformations.
+#   * Single-step: Use `steps[]` with exactly one entry.
+#   * Multi-step: Use `steps[]` with multiple entries for sequential transformations.
 #   * Both formats share the same global build_gate policy.
 #
 # - Stack-aware image selection:
-#   * The `image` field (top-level, in migs[], and in build_gate.healing.by_error_kind.<kind>/router)
+#   * The `image` field (in steps[] and in build_gate.healing.by_error_kind.<kind>/router)
 #     accepts either a string (universal image) or a map (stack-specific images).
 #   * When using the map form, the Build Gate detects the workspace stack
 #     (java-maven, java-gradle, etc.) and resolves the image accordingly.
 #   * Resolution order: exact stack match → "default" key → error.
-#   * See the SINGLE-STEP RUNS section above for full image resolution rules.
+#   * See the CANONICAL MODS SHAPE section above for full image resolution rules.
 #
 # - Multi-step semantics:
 #   * Mods execute in array order (sequential steps within one run).
-#   * All migs share the same repository and global gate/heal policy.
-#   * Each mig step produces a diff artifact captured before the next step.
+#   * All steps share the same repository and global gate/heal policy.
+#   * Each step produces a diff artifact captured before the next step.
 #   * Diffs enable rehydration: any step can be re-executed on any node by
 #     applying the ordered chain of diffs from prior steps onto the base snapshot.
 #
 # - The node agent consumes build_gate.healing.by_error_kind and build_gate.router to run
 #   the router → heal → re-gate loop after the first gate fail (applies to both
-#   single-mig and multi-step runs).
+#   single-step and multi-step runs).
 # - Container cleanup model:
 #   * Containers are retained after step/gate completion.
 #   * Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.

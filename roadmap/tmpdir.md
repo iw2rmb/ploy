@@ -58,3 +58,17 @@ Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.m
     2. `go test ./cmd/ploy ./internal/workflow/contracts ./internal/nodeagent ./internal/workflow/step`
     3. `GOTOOLCHAIN=go1.25.8 make test`
   - Reasoning: medium
+
+- [x] 1.6 Close follow-up verification gaps (canonical names + preprocessing parity).
+  - Repository: `ploy`
+    1. Canonicalize `tmp_dir` names once (`trim + validate`) and dedupe by canonical name in shared contracts validation.
+    2. Reuse canonical tmp names in both nodeagent staging and container mount wiring so runtime paths cannot diverge.
+    3. Route `loadSpec` through the same CLI preprocessing surface as run-submit (`spec_path`, `env_from_file`, `tmp_dir`).
+    4. Align `docs/schemas/mig.example.yaml` to canonical `steps[]` structure and keep `tmp_dir` examples in that shape.
+  - Verification:
+    1. `go test ./internal/workflow/contracts -run 'TestModsSpecValidate_TmpDirStep|TestModsSpecValidate_TmpDirHealing|TestModsSpecValidate_TmpDirRouter|TestStepManifestValidate_TmpDir|TestParseModsSpecJSON_TmpDirNameCanonicalized|TestStepManifestValidate_TmpDirNameCanonicalized'`
+    2. `go test ./internal/nodeagent -run 'TestExecute_TmpDirMaterialization|TestExecute_TmpDirMaterialization_CanonicalizesNameWhitespace'`
+    3. `go test ./cmd/ploy -run 'TestLoadSpec_ResolvesStepAndRouterPreprocessing|TestLoadSpec_ResolvesHealingPreprocessing'`
+    4. `~/@iw2rmb/amata/scripts/check_docs_links.sh`
+    5. `GOTOOLCHAIN=go1.25.8 make test`
+  - Reasoning: medium

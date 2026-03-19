@@ -325,22 +325,34 @@ func validateTmpDir(entries []TmpFilePayload, prefix string) error {
 	seen := make(map[string]struct{}, len(entries))
 	for i, e := range entries {
 		pos := fmt.Sprintf("%s[%d]", prefix, i)
-		name := strings.TrimSpace(e.Name)
-		if name == "" {
-			return fmt.Errorf("%s.name: required", pos)
-		}
-		if name == "." || name == ".." || filepath.Base(name) != name {
-			return fmt.Errorf("%s.name: must be a plain filename with no path separators", pos)
+		name, err := NormalizeTmpFileName(e.Name)
+		if err != nil {
+			return fmt.Errorf("%s.name: %w", pos, err)
 		}
 		if len(e.Content) == 0 {
 			return fmt.Errorf("%s.content: required", pos)
 		}
-		if _, dup := seen[e.Name]; dup {
-			return fmt.Errorf("%s.name: duplicate %q", pos, e.Name)
+		if _, dup := seen[name]; dup {
+			return fmt.Errorf("%s.name: duplicate %q", pos, name)
 		}
-		seen[e.Name] = struct{}{}
+		entries[i].Name = name
+		seen[name] = struct{}{}
 	}
 	return nil
+}
+
+// NormalizeTmpFileName canonicalizes and validates a tmp_dir destination name.
+// The canonical form trims surrounding whitespace and must remain a plain
+// filename (no path separators, not "." or "..").
+func NormalizeTmpFileName(name string) (string, error) {
+	normalized := strings.TrimSpace(name)
+	if normalized == "" {
+		return "", fmt.Errorf("required")
+	}
+	if normalized == "." || normalized == ".." || filepath.Base(normalized) != normalized {
+		return "", fmt.Errorf("must be a plain filename with no path separators")
+	}
+	return normalized, nil
 }
 
 func validateStackGateSpec(spec *StackGateSpec, prefix string) error {

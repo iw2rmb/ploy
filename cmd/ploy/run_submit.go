@@ -618,7 +618,8 @@ func loadSpec(path string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("spec is empty")
 	}
 
-	// Parse YAML/JSON and validate using the canonical parser to catch structural issues early.
+	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/env_from_file/tmp_dir),
+	// then validate with the canonical parser to catch structural issues early.
 	return normalizeModsSpecToJSON(data)
 }
 

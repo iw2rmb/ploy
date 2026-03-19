@@ -88,17 +88,19 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	}
 
 	// Mount each tmp file read-only at /tmp/<name> from the staging directory.
-	// Runtime hardening: skip entries whose name is not a safe basename to
-	// prevent malformed manifests from producing invalid mount targets.
+	// Runtime hardening: reject malformed names or canonical duplicates to keep
+	// staging and mount path derivation deterministic.
 	if strings.TrimSpace(tmpStagingDir) != "" {
+		seenTmpNames := make(map[string]struct{}, len(manifest.TmpDir))
 		for _, tf := range manifest.TmpDir {
-			name := strings.TrimSpace(tf.Name)
-			if name == "" {
-				continue
+			name, err := contracts.NormalizeTmpFileName(tf.Name)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("tmp file name %q is not valid: %w", tf.Name, err)
 			}
-			if name == "." || name == ".." || filepath.Base(name) != name {
-				return ContainerSpec{}, fmt.Errorf("tmp file name %q is not a safe basename", name)
+			if _, dup := seenTmpNames[name]; dup {
+				return ContainerSpec{}, fmt.Errorf("tmp file name duplicate %q", name)
 			}
+			seenTmpNames[name] = struct{}{}
 			mounts = append(mounts, ContainerMount{
 				Source:   filepath.Join(tmpStagingDir, name),
 				Target:   "/tmp/" + name,

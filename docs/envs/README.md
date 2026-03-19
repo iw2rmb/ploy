@@ -130,9 +130,9 @@ Role model (bearer token claims):
 After CLI preprocessing, every submitted entry has only `name` + `content`.
 
 **Validation** (enforced by CLI and nodeagent):
-- `name` must be a plain filename: no path separators, not `.` or `..`, non-empty.
+- `name` is canonicalized by trimming surrounding whitespace, then must be a plain filename: no path separators, not `.` or `..`, non-empty.
 - `content` must be non-empty.
-- No two entries in the same block may share the same `name`.
+- No two entries in the same block may share the same canonical `name` (after trim).
 
 **Runtime behavior** — the node agent materializes each file into a per-job temporary staging directory on the node, then mounts it into the container as a read-only bind mount at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
 
