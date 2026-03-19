@@ -26,7 +26,7 @@ Documentation: `AGENTS.md`; `docs/schemas/mig.example.yaml`; `docs/envs/README.m
     2. Add tests for mixed valid and invalid `tmpDir` entries in step/healing/router blocks.
   - Reasoning: medium
 
-- [ ] 1.3 Thread `tmpDir` through nodeagent typed options and manifest builders.
+- [x] 1.3 Thread `tmpDir` through nodeagent typed options and manifest builders.
   - Repository: `ploy`
     1. Extend `ModContainerSpec` and `StepMod` in `internal/nodeagent/run_options.go` with tmp file payload.
     2. Copy `tmpDir` from parsed `ModsSpec` in `modsSpecToRunOptions` for single-step, multi-step, healing, and router flows.
