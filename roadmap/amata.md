@@ -49,7 +49,7 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     2. `deploy/images/garage.sh --force`
   - Reasoning: high
 
-- [ ] 1.5 Update schemas/docs and E2E fixtures for `amata` step usage (Codex-first)
+- [x] 1.5 Update schemas/docs and E2E fixtures for `amata` step usage (Codex-first)
   - Repository: `ploy`
     1. Update `docs/schemas/mig.example.yaml` with router/healing `amata` examples using `amata.spec` and `amata.set`, plus examples without `amata` that keep direct Codex mode.
     2. Update `docs/migs-lifecycle.md`, `docs/envs/README.md`, and `tests/e2e/migs/README.md` to describe dual-mode execution (`amata` path and direct-Codex fallback), including `CODEX_PROMPT` optionality in `amata.spec` mode and requirement in direct-Codex mode.

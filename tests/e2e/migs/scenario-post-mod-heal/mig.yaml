@@ -78,7 +78,8 @@ steps:
 build_gate:
   enabled: true
 
-  # Router emits bug_summary + error_kind before healing selection.
+  # Router: direct-Codex fallback mode — CODEX_PROMPT required; no amata.spec.
+  # Exercises the direct codex exec path for router.
   router:
     image: localhost:5000/ploy/migs-codex:latest
     env:
@@ -91,6 +92,8 @@ build_gate:
 
         Task:
         Summarize the failure and classify it for healing selection.
+    env_from_file:
+      CODEX_AUTH_JSON: ~/.codex/auth.json
 
   ################################################################################
   # HEALING POLICY FOR POST-MOD FAILURES
@@ -106,25 +109,34 @@ build_gate:
     by_error_kind:
       code:
         retries: 2 # Allow multiple healing attempts for complex errors
-        # Codex healing container using the workspace diff handshake.
-        # For this E2E, Codex will analyze the compile error (missing class) and
-        # create the necessary stub class to fix the build.
+        # Healing: amata mode — CODEX_PROMPT not required; amata spec drives the workflow.
+        # Exercises the amata execution path for healing.
         image: localhost:5000/ploy/migs-codex:latest
-        env:
-          CODEX_PROMPT: |-
-            Rules:
-            - Use /workspace and /in/build-gate.log to understand the compile error.
-            - The error is likely a missing class reference (UnknownClass or similar).
-            - Create the missing class in the appropriate package under /workspace.
-            - The class should have a minimal implementation (empty constructor, toString).
-            - Edit files under /workspace as needed to fix the error.
-            - When you believe the code is ready for a full build validation, stop editing and end the session.
+        amata:
+          spec: |
+            version: amata/v1
+            name: code-healer
+            entry: main
+            workspace:
+              root: /workspace
+            flows:
+              main:
+                steps:
+                  - codex: |
+                      Rules:
+                      - Use /workspace and /in/build-gate.log to understand the compile error.
+                      - The error is likely a missing class reference (UnknownClass or similar).
+                      - Create the missing class in the appropriate package under /workspace.
+                      - The class should have a minimal implementation (empty constructor, toString).
+                      - Edit files under /workspace as needed to fix the error.
+                      - When you believe the code is ready for a full build validation, stop editing and end the session.
+                      - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+                        {"action_summary":"<<=200 chars, single line>"}
 
-            Task:
-            Fix the compilation error described in /in/build-gate.log.
-            This is a post-mig gate failure (the mig transformation broke the build).
-            Create any missing classes or fix any syntax errors introduced by the transformation.
-        # Uncomment if you have Codex auth configured:
+                      Task:
+                      Fix the compilation error described in /in/build-gate.log.
+                      This is a post-mig gate failure (the mig transformation broke the build).
+                      Create any missing classes or fix any syntax errors introduced by the transformation.
         env_from_file:
           CODEX_AUTH_JSON: ~/.codex/auth.json
 

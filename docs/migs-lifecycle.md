@@ -186,6 +186,52 @@ build_gate:
 
 Healing action fields (image, command, env, env_from_file) are specified under
 `healing.by_error_kind.<error_kind>` — there is no nested `mig` key.
+
+#### Dual-mode execution (amata vs direct-Codex)
+
+Both router and healing containers support two execution modes:
+
+**amata mode** (recommended): set `amata.spec` with a valid amata workflow YAML.
+The node agent materializes the spec as `/in/amata.yaml` and runs
+`amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags
+from `amata.set`. `CODEX_PROMPT` is not required in this mode.
+
+```yaml
+router:
+  image: docker.io/user/migs-codex:latest
+  amata:
+    spec: |
+      version: amata/v1
+      name: bug-router
+      entry: main
+      workspace:
+        root: /workspace
+      flows:
+        main:
+          steps:
+            - codex: |
+                Read /in/build-gate.log and output one JSON line:
+                {"bug_summary":"...","error_kind":"code"}
+    # set:   # optional; passed as ordered --set '<param>=<value>' flags
+    #   - param: model
+    #     value: gpt-4o
+  env_from_file:
+    CODEX_AUTH_JSON: ~/.codex/auth.json
+```
+
+**Direct-Codex mode** (fallback): omit `amata`. The container uses the direct
+`codex exec` path. `CODEX_PROMPT` is required in this mode.
+
+```yaml
+router:
+  image: docker.io/user/migs-codex:latest
+  env:
+    CODEX_PROMPT: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
+  env_from_file:
+    CODEX_AUTH_JSON: ~/.codex/auth.json
+```
+
+The same dual-mode rules apply to `healing.by_error_kind.<error_kind>` entries.
 `spec_path` is supported in `build_gate.router` and
 `build_gate.healing.by_error_kind.<error_kind>`; CLI deep-merges the referenced
 object and inline fields override loaded values. `spec_path` supports env

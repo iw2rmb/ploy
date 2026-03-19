@@ -612,8 +612,14 @@ Run/API metadata propagation:
 
 ### How Official Images Consume These Variables
 
-**Codex images (`mig-codex`)**: The entrypoint script checks for `CODEX_AUTH_JSON` and, when
-present, writes it to `/root/.codex/auth.json` before invoking the Codex CLI.
+**Codex images (`mig-codex`)**: The entrypoint script supports two execution modes:
+- **amata mode**: when `amata.spec` is set on the router or healing action, the container runs
+  `amata run /in/amata.yaml` (with optional `--set` flags). `CODEX_PROMPT` is not required.
+- **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
+  `CODEX_PROMPT` is required in this mode.
+
+In both modes, the entrypoint checks for `CODEX_AUTH_JSON` and, when present, writes it to
+`/root/.codex/auth.json` before invoking the CLI.
 
 **Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble that:
 1. Writes `CA_CERTS_PEM_BUNDLE` to a temp file
