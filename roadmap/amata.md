@@ -15,7 +15,7 @@ Documentation: `AGENTS.md`; `docs/migs-lifecycle.md`; `docs/envs/README.md`; `do
     2. `go test ./internal/workflow/contracts -run 'Test.*TmpDir|Test.*Healing'`
   - Reasoning: high
 
-- [ ] 1.2 Thread typed `amata` config into node manifests and execution
+- [x] 1.2 Thread typed `amata` config into node manifests and execution
   - Repository: `ploy`
     1. Extend `nodeagent.ModContainerSpec` in `internal/nodeagent/run_options.go` with `Amata *contracts.AmataRunSpec` and map it in `modsSpecToRunOptions` for both `build_gate.router` and selected healing action.
     2. Add a command builder in `internal/nodeagent/manifest.go` that selects `amata run /in/amata.yaml` plus `--set` entries when `Amata.Spec` exists and selects existing direct `codex exec` path when `Amata.Spec` is absent.

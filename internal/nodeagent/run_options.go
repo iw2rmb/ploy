@@ -55,6 +55,9 @@ type ModContainerSpec struct {
 	Command contracts.CommandSpec
 	Env     map[string]string
 	TmpDir  []contracts.TmpFilePayload
+	// Amata configures amata-mode execution. When non-nil with a non-empty Spec,
+	// the container runs `amata run /in/amata.yaml` instead of the direct codex path.
+	Amata *contracts.AmataRunSpec
 }
 
 // MRWiringOptions configures GitLab merge request creation for run outcomes.
@@ -128,6 +131,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 						Command: action.Command,
 						Env:     copyStringMap(action.Env),
 						TmpDir:  copyTmpDir(action.TmpDir),
+						Amata:   action.Amata,
 					}
 					runOpts.Healing = healing
 				}
@@ -140,6 +144,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 				Command: spec.BuildGate.Router.Command,
 				Env:     copyStringMap(spec.BuildGate.Router.Env),
 				TmpDir:  copyTmpDir(spec.BuildGate.Router.TmpDir),
+				Amata:   spec.BuildGate.Router.Amata,
 			}
 		}
 	}

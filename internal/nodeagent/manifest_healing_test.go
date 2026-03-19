@@ -440,4 +440,115 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 	}
 }
 
+// TestBuildHealingManifest_AmataCommand verifies that when Amata.Spec is set,
+// the manifest command resolves to amata run with ordered --set flags, and that
+// when Amata is nil the direct command is preserved.
+func TestBuildHealingManifest_AmataCommand(t *testing.T) {
+	t.Parallel()
+
+	req := StartRunRequest{
+		RunID:   types.RunID("run-amata-heal"),
+		JobID:   types.JobID("job-amata-heal"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef: types.GitRef("main"),
+	}
+
+	t.Run("amata_spec_selects_amata_command", func(t *testing.T) {
+		t.Parallel()
+
+		mig := ModContainerSpec{
+			Image:   testJobImage("migs-codex:latest"),
+			Command: contracts.CommandSpec{Shell: "codex exec"},
+			Amata: &contracts.AmataRunSpec{
+				Spec: "task: fix",
+				Set: []contracts.AmataSetParam{
+					{Param: "repo", Value: "myrepo"},
+					{Param: "env", Value: "prod"},
+				},
+			},
+		}
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("buildHealingManifest() error = %v", err)
+		}
+		want := []string{"amata", "run", "/in/amata.yaml", "--set", "repo=myrepo", "--set", "env=prod"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
+		}
+		for i, v := range want {
+			if manifest.Command[i] != v {
+				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
+			}
+		}
+	})
+
+	t.Run("amata_no_set_params", func(t *testing.T) {
+		t.Parallel()
+
+		mig := ModContainerSpec{
+			Image: testJobImage("migs-codex:latest"),
+			Amata: &contracts.AmataRunSpec{Spec: "task: fix"},
+		}
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("buildHealingManifest() error = %v", err)
+		}
+		want := []string{"amata", "run", "/in/amata.yaml"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
+		}
+		for i, v := range want {
+			if manifest.Command[i] != v {
+				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
+			}
+		}
+	})
+
+	t.Run("nil_amata_uses_direct_command", func(t *testing.T) {
+		t.Parallel()
+
+		mig := ModContainerSpec{
+			Image:   testJobImage("migs-codex:latest"),
+			Command: contracts.CommandSpec{Shell: "codex exec"},
+			Amata:   nil,
+		}
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("buildHealingManifest() error = %v", err)
+		}
+		want := []string{"/bin/sh", "-c", "codex exec"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
+		}
+		for i, v := range want {
+			if manifest.Command[i] != v {
+				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
+			}
+		}
+	})
+
+	t.Run("amata_with_empty_spec_falls_through_to_direct_command", func(t *testing.T) {
+		t.Parallel()
+
+		mig := ModContainerSpec{
+			Image:   testJobImage("migs-codex:latest"),
+			Command: contracts.CommandSpec{Shell: "codex exec"},
+			Amata:   &contracts.AmataRunSpec{Spec: "   "},
+		}
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		if err != nil {
+			t.Fatalf("buildHealingManifest() error = %v", err)
+		}
+		want := []string{"/bin/sh", "-c", "codex exec"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
+		}
+		for i, v := range want {
+			if manifest.Command[i] != v {
+				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
+			}
+		}
+	})
+}
+
 // Note: contains and findSubstring helpers are defined in tls_test.go
