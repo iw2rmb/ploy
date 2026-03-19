@@ -14,6 +14,7 @@ package contracts
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -74,6 +75,9 @@ func checkForbiddenFields(raw map[string]any) error {
 	if _, ok := raw["mod_index"]; ok {
 		return fmt.Errorf("mod_index: forbidden (derived internally from next_id; must not be provided)")
 	}
+	if err := checkForbiddenAmataPlacement(raw); err != nil {
+		return err
+	}
 
 	// Per-step forbidden fields.
 	if stepsRaw, ok := raw["steps"]; ok && stepsRaw != nil {
@@ -82,9 +86,6 @@ func checkForbiddenFields(raw map[string]any) error {
 				if sm, ok := s.(map[string]any); ok {
 					if _, ok := sm["retain_container"]; ok {
 						return fmt.Errorf("steps[%d].retain_container: forbidden", i)
-					}
-					if _, ok := sm["amata"]; ok {
-						return fmt.Errorf("steps[%d].amata: forbidden (amata is only allowed under build_gate.router and build_gate.healing.by_error_kind.<kind>)", i)
 					}
 				}
 			}
@@ -103,16 +104,10 @@ func checkForbiddenFields(raw map[string]any) error {
 	if _, ok := bg["profile"]; ok {
 		return fmt.Errorf("build_gate.profile: forbidden")
 	}
-	if _, ok := bg["amata"]; ok {
-		return fmt.Errorf("build_gate.amata: forbidden (amata is only allowed under build_gate.router and build_gate.healing.by_error_kind.<kind>)")
-	}
 
 	// Healing forbidden legacy fields.
 	if healAny, ok := bg["healing"]; ok && healAny != nil {
 		if heal, ok := healAny.(map[string]any); ok {
-			if _, ok := heal["amata"]; ok {
-				return fmt.Errorf("build_gate.healing.amata: forbidden (amata is only allowed under build_gate.healing.by_error_kind.<kind>.amata)")
-			}
 			for _, key := range []string{"retries", "image", "command", "env", "retain_container"} {
 				if _, ok := heal[key]; ok {
 					return fmt.Errorf("build_gate.healing.%s: forbidden (use build_gate.healing.by_error_kind.<error_kind>.%s)", key, key)
@@ -158,4 +153,61 @@ func checkForbiddenFields(raw map[string]any) error {
 	}
 
 	return nil
+}
+
+const amataPlacementForbiddenMessage = "forbidden (amata is only allowed under build_gate.router and build_gate.healing.by_error_kind.<kind>)"
+
+func checkForbiddenAmataPlacement(raw map[string]any) error {
+	return walkForbiddenAmataPlacement(raw, "")
+}
+
+func walkForbiddenAmataPlacement(node any, path string) error {
+	switch n := node.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(n))
+		for key := range n {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			nextPath := joinRawFieldPath(path, key)
+			if key == "amata" && !isAllowedAmataPath(nextPath) {
+				return fmt.Errorf("%s: %s", nextPath, amataPlacementForbiddenMessage)
+			}
+			if err := walkForbiddenAmataPlacement(n[key], nextPath); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for i := range n {
+			nextPath := fmt.Sprintf("%s[%d]", path, i)
+			if path == "" {
+				nextPath = fmt.Sprintf("[%d]", i)
+			}
+			if err := walkForbiddenAmataPlacement(n[i], nextPath); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func isAllowedAmataPath(path string) bool {
+	if path == "build_gate.router.amata" {
+		return true
+	}
+	parts := strings.Split(path, ".")
+	return len(parts) == 5 &&
+		parts[0] == "build_gate" &&
+		parts[1] == "healing" &&
+		parts[2] == "by_error_kind" &&
+		parts[3] != "" &&
+		parts[4] == "amata"
+}
+
+func joinRawFieldPath(parent, child string) string {
+	if parent == "" {
+		return child
+	}
+	return parent + "." + child
 }

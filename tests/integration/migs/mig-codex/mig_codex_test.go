@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -39,6 +40,17 @@ func mustRun(t *testing.T, name string, args ...string) (string, string) {
 	return out.String(), errb.String()
 }
 
+func buildMigCodexImage(t *testing.T, repoRoot, imageTag string) {
+	t.Helper()
+	platform := "linux/" + runtime.GOARCH
+	buildScript := filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "build-amata.sh")
+	dockerfile := filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "Dockerfile")
+
+	// Keep tests hermetic: always stage the local amata binary before image build.
+	_, _ = mustRun(t, "env", "PLATFORM="+platform, "bash", buildScript)
+	_, _ = mustRun(t, "docker", "build", "-t", imageTag, "-f", dockerfile, repoRoot)
+}
+
 // TestMigCodexContainer tests mig-codex.sh dual-mode routing inside the container image.
 // Amata mode: injects a mock amata binary via volume mount and verifies artifact outputs.
 // Direct codex mode: verifies CODEX_PROMPT is required when amata mode is not active.
@@ -57,8 +69,7 @@ func TestMigCodexContainer(t *testing.T) {
 	repoRoot = strings.TrimSpace(repoRoot)
 
 	// Build migs-codex image once for both subtests.
-	_, _ = mustRun(t, "docker", "build", "-t", "migs-codex:test-amata",
-		"-f", repoRoot+"/deploy/images/migs/mig-codex/Dockerfile", repoRoot)
+	buildMigCodexImage(t, repoRoot, "migs-codex:test-amata")
 
 	// Build a test image that includes a mock amata binary on top of the base image.
 	// This avoids volume-mount permission issues with Docker Desktop on macOS.
@@ -213,7 +224,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	}
 
 	// Build migs-codex image (tag: migs-codex:latest).
-	_, _ = mustRun(t, "docker", "build", "-t", "migs-codex:latest", "-f", filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "Dockerfile"), repoRoot)
+	buildMigCodexImage(t, repoRoot, "migs-codex:latest")
 
 	// Prepare prompt using sentinel protocol. Codex does NOT have access to
 	// any Build Gate helper inside the container; Build Gate is run externally
