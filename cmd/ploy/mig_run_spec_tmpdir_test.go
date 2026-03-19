@@ -250,6 +250,122 @@ steps:
 	}
 }
 
+// TestBuildSpecPayload_TmpDir_UnreadableFile verifies a deterministic error when a
+// tmp_dir path points to a file that exists but cannot be read.
+func TestBuildSpecPayload_TmpDir_UnreadableFile(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root can read any file; permission test is not meaningful")
+	}
+
+	tmpDir := t.TempDir()
+
+	unreadable := filepath.Join(tmpDir, "secret.txt")
+	if err := os.WriteFile(unreadable, []byte("secret"), 0o000); err != nil {
+		t.Fatalf("write unreadable file: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: secret.txt
+        path: ` + unreadable + `
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err == nil {
+		t.Fatal("expected error for unreadable tmp_dir file, got nil")
+	}
+	if !strings.Contains(err.Error(), "read file") {
+		t.Errorf("expected 'read file' in error, got: %v", err)
+	}
+}
+
+// TestBuildSpecPayload_TmpDir_PathExpansion verifies that tmp_dir path entries
+// support ~ home-dir expansion and $ENV_VAR substitution via resolvePath.
+func TestBuildSpecPayload_TmpDir_PathExpansion(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configFile := filepath.Join(tmpDir, "expand.txt")
+	configContent := "expanded content"
+	if err := os.WriteFile(configFile, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("get home dir: %v", err)
+	}
+
+	// Build a path that uses ~ if the file is under the home dir, otherwise use $VAR expansion.
+	var tildeFile, envFile string
+	if strings.HasPrefix(tmpDir, home+"/") {
+		// Use ~ syntax for a file under home.
+		rel := strings.TrimPrefix(configFile, home+"/")
+		tildeFile = "~/" + rel
+	} else {
+		// File is not under home; fall back to env-var path for the tilde sub-test.
+		tildeFile = configFile
+	}
+
+	// Use an env-var path for the env-expansion sub-test.
+	envVarName := "PLOY_TEST_TMPDIR_PATH_" + strings.ReplaceAll(t.Name(), "/", "_")
+	t.Setenv(envVarName, configFile)
+	envFile = "$" + envVarName + ""
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"tilde expansion", tildeFile},
+		{"env expansion", envFile},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specPath := filepath.Join(tmpDir, "spec-"+tt.name+".yaml")
+			specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: expand.txt
+        path: ` + tt.path + `
+`
+			if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+				t.Fatalf("write spec file: %v", err)
+			}
+
+			payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+			if err != nil {
+				t.Fatalf("buildSpecPayload error: %v", err)
+			}
+
+			var result map[string]any
+			if err := json.Unmarshal(payload, &result); err != nil {
+				t.Fatalf("unmarshal payload: %v", err)
+			}
+
+			steps := result["steps"].([]any)
+			step0 := steps[0].(map[string]any)
+			tmpDirRaw := step0["tmp_dir"].([]any)
+			entry := tmpDirRaw[0].(map[string]any)
+
+			if _, hasPath := entry["path"]; hasPath {
+				t.Errorf("expected 'path' to be removed after resolution")
+			}
+
+			_, content := decodeTmpEntry(t, entry)
+			if string(content) != configContent {
+				t.Errorf("expected content=%q, got %q", configContent, string(content))
+			}
+		})
+	}
+}
+
 // TestBuildSpecPayload_TmpDir_Mixed verifies mixed valid and invalid tmp_dir entries
 // across steps, router, and healing blocks.
 func TestBuildSpecPayload_TmpDir_Mixed(t *testing.T) {
