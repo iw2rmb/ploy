@@ -2,7 +2,7 @@ BINARY := ploy
 BUILD_DIR := dist
 COVERAGE_FILE := $(BUILD_DIR)/coverage.out
 HTML_COVERAGE_FILE := $(BUILD_DIR)/coverage.html
-REQUIRED_GO_TOOLCHAIN := go1.25.5
+REQUIRED_GO_TOOLCHAIN := go1.25.8
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
