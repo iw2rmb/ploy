@@ -319,7 +319,6 @@ For questions or issues with the release process:
 ---
 
 **Related Documentation**:
-- GoReleaser Configuration: [`.goreleaser.yml`](../.goreleaser.yml)
-- Release Workflow: [`.github/workflows/release.yml`](../.github/workflows/release.yml)
-- Changelog: [`CHANGELOG.md`](../CHANGELOG.md)
-- Contributing Guide: [`AGENTS.md`](../AGENTS.md)
+- [Homebrew tap setup](./homebrew-tap-setup.md)
+- [Testing workflow](./testing-workflow.md)
+- [Environment variables](./envs/README.md)

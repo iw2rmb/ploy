@@ -13,8 +13,8 @@ defaults change, or components adopt additional configuration.
 
 ## Dependencies
 
-- [cmd/ploy/dependencies.go](../../cmd/ploy/dependencies.go) — runtime factories
-  resolving control-plane endpoints via mTLS.
+- Runtime factory wiring and control-plane endpoint resolution are covered in
+  [Mods lifecycle](../migs-lifecycle.md).
 
 ## CLI
 
@@ -678,11 +678,10 @@ The following variables are **no longer consumed** by the codebase after the Pos
 
 ## Related Docs
 
-- [README.md](../../README.md) — Server/node pivot architecture
-- [docs/testing-workflow.md](../testing-workflow.md) — Go testing workflow and local validation commands
-- See `CHANGELOG.md` for migration status and recent slices
-- [docs/how-to/deploy-locally.md](../how-to/deploy-locally.md) — Local Docker cluster
-- [docs/how-to/deploy-vps-offline.md](../how-to/deploy-vps-offline.md) — Offline SSH deployment of the full local stack to a VPS
+- [Mods lifecycle](../migs-lifecycle.md) — Server/node execution and orchestration flow
+- [Testing workflow](../testing-workflow.md) — Go testing workflow and local validation commands
+- [Local deployment](../how-to/deploy-locally.md) — Local Docker cluster
+- [Offline VPS deployment](../how-to/deploy-vps-offline.md) — Offline SSH deployment of the local stack to a VPS
 
 ## Build Gate Limits
 
