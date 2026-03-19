@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commitMessage", "reviewReasoning", "notes"],
+  "properties": {
+    "commitMessage": {
+      "$comment": "One-liner title for the commit message",
+      "type": "string"
+    },
+    "reviewReasoning": {
+      "$comment": "Reasoning level required to review the diff",
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "notes": {
+      "$comment": "Implementation notes",
+      "type": "string"
+    }
+  }
+}

@@ -103,6 +103,11 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		UploadDiff:                r.uploadModDiffWithBaseline,
 		StartTime:                 startTime,
 	}
+	if err := configureModAmataInDir(&cfg, typedOpts, stepIdx); err != nil {
+		slog.Error("failed to configure /in/amata.yaml for mig job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
 
 	r.executeStandardJob(ctx, req, cfg)
 }
@@ -165,14 +170,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			if err := r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, req.RecoveryContext, schemaJSON); err != nil {
 				return err
 			}
-			// For amata-mode healing: write /in/amata.yaml with deterministic overwrite.
-			if typedOpts.Healing.Mod.Amata != nil && strings.TrimSpace(typedOpts.Healing.Mod.Amata.Spec) != "" {
-				amataPath := filepath.Join(inDir, "amata.yaml")
-				if err := os.WriteFile(amataPath, []byte(typedOpts.Healing.Mod.Amata.Spec), 0o644); err != nil {
-					return fmt.Errorf("write /in/amata.yaml: %w", err)
-				}
-			}
-			return nil
+			return writeAmataSpecInDir(inDir, typedOpts.Healing.Mod.Amata)
 		},
 		InjectEnv: func(m *contracts.StepManifest, ws string) {
 			r.injectHealingEnvVars(m, ws)
@@ -202,6 +200,47 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	}
 
 	r.executeStandardJob(ctx, req, cfg)
+}
+
+func configureModAmataInDir(cfg *standardJobConfig, typedOpts RunOptions, stepIdx int) error {
+	amata := selectedModAmata(typedOpts, stepIdx)
+	if strings.TrimSpace(amataSpecText(amata)) == "" {
+		return nil
+	}
+	cfg.InDirPattern = "ploy-mig-in-*"
+	cfg.PopulateInDir = func(inDir string) error {
+		return writeAmataSpecInDir(inDir, amata)
+	}
+	return nil
+}
+
+func selectedModAmata(typedOpts RunOptions, stepIdx int) *contracts.AmataRunSpec {
+	if len(typedOpts.Steps) == 0 {
+		return typedOpts.Execution.Amata
+	}
+	if stepIdx < 0 || stepIdx >= len(typedOpts.Steps) {
+		return nil
+	}
+	return typedOpts.Steps[stepIdx].Amata
+}
+
+func amataSpecText(amata *contracts.AmataRunSpec) string {
+	if amata == nil {
+		return ""
+	}
+	return strings.TrimSpace(amata.Spec)
+}
+
+func writeAmataSpecInDir(inDir string, amata *contracts.AmataRunSpec) error {
+	specText := amataSpecText(amata)
+	if specText == "" {
+		return nil
+	}
+	amataPath := filepath.Join(inDir, "amata.yaml")
+	if err := os.WriteFile(amataPath, []byte(amata.Spec), 0o644); err != nil {
+		return fmt.Errorf("write /in/amata.yaml: %w", err)
+	}
+	return nil
 }
 
 // standardJobConfig configures the execution of a standard container job (mig/heal).

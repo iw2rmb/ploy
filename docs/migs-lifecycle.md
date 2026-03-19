@@ -189,10 +189,10 @@ Healing action fields (image, command, env, env_from_file) are specified under
 
 #### Dual-mode execution (amata vs direct-Codex)
 
-Both router and healing containers support two execution modes:
+Mig steps, router, and healing containers support two execution modes:
 
-**amata mode** (recommended): set `amata.spec` with a valid amata workflow YAML.
-The node agent materializes the spec as `/in/amata.yaml` and runs
+**amata mode** (recommended): set `amata.spec` to a path of an amata workflow YAML file.
+The CLI loads file content into the canonical spec. The node agent materializes it as `/in/amata.yaml` and runs
 `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags
 from `amata.set`. `CODEX_PROMPT` is not required in this mode.
 
@@ -231,7 +231,7 @@ router:
     CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
 
-The same dual-mode rules apply to `healing.by_error_kind.<error_kind>` entries.
+The same dual-mode rules apply to `steps[]`, `router`, and `healing.by_error_kind.<error_kind>` entries.
 `spec_path` is supported in `build_gate.router` and
 `build_gate.healing.by_error_kind.<error_kind>`; CLI deep-merges the referenced
 object and inline fields override loaded values. `spec_path` supports env

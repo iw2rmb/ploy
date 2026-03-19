@@ -1198,3 +1198,79 @@ build_gate:
 		t.Fatalf("expected env.B inline value, got %v", env["B"])
 	}
 }
+
+func TestBuildSpecPayload_StepAmataSpecPathResolved(t *testing.T) {
+	tmpDir := t.TempDir()
+	amataPath := filepath.Join(tmpDir, "amata.yaml")
+	amataContent := "version: amata/v1\nname: codex-step\n"
+	if err := os.WriteFile(amataPath, []byte(amataContent), 0o644); err != nil {
+		t.Fatalf("write amata file: %v", err)
+	}
+
+	t.Setenv("PLOY_PATH", tmpDir)
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := `
+steps:
+  - image: docker.io/test/step1:latest
+  - image: docker.io/test/step2:latest
+    amata:
+      spec: $PLOY_PATH/amata.yaml
+      set:
+        - param: model
+          value: gpt-5
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(payload, &out); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	steps, ok := out["steps"].([]any)
+	if !ok || len(steps) != 2 {
+		t.Fatalf("expected 2 steps, got %v", out["steps"])
+	}
+	step1 := steps[1].(map[string]any)
+	amata := step1["amata"].(map[string]any)
+	if got, _ := amata["spec"].(string); got != amataContent {
+		t.Fatalf("expected amata.spec file content %q, got %q", amataContent, got)
+	}
+	set := amata["set"].([]any)
+	if len(set) != 1 {
+		t.Fatalf("expected amata.set len=1, got %d", len(set))
+	}
+	param := set[0].(map[string]any)
+	if got, _ := param["param"].(string); got != "model" {
+		t.Fatalf("expected amata.set[0].param=model, got %v", param["param"])
+	}
+	if got, _ := param["value"].(string); got != "gpt-5" {
+		t.Fatalf("expected amata.set[0].value=gpt-5, got %v", param["value"])
+	}
+}
+
+func TestBuildSpecPayload_StepAmataSpecPathMissingFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_PATH", tmpDir)
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := `
+steps:
+  - image: docker.io/test/step1:latest
+    amata:
+      spec: $PLOY_PATH/missing-amata.yaml
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	if err == nil {
+		t.Fatal("expected missing amata.spec path error")
+	}
+}

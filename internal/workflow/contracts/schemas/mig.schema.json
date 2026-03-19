@@ -21,8 +21,7 @@
     "stepObject": {
       "type": "object",
       "properties": {
-        "retain_container": false,
-        "amata": false
+        "retain_container": false
       },
       "additionalProperties": true
     },

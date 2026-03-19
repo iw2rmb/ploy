@@ -49,6 +49,9 @@ func preprocessModsSpecInPlace(spec map[string]any) error {
 	if err := resolveBuildGateSpecPathInPlace(spec); err != nil {
 		return fmt.Errorf("resolve spec_path (build_gate): %w", err)
 	}
+	if err := resolveAmataSpecPathInPlace(spec); err != nil {
+		return fmt.Errorf("resolve amata.spec path: %w", err)
+	}
 
 	// Resolve env_from_file references in the canonical top-level env block.
 	if err := resolveEnvFromFileInPlace(spec); err != nil {
@@ -243,6 +246,79 @@ func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
 	}
 	delete(router, "spec_path")
 	bg["router"] = deepMergeObjects(fragment, router)
+	return nil
+}
+
+// resolveAmataSpecPathInPlace loads amata.spec from file paths and replaces each
+// path with the file content so typed validation/runtime receive canonical spec text.
+func resolveAmataSpecPathInPlace(spec map[string]any) error {
+	if steps, ok := spec["steps"].([]any); ok {
+		for i, raw := range steps {
+			stepSpec, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			if err := resolveAmataSpecInSection(stepSpec, fmt.Sprintf("steps[%d].amata", i)); err != nil {
+				return err
+			}
+		}
+	}
+
+	bg, ok := spec["build_gate"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	if router, ok := bg["router"].(map[string]any); ok {
+		if err := resolveAmataSpecInSection(router, "build_gate.router.amata"); err != nil {
+			return err
+		}
+	}
+
+	if healing, ok := bg["healing"].(map[string]any); ok {
+		if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+			for errorKind, raw := range byErrorKind {
+				action, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				if err := resolveAmataSpecInSection(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.amata", errorKind)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func resolveAmataSpecInSection(section map[string]any, prefix string) error {
+	amataRaw, hasAmata := section["amata"]
+	if !hasAmata {
+		return nil
+	}
+	amata, ok := amataRaw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s: expected object, got %T", prefix, amataRaw)
+	}
+
+	specRaw, hasSpec := amata["spec"]
+	if !hasSpec {
+		return nil
+	}
+	specPath, ok := specRaw.(string)
+	if !ok {
+		return fmt.Errorf("%s.spec: expected string path, got %T", prefix, specRaw)
+	}
+
+	resolvedPath, err := resolvePath(specPath)
+	if err != nil {
+		return fmt.Errorf("%s.spec: %w", prefix, err)
+	}
+	specContent, err := os.ReadFile(resolvedPath)
+	if err != nil {
+		return fmt.Errorf("%s.spec: read file %s: %w", prefix, resolvedPath, err)
+	}
+	amata["spec"] = string(specContent)
 	return nil
 }
 

@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["message", "ok", "notes"],
+  "properties": {
+    "message": {
+      "type": "string",
+      "$comment": "One-liner commit message that reflects changes"
+    },
+    "ok": {
+      "type": "boolean",
+      "$comment": "If there were any issues, they were solved, and it is OK to proceed"
+    },
+    "notes": {
+      "type": "string",
+      "$comment": "If it's not OK to proceed, state here why; otherwise, provide implementation notes"
+    }
+  }
+}

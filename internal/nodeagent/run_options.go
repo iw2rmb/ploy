@@ -166,6 +166,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
 		runOpts.Execution.TmpDir = copyTmpDir(step.TmpDir)
+		runOpts.Execution.Amata = step.Amata
 	}
 
 	if len(spec.Steps) > 1 {
@@ -177,6 +178,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 					Command: step.Command,
 					Env:     copyStringMap(step.Env),
 					TmpDir:  copyTmpDir(step.TmpDir),
+					Amata:   step.Amata,
 				},
 				Stack:  step.Stack,
 				Always: step.Always,
