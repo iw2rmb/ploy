@@ -92,6 +92,34 @@ func TestBuildContainerSpec_TmpFilesSkippedWhenNoStagingDir(t *testing.T) {
 	}
 }
 
+func TestBuildContainerSpec_TmpFilesTraversalNameRejected(t *testing.T) {
+	stagingDir := t.TempDir()
+
+	tests := []struct {
+		name    string
+		tmpName string
+	}{
+		{name: "path traversal", tmpName: "../escape"},
+		{name: "absolute path", tmpName: "/etc/passwd"},
+		{name: "dot", tmpName: "."},
+		{name: "dotdot", tmpName: ".."},
+		{name: "nested path", tmpName: "sub/file.txt"},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			manifest := baseManifestForTmp(t)
+			manifest.TmpDir = []contracts.TmpFilePayload{
+				{Name: tc.tmpName, Content: []byte("data")},
+			}
+			_, err := buildContainerSpec(types.RunID("run-traversal"), types.JobID("job-traversal"), manifest, "/ws", "", "", stagingDir)
+			if err == nil {
+				t.Fatalf("buildContainerSpec: expected error for name %q, got nil", tc.tmpName)
+			}
+		})
+	}
+}
+
 func TestBuildContainerSpec_TmpFilesEmptyManifestTmpDir(t *testing.T) {
 	stagingDir := t.TempDir()
 

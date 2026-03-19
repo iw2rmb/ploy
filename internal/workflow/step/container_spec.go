@@ -1,6 +1,7 @@
 package step
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,11 +88,16 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	}
 
 	// Mount each tmp file read-only at /tmp/<name> from the staging directory.
+	// Runtime hardening: skip entries whose name is not a safe basename to
+	// prevent malformed manifests from producing invalid mount targets.
 	if strings.TrimSpace(tmpStagingDir) != "" {
 		for _, tf := range manifest.TmpDir {
 			name := strings.TrimSpace(tf.Name)
 			if name == "" {
 				continue
+			}
+			if name == "." || name == ".." || filepath.Base(name) != name {
+				return ContainerSpec{}, fmt.Errorf("tmp file name %q is not a safe basename", name)
 			}
 			mounts = append(mounts, ContainerMount{
 				Source:   filepath.Join(tmpStagingDir, name),

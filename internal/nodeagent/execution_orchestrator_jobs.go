@@ -428,9 +428,15 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 
 // materializeTmpFiles writes each TmpFilePayload to stagingDir as a read-only file.
 // The caller owns the lifecycle of stagingDir.
+// Runtime hardening: verifies each resolved path stays directly under stagingDir
+// (no subdirectories, no traversal) even if validation was bypassed.
 func materializeTmpFiles(entries []contracts.TmpFilePayload, stagingDir string) error {
 	for _, e := range entries {
 		dst := filepath.Join(stagingDir, e.Name)
+		rel, err := filepath.Rel(stagingDir, dst)
+		if err != nil || strings.ContainsRune(rel, filepath.Separator) || rel == "." || strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("tmp file name %q would escape staging dir", e.Name)
+		}
 		if err := os.WriteFile(dst, e.Content, 0o444); err != nil {
 			return fmt.Errorf("write tmp file %q: %w", e.Name, err)
 		}

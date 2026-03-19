@@ -53,6 +53,41 @@ func TestModsSpecValidate_TmpDirStep(t *testing.T) {
 			wantErr: `steps[0].tmp_dir[1].name: duplicate "config.json"`,
 		},
 		{
+			name: "path traversal rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "../x", "content": "aGVsbG8="}]}]
+			}`,
+			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name: "absolute path rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "/etc/passwd", "content": "aGVsbG8="}]}]
+			}`,
+			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name: "dot rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": [{"name": ".", "content": "aGVsbG8="}]}]
+			}`,
+			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name: "dotdot rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "..", "content": "aGVsbG8="}]}]
+			}`,
+			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name: "nested path rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "sub/file.txt", "content": "aGVsbG8="}]}]
+			}`,
+			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
 			name: "second step duplicate names rejected",
 			input: `{
 				"steps": [
@@ -256,6 +291,31 @@ func TestStepManifestValidate_TmpDir(t *testing.T) {
 				{Name: "same.txt", Content: []byte("b")},
 			},
 			wantErr: `tmp_dir[1].name: duplicate "same.txt"`,
+		},
+		{
+			name:    "path traversal rejected",
+			tmpDir:  []TmpFilePayload{{Name: "../x", Content: []byte("data")}},
+			wantErr: "tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name:    "absolute path rejected",
+			tmpDir:  []TmpFilePayload{{Name: "/etc/passwd", Content: []byte("data")}},
+			wantErr: "tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name:    "dot rejected",
+			tmpDir:  []TmpFilePayload{{Name: ".", Content: []byte("data")}},
+			wantErr: "tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name:    "dotdot rejected",
+			tmpDir:  []TmpFilePayload{{Name: "..", Content: []byte("data")}},
+			wantErr: "tmp_dir[0].name: must be a plain filename with no path separators",
+		},
+		{
+			name:    "nested path rejected",
+			tmpDir:  []TmpFilePayload{{Name: "sub/file.txt", Content: []byte("data")}},
+			wantErr: "tmp_dir[0].name: must be a plain filename with no path separators",
 		},
 	}
 

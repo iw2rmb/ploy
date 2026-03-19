@@ -31,6 +31,7 @@ package contracts
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -317,16 +318,19 @@ func validateBuildGatePhaseTarget(target string, prefix string) error {
 	}
 }
 
-// validateStackGateSpec validates a StackGateSpec for ambiguous configuration.
-// Rejects enabled:false with expect:{...} as this is contradictory.
-// validateTmpDir checks that each TmpFilePayload has a non-empty name and
-// non-empty content, and that no two entries share the same destination name.
+// validateTmpDir checks that each TmpFilePayload has a non-empty basename-only
+// name (no path separators, not "." or ".."), non-empty content, and that no
+// two entries share the same destination name.
 func validateTmpDir(entries []TmpFilePayload, prefix string) error {
 	seen := make(map[string]struct{}, len(entries))
 	for i, e := range entries {
 		pos := fmt.Sprintf("%s[%d]", prefix, i)
-		if strings.TrimSpace(e.Name) == "" {
+		name := strings.TrimSpace(e.Name)
+		if name == "" {
 			return fmt.Errorf("%s.name: required", pos)
+		}
+		if name == "." || name == ".." || filepath.Base(name) != name {
+			return fmt.Errorf("%s.name: must be a plain filename with no path separators", pos)
 		}
 		if len(e.Content) == 0 {
 			return fmt.Errorf("%s.content: required", pos)

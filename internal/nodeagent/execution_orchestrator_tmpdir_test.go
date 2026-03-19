@@ -33,6 +33,16 @@ func TestExecute_TmpDirMaterialization(t *testing.T) {
 			name:    "empty entries no-ops",
 			entries: nil,
 		},
+		{
+			name:    "path traversal rejected",
+			entries: []contracts.TmpFilePayload{{Name: "../escape", Content: []byte("data")}},
+			wantErr: true,
+		},
+		{
+			name:    "nested path rejected",
+			entries: []contracts.TmpFilePayload{{Name: "sub/file.txt", Content: []byte("data")}},
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range tests {
