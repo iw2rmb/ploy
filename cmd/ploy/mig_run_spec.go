@@ -16,11 +16,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
+
+var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
 
 func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
 	var raw map[string]any
@@ -424,8 +428,12 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 		for k, v := range env {
 			switch val := v.(type) {
 			case string:
+				expanded, err := expandSpecEnvValue(val)
+				if err != nil {
+					return fmt.Errorf("env[%s]: %w", k, err)
+				}
 				// Direct string value (overwrites env_from_file if present)
-				mergedEnv[k] = val
+				mergedEnv[k] = expanded
 			case map[string]any:
 				// Check for {from_file: "path"} syntax
 				if fromFile, ok := val["from_file"].(string); ok {
@@ -453,7 +461,11 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 		}
 	case map[string]string:
 		for k, v := range env {
-			mergedEnv[k] = v
+			expanded, err := expandSpecEnvValue(v)
+			if err != nil {
+				return fmt.Errorf("env[%s]: %w", k, err)
+			}
+			mergedEnv[k] = expanded
 		}
 	}
 
@@ -463,6 +475,40 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 	}
 
 	return nil
+}
+
+func expandSpecEnvValue(raw string) (string, error) {
+	if !strings.Contains(raw, "$") {
+		return raw, nil
+	}
+
+	missing := make(map[string]struct{})
+	expanded := specEnvPlaceholderRE.ReplaceAllStringFunc(raw, func(match string) string {
+		var name string
+		if strings.HasPrefix(match, "${") {
+			name = strings.TrimSuffix(strings.TrimPrefix(match, "${"), "}")
+		} else {
+			name = strings.TrimPrefix(match, "$")
+		}
+
+		if v, ok := os.LookupEnv(name); ok {
+			return v
+		}
+		missing[name] = struct{}{}
+		return ""
+	})
+
+	if len(missing) == 0 {
+		return expanded, nil
+	}
+
+	names := make([]string, 0, len(missing))
+	for name := range missing {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	return "", fmt.Errorf("unresolved environment variables: %s", strings.Join(names, ", "))
 }
 
 // buildSpecPayload loads a spec from file (YAML or JSON) and merges it with CLI flag overrides.

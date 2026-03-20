@@ -18,10 +18,6 @@ Documentation: <Relevant docs. Use design docs or roadmap docs for this subject,
     1. <Functional action1 at class/function/struct level>
     2. <Functional action2 at class/function/struct level>
     3. ...
-  - Verification: 
-    1. <One-liner test scenario 1>
-    2. <One-liner test scenario 2>
-    3. ...
   - Reasoning: <Estimated reasoning level required for the task: xhigh|high|medium|low>
 
 - [ ] <n.n Next item short title-summary>

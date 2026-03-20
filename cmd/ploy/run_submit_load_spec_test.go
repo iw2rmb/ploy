@@ -162,3 +162,38 @@ build_gate:
 		t.Fatalf("build_gate.healing.by_error_kind.infra.tmp_dir[0].content got %q, want %q", got, want)
 	}
 }
+
+func TestLoadSpec_ExpandsEnvPlaceholders(t *testing.T) {
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	t.Setenv("PLOY_TEST_LOADSPEC_TOKEN", "loadspectoken")
+
+	spec := []byte(`
+steps:
+  - image: docker.io/test/mig:latest
+env:
+  TOKEN: $PLOY_TEST_LOADSPEC_TOKEN
+  URL: https://${PLOY_TEST_LOADSPEC_TOKEN}.example.test
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	env := result["env"].(map[string]any)
+	if got, want := env["TOKEN"].(string), "loadspectoken"; got != want {
+		t.Fatalf("env.TOKEN got %q, want %q", got, want)
+	}
+	if got, want := env["URL"].(string), "https://loadspectoken.example.test"; got != want {
+		t.Fatalf("env.URL got %q, want %q", got, want)
+	}
+}
