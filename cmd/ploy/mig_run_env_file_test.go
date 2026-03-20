@@ -147,6 +147,49 @@ func TestResolveEnvFromFileInPlace(t *testing.T) {
 		}
 	})
 
+	t.Run("env expands $VAR and ${VAR}", func(t *testing.T) {
+		t.Setenv("PLOY_TEST_ENV_ONE", "token-abc")
+		t.Setenv("PLOY_TEST_ENV_TWO", "service")
+
+		spec := map[string]any{
+			"env": map[string]any{
+				"TOKEN": "$PLOY_TEST_ENV_ONE",
+				"URL":   "https://${PLOY_TEST_ENV_TWO}.example.test",
+			},
+		}
+
+		if err := resolveEnvFromFileInPlace(spec); err != nil {
+			t.Fatalf("resolveEnvFromFileInPlace error: %v", err)
+		}
+
+		env, ok := spec["env"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected env map in spec")
+		}
+		if env["TOKEN"] != "token-abc" {
+			t.Errorf("expected env.TOKEN=token-abc, got %v", env["TOKEN"])
+		}
+		if env["URL"] != "https://service.example.test" {
+			t.Errorf("expected env.URL=https://service.example.test, got %v", env["URL"])
+		}
+	})
+
+	t.Run("env with unresolved placeholder returns error", func(t *testing.T) {
+		spec := map[string]any{
+			"env": map[string]any{
+				"BROKEN": "$PLOY_TEST_MISSING",
+			},
+		}
+
+		err := resolveEnvFromFileInPlace(spec)
+		if err == nil {
+			t.Fatalf("expected error for unresolved env placeholder")
+		}
+		if !strings.Contains(err.Error(), "unresolved environment variables: PLOY_TEST_MISSING") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
 	t.Run("both env_from_file and env with mixed values", func(t *testing.T) {
 		file1 := filepath.Join(tmpDir, "mixed1.txt")
 		file2 := filepath.Join(tmpDir, "mixed2.txt")
@@ -475,6 +518,43 @@ env_from_file:
 		}
 		if env["TILDE_AUTH"] != testContent {
 			t.Errorf("expected env.TILDE_AUTH=%q, got %v", testContent, env["TILDE_AUTH"])
+		}
+	})
+
+	t.Run("top-level env placeholders expanded from process env", func(t *testing.T) {
+		t.Setenv("PLOY_TEST_SPEC_TOKEN", "token-from-env")
+
+		specPath := filepath.Join(tmpDir, "spec-expand.yaml")
+		specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+env:
+  TOKEN: $PLOY_TEST_SPEC_TOKEN
+  URL: https://${PLOY_TEST_SPEC_TOKEN}.example.test
+`
+		if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+			t.Fatalf("write spec file: %v", err)
+		}
+
+		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		if err != nil {
+			t.Fatalf("buildSpecPayload error: %v", err)
+		}
+
+		var result map[string]any
+		if err := json.Unmarshal(payload, &result); err != nil {
+			t.Fatalf("unmarshal payload: %v", err)
+		}
+
+		env, ok := result["env"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected env map in result")
+		}
+		if env["TOKEN"] != "token-from-env" {
+			t.Errorf("expected env.TOKEN=token-from-env, got %v", env["TOKEN"])
+		}
+		if env["URL"] != "https://token-from-env.example.test" {
+			t.Errorf("expected env.URL=https://token-from-env.example.test, got %v", env["URL"])
 		}
 	})
 }
