@@ -4,7 +4,7 @@ entry: main
 
 workspace:
   root: "."
-  state_dir: "/tmp/.amata"
+  state_dir: "/out/.amata"
 
 params:
   roadmap_template_file: "/tmp/ROADMAP.md"
@@ -33,17 +33,6 @@ flows:
       - assert:
           expr: not ctx.prev.value["value"]["hasItem"]
         message: implement_loop must terminate with hasItem=false
-
-      - call: roadmap_review_loop
-
-      - codex: |
-          Completed roadmap file: `{{ ctx.params.roadmap_file }}`.
-          Ensure that docs in docs/** correspond to actual state and do not refer to any files outside that folder.
-          Delete DD that is correspond to this roadmap if there is no other reference to that DD except this roadmap.
-          Delete roadmap file.
-        reasoning: $.params.codex_docs_reasoning
-        response: /tmp/commit.schema.json
-        expect: $.value.ok
 
   compose_roadmap:
     steps:
@@ -131,43 +120,6 @@ flows:
                   reviewReasoning: $.prev.prev.prev.value.reviewReasoning
 
               - call: item_review_loop
-
-              - expr: $.prev.value.value
-
-          - default:
-            steps:
-              - expr: $.prev.value
-
-      - expr: $.prev.value.value
-
-  roadmap_review_loop:
-    steps:
-      - codex: |
-          Roadmap file: `{{ ctx.params.roadmap_file }}`.
-          Confirm by inspecting the codebase that the roadmap is implemented correctly, in full, properly wired, and leaves no leftovers.
-          Focus on roadmap scope only, but if during inspection you face issues outside that scope, include them too.
-          Do NOT run builds, tests, linters, IDE refactorings, or any compile/execution commands.
-          Do not fix anything in this step.
-          Respond via schema with:
-          - ok=true if no gaps remain,
-          - ok=false if gaps exist and notes contain actionable gap list.
-        reasoning: $.params.codex_correctness_reasoning
-        response: /tmp/commit.schema.json
-
-      - switch:
-          - when:
-              expr: not ctx.prev.value.ok
-            steps:
-              - codex: |
-                  Roadmap file: `{{ ctx.params.roadmap_file }}`.
-                  Fix all gaps listed below:
-                  {{ ctx.prev.value.notes }}
-                  Do NOT run builds, tests, linters, IDE refactorings, or any compile/execution commands.
-                reasoning: $.params.codex_correctness_reasoning
-                response: /tmp/commit.schema.json
-                expect: $.value.ok
-
-              - call: roadmap_review_loop
 
               - expr: $.prev.value.value
 
