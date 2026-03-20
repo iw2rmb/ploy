@@ -628,7 +628,7 @@ derive_admin_pg_dsn() {
 import os
 from urllib.parse import urlsplit, urlunsplit
 
-dsn = os.environ["PLOY_LOCAL_PG_DSN"].strip()
+dsn = os.environ["PLOY_DB_DSN"].strip()
 if not dsn:
     raise SystemExit("error: PLOY_DB_DSN is required")
 if "://" not in dsn:
