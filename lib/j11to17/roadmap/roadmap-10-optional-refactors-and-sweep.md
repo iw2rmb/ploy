@@ -1,42 +1,20 @@
 # 10 Optional refactors and final sweep
 
-Parent: `roadmap.md` item `1.10`.
-Source: `../post-orw-java11-to-17-migration.md` sections `9-10`.
+Parent item: `roadmap.md` -> `1.10`.
 
-## Goal
-Apply safe optional Java 17 refactors, then close all high-risk text-search findings.
+## Edit targets
+- main/test source trees: `src/main/java/**`, `src/test/java/**`, `src/main/kotlin/**`, `src/test/kotlin/**`
 
-## Detailed actions
-1. Convert clearly immutable DTOs to `record` where no behavior/identity side effects exist.
-2. Convert side-effect-free classic `switch` blocks to `switch` expressions.
-3. Convert remaining straightforward `instanceof` + cast chains to pattern matching.
-4. Execute final search checklist and triage every remaining hit.
+## Optional refactor patterns
+- Immutable DTO classes with only final fields + canonical constructor + trivial getters
+- Classic `switch` blocks with only value returns (no side effects)
+- `instanceof` followed by immediate cast of the same variable
 
-## Before/after examples
-
-```java
-// Before
-public final class User {
-    private final String name;
-    private final int age;
-}
-
-// After
-public record User(String name, int age) {}
-```
-
-```java
-// Before
-if (obj instanceof String) {
-    String s = (String) obj;
-    handle(s);
-}
-
-// After
-if (obj instanceof String s) {
-    handle(s);
-}
-```
+## Actions
+1. Convert eligible immutable DTOs to `record`.
+2. Convert side-effect-free classic `switch` statements to `switch` expressions.
+3. Convert `if (x instanceof T) { T t = (T) x; ... }` to pattern matching `if (x instanceof T t) { ... }`.
+4. If semantic risk exists (inheritance, custom equality, mutable state, side effects), skip conversion and add `TODO(java17): optional refactor skipped due to behavior risk`.
 
 ## Final sweep patterns
 - `import sun.`
@@ -44,7 +22,6 @@ if (obj instanceof String s) {
 - `jdk.internal.`
 - `setAccessible(`
 - `SecurityManager`
-- `finalize(`
 - `jdk.nashorn`
 - `javax.servlet.`
 - `javax.persistence.`
@@ -58,3 +35,5 @@ if (obj instanceof String s) {
 - `--add-exports`
 - `java.se.ee`
 - `-Xverify:none`
+
+For each remaining hit, either apply the relevant roadmap item change or add `TODO(java17):` with exact blocker.

@@ -1,28 +1,20 @@
 # 5 Removed modules and engines
 
-Parent: `roadmap.md` item `1.5`.
-Source: `../post-orw-java11-to-17-migration.md` section `4`.
+Parent item: `roadmap.md` -> `1.5`.
 
-## Goal
-Handle Nashorn removal and Java EE-in-JDK assumptions without environment changes.
+## Edit targets
+- scripting/execution adapters in `src/main/**`
+- integration code under `src/main/**` using JAXB/JAX-WS/other Java EE APIs
+- config files that mention Nashorn or Java EE modules: `*.properties`, `*.yaml`, `*.yml`, `*.sh`, `*.bat`
 
-## Detailed actions
-1. Search and remove active Nashorn calls (`jdk.nashorn.*`, `getEngineByName("nashorn")`).
-2. Replace Nashorn execution paths with explicit unsupported placeholders or interface seams.
-3. Detect Java EE APIs assumed from JDK modules and annotate missing standalone dependency requirements.
+## Match strings
+- `jdk.nashorn.api.scripting`
+- `getEngineByName("nashorn")`
+- `javax.xml.bind`
+- `javax.xml.ws`
+- `javax.activation`
 
-## Before/after examples
-
-```java
-// Before
-ScriptEngine engine = new ScriptEngineManager().getEngineByName("nashorn");
-Object result = engine.eval(jsCode);
-
-// After
-// TODO: Nashorn removed in Java 17.
-throw new UnsupportedOperationException("JavaScript engine must be replaced for Java 17+");
-```
-
-```java
-// TODO: Requires standalone JAXB dependency; add via build tooling.
-```
+## Actions
+1. Remove direct Nashorn engine construction and calls.
+2. Replace removed Nashorn paths with explicit placeholders (for example, throw unsupported exception) and `TODO(java17): replace Nashorn engine`.
+3. For Java EE APIs previously bundled with JDK, keep code minimal and add `TODO(java17): add standalone dependency for <package>` where dependency source is unresolved.
