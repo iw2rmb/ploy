@@ -1,4 +1,6 @@
 image: 127.0.0.1:5000/ploy/migs-codex:latest
+env:
+  CODEX_API_KEY: $LLM_PROXY_API_KEY
 env_from_file:
   CODEX_PROMPT: $PLOY_PATH/healing/router/prompt.md
   CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/config.toml

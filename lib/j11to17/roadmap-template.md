@@ -4,7 +4,7 @@ Scope: <One short statement of boundary and intended outcome.>
 
 Documentation: <Relevant docs. Use design docs or roadmap docs for this subject, not both.>
 
-> Use `COSMIC.md` for functional-process granularity and decomposition. Do not mix it with subject documentation. Omit this line in the resulting roadmap.
+> Use `/tmp/roadmap-COSMIC.md` for functional-process granularity and decomposition. Do not mix it with subject documentation. Omit this line in the resulting roadmap.
 
 > Rules:
 > - Use COSMIC-style granularity: one functional action per numbered line.

@@ -24,7 +24,7 @@ steps:
       GRADLE_PLUGIN_VERSION: "7.27.0" # "7.21.0"
       ORW_REPOS: "https://artifactory.tcsbank.ru/artifactory/maven-all/,https://repo1.maven.org/maven2"
     env_from_file:
-      CA_CERTS_PEM_BUNDLE: $PLOY_PATH/lib/j11to17/ca-certs.pem
+      CA_CERTS_PEM_BUNDLE: $PLOY_CA_CERTS
   - image: 127.0.0.1:5000/ploy/migs-codex:latest
     env:
       CODEX_API_KEY: $LLM_PROXY_API_KEY
@@ -36,10 +36,10 @@ steps:
     tmp_dir:
       - name: post-orw-java11-to-17-migration.md
         path: $PLOY_PATH/lib/j11to17/post-orw-java11-to-17-migration.md
-      - name: ROADMAP.md
-        path: $PLOY_PATH/lib/j11to17/ROADMAP.md
-      - name: COSMIC.md
-        path: $PLOY_PATH/lib/j11to17/COSMIC.md
+      - name: roadmap-template.md
+        path: $PLOY_PATH/lib/j11to17/roadmap-template.md
+      - name: roadmap-COSMIC.md
+        path: $PLOY_PATH/lib/j11to17/roadmap-COSMIC.md
       - name: commit.schema.json
         path: $PLOY_PATH/lib/j11to17/commit.schema.json
       - name: implement_result.schema.json
