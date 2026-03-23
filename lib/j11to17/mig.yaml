@@ -34,12 +34,37 @@ steps:
     amata:
       spec: $PLOY_PATH/lib/j11to17/amata.yaml
     tmp_dir:
+      # amata
       - name: commit.schema.json
         path: $PLOY_PATH/lib/j11to17/commit.schema.json
       - name: implement_result.schema.json
         path: $PLOY_PATH/lib/j11to17/implement_result.schema.json
       - name: roadmap-item.schema.json
         path: $PLOY_PATH/lib/j11to17/roadmap-item.schema.json
+
+      # roadmap
+      - name: roadmap.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap.md
+      - name: roadmap-1-build-targets.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-1-build-targets.md
+      - name: roadmap-2-jdk-internal-apis.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-2-jdk-internal-apis.md
+      - name: roadmap-3-reflection.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-3-reflection.md
+      - name: roadmap-4-security-manager.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-4-security-manager.md
+      - name: roadmap-5-removed-modules.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-5-removed-modules.md
+      - name: roadmap-6-jakarta-imports.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-6-jakarta-imports.md
+      - name: roadmap-7-logging-stack.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-7-logging-stack.md
+      - name: roadmap-8-test-code.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-8-test-code.md
+      - name: roadmap-9-jvm-flags.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-9-jvm-flags.md
+      - name: roadmap-10-optional-refactors-and-sweep.md
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-10-optional-refactors-and-sweep.md
 build_gate:
   enabled: true
   pre:
