@@ -10,8 +10,7 @@ params:
   roadmap_template_file: "/tmp/roadmap-template.md"
   roadmap_file: "/tmp/roadmap.md"
   # complex_task_file: "/tmp/post-orw-java11-to-17-migration.md"
-  codex_model: "openai/gpt-5"
-  codex_correctness_reasoning: "high"
+  # codex_correctness_reasoning: "high"
   codex_docs_reasoning: "high"
 
 defaults:
@@ -19,7 +18,7 @@ defaults:
   expr_lang: starlark
   executors:
     codex:
-      model: $.params.codex_model
+      model: "openai/gpt-5"
       stall:
         after: 30
 
