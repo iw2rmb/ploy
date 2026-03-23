@@ -24,12 +24,3 @@ runSandboxed(args);
 // Replace with process-level isolation.
 runSandboxed(args);
 ```
-
-## Verification checklist
-- No active `System.setSecurityManager(` call sites remain.
-- All removed paths have explicit successor notes.
-
-## Sizing
-- CFP_delta: 5
-- Base reasoning: medium
-- Shifted for assumption-bound: high

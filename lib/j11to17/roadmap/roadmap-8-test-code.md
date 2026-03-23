@@ -27,12 +27,3 @@ void dividesByZero() {
     assertThrows(IllegalArgumentException.class, () -> calculator.divide(1, 0));
 }
 ```
-
-## Verification checklist
-- No `extends TestCase` or JUnit4 `@RunWith` remain in migrated scope.
-- Remaining PowerMock dependencies are explicitly tracked with redesign TODOs.
-
-## Sizing
-- CFP_delta: 12
-- Base reasoning: high
-- Shifted for assumption-bound: xhigh

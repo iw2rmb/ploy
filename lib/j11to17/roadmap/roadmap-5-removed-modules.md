@@ -26,12 +26,3 @@ throw new UnsupportedOperationException("JavaScript engine must be replaced for 
 ```java
 // TODO: Requires standalone JAXB dependency; add via build tooling.
 ```
-
-## Verification checklist
-- No active Nashorn imports/usages remain.
-- Java EE-in-JDK assumptions are explicitly tagged for dependency follow-up.
-
-## Sizing
-- CFP_delta: 5
-- Base reasoning: medium
-- Shifted for assumption-bound: high

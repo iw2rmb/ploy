@@ -23,12 +23,3 @@ log.info("Processing " + order.getId());
 private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 log.info("Processing {}", order.getId());
 ```
-
-## Verification checklist
-- No `org.apache.log4j.` imports remain in migrated modules.
-- No direct Commons Logging factory usage remains unless documented.
-
-## Sizing
-- CFP_delta: 8
-- Base reasoning: medium
-- Shifted for assumption-bound: high

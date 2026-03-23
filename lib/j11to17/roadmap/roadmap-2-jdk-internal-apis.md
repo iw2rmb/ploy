@@ -34,12 +34,3 @@ private static final Unsafe UNSAFE = ...;
 // After
 private final AtomicInteger value = new AtomicInteger();
 ```
-
-## Verification checklist
-- No remaining `import sun.`.
-- Non-SSL `com.sun.*` hits are either replaced or tagged with exact TODO replacement decisions.
-
-## Sizing
-- CFP_delta: 10
-- Base reasoning: high
-- Shifted for assumption-bound: xhigh
