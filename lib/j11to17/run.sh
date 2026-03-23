@@ -11,7 +11,7 @@ TARGET_REF=${PLOY_TARGET_REF:-lsc-java11-to-17}
 
 # Artifacts directory: default to ./lib/mods/scenario-orw-fail/<YYMMDDHHmmss>/
 TS=$(date +%y%m%d%H%M%S)
-ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-/users/v.v.kovalev/ploy/lib/j11to17/runs}
+ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-/Users/v.v.kovalev/@iw2rmb/ploy/lib/j11to17/runs}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 

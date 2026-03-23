@@ -4,6 +4,8 @@ expectations:
   artifacts:
     - path: /out/gate-profile-candidate.json
       schema: gate_profile_v1
+env:
+  CODEX_API_KEY: $LLM_PROXY_API_KEY
 env_from_file:
   CODEX_PROMPT: $PLOY_PATH/healing/infra/prompt.md
   CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/config.toml

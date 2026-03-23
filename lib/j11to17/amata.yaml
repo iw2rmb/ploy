@@ -4,10 +4,10 @@ entry: main
 
 workspace:
   root: "."
-  state_dir: "/out/.amata"
+  state_dir: "/out/amata"
 
 params:
-  roadmap_template_file: "/tmp/ROADMAP.md"
+  roadmap_template_file: "/tmp/roadmap-template.md"
   roadmap_file: "/in/j11to17-roadmap.md"
   complex_task_file: "/tmp/post-orw-java11-to-17-migration.md"
   codex_model: "openai/gpt-5"
