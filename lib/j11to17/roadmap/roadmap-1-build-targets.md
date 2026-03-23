@@ -28,12 +28,3 @@ jvmTarget = "17"
 // TODO: Kotlin plugin version is older than the Java 17 target;
 // consider upgrading per Kotlin's compatibility matrix.
 ```
-
-## Verification checklist
-- No remaining build-target constants set to 11 where they control Java/Kotlin compilation.
-- Remaining `11` hits are non-version business constants or documented TODO decisions.
-
-## Sizing
-- CFP_delta: 6
-- Base reasoning: medium
-- Shifted for assumption-bound: high

@@ -25,12 +25,3 @@ public Object getSomeField() {
     return delegate.getSomeField();
 }
 ```
-
-## Verification checklist
-- Every remaining `setAccessible(true)` hit has explicit justification and TODO owner.
-- No new module-open/export flags were introduced.
-
-## Sizing
-- CFP_delta: 7
-- Base reasoning: medium
-- Shifted for assumption-bound: high

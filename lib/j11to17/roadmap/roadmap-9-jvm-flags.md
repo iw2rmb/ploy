@@ -11,12 +11,3 @@ Remove obsolete JVM flags from repository scripts/config while keeping unresolve
 2. Remove flags made unnecessary by code cleanup.
 3. For still-needed flags, keep them with TODO notes naming required module/package access.
 4. Do not add new tuning/diagnostic JVM flags in this migration slice.
-
-## Verification checklist
-- Each risky flag is either removed or justified with a concrete TODO.
-- No new compatibility flags were introduced.
-
-## Sizing
-- CFP_delta: 5
-- Base reasoning: medium
-- Shifted for assumption-bound: high

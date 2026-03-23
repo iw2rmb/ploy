@@ -23,12 +23,3 @@ import javax.persistence.Entity;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.persistence.Entity;
 ```
-
-## Verification checklist
-- Converted files consistently use `jakarta.*` for the migrated API groups.
-- Remaining `javax.*` references are intentional or documented blockers.
-
-## Sizing
-- CFP_delta: 9
-- Base reasoning: high
-- Shifted for assumption-bound: xhigh
