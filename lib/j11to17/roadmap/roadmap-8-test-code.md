@@ -1,29 +1,26 @@
 # 8 Test code migration
 
-Parent: `roadmap.md` item `1.8`.
-Source: `../post-orw-java11-to-17-migration.md` section `7`.
+Parent item: `roadmap.md` -> `1.8`.
 
-## Goal
-Modernize test code to Java-17-friendly patterns without changing CI/runtime setup.
+## Edit targets
+- test trees: `src/test/java/**`, `src/test/kotlin/**`, `test/**`
+- test utility packages under `src/test/**`
 
-## Detailed actions
-1. Migrate JUnit 3/4 imports and annotations to JUnit 5 (`org.junit.jupiter.*`).
-2. Replace `@Test(expected=...)` with `assertThrows`.
-3. Replace `@RunWith`, legacy rules, and base-class patterns where direct JUnit 5 equivalents exist.
-4. Reduce PowerMock reliance via seams/interfaces where low-risk; mark hard cases with TODO.
+## Match strings
+- `extends TestCase`
+- `org.junit.Test`
+- `@RunWith(`
+- `@Rule`
+- `@ClassRule`
+- `@Before`
+- `@After`
+- `@BeforeClass`
+- `@AfterClass`
+- `@Test(expected =`
+- `org.powermock`
 
-## Before/after examples
-
-```java
-// Before
-@Test(expected = IllegalArgumentException.class)
-public void dividesByZero() {
-    calculator.divide(1, 0);
-}
-
-// After
-@Test
-void dividesByZero() {
-    assertThrows(IllegalArgumentException.class, () -> calculator.divide(1, 0));
-}
-```
+## Actions
+1. Replace JUnit 3/4 APIs with JUnit 5 (`org.junit.jupiter.api.*`) in test source files.
+2. Replace `@Test(expected = ...)` with `assertThrows(...)` blocks.
+3. Replace runner/rule patterns with JUnit 5 extension-style equivalents where straightforward.
+4. For PowerMock-heavy cases that require design changes, keep test readable and add `TODO(java17): replace PowerMock usage in <test-class>`.

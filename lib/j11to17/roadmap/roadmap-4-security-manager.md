@@ -1,26 +1,21 @@
-# 4 SecurityManager deprecation
+# 4 SecurityManager removal
 
-Parent: `roadmap.md` item `1.4`.
-Source: `../post-orw-java11-to-17-migration.md` section `3`.
+Parent item: `roadmap.md` -> `1.4`.
 
-## Goal
-Remove direct SecurityManager usage and isolate sandbox assumptions for manual redesign.
+## Edit targets
+- app entry points: `src/main/**/Main*.java`, `src/main/**/Application*.java`, equivalent Kotlin entry points
+- security/sandbox packages under `src/main/**`
+- config usages in `*.properties`, `*.yaml`, `*.yml` mentioning security policy flags
 
-## Detailed actions
-1. Search for `System.setSecurityManager`, `System.getSecurityManager`, `extends SecurityManager`, `java.lang.SecurityManager`.
-2. Remove active `System.setSecurityManager(...)` calls.
-3. Delete unused custom `SecurityManager` subclasses.
-4. Add minimal TODO notes where process-level/container-level isolation is required.
+## Match strings
+- `System.setSecurityManager(`
+- `System.getSecurityManager(`
+- `extends SecurityManager`
+- `java.lang.SecurityManager`
+- `java.security.policy`
 
-## Before/after examples
-
-```java
-// Before
-System.setSecurityManager(new SecurityManager());
-runSandboxed(args);
-
-// After
-// TODO: SecurityManager is deprecated/removed on Java 17+.
-// Replace with process-level isolation.
-runSandboxed(args);
-```
+## Actions
+1. Remove active `System.setSecurityManager(...)` calls.
+2. Remove dead custom `SecurityManager` subclasses when no longer referenced.
+3. Keep surrounding flow intact and add `TODO(java17): replace SecurityManager sandbox with process/container isolation` where behavior replacement is pending.
+4. Where old permission checks gate business actions, replace with local app-level guard placeholders and TODO markers, not JVM SecurityManager hooks.

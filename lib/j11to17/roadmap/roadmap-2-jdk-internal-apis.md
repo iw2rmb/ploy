@@ -1,36 +1,22 @@
 # 2 JDK-internal APIs
 
-Parent: `roadmap.md` item `1.2`.
-Source: `../post-orw-java11-to-17-migration.md` section `1`.
+Parent item: `roadmap.md` -> `1.2`.
 
-## Goal
-Eliminate dependencies on unsupported internal JDK APIs from code and tracked configs.
+## Edit targets
+- `src/main/java/**`, `src/test/java/**`
+- `src/main/kotlin/**`, `src/test/kotlin/**`
+- version-controlled runtime/config files: `*.properties`, `*.yaml`, `*.yml`, `*.conf`, `*.sh`, `*.bat`
 
-## Detailed actions
-1. Search `src/**`, `test/**`, and config files for `import sun.`, `import com.sun.`, `jdk.internal.`, `--add-opens`, `--add-exports`.
-2. Replace `sun.misc.BASE64Encoder/BASE64Decoder` with `java.util.Base64`.
-3. Replace `sun.misc.Unsafe` CAS/atomic usage with `Atomic*`, `VarHandle`, or other public APIs when straightforward.
-4. Replace non-SSL `com.sun.*` usages with supported public APIs; add precise TODO for unresolved cases.
+## Match strings
+- `import sun.`
+- `import com.sun.`
+- `jdk.internal.`
+- `sun.misc.BASE64Encoder`
+- `sun.misc.BASE64Decoder`
+- `sun.misc.Unsafe`
 
-## Before/after examples
-
-```java
-// Before
-import sun.misc.BASE64Encoder;
-import sun.misc.BASE64Decoder;
-String encoded = new BASE64Encoder().encode(bytes);
-byte[] decoded = new BASE64Decoder().decodeBuffer(encoded);
-
-// After
-import java.util.Base64;
-String encoded = Base64.getEncoder().encodeToString(bytes);
-byte[] decoded = Base64.getDecoder().decode(encoded);
-```
-
-```java
-// Before
-private static final Unsafe UNSAFE = ...;
-
-// After
-private final AtomicInteger value = new AtomicInteger();
-```
+## Actions
+1. Replace `sun.misc.BASE64Encoder/BASE64Decoder` call sites with `java.util.Base64` (`encodeToString`, `decode`).
+2. Replace `sun.misc.Unsafe` CAS/atomic usage with public Java APIs (`Atomic*`, `VarHandle`, or `java.util.concurrent` classes).
+3. For `com.sun.*` imports (except already-migrated SSL cases), switch to public replacements in `java.*`, `javax.*`, or `jakarta.*`.
+4. If no safe public replacement is obvious, keep the code path and add `TODO(java17): replace internal API <fully-qualified-name>` at the usage site.

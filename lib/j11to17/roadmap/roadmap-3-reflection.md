@@ -1,27 +1,21 @@
 # 3 Reflection on internals
 
-Parent: `roadmap.md` item `1.3`.
-Source: `../post-orw-java11-to-17-migration.md` section `2`.
+Parent item: `roadmap.md` -> `1.3`.
 
-## Goal
-Remove brittle reflection against JDK internals and module-encapsulated members.
+## Edit targets
+- `src/main/java/**`, `src/test/java/**`
+- `src/main/kotlin/**`, `src/test/kotlin/**`
+- launch/config files that pass module-open flags: `*.sh`, `*.bat`, `*.properties`, `*.yaml`, `*.yml`
 
-## Detailed actions
-1. Search for `setAccessible(true)`, `Class.forName("java.`, `Class.forName("sun.`, `getDeclaredField`, `getDeclaredMethod`.
-2. For project types, replace reflection with explicit methods/constructors.
-3. For JDK types, switch to public APIs; if no safe replacement exists, add TODO with exact member/type.
-4. Do not add new `--add-opens` or `--add-exports` flags as workaround.
+## Match strings
+- `setAccessible(true)`
+- `Class.forName("java.`
+- `Class.forName("sun.`
+- `getDeclaredField(`
+- `getDeclaredMethod(`
 
-## Before/after examples
-
-```java
-// Before
-Field f = SomeJdkClass.class.getDeclaredField("someField");
-f.setAccessible(true);
-Object value = f.get(instance);
-
-// After
-public Object getSomeField() {
-    return delegate.getSomeField();
-}
-```
+## Actions
+1. For reflection on project-owned classes, replace reflective access with explicit methods/constructors.
+2. For reflection on JDK classes, replace with public API calls when available.
+3. If replacement is not obvious, add `TODO(java17): remove reflective access to <type/member>` on the exact line/block.
+4. Do not add new `--add-opens` or `--add-exports` entries in repository files.

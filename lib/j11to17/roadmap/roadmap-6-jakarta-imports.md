@@ -1,25 +1,17 @@
-# 6 Jakarta import migration
+# 6 Jakarta migration gate and import rewrite
 
-Parent: `roadmap.md` item `1.6`.
-Source: `../post-orw-java11-to-17-migration.md` section `5`.
+Parent item: `roadmap.md` -> `1.6`.
 
-## Goal
-Migrate `javax.*` to `jakarta.*` only when project dependencies are already Jakarta-based.
+## Edit targets
+- dependency baselines: `build.gradle`, `build.gradle.kts`, `settings.gradle*`, `gradle/libs.versions.toml`, `pom.xml`, `**/pom.xml`
+- source files: `src/main/java/**`, `src/test/java/**`, `src/main/kotlin/**`, `src/test/kotlin/**`
 
-## Detailed actions
-1. Confirm baseline stack is Jakarta-first (for example Spring 6+/Boot 3+ or Jakarta EE 9+).
-2. Replace imports in servlet/persistence/validation/injection code paths.
-3. Keep business logic unchanged; adjust packages only.
-4. Add TODO notes for unmapped or baseline-conflicting types.
+## Match strings
+- Stack gate evidence: `org.springframework.boot` with version `3.`, `org.springframework` with version `6.`, `jakarta.` dependencies
+- Legacy imports: `javax.servlet.`, `javax.persistence.`, `javax.validation.`, `javax.inject.`
 
-## Before/after examples
-
-```java
-// Before
-import javax.servlet.http.HttpServletRequest;
-import javax.persistence.Entity;
-
-// After
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.persistence.Entity;
-```
+## Actions
+1. Decide migration gate from dependency files first.
+2. If baseline is Jakarta-first, replace matching `javax.*` imports with `jakarta.*` in source files.
+3. If baseline is not Jakarta-first, keep `javax.*` and add `TODO(java17): blocked Jakarta rewrite by dependency baseline` near affected imports/classes.
+4. Keep code logic and annotations unchanged; only package imports/types change.

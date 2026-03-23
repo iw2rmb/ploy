@@ -1,30 +1,32 @@
 # 1 Build targets and stale markers
 
-Parent: `roadmap.md` item `1.1`.
-Source: `../post-orw-java11-to-17-migration.md` sections `0.1-0.3`.
+Parent item: `roadmap.md` -> `1.1`.
 
-## Goal
-Set Java/Kotlin compile targets to 17 in centralized build descriptors, then clean stale Java version markers.
+## Edit targets
+- `gradle/libs.versions.toml`
+- `gradle.properties`
+- `build.gradle`, `build.gradle.kts`
+- `settings.gradle`, `settings.gradle.kts`
+- `buildSrc/**/*.gradle`, `buildSrc/**/*.gradle.kts`, `buildSrc/**/*.kt`, `buildSrc/**/*.groovy`
+- `**/pom.xml`
+- repo-level config/docs that declare required Java version (`*.md`, `*.adoc`, `*.properties`, `*.yml`, `*.yaml`)
 
-## Detailed actions
-1. Find shared JVM version constants in `gradle/libs.versions.toml`, `gradle.properties`, `buildSrc/**`, convention plugins, Maven properties.
-2. Update constants wired to `sourceCompatibility`, `targetCompatibility`, `javaLanguageVersion`, `kotlinOptions.jvmTarget`, or `jvmToolchain` from 11 to 17.
-3. Search config/build text for `Java 11`, `JDK 11`, `1.8`, `jdk8` and update only runtime/compile requirement statements.
-4. Add TODO comments on ambiguous markers and on old Kotlin plugin versions used with target 17.
+## Match strings
+- `VERSION_11`
+- `sourceCompatibility`
+- `targetCompatibility`
+- `javaLanguageVersion`
+- `jvmTarget`
+- `jvmToolchain`
+- `Java 11`
+- `JDK 11`
+- `jdk8`
+- `1.8`
+- Kotlin plugin declarations: `kotlin("jvm") version`, `id("org.jetbrains.kotlin.jvm") version`, `org.jetbrains.kotlin:kotlin-maven-plugin`
 
-## Before/after examples
-
-```toml
-# Before
-[versions]
-jvmTarget = "11"
-
-# After
-[versions]
-jvmTarget = "17"
-```
-
-```kotlin
-// TODO: Kotlin plugin version is older than the Java 17 target;
-// consider upgrading per Kotlin's compatibility matrix.
-```
+## Actions
+1. Change Java compile target declarations from 11 to 17.
+2. Change Kotlin JVM target declarations from 11 to 17 where they control compile output.
+3. Update stale text markers (`Java 11`, `JDK 11`) only where they describe required runtime/compile version.
+4. For ambiguous `jdk8`/`1.8` markers, keep value and add `TODO(java17): verify whether this marker is a Java version requirement`.
+5. If Kotlin plugin version is clearly old for target 17 (for example `1.6.x` or earlier), add `TODO(java17): Kotlin plugin may be too old for JVM target 17` next to plugin declaration.
