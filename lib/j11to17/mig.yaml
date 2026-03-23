@@ -34,12 +34,6 @@ steps:
     amata:
       spec: $PLOY_PATH/lib/j11to17/amata.yaml
     tmp_dir:
-      - name: post-orw-java11-to-17-migration.md
-        path: $PLOY_PATH/lib/j11to17/post-orw-java11-to-17-migration.md
-      - name: roadmap-template.md
-        path: $PLOY_PATH/lib/j11to17/roadmap-template.md
-      - name: roadmap-COSMIC.md
-        path: $PLOY_PATH/lib/j11to17/roadmap-COSMIC.md
       - name: commit.schema.json
         path: $PLOY_PATH/lib/j11to17/commit.schema.json
       - name: implement_result.schema.json
