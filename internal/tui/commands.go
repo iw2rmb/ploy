@@ -94,5 +94,27 @@ type migDetailsLoadedMsg struct {
 	runTotal  int
 }
 
+// loadRunDetailsCmd returns a tea.Cmd that fetches repo and job totals for the
+// given run, used to populate the S5 detail list.
+func loadRunDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.RunID) tea.Cmd {
+	return func() tea.Msg {
+		totals, err := clitui.GetRunTotalsCommand{
+			Client:  client,
+			BaseURL: baseURL,
+			RunID:   runID,
+		}.Run(context.Background())
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return runDetailsLoadedMsg{repoTotal: int(totals.RepoTotal), jobTotal: int(totals.JobTotal)}
+	}
+}
+
+// runDetailsLoadedMsg carries run detail totals from async fetch.
+type runDetailsLoadedMsg struct {
+	repoTotal int
+	jobTotal  int
+}
+
 // errMsg carries an error from an async command.
 type errMsg struct{ err error }

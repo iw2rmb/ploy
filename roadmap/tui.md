@@ -86,7 +86,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     1. `go test ./internal/tui -run 'Test.*Runs.*|Test.*S4.*'`
   - Reasoning: `medium`
 
-- [ ] 1.8 [determined] Implement State S5 Run Details (`RUN`)
+- [x] 1.8 [determined] Implement State S5 Run Details (`RUN`)
   - Repository: `ploy`
   - Component: `internal/tui/model_*.go`; `internal/tui/view_*.go`; `internal/tui/model_run_details_test.go` (new)
   - Implementation:
