@@ -39,12 +39,14 @@ steps:
         path: $PLOY_PATH/lib/j11to17/commit.schema.json
       - name: implement_result.schema.json
         path: $PLOY_PATH/lib/j11to17/implement_result.schema.json
-      - name: roadmap-item.schema.json
-        path: $PLOY_PATH/lib/j11to17/roadmap-item.schema.json
 
       # roadmap
       - name: roadmap.json
         path: $PLOY_PATH/lib/j11to17/roadmap/roadmap.json
+      - name: roadmap.schema.json
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap.schema.json
+      - name: roadmap-search.sh
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-search.sh
       - name: roadmap-1-build-targets.md
         path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-1-build-targets.md
       - name: roadmap-2-jdk-internal-apis.md
