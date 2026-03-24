@@ -97,7 +97,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     1. `go test ./internal/tui -run 'Test.*Run.*Details.*|Test.*S5.*'`
   - Reasoning: `low`
 
-- [ ] 1.9 [determined] Implement State S6 Jobs List (`PLOY | JOBS`)
+- [x] 1.9 [determined] Implement State S6 Jobs List (`PLOY | JOBS`)
   - Repository: `ploy`
   - Component: `internal/tui/model_*.go`; `internal/tui/view_*.go`; `internal/tui/model_jobs_test.go` (new)
   - Implementation:
