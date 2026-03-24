@@ -31,7 +31,7 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
       NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem \
       npm install -g @openai/codex @charmland/crush; \
     else \
-      npm install -g @openai/codex @charmland/crush; \
+    npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router; \
     fi && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
