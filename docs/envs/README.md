@@ -164,7 +164,8 @@ build_gate:
   `ploy mig run <mig-id|name> [--follow]`.
   Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
-  See `cmd/ploy/README.md` § "Batched Mod Runs" for full usage.
+  See [Mods lifecycle](../migs-lifecycle.md) § "1.4 Batched Mods Runs (`runs` + `run_repos`)"
+  for full usage.
 - `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
   - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `env`, `env_from_file`
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
