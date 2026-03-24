@@ -3,7 +3,7 @@ name: implement-roadmap
 entry: main
 
 workspace:
-  root: "."
+  root: "/workspace"
   state_dir: "/out/amata"
 
 params:
@@ -54,11 +54,18 @@ flows:
 
               Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
 
-              Mandatory rules:
+              Search rules (hard):
               - Use `grep` instead of `rg`. Do not run equivalent grep/ripgrep variants.
               - If exact-match scan in declared edit targets returns 0, stop and return no-op result.
               - No `ls -R` or searching `.`; only declared target paths.
-              - Max 5 tool calls unless a file is actually being edited.
+              - Build grep target list from existing files only (`[ -e path ]` check per path). Do not pass missing paths to grep.
+              - Do not use nested `sh -lc`, do not use `|| true`, and do not use `--include` with explicit file arguments.
+              - Exit code handling for grep is strict:
+                - 0: matches found
+                - 1: no matches
+                - 2: command failure; fix command and rerun. Never treat exit 2 as “no matches”.
+
+              Implementation rules (hard):
               - Stick to the scope of the task strictly.
               - Edit only source code, build descriptors, and version-controlled config/script files.
               - Do not run builds, tests, linters, or IDE-assisted refactors.
@@ -66,5 +73,3 @@ flows:
               - Use `TODO(java17): ...` for unresolved decisions that need human follow-up.
             reasoning: $.step.reasoning
             response: /tmp/implement_result.schema.json
-
-          - command: ["sleep", "60"]

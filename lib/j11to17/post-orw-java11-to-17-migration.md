@@ -820,3 +820,38 @@ Use text search only; do not execute any commands that compile or run the code.
 - `-Xverify:none`
 
 For each hit, apply the relevant section above or leave a minimal `// TODO` / comment when a human decision is required.
+
+---
+
+## 11. Official Reference Documentation
+
+Use these links for precise semantics and migration details. Prefer them over blogs or Q&A sites.
+
+- **Java 11**
+  - JDK 11 documentation home (Oracle):  
+    `https://docs.oracle.com/javase/11/`
+  - JDK 11 Migration Guide index (Oracle “Books” page, includes Migration Guide):  
+    `https://docs.oracle.com/en/java/javase/11/books.html`
+- **Java 17**
+  - JDK 17 documentation home (Oracle):  
+    `https://docs.oracle.com/en/java/javase/17/`
+  - JDK 17 API “New since JDK 11” overview (helps understand APIs newly available when moving 11 → 17):  
+    `https://docs.oracle.com/en/java/javase/17/docs/api/new-list.html`
+- **Java Version History and LTS Context**
+  - Java SE 11 and 17 overview, including LTS status and JEP references:  
+    `https://en.wikipedia.org/wiki/Java_version_history`
+- **Kotlin**
+  - Kotlin FAQ (includes supported JVM versions and general language info):  
+    `https://kotlinlang.org/docs/faq.html`
+  - Java ↔ Kotlin interoperability details (nullability, mapped types, generics):  
+    `https://kotlinlang.org/docs/java-interop.html`
+
+When library‑ or framework‑specific questions arise (for example, Spring 6 + Java 17, Jakarta EE 10),
+always prefer:
+
+- The framework’s **official reference docs** and **migration guides**.
+- The library’s **release notes** and **GitHub issues**.
+
+This guide deliberately avoids duplicating what the OpenRewrite `UpgradeToJava17` recipe
+and official migration guides already do, and focuses instead on manual code changes that
+automated tools cannot safely complete.
