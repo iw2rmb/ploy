@@ -62,7 +62,7 @@ steps:
 ################################################################################
 # TMP_DIR — per-step file injection
 ################################################################################
-# Optional list of files to materialize read-only at /tmp/<name> inside the
+# Optional list of files to materialize at /tmp/<name> inside the
 # container. Supported under steps[], build_gate.router, and
 # build_gate.healing.by_error_kind.<kind>.
 #
@@ -204,7 +204,7 @@ build_gate:
 #       #     value: gpt-4o
 #     env_from_file:
 #       CODEX_AUTH_JSON: ~/.codex/auth.json
-#     # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
+#     # tmp_dir:   # optional; files materialized at /tmp/<name>
 #     #   - name: router-instructions.txt
 #     #     path: ./healing/router/instructions.txt
 #
@@ -266,7 +266,7 @@ build_gate:
 #           #     value: gpt-4o
 #         env_from_file:
 #           CODEX_AUTH_JSON: ~/.codex/auth.json
-#         # tmp_dir:   # optional; files materialized read-only at /tmp/<name>
+#         # tmp_dir:   # optional; files materialized at /tmp/<name>
 #         #   - name: prompt-extra.txt
 #         #     path: ./healing/code/prompt-extra.txt
 #

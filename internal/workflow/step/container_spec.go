@@ -63,7 +63,7 @@ type ContainerResult struct {
 // The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
 // tmpStagingDir is an optional path to a directory containing pre-materialized tmp
-// files; each manifest.TmpDir entry is mounted read-only at /tmp/<name>.
+// files; each manifest.TmpDir entry is mounted read-write at /tmp/<name>.
 func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, tmpStagingDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
@@ -87,7 +87,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
 	}
 
-	// Mount each tmp file read-only at /tmp/<name> from the staging directory.
+	// Mount each tmp file read-write at /tmp/<name> from the staging directory.
 	// Runtime hardening: reject malformed names or canonical duplicates to keep
 	// staging and mount path derivation deterministic.
 	if strings.TrimSpace(tmpStagingDir) != "" {
@@ -104,7 +104,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 			mounts = append(mounts, ContainerMount{
 				Source:   filepath.Join(tmpStagingDir, name),
 				Target:   "/tmp/" + name,
-				ReadOnly: true,
+				ReadOnly: false,
 			})
 		}
 	}

@@ -24,12 +24,12 @@ func baseManifestForTmp(t *testing.T) contracts.StepManifest {
 	}
 }
 
-func TestBuildContainerSpec_TmpFilesAreMountedReadOnly(t *testing.T) {
+func TestBuildContainerSpec_TmpFilesAreMountedReadWrite(t *testing.T) {
 	stagingDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(stagingDir, "config.json"), []byte(`{}`), 0o444); err != nil {
+	if err := os.WriteFile(filepath.Join(stagingDir, "config.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("write staging file: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(stagingDir, "secret.txt"), []byte("s3cr3t"), 0o444); err != nil {
+	if err := os.WriteFile(filepath.Join(stagingDir, "secret.txt"), []byte("s3cr3t"), 0o644); err != nil {
 		t.Fatalf("write staging file: %v", err)
 	}
 
@@ -62,8 +62,8 @@ func TestBuildContainerSpec_TmpFilesAreMountedReadOnly(t *testing.T) {
 				if m.Source != w.source {
 					t.Errorf("mount %s: source got %q, want %q", w.target, m.Source, w.source)
 				}
-				if !m.ReadOnly {
-					t.Errorf("mount %s: not read-only", w.target)
+				if m.ReadOnly {
+					t.Errorf("mount %s: unexpectedly read-only", w.target)
 				}
 			}
 		}

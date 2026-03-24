@@ -74,14 +74,14 @@ func TestExecute_TmpDirMaterialization(t *testing.T) {
 				if string(got) != string(e.Content) {
 					t.Errorf("entry %q: content got %q, want %q", e.Name, got, e.Content)
 				}
-				// Verify read-only permissions (0o444).
+				// Verify writable permissions (0o644).
 				info, statErr := os.Stat(dst)
 				if statErr != nil {
 					t.Errorf("entry %q: stat failed: %v", e.Name, statErr)
 					continue
 				}
-				if info.Mode().Perm() != 0o444 {
-					t.Errorf("entry %q: perm got %o, want 444", e.Name, info.Mode().Perm())
+				if info.Mode().Perm() != 0o644 {
+					t.Errorf("entry %q: perm got %o, want 644", e.Name, info.Mode().Perm())
 				}
 			}
 		})
@@ -131,7 +131,7 @@ func TestExecute_TmpDirMaterialization_CanonicalizesNameWhitespace(t *testing.T)
 
 // TestRunRouterForGateFailure_TmpDirMaterialization verifies that when a router
 // spec contains tmpDir entries, runRouterForGateFailure materializes them into a
-// staging directory, mounts each file read-only at /tmp/<name>, and removes the
+// staging directory, mounts each file read-write at /tmp/<name>, and removes the
 // staging directory after execution (both success and early-return paths).
 func TestRunRouterForGateFailure_TmpDirMaterialization(t *testing.T) {
 	t.Parallel()
@@ -205,7 +205,7 @@ func TestRunRouterForGateFailure_TmpDirMaterialization(t *testing.T) {
 	stagingDir := capturedStagingDir
 	mu.Unlock()
 
-	// Assert /tmp/secret.txt and /tmp/config.json mounts are present and read-only.
+	// Assert /tmp/secret.txt and /tmp/config.json mounts are present and read-write.
 	wantMounts := map[string]bool{
 		"/tmp/secret.txt":  false,
 		"/tmp/config.json": false,
@@ -213,8 +213,8 @@ func TestRunRouterForGateFailure_TmpDirMaterialization(t *testing.T) {
 	for _, m := range spec.Mounts {
 		if _, ok := wantMounts[m.Target]; ok {
 			wantMounts[m.Target] = true
-			if !m.ReadOnly {
-				t.Errorf("mount %q: want ReadOnly=true, got false", m.Target)
+			if m.ReadOnly {
+				t.Errorf("mount %q: want ReadOnly=false, got true", m.Target)
 			}
 		}
 	}

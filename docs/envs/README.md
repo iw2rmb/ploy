@@ -115,13 +115,13 @@ Role model (bearer token claims):
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
   - `steps[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_dir)
-  - `tmp_dir` — Per-step file injection: CLI resolves `path` entries to file bytes before submit; node mounts each file read-only at `/tmp/<name>` inside the container. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_dir behavior](#tmp_dir-file-injection) below.
+  - `tmp_dir` — Per-step file injection: CLI resolves `path` entries to file bytes before submit; node mounts each file read-write at `/tmp/<name>` inside the container. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_dir behavior](#tmp_dir-file-injection) below.
   - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
 ### tmp_dir file injection
 
-`tmp_dir` is an optional list of files injected read-only into a container at `/tmp/<name>`. It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
+`tmp_dir` is an optional list of files injected into a container at `/tmp/<name>` with read-write mounts. It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
 
 **CLI preprocessing boundary** — the CLI resolves each entry before submission:
 - `path` form: CLI reads the file (supports `~/` and `$VAR`/`${VAR}` expansion), stores raw bytes in `content`, and removes `path`.
@@ -134,7 +134,7 @@ After CLI preprocessing, every submitted entry has only `name` + `content`.
 - `content` must be non-empty.
 - No two entries in the same block may share the same canonical `name` (after trim).
 
-**Runtime behavior** — the node agent materializes each file into a per-job temporary staging directory on the node, then mounts it into the container as a read-only bind mount at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
+**Runtime behavior** — the node agent materializes each file into a per-job temporary staging directory on the node, then mounts it into the container as a read-write bind mount at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
 
 **Example spec fragment:**
 ```yaml
