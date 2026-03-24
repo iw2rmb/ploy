@@ -11,6 +11,26 @@ import (
 	internaltui "github.com/iw2rmb/ploy/internal/tui"
 )
 
+// printTUIUsage prints help for 'ploy tui'.
+func printTUIUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy tui")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Launch the interactive terminal UI.")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Screens:")
+	_, _ = fmt.Fprintln(w, "  PLOY              Root selector: Migrations | Runs | Jobs")
+	_, _ = fmt.Fprintln(w, "  PLOY | MIGRATIONS Migration list (newest-to-oldest)")
+	_, _ = fmt.Fprintln(w, "  MIGRATION <name>  Migration details: repositories and runs totals")
+	_, _ = fmt.Fprintln(w, "  PLOY | RUNS       Run list (newest-to-oldest) with timestamp")
+	_, _ = fmt.Fprintln(w, "  RUN               Run details: repositories and jobs totals")
+	_, _ = fmt.Fprintln(w, "  PLOY | JOBS       Jobs list: job, mig name, run id, repo id")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Navigation:")
+	_, _ = fmt.Fprintln(w, "  Enter  Drill into the selected item")
+	_, _ = fmt.Fprintln(w, "  Esc    Return to the previous screen")
+	_, _ = fmt.Fprintln(w, "  q      Quit")
+}
+
 // newTUICmd creates the cobra command for 'ploy tui'.
 func newTUICmd(stderr io.Writer) *cobra.Command {
 	return &cobra.Command{

@@ -108,7 +108,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     1. `go test ./internal/tui -run 'Test.*Jobs.*|Test.*S6.*'`
   - Reasoning: `medium`
 
-- [ ] 1.10 [determined] Wire Command Surface, Docs, And Full Validation
+- [x] 1.10 [determined] Wire Command Surface, Docs, And Full Validation
   - Repository: `ploy`
   - Component: `cmd/ploy/root.go`; `cmd/ploy/main.go`; `cmd/ploy/commands_test.go`; `cmd/ploy/README.md`; `docs/envs/README.md`
   - Implementation:

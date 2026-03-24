@@ -110,6 +110,8 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 					printClusterUsage(stderr)
 				case "config":
 					printConfigUsage(stderr)
+				case "tui":
+					printTUIUsage(stderr)
 				default:
 					printUsage(stderr)
 				}

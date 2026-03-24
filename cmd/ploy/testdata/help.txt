@@ -10,5 +10,6 @@ Core Commands:
   cluster          Manage clusters (deploy, nodes, rollout, tokens)
   config           Inspect or update cluster configuration
   manifest         Inspect and validate integration manifests
+  tui              Interactive TUI for migrations, runs, and jobs
 
 Use 'ploy help <command>' for detailed command help.
