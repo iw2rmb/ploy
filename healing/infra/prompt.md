@@ -11,7 +11,7 @@ Task:
 4. Generate `/out/gate-profile-candidate.json` that validates against `/in/gate_profile.schema.json`, sets `targets.active` per transition policy, keeps stack identity consistent, and always includes command/env for the selected active target.
 5. End with the required one-line `action_summary` JSON.
 
-Task execution rules (hard):
+Mandatory task execution rules:
 - Read `/in/build-gate.log` first.
 - Read `/in/gate_profile.json` when present and use it as gate-profile context.
 - Read `/in/gate_profile.schema.json` and treat it as the required output contract.
@@ -46,7 +46,7 @@ Task execution rules (hard):
   `{"action_summary":"<<=200 chars, single line>"}`
 - Do not output any additional text in the final message.
 
-Search rules (hard):
+Mandatory search rules:
 - Use `grep` instead of `rg`.
 - Do not run equivalent grep/ripgrep variants after first definitive result.
 - If exact-match scan in declared edit targets returns 0, stop and return no-op result.

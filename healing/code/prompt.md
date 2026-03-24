@@ -8,7 +8,7 @@ Task:
 2. Apply minimal, correct source changes under `/workspace`.
 3. End with the required one-line `action_summary` JSON.
 
-Task execution rules (hard):
+Mandatory task execution rules:
 - Read `/in/build-gate.log` first.
 - Edit files only under `/workspace`.
 - Keep fixes minimal and correct.
@@ -16,7 +16,7 @@ Task execution rules (hard):
   `{"action_summary":"<<=200 chars, single line>"}`
 - Do not output any additional text in the final message.
 
-Search rules (hard):
+Mandatory search rules:
 - Use `grep` instead of `rg`.
 - Do not run equivalent grep/ripgrep variants after first definitive result.
 - If exact-match scan in declared edit targets returns 0, stop and return no-op result.
