@@ -205,7 +205,11 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	case S2MigrationsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedMigID = domaintypes.MigID(item.description)
-			title := "MIGRATION " + item.title
+			label := item.title
+			if label == "" {
+				label = item.description
+			}
+			title := "MIGRATION " + label
 			m.detail = newList(title, []list.Item{
 				listItem{title: "repositories", description: "total: —"},
 				listItem{title: "runs", description: "total: —"},
