@@ -125,7 +125,7 @@ type HealingActionSpec struct {
 	// validation/promotion boundaries.
 	Expectations *RecoveryExpectationsSpec `json:"expectations,omitempty" yaml:"expectations,omitempty"`
 
-	// TmpDir lists files to materialize read-only under /tmp in the healing container.
+	// TmpDir lists files to materialize under /tmp in the healing container (read-write mount).
 	// Each entry must have a unique non-empty name and non-empty content.
 	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
 
@@ -160,7 +160,7 @@ type RouterSpec struct {
 	// Env holds environment variables to inject into the router container.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 
-	// TmpDir lists files to materialize read-only under /tmp in the router container.
+	// TmpDir lists files to materialize under /tmp in the router container (read-write mount).
 	// Each entry must have a unique non-empty name and non-empty content.
 	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
 

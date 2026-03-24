@@ -38,7 +38,7 @@ type StepManifest struct {
 	// logged.
 	Options map[string]any
 
-	// TmpDir lists files to materialize read-only under /tmp in the container.
+	// TmpDir lists files to materialize under /tmp in the container (read-write mount).
 	// Each entry must have a unique non-empty name and non-empty content.
 	TmpDir []TmpFilePayload
 }

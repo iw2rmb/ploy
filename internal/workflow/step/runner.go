@@ -67,7 +67,7 @@ type Request struct {
 	// InDir is an optional read-only directory mounted at /in for cross-phase inputs.
 	InDir string
 	// TmpStagingDir is an optional path to a directory containing pre-materialized
-	// tmp files. Each manifest.TmpDir entry is mounted read-only at /tmp/<name>.
+	// tmp files. Each manifest.TmpDir entry is mounted read-write at /tmp/<name>.
 	TmpStagingDir string
 }
 
