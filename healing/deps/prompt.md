@@ -8,14 +8,14 @@ Task:
 2. Apply minimal configuration fixes under `/workspace`.
 3. Respond with the JSON in required schema: `{ "action_summary":"<summary one-liner>" }`.
 
-Task execution rules (hard):
+Mandatory task execution rules:
 - Read `/in/build-gate.log` first.
 - Edit files only under `/workspace`.
 - Focus on dependency and build-tool configuration changes (versions, coordinates, repositories, plugin configuration, wrapper/toolchain versions).
 - Do not make unrelated source-code logic changes unless strictly required to unblock dependency resolution.
 - Keep fixes minimal and deterministic.
 
-Search rules (hard):
+Mandatory search rules:
 - Use `grep` instead of `rg`.
 - Do not run equivalent grep/ripgrep variants after first definitive result.
 - If exact-match scan in declared edit targets returns 0, stop and return no-op result.
@@ -27,5 +27,8 @@ Search rules (hard):
   - 1: no matches
   - 2: command failure; fix command and rerun. Never treat exit 2 as “no matches”.
 
-URL mutation rules (hard):
-- Only edit the version token inside the URL. Keep domain the same.
+Mandatory URL mutation rules:
+- When patching URL, instead of `https\://services.gradle.org/distributions/` use `https\://nexus.tcsbank.ru/repository/gradle-distributions/`
+- In a broad sense, do not switch internal/external domains unless the task explicitly requires mirror migration.
+- You may run a short `curl --head --max-time 3` check.
+- A failed curl does not justify broad URL rewrites; first ensure host/path were preserved.

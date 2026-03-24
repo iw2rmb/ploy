@@ -20,14 +20,14 @@ Classification guidance:
   - missing runtime services/sockets/container capabilities
 - Prefer `deps` over `infra` for deterministic version-mismatch signals in the log.
 
-Task execution rules (hard):
+Mandatory task execution rules:
 - Read `/in/build-gate.log`.
 - Do not edit `/workspace`.
 - Your final message MUST be exactly one line of JSON:
   `{"bug_summary":"<<=200 chars, single line>","error_kind":"infra|code|deps|mixed|unknown","reason":"<<=200 chars, single line>"}`
 - Do not output any additional text in the final message.
 
-Search rules (hard):
+Mandatory search rules:
 - Use `grep` instead of `rg`.
 - Do not run equivalent grep/ripgrep variants after first definitive result.
 - If exact-match scan in declared edit targets returns 0, stop and return no-op result.
