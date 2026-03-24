@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/segmentio/ksuid"
 )
 
 // TestListJobsForTUI covers ordering, run_id filtering, and total counting via CountJobsForTUI.
@@ -27,9 +28,8 @@ func TestListJobsForTUI(t *testing.T) {
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", "feat-a", []byte(`{"type":"test"}`))
 	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/tui-b", "main", "feat-b", []byte(`{"type":"test"}`))
 
-	createJob := func(fx v1Fixture, name string) types.JobID {
+	createJob := func(fx v1Fixture, name string, id types.JobID) types.JobID {
 		t.Helper()
-		id := types.NewJobID()
 		_, err := db.CreateJob(ctx, CreateJobParams{
 			ID:          id,
 			RunID:       fx.Run.ID,
@@ -38,7 +38,7 @@ func TestListJobsForTUI(t *testing.T) {
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        name,
 			Status:      types.JobStatusQueued,
-			JobType:     "",
+			JobType:     "mig",
 			JobImage:    "",
 			NextID:      nil,
 			Meta:        []byte(`{}`),
@@ -50,10 +50,22 @@ func TestListJobsForTUI(t *testing.T) {
 		return id
 	}
 
-	// Create jobs: jobA1 < jobA2 by KSUID order (time-based ascending creation order).
-	jobA1 := createJob(fxA, "job-a1")
-	jobA2 := createJob(fxA, "job-a2")
-	jobB1 := createJob(fxB, "job-b1")
+	// Pre-generate IDs with distinct timestamps so lexicographic (DESC) ordering is deterministic.
+	// idA1 < idA2 < idB1 by KSUID string comparison (oldest to newest).
+	mustKSUID := func(s string) types.JobID {
+		k, err := ksuid.Parse(s)
+		if err != nil {
+			t.Fatalf("ksuid.Parse(%q): %v", s, err)
+		}
+		return types.JobID(k.String())
+	}
+	idA1 := mustKSUID("1VlnyEyNOAvwaZh3KZJkgl61t4x")
+	idA2 := mustKSUID("1VlnyOsy3wff4GTBrpOGU9GfYZH")
+	idB1 := mustKSUID("1VlnyXwq5jBYFLpwR2ZoF4BiNxr")
+
+	jobA1 := createJob(fxA, "job-a1", idA1)
+	jobA2 := createJob(fxA, "job-a2", idA2)
+	jobB1 := createJob(fxB, "job-b1", idB1)
 
 	t.Run("NewestToOldestOrdering", func(t *testing.T) {
 		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
