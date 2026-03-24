@@ -313,6 +313,34 @@ hydration and still reports required resources.
 `upload` uses the cached bearer-token cluster descriptor to post gzipped bundles to the control‑plane API. The CLI always targets the default descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 10 MiB bundle cap locally before sending.
 
+## Interactive TUI (`ploy tui`)
+
+`ploy tui` launches a full-screen terminal UI for browsing migrations, runs, and jobs
+without chaining multiple CLI commands.
+
+```bash
+ploy tui
+```
+
+### Screens and navigation
+
+| Screen | Title | Description |
+|--------|-------|-------------|
+| S1 | `PLOY` | Root selector. Choose Migrations, Runs, or Jobs. |
+| S2 | `PLOY \| MIGRATIONS` | Migration list ordered newest-to-oldest. |
+| S3 | `MIGRATION <name>` | Migration detail: repository count and run count. |
+| S4 | `PLOY \| RUNS` | Run list ordered newest-to-oldest with `DD MM HH:mm` timestamp. |
+| S5 | `RUN` | Run detail: repository count and job count. |
+| S6 | `PLOY \| JOBS` | Jobs list showing job id, mig name, run id, and repo id. |
+
+**Keys:**
+- `Enter` — drill into the selected item.
+- `Esc` — return to the previous screen.
+- `q` — quit.
+
+No new environment variables are required. The TUI reuses the same cluster descriptor
+and bearer token as all other `ploy` commands (see `docs/envs/README.md`).
+
 ## Shell Completion
 
 The CLI provides shell completion for bash, zsh, fish, and PowerShell via the `completion` command:

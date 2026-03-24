@@ -49,6 +49,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, rollout, tokens)")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
 	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
+	_, _ = fmt.Fprintln(w, "  tui              Interactive TUI for migrations, runs, and jobs")
 	// NOTE: `ploy token` has been removed as a top-level command.
 	// Token operations are now accessible only via `ploy cluster token`.
 	_, _ = fmt.Fprintln(w, "")
