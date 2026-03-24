@@ -3,6 +3,7 @@ package tui
 import (
 	"net/http"
 	"net/url"
+	"sort"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -116,8 +117,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case migsLoadedMsg:
-		items := make([]list.Item, len(msg.migs))
-		for i, mig := range msg.migs {
+		sorted := make([]clitui.MigItem, len(msg.migs))
+		copy(sorted, msg.migs)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].CreatedAt > sorted[j].CreatedAt
+		})
+		items := make([]list.Item, len(sorted))
+		for i, mig := range sorted {
 			items[i] = listItem{
 				title:       mig.Name,
 				description: mig.ID.String(),
