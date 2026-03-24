@@ -22,9 +22,10 @@ func TestS2MigrationsListTitle(t *testing.T) {
 // TestS2MigrationsItemsPopulated verifies migration rows use name as title and ID as description.
 func TestS2MigrationsItemsPopulated(t *testing.T) {
 	m := InitialModel(nil, nil)
+	// Provide distinct CreatedAt values so sort order is deterministic.
 	migs := []clitui.MigItem{
-		{ID: domaintypes.MigID("mig-aaa"), Name: "alpha"},
-		{ID: domaintypes.MigID("mig-bbb"), Name: "beta"},
+		{ID: domaintypes.MigID("mig-aaa"), Name: "alpha", CreatedAt: "2024-01-02T00:00:00Z"},
+		{ID: domaintypes.MigID("mig-bbb"), Name: "beta", CreatedAt: "2024-01-01T00:00:00Z"},
 	}
 	next, _ := m.Update(migsLoadedMsg{migs: migs})
 	nm := next.(model)
@@ -34,6 +35,7 @@ func TestS2MigrationsItemsPopulated(t *testing.T) {
 		t.Fatalf("secondary items: got %d, want 2", len(items))
 	}
 
+	// After sorting newest-to-oldest, migs[0] (newer) stays first.
 	for i, mig := range migs {
 		item, ok := items[i].(listItem)
 		if !ok {
@@ -48,14 +50,15 @@ func TestS2MigrationsItemsPopulated(t *testing.T) {
 	}
 }
 
-// TestS2MigrationsOrderingPreserved verifies that items appear in the order received
-// from the API (newest-to-oldest).
-func TestS2MigrationsOrderingPreserved(t *testing.T) {
+// TestS2MigrationsOrderingEnforced verifies that items are sorted newest-to-oldest by
+// CreatedAt regardless of the order received from the API.
+func TestS2MigrationsOrderingEnforced(t *testing.T) {
 	m := InitialModel(nil, nil)
+	// Provide items intentionally out of order (oldest first).
 	migs := []clitui.MigItem{
-		{ID: domaintypes.MigID("mig-newest"), Name: "newest"},
-		{ID: domaintypes.MigID("mig-middle"), Name: "middle"},
-		{ID: domaintypes.MigID("mig-oldest"), Name: "oldest"},
+		{ID: domaintypes.MigID("mig-oldest"), Name: "oldest", CreatedAt: "2024-01-01T00:00:00Z"},
+		{ID: domaintypes.MigID("mig-middle"), Name: "middle", CreatedAt: "2024-01-02T00:00:00Z"},
+		{ID: domaintypes.MigID("mig-newest"), Name: "newest", CreatedAt: "2024-01-03T00:00:00Z"},
 	}
 	next, _ := m.Update(migsLoadedMsg{migs: migs})
 	nm := next.(model)
@@ -65,13 +68,14 @@ func TestS2MigrationsOrderingPreserved(t *testing.T) {
 		t.Fatalf("items count: got %d, want 3", len(items))
 	}
 
-	for i, want := range migs {
+	wantOrder := []string{"newest", "middle", "oldest"}
+	for i, want := range wantOrder {
 		item, ok := items[i].(listItem)
 		if !ok {
 			t.Fatalf("item %d: unexpected type %T", i, items[i])
 		}
-		if item.title != want.Name {
-			t.Errorf("ordering: item %d title: got %q, want %q", i, item.title, want.Name)
+		if item.title != want {
+			t.Errorf("ordering: item %d title: got %q, want %q", i, item.title, want)
 		}
 	}
 }
