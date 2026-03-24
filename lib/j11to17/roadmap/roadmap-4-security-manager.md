@@ -1,17 +1,5 @@
 # 4 SecurityManager removal
 
-## Edit targets
-- app entry points: `src/main/**/Main*.java`, `src/main/**/Application*.java`, equivalent Kotlin entry points
-- security/sandbox packages under `src/main/**`
-- config usages in `*.properties`, `*.yaml`, `*.yml` mentioning security policy flags
-
-## Match strings
-- `System.setSecurityManager(`
-- `System.getSecurityManager(`
-- `extends SecurityManager`
-- `java.lang.SecurityManager`
-- `java.security.policy`
-
 ## Actions
 1. Remove active `System.setSecurityManager(...)` calls.
 2. Remove dead custom `SecurityManager` subclasses when no longer referenced.
