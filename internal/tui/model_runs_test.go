@@ -44,7 +44,7 @@ func TestS4RunsItemsPopulated(t *testing.T) {
 	if !strings.Contains(item.description, "my-mig") {
 		t.Errorf("item description %q: missing migration name %q", item.description, "my-mig")
 	}
-	wantTS := "15 Mar 09:05"
+	wantTS := "15 03 09:05"
 	if !strings.Contains(item.description, wantTS) {
 		t.Errorf("item description %q: missing timestamp %q", item.description, wantTS)
 	}
