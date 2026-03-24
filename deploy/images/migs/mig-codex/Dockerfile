@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:20-alpine
+ARG NODE_IMAGE=node:22-alpine
 
 # --- final image ---
 FROM ${NODE_IMAGE}
@@ -27,8 +27,8 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
       update-ca-certificates || true; \
     fi && \
     if [ -s /etc/ssl/certs/ploy-ca-bundle.pem ]; then \
-      NPM_CONFIG_CAFILE=/etc/ssl/certs/ploy-ca-bundle.pem \
-      NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem; \
+      export NPM_CONFIG_CAFILE=/etc/ssl/certs/ploy-ca-bundle.pem; \
+      export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem; \
     fi && \
     npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
     npm cache clean --force && \
@@ -39,7 +39,12 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
 
 # Codex CLI runs shell snapshots via /bin/sh; Alpine's default (busybox ash)
 # lacks bash syntax support, so point /bin/sh at bash.
-RUN ln -sf /bin/bash /bin/sh
+# RUN ln -sf /bin/bash /bin/sh
+RUN apk update
+RUN apk add --no-cache bash ripgrep fd grep findutils gawk coreutils
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+RUN echo 'export PATH="/usr/local/bin:$PATH"' >> /root/.bashrc
+RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
