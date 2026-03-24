@@ -10,6 +10,18 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+func (m *mockStore) ListJobsForTUI(ctx context.Context, arg store.ListJobsForTUIParams) ([]store.ListJobsForTUIRow, error) {
+	m.listJobsForTUICalled = true
+	m.listJobsForTUIParams = arg
+	return m.listJobsForTUIResult, m.listJobsForTUIErr
+}
+
+func (m *mockStore) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error) {
+	m.countJobsForTUICalled = true
+	m.countJobsForTUIParam = runID
+	return m.countJobsForTUIResult, m.countJobsForTUIErr
+}
+
 func (m *mockStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job, error) {
 	m.claimJobCalled = true
 	m.claimJobParams = nodeID

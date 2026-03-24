@@ -4,7 +4,7 @@ Scope: deliver `ploy tui` with the six-screen navigation contract, Bubble Tea v2
 
 Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md`; `cmd/ploy/README.md`.
 
-- [ ] 1.1 [determined] Add TUI Jobs Data API Contract
+- [x] 1.1 [determined] Add TUI Jobs Data API Contract
   - Repository: `ploy`
   - Component: `internal/store/queries/jobs.sql`; `internal/store/jobs.sql.go`; `internal/server/handlers/register.go`; `internal/server/handlers/jobs_list.go` (new); `docs/api/OpenAPI.yaml`
   - Implementation:

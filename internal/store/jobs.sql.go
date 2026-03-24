@@ -1007,3 +1007,81 @@ func (q *Queries) UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams
 	)
 	return err
 }
+
+const listJobsForTUI = `-- name: ListJobsForTUI :many
+SELECT
+  jobs.id AS job_id,
+  jobs.name,
+  migs.name AS mig_name,
+  jobs.run_id,
+  jobs.repo_id
+FROM jobs
+JOIN runs ON jobs.run_id = runs.id
+JOIN migs ON runs.mig_id = migs.id
+WHERE ($3::text IS NULL OR jobs.run_id = $3::text)
+ORDER BY jobs.id DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListJobsForTUIParams struct {
+	Limit  int32        `json:"limit"`
+	Offset int32        `json:"offset"`
+	RunID  *types.RunID `json:"run_id"`
+}
+
+type ListJobsForTUIRow struct {
+	JobID   types.JobID  `json:"job_id"`
+	Name    string       `json:"name"`
+	MigName string       `json:"mig_name"`
+	RunID   types.RunID  `json:"run_id"`
+	RepoID  types.RepoID `json:"repo_id"`
+}
+
+// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
+// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
+func (q *Queries) ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error) {
+	rows, err := q.db.Query(ctx, listJobsForTUI,
+		arg.Limit,
+		arg.Offset,
+		arg.RunID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListJobsForTUIRow{}
+	for rows.Next() {
+		var i ListJobsForTUIRow
+		if err := rows.Scan(
+			&i.JobID,
+			&i.Name,
+			&i.MigName,
+			&i.RunID,
+			&i.RepoID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const countJobsForTUI = `-- name: CountJobsForTUI :one
+SELECT COUNT(jobs.id)::BIGINT
+FROM jobs
+JOIN runs ON jobs.run_id = runs.id
+JOIN migs ON runs.mig_id = migs.id
+WHERE ($1::text IS NULL OR jobs.run_id = $1::text)
+`
+
+// Counts jobs with optional run_id filter.
+// Used with ListJobsForTUI to provide total for TUI pagination.
+func (q *Queries) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error) {
+	row := q.db.QueryRow(ctx, countJobsForTUI, runID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}

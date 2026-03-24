@@ -122,6 +122,9 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st, bp), auth.RoleWorker)
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/diff", createJobDiffHandler(st, bp), auth.RoleWorker)
 
+	// Jobs — global jobs listing for TUI (list across all runs with mig context).
+	s.HandleFunc("GET /v1/jobs", listJobsHandler(st), auth.RoleControlPlane)
+
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
 	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService, bp, bs), auth.RoleWorker)

@@ -252,6 +252,18 @@ type mockStore struct {
 	createJobResult    store.Job
 	createJobErr       error
 
+	// ListJobsForTUI tracking (TUI global jobs listing)
+	listJobsForTUICalled bool
+	listJobsForTUIParams store.ListJobsForTUIParams
+	listJobsForTUIResult []store.ListJobsForTUIRow
+	listJobsForTUIErr    error
+
+	// CountJobsForTUI tracking (TUI global jobs count)
+	countJobsForTUICalled bool
+	countJobsForTUIParam  *types.RunID
+	countJobsForTUIResult int64
+	countJobsForTUIErr    error
+
 	// ListJobsByRun tracking
 	listJobsByRunCalled bool
 	listJobsByRunParam  string
