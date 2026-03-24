@@ -53,7 +53,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     1. `go test ./internal/tui -run 'Test.*Root.*|Test.*S1.*'`
   - Reasoning: `low`
 
-- [ ] 1.5 [determined] Implement State S2 Migrations List (`PLOY | MIGRATIONS`)
+- [x] 1.5 [determined] Implement State S2 Migrations List (`PLOY | MIGRATIONS`)
   - Repository: `ploy`
   - Component: `internal/tui/model_*.go`; `internal/tui/view_*.go`; `internal/tui/model_migrations_test.go` (new)
   - Implementation:
