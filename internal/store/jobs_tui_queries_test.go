@@ -1,0 +1,178 @@
+package store
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
+)
+
+// TestListJobsForTUI covers ordering, run_id filtering, and total counting via CountJobsForTUI.
+// Skipped unless PLOY_TEST_PG_DSN is set.
+func TestListJobsForTUI(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Two separate runs so we can test filtered vs unfiltered results.
+	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", "feat-a", []byte(`{"type":"test"}`))
+	fxB := newV1Fixture(t, ctx, db, "https://github.com/test/tui-b", "main", "feat-b", []byte(`{"type":"test"}`))
+
+	createJob := func(fx v1Fixture, name string) types.JobID {
+		t.Helper()
+		id := types.NewJobID()
+		_, err := db.CreateJob(ctx, CreateJobParams{
+			ID:          id,
+			RunID:       fx.Run.ID,
+			RepoID:      fx.MigRepo.RepoID,
+			RepoBaseRef: fx.RunRepo.RepoBaseRef,
+			Attempt:     fx.RunRepo.Attempt,
+			Name:        name,
+			Status:      types.JobStatusQueued,
+			JobType:     "",
+			JobImage:    "",
+			NextID:      nil,
+			Meta:        []byte(`{}`),
+			RepoShaIn:   "0000000000000000000000000000000000000000",
+		})
+		if err != nil {
+			t.Fatalf("CreateJob(%s) failed: %v", name, err)
+		}
+		return id
+	}
+
+	// Create jobs: jobA1 < jobA2 by KSUID order (time-based ascending creation order).
+	jobA1 := createJob(fxA, "job-a1")
+	jobA2 := createJob(fxA, "job-a2")
+	jobB1 := createJob(fxB, "job-b1")
+
+	t.Run("NewestToOldestOrdering", func(t *testing.T) {
+		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
+			Limit:  100,
+			Offset: 0,
+			RunID:  nil,
+		})
+		if err != nil {
+			t.Fatalf("ListJobsForTUI() failed: %v", err)
+		}
+
+		// Find positions of our three jobs among all rows.
+		pos := map[types.JobID]int{}
+		for i, r := range rows {
+			pos[r.JobID] = i
+		}
+		for _, id := range []types.JobID{jobA1, jobA2, jobB1} {
+			if _, ok := pos[id]; !ok {
+				t.Fatalf("job %s not found in ListJobsForTUI results", id)
+			}
+		}
+		// Newer jobs (higher KSUID) must appear before older ones.
+		if pos[jobA2] >= pos[jobA1] {
+			t.Errorf("expected jobA2 (newer) before jobA1 (older), got positions %d vs %d", pos[jobA2], pos[jobA1])
+		}
+		if pos[jobB1] >= pos[jobA1] {
+			t.Errorf("expected jobB1 (newer) before jobA1 (older), got positions %d vs %d", pos[jobB1], pos[jobA1])
+		}
+	})
+
+	t.Run("RunIDFilteredResults", func(t *testing.T) {
+		runIDA := fxA.Run.ID
+		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
+			Limit:  100,
+			Offset: 0,
+			RunID:  &runIDA,
+		})
+		if err != nil {
+			t.Fatalf("ListJobsForTUI(run_id=A) failed: %v", err)
+		}
+
+		for _, r := range rows {
+			if r.RunID != runIDA {
+				t.Errorf("expected all rows to have run_id=%s, got %s", runIDA, r.RunID)
+			}
+		}
+
+		// Our two A jobs must be present.
+		found := map[types.JobID]bool{}
+		for _, r := range rows {
+			found[r.JobID] = true
+		}
+		for _, id := range []types.JobID{jobA1, jobA2} {
+			if !found[id] {
+				t.Errorf("expected job %s in filtered results", id)
+			}
+		}
+		if found[jobB1] {
+			t.Errorf("job %s from run B should not appear when filtering by run A", jobB1)
+		}
+	})
+
+	t.Run("UnfilteredIncludesAllRuns", func(t *testing.T) {
+		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
+			Limit:  100,
+			Offset: 0,
+			RunID:  nil,
+		})
+		if err != nil {
+			t.Fatalf("ListJobsForTUI(unfiltered) failed: %v", err)
+		}
+
+		found := map[types.JobID]bool{}
+		for _, r := range rows {
+			found[r.JobID] = true
+		}
+		for _, id := range []types.JobID{jobA1, jobA2, jobB1} {
+			if !found[id] {
+				t.Errorf("expected job %s in unfiltered results", id)
+			}
+		}
+	})
+
+	t.Run("CountJobsForTUI_Unfiltered", func(t *testing.T) {
+		count, err := db.CountJobsForTUI(ctx, nil)
+		if err != nil {
+			t.Fatalf("CountJobsForTUI(nil) failed: %v", err)
+		}
+		if count < 3 {
+			t.Errorf("expected at least 3 jobs, got %d", count)
+		}
+	})
+
+	t.Run("CountJobsForTUI_FilteredByRun", func(t *testing.T) {
+		runIDA := fxA.Run.ID
+
+		countA, err := db.CountJobsForTUI(ctx, &runIDA)
+		if err != nil {
+			t.Fatalf("CountJobsForTUI(runA) failed: %v", err)
+		}
+		if countA < 2 {
+			t.Errorf("expected at least 2 jobs for run A, got %d", countA)
+		}
+
+		runIDB := fxB.Run.ID
+		countB, err := db.CountJobsForTUI(ctx, &runIDB)
+		if err != nil {
+			t.Fatalf("CountJobsForTUI(runB) failed: %v", err)
+		}
+		if countB < 1 {
+			t.Errorf("expected at least 1 job for run B, got %d", countB)
+		}
+
+		countAll, err := db.CountJobsForTUI(ctx, nil)
+		if err != nil {
+			t.Fatalf("CountJobsForTUI(nil) for sum check failed: %v", err)
+		}
+		if countAll < countA+countB {
+			t.Errorf("unfiltered count %d should be >= sum of per-run counts %d+%d=%d", countAll, countA, countB, countA+countB)
+		}
+	})
+}
