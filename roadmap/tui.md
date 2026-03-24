@@ -30,7 +30,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     2. `go test ./internal/cli/... -run 'Test.*TUI.*|Test.*HTTP.*'`
   - Reasoning: `medium`
 
-- [ ] 1.3 [determined] Bootstrap Bubble Tea v2 TUI Shell
+- [x] 1.3 [determined] Bootstrap Bubble Tea v2 TUI Shell
   - Repository: `ploy`
   - Component: `internal/tui/*.go` (new); `cmd/ploy/tui_command.go` (new); `go.mod`; `go.sum`
   - Implementation:
