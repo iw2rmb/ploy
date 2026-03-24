@@ -25,6 +25,24 @@ func TestS3DetailListTitle(t *testing.T) {
 	}
 }
 
+// TestS3DetailListTitleFallbackToID verifies that when migration name is empty, the title falls back to "MIGRATION <id>".
+func TestS3DetailListTitleFallbackToID(t *testing.T) {
+	m := InitialModel(nil, nil)
+	m.screen = S2MigrationsList
+	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+		{ID: domaintypes.MigID("mig-xyz"), Name: ""},
+	}})
+	nm := next.(model)
+	nm.secondary.Select(0)
+
+	result, _ := nm.handleEnter()
+	rm := result.(model)
+	want := "MIGRATION mig-xyz"
+	if rm.detail.Title != want {
+		t.Errorf("detail title: got %q, want %q", rm.detail.Title, want)
+	}
+}
+
 // TestS3DetailItemsPlaceholder verifies that detail items use placeholder totals before data loads.
 func TestS3DetailItemsPlaceholder(t *testing.T) {
 	m := InitialModel(nil, nil)
