@@ -144,7 +144,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i, run := range sorted {
 			items[i] = listItem{
 				title:       run.ID.String(),
-				description: run.MigName + "  " + run.CreatedAt.Format("02 Jan 15:04"),
+				description: run.MigName + "  " + run.CreatedAt.Format("02 01 15:04"),
 			}
 		}
 		m.secondary = newList("RUNS", items)
