@@ -18,7 +18,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     3. `go test ./docs/api/...`
   - Reasoning: `high`
 
-- [ ] 1.2 [determined] Add TUI CLI Data Client Layer
+- [x] 1.2 [determined] Add TUI CLI Data Client Layer
   - Repository: `ploy`
   - Component: `internal/cli/tui/*.go` (new)
   - Implementation:
