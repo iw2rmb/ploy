@@ -1,7 +1,5 @@
 # 3 Reflection on internals
 
-Parent item: `roadmap.md` -> `1.3`.
-
 ## Edit targets
 - `src/main/java/**`, `src/test/java/**`
 - `src/main/kotlin/**`, `src/test/kotlin/**`

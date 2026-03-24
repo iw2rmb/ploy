@@ -13,6 +13,7 @@ Environment:
   CODEX_AUTH_JSON   Inline JSON or file path for auth; if set, written to ~/.codex/auth.json.
   CODEX_CONFIG_TOML Inline TOML for config; if set, written to ~/.codex/config.toml.
   CRUSH_JSON        Inline JSON or file path for Crush config; if set, written to ~/.config/crush/crush.json.
+  CCR_CONFIG_JSON   Inline JSON or file path for Claude Code Router config; if set, written to ~/.claude-code-router/config.json.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior
                     Codex session instead of starting fresh (for healing retries).
   PLOY_API_TOKEN    Optional bearer token for Build Gate API (unused; gate runs externally).
@@ -23,6 +24,9 @@ Behavior:
   - Places auth at ~/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
   - Places config at ~/.codex/config.toml when --config is given or CODEX_CONFIG_TOML is set.
   - Places Crush config at ~/.config/crush/crush.json when CRUSH_JSON is set.
+  - Places Claude Code Router config at ~/.claude-code-router/config.json when CCR_CONFIG_JSON is set.
+  - If ~/.claude-code-router/config.json exists at startup, runs:
+      ccr start && eval "$(ccr activate)"
   - Always adds repository directory with: codex exec --add-dir <input> ...
   - Writes logs to <out>/codex.log and a small run manifest to <out>/codex-run.json.
   - When CODEX_RESUME=1 and a prior session exists, uses "codex exec resume <session>"
@@ -33,6 +37,7 @@ USAGE
 home_dir="${HOME:-/root}"
 codex_config_dir="$home_dir/.codex"
 crush_config_file="$home_dir/.config/crush/crush.json"
+ccr_config_file="$home_dir/.claude-code-router/config.json"
 
 # Materialize env value to a target file. If the env value points to an existing
 # readable file, copy it; otherwise write the value as inline content.
@@ -61,7 +66,19 @@ materialize_env_configs() {
   materialize_env_value_or_file CODEX_AUTH_JSON "$codex_config_dir/auth.json"
   materialize_env_value_or_file CODEX_CONFIG_TOML "$codex_config_dir/config.toml"
   materialize_env_value_or_file CRUSH_JSON "$crush_config_file"
+  materialize_env_value_or_file CCR_CONFIG_JSON "$ccr_config_file"
 }
+
+activate_ccr_if_configured() {
+  if [[ -f "$ccr_config_file" ]]; then
+    ccr start
+    eval "$(ccr activate)"
+  fi
+}
+
+# Materialize startup configs first, then initialize Claude Code Router when configured.
+materialize_env_configs
+activate_ccr_if_configured
 
 # Compat routing for amata specs:
 # 1) No argv + /in/amata.yaml -> amata mode.

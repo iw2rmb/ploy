@@ -555,6 +555,7 @@ The `scope` parameter controls which job types receive each variable:
 |----------|----------|-------------|
 | `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
 | `CODEX_AUTH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.codex/auth.json` at container startup |
+| `CCR_CONFIG_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.claude-code-router/config.json` at container startup |
 | `CRUSH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
@@ -622,10 +623,15 @@ Run/API metadata propagation:
 In both modes, the entrypoint materializes config env vars before invoking the CLI:
 - `CODEX_AUTH_JSON` -> `/root/.codex/auth.json`
 - `CODEX_CONFIG_TOML` -> `/root/.codex/config.toml`
+- `CCR_CONFIG_JSON` -> `/root/.claude-code-router/config.json`
 - `CRUSH_JSON` -> `/root/.config/crush/crush.json`
 
 For each key above, if the env value points to an existing file in the container,
 that file is copied; otherwise the env value is written as inline content.
+
+If `/root/.claude-code-router/config.json` exists at startup, `mig-codex` runs:
+- `ccr start`
+- `eval "$(ccr activate)"`
 
 **Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble that:
 1. Writes `CA_CERTS_PEM_BUNDLE` to a temp file

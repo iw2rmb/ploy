@@ -49,6 +49,12 @@ const (
 	buildGateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
 	buildGateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
 	buildGateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
+	// BuildGateGradleCacheHitsHostFile is the workspace-local file mounted into
+	// Gradle gate containers for cache-hit signaling from the init script.
+	BuildGateGradleCacheHitsHostFile = ".ploy-gradle-build-cache-hits"
+	// BuildGateGradleCacheHitsContainerFile is the in-container path consumed by
+	// the Gradle init script to write cache-hit markers.
+	BuildGateGradleCacheHitsContainerFile = "/tmp/gradle-build-cache-hits"
 
 	// BuildGateWorkspaceOutDir is a workspace-local host directory mounted
 	// into gate containers as /out for deterministic artifact collection.
@@ -72,7 +78,7 @@ type dockerGateExecutor struct {
 }
 
 func readGradleBuildCacheHits(workspace string) []string {
-	path := filepath.Join(workspace, ".ploy-gradle-build-cache-hits")
+	path := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil
@@ -191,6 +197,17 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	mounts := []ContainerMount{
 		{Source: workspace, Target: "/workspace", ReadOnly: false},
 		{Source: gateOutDir, Target: BuildGateContainerOutDir, ReadOnly: false},
+	}
+	if strings.EqualFold(plan.tool, "gradle") {
+		gradleCacheHitsHostPath := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
+		if err := os.WriteFile(gradleCacheHitsHostPath, nil, 0o644); err != nil {
+			return nil, fmt.Errorf("prepare gradle cache hits file: %w", err)
+		}
+		mounts = append(mounts, ContainerMount{
+			Source:   gradleCacheHitsHostPath,
+			Target:   BuildGateGradleCacheHitsContainerFile,
+			ReadOnly: false,
+		})
 	}
 	// Optional limits via env (human suffixes supported for memory/disk). 0 => unlimited.
 	limitMem, _ := parseBytesLimitEnv(buildGateLimitMemoryEnv)

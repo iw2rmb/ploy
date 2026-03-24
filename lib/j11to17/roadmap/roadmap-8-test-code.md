@@ -1,7 +1,5 @@
 # 8 Test code migration
 
-Parent item: `roadmap.md` -> `1.8`.
-
 ## Edit targets
 - test trees: `src/test/java/**`, `src/test/kotlin/**`, `test/**`
 - test utility packages under `src/test/**`

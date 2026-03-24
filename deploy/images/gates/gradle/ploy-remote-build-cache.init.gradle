@@ -32,10 +32,10 @@ if (_ployCacheURL != null && !_ployCacheURL.trim().isEmpty()) {
     if (outcomeStr != null && outcomeStr.toUpperCase().contains("FROM_CACHE")) hit = true
 
     if (hit) {
-      // Best-effort: record cache hits in the workspace so the gate executor can surface
-      // them in structured metadata (even when Gradle runs with `-q`).
+      // Best-effort: record cache hits into a tmp file so the gate executor can
+      // surface them in structured metadata (even when Gradle runs with `-q`).
       try {
-        def hitsFile = new File("/workspace/.ploy-gradle-build-cache-hits")
+        def hitsFile = new File("/tmp/gradle-build-cache-hits")
         hitsFile << (task.path + "\n")
       } catch (Throwable ignored) {
         // Do not fail the build if workspace is not writable.

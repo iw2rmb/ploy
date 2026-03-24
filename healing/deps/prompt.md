@@ -4,10 +4,16 @@ Goal:
 - Fix dependency/version/repository-resolution failures by editing build configuration files in the repository.
 
 Rules:
+- Use `grep` instead of `rg`.
+- Do not run equivalent grep/ripgrep variants after first definitive result.
+- If exact-match scan in declared edit targets returns 0, stop and return no-op result.
+- No `ls -R` or searching `.`; only declared target paths.
+- Max 5 tool calls unless a file is actually being edited.
 - Read `/in/build-gate.log` first.
 - Edit files only under `/workspace`.
 - Focus on dependency and build-tool configuration changes (versions, coordinates, repositories, plugin configuration, wrapper/toolchain versions).
 - Do not make unrelated source-code logic changes unless strictly required to unblock dependency resolution.
+- When replacing urls pointing to packages (like distributionUrl in gradle, etc.), change in those URLs package name/version only.
 - Keep fixes minimal and deterministic.
 - Your final message MUST be exactly one line of JSON:
   `{"action_summary":"<<=200 chars, single line>"}`
