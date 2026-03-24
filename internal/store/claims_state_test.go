@@ -47,7 +47,7 @@ func TestClaimJob_Basic(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -59,9 +59,10 @@ func TestClaimJob_Basic(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-1",
-		IpAddress: mustParseAddr(t, "192.168.1.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-1",
+		IpAddress:   mustParseAddr(t, "192.168.1.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
@@ -124,7 +125,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-1",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -141,7 +142,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-2",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -158,7 +159,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-3",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -170,27 +171,30 @@ func TestClaimJob_FIFO(t *testing.T) {
 
 	// Create test nodes.
 	node1, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-fifo-1",
-		IpAddress: mustParseAddr(t, "192.168.2.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-fifo-1",
+		IpAddress:   mustParseAddr(t, "192.168.2.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
 	node2, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-fifo-2",
-		IpAddress: mustParseAddr(t, "192.168.2.101"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-fifo-2",
+		IpAddress:   mustParseAddr(t, "192.168.2.101"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
 	node3, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-fifo-3",
-		IpAddress: mustParseAddr(t, "192.168.2.102"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-fifo-3",
+		IpAddress:   mustParseAddr(t, "192.168.2.102"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
@@ -251,7 +255,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-" + strconv.Itoa(i),
-			JobType:     "",
+			JobType:     "mig",
 			JobImage:    "",
 			Status:      types.JobStatusQueued,
 			NextID:      nil,
@@ -268,9 +272,10 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	nodes := make([]Node, numNodes)
 	for i := 0; i < numNodes; i++ {
 		node, err := db.CreateNode(ctx, CreateNodeParams{
-			ID:        types.NodeID(types.NewNodeKey()),
-			Name:      nodeNameForTest(t, "concurrent", i),
-			IpAddress: mustParseAddr(t, ipForTest(3, i)),
+			ID:          types.NodeID(types.NewNodeKey()),
+			Name:        nodeNameForTest(t, "concurrent", i),
+			IpAddress:   mustParseAddr(t, ipForTest(3, i)),
+			Concurrency: 1,
 		})
 		if err != nil {
 			t.Fatalf("CreateNode() %d failed: %v", i, err)
@@ -353,9 +358,10 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-empty",
-		IpAddress: mustParseAddr(t, "192.168.4.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-empty",
+		IpAddress:   mustParseAddr(t, "192.168.4.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
@@ -393,7 +399,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -405,9 +411,10 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-drained",
-		IpAddress: mustParseAddr(t, "192.168.6.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-drained",
+		IpAddress:   mustParseAddr(t, "192.168.6.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
@@ -463,7 +470,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "test-job",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -475,9 +482,10 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-undrained",
-		IpAddress: mustParseAddr(t, "192.168.7.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-undrained",
+		IpAddress:   mustParseAddr(t, "192.168.7.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
@@ -542,7 +550,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-3",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -559,7 +567,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-1",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -576,7 +584,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-2",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,
@@ -588,9 +596,10 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-step-order",
-		IpAddress: mustParseAddr(t, "192.168.10.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-step-order",
+		IpAddress:   mustParseAddr(t, "192.168.10.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
@@ -649,7 +658,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "running-job",
 		Status:      types.JobStatusRunning,
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{}`),
@@ -660,9 +669,10 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 
 	// Create a test node.
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:        types.NodeID(types.NewNodeKey()),
-		Name:      "test-node-only-pending",
-		IpAddress: mustParseAddr(t, "192.168.11.100"),
+		ID:          types.NodeID(types.NewNodeKey()),
+		Name:        "test-node-only-pending",
+		IpAddress:   mustParseAddr(t, "192.168.11.100"),
+		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)

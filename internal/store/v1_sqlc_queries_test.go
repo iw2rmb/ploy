@@ -292,8 +292,10 @@ func TestV1SQLCQueries_Specs(t *testing.T) {
 	}
 	defer func() { _, _ = db.Pool().Exec(ctx, "DELETE FROM specs WHERE id=$1", spec2.ID) }()
 
-	older := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	newer := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+	// Use recent timestamps (relative to now) so both specs appear in the top of DESC ordering.
+	now := time.Now().UTC()
+	older := now.Add(-2 * time.Second)
+	newer := now.Add(-1 * time.Second)
 	if _, err := db.Pool().Exec(ctx, "UPDATE specs SET created_at=$2 WHERE id=$1", spec1.ID, older); err != nil {
 		t.Fatalf("set spec1 created_at failed: %v", err)
 	}
