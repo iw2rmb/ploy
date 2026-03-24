@@ -42,7 +42,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     2. `go test ./cmd/ploy -run 'Test.*TUI.*'`
   - Reasoning: `medium`
 
-- [ ] 1.4 [determined] Implement State S1 Root (`PLOY`)
+- [x] 1.4 [determined] Implement State S1 Root (`PLOY`)
   - Repository: `ploy`
   - Component: `internal/tui/model_*.go`; `internal/tui/view_*.go`; `internal/tui/model_root_test.go` (new)
   - Implementation:
