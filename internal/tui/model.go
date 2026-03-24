@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"time"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -134,11 +135,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runsLoadedMsg:
-		items := make([]list.Item, len(msg.runs))
-		for i, run := range msg.runs {
+		sorted := make([]runSummary, len(msg.runs))
+		copy(sorted, msg.runs)
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].CreatedAt.After(sorted[j].CreatedAt)
+		})
+		items := make([]list.Item, len(sorted))
+		for i, run := range sorted {
 			items[i] = listItem{
 				title:       run.ID.String(),
-				description: run.MigName,
+				description: run.MigName + "  " + run.CreatedAt.Format("02 Jan 15:04"),
 			}
 		}
 		m.secondary = newList("RUNS", items)
@@ -260,6 +266,7 @@ type jobsLoadedMsg struct{ jobs []clitui.JobItem }
 
 // runSummary is a minimal run representation used in the TUI.
 type runSummary struct {
-	ID      domaintypes.RunID
-	MigName string
+	ID        domaintypes.RunID
+	MigName   string
+	CreatedAt time.Time
 }

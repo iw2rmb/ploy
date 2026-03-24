@@ -75,7 +75,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     1. `go test ./internal/tui -run 'Test.*Migration.*Details.*|Test.*S3.*'`
   - Reasoning: `low`
 
-- [ ] 1.7 [determined] Implement State S4 Runs List (`PLOY | RUNS`)
+- [x] 1.7 [determined] Implement State S4 Runs List (`PLOY | RUNS`)
   - Repository: `ploy`
   - Component: `internal/tui/model_*.go`; `internal/tui/view_*.go`; `internal/tui/model_runs_test.go` (new)
   - Implementation:
