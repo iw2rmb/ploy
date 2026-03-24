@@ -63,6 +63,16 @@ func TestListJobsForTUI(t *testing.T) {
 	idA2 := mustKSUID("1VlnyOsy3wff4GTBrpOGU9GfYZH")
 	idB1 := mustKSUID("1VlnyXwq5jBYFLpwR2ZoF4BiNxr")
 
+	// Pre-delete hard-coded IDs in case a previous test run left them behind.
+	for _, id := range []types.JobID{idA1, idA2, idB1} {
+		_, _ = db.Pool().Exec(ctx, "DELETE FROM jobs WHERE id = $1", id)
+	}
+	t.Cleanup(func() {
+		for _, id := range []types.JobID{idA1, idA2, idB1} {
+			_, _ = db.Pool().Exec(ctx, "DELETE FROM jobs WHERE id = $1", id)
+		}
+	})
+
 	jobA1 := createJob(fxA, "job-a1", idA1)
 	jobA2 := createJob(fxA, "job-a2", idA2)
 	jobB1 := createJob(fxB, "job-b1", idB1)

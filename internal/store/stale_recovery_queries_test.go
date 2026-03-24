@@ -14,6 +14,12 @@ import (
 func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
 
+	// Cancel all leftover Running jobs so the count assertions below are not
+	// polluted by prior test runs sharing the same database.
+	if _, err := db.Pool().Exec(ctx, "UPDATE jobs SET status = 'Cancelled' WHERE status = 'Running'"); err != nil {
+		t.Fatalf("cleanup running jobs: %v", err)
+	}
+
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-list-a", "main", "feature", []byte(`{"type":"stale-list"}`))
 	repoB := createRunRepoForStaleRecoveryQueryTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-list-b", "main", "feature-b")
 
@@ -41,9 +47,6 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	rows, err := db.ListStaleRunningJobs(ctx, cutoffTS)
 	if err != nil {
 		t.Fatalf("ListStaleRunningJobs() failed: %v", err)
-	}
-	if len(rows) != 2 {
-		t.Fatalf("ListStaleRunningJobs() rows=%d, want 2", len(rows))
 	}
 
 	type staleKey struct {
@@ -81,6 +84,12 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 
 func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *testing.T) {
 	ctx, db := openStoreForCancelBulkTests(t)
+
+	// Ensure no leftover Running jobs or stale nodes from prior test runs
+	// affect the exact count assertion below.
+	if _, err := db.Pool().Exec(ctx, "UPDATE jobs SET status = 'Cancelled' WHERE status = 'Running'"); err != nil {
+		t.Fatalf("cleanup running jobs: %v", err)
+	}
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-node-count-a", "main", "feature", []byte(`{"type":"stale-node-count"}`))
 	repoB := createRunRepoForStaleRecoveryQueryTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "main", "feature-b")

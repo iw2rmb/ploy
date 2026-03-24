@@ -40,7 +40,7 @@ func TestClaimJobLocksJobOnly(t *testing.T) {
 		RepoBaseRef: fx.RunRepo.RepoBaseRef,
 		Attempt:     fx.RunRepo.Attempt,
 		Name:        "job-lock",
-		JobType:     "",
+		JobType:     "mig",
 		JobImage:    "",
 		Status:      types.JobStatusQueued,
 		NextID:      nil,

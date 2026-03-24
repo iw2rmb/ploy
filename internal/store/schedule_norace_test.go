@@ -49,7 +49,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-norace-" + jobID.String(),
-			JobType:     "",
+			JobType:     "mig",
 			JobImage:    "",
 			Status:      types.JobStatusCreated, // Created, not Queued
 			NextID:      nil,
@@ -187,7 +187,7 @@ func TestScheduleNextJobSequential(t *testing.T) {
 			RepoBaseRef: fx.RunRepo.RepoBaseRef,
 			Attempt:     fx.RunRepo.Attempt,
 			Name:        "job-seq-" + jobIDs[i].String(),
-			JobType:     "",
+			JobType:     "mig",
 			JobImage:    "",
 			Status:      types.JobStatusCreated,
 			NextID:      nil,

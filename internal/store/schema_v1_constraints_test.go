@@ -69,8 +69,8 @@ func TestV1Schema_ModsNameUniqueness(t *testing.T) {
 	}
 }
 
-// TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mig_id, repo_url).
-// The mig_repos table has UNIQUE (mig_id, repo_url) to prevent duplicate repo URLs per mig.
+// TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mig_id, repo_id).
+// The mig_repos table has UNIQUE (mig_id, repo_id) to prevent duplicate repo memberships per mig.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_ModReposUniqueness(t *testing.T) {
@@ -100,22 +100,33 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 		t.Fatalf("mig insert failed: %v", err)
 	}
 
+	// Upsert the repos row so mig_repos can reference it.
+	const testRepoURL1 = "https://github.com/test/repo1.git"
+	var resolvedRepoID1 string
+	if err = db.Pool().QueryRow(ctx, `
+			INSERT INTO repos (id, url) VALUES ($1, $2)
+			ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url
+			RETURNING id
+		`, domaintypes.NewMigRepoID().String(), testRepoURL1).Scan(&resolvedRepoID1); err != nil {
+		t.Fatalf("repos upsert failed: %v", err)
+	}
+
 	// Insert first mig_repos row.
 	repoID1 := domaintypes.NewMigRepoID()
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref, created_at)
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID1.String(), modID.String(), "https://github.com/test/repo1.git", "main", "feature")
+		`, repoID1.String(), modID.String(), resolvedRepoID1, "main", "feature")
 	if err != nil {
 		t.Fatalf("first mig_repos insert failed: %v", err)
 	}
 
-	// Attempt to insert second mig_repos row with the same (mig_id, repo_url).
+	// Attempt to insert second mig_repos row with the same (mig_id, repo_id).
 	repoID2 := domaintypes.NewMigRepoID()
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref, created_at)
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID2.String(), modID.String(), "https://github.com/test/repo1.git", "main", "feature-2")
+		`, repoID2.String(), modID.String(), resolvedRepoID1, "main", "feature-2")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
@@ -179,11 +190,22 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 		t.Fatalf("spec insert failed: %v", err)
 	}
 
+	// Upsert the repos row so mig_repos can reference it.
+	const testRepoURLPK = "https://github.com/test/repo-pk.git"
+	var resolvedRepoIDPK string
+	if err = db.Pool().QueryRow(ctx, `
+			INSERT INTO repos (id, url) VALUES ($1, $2)
+			ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url
+			RETURNING id
+		`, domaintypes.NewMigRepoID().String(), testRepoURLPK).Scan(&resolvedRepoIDPK); err != nil {
+		t.Fatalf("repos upsert failed: %v", err)
+	}
+
 	// Insert mod_repo.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref, created_at)
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID.String(), modID.String(), "https://github.com/test/repo-pk.git", "main", "feature")
+		`, repoID.String(), modID.String(), resolvedRepoIDPK, "main", "feature")
 	if err != nil {
 		t.Fatalf("mig_repos insert failed: %v", err)
 	}
@@ -201,7 +223,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, modID.String(), runID.String(), repoID.String(), "main", "feature", "Queued")
+		`, modID.String(), runID.String(), resolvedRepoIDPK, "main", "feature", "Queued")
 	if err != nil {
 		t.Fatalf("first run_repos insert failed: %v", err)
 	}
@@ -210,7 +232,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, modID.String(), runID.String(), repoID.String(), "main", "feature-2", "Queued")
+		`, modID.String(), runID.String(), resolvedRepoIDPK, "main", "feature-2", "Queued")
 
 	// Verify that the insert was rejected due to PK violation.
 	if err == nil {
@@ -225,8 +247,8 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	}
 }
 
-// TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name, next_id).
-// The jobs table has UNIQUE (run_id, repo_id, attempt, name, next_id) to prevent duplicate jobs.
+// TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name).
+// The jobs table has UNIQUE (run_id, repo_id, attempt, name) to prevent duplicate jobs per repo attempt.
 //
 // This test is skipped if PLOY_TEST_PG_DSN is not set.
 func TestV1Schema_JobsUniqueness(t *testing.T) {
@@ -279,11 +301,22 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		t.Fatalf("spec insert failed: %v", err)
 	}
 
+	// Upsert the repos row so mig_repos can reference it.
+	const testRepoURLJobs = "https://github.com/test/repo-jobs.git"
+	var resolvedRepoIDJobs string
+	if err = db.Pool().QueryRow(ctx, `
+			INSERT INTO repos (id, url) VALUES ($1, $2)
+			ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url
+			RETURNING id
+		`, domaintypes.NewMigRepoID().String(), testRepoURLJobs).Scan(&resolvedRepoIDJobs); err != nil {
+		t.Fatalf("repos upsert failed: %v", err)
+	}
+
 	// Insert mod_repo.
 	_, err = db.Pool().Exec(ctx, `
-			INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref, created_at)
+			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID.String(), modID.String(), "https://github.com/test/repo-jobs.git", "main", "feature")
+		`, repoID.String(), modID.String(), resolvedRepoIDJobs, "main", "feature")
 	if err != nil {
 		t.Fatalf("mig_repos insert failed: %v", err)
 	}
@@ -301,7 +334,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, modID.String(), runID.String(), repoID.String(), "main", "feature", "Queued")
+		`, modID.String(), runID.String(), resolvedRepoIDJobs, "main", "feature", "Queued")
 	if err != nil {
 		t.Fatalf("run_repos insert failed: %v", err)
 	}
@@ -310,20 +343,20 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, jobID1.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mig", "test-image")
+		`, jobID1.String(), runID.String(), resolvedRepoIDJobs, "main", 1, "test-job", "Created", nil, "mig", "test-image")
 	if err != nil {
 		t.Fatalf("first job insert failed: %v", err)
 	}
 
-	// Attempt to insert second job with the same (run_id, repo_id, attempt, name, next_id).
+	// Attempt to insert second job with the same (run_id, repo_id, attempt, name).
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, jobID2.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 1000.0, "mig", "test-image")
+		`, jobID2.String(), runID.String(), resolvedRepoIDJobs, "main", 1, "test-job", "Created", nil, "mig", "test-image")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
-		t.Fatal("expected duplicate (run_id, repo_id, attempt, name, next_id) insert to fail, but it succeeded")
+		t.Fatal("expected duplicate (run_id, repo_id, attempt, name) insert to fail, but it succeeded")
 	}
 	var pgErr *pgconn.PgError
 	if !assertPgError(err, &pgErr) {
@@ -333,7 +366,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		t.Errorf("expected unique violation error code 23505, got %s: %s", pgErr.Code, pgErr.Message)
 	}
 
-	// Verify that a job with different next_id can be inserted (same run_id, repo_id, attempt, name).
+	// Verify that a job with a different name can be inserted (same run_id, repo_id, attempt).
 	jobID3 := domaintypes.NewJobID()
 	defer func() {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM jobs WHERE id = $1", jobID3.String())
@@ -342,9 +375,9 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, next_id, job_type, job_image)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		`, jobID3.String(), runID.String(), repoID.String(), "main", 1, "test-job", "Created", 2000.0, "mig", "test-image")
+		`, jobID3.String(), runID.String(), resolvedRepoIDJobs, "main", 1, "test-job-2", "Created", nil, "mig", "test-image")
 	if err != nil {
-		t.Fatalf("job insert with different next_id should succeed, but failed: %v", err)
+		t.Fatalf("job insert with different name should succeed, but failed: %v", err)
 	}
 }
 

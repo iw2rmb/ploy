@@ -41,6 +41,7 @@ func TestSchema_GateProfilesUniqueByRepoShaStack(t *testing.T) {
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO stacks (lang, release, tool, image)
 		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (lang, release, tool) DO UPDATE SET image = EXCLUDED.image
 		RETURNING id
 	`, "java", "17", "maven", "example.com/maven:17").Scan(&stackID); err != nil {
 		t.Fatalf("insert stacks row: %v", err)
@@ -148,10 +149,21 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 		t.Fatalf("insert spec: %v", err)
 	}
 
+	// Upsert into repos so mig_repos FK can reference it.
+	const gatesJobRepoURL = "https://github.com/test/gates-job.git"
+	var gatesJobRepoID string
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO repos (id, url) VALUES ($1, $2)
+		ON CONFLICT (url) DO UPDATE SET url = EXCLUDED.url
+		RETURNING id
+	`, repoID, gatesJobRepoURL).Scan(&gatesJobRepoID); err != nil {
+		t.Fatalf("upsert repos row for gates test: %v", err)
+	}
+
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO mig_repos (id, mig_id, repo_url, base_ref, target_ref)
+		INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref)
 		VALUES ($1, $2, $3, $4, $5)
-	`, migRepoID, migID, "https://github.com/test/gates-job.git", "main", "feature"); err != nil {
+	`, migRepoID, migID, gatesJobRepoID, "main", "feature"); err != nil {
 		t.Fatalf("insert mig_repo: %v", err)
 	}
 
@@ -165,13 +177,13 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, job_type, job_image)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, jobID, runID, migRepoID, "main", 1, "pre_gate", "Created", "gate", "example.com/gate:latest"); err != nil {
+	`, jobID, runID, gatesJobRepoID, "main", 1, "pre_gate", "Created", "gate", "example.com/gate:latest"); err != nil {
 		t.Fatalf("insert first job: %v", err)
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, job_type, job_image)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, jobID2, runID, migRepoID, "main", 1, "post_gate", "Created", "gate", "example.com/gate:latest"); err != nil {
+	`, jobID2, runID, gatesJobRepoID, "main", 1, "post_gate", "Created", "gate", "example.com/gate:latest"); err != nil {
 		t.Fatalf("insert second job: %v", err)
 	}
 
@@ -186,6 +198,7 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 	if err := tx.QueryRow(ctx, `
 		INSERT INTO stacks (lang, release, tool, image)
 		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (lang, release, tool) DO UPDATE SET image = EXCLUDED.image
 		RETURNING id
 	`, "java", "17", "maven", "example.com/maven:17").Scan(&stackID); err != nil {
 		t.Fatalf("insert stack row: %v", err)

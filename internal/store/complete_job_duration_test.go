@@ -196,6 +196,11 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 	})
 
 	t.Run("UpdateJobCompletion with valid started_at", func(t *testing.T) {
+		// Cancel any pre-existing Queued jobs so ClaimJob below picks only our job.
+		if _, err := db.Pool().Exec(ctx, "UPDATE jobs SET status = 'Cancelled' WHERE status = 'Queued'"); err != nil {
+			t.Fatalf("cancel queued jobs: %v", err)
+		}
+
 		// Create and claim a job (started_at will be set during claim).
 		jobID := types.NewJobID()
 		job, err := db.CreateJob(ctx, CreateJobParams{
