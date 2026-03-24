@@ -159,6 +159,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case runDetailsLoadedMsg:
+		items := m.detail.Items()
+		if len(items) >= 2 {
+			items[0] = listItem{title: "Repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
+			items[1] = listItem{title: "Jobs", description: fmt.Sprintf("total: %d", msg.jobTotal)}
+			m.detail.SetItems(items)
+		}
+		return m, nil
+
 	case jobsLoadedMsg:
 		items := make([]list.Item, len(msg.jobs))
 		for i, job := range msg.jobs {
@@ -231,6 +240,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 				listItem{title: "Jobs", description: "total: —"},
 			})
 			m.screen = S5RunDetails
+			return m, loadRunDetailsCmd(m.client, m.baseURL, m.selectedRunID)
 		}
 	}
 	return m, nil
