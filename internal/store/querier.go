@@ -40,6 +40,9 @@ type Querier interface {
 	// Used by repo-scoped terminal detection to determine run_repos.status.
 	// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
+	// Counts jobs with optional run_id filter.
+	// Used with ListJobsForTUI to provide total for TUI pagination.
+	CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error)
 	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
 	// Counts distinct stale nodes that currently have at least one running job.
 	// Excludes NULL node_id rows (orphaned running jobs) from node count.
@@ -186,6 +189,9 @@ type Querier interface {
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
 	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
 	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
+	// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
+	// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
+	ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	// Returns log metadata including object_key for object-storage retrieval.

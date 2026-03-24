@@ -122,6 +122,9 @@ paths:
   # NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
   # Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 
+  # Jobs — global jobs listing for TUI (list across all runs with mig context)
+  /v1/jobs:
+    $ref: './paths/jobs.yaml'
   # Job-level completion endpoint (job-scoped, no node ID) — canonical endpoint for job completion
   /v1/jobs/{job_id}/complete:
     $ref: './paths/jobs_job_id_complete.yaml'
