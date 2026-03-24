@@ -4,12 +4,14 @@ Goal:
 - Determine a gate-profile candidate that makes gate execution reliable without changing repository source files.
 - Produce a valid gate profile candidate artifact for downstream validation.
 
-Hard rules:
-- Use `grep` instead of `rg`.
-- Do not run equivalent grep/ripgrep variants after first definitive result.
-- If exact-match scan in declared edit targets returns 0, stop and return no-op result.
-- No `ls -R` or searching `.`; only declared target paths.
-- Max 5 tool calls unless a file is actually being edited.
+Task:
+1. Diagnose infra/toolchain failure from `/in/build-gate.log`.
+2. Use `/in/gate_profile.json` (if provided) to keep command/env/runtime context aligned with the gate profile used by the failed gate.
+3. Decide if current target is solvable. If not solvable, switch to the next target in chain (`all_tests -> unit -> build`) and repeat decision.
+4. Generate `/out/gate-profile-candidate.json` that validates against `/in/gate_profile.schema.json`, sets `targets.active` per transition policy, keeps stack identity consistent, and always includes command/env for the selected active target.
+5. End with the required one-line `action_summary` JSON.
+
+Task execution rules (hard):
 - Read `/in/build-gate.log` first.
 - Read `/in/gate_profile.json` when present and use it as gate-profile context.
 - Read `/in/gate_profile.schema.json` and treat it as the required output contract.
@@ -44,15 +46,20 @@ Hard rules:
   `{"action_summary":"<<=200 chars, single line>"}`
 - Do not output any additional text in the final message.
 
+Search rules (hard):
+- Use `grep` instead of `rg`.
+- Do not run equivalent grep/ripgrep variants after first definitive result.
+- If exact-match scan in declared edit targets returns 0, stop and return no-op result.
+- No `ls -R` or searching `.`; only declared target paths.
+- Build grep target list from existing files only (`[ -e path ]` check per path). Do not pass missing paths to grep.
+- Do not use nested `sh -lc`, do not use `|| true`, and do not use `--include` with explicit file arguments.
+- Exit code handling for grep is strict:
+  - 0: matches found
+  - 1: no matches
+  - 2: command failure; fix command and rerun. Never treat exit 2 as “no matches”.
+
 Tactic policy:
 1. Prefer staying on the current target when an infra/runtime fix is still possible from profile/runtime hints.
 2. When a target is unsolvable with available options, move to the next target in the chain immediately.
 3. If integration/all-tests are required, encode runtime/container requirements in gate profile (for example `runtime.docker`) instead of changing source.
 4. Never claim success by source edits. If confidence is low, mark target statuses/failure codes honestly and include diagnostics/evidence in candidate.
-
-Task:
-1. Diagnose infra/toolchain failure from `/in/build-gate.log`.
-2. Use `/in/gate_profile.json` (if provided) to keep command/env/runtime context aligned with the gate profile used by the failed gate.
-3. Decide if current target is solvable. If not solvable, switch to the next target in chain (`all_tests -> unit -> build`) and repeat decision.
-4. Generate `/out/gate-profile-candidate.json` that validates against `/in/gate_profile.schema.json`, sets `targets.active` per transition policy, keeps stack identity consistent, and always includes command/env for the selected active target.
-5. End with the required one-line `action_summary` JSON.
