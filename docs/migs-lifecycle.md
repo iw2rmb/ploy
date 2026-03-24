@@ -978,7 +978,7 @@ ploy run pull --dry-run <run-id>
 ploy run pull --origin upstream <run-id>
 ```
 
-See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for CLI reference.
+This section is the canonical CLI reference for local pull workflows.
 
 ### Implementation references
 

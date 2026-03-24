@@ -243,7 +243,8 @@ ploy run status java17-fleet
 ploy run status --json java17-fleet
 ```
 
-See `cmd/ploy/README.md` § "Batched Mod Runs" for the full batch command reference.
+See [Mods lifecycle](../migs-lifecycle.md) § "1.4 Batched Mods Runs (`runs` + `run_repos`)"
+for the full batch command reference.
 
 ### Pull Changes Locally (Alternative to MR)
 
@@ -268,7 +269,8 @@ The `mig pull` command:
 This approach complements MR-based workflows—you can use MRs for production changes
 while using `mig pull` for local development and testing.
 
-See `cmd/ploy/README.md` § "Pull Mods Changes Locally" for detailed usage.
+See [Mods lifecycle](../migs-lifecycle.md) § "Pulling Diffs Locally (`run pull` / `mig pull`)"
+for detailed usage.
 
 ## Related Documentation
 
