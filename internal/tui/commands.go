@@ -64,5 +64,35 @@ func loadJobsCmd(client *http.Client, baseURL *url.URL, runID *domaintypes.RunID
 	}
 }
 
+// loadMigDetailsCmd returns a tea.Cmd that fetches repo and run totals for the
+// given migration, used to populate the S3 detail list.
+func loadMigDetailsCmd(client *http.Client, baseURL *url.URL, migID domaintypes.MigID) tea.Cmd {
+	return func() tea.Msg {
+		repoCount, err := clitui.CountMigReposCommand{
+			Client:  client,
+			BaseURL: baseURL,
+			MigID:   migID,
+		}.Run(context.Background())
+		if err != nil {
+			return errMsg{err: err}
+		}
+		runCount, err := clitui.CountMigRunsCommand{
+			Client:  client,
+			BaseURL: baseURL,
+			MigID:   migID,
+		}.Run(context.Background())
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return migDetailsLoadedMsg{repoTotal: repoCount, runTotal: runCount}
+	}
+}
+
+// migDetailsLoadedMsg carries migration detail totals from async fetch.
+type migDetailsLoadedMsg struct {
+	repoTotal int
+	runTotal  int
+}
+
 // errMsg carries an error from an async command.
 type errMsg struct{ err error }
