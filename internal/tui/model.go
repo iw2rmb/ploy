@@ -173,7 +173,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i, job := range msg.jobs {
 			items[i] = listItem{
 				title:       job.Name,
-				description: job.MigName,
+				description: job.MigName + "  " + job.RunID.String() + "  " + job.RepoID.String(),
 			}
 		}
 		m.secondary = newList("JOBS", items)
