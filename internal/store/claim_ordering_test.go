@@ -28,6 +28,7 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/deterministic-order", "main", "feature", []byte(`{"type":"deterministic"}`))
 	run := fx.Run
@@ -95,10 +96,11 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 	}
 
 	// Create a test node.
+	detID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-deterministic",
-		IpAddress:   mustParseAddr(t, "192.168.50.100"),
+		ID:          detID,
+		Name:        nodeNameForTest(detID),
+		IpAddress:   nodeAddrForTest(detID),
 		Concurrency: 1,
 	})
 	if err != nil {
@@ -140,6 +142,7 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/scoped-order", "main", "feature", []byte(`{"type":"scoped"}`))
 
@@ -273,10 +276,11 @@ func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
 	jobRunLowRepoHigh := createJob(runLow, repoHigh, float64(1000))
 	jobRunHighRepoLow := createJob(runHigh, repoLow, float64(500))
 
+	scopedID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-scoped",
-		IpAddress:   mustParseAddr(t, "192.168.50.101"),
+		ID:          scopedID,
+		Name:        nodeNameForTest(scopedID),
+		IpAddress:   nodeAddrForTest(scopedID),
 		Concurrency: 1,
 	})
 	if err != nil {

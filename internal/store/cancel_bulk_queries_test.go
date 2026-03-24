@@ -315,6 +315,7 @@ func openStoreForCancelBulkTests(t *testing.T) (context.Context, Store) {
 		t.Fatalf("RunMigrations() failed: %v", err)
 	}
 	t.Cleanup(db.Close)
+	cleanTestTables(t, ctx, db)
 	return ctx, db
 }
 

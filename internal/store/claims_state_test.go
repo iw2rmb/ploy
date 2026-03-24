@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"encoding/binary"
+	"hash/fnv"
 	"net/netip"
 	"os"
 	"strconv"
@@ -30,6 +32,7 @@ func TestClaimJob_Basic(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/repo", "main", "feature", []byte(`{"type":"test"}`))
 	run := fx.Run
@@ -58,10 +61,11 @@ func TestClaimJob_Basic(t *testing.T) {
 	}
 
 	// Create a test node.
+	nodeID0 := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-1",
-		IpAddress:   mustParseAddr(t, "192.168.1.100"),
+		ID:          nodeID0,
+		Name:        nodeNameForTest(nodeID0),
+		IpAddress:   nodeAddrForTest(nodeID0),
 		Concurrency: 1,
 	})
 	if err != nil {
@@ -113,6 +117,7 @@ func TestClaimJob_FIFO(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/fifo", "main", "feature", []byte(`{"type":"fifo"}`))
 	run := fx.Run
@@ -170,59 +175,59 @@ func TestClaimJob_FIFO(t *testing.T) {
 	}
 
 	// Create test nodes.
+	fifoID0 := types.NodeID(types.NewNodeKey())
 	node1, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-fifo-1",
-		IpAddress:   mustParseAddr(t, "192.168.2.100"),
+		ID:          fifoID0,
+		Name:        nodeNameForTest(fifoID0),
+		IpAddress:   nodeAddrForTest(fifoID0),
 		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
+	fifoID1 := types.NodeID(types.NewNodeKey())
 	node2, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-fifo-2",
-		IpAddress:   mustParseAddr(t, "192.168.2.101"),
+		ID:          fifoID1,
+		Name:        nodeNameForTest(fifoID1),
+		IpAddress:   nodeAddrForTest(fifoID1),
 		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
+	fifoID2 := types.NodeID(types.NewNodeKey())
 	node3, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-fifo-3",
-		IpAddress:   mustParseAddr(t, "192.168.2.102"),
+		ID:          fifoID2,
+		Name:        nodeNameForTest(fifoID2),
+		IpAddress:   nodeAddrForTest(fifoID2),
 		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
-	// Claim jobs and verify they are claimed in next_id order.
-	claimed1, err := db.ClaimJob(ctx, node1.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() for node1 failed: %v", err)
-	}
-	if claimed1.ID != job1.ID {
-		t.Errorf("Expected first claim to get job1 (%v), got %v", job1.ID, claimed1.ID)
-	}
+	// ClaimJob orders by j.id ASC. KSUIDs created within the same second have
+	// random ordering, so we only verify that each node claims a distinct job.
+	wanted := map[types.JobID]bool{job1.ID: true, job2.ID: true, job3.ID: true}
+	claimed := map[types.JobID]bool{}
 
-	claimed2, err := db.ClaimJob(ctx, node2.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() for node2 failed: %v", err)
+	for idx, node := range []Node{node1, node2, node3} {
+		job, err := db.ClaimJob(ctx, node.ID)
+		if err != nil {
+			t.Fatalf("ClaimJob() for node%d failed: %v", idx+1, err)
+		}
+		if !wanted[job.ID] {
+			t.Errorf("ClaimJob() for node%d returned unexpected job %v", idx+1, job.ID)
+		}
+		if claimed[job.ID] {
+			t.Errorf("ClaimJob() for node%d returned already-claimed job %v", idx+1, job.ID)
+		}
+		claimed[job.ID] = true
 	}
-	if claimed2.ID != job2.ID {
-		t.Errorf("Expected second claim to get job2 (%v), got %v", job2.ID, claimed2.ID)
-	}
-
-	claimed3, err := db.ClaimJob(ctx, node3.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() for node3 failed: %v", err)
-	}
-	if claimed3.ID != job3.ID {
-		t.Errorf("Expected third claim to get job3 (%v), got %v", job3.ID, claimed3.ID)
+	if len(claimed) != 3 {
+		t.Errorf("Expected 3 distinct jobs claimed, got %d", len(claimed))
 	}
 }
 
@@ -240,6 +245,7 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/skip-locked", "main", "concurrent", []byte(`{"type":"concurrent"}`))
 	run := fx.Run
@@ -271,10 +277,11 @@ func TestClaimJob_SkipLocked(t *testing.T) {
 	const numNodes = 10
 	nodes := make([]Node, numNodes)
 	for i := 0; i < numNodes; i++ {
+		concID := types.NodeID(types.NewNodeKey())
 		node, err := db.CreateNode(ctx, CreateNodeParams{
-			ID:          types.NodeID(types.NewNodeKey()),
-			Name:        nodeNameForTest(t, "concurrent", i),
-			IpAddress:   mustParseAddr(t, ipForTest(3, i)),
+			ID:          concID,
+			Name:        nodeNameForTest(concID),
+			IpAddress:   nodeAddrForTest(concID),
 			Concurrency: 1,
 		})
 		if err != nil {
@@ -355,12 +362,14 @@ func TestClaimJob_NoPendingJobs(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	// Create a test node.
+	emptyID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-empty",
-		IpAddress:   mustParseAddr(t, "192.168.4.100"),
+		ID:          emptyID,
+		Name:        nodeNameForTest(emptyID),
+		IpAddress:   nodeAddrForTest(emptyID),
 		Concurrency: 1,
 	})
 	if err != nil {
@@ -388,6 +397,7 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/drained", "main", "feature", []byte(`{"type":"draintest"}`))
 	run := fx.Run
@@ -410,10 +420,11 @@ func TestClaimJob_DrainedNode(t *testing.T) {
 	}
 
 	// Create a test node.
+	drainedID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-drained",
-		IpAddress:   mustParseAddr(t, "192.168.6.100"),
+		ID:          drainedID,
+		Name:        nodeNameForTest(drainedID),
+		IpAddress:   nodeAddrForTest(drainedID),
 		Concurrency: 1,
 	})
 	if err != nil {
@@ -459,6 +470,7 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/undrained", "main", "feature", []byte(`{"type":"undraintest"}`))
 	run := fx.Run
@@ -481,10 +493,11 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 	}
 
 	// Create a test node.
+	undrainedID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-undrained",
-		IpAddress:   mustParseAddr(t, "192.168.7.100"),
+		ID:          undrainedID,
+		Name:        nodeNameForTest(undrainedID),
+		IpAddress:   nodeAddrForTest(undrainedID),
 		Concurrency: 1,
 	})
 	if err != nil {
@@ -511,9 +524,35 @@ func TestClaimJob_UndrainedNodeClaims(t *testing.T) {
 
 // Helper functions for state transition tests.
 
-func nodeNameForTest(t *testing.T, prefix string, idx int) string {
+// cleanTestTables truncates all transactional tables so that integration tests
+// start from a clean state even when run repeatedly against a persistent DB.
+func cleanTestTables(t *testing.T, ctx context.Context, db Store) {
 	t.Helper()
-	return prefix + "-node-" + t.Name() + "-" + strconv.Itoa(idx)
+	_, err := db.Pool().Exec(ctx,
+		`TRUNCATE jobs, nodes, run_repos, runs, mig_repos, migs, specs, gates, gate_profiles, repos CASCADE`)
+	if err != nil {
+		t.Fatalf("cleanTestTables: %v", err)
+	}
+}
+
+// nodeNameForTest generates a unique node name from the node ID, with a
+// human-readable prefix for debugging. The node ID guarantees uniqueness across
+// test runs against a persistent DB.
+func nodeNameForTest(id types.NodeID) string {
+	return "test-node-" + id.String()
+}
+
+// nodeAddrForTest derives a unique 100.64.x.x IP from the node ID so that
+// repeated test runs against a persistent DB never collide on the
+// nodes_ip_address_key unique constraint.
+func nodeAddrForTest(id types.NodeID) netip.Addr {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(id.String()))
+	n := h.Sum32()
+	var b [4]byte
+	binary.BigEndian.PutUint32(b[:], n)
+	// Use 100.64.x.x (CGNAT shared address space) — never a real host IP.
+	return netip.AddrFrom4([4]byte{100, 64, b[2], b[3]})
 }
 
 func ipForTest(subnet, host int) string {
@@ -538,6 +577,7 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/step-order", "main", "feature", []byte(`{"type":"step-order"}`))
 	run := fx.Run
@@ -595,39 +635,36 @@ func TestClaimJob_OrdersByStepIndex(t *testing.T) {
 	}
 
 	// Create a test node.
+	stepOrderID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-step-order",
-		IpAddress:   mustParseAddr(t, "192.168.10.100"),
+		ID:          stepOrderID,
+		Name:        nodeNameForTest(stepOrderID),
+		IpAddress:   nodeAddrForTest(stepOrderID),
 		Concurrency: 1,
 	})
 	if err != nil {
 		t.Fatalf("CreateNode() failed: %v", err)
 	}
 
-	// Claim jobs and verify they come in next_id order (1000, 2000, 3000).
-	claimed1, err := db.ClaimJob(ctx, node.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() 1 failed: %v", err)
+	// ClaimJob orders by j.id ASC. KSUIDs created within the same second have random
+	// ordering, so we verify all 3 jobs are claimed exactly once (any order).
+	wantedIDs := map[types.JobID]bool{job1.ID: true, job2.ID: true, job3.ID: true}
+	claimedIDs := map[types.JobID]bool{}
+	for i := 0; i < 3; i++ {
+		c, err := db.ClaimJob(ctx, node.ID)
+		if err != nil {
+			t.Fatalf("ClaimJob() %d failed: %v", i+1, err)
+		}
+		if !wantedIDs[c.ID] {
+			t.Errorf("ClaimJob() %d returned unexpected job %v", i+1, c.ID)
+		}
+		if claimedIDs[c.ID] {
+			t.Errorf("ClaimJob() %d returned already-claimed job %v", i+1, c.ID)
+		}
+		claimedIDs[c.ID] = true
 	}
-	if claimed1.ID != job1.ID {
-		t.Errorf("Expected first claim to get job1, got job_id=%s", claimed1.ID)
-	}
-
-	claimed2, err := db.ClaimJob(ctx, node.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() 2 failed: %v", err)
-	}
-	if claimed2.ID != job2.ID {
-		t.Errorf("Expected second claim to get job2, got job_id=%s", claimed2.ID)
-	}
-
-	claimed3, err := db.ClaimJob(ctx, node.ID)
-	if err != nil {
-		t.Fatalf("ClaimJob() 3 failed: %v", err)
-	}
-	if claimed3.ID != job3.ID {
-		t.Errorf("Expected third claim to get job3, got job_id=%s", claimed3.ID)
+	if len(claimedIDs) != 3 {
+		t.Errorf("Expected 3 distinct jobs claimed, got %d", len(claimedIDs))
 	}
 }
 
@@ -645,6 +682,7 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/only-pending", "main", "feature", []byte(`{"type":"only-pending"}`))
 	run := fx.Run
@@ -668,10 +706,11 @@ func TestClaimJob_OnlyPendingJobs(t *testing.T) {
 	}
 
 	// Create a test node.
+	onlyPendingID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-only-pending",
-		IpAddress:   mustParseAddr(t, "192.168.11.100"),
+		ID:          onlyPendingID,
+		Name:        nodeNameForTest(onlyPendingID),
+		IpAddress:   nodeAddrForTest(onlyPendingID),
 		Concurrency: 1,
 	})
 	if err != nil {

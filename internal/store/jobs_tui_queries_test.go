@@ -23,6 +23,7 @@ func TestListJobsForTUI(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	// Two separate runs so we can test filtered vs unfiltered results.
 	fxA := newV1Fixture(t, ctx, db, "https://github.com/test/tui-a", "main", "feat-a", []byte(`{"type":"test"}`))

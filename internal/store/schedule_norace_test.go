@@ -32,6 +32,7 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 	if db.Pool().Config().MaxConns < 2 {
 		t.Skipf("pgxpool max_conns=%d; need >=2 to exercise concurrent schedulers", db.Pool().Config().MaxConns)
 	}
@@ -170,13 +171,14 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/schedule-seq", "main", "feature", []byte(`{"type":"sequential"}`))
 
-	// Create jobs with distinct step indices.
+	// Create independent jobs (no next_id chaining). ScheduleNextJob orders by
+	// j.id ASC, so all jobs are immediately schedulable in creation order.
 	const numJobs = 5
 	jobIDs := make([]types.JobID, numJobs)
-	stepIndices := []float64{5000, 1000, 3000, 2000, 4000} // Not in order
 
 	for i := 0; i < numJobs; i++ {
 		jobIDs[i] = types.NewJobID()
@@ -198,26 +200,15 @@ func TestScheduleNextJobSequential(t *testing.T) {
 		}
 	}
 
-	// Build expected order: jobs sorted by next_id ASC.
-	type jobWithIndex struct {
-		id    types.JobID
-		index float64
-	}
-	jobsWithIndex := make([]jobWithIndex, numJobs)
-	for i := 0; i < numJobs; i++ {
-		jobsWithIndex[i] = jobWithIndex{id: jobIDs[i], index: stepIndices[i]}
-	}
-	// Sort by next_id.
-	for i := 0; i < len(jobsWithIndex); i++ {
-		for j := i + 1; j < len(jobsWithIndex); j++ {
-			if jobsWithIndex[j].index < jobsWithIndex[i].index {
-				jobsWithIndex[i], jobsWithIndex[j] = jobsWithIndex[j], jobsWithIndex[i]
+	// Expected order: job IDs sorted ascending (KSUID lexicographic = creation-time order).
+	expectedOrder := make([]types.JobID, numJobs)
+	copy(expectedOrder, jobIDs)
+	for i := 0; i < len(expectedOrder); i++ {
+		for j := i + 1; j < len(expectedOrder); j++ {
+			if string(expectedOrder[j]) < string(expectedOrder[i]) {
+				expectedOrder[i], expectedOrder[j] = expectedOrder[j], expectedOrder[i]
 			}
 		}
-	}
-	expectedOrder := make([]types.JobID, numJobs)
-	for i, j := range jobsWithIndex {
-		expectedOrder[i] = j.id
 	}
 
 	// Schedule jobs one by one and verify order.
