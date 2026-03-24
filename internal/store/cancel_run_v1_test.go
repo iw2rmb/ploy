@@ -116,7 +116,7 @@ func TestCancelRunV1_RollsBackOnFailure(t *testing.T) {
 	job := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "created", types.JobStatusCreated)
 
 	// Inject DB error during CancelActiveJobsByRun so earlier updates must roll back.
-	suffix := strings.ToLower(types.NewNodeKey())
+	suffix := strings.NewReplacer("-", "_").Replace(strings.ToLower(types.NewNodeKey()))
 	fnName := fmt.Sprintf("test_cancel_run_v1_fail_fn_%s", suffix)
 	trName := fmt.Sprintf("test_cancel_run_v1_fail_tr_%s", suffix)
 
@@ -266,7 +266,7 @@ func TestCancelRunV1_RollbackErrorHasContext(t *testing.T) {
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/cancel-run-v1-errctx", "main", "feature-errctx", []byte(`{"type":"cancel-run-v1-errctx"}`))
 	job := createJobForCancelBulkTest(t, ctx, db, fx.Run.ID, fx.MigRepo.RepoID, fx.RunRepo.RepoBaseRef, "created", types.JobStatusCreated)
 
-	suffix := strings.ToLower(types.NewNodeKey())
+	suffix := strings.NewReplacer("-", "_").Replace(strings.ToLower(types.NewNodeKey()))
 	fnName := fmt.Sprintf("test_cancel_run_v1_fail_jobs_ctx_fn_%s", suffix)
 	trName := fmt.Sprintf("test_cancel_run_v1_fail_jobs_ctx_tr_%s", suffix)
 
