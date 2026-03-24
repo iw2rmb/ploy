@@ -25,51 +25,87 @@ flows:
       - shell: ["cat", "{{ ctx.params.roadmap_file }}"]
         response:
           from: stdout
-          schema:
-            type: object
-            additionalProperties: false
-            required: ["steps"]
-            properties:
-              steps:
-                type: array
-                items:
-                  type: object
-                  additionalProperties: false
-                  required: ["title", "filepath", "reasoning"]
-                  properties:
-                    title:
-                      type: string
-                    filepath:
-                      type: string
-                    reasoning:
-                      type: string
-                      enum: ["low", "medium", "high"]
+          schema: /tmp/roadmap.schema.json
 
       - type: for_each
         items: $.prev.value.steps
         as: step
         steps:
-          - codex: |
-              High-level context: bring repository code and version-controlled configs to Java 17-ready state after OpenRewrite recipe bumping Java from 11 to 17.
+          - type: switch
+            cases:
+              - when: '"patterns" in ctx.step and len(ctx.step["patterns"]) > 0'
+                steps:
+                  - shell:
+                      - /tmp/roadmap-search.sh
+                      - '{{ "|".join(ctx.step["patterns"]) }}'
+                      - '{{ "\n".join(ctx.step.get("targets", [])) }}'
+                    response:
+                      from: stdout_lines
+                      schema:
+                        type: array
+                        items:
+                          type: string
 
-              Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
+                  - type: switch
+                    cases:
+                      - when: len(ctx.prev.value) > 0
+                        steps:
+                          - codex: |
+                              High-level context: bring repository code and version-controlled configs to Java 17-ready state after OpenRewrite recipe bumping Java from 11 to 17.
 
-              Search rules (hard):
-              - Use `grep` instead of `rg`. Do not run equivalent grep/ripgrep variants.
-              - If exact-match scan in declared edit targets returns 0, stop and return no-op result.
-              - No `ls -R` or searching `.`; only declared target paths.
-              - Build grep target list from existing files only (`[ -e path ]` check per path). Do not pass missing paths to grep.
-              - Do not use nested `sh -lc`, do not use `|| true`, and do not use `--include` with explicit file arguments.
-              - Exit code handling for grep is strict:
-                - 0: matches found
-                - 1: no matches
-                - 2: command failure; fix command and rerun. Never treat exit 2 as “no matches”.
+                              Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
 
-              Implementation rules (hard):
-              - Stick to the scope of the task strictly.
-              - Edit only source code, build descriptors, and version-controlled config/script files.
-              - Do not run builds, tests, linters, or IDE-assisted refactors.
-              - Do not edit CI images, Docker base images, OS packages, or local/remote JDK installations.
-              - Use `TODO(java17): ...` for unresolved decisions that need human follow-up.
-            reasoning: $.step.reasoning
-            response: /tmp/implement_result.schema.json
+                              Search was already performed by workflow shell step.
+                              Use the findings below as the source of truth and start edits from provided coordinates.
+
+                              Findings (`file:line:column:text`, one per line):
+                              {{ "\n".join(ctx.prev.value) }}
+
+                              Implementation rules (hard):
+                              - Stick to the scope of the task strictly.
+                              - Edit only source code, build descriptors, and version-controlled config/script files.
+                              - Do not run builds, tests, linters, or IDE-assisted refactors.
+                              - Do not edit CI images, Docker base images, OS packages, or local/remote JDK installations.
+                              - Use `TODO(java17): ...` for unresolved decisions that need human follow-up.
+                              - If findings are present, do not run broad repository discovery before checking listed coordinates.
+                            reasoning: $.step.reasoning
+                            response: /tmp/implement_result.schema.json
+
+                      - steps:
+                          - expr:
+                              status: "no_findings"
+                              title: "{{ ctx.step.title }}"
+                              filepath: "{{ ctx.step.filepath }}"
+
+              - steps:
+                  - codex: |
+                      High-level context: bring repository code and version-controlled configs to Java 17-ready state after OpenRewrite recipe bumping Java from 11 to 17.
+
+                      Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
+
+                      Implementation rules (hard):
+                      - Stick to the scope of the task strictly.
+                      - Edit only source code, build descriptors, and version-controlled config/script files.
+                      - Do not run builds, tests, linters, or IDE-assisted refactors.
+                      - Do not edit CI images, Docker base images, OS packages, or local/remote JDK installations.
+                      - Use `TODO(java17): ...` for unresolved decisions that need human follow-up.
+
+                      Mandatory search rules:
+                      - No reasoning/self-talk between commands.
+                      - Max 6 tool calls per step. Max 2 search commands per step.
+                      - rg first. Use grep/find only if rg is unavailable or fails.
+                      - Probe tools once per run. Do not repeat command -v checks.
+                      - First search must be path-only: rg -l (or rg --files with tight -g filters), then open only matched files.
+                      - If the first actionable scan has no matches, stop and return a no-op summary.
+                      - Use one precise batched regex per intent. Do not run near-duplicate scans.
+                      - Do not broaden the same scan intent (for example, same query with larger head limit).
+                      - Avoid broad legacy markers without qualifiers (for example, @Before/@After alone). Pair with explicit JUnit 4 markers.
+                      - After rg -l, open at most 3 files unless an edit is required.
+                      - Never run repo-wide content dumps: forbid rg -n ".*", ls -R, unbounded find ., unfiltered rg --files.
+                      - Cap output aggressively: add | head -n 50 (100 max) on discovery commands; use sed -n '1,120p' for file reads.
+                      - Treat rg exit code 1 as “no matches”, not an error/retry.
+                      - Skip .git, build, target, out by default.
+                      - Do not wrap commands with echo/printf unless debugging.
+                      - Final notes must be at most 5 bullets and 600 chars total.
+                    reasoning: $.step.reasoning
+                    response: /tmp/implement_result.schema.json

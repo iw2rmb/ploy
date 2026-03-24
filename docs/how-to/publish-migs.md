@@ -64,6 +64,7 @@ docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/migs/mig-codex/Dockerfile \
   -t "${IMAGE_PREFIX}/migs-codex:latest" \
+  ${PLOY_CA_CERTS:+--secret id=ploy_ca_bundle,src=${PLOY_CA_CERTS}} \
   --push .
 ```
 

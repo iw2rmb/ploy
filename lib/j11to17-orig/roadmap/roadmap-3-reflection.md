@@ -1,5 +1,17 @@
 # 3 Reflection on internals
 
+## Edit targets
+- `src/main/java/**`, `src/test/java/**`
+- `src/main/kotlin/**`, `src/test/kotlin/**`
+- launch/config files that pass module-open flags: `*.sh`, `*.bat`, `*.properties`, `*.yaml`, `*.yml`
+
+## Match strings
+- `setAccessible(true)`
+- `Class.forName("java.`
+- `Class.forName("sun.`
+- `getDeclaredField(`
+- `getDeclaredMethod(`
+
 ## Actions
 1. For reflection on project-owned classes, replace reflective access with explicit methods/constructors.
 2. For reflection on JDK classes, replace with public API calls when available.

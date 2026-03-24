@@ -46,17 +46,19 @@ Mandatory task execution rules:
   `{"action_summary":"<<=200 chars, single line>"}`
 - Do not output any additional text in the final message.
 
-Mandatory search rules:
-- Use `grep` instead of `rg`.
-- Do not run equivalent grep/ripgrep variants after first definitive result.
-- If exact-match scan in declared edit targets returns 0, stop and return no-op result.
-- No `ls -R` or searching `.`; only declared target paths.
-- Build grep target list from existing files only (`[ -e path ]` check per path). Do not pass missing paths to grep.
-- Do not use nested `sh -lc`, do not use `|| true`, and do not use `--include` with explicit file arguments.
-- Exit code handling for grep is strict:
-  - 0: matches found
-  - 1: no matches
-  - 2: command failure; fix command and rerun. Never treat exit 2 as “no matches”.
+Mandadoty search rules:
+- rg first. Use grep/find only if rg actually fails.
+- Probe tools once per run. Don’t repeat command -v rg / command -v fd.
+- First search pass must be path-only: rg -l (or rg --files with tight -g filters), then open only matched files.
+- Never run repo-wide content dumps:
+  - forbid rg -n ".*", ls -R, unbounded find ., unfiltered rg --files.
+- Cap output aggressively:
+  - add | head -n 50 (or 100 max) on discovery commands.
+  - use sed -n '1,120p' for file reads.
+- Treat rg exit code 1 as “no matches”, not an error/retry.
+- Use one batched regex command per section, not multiple near-duplicate scans.
+- Skip .git, build, target, out by default.
+- Keep reasoning terse: no long self-talk between commands.
 
 Tactic policy:
 1. Prefer staying on the current target when an infra/runtime fix is still possible from profile/runtime hints.
