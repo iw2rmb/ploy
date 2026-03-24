@@ -70,6 +70,9 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	root.AddCommand(newConfigCmd(stderr))   // ploy config (gitlab show/set/validate)
 	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
 
+	// Interactive TUI
+	root.AddCommand(newTUICmd(stderr)) // ploy tui (interactive terminal UI)
+
 	// Server, node, rollout, and token management commands
 	// NOTE: `ploy server`, `ploy node`, `ploy rollout`, and `ploy token` have been removed as top-level commands.
 	// Server deployment is now accessible only via `ploy cluster deploy`.

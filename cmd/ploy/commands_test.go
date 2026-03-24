@@ -29,6 +29,7 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"cluster",  // newClusterCmd (includes token, node, rollout, deploy)
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
+		"tui",      // newTUICmd
 	}
 
 	// Get all registered subcommands from the root command.
@@ -75,6 +76,7 @@ func TestCommandBuildersFunctional(t *testing.T) {
 		{"newClusterCmd", func(w *bytes.Buffer) *cobra.Command { return newClusterCmd(w) }},
 		{"newConfigCmd", func(w *bytes.Buffer) *cobra.Command { return newConfigCmd(w) }},
 		{"newManifestCmd", func(w *bytes.Buffer) *cobra.Command { return newManifestCmd(w) }},
+		{"newTUICmd", func(w *bytes.Buffer) *cobra.Command { return newTUICmd(w) }},
 		// NOTE: legacy newServerCmd/newRolloutCmd/newTokenCmd builders have been removed.
 	}
 
@@ -275,5 +277,33 @@ func TestCompletionCommandFunctional(t *testing.T) {
 			// Since we're testing in-memory, just verify no error occurred.
 			// The actual completion script content is tested by cobra itself.
 		})
+	}
+}
+
+// TestTUICommandRegistered verifies that 'ploy tui' is registered in the root
+// cobra command and has the required Use and Short fields.
+func TestTUICommandRegistered(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	rootCmd := newRootCmd(stderr)
+
+	var tuiCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Name() == "tui" {
+			tuiCmd = cmd
+			break
+		}
+	}
+
+	if tuiCmd == nil {
+		t.Fatal("'tui' command not found in root command")
+	}
+	if strings.TrimSpace(tuiCmd.Use) == "" {
+		t.Error("tui command: Use field is empty")
+	}
+	if strings.TrimSpace(tuiCmd.Short) == "" {
+		t.Error("tui command: Short field is empty")
+	}
+	if tuiCmd.RunE == nil {
+		t.Error("tui command: RunE must be set")
 	}
 }
