@@ -5,10 +5,15 @@ Goal:
 - Produce a valid gate profile candidate artifact for downstream validation.
 
 Hard rules:
+- Use `grep` instead of `rg`.
+- Do not run equivalent grep/ripgrep variants after first definitive result.
+- If exact-match scan in declared edit targets returns 0, stop and return no-op result.
+- No `ls -R` or searching `.`; only declared target paths.
+- Max 5 tool calls unless a file is actually being edited.
 - Read `/in/build-gate.log` first.
 - Read `/in/gate_profile.json` when present and use it as gate-profile context.
 - Read `/in/gate_profile.schema.json` and treat it as the required output contract.
-- DO NOT modify `/workspace` (no create/edit/delete/rename).
+- **DO NOT** modify `/workspace` (no create/edit/delete/rename).
 - If `/workspace` was modified accidentally, revert all workspace changes before finishing.
 - Do not run build tools or tests inside this container; gate validation runs externally.
 - Write only `/out/gate-profile-candidate.json` for the candidate artifact.

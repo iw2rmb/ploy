@@ -1,7 +1,5 @@
 # 1 Build targets and stale markers
 
-Parent item: `roadmap.md` -> `1.1`.
-
 ## Edit targets
 - `gradle/libs.versions.toml`
 - `gradle.properties`

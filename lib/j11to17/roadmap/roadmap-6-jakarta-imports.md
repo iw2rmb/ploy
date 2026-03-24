@@ -1,7 +1,5 @@
 # 6 Jakarta migration gate and import rewrite
 
-Parent item: `roadmap.md` -> `1.6`.
-
 ## Edit targets
 - dependency baselines: `build.gradle`, `build.gradle.kts`, `settings.gradle*`, `gradle/libs.versions.toml`, `pom.xml`, `**/pom.xml`
 - source files: `src/main/java/**`, `src/test/java/**`, `src/main/kotlin/**`, `src/test/kotlin/**`

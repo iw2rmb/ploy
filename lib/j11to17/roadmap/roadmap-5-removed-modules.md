@@ -1,7 +1,5 @@
 # 5 Removed modules and engines
 
-Parent item: `roadmap.md` -> `1.5`.
-
 ## Edit targets
 - scripting/execution adapters in `src/main/**`
 - integration code under `src/main/**` using JAXB/JAX-WS/other Java EE APIs

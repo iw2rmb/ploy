@@ -28,11 +28,9 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     fi && \
     if [ -s /etc/ssl/certs/ploy-ca-bundle.pem ]; then \
       NPM_CONFIG_CAFILE=/etc/ssl/certs/ploy-ca-bundle.pem \
-      NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem \
-      npm install -g @openai/codex @charmland/crush; \
-    else \
-    npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router; \
+      NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem; \
     fi && \
+    npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
@@ -52,6 +50,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     CODEX_AUTH_JSON="" \
     CODEX_CONFIG_TOML="" \
     CRUSH_JSON="" \
+    CCR_CONFIG_JSON="" \
     PLOY_SERVER_URL="" \
     PLOY_API_TOKEN="" \
     PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.crt" \

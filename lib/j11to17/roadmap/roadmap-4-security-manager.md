@@ -1,7 +1,5 @@
 # 4 SecurityManager removal
 
-Parent item: `roadmap.md` -> `1.4`.
-
 ## Edit targets
 - app entry points: `src/main/**/Main*.java`, `src/main/**/Application*.java`, equivalent Kotlin entry points
 - security/sandbox packages under `src/main/**`

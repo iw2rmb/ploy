@@ -1,0 +1,49 @@
+{
+  "LOG": true,
+  "LOG_LEVEL": "debug",
+  "CLAUDE_PATH": "",
+  "HOST": "127.0.0.1",
+  "PORT": 3456,
+  "APIKEY": "",
+  "API_TIMEOUT_MS": "600000",
+  "PROXY_URL": "",
+  "transformers": [],
+  "Providers": [
+    {
+      "name": "qwen",
+      "api_base_url": "https://llm-proxy.t-tech.team/v1/chat/completions",
+      "api_key": "$LLM_PROXY_API_KEY",
+      "models": ["openrouter/qwen/qwen3.5-397b-a17b"],
+      "transformer": {
+        "use": [
+          [
+            "maxtoken",
+            {
+              "max_tokens": 200000
+            }
+          ]
+        ]
+      }
+    }
+  ],
+  "StatusLine": {
+    "enabled": false,
+    "currentStyle": "default",
+    "default": {
+      "modules": []
+    },
+    "powerline": {
+      "modules": []
+    }
+  },
+  "Router": {
+    "default": "qwen,openrouter/qwen/qwen3.5-397b-a17b",
+    "background": "qwen,openrouter/qwen/qwen3.5-397b-a17b",
+    "think": "qwen,openrouter/qwen/qwen3.5-397b-a17b",
+    "longContext": "qwen,openrouter/qwen/qwen3.5-397b-a17b",
+    "longContextThreshold": 60000,
+    "webSearch": "qwen,openrouter/qwen/qwen3.5-397b-a17b",
+    "image": "qwen,openrouter/qwen/qwen3.5-397b-a17b"
+  },
+  "CUSTOM_ROUTER_PATH": ""
+}

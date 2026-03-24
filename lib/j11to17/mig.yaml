@@ -22,14 +22,14 @@ steps:
       RECIPE_VERSION: "3.28.0" # "3.22.0"
       MAVEN_PLUGIN_VERSION: "6.30.0" # "6.18.0"
       GRADLE_PLUGIN_VERSION: "7.27.0" # "7.21.0"
-      ORW_REPOS: "https://artifactory.tcsbank.ru/artifactory/maven-all/,https://repo1.maven.org/maven2"
+      ORW_REPOS: "https://artifactory.tcsbank.ru/artifactory/maven-all/"
     env_from_file:
       CA_CERTS_PEM_BUNDLE: $PLOY_CA_CERTS
   - image: 127.0.0.1:5000/ploy/migs-codex:latest
     env:
       CODEX_API_KEY: $LLM_PROXY_API_KEY
     env_from_file:
-      CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/config.toml
+      CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/codex-config.toml
       CODEX_AUTH_JSON: ~/.codex/auth.json
     amata:
       spec: $PLOY_PATH/lib/j11to17/amata.yaml
@@ -43,8 +43,8 @@ steps:
         path: $PLOY_PATH/lib/j11to17/roadmap-item.schema.json
 
       # roadmap
-      - name: roadmap.md
-        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap.md
+      - name: roadmap.json
+        path: $PLOY_PATH/lib/j11to17/roadmap/roadmap.json
       - name: roadmap-1-build-targets.md
         path: $PLOY_PATH/lib/j11to17/roadmap/roadmap-1-build-targets.md
       - name: roadmap-2-jdk-internal-apis.md

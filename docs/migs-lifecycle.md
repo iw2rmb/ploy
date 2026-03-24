@@ -1364,7 +1364,7 @@ Mods container images are standard OCI images with the following expectations:
     time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
   - **Precedence**: Per-run env (spec or CLI flags) wins over global env—existing
     keys are never overwritten.
-  - **Common global vars**: `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `CRUSH_JSON`, `OPENAI_API_KEY`.
+  - **Common global vars**: `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`, `OPENAI_API_KEY`.
     See `docs/envs/README.md` § "Global Env Configuration" for full details.
 
 - **Execution**

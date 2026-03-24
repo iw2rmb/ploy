@@ -7,8 +7,7 @@ workspace:
   state_dir: "/out/amata"
 
 params:
-  roadmap_template_file: "/tmp/roadmap-template.md"
-  roadmap_file: "/tmp/roadmap.md"
+  roadmap_file: "/tmp/roadmap.json"
 
 defaults:
   cwd: $.workspace.root
@@ -23,38 +22,49 @@ defaults:
 flows:
   main:
     steps:
-      - call: implement_loop
+      - shell: ["cat", "{{ ctx.params.roadmap_file }}"]
+        response:
+          from: stdout
+          schema:
+            type: object
+            additionalProperties: false
+            required: ["steps"]
+            properties:
+              steps:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: ["title", "filepath", "reasoning"]
+                  properties:
+                    title:
+                      type: string
+                    filepath:
+                      type: string
+                    reasoning:
+                      type: string
+                      enum: ["low", "medium", "high"]
 
-      - assert:
-          expr: not ctx.prev.value.hasItem
-        message: implement_loop must terminate with hasItem=false
+      - type: for_each
+        items: $.prev.value.steps
+        as: step
+        steps:
+          - codex: |
+              High-level context: bring repository code and version-controlled configs to Java 17-ready state after OpenRewrite recipe bumping Java from 11 to 17.
 
-  implement_loop:
-    steps:
-      - codex: Respond with the next open (unchecked) item from the roadmap `{{ ctx.params.roadmap_file }}`.
-        reasoning: medium
-        response: /tmp/roadmap-item.schema.json
+              Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
 
-      - switch:
-          - when: ctx.prev.value.hasItem
-            steps:
-              - codex: |
-                  Roadmap file: `{{ ctx.params.roadmap_file }}`.
-                  Implement item: `{{ ctx.prev.value.itemTitle }}`.
-                  Validate implementation as specified in item's details using static checks/searches only.
-                  Do NOT run builds, tests, linters, IDE refactorings, or any compile/execution commands.
-                  Mark that item done.
-                reasoning: $.prev.value.reasoning
-                response: /tmp/implement_result.schema.json
+              Mandatory rules:
+              - Use `grep` instead of `rg`. Do not run equivalent grep/ripgrep variants.
+              - If exact-match scan in declared edit targets returns 0, stop and return no-op result.
+              - No `ls -R` or searching `.`; only declared target paths.
+              - Max 5 tool calls unless a file is actually being edited.
+              - Stick to the scope of the task strictly.
+              - Edit only source code, build descriptors, and version-controlled config/script files.
+              - Do not run builds, tests, linters, or IDE-assisted refactors.
+              - Do not edit CI images, Docker base images, OS packages, or local/remote JDK installations.
+              - Use `TODO(java17): ...` for unresolved decisions that need human follow-up.
+            reasoning: $.step.reasoning
+            response: /tmp/implement_result.schema.json
 
-              - command: ["sleep", "30"]
-
-              - call: implement_loop
-
-              - expr: $.prev.value
-
-          - default:
-            steps:
-              - expr: $.prev.value
-
-      - expr: $.prev.value
+          - command: ["sleep", "60"]

@@ -1,0 +1,35 @@
+diff --git a/build.gradle b/build.gradle
+index b863758..7cb8892 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -27,6 +27,7 @@ tasks.withType(JavaCompile).configureEach {
+ }
+ 
+ repositories {
++    mavenCentral()
+     maven {
+         description "Tinkoff Central Proxy"
+         url "https://artifactory.tcsbank.ru/artifactory/maven-all"
+diff --git a/gradle/wrapper/gradle-wrapper.properties b/gradle/wrapper/gradle-wrapper.properties
+index e94098b..3994438 100644
+--- a/gradle/wrapper/gradle-wrapper.properties
++++ b/gradle/wrapper/gradle-wrapper.properties
+@@ -1,5 +1,5 @@
+ distributionBase=GRADLE_USER_HOME
+ distributionPath=wrapper/dists
+-distributionUrl=https\://nexus.tcsbank.ru/repository/gradle-distributions/gradle-6.8.2-all.zip
++distributionUrl=https\://services.gradle.org/distributions/gradle-7.6.4-bin.zip
+ zipStoreBase=GRADLE_USER_HOME
+ zipStorePath=wrapper/dists
+diff --git a/settings.gradle b/settings.gradle
+index 3791832..d5b3053 100644
+--- a/settings.gradle
++++ b/settings.gradle
+@@ -1,5 +1,7 @@
+ pluginManagement {
+     repositories {
++        gradlePluginPortal()
++        mavenCentral()
+         maven {
+             url "https://nexus.tcsbank.ru/repository/gradle-plugins"
+         }

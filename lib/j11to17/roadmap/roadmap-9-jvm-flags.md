@@ -1,7 +1,5 @@
 # 9 JVM flags in scripts/config
 
-Parent item: `roadmap.md` -> `1.9`.
-
 ## Edit targets
 - launch scripts: `*.sh`, `*.bash`, `*.zsh`, `*.bat`, `*.cmd`
 - runtime config files: `*.properties`, `*.yaml`, `*.yml`, `*.env`

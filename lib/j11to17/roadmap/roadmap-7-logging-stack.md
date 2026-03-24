@@ -1,7 +1,5 @@
 # 7 Logging API modernization
 
-Parent item: `roadmap.md` -> `1.7`.
-
 ## Edit targets
 - application code: `src/main/java/**`, `src/test/java/**`, `src/main/kotlin/**`, `src/test/kotlin/**`
 - logging config references in repo: `log4j.properties`, `log4j.xml`, `log4j2.xml`, related bootstrap classes

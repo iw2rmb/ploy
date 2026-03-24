@@ -1,7 +1,5 @@
 # 10 Optional refactors and final sweep
 
-Parent item: `roadmap.md` -> `1.10`.
-
 ## Edit targets
 - main/test source trees: `src/main/java/**`, `src/test/java/**`, `src/main/kotlin/**`, `src/test/kotlin/**`
 

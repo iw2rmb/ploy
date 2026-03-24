@@ -1,7 +1,5 @@
 # 2 JDK-internal APIs
 
-Parent item: `roadmap.md` -> `1.2`.
-
 ## Edit targets
 - `src/main/java/**`, `src/test/java/**`
 - `src/main/kotlin/**`, `src/test/kotlin/**`

@@ -83,6 +83,51 @@ func TestMigCodexContainer(t *testing.T) {
 	}
 	mustRun(t, "docker", "build", "-t", testImageTag, mockDockerfileDir)
 
+	// Build a test image with mocked ccr + amata to validate startup activation.
+	const ccrTestImageTag = "migs-codex:test-amata-with-mock-ccr"
+	ccrMockDockerfile := `FROM migs-codex:test-amata
+RUN cat <<'EOF' > /usr/local/bin/ccr
+#!/bin/sh
+set -eu
+cmd="${1:-}"
+case "$cmd" in
+  start)
+    printf "start\n" >> /out/ccr-mock.log
+    exit 0
+    ;;
+  activate)
+    printf "activate\n" >> /out/ccr-mock.log
+    printf '%s\n' 'export CCR_ACTIVATED=1'
+    exit 0
+    ;;
+  *)
+    echo "unsupported ccr command: $*" >&2
+    exit 64
+    ;;
+esac
+EOF
+RUN cat <<'EOF' > /usr/local/bin/amata
+#!/bin/sh
+set -eu
+if [ "${CCR_ACTIVATED:-}" != "1" ]; then
+  echo "ccr activation missing" >&2
+  exit 21
+fi
+if [ ! -s "$HOME/.claude-code-router/config.json" ]; then
+  echo "ccr config missing" >&2
+  exit 22
+fi
+echo "amata mock ran"
+exit 0
+EOF
+RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
+`
+	ccrMockDockerfileDir := t.TempDir()
+	if err := os.WriteFile(ccrMockDockerfileDir+"/Dockerfile", []byte(ccrMockDockerfile), 0o644); err != nil {
+		t.Fatalf("write ccr mock Dockerfile: %v", err)
+	}
+	mustRun(t, "docker", "build", "-t", ccrTestImageTag, ccrMockDockerfileDir)
+
 	t.Run("amata_mode_routes_to_amata_and_writes_artifacts", func(t *testing.T) {
 		// Resolve symlinks so Docker Desktop on macOS gets the real path (e.g. /private/tmp vs /tmp).
 		outDir, err := realTempDir("mig-codex-test-out-*")
@@ -164,6 +209,43 @@ func TestMigCodexContainer(t *testing.T) {
 		}
 		if !strings.Contains(outBuf.String(), "prompt required") {
 			t.Errorf("expected 'prompt required' in output, got: %s", outBuf.String())
+		}
+	})
+
+	t.Run("ccr_config_env_triggers_startup_activation", func(t *testing.T) {
+		outDir, err := realTempDir("mig-codex-test-out3-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(outDir) })
+		inDir, err := realTempDir("mig-codex-test-in3-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(inDir) })
+
+		if err := os.WriteFile(inDir+"/amata.yaml", []byte("task: ccr\n"), 0o644); err != nil {
+			t.Fatalf("write amata.yaml: %v", err)
+		}
+
+		run := exec.Command("docker", "run", "--rm",
+			"-v", outDir+":/out",
+			"-v", inDir+":/in:ro",
+			"-e", `CCR_CONFIG_JSON={"router":"enabled"}`,
+			ccrTestImageTag,
+			"amata", "run", "/in/amata.yaml",
+		)
+		if out, err := run.CombinedOutput(); err != nil {
+			t.Fatalf("ccr startup container failed: %v\n%s", err, string(out))
+		}
+
+		ccrLog, err := os.ReadFile(outDir + "/ccr-mock.log")
+		if err != nil {
+			t.Fatalf("ccr-mock.log missing: %v", err)
+		}
+		ccrLines := strings.Split(strings.TrimSpace(string(ccrLog)), "\n")
+		if len(ccrLines) != 2 || ccrLines[0] != "start" || ccrLines[1] != "activate" {
+			t.Fatalf("unexpected ccr call log: %q", string(ccrLog))
 		}
 	})
 }
