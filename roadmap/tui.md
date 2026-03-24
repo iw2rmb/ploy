@@ -64,7 +64,7 @@ Documentation: `design/tui.md`; `docs/envs/README.md`; `docs/testing-workflow.md
     1. `go test ./internal/tui -run 'Test.*Migrations.*|Test.*S2.*'`
   - Reasoning: `medium`
 
-- [ ] 1.6 [determined] Implement State S3 Migration Details (`MIGRATION <...>`)
+- [x] 1.6 [determined] Implement State S3 Migration Details (`MIGRATION <...>`)
   - Repository: `ploy`
   - Component: `internal/tui/model_*.go`; `internal/tui/view_*.go`; `internal/tui/model_migration_details_test.go` (new)
   - Implementation:

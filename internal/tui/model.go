@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
@@ -143,6 +144,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.secondary = newList("RUNS", items)
 		return m, nil
 
+	case migDetailsLoadedMsg:
+		items := m.detail.Items()
+		if len(items) >= 2 {
+			items[0] = listItem{title: "repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
+			items[1] = listItem{title: "runs", description: fmt.Sprintf("total: %d", msg.runTotal)}
+			m.detail.SetItems(items)
+		}
+		return m, nil
+
 	case jobsLoadedMsg:
 		items := make([]list.Item, len(msg.jobs))
 		for i, job := range msg.jobs {
@@ -201,6 +211,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 				listItem{title: "runs", description: "total: —"},
 			})
 			m.screen = S3MigrationDetails
+			return m, loadMigDetailsCmd(m.client, m.baseURL, m.selectedMigID)
 		}
 	case S4RunsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
