@@ -1,6 +1,6 @@
 module github.com/iw2rmb/ploy
 
-go 1.25.8
+go 1.26.1
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3

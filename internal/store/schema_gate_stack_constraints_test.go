@@ -21,6 +21,7 @@ func TestSchema_GateProfilesUniqueByRepoShaStack(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	tx, err := db.Pool().Begin(ctx)
 	if err != nil {
@@ -84,6 +85,7 @@ func TestSchema_GateProfilesForeignKeys(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	tx, err := db.Pool().Begin(ctx)
 	if err != nil {
@@ -120,6 +122,7 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	tx, err := db.Pool().Begin(ctx)
 	if err != nil {
@@ -177,20 +180,21 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, job_type, job_image)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, jobID, runID, gatesJobRepoID, "main", 1, "pre_gate", "Created", "gate", "example.com/gate:latest"); err != nil {
+	`, jobID, runID, gatesJobRepoID, "main", 1, "pre_gate", "Created", "pre_gate", "example.com/gate:latest"); err != nil {
 		t.Fatalf("insert first job: %v", err)
 	}
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO jobs (id, run_id, repo_id, repo_base_ref, attempt, name, status, job_type, job_image)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, jobID2, runID, gatesJobRepoID, "main", 1, "post_gate", "Created", "gate", "example.com/gate:latest"); err != nil {
+	`, jobID2, runID, gatesJobRepoID, "main", 1, "post_gate", "Created", "post_gate", "example.com/gate:latest"); err != nil {
 		t.Fatalf("insert second job: %v", err)
 	}
 
+	profilesRepoID := domaintypes.NewMigRepoID().String()
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO repos (id, url)
 		VALUES ($1, $2)
-	`, repoID, "https://github.com/test/gates-profiles.git"); err != nil {
+	`, profilesRepoID, "https://github.com/test/gates-profiles.git"); err != nil {
 		t.Fatalf("insert repos row: %v", err)
 	}
 
@@ -220,6 +224,12 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 		t.Fatalf("insert gates row: %v", err)
 	}
 
+	// Use savepoints so expected errors don't abort the outer transaction.
+	var pgErr *pgconn.PgError
+
+	if _, spErr := tx.Exec(ctx, "SAVEPOINT sp_dup"); spErr != nil {
+		t.Fatalf("savepoint sp_dup: %v", spErr)
+	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO gates (job_id, profile_id)
 		VALUES ($1, $2)
@@ -227,7 +237,9 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected duplicate gates.job_id insert to fail")
 	}
-	var pgErr *pgconn.PgError
+	if _, spErr := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT sp_dup"); spErr != nil {
+		t.Fatalf("rollback to sp_dup: %v", spErr)
+	}
 	if !assertPgError(err, &pgErr) {
 		t.Fatalf("expected pgconn.PgError, got %T: %v", err, err)
 	}
@@ -235,12 +247,18 @@ func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
 		t.Fatalf("expected unique violation 23505, got %s: %s", pgErr.Code, pgErr.Message)
 	}
 
+	if _, spErr := tx.Exec(ctx, "SAVEPOINT sp_fk"); spErr != nil {
+		t.Fatalf("savepoint sp_fk: %v", spErr)
+	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO gates (job_id, profile_id)
 		VALUES ($1, $2)
 	`, jobID2, int64(999999))
 	if err == nil {
 		t.Fatal("expected gates insert with missing profile to fail")
+	}
+	if _, spErr := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT sp_fk"); spErr != nil {
+		t.Fatalf("rollback to sp_fk: %v", spErr)
 	}
 	if !assertPgError(err, &pgErr) {
 		t.Fatalf("expected pgconn.PgError, got %T: %v", err, err)

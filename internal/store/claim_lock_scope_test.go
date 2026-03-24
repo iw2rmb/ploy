@@ -25,6 +25,7 @@ func TestClaimJobLocksJobOnly(t *testing.T) {
 		t.Fatalf("NewStore() failed: %v", err)
 	}
 	defer db.Close()
+	cleanTestTables(t, ctx, db)
 
 	if db.Pool().Config().MaxConns < 2 {
 		t.Skipf("pgxpool max_conns=%d; need >=2 to exercise concurrent transactions", db.Pool().Config().MaxConns)
@@ -50,10 +51,11 @@ func TestClaimJobLocksJobOnly(t *testing.T) {
 		t.Fatalf("CreateJob() failed: %v", err)
 	}
 
+	lockID := types.NodeID(types.NewNodeKey())
 	node, err := db.CreateNode(ctx, CreateNodeParams{
-		ID:          types.NodeID(types.NewNodeKey()),
-		Name:        "test-node-lock",
-		IpAddress:   mustParseAddr(t, "192.168.100.1"),
+		ID:          lockID,
+		Name:        nodeNameForTest(lockID),
+		IpAddress:   nodeAddrForTest(lockID),
 		Concurrency: 1,
 	})
 	if err != nil {
