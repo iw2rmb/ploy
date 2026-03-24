@@ -848,7 +848,7 @@ main() {
     log "Skipping build step and reusing dist binaries (PLOY_SKIP_BUILD=${PLOY_SKIP_BUILD})..."
   else
     log "Building CLI/binaries (make build)..."
-    make build
+    GOTOOLCHAIN=go1.25.8 make build
   fi
 
   if [[ ! -f "dist/ploy" ]]; then
