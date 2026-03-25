@@ -16,15 +16,20 @@ func TestListJobsHandler_Success(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
+	nodeID := domaintypes.NodeID("abc123")
 
 	st := &mockStore{
 		listJobsForTUIResult: []store.ListJobsForTUIRow{
 			{
-				JobID:   jobID,
-				Name:    "mig-step",
-				MigName: "java17-upgrade",
-				RunID:   runID,
-				RepoID:  repoID,
+				JobID:      jobID,
+				Name:       "mig-step",
+				Status:     domaintypes.JobStatusRunning,
+				DurationMs: 1234,
+				JobImage:   "ghcr.io/iw2rmb/migs-java17:latest",
+				NodeID:     &nodeID,
+				MigName:    "java17-upgrade",
+				RunID:      runID,
+				RepoID:     repoID,
 			},
 		},
 		countJobsForTUIResult: 1,
@@ -70,6 +75,18 @@ func TestListJobsHandler_Success(t *testing.T) {
 	}
 	if got := job["repo_id"]; got != repoID.String() {
 		t.Fatalf("repo_id = %v, want %q", got, repoID.String())
+	}
+	if got := job["status"]; got != "Running" {
+		t.Fatalf("status = %v, want %q", got, "Running")
+	}
+	if got := job["duration_ms"]; got != float64(1234) {
+		t.Fatalf("duration_ms = %v, want %d", got, 1234)
+	}
+	if got := job["job_image"]; got != "ghcr.io/iw2rmb/migs-java17:latest" {
+		t.Fatalf("job_image = %v, want %q", got, "ghcr.io/iw2rmb/migs-java17:latest")
+	}
+	if got := job["node_id"]; got != "abc123" {
+		t.Fatalf("node_id = %v, want %q", got, "abc123")
 	}
 
 	if got, ok := resp["total"].(float64); !ok || got != 1 {

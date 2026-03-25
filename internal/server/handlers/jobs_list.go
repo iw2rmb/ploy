@@ -63,21 +63,29 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		type jobItem struct {
-			JobID   domaintypes.JobID  `json:"job_id"`
-			Name    string             `json:"name"`
-			MigName string             `json:"mig_name"`
-			RunID   domaintypes.RunID  `json:"run_id"`
-			RepoID  domaintypes.RepoID `json:"repo_id"`
+			JobID      domaintypes.JobID     `json:"job_id"`
+			Name       string                `json:"name"`
+			Status     domaintypes.JobStatus `json:"status"`
+			DurationMs int64                 `json:"duration_ms"`
+			JobImage   string                `json:"job_image"`
+			NodeID     *domaintypes.NodeID   `json:"node_id"`
+			MigName    string                `json:"mig_name"`
+			RunID      domaintypes.RunID     `json:"run_id"`
+			RepoID     domaintypes.RepoID    `json:"repo_id"`
 		}
 
 		items := make([]jobItem, 0, len(jobs))
 		for _, j := range jobs {
 			items = append(items, jobItem{
-				JobID:   j.JobID,
-				Name:    j.Name,
-				MigName: j.MigName,
-				RunID:   j.RunID,
-				RepoID:  j.RepoID,
+				JobID:      j.JobID,
+				Name:       j.Name,
+				Status:     j.Status,
+				DurationMs: j.DurationMs,
+				JobImage:   j.JobImage,
+				NodeID:     j.NodeID,
+				MigName:    j.MigName,
+				RunID:      j.RunID,
+				RepoID:     j.RepoID,
 			})
 		}
 

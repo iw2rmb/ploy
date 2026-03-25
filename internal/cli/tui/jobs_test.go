@@ -35,11 +35,15 @@ func TestListJobsCommand(t *testing.T) {
 				_ = json.NewEncoder(w).Encode(map[string]any{
 					"jobs": []map[string]any{
 						{
-							"job_id":   jobID.String(),
-							"name":     "mig-step",
-							"mig_name": "java17-upgrade",
-							"run_id":   runID.String(),
-							"repo_id":  repoID.String(),
+							"job_id":      jobID.String(),
+							"name":        "mig-step",
+							"status":      "Running",
+							"duration_ms": 1200,
+							"job_image":   "ghcr.io/iw2rmb/migs-java17:latest",
+							"node_id":     "abc123",
+							"mig_name":    "java17-upgrade",
+							"run_id":      runID.String(),
+							"repo_id":     repoID.String(),
 						},
 					},
 					"total": 1,
@@ -120,6 +124,21 @@ func TestListJobsCommand(t *testing.T) {
 				}
 				if result.Total != tc.wantTotal {
 					t.Fatalf("got total=%d, want %d", result.Total, tc.wantTotal)
+				}
+				if tc.wantLen == 1 {
+					job := result.Jobs[0]
+					if got, want := job.Status, domaintypes.JobStatusRunning; got != want {
+						t.Fatalf("job status=%q, want %q", got, want)
+					}
+					if got, want := job.DurationMs, int64(1200); got != want {
+						t.Fatalf("job duration=%d, want %d", got, want)
+					}
+					if got, want := job.JobImage, "ghcr.io/iw2rmb/migs-java17:latest"; got != want {
+						t.Fatalf("job image=%q, want %q", got, want)
+					}
+					if job.NodeID == nil || job.NodeID.String() != "abc123" {
+						t.Fatalf("job node_id=%v, want %q", job.NodeID, "abc123")
+					}
 				}
 			}
 		})
