@@ -31,14 +31,22 @@ flows:
         items: $.prev.value.steps
         as: step
         steps:
+          - expr:
+              title: "{{ ctx.step.title }}"
+              filepath: "{{ ctx.step.filepath }}"
+              reasoning: "{{ ctx.step.reasoning }}"
+              patterns_regex: '{{ "|".join(ctx.step["patterns"]) if "patterns" in ctx.step else "" }}'
+              targets_text: '{{ "\n".join(ctx.step["targets"]) if "targets" in ctx.step else "" }}'
+
           - type: switch
             cases:
               - when: '"patterns" in ctx.step and len(ctx.step["patterns"]) > 0'
                 steps:
                   - shell:
+                      - /bin/bash
                       - /tmp/roadmap-search.sh
-                      - '{{ "|".join(ctx.step["patterns"]) }}'
-                      - '{{ "\n".join(ctx.step.get("targets", [])) }}'
+                      - "{{ ctx.prev.value.patterns_regex }}"
+                      - "{{ ctx.prev.value.targets_text }}"
                     response:
                       from: stdout_lines
                       schema:
@@ -53,7 +61,7 @@ flows:
                           - codex: |
                               High-level context: bring repository code and version-controlled configs to Java 17-ready state after OpenRewrite recipe bumping Java from 11 to 17.
 
-                              Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
+                              Implement **only** task and **only as described** in this file: `{{ ctx.prev.prev.value.filepath }}`.
 
                               Search was already performed by workflow shell step.
                               Use the findings below as the source of truth and start edits from provided coordinates.
@@ -68,20 +76,20 @@ flows:
                               - Do not edit CI images, Docker base images, OS packages, or local/remote JDK installations.
                               - Use `TODO(java17): ...` for unresolved decisions that need human follow-up.
                               - If findings are present, do not run broad repository discovery before checking listed coordinates.
-                            reasoning: $.step.reasoning
+                            reasoning: $.prev.prev.value.reasoning
                             response: /tmp/implement_result.schema.json
 
                       - steps:
                           - expr:
                               status: "no_findings"
-                              title: "{{ ctx.step.title }}"
-                              filepath: "{{ ctx.step.filepath }}"
+                              title: "{{ ctx.prev.prev.value.title }}"
+                              filepath: "{{ ctx.prev.prev.value.filepath }}"
 
               - steps:
                   - codex: |
                       High-level context: bring repository code and version-controlled configs to Java 17-ready state after OpenRewrite recipe bumping Java from 11 to 17.
 
-                      Implement **only** task and **only as described** in this file: `{{ ctx.step.filepath }}`.
+                      Implement **only** task and **only as described** in this file: `{{ ctx.prev.value.filepath }}`.
 
                       Implementation rules (hard):
                       - Stick to the scope of the task strictly.
@@ -107,5 +115,5 @@ flows:
                       - Skip .git, build, target, out by default.
                       - Do not wrap commands with echo/printf unless debugging.
                       - Final notes must be at most 5 bullets and 600 chars total.
-                    reasoning: $.step.reasoning
+                    reasoning: $.prev.value.reasoning
                     response: /tmp/implement_result.schema.json
