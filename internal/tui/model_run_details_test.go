@@ -10,7 +10,7 @@ import (
 func makeS5Model(t *testing.T) model {
 	t.Helper()
 	m := InitialModel(nil, nil)
-	m.screen = S4RunsList
+	m.screen = ScreenRunsList
 	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
 		{ID: domaintypes.RunID("run-abc"), MigName: "my-mig", CreatedAt: time.Now()},
 	}})
@@ -23,8 +23,8 @@ func makeS5Model(t *testing.T) model {
 // TestS5ScreenSetOnEnterFromS4 verifies the screen transitions to S5 on Enter from S4.
 func TestS5ScreenSetOnEnterFromS4(t *testing.T) {
 	rm := makeS5Model(t)
-	if rm.screen != S5RunDetails {
-		t.Errorf("Enter(S4): got screen %v, want S5RunDetails", rm.screen)
+	if rm.screen != ScreenRunDetails {
+		t.Errorf("Enter(S4): got screen %v, want ScreenRunDetails", rm.screen)
 	}
 }
 
@@ -94,11 +94,11 @@ func TestS5RunDetailsLoadedUpdatesItems(t *testing.T) {
 // TestS5EscTransitionsToS4 verifies Esc from S5 returns to S4.
 func TestS5EscTransitionsToS4(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S5RunDetails
+	m.screen = ScreenRunDetails
 
 	next, _ := m.handleEsc()
 	nm := next.(model)
-	if nm.screen != S4RunsList {
-		t.Errorf("Esc(S5): got screen %v, want S4RunsList", nm.screen)
+	if nm.screen != ScreenRunsList {
+		t.Errorf("Esc(S5): got screen %v, want ScreenRunsList", nm.screen)
 	}
 }

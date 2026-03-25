@@ -84,23 +84,23 @@ func TestS6JobsOrderingDeterministic(t *testing.T) {
 // TestS6EscTransitionsToS1 verifies Esc from S6 returns to S1.
 func TestS6EscTransitionsToS1(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S6JobsList
+	m.screen = ScreenJobsList
 	next, _ := m.handleEsc()
 	nm := next.(model)
-	if nm.screen != S1Root {
-		t.Errorf("Esc(S6): got screen %v, want S1Root", nm.screen)
+	if nm.screen != ScreenRoot {
+		t.Errorf("Esc(S6): got screen %v, want ScreenRoot", nm.screen)
 	}
 }
 
 // TestS6ViewRendersSideBySide verifies that S6 view joins ploy and secondary lists.
 func TestS6ViewRendersSideBySide(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S6JobsList
+	m.screen = ScreenJobsList
 	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
 		{Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
-	nm.screen = S6JobsList
+	nm.screen = ScreenJobsList
 
 	rendered := nm.View().Content
 	if !strings.Contains(rendered, "PLOY") {

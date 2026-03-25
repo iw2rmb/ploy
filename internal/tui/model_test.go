@@ -8,8 +8,8 @@ import (
 func TestModelInit(t *testing.T) {
 	m := InitialModel(nil, nil)
 
-	if m.screen != S1Root {
-		t.Errorf("initial screen: got %v, want S1Root", m.screen)
+	if m.screen != ScreenRoot {
+		t.Errorf("initial screen: got %v, want ScreenRoot", m.screen)
 	}
 
 	// Init must return nil for the base shell (no async commands on start).
@@ -58,8 +58,8 @@ func TestModelPloyListItems(t *testing.T) {
 // TestModelEscFromS1Quits verifies that pressing Esc from S1 (root) quits.
 func TestModelEscFromS1Quits(t *testing.T) {
 	m := InitialModel(nil, nil)
-	if m.screen != S1Root {
-		t.Fatal("expected S1Root")
+	if m.screen != ScreenRoot {
+		t.Fatal("expected ScreenRoot")
 	}
 
 	_, cmd := m.handleEsc()
@@ -75,11 +75,11 @@ func TestModelEscTransitions(t *testing.T) {
 		from Screen
 		want Screen
 	}{
-		{"S2 -> S1", S2MigrationsList, S1Root},
-		{"S3 -> S2", S3MigrationDetails, S2MigrationsList},
-		{"S4 -> S1", S4RunsList, S1Root},
-		{"S5 -> S4", S5RunDetails, S4RunsList},
-		{"S6 -> S1", S6JobsList, S1Root},
+		{"S2 -> S1", ScreenMigrationsList, ScreenRoot},
+		{"S3 -> S2", ScreenMigrationDetails, ScreenMigrationsList},
+		{"S4 -> S1", ScreenRunsList, ScreenRoot},
+		{"S5 -> S4", ScreenRunDetails, ScreenRunsList},
+		{"S6 -> S1", ScreenJobsList, ScreenRoot},
 	}
 
 	for _, tt := range tests {
@@ -106,9 +106,9 @@ func TestModelEnterTransitionsFromRoot(t *testing.T) {
 		index int
 		want  Screen
 	}{
-		{"Migrations", 0, S2MigrationsList},
-		{"Runs", 1, S4RunsList},
-		{"Jobs", 2, S6JobsList},
+		{"Migrations", 0, ScreenMigrationsList},
+		{"Runs", 1, ScreenRunsList},
+		{"Jobs", 2, ScreenJobsList},
 	}
 
 	for _, tt := range tests {

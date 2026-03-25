@@ -10,7 +10,7 @@ import (
 // TestS3DetailListTitle verifies the detail list title is "MIGRATION <name>" after entering S3.
 func TestS3DetailListTitle(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID("mig-abc"), Name: "my-mig"},
 	}})
@@ -28,7 +28,7 @@ func TestS3DetailListTitle(t *testing.T) {
 // TestS3DetailListTitleFallbackToID verifies that when migration name is empty, the title falls back to "MIGRATION <id>".
 func TestS3DetailListTitleFallbackToID(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID("mig-xyz"), Name: ""},
 	}})
@@ -46,7 +46,7 @@ func TestS3DetailListTitleFallbackToID(t *testing.T) {
 // TestS3DetailItemsPlaceholder verifies that detail items use placeholder totals before data loads.
 func TestS3DetailItemsPlaceholder(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID("mig-abc"), Name: "my-mig"},
 	}})
@@ -75,7 +75,7 @@ func TestS3DetailItemsPlaceholder(t *testing.T) {
 // TestS3MigDetailsLoadedUpdatesItems verifies migDetailsLoadedMsg updates totals.
 func TestS3MigDetailsLoadedUpdatesItems(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID("mig-abc"), Name: "my-mig"},
 	}})
@@ -118,19 +118,19 @@ func TestS3MigDetailsLoadedUpdatesItems(t *testing.T) {
 // TestS3EscTransitionsToS2 verifies Esc from S3 returns to S2.
 func TestS3EscTransitionsToS2(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S3MigrationDetails
+	m.screen = ScreenMigrationDetails
 
 	next, _ := m.handleEsc()
 	nm := next.(model)
-	if nm.screen != S2MigrationsList {
-		t.Errorf("Esc(S3): got screen %v, want S2MigrationsList", nm.screen)
+	if nm.screen != ScreenMigrationsList {
+		t.Errorf("Esc(S3): got screen %v, want ScreenMigrationsList", nm.screen)
 	}
 }
 
 // TestS3ScreenSetOnEnterFromS2 verifies the screen transitions to S3 on Enter from S2.
 func TestS3ScreenSetOnEnterFromS2(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID("mig-abc"), Name: "my-mig"},
 	}})
@@ -139,7 +139,7 @@ func TestS3ScreenSetOnEnterFromS2(t *testing.T) {
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
-	if rm.screen != S3MigrationDetails {
-		t.Errorf("Enter(S2): got screen %v, want S3MigrationDetails", rm.screen)
+	if rm.screen != ScreenMigrationDetails {
+		t.Errorf("Enter(S2): got screen %v, want ScreenMigrationDetails", rm.screen)
 	}
 }

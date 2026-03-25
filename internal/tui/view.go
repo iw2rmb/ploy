@@ -1,27 +1,26 @@
 package tui
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // View satisfies tea.Model and renders the current screen.
 func (m model) View() tea.View {
 	var content string
 	switch m.screen {
-	case S1Root:
+	case ScreenRoot:
 		content = m.ploy.View()
-	case S2MigrationsList:
-		content = strings.Join([]string{m.ploy.View(), m.secondary.View()}, "  ")
-	case S3MigrationDetails:
+	case ScreenMigrationsList:
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
+	case ScreenMigrationDetails:
 		content = m.detail.View()
-	case S4RunsList:
-		content = strings.Join([]string{m.ploy.View(), m.secondary.View()}, "  ")
-	case S5RunDetails:
+	case ScreenRunsList:
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
+	case ScreenRunDetails:
 		content = m.detail.View()
-	case S6JobsList:
-		content = strings.Join([]string{m.ploy.View(), m.secondary.View()}, "  ")
+	case ScreenJobsList:
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
 	}
 	view := tea.NewView(content)
 	view.AltScreen = true

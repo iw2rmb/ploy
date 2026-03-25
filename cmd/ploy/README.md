@@ -326,12 +326,12 @@ ploy tui
 
 | Screen | Title | Description |
 |--------|-------|-------------|
-| S1 | `PLOY` | Root selector. Choose Migrations, Runs, or Jobs. |
-| S2 | `PLOY \| MIGRATIONS` | Migration list ordered newest-to-oldest. |
-| S3 | `MIGRATION <name>` | Migration detail: repository count and run count. |
-| S4 | `PLOY \| RUNS` | Run list ordered newest-to-oldest with `DD MM HH:mm` timestamp. |
-| S5 | `RUN` | Run detail: repository count and job count. |
-| S6 | `PLOY \| JOBS` | Jobs list showing job id, mig name, run id, and repo id. |
+| Root | `PLOY` | Root selector. Choose Migrations, Runs, or Jobs. |
+| Migrations list | `PLOY \| MIGRATIONS` | Two side-by-side columns (`PLOY` + `MIGRATIONS`) with list height matched to terminal height; migrations are ordered newest-to-oldest. |
+| Migration details | `MIGRATION <name>` | Migration detail: repository count and run count. |
+| Runs list | `PLOY \| RUNS` | Two side-by-side columns (`PLOY` + `RUNS`) with list height matched to terminal height; runs are ordered newest-to-oldest with `DD MM HH:mm` timestamp. |
+| Run details | `RUN` | Run detail: repository count and job count. |
+| Jobs list | `PLOY \| JOBS` | Two side-by-side columns (`PLOY` + `JOBS`) with list height matched to terminal height; each row shows job, mig name, run id, and repo id. |
 
 **Keys:**
 - `Enter` — drill into the selected item.
