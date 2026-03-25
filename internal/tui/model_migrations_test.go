@@ -115,6 +115,46 @@ func TestS2EnterSetsSelectedMigID(t *testing.T) {
 	}
 }
 
+func TestS2EnterDefinesMigrationInPloy(t *testing.T) {
+	m := InitialModel(nil, nil)
+	m.screen = ScreenMigrationsList
+	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
+	}})
+	nm := next.(model)
+	nm.secondary.Select(0)
+
+	result, _ := nm.handleEnter()
+	rm := result.(model)
+	items := rm.ploy.Items()
+	if len(items) != 3 {
+		t.Fatalf("ploy items: got %d, want 3", len(items))
+	}
+
+	item0, ok := items[0].(listItem)
+	if !ok {
+		t.Fatalf("item 0: unexpected type %T", items[0])
+	}
+	item1, ok := items[1].(listItem)
+	if !ok {
+		t.Fatalf("item 1: unexpected type %T", items[1])
+	}
+	item2, ok := items[2].(listItem)
+	if !ok {
+		t.Fatalf("item 2: unexpected type %T", items[2])
+	}
+
+	if item0.title != "Migration" {
+		t.Errorf("item 0 title: got %q, want %q", item0.title, "Migration")
+	}
+	if item1.title != "Runs" {
+		t.Errorf("item 1 title: got %q, want %q", item1.title, "Runs")
+	}
+	if item2.title != "Jobs" {
+		t.Errorf("item 2 title: got %q, want %q", item2.title, "Jobs")
+	}
+}
+
 // TestS2EscTransitionsToS1 verifies Esc from S2 returns to S1.
 func TestS2EscTransitionsToS1(t *testing.T) {
 	m := InitialModel(nil, nil)

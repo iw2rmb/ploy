@@ -14,11 +14,11 @@ func (m model) View() tea.View {
 	case ScreenMigrationsList:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
 	case ScreenMigrationDetails:
-		content = m.detail.View()
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.detail.View())
 	case ScreenRunsList:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
 	case ScreenRunDetails:
-		content = m.detail.View()
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.detail.View())
 	case ScreenJobsList:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
 	}

@@ -22,14 +22,17 @@ type Screen int
 const (
 	ScreenRoot             Screen = iota // PLOY root selector
 	ScreenMigrationsList                 // PLOY | MIGRATIONS
-	ScreenMigrationDetails               // MIGRATION <name>
+	ScreenMigrationDetails               // PLOY | MIGRATION <name>
 	ScreenRunsList                       // PLOY | RUNS
-	ScreenRunDetails                     // RUN
+	ScreenRunDetails                     // PLOY | RUN
 	ScreenJobsList                       // PLOY | JOBS
 )
 
 // listWidth is the fixed width applied to standard lists in the TUI.
 const listWidth = 24
+
+// runsListWidth is the fixed width for RUNS items in the right panel.
+const runsListWidth = 30
 
 // jobsListWidth is the fixed width for JOBS items in the right panel.
 const jobsListWidth = 48
@@ -60,7 +63,7 @@ type model struct {
 	secondary list.Model
 
 	// detail is the single-list rendered in S3 (migration details) and S5
-	// (run details).
+	// (run details) as the right panel.
 	detail list.Model
 
 	// selectedMigID tracks the migration chosen in S2 for drill-down to S3.
@@ -68,6 +71,14 @@ type model struct {
 
 	// selectedRunID tracks the run chosen in S4 for drill-down to S5.
 	selectedRunID domaintypes.RunID
+
+	// selectedJobID tracks the job chosen in S6.
+	selectedJobID domaintypes.JobID
+
+	// Selected entity flags control root PLOY item labels (plural vs singular).
+	hasSelectedMigration bool
+	hasSelectedRun       bool
+	hasSelectedJob       bool
 
 	// client and baseURL are used to fetch list data via internal/cli/tui commands.
 	client  *http.Client
@@ -98,13 +109,9 @@ func newJobsList(title string, items []list.Item) list.Model {
 	return newListWithWidth(title, items, jobsListWidth)
 }
 
-// setWindowHeight updates cached terminal height and applies it to all lists.
-func (m *model) setWindowHeight(height int) {
-	if height <= 0 {
-		return
-	}
-	m.windowHeight = height
-	m.applyWindowHeight()
+// newRunsList creates a runs list with a 30-column width.
+func newRunsList(title string, items []list.Item) list.Model {
+	return newListWithWidth(title, items, runsListWidth)
 }
 
 // applyWindowHeight reapplies the cached terminal height to all lists.
@@ -117,16 +124,58 @@ func (m *model) applyWindowHeight() {
 	m.detail.SetHeight(m.windowHeight)
 }
 
-// ployItems are the fixed root-level items for the PLOY list.
-var ployItems = []list.Item{
-	listItem{title: "Migrations", description: "select migration"},
-	listItem{title: "Runs", description: "select run"},
-	listItem{title: "Jobs", description: "select job"},
+// buildPloyItems constructs the left PLOY list with context-aware labels.
+func buildPloyItems(hasMigration, hasRun, hasJob bool) []list.Item {
+	migrationsTitle := "Migrations"
+	if hasMigration {
+		migrationsTitle = "Migration"
+	}
+	runsTitle := "Runs"
+	if hasRun {
+		runsTitle = "Run"
+	}
+	jobsTitle := "Jobs"
+	if hasJob {
+		jobsTitle = "Job"
+	}
+	return []list.Item{
+		listItem{title: migrationsTitle, description: "select migration"},
+		listItem{title: runsTitle, description: "select run"},
+		listItem{title: jobsTitle, description: "select job"},
+	}
+}
+
+// setPloySelectionState applies root item label state while preserving cursor.
+func (m *model) setPloySelectionState(hasMigration, hasRun, hasJob bool) {
+	m.hasSelectedMigration = hasMigration
+	m.hasSelectedRun = hasRun
+	m.hasSelectedJob = hasJob
+
+	selectedIdx := m.ploy.Index()
+	m.ploy.SetItems(buildPloyItems(hasMigration, hasRun, hasJob))
+	if selectedIdx < 0 {
+		selectedIdx = 0
+	}
+	if itemCount := len(m.ploy.Items()); itemCount > 0 {
+		if selectedIdx >= itemCount {
+			selectedIdx = itemCount - 1
+		}
+		m.ploy.Select(selectedIdx)
+	}
+}
+
+// setWindowHeight updates cached terminal height and applies it to all lists.
+func (m *model) setWindowHeight(height int) {
+	if height <= 0 {
+		return
+	}
+	m.windowHeight = height
+	m.applyWindowHeight()
 }
 
 // InitialModel constructs the starting model for the TUI session.
 func InitialModel(client *http.Client, baseURL *url.URL) model {
-	ploy := newList("PLOY", ployItems)
+	ploy := newList("PLOY", buildPloyItems(false, false, false))
 	ploy.SetFilteringEnabled(false)
 
 	return model{
@@ -191,7 +240,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				description: run.MigName + "  " + run.CreatedAt.Format("02 01 15:04"),
 			}
 		}
-		m.secondary = newList("RUNS", items)
+		m.secondary = newRunsList("RUNS", items)
 		m.applyWindowHeight()
 		return m, nil
 
@@ -257,7 +306,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			return m, loadMigsCmd(m.client, m.baseURL)
 		case 1: // Runs
 			m.screen = ScreenRunsList
-			m.secondary = newList("RUNS", nil)
+			m.secondary = newRunsList("RUNS", nil)
 			m.applyWindowHeight()
 			return m, loadRunsCmd(m.client, m.baseURL)
 		case 2: // Jobs
@@ -269,6 +318,9 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	case ScreenMigrationsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedMigID = domaintypes.MigID(item.description)
+			m.selectedRunID = ""
+			m.selectedJobID = ""
+			m.setPloySelectionState(true, false, false)
 			label := item.title
 			if label == "" {
 				label = item.description
@@ -285,6 +337,8 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	case ScreenRunsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedRunID = domaintypes.RunID(item.title)
+			m.selectedJobID = ""
+			m.setPloySelectionState(true, true, false)
 			m.detail = newList("RUN", []list.Item{
 				listItem{title: "Repositories", description: "total: —"},
 				listItem{title: "Jobs", description: "total: —"},
@@ -292,6 +346,11 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.applyWindowHeight()
 			m.screen = ScreenRunDetails
 			return m, loadRunDetailsCmd(m.client, m.baseURL, m.selectedRunID)
+		}
+	case ScreenJobsList:
+		if item, ok := m.secondary.SelectedItem().(listItem); ok {
+			m.selectedJobID = domaintypes.JobID(item.description)
+			m.setPloySelectionState(true, true, true)
 		}
 	}
 	return m, nil
@@ -316,11 +375,11 @@ func renderJobsPrimaryLine(job clitui.JobItem) string {
 }
 
 func renderJobsSecondaryLine(job clitui.JobItem) string {
-	image := strings.TrimSpace(job.JobImage)
-	if image == "" {
-		image = "-"
+	jobID := strings.TrimSpace(job.JobID.String())
+	if jobID == "" {
+		jobID = "-"
 	}
-	return truncateRunes(image, jobsListWidth)
+	return truncateRunes(jobID, jobsListWidth)
 }
 
 func jobsStatusGlyph(status domaintypes.JobStatus) string {

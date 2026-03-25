@@ -65,7 +65,7 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	if got := utf8.RuneCountInString(item.title); got != jobsListWidth {
 		t.Errorf("item title rune width: got %d, want %d", got, jobsListWidth)
 	}
-	if want := "ghcr.io/iw2rmb/ploy/migs-java17:latest"; item.description != want {
+	if want := "job-abc"; item.description != want {
 		t.Errorf("item description: got %q, want %q", item.description, want)
 	}
 }
@@ -113,7 +113,7 @@ func TestS6ViewRendersSideBySide(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenJobsList
 	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
-		{Name: "deploy", Status: domaintypes.JobStatusRunning, JobImage: "img", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
+		{Name: "deploy", Status: domaintypes.JobStatusRunning, JobID: domaintypes.JobID("job-1"), MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
 	nm.screen = ScreenJobsList
@@ -125,7 +125,47 @@ func TestS6ViewRendersSideBySide(t *testing.T) {
 	if !strings.Contains(rendered, "JOBS") {
 		t.Error("view: missing JOBS list")
 	}
-	if !strings.Contains(rendered, "img") {
+	if !strings.Contains(rendered, "job-1") {
 		t.Error("view: missing jobs secondary row format")
+	}
+}
+
+func TestS6EnterDefinesAllPloyItems(t *testing.T) {
+	m := InitialModel(nil, nil)
+	m.screen = ScreenJobsList
+	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
+	}})
+	nm := next.(model)
+	nm.secondary.Select(0)
+
+	result, _ := nm.handleEnter()
+	rm := result.(model)
+	items := rm.ploy.Items()
+	if len(items) != 3 {
+		t.Fatalf("ploy items: got %d, want 3", len(items))
+	}
+
+	item0, ok := items[0].(listItem)
+	if !ok {
+		t.Fatalf("item 0: unexpected type %T", items[0])
+	}
+	item1, ok := items[1].(listItem)
+	if !ok {
+		t.Fatalf("item 1: unexpected type %T", items[1])
+	}
+	item2, ok := items[2].(listItem)
+	if !ok {
+		t.Fatalf("item 2: unexpected type %T", items[2])
+	}
+
+	if item0.title != "Migration" {
+		t.Errorf("item 0 title: got %q, want %q", item0.title, "Migration")
+	}
+	if item1.title != "Run" {
+		t.Errorf("item 1 title: got %q, want %q", item1.title, "Run")
+	}
+	if item2.title != "Job" {
+		t.Errorf("item 2 title: got %q, want %q", item2.title, "Job")
 	}
 }
