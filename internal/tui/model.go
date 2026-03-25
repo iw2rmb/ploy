@@ -18,12 +18,12 @@ import (
 type Screen int
 
 const (
-	S1Root             Screen = iota // PLOY root selector
-	S2MigrationsList                 // PLOY | MIGRATIONS
-	S3MigrationDetails               // MIGRATION <name>
-	S4RunsList                       // PLOY | RUNS
-	S5RunDetails                     // RUN
-	S6JobsList                       // PLOY | JOBS
+	ScreenRoot             Screen = iota // PLOY root selector
+	ScreenMigrationsList                 // PLOY | MIGRATIONS
+	ScreenMigrationDetails               // MIGRATION <name>
+	ScreenRunsList                       // PLOY | RUNS
+	ScreenRunDetails                     // RUN
+	ScreenJobsList                       // PLOY | JOBS
 )
 
 // listWidth is the fixed width applied to every list in the TUI.
@@ -64,6 +64,9 @@ type model struct {
 	// client and baseURL are used to fetch list data via internal/cli/tui commands.
 	client  *http.Client
 	baseURL *url.URL
+
+	// windowHeight tracks the latest terminal height so every list can match it.
+	windowHeight int
 }
 
 // newList creates a list with the shared TUI invariants applied:
@@ -76,6 +79,25 @@ func newList(title string, items []list.Item) list.Model {
 	l.SetShowHelp(false)
 	l.DisableQuitKeybindings()
 	return l
+}
+
+// setWindowHeight updates cached terminal height and applies it to all lists.
+func (m *model) setWindowHeight(height int) {
+	if height <= 0 {
+		return
+	}
+	m.windowHeight = height
+	m.applyWindowHeight()
+}
+
+// applyWindowHeight reapplies the cached terminal height to all lists.
+func (m *model) applyWindowHeight() {
+	if m.windowHeight <= 0 {
+		return
+	}
+	m.ploy.SetHeight(m.windowHeight)
+	m.secondary.SetHeight(m.windowHeight)
+	m.detail.SetHeight(m.windowHeight)
 }
 
 // ployItems are the fixed root-level items for the PLOY list.
@@ -91,7 +113,7 @@ func InitialModel(client *http.Client, baseURL *url.URL) model {
 	ploy.SetFilteringEnabled(false)
 
 	return model{
-		screen:    S1Root,
+		screen:    ScreenRoot,
 		ploy:      ploy,
 		secondary: newList("", nil),
 		detail:    newList("", nil),
@@ -118,6 +140,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleEsc()
 		}
 
+	case tea.WindowSizeMsg:
+		m.setWindowHeight(msg.Height)
+		return m, nil
+
 	case migsLoadedMsg:
 		sorted := make([]clitui.MigItem, len(msg.migs))
 		copy(sorted, msg.migs)
@@ -132,6 +158,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.secondary = newList("MIGRATIONS", items)
+		m.applyWindowHeight()
 		return m, nil
 
 	case runsLoadedMsg:
@@ -148,6 +175,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.secondary = newList("RUNS", items)
+		m.applyWindowHeight()
 		return m, nil
 
 	case migDetailsLoadedMsg:
@@ -177,23 +205,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.secondary = newList("JOBS", items)
+		m.applyWindowHeight()
 		return m, nil
 	}
 
 	// Delegate key input to the active list.
 	var cmd tea.Cmd
 	switch m.screen {
-	case S1Root:
+	case ScreenRoot:
 		m.ploy, cmd = m.ploy.Update(msg)
-	case S2MigrationsList:
+	case ScreenMigrationsList:
 		m.secondary, cmd = m.secondary.Update(msg)
-	case S3MigrationDetails:
+	case ScreenMigrationDetails:
 		m.detail, cmd = m.detail.Update(msg)
-	case S4RunsList:
+	case ScreenRunsList:
 		m.secondary, cmd = m.secondary.Update(msg)
-	case S5RunDetails:
+	case ScreenRunDetails:
 		m.detail, cmd = m.detail.Update(msg)
-	case S6JobsList:
+	case ScreenJobsList:
 		m.secondary, cmd = m.secondary.Update(msg)
 	}
 	return m, cmd
@@ -202,22 +231,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleEnter implements Enter-key transitions per the state machine contract.
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.screen {
-	case S1Root:
+	case ScreenRoot:
 		switch m.ploy.Index() {
 		case 0: // Migrations
-			m.screen = S2MigrationsList
+			m.screen = ScreenMigrationsList
 			m.secondary = newList("MIGRATIONS", nil)
+			m.applyWindowHeight()
 			return m, loadMigsCmd(m.client, m.baseURL)
 		case 1: // Runs
-			m.screen = S4RunsList
+			m.screen = ScreenRunsList
 			m.secondary = newList("RUNS", nil)
+			m.applyWindowHeight()
 			return m, loadRunsCmd(m.client, m.baseURL)
 		case 2: // Jobs
-			m.screen = S6JobsList
+			m.screen = ScreenJobsList
 			m.secondary = newList("JOBS", nil)
+			m.applyWindowHeight()
 			return m, loadJobsCmd(m.client, m.baseURL, nil)
 		}
-	case S2MigrationsList:
+	case ScreenMigrationsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedMigID = domaintypes.MigID(item.description)
 			label := item.title
@@ -229,17 +261,19 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 				listItem{title: "repositories", description: "total: —"},
 				listItem{title: "runs", description: "total: —"},
 			})
-			m.screen = S3MigrationDetails
+			m.applyWindowHeight()
+			m.screen = ScreenMigrationDetails
 			return m, loadMigDetailsCmd(m.client, m.baseURL, m.selectedMigID)
 		}
-	case S4RunsList:
+	case ScreenRunsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedRunID = domaintypes.RunID(item.title)
 			m.detail = newList("RUN", []list.Item{
 				listItem{title: "Repositories", description: "total: —"},
 				listItem{title: "Jobs", description: "total: —"},
 			})
-			m.screen = S5RunDetails
+			m.applyWindowHeight()
+			m.screen = ScreenRunDetails
 			return m, loadRunDetailsCmd(m.client, m.baseURL, m.selectedRunID)
 		}
 	}
@@ -249,17 +283,17 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 // handleEsc implements Esc-key transitions per the state machine contract.
 func (m model) handleEsc() (tea.Model, tea.Cmd) {
 	switch m.screen {
-	case S2MigrationsList:
-		m.screen = S1Root
-	case S3MigrationDetails:
-		m.screen = S2MigrationsList
-	case S4RunsList:
-		m.screen = S1Root
-	case S5RunDetails:
-		m.screen = S4RunsList
-	case S6JobsList:
-		m.screen = S1Root
-	case S1Root:
+	case ScreenMigrationsList:
+		m.screen = ScreenRoot
+	case ScreenMigrationDetails:
+		m.screen = ScreenMigrationsList
+	case ScreenRunsList:
+		m.screen = ScreenRoot
+	case ScreenRunDetails:
+		m.screen = ScreenRunsList
+	case ScreenJobsList:
+		m.screen = ScreenRoot
+	case ScreenRoot:
 		return m, tea.Quit
 	}
 	return m, nil

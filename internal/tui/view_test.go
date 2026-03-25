@@ -1,18 +1,21 @@
 package tui
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestViewEnablesAltScreen(t *testing.T) {
 	tests := []struct {
 		name   string
 		screen Screen
 	}{
-		{name: "root", screen: S1Root},
-		{name: "migrations_list", screen: S2MigrationsList},
-		{name: "migration_details", screen: S3MigrationDetails},
-		{name: "runs_list", screen: S4RunsList},
-		{name: "run_details", screen: S5RunDetails},
-		{name: "jobs_list", screen: S6JobsList},
+		{name: "root", screen: ScreenRoot},
+		{name: "migrations_list", screen: ScreenMigrationsList},
+		{name: "migration_details", screen: ScreenMigrationDetails},
+		{name: "runs_list", screen: ScreenRunsList},
+		{name: "run_details", screen: ScreenRunDetails},
+		{name: "jobs_list", screen: ScreenJobsList},
 	}
 
 	for _, tt := range tests {
@@ -26,4 +29,48 @@ func TestViewEnablesAltScreen(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSplitScreensRenderColumns(t *testing.T) {
+	tests := []struct {
+		name       string
+		screen     Screen
+		rightTitle string
+	}{
+		{name: "migrations", screen: ScreenMigrationsList, rightTitle: "MIGRATIONS"},
+		{name: "runs", screen: ScreenRunsList, rightTitle: "RUNS"},
+		{name: "jobs", screen: ScreenJobsList, rightTitle: "JOBS"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := InitialModel(nil, nil)
+			m.screen = tt.screen
+			m.secondary = newList(tt.rightTitle, nil)
+
+			rendered := m.View().Content
+			ployLine := firstLineWith(rendered, "PLOY")
+			rightLine := firstLineWith(rendered, tt.rightTitle)
+
+			if ployLine < 0 {
+				t.Fatalf("rendered view missing PLOY title")
+			}
+			if rightLine < 0 {
+				t.Fatalf("rendered view missing %s title", tt.rightTitle)
+			}
+			if ployLine != rightLine {
+				t.Fatalf("column titles misaligned: PLOY line=%d %s line=%d", ployLine, tt.rightTitle, rightLine)
+			}
+		})
+	}
+}
+
+func firstLineWith(content string, needle string) int {
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, needle) {
+			return i
+		}
+	}
+	return -1
 }

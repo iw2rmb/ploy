@@ -53,8 +53,8 @@ func TestS1EnterSelectsMigrations(t *testing.T) {
 	m.ploy.Select(0)
 	next, _ := m.handleEnter()
 	nm := next.(model)
-	if nm.screen != S2MigrationsList {
-		t.Errorf("Enter(Migrations): got screen %v, want S2MigrationsList", nm.screen)
+	if nm.screen != ScreenMigrationsList {
+		t.Errorf("Enter(Migrations): got screen %v, want ScreenMigrationsList", nm.screen)
 	}
 }
 
@@ -64,8 +64,8 @@ func TestS1EnterSelectsRuns(t *testing.T) {
 	m.ploy.Select(1)
 	next, _ := m.handleEnter()
 	nm := next.(model)
-	if nm.screen != S4RunsList {
-		t.Errorf("Enter(Runs): got screen %v, want S4RunsList", nm.screen)
+	if nm.screen != ScreenRunsList {
+		t.Errorf("Enter(Runs): got screen %v, want ScreenRunsList", nm.screen)
 	}
 }
 
@@ -75,8 +75,8 @@ func TestS1EnterSelectsJobs(t *testing.T) {
 	m.ploy.Select(2)
 	next, _ := m.handleEnter()
 	nm := next.(model)
-	if nm.screen != S6JobsList {
-		t.Errorf("Enter(Jobs): got screen %v, want S6JobsList", nm.screen)
+	if nm.screen != ScreenJobsList {
+		t.Errorf("Enter(Jobs): got screen %v, want ScreenJobsList", nm.screen)
 	}
 }
 

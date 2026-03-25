@@ -83,7 +83,7 @@ func TestS2MigrationsOrderingEnforced(t *testing.T) {
 // TestS2EnterTransitionsToS3 verifies Enter on a selected migration transitions to S3.
 func TestS2EnterTransitionsToS3(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
 	}})
@@ -92,8 +92,8 @@ func TestS2EnterTransitionsToS3(t *testing.T) {
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
-	if rm.screen != S3MigrationDetails {
-		t.Errorf("Enter(S2): got screen %v, want S3MigrationDetails", rm.screen)
+	if rm.screen != ScreenMigrationDetails {
+		t.Errorf("Enter(S2): got screen %v, want ScreenMigrationDetails", rm.screen)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestS2EnterTransitionsToS3(t *testing.T) {
 func TestS2EnterSetsSelectedMigID(t *testing.T) {
 	const wantID = "mig-xyz"
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
 		{ID: domaintypes.MigID(wantID), Name: "my-migration"},
 	}})
@@ -118,10 +118,10 @@ func TestS2EnterSetsSelectedMigID(t *testing.T) {
 // TestS2EscTransitionsToS1 verifies Esc from S2 returns to S1.
 func TestS2EscTransitionsToS1(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S2MigrationsList
+	m.screen = ScreenMigrationsList
 	next, _ := m.handleEsc()
 	nm := next.(model)
-	if nm.screen != S1Root {
-		t.Errorf("Esc(S2): got screen %v, want S1Root", nm.screen)
+	if nm.screen != ScreenRoot {
+		t.Errorf("Esc(S2): got screen %v, want ScreenRoot", nm.screen)
 	}
 }

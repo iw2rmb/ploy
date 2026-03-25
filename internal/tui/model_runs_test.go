@@ -83,7 +83,7 @@ func TestS4RunsOrderingEnforced(t *testing.T) {
 // TestS4EnterTransitionsToS5 verifies Enter on a selected run transitions to S5.
 func TestS4EnterTransitionsToS5(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S4RunsList
+	m.screen = ScreenRunsList
 	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
 		{ID: domaintypes.RunID("run-xyz"), MigName: "mig", CreatedAt: time.Now()},
 	}})
@@ -92,8 +92,8 @@ func TestS4EnterTransitionsToS5(t *testing.T) {
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
-	if rm.screen != S5RunDetails {
-		t.Errorf("Enter(S4): got screen %v, want S5RunDetails", rm.screen)
+	if rm.screen != ScreenRunDetails {
+		t.Errorf("Enter(S4): got screen %v, want ScreenRunDetails", rm.screen)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestS4EnterTransitionsToS5(t *testing.T) {
 func TestS4EnterSetsSelectedRunID(t *testing.T) {
 	const wantID = "run-xyz"
 	m := InitialModel(nil, nil)
-	m.screen = S4RunsList
+	m.screen = ScreenRunsList
 	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
 		{ID: domaintypes.RunID(wantID), MigName: "mig", CreatedAt: time.Now()},
 	}})
@@ -118,10 +118,10 @@ func TestS4EnterSetsSelectedRunID(t *testing.T) {
 // TestS4EscTransitionsToS1 verifies Esc from S4 returns to S1.
 func TestS4EscTransitionsToS1(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.screen = S4RunsList
+	m.screen = ScreenRunsList
 	next, _ := m.handleEsc()
 	nm := next.(model)
-	if nm.screen != S1Root {
-		t.Errorf("Esc(S4): got screen %v, want S1Root", nm.screen)
+	if nm.screen != ScreenRoot {
+		t.Errorf("Esc(S4): got screen %v, want ScreenRoot", nm.screen)
 	}
 }
