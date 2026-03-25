@@ -15,7 +15,7 @@ import (
 func printTUIUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy tui")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Launch the interactive terminal UI.")
+	_, _ = fmt.Fprintln(w, "Launch the interactive terminal UI in alternate screen mode.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Screens:")
 	_, _ = fmt.Fprintln(w, "  PLOY              Root selector: Migrations | Runs | Jobs")

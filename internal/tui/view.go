@@ -23,5 +23,7 @@ func (m model) View() tea.View {
 	case S6JobsList:
 		content = strings.Join([]string{m.ploy.View(), m.secondary.View()}, "  ")
 	}
-	return tea.NewView(content)
+	view := tea.NewView(content)
+	view.AltScreen = true
+	return view
 }

@@ -316,7 +316,7 @@ It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 10 MiB bundle 
 ## Interactive TUI (`ploy tui`)
 
 `ploy tui` launches a full-screen terminal UI for browsing migrations, runs, and jobs
-without chaining multiple CLI commands.
+without chaining multiple CLI commands. It opens in alternate screen mode.
 
 ```bash
 ploy tui
