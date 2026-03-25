@@ -58,10 +58,14 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	if !strings.HasSuffix(strings.TrimSpace(item.title), "2.5s") {
 		t.Errorf("item title: expected duration suffix %q, got %q", "2.5s", item.title)
 	}
+	durationCell := string([]rune(item.title)[jobsListWidth-jobsDurationWidth : jobsListWidth])
+	if want := "      2.5s"; durationCell != want {
+		t.Errorf("item duration cell: got %q, want %q", durationCell, want)
+	}
 	if got := utf8.RuneCountInString(item.title); got != jobsListWidth {
 		t.Errorf("item title rune width: got %d, want %d", got, jobsListWidth)
 	}
-	if want := "ghcr.io/iw2rmb/ploy/migs-java17:latest @ abc123"; item.description != want {
+	if want := "ghcr.io/iw2rmb/ploy/migs-java17:latest"; item.description != want {
 		t.Errorf("item description: got %q, want %q", item.description, want)
 	}
 }
@@ -121,7 +125,7 @@ func TestS6ViewRendersSideBySide(t *testing.T) {
 	if !strings.Contains(rendered, "JOBS") {
 		t.Error("view: missing JOBS list")
 	}
-	if !strings.Contains(rendered, "img @ -") {
+	if !strings.Contains(rendered, "img") {
 		t.Error("view: missing jobs secondary row format")
 	}
 }

@@ -34,6 +34,9 @@ const listWidth = 24
 // jobsListWidth is the fixed width for JOBS items in the right panel.
 const jobsListWidth = 48
 
+// jobsDurationWidth is the fixed width of the right-aligned duration segment.
+const jobsDurationWidth = 10
+
 // listItem is the default item type used in all TUI lists.
 type listItem struct {
 	title       string
@@ -301,8 +304,9 @@ func renderJobsPrimaryLine(job clitui.JobItem) string {
 		name = "-"
 	}
 	duration := formatDurationCompact(job.DurationMs)
+	duration = leftPadRunes(truncateRunes(duration, jobsDurationWidth), jobsDurationWidth)
 	prefix := glyph + " "
-	availableNameWidth := jobsListWidth - utf8.RuneCountInString(prefix) - 1 - utf8.RuneCountInString(duration)
+	availableNameWidth := jobsListWidth - utf8.RuneCountInString(prefix) - 1 - jobsDurationWidth
 	if availableNameWidth < 1 {
 		availableNameWidth = 1
 	}
@@ -316,16 +320,7 @@ func renderJobsSecondaryLine(job clitui.JobItem) string {
 	if image == "" {
 		image = "-"
 	}
-	node := "-"
-	if job.NodeID != nil && !job.NodeID.IsZero() {
-		node = job.NodeID.String()
-	}
-	suffix := " @ " + node
-	maxImageWidth := jobsListWidth - utf8.RuneCountInString(suffix)
-	if maxImageWidth < 1 {
-		return truncateRunes(suffix, jobsListWidth)
-	}
-	return truncateRunes(image, maxImageWidth) + suffix
+	return truncateRunes(image, jobsListWidth)
 }
 
 func jobsStatusGlyph(status domaintypes.JobStatus) string {
@@ -358,6 +353,17 @@ func truncateRunes(s string, max int) string {
 	}
 	r := []rune(s)
 	return string(r[:max])
+}
+
+func leftPadRunes(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	runes := utf8.RuneCountInString(s)
+	if runes >= width {
+		return s
+	}
+	return strings.Repeat(" ", width-runes) + s
 }
 
 // handleEsc implements Esc-key transitions per the state machine contract.
