@@ -456,6 +456,10 @@ GROUP BY status;
 SELECT
   jobs.id AS job_id,
   jobs.name,
+  jobs.status,
+  jobs.duration_ms,
+  jobs.job_image,
+  jobs.node_id,
   migs.name AS mig_name,
   jobs.run_id,
   jobs.repo_id

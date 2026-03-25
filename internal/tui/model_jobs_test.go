@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -18,19 +19,26 @@ func TestS6JobsListTitle(t *testing.T) {
 	if nm.secondary.Title != "JOBS" {
 		t.Errorf("secondary list title: got %q, want %q", nm.secondary.Title, "JOBS")
 	}
+	if nm.secondary.Width() != jobsListWidth {
+		t.Errorf("secondary list width: got %d, want %d", nm.secondary.Width(), jobsListWidth)
+	}
 }
 
-// TestS6JobsItemsPopulated verifies job rows use job name as title and include
-// mig name, run id, and repo id in the description.
+// TestS6JobsItemsPopulated verifies the two-line job row contract.
 func TestS6JobsItemsPopulated(t *testing.T) {
 	m := InitialModel(nil, nil)
+	nodeID := domaintypes.NodeID("abc123")
 	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
 		{
-			JobID:   domaintypes.JobID("job-abc"),
-			Name:    "deploy",
-			MigName: "my-mig",
-			RunID:   domaintypes.RunID("run-xyz"),
-			RepoID:  domaintypes.RepoID("repo-123"),
+			JobID:      domaintypes.JobID("job-abc"),
+			Name:       "deploy",
+			Status:     domaintypes.JobStatusSuccess,
+			DurationMs: 2500,
+			JobImage:   "ghcr.io/iw2rmb/ploy/migs-java17:latest",
+			NodeID:     &nodeID,
+			MigName:    "my-mig",
+			RunID:      domaintypes.RunID("run-xyz"),
+			RepoID:     domaintypes.RepoID("repo-123"),
 		},
 	}})
 	nm := next.(model)
@@ -44,13 +52,17 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	if !ok {
 		t.Fatalf("item 0: unexpected type %T", items[0])
 	}
-	if item.title != "deploy" {
-		t.Errorf("item title: got %q, want %q", item.title, "deploy")
+	if !strings.Contains(item.title, "✓ deploy") {
+		t.Errorf("item title: expected status glyph and name, got %q", item.title)
 	}
-	for _, want := range []string{"my-mig", "run-xyz", "repo-123"} {
-		if !strings.Contains(item.description, want) {
-			t.Errorf("item description %q: missing %q", item.description, want)
-		}
+	if !strings.HasSuffix(strings.TrimSpace(item.title), "2.5s") {
+		t.Errorf("item title: expected duration suffix %q, got %q", "2.5s", item.title)
+	}
+	if got := utf8.RuneCountInString(item.title); got != jobsListWidth {
+		t.Errorf("item title rune width: got %d, want %d", got, jobsListWidth)
+	}
+	if want := "ghcr.io/iw2rmb/ploy/migs-java17:latest @ abc123"; item.description != want {
+		t.Errorf("item description: got %q, want %q", item.description, want)
 	}
 }
 
@@ -75,8 +87,8 @@ func TestS6JobsOrderingDeterministic(t *testing.T) {
 		if !ok {
 			t.Fatalf("item %d: unexpected type %T", i, items[i])
 		}
-		if item.title != want {
-			t.Errorf("ordering: item %d title: got %q, want %q", i, item.title, want)
+		if !strings.Contains(item.title, want) {
+			t.Errorf("ordering: item %d title %q missing job name %q", i, item.title, want)
 		}
 	}
 }
@@ -97,7 +109,7 @@ func TestS6ViewRendersSideBySide(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenJobsList
 	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
-		{Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
+		{Name: "deploy", Status: domaintypes.JobStatusRunning, JobImage: "img", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
 	nm.screen = ScreenJobsList
@@ -108,5 +120,8 @@ func TestS6ViewRendersSideBySide(t *testing.T) {
 	}
 	if !strings.Contains(rendered, "JOBS") {
 		t.Error("view: missing JOBS list")
+	}
+	if !strings.Contains(rendered, "img @ -") {
+		t.Error("view: missing jobs secondary row format")
 	}
 }

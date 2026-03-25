@@ -12,11 +12,15 @@ import (
 
 // JobItem represents a single job entry from the list API.
 type JobItem struct {
-	JobID   domaintypes.JobID  `json:"job_id"`
-	Name    string             `json:"name"`
-	MigName string             `json:"mig_name"`
-	RunID   domaintypes.RunID  `json:"run_id"`
-	RepoID  domaintypes.RepoID `json:"repo_id"`
+	JobID      domaintypes.JobID     `json:"job_id"`
+	Name       string                `json:"name"`
+	Status     domaintypes.JobStatus `json:"status"`
+	DurationMs int64                 `json:"duration_ms"`
+	JobImage   string                `json:"job_image"`
+	NodeID     *domaintypes.NodeID   `json:"node_id"`
+	MigName    string                `json:"mig_name"`
+	RunID      domaintypes.RunID     `json:"run_id"`
+	RepoID     domaintypes.RepoID    `json:"repo_id"`
 }
 
 // ListJobsResult is the response from GET /v1/jobs.

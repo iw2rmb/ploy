@@ -3,7 +3,8 @@ get:
   summary: List jobs (TUI)
   description: |
     Return a paginated list of jobs with migration context for the TUI jobs-list screen.
-    Each entry includes `job_id`, `name`, `mig_name`, `run_id`, and `repo_id`.
+    Each entry includes `job_id`, `name`, `status`, `duration_ms`, `job_image`,
+    `node_id`, `mig_name`, `run_id`, and `repo_id`.
 
     Results are ordered newest-to-oldest by job ID (KSUID).
     An optional `run_id` filter scopes results to a single run (used for run-detail job totals).
@@ -51,6 +52,20 @@ get:
                     name:
                       type: string
                       description: Job name
+                    status:
+                      type: string
+                      description: Job lifecycle status (`Created|Queued|Running|Success|Fail|Cancelled`).
+                    duration_ms:
+                      type: integer
+                      format: int64
+                      description: Job duration in milliseconds (0 for non-terminal jobs without measured duration).
+                    job_image:
+                      type: string
+                      description: Runtime container image for the job (empty when unavailable).
+                    node_id:
+                      type: string
+                      nullable: true
+                      description: Assigned worker node ID (null when unassigned).
                     mig_name:
                       type: string
                       description: Migration name associated with this job
@@ -60,7 +75,7 @@ get:
                     repo_id:
                       type: string
                       description: Repo ID (NanoID 8-character string)
-                  required: [job_id, name, mig_name, run_id, repo_id]
+                  required: [job_id, name, status, duration_ms, job_image, mig_name, run_id, repo_id]
               total:
                 type: integer
                 format: int64

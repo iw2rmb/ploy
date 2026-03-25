@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
@@ -26,8 +28,11 @@ const (
 	ScreenJobsList                       // PLOY | JOBS
 )
 
-// listWidth is the fixed width applied to every list in the TUI.
+// listWidth is the fixed width applied to standard lists in the TUI.
 const listWidth = 24
+
+// jobsListWidth is the fixed width for JOBS items in the right panel.
+const jobsListWidth = 48
 
 // listItem is the default item type used in all TUI lists.
 type listItem struct {
@@ -69,16 +74,25 @@ type model struct {
 	windowHeight int
 }
 
-// newList creates a list with the shared TUI invariants applied:
-// - width 24
+// newListWithWidth creates a list with the shared TUI invariants applied:
 // - help disabled
 // - quit keybindings disabled
-func newList(title string, items []list.Item) list.Model {
-	l := list.New(items, list.NewDefaultDelegate(), listWidth, 0)
+func newListWithWidth(title string, items []list.Item, width int) list.Model {
+	l := list.New(items, list.NewDefaultDelegate(), width, 0)
 	l.Title = title
 	l.SetShowHelp(false)
 	l.DisableQuitKeybindings()
 	return l
+}
+
+// newList creates a standard-width list (24 columns).
+func newList(title string, items []list.Item) list.Model {
+	return newListWithWidth(title, items, listWidth)
+}
+
+// newJobsList creates a jobs list with a 48-column width.
+func newJobsList(title string, items []list.Item) list.Model {
+	return newListWithWidth(title, items, jobsListWidth)
 }
 
 // setWindowHeight updates cached terminal height and applies it to all lists.
@@ -200,11 +214,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		items := make([]list.Item, len(msg.jobs))
 		for i, job := range msg.jobs {
 			items[i] = listItem{
-				title:       job.Name,
-				description: job.MigName + "  " + job.RunID.String() + "  " + job.RepoID.String(),
+				title:       renderJobsPrimaryLine(job),
+				description: renderJobsSecondaryLine(job),
 			}
 		}
-		m.secondary = newList("JOBS", items)
+		m.secondary = newJobsList("JOBS", items)
 		m.applyWindowHeight()
 		return m, nil
 	}
@@ -245,7 +259,7 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			return m, loadRunsCmd(m.client, m.baseURL)
 		case 2: // Jobs
 			m.screen = ScreenJobsList
-			m.secondary = newList("JOBS", nil)
+			m.secondary = newJobsList("JOBS", nil)
 			m.applyWindowHeight()
 			return m, loadJobsCmd(m.client, m.baseURL, nil)
 		}
@@ -278,6 +292,72 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func renderJobsPrimaryLine(job clitui.JobItem) string {
+	glyph := jobsStatusGlyph(job.Status)
+	name := strings.TrimSpace(job.Name)
+	if name == "" {
+		name = "-"
+	}
+	duration := formatDurationCompact(job.DurationMs)
+	prefix := glyph + " "
+	availableNameWidth := jobsListWidth - utf8.RuneCountInString(prefix) - 1 - utf8.RuneCountInString(duration)
+	if availableNameWidth < 1 {
+		availableNameWidth = 1
+	}
+	name = truncateRunes(name, availableNameWidth)
+	name = name + strings.Repeat(" ", availableNameWidth-utf8.RuneCountInString(name))
+	return prefix + name + " " + duration
+}
+
+func renderJobsSecondaryLine(job clitui.JobItem) string {
+	image := strings.TrimSpace(job.JobImage)
+	if image == "" {
+		image = "-"
+	}
+	node := "-"
+	if job.NodeID != nil && !job.NodeID.IsZero() {
+		node = job.NodeID.String()
+	}
+	suffix := " @ " + node
+	maxImageWidth := jobsListWidth - utf8.RuneCountInString(suffix)
+	if maxImageWidth < 1 {
+		return truncateRunes(suffix, jobsListWidth)
+	}
+	return truncateRunes(image, maxImageWidth) + suffix
+}
+
+func jobsStatusGlyph(status domaintypes.JobStatus) string {
+	switch strings.ToLower(strings.TrimSpace(status.String())) {
+	case "success", "succeeded", "finished", "completed":
+		return "✓"
+	case "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
+		return "X"
+	default:
+		return "⣾"
+	}
+}
+
+func formatDurationCompact(durationMs int64) string {
+	if durationMs <= 0 {
+		return "-"
+	}
+	if durationMs < 1000 {
+		return fmt.Sprintf("%dms", durationMs)
+	}
+	return fmt.Sprintf("%.1fs", float64(durationMs)/1000.0)
+}
+
+func truncateRunes(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(s) <= max {
+		return s
+	}
+	r := []rune(s)
+	return string(r[:max])
 }
 
 // handleEsc implements Esc-key transitions per the state machine contract.
