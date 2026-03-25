@@ -149,3 +149,14 @@ func TestNewJobsListInvariants(t *testing.T) {
 		t.Errorf("jobs list title: got %q, want %q", l.Title, "JOBS")
 	}
 }
+
+func TestNewRunsListInvariants(t *testing.T) {
+	l := newRunsList("RUNS", nil)
+
+	if l.Width() != runsListWidth {
+		t.Errorf("runs list width: got %d, want %d", l.Width(), runsListWidth)
+	}
+	if l.Title != "RUNS" {
+		t.Errorf("runs list title: got %q, want %q", l.Title, "RUNS")
+	}
+}

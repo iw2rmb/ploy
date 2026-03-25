@@ -36,9 +36,12 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 		name       string
 		screen     Screen
 		rightTitle string
+		detailPane bool
 	}{
 		{name: "migrations", screen: ScreenMigrationsList, rightTitle: "MIGRATIONS"},
+		{name: "migration_details", screen: ScreenMigrationDetails, rightTitle: "MIGRATION selected", detailPane: true},
 		{name: "runs", screen: ScreenRunsList, rightTitle: "RUNS"},
+		{name: "run_details", screen: ScreenRunDetails, rightTitle: "RUN", detailPane: true},
 		{name: "jobs", screen: ScreenJobsList, rightTitle: "JOBS"},
 	}
 
@@ -46,7 +49,11 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := InitialModel(nil, nil)
 			m.screen = tt.screen
-			m.secondary = newList(tt.rightTitle, nil)
+			if tt.detailPane {
+				m.detail = newList(tt.rightTitle, nil)
+			} else {
+				m.secondary = newList(tt.rightTitle, nil)
+			}
 
 			rendered := m.View().Content
 			ployLine := firstLineWith(rendered, "PLOY")
