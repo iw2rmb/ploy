@@ -125,9 +125,11 @@ type HealingActionSpec struct {
 	// validation/promotion boundaries.
 	Expectations *RecoveryExpectationsSpec `json:"expectations,omitempty" yaml:"expectations,omitempty"`
 
-	// TmpDir lists files to materialize under /tmp in the healing container (read-write mount).
-	// Each entry must have a unique non-empty name and non-empty content.
-	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
+	// TmpBundle references a pre-uploaded bundle to extract under /tmp in the healing container.
+	TmpBundle *TmpBundleRef `json:"tmp_bundle,omitempty" yaml:"tmp_bundle,omitempty"`
+
+	// LegacyTmpDir captures any legacy tmp_dir JSON payload for explicit rejection.
+	LegacyTmpDir json.RawMessage `json:"tmp_dir,omitempty" yaml:"-"`
 
 	// Amata configures amata-mode execution for this healing action container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
@@ -160,9 +162,11 @@ type RouterSpec struct {
 	// Env holds environment variables to inject into the router container.
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
 
-	// TmpDir lists files to materialize under /tmp in the router container (read-write mount).
-	// Each entry must have a unique non-empty name and non-empty content.
-	TmpDir []TmpFilePayload `json:"tmp_dir,omitempty" yaml:"tmp_dir,omitempty"`
+	// TmpBundle references a pre-uploaded bundle to extract under /tmp in the router container.
+	TmpBundle *TmpBundleRef `json:"tmp_bundle,omitempty" yaml:"tmp_bundle,omitempty"`
+
+	// LegacyTmpDir captures any legacy tmp_dir JSON payload for explicit rejection.
+	LegacyTmpDir json.RawMessage `json:"tmp_dir,omitempty" yaml:"-"`
 
 	// Amata configures amata-mode execution for this router container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional

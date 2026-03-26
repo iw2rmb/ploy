@@ -7,108 +7,85 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestModsSpecValidate_TmpDirStep(t *testing.T) {
+func TestModsSpecValidate_TmpBundleStep(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
 		wantErr string
 	}{
 		{
-			name: "valid single tmp file",
+			name: "valid bundle reference",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["config.json"]}}]
+			}`,
+		},
+		{
+			name: "valid bundle multiple entries",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["a.txt", "b.txt"]}}]
+			}`,
+		},
+		{
+			name: "legacy tmp_dir rejected",
 			input: `{
 				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "config.json", "content": "e2Zve30="}]}]
 			}`,
+			wantErr: "steps[0].tmp_dir: not supported; use tmp_bundle",
 		},
 		{
-			name: "valid multiple tmp files",
+			name: "bundle_id missing",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [
-					{"name": "a.txt", "content": "aGVsbG8="},
-					{"name": "b.txt", "content": "d29ybGQ="}
-				]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"cid": "cid1", "digest": "sha256:abc", "entries": ["f.txt"]}}]
 			}`,
+			wantErr: "steps[0].tmp_bundle.bundle_id: required",
 		},
 		{
-			name: "empty name rejected",
+			name: "cid missing",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "", "content": "aGVsbG8="}]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "digest": "sha256:abc", "entries": ["f.txt"]}}]
 			}`,
-			wantErr: "steps[0].tmp_dir[0].name: required",
+			wantErr: "steps[0].tmp_bundle.cid: required",
 		},
 		{
-			name: "empty content rejected",
+			name: "digest missing",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "file.txt", "content": ""}]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "entries": ["f.txt"]}}]
 			}`,
-			wantErr: "steps[0].tmp_dir[0].content: required",
+			wantErr: "steps[0].tmp_bundle.digest: required",
 		},
 		{
-			name: "duplicate names rejected",
+			name: "entries empty",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [
-					{"name": "config.json", "content": "aGVsbG8="},
-					{"name": "config.json", "content": "d29ybGQ="}
-				]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": []}}]
 			}`,
-			wantErr: `steps[0].tmp_dir[1].name: duplicate "config.json"`,
+			wantErr: "steps[0].tmp_bundle.entries: required",
 		},
 		{
-			name: "duplicate canonical names with whitespace rejected",
+			name: "entry path separator rejected",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [
-					{"name": " config.json ", "content": "aGVsbG8="},
-					{"name": "config.json", "content": "d29ybGQ="}
-				]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["sub/file.txt"]}}]
 			}`,
-			wantErr: `steps[0].tmp_dir[1].name: duplicate "config.json"`,
+			wantErr: "steps[0].tmp_bundle.entries[0]: must be a plain filename with no path separators",
 		},
 		{
-			name: "path traversal rejected",
+			name: "entry dotdot rejected",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "../x", "content": "aGVsbG8="}]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": [".."]}}]
 			}`,
-			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+			wantErr: "steps[0].tmp_bundle.entries[0]: must be a plain filename with no path separators",
 		},
 		{
-			name: "absolute path rejected",
+			name: "duplicate entries rejected",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "/etc/passwd", "content": "aGVsbG8="}]}]
+				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["x", "x"]}}]
 			}`,
-			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
+			wantErr: `steps[0].tmp_bundle.entries[1]: duplicate "x"`,
 		},
 		{
-			name: "dot rejected",
+			name: "no tmp_bundle is valid",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": ".", "content": "aGVsbG8="}]}]
+				"steps": [{"image": "img:latest"}]
 			}`,
-			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
-		},
-		{
-			name: "dotdot rejected",
-			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "..", "content": "aGVsbG8="}]}]
-			}`,
-			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
-		},
-		{
-			name: "nested path rejected",
-			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "sub/file.txt", "content": "aGVsbG8="}]}]
-			}`,
-			wantErr: "steps[0].tmp_dir[0].name: must be a plain filename with no path separators",
-		},
-		{
-			name: "second step duplicate names rejected",
-			input: `{
-				"steps": [
-					{"image": "img:latest"},
-					{"image": "img2:latest", "tmp_dir": [
-						{"name": "x", "content": "aGVsbG8="},
-						{"name": "x", "content": "d29ybGQ="}
-					]}
-				]
-			}`,
-			wantErr: `steps[1].tmp_dir[1].name: duplicate "x"`,
 		},
 	}
 
@@ -132,50 +109,40 @@ func TestModsSpecValidate_TmpDirStep(t *testing.T) {
 	}
 }
 
-func TestModsSpecValidate_TmpDirHealing(t *testing.T) {
+func TestModsSpecValidate_TmpBundleHealing(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
 		"build_gate": {
 			"router": {"image": "router:latest"},
-			"healing": {"by_error_kind": {"infra": {"retries": 1, "image": "healer:latest", "tmp_dir": %s}}}
+			"healing": {"by_error_kind": {"infra": {"retries": 1, "image": "healer:latest", %s}}}
 		}
 	}`
 
 	tests := []struct {
 		name    string
-		tmpDir  string
+		field   string
 		wantErr string
 	}{
 		{
-			name:   "valid tmp file in healing action",
-			tmpDir: `[{"name": "patch.diff", "content": "aGVsbG8="}]`,
+			name:  "valid bundle in healing action",
+			field: `"tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["patch.diff"]}`,
 		},
 		{
-			name:    "empty name in healing action rejected",
-			tmpDir:  `[{"name": "", "content": "aGVsbG8="}]`,
-			wantErr: "build_gate.healing.by_error_kind.infra.tmp_dir[0].name: required",
+			name:    "legacy tmp_dir in healing rejected",
+			field:   `"tmp_dir": [{"name": "patch.diff", "content": "aGVsbG8="}]`,
+			wantErr: "build_gate.healing.by_error_kind.infra.tmp_dir: not supported; use tmp_bundle",
 		},
 		{
-			name:    "empty content in healing action rejected",
-			tmpDir:  `[{"name": "f.txt", "content": ""}]`,
-			wantErr: "build_gate.healing.by_error_kind.infra.tmp_dir[0].content: required",
-		},
-		{
-			name:    "duplicate names in healing action rejected",
-			tmpDir:  `[{"name": "x", "content": "aGVsbG8="}, {"name": "x", "content": "d29ybGQ="}]`,
-			wantErr: `build_gate.healing.by_error_kind.infra.tmp_dir[1].name: duplicate "x"`,
-		},
-		{
-			name:    "duplicate canonical names in healing action rejected",
-			tmpDir:  `[{"name": " x ", "content": "aGVsbG8="}, {"name": "x", "content": "d29ybGQ="}]`,
-			wantErr: `build_gate.healing.by_error_kind.infra.tmp_dir[1].name: duplicate "x"`,
+			name:    "missing bundle_id in healing rejected",
+			field:   `"tmp_bundle": {"cid": "cid1", "digest": "sha256:abc", "entries": ["f.txt"]}`,
+			wantErr: "build_gate.healing.by_error_kind.infra.tmp_bundle.bundle_id: required",
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			input := strings.ReplaceAll(base, "%s", tc.tmpDir)
+			input := strings.ReplaceAll(base, "%s", tc.field)
 			_, err := ParseModsSpecJSON([]byte(input))
 			if tc.wantErr == "" {
 				if err != nil {
@@ -193,42 +160,37 @@ func TestModsSpecValidate_TmpDirHealing(t *testing.T) {
 	}
 }
 
-func TestModsSpecValidate_TmpDirRouter(t *testing.T) {
+func TestModsSpecValidate_TmpBundleRouter(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
-		"build_gate": {"router": {"image": "router:latest", "tmp_dir": %s}}
+		"build_gate": {"router": {"image": "router:latest", %s}}
 	}`
 
 	tests := []struct {
 		name    string
-		tmpDir  string
+		field   string
 		wantErr string
 	}{
 		{
-			name:   "valid tmp file in router",
-			tmpDir: `[{"name": "rules.json", "content": "e30="}]`,
+			name:  "valid bundle in router",
+			field: `"tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["rules.json"]}`,
 		},
 		{
-			name:    "empty name in router rejected",
-			tmpDir:  `[{"name": "", "content": "aGVsbG8="}]`,
-			wantErr: "build_gate.router.tmp_dir[0].name: required",
+			name:    "legacy tmp_dir in router rejected",
+			field:   `"tmp_dir": [{"name": "rules.json", "content": "e30="}]`,
+			wantErr: "build_gate.router.tmp_dir: not supported; use tmp_bundle",
 		},
 		{
-			name:    "duplicate names in router rejected",
-			tmpDir:  `[{"name": "cfg", "content": "aGVsbG8="}, {"name": "cfg", "content": "d29ybGQ="}]`,
-			wantErr: `build_gate.router.tmp_dir[1].name: duplicate "cfg"`,
-		},
-		{
-			name:    "duplicate canonical names in router rejected",
-			tmpDir:  `[{"name": " cfg ", "content": "aGVsbG8="}, {"name": "cfg", "content": "d29ybGQ="}]`,
-			wantErr: `build_gate.router.tmp_dir[1].name: duplicate "cfg"`,
+			name:    "missing cid in router rejected",
+			field:   `"tmp_bundle": {"bundle_id": "b1", "digest": "sha256:abc", "entries": ["f.txt"]}`,
+			wantErr: "build_gate.router.tmp_bundle.cid: required",
 		},
 	}
 
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			input := strings.ReplaceAll(base, "%s", tc.tmpDir)
+			input := strings.ReplaceAll(base, "%s", tc.field)
 			_, err := ParseModsSpecJSON([]byte(input))
 			if tc.wantErr == "" {
 				if err != nil {
@@ -243,6 +205,18 @@ func TestModsSpecValidate_TmpDirRouter(t *testing.T) {
 				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestParseModsSpecJSON_TmpBundleEntriesCanonicalized(t *testing.T) {
+	spec, err := ParseModsSpecJSON([]byte(`{
+		"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "c1", "digest": "d1", "entries": [" config.json "]}}]
+	}`))
+	if err != nil {
+		t.Fatalf("ParseModsSpecJSON() unexpected error: %v", err)
+	}
+	if got, want := spec.Steps[0].TmpBundle.Entries[0], "config.json"; got != want {
+		t.Fatalf("tmp_bundle.entries[0] got %q, want %q", got, want)
 	}
 }
 
@@ -366,18 +340,6 @@ func TestStepManifestValidate_TmpDir(t *testing.T) {
 				t.Fatalf("Validate() error %q does not contain %q", err.Error(), tc.wantErr)
 			}
 		})
-	}
-}
-
-func TestParseModsSpecJSON_TmpDirNameCanonicalized(t *testing.T) {
-	spec, err := ParseModsSpecJSON([]byte(`{
-		"steps": [{"image": "img:latest", "tmp_dir": [{"name": " config.json ", "content": "e30="}]}]
-	}`))
-	if err != nil {
-		t.Fatalf("ParseModsSpecJSON() unexpected error: %v", err)
-	}
-	if got, want := spec.Steps[0].TmpDir[0].Name, "config.json"; got != want {
-		t.Fatalf("tmp_dir[0].name got %q, want %q", got, want)
 	}
 }
 

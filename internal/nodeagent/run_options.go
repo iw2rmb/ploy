@@ -54,7 +54,13 @@ type ModContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
-	TmpDir  []contracts.TmpFilePayload
+	// TmpDir holds pre-materialized file payloads (used for internal nodeagent construction only).
+	// For spec-originated tmp injection, see TmpBundle.
+	TmpDir []contracts.TmpFilePayload
+	// TmpBundle references a pre-uploaded bundle to extract under /tmp at execution time.
+	// Populated from the spec's tmp_bundle field during spec-to-run-options conversion.
+	// The nodeagent downloads and unpacks this bundle before container launch.
+	TmpBundle *contracts.TmpBundleRef
 	// Amata configures amata-mode execution. When non-nil with a non-empty Spec,
 	// the container runs `amata run /in/amata.yaml` instead of the direct codex path.
 	Amata *contracts.AmataRunSpec
@@ -127,11 +133,11 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 						healing.Retries = 1
 					}
 					healing.Mod = ModContainerSpec{
-						Image:   action.Image,
-						Command: action.Command,
-						Env:     copyStringMap(action.Env),
-						TmpDir:  copyTmpDir(action.TmpDir),
-						Amata:   action.Amata,
+						Image:     action.Image,
+						Command:   action.Command,
+						Env:       copyStringMap(action.Env),
+						TmpBundle: action.TmpBundle,
+						Amata:     action.Amata,
 					}
 					runOpts.Healing = healing
 				}
@@ -140,11 +146,11 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 
 		if spec.BuildGate.Router != nil {
 			runOpts.Router = &ModContainerSpec{
-				Image:   spec.BuildGate.Router.Image,
-				Command: spec.BuildGate.Router.Command,
-				Env:     copyStringMap(spec.BuildGate.Router.Env),
-				TmpDir:  copyTmpDir(spec.BuildGate.Router.TmpDir),
-				Amata:   spec.BuildGate.Router.Amata,
+				Image:     spec.BuildGate.Router.Image,
+				Command:   spec.BuildGate.Router.Command,
+				Env:       copyStringMap(spec.BuildGate.Router.Env),
+				TmpBundle: spec.BuildGate.Router.TmpBundle,
+				Amata:     spec.BuildGate.Router.Amata,
 			}
 		}
 	}
@@ -165,7 +171,7 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
-		runOpts.Execution.TmpDir = copyTmpDir(step.TmpDir)
+		runOpts.Execution.TmpBundle = step.TmpBundle
 		runOpts.Execution.Amata = step.Amata
 	}
 
@@ -174,11 +180,11 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 		for _, step := range spec.Steps {
 			runOpts.Steps = append(runOpts.Steps, StepMod{
 				ModContainerSpec: ModContainerSpec{
-					Image:   step.Image,
-					Command: step.Command,
-					Env:     copyStringMap(step.Env),
-					TmpDir:  copyTmpDir(step.TmpDir),
-					Amata:   step.Amata,
+					Image:     step.Image,
+					Command:   step.Command,
+					Env:       copyStringMap(step.Env),
+					TmpBundle: step.TmpBundle,
+					Amata:     step.Amata,
 				},
 				Stack:  step.Stack,
 				Always: step.Always,
