@@ -181,6 +181,53 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 		}
 	})
 
+	t.Run("default_codex_home_materializes_auth_and_config_under_out_codex", func(t *testing.T) {
+		outDir, err := realTempDir("mig-codex-test-out-codex-home-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(outDir) })
+		inDir, err := realTempDir("mig-codex-test-in-codex-home-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(inDir) })
+
+		if err := os.WriteFile(inDir+"/amata.yaml", []byte("task: codex-home\n"), 0o644); err != nil {
+			t.Fatalf("write amata.yaml: %v", err)
+		}
+
+		run := exec.Command("docker", "run", "--rm",
+			"-v", outDir+":/out",
+			"-v", inDir+":/in:ro",
+			"-e", `CODEX_AUTH_JSON={"token":"from_env"}`,
+			"-e", "CODEX_CONFIG_TOML=[model]\nname = \"from_env\"",
+			testImageTag,
+			"amata", "run", "/in/amata.yaml",
+		)
+		if out, err := run.CombinedOutput(); err != nil {
+			t.Fatalf("codex-home test container failed: %v\n%s", err, string(out))
+		}
+
+		authPath := filepath.Join(outDir, "codex", "auth.json")
+		authContent, err := os.ReadFile(authPath)
+		if err != nil {
+			t.Fatalf("read auth.json: %v", err)
+		}
+		if strings.TrimSpace(string(authContent)) != `{"token":"from_env"}` {
+			t.Fatalf("unexpected auth.json content: %q", string(authContent))
+		}
+
+		configPath := filepath.Join(outDir, "codex", "config.toml")
+		configContent, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("read config.toml: %v", err)
+		}
+		if !strings.Contains(string(configContent), `name = "from_env"`) {
+			t.Fatalf("unexpected config.toml content: %q", string(configContent))
+		}
+	})
+
 	t.Run("direct_codex_mode_requires_CODEX_PROMPT", func(t *testing.T) {
 		outDir, err := realTempDir("mig-codex-test-out2-*")
 		if err != nil {

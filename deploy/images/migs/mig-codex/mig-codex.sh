@@ -7,11 +7,13 @@ mig-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.t
 mig-codex amata run /in/amata.yaml [--set <param>=<value> ...]
 
 Environment:
+  CODEX_HOME        Codex home directory for auth/config files.
+                    Defaults to /out/codex in the official mig-codex image.
   CODEX_PROMPT      Inline prompt text (required in direct codex mode; optional in amata mode).
   CODEX_MODEL       Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
   CODEX_API_KEY     API key for Codex/OpenAI; passed through to codex exec and amata as-is.
-  CODEX_AUTH_JSON   Inline JSON or file path for auth; if set, written to ~/.codex/auth.json.
-  CODEX_CONFIG_TOML Inline TOML for config; if set, written to ~/.codex/config.toml.
+  CODEX_AUTH_JSON   Inline JSON or file path for auth; if set, written to \$CODEX_HOME/auth.json.
+  CODEX_CONFIG_TOML Inline TOML for config; if set, written to \$CODEX_HOME/config.toml.
   CRUSH_JSON        Inline JSON or file path for Crush config; if set, written to ~/.config/crush/crush.json.
   CCR_CONFIG_JSON   Inline JSON or file path for Claude Code Router config; if set, written to ~/.claude-code-router/config.json.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior
@@ -21,8 +23,8 @@ Environment:
 Behavior:
   - Amata mode (first arg "amata"): delegates to amata binary; CODEX_PROMPT not required.
   - Direct codex mode (default): uses codex exec; CODEX_PROMPT or --prompt-file required.
-  - Places auth at ~/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
-  - Places config at ~/.codex/config.toml when --config is given or CODEX_CONFIG_TOML is set.
+  - Places auth at \$CODEX_HOME/auth.json when --auth is given or CODEX_AUTH_JSON is set.
+  - Places config at \$CODEX_HOME/config.toml when --config is given or CODEX_CONFIG_TOML is set.
   - Places Crush config at ~/.config/crush/crush.json when CRUSH_JSON is set.
   - Places Claude Code Router config at ~/.claude-code-router/config.json when CCR_CONFIG_JSON is set.
   - If ~/.claude-code-router/config.json exists at startup, runs:
@@ -35,7 +37,8 @@ USAGE
 }
 
 home_dir="${HOME:-/root}"
-codex_config_dir="$home_dir/.codex"
+codex_config_dir="${CODEX_HOME:-$home_dir/.codex}"
+export CODEX_HOME="$codex_config_dir"
 crush_config_file="$home_dir/.config/crush/crush.json"
 ccr_config_file="$home_dir/.claude-code-router/config.json"
 
