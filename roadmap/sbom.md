@@ -82,3 +82,4 @@ Legend: [ ] todo, [x] done.
   - Scope: execute unit tests for touched packages and project hygiene commands.
   - Snippets: `make test`, `make vet`, `make staticcheck`.
   - Tests: all commands above complete successfully.
+  - Gap closure (2026-03-26): freed host root filesystem from `~497MB` available to `~7.5GB` available and reran `make test` successfully; prior `no space left on device` failures were environment-driven.
