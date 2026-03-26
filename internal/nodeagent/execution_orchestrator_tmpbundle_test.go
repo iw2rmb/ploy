@@ -244,6 +244,25 @@ func TestVerifyBundleDigest_CaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestVerifyBundleDigest_Sha256Prefix(t *testing.T) {
+	t.Parallel()
+
+	data := []byte("server prefix test")
+	prefixed := "sha256:" + digestOf(data)
+	if err := verifyBundleDigest(data, prefixed); err != nil {
+		t.Fatalf("expected no error for sha256:-prefixed digest, got: %v", err)
+	}
+}
+
+func TestVerifyBundleDigest_Sha256PrefixMismatch(t *testing.T) {
+	t.Parallel()
+
+	data := []byte("server prefix test")
+	if err := verifyBundleDigest(data, "sha256:deadbeef"); err == nil {
+		t.Fatal("expected error for sha256:-prefixed wrong digest, got nil")
+	}
+}
+
 func upper(s string) string {
 	b := []byte(s)
 	for i, c := range b {
