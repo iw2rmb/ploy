@@ -1,0 +1,67 @@
+post:
+  tags: [Artifacts]
+  summary: Upload a spec bundle (CLI → control plane)
+  description: |
+    Uploads a gzip-compressed spec bundle archive from the CLI to the control plane.
+    The bundle is stored in object storage and its metadata (bundle_id, cid, digest,
+    size) is persisted to the spec_bundles table.
+
+    **Deduplication:** If a bundle with the same content (CID) already exists, the
+    existing bundle_id is returned without re-uploading and `deduplicated: true` is
+    set in the response.
+
+    **Size limit:** Request body is capped at 50 MiB.
+
+    **Auth:** Requires `RoleControlPlane` (CLI bearer token).
+  parameters:
+    - in: query
+      name: created_by
+      required: false
+      schema: { type: string }
+      description: Optional creator identifier (e.g. CLI user or pipeline name)
+  requestBody:
+    required: true
+    content:
+      application/octet-stream:
+        schema:
+          type: string
+          format: binary
+          description: Gzip-compressed tar archive (≤ 50 MiB)
+  responses:
+    '201':
+      description: Created — new bundle persisted
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SpecBundleUploadResponse'
+    '200':
+      description: OK — deduplicated, existing bundle returned
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SpecBundleUploadResponse'
+    '400': { description: Bad Request (empty body) }
+    '413': { description: Payload Too Large (body exceeds 50 MiB) }
+    '500': { description: Internal Server Error }
+components:
+  schemas:
+    SpecBundleUploadResponse:
+      type: object
+      required: [bundle_id, cid, digest, size, deduplicated]
+      properties:
+        bundle_id:
+          type: string
+          description: NanoID(8) identifier assigned to the spec bundle
+        cid:
+          type: string
+          description: Content identifier (bafy-prefixed SHA256)
+        digest:
+          type: string
+          description: "Full SHA256 digest with sha256: prefix"
+        size:
+          type: integer
+          format: int64
+          description: Bundle size in bytes
+        deduplicated:
+          type: boolean
+          description: True if content already existed; false if newly uploaded

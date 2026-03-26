@@ -154,6 +154,17 @@ func (q *Queries) UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBu
 	return err
 }
 
+const deleteSpecBundle = `-- name: DeleteSpecBundle :exec
+DELETE FROM spec_bundles WHERE id = $1
+`
+
+// Deletes a spec bundle metadata row by ID.
+// Called by blobpersist as rollback when object storage upload fails.
+func (q *Queries) DeleteSpecBundle(ctx context.Context, id types.SpecBundleID) error {
+	_, err := q.db.Exec(ctx, deleteSpecBundle, id)
+	return err
+}
+
 const listSpecBundlesUnreferencedBefore = `-- name: ListSpecBundlesUnreferencedBefore :many
 SELECT id, cid, digest, size, object_key, created_by, created_at, last_ref_at
 FROM spec_bundles

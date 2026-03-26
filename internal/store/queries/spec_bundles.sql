@@ -34,6 +34,11 @@ UPDATE spec_bundles
 SET last_ref_at = now()
 WHERE id = $1;
 
+-- name: DeleteSpecBundle :exec
+-- Deletes a spec bundle metadata row by ID.
+-- Called by blobpersist as rollback when object storage upload fails.
+DELETE FROM spec_bundles WHERE id = $1;
+
 -- name: ListSpecBundlesUnreferencedBefore :many
 -- Lists spec bundles whose last_ref_at is before the given threshold.
 -- Used by GC to find bundles eligible for deletion.

@@ -74,6 +74,9 @@ type Querier interface {
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
+	// Deletes a spec bundle metadata row by ID.
+	// Called by blobpersist as rollback when object storage upload fails.
+	DeleteSpecBundle(ctx context.Context, id types.SpecBundleID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteDiff(ctx context.Context, id pgtype.UUID) error
 	DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
