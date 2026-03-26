@@ -41,7 +41,7 @@ func loadRunsCmd(client *http.Client, baseURL *url.URL) tea.Cmd {
 		}
 		runs := make([]runSummary, len(result.Runs))
 		for i, r := range result.Runs {
-			runs[i] = runSummary{ID: r.ID, MigName: r.MigName, CreatedAt: r.CreatedAt}
+			runs[i] = runSummary{ID: r.ID, MigID: r.MigID, MigName: r.MigName, CreatedAt: r.CreatedAt}
 		}
 		return runsLoadedMsg{runs: runs}
 	}

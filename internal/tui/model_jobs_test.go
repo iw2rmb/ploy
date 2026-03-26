@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
@@ -55,15 +56,17 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	if !strings.Contains(item.title, "✓ deploy") {
 		t.Errorf("item title: expected status glyph and name, got %q", item.title)
 	}
-	if !strings.HasSuffix(strings.TrimSpace(item.title), "2.5s") {
-		t.Errorf("item title: expected duration suffix %q, got %q", "2.5s", item.title)
+	if !strings.HasSuffix(strings.TrimSpace(item.title), "2s") {
+		t.Errorf("item title: expected duration suffix %q, got %q", "2s", item.title)
 	}
-	durationCell := string([]rune(item.title)[jobsListWidth-jobsDurationWidth : jobsListWidth])
-	if want := "      2.5s"; durationCell != want {
-		t.Errorf("item duration cell: got %q, want %q", durationCell, want)
+	if !strings.HasSuffix(item.title, " 2s") {
+		t.Errorf("item title: expected right-aligned duration with spacing, got %q", item.title)
 	}
-	if got := utf8.RuneCountInString(item.title); got != jobsListWidth {
-		t.Errorf("item title rune width: got %d, want %d", got, jobsListWidth)
+	if got := utf8.RuneCountInString(item.title); got != jobsContentWidth {
+		t.Errorf("item title rune width: got %d, want %d", got, jobsContentWidth)
+	}
+	if strings.Contains(item.title, "...") || strings.Contains(item.title, "…") {
+		t.Errorf("item title: duration/name must not be ellipsized, got %q", item.title)
 	}
 	if want := "job-abc"; item.description != want {
 		t.Errorf("item description: got %q, want %q", item.description, want)
@@ -133,7 +136,18 @@ func TestS6ViewRendersSideBySide(t *testing.T) {
 func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenJobsList
-	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+	// Load runs first so job selection can resolve mig_id by run_id.
+	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
+		{
+			ID:        domaintypes.RunID("run-1"),
+			MigID:     domaintypes.MigID("mig-1"),
+			MigName:   "mig",
+			CreatedAt: time.Now(),
+		},
+	}})
+	m = next.(model)
+	m.screen = ScreenJobsList
+	next, _ = m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
@@ -159,13 +173,22 @@ func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 		t.Fatalf("item 2: unexpected type %T", items[2])
 	}
 
-	if item0.title != "Migration" {
-		t.Errorf("item 0 title: got %q, want %q", item0.title, "Migration")
+	if item0.title != "mig" {
+		t.Errorf("item 0 title: got %q, want %q", item0.title, "mig")
+	}
+	if item0.description != "mig-1" {
+		t.Errorf("item 0 description: got %q, want %q", item0.description, "mig-1")
 	}
 	if item1.title != "Run" {
 		t.Errorf("item 1 title: got %q, want %q", item1.title, "Run")
 	}
+	if item1.description != "run-1" {
+		t.Errorf("item 1 description: got %q, want %q", item1.description, "run-1")
+	}
 	if item2.title != "Job" {
 		t.Errorf("item 2 title: got %q, want %q", item2.title, "Job")
+	}
+	if item2.description != "job-1" {
+		t.Errorf("item 2 description: got %q, want %q", item2.description, "job-1")
 	}
 }

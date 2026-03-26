@@ -12,7 +12,12 @@ func makeS5Model(t *testing.T) model {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenRunsList
 	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
-		{ID: domaintypes.RunID("run-abc"), MigName: "my-mig", CreatedAt: time.Now()},
+		{
+			ID:        domaintypes.RunID("run-abc"),
+			MigID:     domaintypes.MigID("mig-abc"),
+			MigName:   "my-mig",
+			CreatedAt: time.Now(),
+		},
 	}})
 	nm := next.(model)
 	nm.secondary.Select(0)
@@ -20,7 +25,6 @@ func makeS5Model(t *testing.T) model {
 	return result.(model)
 }
 
-// TestS5ScreenSetOnEnterFromS4 verifies the screen transitions to S5 on Enter from S4.
 func TestS5ScreenSetOnEnterFromS4(t *testing.T) {
 	rm := makeS5Model(t)
 	if rm.screen != ScreenRunDetails {
@@ -28,45 +32,11 @@ func TestS5ScreenSetOnEnterFromS4(t *testing.T) {
 	}
 }
 
-// TestS5DetailListTitle verifies the detail list title is "RUN" after entering S5.
-func TestS5DetailListTitle(t *testing.T) {
+func TestS5PloyItemsPlaceholder(t *testing.T) {
 	rm := makeS5Model(t)
-	if rm.detail.Title != "RUN" {
-		t.Errorf("detail title: got %q, want %q", rm.detail.Title, "RUN")
-	}
-}
-
-// TestS5DetailItemsPlaceholder verifies placeholder items before data loads.
-func TestS5DetailItemsPlaceholder(t *testing.T) {
-	rm := makeS5Model(t)
-	items := rm.detail.Items()
-	if len(items) != 2 {
-		t.Fatalf("detail items count: got %d, want 2", len(items))
-	}
-	wantTitles := []string{"Repositories", "Jobs"}
-	for i, want := range wantTitles {
-		item, ok := items[i].(listItem)
-		if !ok {
-			t.Fatalf("item %d: unexpected type %T", i, items[i])
-		}
-		if item.title != want {
-			t.Errorf("item %d title: got %q, want %q", i, item.title, want)
-		}
-		if item.description != "total: —" {
-			t.Errorf("item %d description: got %q, want %q", i, item.description, "total: —")
-		}
-	}
-}
-
-// TestS5RunDetailsLoadedUpdatesItems verifies runDetailsLoadedMsg updates totals.
-func TestS5RunDetailsLoadedUpdatesItems(t *testing.T) {
-	s5m := makeS5Model(t)
-	afterLoad, _ := s5m.Update(runDetailsLoadedMsg{repoTotal: 4, jobTotal: 7})
-	lm := afterLoad.(model)
-
-	items := lm.detail.Items()
-	if len(items) != 2 {
-		t.Fatalf("detail items count: got %d, want 2", len(items))
+	items := rm.ploy.Items()
+	if len(items) != 3 {
+		t.Fatalf("ploy items count: got %d, want 3", len(items))
 	}
 
 	tests := []struct {
@@ -74,8 +44,9 @@ func TestS5RunDetailsLoadedUpdatesItems(t *testing.T) {
 		wantTitle string
 		wantDesc  string
 	}{
-		{0, "Repositories", "total: 4"},
-		{1, "Jobs", "total: 7"},
+		{0, "my-mig", "mig-abc"},
+		{1, "Run", "run-abc"},
+		{2, "Jobs", "total: —"},
 	}
 	for _, tt := range tests {
 		item, ok := items[tt.idx].(listItem)
@@ -91,7 +62,28 @@ func TestS5RunDetailsLoadedUpdatesItems(t *testing.T) {
 	}
 }
 
-// TestS5EscTransitionsToS4 verifies Esc from S5 returns to S4.
+func TestS5RunDetailsLoadedUpdatesJobsTotalInPloy(t *testing.T) {
+	s5m := makeS5Model(t)
+	afterLoad, _ := s5m.Update(runDetailsLoadedMsg{repoTotal: 4, jobTotal: 7})
+	lm := afterLoad.(model)
+
+	items := lm.ploy.Items()
+	if len(items) != 3 {
+		t.Fatalf("ploy items count: got %d, want 3", len(items))
+	}
+
+	item, ok := items[2].(listItem)
+	if !ok {
+		t.Fatalf("item 2: unexpected type %T", items[2])
+	}
+	if item.title != "Jobs" {
+		t.Errorf("item 2 title: got %q, want %q", item.title, "Jobs")
+	}
+	if item.description != "total: 7" {
+		t.Errorf("item 2 description: got %q, want %q", item.description, "total: 7")
+	}
+}
+
 func TestS5EscTransitionsToS4(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenRunDetails

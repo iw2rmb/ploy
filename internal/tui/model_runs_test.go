@@ -122,7 +122,7 @@ func TestS4EnterDefinesMigrationAndRunInPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenRunsList
 	next, _ := m.Update(runsLoadedMsg{runs: []runSummary{
-		{ID: domaintypes.RunID("run-xyz"), MigName: "mig", CreatedAt: time.Now()},
+		{ID: domaintypes.RunID("run-xyz"), MigID: domaintypes.MigID("mig-123"), MigName: "mig", CreatedAt: time.Now()},
 	}})
 	nm := next.(model)
 	nm.secondary.Select(0)
@@ -147,14 +147,23 @@ func TestS4EnterDefinesMigrationAndRunInPloy(t *testing.T) {
 		t.Fatalf("item 2: unexpected type %T", items[2])
 	}
 
-	if item0.title != "Migration" {
-		t.Errorf("item 0 title: got %q, want %q", item0.title, "Migration")
+	if item0.title != "mig" {
+		t.Errorf("item 0 title: got %q, want %q", item0.title, "mig")
+	}
+	if item0.description != "mig-123" {
+		t.Errorf("item 0 description: got %q, want %q", item0.description, "mig-123")
 	}
 	if item1.title != "Run" {
 		t.Errorf("item 1 title: got %q, want %q", item1.title, "Run")
 	}
+	if item1.description != "run-xyz" {
+		t.Errorf("item 1 description: got %q, want %q", item1.description, "run-xyz")
+	}
 	if item2.title != "Jobs" {
 		t.Errorf("item 2 title: got %q, want %q", item2.title, "Jobs")
+	}
+	if item2.description != "total: —" {
+		t.Errorf("item 2 description: got %q, want %q", item2.description, "total: —")
 	}
 }
 

@@ -20,12 +20,12 @@ func TestModelInit(t *testing.T) {
 }
 
 // TestModelPloyListInvariants verifies that the PLOY root list satisfies
-// the shared list invariants: width 24 and help disabled.
+// the shared list invariants.
 func TestModelPloyListInvariants(t *testing.T) {
 	m := InitialModel(nil, nil)
 
-	if m.ploy.Width() != listWidth {
-		t.Errorf("ploy list width: got %d, want %d", m.ploy.Width(), listWidth)
+	if m.ploy.Width() != ployListWidth {
+		t.Errorf("ploy list width: got %d, want %d", m.ploy.Width(), ployListWidth)
 	}
 
 	// Filtering must be disabled on the root PLOY list.
@@ -158,5 +158,16 @@ func TestNewRunsListInvariants(t *testing.T) {
 	}
 	if l.Title != "RUNS" {
 		t.Errorf("runs list title: got %q, want %q", l.Title, "RUNS")
+	}
+}
+
+func TestNewPloyListInvariants(t *testing.T) {
+	l := newPloyList("PLOY", nil)
+
+	if l.Width() != ployListWidth {
+		t.Errorf("ploy list width: got %d, want %d", l.Width(), ployListWidth)
+	}
+	if l.Title != "PLOY" {
+		t.Errorf("ploy list title: got %q, want %q", l.Title, "PLOY")
 	}
 }
