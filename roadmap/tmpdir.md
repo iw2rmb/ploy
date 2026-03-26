@@ -90,3 +90,16 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     2. `make vet`
     3. `make staticcheck`
   - Reasoning: `medium`
+
+- [ ] 1.7 Refresh Spec-Bundle GC Metadata On Submit Paths
+  - Repository: `ploy`
+  - Component: `internal/server/handlers/runs_submit.go`; `internal/server/handlers/migs_spec.go`; `internal/server/handlers/*_test.go`; `internal/store/*.sql.go`
+  - Implementation:
+    1. In `POST /v1/runs` (`runs_submit.go`), resolve each referenced `tmp_bundle.bundle_id` via `GetSpecBundle` and fail validation when a bundle is missing.
+    2. In `POST /v1/runs` (`runs_submit.go`), call `UpdateSpecBundleLastRefAt` for each validated `tmp_bundle.bundle_id` before persisting the run payload.
+    3. In `POST /v1/migs/{mig_ref}/specs` (`migs_spec.go`), resolve each referenced `tmp_bundle.bundle_id` via `GetSpecBundle` and fail validation when a bundle is missing.
+    4. In `POST /v1/migs/{mig_ref}/specs` (`migs_spec.go`), call `UpdateSpecBundleLastRefAt` for each validated `tmp_bundle.bundle_id` before persisting the spec.
+    5. Add handler tests that assert both endpoints invoke `GetSpecBundle` and `UpdateSpecBundleLastRefAt` for referenced bundle IDs and return deterministic errors for unknown bundle IDs.
+  - Verification:
+    1. `go test ./internal/server/handlers -run 'Test.*RunsSubmit.*TmpBundle.*|Test.*MigSpec.*TmpBundle.*'`
+  - Reasoning: `medium`
