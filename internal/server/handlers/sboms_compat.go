@@ -16,6 +16,11 @@ type sbomCompatSelector struct {
 	Floor string
 }
 
+type sbomCompatSelectorInput struct {
+	Raw        string
+	Candidates []sbomCompatSelector
+}
+
 func sbomCompatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		lang := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("lang")))
@@ -28,7 +33,7 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		selectors, libs, parseErr := parseSBOMCompatSelectors(libsRaw)
+		selectorInputs, libs, parseErr := parseSBOMCompatSelectors(libsRaw)
 		if parseErr != nil {
 			httpErr(w, http.StatusBadRequest, "invalid libs selector: %v", parseErr)
 			return
@@ -71,21 +76,27 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 			versionsByLib[lib] = append(versionsByLib[lib], ver)
 		}
 
-		result := make(map[string]string, len(selectors))
-		for _, selector := range selectors {
-			versions := versionsByLib[selector.Name]
-			if len(versions) == 0 {
+		selectors := make([]sbomCompatSelector, 0, len(selectorInputs))
+		seen := map[string]string{}
+		for _, input := range selectorInputs {
+			selected, ok := resolveSBOMCompatSelector(input, versionsByLib, lang, tool)
+			if !ok {
 				continue
 			}
-			best := ""
-			for _, v := range versions {
-				if selector.Floor != "" && sbom.CompareVersions(lang, tool, v, selector.Floor) < 0 {
-					continue
+			if prevFloor, exists := seen[selected.Name]; exists {
+				if prevFloor != selected.Floor {
+					httpErr(w, http.StatusBadRequest, "invalid libs selector: %v", errCompatSelector(input.Raw))
+					return
 				}
-				if best == "" || sbom.CompareVersions(lang, tool, v, best) < 0 {
-					best = v
-				}
+				continue
 			}
+			seen[selected.Name] = selected.Floor
+			selectors = append(selectors, selected)
+		}
+
+		result := make(map[string]string, len(selectors))
+		for _, selector := range selectors {
+			best := bestSBOMCompatVersion(selector, versionsByLib, lang, tool)
 			if best != "" {
 				result[selector.Name] = best
 			}
@@ -96,73 +107,113 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func parseSBOMCompatSelectors(raw string) ([]sbomCompatSelector, []string, error) {
+func parseSBOMCompatSelectors(raw string) ([]sbomCompatSelectorInput, []string, error) {
 	parts := strings.Split(raw, ",")
-	out := make([]sbomCompatSelector, 0, len(parts))
-	seen := map[string]string{}
+	out := make([]sbomCompatSelectorInput, 0, len(parts))
+	seenFloors := map[string]string{}
+	libsSet := map[string]struct{}{}
 	for _, part := range parts {
 		item := strings.TrimSpace(part)
 		if item == "" {
 			continue
 		}
-		name, floor, ok := parseSBOMCompatSelector(item)
+		candidates, ok := parseSBOMCompatSelector(item)
 		if !ok {
 			return nil, nil, errCompatSelector(item)
 		}
-		if name == "" {
-			return nil, nil, errCompatSelector(item)
-		}
-		if prev, ok := seen[name]; ok {
-			if prev != floor {
+		for _, candidate := range candidates {
+			if candidate.Name == "" {
 				return nil, nil, errCompatSelector(item)
 			}
-			continue
+			libsSet[candidate.Name] = struct{}{}
+			if candidate.Floor == "" {
+				continue
+			}
+			if prev, exists := seenFloors[candidate.Name]; exists && prev != candidate.Floor {
+				return nil, nil, errCompatSelector(item)
+			}
+			seenFloors[candidate.Name] = candidate.Floor
 		}
-		seen[name] = floor
-		out = append(out, sbomCompatSelector{Name: name, Floor: floor})
+		out = append(out, sbomCompatSelectorInput{
+			Raw:        item,
+			Candidates: candidates,
+		})
 	}
 	if len(out) == 0 {
 		return nil, nil, errCompatSelector(raw)
 	}
-	libs := make([]string, 0, len(out))
-	for _, selector := range out {
-		libs = append(libs, selector.Name)
+	libs := make([]string, 0, len(libsSet))
+	for lib := range libsSet {
+		libs = append(libs, lib)
 	}
 	sort.Strings(libs)
 	return out, libs, nil
 }
 
-func parseSBOMCompatSelector(item string) (name string, floor string, ok bool) {
+func parseSBOMCompatSelector(item string) (candidates []sbomCompatSelector, ok bool) {
 	switch strings.Count(item, ":") {
 	case 0:
-		name = strings.ToLower(strings.TrimSpace(item))
-		return name, "", name != ""
+		name := strings.ToLower(strings.TrimSpace(item))
+		if name == "" {
+			return nil, false
+		}
+		return []sbomCompatSelector{{Name: name}}, true
 	case 1:
 		nv := strings.SplitN(item, ":", 2)
 		left := strings.TrimSpace(nv[0])
 		right := strings.TrimSpace(nv[1])
 		if left == "" || right == "" {
-			return "", "", false
+			return nil, false
 		}
-
-		// For ecosystem names like Maven/Gradle group:artifact, keep the full item as the name.
-		if strings.Contains(left, ".") {
-			name = strings.ToLower(strings.TrimSpace(item))
-			return name, "", true
-		}
-
-		name = strings.ToLower(left)
-		return name, right, true
+		return []sbomCompatSelector{
+			{Name: strings.ToLower(strings.TrimSpace(item))},
+			{Name: strings.ToLower(left), Floor: right},
+		}, true
 	default:
 		idx := strings.LastIndex(item, ":")
 		left := strings.TrimSpace(item[:idx])
 		right := strings.TrimSpace(item[idx+1:])
 		if left == "" || right == "" {
-			return "", "", false
+			return nil, false
 		}
-		name = strings.ToLower(left)
-		return name, right, true
+		return []sbomCompatSelector{{Name: strings.ToLower(left), Floor: right}}, true
 	}
+}
+
+func resolveSBOMCompatSelector(
+	input sbomCompatSelectorInput,
+	versionsByLib map[string][]string,
+	lang string,
+	tool string,
+) (selector sbomCompatSelector, ok bool) {
+	for _, candidate := range input.Candidates {
+		if bestSBOMCompatVersion(candidate, versionsByLib, lang, tool) != "" {
+			return candidate, true
+		}
+	}
+	return sbomCompatSelector{}, false
+}
+
+func bestSBOMCompatVersion(
+	selector sbomCompatSelector,
+	versionsByLib map[string][]string,
+	lang string,
+	tool string,
+) string {
+	versions := versionsByLib[selector.Name]
+	if len(versions) == 0 {
+		return ""
+	}
+	best := ""
+	for _, v := range versions {
+		if selector.Floor != "" && sbom.CompareVersions(lang, tool, v, selector.Floor) < 0 {
+			continue
+		}
+		if best == "" || sbom.CompareVersions(lang, tool, v, best) < 0 {
+			best = v
+		}
+	}
+	return best
 }
 
 func errCompatSelector(item string) error {

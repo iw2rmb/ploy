@@ -112,7 +112,7 @@ func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
 	}
 
-	wantLibs := []string{"ch.qos.logback:logback-classic", "org.slf4j:slf4j-api"}
+	wantLibs := []string{"ch.qos.logback:logback-classic", "org.slf4j", "org.slf4j:slf4j-api"}
 	if len(st.listSBOMCompatRowsParams.Libs) != len(wantLibs) {
 		t.Fatalf("query libs len = %d, want %d (%v)", len(st.listSBOMCompatRowsParams.Libs), len(wantLibs), st.listSBOMCompatRowsParams.Libs)
 	}
@@ -131,6 +131,92 @@ func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 	}
 	if got["ch.qos.logback:logback-classic"] != "1.5.6" {
 		t.Fatalf("ch.qos.logback:logback-classic = %q, want 1.5.6", got["ch.qos.logback:logback-classic"])
+	}
+}
+
+func TestSBOMCompatHandler_SupportsSingleColonLibraryNamesWithoutDot(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: true,
+		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
+			{Lib: "svc:api", Ver: "1.0.0"},
+			{Lib: "svc:api", Ver: "1.2.0"},
+			{Lib: "svc", Ver: "0.9.0"},
+		},
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=svc:api", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["svc:api"] != "1.0.0" {
+		t.Fatalf("svc:api = %q, want 1.0.0", got["svc:api"])
+	}
+}
+
+func TestSBOMCompatHandler_SupportsFloorForColonLibraryNamesWithoutDot(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: true,
+		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
+			{Lib: "svc:api", Ver: "1.0.0"},
+			{Lib: "svc:api", Ver: "1.2.0"},
+			{Lib: "svc", Ver: "0.9.0"},
+		},
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=svc:api:1.1.0", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["svc:api"] != "1.2.0" {
+		t.Fatalf("svc:api = %q, want 1.2.0", got["svc:api"])
+	}
+}
+
+func TestSBOMCompatHandler_PrefersExactSingleColonLibraryName(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: true,
+		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
+			{Lib: "lib-a:1.1.0", Ver: "0.0.2"},
+			{Lib: "lib-a", Ver: "1.2.0"},
+		},
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.1.0", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["lib-a:1.1.0"] != "0.0.2" {
+		t.Fatalf("lib-a:1.1.0 = %q, want 0.0.2", got["lib-a:1.1.0"])
 	}
 }
 
