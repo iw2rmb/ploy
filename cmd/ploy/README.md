@@ -394,11 +394,12 @@ ploy completion <shell> --help
   (`environment materialize`).
 - `--spec` — Path to a YAML/JSON spec file defining mig parameters, Build Gate settings,
   and healing configuration for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
-  override corresponding spec values when both are present. Specs use canonical shapes:
-  top-level fields for single-step runs (`image`, `command`, `env`)
-  and `migs[]` for multi-step runs. The spec supports inline environment variables (`env`),
-  file-based secrets (`env_from_file`), Build Gate healing/router (`build_gate.healing.by_error_kind`, `build_gate.router`),
-  and GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
+  override corresponding spec values when both are present. Specs use canonical `steps[]`
+  shape for both single-step and multi-step runs. Each step supports
+  `image`/`command`/`env`/`env_from_file` plus optional `tmp_bundle` file injection.
+  `tmp_bundle` is also supported in Build Gate router/healing action blocks
+  (`build_gate.router`, `build_gate.healing.by_error_kind.<kind>`). The spec also supports
+  GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
   — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Mods stages execute.
