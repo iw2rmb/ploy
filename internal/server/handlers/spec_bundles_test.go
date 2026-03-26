@@ -268,7 +268,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 
 }
 
-func TestSpecBundleDownloadLastRefUsesDetachedContextAfterRequestCancel(t *testing.T) {
+func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResponse(t *testing.T) {
 	bundleID := domaintypes.NewSpecBundleID()
 	objectKey := "spec-bundles/" + bundleID.String() + ".gz"
 	bundleContent := []byte("fake bundle bytes")
@@ -297,14 +297,15 @@ func TestSpecBundleDownloadLastRefUsesDetachedContextAfterRequestCancel(t *testi
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
+	// Regression guard: cancel request context immediately after response completion.
+	cancelReq()
+	close(st.updateSpecBundleLastRefAtProceed)
+
 	select {
 	case <-st.updateSpecBundleLastRefAtStarted:
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for last_ref_at update goroutine to start")
 	}
-
-	cancelReq()
-	close(st.updateSpecBundleLastRefAtProceed)
 
 	select {
 	case <-st.updateSpecBundleLastRefAtDone:
@@ -312,6 +313,12 @@ func TestSpecBundleDownloadLastRefUsesDetachedContextAfterRequestCancel(t *testi
 		t.Fatal("timed out waiting for last_ref_at update goroutine to finish")
 	}
 
+	if !st.updateSpecBundleLastRefAtCalled {
+		t.Fatal("expected UpdateSpecBundleLastRefAt to be invoked for bundle download")
+	}
+	if st.updateSpecBundleLastRefAtParam != bundleID.String() {
+		t.Fatalf("expected UpdateSpecBundleLastRefAt bundle_id=%q, got %q", bundleID.String(), st.updateSpecBundleLastRefAtParam)
+	}
 	if st.updateSpecBundleLastRefAtCtxErr != nil {
 		t.Fatalf("expected detached context to remain active after request cancellation, got %v", st.updateSpecBundleLastRefAtCtxErr)
 	}
