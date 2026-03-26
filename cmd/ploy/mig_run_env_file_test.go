@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -300,7 +301,7 @@ env_from_file:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -348,7 +349,7 @@ env:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -398,7 +399,7 @@ build_gate:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -457,7 +458,7 @@ env_from_file:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 		if err == nil {
 			t.Errorf("expected error for nonexistent env file")
 		}
@@ -502,7 +503,7 @@ env_from_file:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}
@@ -536,7 +537,7 @@ env:
 			t.Fatalf("write spec file: %v", err)
 		}
 
-		payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+		payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 		if err != nil {
 			t.Fatalf("buildSpecPayload error: %v", err)
 		}

@@ -43,22 +43,22 @@ func handleMigAdd(args []string, stderr io.Writer) error {
 		return fmt.Errorf("--name is required")
 	}
 
-	// Load spec from file or stdin if provided.
-	// Uses loadSpec from run_submit.go which handles YAML/JSON parsing.
-	var specData *json.RawMessage
-	if *specFile != "" {
-		data, err := loadSpec(*specFile)
-		if err != nil {
-			return fmt.Errorf("load spec: %w", err)
-		}
-		specData = &data
-	}
-
 	// Resolve control plane connection.
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
+	}
+
+	// Load spec from file or stdin if provided.
+	// Uses loadSpec from run_submit.go which handles YAML/JSON parsing.
+	var specData *json.RawMessage
+	if *specFile != "" {
+		data, err := loadSpec(ctx, base, httpClient, *specFile)
+		if err != nil {
+			return fmt.Errorf("load spec: %w", err)
+		}
+		specData = &data
 	}
 
 	// Execute mig add command.

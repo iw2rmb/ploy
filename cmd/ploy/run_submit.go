@@ -140,16 +140,16 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// Load spec from file or stdin and apply CLI overrides.
-	specPayload, err := buildRunSubmitSpecPayload(flags)
+	ctx := context.Background()
+
+	// Resolve control plane connection (needed before spec processing for bundle upload).
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
-
-	// Resolve control plane connection.
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	// Load spec from file or stdin and apply CLI overrides.
+	specPayload, err := buildRunSubmitSpecPayload(ctx, base, httpClient, flags)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	return nil
 }
 
-func buildRunSubmitSpecPayload(flags *runSubmitFlags) (json.RawMessage, error) {
+func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.Client, flags *runSubmitFlags) (json.RawMessage, error) {
 	specPath := strings.TrimSpace(*flags.SpecFile)
 	if specPath == "" {
 		return nil, fmt.Errorf("load spec: spec path is empty")
@@ -267,6 +267,9 @@ func buildRunSubmitSpecPayload(flags *runSubmitFlags) (json.RawMessage, error) {
 	}
 
 	specPayload, err := buildSpecPayload(
+		ctx,
+		base,
+		client,
 		specPath,
 		modEnvs,
 		modImage,
@@ -596,7 +599,7 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 
 // loadSpec loads a spec from a file path or stdin (when path is "-").
 // Supports both YAML and JSON formats. Returns the spec as JSON bytes.
-func loadSpec(path string) (json.RawMessage, error) {
+func loadSpec(ctx context.Context, base *url.URL, client *http.Client, path string) (json.RawMessage, error) {
 	var data []byte
 	var err error
 
@@ -618,9 +621,9 @@ func loadSpec(path string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("spec is empty")
 	}
 
-	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/env_from_file/tmp_dir),
+	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/env_from_file/tmp_bundle),
 	// then validate with the canonical parser to catch structural issues early.
-	return normalizeModsSpecToJSON(data)
+	return normalizeModsSpecToJSON(ctx, base, client, data)
 }
 
 func outputRunSubmitJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *runSubmitFlags) error {

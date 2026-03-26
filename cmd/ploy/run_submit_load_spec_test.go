@@ -1,29 +1,46 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func decodeTmpFilePayload(t *testing.T, raw any) contracts.TmpFilePayload {
+// newMockBundleSrvForLoadSpec creates a mock bundle server for loadSpec tests.
+func newMockBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *http.Client) {
 	t.Helper()
-
-	b, err := json.Marshal(raw)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/spec-bundles" {
+			data, _ := io.ReadAll(r.Body)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"bundle_id": "test-bundle-id",
+				"cid":       "bafytest",
+				"digest":    "sha256:deadbeef",
+				"size":      len(data),
+			})
+			return
+		}
+		http.Error(w, "unexpected", http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+	u, err := url.Parse(srv.URL)
 	if err != nil {
-		t.Fatalf("marshal tmp_dir entry: %v", err)
+		t.Fatalf("parse server URL: %v", err)
 	}
-	var payload contracts.TmpFilePayload
-	if err := json.Unmarshal(b, &payload); err != nil {
-		t.Fatalf("unmarshal tmp_dir entry: %v", err)
-	}
-	return payload
+	return srv, u, srv.Client()
 }
 
 func TestLoadSpec_ResolvesStepAndRouterPreprocessing(t *testing.T) {
+	_, base, client := newMockBundleSrvForLoadSpec(t)
+
 	tmpDir := t.TempDir()
 	stepEnvPath := filepath.Join(tmpDir, "step.env")
 	stepTmpPath := filepath.Join(tmpDir, "step.txt")
@@ -65,7 +82,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := loadSpec(specPath)
+	payload, err := loadSpec(context.Background(), base, client, specPath)
 	if err != nil {
 		t.Fatalf("loadSpec() unexpected error: %v", err)
 	}
@@ -83,10 +100,20 @@ build_gate:
 	if got, want := stepEnv["STEP_TOKEN"].(string), "step-token"; got != want {
 		t.Fatalf("steps[0].env.STEP_TOKEN got %q, want %q", got, want)
 	}
-	stepTmpDir := step["tmp_dir"].([]any)
-	stepTmp := decodeTmpFilePayload(t, stepTmpDir[0])
-	if got, want := string(stepTmp.Content), "step-tmp"; got != want {
-		t.Fatalf("steps[0].tmp_dir[0].content got %q, want %q", got, want)
+
+	// tmp_dir should be replaced with tmp_bundle after upload.
+	if _, hasTmpDir := step["tmp_dir"]; hasTmpDir {
+		t.Fatalf("expected steps[0].tmp_dir removed after bundle upload")
+	}
+	stepBundle, hasTmpBundle := step["tmp_bundle"].(map[string]any)
+	if !hasTmpBundle {
+		t.Fatalf("expected steps[0].tmp_bundle set after bundle upload")
+	}
+	if stepBundle["bundle_id"] != "test-bundle-id" {
+		t.Errorf("steps[0].tmp_bundle.bundle_id: got %q, want %q", stepBundle["bundle_id"], "test-bundle-id")
+	}
+	if entries, ok := stepBundle["entries"].([]any); !ok || len(entries) != 1 || entries[0] != "step.txt" {
+		t.Errorf("steps[0].tmp_bundle.entries: got %v, want [step.txt]", stepBundle["entries"])
 	}
 
 	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
@@ -97,14 +124,26 @@ build_gate:
 	if got, want := routerEnv["ROUTER_TOKEN"].(string), "router-token"; got != want {
 		t.Fatalf("build_gate.router.env.ROUTER_TOKEN got %q, want %q", got, want)
 	}
-	routerTmpDir := router["tmp_dir"].([]any)
-	routerTmp := decodeTmpFilePayload(t, routerTmpDir[0])
-	if got, want := string(routerTmp.Content), "router-tmp"; got != want {
-		t.Fatalf("build_gate.router.tmp_dir[0].content got %q, want %q", got, want)
+
+	// tmp_dir should be replaced with tmp_bundle.
+	if _, hasTmpDir := router["tmp_dir"]; hasTmpDir {
+		t.Fatalf("expected router.tmp_dir removed after bundle upload")
+	}
+	routerBundle, hasTmpBundle := router["tmp_bundle"].(map[string]any)
+	if !hasTmpBundle {
+		t.Fatalf("expected router.tmp_bundle set after bundle upload")
+	}
+	if routerBundle["bundle_id"] != "test-bundle-id" {
+		t.Errorf("router.tmp_bundle.bundle_id: got %q, want %q", routerBundle["bundle_id"], "test-bundle-id")
+	}
+	if entries, ok := routerBundle["entries"].([]any); !ok || len(entries) != 1 || entries[0] != "router.txt" {
+		t.Errorf("router.tmp_bundle.entries: got %v, want [router.txt]", routerBundle["entries"])
 	}
 }
 
 func TestLoadSpec_ResolvesHealingPreprocessing(t *testing.T) {
+	_, base, client := newMockBundleSrvForLoadSpec(t)
+
 	tmpDir := t.TempDir()
 	healingEnvPath := filepath.Join(tmpDir, "healing.env")
 	healingTmpPath := filepath.Join(tmpDir, "healing.txt")
@@ -138,7 +177,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := loadSpec(specPath)
+	payload, err := loadSpec(context.Background(), base, client, specPath)
 	if err != nil {
 		t.Fatalf("loadSpec() unexpected error: %v", err)
 	}
@@ -156,10 +195,20 @@ build_gate:
 	if got, want := healingEnv["HEALING_TOKEN"].(string), "healing-token"; got != want {
 		t.Fatalf("build_gate.healing.by_error_kind.infra.env.HEALING_TOKEN got %q, want %q", got, want)
 	}
-	healingTmpDir := infra["tmp_dir"].([]any)
-	healingTmp := decodeTmpFilePayload(t, healingTmpDir[0])
-	if got, want := string(healingTmp.Content), "healing-tmp"; got != want {
-		t.Fatalf("build_gate.healing.by_error_kind.infra.tmp_dir[0].content got %q, want %q", got, want)
+
+	// tmp_dir should be replaced with tmp_bundle.
+	if _, hasTmpDir := infra["tmp_dir"]; hasTmpDir {
+		t.Fatalf("expected infra.tmp_dir removed after bundle upload")
+	}
+	infraBundle, hasTmpBundle := infra["tmp_bundle"].(map[string]any)
+	if !hasTmpBundle {
+		t.Fatalf("expected infra.tmp_bundle set after bundle upload")
+	}
+	if infraBundle["bundle_id"] != "test-bundle-id" {
+		t.Errorf("infra.tmp_bundle.bundle_id: got %q, want %q", infraBundle["bundle_id"], "test-bundle-id")
+	}
+	if entries, ok := infraBundle["entries"].([]any); !ok || len(entries) != 1 || entries[0] != "healing.txt" {
+		t.Errorf("infra.tmp_bundle.entries: got %v, want [healing.txt]", infraBundle["entries"])
 	}
 }
 
@@ -179,7 +228,8 @@ env:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := loadSpec(specPath)
+	// No tmp_dir sections, so nil base/client is fine.
+	payload, err := loadSpec(context.Background(), nil, nil, specPath)
 	if err != nil {
 		t.Fatalf("loadSpec() unexpected error: %v", err)
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -18,15 +19,18 @@ func FuzzBuildSpecPayload_NoPanic(f *testing.F) {
 		modEnvs := []string{"KEY=VALUE", "A=B=C", "EMPTY=", "ONLYKEY"}
 
 		payload, err := buildSpecPayload(
-			"",           // no spec file
-			modEnvs,      // env overrides
-			"",           // no image override
-			retain,       // retain flag
-			modCommand,   // command (may be JSON array or string)
-			gitlabPAT,    // gitlab PAT (may be empty)
-			gitlabDomain, // gitlab domain (may be empty)
-			mrSuccess,    // MR on success
-			mrFail,       // MR on fail
+			context.Background(), // ctx
+			nil,                  // no base URL
+			nil,                  // no http client
+			"",                   // no spec file
+			modEnvs,              // env overrides
+			"",                   // no image override
+			retain,               // retain flag
+			modCommand,           // command (may be JSON array or string)
+			gitlabPAT,            // gitlab PAT (may be empty)
+			gitlabDomain,         // gitlab domain (may be empty)
+			mrSuccess,            // MR on success
+			mrFail,               // MR on fail
 		)
 		if err != nil {
 			// On parse/merge error just return; fuzzer will expand inputs.
