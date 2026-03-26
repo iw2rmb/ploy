@@ -118,6 +118,10 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, bp, eventsService), auth.RoleWorker)
 
+	// Spec bundle upload/download endpoints (CLI uploads; worker downloads during execution)
+	s.HandleFunc("POST /v1/spec-bundles", uploadSpecBundleHandler(st, bp), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/spec-bundles/{id}", downloadSpecBundleHandler(st, bs), auth.RoleWorker, auth.RoleControlPlane)
+
 	// Job artifact and diff upload endpoints (run-scoped, no node ID)
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st, bp), auth.RoleWorker)
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/diff", createJobDiffHandler(st, bp), auth.RoleWorker)

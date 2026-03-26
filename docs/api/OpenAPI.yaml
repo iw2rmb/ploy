@@ -182,6 +182,11 @@ paths:
   # SBOM compatibility hints (stack-scoped evidence for deps healing)
   /v1/sboms/compat:
     $ref: './paths/sboms_compat.yaml'
+  # Spec bundle upload (CLI → server) and download (worker ← server)
+  /v1/spec-bundles:
+    $ref: './paths/spec_bundles.yaml'
+  /v1/spec-bundles/{id}:
+    $ref: './paths/spec_bundles_id.yaml'
   # Job diff upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/diff:
     $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'
@@ -333,6 +338,9 @@ components:
       $ref: './components/schemas/controlplane.yaml#/RepoJobItem'
     ListRepoJobsResponse:
       $ref: './components/schemas/controlplane.yaml#/ListRepoJobsResponse'
+    # Spec bundle upload/download schemas
+    SpecBundleUploadResponse:
+      $ref: './paths/spec_bundles.yaml#/components/schemas/SpecBundleUploadResponse'
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed

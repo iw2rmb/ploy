@@ -1,0 +1,34 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string }
+    description: Spec bundle ID (NanoID 8-character string)
+get:
+  tags: [Artifacts]
+  summary: Download a spec bundle by ID (worker ← control plane)
+  description: |
+    Retrieves the raw gzip-compressed spec bundle archive from object storage.
+    Workers call this endpoint to fetch bundles referenced in job specs before
+    execution. The response is streamed directly from object storage.
+
+    **Auth:** Requires `RoleWorker` or `RoleControlPlane`.
+  responses:
+    '200':
+      description: OK — raw bundle bytes
+      content:
+        application/gzip:
+          schema:
+            type: string
+            format: binary
+            description: Gzip-compressed tar archive
+      headers:
+        Content-Disposition:
+          schema: { type: string }
+          description: 'attachment; filename="bundle-{id}.tar.gz"'
+        Content-Length:
+          schema: { type: integer }
+          description: Size of the bundle in bytes
+    '400': { description: Bad Request (invalid bundle ID format) }
+    '404': { description: Spec bundle not found or blob missing }
+    '503': { description: Service Unavailable (object storage unreachable) }

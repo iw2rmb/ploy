@@ -196,6 +196,22 @@ func (s *Service) CreateArtifactBundle(ctx context.Context, params store.CreateA
 	)
 }
 
+// CreateSpecBundle creates a spec bundle entry in the database and uploads the bundle to object storage.
+func (s *Service) CreateSpecBundle(ctx context.Context, params store.CreateSpecBundleParams, data []byte) (store.SpecBundle, error) {
+	return persistBlob(ctx, s, data,
+		func(size int64) { params.Size = size },
+		func(ctx context.Context) (store.SpecBundle, error) {
+			return s.store.CreateSpecBundle(ctx, params)
+		},
+		func(row store.SpecBundle) *string { return row.ObjectKey },
+		func(row store.SpecBundle) any { return row.ID },
+		"spec bundle",
+		func(ctx context.Context, row store.SpecBundle) error {
+			return s.store.DeleteSpecBundle(ctx, row.ID)
+		},
+	)
+}
+
 // LoadRecoveryArtifact resolves and reads a specific artifact path from persisted
 // job artifact bundles. expectedPath must use absolute wire form (for example
 // "/out/gate-profile-candidate.json").

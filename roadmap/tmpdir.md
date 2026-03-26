@@ -27,7 +27,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     1. `go test ./internal/store -run 'Test.*SpecBundle.*'`
   - Reasoning: `medium`
 
-- [ ] 1.2a Add Spec-Bundle Upload/Download API Surface
+- [x] 1.2a Add Spec-Bundle Upload/Download API Surface
   - Repository: `ploy`
   - Component: `internal/server/handlers`; `internal/server/handlers/register.go`; `docs/api/OpenAPI.yaml`; `docs/api/paths/*.yaml`
   - Assumptions:

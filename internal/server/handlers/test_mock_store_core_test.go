@@ -583,6 +583,30 @@ type mockStore struct {
 	listRunsForRepoResult []store.ListRunsForRepoRow
 	listRunsForRepoErr    error
 
+	// SpecBundle tracking
+	createSpecBundleCalled bool
+	createSpecBundleParams store.CreateSpecBundleParams
+	createSpecBundleResult store.SpecBundle
+	createSpecBundleErr    error
+
+	getSpecBundleCalled bool
+	getSpecBundleParam  string
+	getSpecBundleResult store.SpecBundle
+	getSpecBundleErr    error
+
+	getSpecBundleByCIDCalled bool
+	getSpecBundleByCIDParam  string
+	getSpecBundleByCIDResult store.SpecBundle
+	getSpecBundleByCIDErr    error
+
+	updateSpecBundleLastRefAtCalled bool
+	updateSpecBundleLastRefAtParam  string
+	updateSpecBundleLastRefAtErr    error
+
+	deleteSpecBundleCalled bool
+	deleteSpecBundleParam  string
+	deleteSpecBundleErr    error
+
 	// Global Env tracking (config_env table; see docs/envs/README.md#Global Env Configuration)
 	listGlobalEnvCalled bool
 	listGlobalEnvResult []store.ConfigEnv
