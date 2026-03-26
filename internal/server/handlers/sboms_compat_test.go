@@ -92,6 +92,48 @@ func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
 	}
 }
 
+func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
+	t.Parallel()
+
+	st := &mockStore{
+		hasSBOMEvidenceForStackResult: true,
+		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
+			{Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
+			{Lib: "org.slf4j:slf4j-api", Ver: "2.0.13"},
+			{Lib: "ch.qos.logback:logback-classic", Ver: "1.5.6"},
+		},
+	}
+	handler := sbomCompatHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=org.slf4j:slf4j-api,ch.qos.logback:logback-classic:1.5.0", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
+	}
+
+	wantLibs := []string{"ch.qos.logback:logback-classic", "org.slf4j:slf4j-api"}
+	if len(st.listSBOMCompatRowsParams.Libs) != len(wantLibs) {
+		t.Fatalf("query libs len = %d, want %d (%v)", len(st.listSBOMCompatRowsParams.Libs), len(wantLibs), st.listSBOMCompatRowsParams.Libs)
+	}
+	for i := range wantLibs {
+		if st.listSBOMCompatRowsParams.Libs[i] != wantLibs[i] {
+			t.Fatalf("query libs[%d] = %q, want %q", i, st.listSBOMCompatRowsParams.Libs[i], wantLibs[i])
+		}
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got["org.slf4j:slf4j-api"] != "1.7.36" {
+		t.Fatalf("org.slf4j:slf4j-api = %q, want 1.7.36", got["org.slf4j:slf4j-api"])
+	}
+	if got["ch.qos.logback:logback-classic"] != "1.5.6" {
+		t.Fatalf("ch.qos.logback:logback-classic = %q, want 1.5.6", got["ch.qos.logback:logback-classic"])
+	}
+}
+
 func TestSBOMCompatHandler_ValidatesInput(t *testing.T) {
 	t.Parallel()
 
