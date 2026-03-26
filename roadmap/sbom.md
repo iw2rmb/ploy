@@ -45,6 +45,11 @@ Legend: [ ] todo, [x] done.
   - Scope: wire ingestion into gate completion flow; guard by job type/status so failed/canceled gates do not write SBOM rows.
   - Snippets: allowlist `job_type in (pre_gate, post_gate, re_gate)` and `jobs.status='Success'`.
   - Tests: `go test ./internal/server/handlers -run 'Test.*Gate.*SBOM.*Success|Test.*Gate.*SBOM.*NoPersistOnFailure'` — expect writes only on successful gate completions.
+- [x] Remove redundant upload-time SBOM parse/log path from artifact ingestion.
+  - Repository: `ploy`
+  - Component: `internal/server/handlers/jobs_artifact.go`
+  - Scope: stop parsing SBOM rows during artifact upload (`ExtractRowsFromBundle(req.Bundle, ...)`) because rows were not persisted there; keep SBOM persistence solely in completion flow.
+  - Tests: `go test ./internal/server/handlers` — expect artifact upload behavior unchanged while avoiding duplicate parse work and misleading partial wiring.
 
 ## Phase 6: Compatibility API (`/v1/sboms/compat`)
 - [x] Implement compatibility lookup endpoint backed by successful SBOM evidence.
