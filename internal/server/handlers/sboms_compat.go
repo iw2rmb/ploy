@@ -105,17 +105,9 @@ func parseSBOMCompatSelectors(raw string) ([]sbomCompatSelector, []string, error
 		if item == "" {
 			continue
 		}
-		name := ""
-		floor := ""
-		if strings.Contains(item, ":") {
-			nv := strings.SplitN(item, ":", 2)
-			name = strings.ToLower(strings.TrimSpace(nv[0]))
-			floor = strings.TrimSpace(nv[1])
-			if floor == "" {
-				return nil, nil, errCompatSelector(item)
-			}
-		} else {
-			name = strings.ToLower(strings.TrimSpace(item))
+		name, floor, ok := parseSBOMCompatSelector(item)
+		if !ok {
+			return nil, nil, errCompatSelector(item)
 		}
 		if name == "" {
 			return nil, nil, errCompatSelector(item)
@@ -138,6 +130,39 @@ func parseSBOMCompatSelectors(raw string) ([]sbomCompatSelector, []string, error
 	}
 	sort.Strings(libs)
 	return out, libs, nil
+}
+
+func parseSBOMCompatSelector(item string) (name string, floor string, ok bool) {
+	switch strings.Count(item, ":") {
+	case 0:
+		name = strings.ToLower(strings.TrimSpace(item))
+		return name, "", name != ""
+	case 1:
+		nv := strings.SplitN(item, ":", 2)
+		left := strings.TrimSpace(nv[0])
+		right := strings.TrimSpace(nv[1])
+		if left == "" || right == "" {
+			return "", "", false
+		}
+
+		// For ecosystem names like Maven/Gradle group:artifact, keep the full item as the name.
+		if strings.Contains(left, ".") {
+			name = strings.ToLower(strings.TrimSpace(item))
+			return name, "", true
+		}
+
+		name = strings.ToLower(left)
+		return name, right, true
+	default:
+		idx := strings.LastIndex(item, ":")
+		left := strings.TrimSpace(item[:idx])
+		right := strings.TrimSpace(item[idx+1:])
+		if left == "" || right == "" {
+			return "", "", false
+		}
+		name = strings.ToLower(left)
+		return name, right, true
+	}
 }
 
 func errCompatSelector(item string) error {
