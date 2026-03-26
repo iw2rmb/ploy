@@ -69,6 +69,9 @@ type Querier interface {
 	// v1: Creates a new run_repos row scoped to (run_id, repo_id).
 	// Note: attempt defaults to 1; status defaults to 'Queued'.
 	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
+	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
+	// The returned id becomes the bundle_id field in TmpBundleRef.
+	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
@@ -130,6 +133,10 @@ type Querier interface {
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
+	// Returns spec bundle metadata including object_key for object-storage retrieval.
+	GetSpecBundle(ctx context.Context, id types.SpecBundleID) (SpecBundle, error)
+	// Returns the most recently created spec bundle for a given cid.
+	GetSpecBundleByCID(ctx context.Context, cid string) (SpecBundle, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
 	GetStepByJob(ctx context.Context, jobID string) (Step, error)
 	// Checks if a mig_repo has any historical executions (run_repos references).
@@ -234,6 +241,11 @@ type Querier interface {
 	ListRunsWithQueuedRepos(ctx context.Context) ([]types.RunID, error)
 	ListSBOMCompatRows(ctx context.Context, arg ListSBOMCompatRowsParams) ([]ListSBOMCompatRowsRow, error)
 	ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]Sbom, error)
+	// Lists spec bundles ordered by created_at descending (most recent first).
+	ListSpecBundles(ctx context.Context, arg ListSpecBundlesParams) ([]SpecBundle, error)
+	// Lists spec bundles whose last_ref_at is before the given threshold.
+	// Used by GC to find bundles eligible for deletion.
+	ListSpecBundlesUnreferencedBefore(ctx context.Context, lastRefAt pgtype.Timestamptz) ([]SpecBundle, error)
 	// Lists specs ordered by created_at descending (most recent first).
 	// There is an index on created_at to optimize this query.
 	ListSpecs(ctx context.Context, arg ListSpecsParams) ([]Spec, error)
@@ -292,6 +304,8 @@ type Querier interface {
 	// Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
 	// Preserves existing stats and metadata keys via JSONB merge.
 	UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error
+	// Updates last_ref_at to now() for the given spec bundle.
+	UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	UpsertExactGateProfile(ctx context.Context, arg UpsertExactGateProfileParams) (UpsertExactGateProfileRow, error)
 	UpsertGateJobProfileLink(ctx context.Context, arg UpsertGateJobProfileLinkParams) error

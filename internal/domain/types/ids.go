@@ -59,15 +59,16 @@ func idValidator[T any]() func(string) error {
 
 // Tag types for each string ID. Types with format validation implement IDValidator.
 type (
-	runIDTag     struct{}
-	stepIDTag    struct{}
-	jobIDTag     struct{}
-	clusterIDTag struct{}
-	nodeIDTag    struct{}
-	modIDTag     struct{}
-	specIDTag    struct{}
-	modRepoIDTag struct{}
-	repoIDTag    struct{}
+	runIDTag        struct{}
+	stepIDTag       struct{}
+	jobIDTag        struct{}
+	clusterIDTag    struct{}
+	nodeIDTag       struct{}
+	modIDTag        struct{}
+	specIDTag       struct{}
+	modRepoIDTag    struct{}
+	repoIDTag       struct{}
+	specBundleIDTag struct{}
 )
 
 func (runIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidRunID) }
@@ -77,6 +78,9 @@ func (modIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, Err
 func (specIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidSpecID) }
 func (modRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidMigRepoID) }
 func (repoIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidRepoID) }
+func (specBundleIDTag) ValidateID(s string) error {
+	return validateNanoID(s, 8, ErrInvalidSpecBundleID)
+}
 
 // RunID identifies a run instance (workflow execution).
 type RunID = StringID[runIDTag]
@@ -109,6 +113,10 @@ type MigRepoID = StringID[modRepoIDTag]
 // RepoID identifies a global repository record.
 // Uses NanoID(8) and maps to repos.id / run_repos.repo_id / jobs.repo_id.
 type RepoID = StringID[repoIDTag]
+
+// SpecBundleID identifies a spec bundle upload record in the spec_bundles table.
+// Uses NanoID(8) for stable, URL-safe identifiers; becomes the bundle_id in TmpBundleRef.
+type SpecBundleID = StringID[specBundleIDTag]
 
 // MigRef is a reference that can be either a mig ID or a mig name.
 // Used for endpoints that accept "mig id OR name" in the path.
@@ -155,14 +163,15 @@ func (v *MigRef) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v
 
 // Validation errors for ID types.
 var (
-	ErrInvalidRunID     = errors.New("invalid run id")
-	ErrInvalidJobID     = errors.New("invalid job id")
-	ErrInvalidNodeID    = errors.New("invalid node id")
-	ErrInvalidMigID     = errors.New("invalid mig id")
-	ErrInvalidSpecID    = errors.New("invalid spec id")
-	ErrInvalidMigRepoID = errors.New("invalid mig repo id")
-	ErrInvalidRepoID    = errors.New("invalid repo id")
-	ErrInvalidDiffID    = errors.New("invalid diff id")
+	ErrInvalidRunID        = errors.New("invalid run id")
+	ErrInvalidJobID        = errors.New("invalid job id")
+	ErrInvalidNodeID       = errors.New("invalid node id")
+	ErrInvalidMigID        = errors.New("invalid mig id")
+	ErrInvalidSpecID       = errors.New("invalid spec id")
+	ErrInvalidMigRepoID    = errors.New("invalid mig repo id")
+	ErrInvalidRepoID       = errors.New("invalid repo id")
+	ErrInvalidDiffID       = errors.New("invalid diff id")
+	ErrInvalidSpecBundleID = errors.New("invalid spec bundle id")
 )
 
 // DiffID identifies a stored diff record.

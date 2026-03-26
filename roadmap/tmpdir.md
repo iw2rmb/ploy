@@ -16,21 +16,31 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     2. `go test ./docs/...`
   - Reasoning: `medium`
 
-- [ ] 1.2 Add Spec-Bundle Storage And API Surface
+- [x] 1.2 Add Spec-Bundle Metadata Storage Primitives
   - Repository: `ploy`
-  - Component: `internal/store/schema.sql`; `internal/store/queries/*.sql`; `internal/server/handlers`; `internal/server/handlers/register.go`; `docs/api/OpenAPI.yaml`
-  - Assumptions:
-    - Bundle lifecycle is tied to spec usage, with GC based on unreferenced bundle rows.
-    - A control-plane API is acceptable for CLI uploads; direct Garage credentials are not exposed to CLI.
+  - Component: `internal/store/schema.sql`; `internal/store/queries/*.sql`; `internal/store/*.sql.go`
   - Implementation:
-    1. Add persistent metadata for uploaded spec bundles (`id`, `cid`, `digest`, `size`, `object_key`, `created_by`, `created_at`, `last_ref_at`).
-    2. Implement control-plane upload endpoint for bundle bytes and worker download endpoint for bundle retrieval by `bundle_id`.
-    3. Register new endpoints and OpenAPI contracts with explicit request size limits and auth roles.
+    1. Add persistent metadata for uploaded spec bundles (`id`, `cid`, `digest`, `size`, `object_key`, `created_by`, `created_at`, `last_ref_at`) with indexes for `bundle_id`/`cid` lookup and GC scans.
+    2. Add store query surface for create/get/list/update-last-ref operations on spec bundle rows.
+    3. Add store tests for spec-bundle constraints, lookup paths, and `last_ref_at` mutation behavior.
   - Verification:
     1. `go test ./internal/store -run 'Test.*SpecBundle.*'`
-    2. `go test ./internal/server/handlers -run 'Test.*SpecBundle.*'`
-    3. `go test ./docs/api/...`
-  - Reasoning: `xhigh`
+  - Reasoning: `medium`
+
+- [ ] 1.2a Add Spec-Bundle Upload/Download API Surface
+  - Repository: `ploy`
+  - Component: `internal/server/handlers`; `internal/server/handlers/register.go`; `docs/api/OpenAPI.yaml`; `docs/api/paths/*.yaml`
+  - Assumptions:
+    - Bundle lifecycle is tied to spec usage, with GC based on unreferenced spec-bundle rows.
+    - A control-plane API is acceptable for CLI uploads; direct Garage credentials are not exposed to CLI.
+  - Implementation:
+    1. Implement control-plane upload endpoint for spec bundle bytes with explicit request size limits and metadata response.
+    2. Implement worker download endpoint for bundle retrieval by `bundle_id` with role-scoped authorization and deterministic error semantics.
+    3. Register new endpoints and OpenAPI contracts with request/response schemas and auth role requirements.
+  - Verification:
+    1. `go test ./internal/server/handlers -run 'Test.*SpecBundle.*'`
+    2. `go test ./docs/api/...`
+  - Reasoning: `high`
 
 - [ ] 1.3 Rewrite CLI TmpDir Preprocessing To Archive And Upload
   - Repository: `ploy`

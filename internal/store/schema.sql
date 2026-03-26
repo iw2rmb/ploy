@@ -477,6 +477,28 @@ CREATE TABLE IF NOT EXISTS config_env (
 -- Index for listing by scope (useful for job claim filtering).
 CREATE INDEX IF NOT EXISTS config_env_scope_idx ON config_env(scope);
 
+-- Spec bundles (pre-uploaded tar archives referenced by spec tmp_bundle fields)
+-- One row per uploaded bundle; id becomes the bundle_id in TmpBundleRef.
+-- last_ref_at is updated each time a spec or run references this bundle, enabling
+-- GC of unreferenced bundles via last_ref_at scans.
+-- Note: id is TEXT (NanoID-backed, 8 chars); application code generates IDs via NewSpecBundleID().
+CREATE TABLE IF NOT EXISTS spec_bundles (
+  id          TEXT PRIMARY KEY,   -- NanoID-backed string ID (8 chars); no default, app-generated via NewSpecBundleID().
+  cid         TEXT NOT NULL,      -- Content-addressed identifier for deduplication.
+  digest      TEXT NOT NULL,      -- Content hash for integrity verification (e.g. sha256:...).
+  size        BIGINT NOT NULL CHECK (size > 0),  -- Archive size in bytes.
+  object_key  TEXT GENERATED ALWAYS AS (
+    'spec_bundles/' || id || '/bundle.tar'
+  ) STORED,
+  created_by  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_ref_at TIMESTAMPTZ NOT NULL DEFAULT now()  -- Updated on each spec reference; used for GC scans.
+);
+-- Index for deduplication and CID-based lookup.
+CREATE INDEX IF NOT EXISTS spec_bundles_cid_idx ON spec_bundles(cid);
+-- Index for GC scans: find bundles not referenced since a given time.
+CREATE INDEX IF NOT EXISTS spec_bundles_last_ref_idx ON spec_bundles(last_ref_at);
+
 -- Advisory lock usage (documentation only)
 -- Note: v1 model does not use run-level assignment; runs are created with status='Started'.
 -- Jobs are claimed individually at the job level; see ClaimJob query in jobs.sql.
