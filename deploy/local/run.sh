@@ -232,6 +232,23 @@ if not host:
 PY
 }
 
+resolve_required_go_toolchain() {
+  local required
+
+  required="$(awk -F':=' '/^[[:space:]]*REQUIRED_GO_TOOLCHAIN[[:space:]]*:=[[:space:]]*/ {
+    gsub(/[[:space:]]/, "", $2)
+    print $2
+    exit
+  }' "$ROOT_DIR/Makefile")"
+
+  if [[ -z "$required" ]]; then
+    echo "error: failed to resolve REQUIRED_GO_TOOLCHAIN from Makefile" >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$required"
+}
+
 wait_for_postgres() {
   local admin_dsn="$1"
   local last_status=""
@@ -799,6 +816,7 @@ JSON
 
 main() {
   local admin_pg_dsn
+  local required_go_toolchain
   local target_server=0
   local target_node=0
   local skip_build="${PLOY_SKIP_BUILD:-0}"
@@ -847,8 +865,9 @@ main() {
   if (( skip_build_flag )); then
     log "Skipping build step and reusing dist binaries (PLOY_SKIP_BUILD=${PLOY_SKIP_BUILD})..."
   else
-    log "Building CLI/binaries (make build)..."
-    GOTOOLCHAIN=go1.25.8 make build
+    required_go_toolchain="$(resolve_required_go_toolchain)"
+    log "Building CLI/binaries (make build, GOTOOLCHAIN=${GOTOOLCHAIN:-$required_go_toolchain})..."
+    GOTOOLCHAIN="${GOTOOLCHAIN:-$required_go_toolchain}" make build
   fi
 
   if [[ ! -f "dist/ploy" ]]; then
