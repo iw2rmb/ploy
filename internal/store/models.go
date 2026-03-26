@@ -253,6 +253,17 @@ type Spec struct {
 	ArchivedAt pgtype.Timestamptz `json:"archived_at"`
 }
 
+type SpecBundle struct {
+	ID        types.SpecBundleID `json:"id"`
+	Cid       string             `json:"cid"`
+	Digest    string             `json:"digest"`
+	Size      int64              `json:"size"`
+	ObjectKey *string            `json:"object_key"`
+	CreatedBy *string            `json:"created_by"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	LastRefAt pgtype.Timestamptz `json:"last_ref_at"`
+}
+
 type Stack struct {
 	ID        int64              `json:"id"`
 	Lang      string             `json:"lang"`
