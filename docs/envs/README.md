@@ -2,7 +2,7 @@
 
 **Note: Postgres/Bearer Token Pivot (November 2025)**
 
-As of the server/node pivot described in `README.md`, the following legacy systems have been removed:
+As of the server/node pivot, the following legacy systems have been removed:
 - **etcd**: All `PLOY_ETCD_*` variables are no longer consumed by the codebase.
 - **mTLS client authentication**: Replaced with bearer token authentication for CLI and nodes.
 - **Node labels**: Removed in favor of resource-snapshot scheduling.
@@ -21,18 +21,18 @@ defaults change, or components adopt additional configuration.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (e.g., `k8s`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
-- `PLOY_DB_DSN` — Required by `deploy/local/run.sh` and `deploy/vps/run.sh`.
+- `PLOY_DB_DSN` — Required by local and offline-VPS deploy workflows.
   Used both for host-side setup SQL (DB create/drop, token insert, node seed)
   and injected into the server container as `PLOY_POSTGRES_DSN`.
   Host-side DSN may use `localhost`; local deploy rewrites loopback hosts
   (`localhost`, `127.0.0.1`, `::1`) to `host.docker.internal` for container use.
   For VPS deploy, the DSN must already be reachable from both the remote host
-  and the remote `server` container; `deploy/vps/run.sh` does not rewrite it.
+  and the remote `server` container; the offline-VPS deploy flow does not rewrite it.
   Non-loopback hosts must be reachable from inside containers.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
 - `PLOY_CA_CERTS` — Optional path to a PEM CA bundle used by
-  `deploy/local/run.sh` and `deploy/vps/run.sh` to configure Docker daemon trust for Docker Hub
+  local and offline-VPS deploy workflows to configure Docker daemon trust for Docker Hub
   endpoints (`docker.io`, `registry-1.docker.io`, `auth.docker.io`,
   `index.docker.io`).
   The script also installs the bundle into system CA trust before restarting
@@ -43,14 +43,14 @@ defaults change, or components adopt additional configuration.
   Current automation targets:
   - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
   - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
-  `deploy/vps/run.sh` also accepts `PLOY_CA_CERT` as an alias for this value.
+  The offline-VPS deploy flow also accepts `PLOY_CA_CERT` as an alias for this value.
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
-  port `8080` in `deploy/local/docker-compose.yml`. Default: `8080`. Both local
+  port `8080` in the local compose stack. Default: `8080`. Both local
   and VPS deploy scripts pass it through to the compose stack. Use this when the
   host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
-- `WORKER_TOKEN_PATH` — Optional host path used by local scripts to persist the worker bearer
+- `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
-  Default: `deploy/local/node/bearer-token` (file path). If this path is a directory, scripts
+  Default: `node/bearer-token` under the local deploy workspace (file path). If this path is a directory, scripts
   replace it with a file automatically.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`.
@@ -82,25 +82,25 @@ Role model (bearer token claims):
   reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
   Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (default local value: `127.0.0.1:5000/ploy`).
-- `PLOY_GARAGE_FORCE_IMAGES` — Optional flag for `deploy/local/run.sh` image sync step.
-  When set to `1`, `true`, `yes`, or `on`, local deploy calls `deploy/images/garage.sh --force`
+- `PLOY_GARAGE_FORCE_IMAGES` — Optional flag for the local deploy image-sync step.
+  When set to `1`, `true`, `yes`, or `on`, local deploy forces image rebuild/repush
   and rebuilds/repushes mig + build-gate images even if they already exist in Garage-backed registry.
-- `PLOY_REGISTRY_PORT` — Host port for the local Garage-backed OCI registry in `deploy/local/docker-compose.yml`
+- `PLOY_REGISTRY_PORT` — Host port for the local Garage-backed OCI registry in the local compose stack
   (default: `5000`). Both local and VPS deploy scripts pass it through to the
   compose stack.
 - `AUTH_SECRET_PATH` — Optional path to the auth-secret file used by
-  `deploy/local/run.sh` and `deploy/vps/run.sh` for JWT signing secret reuse.
+  local and offline-VPS deploy workflows for JWT signing secret reuse.
   Defaults:
-  - local deploy: `deploy/local/auth-secret.txt`
-  - VPS deploy: `deploy/vps/auth-secret.txt`
-- `CLUSTER_ID` — Optional cluster ID used by `deploy/local/run.sh` and
-  `deploy/vps/run.sh` when generating bearer tokens. Default: `local`.
-- `NODE_ID` — Optional node ID used by `deploy/local/run.sh` and
-  `deploy/vps/run.sh` when seeding the default worker node row and worker token
+  - local deploy: `auth-secret.txt` under local deploy workspace
+  - VPS deploy: `auth-secret.txt` under offline-VPS deploy workspace
+- `CLUSTER_ID` — Optional cluster ID used by local and offline-VPS deploy workflows
+  when generating bearer tokens. Default: `local`.
+- `NODE_ID` — Optional node ID used by local and offline-VPS deploy workflows
+  when seeding the default worker node row and worker token
   description. Default: `local1`.
 - `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
   as `PLOY_CONTAINER_REGISTRY`.
-- `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by `deploy/images/build-and-push-migs.sh`.
+- `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by the mig image build/push helper.
   Default fallback is `${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}`.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
@@ -118,7 +118,7 @@ Role model (bearer token claims):
   - `tmp_bundle` — Per-block bundle reference for file injection: CLI archives and uploads user-specified files/directories, then records the bundle reference (`bundle_id`, `cid`, `digest`, `entries`) in the spec. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_bundle file injection](#tmp_bundle-file-injection) below.
   - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
-  - See `docs/schemas/mig.example.yaml` for the full schema
+  - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 ### tmp_bundle file injection
 
 `tmp_bundle` is an optional bundle reference that injects files/directories into a container under `/tmp/<name>` (read-only mounts). It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
@@ -213,7 +213,7 @@ Router runtime context (injected for `build_gate.router` executions):
 - `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
 - `PLOY_LOOP_KIND` — loop context (`healing`)
 
-See `docs/build-gate/README.md` for Build Gate configuration and execution details.
+See [Build Gate docs](../build-gate/README.md) for Build Gate configuration and execution details.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
@@ -266,8 +266,7 @@ setting on typical deployments where Docker runs on the default Unix socket.
 | `DOCKER_CERT_PATH`   | (unset)                          | Directory containing `ca.pem`, `cert.pem`, `key.pem` for TLS |
 | `DOCKER_API_VERSION` | (auto-negotiated)                | Override API version; normally unnecessary with v29+         |
 
-**Implementation**: `internal/workflow/step/container_docker.go:59-66` constructs the
-Docker client with `client.FromEnv` and `client.WithAPIVersionNegotiation`.
+Runtime behavior: the node's Docker client is created from standard Docker env vars with API version negotiation enabled.
 
 - `DOCKER_AUTH_CONFIG` — Optional Docker auth config JSON used by node image pulls.
   When set, the node extracts credentials for the target image registry and passes
@@ -460,8 +459,7 @@ Precedence at server startup:
 - `PLOY_POSTGRES_DSN` — DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
   The server no longer recognizes `PLOY_SERVER_PG_DSN`.
-- `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by integration tests (e.g., `tests/integration/*` and
-  packages that hit a real database such as `internal/store`). When unset, such tests skip automatically.
+- `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by integration and database-backed tests. When unset, such tests skip automatically.
 
 `ployd` reads `PLOY_POSTGRES_DSN` at startup; when unset, it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_POSTGRES_DSN}` in
 the config file are treated as unset unless the environment variable is actually present.
@@ -490,7 +488,7 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
 | `PLOY_OBJECTSTORE_REGION` | AWS region (optional; for local Garage use `garage`) | - |
 
-For local development, these are configured in `deploy/local/docker-compose.yml`. The local stack includes:
+For local development, these are configured in the local compose stack. The local stack includes:
 - Garage service for S3-compatible storage.
 - `garage-init` bootstrap that creates/authorizes:
   - `ploy` bucket (logs/diffs/artifacts blobs)
@@ -570,8 +568,7 @@ The `scope` parameter controls which job types receive each variable:
 
 ### ORW CLI Contract (Typed)
 
-The shared ORW runtime contract is codified in `internal/workflow/contracts/orw_cli_contract.go`.
-This contract is consumed by runtime and node parsing code to keep ORW behavior deterministic.
+The shared ORW runtime contract is consumed by runtime and node parsing code to keep ORW behavior deterministic.
 
 Required recipe coordinates:
 

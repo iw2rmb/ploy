@@ -13,10 +13,10 @@ checkpoint notes in the repository.
   `job_type`, `job_image`, and `next_id` (successor link in the job chain).
 - **Spec** — YAML/JSON file or inline JSON describing container image,
   command, env, Build Gate and `steps[]` (canonical execution list). Parsed by
-  the CLI in `cmd/ploy/mig_run_spec.go`.
+  the CLI before submission.
 - **Build Gate** — Validation pass run via Docker containers to ensure the
   workspace compiles/tests successfully. The `GateExecutor` adapter
-  (`internal/workflow/step`) abstracts execution; nodes claim gate jobs
+  abstracts execution; nodes claim gate jobs
   from the unified queue and execute them locally. Gates run at two distinct points
   in the lifecycle:
   - **Pre-mig gate** — runs once on the initial workspace before any steps execute.
@@ -116,7 +116,7 @@ jobs and claimed by nodes using queue eligibility + `next_id` successor links:
   and `runGateStage` helpers, so hydration and gate pass/fail semantics are identical
   across pre-mig and post/re-gate paths.
 
-See `docs/build-gate/README.md` for gate configuration and execution details.
+See [Build Gate docs](./build-gate/README.md) for gate configuration and execution details.
 
 ### Gate failure semantics
 
@@ -315,18 +315,7 @@ The <code>healing-log.md</code> format:
 ...
 ```
 
-Implementation references:
-
-- Type definitions: `internal/nodeagent/run_options.go` (`HealingConfig`, `HealingMod`, `RouterConfig`).
-- Spec parsing: `internal/workflow/contracts/mods_spec_parse.go` (`parseHealingSpec`, `parseRouterSpec`).
-- Spec conversion: `internal/nodeagent/run_options.go` (`modsSpecToRunOptions`).
-- Router execution: `internal/nodeagent/execution_orchestrator_router_runtime.go` (`runRouterForGateFailure`).
-- Healing execution: `internal/nodeagent/execution_orchestrator_jobs.go` (`executeHealingJob`).
-- Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`.
-- Summary parsing: `internal/nodeagent/recovery_io.go` (`parseBugSummary`, `parseActionSummary`).
-- Metadata types: `internal/workflow/contracts/build_gate_metadata.go` (`BugSummary`),
-  `internal/workflow/contracts/job_meta.go` (`ActionSummary`).
-- Schema example: `docs/schemas/mig.example.yaml`.
+For an end-to-end schema example, see [mig.example.yaml](./schemas/mig.example.yaml).
 
 ### Workspace and rehydration semantics
 
@@ -334,8 +323,7 @@ This subsection clarifies which code version each Build Gate sees during executi
 Understanding workspace state is essential for debugging gate failures and reasoning
 about multi-step runs where diffs accumulate across steps.
 
-**Implementation reference:**
-- `internal/nodeagent/execution_orchestrator.go` — `executeRun` and `rehydrateWorkspaceForStep`.
+Rehydration is performed by the node runtime before each job starts.
 
 #### Pre-mig gate workspace
 
@@ -391,22 +379,12 @@ Key invariants:
 
 #### Summary table
 
-| Gate Phase     | Workspace State                                      | Code Reference                              |
-|----------------|------------------------------------------------------|---------------------------------------------|
-| Pre-mig gate   | Fresh clone of base_ref                              | `rehydrateWorkspaceForStep` with stepIndex=0 |
-| Post-mig gate[k] | Base clone + diffs[0..k-1] + mig[k] changes         | `rehydrateWorkspaceForStep` with stepIndex=k |
+| Gate Phase     | Workspace State                                      | Runtime Behavior                             |
+|----------------|------------------------------------------------------|----------------------------------------------|
+| Pre-mig gate   | Fresh clone of base_ref                              | Rehydrated baseline workspace for step `0`   |
+| Post-mig gate[k] | Base clone + diffs[0..k-1] + mig[k] changes       | Rehydrated workspace for step `k`            |
 
-### Implementation references
-
-- Gate executor: `internal/workflow/step/gate_docker.go` (`GateExecutor`).
-- Gate job execution: `internal/nodeagent/execution_orchestrator_gate.go`.
-- Healing job execution: `internal/nodeagent/execution_orchestrator_jobs.go`.
-- Router runtime: `internal/nodeagent/execution_orchestrator_router_runtime.go`.
-- Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`.
-- Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
-- Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).
-- Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
-- **Build Gate configuration**: See `docs/build-gate/README.md` for gate configuration
+- **Build Gate configuration**: See [Build Gate docs](./build-gate/README.md) for gate configuration
   and Docker-based execution details.
 
 ## 1.2 Stack-Aware Image Selection
@@ -446,7 +424,7 @@ The Build Gate detects the workspace stack during validation based on file marke
 
 The detected stack is propagated from the Build Gate to Mods steps via
 `BuildGateStageMetadata.Tool`, which is converted to a `ModStack` using
-`ToolToModStack()` in `internal/workflow/contracts/job_image.go`.
+`ToolToModStack()` in runtime implementation.
 
 ### Image resolution rules
 
@@ -584,12 +562,12 @@ node agent propagates deterministic failure fields into run stats metadata:
 
 ### Implementation references
 
-- Image type and resolution: `internal/workflow/contracts/job_image.go`
+- Image type and resolution: runtime implementation
   (`JobImage`, `ResolveImage`, `ParseJobImage`, `ToolToModStack`).
-- Stack propagation: `internal/workflow/contracts/build_gate_metadata.go`
+- Stack propagation: runtime implementation
   (`BuildGateStageMetadata.Tool`).
-- Image resolution in executor: `internal/nodeagent/run_options.go`.
-- Unit tests: `internal/workflow/contracts/job_image_test.go`.
+- Image resolution in executor: runtime implementation.
+- Unit tests: runtime implementation.
 
 ## 1.3 Job Order (DAG)
 
@@ -680,11 +658,11 @@ post-gate  ───────────────▶├─▶ heal-a → 
 
 ### Implementation references
 
-- Job ordering/claim semantics: `internal/store/queries/jobs.sql`, `internal/nodeagent/claimer.go`
-- Healing job insertion and chain rewiring: `internal/server/handlers/nodes_complete_healing.go`
-- Recovery classification/context: `internal/server/handlers/nodes_complete_healing_recovery_context.go`
-- Infra candidate evaluation: `internal/server/handlers/nodes_complete_healing_infra_candidate.go`
-- Linked-job cancellation traversal: `internal/server/handlers/nodes_complete_healing_cancel.go`
+- Job ordering/claim semantics: runtime implementation, runtime implementation
+- Healing job insertion and chain rewiring: runtime implementation
+- Recovery classification/context: runtime implementation
+- Infra candidate evaluation: runtime implementation
+- Linked-job cancellation traversal: runtime implementation
 
 ## 1.4 Batched Mods Runs (`runs` + `run_repos`)
 
@@ -940,19 +918,19 @@ workflows.
 
 **Download size limits (CLI):**
 
-- The CLI streams and gunzips diff downloads (no “read-all then gunzip-all”) using `internal/cli/httpx.GunzipToBytes`.
+- The CLI streams and gunzips diff downloads (no “read-all then gunzip-all”) using runtime implementation.
 - The decompressed patch is capped at 256 MiB (`httpx.MaxGunzipOutputBytes`) to mitigate gzip “zip bombs”.
-- Diff IDs are validated as UUIDs (`internal/domain/types.DiffID`) when decoded from API responses and when constructing download requests.
+- Diff IDs are validated as UUIDs (runtime implementation) when decoded from API responses and when constructing download requests.
 
 **Repo URL rules:**
 
-Repo URL matching uses the shared `vcs.NormalizeRepoURL` helper (see `internal/vcs/repourl.go`):
+Repo URL matching uses the shared `vcs.NormalizeRepoURL` helper (see runtime implementation):
 - Normalization: trim whitespace, strip trailing `/` and `.git` suffix.
 - Matching (server): compare normalized strings; no URL parsing is performed.
 The CLI derives `repo_url` from the git remote URL; the server performs normalized matching
 to select the correct `run_repos` entry.
 
-The CLI validates `repo_url` using `internal/domain/types.RepoURL` (allowed schemes: `https://`, `ssh://`, `file://`) when:
+The CLI validates `repo_url` using runtime implementation (allowed schemes: `https://`, `ssh://`, `file://`) when:
 - the user provides a repo URL explicitly (submit, batch create, `mig repo add`, `mig run --repo`), and
 - the CLI derives `repo_url` from a git remote for pull commands (`run pull`, `mig pull`).
 
@@ -981,15 +959,15 @@ This section is the canonical CLI reference for local pull workflows.
 
 ### Implementation references
 
-- Run submission + repo add: `internal/server/handlers/runs_submit.go`, `internal/server/handlers/runs_batch_http.go`.
-- Run repos queries: `internal/store/queries/run_repos.sql`.
-- Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
-- CLI subcommands: `cmd/ploy/mig_run_repo.go`.
-- Schema: `internal/store/schema.sql` (see `mig_repos`, `runs`, `run_repos`, `jobs` tables).
+- Run submission + repo add: runtime implementation, runtime implementation.
+- Run repos queries: runtime implementation.
+- Batch scheduler: runtime implementation.
+- CLI subcommands: CLI implementation.
+- Schema: runtime implementation (see `mig_repos`, `runs`, `run_repos`, `jobs` tables).
 
 ## 2. Data Model
 
-### 2.1 Run summary (`internal/migs/api`)
+### 2.1 Run summary (runtime implementation)
 
 `RunSummary` is the **canonical wire type** for Mods run status. It is the single
 response schema for:
@@ -1000,7 +978,7 @@ response schema for:
 **Wire contract guarantees:**
 
 - No wrapper types — `RunSummary` is returned directly as the JSON root.
-- Field names are stable and match `internal/migs/api/types.go` exactly.
+- Field names are stable and match runtime implementation exactly.
 - All IDs use KSUID format (27 characters, lexicographically sortable).
 
 **OpenAPI reference:** See `docs/api/components/schemas/controlplane.yaml#/RunSummary`
@@ -1096,7 +1074,7 @@ value is a `StageStatus` object describing that job's execution state.
 		    - `node_id` — which node claimed this job.
 	    - `job_type` — job phase (`pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`, `mr`).
 	    - `job_image` — container image name for this job (persisted by the node for mig/heal/gate jobs).
-		    - `meta` — JSONB with structured job metadata (optional; see `internal/workflow/contracts.JobMeta`).
+		    - `meta` — JSONB with structured job metadata (optional; see runtime implementation).
   - Dynamic insertion rewires explicit successor links:
     - Initial chain: `pre-gate -> mig-0 -> post-gate`.
     - Healing insertion updates `failed.next_id` to `heal`, then links healing tail to the former successor.
@@ -1104,7 +1082,7 @@ value is a `StageStatus` object describing that job's execution state.
 	- **Server-driven scheduling**
 		  - Jobs are created with status `Created` (not yet claimable) or `Queued`
 		    (ready to claim). The first job (`pre-gate`) is created as `Queued`.
-		  - `ClaimJob` (`internal/store/queries/jobs.sql`) only returns `Queued`
+		  - `ClaimJob` (runtime implementation) only returns `Queued`
 		    jobs. This ensures nodes cannot claim jobs until the server decides they
 		    are ready.
 		  - When a job completes successfully, the server promotes that job's
@@ -1114,10 +1092,10 @@ value is a `StageStatus` object describing that job's execution state.
 		    `Queued` to be claimed immediately after insertion.
 
 - **Diffs**
-  - Generated by the workflow runtime (`internal/workflow/step`) and
+  - Generated by the workflow runtime (runtime implementation) and
     uploaded by nodeagents using `/v1/runs/{run_id}/jobs/{job_id}/diff`.
   - Exposed via:
-	    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` (`internal/server/handlers/diffs.go`)
+	    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` (runtime implementation)
 	      — returns a list of diffs with `job_id` and summary metadata, ordered by
 	      producing job chain position, then `created_at` (ascending).
 	    - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — returns the gzipped unified diff.
@@ -1135,7 +1113,7 @@ value is a `StageStatus` object describing that job's execution state.
 
 ## 3. Control Plane HTTP Surfaces
 
-### 3.1 Mods endpoints (`internal/server/handlers`)
+### 3.1 Mods endpoints (runtime implementation)
 
 - `POST /v1/runs` — submit a single-repo Mods run.
   - Shape: `{repo_url, base_ref, target_ref, spec, created_by?}`.
@@ -1160,7 +1138,7 @@ value is a `StageStatus` object describing that job's execution state.
 
 - `GET /v1/runs/{id}/logs` — SSE event stream for a run's logs and status.
   - Handler: `getRunLogsHandler`.
-  - Uses the internal hub (`internal/stream`) and events service to stream:
+  - Uses the internal hub (runtime implementation) and events service to stream:
     - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,job_type,next_id}` (see § 7.2).
     - `event:  run`, data: `RunSummary`.
     - `event: retention`, data: `RetentionHint`.
@@ -1182,7 +1160,7 @@ value is a `StageStatus` object describing that job's execution state.
   `POST /v1/runs/{run_id}/jobs/{job_id}/artifact`, `POST /v1/runs/{run_id}/jobs/{job_id}/diff` —
   write endpoints used by nodeagents to persist logs, diffs, and artifacts.
 
-### 3.2 Node endpoints (`internal/server/handlers/register.go`)
+### 3.2 Node endpoints (runtime implementation)
 
 Nodeagents use `/v1/nodes/*` to execute work:
 
@@ -1212,7 +1190,7 @@ Nodeagents use `/v1/nodes/*` to execute work:
 - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact` — upload per-job artifacts.
 - Legacy HTTP Build Gate endpoints (`/v1/nodes/{id}/buildgate/*`) have been
   removed; gate execution now runs as jobs in the unified queue claimed via
-  `/v1/nodes/{id}/claim`. See `docs/build-gate/README.md` for gate configuration,
+  `/v1/nodes/{id}/claim`. See [Build Gate docs](./build-gate/README.md) for gate configuration,
   unified jobs behavior, and a brief historical note on the removed HTTP mode.
 
 Current stale-heartbeat recovery behavior:
@@ -1259,7 +1237,7 @@ All mutating requests from worker nodes (POST/PUT/DELETE) must include the
 control plane uses this header to validate job ownership and attribute
 artifacts/diffs to the correct node.
 
-### 3.3 Runs endpoints (`internal/server/handlers/runs_batch_http.go`)
+### 3.3 Runs endpoints (runtime implementation)
 
 - `GET /v1/runs` — list batch runs with basic metadata (mod_id, spec_id, status, timestamps) and optional per-repo status counts.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
@@ -1272,8 +1250,8 @@ artifacts/diffs to the correct node.
 For a spec with exactly one `steps[]` entry:
 
 1. CLI (`ploy mig run`) builds a `RunSubmitRequest` in
-   `internal/cli/migs/submit.go` and an optional spec JSON payload in
-   `cmd/ploy/mig_run_spec.go`.
+   runtime implementation and an optional spec JSON payload in
+   CLI implementation.
 2. CLI submits to `POST /v1/runs`. The control plane:
    - Creates `runs` + `run_repos` rows.
    - Publishes an initial `RunSummary` over SSE.
@@ -1308,7 +1286,7 @@ For a spec with multiple `steps[]` entries:
      the claimed job's `next_id` successor only after prior jobs succeed.
    - Execute each job against a workspace that reflects all prior steps.
 
-Workspace rehydration is implemented in `internal/nodeagent/execution_orchestrator.go`:
+Workspace rehydration is implemented in runtime implementation:
 
 - `rehydrateWorkspaceForStep`:
   - Copies the base clone (base_ref).
@@ -1370,7 +1348,7 @@ Mods container images are standard OCI images with the following expectations:
   - **Precedence**: Per-run env (spec or CLI flags) wins over global env—existing
     keys are never overwritten.
   - **Common global vars**: `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`, `OPENAI_API_KEY`.
-    See `docs/envs/README.md` § "Global Env Configuration" for full details.
+    See [Environment Variables](./envs/README.md) § "Global Env Configuration" for full details.
 
 - **Execution**
   - Entry point should read/modify the repo under `/workspace`.
@@ -1395,26 +1373,26 @@ Mods container images are standard OCI images with the following expectations:
 
 ## 6. CLI Surfaces for Mods
 
-The CLI entry points for Mods are implemented in `cmd/ploy`:
+The CLI entry points for Mods are implemented in CLI implementation:
 
 - `ploy mig run`:
-  - Parses flags in `cmd/ploy/mig_command.go`.
-  - Builds the spec payload in `cmd/ploy/mig_run_spec.go` (handles `env` and
+  - Parses flags in CLI implementation.
+  - Builds the spec payload in CLI implementation (handles `env` and
     `env_from_file`).
-  - Constructs and submits `RunSubmitRequest` through `internal/cli/migs`.
-  - Submits via `internal/cli/migs.SubmitCommand`.
+  - Constructs and submits `RunSubmitRequest` through runtime implementation.
+  - Submits via runtime implementation.
   - Optional `--follow` displays a summarized per-repo job graph until completion,
-    implemented via `internal/cli/follow.Engine`. The job graph refreshes on
+    implemented via runtime implementation. The job graph refreshes on
     SSE events from `/v1/runs/{id}/logs` but does not stream container logs.
     Use `ploy run logs <run-id>` to stream logs.
 
 - `ploy mig run <mig-id|name>`:
-  - Creates a run from a mig project via `cmd/ploy/mig_run_project.go`.
+  - Creates a run from a mig project via CLI implementation.
   - Supports `--repo`, `--failed` for repo selection.
   - Optional `--follow` displays the job graph until completion.
 
 - `ploy pull`:
-  - Local repo pull workflow via `cmd/ploy/pull.go`.
+  - Local repo pull workflow via CLI implementation.
   - Ensures a run exists for the current HEAD SHA and pulls diffs.
   - Optional `--follow` displays the job graph and proceeds to pull diffs.
   - `--dry-run` prints planned actions and does not initiate a run or save pull state.
@@ -1422,7 +1400,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 
 - `ploy run logs <run-id>`:
   - Streams logs/events from `/v1/runs/{id}/logs`, focusing on `log` and
-    `retention` events (see `internal/cli/migs/logs.go`).
+    `retention` events (see runtime implementation).
   - This is the canonical surface for streaming container stdout/stderr.
 
 - `ploy run status <run-id>`:
@@ -1455,7 +1433,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
 
 ## 7. SSE Contract
 
-The event hub (`internal/stream/hub.go`) and HTTP wrapper (`internal/stream/http.go`)
+The event hub (runtime implementation) and HTTP wrapper (runtime implementation)
 implement a minimal SSE protocol used by the Mods endpoints.
 
 **OpenAPI reference:** See `docs/api/paths/runs_id_logs.yaml` for the formal
@@ -1516,68 +1494,12 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 
 ### 7.3 Clients
 
-- `internal/cli/stream.Client` uses `Last-Event-ID` and backoff to resume and
+- runtime implementation uses `Last-Event-ID` and backoff to resume and
   retry streams.
-- `internal/cli/migs.EventsCommand` handles `"run"` and `"stage"` events
+- runtime implementation handles `"run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
-- `internal/cli/runs.FollowCommand` and `ploy run logs` focus on `"log"` and
+- runtime implementation and `ploy run logs` focus on `"log"` and
   `"retention"` events for human-readable tails.
-- The shared log printer (`internal/cli/logs`) formats log records using
+- The shared log printer (runtime implementation) formats log records using
   enriched fields when available (see "Structured Log Format" below).
-
-## 8. References
-
-Code paths most relevant for Mods:
-
-- CLI:
-  - `cmd/ploy/mig_run_spec.go`
-  - `cmd/ploy/mig_controlplane_commands.go`
-  - `internal/cli/migs/*`
-- Control plane:
-  - `internal/migs/api/*`
-  - `internal/server/handlers/handlers_mods_ run.go`
-  - `internal/server/handlers/handlers_diffs.go`
-  - `internal/server/handlers/jobs_complete.go` — job completion (via /v1/jobs/{job_id}/complete)
-  - `internal/server/handlers/nodes_claim.go` — job claiming
-  - `internal/server/events/service.go`
-  - `internal/stream/hub.go`, `internal/stream/http.go`
-- Database:
-  - `internal/store/schema.sql` — single source of truth for database schema (`jobs.next_id` chain model)
-  - `internal/store/queries/jobs.sql` — job queries including `ClaimJob` (claims `Queued` jobs) and `ScheduleNextJob` (transitions next `Created` job to `Queued`)
-- Nodeagent:
-  - `internal/nodeagent/execution_orchestrator.go`
-  - `internal/nodeagent/execution_orchestrator_gate.go`
-  - `internal/nodeagent/execution_orchestrator_jobs.go`
-  - `internal/nodeagent/execution_orchestrator_router_runtime.go`
-  - `internal/nodeagent/execution_orchestrator_healing_runtime.go`
-  - `internal/nodeagent/recovery_io.go`
-  - `internal/workflow/step/*`
-
-For concrete end-to-end scenarios and sample specs see:
-
-- `tests/e2e/migs/README.md`
-- `tests/e2e/migs/scenario-orw-pass.sh`
-- `tests/e2e/migs/scenario-orw-fail/run.sh`
-- `tests/e2e/migs/scenario-multi-step/mig.yaml`
-- `tests/e2e/migs/scenario-multi-node-rehydration/run.sh`
-
-## 9. Quick checklist for coding agents
-
-When changing Mods behaviour, prefer these anchors:
-
-- Run/status model:
-  - Update `internal/migs/api/types.go` ( run/job types).
-  - Wire server handlers in `internal/server/handlers/handlers_mods_*.go`.
-  - Keep `docs/migs-lifecycle.md` and `tests/e2e/migs/README.md` in sync.
-- SSE/event flow:
-  - Use `internal/server/events/service.go` and `internal/stream/*` for hub/SSE.
-  - Adjust CLI consumers under `internal/cli/migs` and `internal/cli/runs`.
-- Node execution/rehydration:
-  - Use `internal/nodeagent/execution_orchestrator.go` plus
-    `internal/workflow/step/*`.
-  - Keep `next_id` chain relationships consistent across jobs and diffs.
-- Job scheduling:
-  - `ClaimJob` in `internal/store/queries/jobs.sql` only returns `Queued` jobs.
-  - `ScheduleNextJob` transitions the next chain successor from `Created` to `Queued` after completion.
-  - This server-driven model ensures jobs execute in chain order.
