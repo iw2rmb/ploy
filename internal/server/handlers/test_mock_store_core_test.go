@@ -602,6 +602,10 @@ type mockStore struct {
 	updateSpecBundleLastRefAtCalled bool
 	updateSpecBundleLastRefAtParam  string
 	updateSpecBundleLastRefAtErr    error
+	updateSpecBundleLastRefAtStarted chan struct{}
+	updateSpecBundleLastRefAtProceed chan struct{}
+	updateSpecBundleLastRefAtDone    chan struct{}
+	updateSpecBundleLastRefAtCtxErr  error
 
 	deleteSpecBundleCalled bool
 	deleteSpecBundleParam  string
