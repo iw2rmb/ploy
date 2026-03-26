@@ -313,7 +313,6 @@ CREATE TABLE IF NOT EXISTS sboms (
   repo_id     TEXT NOT NULL REFERENCES repos(id) ON DELETE CASCADE,
   lib         TEXT NOT NULL,
   ver         TEXT NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (job_id, repo_id, lib, ver)
 );
 CREATE INDEX IF NOT EXISTS sboms_repo_lib_ver_idx ON sboms(repo_id, lib, ver);

@@ -35,4 +35,17 @@ func TestSBOMConstraint_PrimaryKeyDefinedInSchema(t *testing.T) {
 	if !strings.Contains(schema, wantPK) {
 		t.Fatalf("schema missing sboms primary key definition")
 	}
+
+	start := strings.Index(schema, normalizeWhitespace("CREATE TABLE IF NOT EXISTS sboms ("))
+	if start == -1 {
+		t.Fatalf("schema missing sboms table start")
+	}
+	tableSection := schema[start:]
+	end := strings.Index(tableSection, ");")
+	if end == -1 {
+		t.Fatalf("schema missing sboms table end")
+	}
+	if strings.Contains(tableSection[:end], "created_at") {
+		t.Fatalf("sboms table must not define created_at; time attribution must come from jobs.created_at via join")
+	}
 }

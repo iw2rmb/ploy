@@ -22,7 +22,7 @@ func (q *Queries) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) er
 }
 
 const listSBOMRowsByJob = `-- name: ListSBOMRowsByJob :many
-SELECT job_id, repo_id, lib, ver, created_at
+SELECT job_id, repo_id, lib, ver
 FROM sboms
 WHERE job_id = $1
 ORDER BY lib ASC, ver ASC
@@ -42,7 +42,6 @@ func (q *Queries) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]S
 			&i.RepoID,
 			&i.Lib,
 			&i.Ver,
-			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
