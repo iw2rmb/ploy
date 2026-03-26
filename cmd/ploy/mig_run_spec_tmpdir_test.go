@@ -1,6 +1,9 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
@@ -775,5 +778,269 @@ steps:
 	}
 	if !strings.Contains(err.Error(), "stat") && !strings.Contains(err.Error(), "no such file") {
 		t.Errorf("expected stat or file-not-found error, got: %v", err)
+	}
+}
+
+// readTarEntries decompresses a gzip-compressed tar archive and returns the names
+// of all entries (headers) in the order they appear.
+func readTarEntries(t *testing.T, archiveBytes []byte) []string {
+	t.Helper()
+	gr, err := gzip.NewReader(bytes.NewReader(archiveBytes))
+	if err != nil {
+		t.Fatalf("gzip.NewReader: %v", err)
+	}
+	defer gr.Close()
+	tr := tar.NewReader(gr)
+	var names []string
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar.Next: %v", err)
+		}
+		names = append(names, hdr.Name)
+	}
+	return names
+}
+
+// readTarFileContent returns the content of the named entry in a gzip-compressed tar.
+func readTarFileContent(t *testing.T, archiveBytes []byte, entryName string) []byte {
+	t.Helper()
+	gr, err := gzip.NewReader(bytes.NewReader(archiveBytes))
+	if err != nil {
+		t.Fatalf("gzip.NewReader: %v", err)
+	}
+	defer gr.Close()
+	tr := tar.NewReader(gr)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar.Next: %v", err)
+		}
+		if hdr.Name == entryName {
+			data, err := io.ReadAll(tr)
+			if err != nil {
+				t.Fatalf("read %s: %v", entryName, err)
+			}
+			return data
+		}
+	}
+	t.Fatalf("entry %q not found in archive", entryName)
+	return nil
+}
+
+// TestBuildSpecBundleArchive_DirectoryInput verifies that when a tmp_dir entry's path
+// is a directory, the archive contains the directory header followed by all nested files
+// in sorted order. File content must match the source.
+func TestBuildSpecBundleArchive_DirectoryInput(t *testing.T) {
+	base := t.TempDir()
+
+	// Build: mydir/{a.txt, b.txt, sub/c.txt}
+	mydir := filepath.Join(base, "mydir")
+	if err := os.MkdirAll(filepath.Join(mydir, "sub"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	files := map[string]string{
+		filepath.Join(mydir, "a.txt"):       "alpha",
+		filepath.Join(mydir, "b.txt"):       "beta",
+		filepath.Join(mydir, "sub", "c.txt"): "gamma",
+	}
+	for path, content := range files {
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+	}
+
+	entries := []tmpDirEntry{{Name: "mydir", Path: mydir}}
+	archiveBytes, err := buildSpecBundleArchive(entries)
+	if err != nil {
+		t.Fatalf("buildSpecBundleArchive: %v", err)
+	}
+
+	got := readTarEntries(t, archiveBytes)
+	want := []string{
+		"mydir/",
+		"mydir/a.txt",
+		"mydir/b.txt",
+		"mydir/sub/",
+		"mydir/sub/c.txt",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("entry count: got %v, want %v", got, want)
+	}
+	for i, name := range want {
+		if got[i] != name {
+			t.Errorf("entry[%d]: got %q, want %q", i, got[i], name)
+		}
+	}
+
+	// Verify file content.
+	if content := readTarFileContent(t, archiveBytes, "mydir/a.txt"); string(content) != "alpha" {
+		t.Errorf("mydir/a.txt content: got %q, want %q", content, "alpha")
+	}
+	if content := readTarFileContent(t, archiveBytes, "mydir/sub/c.txt"); string(content) != "gamma" {
+		t.Errorf("mydir/sub/c.txt content: got %q, want %q", content, "gamma")
+	}
+}
+
+// TestBuildSpecBundleArchive_RepeatedRunsDeterminism verifies that calling
+// buildSpecBundleArchive twice with the same entries produces byte-identical archives.
+func TestBuildSpecBundleArchive_RepeatedRunsDeterminism(t *testing.T) {
+	base := t.TempDir()
+
+	mydir := filepath.Join(base, "data")
+	if err := os.MkdirAll(mydir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	for _, name := range []string{"x.txt", "y.txt"} {
+		if err := os.WriteFile(filepath.Join(mydir, name), []byte(name), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+	plainFile := filepath.Join(base, "plain.txt")
+	if err := os.WriteFile(plainFile, []byte("plain"), 0o644); err != nil {
+		t.Fatalf("write plain.txt: %v", err)
+	}
+
+	entries := []tmpDirEntry{
+		{Name: "data", Path: mydir},
+		{Name: "plain.txt", Path: plainFile},
+	}
+
+	first, err := buildSpecBundleArchive(entries)
+	if err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	second, err := buildSpecBundleArchive(entries)
+	if err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+
+	if !bytes.Equal(first, second) {
+		t.Error("archive bytes differ between repeated runs with identical inputs")
+	}
+}
+
+// TestBuildSpecBundleArchive_ShuffledInputDeterminism verifies that buildSpecBundleArchive
+// produces byte-identical archives when entries are provided in different orderings,
+// because entries are sorted by Name before archiving.
+func TestBuildSpecBundleArchive_ShuffledInputDeterminism(t *testing.T) {
+	base := t.TempDir()
+
+	names := []string{"apple.txt", "cherry.txt", "banana.txt"}
+	for _, name := range names {
+		if err := os.WriteFile(filepath.Join(base, name), []byte(name), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	orderings := [][]tmpDirEntry{
+		{
+			{Name: "apple.txt", Path: filepath.Join(base, "apple.txt")},
+			{Name: "banana.txt", Path: filepath.Join(base, "banana.txt")},
+			{Name: "cherry.txt", Path: filepath.Join(base, "cherry.txt")},
+		},
+		{
+			{Name: "cherry.txt", Path: filepath.Join(base, "cherry.txt")},
+			{Name: "apple.txt", Path: filepath.Join(base, "apple.txt")},
+			{Name: "banana.txt", Path: filepath.Join(base, "banana.txt")},
+		},
+		{
+			{Name: "banana.txt", Path: filepath.Join(base, "banana.txt")},
+			{Name: "cherry.txt", Path: filepath.Join(base, "cherry.txt")},
+			{Name: "apple.txt", Path: filepath.Join(base, "apple.txt")},
+		},
+	}
+
+	reference, err := buildSpecBundleArchive(orderings[0])
+	if err != nil {
+		t.Fatalf("reference archive: %v", err)
+	}
+
+	for i, entries := range orderings[1:] {
+		got, err := buildSpecBundleArchive(entries)
+		if err != nil {
+			t.Fatalf("ordering[%d]: %v", i+1, err)
+		}
+		if !bytes.Equal(reference, got) {
+			t.Errorf("ordering[%d] produces different archive bytes than reference", i+1)
+		}
+	}
+}
+
+// TestBuildSpecPayload_TmpDir_DirectoryPath verifies that a tmp_dir entry whose path
+// is a directory is archived and uploaded, and that the bundle entries list contains
+// the directory name (not individual file paths).
+func TestBuildSpecPayload_TmpDir_DirectoryPath(t *testing.T) {
+	srv, lastUpload := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
+	tmpRoot := t.TempDir()
+
+	// Build: scripts/{run.sh, setup.sh}
+	scriptsDir := filepath.Join(tmpRoot, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0o755); err != nil {
+		t.Fatalf("mkdir scripts: %v", err)
+	}
+	for _, name := range []string{"run.sh", "setup.sh"} {
+		if err := os.WriteFile(filepath.Join(scriptsDir, name), []byte("#!/bin/sh"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	specPath := filepath.Join(tmpRoot, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: scripts
+        path: ` + scriptsDir + `
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload: %v", err)
+	}
+
+	// Verify the archive sent to the server contains directory entries.
+	archiveEntries := readTarEntries(t, *lastUpload)
+	wantArchiveEntries := []string{"scripts/", "scripts/run.sh", "scripts/setup.sh"}
+	if len(archiveEntries) != len(wantArchiveEntries) {
+		t.Fatalf("archive entry count: got %v, want %v", archiveEntries, wantArchiveEntries)
+	}
+	for i, name := range wantArchiveEntries {
+		if archiveEntries[i] != name {
+			t.Errorf("archive entry[%d]: got %q, want %q", i, archiveEntries[i], name)
+		}
+	}
+
+	// Verify the spec payload has tmp_bundle with the directory name as the single entry.
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	steps := result["steps"].([]any)
+	step0 := steps[0].(map[string]any)
+
+	if _, hasTmpDir := step0["tmp_dir"]; hasTmpDir {
+		t.Errorf("expected 'tmp_dir' to be removed from step after bundle upload")
+	}
+	tmpBundle, hasTmpBundle := step0["tmp_bundle"]
+	if !hasTmpBundle {
+		t.Fatalf("expected 'tmp_bundle' to be set in step after bundle upload")
+	}
+	entries := tmpBundle.(map[string]any)["entries"].([]any)
+	if len(entries) != 1 || entries[0] != "scripts" {
+		t.Errorf("expected entries=[scripts], got %v", entries)
 	}
 }
