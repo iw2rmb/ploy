@@ -91,15 +91,13 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     3. `make staticcheck`
   - Reasoning: `medium`
 
-- [ ] 1.7 Refresh Spec-Bundle GC Metadata On Submit Paths
+- [ ] 1.7 Fix `last_ref_at` Update Context In Bundle Download
   - Repository: `ploy`
-  - Component: `internal/server/handlers/runs_submit.go`; `internal/server/handlers/migs_spec.go`; `internal/server/handlers/*_test.go`; `internal/store/*.sql.go`
+  - Component: `internal/server/handlers/spec_bundles.go`; `internal/server/handlers/*_test.go`
   - Implementation:
-    1. In `POST /v1/runs` (`runs_submit.go`), resolve each referenced `tmp_bundle.bundle_id` via `GetSpecBundle` and fail validation when a bundle is missing.
-    2. In `POST /v1/runs` (`runs_submit.go`), call `UpdateSpecBundleLastRefAt` for each validated `tmp_bundle.bundle_id` before persisting the run payload.
-    3. In `POST /v1/migs/{mig_ref}/specs` (`migs_spec.go`), resolve each referenced `tmp_bundle.bundle_id` via `GetSpecBundle` and fail validation when a bundle is missing.
-    4. In `POST /v1/migs/{mig_ref}/specs` (`migs_spec.go`), call `UpdateSpecBundleLastRefAt` for each validated `tmp_bundle.bundle_id` before persisting the spec.
-    5. Add handler tests that assert both endpoints invoke `GetSpecBundle` and `UpdateSpecBundleLastRefAt` for referenced bundle IDs and return deterministic errors for unknown bundle IDs.
+    1. In `downloadSpecBundleHandler` (`spec_bundles.go`), stop using `r.Context()` inside the async `UpdateSpecBundleLastRefAt` goroutine.
+    2. Use a detached bounded context (for example, `context.WithTimeout(context.Background(), ...)`) for `UpdateSpecBundleLastRefAt` so request cancellation does not drop `last_ref_at` refreshes.
+    3. Add handler tests that verify `UpdateSpecBundleLastRefAt` still runs when the request context is canceled immediately after response completion.
   - Verification:
-    1. `go test ./internal/server/handlers -run 'Test.*RunsSubmit.*TmpBundle.*|Test.*MigSpec.*TmpBundle.*'`
+    1. `go test ./internal/server/handlers -run 'Test.*SpecBundle.*Download.*LastRef.*'`
   - Reasoning: `medium`
