@@ -330,10 +330,10 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			preWorkspaceTree = tree
 		}
 
-		// Materialize any manifest tmp files or bundle into a staging directory.
+		// Materialize the manifest tmp bundle into a staging directory.
 		// The staging dir is removed deterministically when executeBody returns.
 		var tmpStagingDir string
-		if len(manifest.TmpDir) > 0 || manifest.TmpBundle != nil {
+		if manifest.TmpBundle != nil {
 			dir, err := os.MkdirTemp("", "ploy-tmpfiles-*")
 			if err != nil {
 				return fmt.Errorf("create tmp staging dir: %w", err)
@@ -343,11 +343,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 					slog.Warn("failed to remove tmp staging dir", "path", dir, "error", rmErr)
 				}
 			}()
-			if len(manifest.TmpDir) > 0 {
-				if err := materializeTmpFiles(manifest.TmpDir, dir); err != nil {
-					return fmt.Errorf("materialize tmp files: %w", err)
-				}
-			}
 			if manifest.TmpBundle != nil {
 				if err := r.materializeTmpBundle(ctx, manifest.TmpBundle, dir); err != nil {
 					return fmt.Errorf("materialize tmp bundle: %w", err)
@@ -480,33 +475,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		slog.Error("failed to create temp directories", "run_id", req.RunID, "error", outDirErr)
 		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
 	}
-}
-
-// materializeTmpFiles writes each TmpFilePayload to stagingDir as a writable file.
-// The caller owns the lifecycle of stagingDir.
-// Runtime hardening: verifies each resolved path stays directly under stagingDir
-// (no subdirectories, no traversal) even if validation was bypassed.
-func materializeTmpFiles(entries []contracts.TmpFilePayload, stagingDir string) error {
-	seen := make(map[string]struct{}, len(entries))
-	for _, e := range entries {
-		name, err := contracts.NormalizeTmpFileName(e.Name)
-		if err != nil {
-			return fmt.Errorf("tmp file name %q: %w", e.Name, err)
-		}
-		if _, dup := seen[name]; dup {
-			return fmt.Errorf("tmp file name duplicate %q", name)
-		}
-		seen[name] = struct{}{}
-		dst := filepath.Join(stagingDir, name)
-		rel, err := filepath.Rel(stagingDir, dst)
-		if err != nil || strings.ContainsRune(rel, filepath.Separator) || rel == "." || strings.HasPrefix(rel, "..") {
-			return fmt.Errorf("tmp file name %q would escape staging dir", name)
-		}
-		if err := os.WriteFile(dst, e.Content, 0o644); err != nil {
-			return fmt.Errorf("write tmp file %q: %w", name, err)
-		}
-	}
-	return nil
 }
 
 // withTempDir creates a temporary directory, calls fn, then removes the directory.

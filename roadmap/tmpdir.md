@@ -66,7 +66,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     2. `go test ./internal/workflow/step -run 'Test.*ContainerSpec.*Tmp.*'`
   - Reasoning: `high`
 
-- [ ] 1.5 Remove Legacy Inline TmpDir Path
+- [x] 1.5 Remove Legacy Inline TmpDir Path
   - Repository: `ploy`
   - Component: `internal/workflow/contracts/mods_spec_tmpdir_test.go`; `cmd/ploy/mig_run_spec_tmpdir_test.go`; `docs/envs/README.md`; `docs/schemas/mig.example.yaml`; `cmd/ploy/README.md`
   - Implementation:

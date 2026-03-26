@@ -54,9 +54,6 @@ type ModContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
-	// TmpDir holds pre-materialized file payloads (used for internal nodeagent construction only).
-	// For spec-originated tmp injection, see TmpBundle.
-	TmpDir []contracts.TmpFilePayload
 	// TmpBundle references a pre-uploaded bundle to extract under /tmp at execution time.
 	// Populated from the spec's tmp_bundle field during spec-to-run-options conversion.
 	// The nodeagent downloads and unpacks this bundle before container launch.
@@ -207,17 +204,6 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	}
 
 	return runOpts
-}
-
-// copyTmpDir creates a shallow copy of a TmpFilePayload slice.
-// Returns nil if the input is nil or empty.
-func copyTmpDir(entries []contracts.TmpFilePayload) []contracts.TmpFilePayload {
-	if len(entries) == 0 {
-		return nil
-	}
-	out := make([]contracts.TmpFilePayload, len(entries))
-	copy(out, entries)
-	return out
 }
 
 // copyStringMap creates a shallow copy of a string map.

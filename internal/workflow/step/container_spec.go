@@ -62,8 +62,8 @@ type ContainerResult struct {
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
 // The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
-// tmpStagingDir is an optional path to a directory containing pre-materialized tmp
-// files; each manifest.TmpDir entry is mounted read-write at /tmp/<name>.
+// tmpStagingDir is an optional path to a staging directory for bundle entries;
+// each bundle entry in manifest.TmpBundle is mounted read-only at /tmp/<name>.
 func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, tmpStagingDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
@@ -85,28 +85,6 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	// Optional /in mount for cross-phase inputs (read-only)
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
-	}
-
-	// Mount each tmp file read-write at /tmp/<name> from the staging directory.
-	// Runtime hardening: reject malformed names or canonical duplicates to keep
-	// staging and mount path derivation deterministic.
-	if strings.TrimSpace(tmpStagingDir) != "" {
-		seenTmpNames := make(map[string]struct{}, len(manifest.TmpDir))
-		for _, tf := range manifest.TmpDir {
-			name, err := contracts.NormalizeTmpFileName(tf.Name)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("tmp file name %q is not valid: %w", tf.Name, err)
-			}
-			if _, dup := seenTmpNames[name]; dup {
-				return ContainerSpec{}, fmt.Errorf("tmp file name duplicate %q", name)
-			}
-			seenTmpNames[name] = struct{}{}
-			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(tmpStagingDir, name),
-				Target:   "/tmp/" + name,
-				ReadOnly: false,
-			})
-		}
 	}
 
 	// Mount each bundle entry read-only at /tmp/<name> from the staging directory.

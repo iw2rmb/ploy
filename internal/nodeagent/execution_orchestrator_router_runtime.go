@@ -94,10 +94,10 @@ func (r *runController) runRouterForGateFailure(
 		gateResult.Recovery.RouterCmd = append([]string{}, routerManifest.Command...)
 	}
 
-	// Materialize any router tmp files or bundle into a staging directory.
+	// Materialize the router tmp bundle into a staging directory.
 	// The staging dir is removed deterministically when runRouterForGateFailure returns.
 	var routerTmpStagingDir string
-	if len(routerManifest.TmpDir) > 0 || routerManifest.TmpBundle != nil {
+	if routerManifest.TmpBundle != nil {
 		dir, err := os.MkdirTemp("", "ploy-router-tmpfiles-*")
 		if err != nil {
 			slog.Warn("failed to create router tmp staging dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
@@ -108,12 +108,6 @@ func (r *runController) runRouterForGateFailure(
 				slog.Warn("failed to remove router tmp staging dir", "path", dir, "error", rmErr)
 			}
 		}()
-		if len(routerManifest.TmpDir) > 0 {
-			if err := materializeTmpFiles(routerManifest.TmpDir, dir); err != nil {
-				slog.Warn("failed to materialize router tmp files", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-				return
-			}
-		}
 		if routerManifest.TmpBundle != nil {
 			if err := r.materializeTmpBundle(ctx, routerManifest.TmpBundle, dir); err != nil {
 				slog.Warn("failed to materialize router tmp bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)

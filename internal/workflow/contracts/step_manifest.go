@@ -38,13 +38,8 @@ type StepManifest struct {
 	// logged.
 	Options map[string]any
 
-	// TmpDir lists files to materialize under /tmp in the container (read-write mount).
-	// Each entry must have a unique non-empty name and non-empty content.
-	// Populated by the nodeagent after downloading the bundle referenced by TmpBundle.
-	TmpDir []TmpFilePayload
-
 	// TmpBundle references the bundle to download and extract under /tmp.
-	// Set by the nodeagent from the incoming spec; TmpDir is populated at execution time.
+	// Set by the nodeagent from the incoming spec at execution time.
 	TmpBundle *TmpBundleRef
 }
 
@@ -217,9 +212,6 @@ func (m StepManifest) Validate() error {
 		return err
 	}
 	if err := m.validateResources(); err != nil {
-		return err
-	}
-	if err := validateTmpDir(m.TmpDir, "tmp_dir"); err != nil {
 		return err
 	}
 	return nil
