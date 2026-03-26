@@ -330,10 +330,10 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 			preWorkspaceTree = tree
 		}
 
-		// Materialize any manifest tmp files into a staging directory.
+		// Materialize any manifest tmp files or bundle into a staging directory.
 		// The staging dir is removed deterministically when executeBody returns.
 		var tmpStagingDir string
-		if len(manifest.TmpDir) > 0 {
+		if len(manifest.TmpDir) > 0 || manifest.TmpBundle != nil {
 			dir, err := os.MkdirTemp("", "ploy-tmpfiles-*")
 			if err != nil {
 				return fmt.Errorf("create tmp staging dir: %w", err)
@@ -343,8 +343,15 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 					slog.Warn("failed to remove tmp staging dir", "path", dir, "error", rmErr)
 				}
 			}()
-			if err := materializeTmpFiles(manifest.TmpDir, dir); err != nil {
-				return fmt.Errorf("materialize tmp files: %w", err)
+			if len(manifest.TmpDir) > 0 {
+				if err := materializeTmpFiles(manifest.TmpDir, dir); err != nil {
+					return fmt.Errorf("materialize tmp files: %w", err)
+				}
+			}
+			if manifest.TmpBundle != nil {
+				if err := r.materializeTmpBundle(ctx, manifest.TmpBundle, dir); err != nil {
+					return fmt.Errorf("materialize tmp bundle: %w", err)
+				}
 			}
 			tmpStagingDir = dir
 		}

@@ -54,7 +54,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     2. `go test ./internal/cli/migs -run 'Test.*Spec.*'`
   - Reasoning: `medium`
 
-- [ ] 1.4 Implement Node Download, Safe Unpack, And Mount Wiring
+- [x] 1.4 Implement Node Download, Safe Unpack, And Mount Wiring
   - Repository: `ploy`
   - Component: `internal/nodeagent/execution_orchestrator_jobs.go`; `internal/nodeagent/execution_orchestrator_router_runtime.go`; `internal/nodeagent/uploaders.go`; `internal/workflow/step/container_spec.go`
   - Implementation:

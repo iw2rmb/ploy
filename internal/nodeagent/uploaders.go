@@ -172,6 +172,34 @@ func (b *baseUploader) UploadRunEvent(
 	return nil
 }
 
+// DownloadSpecBundle fetches a spec bundle archive from the control plane by bundle ID.
+// Returns the raw gzip bytes of the bundle archive for digest verification and extraction.
+func (b *baseUploader) DownloadSpecBundle(ctx context.Context, bundleID string) ([]byte, error) {
+	if strings.TrimSpace(bundleID) == "" {
+		return nil, fmt.Errorf("bundle_id is required")
+	}
+	apiPath := fmt.Sprintf("/v1/spec-bundles/%s", bundleID)
+	u := MustBuildURL(b.cfg.ServerURL, apiPath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("download spec bundle %s: status %d: %s", bundleID, resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	return data, nil
+}
+
 // createTarGzBundle creates a gzipped tar archive from the given file paths.
 func createTarGzBundle(paths []string) ([]byte, error) {
 	entries := make([]ArtifactBundleEntry, 0, len(paths))
