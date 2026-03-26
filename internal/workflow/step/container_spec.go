@@ -109,6 +109,28 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		}
 	}
 
+	// Mount each bundle entry read-only at /tmp/<name> from the staging directory.
+	// Bundle entries are extracted from the downloaded archive before Run() is called.
+	// Runtime hardening: reject malformed names or canonical duplicates.
+	if strings.TrimSpace(tmpStagingDir) != "" && manifest.TmpBundle != nil {
+		seenBundleNames := make(map[string]struct{}, len(manifest.TmpBundle.Entries))
+		for _, entryName := range manifest.TmpBundle.Entries {
+			name, err := contracts.NormalizeTmpFileName(entryName)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("tmp bundle entry %q is not valid: %w", entryName, err)
+			}
+			if _, dup := seenBundleNames[name]; dup {
+				return ContainerSpec{}, fmt.Errorf("tmp bundle entry duplicate %q", name)
+			}
+			seenBundleNames[name] = struct{}{}
+			mounts = append(mounts, ContainerMount{
+				Source:   filepath.Join(tmpStagingDir, name),
+				Target:   "/tmp/" + name,
+				ReadOnly: true,
+			})
+		}
+	}
+
 	// Optional: mount host Docker socket for containers that request it via manifest options
 	if mountDockerSocket, ok := manifest.OptionBool("mount_docker_socket"); ok && mountDockerSocket {
 		const sock = "/var/run/docker.sock"
