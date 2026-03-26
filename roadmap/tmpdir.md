@@ -83,7 +83,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
   - Component: `tests/e2e/migs/*`; `Makefile` workflows
   - Implementation:
     1. Add one E2E scenario with mixed file+directory tmp inputs and validate runtime visibility under `/tmp`.
-    2. Add one negative E2E scenario for blocked archive entries (traversal/symlink) and assert deterministic failure messages.
+    2. Add one negative E2E scenario for blocked archive entries (traversal/symlink) and assert deterministic failure messages. Both traversal (`../evil.txt`) and symlink (`TypeSymlink` entry) are covered in `scenario-tmpdir-blocked/run.sh` (Parts 1 and 2).
     3. Run full project hygiene and unit test targets for touched modules.
   - Verification:
     1. `make test`
