@@ -136,8 +136,6 @@ fi
 REPO_STATUS="$(printf '%s' "$RUN_JSON" | jq -r '.repos[0].status // empty' 2>/dev/null || echo "")"
 if [[ "$REPO_STATUS" == "Fail" ]]; then
   echo "  + repo status: Fail (expected)"
-elif [[ -n "$REPO_STATUS" && "$REPO_STATUS" != "Success" ]]; then
-  echo "  + repo status: ${REPO_STATUS} (non-Success, accepted)"
 else
   echo "  ! repo status: expected Fail, got '${REPO_STATUS}'" >&2
   FAILED=1
@@ -264,8 +262,6 @@ fi
 REPO_STATUS_SYM="$(printf '%s' "$RUN_JSON_SYM" | jq -r '.repos[0].status // empty' 2>/dev/null || echo "")"
 if [[ "$REPO_STATUS_SYM" == "Fail" ]]; then
   echo "  + repo status: Fail (expected)"
-elif [[ -n "$REPO_STATUS_SYM" && "$REPO_STATUS_SYM" != "Success" ]]; then
-  echo "  + repo status: ${REPO_STATUS_SYM} (non-Success, accepted)"
 else
   echo "  ! repo status: expected Fail, got '${REPO_STATUS_SYM}'" >&2
   FAILED_SYM=1
