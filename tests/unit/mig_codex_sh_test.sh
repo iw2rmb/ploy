@@ -14,13 +14,11 @@ set -uo pipefail
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 SCRIPT="$ROOT_DIR/deploy/images/migs/mig-codex/mig-codex.sh"
 
-# Create a wrapper script that patches mig-codex.sh to use $HOME/.codex instead
-# of hardcoded /root/.codex. This allows tests to run outside Docker containers.
+# Create a temporary copy of mig-codex.sh for test execution.
 create_test_script() {
   local tmp_script
   tmp_script=$(mktemp)
-  # Replace /root/.codex with $HOME/.codex for testability
-  sed 's|/root/.codex|$HOME/.codex|g' "$SCRIPT" > "$tmp_script"
+  cat "$SCRIPT" > "$tmp_script"
   chmod +x "$tmp_script"
   echo "$tmp_script"
 }
@@ -1044,6 +1042,66 @@ MOCKAMATA
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Test: Amata mode - CODEX_HOME override controls auth/config destinations
+# ─────────────────────────────────────────────────────────────────────────────
+test_codex_home_override_materializes_auth_and_config() {
+  run_test
+
+  local tmp_bin tmp_out
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+
+  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+#!/bin/bash
+exit 0
+MOCKAMATA
+  chmod +x "$tmp_bin/amata"
+
+  local tmp_home tmp_script codex_home
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+  codex_home="$tmp_out/codex-home"
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export OUTDIR="$tmp_out"
+    export CODEX_HOME="$codex_home"
+    export CODEX_AUTH_JSON='{"token":"auth_override"}'
+    export CODEX_CONFIG_TOML='[model]'$'\n''name = "o4-mini-override"'
+    unset CODEX_PROMPT
+    bash "$tmp_script" amata run /in/amata.yaml
+  ) >/dev/null 2>&1
+
+  assert_file_content_and_mode_600 \
+    "$codex_home/auth.json" \
+    '{"token":"auth_override"}' \
+    "amata mode: CODEX_HOME override auth.json"
+
+  if [[ -f "$codex_home/config.toml" ]] && grep -q 'o4-mini-override' "$codex_home/config.toml"; then
+    pass "amata mode: CODEX_HOME override config.toml content"
+  else
+    fail "amata mode: CODEX_HOME override config.toml content" "config.toml missing or unexpected"
+  fi
+
+  local perms
+  perms=$(file_perms_octal "$codex_home/config.toml")
+  if [[ "$perms" == "600" ]]; then
+    pass "amata mode: CODEX_HOME override config.toml permissions"
+  else
+    fail "amata mode: CODEX_HOME override config.toml permissions" "got: $perms, want: 600"
+  fi
+
+  if [[ ! -f "$tmp_home/.codex/auth.json" && ! -f "$tmp_home/.codex/config.toml" ]]; then
+    pass "amata mode: default ~/.codex not used when CODEX_HOME is set"
+  else
+    fail "amata mode: default ~/.codex not used when CODEX_HOME is set" "found files under $tmp_home/.codex"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: Direct mode - CRUSH_JSON inline content is materialized
 # ─────────────────────────────────────────────────────────────────────────────
 test_crush_json_materialized_direct_mode_content() {
@@ -1340,6 +1398,10 @@ test_amata_mode_creates_artifacts
 echo ""
 echo "Test: Amata mode credentials materialized with secure permissions"
 test_amata_mode_credentials_materialized
+
+echo ""
+echo "Test: CODEX_HOME override materializes auth/config in custom directory"
+test_codex_home_override_materializes_auth_and_config
 
 echo ""
 echo "Test: CRUSH_JSON materialized in direct mode from inline content"

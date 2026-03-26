@@ -53,7 +53,7 @@ put:
     - `CA_CERTS_PEM_BUNDLE` with scope `all` — PEM-encoded CA certificates
       installed into container trust stores.
     - `CODEX_AUTH_JSON` with scope `migs` — Codex credentials written to
-      `/root/.codex/auth.json` by mig-codex images.
+      `/out/codex/auth.json` by mig-codex images (`CODEX_HOME=/out/codex` by default).
     - `CCR_CONFIG_JSON` with scope `migs` — Claude Code Router config written to
       `/root/.claude-code-router/config.json` by mig-codex images.
     - `CRUSH_JSON` with scope `migs` — Crush JSON content or file path

@@ -555,7 +555,7 @@ The `scope` parameter controls which job types receive each variable:
 | Variable | Consumer | Description |
 |----------|----------|-------------|
 | `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
-| `CODEX_AUTH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.codex/auth.json` at container startup |
+| `CODEX_AUTH_JSON` | `mig-codex` | JSON content or file path materialized to `/out/codex/auth.json` at container startup |
 | `CCR_CONFIG_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.claude-code-router/config.json` at container startup |
 | `CRUSH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
@@ -622,10 +622,13 @@ Run/API metadata propagation:
   `CODEX_PROMPT` is required in this mode.
 
 In both modes, the entrypoint materializes config env vars before invoking the CLI:
-- `CODEX_AUTH_JSON` -> `/root/.codex/auth.json`
-- `CODEX_CONFIG_TOML` -> `/root/.codex/config.toml`
+- `CODEX_AUTH_JSON` -> `/out/codex/auth.json`
+- `CODEX_CONFIG_TOML` -> `/out/codex/config.toml`
 - `CCR_CONFIG_JSON` -> `/root/.claude-code-router/config.json`
 - `CRUSH_JSON` -> `/root/.config/crush/crush.json`
+
+`mig-codex` sets `CODEX_HOME=/out/codex` by default, so Codex auth/config files
+are persisted under the mounted `/out` volume.
 
 For each key above, if the env value points to an existing file in the container,
 that file is copied; otherwise the env value is written as inline content.

@@ -33,8 +33,8 @@ RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
     npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
-    mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
-    chmod 700 /root/.codex && \
+    mkdir -p /workspace /out /out/codex /etc/ploy/certs && \
+    chmod 700 /out/codex && \
     chmod 755 /etc/ploy/certs
 
 # Codex CLI runs shell snapshots via /bin/sh; Alpine's default (busybox ash)
@@ -49,6 +49,7 @@ RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \
+    CODEX_HOME=/out/codex \
     CODEX_PROMPT="" \
     CODEX_MODEL="" \
     CODEX_EXTRA_DIR="" \
