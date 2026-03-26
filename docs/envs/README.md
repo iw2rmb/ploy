@@ -114,49 +114,55 @@ Role model (bearer token claims):
   Build Gate settings, and healing configuration. The spec supports:
   - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
   - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
-  - `steps[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_dir)
-  - `tmp_dir` — Per-step file injection: CLI resolves `path` entries to file bytes before submit; node mounts each file read-write at `/tmp/<name>` inside the container. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_dir behavior](#tmp_dir-file-injection) below.
+  - `steps[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_bundle)
+  - `tmp_bundle` — Per-block bundle reference for file injection: CLI archives and uploads user-specified files/directories, then records the bundle reference (`bundle_id`, `cid`, `digest`, `entries`) in the spec. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_bundle file injection](#tmp_bundle-file-injection) below.
   - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See `docs/schemas/mig.example.yaml` for the full schema
-### tmp_dir file injection
+### tmp_bundle file injection
 
-`tmp_dir` is an optional list of files injected into a container at `/tmp/<name>` with read-write mounts. It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
+`tmp_bundle` is an optional bundle reference that injects files/directories into a container under `/tmp/<name>` (read-only mounts). It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
 
-**CLI preprocessing boundary** — the CLI resolves each entry before submission:
-- `path` form: CLI reads the file (supports `~/` and `$VAR`/`${VAR}` expansion), stores raw bytes in `content`, and removes `path`.
-- `content` form: already-inlined bytes; passed through unchanged.
+**CLI upload boundary** — before spec submission, the CLI:
+1. Archives each user-specified source (file or directory) into a deterministic bundle.
+2. Uploads the bundle via the control-plane API and captures the returned metadata.
+3. Replaces the user-facing source spec with the bundle reference in the submitted payload.
 
-After CLI preprocessing, every submitted entry has only `name` + `content`.
+**Bundle reference fields** (all required when `tmp_bundle` is present):
+- `bundle_id` — opaque server-assigned identifier returned by the upload API.
+- `cid` — content-addressed identifier of the bundle archive.
+- `digest` — hex-encoded SHA-256 digest of the bundle archive bytes.
+- `entries` — ordered list of top-level names in the bundle. Each entry must be a plain filename (no path separators, not `.` or `..`, non-empty, no duplicates after whitespace trim).
 
-**Validation** (enforced by CLI and nodeagent):
-- `name` is canonicalized by trimming surrounding whitespace, then must be a plain filename: no path separators, not `.` or `..`, non-empty.
-- `content` must be non-empty.
-- No two entries in the same block may share the same canonical `name` (after trim).
+**Runtime behavior** — the node agent downloads the bundle, verifies the digest, and extracts each top-level entry into a per-job staging directory. Each entry is then mounted read-only into the container at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
 
-**Runtime behavior** — the node agent materializes each file into a per-job temporary staging directory on the node, then mounts it into the container as a read-write bind mount at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
-
-**Example spec fragment:**
+**Example spec fragment (as submitted — after CLI upload):**
 ```yaml
 steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
-    tmp_dir:
-      - name: recipe.yaml
-        path: ./recipes/migrate-java17.yaml   # resolved by CLI
+    tmp_bundle:
+      bundle_id: bun-a1b2c3
+      cid: bafyrei...
+      digest: sha256:deadbeef...
+      entries: [recipe.yaml]
 
 build_gate:
   router:
     image: docker.io/your-dh-user/migs-codex:latest
-    tmp_dir:
-      - name: router-instructions.txt
-        path: ./healing/router/instructions.txt
+    tmp_bundle:
+      bundle_id: bun-d4e5f6
+      cid: bafyrei...
+      digest: sha256:cafebabe...
+      entries: [router-instructions.txt]
   healing:
     by_error_kind:
       code:
         image: docker.io/your-dh-user/migs-codex:latest
-        tmp_dir:
-          - name: prompt-extra.txt
-            path: ./healing/code/prompt-extra.txt
+        tmp_bundle:
+          bundle_id: bun-g7h8i9
+          cid: bafyrei...
+          digest: sha256:12345678...
+          entries: [prompt-extra.txt]
 ```
 
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.

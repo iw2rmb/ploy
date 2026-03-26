@@ -60,32 +60,32 @@ steps:
       # CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
-# TMP_DIR — per-step file injection
+# TMP_BUNDLE — per-block bundle injection
 ################################################################################
-# Optional list of files to materialize at /tmp/<name> inside the
-# container. Supported under steps[], build_gate.router, and
-# build_gate.healing.by_error_kind.<kind>.
+# Optional bundle reference that injects files/directories at /tmp/<name>
+# (read-only) inside the container. Supported under steps[], build_gate.router,
+# and build_gate.healing.by_error_kind.<kind>.
 #
-# Two forms per entry:
-#  1. path  — CLI reads the file and embeds its bytes as content before submit.
-#             Supports ~ expansion and $VAR/${ VAR} env expansion.
-#  2. content — raw bytes already inlined (used when submitting via API).
+# The CLI archives user-specified sources, uploads the bundle via the
+# control-plane API, and embeds the returned bundle reference in the spec.
+# The node agent downloads, verifies (digest), and extracts the bundle at
+# execution time, mounting each top-level entry read-only at /tmp/<name>.
 #
-# Validation rules (enforced at CLI and nodeagent layers):
-#  - name: required; surrounding whitespace is trimmed, then value must be a
-#          plain filename (no path separators, not "." or "..")
-#  - content: required and non-empty
-#  - No two entries may share the same destination name within a single block
-#    after canonicalization
+# Bundle reference fields (all required when tmp_bundle is present):
+#  - bundle_id: opaque server-assigned identifier from the upload API
+#  - cid:       content-addressed identifier of the bundle archive
+#  - digest:    hex-encoded SHA-256 digest of the bundle bytes
+#  - entries:   list of top-level names; each must be a plain filename
+#               (no path separators, not "." or "..", no duplicates after trim)
 #
 # Example (disabled by default; remove comments to activate):
 # steps:
 #   - image: docker.io/your-dh-user/migs-openrewrite:latest
-#     tmp_dir:
-#       - name: recipe.yaml
-#         path: ./recipes/migrate-java17.yaml   # CLI resolves and inlines content
-#       - name: orw-settings.xml
-#         path: ~/.m2/orw-settings.xml
+#     tmp_bundle:
+#       bundle_id: bun-a1b2c3
+#       cid: bafyrei...
+#       digest: sha256:deadbeef...
+#       entries: [recipe.yaml, orw-settings.xml]
 
 ################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
@@ -111,9 +111,11 @@ steps:
 #   - image: docker.io/your-dh-user/migs-migrate-java8:latest
 #     env:
 #       MIGRATION_TARGET: java8
-#     tmp_dir:
-#       - name: settings.xml
-#         path: ~/.m2/settings.xml     # CLI reads and inlines file content
+#     tmp_bundle:
+#       bundle_id: bun-a1b2c3   # returned by CLI after upload
+#       cid: bafyrei...
+#       digest: sha256:deadbeef...
+#       entries: [settings.xml]
 #   - image: docker.io/your-dh-user/migs-migrate-java11:latest
 #     env:
 #       MIGRATION_TARGET: java11
@@ -204,9 +206,11 @@ build_gate:
 #       #     value: gpt-4o
 #     env_from_file:
 #       CODEX_AUTH_JSON: ~/.codex/auth.json
-#     # tmp_dir:   # optional; files materialized at /tmp/<name>
-#     #   - name: router-instructions.txt
-#     #     path: ./healing/router/instructions.txt
+#     # tmp_bundle:   # optional; bundle reference for files at /tmp/<name>
+#     #   bundle_id: bun-...
+#     #   cid: bafyrei...
+#     #   digest: sha256:...
+#     #   entries: [router-instructions.txt]
 #
 # 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
 #
@@ -266,9 +270,11 @@ build_gate:
 #           #     value: gpt-4o
 #         env_from_file:
 #           CODEX_AUTH_JSON: ~/.codex/auth.json
-#         # tmp_dir:   # optional; files materialized at /tmp/<name>
-#         #   - name: prompt-extra.txt
-#         #     path: ./healing/code/prompt-extra.txt
+#         # tmp_bundle:   # optional; bundle reference for files at /tmp/<name>
+#         #   bundle_id: bun-...
+#         #   cid: bafyrei...
+#         #   digest: sha256:...
+#         #   entries: [prompt-extra.txt]
 #
 # 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
 #
@@ -324,7 +330,7 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy run --spec mig.yaml` along with
 #   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
-# - The agent honors: image, command, env, env_from_file, tmp_dir,
+# - The agent honors: image, command, env, env_from_file, tmp_bundle,
 #   steps[] (for single-step and multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
 #

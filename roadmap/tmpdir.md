@@ -4,7 +4,7 @@ Scope: replace inline `tmp_dir` file payloads with bundle references by archivin
 
 Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yaml`; `cmd/ploy/README.md`; `docs/migs-lifecycle.md`; `internal/workflow/contracts/mods_spec.go`; `cmd/ploy/mig_run_spec.go`; `internal/server/handlers/register.go`; `internal/server/handlers/migs_spec.go`; `internal/server/handlers/runs_submit.go`; `internal/nodeagent/execution_orchestrator_jobs.go`; `internal/nodeagent/execution_orchestrator_router_runtime.go`; `internal/workflow/step/container_spec.go`.
 
-- [ ] 1.1 Lock Contract Boundary And Preconditions
+- [x] 1.1 Lock Contract Boundary And Preconditions
   - Repository: `ploy`
   - Component: `internal/workflow/contracts/mods_spec.go`; `internal/workflow/contracts/build_gate_config.go`; `docs/envs/README.md`; `docs/schemas/mig.example.yaml`
   - Implementation:
