@@ -7,7 +7,7 @@ services:
         - ploy_ca_bundle
     image: ploy-server:local
     extra_hosts:
-      - "host.docker.internal:172.17.0.1"
+      - "host.docker.internal:host-gateway"
     platform: linux/amd64
     depends_on:
       garage:
