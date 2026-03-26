@@ -39,11 +39,15 @@ func (r *runController) materializeTmpBundle(ctx context.Context, bundle *contra
 	return nil
 }
 
-// verifyBundleDigest checks that the SHA-256 digest of data matches expectedDigest (hex-encoded).
+// verifyBundleDigest checks that the SHA-256 digest of data matches expectedDigest.
+// expectedDigest may be a bare hex string or carry a "sha256:" prefix as returned
+// by the server's upload response.
 func verifyBundleDigest(data []byte, expectedDigest string) error {
 	hash := sha256.Sum256(data)
 	actual := hex.EncodeToString(hash[:])
-	if !strings.EqualFold(actual, strings.TrimSpace(expectedDigest)) {
+	expected := strings.TrimSpace(expectedDigest)
+	expected = strings.TrimPrefix(expected, "sha256:")
+	if !strings.EqualFold(actual, expected) {
 		return fmt.Errorf("digest mismatch: expected %s, got %s", expectedDigest, actual)
 	}
 	return nil

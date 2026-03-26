@@ -78,7 +78,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     2. `~/@iw2rmb/amata/scripts/check_docs_links.sh`
   - Reasoning: `medium`
 
-- [ ] 1.6 End-To-End Validation And Hygiene
+- [x] 1.6 End-To-End Validation And Hygiene
   - Repository: `ploy`
   - Component: `tests/e2e/migs/*`; `Makefile` workflows
   - Implementation:
