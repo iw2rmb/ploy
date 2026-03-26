@@ -275,6 +275,111 @@ build_gate:
 	}
 }
 
+// TestBuildSpecPayload_TmpDir_NameNormalization verifies that tmp_dir[].name values are
+// normalized with canonical filename rules before archiving and metadata emission.
+func TestBuildSpecPayload_TmpDir_NameNormalization(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	// Names with surrounding whitespace should be normalized (trimmed) before use.
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: "  config.json  "
+        path: ` + configFile + `
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	steps := result["steps"].([]any)
+	step0 := steps[0].(map[string]any)
+	bundle := step0["tmp_bundle"].(map[string]any)
+	entries := bundle["entries"].([]any)
+	if len(entries) != 1 || entries[0] != "config.json" {
+		t.Errorf("expected normalized entries=[config.json], got %v", entries)
+	}
+}
+
+// TestBuildSpecPayload_TmpDir_InvalidName verifies that invalid tmp_dir[].name values
+// are rejected before archiving with a descriptive error.
+func TestBuildSpecPayload_TmpDir_InvalidName(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		entryName  string
+		wantErrSub string
+	}{
+		{
+			name:       "path separator in name",
+			entryName:  "sub/config.json",
+			wantErrSub: "plain filename",
+		},
+		{
+			name:       "dotdot name",
+			entryName:  "..",
+			wantErrSub: "plain filename",
+		},
+		{
+			name:       "empty name",
+			entryName:  "   ",
+			wantErrSub: "required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specPath := filepath.Join(tmpDir, "spec-"+strings.ReplaceAll(tt.name, " ", "-")+".yaml")
+			specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: "` + tt.entryName + `"
+        path: ` + configFile + `
+`
+			if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+				t.Fatalf("write spec file: %v", err)
+			}
+			_, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
+			if err == nil {
+				t.Fatal("expected error for invalid name, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrSub) {
+				t.Errorf("expected %q in error, got: %v", tt.wantErrSub, err)
+			}
+		})
+	}
+}
+
 // TestBuildSpecPayload_TmpDir_InvalidPathType verifies a deterministic error when a
 // tmp_dir entry has a non-string path value.
 func TestBuildSpecPayload_TmpDir_InvalidPathType(t *testing.T) {

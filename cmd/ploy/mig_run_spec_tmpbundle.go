@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // tmpDirEntry represents a single entry in a spec's tmp_dir array.
@@ -309,6 +311,10 @@ func processTmpDirBlock(ctx context.Context, base *url.URL, client *http.Client,
 		name, ok := nameVal.(string)
 		if !ok {
 			return fmt.Errorf("%s.tmp_dir[%d].name: expected string, got %T", prefix, i, nameVal)
+		}
+		name, err := contracts.NormalizeTmpFileName(name)
+		if err != nil {
+			return fmt.Errorf("%s.tmp_dir[%d].name: %w", prefix, i, err)
 		}
 		pathVal, hasPath := entryMap["path"]
 		if !hasPath {
