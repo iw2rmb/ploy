@@ -4,7 +4,7 @@ package mock
 import (
 	"bytes"
 	"context"
-	"errors"
+	"fmt"
 	"io"
 	"sync"
 
@@ -12,7 +12,8 @@ import (
 )
 
 // ErrNotFound is returned when an object is not found.
-var ErrNotFound = errors.New("object not found")
+// It wraps blobstore.ErrNotFound so callers can use errors.Is(err, blobstore.ErrNotFound).
+var ErrNotFound = fmt.Errorf("mock: %w", blobstore.ErrNotFound)
 
 // Store is an in-memory implementation of blobstore.Store.
 type Store struct {

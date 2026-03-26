@@ -174,6 +174,12 @@ func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerF
 
 		rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
 		if err != nil {
+			if errors.Is(err, blobstore.ErrNotFound) {
+				httpErr(w, http.StatusNotFound, "spec bundle blob not found")
+				slog.Error("spec bundle download: blob missing from object store",
+					"bundle_id", bundleID.String(), "object_key", *bundle.ObjectKey)
+				return
+			}
 			httpErr(w, http.StatusServiceUnavailable, "failed to retrieve spec bundle blob")
 			slog.Error("spec bundle download: blob get failed",
 				"bundle_id", bundleID.String(), "object_key", *bundle.ObjectKey, "err", err)

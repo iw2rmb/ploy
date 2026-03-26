@@ -4,6 +4,7 @@ package s3
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	"github.com/iw2rmb/ploy/internal/server/config"
@@ -99,6 +101,10 @@ func (s *Store) Get(ctx context.Context, key string) (io.ReadCloser, int64, erro
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		var nsk *s3types.NoSuchKey
+		if errors.As(err, &nsk) {
+			return nil, 0, fmt.Errorf("s3: get object %s: %w", key, blobstore.ErrNotFound)
+		}
 		return nil, 0, fmt.Errorf("s3: get object %s: %w", key, err)
 	}
 

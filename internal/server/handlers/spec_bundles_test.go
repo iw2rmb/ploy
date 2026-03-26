@@ -226,6 +226,26 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		}
 	})
 
+	t.Run("BlobNotFound", func(t *testing.T) {
+		// Metadata row exists but blob is absent from object store: expect 404, not 503.
+		st := &mockStore{
+			getSpecBundleResult: store.SpecBundle{
+				ID:        bundleID,
+				ObjectKey: &objectKey,
+			},
+		}
+		bs := bsmock.New() // empty: key not seeded
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
+		req.SetPathValue("id", bundleID.String())
+		w := httptest.NewRecorder()
+		downloadSpecBundleHandler(st, bs)(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Errorf("expected 404 for missing blob, got %d", w.Code)
+		}
+	})
+
 	t.Run("MissingObjectKey", func(t *testing.T) {
 		st := &mockStore{
 			getSpecBundleResult: store.SpecBundle{
