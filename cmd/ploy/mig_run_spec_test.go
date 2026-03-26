@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -29,6 +30,9 @@ gitlab_domain: gitlab.com
 	// CLI overrides should take precedence
 	modEnvs := []string{"KEY1=from_cli", "KEY3=new_value"}
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		specPath,
 		modEnvs,
 		"docker.io/test/mig:v2", // override image
@@ -102,6 +106,9 @@ gitlab_domain: gitlab.com
 func TestBuildSpecPayloadNoSpec(t *testing.T) {
 	// No spec file, only CLI flags
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		"",
 		[]string{"KEY1=value1"},
 		"docker.io/test/mig:latest",
@@ -147,7 +154,7 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 // no spec file or CLI overrides are provided (empty payload case).
 func TestBuildSpecPayloadEmpty(t *testing.T) {
 	// No spec file and no CLI overrides
-	payload, err := buildSpecPayload("", nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, "", nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -238,6 +245,9 @@ func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
 				modImage = "docker.io/test/mig:latest"
 			}
 			payload, err := buildSpecPayload(
+				context.Background(),
+				nil,
+				nil,
 				specFile,
 				nil,
 				modImage,
@@ -299,6 +309,9 @@ env:
 
 	// Simulate user running: ploy mig run --spec test.yaml --gitlab-pat glpat-xxx --mr-fail
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		specPath,
 		nil,              // no additional env
 		"",               // no image override
@@ -381,7 +394,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -427,7 +440,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}

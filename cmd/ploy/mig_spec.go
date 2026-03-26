@@ -54,17 +54,17 @@ func handleMigSpecSet(args []string, stderr io.Writer) error {
 	modRef := args[0]
 	specPath := args[1]
 
-	// Load spec from file or stdin using shared loadSpec function.
-	specData, err := loadSpec(specPath)
-	if err != nil {
-		return fmt.Errorf("load spec: %w", err)
-	}
-
 	// Resolve control plane connection.
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
+	}
+
+	// Load spec from file or stdin using shared loadSpec function.
+	specData, err := loadSpec(ctx, base, httpClient, specPath)
+	if err != nil {
+		return fmt.Errorf("load spec: %w", err)
 	}
 
 	// Execute set mig spec command.

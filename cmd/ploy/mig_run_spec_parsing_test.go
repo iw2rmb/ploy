@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -36,7 +37,7 @@ mr_on_success: true
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -143,7 +144,7 @@ build_gate:
 				t.Fatalf("write spec file: %v", err)
 			}
 
-			_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+			_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -179,7 +180,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -253,7 +254,7 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -300,7 +301,7 @@ steps:
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
 	}
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload: %v", err)
 	}
@@ -338,7 +339,7 @@ steps:
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec: %v", err)
 	}
-	payload, err := buildSpecPayload(specPath, nil, "", false, `["echo","cli"]`, "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, `["echo","cli"]`, "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload: %v", err)
 	}
@@ -365,7 +366,7 @@ steps:
 // when attempting to read a non-existent spec file.
 func TestBuildSpecPayloadInvalidFile(t *testing.T) {
 	// Non-existent file should error
-	_, err := buildSpecPayload("/nonexistent/path/spec.yaml", nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), nil, nil, "/nonexistent/path/spec.yaml", nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Errorf("expected error for non-existent file")
 	}
@@ -381,7 +382,7 @@ func TestBuildSpecPayloadInvalidFormat(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Errorf("expected error for invalid YAML/JSON")
 	}
@@ -392,6 +393,9 @@ func TestBuildSpecPayloadInvalidFormat(t *testing.T) {
 func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 	// Test command as JSON array
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		"",
 		nil,
 		"docker.io/test/mig:latest",
@@ -436,6 +440,9 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 func TestBuildSpecPayloadCommandString(t *testing.T) {
 	// Test command as plain string
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		"",
 		nil,
 		"docker.io/test/mig:latest",
@@ -494,7 +501,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -583,7 +590,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -675,7 +682,7 @@ steps:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -733,6 +740,9 @@ env:
 
 	// Apply CLI overrides (env, image).
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		specPath,
 		[]string{"CLI_KEY=cli_value"},
 		"docker.io/test/override:v2",
@@ -813,6 +823,9 @@ steps:
 
 	// Attempt to apply CLI overrides (should be ignored for multi-step format).
 	payload, err := buildSpecPayload(
+		context.Background(),
+		nil,
+		nil,
 		specPath,
 		[]string{"CLI_KEY=cli_value"},
 		"docker.io/test/override:v2",
@@ -918,7 +931,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -979,7 +992,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Fatal("expected error for non-string spec_path")
 	}
@@ -1012,7 +1025,7 @@ build_gate:
     image: docker.io/test/router:latest
 `, fragmentPath))
 
-	normalized, err := normalizeModsSpecToJSON(spec)
+	normalized, err := normalizeModsSpecToJSON(context.Background(), nil, nil, spec)
 	if err != nil {
 		t.Fatalf("normalizeModsSpecToJSON error: %v", err)
 	}
@@ -1062,7 +1075,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -1102,7 +1115,7 @@ build_gate:
 	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
 	}
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Fatal("expected error for non-string router spec_path")
 	}
@@ -1133,7 +1146,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -1175,7 +1188,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -1223,7 +1236,7 @@ steps:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -1269,7 +1282,7 @@ steps:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Fatal("expected missing amata.spec path error")
 	}

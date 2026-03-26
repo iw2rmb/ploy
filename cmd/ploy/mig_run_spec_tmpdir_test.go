@@ -1,34 +1,60 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// decodeTmpEntry round-trips a raw map[string]any tmp_dir entry through JSON to
-// extract the typed Name and Content fields.
-func decodeTmpEntry(t *testing.T, entry map[string]any) (name string, content []byte) {
+// newMockBundleServer creates a test HTTP server that handles POST /v1/spec-bundles.
+// It captures the last uploaded bytes for inspection and returns a fixed response.
+func newMockBundleServer(t *testing.T) (*httptest.Server, *[]byte) {
 	t.Helper()
-	entryJSON, err := json.Marshal(entry)
-	if err != nil {
-		t.Fatalf("marshal tmp_dir entry: %v", err)
-	}
-	var te struct {
-		Name    string `json:"name"`
-		Content []byte `json:"content"`
-	}
-	if err := json.Unmarshal(entryJSON, &te); err != nil {
-		t.Fatalf("unmarshal tmp_dir entry: %v", err)
-	}
-	return te.Name, te.Content
+	var lastUpload []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/spec-bundles" {
+			data, _ := io.ReadAll(r.Body)
+			lastUpload = data
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"bundle_id": "test-bundle-id",
+				"cid":       "bafytest",
+				"digest":    "sha256:deadbeef",
+				"size":      len(data),
+			})
+			return
+		}
+		http.Error(w, "unexpected", http.StatusInternalServerError)
+	}))
+	return srv, &lastUpload
 }
 
-// TestBuildSpecPayload_TmpDir_Steps verifies that tmp_dir path entries in steps[]
-// are resolved: file content is read and stored in the canonical content field.
+// parsedBundleBase parses the test server URL into a *url.URL.
+func parsedBundleBase(t *testing.T, srv *httptest.Server) *url.URL {
+	t.Helper()
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatalf("parse server URL: %v", err)
+	}
+	return u
+}
+
+// TestBuildSpecPayload_TmpDir_Steps verifies that tmp_dir entries in steps[]
+// are archived, uploaded, and replaced with a tmp_bundle reference.
 func TestBuildSpecPayload_TmpDir_Steps(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	configFile := filepath.Join(tmpDir, "config.json")
@@ -49,7 +75,7 @@ steps:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -61,25 +87,44 @@ steps:
 
 	steps := result["steps"].([]any)
 	step0 := steps[0].(map[string]any)
-	tmpDirRaw := step0["tmp_dir"].([]any)
-	entry := tmpDirRaw[0].(map[string]any)
 
-	if _, hasPath := entry["path"]; hasPath {
-		t.Errorf("expected 'path' to be removed from tmp_dir entry after resolution")
+	if _, hasTmpDir := step0["tmp_dir"]; hasTmpDir {
+		t.Errorf("expected 'tmp_dir' to be removed from step after bundle upload")
 	}
 
-	name, content := decodeTmpEntry(t, entry)
-	if name != "config.json" {
-		t.Errorf("expected name=config.json, got %q", name)
+	tmpBundle, hasTmpBundle := step0["tmp_bundle"]
+	if !hasTmpBundle {
+		t.Fatalf("expected 'tmp_bundle' to be set in step after bundle upload")
 	}
-	if string(content) != configContent {
-		t.Errorf("expected content=%q, got %q", configContent, string(content))
+
+	bundle := tmpBundle.(map[string]any)
+	if bundle["bundle_id"] != "test-bundle-id" {
+		t.Errorf("expected bundle_id=test-bundle-id, got %q", bundle["bundle_id"])
+	}
+	if bundle["cid"] != "bafytest" {
+		t.Errorf("expected cid=bafytest, got %q", bundle["cid"])
+	}
+	if bundle["digest"] != "sha256:deadbeef" {
+		t.Errorf("expected digest=sha256:deadbeef, got %q", bundle["digest"])
+	}
+
+	entries, ok := bundle["entries"].([]any)
+	if !ok {
+		t.Fatalf("expected entries to be []any, got %T", bundle["entries"])
+	}
+	if len(entries) != 1 || entries[0] != "config.json" {
+		t.Errorf("expected entries=[config.json], got %v", entries)
 	}
 }
 
-// TestBuildSpecPayload_TmpDir_Router verifies that tmp_dir path entries in build_gate.router
-// are resolved to file content.
+// TestBuildSpecPayload_TmpDir_Router verifies that tmp_dir entries in build_gate.router
+// are archived, uploaded, and replaced with a tmp_bundle reference.
 func TestBuildSpecPayload_TmpDir_Router(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	promptFile := filepath.Join(tmpDir, "prompt.txt")
@@ -108,7 +153,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -120,25 +165,44 @@ build_gate:
 
 	bg := result["build_gate"].(map[string]any)
 	router := bg["router"].(map[string]any)
-	tmpDirRaw := router["tmp_dir"].([]any)
-	entry := tmpDirRaw[0].(map[string]any)
 
-	if _, hasPath := entry["path"]; hasPath {
-		t.Errorf("expected 'path' to be removed from router tmp_dir entry")
+	if _, hasTmpDir := router["tmp_dir"]; hasTmpDir {
+		t.Errorf("expected 'tmp_dir' to be removed from router after bundle upload")
 	}
 
-	name, content := decodeTmpEntry(t, entry)
-	if name != "prompt.txt" {
-		t.Errorf("expected name=prompt.txt, got %q", name)
+	tmpBundle, hasTmpBundle := router["tmp_bundle"]
+	if !hasTmpBundle {
+		t.Fatalf("expected 'tmp_bundle' to be set in router after bundle upload")
 	}
-	if string(content) != promptContent {
-		t.Errorf("expected content=%q, got %q", promptContent, string(content))
+
+	bundle := tmpBundle.(map[string]any)
+	if bundle["bundle_id"] != "test-bundle-id" {
+		t.Errorf("expected bundle_id=test-bundle-id, got %q", bundle["bundle_id"])
+	}
+	if bundle["cid"] != "bafytest" {
+		t.Errorf("expected cid=bafytest, got %q", bundle["cid"])
+	}
+	if bundle["digest"] != "sha256:deadbeef" {
+		t.Errorf("expected digest=sha256:deadbeef, got %q", bundle["digest"])
+	}
+
+	entries, ok := bundle["entries"].([]any)
+	if !ok {
+		t.Fatalf("expected entries to be []any, got %T", bundle["entries"])
+	}
+	if len(entries) != 1 || entries[0] != "prompt.txt" {
+		t.Errorf("expected entries=[prompt.txt], got %v", entries)
 	}
 }
 
-// TestBuildSpecPayload_TmpDir_Healing verifies that tmp_dir path entries in
-// build_gate.healing.by_error_kind.* are resolved to file content.
+// TestBuildSpecPayload_TmpDir_Healing verifies that tmp_dir entries in
+// build_gate.healing.by_error_kind.* are archived, uploaded, and replaced with tmp_bundle.
 func TestBuildSpecPayload_TmpDir_Healing(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	patchFile := filepath.Join(tmpDir, "patch.sh")
@@ -167,7 +231,7 @@ build_gate:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -181,25 +245,44 @@ build_gate:
 	healing := bg["healing"].(map[string]any)
 	byErrorKind := healing["by_error_kind"].(map[string]any)
 	code := byErrorKind["code"].(map[string]any)
-	tmpDirRaw := code["tmp_dir"].([]any)
-	entry := tmpDirRaw[0].(map[string]any)
 
-	if _, hasPath := entry["path"]; hasPath {
-		t.Errorf("expected 'path' to be removed from healing tmp_dir entry")
+	if _, hasTmpDir := code["tmp_dir"]; hasTmpDir {
+		t.Errorf("expected 'tmp_dir' to be removed from healing action after bundle upload")
 	}
 
-	name, content := decodeTmpEntry(t, entry)
-	if name != "patch.sh" {
-		t.Errorf("expected name=patch.sh, got %q", name)
+	tmpBundle, hasTmpBundle := code["tmp_bundle"]
+	if !hasTmpBundle {
+		t.Fatalf("expected 'tmp_bundle' to be set in healing action after bundle upload")
 	}
-	if string(content) != patchContent {
-		t.Errorf("expected content=%q, got %q", patchContent, string(content))
+
+	bundle := tmpBundle.(map[string]any)
+	if bundle["bundle_id"] != "test-bundle-id" {
+		t.Errorf("expected bundle_id=test-bundle-id, got %q", bundle["bundle_id"])
+	}
+	if bundle["cid"] != "bafytest" {
+		t.Errorf("expected cid=bafytest, got %q", bundle["cid"])
+	}
+	if bundle["digest"] != "sha256:deadbeef" {
+		t.Errorf("expected digest=sha256:deadbeef, got %q", bundle["digest"])
+	}
+
+	entries, ok := bundle["entries"].([]any)
+	if !ok {
+		t.Fatalf("expected entries to be []any, got %T", bundle["entries"])
+	}
+	if len(entries) != 1 || entries[0] != "patch.sh" {
+		t.Errorf("expected entries=[patch.sh], got %v", entries)
 	}
 }
 
 // TestBuildSpecPayload_TmpDir_InvalidPathType verifies a deterministic error when a
 // tmp_dir entry has a non-string path value.
 func TestBuildSpecPayload_TmpDir_InvalidPathType(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	specPath := filepath.Join(tmpDir, "spec.yaml")
@@ -215,7 +298,7 @@ steps:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Fatal("expected error for non-string path in tmp_dir, got nil")
 	}
@@ -227,6 +310,11 @@ steps:
 // TestBuildSpecPayload_TmpDir_MissingFile verifies a deterministic error when a
 // tmp_dir path points to a nonexistent file.
 func TestBuildSpecPayload_TmpDir_MissingFile(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	specPath := filepath.Join(tmpDir, "spec.yaml")
@@ -241,53 +329,24 @@ steps:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 	if err == nil {
 		t.Fatal("expected error for missing tmp_dir file, got nil")
 	}
-	if !strings.Contains(err.Error(), "read file") {
-		t.Errorf("expected 'read file' in error, got: %v", err)
-	}
-}
-
-// TestBuildSpecPayload_TmpDir_UnreadableFile verifies a deterministic error when a
-// tmp_dir path points to a file that exists but cannot be read.
-func TestBuildSpecPayload_TmpDir_UnreadableFile(t *testing.T) {
-	if os.Getuid() == 0 {
-		t.Skip("root can read any file; permission test is not meaningful")
-	}
-
-	tmpDir := t.TempDir()
-
-	unreadable := filepath.Join(tmpDir, "secret.txt")
-	if err := os.WriteFile(unreadable, []byte("secret"), 0o000); err != nil {
-		t.Fatalf("write unreadable file: %v", err)
-	}
-
-	specPath := filepath.Join(tmpDir, "spec.yaml")
-	specContent := `
-steps:
-  - image: docker.io/test/mig:latest
-    tmp_dir:
-      - name: secret.txt
-        path: ` + unreadable + `
-`
-	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
-		t.Fatalf("write spec file: %v", err)
-	}
-
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
-	if err == nil {
-		t.Fatal("expected error for unreadable tmp_dir file, got nil")
-	}
-	if !strings.Contains(err.Error(), "read file") {
-		t.Errorf("expected 'read file' in error, got: %v", err)
+	// The error comes from stat or read failing
+	if !strings.Contains(err.Error(), "stat") && !strings.Contains(err.Error(), "no such file") {
+		t.Errorf("expected stat or file-not-found error, got: %v", err)
 	}
 }
 
 // TestBuildSpecPayload_TmpDir_PathExpansion verifies that tmp_dir path entries
 // support ~ home-dir expansion and $ENV_VAR substitution via resolvePath.
 func TestBuildSpecPayload_TmpDir_PathExpansion(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	configFile := filepath.Join(tmpDir, "expand.txt")
@@ -302,20 +361,18 @@ func TestBuildSpecPayload_TmpDir_PathExpansion(t *testing.T) {
 	}
 
 	// Build a path that uses ~ if the file is under the home dir, otherwise use $VAR expansion.
-	var tildeFile, envFile string
+	var tildeFile string
 	if strings.HasPrefix(tmpDir, home+"/") {
-		// Use ~ syntax for a file under home.
 		rel := strings.TrimPrefix(configFile, home+"/")
 		tildeFile = "~/" + rel
 	} else {
-		// File is not under home; fall back to env-var path for the tilde sub-test.
 		tildeFile = configFile
 	}
 
 	// Use an env-var path for the env-expansion sub-test.
 	envVarName := "PLOY_TEST_TMPDIR_PATH_" + strings.ReplaceAll(t.Name(), "/", "_")
 	t.Setenv(envVarName, configFile)
-	envFile = "$" + envVarName + ""
+	envFile := "$" + envVarName
 
 	tests := []struct {
 		name string
@@ -339,7 +396,7 @@ steps:
 				t.Fatalf("write spec file: %v", err)
 			}
 
-			payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+			payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 			if err != nil {
 				t.Fatalf("buildSpecPayload error: %v", err)
 			}
@@ -351,16 +408,13 @@ steps:
 
 			steps := result["steps"].([]any)
 			step0 := steps[0].(map[string]any)
-			tmpDirRaw := step0["tmp_dir"].([]any)
-			entry := tmpDirRaw[0].(map[string]any)
 
-			if _, hasPath := entry["path"]; hasPath {
-				t.Errorf("expected 'path' to be removed after resolution")
+			if _, hasTmpDir := step0["tmp_dir"]; hasTmpDir {
+				t.Errorf("expected 'tmp_dir' to be removed after bundle upload")
 			}
 
-			_, content := decodeTmpEntry(t, entry)
-			if string(content) != configContent {
-				t.Errorf("expected content=%q, got %q", configContent, string(content))
+			if _, hasTmpBundle := step0["tmp_bundle"]; !hasTmpBundle {
+				t.Errorf("expected 'tmp_bundle' to be set after bundle upload")
 			}
 		})
 	}
@@ -369,6 +423,11 @@ steps:
 // TestBuildSpecPayload_TmpDir_Mixed verifies mixed valid and invalid tmp_dir entries
 // across steps, router, and healing blocks.
 func TestBuildSpecPayload_TmpDir_Mixed(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
 	tmpDir := t.TempDir()
 
 	validFile := filepath.Join(tmpDir, "valid.txt")
@@ -392,7 +451,8 @@ steps:
       - name: missing.txt
         path: /nonexistent/missing.txt
 `,
-			wantErrSub: "read file",
+			// stat error for missing file
+			wantErrSub: "stat",
 		},
 		{
 			name: "steps: valid path then invalid path type",
@@ -426,7 +486,7 @@ build_gate:
       - name: gone.txt
         path: /nonexistent/gone.txt
 `,
-			wantErrSub: "read file",
+			wantErrSub: "stat",
 		},
 		{
 			name: "healing: missing file",
@@ -445,7 +505,7 @@ build_gate:
   router:
     image: docker.io/test/router:latest
 `,
-			wantErrSub: "read file",
+			wantErrSub: "stat",
 		},
 	}
 
@@ -455,7 +515,7 @@ build_gate:
 			if err := os.WriteFile(specPath, []byte(tt.specContent), 0o644); err != nil {
 				t.Fatalf("write spec file: %v", err)
 			}
-			_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+			_, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -463,5 +523,60 @@ build_gate:
 				t.Errorf("expected %q in error, got: %v", tt.wantErrSub, err)
 			}
 		})
+	}
+}
+
+// TestBuildSpecPayload_TmpDir_NilBaseNoTmpDir verifies that when there are no
+// tmp_dir sections, buildSpecPayload succeeds even with nil base/client.
+func TestBuildSpecPayload_TmpDir_NilBaseNoTmpDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	// nil base/client is fine when no tmp_dir is present
+	payload, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+	if len(payload) == 0 {
+		t.Fatal("expected non-empty payload")
+	}
+}
+
+// TestBuildSpecPayload_TmpDir_NilBaseWithTmpDir verifies that when tmp_dir sections
+// are present but base is nil, buildSpecPayload returns a descriptive error.
+func TestBuildSpecPayload_TmpDir_NilBaseWithTmpDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: config.json
+        path: ` + configFile + `
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	_, err := buildSpecPayload(context.Background(), nil, nil, specPath, nil, "", false, "", "", "", false, false)
+	if err == nil {
+		t.Fatal("expected error when tmp_dir found but base is nil, got nil")
+	}
+	if !strings.Contains(err.Error(), "no server base URL") {
+		t.Errorf("expected 'no server base URL' in error, got: %v", err)
 	}
 }

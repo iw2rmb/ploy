@@ -12,8 +12,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,7 +29,7 @@ import (
 
 var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
 
-func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
+func normalizeModsSpecToJSON(ctx context.Context, base *url.URL, client *http.Client, data []byte) (json.RawMessage, error) {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		if err := yaml.Unmarshal(data, &raw); err != nil {
@@ -34,6 +37,10 @@ func normalizeModsSpecToJSON(data []byte) (json.RawMessage, error) {
 		}
 	}
 	if err := preprocessModsSpecInPlace(raw); err != nil {
+		return nil, err
+	}
+
+	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, raw); err != nil {
 		return nil, err
 	}
 
@@ -91,37 +98,6 @@ func preprocessModsSpecInPlace(spec map[string]any) error {
 				if err := resolveEnvFromFileInPlace(stepEntry); err != nil {
 					return fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
 				}
-			}
-		}
-	}
-
-	// Resolve tmp_dir path references in steps[], build_gate.router, and build_gate.healing.by_error_kind.*.
-	if steps, ok := spec["steps"].([]any); ok {
-		for i, s := range steps {
-			if stepEntry, ok := s.(map[string]any); ok {
-				if err := resolveTmpDirInPlace(stepEntry, fmt.Sprintf("steps[%d].tmp_dir", i)); err != nil {
-					return fmt.Errorf("resolve tmp_dir (steps[%d]): %w", i, err)
-				}
-			}
-		}
-	}
-	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if healing, ok := bg["healing"].(map[string]any); ok {
-			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-				for errorKind, item := range byErrorKind {
-					action, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					if err := resolveTmpDirInPlace(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.tmp_dir", errorKind)); err != nil {
-						return fmt.Errorf("resolve tmp_dir (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
-					}
-				}
-			}
-		}
-		if router, ok := bg["router"].(map[string]any); ok {
-			if err := resolveTmpDirInPlace(router, "build_gate.router.tmp_dir"); err != nil {
-				return fmt.Errorf("resolve tmp_dir (build_gate.router): %w", err)
 			}
 		}
 	}
@@ -326,47 +302,6 @@ func resolveAmataSpecInSection(section map[string]any, prefix string) error {
 	return nil
 }
 
-// resolveTmpDirInPlace processes tmp_dir entries in a spec section,
-// resolving "path" references to file content.
-// Each entry with a "path" key has the file read and its bytes stored in "content";
-// "path" is removed so it never reaches canonical validation.
-// Entries without "path" are passed through unchanged.
-func resolveTmpDirInPlace(spec map[string]any, prefix string) error {
-	raw, ok := spec["tmp_dir"]
-	if !ok {
-		return nil
-	}
-	entries, ok := raw.([]any)
-	if !ok {
-		return fmt.Errorf("%s: expected array, got %T", prefix, raw)
-	}
-	for i, item := range entries {
-		entry, ok := item.(map[string]any)
-		if !ok {
-			return fmt.Errorf("%s[%d]: expected object, got %T", prefix, i, item)
-		}
-		pathVal, hasPath := entry["path"]
-		if !hasPath {
-			continue
-		}
-		path, ok := pathVal.(string)
-		if !ok {
-			return fmt.Errorf("%s[%d].path: expected string path, got %T", prefix, i, pathVal)
-		}
-		resolved, err := resolvePath(path)
-		if err != nil {
-			return fmt.Errorf("%s[%d].path: %w", prefix, i, err)
-		}
-		content, err := os.ReadFile(resolved)
-		if err != nil {
-			return fmt.Errorf("%s[%d].path: read file %s: %w", prefix, i, resolved, err)
-		}
-		delete(entry, "path")
-		entry["content"] = content
-	}
-	return nil
-}
-
 // resolveEnvFromFile reads a file path (expanding ~) and returns its content as a string.
 // File content is treated as sensitive, so any errors redact the file path for security.
 func resolveEnvFromFile(path string) (string, error) {
@@ -534,6 +469,9 @@ func expandSpecEnvValue(raw string) (string, error) {
 // - The CLI preserves steps[] without modification; image/command/retain overrides do not apply when len(steps) > 1.
 // - The server copies steps[] indexes into jobs.next_id and diffs.next_id.
 func buildSpecPayload(
+	ctx context.Context,
+	base *url.URL,
+	client *http.Client,
 	specFile string,
 	modEnvs []string,
 	modImage string,
@@ -547,24 +485,28 @@ func buildSpecPayload(
 	_ = retain
 
 	// Start with spec from file (if provided)
-	var base map[string]any
+	var specMap map[string]any
 	if specFile != "" {
 		data, err := os.ReadFile(specFile)
 		if err != nil {
 			return nil, fmt.Errorf("read spec file %s: %w", specFile, err)
 		}
 		// Try JSON first, fallback to YAML
-		if err := json.Unmarshal(data, &base); err != nil {
+		if err := json.Unmarshal(data, &specMap); err != nil {
 			// Not JSON; try YAML
-			if err := yaml.Unmarshal(data, &base); err != nil {
+			if err := yaml.Unmarshal(data, &specMap); err != nil {
 				return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", specFile, err)
 			}
 		}
 	} else {
-		base = make(map[string]any)
+		specMap = make(map[string]any)
 	}
 
-	if err := preprocessModsSpecInPlace(base); err != nil {
+	if err := preprocessModsSpecInPlace(specMap); err != nil {
+		return nil, err
+	}
+
+	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, specMap); err != nil {
 		return nil, err
 	}
 
@@ -573,14 +515,14 @@ func buildSpecPayload(
 		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
 
 	// Only proceed if we have a spec file or CLI overrides
-	if len(base) == 0 && !hasOverrides {
+	if len(specMap) == 0 && !hasOverrides {
 		return nil, nil
 	}
 
 	if len(modEnvs) > 0 {
 		// Start from existing env.
 		current := make(map[string]any)
-		if existingEnv, ok := base["env"].(map[string]any); ok {
+		if existingEnv, ok := specMap["env"].(map[string]any); ok {
 			for k, v := range existingEnv {
 				if s, ok := v.(string); ok {
 					current[k] = s
@@ -607,27 +549,27 @@ func buildSpecPayload(
 			}
 		}
 		if len(current) > 0 {
-			base["env"] = current
+			specMap["env"] = current
 		}
 	}
 
 	// Image/command overrides apply only to single-step specs. For multi-step
 	// specs (len(steps) > 1), these overrides are ignored.
 	var stepsLen int
-	if steps, ok := base["steps"].([]any); ok {
+	if steps, ok := specMap["steps"].([]any); ok {
 		stepsLen = len(steps)
 	}
 	if stepsLen <= 1 && (modImage != "" || modCommand != "") {
 		// Ensure steps[0] exists and is a map.
 		var step0 map[string]any
 		if stepsLen == 1 {
-			if m, ok := base["steps"].([]any)[0].(map[string]any); ok {
+			if m, ok := specMap["steps"].([]any)[0].(map[string]any); ok {
 				step0 = m
 			}
 		}
 		if step0 == nil {
 			step0 = make(map[string]any)
-			base["steps"] = []any{step0}
+			specMap["steps"] = []any{step0}
 		}
 
 		if modImage != "" {
@@ -651,32 +593,32 @@ func buildSpecPayload(
 
 	// Add GitLab options (never print PAT in logs; node agent will handle redaction)
 	if gitlabPAT != "" {
-		base["gitlab_pat"] = gitlabPAT
+		specMap["gitlab_pat"] = gitlabPAT
 	}
 	if gitlabDomain != "" {
-		base["gitlab_domain"] = gitlabDomain
+		specMap["gitlab_domain"] = gitlabDomain
 	}
 	if mrSuccess {
-		base["mr_on_success"] = true
+		specMap["mr_on_success"] = true
 	}
 	if mrFail {
-		base["mr_on_fail"] = true
+		specMap["mr_on_fail"] = true
 	}
 
 	// Default gitlab_domain to "gitlab.com" when gitlab_pat is provided but gitlab_domain is empty.
 	// This runs after all CLI overrides to check the final state.
-	if _, hasPAT := base["gitlab_pat"]; hasPAT {
-		if _, hasDomain := base["gitlab_domain"]; !hasDomain {
-			base["gitlab_domain"] = "gitlab.com"
+	if _, hasPAT := specMap["gitlab_pat"]; hasPAT {
+		if _, hasDomain := specMap["gitlab_domain"]; !hasDomain {
+			specMap["gitlab_domain"] = "gitlab.com"
 		}
 	}
 
-	if len(base) == 0 {
+	if len(specMap) == 0 {
 		return nil, nil
 	}
 
 	// Marshal to JSON for submission
-	jsonBytes, err := json.Marshal(base)
+	jsonBytes, err := json.Marshal(specMap)
 	if err != nil {
 		return nil, fmt.Errorf("marshal spec: %w", err)
 	}

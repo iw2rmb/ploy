@@ -42,7 +42,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     2. `go test ./docs/api/...`
   - Reasoning: `high`
 
-- [ ] 1.3 Rewrite CLI TmpDir Preprocessing To Archive And Upload
+- [x] 1.3 Rewrite CLI TmpDir Preprocessing To Archive And Upload
   - Repository: `ploy`
   - Component: `cmd/ploy/mig_run_spec.go`; `cmd/ploy/run_submit.go`; `cmd/ploy/mig_add.go`; `cmd/ploy/mig_spec.go`; `internal/cli/migs/*`; `cmd/ploy/*tmpdir*_test.go`
   - Implementation:
