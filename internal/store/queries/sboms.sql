@@ -8,7 +8,7 @@ DELETE FROM sboms
 WHERE job_id = $1;
 
 -- name: ListSBOMRowsByJob :many
-SELECT job_id, repo_id, lib, ver, created_at
+SELECT job_id, repo_id, lib, ver
 FROM sboms
 WHERE job_id = $1
 ORDER BY lib ASC, ver ASC;
