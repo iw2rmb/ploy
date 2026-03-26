@@ -83,3 +83,4 @@ Legend: [ ] todo, [x] done.
   - Snippets: `make test`, `make vet`, `make staticcheck`.
   - Tests: all commands above complete successfully.
   - Gap closure (2026-03-26): freed host root filesystem from `~497MB` available to `~7.5GB` available and reran `make test`, `make vet`, and `make staticcheck` successfully; prior `no space left on device` plus missing/unwritable Go build cache/temp artifact failures were environment-driven.
+  - Gap closure (2026-03-26): after freeing disk space, reran blocked SBOM handler tests in `internal/server/handlers` via `go test ./internal/server/handlers -run 'TestMaybePersistGateSuccessSBOMRows_|TestSBOMCompatHandler_|TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps'`; suite passed (`ok .../internal/server/handlers`).
