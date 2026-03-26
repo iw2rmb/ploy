@@ -52,7 +52,6 @@ ENV PATH="/usr/local/bin:${PATH}" \
     CODEX_HOME=/out/codex \
     CODEX_PROMPT="" \
     CODEX_MODEL="" \
-    CODEX_EXTRA_DIR="" \
     CODEX_AUTH_JSON="" \
     CODEX_CONFIG_TOML="" \
     CRUSH_JSON="" \
