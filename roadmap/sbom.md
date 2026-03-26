@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
   - Component: `internal/server/handlers` + `internal/store/queries`
   - Scope: add handler and queries for stack-filtered lookup by `lang/release/tool`; for each requested lib return minimum successful version, or minimum successful version `>=` requested floor when `name:ver` is provided; return `null` when no stack evidence exists.
   - Snippets: response payload `{ "<lib>": "<ver>", ... } | null`.
-  - Tests: `go test ./internal/server/handlers -run 'Test.*SBOM.*Compat'` and store query tests — expect correct per-lib results, floor filtering, and null response semantics.
+  - Tests: `go test ./internal/server/handlers -run 'Test.*SBOM.*Compat'` and store query tests — expect correct per-lib results, floor filtering, colon-containing library name parsing/lookup (both `name` and `name:floor` inputs), and null response semantics.
 
 ## Phase 7: Ecosystem-Aware Version Ordering
 - [x] Implement non-lexical version ordering per ecosystem for compatibility floor queries.
