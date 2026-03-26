@@ -12,15 +12,15 @@ checkpoint notes in the repository.
   `post-gate`). Jobs are stored as `jobs` rows. Persisted job fields are
   `job_type`, `job_image`, and `next_id` (successor link in the job chain).
 - **Spec** — YAML/JSON file or inline JSON describing container image,
-  command, env, Build Gate and optional `migs[]` steps. Parsed by the CLI in
-  `cmd/ploy/mod_run_spec.go`.
+  command, env, Build Gate and `steps[]` (canonical execution list). Parsed by
+  the CLI in `cmd/ploy/mig_run_spec.go`.
 - **Build Gate** — Validation pass run via Docker containers to ensure the
   workspace compiles/tests successfully. The `GateExecutor` adapter
   (`internal/workflow/step`) abstracts execution; nodes claim gate jobs
   from the unified queue and execute them locally. Gates run at two distinct points
   in the lifecycle:
-  - **Pre-mig gate** — runs once on the initial workspace before any migs execute.
-  - **Post-mig gate** — runs after each mig in `migs[]` that exits with code 0.
+  - **Pre-mig gate** — runs once on the initial workspace before any steps execute.
+  - **Post-mig gate** — runs after each step in `steps[]` that exits with code 0.
 - **Healing** — Optional corrective steps run when any Build Gate (pre or post)
   fails. The system enters a fail → heal migs → re-gate loop; if the gate still
   fails after retries, the run terminates.
@@ -28,18 +28,17 @@ checkpoint notes in the repository.
 ## 1.1 Build Gate Sequence
 
 This section makes the pre-/post-gate execution order explicit for both
-single-mig and multi-mig runs. All gate failures follow the same healing
+single-step and multi-step runs. All gate failures follow the same healing
 protocol: fail → heal migs → re-gate; if healing is exhausted, the run fails
-and no further migs execute.
+and no further steps execute.
 
-### Single-mig runs (no `migs[]`)
+### Single-step runs (`steps[]` with one entry)
 
 > **Note:** A single-repo submission is internally a degenerate batch with one
 > `run_repos` entry. See § 1.4 (Batched Mods Runs) for the batch model
 > (`runs` + `run_repos`) and how single-repo runs fit into the unified architecture.
 
-When the spec does **not** contain a `migs[]` array (single-step run using
-top-level `image`/`command`/`env`), the execution sequence is:
+When `steps[]` contains exactly one entry, the execution sequence is:
 
 ```
 pre-gate(+healing) → mig → post-gate(+healing)
@@ -60,9 +59,9 @@ pre-gate(+healing) → mig → post-gate(+healing)
    - On failure with healing migs configured: enter fail → heal → re-gate loop.
    - If healing is exhausted: run fails.
 
-### Multi-mig runs (`migs[]`)
+### Multi-step runs (`steps[]`)
 
-When the spec contains a `migs[]` array with multiple entries, the execution
+When `steps[]` contains multiple entries, the execution
 sequence is:
 
 ```
@@ -74,13 +73,13 @@ pre-gate(+healing) → mig[0] → post-gate[0](+healing) → mig[1] → post-gat
    - On failure with healing: enter fail → heal → re-gate loop.
    - If healing exhausted: run exits without executing any migs.
 
-2. **For each mig[k] in `migs[]` (k = 0, 1, ..., N-1)**:
+2. **For each step[k] in `steps[]` (k = 0, 1, ..., N-1)**:
    - **Mod[k] execution** — Runs against the workspace with changes from all
-     prior migs applied.
-   - **Post-mig gate[k]** — Runs after mig[k] exits with code 0.
+     prior steps applied.
+   - **Post-mig gate[k]** — Runs after step[k] exits with code 0.
      - On failure with healing: enter fail → heal → re-gate loop.
-     - If healing exhausted: run fails and no further migs execute.
-   - If mig[k] exits non-zero: run fails; no post-gate and no further migs.
+     - If healing exhausted: run fails and no further steps execute.
+   - If step[k] exits non-zero: run fails; no post-gate and no further steps.
 
 ### Gate execution via unified jobs queue
 
@@ -419,7 +418,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (top-level, in `migs[]`, and in `build_gate.healing.by_error_kind.<kind>`/`build_gate.router`) accepts two forms:
+The `image` field (in `steps[]` and in `build_gate.healing.by_error_kind.<kind>`/`build_gate.router`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
@@ -610,7 +609,7 @@ transaction.
 
 ### Simple run graph
 
-A successful single-mig run creates a linear three-node chain:
+A successful single-step run creates a linear three-node chain:
 
 ```
 ┌───────────┐       ┌───────────┐       ┌───────────┐
@@ -985,7 +984,7 @@ This section is the canonical CLI reference for local pull workflows.
 - Run submission + repo add: `internal/server/handlers/runs_submit.go`, `internal/server/handlers/runs_batch_http.go`.
 - Run repos queries: `internal/store/queries/run_repos.sql`.
 - Batch scheduler: `internal/store/batchscheduler/batch_scheduler.go`.
-- CLI subcommands: `cmd/ploy/mod_run_repo.go`.
+- CLI subcommands: `cmd/ploy/mig_run_repo.go`.
 - Schema: `internal/store/schema.sql` (see `mig_repos`, `runs`, `run_repos`, `jobs` tables).
 
 ## 2. Data Model
@@ -1270,11 +1269,11 @@ artifacts/diffs to the correct node.
 
 ### 4.1 Single-step runs
 
-For a spec without `migs[]` (single-step top-level `image`/`command`/`env`):
+For a spec with exactly one `steps[]` entry:
 
 1. CLI (`ploy mig run`) builds a `RunSubmitRequest` in
-   `cmd/ploy/mod_run_exec.go` and an optional spec JSON payload in
-   `cmd/ploy/mod_run_spec.go`.
+   `internal/cli/migs/submit.go` and an optional spec JSON payload in
+   `cmd/ploy/mig_run_spec.go`.
 2. CLI submits to `POST /v1/runs`. The control plane:
    - Creates `runs` + `run_repos` rows.
    - Publishes an initial `RunSummary` over SSE.
@@ -1290,11 +1289,11 @@ For a spec without `migs[]` (single-step top-level `image`/`command`/`env`):
 5. Control plane updates  run status and emits a final `run` snapshot plus
    a `done` status on the SSE stream.
 
-### 4.2 Multi-step runs (`migs[]`) and rehydration
+### 4.2 Multi-step runs (`steps[]`) and rehydration
 
-For a spec with `migs[]`:
+For a spec with multiple `steps[]` entries:
 
-1. CLI preserves the `migs[]` array as-is (`buildSpecPayload` does not rewrite
+1. CLI preserves the `steps[]` array as-is (`buildSpecPayload` does not rewrite
    or reorder entries).
 2. `POST /v1/runs`:
    - Creates `runs` + `run_repos` rows.
@@ -1350,9 +1349,15 @@ Mods container images are standard OCI images with the following expectations:
     - `env_from_file` paths are resolved on the CLI side and injected as string
       values.
     - Supported on:
-      - top-level spec (single-step runs),
-      - each `migs[]` entry (multi-step runs),
+      - each `steps[]` entry (single-step and multi-step runs),
       - `build_gate.healing.by_error_kind` and `build_gate.router`.
+  - Spec tmp injection is bundle-based (`tmp_bundle`) and supported on
+    `steps[]`, `build_gate.router`, and
+    `build_gate.healing.by_error_kind.<error_kind>`.
+    - Canonical fields: `bundle_id`, `cid`, `digest`, `entries`.
+    - Legacy inline `tmp_dir[].content` payloads are not supported.
+    - The node downloads and verifies the bundle, extracts it safely, and mounts
+      each declared top-level entry read-only at `/tmp/<name>`.
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
     env vars are filtered by scope (`all`, `migs`, `heal`, `gate`) to match job types:
@@ -1393,11 +1398,10 @@ Mods container images are standard OCI images with the following expectations:
 The CLI entry points for Mods are implemented in `cmd/ploy`:
 
 - `ploy mig run`:
-  - Parses flags in `cmd/ploy/mod_run_flags.go`.
-  - Builds the spec payload in `cmd/ploy/mod_run_spec.go` (handles `env` and
+  - Parses flags in `cmd/ploy/mig_command.go`.
+  - Builds the spec payload in `cmd/ploy/mig_run_spec.go` (handles `env` and
     `env_from_file`).
-  - Constructs `RunSubmitRequest` with stage definitions in
-    `cmd/ploy/mod_run_exec.go`.
+  - Constructs and submits `RunSubmitRequest` through `internal/cli/migs`.
   - Submits via `internal/cli/migs.SubmitCommand`.
   - Optional `--follow` displays a summarized per-repo job graph until completion,
     implemented via `internal/cli/follow.Engine`. The job graph refreshes on
@@ -1405,7 +1409,7 @@ The CLI entry points for Mods are implemented in `cmd/ploy`:
     Use `ploy run logs <run-id>` to stream logs.
 
 - `ploy mig run <mig-id|name>`:
-  - Creates a run from a mig project via `cmd/ploy/mod_run_project.go`.
+  - Creates a run from a mig project via `cmd/ploy/mig_run_project.go`.
   - Supports `--repo`, `--failed` for repo selection.
   - Optional `--follow` displays the job graph until completion.
 
@@ -1527,9 +1531,8 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 Code paths most relevant for Mods:
 
 - CLI:
-  - `cmd/ploy/mod_run_exec.go`
-  - `cmd/ploy/mod_run_spec.go`
-  - `cmd/ploy/mod_controlplane_commands.go`
+  - `cmd/ploy/mig_run_spec.go`
+  - `cmd/ploy/mig_controlplane_commands.go`
   - `internal/cli/migs/*`
 - Control plane:
   - `internal/migs/api/*`
