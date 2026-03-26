@@ -3,8 +3,12 @@ package blobstore
 
 import (
 	"context"
+	"errors"
 	"io"
 )
+
+// ErrNotFound is returned by Store.Get when the requested object does not exist.
+var ErrNotFound = errors.New("blobstore: object not found")
 
 // Store defines the interface for blob storage operations.
 type Store interface {
