@@ -118,6 +118,15 @@ printf '%s\n' "$RUN_JSON" >"${E2E_ARTIFACT_DIR}/run-blocked.json"
 # Step 5: assert the run failed (status "Fail", not "Success").
 FAILED=0
 
+# Assert the output contains the expected traversal-rejection error message.
+EXPECTED_MSG="path traversal in entry"
+if printf '%s' "$RUN_JSON" | grep -qF "$EXPECTED_MSG"; then
+  echo "  + failure message: found '${EXPECTED_MSG}' (expected)"
+else
+  echo "  ! failure message: expected substring '${EXPECTED_MSG}' not found in output" >&2
+  FAILED=1
+fi
+
 REPO_STATUS="$(printf '%s' "$RUN_JSON" | jq -r '.repos[0].status // empty' 2>/dev/null || echo "")"
 if [[ "$REPO_STATUS" == "Fail" ]]; then
   echo "  + repo status: Fail (expected)"
