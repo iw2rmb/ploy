@@ -22,23 +22,26 @@ type Screen int
 const (
 	ScreenRoot             Screen = iota // PLOY root selector
 	ScreenMigrationsList                 // PLOY | MIGRATIONS
-	ScreenMigrationDetails               // PLOY | MIGRATION <name>
+	ScreenMigrationDetails               // PLOY (selected migration context)
 	ScreenRunsList                       // PLOY | RUNS
-	ScreenRunDetails                     // PLOY | RUN
+	ScreenRunDetails                     // PLOY (selected run context)
 	ScreenJobsList                       // PLOY | JOBS
 )
 
-// listWidth is the fixed width applied to standard lists in the TUI.
+// listWidth is the fixed width applied to standard non-PLOY lists in the TUI.
 const listWidth = 24
+
+// ployListWidth is the fixed width for the left PLOY list.
+const ployListWidth = 30
 
 // runsListWidth is the fixed width for RUNS items in the right panel.
 const runsListWidth = 30
 
 // jobsListWidth is the fixed width for JOBS items in the right panel.
-const jobsListWidth = 48
+const jobsListWidth = 30
 
-// jobsDurationWidth is the fixed width of the right-aligned duration segment.
-const jobsDurationWidth = 10
+// jobsContentWidth is an item text budget (excluding list delegate chrome).
+const jobsContentWidth = 26
 
 // listItem is the default item type used in all TUI lists.
 type listItem struct {
@@ -69,6 +72,9 @@ type model struct {
 	// selectedMigID tracks the migration chosen in S2 for drill-down to S3.
 	selectedMigID domaintypes.MigID
 
+	// selectedMigName tracks migration name when selected through runs.
+	selectedMigName string
+
 	// selectedRunID tracks the run chosen in S4 for drill-down to S5.
 	selectedRunID domaintypes.RunID
 
@@ -86,6 +92,12 @@ type model struct {
 
 	// windowHeight tracks the latest terminal height so every list can match it.
 	windowHeight int
+
+	// runs caches the latest runs list so run selection can resolve mig context.
+	runs []runSummary
+
+	// jobs caches the latest jobs list so job selection can resolve context.
+	jobs []clitui.JobItem
 }
 
 // newListWithWidth creates a list with the shared TUI invariants applied:
@@ -102,6 +114,11 @@ func newListWithWidth(title string, items []list.Item, width int) list.Model {
 // newList creates a standard-width list (24 columns).
 func newList(title string, items []list.Item) list.Model {
 	return newListWithWidth(title, items, listWidth)
+}
+
+// newPloyList creates the left PLOY list with fixed width.
+func newPloyList(title string, items []list.Item) list.Model {
+	return newListWithWidth(title, items, ployListWidth)
 }
 
 // newJobsList creates a jobs list with a 48-column width.
@@ -145,6 +162,66 @@ func buildPloyItems(hasMigration, hasRun, hasJob bool) []list.Item {
 	}
 }
 
+func buildRunDetailsPloyItems(migName string, migID domaintypes.MigID, runID domaintypes.RunID, jobsTotal string) []list.Item {
+	migTitle := strings.TrimSpace(migName)
+	if migTitle == "" {
+		migTitle = "-"
+	}
+	migDesc := strings.TrimSpace(migID.String())
+	if migDesc == "" {
+		migDesc = "-"
+	}
+	runDesc := strings.TrimSpace(runID.String())
+	if runDesc == "" {
+		runDesc = "-"
+	}
+	return []list.Item{
+		listItem{title: migTitle, description: migDesc},
+		listItem{title: "Run", description: runDesc},
+		listItem{title: "Jobs", description: jobsTotal},
+	}
+}
+
+func buildMigrationDetailsPloyItems(migName string, migID domaintypes.MigID, runsTotal string) []list.Item {
+	migTitle := strings.TrimSpace(migName)
+	if migTitle == "" {
+		migTitle = "-"
+	}
+	migDesc := strings.TrimSpace(migID.String())
+	if migDesc == "" {
+		migDesc = "-"
+	}
+	return []list.Item{
+		listItem{title: migTitle, description: migDesc},
+		listItem{title: "Runs", description: runsTotal},
+		listItem{title: "Jobs", description: "select job"},
+	}
+}
+
+func buildJobDetailsPloyItems(migName string, migID domaintypes.MigID, runID domaintypes.RunID, jobID domaintypes.JobID) []list.Item {
+	migTitle := strings.TrimSpace(migName)
+	if migTitle == "" {
+		migTitle = "-"
+	}
+	migDesc := strings.TrimSpace(migID.String())
+	if migDesc == "" {
+		migDesc = "-"
+	}
+	runDesc := strings.TrimSpace(runID.String())
+	if runDesc == "" {
+		runDesc = "-"
+	}
+	jobDesc := strings.TrimSpace(jobID.String())
+	if jobDesc == "" {
+		jobDesc = "-"
+	}
+	return []list.Item{
+		listItem{title: migTitle, description: migDesc},
+		listItem{title: "Run", description: runDesc},
+		listItem{title: "Job", description: jobDesc},
+	}
+}
+
 // setPloySelectionState applies root item label state while preserving cursor.
 func (m *model) setPloySelectionState(hasMigration, hasRun, hasJob bool) {
 	m.hasSelectedMigration = hasMigration
@@ -175,7 +252,7 @@ func (m *model) setWindowHeight(height int) {
 
 // InitialModel constructs the starting model for the TUI session.
 func InitialModel(client *http.Client, baseURL *url.URL) model {
-	ploy := newList("PLOY", buildPloyItems(false, false, false))
+	ploy := newPloyList("PLOY", buildPloyItems(false, false, false))
 	ploy.SetFilteringEnabled(false)
 
 	return model{
@@ -240,11 +317,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				description: run.MigName + "  " + run.CreatedAt.Format("02 01 15:04"),
 			}
 		}
+		m.runs = sorted
 		m.secondary = newRunsList("RUNS", items)
 		m.applyWindowHeight()
 		return m, nil
 
 	case migDetailsLoadedMsg:
+		if m.screen == ScreenMigrationDetails {
+			m.ploy.SetItems(buildMigrationDetailsPloyItems(
+				m.selectedMigName,
+				m.selectedMigID,
+				fmt.Sprintf("total: %d", msg.runTotal),
+			))
+			m.ploy.Select(0)
+			return m, nil
+		}
 		items := m.detail.Items()
 		if len(items) >= 2 {
 			items[0] = listItem{title: "repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
@@ -254,6 +341,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case runDetailsLoadedMsg:
+		if m.screen == ScreenRunDetails {
+			m.ploy.SetItems(buildRunDetailsPloyItems(
+				m.selectedMigName,
+				m.selectedMigID,
+				m.selectedRunID,
+				fmt.Sprintf("total: %d", msg.jobTotal),
+			))
+			m.ploy.Select(1)
+			return m, nil
+		}
 		items := m.detail.Items()
 		if len(items) >= 2 {
 			items[0] = listItem{title: "Repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
@@ -270,6 +367,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				description: renderJobsSecondaryLine(job),
 			}
 		}
+		m.jobs = msg.jobs
 		m.secondary = newJobsList("JOBS", items)
 		m.applyWindowHeight()
 		return m, nil
@@ -283,11 +381,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ScreenMigrationsList:
 		m.secondary, cmd = m.secondary.Update(msg)
 	case ScreenMigrationDetails:
-		m.detail, cmd = m.detail.Update(msg)
+		m.ploy, cmd = m.ploy.Update(msg)
 	case ScreenRunsList:
 		m.secondary, cmd = m.secondary.Update(msg)
 	case ScreenRunDetails:
-		m.detail, cmd = m.detail.Update(msg)
+		m.ploy, cmd = m.ploy.Update(msg)
 	case ScreenJobsList:
 		m.secondary, cmd = m.secondary.Update(msg)
 	}
@@ -313,23 +411,20 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 			m.screen = ScreenJobsList
 			m.secondary = newJobsList("JOBS", nil)
 			m.applyWindowHeight()
-			return m, loadJobsCmd(m.client, m.baseURL, nil)
+			return m, tea.Batch(loadJobsCmd(m.client, m.baseURL, nil), loadRunsCmd(m.client, m.baseURL))
 		}
 	case ScreenMigrationsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedMigID = domaintypes.MigID(item.description)
+			m.selectedMigName = item.title
 			m.selectedRunID = ""
 			m.selectedJobID = ""
-			m.setPloySelectionState(true, false, false)
-			label := item.title
-			if label == "" {
-				label = item.description
-			}
-			title := "MIGRATION " + label
-			m.detail = newList(title, []list.Item{
-				listItem{title: "repositories", description: "total: —"},
-				listItem{title: "runs", description: "total: —"},
-			})
+			m.ploy.SetItems(buildMigrationDetailsPloyItems(
+				m.selectedMigName,
+				m.selectedMigID,
+				"total: —",
+			))
+			m.ploy.Select(0)
 			m.applyWindowHeight()
 			m.screen = ScreenMigrationDetails
 			return m, loadMigDetailsCmd(m.client, m.baseURL, m.selectedMigID)
@@ -338,11 +433,22 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedRunID = domaintypes.RunID(item.title)
 			m.selectedJobID = ""
-			m.setPloySelectionState(true, true, false)
-			m.detail = newList("RUN", []list.Item{
-				listItem{title: "Repositories", description: "total: —"},
-				listItem{title: "Jobs", description: "total: —"},
-			})
+			m.selectedMigID = ""
+			m.selectedMigName = ""
+			for _, run := range m.runs {
+				if run.ID == m.selectedRunID {
+					m.selectedMigID = run.MigID
+					m.selectedMigName = run.MigName
+					break
+				}
+			}
+			m.ploy.SetItems(buildRunDetailsPloyItems(
+				m.selectedMigName,
+				m.selectedMigID,
+				m.selectedRunID,
+				"total: —",
+			))
+			m.ploy.Select(1)
 			m.applyWindowHeight()
 			m.screen = ScreenRunDetails
 			return m, loadRunDetailsCmd(m.client, m.baseURL, m.selectedRunID)
@@ -350,7 +456,34 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	case ScreenJobsList:
 		if item, ok := m.secondary.SelectedItem().(listItem); ok {
 			m.selectedJobID = domaintypes.JobID(item.description)
-			m.setPloySelectionState(true, true, true)
+			var selectedJob clitui.JobItem
+			foundJob := false
+			for _, job := range m.jobs {
+				if job.JobID == m.selectedJobID {
+					selectedJob = job
+					foundJob = true
+					break
+				}
+			}
+			if !foundJob {
+				return m, nil
+			}
+			m.selectedRunID = selectedJob.RunID
+			m.selectedMigName = selectedJob.MigName
+			m.selectedMigID = ""
+			for _, run := range m.runs {
+				if run.ID == m.selectedRunID {
+					m.selectedMigID = run.MigID
+					break
+				}
+			}
+			m.ploy.SetItems(buildJobDetailsPloyItems(
+				m.selectedMigName,
+				m.selectedMigID,
+				m.selectedRunID,
+				m.selectedJobID,
+			))
+			m.ploy.Select(2)
 		}
 	}
 	return m, nil
@@ -362,10 +495,9 @@ func renderJobsPrimaryLine(job clitui.JobItem) string {
 	if name == "" {
 		name = "-"
 	}
-	duration := formatDurationCompact(job.DurationMs)
-	duration = leftPadRunes(truncateRunes(duration, jobsDurationWidth), jobsDurationWidth)
+	duration := formatDurationShort(job.DurationMs)
 	prefix := glyph + " "
-	availableNameWidth := jobsListWidth - utf8.RuneCountInString(prefix) - 1 - jobsDurationWidth
+	availableNameWidth := jobsContentWidth - utf8.RuneCountInString(prefix) - 1 - utf8.RuneCountInString(duration)
 	if availableNameWidth < 1 {
 		availableNameWidth = 1
 	}
@@ -393,14 +525,20 @@ func jobsStatusGlyph(status domaintypes.JobStatus) string {
 	}
 }
 
-func formatDurationCompact(durationMs int64) string {
+func formatDurationShort(durationMs int64) string {
 	if durationMs <= 0 {
 		return "-"
 	}
 	if durationMs < 1000 {
 		return fmt.Sprintf("%dms", durationMs)
 	}
-	return fmt.Sprintf("%.1fs", float64(durationMs)/1000.0)
+	if durationMs < 60000 {
+		return fmt.Sprintf("%ds", durationMs/1000)
+	}
+	if durationMs < 3600000 {
+		return fmt.Sprintf("%dm", durationMs/60000)
+	}
+	return fmt.Sprintf("%dh", durationMs/3600000)
 }
 
 func truncateRunes(s string, max int) string {
@@ -414,17 +552,6 @@ func truncateRunes(s string, max int) string {
 	return string(r[:max])
 }
 
-func leftPadRunes(s string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	runes := utf8.RuneCountInString(s)
-	if runes >= width {
-		return s
-	}
-	return strings.Repeat(" ", width-runes) + s
-}
-
 // handleEsc implements Esc-key transitions per the state machine contract.
 func (m model) handleEsc() (tea.Model, tea.Cmd) {
 	switch m.screen {
@@ -432,10 +559,12 @@ func (m model) handleEsc() (tea.Model, tea.Cmd) {
 		m.screen = ScreenRoot
 	case ScreenMigrationDetails:
 		m.screen = ScreenMigrationsList
+		m.setPloySelectionState(true, false, false)
 	case ScreenRunsList:
 		m.screen = ScreenRoot
 	case ScreenRunDetails:
 		m.screen = ScreenRunsList
+		m.setPloySelectionState(true, true, false)
 	case ScreenJobsList:
 		m.screen = ScreenRoot
 	case ScreenRoot:
@@ -456,6 +585,7 @@ type jobsLoadedMsg struct{ jobs []clitui.JobItem }
 // runSummary is a minimal run representation used in the TUI.
 type runSummary struct {
 	ID        domaintypes.RunID
+	MigID     domaintypes.MigID
 	MigName   string
 	CreatedAt time.Time
 }

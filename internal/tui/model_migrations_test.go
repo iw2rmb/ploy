@@ -115,7 +115,7 @@ func TestS2EnterSetsSelectedMigID(t *testing.T) {
 	}
 }
 
-func TestS2EnterDefinesMigrationInPloy(t *testing.T) {
+func TestS2EnterDefinesSelectedMigrationInPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenMigrationsList
 	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
@@ -144,14 +144,23 @@ func TestS2EnterDefinesMigrationInPloy(t *testing.T) {
 		t.Fatalf("item 2: unexpected type %T", items[2])
 	}
 
-	if item0.title != "Migration" {
-		t.Errorf("item 0 title: got %q, want %q", item0.title, "Migration")
+	if item0.title != "my-migration" {
+		t.Errorf("item 0 title: got %q, want %q", item0.title, "my-migration")
+	}
+	if item0.description != "mig-xyz" {
+		t.Errorf("item 0 description: got %q, want %q", item0.description, "mig-xyz")
 	}
 	if item1.title != "Runs" {
 		t.Errorf("item 1 title: got %q, want %q", item1.title, "Runs")
 	}
+	if item1.description != "total: —" {
+		t.Errorf("item 1 description: got %q, want %q", item1.description, "total: —")
+	}
 	if item2.title != "Jobs" {
 		t.Errorf("item 2 title: got %q, want %q", item2.title, "Jobs")
+	}
+	if item2.description != "select job" {
+		t.Errorf("item 2 description: got %q, want %q", item2.description, "select job")
 	}
 }
 

@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	"charm.land/bubbles/v2/list"
 )
 
 func TestViewEnablesAltScreen(t *testing.T) {
@@ -39,9 +41,7 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 		detailPane bool
 	}{
 		{name: "migrations", screen: ScreenMigrationsList, rightTitle: "MIGRATIONS"},
-		{name: "migration_details", screen: ScreenMigrationDetails, rightTitle: "MIGRATION selected", detailPane: true},
 		{name: "runs", screen: ScreenRunsList, rightTitle: "RUNS"},
-		{name: "run_details", screen: ScreenRunDetails, rightTitle: "RUN", detailPane: true},
 		{name: "jobs", screen: ScreenJobsList, rightTitle: "JOBS"},
 	}
 
@@ -69,6 +69,42 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 				t.Fatalf("column titles misaligned: PLOY line=%d %s line=%d", ployLine, tt.rightTitle, rightLine)
 			}
 		})
+	}
+}
+
+func TestMigrationDetailsRendersOnlyPloy(t *testing.T) {
+	m := InitialModel(nil, nil)
+	m.screen = ScreenMigrationDetails
+	m.ploy.SetItems([]list.Item{
+		listItem{title: "my-mig", description: "mig-abc"},
+		listItem{title: "Runs", description: "total: 1"},
+		listItem{title: "Jobs", description: "select job"},
+	})
+
+	rendered := m.View().Content
+	if !strings.Contains(rendered, "PLOY") {
+		t.Fatalf("rendered view missing PLOY title")
+	}
+	if strings.Contains(rendered, "MIGRATION ") {
+		t.Fatalf("rendered view unexpectedly contains MIGRATION pane title")
+	}
+}
+
+func TestRunDetailsRendersOnlyPloy(t *testing.T) {
+	m := InitialModel(nil, nil)
+	m.screen = ScreenRunDetails
+	m.ploy.SetItems([]list.Item{
+		listItem{title: "my-mig", description: "mig-abc"},
+		listItem{title: "Run", description: "run-abc"},
+		listItem{title: "Jobs", description: "total: 8"},
+	})
+
+	rendered := m.View().Content
+	if !strings.Contains(rendered, "PLOY") {
+		t.Fatalf("rendered view missing PLOY title")
+	}
+	if strings.Contains(rendered, "RUN\n") {
+		t.Fatalf("rendered view unexpectedly contains RUN pane title")
 	}
 }
 
