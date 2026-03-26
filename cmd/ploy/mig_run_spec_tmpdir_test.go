@@ -685,3 +685,95 @@ steps:
 		t.Errorf("expected 'no server base URL' in error, got: %v", err)
 	}
 }
+
+// TestBuildSpecPayload_TmpDir_SymlinkFile verifies that a top-level tmp_dir path that
+// is a symlink to a regular file is followed and its content ends up in the bundle.
+func TestBuildSpecPayload_TmpDir_SymlinkFile(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
+	tmpDir := t.TempDir()
+
+	realFile := filepath.Join(tmpDir, "real.txt")
+	if err := os.WriteFile(realFile, []byte("symlinked content"), 0o644); err != nil {
+		t.Fatalf("write real file: %v", err)
+	}
+	linkFile := filepath.Join(tmpDir, "link.txt")
+	if err := os.Symlink(realFile, linkFile); err != nil {
+		t.Fatalf("create symlink: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: link.txt
+        path: ` + linkFile + `
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	steps := result["steps"].([]any)
+	step0 := steps[0].(map[string]any)
+
+	if _, hasTmpDir := step0["tmp_dir"]; hasTmpDir {
+		t.Errorf("expected 'tmp_dir' to be removed after bundle upload")
+	}
+	tmpBundle, hasTmpBundle := step0["tmp_bundle"]
+	if !hasTmpBundle {
+		t.Fatalf("expected 'tmp_bundle' to be set after bundle upload")
+	}
+	entries := tmpBundle.(map[string]any)["entries"].([]any)
+	if len(entries) != 1 || entries[0] != "link.txt" {
+		t.Errorf("expected entries=[link.txt], got %v", entries)
+	}
+}
+
+// TestBuildSpecPayload_TmpDir_SymlinkDangling verifies that a top-level tmp_dir path
+// that is a dangling symlink returns a deterministic error rather than being silently omitted.
+func TestBuildSpecPayload_TmpDir_SymlinkDangling(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
+	tmpDir := t.TempDir()
+
+	linkFile := filepath.Join(tmpDir, "dangling.txt")
+	if err := os.Symlink(filepath.Join(tmpDir, "nonexistent-target.txt"), linkFile); err != nil {
+		t.Fatalf("create dangling symlink: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: dangling.txt
+        path: ` + linkFile + `
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	_, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
+	if err == nil {
+		t.Fatal("expected error for dangling symlink, got nil")
+	}
+	if !strings.Contains(err.Error(), "stat") && !strings.Contains(err.Error(), "no such file") {
+		t.Errorf("expected stat or file-not-found error, got: %v", err)
+	}
+}

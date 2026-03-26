@@ -35,7 +35,8 @@ type tmpDirEntry struct {
 // provided tmp_dir entries. Entries are sorted by Name for determinism.
 // Files are added as single tar entries named <name>.
 // Directories are added as a <name>/ entry plus all nested files (sorted, recursive).
-// Symlinks are skipped silently.
+// Top-level symlinks are followed to their target file or directory; dangling symlinks
+// return a validation error so every declared entry is guaranteed to appear in the bundle.
 // All tar headers use zero timestamps for content-addressed determinism.
 // File permissions use 0o644 for files, 0o755 for directories.
 func buildSpecBundleArchive(entries []tmpDirEntry) ([]byte, error) {
@@ -56,16 +57,15 @@ func buildSpecBundleArchive(entries []tmpDirEntry) ([]byte, error) {
 			return nil, fmt.Errorf("tmp_dir entry %q: resolve path: %w", entry.Name, err)
 		}
 
-		info, err := os.Lstat(resolved)
+		// Use os.Stat (follows symlinks) so a symlink source resolves to its
+		// target type. A dangling symlink causes Stat to fail, which is surfaced
+		// as a validation error rather than being silently omitted.
+		info, err := os.Stat(resolved)
 		if err != nil {
 			return nil, fmt.Errorf("tmp_dir entry %q: stat %s: %w", entry.Name, resolved, err)
 		}
 
 		switch {
-		case info.Mode()&os.ModeSymlink != 0:
-			// Skip symlinks silently.
-			continue
-
 		case info.IsDir():
 			// Add directory entry.
 			dirHdr := &tar.Header{
