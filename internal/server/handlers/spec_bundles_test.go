@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -264,4 +265,54 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 			t.Errorf("expected 404 for missing object key, got %d", w.Code)
 		}
 	})
+
+}
+
+func TestSpecBundleDownloadLastRefUsesDetachedContextAfterRequestCancel(t *testing.T) {
+	bundleID := domaintypes.NewSpecBundleID()
+	objectKey := "spec-bundles/" + bundleID.String() + ".gz"
+	bundleContent := []byte("fake bundle bytes")
+
+	st := &mockStore{
+		getSpecBundleResult: store.SpecBundle{
+			ID:        bundleID,
+			ObjectKey: &objectKey,
+		},
+		updateSpecBundleLastRefAtStarted: make(chan struct{}),
+		updateSpecBundleLastRefAtProceed: make(chan struct{}),
+		updateSpecBundleLastRefAtDone:    make(chan struct{}),
+	}
+	bs := bsmock.New()
+	if _, err := bs.Put(context.Background(), objectKey, "application/gzip", bundleContent); err != nil {
+		t.Fatalf("seed blob store: %v", err)
+	}
+
+	reqBase := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
+	reqCtx, cancelReq := context.WithCancel(reqBase.Context())
+	req := reqBase.WithContext(reqCtx)
+	req.SetPathValue("id", bundleID.String())
+	w := httptest.NewRecorder()
+	downloadSpecBundleHandler(st, bs)(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	select {
+	case <-st.updateSpecBundleLastRefAtStarted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for last_ref_at update goroutine to start")
+	}
+
+	cancelReq()
+	close(st.updateSpecBundleLastRefAtProceed)
+
+	select {
+	case <-st.updateSpecBundleLastRefAtDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for last_ref_at update goroutine to finish")
+	}
+
+	if st.updateSpecBundleLastRefAtCtxErr != nil {
+		t.Fatalf("expected detached context to remain active after request cancellation, got %v", st.updateSpecBundleLastRefAtCtxErr)
+	}
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -23,6 +25,8 @@ import (
 // maxSpecBundleSize is the maximum allowed size for an uploaded spec bundle (50 MiB).
 // Spec bundles may contain user files/directories, so a larger cap than artifact bundles is warranted.
 const maxSpecBundleSize = 50 << 20 // 50 MiB
+
+const specBundleLastRefUpdateTimeout = 5 * time.Second
 
 // computeSpecBundleCIDAndDigest computes a content identifier and SHA256 digest for a spec bundle.
 // Uses the same scheme as artifact bundles for consistency.
@@ -188,12 +192,14 @@ func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerF
 		defer rc.Close()
 
 		// Update last_ref_at asynchronously to track GC eligibility.
-		go func() {
-			if refErr := st.UpdateSpecBundleLastRefAt(r.Context(), bundle.ID); refErr != nil {
+		go func(bundleID domaintypes.SpecBundleID) {
+			ctx, cancel := context.WithTimeout(context.Background(), specBundleLastRefUpdateTimeout)
+			defer cancel()
+			if refErr := st.UpdateSpecBundleLastRefAt(ctx, bundleID); refErr != nil {
 				slog.Warn("spec bundle download: failed to update last_ref_at",
-					"bundle_id", bundle.ID.String(), "err", refErr)
+					"bundle_id", bundleID.String(), "err", refErr)
 			}
-		}()
+		}(bundle.ID)
 
 		w.Header().Set("Content-Type", "application/gzip")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", "bundle-"+bundleID.String()+".tar.gz"))

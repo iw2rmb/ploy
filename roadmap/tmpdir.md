@@ -91,7 +91,7 @@ Documentation: `AGENTS.md`; `docs/envs/README.md`; `docs/schemas/mig.example.yam
     3. `make staticcheck`
   - Reasoning: `medium`
 
-- [ ] 1.7 Fix `last_ref_at` Update Context In Bundle Download
+- [x] 1.7 Fix `last_ref_at` Update Context In Bundle Download
   - Repository: `ploy`
   - Component: `internal/server/handlers/spec_bundles.go`; `internal/server/handlers/*_test.go`
   - Implementation:

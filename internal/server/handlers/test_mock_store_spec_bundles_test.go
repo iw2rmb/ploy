@@ -30,6 +30,16 @@ func (m *mockStore) GetSpecBundleByCID(ctx context.Context, cid string) (store.S
 func (m *mockStore) UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error {
 	m.updateSpecBundleLastRefAtCalled = true
 	m.updateSpecBundleLastRefAtParam = id.String()
+	if m.updateSpecBundleLastRefAtStarted != nil {
+		close(m.updateSpecBundleLastRefAtStarted)
+	}
+	if m.updateSpecBundleLastRefAtProceed != nil {
+		<-m.updateSpecBundleLastRefAtProceed
+	}
+	m.updateSpecBundleLastRefAtCtxErr = ctx.Err()
+	if m.updateSpecBundleLastRefAtDone != nil {
+		close(m.updateSpecBundleLastRefAtDone)
+	}
 	return m.updateSpecBundleLastRefAtErr
 }
 
