@@ -107,17 +107,6 @@ type ModsSpec struct {
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
 }
 
-// TmpFilePayload describes a single file to materialize under /tmp in the container.
-// Name is the destination filename (not a path); Content is the raw file bytes.
-// Both fields are required: Name must be non-empty and Content must be non-empty.
-//
-// Deprecated: TmpFilePayload is retained for StepManifest (internal nodeagent use only).
-// For wire-format specs (ModStep, RouterSpec, HealingActionSpec), use TmpBundleRef.
-type TmpFilePayload struct {
-	Name    string `json:"name" yaml:"name"`
-	Content []byte `json:"content" yaml:"content"`
-}
-
 // TmpBundleRef references an uploaded bundle to be extracted under /tmp in the container.
 // The bundle is uploaded via the control-plane API before spec submission; the node agent
 // downloads, verifies, and unpacks it at execution time.
@@ -419,29 +408,6 @@ func validateTmpBundle(bundle *TmpBundleRef, prefix string) error {
 			return fmt.Errorf("%s: duplicate %q", pos, name)
 		}
 		bundle.Entries[i] = name
-		seen[name] = struct{}{}
-	}
-	return nil
-}
-
-// validateTmpDir checks that each TmpFilePayload has a non-empty basename-only
-// name (no path separators, not "." or ".."), non-empty content, and that no
-// two entries share the same destination name.
-func validateTmpDir(entries []TmpFilePayload, prefix string) error {
-	seen := make(map[string]struct{}, len(entries))
-	for i, e := range entries {
-		pos := fmt.Sprintf("%s[%d]", prefix, i)
-		name, err := NormalizeTmpFileName(e.Name)
-		if err != nil {
-			return fmt.Errorf("%s.name: %w", pos, err)
-		}
-		if len(e.Content) == 0 {
-			return fmt.Errorf("%s.content: required", pos)
-		}
-		if _, dup := seen[name]; dup {
-			return fmt.Errorf("%s.name: duplicate %q", pos, name)
-		}
-		entries[i].Name = name
 		seen[name] = struct{}{}
 	}
 	return nil

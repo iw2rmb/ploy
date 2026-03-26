@@ -66,7 +66,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	command := []string(nil)
 	env := make(map[string]string, len(req.Env))
 
-	var tmpDir []contracts.TmpFilePayload
 	var tmpBundle *contracts.TmpBundleRef
 	if len(typedOpts.Steps) > 0 {
 		// Multi-step run.
@@ -87,7 +86,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		} else {
 			command = stepMod.Command.ToSlice()
 		}
-		tmpDir = stepMod.TmpDir
 		tmpBundle = stepMod.TmpBundle
 
 		for k, v := range req.Env {
@@ -110,7 +108,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		} else {
 			command = typedOpts.Execution.Command.ToSlice()
 		}
-		tmpDir = typedOpts.Execution.TmpDir
 		tmpBundle = typedOpts.Execution.TmpBundle
 
 		for k, v := range req.Env {
@@ -181,7 +178,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		Command:    command,
 		WorkingDir: "/workspace",
 		Env:        env,
-		TmpDir:     tmpDir,
 		TmpBundle:  tmpBundle,
 		Gate: &contracts.StepGateSpec{
 			Enabled:        true,
@@ -286,7 +282,6 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 		Command:    command,
 		WorkingDir: "/workspace",
 		Env:        env,
-		TmpDir:     mig.TmpDir,
 		TmpBundle:  mig.TmpBundle,
 		Gate:       &contracts.StepGateSpec{Enabled: false},
 		Inputs: []contracts.StepInput{
@@ -340,7 +335,6 @@ func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack con
 		Command:    command,
 		WorkingDir: "/workspace",
 		Env:        env,
-		TmpDir:     router.TmpDir,
 		TmpBundle:  router.TmpBundle,
 		Gate:       &contracts.StepGateSpec{Enabled: false},
 		Inputs: []contracts.StepInput{
