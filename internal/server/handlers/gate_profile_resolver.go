@@ -87,26 +87,29 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 		return nil, fmt.Errorf("resolve stack id: %w", err)
 	}
 
-	exactCand, err := r.fetchExactCandidate(ctx, job.RepoID, repoSHAIn, stackID)
-	if err != nil {
-		return nil, fmt.Errorf("lookup exact gate profile: %w", err)
-	}
-
-	var latestCand, defCand *gateprofile.ProfileCandidate
-	if exactCand == nil {
-		latestCand, err = r.fetchLatestCandidate(ctx, job.RepoID, stackID)
-		if err != nil {
-			return nil, fmt.Errorf("lookup latest gate profile: %w", err)
-		}
-		if latestCand == nil {
-			defCand, err = r.fetchDefaultCandidate(ctx, stackID)
+	selected, err := gateprofile.SelectProfileLazy(
+		func() (*gateprofile.ProfileCandidate, error) {
+			c, err := r.fetchExactCandidate(ctx, job.RepoID, repoSHAIn, stackID)
+			if err != nil {
+				return nil, fmt.Errorf("lookup exact gate profile: %w", err)
+			}
+			return c, nil
+		},
+		func() (*gateprofile.ProfileCandidate, error) {
+			c, err := r.fetchLatestCandidate(ctx, job.RepoID, stackID)
+			if err != nil {
+				return nil, fmt.Errorf("lookup latest gate profile: %w", err)
+			}
+			return c, nil
+		},
+		func() (*gateprofile.ProfileCandidate, error) {
+			c, err := r.fetchDefaultCandidate(ctx, stackID)
 			if err != nil {
 				return nil, fmt.Errorf("lookup default gate profile: %w", err)
 			}
-		}
-	}
-
-	selected := gateprofile.SelectProfile(exactCand, latestCand, defCand)
+			return c, nil
+		},
+	)
 	if selected == nil {
 		return nil, nil
 	}

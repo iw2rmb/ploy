@@ -42,6 +42,35 @@ func SelectProfile(exact, latest, def *ProfileCandidate) *ProfileCandidate {
 	return def
 }
 
+// SelectProfileLazy resolves the highest-priority gate profile candidate using
+// lazy fetching. fetchExact is called first; if it returns a non-nil candidate,
+// fetchLatest and fetchDefault are not called. If fetchLatest returns a non-nil
+// candidate, fetchDefault is not called.
+//
+// The precedence decision (exact > latest > default) is owned by this function.
+// Returns (nil, nil) if all fetch functions return (nil, nil).
+func SelectProfileLazy(
+	fetchExact func() (*ProfileCandidate, error),
+	fetchLatest func() (*ProfileCandidate, error),
+	fetchDefault func() (*ProfileCandidate, error),
+) (*ProfileCandidate, error) {
+	exact, err := fetchExact()
+	if err != nil {
+		return nil, err
+	}
+	if exact != nil {
+		return exact, nil
+	}
+	latest, err := fetchLatest()
+	if err != nil {
+		return nil, err
+	}
+	if latest != nil {
+		return latest, nil
+	}
+	return fetchDefault()
+}
+
 // GateOverrideForJobType derives the gate phase and build gate override from a
 // resolved gate profile for the given job type.
 //
