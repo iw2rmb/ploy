@@ -112,9 +112,9 @@ Goal lock: every unchecked item below is considered complete only when redundanc
   - Type: determined
   - Component: `internal/server/handlers/gate_profile_resolver.go`, `internal/server/handlers/gate_profile_persistence.go`, `internal/workflow/gateprofile/service.go`
   - Implementation:
-    1. Route server `gate_profile_resolver` and `gate_profile_persistence` through the shared gateprofile service.
-    2. Delete server-local precedence/fallback branches replaced by shared service outputs.
-    3. Delete server-local normalization wrappers that only mirrored precedence behavior.
+    1. Route server `gate_profile_resolver` through the shared gateprofile service and delete server-local precedence branches.
+    2. (n/a) `internal/server/handlers/gate_profile_persistence.go` was listed as a migration target, but it contains no profile-selection precedence mirroring the service. Its logic is write-side only: `resolveGateProfileStackRow` performs a DB lookup chain (by full expectation → lang/tool → image) to find the stack row to write against, `buildSuccessfulGateProfilePayload` constructs a new profile struct from detected gate metadata, and `persistGateProfilePayload` writes the blob and upserts DB rows. None of these duplicate the service's read-side `SelectProfile`/`GateOverrideForJobType`/`StackMatches` logic. No adoption of gateprofile service functions in persistence is applicable here.
+    3. Delete server-local precedence/fallback branches replaced by shared service outputs (resolver only).
     4. Keep no dual resolver path in server handlers.
   - Verification:
     1. Run `go test ./internal/server/handlers ./internal/workflow/gateprofile`.
@@ -127,6 +127,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - Adoption confirmed: `gate_profile_resolver.go` calls `gateprofile.SelectProfile`, branches on `gateprofile.ProfilePrecedenceExact`, and constructs `*gateprofile.ProfileCandidate` from DB rows via `fetchExactCandidate`, `fetchLatestCandidate`, `fetchDefaultCandidate`.
     - Consolidated duplicate stack row type: `gateProfileResolverStackRow` deleted; `gate_profile_resolver.go` now uses `gateProfileStackRow` (from `gate_profile_persistence.go`) throughout, including the `gateProfileResolverStore` interface and `sqlGateProfileResolverStore.ResolveStackRowByImage`.
     - No dual precedence path remains in resolver: single call to `gateprofile.SelectProfile` owns the exact/latest/default ordering.
+    - Persistence de-scoped (see step 2 n/a): `gate_profile_persistence.go` has no profile-selection precedence to route; its write-side stack resolution and payload construction are not duplicates of any service function.
 
 - [ ] 2.1c Adopt canonical gate-profile service in nodeagent paths and delete nodeagent-local precedence logic
   - Type: determined
