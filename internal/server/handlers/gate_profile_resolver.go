@@ -91,13 +91,17 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 	if err != nil {
 		return nil, fmt.Errorf("lookup exact gate profile: %w", err)
 	}
-	latestCand, err := r.fetchLatestCandidate(ctx, job.RepoID, stackID)
-	if err != nil {
-		return nil, fmt.Errorf("lookup latest gate profile: %w", err)
-	}
-	defCand, err := r.fetchDefaultCandidate(ctx, stackID)
-	if err != nil {
-		return nil, fmt.Errorf("lookup default gate profile: %w", err)
+
+	var latestCand, defCand *gateprofile.ProfileCandidate
+	if exactCand == nil {
+		latestCand, err = r.fetchLatestCandidate(ctx, job.RepoID, stackID)
+		if err != nil {
+			return nil, fmt.Errorf("lookup latest gate profile: %w", err)
+		}
+		defCand, err = r.fetchDefaultCandidate(ctx, stackID)
+		if err != nil {
+			return nil, fmt.Errorf("lookup default gate profile: %w", err)
+		}
 	}
 
 	selected := gateprofile.SelectProfile(exactCand, latestCand, defCand)
