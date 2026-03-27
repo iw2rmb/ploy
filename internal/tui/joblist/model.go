@@ -28,10 +28,12 @@ func (r row) Description() string { return r.desc }
 func (r row) FilterValue() string { return r.title }
 
 // Model is the JobList domain component. It owns job row state, list cursor,
-// and job detail payload cache for the jobs pane.
+// confirmed selected job identity, and job detail payload cache for the jobs pane.
 type Model struct {
-	inner list.Model
-	jobs  []clitui.JobItem
+	inner          list.Model
+	jobs           []clitui.JobItem
+	selectedJobID  domaintypes.JobID
+	details        *clitui.JobItem
 }
 
 // New creates an initialized JobList with the given title.
@@ -43,7 +45,7 @@ func New(title string) Model {
 	return Model{inner: l}
 }
 
-// SetJobs replaces the job items, rebuilds the list rows, and resets the cache.
+// SetJobs replaces the job items, rebuilds the list rows, and clears the details cache.
 func (m Model) SetJobs(jobs []clitui.JobItem) Model {
 	items := make([]list.Item, len(jobs))
 	for i, job := range jobs {
@@ -53,6 +55,7 @@ func (m Model) SetJobs(jobs []clitui.JobItem) Model {
 		}
 	}
 	m.jobs = jobs
+	m.details = nil
 	m.inner.SetItems(items)
 	return m
 }
@@ -99,6 +102,29 @@ func (m Model) SelectedJobID() domaintypes.JobID {
 		return ""
 	}
 	return job.JobID
+}
+
+// SetSelectedJobID records the confirmed job selection (set when the user presses Enter).
+func (m Model) SetSelectedJobID(id domaintypes.JobID) Model {
+	m.selectedJobID = id
+	return m
+}
+
+// ConfirmedJobID returns the job ID that was explicitly confirmed via Enter.
+// This is distinct from SelectedJobID, which follows the cursor.
+func (m Model) ConfirmedJobID() domaintypes.JobID {
+	return m.selectedJobID
+}
+
+// SetDetails stores the fetched job detail payload for the confirmed selection.
+func (m Model) SetDetails(item *clitui.JobItem) Model {
+	m.details = item
+	return m
+}
+
+// Details returns the cached job detail payload, or nil if not yet loaded.
+func (m Model) Details() *clitui.JobItem {
+	return m.details
 }
 
 // Update routes messages into the inner list.
