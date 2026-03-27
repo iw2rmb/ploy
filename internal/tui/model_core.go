@@ -9,7 +9,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 
-	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
+	clitui "github.com/iw2rmb/ploy/internal/client/tui"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
