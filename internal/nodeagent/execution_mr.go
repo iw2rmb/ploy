@@ -216,7 +216,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		builder.Error(mrErr.Error())
 		stats := builder.MustBuild()
 
-		status := jobStatusFromRunError(mrErr)
+		status := JobStatusFromRunError(mrErr)
 		if status == types.JobStatusCancelled {
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusCancelled.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload MR job cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)

@@ -414,7 +414,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		stats := statsBuilder.MustBuild()
 
 		if runErr != nil {
-			status := jobStatusFromRunError(runErr)
+			status := JobStatusFromRunError(runErr)
 			var exitCode *int32
 			if status == types.JobStatusFail {
 				var runtimeExitCode int32 = -1

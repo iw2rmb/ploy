@@ -11,9 +11,12 @@ package lifecycle_test
 // server does (compute a chain action from that status) are consistent.
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/nodeagent"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
@@ -31,21 +34,23 @@ const (
 	outcomeContextCancelled
 )
 
-// jobStatusFromOutcome mirrors the nodeagent's status determination logic:
-//   - Success     → JobStatusSuccess
-//   - NonZeroExit → JobStatusFail
-//   - RuntimeError → JobStatusFail
-//   - ContextCancelled → JobStatusCancelled
-func jobStatusFromOutcome(o nodeagentExecutionOutcome) domaintypes.JobStatus {
+// nodeagentStatusForOutcome derives the job status using the real nodeagent
+// execution paths. Success and non-zero-exit use the same constants the
+// nodeagent assigns directly; runtime and cancellation errors are routed
+// through nodeagent.JobStatusFromRunError so test behaviour tracks the
+// canonical implementation.
+func nodeagentStatusForOutcome(o nodeagentExecutionOutcome) domaintypes.JobStatus {
 	switch o {
 	case outcomeSuccess:
 		return domaintypes.JobStatusSuccess
-	case outcomeNonZeroExit, outcomeRuntimeError:
+	case outcomeNonZeroExit:
 		return domaintypes.JobStatusFail
+	case outcomeRuntimeError:
+		return nodeagent.JobStatusFromRunError(errors.New("runtime error"))
 	case outcomeContextCancelled:
-		return domaintypes.JobStatusCancelled
+		return nodeagent.JobStatusFromRunError(context.Canceled)
 	default:
-		return domaintypes.JobStatusFail
+		return nodeagent.JobStatusFromRunError(errors.New("unknown outcome"))
 	}
 }
 
@@ -265,10 +270,12 @@ func TestCrossPathTransitionParity(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Step 1: verify the nodeagent-side status determination.
-			gotStatus := jobStatusFromOutcome(tc.outcome)
+			// Step 1: verify the nodeagent-side status determination via the real
+			// nodeagent path (JobStatusFromRunError for error outcomes; direct
+			// constants for success and non-zero-exit, matching the real code).
+			gotStatus := nodeagentStatusForOutcome(tc.outcome)
 			if gotStatus != tc.wantStatus {
-				t.Fatalf("jobStatusFromOutcome(%v) = %v, want %v", tc.outcome, gotStatus, tc.wantStatus)
+				t.Fatalf("nodeagentStatusForOutcome(%v) = %v, want %v", tc.outcome, gotStatus, tc.wantStatus)
 			}
 
 			// Step 2: verify the server-side lifecycle chain decision for that status.
@@ -283,9 +290,10 @@ func TestCrossPathTransitionParity(t *testing.T) {
 	}
 }
 
-// TestJobStatusFromOutcome_Exhaustive verifies that jobStatusFromOutcome covers
-// every outcome variant and maps to the correct status string used in the wire protocol.
-func TestJobStatusFromOutcome_Exhaustive(t *testing.T) {
+// TestNodeagentJobStatusFromRunError_Exhaustive verifies that the real
+// nodeagent.JobStatusFromRunError covers every outcome variant and maps to the
+// correct status string used in the wire protocol.
+func TestNodeagentJobStatusFromRunError_Exhaustive(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -301,9 +309,9 @@ func TestJobStatusFromOutcome_Exhaustive(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.wantStatus, func(t *testing.T) {
 			t.Parallel()
-			got := jobStatusFromOutcome(tc.outcome)
+			got := nodeagentStatusForOutcome(tc.outcome)
 			if got.String() != tc.wantStatus {
-				t.Fatalf("jobStatusFromOutcome(%v).String() = %q, want %q", tc.outcome, got.String(), tc.wantStatus)
+				t.Fatalf("nodeagentStatusForOutcome(%v).String() = %q, want %q", tc.outcome, got.String(), tc.wantStatus)
 			}
 		})
 	}
