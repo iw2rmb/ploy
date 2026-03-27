@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -372,6 +373,53 @@ func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
 	}
 	if resolution.ExactHit {
 		t.Fatal("ExactHit=true, want false on default fallback")
+	}
+}
+
+func TestGateProfileResolver_ExactHit_LatestDefaultErrorsNotReached(t *testing.T) {
+	t.Parallel()
+
+	repoID := types.NewRepoID()
+	const shaIn = "0123456789abcdef0123456789abcdef01234567"
+	exactKey := "gate-profiles/exact.json"
+	exactPayload := []byte(`{"schema_version":1}`)
+
+	st := &stubGateProfileResolverStore{
+		stackByImage: map[string]int64{"docker.io/stack:latest": 7},
+		exactRow: gateProfileRow{
+			ID:        11,
+			RepoID:    repoID,
+			RepoSHA:   shaIn,
+			RepoSHA8:  shaIn[:8],
+			StackID:   7,
+			ObjectKey: exactKey,
+		},
+		latestErr:  fmt.Errorf("db connection reset"),
+		defaultErr: fmt.Errorf("db connection reset"),
+	}
+	bs := &stubBlobStore{
+		getPayloadByKey: map[string][]byte{
+			exactKey: exactPayload,
+		},
+	}
+	resolver := &dbGateProfileResolver{st: st, bs: bs}
+
+	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
+	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
+	if err != nil {
+		t.Fatalf("ResolveGateProfileForJob() error = %v; want nil (exact hit must not reach latest/default lookups)", err)
+	}
+	if resolution == nil {
+		t.Fatal("expected non-nil gate profile resolution")
+	}
+	if resolution.ProfileID != 11 {
+		t.Fatalf("profile_id = %d, want 11", resolution.ProfileID)
+	}
+	if string(resolution.Payload) != string(exactPayload) {
+		t.Fatalf("profile payload mismatch: got %q want %q", resolution.Payload, exactPayload)
+	}
+	if !resolution.ExactHit {
+		t.Fatal("ExactHit=false, want true")
 	}
 }
 
