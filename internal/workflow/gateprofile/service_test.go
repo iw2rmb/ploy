@@ -8,6 +8,223 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
+	t.Parallel()
+
+	mavenOverride := &contracts.BuildGateProfileOverride{
+		Command: contracts.CommandSpec{Shell: "mvn -q test"},
+		Env:     map[string]string{"MAVEN_OPTS": "-Xmx2g"},
+		Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "21"},
+		Target:  contracts.GateProfileTargetAllTests,
+	}
+
+	gradleOverride := &contracts.BuildGateProfileOverride{
+		Command: contracts.CommandSpec{Shell: "./gradlew test"},
+		Stack:   &contracts.GateProfileStack{Language: "java", Tool: "gradle"},
+	}
+
+	execOverride := &contracts.BuildGateProfileOverride{
+		Command: contracts.CommandSpec{Exec: []string{"mvn", "-q", "compile"}},
+		Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven"},
+	}
+
+	tests := []struct {
+		name           string
+		repoID         string
+		override       *contracts.BuildGateProfileOverride
+		target         string
+		jobType        types.JobType
+		meta           *contracts.BuildGateStageMetadata
+		wantErr        bool
+		wantActive     string
+		wantStackLang  string
+		wantStackTool  string
+		wantStackRel   string
+		wantEnvKey     string
+		wantEnvVal     string
+		wantCmdInBuild string
+		wantCmdInUnit  string
+		wantCmdInAll   string
+	}{
+		{
+			name:          "shell command, explicit stack, all_tests target via override.Target",
+			repoID:        "repo_1",
+			override:      mavenOverride,
+			target:        "",
+			jobType:       types.JobTypePreGate,
+			wantActive:    contracts.GateProfileTargetAllTests,
+			wantStackLang: "java",
+			wantStackTool: "maven",
+			wantStackRel:  "21",
+			wantEnvKey:    "MAVEN_OPTS",
+			wantEnvVal:    "-Xmx2g",
+			wantCmdInAll:  "mvn -q test",
+		},
+		{
+			name:          "explicit target=build overrides override.Target",
+			repoID:        "repo_1",
+			override:      mavenOverride,
+			target:        contracts.GateProfileTargetBuild,
+			jobType:       types.JobTypePreGate,
+			wantActive:    contracts.GateProfileTargetBuild,
+			wantStackLang: "java",
+			wantStackTool: "maven",
+			wantCmdInBuild: "mvn -q test",
+		},
+		{
+			name:          "explicit target=unit",
+			repoID:        "repo_1",
+			override:      mavenOverride,
+			target:        contracts.GateProfileTargetUnit,
+			jobType:       types.JobTypePostGate,
+			wantActive:    contracts.GateProfileTargetUnit,
+			wantStackLang: "java",
+			wantStackTool: "maven",
+			wantCmdInUnit: "mvn -q test",
+		},
+		{
+			name:          "re_gate accepted same as post_gate",
+			repoID:        "repo_1",
+			override:      gradleOverride,
+			target:        "",
+			jobType:       types.JobTypeReGate,
+			wantActive:    contracts.GateProfileTargetAllTests,
+			wantStackLang: "java",
+			wantStackTool: "gradle",
+			wantCmdInAll:  "./gradlew test",
+		},
+		{
+			name:          "exec form command joined without quoting",
+			repoID:        "repo_1",
+			override:      execOverride,
+			target:        "",
+			jobType:       types.JobTypePreGate,
+			wantActive:    contracts.GateProfileTargetAllTests,
+			wantStackLang: "java",
+			wantStackTool: "maven",
+			wantCmdInAll:  "mvn -q compile",
+		},
+		{
+			name:    "nil override returns error",
+			repoID:  "repo_1",
+			jobType: types.JobTypePreGate,
+			wantErr: true,
+		},
+		{
+			name: "empty command returns error",
+			repoID: "repo_1",
+			override: &contracts.BuildGateProfileOverride{
+				Stack: &contracts.GateProfileStack{Language: "java", Tool: "maven"},
+			},
+			jobType: types.JobTypePreGate,
+			wantErr: true,
+		},
+		{
+			name: "missing stack falls back to DetectedStackExpectation from meta",
+			repoID: "repo_1",
+			override: &contracts.BuildGateProfileOverride{
+				Command: contracts.CommandSpec{Shell: "mvn test"},
+			},
+			jobType: types.JobTypePreGate,
+			meta: &contracts.BuildGateStageMetadata{
+				Detected: &contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
+			},
+			wantActive:    contracts.GateProfileTargetAllTests,
+			wantStackLang: "java",
+			wantStackTool: "gradle",
+			wantStackRel:  "17",
+			wantCmdInAll:  "mvn test",
+		},
+		{
+			name: "missing stack falls back to ModStack name from StaticChecks",
+			repoID: "repo_1",
+			override: &contracts.BuildGateProfileOverride{
+				Command: contracts.CommandSpec{Shell: "mvn test"},
+			},
+			jobType: types.JobTypePreGate,
+			meta: &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Language: "java", Tool: "maven", Passed: true},
+				},
+			},
+			wantActive:    contracts.GateProfileTargetAllTests,
+			wantStackLang: "java",
+			wantStackTool: "maven",
+			wantCmdInAll:  "mvn test",
+		},
+		{
+			name: "no stack anywhere returns error",
+			repoID: "repo_1",
+			override: &contracts.BuildGateProfileOverride{
+				Command: contracts.CommandSpec{Shell: "mvn test"},
+			},
+			jobType: types.JobTypePreGate,
+			wantErr: true,
+		},
+		{
+			name:     "unsupported job type returns error",
+			repoID:   "repo_1",
+			override: mavenOverride,
+			jobType:  types.JobTypeMod,
+			wantErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			raw, err := DeriveProfileSnapshotFromOverride(tc.repoID, tc.override, tc.target, tc.jobType, tc.meta)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("DeriveProfileSnapshotFromOverride() error=nil, want error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("DeriveProfileSnapshotFromOverride() error=%v", err)
+			}
+			profile, err := contracts.ParseGateProfileJSON(raw)
+			if err != nil {
+				t.Fatalf("snapshot fails ParseGateProfileJSON: %v", err)
+			}
+			if got, want := profile.Targets.Active, tc.wantActive; got != want {
+				t.Fatalf("targets.active=%q, want %q", got, want)
+			}
+			if got, want := profile.Stack.Language, tc.wantStackLang; got != want {
+				t.Fatalf("stack.language=%q, want %q", got, want)
+			}
+			if got, want := profile.Stack.Tool, tc.wantStackTool; got != want {
+				t.Fatalf("stack.tool=%q, want %q", got, want)
+			}
+			if tc.wantStackRel != "" {
+				if got, want := profile.Stack.Release, tc.wantStackRel; got != want {
+					t.Fatalf("stack.release=%q, want %q", got, want)
+				}
+			}
+			if tc.wantEnvKey != "" {
+				if got, want := profile.Targets.AllTests.Env[tc.wantEnvKey], tc.wantEnvVal; got != want {
+					t.Fatalf("all_tests.env[%s]=%q, want %q", tc.wantEnvKey, got, want)
+				}
+			}
+			if tc.wantCmdInBuild != "" {
+				if got, want := profile.Targets.Build.Command, tc.wantCmdInBuild; got != want {
+					t.Fatalf("targets.build.command=%q, want %q", got, want)
+				}
+			}
+			if tc.wantCmdInUnit != "" {
+				if got, want := profile.Targets.Unit.Command, tc.wantCmdInUnit; got != want {
+					t.Fatalf("targets.unit.command=%q, want %q", got, want)
+				}
+			}
+			if tc.wantCmdInAll != "" {
+				if got, want := profile.Targets.AllTests.Command, tc.wantCmdInAll; got != want {
+					t.Fatalf("targets.all_tests.command=%q, want %q", got, want)
+				}
+			}
+		})
+	}
+}
+
 // buildTestProfile returns a valid GateProfile parsed from JSON for use in tests.
 func buildTestProfile(t *testing.T, raw string) *contracts.GateProfile {
 	t.Helper()

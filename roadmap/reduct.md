@@ -131,7 +131,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - No dual precedence path remains in resolver: single call to `gateprofile.SelectProfileLazy` owns the exact/latest/default ordering and lazy fetch control.
     - Persistence de-scoped (see step 2 n/a): `gate_profile_persistence.go` has no profile-selection precedence to route; its write-side stack resolution and payload construction are not duplicates of any service function.
 
-- [ ] 2.1c Adopt canonical gate-profile service in nodeagent paths and delete nodeagent-local precedence logic
+- [x] 2.1c Adopt canonical gate-profile service in nodeagent paths and delete nodeagent-local precedence logic
   - Type: determined
   - Component: `internal/nodeagent/run_options.go`, `internal/nodeagent/execution_orchestrator_gate.go`, `internal/workflow/gateprofile/service.go`
   - Implementation:
@@ -144,6 +144,13 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     2. Run `go test ./internal/... -run 'GateProfile|StackGate|BuildGate'`.
     3. Add structural proof in completion notes: removed nodeagent-local precedence symbols and canonical service call sites.
   - Reasoning: high (9 CFP)
+  - Structural proof:
+    - Removed from `execution_orchestrator_gate.go` (rg confirms no match): `deriveGateProfileSnapshotFromOverride`, `resolveGateProfileSnapshotTarget`, `resolveGateProfileSnapshotStack`, `gateProfileCommandFromOverride`, `copySnapshotEnv` — five local precedence/normalization symbols deleted.
+    - Removed `strconv` import from `execution_orchestrator_gate.go` (was only used by `gateProfileCommandFromOverride`).
+    - Adoption confirmed: `resolveGateProfileSnapshotRaw` in `execution_orchestrator_gate.go` now calls `gateprofile.DeriveProfileSnapshotFromOverride` as the single owner of override→profile snapshot derivation (including target resolution, stack precedence, and command normalization).
+    - Canonical owner: `internal/workflow/gateprofile/service.go` gains `DeriveProfileSnapshotFromOverride` with helpers `resolveSnapshotTarget`, `resolveSnapshotStack`, `commandFromOverride`, `snapshotEnvCopy`. Precedence semantics: override.Stack > DetectedStackExpectation > ModStack name; explicit target > override.Target > all_tests default.
+    - New coverage: `TestDeriveProfileSnapshotFromOverride` (11 cases) in `internal/workflow/gateprofile/service_test.go` locks shell/exec command forms, all three target selection paths, stack resolution tiers, and error cases (nil override, empty command, no stack, unsupported job type).
+    - No dual snapshot derivation path remains: nodeagent `persistGateProfileSnapshot` calls `resolveGateProfileSnapshotRaw` which delegates entirely to service.
 
 - [ ] 2.2 Unify gate-profile input contracts and manifest projection
   - Type: determined

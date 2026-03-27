@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/gateprofile"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -434,7 +434,7 @@ func resolveGateProfileSnapshotRaw(
 	if gateSpec == nil || gateSpec.GateProfile == nil || gateSpec.RepoID.IsZero() {
 		return nil
 	}
-	raw, err := deriveGateProfileSnapshotFromOverride(
+	raw, err := gateprofile.DeriveProfileSnapshotFromOverride(
 		gateSpec.RepoID.String(),
 		gateSpec.GateProfile,
 		strings.TrimSpace(gateSpec.Target),
@@ -445,160 +445,6 @@ func resolveGateProfileSnapshotRaw(
 		return nil
 	}
 	return raw
-}
-
-func deriveGateProfileSnapshotFromOverride(
-	repoID string,
-	override *contracts.BuildGateProfileOverride,
-	target string,
-	jobType types.JobType,
-	meta *contracts.BuildGateStageMetadata,
-) (json.RawMessage, error) {
-	if override == nil || override.Command.IsEmpty() {
-		return nil, fmt.Errorf("gate override unavailable")
-	}
-	command, ok := gateProfileCommandFromOverride(override.Command)
-	if !ok {
-		return nil, fmt.Errorf("unsupported command form")
-	}
-	stack := resolveGateProfileSnapshotStack(override, meta)
-	if strings.TrimSpace(stack.Language) == "" || strings.TrimSpace(stack.Tool) == "" {
-		return nil, fmt.Errorf("stack metadata unavailable")
-	}
-
-	targetPassed := &contracts.GateProfileTarget{
-		Status:  contracts.PrepTargetStatusPassed,
-		Command: command,
-		Env:     copySnapshotEnv(override.Env),
-	}
-	targetNotAttempted := func() *contracts.GateProfileTarget {
-		return &contracts.GateProfileTarget{
-			Status: contracts.PrepTargetStatusNotAttempted,
-			Env:    map[string]string{},
-		}
-	}
-	profile := contracts.GateProfile{
-		SchemaVersion: 1,
-		RepoID:        strings.TrimSpace(repoID),
-		RunnerMode:    contracts.PrepRunnerModeSimple,
-		Stack:         stack,
-		Targets: contracts.GateProfileTargets{
-			Active:   resolveGateProfileSnapshotTarget(target, override.Target),
-			Build:    targetNotAttempted(),
-			Unit:     targetNotAttempted(),
-			AllTests: targetNotAttempted(),
-		},
-		Orchestration: contracts.GateProfileOrchestration{
-			Pre:  []json.RawMessage{},
-			Post: []json.RawMessage{},
-		},
-	}
-	switch jobType {
-	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
-		switch profile.Targets.Active {
-		case contracts.GateProfileTargetBuild:
-			profile.Targets.Build = targetPassed
-		case contracts.GateProfileTargetUnit:
-			profile.Targets.Unit = targetPassed
-		default:
-			profile.Targets.AllTests = targetPassed
-		}
-	default:
-		return nil, fmt.Errorf("unsupported job type %q", jobType)
-	}
-	raw, err := json.Marshal(profile)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := contracts.ParseGateProfileJSON(raw); err != nil {
-		return nil, err
-	}
-	return raw, nil
-}
-
-func resolveGateProfileSnapshotTarget(explicit, fallback string) string {
-	switch strings.TrimSpace(explicit) {
-	case contracts.GateProfileTargetBuild, contracts.GateProfileTargetUnit, contracts.GateProfileTargetAllTests:
-		return strings.TrimSpace(explicit)
-	}
-	switch strings.TrimSpace(fallback) {
-	case contracts.GateProfileTargetBuild, contracts.GateProfileTargetUnit, contracts.GateProfileTargetAllTests:
-		return strings.TrimSpace(fallback)
-	}
-	return contracts.GateProfileTargetAllTests
-}
-
-func resolveGateProfileSnapshotStack(
-	override *contracts.BuildGateProfileOverride,
-	meta *contracts.BuildGateStageMetadata,
-) contracts.GateProfileStack {
-	if override != nil && override.Stack != nil {
-		return contracts.GateProfileStack{
-			Language: strings.TrimSpace(override.Stack.Language),
-			Tool:     strings.TrimSpace(override.Stack.Tool),
-			Release:  strings.TrimSpace(override.Stack.Release),
-		}
-	}
-	if meta != nil {
-		if detected := meta.DetectedStackExpectation(); detected != nil {
-			return contracts.GateProfileStack{
-				Language: strings.TrimSpace(detected.Language),
-				Tool:     strings.TrimSpace(detected.Tool),
-				Release:  strings.TrimSpace(detected.Release),
-			}
-		}
-	}
-
-	stack := contracts.ModStackUnknown
-	if meta != nil {
-		stack = meta.DetectedStack()
-	}
-	switch stack {
-	case contracts.ModStackJavaMaven:
-		return contracts.GateProfileStack{Language: "java", Tool: "maven"}
-	case contracts.ModStackJavaGradle:
-		return contracts.GateProfileStack{Language: "java", Tool: "gradle"}
-	case contracts.ModStackJava:
-		return contracts.GateProfileStack{Language: "java", Tool: "java"}
-	default:
-		return contracts.GateProfileStack{}
-	}
-}
-
-func gateProfileCommandFromOverride(command contracts.CommandSpec) (string, bool) {
-	if shell := strings.TrimSpace(command.Shell); shell != "" {
-		return shell, true
-	}
-	if len(command.Exec) == 0 {
-		return "", false
-	}
-	parts := make([]string, 0, len(command.Exec))
-	for _, part := range command.Exec {
-		trimmed := strings.TrimSpace(part)
-		if trimmed == "" {
-			continue
-		}
-		if strings.ContainsAny(trimmed, " \t\n\r\"'\\$`") {
-			parts = append(parts, strconv.Quote(trimmed))
-			continue
-		}
-		parts = append(parts, trimmed)
-	}
-	if len(parts) == 0 {
-		return "", false
-	}
-	return strings.Join(parts, " "), true
-}
-
-func copySnapshotEnv(env map[string]string) map[string]string {
-	if len(env) == 0 {
-		return map[string]string{}
-	}
-	out := make(map[string]string, len(env))
-	for k, v := range env {
-		out[k] = v
-	}
-	return out
 }
 
 func (r *runController) cleanupGateOutDir(workspace string) {
