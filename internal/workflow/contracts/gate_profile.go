@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -27,8 +25,6 @@ const (
 
 	GateProfileDockerHostEnv       = "DOCKER_HOST"
 	GateProfileDockerAPIVersionEnv = "DOCKER_API_VERSION"
-
-	defaultGateProfileDockerHostSocket = "unix:///var/run/docker.sock"
 
 	GateProfileCandidateArtifactPath = "/out/gate-profile-candidate.json"
 	GateProfileCandidateSchemaID     = "gate_profile_v1"
@@ -214,78 +210,6 @@ func validateGateProfileActiveTarget(targets GateProfileTargets) error {
 	}
 }
 
-func GateProfileStackMatches(profile *GateProfile, language, tool, release string) bool {
-	if profile == nil {
-		return false
-	}
-	pLang := strings.TrimSpace(profile.Stack.Language)
-	pTool := strings.TrimSpace(profile.Stack.Tool)
-	if pLang == "" || pTool == "" {
-		return false
-	}
-	if !StackFieldsMatch(language, tool, "", pLang, pTool, "") {
-		return false
-	}
-	// Release has special semantics here: empty input release always matches,
-	// but a non-empty input release requires the profile to have a release.
-	if strings.TrimSpace(release) == "" {
-		return true
-	}
-	pRelease := strings.TrimSpace(profile.Stack.Release)
-	if pRelease == "" {
-		return false
-	}
-	return pRelease == strings.TrimSpace(release)
-}
-
-func GateProfileGateOverrideForJobType(
-	profile *GateProfile,
-	jobType types.JobType,
-) (BuildGateProfilePhase, *BuildGateProfileOverride, error) {
-	if profile == nil {
-		return "", nil, nil
-	}
-
-	var phase BuildGateProfilePhase
-
-	switch jobType {
-	case types.JobTypePreGate:
-		phase = BuildGateProfilePhasePre
-	case types.JobTypePostGate, types.JobTypeReGate:
-		phase = BuildGateProfilePhasePost
-	default:
-		return "", nil, nil
-	}
-
-	active := strings.TrimSpace(profile.Targets.Active)
-	if active == GateProfileTargetUnsupported {
-		return phase, nil, nil
-	}
-	target := profile.Targets.TargetByName(active)
-	if target == nil {
-		return "", nil, fmt.Errorf("gate_profile: missing active target %q for job_type %q", active, jobType)
-	}
-
-	override, err := gateProfileTargetToBuildGateOverride(target)
-	if err != nil {
-		return "", nil, err
-	}
-	if override == nil {
-		return phase, nil, nil
-	}
-	override.Target = active
-	override.Stack = &GateProfileStack{
-		Language: profile.Stack.Language,
-		Tool:     profile.Stack.Tool,
-		Release:  profile.Stack.Release,
-	}
-	runtimeEnv, err := gateProfileRuntimeGateEnv(profile.Runtime)
-	if err != nil {
-		return "", nil, err
-	}
-	override.Env = MergeEnv(override.Env, runtimeEnv)
-	return phase, override, nil
-}
 
 func validateGateProfileTarget(target *GateProfileTarget, prefix string) error {
 	if target == nil {
@@ -303,20 +227,6 @@ func validateGateProfileTarget(target *GateProfileTarget, prefix string) error {
 		}
 	}
 	return nil
-}
-
-func gateProfileTargetToBuildGateOverride(target *GateProfileTarget) (*BuildGateProfileOverride, error) {
-	if target == nil {
-		return nil, nil
-	}
-	cmd := strings.TrimSpace(target.Command)
-	if cmd == "" {
-		return nil, nil
-	}
-	return &BuildGateProfileOverride{
-		Command: CommandSpec{Shell: cmd},
-		Env:     CopyEnv(target.Env),
-	}, nil
 }
 
 func validateGateProfileRuntime(runtime *GateProfileRuntime) error {
@@ -345,44 +255,6 @@ func validateGateProfileRuntime(runtime *GateProfileRuntime) error {
 		return fmt.Errorf("gate_profile.runtime.docker.api_version: must not be blank")
 	}
 	return nil
-}
-
-func gateProfileRuntimeGateEnv(runtime *GateProfileRuntime) (map[string]string, error) {
-	if runtime == nil || runtime.Docker == nil {
-		return nil, nil
-	}
-
-	mode := strings.TrimSpace(runtime.Docker.Mode)
-	apiVersion := strings.TrimSpace(runtime.Docker.APIVersion)
-	switch mode {
-	case GateProfileDockerModeNone:
-		if apiVersion == "" {
-			return nil, nil
-		}
-		return map[string]string{GateProfileDockerAPIVersionEnv: apiVersion}, nil
-	case GateProfileDockerModeHostSocket:
-		env := map[string]string{
-			GateProfileDockerHostEnv: defaultGateProfileDockerHostSocket,
-		}
-		if apiVersion != "" {
-			env[GateProfileDockerAPIVersionEnv] = apiVersion
-		}
-		return env, nil
-	case GateProfileDockerModeTCP:
-		host := strings.TrimSpace(runtime.Docker.Host)
-		if host == "" {
-			return nil, fmt.Errorf("gate_profile.runtime.docker.host: required for mode %q", GateProfileDockerModeTCP)
-		}
-		env := map[string]string{
-			GateProfileDockerHostEnv: host,
-		}
-		if apiVersion != "" {
-			env[GateProfileDockerAPIVersionEnv] = apiVersion
-		}
-		return env, nil
-	default:
-		return nil, fmt.Errorf("gate_profile.runtime.docker.mode: invalid value %q", runtime.Docker.Mode)
-	}
 }
 
 func IsSupportedGateProfileArtifactSchema(schema string) bool {

@@ -10,6 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/gateprofile"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
@@ -77,7 +78,7 @@ func candidateMatchesDetectedStack(profile *contracts.GateProfile, detected *con
 	if profile == nil || detected == nil {
 		return false
 	}
-	return contracts.GateProfileStackMatches(profile, detected.Language, detected.Tool, detected.Release)
+	return gateprofile.StackMatches(profile, detected.Language, detected.Tool, detected.Release)
 }
 
 func resolvePreviousHealJob(
