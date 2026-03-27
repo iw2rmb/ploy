@@ -35,11 +35,6 @@ func newPloyList(title string, items []list.Item) list.Model {
 	return newListWithWidth(title, items, ployListWidth)
 }
 
-// newJobsList creates a jobs list with a 48-column width.
-func newJobsList(title string, items []list.Item) list.Model {
-	return newListWithWidth(title, items, jobsListWidth)
-}
-
 // newRunsList creates a runs list with a 30-column width.
 func newRunsList(title string, items []list.Item) list.Model {
 	return newListWithWidth(title, items, runsListWidth)
@@ -53,6 +48,7 @@ func (m *model) applyWindowHeight() {
 	m.ploy.SetHeight(m.windowHeight)
 	m.secondary.SetHeight(m.windowHeight)
 	m.detail.SetHeight(m.windowHeight)
+	m.jobList.SetHeight(m.windowHeight)
 }
 
 // buildPloyItems constructs the left PLOY list with context-aware labels.

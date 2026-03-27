@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
+	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
 // InitialModel constructs the starting model for the TUI session.
@@ -22,6 +23,7 @@ func InitialModel(client *http.Client, baseURL *url.URL) model {
 		ploy:      ploy,
 		secondary: newList("", nil),
 		detail:    newList("", nil),
+		jobList:   joblist.New("JOBS"),
 		client:    client,
 		baseURL:   baseURL,
 	}
@@ -143,15 +145,7 @@ func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 }
 
 func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
-	items := make([]list.Item, len(msg.jobs))
-	for i, job := range msg.jobs {
-		items[i] = listItem{
-			title:       renderJobsPrimaryLine(job),
-			description: renderJobsSecondaryLine(job),
-		}
-	}
-	m.jobs = msg.jobs
-	m.secondary = newJobsList("JOBS", items)
+	m.jobList = m.jobList.SetJobs(msg.jobs)
 	m.applyWindowHeight()
 	return m
 }
@@ -170,7 +164,7 @@ func (m model) updateActiveList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ScreenRunDetails:
 		m.ploy, cmd = m.ploy.Update(msg)
 	case ScreenJobsList:
-		m.secondary, cmd = m.secondary.Update(msg)
+		m.jobList, cmd = m.jobList.Update(msg)
 	}
 	return m, cmd
 }

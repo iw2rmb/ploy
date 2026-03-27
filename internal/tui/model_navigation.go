@@ -3,7 +3,6 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -36,7 +35,6 @@ func (m model) handleEnterFromRoot() (tea.Model, tea.Cmd) {
 		return m, loadRunsCmd(m.client, m.baseURL)
 	case 2: // Jobs
 		m.screen = ScreenJobsList
-		m.secondary = newJobsList("JOBS", nil)
 		m.applyWindowHeight()
 		return m, tea.Batch(loadJobsCmd(m.client, m.baseURL, nil), loadRunsCmd(m.client, m.baseURL))
 	}
@@ -85,15 +83,11 @@ func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
-	item, ok := m.secondary.SelectedItem().(listItem)
+	selectedJob, ok := m.jobList.SelectedJob()
 	if !ok {
 		return m, nil
 	}
-	m.selectedJobID = domaintypes.JobID(item.description)
-	selectedJob, foundJob := findJobByID(m.jobs, m.selectedJobID)
-	if !foundJob {
-		return m, nil
-	}
+	m.selectedJobID = selectedJob.JobID
 	m.selectedRunID = selectedJob.RunID
 	m.selectedMigName = selectedJob.MigName
 	m.selectedMigID = ""
@@ -116,15 +110,6 @@ func (m *model) resolveMigContext(runID domaintypes.RunID) {
 			return
 		}
 	}
-}
-
-func findJobByID(jobs []clitui.JobItem, jobID domaintypes.JobID) (clitui.JobItem, bool) {
-	for _, job := range jobs {
-		if job.JobID == jobID {
-			return job, true
-		}
-	}
-	return clitui.JobItem{}, false
 }
 
 // handleEsc implements Esc-key transitions per the state machine contract.

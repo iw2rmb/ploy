@@ -11,8 +11,10 @@ func (m model) View() tea.View {
 	switch m.screen {
 	case ScreenRoot:
 		content = m.ploy.View()
-	case ScreenMigrationsList, ScreenRunsList, ScreenJobsList:
+	case ScreenMigrationsList, ScreenRunsList:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
+	case ScreenJobsList:
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.jobList.View())
 	case ScreenMigrationDetails, ScreenRunDetails:
 		content = m.ploy.View()
 	}
