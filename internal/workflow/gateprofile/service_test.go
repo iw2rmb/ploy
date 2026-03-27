@@ -1,6 +1,7 @@
 package gateprofile
 
 import (
+	"errors"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -141,6 +142,111 @@ func TestSelectProfile(t *testing.T) {
 			}
 			if got.Precedence != tc.wantPrecedence {
 				t.Fatalf("SelectProfile.Precedence=%d, want %d", got.Precedence, tc.wantPrecedence)
+			}
+		})
+	}
+}
+
+func TestSelectProfileLazy(t *testing.T) {
+	t.Parallel()
+
+	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact-key", Precedence: ProfilePrecedenceExact}
+	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest-key", Precedence: ProfilePrecedenceLatest}
+	def := &ProfileCandidate{ID: 3, ObjectKey: "default-key", Precedence: ProfilePrecedenceDefault}
+
+	sentinelErr := errors.New("fetch failed")
+
+	hit := func(c *ProfileCandidate) func() (*ProfileCandidate, error) {
+		return func() (*ProfileCandidate, error) { return c, nil }
+	}
+	miss := func() (*ProfileCandidate, error) { return nil, nil }
+	boom := func() (*ProfileCandidate, error) { return nil, sentinelErr }
+
+	tests := []struct {
+		name        string
+		fetchExact  func() (*ProfileCandidate, error)
+		fetchLatest func() (*ProfileCandidate, error)
+		fetchDef    func() (*ProfileCandidate, error)
+		wantID      int64
+		wantErr     bool
+	}{
+		{
+			name:        "exact found — latest and default not called",
+			fetchExact:  hit(exact),
+			fetchLatest: boom,
+			fetchDef:    boom,
+			wantID:      1,
+		},
+		{
+			name:        "exact miss, latest found — default not called",
+			fetchExact:  miss,
+			fetchLatest: hit(latest),
+			fetchDef:    boom,
+			wantID:      2,
+		},
+		{
+			name:        "exact and latest miss — default returned",
+			fetchExact:  miss,
+			fetchLatest: miss,
+			fetchDef:    hit(def),
+			wantID:      3,
+		},
+		{
+			name:        "all miss — nil returned",
+			fetchExact:  miss,
+			fetchLatest: miss,
+			fetchDef:    miss,
+			wantID:      0,
+		},
+		{
+			name:        "exact error propagates",
+			fetchExact:  boom,
+			fetchLatest: miss,
+			fetchDef:    miss,
+			wantErr:     true,
+		},
+		{
+			name:        "latest error propagates when exact is miss",
+			fetchExact:  miss,
+			fetchLatest: boom,
+			fetchDef:    miss,
+			wantErr:     true,
+		},
+		{
+			name:        "default error propagates when exact and latest are miss",
+			fetchExact:  miss,
+			fetchLatest: miss,
+			fetchDef:    boom,
+			wantErr:     true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := SelectProfileLazy(tc.fetchExact, tc.fetchLatest, tc.fetchDef)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("SelectProfileLazy() error=nil, want non-nil")
+				}
+				if !errors.Is(err, sentinelErr) {
+					t.Fatalf("SelectProfileLazy() error=%v, want sentinel", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("SelectProfileLazy() error=%v, want nil", err)
+			}
+			if tc.wantID == 0 {
+				if got != nil {
+					t.Fatalf("SelectProfileLazy()=%v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("SelectProfileLazy()=nil, want non-nil")
+			}
+			if got.ID != tc.wantID {
+				t.Fatalf("SelectProfileLazy().ID=%d, want %d", got.ID, tc.wantID)
 			}
 		})
 	}

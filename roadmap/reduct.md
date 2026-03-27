@@ -123,10 +123,12 @@ Goal lock: every unchecked item below is considered complete only when redundanc
   - Reasoning: high (9 CFP)
   - Structural proof:
     - Removed `gateProfileResolverStackRow` from `gate_profile_resolver.go` (rg `gateProfileResolverStackRow` `internal/` returns no match).
-    - Removed inline precedence chain (`exact → latest → default`) from `ResolveGateProfileForJob`; replaced by `gateprofile.SelectProfile(exactCand, latestCand, defCand)`.
-    - Adoption confirmed: `gate_profile_resolver.go` calls `gateprofile.SelectProfile`, branches on `gateprofile.ProfilePrecedenceExact`, and constructs `*gateprofile.ProfileCandidate` from DB rows via `fetchExactCandidate`, `fetchLatestCandidate`, `fetchDefaultCandidate`.
+    - Removed server-local precedence/fallback control (`if exactCand == nil` and nested `if latestCand == nil`) from `ResolveGateProfileForJob`; the `if`-chain and inline candidate accumulation are gone.
+    - Added `gateprofile.SelectProfileLazy` to `internal/workflow/gateprofile/service.go` as the canonical owner of the lazy exact→latest→default fetch order; it calls fetchExact first and skips fetchLatest/fetchDefault when a higher-priority candidate is found.
+    - Adoption confirmed: `gate_profile_resolver.go` now calls `gateprofile.SelectProfileLazy` at line 90 with three closures wrapping `fetchExactCandidate`, `fetchLatestCandidate`, `fetchDefaultCandidate`; no inline precedence decision branches remain in the resolver.
+    - `SelectProfileLazy` covered by `TestSelectProfileLazy` (7 cases) in `internal/workflow/gateprofile/service_test.go`; resolver regression tests `TestGateProfileResolver_ExactHit_LatestDefaultErrorsNotReached` and `TestGateProfileResolver_LatestFound_DefaultErrorNotReached` continue to pass because lazy skip behavior is now owned by the service function.
     - Consolidated duplicate stack row type: `gateProfileResolverStackRow` deleted; `gate_profile_resolver.go` now uses `gateProfileStackRow` (from `gate_profile_persistence.go`) throughout, including the `gateProfileResolverStore` interface and `sqlGateProfileResolverStore.ResolveStackRowByImage`.
-    - No dual precedence path remains in resolver: single call to `gateprofile.SelectProfile` owns the exact/latest/default ordering.
+    - No dual precedence path remains in resolver: single call to `gateprofile.SelectProfileLazy` owns the exact/latest/default ordering and lazy fetch control.
     - Persistence de-scoped (see step 2 n/a): `gate_profile_persistence.go` has no profile-selection precedence to route; its write-side stack resolution and payload construction are not duplicates of any service function.
 
 - [ ] 2.1c Adopt canonical gate-profile service in nodeagent paths and delete nodeagent-local precedence logic
