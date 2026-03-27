@@ -99,6 +99,9 @@ type model struct {
 
 	// jobs caches the latest jobs list so job selection can resolve context.
 	jobs []clitui.JobItem
+
+	// lastErr holds the most recent error returned by an async command.
+	lastErr error
 }
 
 // migsLoadedMsg carries migrations fetched from the API.

@@ -3,11 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -118,13 +115,7 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 			}
 			defer rc.Close()
 
-			w.Header().Set("Content-Type", "application/octet-stream")
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.bin", idStr))
-			w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-			w.WriteHeader(http.StatusOK)
-			if _, err := io.Copy(w, rc); err != nil {
-				slog.Error("download artifact: stream failed", "artifact_id", idStr, "err", err)
-			}
+			streamBlob(w, rc, size, idStr+".bin", "application/octet-stream")
 			return
 		}
 

@@ -57,16 +57,8 @@ func getRunLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 			return
 		}
 
-		// Verify run exists in the database.
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			switch {
-			case errors.Is(err, pgx.ErrNoRows):
-				httpErr(w, http.StatusNotFound, "run not found")
-			default:
-				slog.Error("get run logs: database error", "run_id", runID.String(), "err", err)
-				httpErr(w, http.StatusInternalServerError, "failed to get run")
-			}
+		run, ok := getRunOrFail(w, r, st, runID, "get run logs")
+		if !ok {
 			return
 		}
 
@@ -85,7 +77,7 @@ func getRunLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 
 		// For fresh connections, backfill historical logs from DB + object store.
 		if sinceID == 0 && bs != nil {
-			if serveWithBackfill(w, r, st, bs, hub, run, runID) {
+			if serveWithBackfill(w, r, st, bs, hub, run, runID, nil) {
 				return
 			}
 			// If backfill setup failed (e.g., no flusher), fall through to pure hub streaming.
@@ -103,7 +95,9 @@ func getRunLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 // serveWithBackfill writes SSE headers, backfills historical logs, and for active
 // runs transitions to live hub streaming. Returns true if the response was fully
 // handled (caller should return), false if the caller should fall through.
-func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, bs blobstore.Store, hub *logstream.Hub, run store.Run, runID domaintypes.RunID) bool {
+//
+// If allowedJobs is non-nil, backfill and live events are filtered to those jobs only.
+func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, bs blobstore.Store, hub *logstream.Hub, run store.Run, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) bool {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		return false
@@ -120,12 +114,12 @@ func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, b
 	flusher.Flush()
 
 	// Backfill historical logs from DB + Garage.
-	if err := backfillRunLogs(r.Context(), w, flusher, st, bs, runID, nil); err != nil {
+	if err := backfillRunLogs(r.Context(), w, flusher, st, bs, runID, allowedJobs); err != nil {
 		slog.Error("backfill logs failed", "run_id", runID.String(), "err", err)
 	}
 
 	// If run is terminal, write done and return.
-	if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
+	if isTerminalRunStatus(run.Status) {
 		doneData, _ := json.Marshal(map[string]string{"status": string(run.Status)})
 		_ = logstream.WriteEventFrame(w, logstream.Event{Type: domaintypes.SSEEventDone, Data: doneData})
 		flusher.Flush()
@@ -147,6 +141,12 @@ func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, b
 	}
 	defer sub.Cancel()
 
+	// Build filter for repo-scoped streaming (nil for unfiltered).
+	var filter func(logstream.Event) (logstream.Event, bool)
+	if allowedJobs != nil {
+		filter = buildRepoLogFilter(allowedJobs)
+	}
+
 	for {
 		select {
 		case <-r.Context().Done():
@@ -154,6 +154,13 @@ func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, b
 		case evt, ok := <-sub.Events:
 			if !ok {
 				return true
+			}
+			if filter != nil {
+				var keep bool
+				evt, keep = filter(evt)
+				if !keep {
+					continue
+				}
 			}
 			if err := logstream.WriteEventFrame(w, evt); err != nil {
 				return true
@@ -259,33 +266,6 @@ func timestampToString(ts pgtype.Timestamptz) string {
 
 // --- Merged from events_repo.go ---
 
-type optionalJobID domaintypes.JobID
-
-func (v *optionalJobID) UnmarshalJSON(b []byte) error {
-	if v == nil {
-		return errors.New("optionalJobID: UnmarshalJSON on nil pointer")
-	}
-	if string(b) == "null" {
-		*v = ""
-		return nil
-	}
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	s = strings.TrimSpace(s)
-	if s == "" {
-		*v = ""
-		return nil
-	}
-	var id domaintypes.JobID
-	if err := id.UnmarshalText([]byte(s)); err != nil {
-		return err
-	}
-	*v = optionalJobID(id)
-	return nil
-}
-
 // getRunRepoLogsHandler returns an HTTP handler that streams run logs/events over SSE,
 // filtered to jobs belonging to a specific repo execution within the run.
 // GET /v1/runs/{run_id}/repos/{repo_id}/logs
@@ -314,10 +294,8 @@ func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *se
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			slog.Error("get run repo logs: get run failed", "run_id", runID.String(), "err", err)
-			httpErr(w, http.StatusInternalServerError, "failed to get run")
+		run, ok := getRunOrFail(w, r, st, runID, "get run repo logs")
+		if !ok {
 			return
 		}
 
@@ -347,7 +325,7 @@ func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *se
 
 		// For fresh connections, backfill historical logs filtered by allowed jobs.
 		if sinceID == 0 && bs != nil {
-			if serveRepoWithBackfill(w, r, st, bs, hub, run, runID, allowedJobs) {
+			if serveWithBackfill(w, r, st, bs, hub, run, runID, allowedJobs) {
 				return
 			}
 		}
@@ -362,74 +340,6 @@ func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *se
 	}
 }
 
-// serveRepoWithBackfill is like serveWithBackfill but filters logs to allowed jobs.
-func serveRepoWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, bs blobstore.Store, hub *logstream.Hub, run store.Run, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) bool {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		return false
-	}
-
-	headers := w.Header()
-	headers.Set("Content-Type", "text/event-stream")
-	headers.Set("Cache-Control", "no-cache")
-	headers.Set("Connection", "keep-alive")
-	if _, err := io.WriteString(w, ":ok\n\n"); err != nil {
-		return true
-	}
-	flusher.Flush()
-
-	if err := backfillRunLogs(r.Context(), w, flusher, st, bs, runID, allowedJobs); err != nil {
-		slog.Error("backfill repo logs failed", "run_id", runID.String(), "err", err)
-	}
-
-	if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
-		doneData, _ := json.Marshal(map[string]string{"status": string(run.Status)})
-		_ = logstream.WriteEventFrame(w, logstream.Event{Type: domaintypes.SSEEventDone, Data: doneData})
-		flusher.Flush()
-		return true
-	}
-
-	snapshot := hub.Snapshot(runID)
-	var hubSinceID domaintypes.EventID
-	if len(snapshot) > 0 {
-		hubSinceID = snapshot[len(snapshot)-1].ID
-	}
-
-	sub, err := hub.Subscribe(r.Context(), runID, hubSinceID)
-	if err != nil {
-		slog.Error("subscribe after backfill failed", "run_id", runID.String(), "err", err)
-		return true
-	}
-	defer sub.Cancel()
-
-	filter := buildRepoLogFilter(allowedJobs)
-
-	for {
-		select {
-		case <-r.Context().Done():
-			return true
-		case evt, ok := <-sub.Events:
-			if !ok {
-				return true
-			}
-			if filter != nil {
-				var keep bool
-				evt, keep = filter(evt)
-				if !keep {
-					continue
-				}
-			}
-			if err := logstream.WriteEventFrame(w, evt); err != nil {
-				return true
-			}
-			flusher.Flush()
-			if evt.Type == domaintypes.SSEEventDone {
-				return true
-			}
-		}
-	}
-}
-
 // buildRepoLogFilter returns a filter function that passes only log events
 // belonging to the allowed jobs set.
 func buildRepoLogFilter(allowedJobs map[domaintypes.JobID]struct{}) func(logstream.Event) (logstream.Event, bool) {
@@ -437,13 +347,16 @@ func buildRepoLogFilter(allowedJobs map[domaintypes.JobID]struct{}) func(logstre
 		switch evt.Type {
 		case domaintypes.SSEEventLog:
 			var payload struct {
-				JobID optionalJobID `json:"job_id,omitempty"`
+				JobID *string `json:"job_id,omitempty"`
 			}
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
 				return evt, true
 			}
-			jobID := domaintypes.JobID(payload.JobID)
-			if jobID.IsZero() {
+			if payload.JobID == nil || strings.TrimSpace(*payload.JobID) == "" {
+				return evt, false
+			}
+			var jobID domaintypes.JobID
+			if err := jobID.UnmarshalText([]byte(*payload.JobID)); err != nil {
 				return evt, false
 			}
 			_, ok := allowedJobs[jobID]

@@ -96,7 +96,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 			},
 			wantStatus:     http.StatusBadRequest,
-			wantBodySubstr: "repo_url is required",
+			wantBodySubstr: "repo_url: empty",
 		},
 		{
 			name:  "error - missing base_ref",
@@ -109,7 +109,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 			},
 			wantStatus:     http.StatusBadRequest,
-			wantBodySubstr: "base_ref is required",
+			wantBodySubstr: "base_ref: empty",
 		},
 		{
 			name:  "error - invalid repo_url scheme",
@@ -123,7 +123,7 @@ func TestAddModRepoHandler(t *testing.T) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 			},
 			wantStatus:     http.StatusBadRequest,
-			wantBodySubstr: "repo_url",
+			wantBodySubstr: "invalid repo url",
 		},
 	}
 

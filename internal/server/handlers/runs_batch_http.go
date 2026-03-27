@@ -29,19 +29,13 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("cancel run: fetch failed", "run_id", runID.String(), "err", err)
+		run, ok := getRunOrFail(w, r, st, runID, "cancel run")
+		if !ok {
 			return
 		}
 
 		// Idempotent: if already terminal, return current state.
-		if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
+		if isTerminalRunStatus(run.Status) {
 			summary := runToSummary(run)
 			if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 				summary.Counts = counts
@@ -80,18 +74,8 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("add run repo: get run failed", "run_id", runID.String(), "err", err)
-			return
-		}
-		if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
-			httpErr(w, http.StatusConflict, "cannot add repos to a terminal run")
+		run, ok := getActiveRunOrFail(w, r, st, runID, "add run repo")
+		if !ok {
 			return
 		}
 
@@ -244,7 +228,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		if rr.Status == domaintypes.RunRepoStatusCancelled || rr.Status == domaintypes.RunRepoStatusSuccess || rr.Status == domaintypes.RunRepoStatusFail {
+		if isTerminalRunRepoStatus(rr.Status) {
 			repoURL := ""
 			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 				repoURL = resolvedURL
@@ -255,7 +239,9 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		_ = st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusCancelled})
+		if err := st.UpdateRunRepoStatus(r.Context(), store.UpdateRunRepoStatusParams{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusCancelled}); err != nil {
+			slog.Error("cancel run repo: update status failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
+		}
 
 		now := time.Now().UTC()
 		jobs, err := st.ListJobsByRunRepoAttempt(r.Context(), store.ListJobsByRunRepoAttemptParams{RunID: runID, RepoID: repoID, Attempt: rr.Attempt})
@@ -306,14 +292,8 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("restart run repo: get run failed", "run_id", runID.String(), "err", err)
+		run, ok := getRunOrFail(w, r, st, runID, "restart run repo")
+		if !ok {
 			return
 		}
 
@@ -351,7 +331,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// If the run is terminal, reopen it to Started for the restart attempt.
-		if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
+		if isTerminalRunStatus(run.Status) {
 			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: domaintypes.RunStatusStarted}); err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
 				return
@@ -431,19 +411,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		run, err := st.GetRun(r.Context(), runID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
-			slog.Error("start run: fetch failed", "run_id", runID.String(), "err", err)
-			return
-		}
-
-		if isTerminalRunStatus(run.Status) {
-			httpErr(w, http.StatusConflict, "cannot start repos in a terminal run")
+		if _, ok := getActiveRunOrFail(w, r, st, runID, "start run"); !ok {
 			return
 		}
 

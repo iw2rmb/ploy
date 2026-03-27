@@ -4,9 +4,15 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/list"
-
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
+
+// normalizeLabel returns the trimmed string, or "-" if it's blank.
+func normalizeLabel(s string) string {
+	if t := strings.TrimSpace(s); t != "" {
+		return t
+	}
+	return "-"
+}
 
 // newListWithWidth creates a list with the shared TUI invariants applied:
 // - help disabled
@@ -70,64 +76,16 @@ func buildPloyItems(hasMigration, hasRun, hasJob bool) []list.Item {
 	}
 }
 
-func buildRunDetailsPloyItems(migName string, migID domaintypes.MigID, runID domaintypes.RunID, jobsTotal string) []list.Item {
-	migTitle := strings.TrimSpace(migName)
-	if migTitle == "" {
-		migTitle = "-"
-	}
-	migDesc := strings.TrimSpace(migID.String())
-	if migDesc == "" {
-		migDesc = "-"
-	}
-	runDesc := strings.TrimSpace(runID.String())
-	if runDesc == "" {
-		runDesc = "-"
-	}
-	return []list.Item{
-		listItem{title: migTitle, description: migDesc},
-		listItem{title: "Run", description: runDesc},
-		listItem{title: "Jobs", description: jobsTotal},
-	}
-}
+// ployEntry holds a title-description pair for the PLOY detail list.
+type ployEntry struct{ title, desc string }
 
-func buildMigrationDetailsPloyItems(migName string, migID domaintypes.MigID, runsTotal string) []list.Item {
-	migTitle := strings.TrimSpace(migName)
-	if migTitle == "" {
-		migTitle = "-"
+// buildDetailsPloyItems constructs a PLOY detail list, normalizing each entry.
+func buildDetailsPloyItems(entries []ployEntry) []list.Item {
+	items := make([]list.Item, len(entries))
+	for i, e := range entries {
+		items[i] = listItem{title: normalizeLabel(e.title), description: normalizeLabel(e.desc)}
 	}
-	migDesc := strings.TrimSpace(migID.String())
-	if migDesc == "" {
-		migDesc = "-"
-	}
-	return []list.Item{
-		listItem{title: migTitle, description: migDesc},
-		listItem{title: "Runs", description: runsTotal},
-		listItem{title: "Jobs", description: "select job"},
-	}
-}
-
-func buildJobDetailsPloyItems(migName string, migID domaintypes.MigID, runID domaintypes.RunID, jobID domaintypes.JobID) []list.Item {
-	migTitle := strings.TrimSpace(migName)
-	if migTitle == "" {
-		migTitle = "-"
-	}
-	migDesc := strings.TrimSpace(migID.String())
-	if migDesc == "" {
-		migDesc = "-"
-	}
-	runDesc := strings.TrimSpace(runID.String())
-	if runDesc == "" {
-		runDesc = "-"
-	}
-	jobDesc := strings.TrimSpace(jobID.String())
-	if jobDesc == "" {
-		jobDesc = "-"
-	}
-	return []list.Item{
-		listItem{title: migTitle, description: migDesc},
-		listItem{title: "Run", description: runDesc},
-		listItem{title: "Job", description: jobDesc},
-	}
+	return items
 }
 
 // setPloySelectionState applies root item label state while preserving cursor.

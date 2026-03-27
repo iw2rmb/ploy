@@ -52,11 +52,11 @@ func (m model) handleEnterFromMigrationsList() (tea.Model, tea.Cmd) {
 	m.selectedMigName = item.title
 	m.selectedRunID = ""
 	m.selectedJobID = ""
-	m.ploy.SetItems(buildMigrationDetailsPloyItems(
-		m.selectedMigName,
-		m.selectedMigID,
-		"total: —",
-	))
+	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+		{title: m.selectedMigName, desc: m.selectedMigID.String()},
+		{title: "Runs", desc: "total: —"},
+		{title: "Jobs", desc: "select job"},
+	}))
 	m.ploy.Select(0)
 	m.applyWindowHeight()
 	m.screen = ScreenMigrationDetails
@@ -72,19 +72,12 @@ func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
 	m.selectedJobID = ""
 	m.selectedMigID = ""
 	m.selectedMigName = ""
-	for _, run := range m.runs {
-		if run.ID == m.selectedRunID {
-			m.selectedMigID = run.MigID
-			m.selectedMigName = run.MigName
-			break
-		}
-	}
-	m.ploy.SetItems(buildRunDetailsPloyItems(
-		m.selectedMigName,
-		m.selectedMigID,
-		m.selectedRunID,
-		"total: —",
-	))
+	m.resolveMigContext(m.selectedRunID)
+	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+		{title: m.selectedMigName, desc: m.selectedMigID.String()},
+		{title: "Run", desc: m.selectedRunID.String()},
+		{title: "Jobs", desc: "total: —"},
+	}))
 	m.ploy.Select(1)
 	m.applyWindowHeight()
 	m.screen = ScreenRunDetails
@@ -104,20 +97,25 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 	m.selectedRunID = selectedJob.RunID
 	m.selectedMigName = selectedJob.MigName
 	m.selectedMigID = ""
-	for _, run := range m.runs {
-		if run.ID == m.selectedRunID {
-			m.selectedMigID = run.MigID
-			break
-		}
-	}
-	m.ploy.SetItems(buildJobDetailsPloyItems(
-		m.selectedMigName,
-		m.selectedMigID,
-		m.selectedRunID,
-		m.selectedJobID,
-	))
+	m.resolveMigContext(m.selectedRunID)
+	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+		{title: m.selectedMigName, desc: m.selectedMigID.String()},
+		{title: "Run", desc: m.selectedRunID.String()},
+		{title: "Job", desc: m.selectedJobID.String()},
+	}))
 	m.ploy.Select(2)
 	return m, nil
+}
+
+// resolveMigContext populates selectedMigID and selectedMigName from the runs cache.
+func (m *model) resolveMigContext(runID domaintypes.RunID) {
+	for _, run := range m.runs {
+		if run.ID == runID {
+			m.selectedMigID = run.MigID
+			m.selectedMigName = run.MigName
+			return
+		}
+	}
 }
 
 func findJobByID(jobs []clitui.JobItem, jobID domaintypes.JobID) (clitui.JobItem, bool) {

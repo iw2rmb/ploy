@@ -10,7 +10,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -201,12 +200,6 @@ func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerF
 			}
 		}(bundle.ID)
 
-		w.Header().Set("Content-Type", "application/gzip")
-		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", "bundle-"+bundleID.String()+".tar.gz"))
-		w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-		w.WriteHeader(http.StatusOK)
-		if _, err := io.Copy(w, rc); err != nil {
-			slog.Error("spec bundle download: stream failed", "bundle_id", bundleID.String(), "err", err)
-		}
+		streamBlob(w, rc, size, fmt.Sprintf("%q", "bundle-"+bundleID.String()+".tar.gz"), "application/gzip")
 	}
 }

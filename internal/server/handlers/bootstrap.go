@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -137,56 +138,9 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 // Response: { "certificate": "...", "ca_bundle": "...", "serial": "...", ... }
 func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract and validate bootstrap token from Authorization header.
-		authHeader := r.Header.Get("Authorization")
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			httpErr(w, http.StatusUnauthorized, "missing or invalid Authorization header")
-			return
-		}
-
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-		// Validate token.
-		claims, err := auth.ValidateToken(tokenString, tokenSecret)
+		claims, err := validateBootstrapToken(r, st, tokenSecret)
 		if err != nil {
-			httpErr(w, http.StatusUnauthorized, "invalid token: %v", err)
-			slog.Warn("bootstrap certificate: invalid token", "err", err)
-			return
-		}
-
-		// Verify token is a bootstrap token.
-		if claims.TokenType != auth.TokenTypeBootstrap {
-			httpErr(w, http.StatusUnauthorized, "invalid token type: expected bootstrap token")
-			return
-		}
-
-		// Verify token is not expired.
-		if time.Now().After(claims.ExpiresAt.Time) {
-			httpErr(w, http.StatusUnauthorized, "token expired")
-			return
-		}
-
-		// Check if token is revoked.
-		revoked, err := st.CheckBootstrapTokenRevoked(r.Context(), claims.ID)
-		if err == nil && revoked.Valid {
-			httpErr(w, http.StatusUnauthorized, "token revoked")
-			return
-		}
-
-		// Get bootstrap token info from database.
-		tokenInfo, err := st.GetBootstrapToken(r.Context(), claims.ID)
-		if err != nil {
-			httpErr(w, http.StatusUnauthorized, "token not found or invalid")
-			slog.Warn("bootstrap certificate: token not found in database", "token_id", claims.ID, "err", err)
-			return
-		}
-
-		// Verify token hasn't been used yet.
-		if tokenInfo.UsedAt.Valid {
-			// If cert was already issued, this is idempotent retry - we could allow it
-			// For now, reject to enforce single-use
-			httpErr(w, http.StatusUnauthorized, "token already used")
-			slog.Warn("bootstrap certificate: token already used", "token_id", claims.ID)
+			httpErr(w, http.StatusUnauthorized, "%s", err)
 			return
 		}
 
@@ -194,47 +148,18 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		var req struct {
 			CSR string `json:"csr"`
 		}
-
 		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
-		// Validate CSR is not empty.
-		if strings.TrimSpace(req.CSR) == "" {
-			httpErr(w, http.StatusBadRequest, "csr field is required")
-			return
-		}
-
-		// Parse and validate CSR CN matches token's node_id.
-		block, _ := pem.Decode([]byte(req.CSR))
-		if block == nil || block.Type != "CERTIFICATE REQUEST" {
-			httpErr(w, http.StatusBadRequest, "invalid CSR PEM")
-			return
-		}
-
-		parsedCSR, err := x509.ParseCertificateRequest(block.Bytes)
+		parsedCSR, err := parseAndVerifyCSR(req.CSR, "node:"+claims.NodeID.String())
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "parse CSR: %v", err)
+			httpErr(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		_ = parsedCSR // signature/CN already verified
 
-		if err := parsedCSR.CheckSignature(); err != nil {
-			httpErr(w, http.StatusBadRequest, "verify CSR signature: %v", err)
-			return
-		}
-
-		// Verify CSR CN matches token's node_id.
-		expectedCN := "node:" + claims.NodeID.String()
-		if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
-			httpErr(w, http.StatusBadRequest, "CSR subject common name must match node_id from token")
-			slog.Warn("bootstrap certificate: CN mismatch",
-				"expected", expectedCN,
-				"actual", parsedCSR.Subject.CommonName,
-			)
-			return
-		}
-
-		// Load cluster CA.
+		// Load cluster CA and sign the CSR.
 		ca, rawCACert, err := loadClusterCA()
 		if err != nil {
 			if errors.Is(err, errCANotConfigured) {
@@ -246,7 +171,6 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			return
 		}
 
-		// Sign the CSR.
 		cert, err := pki.SignNodeCSR(ca, []byte(req.CSR), time.Now())
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "sign failed: %v", err)
@@ -254,72 +178,22 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			return
 		}
 
-		// Register node in database if it doesn't exist yet.
-		// Use the node_id from the bootstrap token and default values for other fields.
-		nodeID := claims.NodeID
-		if nodeID.IsZero() {
-			httpErr(w, http.StatusInternalServerError, "invalid node_id in token")
-			slog.Error("bootstrap certificate: invalid node_id", "node_id", claims.NodeID.String())
+		if err := registerNodeIfNew(r.Context(), st, claims.NodeID); err != nil {
+			httpErr(w, http.StatusInternalServerError, "failed to register node: %v", err)
 			return
 		}
 
-		// Check if node already exists
-		_, err = st.GetNode(r.Context(), nodeID)
-		if err != nil {
-			// Node doesn't exist, create it with default values.
-			// CreateNode now requires an app-supplied ID (NanoID-backed).
-			ipAddr, _ := netip.ParseAddr("0.0.0.0")
-			_, err = st.CreateNode(r.Context(), store.CreateNodeParams{
-				ID:          nodeID,
-				Name:        "node-" + nodeID.String(), // Use node ID as name suffix
-				IpAddress:   ipAddr,                    // Placeholder IP, will be updated on first heartbeat
-				Version:     nil,                       // Will be updated on first heartbeat
-				Concurrency: 1,                         // Default concurrency
-			})
-			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to register node: %v", err)
-				slog.Error("bootstrap certificate: failed to register node", "node_id", claims.NodeID.String(), "err", err)
-				return
-			}
-			slog.Info("node registered", "node_id", claims.NodeID.String())
-		}
-
-		// Mark bootstrap token as used.
-		err = st.UpdateBootstrapTokenLastUsed(r.Context(), claims.ID)
-		if err != nil {
+		// Mark bootstrap token as used (best-effort, cert already issued).
+		if err := st.UpdateBootstrapTokenLastUsed(r.Context(), claims.ID); err != nil {
 			slog.Error("bootstrap certificate: failed to mark token as used", "token_id", claims.ID, "err", err)
-			// Don't fail the request - cert was already issued
 		}
-
-		// Mark cert as issued.
-		err = st.MarkBootstrapTokenCertIssued(r.Context(), claims.ID)
-		if err != nil {
+		if err := st.MarkBootstrapTokenCertIssued(r.Context(), claims.ID); err != nil {
 			slog.Error("bootstrap certificate: failed to mark cert as issued", "token_id", claims.ID, "err", err)
-			// Don't fail the request - cert was already issued
 		}
 
-		// Generate a long-lived worker bearer token for the node to use for API authentication.
-		// The certificate is for the node's own HTTPS server; the bearer token is for control plane auth.
-		tokenSecret := os.Getenv("PLOY_AUTH_SECRET")
-		if tokenSecret == "" {
-			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_AUTH_SECRET not set")
-			slog.Error("bootstrap certificate: PLOY_AUTH_SECRET not set")
-			return
-		}
-
-		clusterID := os.Getenv("PLOY_CLUSTER_ID")
-		if clusterID == "" {
-			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
-			slog.Error("bootstrap certificate: PLOY_CLUSTER_ID not set")
-			return
-		}
-
-		// Generate worker token with 1 year expiration
-		tokenExpiry := time.Now().AddDate(1, 0, 0)
-		workerToken, err := auth.GenerateAPIToken(tokenSecret, clusterID, string(auth.RoleWorker), tokenExpiry)
+		workerToken, err := issueWorkerToken()
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to generate worker token: %v", err)
-			slog.Error("bootstrap certificate: generate worker token failed", "err", err)
+			httpErr(w, http.StatusInternalServerError, "%s", err)
 			return
 		}
 
@@ -357,6 +231,130 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			"not_after", cert.NotAfter.Format(time.RFC3339),
 		)
 	}
+}
+
+// validateBootstrapToken extracts and validates a bootstrap token from the
+// Authorization header. Returns validated claims or an error suitable for
+// the HTTP response.
+func validateBootstrapToken(r *http.Request, st store.Store, tokenSecret string) (*auth.TokenClaims, error) {
+	authHeader := r.Header.Get("Authorization")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return nil, fmt.Errorf("missing or invalid Authorization header")
+	}
+
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+	claims, err := auth.ValidateToken(tokenString, tokenSecret)
+	if err != nil {
+		slog.Warn("bootstrap certificate: invalid token", "err", err)
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+
+	if claims.TokenType != auth.TokenTypeBootstrap {
+		return nil, fmt.Errorf("invalid token type: expected bootstrap token")
+	}
+
+	if time.Now().After(claims.ExpiresAt.Time) {
+		return nil, fmt.Errorf("token expired")
+	}
+
+	revoked, err := st.CheckBootstrapTokenRevoked(r.Context(), claims.ID)
+	if err == nil && revoked.Valid {
+		return nil, fmt.Errorf("token revoked")
+	}
+
+	tokenInfo, err := st.GetBootstrapToken(r.Context(), claims.ID)
+	if err != nil {
+		slog.Warn("bootstrap certificate: token not found in database", "token_id", claims.ID, "err", err)
+		return nil, fmt.Errorf("token not found or invalid")
+	}
+
+	if tokenInfo.UsedAt.Valid {
+		slog.Warn("bootstrap certificate: token already used", "token_id", claims.ID)
+		return nil, fmt.Errorf("token already used")
+	}
+
+	return claims, nil
+}
+
+// parseAndVerifyCSR parses a PEM-encoded CSR, verifies its signature, and
+// checks that the CN matches expectedCN.
+func parseAndVerifyCSR(csrPEM string, expectedCN string) (*x509.CertificateRequest, error) {
+	if strings.TrimSpace(csrPEM) == "" {
+		return nil, fmt.Errorf("csr field is required")
+	}
+
+	block, _ := pem.Decode([]byte(csrPEM))
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return nil, fmt.Errorf("invalid CSR PEM")
+	}
+
+	parsed, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse CSR: %w", err)
+	}
+
+	if err := parsed.CheckSignature(); err != nil {
+		return nil, fmt.Errorf("verify CSR signature: %w", err)
+	}
+
+	if strings.TrimSpace(parsed.Subject.CommonName) != expectedCN {
+		slog.Warn("bootstrap certificate: CN mismatch",
+			"expected", expectedCN,
+			"actual", parsed.Subject.CommonName,
+		)
+		return nil, fmt.Errorf("CSR subject common name must match node_id from token")
+	}
+
+	return parsed, nil
+}
+
+// registerNodeIfNew creates a node record with defaults if it doesn't already exist.
+func registerNodeIfNew(ctx context.Context, st store.Store, nodeID domaintypes.NodeID) error {
+	if nodeID.IsZero() {
+		return fmt.Errorf("invalid node_id")
+	}
+
+	if _, err := st.GetNode(ctx, nodeID); err == nil {
+		return nil // already exists
+	}
+
+	ipAddr, _ := netip.ParseAddr("0.0.0.0")
+	if _, err := st.CreateNode(ctx, store.CreateNodeParams{
+		ID:          nodeID,
+		Name:        "node-" + nodeID.String(),
+		IpAddress:   ipAddr,
+		Version:     nil,
+		Concurrency: 1,
+	}); err != nil {
+		slog.Error("bootstrap certificate: failed to register node", "node_id", nodeID.String(), "err", err)
+		return err
+	}
+	slog.Info("node registered", "node_id", nodeID.String())
+	return nil
+}
+
+// issueWorkerToken generates a long-lived worker bearer token for API authentication.
+func issueWorkerToken() (string, error) {
+	secret := os.Getenv("PLOY_AUTH_SECRET")
+	if secret == "" {
+		slog.Error("bootstrap certificate: PLOY_AUTH_SECRET not set")
+		return "", fmt.Errorf("server misconfigured: PLOY_AUTH_SECRET not set")
+	}
+
+	clusterID := os.Getenv("PLOY_CLUSTER_ID")
+	if clusterID == "" {
+		slog.Error("bootstrap certificate: PLOY_CLUSTER_ID not set")
+		return "", fmt.Errorf("server misconfigured: PLOY_CLUSTER_ID not set")
+	}
+
+	tokenExpiry := time.Now().AddDate(1, 0, 0)
+	token, err := auth.GenerateAPIToken(secret, clusterID, string(auth.RoleWorker), tokenExpiry)
+	if err != nil {
+		slog.Error("bootstrap certificate: generate worker token failed", "err", err)
+		return "", fmt.Errorf("failed to generate worker token: %w", err)
+	}
+	return token, nil
 }
 
 // loadClusterCA loads the cluster CA certificate and private key from environment variables.

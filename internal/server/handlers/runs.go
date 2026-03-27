@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -291,27 +290,10 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 
 func listRunsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		limit := int32(50)
-		offset := int32(0)
-
-		if l := r.URL.Query().Get("limit"); l != "" {
-			parsed, err := strconv.ParseInt(l, 10, 32)
-			if err != nil || parsed < 1 {
-				httpErr(w, http.StatusBadRequest, "invalid limit parameter")
-				return
-			}
-			limit = int32(parsed)
-			if limit > 100 {
-				limit = 100
-			}
-		}
-		if o := r.URL.Query().Get("offset"); o != "" {
-			parsed, err := strconv.ParseInt(o, 10, 32)
-			if err != nil || parsed < 0 {
-				httpErr(w, http.StatusBadRequest, "invalid offset parameter")
-				return
-			}
-			offset = int32(parsed)
+		limit, offset, err := parsePagination(r)
+		if err != nil {
+			httpErr(w, http.StatusBadRequest, "%s", err)
+			return
 		}
 
 		runs, err := st.ListRuns(r.Context(), store.ListRunsParams{Limit: limit, Offset: offset})

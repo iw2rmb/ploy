@@ -6,8 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // requiredPathParam extracts and validates a required path parameter from the request.
@@ -133,4 +140,69 @@ func optionalQuery[T any, PT interface {
 		return nil, fmt.Errorf("%s: %w", key, err)
 	}
 	return &id, nil
+}
+
+// parsePagination extracts limit/offset from query parameters with validation.
+// Defaults: limit=50, offset=0. Limit is capped at 100.
+func parsePagination(r *http.Request) (limit, offset int32, err error) {
+	limit = 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		parsed, parseErr := strconv.ParseInt(l, 10, 32)
+		if parseErr != nil || parsed < 1 {
+			return 0, 0, fmt.Errorf("invalid limit parameter")
+		}
+		limit = int32(parsed)
+		if limit > 100 {
+			limit = 100
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		parsed, parseErr := strconv.ParseInt(o, 10, 32)
+		if parseErr != nil || parsed < 0 {
+			return 0, 0, fmt.Errorf("invalid offset parameter")
+		}
+		offset = int32(parsed)
+	}
+	return limit, offset, nil
+}
+
+// getRunOrFail fetches a run by ID. On error it writes the HTTP response
+// (404 for not found, 500 for other errors) and returns ok=false.
+func getRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, logPrefix string) (store.Run, bool) {
+	run, err := st.GetRun(r.Context(), runID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpErr(w, http.StatusNotFound, "run not found")
+			return store.Run{}, false
+		}
+		slog.Error(logPrefix+": database error", "run_id", runID.String(), "err", err)
+		httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
+		return store.Run{}, false
+	}
+	return run, true
+}
+
+// getActiveRunOrFail fetches a run and rejects terminal runs with 409 Conflict.
+func getActiveRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID domaintypes.RunID, logPrefix string) (store.Run, bool) {
+	run, ok := getRunOrFail(w, r, st, runID, logPrefix)
+	if !ok {
+		return store.Run{}, false
+	}
+	if isTerminalRunStatus(run.Status) {
+		httpErr(w, http.StatusConflict, "run is in terminal state")
+		return store.Run{}, false
+	}
+	return run, true
+}
+
+// streamBlob writes standard download headers and streams content from r to w.
+// The caller is responsible for opening/closing the reader.
+func streamBlob(w http.ResponseWriter, reader io.Reader, size int64, filename, contentType string) {
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	w.WriteHeader(http.StatusOK)
+	if _, err := io.Copy(w, reader); err != nil {
+		slog.Error("stream blob failed", "filename", filename, "err", err)
+	}
 }
