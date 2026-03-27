@@ -65,9 +65,7 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 
 	createNodeLogsHandler(st, bp, eventsService).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status %d, want 201", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("content-type=%s, want application/json", ct)

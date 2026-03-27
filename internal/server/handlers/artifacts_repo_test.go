@@ -97,9 +97,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 
 	listRunRepoArtifactsHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.getRunRepoCalled {
 		t.Fatalf("expected GetRunRepo to be called")
 	}

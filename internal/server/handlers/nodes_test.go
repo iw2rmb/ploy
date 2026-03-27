@@ -35,15 +35,9 @@ func TestDrainNodeHandlerSuccess(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil)
-	req.SetPathValue("id", nodeIDStr)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil, "id", nodeIDStr)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 
 	if !st.getNodeCalled {
 		t.Error("expected GetNode to be called")
@@ -74,15 +68,9 @@ func TestDrainNodeHandlerInvalidID(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+tc.urlID+"/drain", nil)
-			req.SetPathValue("id", tc.id)
-			rr := httptest.NewRecorder()
+			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+tc.urlID+"/drain", nil, "id", tc.id)
 
-			handler.ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
 }
@@ -95,15 +83,9 @@ func TestDrainNodeHandlerNotFound(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil)
-	req.SetPathValue("id", nodeID)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil, "id", nodeID)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 	if !strings.Contains(rr.Body.String(), "node not found") {
 		t.Errorf("expected error about node not found, got: %s", rr.Body.String())
 	}
@@ -128,15 +110,9 @@ func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
 	}
 
 	handler := drainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil)
-	req.SetPathValue("id", nodeIDStr)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil, "id", nodeIDStr)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusConflict)
 	if !strings.Contains(rr.Body.String(), "already drained") {
 		t.Errorf("expected error about already drained, got: %s", rr.Body.String())
 	}
@@ -164,15 +140,9 @@ func TestUndrainNodeHandlerSuccess(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil)
-	req.SetPathValue("id", nodeIDStr)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil, "id", nodeIDStr)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 
 	if !st.getNodeCalled {
 		t.Error("expected GetNode to be called")
@@ -203,15 +173,9 @@ func TestUndrainNodeHandlerInvalidID(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+tc.urlID+"/undrain", nil)
-			req.SetPathValue("id", tc.id)
-			rr := httptest.NewRecorder()
+			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+tc.urlID+"/undrain", nil, "id", tc.id)
 
-			handler.ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
 }
@@ -224,15 +188,9 @@ func TestUndrainNodeHandlerNotFound(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil)
-	req.SetPathValue("id", nodeID)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil, "id", nodeID)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 	if !strings.Contains(rr.Body.String(), "node not found") {
 		t.Errorf("expected error about node not found, got: %s", rr.Body.String())
 	}
@@ -257,15 +215,9 @@ func TestUndrainNodeHandlerNotDrained(t *testing.T) {
 	}
 
 	handler := undrainNodeHandler(st)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil)
-	req.SetPathValue("id", nodeIDStr)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil, "id", nodeIDStr)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusConflict)
 	if !strings.Contains(rr.Body.String(), "not drained") {
 		t.Errorf("expected error about not drained, got: %s", rr.Body.String())
 	}
@@ -325,9 +277,7 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp []struct {
 		ID              string  `json:"id"`
@@ -409,14 +359,9 @@ func TestListNodesHandlerEmpty(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
-	var resp []interface{}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+	resp := decodeBody[[]interface{}](t, rr)
 
 	if len(resp) != 0 {
 		t.Fatalf("expected empty list, got %d items", len(resp))

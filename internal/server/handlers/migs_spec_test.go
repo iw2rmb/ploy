@@ -33,15 +33,9 @@ func TestMods_GetLatestSpec_Success(t *testing.T) {
 	}
 	handler := getMigLatestSpecHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs/mod123/specs/latest", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/mod123/specs/latest", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if got := rr.Header().Get("Content-Type"); got != "application/json" {
 		t.Fatalf("content-type = %q, want application/json", got)
 	}
@@ -67,15 +61,9 @@ func TestMods_GetLatestSpec_MigWithoutSpec(t *testing.T) {
 	}
 	handler := getMigLatestSpecHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs/mod123/specs/latest", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/mod123/specs/latest", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNotFound, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 	if st.getSpecCalled {
 		t.Fatal("GetSpec must not be called when mig has no spec")
 	}
@@ -85,15 +73,9 @@ func TestMods_GetLatestSpec_MigNotFound(t *testing.T) {
 	st := &mockStore{getModErr: pgx.ErrNoRows}
 	handler := getMigLatestSpecHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs/missing/specs/latest", nil)
-	req.SetPathValue("mig_ref", "missing")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/missing/specs/latest", nil, "mig_ref", "missing")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNotFound, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 	if st.getSpecCalled {
 		t.Fatal("GetSpec must not be called when mig is missing")
 	}
@@ -123,18 +105,10 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	reqBody := map[string]any{
 		"spec": spec,
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify store methods called.
 	if !st.getModCalled {
@@ -183,18 +157,10 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 		"name": "my-named-spec",
 		"spec": spec,
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify name was passed to store.
 	if st.createSpecParams.Name != "my-named-spec" {
@@ -289,18 +255,10 @@ func TestMods_SetSpec_MissingSpec(t *testing.T) {
 	handler := setMigSpecHandler(st)
 
 	reqBody := map[string]any{"name": "no-spec"}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 
 	// Store should not be called.
 	if st.createSpecCalled {
@@ -317,18 +275,10 @@ func TestMods_SetSpec_InvalidSpec(t *testing.T) {
 	reqBody := map[string]any{
 		"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestMods_SetSpec_ModNotFound verifies POST /v1/migs/{mig_ref}/specs returns 404 for missing mig.
@@ -344,18 +294,10 @@ func TestMods_SetSpec_ModNotFound(t *testing.T) {
 		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/nonexistent/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "nonexistent")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/nonexistent/specs", reqBody, "mig_ref", "nonexistent")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 
 	// CreateSpec should not be called.
 	if st.createSpecCalled {
@@ -380,18 +322,10 @@ func TestMods_SetSpec_ArchivedMod(t *testing.T) {
 		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 
 	// CreateSpec should not be called for archived migs.
 	if st.createSpecCalled {
@@ -411,9 +345,7 @@ func TestMods_SetSpec_InvalidJSON(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestMods_SetSpec_CreateSpecError verifies POST /v1/migs/{mig_ref}/specs returns 500 on CreateSpec failure.
@@ -434,18 +366,10 @@ func TestMods_SetSpec_CreateSpecError(t *testing.T) {
 		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestMods_SetSpec_UpdateMigSpecError verifies POST /v1/migs/{mig_ref}/specs returns 500 on UpdateMigSpec failure.
@@ -466,16 +390,8 @@ func TestMods_SetSpec_UpdateMigSpecError(t *testing.T) {
 		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 	reqBody := map[string]any{"spec": spec}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/specs", bytes.NewReader(body))
-	req.SetPathValue("mig_ref", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", reqBody, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }

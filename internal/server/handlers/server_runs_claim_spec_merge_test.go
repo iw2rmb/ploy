@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -68,20 +66,11 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	configHolder.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false})
 
 	handler := claimJobHandler(st, configHolder)
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-	req.SetPathValue("id", nodeKey)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-	handler.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusOK)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 	spec, ok := resp["spec"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected spec to be an object, got %T", resp["spec"])
@@ -199,20 +188,11 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 			}
 
 			handler := claimJobHandler(st, &ConfigHolder{})
-			req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-			req.SetPathValue("id", nodeKey)
-			rr := httptest.NewRecorder()
+			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-			handler.ServeHTTP(rr, req)
+			assertStatus(t, rr, http.StatusOK)
 
-			if rr.Code != http.StatusOK {
-				t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-			}
-
-			var resp map[string]any
-			if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-				t.Fatalf("decode response: %v", err)
-			}
+			resp := decodeBody[map[string]any](t, rr)
 			if got, ok := resp["repo_gate_profile_missing"].(bool); !ok || !got {
 				t.Fatalf("expected repo_gate_profile_missing=true, got %v", resp["repo_gate_profile_missing"])
 			}

@@ -20,9 +20,7 @@ func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if body := rr.Body.String(); body != "null" {
 		t.Fatalf("body = %q, want null", body)
 	}
@@ -48,9 +46,7 @@ func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var got map[string]string
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
@@ -80,9 +76,7 @@ func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	var got map[string]string
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -108,9 +102,7 @@ func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	wantLibs := []string{"ch.qos.logback:logback-classic", "org.slf4j", "org.slf4j:slf4j-api"}
 	if len(st.listSBOMCompatRowsParams.Libs) != len(wantLibs) {
@@ -150,9 +142,7 @@ func TestSBOMCompatHandler_SupportsSingleColonLibraryNamesWithoutDot(t *testing.
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var got map[string]string
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
@@ -179,9 +169,7 @@ func TestSBOMCompatHandler_SupportsFloorForColonLibraryNamesWithoutDot(t *testin
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var got map[string]string
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
@@ -207,9 +195,7 @@ func TestSBOMCompatHandler_PrefersExactSingleColonLibraryName(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var got map[string]string
 	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
@@ -248,9 +234,7 @@ func TestSBOMCompatHandler_ValidatesInput(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want 400", rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
 }

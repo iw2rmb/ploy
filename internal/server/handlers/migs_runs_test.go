@@ -49,18 +49,10 @@ func TestModRuns_Create_AllRepos(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify store methods called.
 	if !st.getModCalled {
@@ -122,18 +114,10 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 			"mode": "failed",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify ListFailedRepoIDsByMig was called.
 	if !st.listFailedRepoIDsByModCalled {
@@ -200,18 +184,10 @@ func TestModRuns_Create_ExplicitRepos(t *testing.T) {
 			},
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify ListMigReposByMig was called for explicit matching.
 	if !st.listMigReposByModCalled {
@@ -256,18 +232,10 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 		},
 		"created_by": "test-user@example.com",
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify created_by was propagated to CreateRun.
 	if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != "test-user@example.com" {
@@ -300,18 +268,10 @@ func TestModRuns_Create_DoesNotCreateJobsImmediately(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	if st.createJobCallCount != 0 {
 		t.Fatalf("expected no jobs to be created during submission, got %d", st.createJobCallCount)
@@ -332,18 +292,10 @@ func TestModRuns_Create_InvalidMode(t *testing.T) {
 			"mode": "invalid",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 
 	// Store should not be called.
 	if st.getModCalled {
@@ -363,18 +315,10 @@ func TestModRuns_Create_ExplicitEmptyRepos(t *testing.T) {
 			"repos": []string{},
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestModRuns_Create_ModNotFound verifies POST /v1/migs/{mig_id}/runs returns 404 for missing mig.
@@ -390,18 +334,10 @@ func TestModRuns_Create_ModNotFound(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID+"/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", modID)
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID+"/runs", reqBody, "mig_id", modID)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 // TestModRuns_Create_ArchivedMod verifies POST /v1/migs/{mig_id}/runs rejects archived migs.
@@ -423,18 +359,10 @@ func TestModRuns_Create_ArchivedMod(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 }
 
 // TestModRuns_Create_NoSpec verifies POST /v1/migs/{mig_id}/runs rejects migs without a spec.
@@ -455,18 +383,10 @@ func TestModRuns_Create_NoSpec(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestModRuns_Create_NoReposSelected verifies POST /v1/migs/{mig_id}/runs returns error
@@ -497,18 +417,10 @@ func TestModRuns_Create_NoReposSelected(t *testing.T) {
 			"mode": "failed",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestModRuns_Create_InvalidJSON verifies POST /v1/migs/{mig_id}/runs rejects malformed JSON.
@@ -523,9 +435,7 @@ func TestModRuns_Create_InvalidJSON(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // =============================================================================
@@ -544,18 +454,10 @@ func TestModRuns_Create_GetMigError(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestModRuns_Create_ListModReposError verifies POST /v1/migs/{mig_id}/runs returns 500 on ListMigReposByMig failure.
@@ -581,18 +483,10 @@ func TestModRuns_Create_ListModReposError(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestModRuns_Create_CreateRunError verifies POST /v1/migs/{mig_id}/runs returns 500 on CreateRun failure.
@@ -621,18 +515,10 @@ func TestModRuns_Create_CreateRunError(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestModRuns_Create_CreateRunRepoError verifies POST /v1/migs/{mig_id}/runs returns 500 on CreateRunRepo failure.
@@ -661,18 +547,10 @@ func TestModRuns_Create_CreateRunRepoError(t *testing.T) {
 			"mode": "all",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestModRuns_Create_ListFailedReposError verifies POST /v1/migs/{mig_id}/runs returns 500 on ListFailedRepoIDsByMig failure.
@@ -701,18 +579,10 @@ func TestModRuns_Create_ListFailedReposError(t *testing.T) {
 			"mode": "failed",
 		},
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/mod123/runs", bytes.NewReader(body))
-	req.SetPathValue("mig_id", "mod123")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func TestModRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
@@ -754,9 +624,7 @@ func TestModRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 	if st.createRunRepoCalled {
 		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
 	}

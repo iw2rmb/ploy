@@ -37,8 +37,6 @@ func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRep
 }
 
 func (m *mockStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
-	m.getModRepoCalled = true
-	m.getModRepoParam = id.String()
 	return m.getModRepoResult, m.getModRepoErr
 }
 
@@ -114,15 +112,11 @@ func (m *mockStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, e
 
 // DeleteMigRepo deletes a mod_repo by id.
 func (m *mockStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
-	m.deleteMigRepoCalled = true
-	m.deleteMigRepoParam = id.String()
 	return m.deleteMigRepoErr
 }
 
 // HasMigRepoHistory checks if a mod_repo has any historical executions.
 func (m *mockStore) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
-	m.hasModRepoHistoryCalled = true
-	m.hasModRepoHistoryParam = repoID.String()
 	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
 }
 

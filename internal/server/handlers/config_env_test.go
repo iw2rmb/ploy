@@ -25,14 +25,9 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
-	var resp []globalEnvListItem
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[[]globalEnvListItem](t, rr)
 
 	if len(resp) != 2 {
 		t.Fatalf("got %d entries, want 2", len(resp))
@@ -64,20 +59,11 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 	handler := getGlobalEnvHandler(holder)
 
 	// Create a request with path value set.
-	req := httptest.NewRequest(http.MethodGet, "/v1/config/env/CODEX_AUTH_JSON", nil)
-	req.SetPathValue("key", "CODEX_AUTH_JSON")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/CODEX_AUTH_JSON", nil, "key", "CODEX_AUTH_JSON")
 
-	handler.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusOK)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
-
-	var resp globalEnvResponse
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[globalEnvResponse](t, rr)
 
 	// Value should be returned for admin access.
 	if resp.Key != "CODEX_AUTH_JSON" {
@@ -100,15 +86,9 @@ func TestConfigEnvGetNotFound(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := getGlobalEnvHandler(holder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/config/env/NONEXISTENT", nil)
-	req.SetPathValue("key", "NONEXISTENT")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/NONEXISTENT", nil, "key", "NONEXISTENT")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 // TestConfigEnvPutUpsertsEntry verifies PUT /v1/config/env/{key}
@@ -124,18 +104,10 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 		"scope":  "all",
 		"secret": true,
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/env/CA_CERTS_PEM_BUNDLE", bytes.NewReader(body))
-	req.SetPathValue("key", "CA_CERTS_PEM_BUNDLE")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/CA_CERTS_PEM_BUNDLE", reqBody, "key", "CA_CERTS_PEM_BUNDLE")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store was called.
 	if !st.upsertGlobalEnvCalled {
@@ -168,18 +140,10 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 		"value": "test-value",
 		"scope": "migs",
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/env/TEST_KEY", bytes.NewReader(body))
-	req.SetPathValue("key", "TEST_KEY")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify secret defaults to true.
 	if !st.upsertGlobalEnvParams.Secret {
@@ -203,18 +167,10 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 		"value": "test",
 		"scope": "invalid-scope",
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/env/TEST_KEY", bytes.NewReader(body))
-	req.SetPathValue("key", "TEST_KEY")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 
 	// Store should not be called.
 	if st.upsertGlobalEnvCalled {
@@ -232,15 +188,9 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 
 	handler := deleteGlobalEnvHandler(holder, st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/config/env/OLD_KEY", nil)
-	req.SetPathValue("key", "OLD_KEY")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY", nil, "key", "OLD_KEY")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNoContent)
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify store was called.
 	if !st.deleteGlobalEnvCalled {
@@ -357,9 +307,7 @@ func TestConfigEnvPutInvalidJSON(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestConfigEnvPutStoreError verifies that store errors return 500.
@@ -372,18 +320,10 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 	handler := putGlobalEnvHandler(holder, st)
 
 	reqBody := map[string]any{"value": "test", "scope": "all"}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/env/TEST", bytes.NewReader(body))
-	req.SetPathValue("key", "TEST")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST", reqBody, "key", "TEST")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 
 	// Holder should not be updated on store failure.
 	if _, ok := holder.GetGlobalEnvVar("TEST"); ok {
@@ -402,15 +342,9 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 
 	handler := deleteGlobalEnvHandler(holder, st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/config/env/OLD_KEY", nil)
-	req.SetPathValue("key", "OLD_KEY")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY", nil, "key", "OLD_KEY")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 
 	// Holder should not be updated on store failure.
 	if _, ok := holder.GetGlobalEnvVar("OLD_KEY"); !ok {

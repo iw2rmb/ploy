@@ -12,8 +12,6 @@ import (
 // mockStore is a minimal Store implementation for testing handlers.
 type mockStore struct {
 	store.Store
-	updateCertMetadataCalled bool
-	updateCertMetadataParams store.UpdateNodeCertMetadataParams
 	updateCertMetadataErr    error
 
 	// v1 migs/specs/mig_repos tracking (used by /v1/migs and /v1/runs handlers)
@@ -63,8 +61,6 @@ type mockStore struct {
 	createMigRepoResult store.MigRepo
 	createMigRepoErr    error
 
-	getModRepoCalled bool
-	getModRepoParam  string
 	getModRepoResult store.MigRepo
 	getModRepoErr    error
 
@@ -98,8 +94,6 @@ type mockStore struct {
 	getRunTimingResult store.RunsTiming
 	getRunTimingErr    error
 
-	listRunsTimingsCalled bool
-	listRunsTimingsParams store.ListRunsTimingsParams
 	listRunsTimingsResult []store.RunsTiming
 	listRunsTimingsErr    error
 
@@ -107,8 +101,6 @@ type mockStore struct {
 	deleteRunParams string
 	deleteRunErr    error
 
-	claimRunCalled bool
-	claimRunParams *string
 	claimRunResult store.Run
 	claimRunErr    error
 
@@ -126,8 +118,6 @@ type mockStore struct {
 	updateNodeHeartbeatParams store.UpdateNodeHeartbeatParams
 	updateNodeHeartbeatErr    error
 
-	createEventCalled bool
-	createEventParams store.CreateEventParams
 	createEventResult store.Event
 	createEventErr    error
 
@@ -142,19 +132,13 @@ type mockStore struct {
 	createDiffResult store.Diff
 	createDiffErr    error
 
-	createArtifactBundleCalled bool
-	createArtifactBundleParams store.CreateArtifactBundleParams
 	createArtifactBundleResult store.ArtifactBundle
 	createArtifactBundleErr    error
 
 	// AckRunStart tracking
-	ackRunStartCalled bool
-	ackRunStartParam  string
 	ackRunStartErr    error
 
 	// UpdateRunCompletion tracking
-	updateRunCompletionCalled bool
-	updateRunCompletionParams store.UpdateRunCompletionParams
 	updateRunCompletionErr    error
 
 	// UpdateRunStatus tracking
@@ -168,8 +152,6 @@ type mockStore struct {
 	cancelRunV1Err    error
 
 	// UpdateRunResume tracking (resume_count, last_resumed_at)
-	updateRunResumeCalled bool
-	updateRunResumeParam  string
 	updateRunResumeErr    error
 
 	// UpdateRunStatsMRURL tracking (MR URL propagation)
@@ -188,20 +170,14 @@ type mockStore struct {
 	listNodesErr    error
 
 	// ListArtifactBundlesByCID tracking
-	listArtifactBundlesByCIDCalled bool
-	listArtifactBundlesByCIDParams *string
 	listArtifactBundlesByCIDResult []store.ArtifactBundle
 	listArtifactBundlesByCIDErr    error
 
 	// ListArtifactBundlesMetaByCID tracking
-	listArtifactBundlesMetaByCIDCalled bool
-	listArtifactBundlesMetaByCIDParams *string
 	listArtifactBundlesMetaByCIDResult []store.ArtifactBundle
 	listArtifactBundlesMetaByCIDErr    error
 
 	// ListArtifactBundlesByRun tracking
-	listArtifactBundlesByRunCalled bool
-	listArtifactBundlesByRunParam  string
 	listArtifactBundlesByRunResult []store.ArtifactBundle
 	listArtifactBundlesByRunErr    error
 
@@ -212,31 +188,21 @@ type mockStore struct {
 	listArtifactBundlesMetaByRunErr    error
 
 	// GetArtifactBundle tracking
-	getArtifactBundleCalled bool
-	getArtifactBundleParams pgtype.UUID
 	getArtifactBundleResult store.ArtifactBundle
 	getArtifactBundleErr    error
 
 	// ListArtifactBundlesByRunAndJob tracking
-	listArtifactBundlesByRunAndJobCalled bool
-	listArtifactBundlesByRunAndJobParams store.ListArtifactBundlesByRunAndJobParams
 	listArtifactBundlesByRunAndJobResult []store.ArtifactBundle
 	listArtifactBundlesByRunAndJobErr    error
 
 	// ListArtifactBundlesMetaByRunAndJob tracking
-	listArtifactBundlesMetaByRunAndJobCalled bool
-	listArtifactBundlesMetaByRunAndJobParams store.ListArtifactBundlesMetaByRunAndJobParams
 	listArtifactBundlesMetaByRunAndJobResult []store.ArtifactBundle
 	listArtifactBundlesMetaByRunAndJobErr    error
 
 	// SBOM row query tracking
-	listSBOMRowsByJobCalled bool
-	listSBOMRowsByJobParam  types.JobID
 	listSBOMRowsByJobResult []store.Sbom
 	listSBOMRowsByJobErr    error
 
-	hasSBOMEvidenceForStackCalled bool
-	hasSBOMEvidenceForStackParams store.HasSBOMEvidenceForStackParams
 	hasSBOMEvidenceForStackResult bool
 	hasSBOMEvidenceForStackErr    error
 
@@ -277,20 +243,14 @@ type mockStore struct {
 	listJobsByRunRepoAttemptErr    error
 
 	// CountJobsByRun tracking
-	countJobsByRunCalled bool
-	countJobsByRunParam  string
 	countJobsByRunResult int64
 	countJobsByRunErr    error
 
 	// CountJobsByRunAndStatus tracking
-	countJobsByRunAndStatusCalled bool
-	countJobsByRunAndStatusParams store.CountJobsByRunAndStatusParams
 	countJobsByRunAndStatusResult int64
 	countJobsByRunAndStatusErr    error
 
 	// CountJobsByRunRepoAttemptGroupByStatus tracking (v1 repo-scoped progression)
-	countJobsByRunRepoAttemptGroupByStatusCalled bool
-	countJobsByRunRepoAttemptGroupByStatusParams store.CountJobsByRunRepoAttemptGroupByStatusParams
 	countJobsByRunRepoAttemptGroupByStatusResult []store.CountJobsByRunRepoAttemptGroupByStatusRow
 	countJobsByRunRepoAttemptGroupByStatusErr    error
 
@@ -347,23 +307,15 @@ type mockStore struct {
 	promoteJobByIDIfUnblockedErr    error
 
 	// PromoteReGateRecoveryCandidateGateProfile tracking
-	promoteReGateRecoveryCandidateGateProfileCalled bool
-	promoteReGateRecoveryCandidateGateProfileParams store.PromoteReGateRecoveryCandidateGateProfileParams
 	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
 	promoteReGateRecoveryCandidateGateProfileErr    error
 
-	resolveStackRowByImageCalled bool
-	resolveStackRowByImageParam  string
 	resolveStackRowByImageResult store.ResolveStackRowByImageRow
 	resolveStackRowByImageErr    error
 
-	resolveStackRowByLangToolCalled bool
-	resolveStackRowByLangToolParam  store.ResolveStackRowByLangToolParams
 	resolveStackRowByLangToolResult store.ResolveStackRowByLangToolRow
 	resolveStackRowByLangToolErr    error
 
-	resolveStackRowByLangToolReleaseCalled bool
-	resolveStackRowByLangToolReleaseParam  store.ResolveStackRowByLangToolReleaseParams
 	resolveStackRowByLangToolReleaseResult store.ResolveStackRowByLangToolReleaseRow
 	resolveStackRowByLangToolReleaseErr    error
 
@@ -377,13 +329,10 @@ type mockStore struct {
 	upsertGateJobProfileLinkErr    error
 
 	// UpdateJobNextID tracking
-	updateJobNextIDCalled bool
 	updateJobNextIDParams []store.UpdateJobNextIDParams
 	updateJobNextIDErr    error
 
 	// ListDiffsByRunRepo tracking (v1 repo-scoped diffs listing)
-	listDiffsByRunRepoCalled bool
-	listDiffsByRunRepoParams store.ListDiffsByRunRepoParams
 	listDiffsByRunRepoResult []store.Diff
 	listDiffsByRunRepoErr    error
 
@@ -400,60 +349,36 @@ type mockStore struct {
 	getDiffErr    error
 
 	// CreateLog tracking
-	createLogCalled bool
-	createLogParams store.CreateLogParams
 	createLogResult store.Log
 	createLogErr    error
 
 	// API Token tracking
-	insertAPITokenCalled bool
-	insertAPITokenParams store.InsertAPITokenParams
 	insertAPITokenErr    error
 
-	listAPITokensCalled bool
-	listAPITokensParams *string // cluster_id (nullable)
 	listAPITokensResult []store.ListAPITokensRow
 	listAPITokensErr    error
 
-	revokeAPITokenCalled bool
-	revokeAPITokenParam  string // token_id
 	revokeAPITokenErr    error
 
-	checkAPITokenRevokedCalled bool
-	checkAPITokenRevokedParam  string
 	checkAPITokenRevokedResult pgtype.Timestamptz
 	checkAPITokenRevokedErr    error
 
-	updateAPITokenLastUsedCalled bool
-	updateAPITokenLastUsedParam  string
 	updateAPITokenLastUsedErr    error
 
 	// Bootstrap Token tracking
-	insertBootstrapTokenCalled bool
-	insertBootstrapTokenParams store.InsertBootstrapTokenParams
 	insertBootstrapTokenErr    error
 
-	getBootstrapTokenCalled bool
-	getBootstrapTokenParam  string
 	getBootstrapTokenResult store.GetBootstrapTokenRow
 	getBootstrapTokenErr    error
 
-	checkBootstrapTokenRevokedCalled bool
-	checkBootstrapTokenRevokedParam  string
 	checkBootstrapTokenRevokedResult pgtype.Timestamptz
 	checkBootstrapTokenRevokedErr    error
 
-	updateBootstrapTokenLastUsedCalled bool
-	updateBootstrapTokenLastUsedParam  string
 	updateBootstrapTokenLastUsedErr    error
 
-	markBootstrapTokenUsedCalled bool
-	markBootstrapTokenUsedParam  string
 	markBootstrapTokenUsedErr    error
 
 	// ListRuns tracking (for batch run handlers)
-	listRunsCalled bool
-	listRunsParams store.ListRunsParams
 	listRunsResult []store.Run
 	listRunsErr    error
 
@@ -469,8 +394,6 @@ type mockStore struct {
 	listStaleRunningJobsResult []store.ListStaleRunningJobsRow
 	listStaleRunningJobsErr    error
 
-	countStaleNodesWithRunningJobsCalled bool
-	countStaleNodesWithRunningJobsParam  pgtype.Timestamptz
 	countStaleNodesWithRunningJobsResult int64
 	countStaleNodesWithRunningJobsErr    error
 
@@ -480,8 +403,6 @@ type mockStore struct {
 	cancelActiveJobsByRunRepoAttemptErr    error
 
 	// CountRunReposByStatus tracking — run IDs are now strings (KSUID).
-	countRunReposByStatusCalled bool
-	countRunReposByStatusParam  string
 	countRunReposByStatusResult []store.CountRunReposByStatusRow
 	countRunReposByStatusErr    error
 
@@ -526,13 +447,9 @@ type mockStore struct {
 	upsertModRepoErr    error
 
 	// DeleteMigRepo tracking
-	deleteMigRepoCalled bool
-	deleteMigRepoParam  string
 	deleteMigRepoErr    error
 
 	// HasMigRepoHistory tracking (for delete validation)
-	hasModRepoHistoryCalled bool
-	hasModRepoHistoryParam  string
 	hasModRepoHistoryResult bool
 	hasModRepoHistoryErr    error
 
@@ -586,18 +503,13 @@ type mockStore struct {
 	listRunsForRepoErr    error
 
 	// SpecBundle tracking
-	createSpecBundleCalled bool
 	createSpecBundleParams store.CreateSpecBundleParams
 	createSpecBundleResult store.SpecBundle
 	createSpecBundleErr    error
 
-	getSpecBundleCalled bool
-	getSpecBundleParam  string
 	getSpecBundleResult store.SpecBundle
 	getSpecBundleErr    error
 
-	getSpecBundleByCIDCalled bool
-	getSpecBundleByCIDParam  string
 	getSpecBundleByCIDResult store.SpecBundle
 	getSpecBundleByCIDErr    error
 
@@ -609,8 +521,6 @@ type mockStore struct {
 	updateSpecBundleLastRefAtDone    chan struct{}
 	updateSpecBundleLastRefAtCtxErr  error
 
-	deleteSpecBundleCalled bool
-	deleteSpecBundleParam  string
 	deleteSpecBundleErr    error
 
 	// UpdateMigRepoRefs tracking
@@ -619,12 +529,9 @@ type mockStore struct {
 	updateMigRepoRefsErr    error
 
 	// Global Env tracking (config_env table; see docs/envs/README.md#Global Env Configuration)
-	listGlobalEnvCalled bool
 	listGlobalEnvResult []store.ConfigEnv
 	listGlobalEnvErr    error
 
-	getGlobalEnvCalled bool
-	getGlobalEnvParam  string
 	getGlobalEnvResult store.ConfigEnv
 	getGlobalEnvErr    error
 
@@ -638,8 +545,6 @@ type mockStore struct {
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
-	m.updateCertMetadataCalled = true
-	m.updateCertMetadataParams = params
 	return m.updateCertMetadataErr
 }
 
@@ -656,8 +561,6 @@ func (m *mockStore) UpdateNodeHeartbeat(ctx context.Context, params store.Update
 }
 
 func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
-	m.createEventCalled = true
-	m.createEventParams = params
 	return m.createEventResult, m.createEventErr
 }
 

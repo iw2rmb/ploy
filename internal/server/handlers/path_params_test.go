@@ -26,9 +26,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 
 		h.ServeHTTP(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-		}
+		assertStatus(t, rr, http.StatusBadRequest)
 		if st.getRunCalled {
 			t.Fatalf("expected no store calls, but GetRun was called")
 		}
@@ -46,9 +44,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 
 		h.ServeHTTP(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-		}
+		assertStatus(t, rr, http.StatusBadRequest)
 		if st.getRunCalled {
 			t.Fatalf("expected no store calls, but GetRun was called")
 		}
@@ -68,9 +64,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 
 		h.ServeHTTP(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-		}
+		assertStatus(t, rr, http.StatusBadRequest)
 		if st.getRunCalled || st.getJobCalled || st.createDiffCalled {
 			t.Fatalf("expected no store calls, but got GetRun=%v GetJob=%v CreateDiff=%v", st.getRunCalled, st.getJobCalled, st.createDiffCalled)
 		}
@@ -88,9 +82,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 
 		h.ServeHTTP(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-		}
+		assertStatus(t, rr, http.StatusBadRequest)
 		if st.getModCalled || st.createRunCalled {
 			t.Fatalf("expected no store calls, but got GetMig=%v CreateRun=%v", st.getModCalled, st.createRunCalled)
 		}
@@ -108,9 +100,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 
 		h.ServeHTTP(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-		}
+		assertStatus(t, rr, http.StatusBadRequest)
 		if st.listRunsForRepoCalled {
 			t.Fatalf("expected no store calls, but ListRunsForRepo was called")
 		}
@@ -128,9 +118,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 
 		h.ServeHTTP(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-		}
+		assertStatus(t, rr, http.StatusBadRequest)
 		if st.getNodeCalled || st.updateNodeHeartbeatCalled {
 			t.Fatalf("expected no store calls, but got GetNode=%v UpdateNodeHeartbeat=%v", st.getNodeCalled, st.updateNodeHeartbeatCalled)
 		}

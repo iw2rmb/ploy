@@ -26,9 +26,7 @@ func TestListReposHandler_Success_Empty(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Repos []RepoSummary `json:"repos"`
@@ -74,9 +72,7 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Repos []RepoSummary `json:"repos"`
@@ -120,9 +116,7 @@ func TestListReposHandler_WithFilter(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if st.listDistinctReposParam != "org/project" {
 		t.Fatalf("expected filter 'org/project', got %q", st.listDistinctReposParam)
 	}
@@ -140,9 +134,7 @@ func TestListReposHandler_StoreError(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func TestListRunsForRepoHandler_Success(t *testing.T) {
@@ -169,14 +161,9 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	handler := listRunsForRepoHandler(st)
 
 	repoID := "repo_123"
-	req := httptest.NewRequest(http.MethodGet, "/v1/repos/"+repoID+"/runs", nil)
-	req.SetPathValue("repo_id", repoID)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/repos/"+repoID+"/runs", nil, "repo_id", repoID)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Runs []RepoRunSummary `json:"runs"`
@@ -234,14 +221,9 @@ func TestListRunsForRepoHandler_WithPagination(t *testing.T) {
 	handler := listRunsForRepoHandler(st)
 
 	repoID := "repo_123"
-	req := httptest.NewRequest(http.MethodGet, "/v1/repos/"+repoID+"/runs?limit=25&offset=10", nil)
-	req.SetPathValue("repo_id", repoID)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/repos/"+repoID+"/runs?limit=25&offset=10", nil, "repo_id", repoID)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	if st.listRunsForRepoParams.Limit != 25 {
 		t.Fatalf("expected limit 25, got %d", st.listRunsForRepoParams.Limit)
@@ -267,14 +249,9 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 			st := &mockStore{listRunsForRepoErr: errors.New("should not be called")}
 			handler := listRunsForRepoHandler(st)
 
-			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
-			req.SetPathValue("repo_id", "repo_123")
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
+			rr := doRequest(t, handler, http.MethodGet, tc.url, nil, "repo_id", "repo_123")
 
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
 }
@@ -285,12 +262,7 @@ func TestListRunsForRepoHandler_MissingRepoID(t *testing.T) {
 	st := &mockStore{listRunsForRepoErr: errors.New("should not be called")}
 	handler := listRunsForRepoHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/repos//runs", nil)
-	req.SetPathValue("repo_id", "")
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/repos//runs", nil, "repo_id", "")
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }

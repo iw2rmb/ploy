@@ -36,9 +36,7 @@ func TestMods_Create_Success(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify store was called with correct params.
 	if !st.createMigCalled {
@@ -89,9 +87,7 @@ func TestMods_Create_WithSpec(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify both mig and spec were created.
 	if !st.createMigCalled {
@@ -118,136 +114,36 @@ func TestMods_Create_WithSpec(t *testing.T) {
 	}
 }
 
-// TestMods_Create_EmptyName verifies POST /v1/migs rejects empty name.
-func TestMods_Create_EmptyName(t *testing.T) {
-	st := &mockStore{}
-	handler := createMigHandler(st)
-
-	reqBody := map[string]any{"name": ""}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+// TestMods_Create_ErrorPaths verifies POST /v1/migs rejects invalid input and
+// returns appropriate error status codes.
+func TestMods_Create_ErrorPaths(t *testing.T) {
+	tests := []struct {
+		name       string
+		store      *mockStore
+		body       any
+		wantStatus int
+		wantNoCalls bool // if true, createMigCalled must be false
+	}{
+		{name: "empty name", store: &mockStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "invalid name (spaces)", store: &mockStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "invalid JSON", store: &mockStore{}, body: "not json", wantStatus: http.StatusBadRequest},
+		{name: "invalid spec (legacy)", store: &mockStore{}, body: map[string]any{
+			"name": "mig-invalid-spec",
+			"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
+		}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "duplicate name", store: &mockStore{createMigErr: &pgconn.PgError{Code: "23505"}}, body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
+		{name: "store error", store: &mockStore{createMigErr: errors.New("database connection failed")}, body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},
 	}
 
-	// Store should not be called.
-	if st.createMigCalled {
-		t.Error("store.CreateMig should not be called for empty name")
-	}
-}
-
-func TestMods_Create_InvalidName(t *testing.T) {
-	st := &mockStore{}
-	handler := createMigHandler(st)
-
-	reqBody := map[string]any{"name": "my mig"}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
-	if st.createMigCalled {
-		t.Error("store.CreateMig should not be called for invalid name")
-	}
-}
-
-// TestMods_Create_DuplicateName verifies POST /v1/migs returns 409 for duplicate name.
-// Mig names must be unique.
-func TestMods_Create_DuplicateName(t *testing.T) {
-	// Simulate unique constraint violation (PostgreSQL error code 23505).
-	st := &mockStore{
-		createMigErr: &pgconn.PgError{Code: "23505"},
-	}
-	handler := createMigHandler(st)
-
-	reqBody := map[string]any{"name": "existing-mig"}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
-	}
-}
-
-// TestMods_Create_InvalidJSON verifies POST /v1/migs rejects malformed JSON.
-func TestMods_Create_InvalidJSON(t *testing.T) {
-	st := &mockStore{}
-	handler := createMigHandler(st)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader([]byte("not json")))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
-}
-
-// TestMods_Create_InvalidSpec verifies POST /v1/migs rejects invalid spec JSON.
-// Legacy spec shapes (with top-level "mig" key) are rejected per
-// internal/workflow/contracts/mods_spec.go:402-404.
-func TestMods_Create_InvalidSpec(t *testing.T) {
-	st := &mockStore{}
-	handler := createMigHandler(st)
-
-	// Legacy spec shape with "mig" key is explicitly rejected.
-	reqBody := map[string]any{
-		"name": "mig-invalid-spec",
-		"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
-	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
-	if st.createMigCalled {
-		t.Error("store.CreateMig should not be called for invalid spec")
-	}
-}
-
-// TestMods_Create_StoreError verifies POST /v1/migs returns 500 on store error.
-func TestMods_Create_StoreError(t *testing.T) {
-	st := &mockStore{
-		createMigErr: errors.New("database connection failed"),
-	}
-	handler := createMigHandler(st)
-
-	reqBody := map[string]any{"name": "test-mig"}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler := createMigHandler(tt.store)
+			rr := doJSON(t, handler, http.MethodPost, "/v1/migs", tt.body)
+			assertStatus(t, rr, tt.wantStatus)
+			if tt.wantNoCalls && tt.store.createMigCalled {
+				t.Error("store.CreateMig should not be called")
+			}
+		})
 	}
 }
 
@@ -272,9 +168,7 @@ func TestMods_List_Success(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Migs []struct {
@@ -305,9 +199,7 @@ func TestMods_List_WithPagination(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store received correct params.
 	if !st.listMigsCalled {
@@ -331,9 +223,7 @@ func TestMods_List_WithNameFilter(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store received name filter.
 	if st.listMigsParams.NameFilter == nil {
@@ -365,9 +255,7 @@ func TestMods_List_ArchivedFilter(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			if rr.Code != http.StatusOK {
-				t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-			}
+			assertStatus(t, rr, http.StatusOK)
 
 			if st.listMigsParams.ArchivedOnly == nil {
 				t.Fatal("ArchivedOnly is nil")
@@ -379,33 +267,20 @@ func TestMods_List_ArchivedFilter(t *testing.T) {
 	}
 }
 
-// TestMods_List_InvalidLimit verifies GET /v1/migs rejects invalid limit.
-func TestMods_List_InvalidLimit(t *testing.T) {
-	st := &mockStore{}
-	handler := listMigsHandler(st)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs?limit=notanumber", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+// TestMods_List_InvalidQueryParams verifies GET /v1/migs rejects invalid query params.
+func TestMods_List_InvalidQueryParams(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+	}{
+		{name: "invalid limit", query: "limit=notanumber"},
+		{name: "invalid archived", query: "archived=notabool"},
 	}
-}
-
-// TestMods_List_InvalidArchived verifies GET /v1/migs rejects invalid archived value.
-func TestMods_List_InvalidArchived(t *testing.T) {
-	st := &mockStore{}
-	handler := listMigsHandler(st)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs?archived=notabool", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := doJSON(t, listMigsHandler(&mockStore{}), http.MethodGet, "/v1/migs?"+tt.query, nil)
+			assertStatus(t, rr, http.StatusBadRequest)
+		})
 	}
 }
 
@@ -434,9 +309,7 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Migs []struct {
@@ -482,9 +355,7 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Migs []struct {
@@ -514,9 +385,7 @@ func TestMods_List_StoreError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // =============================================================================
@@ -532,15 +401,9 @@ func TestMods_Delete_Success(t *testing.T) {
 	}
 	handler := deleteMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/mod123", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/mod123", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNoContent, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify store methods called.
 	if !st.getModCalled {
@@ -561,15 +424,9 @@ func TestMods_Delete_NotFound(t *testing.T) {
 	}
 	handler := deleteMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/nonexistent", nil)
-	req.SetPathValue("mig_ref", "nonexistent")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/nonexistent", nil, "mig_ref", "nonexistent")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 
 	// DeleteMig should not be called.
 	if st.deleteMigCalled {
@@ -589,15 +446,9 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 	}
 	handler := deleteMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/mod123", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/mod123", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 
 	// DeleteMig should not be called.
 	if st.deleteMigCalled {
@@ -614,15 +465,9 @@ func TestMods_Delete_ByName(t *testing.T) {
 	}
 	handler := deleteMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/my-mig", nil)
-	req.SetPathValue("mig_ref", "my-mig")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/my-mig", nil, "mig_ref", "my-mig")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusNoContent, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 	if !st.getModByNameCalled {
 		t.Error("store.GetMigByName was not called")
 	}
@@ -639,15 +484,9 @@ func TestMods_Delete_StoreError(t *testing.T) {
 	}
 	handler := deleteMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/migs/mod123", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/mod123", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // =============================================================================

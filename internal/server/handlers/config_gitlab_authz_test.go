@@ -50,9 +50,7 @@ func TestConfigGitLab_AdminOnly(t *testing.T) {
 				rr := httptest.NewRecorder()
 				srv.Handler().ServeHTTP(rr, req)
 
-				if rr.Code != http.StatusForbidden {
-					t.Errorf("control-plane: got %d, want %d", rr.Code, http.StatusForbidden)
-				}
+				assertStatus(t, rr, http.StatusForbidden)
 			})
 
 			// Worker callers should be forbidden.
@@ -72,9 +70,7 @@ func TestConfigGitLab_AdminOnly(t *testing.T) {
 				rr := httptest.NewRecorder()
 				srv.Handler().ServeHTTP(rr, req)
 
-				if rr.Code != http.StatusForbidden {
-					t.Errorf("worker: got %d, want %d", rr.Code, http.StatusForbidden)
-				}
+				assertStatus(t, rr, http.StatusForbidden)
 			})
 
 			// CLI admin callers should be allowed (not forbidden).

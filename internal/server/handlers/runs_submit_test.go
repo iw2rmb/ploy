@@ -46,9 +46,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify store methods were called in order.
 	if !st.createSpecCalled {
@@ -126,9 +124,7 @@ func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	if st.createJobCallCount != 0 {
 		t.Fatalf("expected no jobs to be created during submission, got %d", st.createJobCallCount)
@@ -162,9 +158,7 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify mod_repo was created with normalized URL.
 	if !st.createMigRepoCalled {
@@ -200,9 +194,7 @@ func TestRunsCreateSingleRepo_MissingRepoURL(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 
 	// Store should not be called.
 	if st.createSpecCalled {
@@ -236,9 +228,7 @@ func TestRunsCreateSingleRepo_InvalidRepoURLScheme(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestRunsCreateSingleRepo_MissingBaseRef verifies POST /v1/runs rejects missing base_ref.
@@ -264,9 +254,7 @@ func TestRunsCreateSingleRepo_MissingBaseRef(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestRunsCreateSingleRepo_MissingTargetRef verifies POST /v1/runs rejects missing target_ref.
@@ -292,9 +280,7 @@ func TestRunsCreateSingleRepo_MissingTargetRef(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestRunsCreateSingleRepo_MissingSpec verifies POST /v1/runs rejects missing spec.
@@ -315,9 +301,7 @@ func TestRunsCreateSingleRepo_MissingSpec(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestRunsCreateSingleRepo_InvalidSpec verifies POST /v1/runs rejects invalid spec.
@@ -340,9 +324,7 @@ func TestRunsCreateSingleRepo_InvalidSpec(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 
 	// Store should not be called.
 	if st.createSpecCalled {
@@ -361,9 +343,7 @@ func TestRunsCreateSingleRepo_InvalidJSON(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestRunsCreateSingleRepo_WithCreatedBy verifies POST /v1/runs accepts optional created_by.
@@ -392,9 +372,7 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	// Verify created_by was propagated to store calls.
 	if st.createSpecParams.CreatedBy == nil || *st.createSpecParams.CreatedBy != "test-user@example.com" {
@@ -437,9 +415,7 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusCreated, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	if st.createJobCallCount != 0 {
 		t.Errorf("createJobCallCount = %d, want 0", st.createJobCallCount)
@@ -476,9 +452,7 @@ func TestRunsCreateSingleRepo_CreateSpecError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestRunsCreateSingleRepo_CreateMigError verifies POST /v1/runs returns 500 on CreateMig failure.
@@ -507,9 +481,7 @@ func TestRunsCreateSingleRepo_CreateMigError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestRunsCreateSingleRepo_CreateMigRepoError verifies POST /v1/runs returns 500 on CreateMigRepo failure.
@@ -538,9 +510,7 @@ func TestRunsCreateSingleRepo_CreateMigRepoError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestRunsCreateSingleRepo_CreateRunError verifies POST /v1/runs returns 500 on CreateRun failure.
@@ -569,9 +539,7 @@ func TestRunsCreateSingleRepo_CreateRunError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestRunsCreateSingleRepo_CreateRunRepoError verifies POST /v1/runs returns 500 on CreateRunRepo failure.
@@ -600,9 +568,7 @@ func TestRunsCreateSingleRepo_CreateRunRepoError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
@@ -632,9 +598,7 @@ func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusBadRequest, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 	if st.createRunRepoCalled {
 		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
 	}

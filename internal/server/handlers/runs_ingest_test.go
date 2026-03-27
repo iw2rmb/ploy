@@ -60,9 +60,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 	if ms.lastCreate.RunID != runID {
 		t.Fatalf("runID mismatch")
 	}
@@ -86,9 +84,7 @@ func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("want 413 got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusRequestEntityTooLarge)
 }
 
 // ----- run diffs -----
@@ -127,9 +123,7 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 }
 
 // ----- run artifacts -----
@@ -183,9 +177,7 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	req.Header.Set(nodeUUIDHeader, nodeIDStr)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 }
 
 func TestCreateMigArtifactBundleHandler_Success(t *testing.T) {

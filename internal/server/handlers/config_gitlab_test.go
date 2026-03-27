@@ -24,9 +24,7 @@ func TestConfigGitLabGetReturnsCurrentConfig(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Domain string `json:"domain"`
@@ -68,9 +66,7 @@ func TestConfigGitLabPutUpdatesConfig(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Domain string `json:"domain"`
@@ -109,9 +105,7 @@ func TestConfigGitLabPutInvalidJSON(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want %d", rr.Code, http.StatusBadRequest)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestConfigGitLabRoundTrip verifies that PUT followed by GET returns the same values.

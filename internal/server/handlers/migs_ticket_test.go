@@ -66,9 +66,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	var resp struct {
 		RunID  string `json:"run_id"`
@@ -451,9 +449,7 @@ func TestCreateSingleRepoRunHandler_MissingFields(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 			if !strings.Contains(rr.Body.String(), tc.err) {
 				t.Fatalf("expected error %q, got: %s", tc.err, rr.Body.String())
 			}
@@ -472,9 +468,7 @@ func TestCreateSingleRepoRunHandler_InvalidJSON(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 	if !strings.Contains(rr.Body.String(), "invalid request") {
 		t.Fatalf("expected 'invalid request' error, got: %s", rr.Body.String())
 	}
@@ -510,9 +504,7 @@ func TestCreateSingleRepoRunHandler_InvalidRepoURL(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("expected status 400, got %d", rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 			if !strings.Contains(rr.Body.String(), tc.errMsg) {
 				t.Fatalf("expected error %q, got: %s", tc.errMsg, rr.Body.String())
 			}
@@ -550,9 +542,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 
 	var resp struct {
 		RunID string `json:"run_id"`
@@ -612,9 +602,7 @@ func TestCreateSingleRepoRunHandler_MultiStepDefersJobCreation(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 	if st.createJobCallCount != 0 {
 		t.Fatalf("expected no jobs on submission, got %d", st.createJobCallCount)
 	}
@@ -651,20 +639,11 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	}
 
 	handler := getRunStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runIDStr+"/status", nil)
-	req.SetPathValue("id", runIDStr)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runIDStr+"/status", nil, "id", runIDStr)
 
-	handler.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusOK)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp modsapi.RunSummary
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[modsapi.RunSummary](t, rr)
 
 	if resp.RunID.String() != runIDStr {
 		t.Fatalf("expected run_id %s, got %s", runIDStr, resp.RunID.String())
@@ -706,15 +685,9 @@ func TestGetRunStatusHandler_NotFound(t *testing.T) {
 	}
 
 	handler := getRunStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/status", nil)
-	req.SetPathValue("id", runID)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID+"/status", nil, "id", runID)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 	if !strings.Contains(rr.Body.String(), "not found") {
 		t.Fatalf("expected 'not found' error, got: %s", rr.Body.String())
 	}
@@ -726,15 +699,9 @@ func TestGetRunStatusHandler_EmptyID(t *testing.T) {
 	st := &mockStore{}
 	handler := getRunStatusHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs//status", nil)
-	req.SetPathValue("id", "")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs//status", nil, "id", "")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 	if !strings.Contains(rr.Body.String(), "path parameter is required") {
 		t.Fatalf("expected required path parameter error, got: %s", rr.Body.String())
 	}
