@@ -9,6 +9,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/gateprofile"
 )
 
 func mergeRepoGateProfileIntoSpec(spec json.RawMessage, gateProfile []byte, jobType domaintypes.JobType) (json.RawMessage, error) {
@@ -37,7 +38,7 @@ func applyRepoGateProfileMutator(m map[string]any, gateProfile []byte, jobType d
 	if err != nil {
 		return err
 	}
-	phase, override, err := contracts.GateProfileGateOverrideForJobType(profile, jobType)
+	phase, override, err := gateprofile.GateOverrideForJobType(profile, jobType)
 	if err != nil {
 		return err
 	}
@@ -89,7 +90,7 @@ func applyRecoveryCandidatePrepMutator(m map[string]any, job store.Job, jobType 
 	if err != nil {
 		return fmt.Errorf("parse recovery candidate gate_profile: %w", err)
 	}
-	phase, override, err := contracts.GateProfileGateOverrideForJobType(profile, jobType)
+	phase, override, err := gateprofile.GateOverrideForJobType(profile, jobType)
 	if err != nil {
 		return err
 	}

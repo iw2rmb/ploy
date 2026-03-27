@@ -89,7 +89,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - Remaining explicit status assignments in `execution_orchestrator_gate.go` (gate infra error → `Cancelled`, gate result → `Fail`/`Success`) are deliberate semantic choices, not lifecycle-mirrorings: the gate infra path intentionally diverges from `JobStatusFromRunError` to force `Cancelled` regardless of error type, preventing healing activation on infrastructure failures.
     - 1.3 re-marked complete with structural evidence above; no dual-path branches remain in the listed components.
 
-- [ ] 2.1a Extract canonical gate-profile resolution service
+- [x] 2.1a Extract canonical gate-profile resolution service
   - Type: determined
   - Component: `internal/workflow/contracts/gate_profile.go`, `internal/workflow/gateprofile/service.go`
   - Implementation:
@@ -102,6 +102,11 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     2. Run `go test ./internal/... -run 'GateProfile|StackGate|BuildGate'`.
     3. Add structural proof in completion notes: removed old precedence helpers and service-owned precedence paths.
   - Reasoning: high (12 CFP)
+  - Structural proof:
+    - New canonical owner: `internal/workflow/gateprofile/service.go` with `GateOverrideForJobType` and `StackMatches` as the single owner of gate-profile override derivation and stack-matching precedence.
+    - Removed from contracts (rg `GateProfileGateOverrideForJobType\|GateProfileStackMatches\|gateProfileTargetToBuildGateOverride\|gateProfileRuntimeGateEnv\|defaultGateProfileDockerHostSocket` `internal/workflow/contracts/gate_profile.go` returns no match): all five symbols deleted.
+    - Adoption confirmed: `internal/server/handlers/claim_spec_mutator_gate.go` calls `gateprofile.GateOverrideForJobType` at both call sites; `internal/server/handlers/nodes_complete_healing_infra_candidate.go` calls `gateprofile.StackMatches`. No remaining `contracts.GateProfileGateOverrideForJobType` or `contracts.GateProfileStackMatches` references in codebase.
+    - Superseded tests removed: `gate_profile_test.go` in contracts no longer contains override/stack-match tests; table-driven coverage lives in `internal/workflow/gateprofile/service_test.go` (`TestGateOverrideForJobType` 11 cases, `TestStackMatches` 8 cases).
 
 - [ ] 2.1b Adopt canonical gate-profile service in server paths and delete server-local precedence logic
   - Type: determined
