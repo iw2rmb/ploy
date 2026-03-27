@@ -68,9 +68,6 @@ type model struct {
 	// selectedRunID tracks the run chosen in S4 for drill-down to S5.
 	selectedRunID domaintypes.RunID
 
-	// selectedJobID tracks the job chosen in S6.
-	selectedJobID domaintypes.JobID
-
 	// Selected entity flags control root PLOY item labels (plural vs singular).
 	hasSelectedMigration bool
 	hasSelectedRun       bool

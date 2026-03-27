@@ -125,6 +125,61 @@ func TestSelectedJobEmptyOnNoJobs(t *testing.T) {
 	}
 }
 
+func TestConfirmedJobIDDefaultsEmpty(t *testing.T) {
+	m := joblist.New("JOBS")
+	if id := m.ConfirmedJobID(); id != "" {
+		t.Errorf("ConfirmedJobID on new model: got %q, want empty", id)
+	}
+}
+
+func TestSetSelectedJobIDRoundTrip(t *testing.T) {
+	m := joblist.New("JOBS")
+	m = m.SetSelectedJobID(domaintypes.JobID("job-42"))
+	if got := m.ConfirmedJobID(); got != "job-42" {
+		t.Errorf("ConfirmedJobID: got %q, want %q", got, "job-42")
+	}
+}
+
+func TestSetSelectedJobIDCanBeCleared(t *testing.T) {
+	m := joblist.New("JOBS")
+	m = m.SetSelectedJobID(domaintypes.JobID("job-1"))
+	m = m.SetSelectedJobID("")
+	if id := m.ConfirmedJobID(); id != "" {
+		t.Errorf("ConfirmedJobID after clear: got %q, want empty", id)
+	}
+}
+
+func TestDetailsNilByDefault(t *testing.T) {
+	m := joblist.New("JOBS")
+	if m.Details() != nil {
+		t.Error("Details on new model: expected nil")
+	}
+}
+
+func TestSetDetailsRoundTrip(t *testing.T) {
+	m := joblist.New("JOBS")
+	item := &clitui.JobItem{JobID: domaintypes.JobID("job-99"), Name: "deploy"}
+	m = m.SetDetails(item)
+	got := m.Details()
+	if got == nil {
+		t.Fatal("Details: got nil, want non-nil")
+	}
+	if got.JobID != "job-99" {
+		t.Errorf("Details.JobID: got %q, want %q", got.JobID, "job-99")
+	}
+}
+
+func TestSetJobsClearsDetails(t *testing.T) {
+	m := joblist.New("JOBS")
+	m = m.SetDetails(&clitui.JobItem{JobID: domaintypes.JobID("job-1")})
+	m = m.SetJobs([]clitui.JobItem{
+		{Name: "other", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
+	})
+	if m.Details() != nil {
+		t.Error("SetJobs: expected Details() to be cleared, got non-nil")
+	}
+}
+
 func TestStatusGlyphTerminalStates(t *testing.T) {
 	successGlyph := joblist.StatusGlyph(domaintypes.JobStatusSuccess)
 	failGlyph := joblist.StatusGlyph(domaintypes.JobStatusFail)

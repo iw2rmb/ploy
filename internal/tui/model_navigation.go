@@ -49,7 +49,7 @@ func (m model) handleEnterFromMigrationsList() (tea.Model, tea.Cmd) {
 	m.selectedMigID = domaintypes.MigID(item.description)
 	m.selectedMigName = item.title
 	m.selectedRunID = ""
-	m.selectedJobID = ""
+	m.jobList = m.jobList.SetSelectedJobID("")
 	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
 		{title: m.selectedMigName, desc: m.selectedMigID.String()},
 		{title: "Runs", desc: "total: —"},
@@ -67,7 +67,7 @@ func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.selectedRunID = domaintypes.RunID(item.title)
-	m.selectedJobID = ""
+	m.jobList = m.jobList.SetSelectedJobID("")
 	m.selectedMigID = ""
 	m.selectedMigName = ""
 	m.resolveMigContext(m.selectedRunID)
@@ -87,7 +87,7 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	m.selectedJobID = selectedJob.JobID
+	m.jobList = m.jobList.SetSelectedJobID(selectedJob.JobID)
 	m.selectedRunID = selectedJob.RunID
 	m.selectedMigName = selectedJob.MigName
 	m.selectedMigID = ""
@@ -95,7 +95,7 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
 		{title: m.selectedMigName, desc: m.selectedMigID.String()},
 		{title: "Run", desc: m.selectedRunID.String()},
-		{title: "Job", desc: m.selectedJobID.String()},
+		{title: "Job", desc: m.jobList.ConfirmedJobID().String()},
 	}))
 	m.ploy.Select(2)
 	return m, nil
