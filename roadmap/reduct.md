@@ -108,7 +108,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - Adoption confirmed: `internal/server/handlers/claim_spec_mutator_gate.go` calls `gateprofile.GateOverrideForJobType` at both call sites; `internal/server/handlers/nodes_complete_healing_infra_candidate.go` calls `gateprofile.StackMatches`. No remaining `contracts.GateProfileGateOverrideForJobType` or `contracts.GateProfileStackMatches` references in codebase.
     - Superseded tests removed: `gate_profile_test.go` in contracts no longer contains override/stack-match tests; table-driven coverage lives in `internal/workflow/gateprofile/service_test.go` (`TestGateOverrideForJobType` 11 cases, `TestStackMatches` 8 cases).
 
-- [ ] 2.1b Adopt canonical gate-profile service in server paths and delete server-local precedence logic
+- [x] 2.1b Adopt canonical gate-profile service in server paths and delete server-local precedence logic
   - Type: determined
   - Component: `internal/server/handlers/gate_profile_resolver.go`, `internal/server/handlers/gate_profile_persistence.go`, `internal/workflow/gateprofile/service.go`
   - Implementation:
@@ -121,6 +121,12 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     2. Run `go test ./internal/... -run 'GateProfile|StackGate|BuildGate'`.
     3. Add structural proof in completion notes: removed server-local precedence symbols and canonical service call sites.
   - Reasoning: high (9 CFP)
+  - Structural proof:
+    - Removed `gateProfileResolverStackRow` from `gate_profile_resolver.go` (rg `gateProfileResolverStackRow` `internal/` returns no match).
+    - Removed inline precedence chain (`exact → latest → default`) from `ResolveGateProfileForJob`; replaced by `gateprofile.SelectProfile(exactCand, latestCand, defCand)`.
+    - Adoption confirmed: `gate_profile_resolver.go` calls `gateprofile.SelectProfile`, branches on `gateprofile.ProfilePrecedenceExact`, and constructs `*gateprofile.ProfileCandidate` from DB rows via `fetchExactCandidate`, `fetchLatestCandidate`, `fetchDefaultCandidate`.
+    - Consolidated duplicate stack row type: `gateProfileResolverStackRow` deleted; `gate_profile_resolver.go` now uses `gateProfileStackRow` (from `gate_profile_persistence.go`) throughout, including the `gateProfileResolverStore` interface and `sqlGateProfileResolverStore.ResolveStackRowByImage`.
+    - No dual precedence path remains in resolver: single call to `gateprofile.SelectProfile` owns the exact/latest/default ordering.
 
 - [ ] 2.1c Adopt canonical gate-profile service in nodeagent paths and delete nodeagent-local precedence logic
   - Type: determined
