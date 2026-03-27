@@ -15,7 +15,7 @@ import (
 
 type stubGateProfileResolverStore struct {
 	stackByImage    map[string]int64
-	stackRowByImage map[string]gateProfileResolverStackRow
+	stackRowByImage map[string]gateProfileStackRow
 	stackByRequired map[string]int64
 	anyStackID      int64
 	anyStackErr     error
@@ -57,15 +57,15 @@ func (s *stubGateProfileResolverStore) ResolveStackIDByImage(_ context.Context, 
 	return 0, pgx.ErrNoRows
 }
 
-func (s *stubGateProfileResolverStore) ResolveStackRowByImage(_ context.Context, image string) (gateProfileResolverStackRow, error) {
+func (s *stubGateProfileResolverStore) ResolveStackRowByImage(_ context.Context, image string) (gateProfileStackRow, error) {
 	s.resolveImageCall = image
 	if row, ok := s.stackRowByImage[image]; ok {
 		return row, nil
 	}
 	if stackID, ok := s.stackByImage[image]; ok {
-		return gateProfileResolverStackRow{ID: stackID}, nil
+		return gateProfileStackRow{ID: stackID}, nil
 	}
-	return gateProfileResolverStackRow{}, pgx.ErrNoRows
+	return gateProfileStackRow{}, pgx.ErrNoRows
 }
 
 func strictStackKey(language, tool, release string) string {
@@ -480,12 +480,12 @@ func TestGateProfileResolver_StrictToollessPrefersImageMatchedStack(t *testing.T
 	exactKey := "gate-profiles/strict-toolless.json"
 
 	st := &stubGateProfileResolverStore{
-		stackRowByImage: map[string]gateProfileResolverStackRow{
+		stackRowByImage: map[string]gateProfileStackRow{
 			"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11": {
-				ID:       3,
-				Language: "java",
-				Tool:     "gradle",
-				Release:  "11",
+				ID:      3,
+				Lang:    "java",
+				Tool:    "gradle",
+				Release: "11",
 			},
 		},
 		stackByRequired: map[string]int64{
@@ -541,12 +541,12 @@ func TestGateProfileResolver_StrictToollessImageMismatchSkipsFallbacks(t *testin
 	const shaIn = "0123456789abcdef0123456789abcdef01234567"
 
 	st := &stubGateProfileResolverStore{
-		stackRowByImage: map[string]gateProfileResolverStackRow{
+		stackRowByImage: map[string]gateProfileStackRow{
 			"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17": {
-				ID:       4,
-				Language: "java",
-				Tool:     "gradle",
-				Release:  "17",
+				ID:      4,
+				Lang:    "java",
+				Tool:    "gradle",
+				Release: "17",
 			},
 		},
 		repoSHAStackID: 7,
