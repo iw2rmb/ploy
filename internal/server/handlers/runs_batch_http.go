@@ -13,6 +13,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // cancelRunHandlerV1 returns an HTTP handler that cancels a v1 run.
@@ -35,7 +36,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 		}
 
 		// Idempotent: if already terminal, return current state.
-		if isTerminalRunStatus(run.Status) {
+		if lifecycle.IsTerminalRunStatus(run.Status) {
 			summary := runToSummary(run)
 			if counts, _ := getRunRepoCounts(r.Context(), st, run.ID); counts != nil && counts.Total > 0 {
 				summary.Counts = counts
@@ -228,7 +229,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		if isTerminalRunRepoStatus(rr.Status) {
+		if lifecycle.IsTerminalRunRepoStatus(rr.Status) {
 			repoURL := ""
 			if resolvedURL, err := repoURLForID(r.Context(), st, rr.RepoID); err == nil {
 				repoURL = resolvedURL
@@ -331,7 +332,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// If the run is terminal, reopen it to Started for the restart attempt.
-		if isTerminalRunStatus(run.Status) {
+		if lifecycle.IsTerminalRunStatus(run.Status) {
 			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: domaintypes.RunStatusStarted}); err != nil {
 				httpErr(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
 				return

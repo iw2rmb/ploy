@@ -15,6 +15,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // requiredPathParam extracts and validates a required path parameter from the request.
@@ -188,7 +189,7 @@ func getActiveRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, 
 	if !ok {
 		return store.Run{}, false
 	}
-	if isTerminalRunStatus(run.Status) {
+	if lifecycle.IsTerminalRunStatus(run.Status) {
 		httpErr(w, http.StatusConflict, "run is in terminal state")
 		return store.Run{}, false
 	}

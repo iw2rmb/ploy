@@ -6,11 +6,14 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // MaybeUpdateRunRepoStatus derives and persists run_repos.status from job outcomes.
@@ -69,7 +72,7 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 		return false, fmt.Errorf("count run repos: %w", err)
 	}
 
-	eval := EvaluateRunCompletionFromRepoCounts(counts)
+	eval := lifecycle.EvaluateRunCompletionFromRepoCounts(counts)
 	if !eval.ShouldFinish {
 		return false, nil
 	}
@@ -110,4 +113,11 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 
 	slog.Info("run completed", "run_id", runID, "status", domaintypes.RunStatusFinished)
 	return true, nil
+}
+
+func timeOrZero(ts pgtype.Timestamptz) time.Time {
+	if ts.Valid {
+		return ts.Time
+	}
+	return time.Time{}
 }

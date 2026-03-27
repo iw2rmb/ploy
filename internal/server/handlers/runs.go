@@ -12,27 +12,13 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // --- Batch types and helpers (from runs_batch_types.go) ---
 
 // NOTE: Run IDs in this file are KSUID-backed strings; run_repo IDs are NanoID(8)-backed strings.
 // Both are now string types in the store layer; no UUID parsing is needed.
-
-// Derived batch status constants exposed for API consumers.
-// These represent the batch-level state computed from repo statuses.
-const (
-	// DerivedStatusPending indicates no repos have started (all queued or no repos).
-	DerivedStatusPending = "pending"
-	// DerivedStatusRunning indicates at least one repo is currently running.
-	DerivedStatusRunning = "running"
-	// DerivedStatusCompleted indicates all repos finished with no failures.
-	DerivedStatusCompleted = "completed"
-	// DerivedStatusFailed indicates at least one repo failed (and none running).
-	DerivedStatusFailed = "failed"
-	// DerivedStatusCancelled indicates the batch was stopped and repos were cancelled.
-	DerivedStatusCancelled = "cancelled"
-)
 
 // runToSummary converts a store.Run to a RunSummary.
 // Wraps raw store strings in domain types for type-safe API output.
@@ -84,71 +70,11 @@ func getRunRepoCounts(ctx context.Context, st store.Store, runID domaintypes.Run
 	}
 
 	// Derive batch-level status from repo counts.
-	counts.DerivedStatus = deriveBatchStatus(counts)
+	counts.DerivedStatus = lifecycle.DeriveBatchStatus(counts)
 
 	return counts, nil
 }
 
-// deriveBatchStatus computes a single batch-level status from repo counts.
-// The precedence order is:
-//  1. cancelled — if any repo is cancelled (batch was explicitly stopped).
-//  2. running — if any repo is currently running.
-//  3. failed — if none running, and at least one repo failed.
-//  4. completed — if all repos are in terminal states (success/cancelled) with no failures.
-//  5. pending — if no repos have started yet (all pending, or no repos).
-func deriveBatchStatus(counts *domaintypes.RunRepoCounts) string {
-	// No repos in batch — treat as pending (batch has no work yet).
-	if counts.Total == 0 {
-		return DerivedStatusPending
-	}
-
-	// If any repo was cancelled, the batch was explicitly stopped.
-	// This takes precedence because it represents user intent to abort.
-	if counts.Cancelled > 0 {
-		return DerivedStatusCancelled
-	}
-
-	// If any repo is currently running, the batch is actively running.
-	if counts.Running > 0 {
-		return DerivedStatusRunning
-	}
-
-	// At this point, no repos are running or cancelled.
-	// Check if any repos failed — if so, the batch failed.
-	if counts.Fail > 0 {
-		return DerivedStatusFailed
-	}
-
-	terminalCount := counts.Success + counts.Fail + counts.Cancelled
-
-	// If all repos are in terminal state and none failed, batch completed successfully.
-	if terminalCount == counts.Total {
-		return DerivedStatusCompleted
-	}
-
-	// Some repos are still queued (not started), batch is pending/waiting.
-	return DerivedStatusPending
-}
-
-// isTerminalRunStatus returns true if the run status is terminal (no further transitions).
-func isTerminalRunStatus(status domaintypes.RunStatus) bool {
-	switch status {
-	case domaintypes.RunStatusFinished, domaintypes.RunStatusCancelled:
-		return true
-	default:
-		return false
-	}
-}
-
-// isTerminalRunRepoStatus returns true if the run repo status is terminal.
-func isTerminalRunRepoStatus(status domaintypes.RunRepoStatus) bool {
-	switch status {
-	case domaintypes.RunRepoStatusSuccess, domaintypes.RunRepoStatusFail, domaintypes.RunRepoStatusCancelled:
-		return true
-	default:
-		return false
-	}
-}
 
 // RunRepoResponse represents a single repo within a batch for API responses.
 // Exposes repo URL, refs, attempt count, status, error, and timing fields.
