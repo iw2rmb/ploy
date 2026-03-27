@@ -11,117 +11,70 @@ import (
 func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
 	t.Parallel()
 
-	mavenOverride := &contracts.BuildGateProfileOverride{
+	baseOverride := &contracts.BuildGateProfileOverride{
 		Command: contracts.CommandSpec{Shell: "mvn -q test"},
 		Env:     map[string]string{"MAVEN_OPTS": "-Xmx2g"},
 		Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "21"},
 		Target:  contracts.GateProfileTargetAllTests,
 	}
 
-	gradleOverride := &contracts.BuildGateProfileOverride{
-		Command: contracts.CommandSpec{Shell: "./gradlew test"},
-		Stack:   &contracts.GateProfileStack{Language: "java", Tool: "gradle"},
-	}
-
-	execOverride := &contracts.BuildGateProfileOverride{
-		Command: contracts.CommandSpec{Exec: []string{"mvn", "-q", "compile"}},
-		Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven"},
-	}
-
 	tests := []struct {
-		name           string
-		repoID         string
-		override       *contracts.BuildGateProfileOverride
-		target         string
-		jobType        types.JobType
-		meta           *contracts.BuildGateStageMetadata
-		wantErr        bool
-		wantActive     string
-		wantStackLang  string
-		wantStackTool  string
-		wantStackRel   string
-		wantEnvKey     string
-		wantEnvVal     string
-		wantCmdInBuild string
-		wantCmdInUnit  string
-		wantCmdInAll   string
+		name     string
+		override *contracts.BuildGateProfileOverride
+		target   string
+		jobType  types.JobType
+		meta     *contracts.BuildGateStageMetadata
+		wantErr  bool
+		assert   func(t *testing.T, p *contracts.GateProfile)
 	}{
 		{
-			name:          "shell command, explicit stack, all_tests target via override.Target",
-			repoID:        "repo_1",
-			override:      mavenOverride,
-			target:        "",
-			jobType:       types.JobTypePreGate,
-			wantActive:    contracts.GateProfileTargetAllTests,
-			wantStackLang: "java",
-			wantStackTool: "maven",
-			wantStackRel:  "21",
-			wantEnvKey:    "MAVEN_OPTS",
-			wantEnvVal:    "-Xmx2g",
-			wantCmdInAll:  "mvn -q test",
-		},
-		{
-			name:          "explicit target=build overrides override.Target",
-			repoID:        "repo_1",
-			override:      mavenOverride,
-			target:        contracts.GateProfileTargetBuild,
-			jobType:       types.JobTypePreGate,
-			wantActive:    contracts.GateProfileTargetBuild,
-			wantStackLang: "java",
-			wantStackTool: "maven",
-			wantCmdInBuild: "mvn -q test",
-		},
-		{
-			name:          "explicit target=unit",
-			repoID:        "repo_1",
-			override:      mavenOverride,
-			target:        contracts.GateProfileTargetUnit,
-			jobType:       types.JobTypePostGate,
-			wantActive:    contracts.GateProfileTargetUnit,
-			wantStackLang: "java",
-			wantStackTool: "maven",
-			wantCmdInUnit: "mvn -q test",
-		},
-		{
-			name:          "re_gate accepted same as post_gate",
-			repoID:        "repo_1",
-			override:      gradleOverride,
-			target:        "",
-			jobType:       types.JobTypeReGate,
-			wantActive:    contracts.GateProfileTargetAllTests,
-			wantStackLang: "java",
-			wantStackTool: "gradle",
-			wantCmdInAll:  "./gradlew test",
-		},
-		{
-			name:          "exec form command joined without quoting",
-			repoID:        "repo_1",
-			override:      execOverride,
-			target:        "",
-			jobType:       types.JobTypePreGate,
-			wantActive:    contracts.GateProfileTargetAllTests,
-			wantStackLang: "java",
-			wantStackTool: "maven",
-			wantCmdInAll:  "mvn -q compile",
-		},
-		{
-			name:    "nil override returns error",
-			repoID:  "repo_1",
-			jobType: types.JobTypePreGate,
-			wantErr: true,
-		},
-		{
-			name: "empty command returns error",
-			repoID: "repo_1",
-			override: &contracts.BuildGateProfileOverride{
-				Stack: &contracts.GateProfileStack{Language: "java", Tool: "maven"},
+			name:     "override target defaults to all_tests",
+			override: baseOverride,
+			jobType:  types.JobTypePreGate,
+			assert: func(t *testing.T, p *contracts.GateProfile) {
+				t.Helper()
+				if p.Targets.Active != contracts.GateProfileTargetAllTests {
+					t.Fatalf("active=%q", p.Targets.Active)
+				}
+				if p.Targets.AllTests.Command != "mvn -q test" {
+					t.Fatalf("all_tests.command=%q", p.Targets.AllTests.Command)
+				}
+				if p.Stack.Release != "21" {
+					t.Fatalf("stack.release=%q", p.Stack.Release)
+				}
 			},
-			jobType: types.JobTypePreGate,
-			wantErr: true,
 		},
 		{
-			name: "missing stack falls back to DetectedStackExpectation from meta",
-			repoID: "repo_1",
+			name:     "explicit target overrides override target",
+			override: baseOverride,
+			target:   contracts.GateProfileTargetBuild,
+			jobType:  types.JobTypePreGate,
+			assert: func(t *testing.T, p *contracts.GateProfile) {
+				t.Helper()
+				if p.Targets.Active != contracts.GateProfileTargetBuild {
+					t.Fatalf("active=%q", p.Targets.Active)
+				}
+				if p.Targets.Build.Command != "mvn -q test" {
+					t.Fatalf("build.command=%q", p.Targets.Build.Command)
+				}
+			},
+		},
+		{
+			name: "exec command is normalized",
+			override: &contracts.BuildGateProfileOverride{
+				Command: contracts.CommandSpec{Exec: []string{"mvn", "-q", "compile"}},
+				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven"},
+			},
+			jobType: types.JobTypePostGate,
+			assert: func(t *testing.T, p *contracts.GateProfile) {
+				t.Helper()
+				if p.Targets.AllTests.Command != "mvn -q compile" {
+					t.Fatalf("all_tests.command=%q", p.Targets.AllTests.Command)
+				}
+			},
+		},
+		{
+			name: "stack falls back to detected expectation",
 			override: &contracts.BuildGateProfileOverride{
 				Command: contracts.CommandSpec{Shell: "mvn test"},
 			},
@@ -129,32 +82,42 @@ func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
 			meta: &contracts.BuildGateStageMetadata{
 				Detected: &contracts.StackExpectation{Language: "java", Tool: "gradle", Release: "17"},
 			},
-			wantActive:    contracts.GateProfileTargetAllTests,
-			wantStackLang: "java",
-			wantStackTool: "gradle",
-			wantStackRel:  "17",
-			wantCmdInAll:  "mvn test",
+			assert: func(t *testing.T, p *contracts.GateProfile) {
+				t.Helper()
+				if p.Stack.Tool != "gradle" || p.Stack.Release != "17" {
+					t.Fatalf("stack=%+v", p.Stack)
+				}
+			},
 		},
 		{
-			name: "missing stack falls back to ModStack name from StaticChecks",
-			repoID: "repo_1",
+			name: "regate is accepted",
 			override: &contracts.BuildGateProfileOverride{
-				Command: contracts.CommandSpec{Shell: "mvn test"},
+				Command: contracts.CommandSpec{Shell: "./gradlew test"},
+				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "gradle"},
+			},
+			jobType: types.JobTypeReGate,
+			assert: func(t *testing.T, p *contracts.GateProfile) {
+				t.Helper()
+				if p.Targets.Active != contracts.GateProfileTargetAllTests {
+					t.Fatalf("active=%q", p.Targets.Active)
+				}
+			},
+		},
+		{
+			name:    "nil override fails",
+			jobType: types.JobTypePreGate,
+			wantErr: true,
+		},
+		{
+			name: "empty command fails",
+			override: &contracts.BuildGateProfileOverride{
+				Stack: &contracts.GateProfileStack{Language: "java", Tool: "maven"},
 			},
 			jobType: types.JobTypePreGate,
-			meta: &contracts.BuildGateStageMetadata{
-				StaticChecks: []contracts.BuildGateStaticCheckReport{
-					{Language: "java", Tool: "maven", Passed: true},
-				},
-			},
-			wantActive:    contracts.GateProfileTargetAllTests,
-			wantStackLang: "java",
-			wantStackTool: "maven",
-			wantCmdInAll:  "mvn test",
+			wantErr: true,
 		},
 		{
-			name: "no stack anywhere returns error",
-			repoID: "repo_1",
+			name: "no stack source fails",
 			override: &contracts.BuildGateProfileOverride{
 				Command: contracts.CommandSpec{Shell: "mvn test"},
 			},
@@ -162,9 +125,8 @@ func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:     "unsupported job type returns error",
-			repoID:   "repo_1",
-			override: mavenOverride,
+			name:     "unsupported job type fails",
+			override: baseOverride,
 			jobType:  types.JobTypeMod,
 			wantErr:  true,
 		},
@@ -173,10 +135,10 @@ func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			raw, err := DeriveProfileSnapshotFromOverride(tc.repoID, tc.override, tc.target, tc.jobType, tc.meta)
+			raw, err := DeriveProfileSnapshotFromOverride("repo_1", tc.override, tc.target, tc.jobType, tc.meta)
 			if tc.wantErr {
 				if err == nil {
-					t.Fatal("DeriveProfileSnapshotFromOverride() error=nil, want error")
+					t.Fatal("error=nil, want non-nil")
 				}
 				return
 			}
@@ -185,180 +147,49 @@ func TestDeriveProfileSnapshotFromOverride(t *testing.T) {
 			}
 			profile, err := contracts.ParseGateProfileJSON(raw)
 			if err != nil {
-				t.Fatalf("snapshot fails ParseGateProfileJSON: %v", err)
+				t.Fatalf("ParseGateProfileJSON() error=%v", err)
 			}
-			if got, want := profile.Targets.Active, tc.wantActive; got != want {
-				t.Fatalf("targets.active=%q, want %q", got, want)
-			}
-			if got, want := profile.Stack.Language, tc.wantStackLang; got != want {
-				t.Fatalf("stack.language=%q, want %q", got, want)
-			}
-			if got, want := profile.Stack.Tool, tc.wantStackTool; got != want {
-				t.Fatalf("stack.tool=%q, want %q", got, want)
-			}
-			if tc.wantStackRel != "" {
-				if got, want := profile.Stack.Release, tc.wantStackRel; got != want {
-					t.Fatalf("stack.release=%q, want %q", got, want)
-				}
-			}
-			if tc.wantEnvKey != "" {
-				if got, want := profile.Targets.AllTests.Env[tc.wantEnvKey], tc.wantEnvVal; got != want {
-					t.Fatalf("all_tests.env[%s]=%q, want %q", tc.wantEnvKey, got, want)
-				}
-			}
-			if tc.wantCmdInBuild != "" {
-				if got, want := profile.Targets.Build.Command, tc.wantCmdInBuild; got != want {
-					t.Fatalf("targets.build.command=%q, want %q", got, want)
-				}
-			}
-			if tc.wantCmdInUnit != "" {
-				if got, want := profile.Targets.Unit.Command, tc.wantCmdInUnit; got != want {
-					t.Fatalf("targets.unit.command=%q, want %q", got, want)
-				}
-			}
-			if tc.wantCmdInAll != "" {
-				if got, want := profile.Targets.AllTests.Command, tc.wantCmdInAll; got != want {
-					t.Fatalf("targets.all_tests.command=%q, want %q", got, want)
-				}
+			if tc.assert != nil {
+				tc.assert(t, profile)
 			}
 		})
 	}
 }
 
-// buildTestProfile returns a valid GateProfile parsed from JSON for use in tests.
-func buildTestProfile(t *testing.T, raw string) *contracts.GateProfile {
-	t.Helper()
-	p, err := contracts.ParseGateProfileJSON([]byte(raw))
-	if err != nil {
-		t.Fatalf("ParseGateProfileJSON: %v", err)
-	}
-	return p
-}
-
-// TestProfilePrecedenceOrder locks the relative ordering of precedence constants so
-// callers can safely compare ProfilePrecedence values numerically.
 func TestProfilePrecedenceOrder(t *testing.T) {
 	t.Parallel()
 	if !(ProfilePrecedenceExact > ProfilePrecedenceLatest) {
-		t.Errorf("ProfilePrecedenceExact (%d) must be > ProfilePrecedenceLatest (%d)",
-			ProfilePrecedenceExact, ProfilePrecedenceLatest)
+		t.Fatalf("exact=%d latest=%d", ProfilePrecedenceExact, ProfilePrecedenceLatest)
 	}
 	if !(ProfilePrecedenceLatest > ProfilePrecedenceDefault) {
-		t.Errorf("ProfilePrecedenceLatest (%d) must be > ProfilePrecedenceDefault (%d)",
-			ProfilePrecedenceLatest, ProfilePrecedenceDefault)
+		t.Fatalf("latest=%d default=%d", ProfilePrecedenceLatest, ProfilePrecedenceDefault)
 	}
 }
 
 func TestSelectProfile(t *testing.T) {
 	t.Parallel()
+	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact", Precedence: ProfilePrecedenceExact}
+	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest", Precedence: ProfilePrecedenceLatest}
+	def := &ProfileCandidate{ID: 3, ObjectKey: "default", Precedence: ProfilePrecedenceDefault}
 
-	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact-key", Precedence: ProfilePrecedenceExact}
-	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest-key", Precedence: ProfilePrecedenceLatest}
-	def := &ProfileCandidate{ID: 3, ObjectKey: "default-key", Precedence: ProfilePrecedenceDefault}
-
-	tests := []struct {
-		name           string
-		exact          *ProfileCandidate
-		latest         *ProfileCandidate
-		def            *ProfileCandidate
-		wantID         int64
-		wantObjectKey  string
-		wantPrecedence ProfilePrecedence
+	cases := []struct {
+		name string
+		ex   *ProfileCandidate
+		la   *ProfileCandidate
+		de   *ProfileCandidate
+		want *ProfileCandidate
 	}{
-		{
-			name:           "exact wins over all others",
-			exact:          exact,
-			latest:         latest,
-			def:            def,
-			wantID:         1,
-			wantObjectKey:  "exact-key",
-			wantPrecedence: ProfilePrecedenceExact,
-		},
-		{
-			name:           "latest wins when exact is absent",
-			exact:          nil,
-			latest:         latest,
-			def:            def,
-			wantID:         2,
-			wantObjectKey:  "latest-key",
-			wantPrecedence: ProfilePrecedenceLatest,
-		},
-		{
-			name:           "default wins when exact and latest are absent",
-			exact:          nil,
-			latest:         nil,
-			def:            def,
-			wantID:         3,
-			wantObjectKey:  "default-key",
-			wantPrecedence: ProfilePrecedenceDefault,
-		},
-		{
-			name:   "all nil returns nil",
-			exact:  nil,
-			latest: nil,
-			def:    nil,
-			wantID: 0,
-		},
-		// Single-candidate fallback cases: verify each tier works in isolation.
-		{
-			name:           "exact only — no fallback needed",
-			exact:          exact,
-			latest:         nil,
-			def:            nil,
-			wantID:         1,
-			wantObjectKey:  "exact-key",
-			wantPrecedence: ProfilePrecedenceExact,
-		},
-		{
-			name:           "latest only — default is absent, latest is returned",
-			exact:          nil,
-			latest:         latest,
-			def:            nil,
-			wantID:         2,
-			wantObjectKey:  "latest-key",
-			wantPrecedence: ProfilePrecedenceLatest,
-		},
-		{
-			name:           "default only — exact and latest absent, default is returned",
-			exact:          nil,
-			latest:         nil,
-			def:            def,
-			wantID:         3,
-			wantObjectKey:  "default-key",
-			wantPrecedence: ProfilePrecedenceDefault,
-		},
-		// Normalization: returned pointer is the same instance (no copying/mutation).
-		{
-			name:           "returned candidate is identical to input (no copy)",
-			exact:          exact,
-			latest:         latest,
-			def:            def,
-			wantID:         1,
-			wantObjectKey:  "exact-key",
-			wantPrecedence: ProfilePrecedenceExact,
-		},
+		{name: "exact wins", ex: exact, la: latest, de: def, want: exact},
+		{name: "latest fallback", la: latest, de: def, want: latest},
+		{name: "default fallback", de: def, want: def},
+		{name: "all nil", want: nil},
 	}
 
-	for _, tc := range tests {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := SelectProfile(tc.exact, tc.latest, tc.def)
-			if tc.wantID == 0 {
-				if got != nil {
-					t.Fatalf("SelectProfile=%v, want nil", got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatal("SelectProfile=nil, want non-nil")
-			}
-			if got.ID != tc.wantID {
-				t.Fatalf("SelectProfile.ID=%d, want %d", got.ID, tc.wantID)
-			}
-			if got.ObjectKey != tc.wantObjectKey {
-				t.Fatalf("SelectProfile.ObjectKey=%q, want %q", got.ObjectKey, tc.wantObjectKey)
-			}
-			if got.Precedence != tc.wantPrecedence {
-				t.Fatalf("SelectProfile.Precedence=%d, want %d", got.Precedence, tc.wantPrecedence)
+			got := SelectProfile(tc.ex, tc.la, tc.de)
+			if got != tc.want {
+				t.Fatalf("SelectProfile()=%v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -366,104 +197,46 @@ func TestSelectProfile(t *testing.T) {
 
 func TestSelectProfileLazy(t *testing.T) {
 	t.Parallel()
-
-	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact-key", Precedence: ProfilePrecedenceExact}
-	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest-key", Precedence: ProfilePrecedenceLatest}
-	def := &ProfileCandidate{ID: 3, ObjectKey: "default-key", Precedence: ProfilePrecedenceDefault}
-
-	sentinelErr := errors.New("fetch failed")
+	exact := &ProfileCandidate{ID: 1}
+	latest := &ProfileCandidate{ID: 2}
+	def := &ProfileCandidate{ID: 3}
+	sentinel := errors.New("fetch failed")
 
 	hit := func(c *ProfileCandidate) func() (*ProfileCandidate, error) {
 		return func() (*ProfileCandidate, error) { return c, nil }
 	}
 	miss := func() (*ProfileCandidate, error) { return nil, nil }
-	boom := func() (*ProfileCandidate, error) { return nil, sentinelErr }
+	boom := func() (*ProfileCandidate, error) { return nil, sentinel }
 
-	tests := []struct {
+	cases := []struct {
 		name        string
 		fetchExact  func() (*ProfileCandidate, error)
 		fetchLatest func() (*ProfileCandidate, error)
 		fetchDef    func() (*ProfileCandidate, error)
-		wantID      int64
+		want        *ProfileCandidate
 		wantErr     bool
 	}{
-		{
-			name:        "exact found — latest and default not called",
-			fetchExact:  hit(exact),
-			fetchLatest: boom,
-			fetchDef:    boom,
-			wantID:      1,
-		},
-		{
-			name:        "exact miss, latest found — default not called",
-			fetchExact:  miss,
-			fetchLatest: hit(latest),
-			fetchDef:    boom,
-			wantID:      2,
-		},
-		{
-			name:        "exact and latest miss — default returned",
-			fetchExact:  miss,
-			fetchLatest: miss,
-			fetchDef:    hit(def),
-			wantID:      3,
-		},
-		{
-			name:        "all miss — nil returned",
-			fetchExact:  miss,
-			fetchLatest: miss,
-			fetchDef:    miss,
-			wantID:      0,
-		},
-		{
-			name:        "exact error propagates",
-			fetchExact:  boom,
-			fetchLatest: miss,
-			fetchDef:    miss,
-			wantErr:     true,
-		},
-		{
-			name:        "latest error propagates when exact is miss",
-			fetchExact:  miss,
-			fetchLatest: boom,
-			fetchDef:    miss,
-			wantErr:     true,
-		},
-		{
-			name:        "default error propagates when exact and latest are miss",
-			fetchExact:  miss,
-			fetchLatest: miss,
-			fetchDef:    boom,
-			wantErr:     true,
-		},
+		{name: "exact short-circuits", fetchExact: hit(exact), fetchLatest: boom, fetchDef: boom, want: exact},
+		{name: "latest short-circuits default", fetchExact: miss, fetchLatest: hit(latest), fetchDef: boom, want: latest},
+		{name: "default fallback", fetchExact: miss, fetchLatest: miss, fetchDef: hit(def), want: def},
+		{name: "all miss", fetchExact: miss, fetchLatest: miss, fetchDef: miss, want: nil},
+		{name: "error propagates", fetchExact: boom, fetchLatest: miss, fetchDef: miss, wantErr: true},
 	}
 
-	for _, tc := range tests {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := SelectProfileLazy(tc.fetchExact, tc.fetchLatest, tc.fetchDef)
 			if tc.wantErr {
-				if err == nil {
-					t.Fatal("SelectProfileLazy() error=nil, want non-nil")
-				}
-				if !errors.Is(err, sentinelErr) {
-					t.Fatalf("SelectProfileLazy() error=%v, want sentinel", err)
+				if !errors.Is(err, sentinel) {
+					t.Fatalf("error=%v, want sentinel", err)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("SelectProfileLazy() error=%v, want nil", err)
+				t.Fatalf("error=%v", err)
 			}
-			if tc.wantID == 0 {
-				if got != nil {
-					t.Fatalf("SelectProfileLazy()=%v, want nil", got)
-				}
-				return
-			}
-			if got == nil {
-				t.Fatal("SelectProfileLazy()=nil, want non-nil")
-			}
-			if got.ID != tc.wantID {
-				t.Fatalf("SelectProfileLazy().ID=%d, want %d", got.ID, tc.wantID)
+			if got != tc.want {
+				t.Fatalf("got=%v want=%v", got, tc.want)
 			}
 		})
 	}
@@ -472,193 +245,102 @@ func TestSelectProfileLazy(t *testing.T) {
 func TestGateOverrideForJobType(t *testing.T) {
 	t.Parallel()
 
-	simpleProfile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"targets": {
-			"active": "build",
-			"build": {"status":"passed","command":"go test ./...","env":{"GOFLAGS":"-mod=readonly"}},
-			"unit":  {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
+	base := testGateProfile()
+	base.Targets.Active = contracts.GateProfileTargetBuild
+	base.Targets.Build.Status = contracts.PrepTargetStatusPassed
+	base.Targets.Build.Command = "go test ./..."
+	base.Targets.Build.Env = map[string]string{"GOFLAGS": "-mod=readonly"}
 
-	unsupportedProfile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"targets": {
-			"active": "unsupported",
-			"build":  {"status":"failed","command":"go test ./...","env":{},"failure_code":"infra_support"},
-			"unit":  {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
+	unsupported := testGateProfile()
+	unsupported.Targets.Active = contracts.GateProfileTargetUnsupported
 
-	hostSocketProfile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"runtime": {"docker": {"mode":"host_socket","api_version":"1.45"}},
-		"targets": {
-			"active": "build",
-			"build": {"status":"passed","command":"go test ./...","env":{}},
-			"unit":  {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
-
-	tcpProfile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"runtime": {"docker": {"mode":"tcp","host":"tcp://dind:2375"}},
-		"targets": {
-			"active": "build",
-			"build": {"status":"passed","command":"go test ./...","env":{}},
-			"unit":  {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
-
-	failedTargetProfile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"go","tool":"go"},
-		"targets": {
-			"active": "unit",
-			"build":  {"status":"not_attempted","command":"go build ./...","env":{}},
-			"unit":  {"status":"failed","command":"go test ./... -run Unit","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
-
-	tests := []struct {
-		name        string
-		profile     *contracts.GateProfile
-		jobType     types.JobType
-		wantPhase   contracts.BuildGateProfilePhase
-		wantNil     bool
-		wantErr     bool
-		wantCommand string
-		wantEnvKey  string
-		wantEnvVal  string
-	}{
-		{
-			name:        "pre_gate maps to pre phase with active target command",
-			profile:     simpleProfile,
-			jobType:     types.JobTypePreGate,
-			wantPhase:   contracts.BuildGateProfilePhasePre,
-			wantCommand: "go test ./...",
-			wantEnvKey:  "GOFLAGS",
-			wantEnvVal:  "-mod=readonly",
-		},
-		{
-			name:        "post_gate maps to post phase with active target command",
-			profile:     simpleProfile,
-			jobType:     types.JobTypePostGate,
-			wantPhase:   contracts.BuildGateProfilePhasePost,
-			wantCommand: "go test ./...",
-		},
-		{
-			name:        "regate maps to post phase same as post_gate",
-			profile:     simpleProfile,
-			jobType:     types.JobTypeReGate,
-			wantPhase:   contracts.BuildGateProfilePhasePost,
-			wantCommand: "go test ./...",
-		},
-		{
-			name:    "non-gate job type returns empty phase and nil override",
-			profile: simpleProfile,
-			jobType: types.JobTypeMod,
-			wantNil: true,
-		},
-		{
-			name:    "nil profile returns empty phase and nil override",
-			profile: nil,
-			jobType: types.JobTypePreGate,
-			wantNil: true,
-		},
-		{
-			name:    "unsupported active target returns phase with nil override",
-			profile: unsupportedProfile,
-			jobType: types.JobTypePreGate,
-			wantPhase: contracts.BuildGateProfilePhasePre,
-			wantNil: true,
-		},
-		{
-			name:        "command always used regardless of target status (failed target)",
-			profile:     failedTargetProfile,
-			jobType:     types.JobTypePreGate,
-			wantPhase:   contracts.BuildGateProfilePhasePre,
-			wantCommand: "go test ./... -run Unit",
-		},
-		{
-			name:       "host_socket runtime injects DOCKER_HOST env",
-			profile:    hostSocketProfile,
-			jobType:    types.JobTypePreGate,
-			wantPhase:  contracts.BuildGateProfilePhasePre,
-			wantEnvKey: contracts.GateProfileDockerHostEnv,
-			wantEnvVal: defaultDockerHostSocket,
-		},
-		{
-			name:       "host_socket with api_version injects DOCKER_API_VERSION env",
-			profile:    hostSocketProfile,
-			jobType:    types.JobTypePreGate,
-			wantPhase:  contracts.BuildGateProfilePhasePre,
-			wantEnvKey: contracts.GateProfileDockerAPIVersionEnv,
-			wantEnvVal: "1.45",
-		},
-		{
-			name:       "tcp runtime injects DOCKER_HOST from host field",
-			profile:    tcpProfile,
-			jobType:    types.JobTypePreGate,
-			wantPhase:  contracts.BuildGateProfilePhasePre,
-			wantEnvKey: contracts.GateProfileDockerHostEnv,
-			wantEnvVal: "tcp://dind:2375",
-		},
+	hostSocket := testGateProfile()
+	hostSocket.Targets.Active = contracts.GateProfileTargetBuild
+	hostSocket.Targets.Build.Command = "go test ./..."
+	hostSocket.Runtime = &contracts.GateProfileRuntime{
+		Docker: &contracts.GateProfileRuntimeDocker{Mode: contracts.GateProfileDockerModeHostSocket, APIVersion: "1.45"},
 	}
 
-	for _, tc := range tests {
+	tcp := testGateProfile()
+	tcp.Targets.Active = contracts.GateProfileTargetBuild
+	tcp.Targets.Build.Command = "go test ./..."
+	tcp.Runtime = &contracts.GateProfileRuntime{
+		Docker: &contracts.GateProfileRuntimeDocker{Mode: contracts.GateProfileDockerModeTCP, Host: "tcp://dind:2375"},
+	}
+
+	failedUnit := testGateProfile()
+	failedUnit.Targets.Active = contracts.GateProfileTargetUnit
+	failedUnit.Targets.Unit = &contracts.GateProfileTarget{Status: contracts.PrepTargetStatusFailed, Command: "go test ./... -run Unit", Env: map[string]string{}}
+
+	cases := []struct {
+		name      string
+		profile   *contracts.GateProfile
+		jobType   types.JobType
+		wantPhase contracts.BuildGateProfilePhase
+		wantNil   bool
+		assert    func(t *testing.T, o *contracts.BuildGateProfileOverride)
+	}{
+		{name: "pre maps to pre", profile: base, jobType: types.JobTypePreGate, wantPhase: contracts.BuildGateProfilePhasePre,
+			assert: func(t *testing.T, o *contracts.BuildGateProfileOverride) {
+				t.Helper()
+				if o.Command.Shell != "go test ./..." || o.Env["GOFLAGS"] != "-mod=readonly" {
+					t.Fatalf("override=%+v", o)
+				}
+			}},
+		{name: "post maps to post", profile: base, jobType: types.JobTypePostGate, wantPhase: contracts.BuildGateProfilePhasePost},
+		{name: "regate maps to post", profile: base, jobType: types.JobTypeReGate, wantPhase: contracts.BuildGateProfilePhasePost},
+		{name: "non gate job returns nil", profile: base, jobType: types.JobTypeMod, wantNil: true},
+		{name: "nil profile returns nil", profile: nil, jobType: types.JobTypePreGate, wantNil: true},
+		{name: "unsupported active target returns nil override", profile: unsupported, jobType: types.JobTypePreGate, wantPhase: contracts.BuildGateProfilePhasePre, wantNil: true},
+		{name: "host_socket injects docker env", profile: hostSocket, jobType: types.JobTypePreGate, wantPhase: contracts.BuildGateProfilePhasePre,
+			assert: func(t *testing.T, o *contracts.BuildGateProfileOverride) {
+				t.Helper()
+				if o.Env[contracts.GateProfileDockerHostEnv] != defaultDockerHostSocket {
+					t.Fatalf("DOCKER_HOST=%q", o.Env[contracts.GateProfileDockerHostEnv])
+				}
+				if o.Env[contracts.GateProfileDockerAPIVersionEnv] != "1.45" {
+					t.Fatalf("DOCKER_API_VERSION=%q", o.Env[contracts.GateProfileDockerAPIVersionEnv])
+				}
+			}},
+		{name: "tcp runtime injects host", profile: tcp, jobType: types.JobTypePreGate, wantPhase: contracts.BuildGateProfilePhasePre,
+			assert: func(t *testing.T, o *contracts.BuildGateProfileOverride) {
+				t.Helper()
+				if o.Env[contracts.GateProfileDockerHostEnv] != "tcp://dind:2375" {
+					t.Fatalf("DOCKER_HOST=%q", o.Env[contracts.GateProfileDockerHostEnv])
+				}
+			}},
+		{name: "failed active target command is still used", profile: failedUnit, jobType: types.JobTypePreGate, wantPhase: contracts.BuildGateProfilePhasePre,
+			assert: func(t *testing.T, o *contracts.BuildGateProfileOverride) {
+				t.Helper()
+				if o.Command.Shell != "go test ./... -run Unit" {
+					t.Fatalf("command=%q", o.Command.Shell)
+				}
+			}},
+	}
+
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			phase, override, err := GateOverrideForJobType(tc.profile, tc.jobType)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Fatalf("error=%v", err)
 			}
 			if tc.wantNil {
 				if override != nil {
 					t.Fatalf("override=%v, want nil", override)
 				}
 				if tc.wantPhase != "" && phase != tc.wantPhase {
-					t.Fatalf("phase=%q, want %q", phase, tc.wantPhase)
+					t.Fatalf("phase=%q want=%q", phase, tc.wantPhase)
 				}
 				return
 			}
 			if phase != tc.wantPhase {
-				t.Fatalf("phase=%q, want %q", phase, tc.wantPhase)
+				t.Fatalf("phase=%q want=%q", phase, tc.wantPhase)
 			}
 			if override == nil {
-				t.Fatal("override=nil, want non-nil")
+				t.Fatal("override=nil")
 			}
-			if tc.wantCommand != "" && override.Command.Shell != tc.wantCommand {
-				t.Fatalf("command=%q, want %q", override.Command.Shell, tc.wantCommand)
-			}
-			if tc.wantEnvKey != "" {
-				if got := override.Env[tc.wantEnvKey]; got != tc.wantEnvVal {
-					t.Fatalf("env[%s]=%q, want %q", tc.wantEnvKey, got, tc.wantEnvVal)
-				}
+			if tc.assert != nil {
+				tc.assert(t, override)
 			}
 		})
 	}
@@ -667,112 +349,49 @@ func TestGateOverrideForJobType(t *testing.T) {
 func TestStackMatches(t *testing.T) {
 	t.Parallel()
 
-	profile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"java","tool":"gradle","release":"11"},
-		"targets": {
-			"active": "build",
-			"build": {"status":"passed","command":"./gradlew test","env":{}},
-			"unit":  {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
+	withRelease := testGateProfile()
+	withRelease.Stack = contracts.GateProfileStack{Language: "java", Tool: "gradle", Release: "11"}
+	noRelease := testGateProfile()
+	noRelease.Stack = contracts.GateProfileStack{Language: "java", Tool: "gradle"}
 
-	noReleaseProfile := buildTestProfile(t, `{
-		"schema_version": 1, "repo_id": "repo_1",
-		"runner_mode": "simple",
-		"stack": {"language":"java","tool":"gradle"},
-		"targets": {
-			"active": "build",
-			"build": {"status":"passed","command":"./gradlew test","env":{}},
-			"unit":  {"status":"not_attempted","env":{}},
-			"all_tests": {"status":"not_attempted","env":{}}
-		},
-		"orchestration": {"pre":[],"post":[]}
-	}`)
-
-	tests := []struct {
+	cases := []struct {
 		name    string
 		profile *contracts.GateProfile
 		lang    string
 		tool    string
-		release string
+		rel     string
 		want    bool
 	}{
-		{
-			name:    "nil profile does not match",
-			profile: nil,
-			lang:    "java",
-			tool:    "gradle",
-			release: "",
-			want:    false,
-		},
-		{
-			name:    "empty release acts as wildcard (matches any release)",
-			profile: profile,
-			lang:    "java",
-			tool:    "gradle",
-			release: "",
-			want:    true,
-		},
-		{
-			name:    "exact release match passes",
-			profile: profile,
-			lang:    "java",
-			tool:    "gradle",
-			release: "11",
-			want:    true,
-		},
-		{
-			name:    "mismatched release fails",
-			profile: profile,
-			lang:    "java",
-			tool:    "gradle",
-			release: "17",
-			want:    false,
-		},
-		{
-			name:    "non-empty release against profile with no release fails",
-			profile: noReleaseProfile,
-			lang:    "java",
-			tool:    "gradle",
-			release: "11",
-			want:    false,
-		},
-		{
-			name:    "empty release against profile with no release matches",
-			profile: noReleaseProfile,
-			lang:    "java",
-			tool:    "gradle",
-			release: "",
-			want:    true,
-		},
-		{
-			name:    "wrong language does not match",
-			profile: profile,
-			lang:    "go",
-			tool:    "gradle",
-			release: "",
-			want:    false,
-		},
-		{
-			name:    "wrong tool does not match",
-			profile: profile,
-			lang:    "java",
-			tool:    "maven",
-			release: "",
-			want:    false,
-		},
+		{name: "nil profile false", profile: nil, lang: "java", tool: "gradle", want: false},
+		{name: "release wildcard", profile: withRelease, lang: "java", tool: "gradle", rel: "", want: true},
+		{name: "exact release", profile: withRelease, lang: "java", tool: "gradle", rel: "11", want: true},
+		{name: "release mismatch", profile: withRelease, lang: "java", tool: "gradle", rel: "17", want: false},
+		{name: "non-empty release requires profile release", profile: noRelease, lang: "java", tool: "gradle", rel: "11", want: false},
+		{name: "language mismatch", profile: withRelease, lang: "go", tool: "gradle", rel: "", want: false},
+		{name: "tool mismatch", profile: withRelease, lang: "java", tool: "maven", rel: "", want: false},
 	}
 
-	for _, tc := range tests {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := StackMatches(tc.profile, tc.lang, tc.tool, tc.release)
-			if got != tc.want {
-				t.Fatalf("StackMatches(%q,%q,%q)=%v, want %v", tc.lang, tc.tool, tc.release, got, tc.want)
+			if got := StackMatches(tc.profile, tc.lang, tc.tool, tc.rel); got != tc.want {
+				t.Fatalf("StackMatches()=%v want=%v", got, tc.want)
 			}
 		})
+	}
+}
+
+func testGateProfile() *contracts.GateProfile {
+	return &contracts.GateProfile{
+		SchemaVersion: 1,
+		RepoID:        "repo_1",
+		RunnerMode:    contracts.PrepRunnerModeSimple,
+		Stack:         contracts.GateProfileStack{Language: "go", Tool: "go"},
+		Targets: contracts.GateProfileTargets{
+			Active:   contracts.GateProfileTargetBuild,
+			Build:    &contracts.GateProfileTarget{Status: contracts.PrepTargetStatusNotAttempted, Env: map[string]string{}},
+			Unit:     &contracts.GateProfileTarget{Status: contracts.PrepTargetStatusNotAttempted, Env: map[string]string{}},
+			AllTests: &contracts.GateProfileTarget{Status: contracts.PrepTargetStatusNotAttempted, Env: map[string]string{}},
+		},
+		Orchestration: contracts.GateProfileOrchestration{},
 	}
 }

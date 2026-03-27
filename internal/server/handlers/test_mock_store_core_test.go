@@ -555,10 +555,12 @@ type mockStore struct {
 	getLatestRunRepoByModAndRepoStatusErr    error
 
 	// GetRunRepo tracking — composite key (run_id, repo_id).
-	getRunRepoCalled bool
-	getRunRepoParam  store.GetRunRepoParams
-	getRunRepoResult store.RunRepo
-	getRunRepoErr    error
+	getRunRepoCalled  bool
+	getRunRepoParam   store.GetRunRepoParams
+	getRunRepoResult  store.RunRepo
+	getRunRepoResults []store.RunRepo // successive calls return entries in order
+	getRunRepoCalls   int
+	getRunRepoErr     error
 
 	// IncrementRunRepoAttempt tracking — composite key (run_id, repo_id).
 	incrementRunRepoAttemptCalled bool
@@ -610,6 +612,11 @@ type mockStore struct {
 	deleteSpecBundleCalled bool
 	deleteSpecBundleParam  string
 	deleteSpecBundleErr    error
+
+	// UpdateMigRepoRefs tracking
+	updateMigRepoRefsCalled bool
+	updateMigRepoRefsParams store.UpdateMigRepoRefsParams
+	updateMigRepoRefsErr    error
 
 	// Global Env tracking (config_env table; see docs/envs/README.md#Global Env Configuration)
 	listGlobalEnvCalled bool

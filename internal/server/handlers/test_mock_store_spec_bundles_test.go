@@ -3,8 +3,6 @@ package handlers
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
-
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -47,12 +45,4 @@ func (m *mockStore) DeleteSpecBundle(ctx context.Context, id types.SpecBundleID)
 	m.deleteSpecBundleCalled = true
 	m.deleteSpecBundleParam = id.String()
 	return m.deleteSpecBundleErr
-}
-
-func (m *mockStore) ListSpecBundles(ctx context.Context, arg store.ListSpecBundlesParams) ([]store.SpecBundle, error) {
-	return nil, nil
-}
-
-func (m *mockStore) ListSpecBundlesUnreferencedBefore(ctx context.Context, lastRefAt pgtype.Timestamptz) ([]store.SpecBundle, error) {
-	return nil, nil
 }

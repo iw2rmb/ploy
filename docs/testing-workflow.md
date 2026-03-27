@@ -125,6 +125,19 @@ func TestRepoHandler(t *testing.T) {
 - Prefer one domain per file (for example: runtime, profile-target, mounts-limits, recovery, error-path).
 - Move shared fixtures/builders into dedicated `*_fixture_test.go` files and reuse them across domain files.
 
+### Test LOC Guardrails
+
+- Treat test code as production code: duplication is a defect, not a convenience.
+- Keep one canonical table per behavior path; do not add parallel tables that assert the same branch with different phrasing.
+- When adding a new canonical test owner, delete superseded tests in the same change.
+- Prefer typed fixture builders over repeated inline JSON/YAML blobs.
+- Reuse assertion helpers for repeated shape checks (`command/env/stack/target` style checks), instead of per-case ad-hoc assertions.
+- Keep table-driven suites focused: add a case only when it exercises a distinct branch, error mapping, or contract edge.
+- Avoid “combination explosion” suites. If behavior is already locked by one dimension, do not multiply cases across orthogonal dimensions.
+- For contract/refactor slices, require a net test LOC justification in PR notes when test files grow significantly (for example `>200` added lines in a package).
+- Refactor trigger: if a test file crosses ~400 LOC, split by behavior domain and extract shared fixtures before adding more cases.
+- Prefer deterministic helpers + concise case tables over large fixture literals repeated across tests.
+
 ```go
 // internal/testutil/testutil.go
 package testutil

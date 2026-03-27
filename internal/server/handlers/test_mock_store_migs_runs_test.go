@@ -302,7 +302,18 @@ func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRep
 func (m *mockStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
 	m.getRunRepoCalled = true
 	m.getRunRepoParam = arg
-	return m.getRunRepoResult, m.getRunRepoErr
+	if m.getRunRepoErr != nil {
+		return store.RunRepo{}, m.getRunRepoErr
+	}
+	if len(m.getRunRepoResults) > 0 {
+		idx := m.getRunRepoCalls
+		if idx >= len(m.getRunRepoResults) {
+			idx = len(m.getRunRepoResults) - 1
+		}
+		m.getRunRepoCalls++
+		return m.getRunRepoResults[idx], nil
+	}
+	return m.getRunRepoResult, nil
 }
 
 // IncrementRunRepoAttempt — repo IDs are now strings (NanoID).
