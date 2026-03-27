@@ -3,7 +3,6 @@ package nodeagent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -217,7 +216,8 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		builder.Error(mrErr.Error())
 		stats := builder.MustBuild()
 
-		if errors.Is(mrErr, context.Canceled) || errors.Is(mrErr, context.DeadlineExceeded) {
+		status := jobStatusFromRunError(mrErr)
+		if status == types.JobStatusCancelled {
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusCancelled.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload MR job cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 			}

@@ -122,15 +122,24 @@ func modStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
 	return idx, nil
 }
 
+// jobStatusFromRunError maps a run error to the appropriate terminal job status.
+// context.Canceled and context.DeadlineExceeded produce Cancelled; all other
+// errors produce Fail. This is the canonical status-from-error mapping shared
+// across all nodeagent execution paths.
+func jobStatusFromRunError(err error) types.JobStatus {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return types.JobStatusCancelled
+	}
+	return types.JobStatusFail
+}
+
 // uploadFailureStatus uploads a failure status for early errors.
 // Uses exit code -1 to indicate pre-execution infrastructure failures.
 // v1 uses capitalized job status values: Success, Fail, Cancelled.
 func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
-	status := types.JobStatusFail
+	status := jobStatusFromRunError(err)
 	var exitCode *int32
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		status = types.JobStatusCancelled
-	} else {
+	if status == types.JobStatusFail {
 		var preExecutionExitCode int32 = -1 // -1 indicates pre-execution failure
 		exitCode = &preExecutionExitCode
 	}
