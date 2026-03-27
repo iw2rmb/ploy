@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -45,13 +44,9 @@ func (s *transientGetRunStore) GetRun(ctx context.Context, id domaintypes.RunID)
 func TestCompleteJob_PublishesEvents(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 1000)
+	f := newRepoScopedFixture("mig", 1000)
 	now := time.Now()
-
-	repoID := domaintypes.NewRepoID()
-	f.Job.RepoID = repoID
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	repoID := f.Job.RepoID
 
 	st := &mockStore{
 		getRunResult: store.Run{
@@ -161,9 +156,7 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify PromoteJobByIDIfUnblocked was called with the linked successor.
-	if !st.promoteJobByIDIfUnblockedCalled {
-		t.Fatal("expected PromoteJobByIDIfUnblocked to be called")
-	}
+	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblockedCalled)
 	if st.promoteJobByIDIfUnblockedParam != nextJobID {
 		t.Fatalf("expected PromoteJobByIDIfUnblocked(%s), got %s", nextJobID, st.promoteJobByIDIfUnblockedParam)
 	}
@@ -175,15 +168,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("", 1000)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: domaintypes.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
+	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -204,13 +189,9 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeMod, 2000)
-	repoID := domaintypes.NewRepoID()
+	f := newRepoScopedFixture(domaintypes.JobTypeMod, 2000)
+	repoID := f.Job.RepoID
 	postJobID := domaintypes.NewJobID()
-
-	f.Job.RepoID = repoID
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
 	f.Job.Meta = []byte(`{"kind":"mig"}`)
 
 	// Jobs: pre-gate succeeded, mig failed, post-gate created.
@@ -263,9 +244,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify UpdateJobCompletion was called for the mig job.
-	if !st.updateJobCompletionCalled {
-		t.Fatal("expected UpdateJobCompletion to be called")
-	}
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 	if st.updateJobCompletionParams.ID != jobs[1].ID {
 		t.Fatalf("expected UpdateJobCompletion for mig job, got %v", st.updateJobCompletionParams.ID)
 	}
@@ -296,15 +275,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("", 1000)
-
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: domaintypes.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
+	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -312,9 +283,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Cancelled"}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionCalled {
-		t.Fatal("expected UpdateJobCompletion to be called")
-	}
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 	if st.updateJobCompletionParams.Status != domaintypes.JobStatusCancelled {
 		t.Fatalf("expected job status canceled, got %s", st.updateJobCompletionParams.Status)
 	}
@@ -369,35 +338,11 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypePreGate, 1000)
-	repoID := domaintypes.NewRepoID()
+	f := newRepoScopedFixture(domaintypes.JobTypePreGate, 1000)
+	repoID := f.Job.RepoID
 	specID := domaintypes.NewSpecID()
-	f.Job.RepoID = repoID
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
 	f.Job.Meta = []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`)
-
-	specBytes, err := json.Marshal(map[string]any{
-		"steps": []any{
-			map[string]any{"image": "migs-orw:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"retries": 1,
-						"image":   "migs-codex:latest",
-					},
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal spec: %v", err)
-	}
+	specBytes := healingSpecBytes(t)
 
 	successor := store.Job{
 		ID:          domaintypes.NewJobID(),
@@ -465,35 +410,11 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypePreGate, 1000)
-	repoID := domaintypes.NewRepoID()
+	f := newRepoScopedFixture(domaintypes.JobTypePreGate, 1000)
+	repoID := f.Job.RepoID
 	specID := domaintypes.NewSpecID()
-	f.Job.RepoID = repoID
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
 	f.Job.Meta = []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`)
-
-	specBytes, err := json.Marshal(map[string]any{
-		"steps": []any{
-			map[string]any{"image": "migs-orw:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"retries": 1,
-						"image":   "migs-codex:latest",
-					},
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal spec: %v", err)
-	}
+	specBytes := healingSpecBytes(t)
 
 	successor := store.Job{
 		ID:          domaintypes.NewJobID(),
@@ -544,35 +465,11 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypePreGate, 1000)
-	repoID := domaintypes.NewRepoID()
+	f := newRepoScopedFixture(domaintypes.JobTypePreGate, 1000)
+	repoID := f.Job.RepoID
 	specID := domaintypes.NewSpecID()
-	f.Job.RepoID = repoID
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
 	f.Job.Meta = []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`)
-
-	specBytes, err := json.Marshal(map[string]any{
-		"steps": []any{
-			map[string]any{"image": "migs-orw:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"retries": 1,
-						"image":   "migs-codex:latest",
-					},
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal spec: %v", err)
-	}
+	specBytes := healingSpecBytes(t)
 
 	successor := store.Job{
 		ID:          domaintypes.NewJobID(),

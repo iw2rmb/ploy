@@ -19,10 +19,7 @@ import (
 func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeReGate, 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture(domaintypes.JobTypeReGate, 1000)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
 	st := &mockStore{
@@ -48,15 +45,9 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.upsertExactGateProfileCalled {
-		t.Fatal("expected UpsertExactGateProfile to be called")
-	}
-	if !st.upsertGateJobProfileLinkCalled {
-		t.Fatal("expected UpsertGateJobProfileLink to be called")
-	}
-	if !st.updateJobMetaCalled {
-		t.Fatal("expected UpdateJobMeta to be called")
-	}
+	assertCalled(t, "UpsertExactGateProfile", st.upsertExactGateProfileCalled)
+	assertCalled(t, "UpsertGateJobProfileLink", st.upsertGateJobProfileLinkCalled)
+	assertCalled(t, "UpdateJobMeta", st.updateJobMetaCalled)
 	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
 	if err != nil {
 		t.Fatalf("unmarshal promoted meta: %v", err)
@@ -69,10 +60,7 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeReGate, 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture(domaintypes.JobTypeReGate, 1000)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
 	st := &mockStore{
@@ -95,9 +83,7 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
+	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 
 	meta, err := contracts.UnmarshalJobMeta(st.updateJobCompletionWithMetaParams.Meta)
 	if err != nil {
@@ -117,10 +103,7 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeReGate, 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture(domaintypes.JobTypeReGate, 1000)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
 
 	st := &mockStore{
@@ -141,10 +124,7 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeHeal, 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture(domaintypes.JobTypeHeal, 1000)
 	reGateID := domaintypes.NewJobID()
 	f.Job.NextID = &reGateID
 	f.Job.Meta = []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`)
@@ -235,10 +215,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture(domaintypes.JobTypeHeal, 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture(domaintypes.JobTypeHeal, 1000)
 	reGateID := domaintypes.NewJobID()
 	f.Job.NextID = &reGateID
 
