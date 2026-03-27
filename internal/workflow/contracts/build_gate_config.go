@@ -4,7 +4,10 @@
 // and how healing operates when the gate fails.
 package contracts
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // BuildGateConfig configures Build Gate validation for a Mods run.
 type BuildGateConfig struct {
@@ -200,4 +203,59 @@ type AmataSetParam struct {
 
 	// Value is the parameter value passed verbatim (may be empty string).
 	Value string `json:"value" yaml:"value"`
+}
+
+// BuildGateProfileOverrideToSpecMap converts a BuildGateProfileOverride to the
+// map[string]any wire format used for spec JSON injection.
+// Returns nil when override is nil.
+func BuildGateProfileOverrideToSpecMap(override *BuildGateProfileOverride) map[string]any {
+	if override == nil {
+		return nil
+	}
+	m := map[string]any{}
+	if len(override.Command.Exec) > 0 {
+		exec := make([]any, len(override.Command.Exec))
+		for i, v := range override.Command.Exec {
+			exec[i] = v
+		}
+		m["command"] = exec
+	} else {
+		m["command"] = override.Command.Shell
+	}
+	if len(override.Env) > 0 {
+		env := make(map[string]any, len(override.Env))
+		for k, v := range override.Env {
+			env[k] = v
+		}
+		m["env"] = env
+	}
+	if override.Stack != nil {
+		stack := map[string]any{
+			"language": override.Stack.Language,
+			"tool":     override.Stack.Tool,
+		}
+		if strings.TrimSpace(override.Stack.Release) != "" {
+			stack["release"] = override.Stack.Release
+		}
+		m["stack"] = stack
+	}
+	if t := strings.TrimSpace(override.Target); t != "" {
+		m["target"] = t
+	}
+	return m
+}
+
+// ApplyBuildGatePhaseToGateSpec copies the gate execution fields from a
+// BuildGatePhaseConfig into the corresponding fields of a StepGateSpec.
+// StackDetect is set only when phase.Stack is non-nil and enabled.
+func ApplyBuildGatePhaseToGateSpec(spec *StepGateSpec, phase *BuildGatePhaseConfig) {
+	if spec == nil || phase == nil {
+		return
+	}
+	spec.GateProfile = phase.GateProfile
+	spec.Target = phase.Target
+	spec.Always = phase.Always
+	if phase.Stack != nil && phase.Stack.Enabled {
+		spec.StackDetect = phase.Stack
+	}
 }

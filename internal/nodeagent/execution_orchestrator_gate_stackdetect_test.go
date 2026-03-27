@@ -22,14 +22,18 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 	t.Run("pre_gate uses pre stack", func(t *testing.T) {
 		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
 		typedOpts := RunOptions{}
-		typedOpts.BuildGate.PreStack = pre
-		typedOpts.BuildGate.PostStack = post
-		typedOpts.BuildGate.PreGateProfile = preGateProfile
-		typedOpts.BuildGate.PostGateProfile = postGateProfile
-		typedOpts.BuildGate.PreTarget = contracts.GateProfileTargetUnit
-		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
-		typedOpts.BuildGate.PreAlways = true
-		typedOpts.BuildGate.PostAlways = false
+		typedOpts.BuildGate.Pre = &contracts.BuildGatePhaseConfig{
+			Stack:       pre,
+			GateProfile: preGateProfile,
+			Target:      contracts.GateProfileTargetUnit,
+			Always:      true,
+		}
+		typedOpts.BuildGate.Post = &contracts.BuildGatePhaseConfig{
+			Stack:       post,
+			GateProfile: postGateProfile,
+			Target:      contracts.GateProfileTargetAllTests,
+			Always:      false,
+		}
 
 		skip := &contracts.BuildGateSkipMetadata{Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit}
 		applyGatePhaseOverrides(&manifest, StartRunRequest{
@@ -57,14 +61,18 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 	t.Run("post_gate uses post stack", func(t *testing.T) {
 		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
 		typedOpts := RunOptions{}
-		typedOpts.BuildGate.PreStack = pre
-		typedOpts.BuildGate.PostStack = post
-		typedOpts.BuildGate.PreGateProfile = preGateProfile
-		typedOpts.BuildGate.PostGateProfile = postGateProfile
-		typedOpts.BuildGate.PreTarget = contracts.GateProfileTargetUnit
-		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
-		typedOpts.BuildGate.PreAlways = true
-		typedOpts.BuildGate.PostAlways = false
+		typedOpts.BuildGate.Pre = &contracts.BuildGatePhaseConfig{
+			Stack:       pre,
+			GateProfile: preGateProfile,
+			Target:      contracts.GateProfileTargetUnit,
+			Always:      true,
+		}
+		typedOpts.BuildGate.Post = &contracts.BuildGatePhaseConfig{
+			Stack:       post,
+			GateProfile: postGateProfile,
+			Target:      contracts.GateProfileTargetAllTests,
+			Always:      false,
+		}
 
 		skip := &contracts.BuildGateSkipMetadata{Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests}
 		applyGatePhaseOverrides(&manifest, StartRunRequest{
@@ -92,14 +100,18 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 	t.Run("re_gate uses stack detection output and post gate_profile override", func(t *testing.T) {
 		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
 		typedOpts := RunOptions{}
-		typedOpts.BuildGate.PreStack = pre
-		typedOpts.BuildGate.PostStack = post
-		typedOpts.BuildGate.PreGateProfile = preGateProfile
-		typedOpts.BuildGate.PostGateProfile = postGateProfile
-		typedOpts.BuildGate.PreTarget = contracts.GateProfileTargetUnit
-		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
-		typedOpts.BuildGate.PreAlways = true
-		typedOpts.BuildGate.PostAlways = false
+		typedOpts.BuildGate.Pre = &contracts.BuildGatePhaseConfig{
+			Stack:       pre,
+			GateProfile: preGateProfile,
+			Target:      contracts.GateProfileTargetUnit,
+			Always:      true,
+		}
+		typedOpts.BuildGate.Post = &contracts.BuildGatePhaseConfig{
+			Stack:       post,
+			GateProfile: postGateProfile,
+			Target:      contracts.GateProfileTargetAllTests,
+			Always:      false,
+		}
 
 		applyGatePhaseOverrides(&manifest, StartRunRequest{
 			JobType: types.JobTypeReGate,
@@ -128,7 +140,9 @@ func TestApplyGatePhaseOverrides_PrePostAndReGate(t *testing.T) {
 	t.Run("re_gate does not enforce target lock for non-infra recovery", func(t *testing.T) {
 		manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
 		typedOpts := RunOptions{}
-		typedOpts.BuildGate.PostTarget = contracts.GateProfileTargetAllTests
+		typedOpts.BuildGate.Post = &contracts.BuildGatePhaseConfig{
+			Target: contracts.GateProfileTargetAllTests,
+		}
 
 		applyGatePhaseOverrides(&manifest, StartRunRequest{
 			JobType: types.JobTypeReGate,
