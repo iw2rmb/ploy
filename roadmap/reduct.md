@@ -54,130 +54,225 @@ Goal lock: every unchecked item below is considered complete only when redundanc
   - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`, `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service.go`
   - Assumptions: Existing nodeagent retry and rehydrate transition behavior matches server transition semantics closely enough to consume shared orchestrator outputs without introducing new nodeagent-only transition types.
   - Implementation:
-    1. Refactor nodeagent execution orchestrator claim/complete paths to consume the shared lifecycle orchestrator transition outputs.
-    2. Refactor nodeagent retry and rehydrate branches to use shared retry/healing transition outputs and remove duplicated local branch trees.
-    3. Add parity fixtures that execute identical transition cases through server and nodeagent call paths.
-    4. Remove now-redundant nodeagent-local helper logic replaced by shared orchestrator transitions.
+    1. Route nodeagent claim/complete decisions through `internal/workflow/lifecycle/orchestrator.go` as the only transition owner.
+    2. Route nodeagent retry/rehydrate decisions through shared retry/healing transition outputs and delete superseded nodeagent-local decision branches.
+    3. Add parity fixtures that execute identical transition cases through server and nodeagent paths to lock shared semantics.
+    4. Delete now-redundant nodeagent-local transition helpers/wrappers and keep no dual-path fallback branches.
   - Verification:
     1. Run `go test ./internal/workflow/lifecycle ./internal/nodeagent ./internal/server/handlers`.
     2. Run `go test ./internal/... -run 'Claim|Complete|Healing|Rehydrate|Retry'`.
+    3. Add structural proof in completion notes: removed nodeagent transition symbols and canonical lifecycle call sites.
   - Reasoning: high (8 CFP)
 
-- [ ] 2.1 Create a single gate-profile resolution service consumed by server and nodeagent
+- [ ] 2.1a Extract canonical gate-profile resolution service
   - Type: determined
-  - Component: `internal/workflow/contracts/gate_profile.go`, `internal/server/handlers/gate_profile_resolver.go`, `internal/server/handlers/gate_profile_persistence.go`, `internal/nodeagent/run_options.go`, `internal/nodeagent/execution_orchestrator_gate.go`, `internal/store/gate_profiles.sql.go`
+  - Component: `internal/workflow/contracts/gate_profile.go`, `internal/workflow/gateprofile/service.go`
   - Implementation:
-    1. Introduce `internal/workflow/gateprofile/service.go` that resolves default, exact, and latest gate profile with one deterministic precedence algorithm.
-    2. Refactor server `gate_profile_resolver` and `gate_profile_persistence` paths to use this service instead of local precedence code.
-    3. Refactor nodeagent gate runtime option resolution to call the same service and use the same result type.
-    4. Remove duplicated fallback and normalization logic from handlers and nodeagent packages.
+    1. Introduce `internal/workflow/gateprofile/service.go` as the single owner of default/exact/latest gate-profile precedence.
+    2. Move shared fallback/normalization branches from existing resolver code into the service.
+    3. Delete superseded contract-local precedence helpers that become redundant after extraction.
+    4. Keep service-level table tests that lock precedence semantics.
   - Verification:
-    1. Run `go test ./internal/workflow/gateprofile ./internal/server/handlers ./internal/nodeagent`.
+    1. Run `go test ./internal/workflow/gateprofile ./internal/workflow/contracts`.
     2. Run `go test ./internal/... -run 'GateProfile|StackGate|BuildGate'`.
-  - Reasoning: xhigh (18 CFP)
+    3. Add structural proof in completion notes: removed old precedence helpers and service-owned precedence paths.
+  - Reasoning: high (12 CFP)
+
+- [ ] 2.1b Adopt canonical gate-profile service in server paths and delete server-local precedence logic
+  - Type: determined
+  - Component: `internal/server/handlers/gate_profile_resolver.go`, `internal/server/handlers/gate_profile_persistence.go`, `internal/workflow/gateprofile/service.go`
+  - Implementation:
+    1. Route server `gate_profile_resolver` and `gate_profile_persistence` through the shared gateprofile service.
+    2. Delete server-local precedence/fallback branches replaced by shared service outputs.
+    3. Delete server-local normalization wrappers that only mirrored precedence behavior.
+    4. Keep no dual resolver path in server handlers.
+  - Verification:
+    1. Run `go test ./internal/server/handlers ./internal/workflow/gateprofile`.
+    2. Run `go test ./internal/... -run 'GateProfile|StackGate|BuildGate'`.
+    3. Add structural proof in completion notes: removed server-local precedence symbols and canonical service call sites.
+  - Reasoning: high (9 CFP)
+
+- [ ] 2.1c Adopt canonical gate-profile service in nodeagent paths and delete nodeagent-local precedence logic
+  - Type: determined
+  - Component: `internal/nodeagent/run_options.go`, `internal/nodeagent/execution_orchestrator_gate.go`, `internal/workflow/gateprofile/service.go`
+  - Implementation:
+    1. Route nodeagent gate runtime option resolution through the shared gateprofile service and shared result types.
+    2. Delete nodeagent-local precedence/fallback branches replaced by shared service outputs.
+    3. Delete nodeagent-local normalization wrappers that only mirrored precedence behavior.
+    4. Keep no dual resolver path in nodeagent gate option assembly.
+  - Verification:
+    1. Run `go test ./internal/nodeagent ./internal/workflow/gateprofile`.
+    2. Run `go test ./internal/... -run 'GateProfile|StackGate|BuildGate'`.
+    3. Add structural proof in completion notes: removed nodeagent-local precedence symbols and canonical service call sites.
+  - Reasoning: high (9 CFP)
 
 - [ ] 2.2 Unify gate-profile input contracts and manifest projection
   - Type: determined
   - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/step_manifest.go`, `internal/workflow/contracts/build_gate_metadata.go`, `internal/nodeagent/manifest.go`, `internal/server/handlers/claim_spec_mutator_gate.go`, `internal/workflow/step/gate_plan_resolver.go`
   - Implementation:
-    1. Add one canonical gate-profile projection function in `workflow/contracts` that converts spec inputs into runtime gate metadata.
-    2. Replace gate-profile projection logic in `nodeagent/manifest.go` and `handlers/claim_spec_mutator_gate.go` with the canonical function.
-    3. Remove duplicate gate metadata normalization and defaulting branches in step planning and claim-spec mutation flows.
-    4. Keep one contract-level table-driven test suite that is imported by both server and nodeagent-facing tests.
+    1. Add one canonical gate-profile projection function in `workflow/contracts` for spec-to-runtime gate metadata.
+    2. Route `nodeagent/manifest.go` and `handlers/claim_spec_mutator_gate.go` to the canonical projection function.
+    3. Delete duplicate gate metadata normalization/defaulting branches from step planning and claim-spec mutation flows.
+    4. Keep one contract-level table-driven suite and remove superseded duplicated projection tests.
   - Verification:
     1. Run `go test ./internal/workflow/contracts ./internal/nodeagent ./internal/server/handlers ./internal/workflow/step`.
     2. Run `go test ./internal/... -run 'Manifest|GatePlan|ClaimSpecMutator'`.
+    3. Add structural proof in completion notes: removed projection branches and unified contract projection call sites.
   - Reasoning: high (14 CFP)
 
-- [ ] 3.1 Collapse duplicated blob list APIs into selector-based store methods
+- [ ] 3.1a Collapse duplicated log/diff list APIs into selector-based store methods
   - Type: assumption-bound
-  - Component: `internal/store/querier.go`, `internal/store/artifact_bundles.sql.go`, `internal/store/logs.sql.go`, `internal/store/diffs.sql.go`, `internal/store/events.sql.go`, `internal/store/models.go`, `internal/store/queries`
+  - Component: `internal/store/querier.go`, `internal/store/logs.sql.go`, `internal/store/diffs.sql.go`, `internal/store/models.go`, `internal/store/queries`
   - Assumptions: `sqlc` query regeneration remains the required source of truth for store interfaces and generated files.
   - Implementation:
-    1. Replace parallel `List*` versus `List*Meta*` query families with one selector-based query family per blob type.
-    2. Regenerate store interfaces and models so call sites consume a single method with explicit projection selection.
-    3. Refactor store tests to validate selector behavior instead of separate meta/full method behavior.
-    4. Remove deprecated duplicate query definitions and generated wrappers.
+    1. Replace parallel `ListLogs*`/`ListDiffs*` meta/full query families with selector-based query families.
+    2. Regenerate store interfaces/models so log/diff call sites use one selector-aware method per blob type.
+    3. Delete deprecated log/diff duplicate query definitions/generated wrappers and compatibility aliases.
+    4. Refactor log/diff store tests to selector behavior and delete split meta/full-path tests.
+  - Verification:
+    1. Run `go test ./internal/store/... -run 'Log|Diff|List'`.
+    2. Run `go test ./internal/store/...`.
+    3. Add structural proof in completion notes: removed log/diff duplicate entrypoints and selector-only call paths.
+  - Reasoning: high (14 CFP)
+
+- [ ] 3.1b Collapse duplicated artifact/event list APIs into selector-based store methods
+  - Type: assumption-bound
+  - Component: `internal/store/querier.go`, `internal/store/artifact_bundles.sql.go`, `internal/store/events.sql.go`, `internal/store/models.go`, `internal/store/queries`
+  - Assumptions: `sqlc` query regeneration remains the required source of truth for store interfaces and generated files.
+  - Implementation:
+    1. Replace parallel `ListArtifact*`/`ListEvents*` meta/full query families with selector-based query families.
+    2. Regenerate store interfaces/models so artifact/event call sites use one selector-aware method per blob type.
+    3. Delete deprecated artifact/event duplicate query definitions/generated wrappers and compatibility aliases.
+    4. Refactor artifact/event store tests to selector behavior and delete split meta/full-path tests.
+  - Verification:
+    1. Run `go test ./internal/store/... -run 'Artifact|Event|List'`.
+    2. Run `go test ./internal/store/...`.
+    3. Add structural proof in completion notes: removed artifact/event duplicate entrypoints and selector-only call paths.
+  - Reasoning: high (14 CFP)
+
+- [ ] 3.1c Finalize selector-only store surface and remove remaining duplicate list entrypoints
+  - Type: determined
+  - Component: `internal/store/querier.go`, `internal/store/models.go`, `internal/store/queries`
+  - Implementation:
+    1. Delete remaining duplicate list entrypoints left after `3.1a` and `3.1b`.
+    2. Enforce selector-only method families in `querier` interfaces and adapters.
+    3. Remove residual compatibility wiring that proxies old method names to selector methods.
+    4. Keep one canonical selector-path test per blob type and delete transitional duplicate tests.
   - Verification:
     1. Run `go test ./internal/store/...`.
     2. Run `make test`.
-  - Reasoning: xhigh (26 CFP)
+    3. Add structural proof in completion notes: selector-only interface surface and no duplicate list entrypoints.
+  - Reasoning: medium (8 CFP)
 
 - [ ] 3.2 Standardize blob download/read flow across handlers and blobpersist
   - Type: determined
   - Component: `internal/server/handlers/artifacts_download.go`, `internal/server/handlers/artifacts_repo.go`, `internal/server/handlers/diffs.go`, `internal/server/handlers/spec_bundles.go`, `internal/server/blobpersist/service.go`, `internal/nodeagent/uploaders.go`
   - Implementation:
-    1. Add a shared blob read helper package with typed readers for artifact bundle, diff, log, and spec bundle by selector.
-    2. Refactor artifact and diff handlers to use the shared read helpers and common not-found/error mapping.
-    3. Refactor blobpersist recovery artifact loading to reuse the same typed reader interfaces.
-    4. Refactor nodeagent uploader response decoding to use one canonical blob metadata response struct.
+    1. Add one shared blob-read helper package with typed readers for artifact bundle, diff, log, and spec bundle selectors.
+    2. Route artifact and diff handlers through shared readers/error mapping and delete handler-local read/error branches.
+    3. Route blobpersist recovery artifact loading through the same typed reader interfaces and delete local loaders.
+    4. Route nodeagent uploader response decoding through one canonical blob metadata response struct and delete duplicate decoders.
   - Verification:
     1. Run `go test ./internal/server/handlers ./internal/server/blobpersist ./internal/nodeagent`.
     2. Run `go test ./internal/... -run 'Artifact|Diff|SpecBundle|Blob'`.
+    3. Add structural proof in completion notes: removed local blob-read/decoder branches and shared-reader call sites.
   - Reasoning: high (16 CFP)
 
 - [ ] 4.1 Introduce shared HTTP contract helpers for handlers
   - Type: determined
   - Component: `internal/server/handlers/ingest_common.go`, `internal/server/handlers/bootstrap.go`, `internal/server/handlers/migs_crud.go`, `internal/server/handlers/runs.go`, `internal/server/handlers/repos.go`, `internal/server/handlers/events.go`
   - Implementation:
-    1. Add `internal/server/handlers/http_contract.go` with shared `RespondJSON`, `DecodeRequest`, and uniform error-envelope helpers.
-    2. Migrate handler entrypoints to use shared request decode and response write helpers while preserving status codes and payload fields.
-    3. Replace per-file ad-hoc response struct duplicates with shared contract structs where payload shapes are identical.
-    4. Remove dead helper fragments in individual handler files after migration.
+    1. Add `internal/server/handlers/http_contract.go` as the canonical handler HTTP contract helper surface.
+    2. Route handler entrypoints through shared decode/respond helpers while preserving existing status codes/payload fields.
+    3. Replace per-file duplicated response structs with shared contract structs where payload shapes match.
+    4. Delete superseded per-file helper fragments and duplicated envelope logic; keep no dual helper stacks.
   - Verification:
     1. Run `go test ./internal/server/handlers`.
     2. Run `go test ./internal/... -run 'Handler|HTTP|DecodeJSON|invalid request'`.
+    3. Add structural proof in completion notes: removed ad-hoc handler helpers and canonical helper call sites.
   - Reasoning: xhigh (20 CFP)
 
-- [ ] 4.2 Move reusable request/response DTOs from handlers to domain-level api package
+- [ ] 4.2a Create canonical domain-level DTO package for shared API payloads
   - Type: assumption-bound
-  - Component: `internal/domain/types`, `internal/migs/api`, `internal/server/handlers/*.go`, `internal/client/tui`, `internal/cli/migs`, `internal/cli/runs`
+  - Component: `internal/domain/api`, `internal/domain/types`, `internal/migs/api`
   - Assumptions: Existing endpoint payload schemas are stable enough to centralize without immediate follow-up API changes.
   - Implementation:
-    1. Create `internal/domain/api` DTO files for shared run, repo, mig, artifact, and status payload shapes.
-    2. Replace duplicated inline handler request/response structs with imported DTO types.
-    3. Update client/tui and cli call sites to decode into the same DTOs when endpoint payloads match.
-    4. Remove duplicate contract structs from handler and cli packages.
+    1. Create `internal/domain/api` DTO files for shared run/repo/mig/artifact/status payload shapes.
+    2. Consolidate equivalent existing DTO definitions into canonical domain DTO definitions.
+    3. Delete superseded duplicate DTO definitions in `internal/domain/types`/`internal/migs/api` where ownership is moved.
+    4. Keep domain-level DTO tests validating field parity for moved contracts.
   - Verification:
-    1. Run `go test ./internal/server/handlers ./internal/cli/... ./internal/client/... ./internal/migs/api ./internal/domain/...`.
+    1. Run `go test ./internal/domain/... ./internal/migs/api`.
+    2. Run `go test ./internal/... -run 'DTO|Payload|Schema'`.
+    3. Add structural proof in completion notes: canonical DTO owners and removed duplicate definitions.
+  - Reasoning: high (10 CFP)
+
+- [ ] 4.2b Migrate handlers to canonical DTOs and delete handler-local contract duplicates
+  - Type: determined
+  - Component: `internal/server/handlers/*.go`, `internal/domain/api`
+  - Implementation:
+    1. Route handler request/response contracts to `internal/domain/api` DTO imports where payloads match.
+    2. Delete duplicated inline handler request/response structs replaced by canonical DTOs.
+    3. Delete handler-local compatibility copy types that mirror canonical DTOs.
+    4. Keep no dual contract shapes for the same endpoint payload in handlers.
+  - Verification:
+    1. Run `go test ./internal/server/handlers ./internal/domain/api`.
+    2. Run `go test ./internal/... -run 'Handler|DTO|Decode|Encode'`.
+    3. Add structural proof in completion notes: removed handler-local duplicates and canonical DTO usage.
+  - Reasoning: high (9 CFP)
+
+- [ ] 4.2c Migrate client and CLI decode paths to canonical DTOs and delete duplicate decode structs
+  - Type: determined
+  - Component: `internal/client/tui`, `internal/cli/migs`, `internal/cli/runs`, `internal/domain/api`
+  - Implementation:
+    1. Route client/tui/cli decode paths to canonical DTOs where endpoint payloads match.
+    2. Delete duplicate decode structs from client and CLI packages replaced by canonical DTOs.
+    3. Delete compatibility decode wrappers that only map duplicate structs to canonical DTOs.
+    4. Keep no dual decode struct definitions for the same payload shape.
+  - Verification:
+    1. Run `go test ./internal/cli/... ./internal/client/... ./internal/domain/api`.
     2. Run `make test`.
-  - Reasoning: xhigh (18 CFP)
+    3. Add structural proof in completion notes: removed duplicate decode structs and canonical decode/import paths.
+  - Reasoning: high (9 CFP)
 
 - [ ] 5.1 Replace monolithic mockStore in handlers with focused fixture builders
   - Type: determined
   - Component: `internal/server/handlers/test_mock_store_core_test.go`, `internal/server/handlers/test_mock_store_jobs_test.go`, `internal/server/handlers/test_mock_store_migs_runs_test.go`, `internal/server/handlers/test_mock_store_artifacts_sbom_test.go`, `internal/server/handlers/test_helpers_test.go`
   - Implementation:
     1. Split `mockStore` into domain-focused fixtures (`runFixtureStore`, `jobFixtureStore`, `artifactFixtureStore`, `migFixtureStore`) with minimal method sets.
-    2. Introduce shared fixture builder helpers for repeated setup patterns (run creation, repo rows, job chains, artifact rows).
-    3. Migrate handler tests incrementally to targeted fixtures and delete unused fields/methods after each migration batch.
-    4. Remove the legacy monolithic `mockStore` type once all tests are migrated.
+    2. Introduce shared fixture builders for repeated setup patterns (run creation, repo rows, job chains, artifact rows).
+    3. Migrate handler tests to targeted fixtures and delete unused fields/methods in each migrated slice.
+    4. Remove the legacy monolithic `mockStore` type and any compatibility wrappers once migration is complete.
   - Verification:
     1. Run `go test ./internal/server/handlers`.
     2. Run `go test ./internal/server/... -run 'handlers|recovery'`.
+    3. Add structural proof in completion notes: removed monolithic mockStore entrypoints and focused fixture usage.
   - Reasoning: high (15 CFP)
 
 - [ ] 5.2 Create shared internal testkit for cross-module orchestration scenarios
   - Type: determined
   - Component: `internal/testutil`, `internal/server/recovery`, `internal/nodeagent`, `internal/workflow/step`, `internal/store`, `internal/cli/follow`
   - Implementation:
-    1. Add `internal/testutil/workflowkit` with reusable scenario builders for run states, repo attempts, job graphs, and gate-profile variants.
-    2. Replace duplicated scenario assembly in server, nodeagent, workflow, and store tests with `workflowkit` builders.
-    3. Add one canonical cross-module golden scenario per behavior path (claim, complete, recover, heal, gate-profile override).
-    4. Delete redundant near-duplicate tests that validate the same behavior path without extra assertions.
+    1. Add `internal/testutil/workflowkit` as the canonical cross-module scenario-builder owner.
+    2. Route server/nodeagent/workflow/store test scenario assembly through `workflowkit` and delete local scenario builders.
+    3. Keep one canonical cross-module golden scenario per behavior path (claim/complete/recover/heal/gate-profile override).
+    4. Delete redundant near-duplicate tests that cover identical behavior paths without additional assertions.
   - Verification:
     1. Run `go test ./internal/server/... ./internal/nodeagent/... ./internal/workflow/... ./internal/store/... ./internal/cli/follow/...`.
     2. Run `make test`.
+    3. Add structural proof in completion notes: removed duplicate scenario builders/tests and workflowkit-only assembly paths.
   - Reasoning: xhigh (19 CFP)
 
 - [ ] 5.3 Add LOC and duplication guardrails to keep reductions from regressing
   - Type: determined
   - Component: `Makefile`, `scripts/`, `internal/server/handlers`, `internal/nodeagent`, `internal/workflow/contracts`, `internal/store`, `docs/testing-workflow.md`
   - Implementation:
-    1. Add a script in `scripts/` that reports per-package non-test LOC and duplicate-symbol heuristics for `internal/` hotspots.
-    2. Add `make redundancy-check` target that fails when hotspot package budgets are exceeded after the reduction passes.
-    3. Wire `redundancy-check` into CI checks used by contributors for pre-merge validation.
-    4. Document guardrail usage and target budgets in `docs/testing-workflow.md`.
+    1. Add a script in `scripts/` that reports structural duplication signals in `internal/` hotspots (duplicate symbol patterns and parallel entrypoint families).
+    2. Add `make redundancy-check` that fails on newly introduced duplicate-symbol/parallel-entrypoint findings in scoped hotspot packages.
+    3. Wire `redundancy-check` into contributor CI checks so new duplicate paths are blocked at PR time.
+    4. Document guardrail usage and failure interpretation in `docs/testing-workflow.md` with remediation flow.
   - Verification:
     1. Run `make redundancy-check`.
     2. Run `make test`.
+    3. Add structural proof in completion notes: baseline findings resolved and no newly introduced duplicate paths in scoped hotspots.
   - Reasoning: medium (8 CFP)

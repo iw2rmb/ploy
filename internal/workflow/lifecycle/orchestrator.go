@@ -1,7 +1,9 @@
 package lifecycle
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,6 +12,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+// ========== Execution Error Classification ==========
+
+// JobStatusFromRunError maps a job execution error to the appropriate terminal job status.
+// context.Canceled and context.DeadlineExceeded produce Cancelled; all other
+// errors produce Fail. This is the canonical status-from-error mapping consumed
+// across all nodeagent execution paths.
+func JobStatusFromRunError(err error) domaintypes.JobStatus {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return domaintypes.JobStatusCancelled
+	}
+	return domaintypes.JobStatusFail
+}
 
 var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 

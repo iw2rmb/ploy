@@ -16,7 +16,6 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/nodeagent"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
@@ -32,13 +31,18 @@ const (
 	outcomeRuntimeError
 	// outcomeContextCancelled: execution context was cancelled or deadline exceeded.
 	outcomeContextCancelled
+	// outcomeGateInfraError: gate execution infrastructure error (Docker pull/start failure).
+	// Unlike outcomeRuntimeError, the gate job hardcodes Cancelled for these errors to
+	// prevent healing from triggering on infrastructure failures.
+	outcomeGateInfraError
 )
 
 // nodeagentStatusForOutcome derives the job status using the real nodeagent
 // execution paths. Success and non-zero-exit use the same constants the
 // nodeagent assigns directly; runtime and cancellation errors are routed
-// through nodeagent.JobStatusFromRunError so test behaviour tracks the
-// canonical implementation.
+// through lifecycle.JobStatusFromRunError so test behaviour tracks the
+// canonical implementation. Gate infra errors return Cancelled directly,
+// mirroring the hardcoded assignment in executeGateJob.
 func nodeagentStatusForOutcome(o nodeagentExecutionOutcome) domaintypes.JobStatus {
 	switch o {
 	case outcomeSuccess:
@@ -46,11 +50,15 @@ func nodeagentStatusForOutcome(o nodeagentExecutionOutcome) domaintypes.JobStatu
 	case outcomeNonZeroExit:
 		return domaintypes.JobStatusFail
 	case outcomeRuntimeError:
-		return nodeagent.JobStatusFromRunError(errors.New("runtime error"))
+		return lifecycle.JobStatusFromRunError(errors.New("runtime error"))
 	case outcomeContextCancelled:
-		return nodeagent.JobStatusFromRunError(context.Canceled)
+		return lifecycle.JobStatusFromRunError(context.Canceled)
+	case outcomeGateInfraError:
+		// Gate execution errors (Docker pull/create/start failures) are always
+		// Cancelled — hardcoded in executeGateJob to prevent healing on infra failures.
+		return domaintypes.JobStatusCancelled
 	default:
-		return nodeagent.JobStatusFromRunError(errors.New("unknown outcome"))
+		return lifecycle.JobStatusFromRunError(errors.New("unknown outcome"))
 	}
 }
 
@@ -113,6 +121,14 @@ func TestCrossPathTransitionParity(t *testing.T) {
 			wantStatus:      domaintypes.JobStatusCancelled,
 			wantChainAction: lifecycle.CompletionChainCancelRemainder,
 		},
+		{
+			name:            "pre-gate infra error cancels remainder without healing",
+			jobType:         domaintypes.JobTypePreGate,
+			outcome:         outcomeGateInfraError,
+			hasNext:         true,
+			wantStatus:      domaintypes.JobStatusCancelled,
+			wantChainAction: lifecycle.CompletionChainCancelRemainder,
+		},
 
 		// ── Gate job: post_gate ─────────────────────────────────────────────────
 
@@ -140,6 +156,14 @@ func TestCrossPathTransitionParity(t *testing.T) {
 			wantStatus:      domaintypes.JobStatusCancelled,
 			wantChainAction: lifecycle.CompletionChainCancelRemainder,
 		},
+		{
+			name:            "post-gate infra error cancels remainder without healing",
+			jobType:         domaintypes.JobTypePostGate,
+			outcome:         outcomeGateInfraError,
+			hasNext:         true,
+			wantStatus:      domaintypes.JobStatusCancelled,
+			wantChainAction: lifecycle.CompletionChainCancelRemainder,
+		},
 
 		// ── Gate job: re_gate ───────────────────────────────────────────────────
 
@@ -163,6 +187,14 @@ func TestCrossPathTransitionParity(t *testing.T) {
 			name:            "re-gate context cancelled cancels remainder",
 			jobType:         domaintypes.JobTypeReGate,
 			outcome:         outcomeContextCancelled,
+			hasNext:         true,
+			wantStatus:      domaintypes.JobStatusCancelled,
+			wantChainAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		{
+			name:            "re-gate infra error cancels remainder without healing",
+			jobType:         domaintypes.JobTypeReGate,
+			outcome:         outcomeGateInfraError,
 			hasNext:         true,
 			wantStatus:      domaintypes.JobStatusCancelled,
 			wantChainAction: lifecycle.CompletionChainCancelRemainder,
@@ -271,7 +303,7 @@ func TestCrossPathTransitionParity(t *testing.T) {
 			t.Parallel()
 
 			// Step 1: verify the nodeagent-side status determination via the real
-			// nodeagent path (JobStatusFromRunError for error outcomes; direct
+			// nodeagent path (lifecycle.JobStatusFromRunError for error outcomes; direct
 			// constants for success and non-zero-exit, matching the real code).
 			gotStatus := nodeagentStatusForOutcome(tc.outcome)
 			if gotStatus != tc.wantStatus {
@@ -290,10 +322,10 @@ func TestCrossPathTransitionParity(t *testing.T) {
 	}
 }
 
-// TestNodeagentJobStatusFromRunError_Exhaustive verifies that the real
-// nodeagent.JobStatusFromRunError covers every outcome variant and maps to the
-// correct status string used in the wire protocol.
-func TestNodeagentJobStatusFromRunError_Exhaustive(t *testing.T) {
+// TestJobStatusFromRunError_Exhaustive verifies that lifecycle.JobStatusFromRunError
+// covers every execution outcome variant and maps to the correct status string
+// used in the wire protocol.
+func TestJobStatusFromRunError_Exhaustive(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -304,6 +336,7 @@ func TestNodeagentJobStatusFromRunError_Exhaustive(t *testing.T) {
 		{outcomeNonZeroExit, "Fail"},
 		{outcomeRuntimeError, "Fail"},
 		{outcomeContextCancelled, "Cancelled"},
+		{outcomeGateInfraError, "Cancelled"},
 	}
 
 	for _, tc := range cases {
