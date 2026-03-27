@@ -61,6 +61,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRunDetailsLoaded(msg), nil
 	case jobsLoadedMsg:
 		return m.handleJobsLoaded(msg), nil
+	case jobDetailsLoadedMsg:
+		return m.handleJobDetailsLoaded(msg), nil
 	case errMsg:
 		m.lastErr = msg.err
 		return m, nil
@@ -147,6 +149,11 @@ func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
 	m.jobList = m.jobList.SetJobs(msg.jobs)
 	m.applyWindowHeight()
+	return m
+}
+
+func (m model) handleJobDetailsLoaded(msg jobDetailsLoadedMsg) model {
+	m.jobList = m.jobList.SetDetails(msg.detail)
 	return m
 }
 

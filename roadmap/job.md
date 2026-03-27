@@ -26,7 +26,7 @@ Documentation: `design/job.md`
     2. Add/adjust test cases for root-with-job-selected composition and focus behavior.
   - Reasoning: medium (CFP_delta: 7)
 
-- [ ] 1.3 Unify JobList data access with CLI command layer (`determined`)
+- [x] 1.3 Unify JobList data access with CLI command layer (`determined`)
   - Component: `internal/cli/runs`, `internal/cli/tui`, `internal/tui/commands.go`
   - Implementation:
     1. Reuse existing `internal/cli/runs` run-repo commands for JobList details and extend them with machine-readable helpers where current command surface is print-oriented.

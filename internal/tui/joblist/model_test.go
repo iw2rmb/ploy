@@ -6,6 +6,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
+	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
@@ -158,7 +159,7 @@ func TestDetailsNilByDefault(t *testing.T) {
 
 func TestSetDetailsRoundTrip(t *testing.T) {
 	m := joblist.New("JOBS")
-	item := &clitui.JobItem{JobID: domaintypes.JobID("job-99"), Name: "deploy"}
+	item := &cliruns.RepoJobEntry{JobID: domaintypes.JobID("job-99"), Name: "deploy"}
 	m = m.SetDetails(item)
 	got := m.Details()
 	if got == nil {
@@ -171,7 +172,7 @@ func TestSetDetailsRoundTrip(t *testing.T) {
 
 func TestSetJobsClearsDetails(t *testing.T) {
 	m := joblist.New("JOBS")
-	m = m.SetDetails(&clitui.JobItem{JobID: domaintypes.JobID("job-1")})
+	m = m.SetDetails(&cliruns.RepoJobEntry{JobID: domaintypes.JobID("job-1")})
 	m = m.SetJobs([]clitui.JobItem{
 		{Name: "other", MigName: "m", RunID: domaintypes.RunID("r"), RepoID: domaintypes.RepoID("repo")},
 	})

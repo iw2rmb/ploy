@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -114,6 +115,29 @@ func loadRunDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.
 type runDetailsLoadedMsg struct {
 	repoTotal int
 	jobTotal  int
+}
+
+// loadJobDetailsCmd fetches repo-scoped job details for the confirmed job using
+// the run-repo command surface from internal/cli/runs.
+func loadJobDetailsCmd(client *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.RepoID, jobID domaintypes.JobID) tea.Cmd {
+	return func() tea.Msg {
+		result, err := cliruns.ListRepoJobsCommand{
+			Client:  client,
+			BaseURL: baseURL,
+			RunID:   runID,
+			RepoID:  domaintypes.MigRepoID(string(repoID)),
+		}.Run(context.Background())
+		if err != nil {
+			return errMsg{err: err}
+		}
+		for _, job := range result.Jobs {
+			if job.JobID == jobID {
+				j := job
+				return jobDetailsLoadedMsg{detail: &j}
+			}
+		}
+		return jobDetailsLoadedMsg{detail: nil}
+	}
 }
 
 // errMsg carries an error from an async command.
