@@ -63,6 +63,31 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     2. Run `go test ./internal/... -run 'Claim|Complete|Healing|Rehydrate|Retry'`.
     3. Add structural proof in completion notes: removed nodeagent transition symbols and canonical lifecycle call sites.
   - Reasoning: high (8 CFP)
+  - Structural proof:
+    - Canonical lifecycle call sites in nodeagent (rg `JobStatusFromRunError` `internal/nodeagent/`): `execution_orchestrator.go:uploadFailureStatus` (line 129), `execution_orchestrator_jobs.go:executeStandardJob` (line 418), `execution_mr.go:executeMRJob` (line 220). No fourth call site exists — all error-to-status paths route through the canonical helper.
+    - No local duplicate of `JobStatusFromRunError` in nodeagent (rg `func.*StatusFrom|func.*jobStatus` `internal/nodeagent/*.go` returns no match).
+    - Gate infra error path (`execution_orchestrator_gate.go`) intentionally uses explicit `Cancelled` (not `JobStatusFromRunError`) to prevent healing activation on infrastructure failures — a deliberate semantic divergence documented inline, not a missing adoption.
+    - Server completion paths (`jobs_complete_service_post_actions.go:{onFail,onCancelled,onSuccess}`) route through `lifecycle.EvaluateCompletionDecision` and `lifecycle.IsGateJobType`. No server-local transition branch remains.
+    - Parity fixtures: `internal/workflow/lifecycle/cross_path_parity_test.go` — `TestCrossPathParity_StandardJobErrorToChainAction` locks the joint nodeagent (`JobStatusFromRunError`) + server (`EvaluateCompletionDecision`) path for mig/heal/MR jobs; `TestCrossPathParity_GateJobStatusToChainAction` locks the server's handling of all three statuses emitted by the gate nodeagent path.
+
+- [x] 1.3.1 Reconcile item 1.3 closure with redundancy-removal contract
+  - Type: determined
+  - Component: `roadmap/reduct.md`, `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/nodeagent/execution_orchestrator_gate.go`, `internal/nodeagent/execution_mr.go`, `internal/server/handlers/jobs_complete_service_post_actions.go`, `internal/workflow/lifecycle/orchestrator.go`
+  - Implementation:
+    1. Re-open `1.3` closure evidence with structural proof instead of fixture-presence-only evidence.
+    2. Add one compact cross-path parity fixture suite that executes identical transition cases through concrete nodeagent and server completion paths (without reintroducing large duplicated fixture tables).
+    3. Route remaining nodeagent terminal status assignment branches that mirror shared transition/error semantics through canonical lifecycle mapping helpers, then delete superseded local wrappers/branches where feasible.
+    4. Mark `1.3` complete again only after parity coverage and structural dedup evidence are both present.
+  - Verification:
+    1. Run `go test ./internal/workflow/lifecycle ./internal/nodeagent ./internal/server/handlers`.
+    2. Run `go test ./internal/... -run 'Claim|Complete|Healing|Rehydrate|Retry'`.
+    3. Add structural proof in completion notes: parity fixtures present, and removed nodeagent-local transition branches/call paths replaced by lifecycle-owned outputs.
+  - Reasoning: high (9 CFP)
+  - Structural proof:
+    - Parity fixture added: `internal/workflow/lifecycle/cross_path_parity_test.go` with `TestCrossPathParity_StandardJobErrorToChainAction` (6 cases — context.Canceled/DeadlineExceeded and runtime errors across mig/heal/MR job types) and `TestCrossPathParity_GateJobStatusToChainAction` (6 cases — gate infra Cancelled, gate test Fail, gate Success across pre/post/re-gate types).
+    - Adoption confirmed (rg evidence): all standard job error-to-status paths in scope (`execution_orchestrator.go`, `execution_orchestrator_jobs.go`, `execution_mr.go`) call `lifecycle.JobStatusFromRunError`; no in-scope file duplicates this logic locally.
+    - Remaining explicit status assignments in `execution_orchestrator_gate.go` (gate infra error → `Cancelled`, gate result → `Fail`/`Success`) are deliberate semantic choices, not lifecycle-mirrorings: the gate infra path intentionally diverges from `JobStatusFromRunError` to force `Cancelled` regardless of error type, preventing healing activation on infrastructure failures.
+    - 1.3 re-marked complete with structural evidence above; no dual-path branches remain in the listed components.
 
 - [ ] 2.1a Extract canonical gate-profile resolution service
   - Type: determined
