@@ -232,15 +232,7 @@ func listRunStageArtifacts(
 	return artifacts, nil
 }
 
-type repoDiffEntry struct {
-	ID        domaintypes.DiffID      `json:"id"`
-	JobID     domaintypes.JobID       `json:"job_id"`
-	CreatedAt time.Time               `json:"created_at"`
-	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
-}
-
-func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]repoDiffEntry, error) {
+func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) ([]RepoDiffEntry, error) {
 	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos", repoID.String(), "diffs")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -258,13 +250,13 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 
 	var result struct {
-		Diffs []repoDiffEntry `json:"diffs"`
+		Diffs []RepoDiffEntry `json:"diffs"`
 	}
 	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run report: decode diffs: %w", err)
 	}
 	if result.Diffs == nil {
-		result.Diffs = make([]repoDiffEntry, 0)
+		result.Diffs = make([]RepoDiffEntry, 0)
 	}
 
 	return result.Diffs, nil
@@ -272,7 +264,7 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 // latestRepoDiff returns the most recent diff entry.
 // The API returns diffs ordered by created_at ascending, so the last element is the latest.
-func latestRepoDiff(diffs []repoDiffEntry) *repoDiffEntry {
+func latestRepoDiff(diffs []RepoDiffEntry) *RepoDiffEntry {
 	if len(diffs) == 0 {
 		return nil
 	}

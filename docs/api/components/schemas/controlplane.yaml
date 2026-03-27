@@ -770,7 +770,14 @@ DiffItem:
     summary:
       type: object
       additionalProperties: true
-      description: "Diff summary metadata (exit_code, files_changed, job_type, etc.)"
+      description: |
+        Diff summary metadata. Known fields:
+        - exit_code (int): container exit code
+        - files_changed (int): number of changed files
+        - lines_added (int): total inserted lines in the patch
+        - lines_removed (int): total deleted lines in the patch
+        - job_type (string): "mig" or "healing"
+        - timings (object): hydration/execution/diff/total duration in ms
   required: [id, job_id, created_at, gzipped_size]
 
 # DiffListResponse is the response for listing diffs.
@@ -1119,10 +1126,35 @@ RepoJobItem:
       type: integer
       format: int64
       description: Job duration in milliseconds (0 if not finished)
+    exit_code:
+      type: integer
+      format: int32
+      nullable: true
+      description: Container exit code when job has finished (omitted when not yet set)
     display_name:
       type: string
       nullable: true
       description: User-friendly step name from spec (for mig jobs)
+    action_summary:
+      type: string
+      nullable: true
+      description: One-line description of what a healing job did (mig jobs only)
+    bug_summary:
+      type: string
+      nullable: true
+      description: One-line build failure description produced by the router (gate jobs only)
+    lang:
+      type: string
+      nullable: true
+      description: Detected programming language from gate stack detection (gate jobs only)
+    version:
+      type: string
+      nullable: true
+      description: Detected language version/release from gate stack detection (gate jobs only)
+    tooling:
+      type: string
+      nullable: true
+      description: Detected build tool from gate stack detection (gate jobs only)
     recovery:
       type: object
       nullable: true

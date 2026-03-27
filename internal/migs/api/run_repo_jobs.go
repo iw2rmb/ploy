@@ -44,6 +44,11 @@ type RunRepoJob struct {
 	ActionSummary string                `json:"action_summary,omitempty"`
 	BugSummary    string                `json:"bug_summary,omitempty"`
 	Recovery      *RunRepoJobRecovery   `json:"recovery,omitempty"`
+	// Build-gate stack detection fields (gate jobs only).
+	// Populated from gate metadata's detected_stack when present.
+	Lang    string `json:"lang,omitempty"`
+	Version string `json:"version,omitempty"`
+	Tooling string `json:"tooling,omitempty"`
 }
 
 // ListRunRepoJobsResponse is the response for GET /v1/runs/{run_id}/repos/{repo_id}/jobs.

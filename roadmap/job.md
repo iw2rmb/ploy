@@ -37,7 +37,7 @@ Documentation: `design/job.md`
     2. Confirm no new TUI-only HTTP command package is introduced.
   - Reasoning: medium (CFP_delta: 8)
 
-- [ ] 1.4 Extend current run-repo payloads for required JobList details (`determined`)
+- [x] 1.4 Extend current run-repo payloads for required JobList details (`determined`)
   - Component: `internal/migs/api/run_repo_jobs.go`, `internal/server/handlers/runs_repo_jobs.go`, `internal/domain/types/diffsummary.go`, `internal/server/handlers/diffs.go`, `docs/api/components/schemas/controlplane.yaml`
   - Implementation:
     1. Extend run-repo jobs response with missing structured detail fields required by JobList while keeping existing endpoint path.

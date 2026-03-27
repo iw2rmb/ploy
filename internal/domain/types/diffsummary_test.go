@@ -294,3 +294,70 @@ func TestDiffSummaryBuilder(t *testing.T) {
 		}
 	})
 }
+
+func TestDiffSummary_LinesAdded(t *testing.T) {
+	tests := []struct {
+		name      string
+		json      string
+		wantCount int
+		wantFound bool
+	}{
+		{"present", `{"lines_added": 42}`, 42, true},
+		{"zero", `{"lines_added": 0}`, 0, true},
+		{"missing", `{}`, 0, false},
+		{"null", `{"lines_added": null}`, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary := mustParseDiffSummary(t, tt.json)
+			count, found := summary.LinesAdded()
+			if count != tt.wantCount || found != tt.wantFound {
+				t.Errorf("LinesAdded() = (%d, %v), want (%d, %v)", count, found, tt.wantCount, tt.wantFound)
+			}
+		})
+	}
+}
+
+func TestDiffSummary_LinesRemoved(t *testing.T) {
+	tests := []struct {
+		name      string
+		json      string
+		wantCount int
+		wantFound bool
+	}{
+		{"present", `{"lines_removed": 7}`, 7, true},
+		{"zero", `{"lines_removed": 0}`, 0, true},
+		{"missing", `{}`, 0, false},
+		{"null", `{"lines_removed": null}`, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			summary := mustParseDiffSummary(t, tt.json)
+			count, found := summary.LinesRemoved()
+			if count != tt.wantCount || found != tt.wantFound {
+				t.Errorf("LinesRemoved() = (%d, %v), want (%d, %v)", count, found, tt.wantCount, tt.wantFound)
+			}
+		})
+	}
+}
+
+func TestDiffSummaryBuilder_LineDeltaRoundtrip(t *testing.T) {
+	summary := NewDiffSummaryBuilder().
+		LinesAdded(15).
+		LinesRemoved(3).
+		FilesChanged(2).
+		MustBuild()
+
+	added, ok := summary.LinesAdded()
+	if !ok || added != 15 {
+		t.Errorf("LinesAdded() = (%d, %v), want (15, true)", added, ok)
+	}
+	removed, ok := summary.LinesRemoved()
+	if !ok || removed != 3 {
+		t.Errorf("LinesRemoved() = (%d, %v), want (3, true)", removed, ok)
+	}
+	files, ok := summary.FilesChanged()
+	if !ok || files != 2 {
+		t.Errorf("FilesChanged() = (%d, %v), want (2, true)", files, ok)
+	}
+}

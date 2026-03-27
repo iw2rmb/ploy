@@ -1,12 +1,48 @@
 package step
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
 	"strings"
 )
+
+// PatchStats holds line-level statistics derived from a unified diff.
+type PatchStats struct {
+	FilesChanged int
+	LinesAdded   int
+	LinesRemoved int
+}
+
+// CountPatchStats parses a unified diff and returns file and line delta counts.
+// It counts `+` lines (excluding `+++ ` file headers) as additions and `-` lines
+// (excluding `--- ` file headers) as removals. Each `diff --git` or `diff --no-index`
+// header marks one changed file.
+func CountPatchStats(patchBytes []byte) PatchStats {
+	if len(patchBytes) == 0 {
+		return PatchStats{}
+	}
+	var stats PatchStats
+	scanner := bufio.NewScanner(bytes.NewReader(patchBytes))
+	for scanner.Scan() {
+		line := scanner.Text()
+		switch {
+		case strings.HasPrefix(line, "diff --"):
+			stats.FilesChanged++
+		case strings.HasPrefix(line, "+++ "):
+			// file header — skip
+		case strings.HasPrefix(line, "--- "):
+			// file header — skip
+		case strings.HasPrefix(line, "+"):
+			stats.LinesAdded++
+		case strings.HasPrefix(line, "-"):
+			stats.LinesRemoved++
+		}
+	}
+	return stats
+}
 
 type filesystemDiffGenerator struct{}
 
