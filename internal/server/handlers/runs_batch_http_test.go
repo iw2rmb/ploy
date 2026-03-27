@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -19,411 +18,11 @@ import (
 
 const testRunRepoSHASeed = "0123456789abcdef0123456789abcdef01234567"
 
-type cancelRunStoreMock struct {
-	store.Store
-	getRunResult store.Run
-	getRunErr    error
-
-	cancelRunV1Called bool
-	cancelRunV1Param  domaintypes.RunID
-	cancelRunV1Err    error
-
-	countRows []store.CountRunReposByStatusRow
-	countErr  error
-}
-
-func (m *cancelRunStoreMock) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
-	return m.getRunResult, m.getRunErr
-}
-
-func (m *cancelRunStoreMock) CancelRunV1(ctx context.Context, runID domaintypes.RunID) error {
-	m.cancelRunV1Called = true
-	m.cancelRunV1Param = runID
-	return m.cancelRunV1Err
-}
-
-func (m *cancelRunStoreMock) CountRunReposByStatus(ctx context.Context, runID domaintypes.RunID) ([]store.CountRunReposByStatusRow, error) {
-	return m.countRows, m.countErr
-}
-
-type addRunRepoStoreMock struct {
-	store.Store
-	getRunResult store.Run
-	getRunErr    error
-	repoByID     map[domaintypes.RepoID]store.Repo
-
-	createMigRepoCalled bool
-	createMigRepoParams store.CreateMigRepoParams
-	createMigRepoResult store.MigRepo
-	createMigRepoErr    error
-
-	createRunRepoCalled bool
-	createRunRepoParams store.CreateRunRepoParams
-	createRunRepoResult store.RunRepo
-	createRunRepoErr    error
-
-	getSpecResult store.Spec
-	getSpecErr    error
-
-	createJobCallCount int
-	createJobParams    []store.CreateJobParams
-	createJobErr       error
-}
-
-func (m *addRunRepoStoreMock) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
-	return m.getRunResult, m.getRunErr
-}
-
-func (m *addRunRepoStoreMock) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
-	m.createMigRepoCalled = true
-	m.createMigRepoParams = params
-	result := m.createMigRepoResult
-	if result.ID.IsZero() {
-		result.ID = params.ID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = domaintypes.NewRepoID()
-	}
-	if m.repoByID == nil {
-		m.repoByID = map[domaintypes.RepoID]store.Repo{}
-	}
-	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: params.Url}
-	return result, m.createMigRepoErr
-}
-
-func (m *addRunRepoStoreMock) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
-	m.createRunRepoCalled = true
-	m.createRunRepoParams = params
-	if m.createRunRepoErr != nil {
-		return store.RunRepo{}, m.createRunRepoErr
-	}
-	result := m.createRunRepoResult
-	if result.RunID.IsZero() {
-		result.RunID = params.RunID
-	}
-	if result.RepoID.IsZero() {
-		result.RepoID = params.RepoID
-	}
-	if result.MigID.IsZero() {
-		result.MigID = params.MigID
-	}
-	if result.RepoBaseRef == "" {
-		result.RepoBaseRef = params.RepoBaseRef
-	}
-	if result.RepoTargetRef == "" {
-		result.RepoTargetRef = params.RepoTargetRef
-	}
-	if result.Status == "" {
-		result.Status = domaintypes.RunRepoStatusQueued
-	}
-	if result.Attempt == 0 {
-		result.Attempt = 1
-	}
-	if !result.CreatedAt.Valid {
-		result.CreatedAt = pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}
-	}
-	return result, nil
-}
-
-func (m *addRunRepoStoreMock) GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error) {
-	return m.getSpecResult, m.getSpecErr
-}
-
-func (m *addRunRepoStoreMock) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJobCallCount++
-	m.createJobParams = append(m.createJobParams, params)
-	if m.createJobErr != nil {
-		return store.Job{}, m.createJobErr
-	}
-	return store.Job{ID: domaintypes.NewJobID()}, nil
-}
-
-func (m *addRunRepoStoreMock) GetRepo(ctx context.Context, id domaintypes.RepoID) (store.Repo, error) {
-	if m.repoByID != nil {
-		if repo, ok := m.repoByID[id]; ok {
-			return repo, nil
-		}
-	}
-	if !id.IsZero() {
-		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
-	}
-	return store.Repo{}, pgx.ErrNoRows
-}
-
-type listRunReposStoreMock struct {
-	store.Store
-	listRunReposWithURLByRunCalled bool
-	listRunReposWithURLByRunParam  domaintypes.RunID
-	listRunReposWithURLByRunResult []store.ListRunReposWithURLByRunRow
-	listRunReposWithURLByRunErr    error
-}
-
-func (m *listRunReposStoreMock) ListRunReposWithURLByRun(ctx context.Context, runID domaintypes.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
-	m.listRunReposWithURLByRunCalled = true
-	m.listRunReposWithURLByRunParam = runID
-	return m.listRunReposWithURLByRunResult, m.listRunReposWithURLByRunErr
-}
-
-type cancelRunRepoStoreMock struct {
-	store.Store
-	getRunRepoResults []store.RunRepo
-	getRunRepoErr     error
-	getRunRepoCalls   int
-
-	getModRepoResult store.MigRepo
-	getModRepoErr    error
-	repoByID         map[domaintypes.RepoID]store.Repo
-
-	updateRunRepoStatusCalled bool
-	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
-
-	listJobsResult []store.Job
-	listJobsErr    error
-
-	updateJobStatusCalled bool
-	updateJobStatusCalls  []store.UpdateJobStatusParams
-}
-
-func (m *cancelRunRepoStoreMock) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
-	if m.getRunRepoErr != nil {
-		return store.RunRepo{}, m.getRunRepoErr
-	}
-	if len(m.getRunRepoResults) == 0 {
-		return store.RunRepo{}, nil
-	}
-	idx := m.getRunRepoCalls
-	if idx >= len(m.getRunRepoResults) {
-		idx = len(m.getRunRepoResults) - 1
-	}
-	m.getRunRepoCalls++
-	return m.getRunRepoResults[idx], nil
-}
-
-func (m *cancelRunRepoStoreMock) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
-	return m.getModRepoResult, m.getModRepoErr
-}
-
-func (m *cancelRunRepoStoreMock) GetRepo(ctx context.Context, id domaintypes.RepoID) (store.Repo, error) {
-	if m.repoByID != nil {
-		if repo, ok := m.repoByID[id]; ok {
-			return repo, nil
-		}
-	}
-	if !id.IsZero() {
-		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
-	}
-	return store.Repo{}, pgx.ErrNoRows
-}
-
-func (m *cancelRunRepoStoreMock) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
-	m.updateRunRepoStatusCalled = true
-	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
-	return nil
-}
-
-func (m *cancelRunRepoStoreMock) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
-	return m.listJobsResult, m.listJobsErr
-}
-
-func (m *cancelRunRepoStoreMock) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
-	m.updateJobStatusCalled = true
-	m.updateJobStatusCalls = append(m.updateJobStatusCalls, params)
-	return nil
-}
-
-type restartRunRepoStoreMock struct {
-	store.Store
-	getRunResult store.Run
-	getRunErr    error
-	repoByID     map[domaintypes.RepoID]store.Repo
-
-	getRunRepoResults []store.RunRepo
-	getRunRepoErr     error
-	getRunRepoCalls   int
-
-	updateRunStatusCalled bool
-	updateRunStatusParams []store.UpdateRunStatusParams
-	updateRunStatusErr    error
-
-	updateRunRepoRefsCalled bool
-	updateRunRepoRefsParams []store.UpdateRunRepoRefsParams
-
-	updateModRepoRefsCalled bool
-	updateModRepoRefsParams []store.UpdateMigRepoRefsParams
-
-	incrementRunRepoAttemptCalled bool
-	incrementRunRepoAttemptParam  store.IncrementRunRepoAttemptParams
-	incrementRunRepoAttemptErr    error
-
-	getSpecResult store.Spec
-	getSpecErr    error
-
-	createJobCallCount int
-	createJobParams    []store.CreateJobParams
-	createJobErr       error
-
-	getModRepoResult store.MigRepo
-	getModRepoErr    error
-}
-
-func (m *restartRunRepoStoreMock) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
-	return m.getRunResult, m.getRunErr
-}
-
-func (m *restartRunRepoStoreMock) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
-	if m.getRunRepoErr != nil {
-		return store.RunRepo{}, m.getRunRepoErr
-	}
-	if len(m.getRunRepoResults) == 0 {
-		return store.RunRepo{}, nil
-	}
-	idx := m.getRunRepoCalls
-	if idx >= len(m.getRunRepoResults) {
-		idx = len(m.getRunRepoResults) - 1
-	}
-	m.getRunRepoCalls++
-	return m.getRunRepoResults[idx], nil
-}
-
-func (m *restartRunRepoStoreMock) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
-	m.updateRunStatusCalled = true
-	m.updateRunStatusParams = append(m.updateRunStatusParams, params)
-	return m.updateRunStatusErr
-}
-
-func (m *restartRunRepoStoreMock) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
-	m.updateRunRepoRefsCalled = true
-	m.updateRunRepoRefsParams = append(m.updateRunRepoRefsParams, params)
-	return nil
-}
-
-func (m *restartRunRepoStoreMock) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
-	m.updateModRepoRefsCalled = true
-	m.updateModRepoRefsParams = append(m.updateModRepoRefsParams, params)
-	return nil
-}
-
-func (m *restartRunRepoStoreMock) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
-	m.incrementRunRepoAttemptCalled = true
-	m.incrementRunRepoAttemptParam = arg
-	return m.incrementRunRepoAttemptErr
-}
-
-func (m *restartRunRepoStoreMock) GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error) {
-	return m.getSpecResult, m.getSpecErr
-}
-
-func (m *restartRunRepoStoreMock) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJobCallCount++
-	m.createJobParams = append(m.createJobParams, params)
-	if m.createJobErr != nil {
-		return store.Job{}, m.createJobErr
-	}
-	return store.Job{ID: domaintypes.NewJobID()}, nil
-}
-
-func (m *restartRunRepoStoreMock) GetMigRepo(ctx context.Context, id domaintypes.MigRepoID) (store.MigRepo, error) {
-	return m.getModRepoResult, m.getModRepoErr
-}
-
-func (m *restartRunRepoStoreMock) ListMigReposByMig(ctx context.Context, modID domaintypes.MigID) ([]store.MigRepo, error) {
-	if m.getModRepoErr != nil {
-		return nil, m.getModRepoErr
-	}
-	if !m.getModRepoResult.ID.IsZero() {
-		return []store.MigRepo{m.getModRepoResult}, nil
-	}
-	return nil, nil
-}
-
-func (m *restartRunRepoStoreMock) GetRepo(ctx context.Context, id domaintypes.RepoID) (store.Repo, error) {
-	if m.repoByID != nil {
-		if repo, ok := m.repoByID[id]; ok {
-			return repo, nil
-		}
-	}
-	if !id.IsZero() {
-		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
-	}
-	return store.Repo{}, pgx.ErrNoRows
-}
-
-type startRunStoreMock struct {
-	store.Store
-	getRunResult store.Run
-	getRunErr    error
-
-	getSpecResult store.Spec
-	getSpecErr    error
-
-	listRunReposByRunResult []store.RunRepo
-	listRunReposByRunErr    error
-
-	listQueuedRunReposByRunResult []store.RunRepo
-	listQueuedRunReposByRunErr    error
-
-	listJobsByRunRepoAttemptResult []store.Job
-	listJobsByRunRepoAttemptErr    error
-
-	updateRunRepoErrorCalled bool
-	updateRunRepoErrorParams []store.UpdateRunRepoErrorParams
-
-	scheduleNextJobCalled bool
-	scheduleNextJobParam  store.ScheduleNextJobParams
-	scheduleNextJobResult store.Job
-	scheduleNextJobErr    error
-
-	createJobCallCount int
-	createJobParams    []store.CreateJobParams
-	createJobErr       error
-}
-
-func (m *startRunStoreMock) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
-	return m.getRunResult, m.getRunErr
-}
-
-func (m *startRunStoreMock) GetSpec(ctx context.Context, id domaintypes.SpecID) (store.Spec, error) {
-	return m.getSpecResult, m.getSpecErr
-}
-
-func (m *startRunStoreMock) ListRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error) {
-	return m.listRunReposByRunResult, m.listRunReposByRunErr
-}
-
-func (m *startRunStoreMock) ListQueuedRunReposByRun(ctx context.Context, runID domaintypes.RunID) ([]store.RunRepo, error) {
-	return m.listQueuedRunReposByRunResult, m.listQueuedRunReposByRunErr
-}
-
-func (m *startRunStoreMock) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
-	return m.listJobsByRunRepoAttemptResult, m.listJobsByRunRepoAttemptErr
-}
-
-func (m *startRunStoreMock) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
-	m.updateRunRepoErrorCalled = true
-	m.updateRunRepoErrorParams = append(m.updateRunRepoErrorParams, params)
-	return nil
-}
-
-func (m *startRunStoreMock) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error) {
-	m.scheduleNextJobCalled = true
-	m.scheduleNextJobParam = arg
-	return m.scheduleNextJobResult, m.scheduleNextJobErr
-}
-
-func (m *startRunStoreMock) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJobCallCount++
-	m.createJobParams = append(m.createJobParams, params)
-	if m.createJobErr != nil {
-		return store.Job{}, m.createJobErr
-	}
-	return store.Job{ID: domaintypes.NewJobID()}, nil
-}
-
 func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &cancelRunStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -439,13 +38,11 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.cancelRunV1Called {
 		t.Fatalf("expected CancelRunV1 to be called")
 	}
-	if st.cancelRunV1Param != runID {
+	if st.cancelRunV1Param != runID.String() {
 		t.Fatalf("expected CancelRunV1 run id %q, got %q", runID, st.cancelRunV1Param)
 	}
 }
@@ -454,7 +51,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &cancelRunStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -471,9 +68,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 	if !st.cancelRunV1Called {
 		t.Fatalf("expected CancelRunV1 to be called")
 	}
@@ -483,7 +78,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &cancelRunStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -499,9 +94,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 
 	cancelRunHandlerV1(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if st.cancelRunV1Called {
 		t.Fatalf("did not expect CancelRunV1 to be called for terminal run")
 	}
@@ -515,7 +108,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	modRepoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
-	st := &addRunRepoStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -547,9 +140,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 
 	addRunRepoHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusCreated)
 	if !st.createMigRepoCalled || !st.createRunRepoCalled {
 		t.Fatalf("expected CreateMigRepo and CreateRunRepo to be called")
 	}
@@ -564,7 +155,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &listRunReposStoreMock{
+	st := &mockStore{
 		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
 			{
 				RunID:         runID,
@@ -585,9 +176,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 
 	listRunReposHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Repos []RunRepoResponse `json:"repos"`
@@ -601,7 +190,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	if !st.listRunReposWithURLByRunCalled {
 		t.Fatalf("expected ListRunReposWithURLByRun to be called")
 	}
-	if st.listRunReposWithURLByRunParam != runID {
+	if st.listRunReposWithURLByRunParam != runID.String() {
 		t.Fatalf("expected run id %q, got %q", runID, st.listRunReposWithURLByRunParam)
 	}
 }
@@ -610,7 +199,7 @@ func TestListRunReposHandler_ListError(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &listRunReposStoreMock{
+	st := &mockStore{
 		listRunReposWithURLByRunErr: errors.New("db exploded"),
 	}
 
@@ -620,9 +209,7 @@ func TestListRunReposHandler_ListError(t *testing.T) {
 
 	listRunReposHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
@@ -630,7 +217,7 @@ func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	st := &cancelRunRepoStoreMock{
+	st := &mockStore{
 		getRunRepoErr: pgx.ErrNoRows,
 	}
 
@@ -641,9 +228,7 @@ func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 
 	cancelRunRepoHandlerV1(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
@@ -654,7 +239,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	modRepoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
-	st := &restartRunRepoStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -689,6 +274,9 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 			ID:     modRepoID,
 			RepoID: repoID,
 		},
+		listMigReposByModResult: []store.MigRepo{
+			{ID: modRepoID, RepoID: repoID},
+		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
@@ -706,13 +294,11 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 
 	restartRunRepoHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.updateRunStatusCalled {
 		t.Fatalf("expected UpdateRunStatus to be called for terminal run")
 	}
-	if !st.updateRunRepoRefsCalled || !st.updateModRepoRefsCalled {
+	if !st.updateRunRepoRefsCalled || !st.updateMigRepoRefsCalled {
 		t.Fatalf("expected refs updates to be called")
 	}
 	if !st.incrementRunRepoAttemptCalled {
@@ -741,7 +327,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 		CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
-	st := &startRunStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -760,17 +346,12 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 
 	startRunHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if st.createJobCallCount != 3 {
 		t.Fatalf("expected starter to create 3 jobs, got %d", st.createJobCallCount)
 	}
 
-	var resp StartRunResponse
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[StartRunResponse](t, rr)
 	if resp.RunID != runID {
 		t.Fatalf("expected run id %q, got %q", runID, resp.RunID)
 	}
@@ -783,7 +364,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &startRunStoreMock{
+	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        runID,
 			MigID:     domaintypes.NewMigID(),
@@ -799,7 +380,5 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 
 	startRunHandler(st).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 }

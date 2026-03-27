@@ -105,6 +105,54 @@ func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
 	return req.WithContext(ctx)
 }
 
+// newMockStoreForJob returns a mockStore pre-configured for a standard running job fixture.
+// The store has getRunResult (Started), getJobResult, and listJobsByRunResult set.
+func newMockStoreForJob(f jobTestFixture) *mockStore {
+	return &mockStore{
+		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
+		getJobResult:        f.Job,
+		listJobsByRunResult: []store.Job{f.Job},
+	}
+}
+
+// doJSON sends a JSON request to handler and returns the recorder.
+// body is marshaled to JSON; pass nil for no body.
+func doJSON(t *testing.T, handler http.Handler, method, path string, body any) *httptest.ResponseRecorder {
+	t.Helper()
+	var r *http.Request
+	if body != nil {
+		raw, err := json.Marshal(body)
+		if err != nil {
+			t.Fatalf("marshal body: %v", err)
+		}
+		r = httptest.NewRequest(method, path, bytes.NewReader(raw))
+		r.Header.Set("Content-Type", "application/json")
+	} else {
+		r = httptest.NewRequest(method, path, nil)
+	}
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, r)
+	return rr
+}
+
+// assertStatus fails the test if rr.Code != want.
+func assertStatus(t *testing.T, rr *httptest.ResponseRecorder, want int) {
+	t.Helper()
+	if rr.Code != want {
+		t.Fatalf("expected status %d, got %d: %s", want, rr.Code, rr.Body.String())
+	}
+}
+
+// decodeBody decodes rr.Body as JSON into T.
+func decodeBody[T any](t *testing.T, rr *httptest.ResponseRecorder) T {
+	t.Helper()
+	var v T
+	if err := json.NewDecoder(rr.Body).Decode(&v); err != nil {
+		t.Fatalf("decode response body: %v", err)
+	}
+	return v
+}
+
 // newTestServerWithRole creates an HTTP server with routes registered and
 // the given auth role as the default for all requests.
 func newTestServerWithRole(t *testing.T, role auth.Role) *server.HTTPServer {

@@ -133,4 +133,10 @@ func (m *mockStore) ListFailedRepoIDsByMig(ctx context.Context, modID types.MigI
 	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr
 }
 
+func (m *mockStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
+	m.updateMigRepoRefsCalled = true
+	m.updateMigRepoRefsParams = params
+	return m.updateMigRepoRefsErr
+}
+
 // ListRunReposWithURLByRun returns run repos with their repo_url for pull resolution.
