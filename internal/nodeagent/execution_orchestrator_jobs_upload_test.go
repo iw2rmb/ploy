@@ -19,7 +19,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-// TestRunController_uploadConfiguredArtifacts verifies artifact path resolution and upload.
 func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 	t.Parallel()
 
@@ -139,7 +138,6 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 	}
 }
 
-// TestRunController_uploadOutDir verifies /out directory bundling and upload.
 func TestRunController_uploadOutDir(t *testing.T) {
 	t.Parallel()
 
@@ -307,7 +305,6 @@ func TestRunController_uploadOutDirBundle_CustomName(t *testing.T) {
 	}
 }
 
-// TestRunController_uploadStatus verifies status upload with retry logic.
 func TestRunController_uploadStatus(t *testing.T) {
 	t.Parallel()
 
@@ -370,7 +367,6 @@ func TestRunController_uploadStatus(t *testing.T) {
 	}
 }
 
-// TestRunController_uploadGateLogsArtifact verifies gate log artifact upload with ID attachment.
 func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 	t.Parallel()
 

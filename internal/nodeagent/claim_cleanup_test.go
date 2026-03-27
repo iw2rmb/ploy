@@ -12,41 +12,6 @@ import (
 	"github.com/moby/moby/client"
 )
 
-type fakeClaimCleanupDockerClient struct {
-	infoResult client.SystemInfoResult
-	infoErr    error
-
-	listResult client.ContainerListResult
-	listErr    error
-	listCalls  int
-
-	removeErrByID map[string]error
-	removedIDs    []string
-}
-
-func (f *fakeClaimCleanupDockerClient) Info(context.Context, client.InfoOptions) (client.SystemInfoResult, error) {
-	if f.infoErr != nil {
-		return client.SystemInfoResult{}, f.infoErr
-	}
-	return f.infoResult, nil
-}
-
-func (f *fakeClaimCleanupDockerClient) ContainerList(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
-	f.listCalls++
-	if f.listErr != nil {
-		return client.ContainerListResult{}, f.listErr
-	}
-	return f.listResult, nil
-}
-
-func (f *fakeClaimCleanupDockerClient) ContainerRemove(_ context.Context, containerID string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
-	f.removedIDs = append(f.removedIDs, containerID)
-	if err, ok := f.removeErrByID[containerID]; ok && err != nil {
-		return client.ContainerRemoveResult{}, err
-	}
-	return client.ContainerRemoveResult{}, nil
-}
-
 type fakeFreeBytes struct {
 	values []int64
 	errAt  int
@@ -74,7 +39,7 @@ func (f *fakeFreeBytes) read(path string) (int64, error) {
 func TestDockerPreClaimCleanup_EnoughCapacitySkipsCleanup(t *testing.T) {
 	t.Parallel()
 
-	fakeDocker := &fakeClaimCleanupDockerClient{
+	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 	}
 	fb := &fakeFreeBytes{values: []int64{minDockerFreeBytes + 1}}
@@ -100,7 +65,7 @@ func TestDockerPreClaimCleanup_FiltersAndRemovesFIFO(t *testing.T) {
 	t.Parallel()
 
 	low := minDockerFreeBytes - 1
-	fakeDocker := &fakeClaimCleanupDockerClient{
+	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
 			{ID: "unmanaged-stopped", Created: 1, State: containertypes.ContainerState("exited")},
@@ -138,7 +103,7 @@ func TestDockerPreClaimCleanup_ExhaustedContainersReturnsFalse(t *testing.T) {
 	t.Parallel()
 
 	low := minDockerFreeBytes - 1
-	fakeDocker := &fakeClaimCleanupDockerClient{
+	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
 			{ID: "old-1", Created: 1, State: containertypes.ContainerState("exited"), Labels: map[string]string{types.LabelRunID: "run-1"}},
@@ -165,7 +130,7 @@ func TestDockerPreClaimCleanup_InfoError(t *testing.T) {
 	t.Parallel()
 
 	cleanup := &dockerPreClaimCleanup{
-		docker: &fakeClaimCleanupDockerClient{infoErr: errors.New("boom")},
+		docker: &fakeDockerClient{infoErr: errors.New("boom")},
 		freeBytes: func(string) (int64, error) {
 			return minDockerFreeBytes, nil
 		},
@@ -184,7 +149,7 @@ func TestDockerPreClaimCleanup_EmptyDockerRootDir(t *testing.T) {
 	t.Parallel()
 
 	cleanup := &dockerPreClaimCleanup{
-		docker: &fakeClaimCleanupDockerClient{infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: ""}}},
+		docker: &fakeDockerClient{infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: ""}}},
 		freeBytes: func(string) (int64, error) {
 			return minDockerFreeBytes, nil
 		},
@@ -203,7 +168,7 @@ func TestDockerPreClaimCleanup_FreeBytesError(t *testing.T) {
 	t.Parallel()
 
 	cleanup := &dockerPreClaimCleanup{
-		docker: &fakeClaimCleanupDockerClient{infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}}},
+		docker: &fakeDockerClient{infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}}},
 		freeBytes: func(string) (int64, error) {
 			return 0, errors.New("statfs failed")
 		},
@@ -222,7 +187,7 @@ func TestDockerPreClaimCleanup_RemoveError(t *testing.T) {
 	t.Parallel()
 
 	low := minDockerFreeBytes - 1
-	fakeDocker := &fakeClaimCleanupDockerClient{
+	fakeDocker := &fakeDockerClient{
 		infoResult: client.SystemInfoResult{Info: system.Info{DockerRootDir: "/var/lib/docker"}},
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{{
 			ID:      "old-1",

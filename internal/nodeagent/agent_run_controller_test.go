@@ -9,7 +9,6 @@ import (
 
 // Run controller unit tests: StartRun / StopRun behavior.
 
-// TestRunControllerStartRun verifies that starting a run registers it in the controller.
 func TestRunControllerStartRun(t *testing.T) {
 	cfg := newTestConfig("http://127.0.0.1:8080")
 	rc := &runController{
@@ -38,7 +37,6 @@ func TestRunControllerStartRun(t *testing.T) {
 	}
 }
 
-// TestRunControllerStartRunDuplicate verifies that starting a duplicate job returns an error.
 func TestRunControllerStartRunDuplicate(t *testing.T) {
 	cfg := newTestConfig("http://127.0.0.1:8080")
 	rc := &runController{
@@ -67,7 +65,6 @@ func TestRunControllerStartRunDuplicate(t *testing.T) {
 	}
 }
 
-// TestRunControllerStopRun verifies that stopping a run removes its jobs from the controller.
 func TestRunControllerStopRun(t *testing.T) {
 	cfg := newTestConfig("http://127.0.0.1:8080")
 	rc := &runController{
@@ -107,7 +104,6 @@ func TestRunControllerStopRun(t *testing.T) {
 	}
 }
 
-// TestRunControllerStopNonExistent verifies that stopping a nonexistent run returns an error.
 func TestRunControllerStopNonExistent(t *testing.T) {
 	cfg := newTestConfig("http://127.0.0.1:8080")
 	rc := &runController{

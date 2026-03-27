@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// TestParseSpec_GitLabConfigFromServer verifies that parseSpec correctly extracts
-// gitlab_pat and gitlab_domain from spec when supplied by the server.
 func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 	t.Parallel()
 
@@ -40,8 +38,6 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 	}
 }
 
-// TestParseSpec_GitLabConfigWithMRFlags verifies that parseSpec correctly extracts
-// gitlab config fields along with MR creation flags.
 func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	t.Parallel()
 

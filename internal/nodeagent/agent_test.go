@@ -16,7 +16,6 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestAgentCreation verifies that New() constructs all required components.
 func TestAgentCreation(t *testing.T) {
 	t.Parallel()
 
@@ -56,7 +55,6 @@ func TestAgentCreation(t *testing.T) {
 	}
 }
 
-// TestAgentLifecycle verifies the full agent start/stop lifecycle.
 func TestAgentLifecycle(t *testing.T) {
 	t.Parallel()
 
@@ -143,7 +141,6 @@ func TestAgentLifecycle(t *testing.T) {
 	}
 }
 
-// TestAgentGracefulShutdown verifies that the agent stops cleanly on context cancellation.
 func TestAgentGracefulShutdown(t *testing.T) {
 	t.Parallel()
 
@@ -317,7 +314,6 @@ func TestAgentComponentIntegration(t *testing.T) {
 	}
 }
 
-// TestAgentWithTLS verifies agent creation and startup with TLS enabled.
 func TestAgentWithTLS(t *testing.T) {
 	t.Parallel()
 

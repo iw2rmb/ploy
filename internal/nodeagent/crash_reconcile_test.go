@@ -1,11 +1,9 @@
 package nodeagent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -18,69 +16,6 @@ import (
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 )
-
-type fakeCrashReconcileDockerClient struct {
-	listResult client.ContainerListResult
-	listErr    error
-	listCalls  int
-
-	inspectByID    map[string]client.ContainerInspectResult
-	inspectErrByID map[string]error
-
-	waitByID      map[string]containertypes.WaitResponse
-	waitErrByID   map[string]error
-	waitBlockByID map[string]chan struct{}
-
-	logsByID    map[string][]byte
-	logsErrByID map[string]error
-}
-
-func (f *fakeCrashReconcileDockerClient) ContainerList(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
-	f.listCalls++
-	if f.listErr != nil {
-		return client.ContainerListResult{}, f.listErr
-	}
-	return f.listResult, nil
-}
-
-func (f *fakeCrashReconcileDockerClient) ContainerInspect(_ context.Context, containerID string, _ client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
-	if err, ok := f.inspectErrByID[containerID]; ok && err != nil {
-		return client.ContainerInspectResult{}, err
-	}
-	if inspect, ok := f.inspectByID[containerID]; ok {
-		return inspect, nil
-	}
-	return client.ContainerInspectResult{}, errors.New("missing inspect result")
-}
-
-func (f *fakeCrashReconcileDockerClient) ContainerWait(_ context.Context, containerID string, _ client.ContainerWaitOptions) client.ContainerWaitResult {
-	result := make(chan containertypes.WaitResponse, 1)
-	errCh := make(chan error, 1)
-	if gate, ok := f.waitBlockByID[containerID]; ok && gate != nil {
-		<-gate
-	}
-	if err, ok := f.waitErrByID[containerID]; ok && err != nil {
-		errCh <- err
-		return client.ContainerWaitResult{Result: result, Error: errCh}
-	}
-	waitResp, ok := f.waitByID[containerID]
-	if !ok {
-		waitResp = containertypes.WaitResponse{StatusCode: 0}
-	}
-	result <- waitResp
-	return client.ContainerWaitResult{Result: result, Error: errCh}
-}
-
-func (f *fakeCrashReconcileDockerClient) ContainerLogs(_ context.Context, containerID string, _ client.ContainerLogsOptions) (client.ContainerLogsResult, error) {
-	if err, ok := f.logsErrByID[containerID]; ok && err != nil {
-		return nil, err
-	}
-	data, ok := f.logsByID[containerID]
-	if !ok {
-		data = nil
-	}
-	return io.NopCloser(bytes.NewReader(data)), nil
-}
 
 func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	t.Parallel()
@@ -109,7 +44,7 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	controller := &mockRunController{}
 	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{
-		docker: &fakeCrashReconcileDockerClient{
+		docker: &fakeDockerClient{
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
 				{
 					ID:     "ctr-terminal",
@@ -172,7 +107,7 @@ func TestCrashReconcile_ClassifiesByRuntimeState_Contract(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 2, 26, 14, 0, 0, 0, time.UTC)
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
 			{
 				ID:     "running-2",
@@ -256,7 +191,7 @@ func TestCrashReconcile_UsesFinishedAtCutoff_Contract(t *testing.T) {
 
 	now := time.Date(2026, 2, 26, 15, 0, 0, 0, time.UTC)
 	cutoff := now.Add(-120 * time.Second)
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
 			{
 				ID:      "boundary",
@@ -314,7 +249,7 @@ func TestCrashReconcile_SkipsStaleTerminalContainers_Contract(t *testing.T) {
 
 	now := time.Date(2026, 2, 26, 16, 0, 0, 0, time.UTC)
 	cutoff := now.Add(-120 * time.Second)
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		listResult: client.ContainerListResult{Items: []containertypes.Summary{
 			{ID: "stale", Labels: map[string]string{types.LabelRunID: "run-stale", types.LabelJobID: "job-stale"}},
 			{ID: "empty-finished", Labels: map[string]string{types.LabelRunID: "run-empty", types.LabelJobID: "job-empty"}},
@@ -382,7 +317,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	}))
 	defer ts.Close()
 
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		waitByID: map[string]containertypes.WaitResponse{
 			containerID: {StatusCode: 0},
 		},
@@ -455,7 +390,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 	}))
 	defer ts.Close()
 
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		waitByID: map[string]containertypes.WaitResponse{
 			containerID: {StatusCode: 0},
 		},
@@ -545,7 +480,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		waitErrByID: map[string]error{
 			failContainer: errors.New("wait failed"),
 		},

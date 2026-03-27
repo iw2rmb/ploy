@@ -18,7 +18,6 @@ func cleanupWorkspace(path string) {
 	_ = os.RemoveAll(path)
 }
 
-// TestWorkspaceHelpers verifies workspace creation and cleanup helpers.
 func TestWorkspaceHelpers(t *testing.T) {
 	t.Run("workspace creation produces unique directory", func(t *testing.T) {
 		ws, err := createEphemeralWorkspace()
@@ -64,7 +63,6 @@ func TestWorkspaceHelpers(t *testing.T) {
 	})
 }
 
-// TestWorkspaceBaseEnv verifies that workspace creation respects the PLOYD_CACHE_HOME environment variable.
 func TestWorkspaceBaseEnv(t *testing.T) {
 	t.Run("respects PLOYD_CACHE_HOME base", func(t *testing.T) {
 		base := t.TempDir()
