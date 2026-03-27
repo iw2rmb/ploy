@@ -63,7 +63,7 @@ func MaybeUpdateRunRepoStatus(
 // all run_repos are terminal and publishes run/done SSE events.
 func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eventsService *server.EventsService, run store.Run) (bool, error) {
 	runID := run.ID
-	if run.Status == domaintypes.RunStatusFinished || run.Status == domaintypes.RunStatusCancelled {
+	if lifecycle.IsTerminalRunStatus(run.Status) {
 		return false, nil
 	}
 
@@ -81,7 +81,7 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 	if err != nil {
 		return false, fmt.Errorf("get run for completion check: %w", err)
 	}
-	if currentRun.Status == domaintypes.RunStatusFinished || currentRun.Status == domaintypes.RunStatusCancelled {
+	if lifecycle.IsTerminalRunStatus(currentRun.Status) {
 		return false, nil
 	}
 
