@@ -164,7 +164,7 @@ func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
 
 	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{
-		docker: &fakeCrashReconcileDockerClient{
+		docker: &fakeDockerClient{
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
 				{
 					ID:     "terminal-ctr",
@@ -222,7 +222,7 @@ func TestClaimLoop_StartupReconcileFailureStopsClaimLoop(t *testing.T) {
 
 	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{
-		docker: &fakeCrashReconcileDockerClient{
+		docker: &fakeDockerClient{
 			listErr: context.DeadlineExceeded,
 		},
 	}
@@ -242,7 +242,7 @@ func TestClaimLoop_StartupReconcileRunsOncePerProcess(t *testing.T) {
 
 	claimer := setupClaimer(t, newTestConfig("http://127.0.0.1:8080"), &mockRunController{})
 
-	fakeDocker := &fakeCrashReconcileDockerClient{
+	fakeDocker := &fakeDockerClient{
 		listResult: client.ContainerListResult{},
 	}
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}

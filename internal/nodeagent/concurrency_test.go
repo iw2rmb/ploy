@@ -10,9 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestConcurrency_LimitsJobExecution verifies that Config.Concurrency limits
-// the number of jobs that can execute concurrently. When N+1 jobs are started,
-// only N should execute at a time.
 func TestConcurrency_LimitsJobExecution(t *testing.T) {
 	t.Parallel()
 
@@ -130,8 +127,6 @@ func TestConcurrency_LimitsJobExecution(t *testing.T) {
 	}
 }
 
-// TestConcurrency_DefaultsToOne verifies that when Concurrency is 0 or not set,
-// it defaults to 1 (serial execution).
 func TestConcurrency_DefaultsToOne(t *testing.T) {
 	t.Parallel()
 
@@ -220,8 +215,6 @@ func TestConcurrency_DefaultsToOne(t *testing.T) {
 	}
 }
 
-// TestConcurrency_ContextCancellation verifies that AcquireSlot respects context
-// cancellation when waiting for a slot.
 func TestConcurrency_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
@@ -271,8 +264,6 @@ func TestConcurrency_ContextCancellation(t *testing.T) {
 	rc.ReleaseSlot()
 }
 
-// TestConcurrency_SlotReleasedOnJobCompletion verifies that slots are properly
-// released when jobs complete, allowing new jobs to start.
 func TestConcurrency_SlotReleasedOnJobCompletion(t *testing.T) {
 	t.Parallel()
 

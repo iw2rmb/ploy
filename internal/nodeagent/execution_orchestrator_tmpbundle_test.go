@@ -59,7 +59,6 @@ func buildTestTarGz(t *testing.T, entries map[string][]byte, typeflagOverrides m
 	return buf.Bytes()
 }
 
-// digestOf returns the hex-encoded SHA-256 digest of data.
 func digestOf(data []byte) string {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
@@ -121,145 +120,104 @@ func TestExtractTmpBundle_ValidDirectory(t *testing.T) {
 	}
 }
 
-func TestExtractTmpBundle_RejectsSymlink(t *testing.T) {
+func TestExtractTmpBundle_RejectsUnsafeEntryType(t *testing.T) {
 	t.Parallel()
 
-	data := buildTestTarGz(t, map[string][]byte{
-		"evil.sh": []byte("data"),
-	}, map[string]byte{"evil.sh": tar.TypeSymlink})
-
-	stagingDir := t.TempDir()
-	err := extractTmpBundle(data, stagingDir)
-	if err == nil {
-		t.Fatal("expected error for symlink entry, got nil")
+	tests := []struct {
+		name     string
+		typeflag byte
+	}{
+		{name: "symlink", typeflag: tar.TypeSymlink},
+		{name: "hardlink", typeflag: tar.TypeLink},
 	}
-}
 
-func TestExtractTmpBundle_RejectsHardlink(t *testing.T) {
-	t.Parallel()
-
-	data := buildTestTarGz(t, map[string][]byte{
-		"hard.sh": []byte("data"),
-	}, map[string]byte{"hard.sh": tar.TypeLink})
-
-	stagingDir := t.TempDir()
-	err := extractTmpBundle(data, stagingDir)
-	if err == nil {
-		t.Fatal("expected error for hardlink entry, got nil")
-	}
-}
-
-func TestExtractTmpBundle_RejectsAbsolutePath(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	gw := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gw)
-	_ = tw.WriteHeader(&tar.Header{Name: "/etc/passwd", Typeflag: tar.TypeReg, Size: 4, Mode: 0o644})
-	_, _ = tw.Write([]byte("root"))
-	_ = tw.Close()
-	_ = gw.Close()
-
-	stagingDir := t.TempDir()
-	if err := extractTmpBundle(buf.Bytes(), stagingDir); err == nil {
-		t.Fatal("expected error for absolute path, got nil")
-	}
-}
-
-func TestExtractTmpBundle_RejectsTraversal(t *testing.T) {
-	t.Parallel()
-
-	tests := []string{
-		"../escape",
-		"foo/../../etc/passwd",
-	}
-	for _, name := range tests {
-		name := name
-		t.Run(name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var buf bytes.Buffer
-			gw := gzip.NewWriter(&buf)
-			tw := tar.NewWriter(gw)
-			_ = tw.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Size: 4, Mode: 0o644})
-			_, _ = tw.Write([]byte("data"))
-			_ = tw.Close()
-			_ = gw.Close()
+			data := buildTestTarGz(t, map[string][]byte{
+				"evil.sh": []byte("data"),
+			}, map[string]byte{"evil.sh": tt.typeflag})
 
 			stagingDir := t.TempDir()
-			if err := extractTmpBundle(buf.Bytes(), stagingDir); err == nil {
-				t.Fatalf("expected error for traversal path %q, got nil", name)
+			if err := extractTmpBundle(data, stagingDir); err == nil {
+				t.Fatalf("expected error for %s entry, got nil", tt.name)
 			}
 		})
 	}
 }
 
-func TestExtractTmpBundle_RejectsDuplicatePath(t *testing.T) {
+func TestExtractTmpBundle_RejectsUnsafePath(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-	gw := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gw)
-	for range 2 {
-		_ = tw.WriteHeader(&tar.Header{Name: "config.json", Typeflag: tar.TypeReg, Size: 2, Mode: 0o644})
-		_, _ = tw.Write([]byte("{}"))
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "absolute_path", path: "/etc/passwd"},
+		{name: "traversal_parent", path: "../escape"},
+		{name: "traversal_nested", path: "foo/../../etc/passwd"},
+		{name: "duplicate_path", path: ""},
 	}
-	_ = tw.Close()
-	_ = gw.Close()
 
-	stagingDir := t.TempDir()
-	if err := extractTmpBundle(buf.Bytes(), stagingDir); err == nil {
-		t.Fatal("expected error for duplicate path, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var buf bytes.Buffer
+			gw := gzip.NewWriter(&buf)
+			tw := tar.NewWriter(gw)
+
+			if tt.name == "duplicate_path" {
+				for range 2 {
+					_ = tw.WriteHeader(&tar.Header{Name: "config.json", Typeflag: tar.TypeReg, Size: 2, Mode: 0o644})
+					_, _ = tw.Write([]byte("{}"))
+				}
+			} else {
+				_ = tw.WriteHeader(&tar.Header{Name: tt.path, Typeflag: tar.TypeReg, Size: 4, Mode: 0o644})
+				_, _ = tw.Write([]byte("data"))
+			}
+
+			_ = tw.Close()
+			_ = gw.Close()
+
+			stagingDir := t.TempDir()
+			if err := extractTmpBundle(buf.Bytes(), stagingDir); err == nil {
+				t.Fatalf("expected error for %s, got nil", tt.name)
+			}
+		})
 	}
 }
 
-// --- verifyBundleDigest tests ---
-
-func TestVerifyBundleDigest_Match(t *testing.T) {
+func TestVerifyBundleDigest(t *testing.T) {
 	t.Parallel()
 
 	data := []byte("hello bundle")
-	digest := digestOf(data)
-	if err := verifyBundleDigest(data, digest); err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	correctDigest := digestOf(data)
+
+	tests := []struct {
+		name    string
+		data    []byte
+		digest  string
+		wantErr bool
+	}{
+		{name: "match", data: data, digest: correctDigest},
+		{name: "mismatch", data: data, digest: "deadbeef", wantErr: true},
+		{name: "case_insensitive", data: []byte("case test"), digest: upper(digestOf([]byte("case test")))},
+		{name: "sha256_prefix", data: []byte("server prefix test"), digest: "sha256:" + digestOf([]byte("server prefix test"))},
+		{name: "sha256_prefix_mismatch", data: []byte("server prefix test"), digest: "sha256:deadbeef", wantErr: true},
 	}
-}
 
-func TestVerifyBundleDigest_Mismatch(t *testing.T) {
-	t.Parallel()
-
-	data := []byte("hello bundle")
-	if err := verifyBundleDigest(data, "deadbeef"); err == nil {
-		t.Fatal("expected error for digest mismatch, got nil")
-	}
-}
-
-func TestVerifyBundleDigest_CaseInsensitive(t *testing.T) {
-	t.Parallel()
-
-	data := []byte("case test")
-	lower := digestOf(data)
-	upper := upper(lower)
-	if err := verifyBundleDigest(data, upper); err != nil {
-		t.Fatalf("expected no error for uppercase digest, got: %v", err)
-	}
-}
-
-func TestVerifyBundleDigest_Sha256Prefix(t *testing.T) {
-	t.Parallel()
-
-	data := []byte("server prefix test")
-	prefixed := "sha256:" + digestOf(data)
-	if err := verifyBundleDigest(data, prefixed); err != nil {
-		t.Fatalf("expected no error for sha256:-prefixed digest, got: %v", err)
-	}
-}
-
-func TestVerifyBundleDigest_Sha256PrefixMismatch(t *testing.T) {
-	t.Parallel()
-
-	data := []byte("server prefix test")
-	if err := verifyBundleDigest(data, "sha256:deadbeef"); err == nil {
-		t.Fatal("expected error for sha256:-prefixed wrong digest, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := verifyBundleDigest(tt.data, tt.digest)
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
@@ -278,13 +236,11 @@ func upper(s string) string {
 func TestTmpBundle_Materialization_DownloadVerifyExtract(t *testing.T) {
 	t.Parallel()
 
-	// Build a valid archive with one file.
 	archiveData := buildTestTarGz(t, map[string][]byte{
 		"config.json": []byte(`{"key":"value"}`),
 	}, nil)
 	digest := digestOf(archiveData)
 
-	// Serve the archive via a test HTTP server.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/gzip")
 		w.WriteHeader(http.StatusOK)

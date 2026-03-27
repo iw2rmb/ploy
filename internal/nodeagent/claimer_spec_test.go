@@ -43,8 +43,6 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	}
 }
 
-// TestParseSpec_CanonicalSingleStepFormat verifies that parseSpec correctly extracts
-// single-step execution fields from steps[0] and preserves env merge semantics.
 func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	specJSON := `{
         "steps": [{
@@ -288,8 +286,6 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 	}
 }
 
-// TestParseHealingMod_ModFields verifies that healing mig parsing correctly
-// extracts mig fields including image, command, and env.
 func TestParseHealingMod_ModFields(t *testing.T) {
 	t.Parallel()
 

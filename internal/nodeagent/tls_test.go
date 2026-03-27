@@ -14,8 +14,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/pki"
 )
 
-// TestServerTLSWiring verifies that the node agent server correctly sets up
-// TLS with client certificate verification when TLS is enabled.
 func TestServerTLSWiring(t *testing.T) {
 	// Generate test CA and certificates.
 	now := time.Now().UTC()
@@ -217,8 +215,6 @@ func TestServerTLSWiring(t *testing.T) {
 	})
 }
 
-// TestClientTLSWiring verifies that the heartbeat manager correctly sets up
-// TLS with client certificate authentication.
 func TestClientTLSWiring(t *testing.T) {
 	// Generate test CA and certificates.
 	now := time.Now().UTC()
@@ -361,7 +357,6 @@ func TestClientTLSWiring(t *testing.T) {
 	}
 }
 
-// TestTLSDisabled verifies that when TLS is disabled, plain HTTP is used.
 func TestTLSDisabled(t *testing.T) {
 	cfg := Config{
 		ServerURL: "http://127.0.0.1:8080",
@@ -666,72 +661,59 @@ func TestBootstrapTLS_CAPathFallback(t *testing.T) {
 	}
 }
 
-// TestBootstrapTLS_InvalidCAFile verifies that requestCertificate returns an error
-// when the configured BootstrapCAPath contains invalid certificate data.
-func TestBootstrapTLS_InvalidCAFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	bootstrapCAPath := filepath.Join(tmpDir, "invalid-ca.crt")
+func TestBootstrapTLS_CAFileErrors(t *testing.T) {
+	t.Parallel()
 
-	// Write invalid certificate data.
-	if err := os.WriteFile(bootstrapCAPath, []byte("not a valid certificate"), 0600); err != nil {
-		t.Fatalf("write invalid CA: %v", err)
-	}
-
-	cfg := Config{
-		ServerURL: "https://127.0.0.1:9999",
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled:         true,
-				BootstrapCAPath: bootstrapCAPath,
-			},
+	tests := []struct {
+		name      string
+		writeFile bool
+		content   string
+		errSubstr string
+	}{
+		{
+			name:      "invalid_content",
+			writeFile: true,
+			content:   "not a valid certificate",
+			errSubstr: "no valid certificates found",
+		},
+		{
+			name:      "missing_file",
+			writeFile: false,
+			errSubstr: "read bootstrap CA",
 		},
 	}
 
-	agent := &Agent{cfg: cfg}
-	ctx := context.Background()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tmpDir := t.TempDir()
+			caPath := filepath.Join(tmpDir, "ca.crt")
 
-	// Request should fail immediately due to invalid CA file.
-	_, _, err := agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
-	if err == nil {
-		t.Fatal("expected error for invalid CA file, got nil")
-	}
+			if tt.writeFile {
+				if err := os.WriteFile(caPath, []byte(tt.content), 0600); err != nil {
+					t.Fatalf("write CA file: %v", err)
+				}
+			}
 
-	// Verify error message mentions the parse failure.
-	expectedSubstr := "no valid certificates found"
-	if !containsError(err, expectedSubstr) {
-		t.Errorf("expected error containing %q, got: %v", expectedSubstr, err)
-	}
-}
+			cfg := Config{
+				ServerURL: "https://127.0.0.1:9999",
+				NodeID:    testNodeID,
+				HTTP: HTTPConfig{
+					TLS: TLSConfig{
+						Enabled:         true,
+						BootstrapCAPath: caPath,
+					},
+				},
+			}
 
-// TestBootstrapTLS_MissingCAFile verifies that requestCertificate returns an error
-// when the configured BootstrapCAPath file does not exist.
-func TestBootstrapTLS_MissingCAFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	missingPath := filepath.Join(tmpDir, "missing-ca.crt")
-
-	cfg := Config{
-		ServerURL: "https://127.0.0.1:9999",
-		NodeID:    testNodeID,
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled:         true,
-				BootstrapCAPath: missingPath,
-			},
-		},
-	}
-
-	agent := &Agent{cfg: cfg}
-	ctx := context.Background()
-
-	// Request should fail immediately because CA file doesn't exist.
-	_, _, err := agent.requestCertificate(ctx, "test-token", []byte("csr-data"))
-	if err == nil {
-		t.Fatal("expected error for missing CA file, got nil")
-	}
-
-	// Verify error message mentions the read failure.
-	if !containsError(err, "read bootstrap CA") {
-		t.Errorf("expected error about reading CA, got: %v", err)
+			agent := &Agent{cfg: cfg}
+			_, _, err := agent.requestCertificate(context.Background(), "test-token", []byte("csr-data"))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !containsError(err, tt.errSubstr) {
+				t.Errorf("expected error containing %q, got: %v", tt.errSubstr, err)
+			}
+		})
 	}
 }

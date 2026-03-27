@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// TestRequestCertificate_Success verifies successful certificate acquisition on first attempt.
 func TestRequestCertificate_Success(t *testing.T) {
 	t.Parallel()
 
@@ -59,7 +58,6 @@ func TestRequestCertificate_Success(t *testing.T) {
 	}
 }
 
-// TestRequestCertificate_RetryOnNetworkError verifies retry behavior on network errors.
 func TestRequestCertificate_RetryOnNetworkError(t *testing.T) {
 	t.Parallel()
 
@@ -107,7 +105,6 @@ func TestRequestCertificate_RetryOnNetworkError(t *testing.T) {
 	}
 }
 
-// TestRequestCertificate_RetryExhaustion verifies failure after max retries.
 func TestRequestCertificate_RetryExhaustion(t *testing.T) {
 	t.Parallel()
 
@@ -136,7 +133,6 @@ func TestRequestCertificate_RetryExhaustion(t *testing.T) {
 	}
 }
 
-// TestRequestCertificate_BackoffProgression verifies exponential backoff intervals.
 func TestRequestCertificate_BackoffProgression(t *testing.T) {
 	t.Parallel()
 
@@ -209,7 +205,6 @@ func TestRequestCertificate_BackoffProgression(t *testing.T) {
 	}
 }
 
-// TestRequestCertificate_ContextCancellation verifies context cancellation during retry.
 func TestRequestCertificate_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
@@ -238,7 +233,6 @@ func TestRequestCertificate_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestRequestCertificate_BearerToken verifies bearer token is saved when provided.
 func TestRequestCertificate_BearerToken(t *testing.T) {
 	// Note: Cannot use t.Parallel() because we use t.Setenv() to override the bearer token path.
 
@@ -282,7 +276,6 @@ func TestRequestCertificate_BearerToken(t *testing.T) {
 	}
 }
 
-// TestRequestCertificate_Non200Status verifies retry on non-200 responses.
 func TestRequestCertificate_Non200Status(t *testing.T) {
 	t.Parallel()
 

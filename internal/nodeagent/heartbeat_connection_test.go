@@ -14,42 +14,46 @@ import (
 	"time"
 )
 
-// TestBuildURLBasic verifies basic URL construction from server base and path.
-func TestBuildURLBasic(t *testing.T) {
-	u, err := BuildURL("http://server.example.com:8080", "/v1/nodes/x/heartbeat")
-	if err != nil {
-		t.Fatalf("buildURL error: %v", err)
-	}
-	want := "http://server.example.com:8080/v1/nodes/x/heartbeat"
-	if u != want {
-		t.Fatalf("url = %q, want %q", u, want)
-	}
-}
+func TestBuildURL(t *testing.T) {
+	t.Parallel()
 
-// TestBuildURLTrailingSlash verifies URL construction handles trailing slashes correctly.
-func TestBuildURLTrailingSlash(t *testing.T) {
-	u, err := BuildURL("http://server.example.com:8080/", "/v1/foo")
-	if err != nil {
-		t.Fatalf("buildURL error: %v", err)
+	tests := []struct {
+		name string
+		base string
+		path string
+		want string
+	}{
+		{
+			name: "basic",
+			base: "http://server.example.com:8080",
+			path: "/v1/nodes/x/heartbeat",
+			want: "http://server.example.com:8080/v1/nodes/x/heartbeat",
+		},
+		{
+			name: "trailing_slash",
+			base: "http://server.example.com:8080/",
+			path: "/v1/foo",
+			want: "http://server.example.com:8080/v1/foo",
+		},
+		{
+			name: "escapes_node_id",
+			base: "http://server.example.com:8080",
+			path: path.Join("/v1/nodes", url.PathEscape("node/01 abc"), "heartbeat"),
+			want: "http://server.example.com:8080/v1/nodes/node%2F01%20abc/heartbeat",
+		},
 	}
-	want := "http://server.example.com:8080/v1/foo"
-	if u != want {
-		t.Fatalf("url = %q, want %q", u, want)
-	}
-}
 
-// TestBuildURLEscapesNodeID verifies URL path escaping for special characters in node IDs.
-func TestBuildURLEscapesNodeID(t *testing.T) {
-	base := "http://server.example.com:8080"
-	nodeID := "node/01 abc"
-	p := path.Join("/v1/nodes", url.PathEscape(nodeID), "heartbeat")
-	u, err := BuildURL(base, p)
-	if err != nil {
-		t.Fatalf("buildURL error: %v", err)
-	}
-	want := "http://server.example.com:8080/v1/nodes/node%2F01%20abc/heartbeat"
-	if u != want {
-		t.Fatalf("url = %q, want %q", u, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			u, err := BuildURL(tt.base, tt.path)
+			if err != nil {
+				t.Fatalf("BuildURL error: %v", err)
+			}
+			if u != tt.want {
+				t.Fatalf("url = %q, want %q", u, tt.want)
+			}
+		})
 	}
 }
 
@@ -91,7 +95,6 @@ func TestBuildURLRejectsAbsoluteOrAuthorityPath(t *testing.T) {
 	}
 }
 
-// TestSendHeartbeatSuccess verifies successful heartbeat POST request and payload.
 func TestSendHeartbeatSuccess(t *testing.T) {
 	var receivedPayload HeartbeatPayload
 	var receivedMap map[string]any
@@ -170,7 +173,6 @@ func TestSendHeartbeatSuccess(t *testing.T) {
 	}
 }
 
-// TestSendHeartbeatHandlesServerError verifies error handling for various HTTP status codes.
 func TestSendHeartbeatHandlesServerError(t *testing.T) {
 	tests := []struct {
 		name       string

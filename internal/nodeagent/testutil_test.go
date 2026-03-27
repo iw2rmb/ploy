@@ -5,6 +5,8 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/binary"
+	"errors"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -197,6 +199,92 @@ func inspectWithState(running bool, status containertypes.ContainerState, finish
 			},
 		},
 	}
+}
+
+// fakeDockerClient is a composable test double that satisfies both
+// crashReconcileDockerClient and claimCleanupDockerClient interfaces.
+type fakeDockerClient struct {
+	listResult client.ContainerListResult
+	listErr    error
+	listCalls  int
+
+	inspectByID    map[string]client.ContainerInspectResult
+	inspectErrByID map[string]error
+
+	waitByID      map[string]containertypes.WaitResponse
+	waitErrByID   map[string]error
+	waitBlockByID map[string]chan struct{}
+
+	logsByID    map[string][]byte
+	logsErrByID map[string]error
+
+	infoResult client.SystemInfoResult
+	infoErr    error
+
+	removeErrByID map[string]error
+	removedIDs    []string
+}
+
+func (f *fakeDockerClient) ContainerList(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
+	f.listCalls++
+	if f.listErr != nil {
+		return client.ContainerListResult{}, f.listErr
+	}
+	return f.listResult, nil
+}
+
+func (f *fakeDockerClient) ContainerInspect(_ context.Context, containerID string, _ client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+	if err, ok := f.inspectErrByID[containerID]; ok && err != nil {
+		return client.ContainerInspectResult{}, err
+	}
+	if inspect, ok := f.inspectByID[containerID]; ok {
+		return inspect, nil
+	}
+	return client.ContainerInspectResult{}, errors.New("missing inspect result")
+}
+
+func (f *fakeDockerClient) ContainerWait(_ context.Context, containerID string, _ client.ContainerWaitOptions) client.ContainerWaitResult {
+	result := make(chan containertypes.WaitResponse, 1)
+	errCh := make(chan error, 1)
+	if gate, ok := f.waitBlockByID[containerID]; ok && gate != nil {
+		<-gate
+	}
+	if err, ok := f.waitErrByID[containerID]; ok && err != nil {
+		errCh <- err
+		return client.ContainerWaitResult{Result: result, Error: errCh}
+	}
+	waitResp, ok := f.waitByID[containerID]
+	if !ok {
+		waitResp = containertypes.WaitResponse{StatusCode: 0}
+	}
+	result <- waitResp
+	return client.ContainerWaitResult{Result: result, Error: errCh}
+}
+
+func (f *fakeDockerClient) ContainerLogs(_ context.Context, containerID string, _ client.ContainerLogsOptions) (client.ContainerLogsResult, error) {
+	if err, ok := f.logsErrByID[containerID]; ok && err != nil {
+		return nil, err
+	}
+	data, ok := f.logsByID[containerID]
+	if !ok {
+		data = nil
+	}
+	return io.NopCloser(bytes.NewReader(data)), nil
+}
+
+func (f *fakeDockerClient) Info(context.Context, client.InfoOptions) (client.SystemInfoResult, error) {
+	if f.infoErr != nil {
+		return client.SystemInfoResult{}, f.infoErr
+	}
+	return f.infoResult, nil
+}
+
+func (f *fakeDockerClient) ContainerRemove(_ context.Context, containerID string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
+	f.removedIDs = append(f.removedIDs, containerID)
+	if err, ok := f.removeErrByID[containerID]; ok && err != nil {
+		return client.ContainerRemoveResult{}, err
+	}
+	return client.ContainerRemoveResult{}, nil
 }
 
 // multiplexedDockerLogs builds Docker stdcopy-framed log output for testing.

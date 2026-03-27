@@ -7,7 +7,7 @@ func installNoopStartupReconciler(claimer *ClaimManager) {
 		return
 	}
 	claimer.startupReconciler = &startupCrashReconciler{
-		docker: &fakeCrashReconcileDockerClient{
+		docker: &fakeDockerClient{
 			listResult: client.ContainerListResult{},
 		},
 	}

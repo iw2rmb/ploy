@@ -18,7 +18,6 @@ import (
 	"github.com/moby/moby/client"
 )
 
-// TestClaimLoop verifies the claim loop posts claim and starts execution.
 func TestClaimLoop(t *testing.T) {
 	t.Parallel()
 
@@ -70,7 +69,6 @@ func TestClaimLoop(t *testing.T) {
 	}
 }
 
-// TestClaimLoopNoWork verifies the loop handles 204 No Content gracefully.
 func TestClaimLoopNoWork(t *testing.T) {
 	t.Parallel()
 
@@ -99,7 +97,6 @@ func TestClaimLoopNoWork(t *testing.T) {
 	}
 }
 
-// TestClaimLoopBackoff verifies exponential backoff behavior.
 func TestClaimLoopBackoff(t *testing.T) {
 	t.Parallel()
 
@@ -153,7 +150,6 @@ func TestClaimLoopBackoff(t *testing.T) {
 	}
 }
 
-// TestClaimLoopBackoffReset verifies backoff resets on successful claim.
 func TestClaimLoopBackoffReset(t *testing.T) {
 	t.Parallel()
 
@@ -332,8 +328,6 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	}
 }
 
-// TestClaimLoop_NextIDMapping verifies that claim next_id is mapped into
-// StartRunRequest.NextID.
 func TestClaimLoop_NextIDMapping(t *testing.T) {
 	t.Parallel()
 
@@ -555,7 +549,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 	controller := &mockRunController{slotSem: make(chan struct{}, 1)}
 	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{
-		docker: &fakeCrashReconcileDockerClient{
+		docker: &fakeDockerClient{
 			waitByID: map[string]containertypes.WaitResponse{
 				"ctr-recovered": {StatusCode: 0},
 			},

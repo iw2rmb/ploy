@@ -168,8 +168,6 @@ func TestPersistGateProfileSnapshot_RemovesStaleSnapshot(t *testing.T) {
 	}
 }
 
-// TestPersistGateStack_WritesStack verifies that persistGateStack writes the
-// detected stack to a file under the run directory for later retrieval.
 func TestPersistGateStack_WritesStack(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
@@ -219,8 +217,6 @@ func TestPersistGateStack_Idempotent(t *testing.T) {
 	}
 }
 
-// TestLoadPersistedStack_ReturnsStack verifies that loadPersistedStack reads
-// the persisted stack from the run directory.
 func TestLoadPersistedStack_ReturnsStack(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
@@ -243,8 +239,6 @@ func TestLoadPersistedStack_ReturnsStack(t *testing.T) {
 	}
 }
 
-// TestLoadPersistedStack_DefaultsToUnknown verifies that loadPersistedStack
-// returns ModStackUnknown when no stack file exists.
 func TestLoadPersistedStack_DefaultsToUnknown(t *testing.T) {
 	cacheHome := t.TempDir()
 	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
