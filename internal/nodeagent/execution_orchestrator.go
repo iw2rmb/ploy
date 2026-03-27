@@ -9,7 +9,6 @@ package nodeagent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -20,6 +19,7 @@ import (
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -122,22 +122,11 @@ func modStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
 	return idx, nil
 }
 
-// JobStatusFromRunError maps a run error to the appropriate terminal job status.
-// context.Canceled and context.DeadlineExceeded produce Cancelled; all other
-// errors produce Fail. This is the canonical status-from-error mapping shared
-// across all nodeagent execution paths.
-func JobStatusFromRunError(err error) types.JobStatus {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return types.JobStatusCancelled
-	}
-	return types.JobStatusFail
-}
-
 // uploadFailureStatus uploads a failure status for early errors.
 // Uses exit code -1 to indicate pre-execution infrastructure failures.
 // v1 uses capitalized job status values: Success, Fail, Cancelled.
 func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
-	status := JobStatusFromRunError(err)
+	status := lifecycle.JobStatusFromRunError(err)
 	var exitCode *int32
 	if status == types.JobStatusFail {
 		var preExecutionExitCode int32 = -1 // -1 indicates pre-execution failure

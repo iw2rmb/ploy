@@ -15,6 +15,7 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -414,7 +415,7 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		stats := statsBuilder.MustBuild()
 
 		if runErr != nil {
-			status := JobStatusFromRunError(runErr)
+			status := lifecycle.JobStatusFromRunError(runErr)
 			var exitCode *int32
 			if status == types.JobStatusFail {
 				var runtimeExitCode int32 = -1

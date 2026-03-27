@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // GitLab merge request operations.
@@ -216,7 +217,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		builder.Error(mrErr.Error())
 		stats := builder.MustBuild()
 
-		status := JobStatusFromRunError(mrErr)
+		status := lifecycle.JobStatusFromRunError(mrErr)
 		if status == types.JobStatusCancelled {
 			if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusCancelled.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
 				slog.Error("failed to upload MR job cancelled status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
