@@ -7,7 +7,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -65,7 +69,7 @@ type jobTestFixture struct {
 
 // newJobFixture creates a running job fixture with default values.
 // jobType defaults to domaintypes.JobTypeMod.
-func newJobFixture(jobType domaintypes.JobType, _ float64) jobTestFixture {
+func newJobFixture(jobType domaintypes.JobType) jobTestFixture {
 	nodeIDStr := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
@@ -93,12 +97,26 @@ func newJobFixture(jobType domaintypes.JobType, _ float64) jobTestFixture {
 
 // newRepoScopedFixture creates a job fixture pre-configured with a repo ID,
 // base ref "main", and attempt 1 — the common setup for repo-scoped tests.
-func newRepoScopedFixture(jobType domaintypes.JobType, nextID float64) jobTestFixture {
-	f := newJobFixture(jobType, nextID)
+func newRepoScopedFixture(jobType domaintypes.JobType) jobTestFixture {
+	f := newJobFixture(jobType)
 	f.Job.RepoID = domaintypes.NewRepoID()
 	f.Job.RepoBaseRef = "main"
 	f.Job.Attempt = 1
 	return f
+}
+
+// jobStatusReq builds an HTTP request for GET /v1/jobs/{job_id}/status
+// with the fixture's node identity header.
+// If overrideNodeID is non-empty, it replaces the default node identity.
+func (f jobTestFixture) jobStatusReq(overrideNodeID string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+f.JobID.String()+"/status", nil)
+	req.SetPathValue("job_id", f.JobID.String())
+	nodeID := f.NodeIDStr
+	if overrideNodeID != "" {
+		nodeID = overrideNodeID
+	}
+	req.Header.Set(nodeUUIDHeader, nodeID)
+	return req
 }
 
 // completeJobReq builds an HTTP request for POST /v1/jobs/{job_id}/complete
@@ -153,6 +171,90 @@ func withJobResults(m map[domaintypes.JobID]store.Job) func(*mockStore) {
 	return func(st *mockStore) { st.getJobResults = m }
 }
 
+func withPromoteResult(job store.Job) func(*mockStore) {
+	return func(st *mockStore) { st.promoteJobByIDIfUnblockedResult = job }
+}
+
+func withGetRunErr(err error) func(*mockStore) {
+	return func(st *mockStore) {
+		st.getRunErr = err
+		st.getRunResult = store.Run{}
+	}
+}
+
+func withGetJobErr(err error) func(*mockStore) {
+	return func(st *mockStore) {
+		st.getJobErr = err
+		st.getJobResult = store.Job{}
+	}
+}
+
+func withListJobsByRun(jobs []store.Job) func(*mockStore) {
+	return func(st *mockStore) { st.listJobsByRunResult = jobs }
+}
+
+func withArtifactBundles(bundles []store.ArtifactBundle) func(*mockStore) {
+	return func(st *mockStore) { st.listArtifactBundlesMetaByRunAndJobResult = bundles }
+}
+
+func withResolveStackRow(row store.ResolveStackRowByLangToolRow) func(*mockStore) {
+	return func(st *mockStore) { st.resolveStackRowByLangToolResult = row }
+}
+
+func withGetRunCreatedAt(t time.Time) func(*mockStore) {
+	return func(st *mockStore) {
+		st.getRunResult.CreatedAt = pgtype.Timestamptz{Time: t, Valid: true}
+	}
+}
+
+// gateFailureFixture holds the shared setup for gate-failure healing tests.
+type gateFailureFixture struct {
+	jobTestFixture
+	Successor store.Job
+	SpecID    domaintypes.SpecID
+	SpecBytes []byte
+	Store     *mockStore
+}
+
+// newGateFailureFixture creates a pre-gate job fixture with recovery metadata,
+// a successor mig job, healing spec, and a fully wired mock store.
+// recoveryMeta is the raw job meta JSON for the failed gate.
+func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture {
+	t.Helper()
+	f := newRepoScopedFixture(domaintypes.JobTypePreGate)
+	specID := domaintypes.NewSpecID()
+	f.Job.Meta = recoveryMeta
+	specBytes := healingSpecBytes(t)
+
+	successor := store.Job{
+		ID:          domaintypes.NewJobID(),
+		RunID:       f.RunID,
+		RepoID:      f.Job.RepoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		Name:        "mig-0",
+		Status:      domaintypes.JobStatusCreated,
+		JobType:     domaintypes.JobTypeMod,
+		Meta:        []byte(`{}`),
+	}
+	f.Job.NextID = &successor.ID
+
+	jobs := []store.Job{f.Job, successor}
+	st := newMockStoreForJob(f,
+		withSpec(specID, specBytes),
+		withListJobsByRun(jobs),
+		withRepoAttemptJobs(jobs),
+	)
+
+	return gateFailureFixture{
+		jobTestFixture: f,
+		Successor:      successor,
+		SpecID:         specID,
+		SpecBytes:      specBytes,
+		Store:          st,
+	}
+}
+
 // doJSON sends a JSON request to handler and returns the recorder.
 // body is marshaled to JSON; pass nil for no body.
 func doJSON(t *testing.T, handler http.Handler, method, path string, body any) *httptest.ResponseRecorder {
@@ -199,6 +301,19 @@ func assertStatus(t *testing.T, rr *httptest.ResponseRecorder, want int) {
 	}
 }
 
+// assertJSONValue fails if the JSON body doesn't contain key with value want.
+func assertJSONValue(t *testing.T, body, key, want string) {
+	t.Helper()
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(body), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	got, _ := payload[key].(string)
+	if got != want {
+		t.Fatalf("response[%q] = %q, want %q", key, got, want)
+	}
+}
+
 // assertCalled fails the test if called is false.
 func assertCalled(t *testing.T, name string, called bool) {
 	t.Helper()
@@ -212,6 +327,48 @@ func assertNotCalled(t *testing.T, name string, called bool) {
 	t.Helper()
 	if called {
 		t.Fatalf("did not expect %s to be called", name)
+	}
+}
+
+// assertNoCompletion fails if either UpdateJobCompletion or UpdateJobCompletionWithMeta was called.
+func assertNoCompletion(t *testing.T, st *mockStore) {
+	t.Helper()
+	if st.updateJobCompletionCalled || st.updateJobCompletionWithMetaCalled {
+		t.Fatal("did not expect any completion persistence")
+	}
+}
+
+// assertRepoError fails if UpdateRunRepoError was not called with the expected
+// run/repo IDs and error substrings.
+func assertRepoError(t *testing.T, st *mockStore, runID domaintypes.RunID, repoID domaintypes.RepoID, substrings ...string) {
+	t.Helper()
+	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
+	if st.updateRunRepoErrorParams.RunID != runID {
+		t.Fatalf("expected RunID %s, got %s", runID, st.updateRunRepoErrorParams.RunID)
+	}
+	if st.updateRunRepoErrorParams.RepoID != repoID {
+		t.Fatalf("expected RepoID %s, got %s", repoID, st.updateRunRepoErrorParams.RepoID)
+	}
+	if st.updateRunRepoErrorParams.LastError == nil {
+		t.Fatal("expected LastError to be set")
+	}
+	msg := *st.updateRunRepoErrorParams.LastError
+	for _, want := range substrings {
+		if !strings.Contains(msg, want) {
+			t.Errorf("expected error to contain %q, got: %s", want, msg)
+		}
+	}
+}
+
+// assertMetaKind fails if the persisted meta JSON doesn't have the expected kind.
+func assertMetaKind(t *testing.T, metaBytes []byte, wantKind string) {
+	t.Helper()
+	var meta map[string]any
+	if err := json.Unmarshal(metaBytes, &meta); err != nil {
+		t.Fatalf("failed to unmarshal persisted meta: %v", err)
+	}
+	if kind, ok := meta["kind"].(string); !ok || kind != wantKind {
+		t.Fatalf("expected meta.kind == %q, got %#v", wantKind, meta["kind"])
 	}
 }
 
