@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -142,12 +143,37 @@ func TestPloyListNonJobsSelectedShowsOnlyPloy(t *testing.T) {
 
 // TestPloyListFocusRemainsOnPloy verifies that ScreenPloyList routes key messages
 // to the PLOY list, not the JobList, keeping PLOY as the active list.
+// It sends a real "k" (up) key while the ploy cursor is on Jobs (index 2) and
+// confirms the ploy cursor moves while the jobList index remains unchanged.
 func TestPloyListFocusRemainsOnPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.ploy.Select(0)
-	// Route a navigation message through updateActiveList.
-	_, _ = m.updateActiveList(nil)
-	// The screen must remain ScreenPloyList with ploy as active list.
+
+	// Load two jobs so the jobList has multiple items to potentially navigate.
+	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+		{JobID: domaintypes.JobID("job-1"), Name: "alpha", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
+		{JobID: domaintypes.JobID("job-2"), Name: "beta", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
+	}})
+	m = next.(model)
+
+	// Place ploy cursor on Jobs (index 2) — the jobs panel is visible.
+	m.ploy.Select(2)
+	jobListIdxBefore := m.jobList.Index()
+
+	// Send a real "k" (up) key through Update; on ScreenPloyList this must
+	// be routed to m.ploy, not m.jobList.
+	next, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
+	m = next.(model)
+
+	// ploy cursor must have moved up (from 2 → 1).
+	if m.ploy.Index() != 1 {
+		t.Errorf("ploy cursor: got %d, want 1 after 'k' key on ScreenPloyList", m.ploy.Index())
+	}
+	// jobList cursor must be untouched.
+	if m.jobList.Index() != jobListIdxBefore {
+		t.Errorf("jobList cursor: got %d, want %d — jobList must not receive keys on ScreenPloyList",
+			m.jobList.Index(), jobListIdxBefore)
+	}
+	// Screen must remain ScreenPloyList.
 	if m.screen != ScreenPloyList {
 		t.Errorf("screen changed: got %v, want ScreenPloyList", m.screen)
 	}
