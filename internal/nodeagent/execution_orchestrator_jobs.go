@@ -5,7 +5,6 @@ package nodeagent
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -415,11 +414,9 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		stats := statsBuilder.MustBuild()
 
 		if runErr != nil {
-			status := types.JobStatusFail
+			status := jobStatusFromRunError(runErr)
 			var exitCode *int32
-			if errors.Is(runErr, context.Canceled) || errors.Is(runErr, context.DeadlineExceeded) {
-				status = types.JobStatusCancelled
-			} else {
+			if status == types.JobStatusFail {
 				var runtimeExitCode int32 = -1
 				exitCode = &runtimeExitCode
 			}

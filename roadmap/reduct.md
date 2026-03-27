@@ -30,7 +30,26 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `go test ./internal/... -run 'Claim|Complete|Healing'`.
   - Reasoning: high (15 CFP)
 
-- [ ] 1.3 Adopt shared claim/complete transition core in nodeagent and add cross-path parity fixtures
+## Execution Contract For Remaining Items (1.3+)
+
+Goal lock: every unchecked item below is considered complete only when redundancy is physically removed, not when a shared abstraction is merely introduced.
+
+- Completion gate (mandatory for each item):
+  1. Keep one canonical owner for the behavior named in the item and route all listed components to it.
+  2. Delete superseded local helpers/branch trees/wrappers in listed components in the same item closure.
+  3. Prove removal with factual evidence: in PR notes, include `rg` evidence that old symbols/branches no longer exist in the scoped components.
+  4. Prove adoption with factual evidence: in PR notes, include call-site evidence that scoped components now invoke only the canonical owner.
+  5. Pass the item verification commands only after (2)-(4) are done; extraction-only closures are invalid.
+
+- Scope rule:
+  1. If an item cannot both extract and delete within one closure, split it into sub-items, but do not mark parent item complete until deletion sub-item is done.
+  2. No backward-compatibility placeholders, dual paths, or transitional wrappers are kept after item completion unless explicitly required by the user.
+
+- Review rule:
+  1. Review comments and completion notes must use structural evidence (removed files/functions/branches and unified call paths), not LOC accounting summaries.
+  2. `5.3` remains valuable for regression prevention, but it is not a substitute for structural deduplication evidence in each item closure.
+
+- [x] 1.3 Adopt shared claim/complete transition core in nodeagent and add cross-path parity fixtures
   - Type: assumption-bound
   - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`, `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service.go`
   - Assumptions: Existing nodeagent retry and rehydrate transition behavior matches server transition semantics closely enough to consume shared orchestrator outputs without introducing new nodeagent-only transition types.
