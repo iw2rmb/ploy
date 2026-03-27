@@ -6,11 +6,11 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
 
 - [x] 1.1 Consolidate run/repo terminal-state derivation into one lifecycle package
   - Type: determined
-  - Component: `internal/workflow/lifecycle`, `internal/server/handlers/runs.go`, `internal/server/handlers/jobs_complete_logic.go`, `internal/server/recovery/reconcile_run_completion.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/domain/types/statuses.go`
+  - Component: `internal/workflow/lifecycle`, `internal/server/handlers/runs.go`, `internal/server/handlers/jobs_complete_logic.go`, `internal/server/recovery/reconcile_run_completion.go`, `internal/domain/types/statuses.go`
   - Implementation:
     1. Create `internal/workflow/lifecycle/status.go` with exported pure functions for run terminal checks, repo terminal checks, and derived batch status computation.
     2. Replace local status helpers in handlers and recovery code with calls to `workflow/lifecycle` functions.
-    3. Replace nodeagent terminal-state checks with the same `workflow/lifecycle` functions.
+    3. (n/a) `internal/nodeagent/execution_orchestrator_jobs.go` was originally listed as a migration target, but it contains no `RunStatus`/`RunRepoStatus` terminal checks — it only emits `JobStatus` values as job outputs. No adoption of lifecycle helpers is applicable here.
     4. Remove duplicate local helper functions and dead tests that only validate removed local wrappers.
   - Verification:
     1. Run `go test ./internal/workflow/lifecycle ./internal/server/handlers ./internal/server/recovery ./internal/nodeagent`.
