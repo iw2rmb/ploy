@@ -17,40 +17,62 @@ func buildTestProfile(t *testing.T, raw string) *contracts.GateProfile {
 	return p
 }
 
+// TestProfilePrecedenceOrder locks the relative ordering of precedence constants so
+// callers can safely compare ProfilePrecedence values numerically.
+func TestProfilePrecedenceOrder(t *testing.T) {
+	t.Parallel()
+	if !(ProfilePrecedenceExact > ProfilePrecedenceLatest) {
+		t.Errorf("ProfilePrecedenceExact (%d) must be > ProfilePrecedenceLatest (%d)",
+			ProfilePrecedenceExact, ProfilePrecedenceLatest)
+	}
+	if !(ProfilePrecedenceLatest > ProfilePrecedenceDefault) {
+		t.Errorf("ProfilePrecedenceLatest (%d) must be > ProfilePrecedenceDefault (%d)",
+			ProfilePrecedenceLatest, ProfilePrecedenceDefault)
+	}
+}
+
 func TestSelectProfile(t *testing.T) {
 	t.Parallel()
 
-	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact", Precedence: ProfilePrecedenceExact}
-	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest", Precedence: ProfilePrecedenceLatest}
-	def := &ProfileCandidate{ID: 3, ObjectKey: "default", Precedence: ProfilePrecedenceDefault}
+	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact-key", Precedence: ProfilePrecedenceExact}
+	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest-key", Precedence: ProfilePrecedenceLatest}
+	def := &ProfileCandidate{ID: 3, ObjectKey: "default-key", Precedence: ProfilePrecedenceDefault}
 
 	tests := []struct {
-		name   string
-		exact  *ProfileCandidate
-		latest *ProfileCandidate
-		def    *ProfileCandidate
-		wantID int64
+		name           string
+		exact          *ProfileCandidate
+		latest         *ProfileCandidate
+		def            *ProfileCandidate
+		wantID         int64
+		wantObjectKey  string
+		wantPrecedence ProfilePrecedence
 	}{
 		{
-			name:   "exact wins over all others",
-			exact:  exact,
-			latest: latest,
-			def:    def,
-			wantID: 1,
+			name:           "exact wins over all others",
+			exact:          exact,
+			latest:         latest,
+			def:            def,
+			wantID:         1,
+			wantObjectKey:  "exact-key",
+			wantPrecedence: ProfilePrecedenceExact,
 		},
 		{
-			name:   "latest wins when exact is absent",
-			exact:  nil,
-			latest: latest,
-			def:    def,
-			wantID: 2,
+			name:           "latest wins when exact is absent",
+			exact:          nil,
+			latest:         latest,
+			def:            def,
+			wantID:         2,
+			wantObjectKey:  "latest-key",
+			wantPrecedence: ProfilePrecedenceLatest,
 		},
 		{
-			name:   "default wins when exact and latest are absent",
-			exact:  nil,
-			latest: nil,
-			def:    def,
-			wantID: 3,
+			name:           "default wins when exact and latest are absent",
+			exact:          nil,
+			latest:         nil,
+			def:            def,
+			wantID:         3,
+			wantObjectKey:  "default-key",
+			wantPrecedence: ProfilePrecedenceDefault,
 		},
 		{
 			name:   "all nil returns nil",
@@ -59,12 +81,43 @@ func TestSelectProfile(t *testing.T) {
 			def:    nil,
 			wantID: 0,
 		},
+		// Single-candidate fallback cases: verify each tier works in isolation.
 		{
-			name:   "exact only returns exact",
-			exact:  exact,
-			latest: nil,
-			def:    nil,
-			wantID: 1,
+			name:           "exact only — no fallback needed",
+			exact:          exact,
+			latest:         nil,
+			def:            nil,
+			wantID:         1,
+			wantObjectKey:  "exact-key",
+			wantPrecedence: ProfilePrecedenceExact,
+		},
+		{
+			name:           "latest only — default is absent, latest is returned",
+			exact:          nil,
+			latest:         latest,
+			def:            nil,
+			wantID:         2,
+			wantObjectKey:  "latest-key",
+			wantPrecedence: ProfilePrecedenceLatest,
+		},
+		{
+			name:           "default only — exact and latest absent, default is returned",
+			exact:          nil,
+			latest:         nil,
+			def:            def,
+			wantID:         3,
+			wantObjectKey:  "default-key",
+			wantPrecedence: ProfilePrecedenceDefault,
+		},
+		// Normalization: returned pointer is the same instance (no copying/mutation).
+		{
+			name:           "returned candidate is identical to input (no copy)",
+			exact:          exact,
+			latest:         latest,
+			def:            def,
+			wantID:         1,
+			wantObjectKey:  "exact-key",
+			wantPrecedence: ProfilePrecedenceExact,
 		},
 	}
 
@@ -82,6 +135,12 @@ func TestSelectProfile(t *testing.T) {
 			}
 			if got.ID != tc.wantID {
 				t.Fatalf("SelectProfile.ID=%d, want %d", got.ID, tc.wantID)
+			}
+			if got.ObjectKey != tc.wantObjectKey {
+				t.Fatalf("SelectProfile.ObjectKey=%q, want %q", got.ObjectKey, tc.wantObjectKey)
+			}
+			if got.Precedence != tc.wantPrecedence {
+				t.Fatalf("SelectProfile.Precedence=%d, want %d", got.Precedence, tc.wantPrecedence)
 			}
 		})
 	}
