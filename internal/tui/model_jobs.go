@@ -13,10 +13,7 @@ import (
 
 func renderJobsPrimaryLine(job clitui.JobItem) string {
 	glyph := jobsStatusGlyph(job.Status)
-	name := strings.TrimSpace(job.Name)
-	if name == "" {
-		name = "-"
-	}
+	name := normalizeLabel(job.Name)
 	duration := formatDurationShort(job.DurationMs)
 	prefix := glyph + " "
 	availableNameWidth := jobsContentWidth - lipgloss.Width(prefix) - 1 - lipgloss.Width(duration)
@@ -29,11 +26,7 @@ func renderJobsPrimaryLine(job clitui.JobItem) string {
 }
 
 func renderJobsSecondaryLine(job clitui.JobItem) string {
-	jobID := strings.TrimSpace(job.JobID.String())
-	if jobID == "" {
-		jobID = "-"
-	}
-	return truncateRunes(jobID, jobsListWidth)
+	return truncateRunes(normalizeLabel(job.JobID.String()), jobsListWidth)
 }
 
 func jobsStatusGlyph(status domaintypes.JobStatus) string {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -15,27 +14,10 @@ import (
 // Query params: ?limit=N&offset=N&run_id=<id> (all optional)
 func listJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		limit := int32(50)
-		offset := int32(0)
-
-		if l := r.URL.Query().Get("limit"); l != "" {
-			parsed, err := strconv.ParseInt(l, 10, 32)
-			if err != nil || parsed < 1 {
-				httpErr(w, http.StatusBadRequest, "invalid limit parameter")
-				return
-			}
-			limit = int32(parsed)
-			if limit > 100 {
-				limit = 100
-			}
-		}
-		if o := r.URL.Query().Get("offset"); o != "" {
-			parsed, err := strconv.ParseInt(o, 10, 32)
-			if err != nil || parsed < 0 {
-				httpErr(w, http.StatusBadRequest, "invalid offset parameter")
-				return
-			}
-			offset = int32(parsed)
+		limit, offset, err := parsePagination(r)
+		if err != nil {
+			httpErr(w, http.StatusBadRequest, "%s", err)
+			return
 		}
 
 		runID, err := optionalQuery[domaintypes.RunID](r, "run_id")

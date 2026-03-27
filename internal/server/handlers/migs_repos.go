@@ -38,32 +38,27 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Parse request body with strict validation.
 		var req struct {
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
+			RepoURL   domaintypes.RepoURL `json:"repo_url"`
+			BaseRef   domaintypes.GitRef  `json:"base_ref"`
+			TargetRef domaintypes.GitRef  `json:"target_ref"`
 		}
 		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
-		// Validate required fields.
-		if req.RepoURL == "" {
-			httpErr(w, http.StatusBadRequest, "repo_url is required")
-			return
-		}
-		if req.BaseRef == "" {
-			httpErr(w, http.StatusBadRequest, "base_ref is required")
-			return
-		}
-		if req.TargetRef == "" {
-			httpErr(w, http.StatusBadRequest, "target_ref is required")
-			return
-		}
-
-		// Normalize and validate repo URL (strips trailing slashes and .git suffixes).
-		normalizedURL := domaintypes.NormalizeRepoURL(req.RepoURL)
-		if err := domaintypes.RepoURL(normalizedURL).Validate(); err != nil {
+		// Normalize and validate using domain types.
+		normalizedURL := domaintypes.NormalizeRepoURL(string(req.RepoURL))
+		req.RepoURL = domaintypes.RepoURL(normalizedURL)
+		if err := req.RepoURL.Validate(); err != nil {
 			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
+			return
+		}
+		if err := req.BaseRef.Validate(); err != nil {
+			httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
+			return
+		}
+		if err := req.TargetRef.Validate(); err != nil {
+			httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
 			return
 		}
 
@@ -89,8 +84,8 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			ID:        repoID,
 			MigID:     modID,
 			Url:       normalizedURL,
-			BaseRef:   req.BaseRef,
-			TargetRef: req.TargetRef,
+			BaseRef:   req.BaseRef.String(),
+			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			// Check for unique constraint violation (duplicate repo_url in mig).

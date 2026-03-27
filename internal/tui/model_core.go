@@ -59,6 +59,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleRunDetailsLoaded(msg), nil
 	case jobsLoadedMsg:
 		return m.handleJobsLoaded(msg), nil
+	case errMsg:
+		m.lastErr = msg.err
+		return m, nil
 	}
 
 	return m.updateActiveList(msg)
@@ -103,11 +106,11 @@ func (m model) handleRunsLoaded(msg runsLoadedMsg) model {
 
 func (m model) handleMigDetailsLoaded(msg migDetailsLoadedMsg) model {
 	if m.screen == ScreenMigrationDetails {
-		m.ploy.SetItems(buildMigrationDetailsPloyItems(
-			m.selectedMigName,
-			m.selectedMigID,
-			fmt.Sprintf("total: %d", msg.runTotal),
-		))
+		m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+			{title: m.selectedMigName, desc: m.selectedMigID.String()},
+			{title: "Runs", desc: fmt.Sprintf("total: %d", msg.runTotal)},
+			{title: "Jobs", desc: "select job"},
+		}))
 		m.ploy.Select(0)
 		return m
 	}
@@ -122,12 +125,11 @@ func (m model) handleMigDetailsLoaded(msg migDetailsLoadedMsg) model {
 
 func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 	if m.screen == ScreenRunDetails {
-		m.ploy.SetItems(buildRunDetailsPloyItems(
-			m.selectedMigName,
-			m.selectedMigID,
-			m.selectedRunID,
-			fmt.Sprintf("total: %d", msg.jobTotal),
-		))
+		m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+			{title: m.selectedMigName, desc: m.selectedMigID.String()},
+			{title: "Run", desc: m.selectedRunID.String()},
+			{title: "Jobs", desc: fmt.Sprintf("total: %d", msg.jobTotal)},
+		}))
 		m.ploy.Select(1)
 		return m
 	}
