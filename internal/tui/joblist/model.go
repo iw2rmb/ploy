@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 
+	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -30,10 +31,10 @@ func (r row) FilterValue() string { return r.title }
 // Model is the JobList domain component. It owns job row state, list cursor,
 // confirmed selected job identity, and job detail payload cache for the jobs pane.
 type Model struct {
-	inner          list.Model
-	jobs           []clitui.JobItem
-	selectedJobID  domaintypes.JobID
-	details        *clitui.JobItem
+	inner         list.Model
+	jobs          []clitui.JobItem
+	selectedJobID domaintypes.JobID
+	details       *cliruns.RepoJobEntry
 }
 
 // New creates an initialized JobList with the given title.
@@ -117,13 +118,13 @@ func (m Model) ConfirmedJobID() domaintypes.JobID {
 }
 
 // SetDetails stores the fetched job detail payload for the confirmed selection.
-func (m Model) SetDetails(item *clitui.JobItem) Model {
+func (m Model) SetDetails(item *cliruns.RepoJobEntry) Model {
 	m.details = item
 	return m
 }
 
 // Details returns the cached job detail payload, or nil if not yet loaded.
-func (m Model) Details() *clitui.JobItem {
+func (m Model) Details() *cliruns.RepoJobEntry {
 	return m.details
 }
 
