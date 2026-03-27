@@ -675,6 +675,66 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 	}
 }
 
+func TestMaybeCreateHealingJobs_TerminalClassificationCancelsWithoutSpecFetch(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	specID := domaintypes.NewSpecID()
+	successorID := domaintypes.NewJobID()
+
+	failedID := domaintypes.NewJobID()
+	st := &mockStore{
+		// Spec fetch must not be reached: a failure here should not block cancellation.
+		getSpecErr: errors.New("db unavailable"),
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:          failedID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "pre-gate",
+				Status:      domaintypes.JobStatusFail,
+				JobType:     domaintypes.JobTypePreGate,
+				RepoShaIn:   healingTestRepoSHAIn,
+				NextID:      &successorID,
+				Meta:        []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`),
+			},
+			{
+				ID:          successorID,
+				RunID:       runID,
+				RepoID:      repoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        "mig-0",
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     domaintypes.JobTypeMod,
+				Meta:        []byte(`{"kind":"mig"}`),
+			},
+		},
+	}
+
+	run := store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	failed := st.listJobsByRunRepoAttemptResult[0]
+	if err := maybeCreateHealingJobs(ctx, st, nil, run, failed); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+	if st.getSpecCalled {
+		t.Fatal("GetSpec must not be called for terminal recovery classification")
+	}
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no healing jobs for terminal classification, got %d CreateJob calls", st.createJobCallCount)
+	}
+	if len(st.updateJobStatusCalls) != 1 {
+		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
+	}
+	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
+	}
+}
+
 func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 

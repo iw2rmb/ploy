@@ -58,8 +58,19 @@ func maybeCreateHealingJobs(
 		recoveryKind = contracts.DefaultRecoveryErrorKind()
 	}
 
-	// Fetch spec before calling the orchestrator (terminal check is inside the orchestrator
-	// but fetching spec early avoids a second DB call on the happy path).
+	// Terminal classification does not require spec I/O: cancel immediately so that
+	// a spec fetch failure cannot block cancellation on this path.
+	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
+		slog.Info("maybeCreateHealingJobs: canceling remaining linked jobs",
+			"run_id", failedJob.RunID,
+			"job_id", failedJob.ID,
+			"error_kind", recoveryMeta.ErrorKind,
+			"reason", "terminal recovery classification",
+		)
+		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
+	}
+
+	// Fetch spec only for non-terminal paths where healing config is needed.
 	specRow, err := st.GetSpec(ctx, run.SpecID)
 	if err != nil {
 		return fmt.Errorf("get spec: %w", err)
