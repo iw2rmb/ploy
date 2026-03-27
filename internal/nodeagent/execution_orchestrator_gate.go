@@ -229,25 +229,14 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 
 	switch req.JobType {
 	case types.JobTypePreGate:
-		if typedOpts.BuildGate.PreStack != nil && typedOpts.BuildGate.PreStack.Enabled {
-			manifest.Gate.StackDetect = typedOpts.BuildGate.PreStack
-		}
-		manifest.Gate.GateProfile = typedOpts.BuildGate.PreGateProfile
-		manifest.Gate.Target = typedOpts.BuildGate.PreTarget
-		manifest.Gate.Always = typedOpts.BuildGate.PreAlways
+		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Pre)
 		manifest.Gate.Skip = req.GateSkip
 	case types.JobTypePostGate:
-		if typedOpts.BuildGate.PostStack != nil && typedOpts.BuildGate.PostStack.Enabled {
-			manifest.Gate.StackDetect = typedOpts.BuildGate.PostStack
-		}
-		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
-		manifest.Gate.Target = typedOpts.BuildGate.PostTarget
-		manifest.Gate.Always = typedOpts.BuildGate.PostAlways
+		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
 		manifest.Gate.Skip = req.GateSkip
 	case types.JobTypeReGate:
-		manifest.Gate.GateProfile = typedOpts.BuildGate.PostGateProfile
-		manifest.Gate.Target = typedOpts.BuildGate.PostTarget
-		manifest.Gate.Always = typedOpts.BuildGate.PostAlways
+		contracts.ApplyBuildGatePhaseToGateSpec(manifest.Gate, typedOpts.BuildGate.Post)
+		manifest.Gate.StackDetect = nil // re-gate uses persisted stack from original gate run
 		manifest.Gate.Skip = req.GateSkip
 		if req.RecoveryContext != nil {
 			if kind, ok := contracts.ParseRecoveryErrorKind(req.RecoveryContext.SelectedErrorKind); ok &&

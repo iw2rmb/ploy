@@ -26,16 +26,10 @@ type RunOptions struct {
 
 // BuildGateOptions configures pre-mig build gate validation.
 type BuildGateOptions struct {
-	Enabled         bool
-	Images          []contracts.BuildGateImageRule
-	PreStack        *contracts.BuildGateStackConfig
-	PostStack       *contracts.BuildGateStackConfig
-	PreGateProfile  *contracts.BuildGateProfileOverride
-	PostGateProfile *contracts.BuildGateProfileOverride
-	PreTarget       string
-	PostTarget      string
-	PreAlways       bool
-	PostAlways      bool
+	Enabled bool
+	Images  []contracts.BuildGateImageRule
+	Pre     *contracts.BuildGatePhaseConfig
+	Post    *contracts.BuildGatePhaseConfig
 }
 
 // HealingConfig describes the heal → re-gate loop configuration.
@@ -107,18 +101,8 @@ func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
 	if spec.BuildGate != nil {
 		runOpts.BuildGate.Enabled = spec.BuildGate.Enabled
 		runOpts.BuildGate.Images = spec.BuildGate.Images
-		if spec.BuildGate.Pre != nil {
-			runOpts.BuildGate.PreStack = spec.BuildGate.Pre.Stack
-			runOpts.BuildGate.PreGateProfile = copyBuildGateProfileOverride(spec.BuildGate.Pre.GateProfile)
-			runOpts.BuildGate.PreTarget = spec.BuildGate.Pre.Target
-			runOpts.BuildGate.PreAlways = spec.BuildGate.Pre.Always
-		}
-		if spec.BuildGate.Post != nil {
-			runOpts.BuildGate.PostStack = spec.BuildGate.Post.Stack
-			runOpts.BuildGate.PostGateProfile = copyBuildGateProfileOverride(spec.BuildGate.Post.GateProfile)
-			runOpts.BuildGate.PostTarget = spec.BuildGate.Post.Target
-			runOpts.BuildGate.PostAlways = spec.BuildGate.Post.Always
-		}
+		runOpts.BuildGate.Pre = spec.BuildGate.Pre
+		runOpts.BuildGate.Post = spec.BuildGate.Post
 
 		if spec.BuildGate.Healing != nil {
 			runOpts.HealingSelector = copyHealingSpec(spec.BuildGate.Healing)
@@ -217,23 +201,6 @@ func copyStringMap(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
-}
-
-func copyBuildGateProfileOverride(in *contracts.BuildGateProfileOverride) *contracts.BuildGateProfileOverride {
-	if in == nil {
-		return nil
-	}
-	var stack *contracts.GateProfileStack
-	if in.Stack != nil {
-		copied := *in.Stack
-		stack = &copied
-	}
-	return &contracts.BuildGateProfileOverride{
-		Command: in.Command,
-		Env:     copyStringMap(in.Env),
-		Stack:   stack,
-		Target:  in.Target,
-	}
 }
 
 func copyHealingSpec(in *contracts.HealingSpec) *contracts.HealingSpec {

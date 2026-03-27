@@ -152,7 +152,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - New coverage: `TestDeriveProfileSnapshotFromOverride` (11 cases) in `internal/workflow/gateprofile/service_test.go` locks shell/exec command forms, all three target selection paths, stack resolution tiers, and error cases (nil override, empty command, no stack, unsupported job type).
     - No dual snapshot derivation path remains: nodeagent `persistGateProfileSnapshot` calls `resolveGateProfileSnapshotRaw` which delegates entirely to service.
 
-- [ ] 2.2 Unify gate-profile input contracts and manifest projection
+- [x] 2.2 Unify gate-profile input contracts and manifest projection
   - Type: determined
   - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/step_manifest.go`, `internal/workflow/contracts/build_gate_metadata.go`, `internal/nodeagent/manifest.go`, `internal/server/handlers/claim_spec_mutator_gate.go`, `internal/workflow/step/gate_plan_resolver.go`
   - Implementation:
@@ -165,6 +165,13 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     2. Run `go test ./internal/... -run 'Manifest|GatePlan|ClaimSpecMutator'`.
     3. Add structural proof in completion notes: removed projection branches and unified contract projection call sites.
   - Reasoning: high (14 CFP)
+  - Completion notes:
+    - Added `BuildGateProfileOverrideToSpecMap` and `ApplyBuildGatePhaseToGateSpec` to `internal/workflow/contracts/build_gate_config.go`.
+    - Deleted `buildGatePrepOverrideToMap` and `commandSpecToWireValue` from `internal/server/handlers/claim_spec_mutator_gate.go`; call site updated to `contracts.BuildGateProfileOverrideToSpecMap`.
+    - `BuildGateOptions` in `internal/nodeagent/run_options.go` collapsed from 8 flattened fields (`PreStack`, `PostStack`, `PreGateProfile`, `PostGateProfile`, `PreTarget`, `PostTarget`, `PreAlways`, `PostAlways`) to 2 phase-config pointers (`Pre`, `Post *contracts.BuildGatePhaseConfig`); deleted `copyBuildGateProfileOverride`; `modsSpecToRunOptions` reduced to direct pointer assignment.
+    - `applyGatePhaseOverrides` in `internal/nodeagent/execution_orchestrator_gate.go` updated to call `contracts.ApplyBuildGatePhaseToGateSpec`; re_gate case clears `StackDetect=nil` since it uses persisted stack from original gate run.
+    - Test files updated: `execution_orchestrator_gate_stackdetect_test.go` and `run_options_test.go` migrated to `Pre`/`Post` phase-config accessors.
+    - New table-driven suite: `internal/workflow/contracts/build_gate_projection_test.go` (15 cases for both canonical functions).
 
 - [ ] 3.1a Collapse duplicated log/diff list APIs into selector-based store methods
   - Type: assumption-bound

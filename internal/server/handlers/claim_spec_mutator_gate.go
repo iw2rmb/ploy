@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -143,48 +142,6 @@ func applyGatePrepOverrideMutator(
 	if existing, exists := phaseCfg["gate_profile"]; exists && existing != nil {
 		return nil
 	}
-	phaseCfg["gate_profile"] = buildGatePrepOverrideToMap(override)
+	phaseCfg["gate_profile"] = contracts.BuildGateProfileOverrideToSpecMap(override)
 	return nil
-}
-
-func buildGatePrepOverrideToMap(override *contracts.BuildGateProfileOverride) map[string]any {
-	if override == nil {
-		return nil
-	}
-
-	prep := map[string]any{
-		"command": commandSpecToWireValue(override.Command),
-	}
-	if len(override.Env) > 0 {
-		env := make(map[string]any, len(override.Env))
-		for k, v := range override.Env {
-			env[k] = v
-		}
-		prep["env"] = env
-	}
-	if override.Stack != nil {
-		stack := map[string]any{
-			"language": override.Stack.Language,
-			"tool":     override.Stack.Tool,
-		}
-		if strings.TrimSpace(override.Stack.Release) != "" {
-			stack["release"] = override.Stack.Release
-		}
-		prep["stack"] = stack
-	}
-	if target := strings.TrimSpace(override.Target); target != "" {
-		prep["target"] = target
-	}
-	return prep
-}
-
-func commandSpecToWireValue(command contracts.CommandSpec) any {
-	if len(command.Exec) > 0 {
-		out := make([]any, 0, len(command.Exec))
-		for _, v := range command.Exec {
-			out = append(out, v)
-		}
-		return out
-	}
-	return command.Shell
 }

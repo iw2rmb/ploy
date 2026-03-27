@@ -281,41 +281,47 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		if !runOpts.BuildGate.Enabled {
 			t.Error("BuildGate.Enabled: expected true")
 		}
-		if runOpts.BuildGate.PreGateProfile == nil {
-			t.Fatal("BuildGate.PreGateProfile: expected non-nil")
+		if runOpts.BuildGate.Pre == nil {
+			t.Fatal("BuildGate.Pre: expected non-nil")
 		}
-		if runOpts.BuildGate.PreGateProfile.Command.Shell != "go test ./..." {
-			t.Errorf("BuildGate.PreGateProfile.Command.Shell: got %q, want %q", runOpts.BuildGate.PreGateProfile.Command.Shell, "go test ./...")
+		if runOpts.BuildGate.Pre.GateProfile == nil {
+			t.Fatal("BuildGate.Pre.GateProfile: expected non-nil")
 		}
-		if got := runOpts.BuildGate.PreGateProfile.Env["GOFLAGS"]; got != "-mod=readonly" {
-			t.Errorf("BuildGate.PreGateProfile.Env[GOFLAGS]: got %q, want %q", got, "-mod=readonly")
+		if runOpts.BuildGate.Pre.GateProfile.Command.Shell != "go test ./..." {
+			t.Errorf("BuildGate.Pre.GateProfile.Command.Shell: got %q, want %q", runOpts.BuildGate.Pre.GateProfile.Command.Shell, "go test ./...")
 		}
-		if got := runOpts.BuildGate.PreTarget; got != contracts.GateProfileTargetUnit {
-			t.Errorf("BuildGate.PreTarget: got %q, want %q", got, contracts.GateProfileTargetUnit)
+		if got := runOpts.BuildGate.Pre.GateProfile.Env["GOFLAGS"]; got != "-mod=readonly" {
+			t.Errorf("BuildGate.Pre.GateProfile.Env[GOFLAGS]: got %q, want %q", got, "-mod=readonly")
 		}
-		if !runOpts.BuildGate.PreAlways {
-			t.Error("BuildGate.PreAlways: got false, want true")
+		if got := runOpts.BuildGate.Pre.Target; got != contracts.GateProfileTargetUnit {
+			t.Errorf("BuildGate.Pre.Target: got %q, want %q", got, contracts.GateProfileTargetUnit)
 		}
-		if runOpts.BuildGate.PostGateProfile == nil {
-			t.Fatal("BuildGate.PostGateProfile: expected non-nil")
+		if !runOpts.BuildGate.Pre.Always {
+			t.Error("BuildGate.Pre.Always: got false, want true")
+		}
+		if runOpts.BuildGate.Post == nil {
+			t.Fatal("BuildGate.Post: expected non-nil")
+		}
+		if runOpts.BuildGate.Post.GateProfile == nil {
+			t.Fatal("BuildGate.Post.GateProfile: expected non-nil")
 		}
 		wantPost := []string{"go", "test", "./...", "-run", "TestUnit"}
-		if len(runOpts.BuildGate.PostGateProfile.Command.Exec) != len(wantPost) {
-			t.Fatalf("BuildGate.PostGateProfile.Command.Exec length: got %d, want %d", len(runOpts.BuildGate.PostGateProfile.Command.Exec), len(wantPost))
+		if len(runOpts.BuildGate.Post.GateProfile.Command.Exec) != len(wantPost) {
+			t.Fatalf("BuildGate.Post.GateProfile.Command.Exec length: got %d, want %d", len(runOpts.BuildGate.Post.GateProfile.Command.Exec), len(wantPost))
 		}
 		for i, v := range wantPost {
-			if got := runOpts.BuildGate.PostGateProfile.Command.Exec[i]; got != v {
-				t.Errorf("BuildGate.PostGateProfile.Command.Exec[%d]: got %q, want %q", i, got, v)
+			if got := runOpts.BuildGate.Post.GateProfile.Command.Exec[i]; got != v {
+				t.Errorf("BuildGate.Post.GateProfile.Command.Exec[%d]: got %q, want %q", i, got, v)
 			}
 		}
-		if got := runOpts.BuildGate.PostGateProfile.Env["CGO_ENABLED"]; got != "0" {
-			t.Errorf("BuildGate.PostGateProfile.Env[CGO_ENABLED]: got %q, want %q", got, "0")
+		if got := runOpts.BuildGate.Post.GateProfile.Env["CGO_ENABLED"]; got != "0" {
+			t.Errorf("BuildGate.Post.GateProfile.Env[CGO_ENABLED]: got %q, want %q", got, "0")
 		}
-		if got := runOpts.BuildGate.PostTarget; got != contracts.GateProfileTargetAllTests {
-			t.Errorf("BuildGate.PostTarget: got %q, want %q", got, contracts.GateProfileTargetAllTests)
+		if got := runOpts.BuildGate.Post.Target; got != contracts.GateProfileTargetAllTests {
+			t.Errorf("BuildGate.Post.Target: got %q, want %q", got, contracts.GateProfileTargetAllTests)
 		}
-		if runOpts.BuildGate.PostAlways {
-			t.Error("BuildGate.PostAlways: got true, want false")
+		if runOpts.BuildGate.Post.Always {
+			t.Error("BuildGate.Post.Always: got true, want false")
 		}
 
 		if runOpts.Healing == nil {
