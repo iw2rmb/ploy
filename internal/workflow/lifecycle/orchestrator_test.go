@@ -63,6 +63,118 @@ func TestEvaluateClaimDecision(t *testing.T) {
 	}
 }
 
+// ========== EvaluateCompletionDecision ==========
+
+func TestEvaluateCompletionDecision(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		jobType    domaintypes.JobType
+		jobStatus  domaintypes.JobStatus
+		hasNext    bool
+		wantAction lifecycle.CompletionChainAction
+	}{
+		// Success paths
+		{
+			name:       "success with successor advances chain",
+			jobType:    domaintypes.JobTypeMod,
+			jobStatus:  domaintypes.JobStatusSuccess,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainAdvanceNext,
+		},
+		{
+			name:       "success without successor takes no action",
+			jobType:    domaintypes.JobTypeMod,
+			jobStatus:  domaintypes.JobStatusSuccess,
+			hasNext:    false,
+			wantAction: lifecycle.CompletionChainNoAction,
+		},
+		// Fail paths
+		{
+			name:       "failed MR job takes no chain action",
+			jobType:    domaintypes.JobTypeMR,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainNoAction,
+		},
+		{
+			name:       "failed pre-gate triggers gate failure evaluation",
+			jobType:    domaintypes.JobTypePreGate,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainEvaluateGateFailure,
+		},
+		{
+			name:       "failed post-gate triggers gate failure evaluation",
+			jobType:    domaintypes.JobTypePostGate,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    false,
+			wantAction: lifecycle.CompletionChainEvaluateGateFailure,
+		},
+		{
+			name:       "failed re-gate triggers gate failure evaluation",
+			jobType:    domaintypes.JobTypeReGate,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainEvaluateGateFailure,
+		},
+		{
+			name:       "failed non-gate mod job cancels chain",
+			jobType:    domaintypes.JobTypeMod,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		{
+			name:       "failed heal job cancels chain",
+			jobType:    domaintypes.JobTypeHeal,
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		{
+			name:       "failed unknown job type cancels chain",
+			jobType:    "",
+			jobStatus:  domaintypes.JobStatusFail,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		// Cancelled paths
+		{
+			name:       "cancelled MR job takes no chain action",
+			jobType:    domaintypes.JobTypeMR,
+			jobStatus:  domaintypes.JobStatusCancelled,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainNoAction,
+		},
+		{
+			name:       "cancelled non-MR job cancels remainder",
+			jobType:    domaintypes.JobTypeMod,
+			jobStatus:  domaintypes.JobStatusCancelled,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		{
+			name:       "cancelled gate job cancels remainder",
+			jobType:    domaintypes.JobTypePreGate,
+			jobStatus:  domaintypes.JobStatusCancelled,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := lifecycle.EvaluateCompletionDecision(tc.jobType, tc.jobStatus, tc.hasNext)
+			if got.ChainAction != tc.wantAction {
+				t.Fatalf("ChainAction = %v, want %v", got.ChainAction, tc.wantAction)
+			}
+		})
+	}
+}
+
 // ========== IsGateJobType ==========
 
 func TestIsGateJobType(t *testing.T) {

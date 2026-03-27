@@ -10,6 +10,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/recovery"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState) {
@@ -41,13 +42,14 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 		jobType = ""
 	}
 
-	switch jobType {
-	case domaintypes.JobTypeMR:
+	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	switch decision.ChainAction {
+	case lifecycle.CompletionChainNoAction:
 		slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
 			"job_id", state.job.ID,
 			"next_id", state.job.NextID,
 		)
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+	case lifecycle.CompletionChainEvaluateGateFailure:
 		if errMsg := formatStackGateError(jobType, state.persistedMeta); errMsg != nil {
 			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
 				RunID:     state.job.RunID,
@@ -71,7 +73,7 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 				)
 			}
 		}
-	default:
+	case lifecycle.CompletionChainCancelRemainder:
 		if err := cancelRemainingJobsAfterFailure(ctx, s.store, state.job); err != nil {
 			slog.Error("complete job: failed to cancel remaining jobs after non-gate failure",
 				"job_id", state.job.ID,
@@ -87,7 +89,8 @@ func (s *CompleteJobService) onCancelled(ctx context.Context, state *completeJob
 		return
 	}
 	jobType := domaintypes.JobType(state.job.JobType)
-	if jobType.Validate() == nil && jobType == domaintypes.JobTypeMR {
+	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	if decision.ChainAction == lifecycle.CompletionChainNoAction {
 		return
 	}
 	if err := cancelRemainingJobsAfterFailure(ctx, s.store, state.job); err != nil {
@@ -106,7 +109,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 
 	jobType := domaintypes.JobType(state.job.JobType)
 	if s.gateProfilesBS != nil {
-		if jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate {
+		if lifecycle.IsGateJobType(jobType) {
 			run, ok := s.loadRunForPostCompletion(ctx, state, "gate profile persistence")
 			if ok {
 				specRow, specErr := s.store.GetSpec(ctx, run.SpecID)
@@ -143,7 +146,8 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 		)
 	}
 
-	if state.job.NextID != nil {
+	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
+	if decision.ChainAction == lifecycle.CompletionChainAdvanceNext {
 		if _, err := s.store.PromoteJobByIDIfUnblocked(ctx, *state.job.NextID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("complete job: failed to promote next linked job",
 				"job_id", state.job.ID,
