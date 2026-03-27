@@ -48,7 +48,7 @@ Documentation: `design/job.md`
     2. Validate OpenAPI schema references for modified fields.
   - Reasoning: high (CFP_delta: 10)
 
-- [ ] 1.5 Finalize docs and behavioral acceptance (`determined`)
+- [x] 1.5 Finalize docs and behavioral acceptance (`determined`)
   - Component: `docs/how-to/tui-navigation.md`, `design/job.md`, `roadmap/job.md`
   - Implementation:
     1. Update TUI navigation docs to include JobList reuse in both screens and root conditional composition behavior.

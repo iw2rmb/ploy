@@ -4,7 +4,7 @@ This page describes current `ploy tui` navigation and list behavior.
 
 ## Layout
 
-- Root screen shows a single `PLOY` list with 3 items: `Migrations`, `Runs`, `Jobs`.
+- Root screen (`ScreenPloyList`) shows a single `PLOY` list with 3 items: `Migrations`, `Runs`, `Jobs`.
 - List screens are split into 2 columns:
   - left: `PLOY`
   - right: context list (`MIGRATIONS`, `RUNS`, or `JOBS`)
@@ -36,3 +36,27 @@ Each job row uses two lines:
 
 - Primary line: status glyph + job name + short duration (kept within row width, no ellipsis)
 - Secondary line: `<job-id>`
+
+## JobList Component
+
+`JobList` is a reusable domain component (`internal/tui/joblist`) that owns:
+
+- Job rows state and cursor.
+- Confirmed selected job identity (set on Enter).
+- Job detail payload cache.
+- Jobs-specific view rendering (row format, status glyphs).
+
+`JobList` is used in two screens:
+
+- **`ScreenJobsList`** — renders `PLOY | JobList`. `JobList` may be the active list.
+- **`ScreenPloyList`** — when the `Jobs` item (index 2) is selected in PLOY, renders `PLOY | JobList` in the right pane. PLOY remains the active list; focus does not transfer to `JobList`.
+
+When the PLOY selection moves away from `Jobs`, the right pane is hidden and only `PLOY` is rendered.
+
+## Data Access
+
+`JobList` fetches job data through the unified CLI command layer:
+
+- Job rows are populated from `internal/cli/tui` job items.
+- Job detail payloads are fetched via `internal/cli/runs` run-repo commands (`RepoJobEntry`).
+- No TUI-only HTTP client is introduced; `internal/cli/tui` acts as a thin adapter.
