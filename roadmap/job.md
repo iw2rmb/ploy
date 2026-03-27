@@ -57,4 +57,9 @@ Documentation: `design/job.md`
   - Verification:
     1. `~/@iw2rmb/amata/scripts/check_docs_links.sh`
     2. Manual terminal smoke check: root PLOY with Job selected shows JobList; jobs screen shows same component behavior.
+  - Smoke check record (2026-03-27):
+    - `TestPloyListJobsSelectedShowsJobListPanel`: `ScreenPloyList` cursor on Jobs (index 2) — view contains both `PLOY` and `JOBS` panel. PASS.
+    - `TestPloyListFocusRemainsOnPloy`: `'k'` key on `ScreenPloyList` moves `m.ploy` cursor (2→1), `m.jobList` index unchanged, screen remains `ScreenPloyList`. PASS.
+    - `TestSplitScreensRenderColumns/jobs`: `ScreenJobsList` renders `PLOY | JOBS` split columns — same `JobList` component behavior as root composition. PASS.
+    - All three pass: `go test ./internal/tui -run "PloyListJobsSelected|PloyListFocus|SplitScreens"` → ok.
   - Reasoning: low (CFP_delta: 3)
