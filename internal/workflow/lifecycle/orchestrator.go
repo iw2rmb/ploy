@@ -30,6 +30,59 @@ func EvaluateClaimDecision(jobType domaintypes.JobType, rrStatus domaintypes.Run
 	}
 }
 
+// ========== Completion Decision ==========
+
+// CompletionChainAction is the chain management action required after a job completes.
+type CompletionChainAction int
+
+const (
+	// CompletionChainNoAction means no chain management is needed (e.g. MR jobs, success with no successor).
+	CompletionChainNoAction CompletionChainAction = iota
+	// CompletionChainCancelRemainder cancels remaining non-terminal jobs in the chain.
+	CompletionChainCancelRemainder
+	// CompletionChainAdvanceNext promotes the next linked job for execution.
+	CompletionChainAdvanceNext
+	// CompletionChainEvaluateGateFailure requires full gate failure evaluation (cancel or insert heal chain).
+	CompletionChainEvaluateGateFailure
+)
+
+// CompletionDecision is the pure output of completion transition evaluation.
+type CompletionDecision struct {
+	ChainAction CompletionChainAction
+}
+
+// EvaluateCompletionDecision computes the chain management action required after a job
+// completes. It is pure: no I/O is performed.
+// hasNext should be true when the completed job has a linked successor (NextID != nil).
+func EvaluateCompletionDecision(
+	jobType domaintypes.JobType,
+	jobStatus domaintypes.JobStatus,
+	hasNext bool,
+) CompletionDecision {
+	switch jobStatus {
+	case domaintypes.JobStatusSuccess:
+		if hasNext {
+			return CompletionDecision{ChainAction: CompletionChainAdvanceNext}
+		}
+		return CompletionDecision{ChainAction: CompletionChainNoAction}
+	case domaintypes.JobStatusFail:
+		if jobType == domaintypes.JobTypeMR {
+			return CompletionDecision{ChainAction: CompletionChainNoAction}
+		}
+		if IsGateJobType(jobType) {
+			return CompletionDecision{ChainAction: CompletionChainEvaluateGateFailure}
+		}
+		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
+	case domaintypes.JobStatusCancelled:
+		if jobType == domaintypes.JobTypeMR {
+			return CompletionDecision{ChainAction: CompletionChainNoAction}
+		}
+		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
+	default:
+		return CompletionDecision{ChainAction: CompletionChainNoAction}
+	}
+}
+
 // ========== Gate Failure Transition ==========
 
 // IsGateJobType reports whether jobType is a gate variant (pre, post, or re-gate).
