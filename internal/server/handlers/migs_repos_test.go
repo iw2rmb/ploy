@@ -134,20 +134,12 @@ func TestAddModRepoHandler(t *testing.T) {
 				tt.setupMock(ms)
 			}
 
-			bodyJSON, _ := json.Marshal(tt.body)
-			req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+tt.modID+"/repos", bytes.NewReader(bodyJSON))
-			req.Header.Set("Content-Type", "application/json")
-			req.SetPathValue("mig_id", tt.modID)
-
-			rec := httptest.NewRecorder()
 			handler := addMigRepoHandler(ms)
-			handler(rec, req)
+			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+tt.modID+"/repos", tt.body, "mig_id", tt.modID)
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("got status %d, want %d; body: %s", rec.Code, tt.wantStatus, rec.Body.String())
-			}
-			if tt.wantBodySubstr != "" && !bytes.Contains(rec.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
+			assertStatus(t, rr, tt.wantStatus)
+			if tt.wantBodySubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(tt.wantBodySubstr)) {
+				t.Errorf("body %q does not contain %q", rr.Body.String(), tt.wantBodySubstr)
 			}
 			if tt.wantRepoURL != "" {
 				if !ms.createMigRepoCalled {
@@ -216,18 +208,12 @@ func TestListModReposHandler(t *testing.T) {
 				tt.setupMock(ms)
 			}
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/migs/"+tt.modID+"/repos", nil)
-			req.SetPathValue("mig_id", tt.modID)
-
-			rec := httptest.NewRecorder()
 			handler := listMigReposHandler(ms)
-			handler(rec, req)
+			rr := doRequest(t, handler, http.MethodGet, "/v1/migs/"+tt.modID+"/repos", nil, "mig_id", tt.modID)
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("got status %d, want %d; body: %s", rec.Code, tt.wantStatus, rec.Body.String())
-			}
-			if tt.wantBodySubstr != "" && !bytes.Contains(rec.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
+			assertStatus(t, rr, tt.wantStatus)
+			if tt.wantBodySubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(tt.wantBodySubstr)) {
+				t.Errorf("body %q does not contain %q", rr.Body.String(), tt.wantBodySubstr)
 			}
 			if tt.wantStatus == http.StatusOK {
 				var resp struct {
@@ -235,7 +221,7 @@ func TestListModReposHandler(t *testing.T) {
 						ID string `json:"id"`
 					} `json:"repos"`
 				}
-				if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+				if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 					t.Fatalf("failed to unmarshal response: %v", err)
 				}
 				if len(resp.Repos) != tt.wantCount {
@@ -320,25 +306,20 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 				tt.setupMock(ms)
 			}
 
-			req := httptest.NewRequest(http.MethodDelete, "/v1/migs/"+tt.modID+"/repos/"+tt.repoID, nil)
-			req.SetPathValue("mig_id", tt.modID)
-			req.SetPathValue("repo_id", tt.repoID)
-
-			rec := httptest.NewRecorder()
 			handler := deleteMigRepoHandler(ms)
-			handler(rec, req)
+			rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/"+tt.modID+"/repos/"+tt.repoID, nil, "mig_id", tt.modID, "repo_id", tt.repoID)
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("got status %d, want %d; body: %s", rec.Code, tt.wantStatus, rec.Body.String())
-			}
-			if tt.wantBodySubstr != "" && !bytes.Contains(rec.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
+			assertStatus(t, rr, tt.wantStatus)
+			if tt.wantBodySubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(tt.wantBodySubstr)) {
+				t.Errorf("body %q does not contain %q", rr.Body.String(), tt.wantBodySubstr)
 			}
 		})
 	}
 }
 
 // TestBulkUpsertMigReposHandler tests the POST /v1/migs/{mig_id}/repos/bulk endpoint.
+// Uses manual request construction because doRequest() sets application/json Content-Type,
+// but this endpoint requires text/csv.
 func TestBulkUpsertMigReposHandler(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -362,7 +343,6 @@ https://github.com/org/repo1,main,feature1
 https://github.com/org/repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				// GetMigRepoByURL returns not found (new repos).
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -378,7 +358,6 @@ https://github.com/org/repo2,develop,feature2`,
 https://github.com/org/existing,main,new-feature`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				// GetMigRepoByURL returns existing repo (update case).
 				m.getModRepoByURLResult = store.MigRepo{
 					ID:    "repoexst",
 					MigID: "mod123",
@@ -398,7 +377,6 @@ https://github.com/org/new-repo1,main,feature1
 https://github.com/org/new-repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				// GetMigRepoByURL returns not found for all (new repos).
 				m.getModRepoByURLErr = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
@@ -577,6 +555,7 @@ https://github.com/org/repo,,feature`,
 				tt.setupMock(ms)
 			}
 
+			// Manual request construction: bulk-upsert uses text/csv Content-Type.
 			req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+tt.modID+"/repos/bulk", bytes.NewReader([]byte(tt.body)))
 			req.Header.Set("Content-Type", tt.contentType)
 			req.SetPathValue("mig_id", tt.modID)
@@ -585,9 +564,7 @@ https://github.com/org/repo,,feature`,
 			handler := bulkUpsertMigReposHandler(ms)
 			handler(rec, req)
 
-			if rec.Code != tt.wantStatus {
-				t.Errorf("got status %d, want %d; body: %s", rec.Code, tt.wantStatus, rec.Body.String())
-			}
+			assertStatus(t, rec, tt.wantStatus)
 			if tt.wantBodySubstr != "" && !bytes.Contains(rec.Body.Bytes(), []byte(tt.wantBodySubstr)) {
 				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
 			}

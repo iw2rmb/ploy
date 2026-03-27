@@ -51,6 +51,48 @@ func (f *flushRecorder) Flush() {}
 // strPtr returns a pointer to s.
 func strPtr(s string) *string { return &s }
 
+// boolPtr returns a pointer to b.
+func boolPtr(b bool) *bool { return &b }
+
+// validSpecBody returns a canonical spec map for test request bodies.
+func validSpecBody() map[string]any {
+	return map[string]any{
+		"version": "0.2.0",
+		"env":     map[string]any{},
+		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
+	}
+}
+
+// allReposSelector returns a repo_selector body with mode "all".
+func allReposSelector() map[string]any {
+	return map[string]any{
+		"repo_selector": map[string]any{
+			"mode": "all",
+		},
+	}
+}
+
+// activeMigWithSpec returns a mockStore pre-configured with an active (non-archived)
+// mig (ID "mod123"), a spec row, and one MigRepo. Eliminates repeated setup blocks
+// across migs_runs and migs_spec tests.
+func activeMigWithSpec(specID domaintypes.SpecID) *mockStore {
+	return &mockStore{
+		getModResult: store.Mig{
+			ID:         "mod123",
+			Name:       "test-mig",
+			SpecID:     &specID,
+			ArchivedAt: pgtype.Timestamptz{Valid: false},
+		},
+		getSpecResult: store.Spec{
+			ID:   specID,
+			Spec: []byte(`{"steps":[{"image":"docker.io/test/mig:latest"}]}`),
+		},
+		listMigReposByModResult: []store.MigRepo{
+			{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
+		},
+	}
+}
+
 // mockError is a simple error type for testing store error paths.
 type mockError struct{ msg string }
 
@@ -408,6 +450,72 @@ func healingSpecBytes(t *testing.T) []byte {
 		t.Fatalf("marshal healing spec: %v", err)
 	}
 	return b
+}
+
+// expectedJob describes the expected attributes of a single job in a chain.
+type expectedJob struct {
+	Name       string
+	JobType    domaintypes.JobType
+	Status     domaintypes.JobStatus
+	Image      string
+	RepoShaIn  string // expected repo_sha_in; empty means assert empty
+}
+
+// createJobsByName indexes CreateJobParams by name.
+func createJobsByName(params []store.CreateJobParams) map[string]store.CreateJobParams {
+	byName := make(map[string]store.CreateJobParams, len(params))
+	for _, p := range params {
+		byName[p.Name] = p
+	}
+	return byName
+}
+
+// assertJobChain verifies that the created jobs match the expected chain,
+// checking job_type, status, image, repo_id, repo_base_ref, attempt, run_id, and repo_sha_in.
+func assertJobChain(t *testing.T, params []store.CreateJobParams, runID domaintypes.RunID, repoID domaintypes.RepoID, repoBaseRef string, attempt int32, expected []expectedJob) {
+	t.Helper()
+
+	if len(params) != len(expected) {
+		t.Fatalf("expected %d jobs, got %d", len(expected), len(params))
+	}
+
+	byName := createJobsByName(params)
+	for _, exp := range expected {
+		got, ok := byName[exp.Name]
+		if !ok {
+			t.Fatalf("missing job %q", exp.Name)
+		}
+		if got.JobType != exp.JobType {
+			t.Errorf("job %q: expected job_type %q, got %q", exp.Name, exp.JobType, got.JobType)
+		}
+		if got.Status != exp.Status {
+			t.Errorf("job %q: expected status %s, got %s", exp.Name, exp.Status, got.Status)
+		}
+		if exp.Image != "" && got.JobImage != exp.Image {
+			t.Errorf("job %q: expected job_image %q, got %q", exp.Name, exp.Image, got.JobImage)
+		}
+		if got.RepoID != repoID {
+			t.Errorf("job %q: expected repo_id %q, got %q", exp.Name, repoID, got.RepoID)
+		}
+		if got.RepoBaseRef != repoBaseRef {
+			t.Errorf("job %q: expected repo_base_ref %q, got %q", exp.Name, repoBaseRef, got.RepoBaseRef)
+		}
+		if got.Attempt != attempt {
+			t.Errorf("job %q: expected attempt %d, got %d", exp.Name, attempt, got.Attempt)
+		}
+		if got.RunID != runID {
+			t.Errorf("job %q: expected run_id %q, got %q", exp.Name, runID, got.RunID)
+		}
+		if exp.RepoShaIn != "" {
+			if got.RepoShaIn != exp.RepoShaIn {
+				t.Errorf("job %q: expected repo_sha_in %q, got %q", exp.Name, exp.RepoShaIn, got.RepoShaIn)
+			}
+		} else {
+			if got.RepoShaIn != "" {
+				t.Errorf("job %q: expected empty repo_sha_in, got %q", exp.Name, got.RepoShaIn)
+			}
+		}
+	}
 }
 
 // newTestServerWithRole creates an HTTP server with routes registered and

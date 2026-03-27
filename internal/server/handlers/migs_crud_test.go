@@ -1,11 +1,8 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -22,23 +19,13 @@ import (
 // =============================================================================
 
 // TestMods_Create_Success verifies POST /v1/migs creates a mig with valid input.
-// Tests mig project creation endpoint.
 func TestMods_Create_Success(t *testing.T) {
 	st := &mockStore{}
 	handler := createMigHandler(st)
 
-	reqBody := map[string]any{"name": "my-mig"}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs", map[string]any{"name": "my-mig"})
 	assertStatus(t, rr, http.StatusCreated)
 
-	// Verify store was called with correct params.
 	if !st.createMigCalled {
 		t.Error("store.CreateMig was not called")
 	}
@@ -46,16 +33,12 @@ func TestMods_Create_Success(t *testing.T) {
 		t.Errorf("store Name = %q, want %q", st.createMigParams.Name, "my-mig")
 	}
 
-	// Verify response shape.
-	var resp struct {
+	resp := decodeBody[struct {
 		ID        string  `json:"id"`
 		Name      string  `json:"name"`
 		SpecID    *string `json:"spec_id,omitempty"`
 		CreatedAt string  `json:"created_at"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, rr)
 	if resp.Name != "my-mig" {
 		t.Errorf("response Name = %q, want %q", resp.Name, "my-mig")
 	}
@@ -65,31 +48,18 @@ func TestMods_Create_Success(t *testing.T) {
 }
 
 // TestMods_Create_WithSpec verifies POST /v1/migs with spec creates both mig and spec.
-// Optional spec parameter creates initial spec row.
 func TestMods_Create_WithSpec(t *testing.T) {
 	st := &mockStore{}
 	handler := createMigHandler(st)
 
-	spec := map[string]any{
-		"version": "0.2.0",
-		"env":     map[string]any{},
-		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
-	}
 	reqBody := map[string]any{
 		"name": "mig-with-spec",
-		"spec": spec,
+		"spec": validSpecBody(),
 	}
-	body, _ := json.Marshal(reqBody)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs", reqBody)
 	assertStatus(t, rr, http.StatusCreated)
 
-	// Verify both mig and spec were created.
 	if !st.createMigCalled {
 		t.Error("store.CreateMig was not called")
 	}
@@ -100,15 +70,11 @@ func TestMods_Create_WithSpec(t *testing.T) {
 		t.Error("store.UpdateMigSpec was not called")
 	}
 
-	// Verify response includes spec_id.
-	var resp struct {
+	resp := decodeBody[struct {
 		ID     string  `json:"id"`
 		Name   string  `json:"name"`
 		SpecID *string `json:"spec_id,omitempty"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, rr)
 	if resp.SpecID == nil {
 		t.Error("response spec_id is nil, expected non-nil when spec provided")
 	}
@@ -152,7 +118,6 @@ func TestMods_Create_ErrorPaths(t *testing.T) {
 // =============================================================================
 
 // TestMods_List_Success verifies GET /v1/migs returns migs list.
-// Tests mig listing with pagination and filters.
 func TestMods_List_Success(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
@@ -161,25 +126,16 @@ func TestMods_List_Success(t *testing.T) {
 			{ID: "mod2", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
 		},
 	}
-	handler := listMigsHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs", nil)
 	assertStatus(t, rr, http.StatusOK)
 
-	var resp struct {
-		Migs []struct {
-			ID       string `json:"id"`
-			Name     string `json:"name"`
-			Archived bool   `json:"archived"`
-		} `json:"migs"`
+	type migItem struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Archived bool   `json:"archived"`
 	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[struct{ Migs []migItem }](t, rr)
 
 	if len(resp.Migs) != 2 {
 		t.Fatalf("got %d migs, want 2", len(resp.Migs))
@@ -192,16 +148,10 @@ func TestMods_List_Success(t *testing.T) {
 // TestMods_List_WithPagination verifies GET /v1/migs respects limit/offset.
 func TestMods_List_WithPagination(t *testing.T) {
 	st := &mockStore{}
-	handler := listMigsHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs?limit=10&offset=5", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?limit=10&offset=5", nil)
 	assertStatus(t, rr, http.StatusOK)
 
-	// Verify store received correct params.
 	if !st.listMigsCalled {
 		t.Fatal("store.ListMigs was not called")
 	}
@@ -216,16 +166,10 @@ func TestMods_List_WithPagination(t *testing.T) {
 // TestMods_List_WithNameFilter verifies GET /v1/migs respects name_substring filter.
 func TestMods_List_WithNameFilter(t *testing.T) {
 	st := &mockStore{}
-	handler := listMigsHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs?name_substring=alpha", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?name_substring=alpha", nil)
 	assertStatus(t, rr, http.StatusOK)
 
-	// Verify store received name filter.
 	if st.listMigsParams.NameFilter == nil {
 		t.Fatal("NameFilter is nil, expected pointer to 'alpha'")
 	}
@@ -235,7 +179,6 @@ func TestMods_List_WithNameFilter(t *testing.T) {
 }
 
 // TestMods_List_ArchivedFilter verifies GET /v1/migs respects archived filter.
-// Tests archived filter parameter.
 func TestMods_List_ArchivedFilter(t *testing.T) {
 	tests := []struct {
 		query        string
@@ -248,13 +191,8 @@ func TestMods_List_ArchivedFilter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
 			st := &mockStore{}
-			handler := listMigsHandler(st)
 
-			req := httptest.NewRequest(http.MethodGet, "/v1/migs?"+tt.query, nil)
-			rr := httptest.NewRecorder()
-
-			handler.ServeHTTP(rr, req)
-
+			rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?"+tt.query, nil)
 			assertStatus(t, rr, http.StatusOK)
 
 			if st.listMigsParams.ArchivedOnly == nil {
@@ -302,24 +240,15 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 			"repo2": {ID: "repo2", Url: "https://github.com/org/other"},
 		},
 	}
-	handler := listMigsHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs?repo_url=https://github.com/org/repo.git/", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?repo_url=https://github.com/org/repo.git/", nil)
 	assertStatus(t, rr, http.StatusOK)
 
-	var resp struct {
-		Migs []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"migs"`
+	type migItem struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
 	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[struct{ Migs []migItem }](t, rr)
 	if len(resp.Migs) != 1 {
 		t.Fatalf("got %d migs, want 1", len(resp.Migs))
 	}
@@ -348,23 +277,12 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 			"repoC": {ID: "repoC", Url: "https://github.com/org/repo"},
 		},
 	}
-	handler := listMigsHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs?repo_url=https://github.com/org/repo&limit=1&offset=1", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?repo_url=https://github.com/org/repo&limit=1&offset=1", nil)
 	assertStatus(t, rr, http.StatusOK)
 
-	var resp struct {
-		Migs []struct {
-			ID string `json:"id"`
-		} `json:"migs"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	type migItem struct{ ID string `json:"id"` }
+	resp := decodeBody[struct{ Migs []migItem }](t, rr)
 	if len(resp.Migs) != 1 {
 		t.Fatalf("got %d migs, want 1", len(resp.Migs))
 	}
@@ -375,16 +293,9 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 
 // TestMods_List_StoreError verifies GET /v1/migs returns 500 on store error.
 func TestMods_List_StoreError(t *testing.T) {
-	st := &mockStore{
-		listMigsErr: errors.New("database connection failed"),
-	}
-	handler := listMigsHandler(st)
+	st := &mockStore{listMigsErr: errors.New("database connection failed")}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/migs", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs", nil)
 	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
@@ -489,10 +400,3 @@ func TestMods_Delete_StoreError(t *testing.T) {
 	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
-// =============================================================================
-// Helpers
-// =============================================================================
-
-func boolPtr(b bool) *bool {
-	return &b
-}

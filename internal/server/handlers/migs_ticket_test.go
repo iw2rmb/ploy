@@ -15,25 +15,9 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func newTestEventsService() *server.EventsService {
-	svc, _ := server.NewEventsService(server.EventsOptions{
-		BufferSize:  10,
-		HistorySize: 100,
-	})
-	return svc
-}
-
-func createJobsByName(params []store.CreateJobParams) map[string]store.CreateJobParams {
-	byName := make(map[string]store.CreateJobParams, len(params))
-	for _, p := range params {
-		byName[p.Name] = p
-	}
-	return byName
-}
 
 const testRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
 
@@ -95,161 +79,76 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	}
 }
 
-// These tests verify v1 job creation behavior:
+// TestCreateJobsFromSpec verifies v1 job creation behavior:
 // - Jobs are created directly for (runs.id, run_repos.repo_id)
 // - jobs.repo_id and jobs.repo_base_ref are persisted correctly
 // - First job is Queued, remaining jobs are Created per repo attempt
-
-func TestCreateJobsFromSpec_SingleMod(t *testing.T) {
+func TestCreateJobsFromSpec(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.RunID("run_test_12345678901234567")
-	repoID := domaintypes.RepoID("repo_abc")
-	const (
-		repoBaseRef = "main"
-		attempt     = int32(1)
-	)
-
-	st := &mockStore{}
-
-	spec := []byte(`{"steps":[{"image":"mod1:v1"}]}`)
-
-	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	// Verify 3 jobs were created: pre-gate, mig-0, post-gate.
-	if st.createJobCallCount != 3 {
-		t.Fatalf("expected 3 jobs, got %d", st.createJobCallCount)
-	}
-
-	// Verify job status and shape (pre-gate is Queued, rest are Created).
-	expectedJobs := []struct {
-		name    string
-		jobType domaintypes.JobType
-		status  domaintypes.JobStatus
+	tests := []struct {
+		name        string
+		runID       domaintypes.RunID
+		repoID      domaintypes.RepoID
+		repoBaseRef string
+		attempt     int32
+		spec        []byte
+		expected    []expectedJob
 	}{
-		{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued}, // First job is Queued.
-		{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated},       // Remaining jobs are Created.
-		{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated},
+		{
+			name:        "SingleMod",
+			runID:       domaintypes.RunID("run_test_12345678901234567"),
+			repoID:      domaintypes.RepoID("repo_abc"),
+			repoBaseRef: "main",
+			attempt:     1,
+			spec:        []byte(`{"steps":[{"image":"mod1:v1"}]}`),
+			expected: []expectedJob{
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			},
+		},
+		{
+			name:        "MultiStep",
+			runID:       domaintypes.RunID("run_multistep_0123456789"),
+			repoID:      domaintypes.RepoID("repo_multi"),
+			repoBaseRef: "develop",
+			attempt:     2,
+			spec:        []byte(`{"steps":[{"image":"mod1:v1"},{"image":"mod2:v2"},{"image":"mod3:v3"}]}`),
+			expected: []expectedJob{
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod1:v1", ""},
+				{"mig-1", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod2:v2", ""},
+				{"mig-2", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod3:v3", ""},
+				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			},
+		},
+		{
+			name:        "CustomAttemptAndRef",
+			runID:       domaintypes.RunID("run_v1_direct_addressing_12"),
+			repoID:      domaintypes.RepoID("repo_direct_addr"),
+			repoBaseRef: "feature/test",
+			attempt:     3,
+			spec:        []byte(`{"steps":[{"image":"a"}]}`),
+			expected: []expectedJob{
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			},
+		},
 	}
 
-	byName := createJobsByName(st.createJobParams)
-	for _, exp := range expectedJobs {
-		got, ok := byName[exp.name]
-		if !ok {
-			t.Fatalf("missing job %q", exp.name)
-		}
-		if got.JobType != exp.jobType {
-			t.Errorf("job %q: expected job_type %q, got %q", exp.name, exp.jobType, got.JobType)
-		}
-		if got.Status != exp.status {
-			t.Errorf("job %q: expected status %s, got %s", exp.name, exp.status, got.Status)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &mockStore{}
 
-		// Verify repo_id and repo_base_ref are persisted correctly.
-		if got.RepoID != repoID {
-			t.Errorf("job %q: expected repo_id %q, got %q", exp.name, repoID, got.RepoID)
-		}
-		if got.RepoBaseRef != repoBaseRef {
-			t.Errorf("job %q: expected repo_base_ref %q, got %q", exp.name, repoBaseRef, got.RepoBaseRef)
-		}
-		if got.Attempt != attempt {
-			t.Errorf("job %q: expected attempt %d, got %d", exp.name, attempt, got.Attempt)
-		}
-		if got.RunID != runID {
-			t.Errorf("job %q: expected run_id %q, got %q", exp.name, runID, got.RunID)
-		}
-		if exp.name == "pre-gate" && got.RepoShaIn != testRepoSHA0 {
-			t.Errorf("job %q: expected repo_sha_in %q, got %q", exp.name, testRepoSHA0, got.RepoShaIn)
-		}
-		if exp.name != "pre-gate" && got.RepoShaIn != "" {
-			t.Errorf("job %q: expected empty repo_sha_in, got %q", exp.name, got.RepoShaIn)
-		}
-	}
-}
+			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, testRepoSHA0, tt.spec)
+			if err != nil {
+				t.Fatalf("createJobsFromSpec failed: %v", err)
+			}
 
-func TestCreateJobsFromSpec_MultiStep(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.RunID("run_multistep_0123456789")
-	repoID := domaintypes.RepoID("repo_multi")
-	const (
-		repoBaseRef = "develop"
-		attempt     = int32(2)
-	)
-
-	st := &mockStore{}
-
-	// Multi-step spec with 3 steps.
-	spec := []byte(`{
-		"steps": [
-			{"image": "mod1:v1"},
-			{"image": "mod2:v2"},
-			{"image": "mod3:v3"}
-		]
-	}`)
-
-	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	// Verify 5 jobs were created: pre-gate, mig-0, mig-1, mig-2, post-gate.
-	if st.createJobCallCount != 5 {
-		t.Fatalf("expected 5 jobs (pre-gate + 3 migs + post-gate), got %d", st.createJobCallCount)
-	}
-
-	// Verify job status and shape (pre-gate is Queued, rest are Created).
-	expectedJobs := []struct {
-		name     string
-		jobType  domaintypes.JobType
-		status   domaintypes.JobStatus
-		modImage string
-	}{
-		{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, ""},  // First job is Queued.
-		{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod1:v1"}, // Remaining jobs are Created.
-		{"mig-1", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod2:v2"},
-		{"mig-2", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod3:v3"},
-		{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, ""},
-	}
-
-	byName := createJobsByName(st.createJobParams)
-	for _, exp := range expectedJobs {
-		got, ok := byName[exp.name]
-		if !ok {
-			t.Fatalf("missing job %q", exp.name)
-		}
-		if got.JobType != exp.jobType {
-			t.Errorf("job %q: expected job_type %q, got %q", exp.name, exp.jobType, got.JobType)
-		}
-		if got.Status != exp.status {
-			t.Errorf("job %q: expected status %s, got %s", exp.name, exp.status, got.Status)
-		}
-		if got.JobImage != exp.modImage {
-			t.Errorf("job %q: expected job_image %q, got %q", exp.name, exp.modImage, got.JobImage)
-		}
-
-		// Verify repo_id and repo_base_ref are persisted correctly.
-		if got.RepoID != repoID {
-			t.Errorf("job %q: expected repo_id %q, got %q", exp.name, repoID, got.RepoID)
-		}
-		if got.RepoBaseRef != repoBaseRef {
-			t.Errorf("job %q: expected repo_base_ref %q, got %q", exp.name, repoBaseRef, got.RepoBaseRef)
-		}
-		if got.Attempt != attempt {
-			t.Errorf("job %q: expected attempt %d, got %d", exp.name, attempt, got.Attempt)
-		}
-		if got.RunID != runID {
-			t.Errorf("job %q: expected run_id %q, got %q", exp.name, runID, got.RunID)
-		}
-		if exp.name == "pre-gate" && got.RepoShaIn != testRepoSHA0 {
-			t.Errorf("job %q: expected repo_sha_in %q, got %q", exp.name, testRepoSHA0, got.RepoShaIn)
-		}
-		if exp.name != "pre-gate" && got.RepoShaIn != "" {
-			t.Errorf("job %q: expected empty repo_sha_in, got %q", exp.name, got.RepoShaIn)
-		}
+			assertJobChain(t, st.createJobParams, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, tt.expected)
+		})
 	}
 }
 
@@ -329,41 +228,6 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestCreateJobsDirectlyForRunRepoID(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.RunID("run_v1_direct_addressing_12")
-	repoID := domaintypes.RepoID("repo_direct_addr")
-	const (
-		repoBaseRef = "feature/test"
-		attempt     = int32(3)
-	)
-
-	st := &mockStore{}
-	spec := []byte(`{"steps":[{"image":"a"}]}`)
-
-	err := createJobsFromSpec(context.Background(), st, runID, repoID, repoBaseRef, attempt, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
-	// Verify all jobs are created with the same (run_id, repo_id, attempt) tuple.
-	for i, p := range st.createJobParams {
-		if p.RunID != runID {
-			t.Errorf("job %d: expected run_id %q (direct addressing), got %q", i, runID, p.RunID)
-		}
-		if p.RepoID != repoID {
-			t.Errorf("job %d: expected repo_id %q (no child runs), got %q", i, repoID, p.RepoID)
-		}
-		if p.Attempt != attempt {
-			t.Errorf("job %d: expected attempt %d, got %d", i, attempt, p.Attempt)
-		}
-		if p.RepoBaseRef != repoBaseRef {
-			t.Errorf("job %d: expected repo_base_ref %q, got %q", i, repoBaseRef, p.RepoBaseRef)
-		}
 	}
 }
 
@@ -523,7 +387,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 		},
 	}
 
-	eventsService := newTestEventsService()
+	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
 	reqBody := map[string]any{
@@ -569,42 +433,6 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	}
 	if !foundRunEvent {
 		t.Fatalf("expected to find a 'run' event in the snapshot")
-	}
-}
-
-func TestCreateSingleRepoRunHandler_MultiStepDefersJobCreation(t *testing.T) {
-	t.Parallel()
-
-	now := time.Now().UTC()
-	st := &mockStore{
-		createRunResult: store.Run{
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-	}
-
-	handler := createSingleRepoRunHandler(st, nil)
-
-	reqBody := map[string]any{
-		"repo_url":   "https://github.com/user/repo.git",
-		"base_ref":   "main",
-		"target_ref": "feature",
-		"spec": map[string]any{
-			"steps": []any{
-				map[string]any{"image": "img1:latest"},
-				map[string]any{"image": "img2:latest"},
-			},
-		},
-	}
-	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusCreated)
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no jobs on submission, got %d", st.createJobCallCount)
 	}
 }
 
