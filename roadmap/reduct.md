@@ -103,7 +103,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     3. Add structural proof in completion notes: removed old precedence helpers and service-owned precedence paths.
   - Reasoning: high (12 CFP)
   - Structural proof:
-    - New canonical owner: `internal/workflow/gateprofile/service.go` with `GateOverrideForJobType` and `StackMatches` as the single owner of gate-profile override derivation and stack-matching precedence.
+    - New canonical owner: `internal/workflow/gateprofile/service.go` with `GateOverrideForJobType`, `StackMatches`, and `SelectProfile` (+ `ProfileCandidate`/`ProfilePrecedence` types) as the single owner of gate-profile override derivation, stack-matching precedence, and default/exact/latest resolution precedence.
     - Removed from contracts (rg `GateProfileGateOverrideForJobType\|GateProfileStackMatches\|gateProfileTargetToBuildGateOverride\|gateProfileRuntimeGateEnv\|defaultGateProfileDockerHostSocket` `internal/workflow/contracts/gate_profile.go` returns no match): all five symbols deleted.
     - Adoption confirmed: `internal/server/handlers/claim_spec_mutator_gate.go` calls `gateprofile.GateOverrideForJobType` at both call sites; `internal/server/handlers/nodes_complete_healing_infra_candidate.go` calls `gateprofile.StackMatches`. No remaining `contracts.GateProfileGateOverrideForJobType` or `contracts.GateProfileStackMatches` references in codebase.
     - Superseded tests removed: `gate_profile_test.go` in contracts no longer contains override/stack-match tests; table-driven coverage lives in `internal/workflow/gateprofile/service_test.go` (`TestGateOverrideForJobType` 11 cases, `TestStackMatches` 8 cases).
