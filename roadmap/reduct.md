@@ -17,19 +17,32 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `go test ./internal/... -run 'RunRepo|DerivedStatus|Terminal'`.
   - Reasoning: high (12 CFP)
 
-- [ ] 1.2 Extract shared claim/complete orchestration core from handlers and nodeagent
-  - Type: assumption-bound
-  - Component: `internal/workflow/lifecycle`, `internal/server/handlers/jobs_complete_service.go`, `internal/server/handlers/nodes_claim_service.go`, `internal/server/handlers/nodes_complete_healing.go`, `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`
-  - Assumptions: Existing handler/nodeagent behavior around healing candidate and retry transitions is canonical and should be preserved exactly before simplification.
+- [x] 1.2 Extract shared claim/complete transition core and adopt it in server handlers
+  - Type: determined
+  - Component: `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service.go`, `internal/server/handlers/nodes_claim_service.go`, `internal/server/handlers/nodes_complete_healing.go`
   - Implementation:
-    1. Add `internal/workflow/lifecycle/orchestrator.go` with explicit interfaces for claim decision, completion decision, and retry/healing transition output.
+    1. Add `internal/workflow/lifecycle/orchestrator.go` with explicit interfaces and result structs for claim decision, completion decision, and retry/healing transitions.
     2. Refactor server-side claim and completion service functions to delegate transition computation to the shared orchestrator core.
-    3. Refactor nodeagent execution orchestrator functions to consume the same transition outputs instead of local branch trees.
-    4. Add parity tests that run identical transition fixtures against server path and nodeagent path.
+    3. Refactor server healing completion flow to consume shared retry/healing transition outputs instead of local branch trees.
+    4. Add lifecycle plus handler tests that lock transition outputs for server claim/complete/healing paths.
   - Verification:
-    1. Run `go test ./internal/workflow/lifecycle ./internal/server/handlers ./internal/nodeagent`.
-    2. Run `go test ./internal/... -run 'Claim|Complete|Healing|Rehydrate'`.
-  - Reasoning: xhigh (24 CFP)
+    1. Run `go test ./internal/workflow/lifecycle ./internal/server/handlers`.
+    2. Run `go test ./internal/... -run 'Claim|Complete|Healing'`.
+  - Reasoning: high (15 CFP)
+
+- [ ] 1.3 Adopt shared claim/complete transition core in nodeagent and add cross-path parity fixtures
+  - Type: assumption-bound
+  - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`, `internal/workflow/lifecycle/orchestrator.go`, `internal/server/handlers/jobs_complete_service.go`
+  - Assumptions: Existing nodeagent retry and rehydrate transition behavior matches server transition semantics closely enough to consume shared orchestrator outputs without introducing new nodeagent-only transition types.
+  - Implementation:
+    1. Refactor nodeagent execution orchestrator claim/complete paths to consume the shared lifecycle orchestrator transition outputs.
+    2. Refactor nodeagent retry and rehydrate branches to use shared retry/healing transition outputs and remove duplicated local branch trees.
+    3. Add parity fixtures that execute identical transition cases through server and nodeagent call paths.
+    4. Remove now-redundant nodeagent-local helper logic replaced by shared orchestrator transitions.
+  - Verification:
+    1. Run `go test ./internal/workflow/lifecycle ./internal/nodeagent ./internal/server/handlers`.
+    2. Run `go test ./internal/... -run 'Claim|Complete|Healing|Rehydrate|Retry'`.
+  - Reasoning: high (8 CFP)
 
 - [ ] 2.1 Create a single gate-profile resolution service consumed by server and nodeagent
   - Type: determined

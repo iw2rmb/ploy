@@ -10,6 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -120,13 +121,13 @@ func maybeRefreshNextReGateRecoveryCandidate(
 	}
 
 	var detectedExpectation *contracts.StackExpectation
-	if prevHeal := recoveryChainPredecessor(reGateJob.ID, jobsByID); prevHeal != nil {
-		if failedGate := recoveryChainPredecessor(prevHeal.ID, jobsByID); failedGate != nil {
-			_, _, detectedExpectation = resolveFailedGateRecoveryContext(*failedGate)
+	if prevHeal := lifecycle.RecoveryChainPredecessor(reGateJob.ID, jobsByID); prevHeal != nil {
+		if failedGate := lifecycle.RecoveryChainPredecessor(prevHeal.ID, jobsByID); failedGate != nil {
+			_, _, detectedExpectation = lifecycle.ResolveGateRecoveryContext(*failedGate)
 		}
 	}
 
-	updatedRecovery := cloneRecoveryMetadata(recovery)
+	updatedRecovery := lifecycle.CloneRecoveryMetadata(recovery)
 	evaluateAndAttachInfraCandidate(ctx, bp, reGateJob.RunID, reGateJob, jobsByID, detectedExpectation, updatedRecovery)
 	if meta.Recovery != nil {
 		meta.Recovery = updatedRecovery

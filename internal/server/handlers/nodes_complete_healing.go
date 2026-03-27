@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // maybeCreateHealingJobs inserts a heal -> re-gate chain after a failed gate job by rewiring next_id links.
@@ -44,7 +43,7 @@ func maybeCreateHealingJobs(
 	if err := jobType.Validate(); err != nil {
 		return fmt.Errorf("invalid job_type %q for failed job_id=%s: %w", failedJob.JobType, failedJob.ID, err)
 	}
-	if !isGateJobType(jobType) {
+	if !lifecycle.IsGateJobType(jobType) {
 		slog.Debug("maybeCreateHealingJobs: not a gate job, skipping healing",
 			"run_id", failedJob.RunID,
 			"job_id", failedJob.ID,
@@ -53,20 +52,14 @@ func maybeCreateHealingJobs(
 		return nil
 	}
 
-	recoveryMeta, detectedStack, detectedExpectation := resolveFailedGateRecoveryContext(failedJob)
+	recoveryMeta, detectedStack, detectedExpectation := lifecycle.ResolveGateRecoveryContext(failedJob)
 	recoveryKind, ok := contracts.ParseRecoveryErrorKind(recoveryMeta.ErrorKind)
 	if !ok {
 		recoveryKind = contracts.DefaultRecoveryErrorKind()
 	}
-	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
-		slog.Info("maybeCreateHealingJobs: terminal recovery classification, canceling remaining linked jobs",
-			"run_id", failedJob.RunID,
-			"job_id", failedJob.ID,
-			"error_kind", recoveryMeta.ErrorKind,
-		)
-		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
-	}
 
+	// Fetch spec before calling the orchestrator (terminal check is inside the orchestrator
+	// but fetching spec early avoids a second DB call on the happy path).
 	specRow, err := st.GetSpec(ctx, run.SpecID)
 	if err != nil {
 		return fmt.Errorf("get spec: %w", err)
@@ -76,120 +69,55 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("parse run spec: %w", err)
 	}
 
-	healing := (*contracts.HealingSpec)(nil)
+	var healing *contracts.HealingSpec
 	if spec.BuildGate != nil {
 		healing = spec.BuildGate.Healing
 	}
-	if healing == nil || len(healing.ByErrorKind) == 0 {
-		slog.Debug("maybeCreateHealingJobs: no healing config, canceling remaining linked jobs",
-			"run_id", failedJob.RunID,
-			"job_id", failedJob.ID,
-		)
-		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
+
+	decision, decisionErr := lifecycle.EvaluateGateFailureTransition(
+		failedJob, jobsByID, recoveryMeta, recoveryKind, detectedStack, healing, domaintypes.NewJobID)
+	if decisionErr != nil {
+		return fmt.Errorf("evaluate gate failure transition: %w", decisionErr)
 	}
 
-	action, ok := healing.ByErrorKind[recoveryKind.String()]
-	if !ok {
-		slog.Info("maybeCreateHealingJobs: no healing action for error_kind, canceling remaining linked jobs",
+	if decision.Outcome == lifecycle.GateFailureOutcomeCancel {
+		slog.Info("maybeCreateHealingJobs: canceling remaining linked jobs",
 			"run_id", failedJob.RunID,
 			"job_id", failedJob.ID,
 			"error_kind", recoveryMeta.ErrorKind,
-		)
-		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
-	}
-	if len(recoveryMeta.Expectations) == 0 && action.Expectations != nil {
-		if b, err := json.Marshal(action.Expectations); err == nil {
-			recoveryMeta.Expectations = b
-		}
-	}
-
-	retries := action.Retries
-	if retries <= 0 {
-		retries = 1
-	}
-
-	baseGateID := resolveBaseGateID(failedJob, jobsByID)
-	healingAttempts := countExistingHealingAttempts(baseGateID, jobsByID)
-	healingAttemptNumber := healingAttempts + 1
-	if healingAttemptNumber > retries {
-		slog.Info("maybeCreateHealingJobs: healing retries exhausted",
-			"run_id", failedJob.RunID,
-			"job_id", failedJob.ID,
-			"attempt", healingAttemptNumber,
-			"max_retries", retries,
+			"reason", decision.CancelReason,
 		)
 		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
 	}
 
-	healImage, err := action.Image.ResolveImage(detectedStack)
-	if err != nil {
-		return fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
-	}
+	chain := decision.Chain
 
-	reGateRecoveryMeta := cloneRecoveryMetadata(recoveryMeta)
-	if shouldEvaluateInfraCandidate(recoveryMeta, action) {
-		if reGateRecoveryMeta == nil {
-			reGateRecoveryMeta = &contracts.BuildGateRecoveryMetadata{
-				LoopKind:  recoveryMeta.LoopKind,
-				ErrorKind: recoveryMeta.ErrorKind,
-			}
-		}
-		artifactPath := contracts.GateProfileCandidateArtifactPath
-		if p, ok := resolveRecoveryCandidateArtifactPath(recoveryMeta.Expectations); ok {
-			artifactPath = p
-		}
-		reGateRecoveryMeta.CandidateSchemaID = contracts.GateProfileCandidateSchemaID
-		reGateRecoveryMeta.CandidateArtifactPath = artifactPath
+	// Attach infra candidate artifact if the orchestrator determined it is needed.
+	if chain.ShouldAttachCandidate {
 		evaluateAndAttachInfraCandidate(
-			ctx,
-			bp,
-			run.ID,
-			failedJob,
-			jobsByID,
-			detectedExpectation,
-			reGateRecoveryMeta,
-		)
+			ctx, bp, run.ID, failedJob, jobsByID, detectedExpectation, chain.ReGateMeta.Recovery)
 	}
 
-	reGateMetaBytes, err := contracts.MarshalJobMeta(&contracts.JobMeta{
-		Kind:     contracts.JobKindGate,
-		Recovery: reGateRecoveryMeta,
-	})
+	reGateMetaBytes, err := contracts.MarshalJobMeta(chain.ReGateMeta)
 	if err != nil {
 		return fmt.Errorf("marshal re-gate job meta: %w", err)
 	}
-	healMetaBytes, err := contracts.MarshalJobMeta(&contracts.JobMeta{
-		Kind:     contracts.JobKindMod,
-		Recovery: cloneRecoveryMetadata(recoveryMeta),
-	})
+	healMetaBytes, err := contracts.MarshalJobMeta(chain.HealMeta)
 	if err != nil {
 		return fmt.Errorf("marshal heal job meta: %w", err)
 	}
 
-	oldNext := failedJob.NextID
-	healID := domaintypes.NewJobID()
-	reGateID := domaintypes.NewJobID()
-	healRepoSHAIn := strings.TrimSpace(strings.ToLower(failedJob.RepoShaIn))
-	if !sha40Pattern.MatchString(healRepoSHAIn) {
-		slog.Error("maybeCreateHealingJobs: invalid failed job repo_sha_in; canceling remaining linked jobs",
-			"run_id", failedJob.RunID,
-			"job_id", failedJob.ID,
-			"repo_sha_in", failedJob.RepoShaIn,
-		)
-		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
-	}
-
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          reGateID,
+		ID:          chain.ReGateID,
 		RunID:       failedJob.RunID,
 		RepoID:      failedJob.RepoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("re-gate-%d", healingAttemptNumber),
+		Name:        fmt.Sprintf("re-gate-%d", chain.AttemptNumber),
 		JobType:     domaintypes.JobTypeReGate,
 		JobImage:    "",
 		Status:      domaintypes.JobStatusCreated,
-		NextID:      oldNext,
+		NextID:      chain.OldSuccessorID,
 		Meta:        reGateMetaBytes,
 	})
 	if err != nil {
@@ -197,133 +125,36 @@ func maybeCreateHealingJobs(
 	}
 
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
-		ID:          healID,
+		ID:          chain.HealID,
 		RunID:       failedJob.RunID,
 		RepoID:      failedJob.RepoID,
 		RepoBaseRef: failedJob.RepoBaseRef,
 		Attempt:     failedJob.Attempt,
-		Name:        fmt.Sprintf("heal-%d-0", healingAttemptNumber),
+		Name:        fmt.Sprintf("heal-%d-0", chain.AttemptNumber),
 		JobType:     domaintypes.JobTypeHeal,
-		JobImage:    healImage,
+		JobImage:    chain.HealImage,
 		Status:      domaintypes.JobStatusQueued,
-		NextID:      &reGateID,
+		NextID:      &chain.ReGateID,
 		Meta:        healMetaBytes,
-		RepoShaIn:   healRepoSHAIn,
+		RepoShaIn:   chain.HealRepoSHAIn,
 	})
 	if err != nil {
 		return fmt.Errorf("create heal job: %w", err)
 	}
 
-	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &healID}); err != nil {
+	if err := st.UpdateJobNextID(ctx, store.UpdateJobNextIDParams{ID: failedJob.ID, NextID: &chain.HealID}); err != nil {
 		return fmt.Errorf("rewire failed job next_id: %w", err)
 	}
 
 	slog.Info("maybeCreateHealingJobs: rewired chain",
 		"run_id", failedJob.RunID,
 		"failed_job_id", failedJob.ID,
-		"heal_job_id", healID,
-		"re_gate_job_id", reGateID,
-		"old_next", oldNext,
-		"attempt", healingAttemptNumber,
+		"heal_job_id", chain.HealID,
+		"re_gate_job_id", chain.ReGateID,
+		"old_next", chain.OldSuccessorID,
+		"attempt", chain.AttemptNumber,
 		"error_kind", recoveryMeta.ErrorKind,
 		"strategy_id", recoveryMeta.StrategyID,
 	)
 	return nil
-}
-
-func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
-	if src == nil {
-		return nil
-	}
-	out := *src
-	if src.Confidence != nil {
-		v := *src.Confidence
-		out.Confidence = &v
-	}
-	if src.CandidatePromoted != nil {
-		v := *src.CandidatePromoted
-		out.CandidatePromoted = &v
-	}
-	if len(src.Expectations) > 0 {
-		out.Expectations = append([]byte(nil), src.Expectations...)
-	}
-	if len(src.CandidateGateProfile) > 0 {
-		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
-	}
-	if src.DepsBumps != nil {
-		out.DepsBumps = cloneDepsBumpsMap(src.DepsBumps)
-	}
-	return &out
-}
-
-func cloneDepsBumpsMap(src map[string]*string) map[string]*string {
-	if src == nil {
-		return nil
-	}
-	out := make(map[string]*string, len(src))
-	for k, v := range src {
-		if v == nil {
-			out[k] = nil
-			continue
-		}
-		ver := *v
-		out[k] = &ver
-	}
-	return out
-}
-
-func isGateJobType(jobType domaintypes.JobType) bool {
-	return jobType == domaintypes.JobTypePreGate || jobType == domaintypes.JobTypePostGate || jobType == domaintypes.JobTypeReGate
-}
-
-func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store.Job) domaintypes.JobID {
-	failedType := domaintypes.JobType(failedJob.JobType)
-	if failedType != domaintypes.JobTypeReGate {
-		return failedJob.ID
-	}
-
-	currentID := failedJob.ID
-	for range len(jobsByID) {
-		prev := recoveryChainPredecessor(currentID, jobsByID)
-		if prev == nil {
-			break
-		}
-		prevType := domaintypes.JobType(prev.JobType)
-		if prevType == domaintypes.JobTypePreGate || prevType == domaintypes.JobTypePostGate {
-			return prev.ID
-		}
-		currentID = prev.ID
-	}
-	return failedJob.ID
-}
-
-func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {
-	base, ok := jobsByID[baseGateID]
-	if !ok {
-		return 0
-	}
-
-	attempts := 0
-	seen := map[domaintypes.JobID]struct{}{}
-	nextID := base.NextID
-	for nextID != nil {
-		if _, dup := seen[*nextID]; dup {
-			break
-		}
-		seen[*nextID] = struct{}{}
-
-		job, ok := jobsByID[*nextID]
-		if !ok {
-			break
-		}
-		jobType := domaintypes.JobType(job.JobType)
-		if jobType == domaintypes.JobTypeHeal {
-			attempts++
-		}
-		if jobType != domaintypes.JobTypeHeal && jobType != domaintypes.JobTypeReGate {
-			break
-		}
-		nextID = job.NextID
-	}
-	return attempts
 }
