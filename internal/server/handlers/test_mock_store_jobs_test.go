@@ -104,8 +104,6 @@ func (m *mockStore) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgty
 }
 
 func (m *mockStore) CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error) {
-	m.countStaleNodesWithRunningJobsCalled = true
-	m.countStaleNodesWithRunningJobsParam = lastHeartbeat
 	return m.countStaleNodesWithRunningJobsResult, m.countStaleNodesWithRunningJobsErr
 }
 
@@ -116,8 +114,6 @@ func (m *mockStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params
 }
 
 func (m *mockStore) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
-	m.countJobsByRunCalled = true
-	m.countJobsByRunParam = runID.String()
 	if m.countJobsByRunErr != nil {
 		return 0, m.countJobsByRunErr
 	}
@@ -129,8 +125,6 @@ func (m *mockStore) CountJobsByRun(ctx context.Context, runID types.RunID) (int6
 }
 
 func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJobsByRunAndStatusParams) (int64, error) {
-	m.countJobsByRunAndStatusCalled = true
-	m.countJobsByRunAndStatusParams = arg
 	if m.countJobsByRunAndStatusErr != nil {
 		return 0, m.countJobsByRunAndStatusErr
 	}
@@ -155,8 +149,6 @@ func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.Count
 // CountJobsByRunRepoAttemptGroupByStatus returns job counts by status for a repo attempt.
 // Used by maybeUpdateRunRepoStatus for v1 repo-scoped terminal detection.
 func (m *mockStore) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunRepoAttemptGroupByStatusParams) ([]store.CountJobsByRunRepoAttemptGroupByStatusRow, error) {
-	m.countJobsByRunRepoAttemptGroupByStatusCalled = true
-	m.countJobsByRunRepoAttemptGroupByStatusParams = arg
 	return m.countJobsByRunRepoAttemptGroupByStatusResult, m.countJobsByRunRepoAttemptGroupByStatusErr
 }
 
@@ -255,8 +247,6 @@ func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobI
 }
 
 func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error) {
-	m.promoteReGateRecoveryCandidateGateProfileCalled = true
-	m.promoteReGateRecoveryCandidateGateProfileParams = arg
 	if m.promoteReGateRecoveryCandidateGateProfileErr != nil {
 		return "", m.promoteReGateRecoveryCandidateGateProfileErr
 	}
@@ -271,8 +261,6 @@ func (m *mockStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Contex
 }
 
 func (m *mockStore) ResolveStackRowByImage(ctx context.Context, image string) (store.ResolveStackRowByImageRow, error) {
-	m.resolveStackRowByImageCalled = true
-	m.resolveStackRowByImageParam = image
 	if m.resolveStackRowByImageErr != nil {
 		return store.ResolveStackRowByImageRow{}, m.resolveStackRowByImageErr
 	}
@@ -283,8 +271,6 @@ func (m *mockStore) ResolveStackRowByImage(ctx context.Context, image string) (s
 }
 
 func (m *mockStore) ResolveStackRowByLangTool(ctx context.Context, arg store.ResolveStackRowByLangToolParams) (store.ResolveStackRowByLangToolRow, error) {
-	m.resolveStackRowByLangToolCalled = true
-	m.resolveStackRowByLangToolParam = arg
 	if m.resolveStackRowByLangToolErr != nil {
 		return store.ResolveStackRowByLangToolRow{}, m.resolveStackRowByLangToolErr
 	}
@@ -295,8 +281,6 @@ func (m *mockStore) ResolveStackRowByLangTool(ctx context.Context, arg store.Res
 }
 
 func (m *mockStore) ResolveStackRowByLangToolRelease(ctx context.Context, arg store.ResolveStackRowByLangToolReleaseParams) (store.ResolveStackRowByLangToolReleaseRow, error) {
-	m.resolveStackRowByLangToolReleaseCalled = true
-	m.resolveStackRowByLangToolReleaseParam = arg
 	if m.resolveStackRowByLangToolReleaseErr != nil {
 		return store.ResolveStackRowByLangToolReleaseRow{}, m.resolveStackRowByLangToolReleaseErr
 	}
@@ -332,7 +316,6 @@ func (m *mockStore) UpsertGateJobProfileLink(ctx context.Context, arg store.Upse
 }
 
 func (m *mockStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {
-	m.updateJobNextIDCalled = true
 	m.updateJobNextIDParams = append(m.updateJobNextIDParams, params)
 	if m.updateJobNextIDErr != nil {
 		return m.updateJobNextIDErr

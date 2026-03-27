@@ -119,16 +119,34 @@ func newMockStoreForJob(f jobTestFixture) *mockStore {
 // body is marshaled to JSON; pass nil for no body.
 func doJSON(t *testing.T, handler http.Handler, method, path string, body any) *httptest.ResponseRecorder {
 	t.Helper()
+	return doRequest(t, handler, method, path, body)
+}
+
+// doRequest sends a request to handler and returns the recorder.
+// body: nil → no body; string → raw body; otherwise → JSON-marshaled.
+// pathParams are key-value pairs: "mig_ref", "mod123", "run_id", "run1".
+func doRequest(t *testing.T, handler http.Handler, method, path string, body any, pathParams ...string) *httptest.ResponseRecorder {
+	t.Helper()
 	var r *http.Request
-	if body != nil {
-		raw, err := json.Marshal(body)
+	switch v := body.(type) {
+	case nil:
+		r = httptest.NewRequest(method, path, nil)
+	case string:
+		r = httptest.NewRequest(method, path, bytes.NewBufferString(v))
+		r.Header.Set("Content-Type", "application/json")
+	case []byte:
+		r = httptest.NewRequest(method, path, bytes.NewReader(v))
+		r.Header.Set("Content-Type", "application/json")
+	default:
+		raw, err := json.Marshal(v)
 		if err != nil {
 			t.Fatalf("marshal body: %v", err)
 		}
 		r = httptest.NewRequest(method, path, bytes.NewReader(raw))
 		r.Header.Set("Content-Type", "application/json")
-	} else {
-		r = httptest.NewRequest(method, path, nil)
+	}
+	for i := 0; i+1 < len(pathParams); i += 2 {
+		r.SetPathValue(pathParams[i], pathParams[i+1])
 	}
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, r)

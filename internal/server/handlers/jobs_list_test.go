@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,9 +40,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.listJobsForTUICalled {
 		t.Fatal("expected ListJobsForTUI to be called")
 	}
@@ -51,10 +48,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 		t.Fatal("expected CountJobsForTUI to be called")
 	}
 
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 
 	jobs, ok := resp["jobs"].([]any)
 	if !ok || len(jobs) != 1 {
@@ -108,14 +102,9 @@ func TestListJobsHandler_EmptyResult(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 	jobs := resp["jobs"].([]any)
 	if len(jobs) != 0 {
 		t.Fatalf("expected 0 jobs, got %d", len(jobs))
@@ -140,9 +129,7 @@ func TestListJobsHandler_RunIDFilter(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.listJobsForTUICalled {
 		t.Fatal("expected ListJobsForTUI to be called")
 	}
@@ -168,9 +155,7 @@ func TestListJobsHandler_DefaultPagination(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if st.listJobsForTUIParams.Limit != 50 {
 		t.Fatalf("default limit = %d, want 50", st.listJobsForTUIParams.Limit)
 	}
@@ -199,9 +184,7 @@ func TestListJobsHandler_InvalidPagination(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, tc.query, nil)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)
-			if rr.Code != http.StatusBadRequest {
-				t.Fatalf("%s: expected status 400, got %d", tc.name, rr.Code)
-			}
+			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
 }
@@ -219,9 +202,7 @@ func TestListJobsHandler_ListError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func TestListJobsHandler_CountError(t *testing.T) {
@@ -238,7 +219,5 @@ func TestListJobsHandler_CountError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }

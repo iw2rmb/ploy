@@ -45,9 +45,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	req.SetPathValue("run_id", runID.String())
 	req.SetPathValue("repo_id", repoID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if ct := rr.Header().Get("Content-Type"); ct != "application/gzip" {
 		t.Fatalf("content-type=%s, want application/gzip", ct)
 	}
@@ -104,9 +102,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	req.SetPathValue("repo_id", repoBID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify the query was called with correct parameters
 	if !st.listDiffsMetaByRunRepoCalled {
@@ -157,9 +153,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	req.SetPathValue("repo_id", repoID)
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d, body: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp diffListResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
@@ -195,9 +189,7 @@ func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 	req.SetPathValue("repo_id", "repoAAAA")
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status %d, want 400", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestRunRepoDiffs_MissingRepoID verifies that missing repo_id returns 400.
@@ -211,7 +203,5 @@ func TestRunRepoDiffs_MissingRepoID(t *testing.T) {
 	req.SetPathValue("repo_id", "")
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("status %d, want 400", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }

@@ -33,9 +33,7 @@ func TestGetRunLogsHandler_TicketNotFound(t *testing.T) {
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("want 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestGetRunLogsHandler_InvalidRunID(t *testing.T) {
@@ -48,9 +46,7 @@ func TestGetRunLogsHandler_InvalidRunID(t *testing.T) {
 	req.SetPathValue("id", "invalid")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("want 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 	if st.getRunCalled {
 		t.Fatal("expected GetRun not to be called")
 	}
@@ -66,9 +62,7 @@ func TestGetRunLogsHandler_MissingID(t *testing.T) {
 	req.SetPathValue("id", "")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("want 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
@@ -82,9 +76,7 @@ func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
 	req.SetPathValue("id", runID)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("want 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 	if !st.getRunCalled {
 		t.Fatal("expected GetRun to be called")
 	}
@@ -121,7 +113,7 @@ func TestGetRunLogsHandler_Success(t *testing.T) {
 	}
 
 	if rr.Code != http.StatusOK {
-		t.Fatalf("want 200, got %d", rr.Code)
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
 	if !strings.Contains(body, "event: log") || !strings.Contains(body, "event: done") {
@@ -227,7 +219,7 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	}
 
 	if rr.Code != http.StatusOK {
-		t.Fatalf("want 200, got %d", rr.Code)
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
 

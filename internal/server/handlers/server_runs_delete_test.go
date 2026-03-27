@@ -28,15 +28,9 @@ func TestDeleteRun_Success(t *testing.T) {
 
 	handler := deleteRunHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/"+runID.String(), nil)
-	req.SetPathValue("id", runID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/runs/"+runID.String(), nil, "id", runID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify DeleteRun was called with correct run ID.
 	if !st.deleteRunCalled {
@@ -59,15 +53,9 @@ func TestDeleteRun_NotFound(t *testing.T) {
 
 	handler := deleteRunHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/"+runID.String(), nil)
-	req.SetPathValue("id", runID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/runs/"+runID.String(), nil, "id", runID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 
 	// Verify DeleteRun was not called since GetRun failed.
 	if st.deleteRunCalled {
@@ -89,9 +77,7 @@ func TestDeleteRun_EmptyID(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestDeleteRun_MissingID verifies 400 is returned when id path parameter is missing.
@@ -101,13 +87,7 @@ func TestDeleteRun_MissingID(t *testing.T) {
 	st := &mockStore{}
 	handler := deleteRunHandler(st)
 
-	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/", nil)
-	req.SetPathValue("id", "")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/runs/", nil, "id", "")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }

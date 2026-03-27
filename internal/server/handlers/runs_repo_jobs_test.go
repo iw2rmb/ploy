@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -43,24 +42,14 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.listJobsByRunRepoAttemptCalled {
 		t.Fatal("expected ListJobsByRunRepoAttempt to be called")
 	}
 
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 
 	jobs, ok := resp["jobs"].([]any)
 	if !ok || len(jobs) != 1 {
@@ -103,16 +92,9 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs?attempt=3", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs?attempt=3", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if got := st.listJobsByRunRepoAttemptParams.Attempt; got != 3 {
 		t.Fatalf("query attempt override not applied: got %d want %d", got, 3)
 	}
@@ -143,21 +125,11 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusOK)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 
 	jobs, ok := resp["jobs"].([]any)
 	if !ok || len(jobs) != 4 {
@@ -213,16 +185,9 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Jobs []struct {
@@ -305,16 +270,9 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Jobs []struct {
@@ -369,16 +327,9 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Jobs []struct {
@@ -445,16 +396,9 @@ func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp struct {
 		Jobs []struct {
@@ -508,14 +452,7 @@ func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
 	}
 
 	handler := listRunRepoJobsHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
-	req.SetPathValue("run_id", runID.String())
-	req.SetPathValue("repo_id", repoID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 }

@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -62,15 +60,9 @@ func TestClaimJob_Success(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-	req.SetPathValue("id", nodeKey)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.claimJobCalled || string(st.claimJobParams) != nodeID.String() {
 		t.Fatalf("expected ClaimJob to be called with node id")
 	}
@@ -78,10 +70,7 @@ func TestClaimJob_Success(t *testing.T) {
 		t.Fatalf("expected UpdateRunRepoStatus to be called")
 	}
 
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 
 	if resp["id"] != runID.String() {
 		t.Fatalf("expected id (run_id) %s, got %v", runID.String(), resp["id"])
@@ -171,15 +160,9 @@ func TestClaimJob_SpecFromDBMustBeJSONObject(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-	req.SetPathValue("id", nodeKey)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
@@ -230,23 +213,14 @@ func TestClaimJob_MRJob_DoesNotUpdateRunRepoStatus(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-	req.SetPathValue("id", nodeKey)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if len(st.updateRunRepoStatusParams) != 0 {
 		t.Fatalf("expected UpdateRunRepoStatus not to be called for MR jobs")
 	}
 
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 	if resp["status"] != "Finished" {
 		t.Fatalf("expected status Finished, got %v", resp["status"])
 	}
@@ -271,15 +245,9 @@ func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil, "id", nodeID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 }
 
 func TestClaimJob_NodeNotFound(t *testing.T) {
@@ -289,15 +257,9 @@ func TestClaimJob_NodeNotFound(t *testing.T) {
 	st := &mockStore{getNodeErr: pgx.ErrNoRows}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil)
-	req.SetPathValue("id", nodeID)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/claim", nil, "id", nodeID)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d", rr.Code)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
@@ -348,20 +310,11 @@ func TestClaimJob_ResponseUsesNextIDContract(t *testing.T) {
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-	req.SetPathValue("id", nodeKey)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-	handler.ServeHTTP(rr, req)
+	assertStatus(t, rr, http.StatusOK)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 
 	if _, ok := resp["next_id"]; !ok {
 		t.Fatalf("expected claim response to include next_id")

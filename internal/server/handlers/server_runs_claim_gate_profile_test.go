@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -112,19 +110,10 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 			}
 
 			handler := claimJobHandler(st, &ConfigHolder{})
-			req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-			req.SetPathValue("id", nodeKey)
-			rr := httptest.NewRecorder()
+			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
+			assertStatus(t, rr, http.StatusOK)
 
-			handler.ServeHTTP(rr, req)
-			if rr.Code != http.StatusOK {
-				t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-			}
-
-			var resp map[string]any
-			if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-				t.Fatalf("decode response: %v", err)
-			}
+			resp := decodeBody[map[string]any](t, rr)
 			spec, ok := resp["spec"].(map[string]any)
 			if !ok {
 				t.Fatalf("expected spec object, got %T", resp["spec"])
@@ -208,15 +197,9 @@ func TestClaimJob_InvalidRecoveryCandidateGateProfileReturnsError(t *testing.T) 
 	}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil)
-	req.SetPathValue("id", nodeKey)
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 	if !strings.Contains(rr.Body.String(), "gate_profile") {
 		t.Fatalf("expected gate_profile error, got %q", rr.Body.String())
 	}

@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -40,14 +38,9 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 
 	// Request with repo_url that matches (with .git suffix that normalizes away)
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp pullResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
@@ -98,14 +91,9 @@ func TestPullRunRepoHandler_URLNormalization(t *testing.T) {
 
 	// Client sends with .git
 	body := `{"repo_url": "https://github.com/org/repo.git"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 }
 
 func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
@@ -130,14 +118,9 @@ func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
 
 	// Client sends without trailing slash
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 }
 
 func TestPullRunRepoHandler_RunNotFound(t *testing.T) {
@@ -151,14 +134,9 @@ func TestPullRunRepoHandler_RunNotFound(t *testing.T) {
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
@@ -182,14 +160,9 @@ func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
 
 	// Request with non-matching repo_url
 	body := `{"repo_url": "https://github.com/org/nonexistent"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
@@ -221,14 +194,9 @@ func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 }
 
 func TestPullRunRepoHandler_MissingRepoURL(t *testing.T) {
@@ -240,14 +208,9 @@ func TestPullRunRepoHandler_MissingRepoURL(t *testing.T) {
 	handler := pullRunRepoHandler(st)
 
 	body := `{}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 func TestPullRunRepoHandler_MissingRunID(t *testing.T) {
@@ -257,14 +220,9 @@ func TestPullRunRepoHandler_MissingRunID(t *testing.T) {
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs//pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", "")
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs//pull", body, "run_id", "")
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 func TestPullRunRepoHandler_StoreError(t *testing.T) {
@@ -279,14 +237,9 @@ func TestPullRunRepoHandler_StoreError(t *testing.T) {
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("run_id", runID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs/"+runID.String()+"/pull", body, "run_id", runID.String())
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // -------------------------------------------------------------------------
@@ -325,14 +278,9 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 
 	// Default mode is "last-succeeded"
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp pullResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
@@ -389,14 +337,9 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo", "mode": "last-failed"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	var resp pullResponse
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
@@ -445,14 +388,9 @@ func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 
 	// Request without .git suffix
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 }
 
 func TestPullModRepoHandler_ModNotFound(t *testing.T) {
@@ -466,14 +404,9 @@ func TestPullModRepoHandler_ModNotFound(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
@@ -501,14 +434,9 @@ func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/nonexistent"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
@@ -537,14 +465,9 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestPullModRepoHandler_InvalidMode(t *testing.T) {
@@ -558,14 +481,9 @@ func TestPullModRepoHandler_InvalidMode(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo", "mode": "invalid"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 func TestPullModRepoHandler_MissingRepoURL(t *testing.T) {
@@ -577,14 +495,9 @@ func TestPullModRepoHandler_MissingRepoURL(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 func TestPullModRepoHandler_MissingModID(t *testing.T) {
@@ -594,14 +507,9 @@ func TestPullModRepoHandler_MissingModID(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs//pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", "")
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs//pull", body, "mig_id", "")
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 func TestPullModRepoHandler_StoreError(t *testing.T) {
@@ -616,12 +524,7 @@ func TestPullModRepoHandler_StoreError(t *testing.T) {
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+modID.String()+"/pull", bytes.NewBufferString(body))
-	req.SetPathValue("mig_id", modID.String())
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+modID.String()+"/pull", body, "mig_id", modID.String())
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }

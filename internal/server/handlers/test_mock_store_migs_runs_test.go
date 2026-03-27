@@ -168,8 +168,6 @@ func (m *mockStore) GetRunTiming(ctx context.Context, id types.RunID) (store.Run
 }
 
 func (m *mockStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimingsParams) ([]store.RunsTiming, error) {
-	m.listRunsTimingsCalled = true
-	m.listRunsTimingsParams = arg
 	return m.listRunsTimingsResult, m.listRunsTimingsErr
 }
 
@@ -180,22 +178,16 @@ func (m *mockStore) DeleteRun(ctx context.Context, id types.RunID) error {
 }
 
 func (m *mockStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, error) {
-	m.claimRunCalled = true
-	m.claimRunParams = nodeID
 	return m.claimRunResult, m.claimRunErr
 }
 
 // ClaimJob implements job claiming for the new unified job model.
 
 func (m *mockStore) AckRunStart(ctx context.Context, id string) error {
-	m.ackRunStartCalled = true
-	m.ackRunStartParam = id
 	return m.ackRunStartErr
 }
 
 func (m *mockStore) UpdateRunCompletion(ctx context.Context, params store.UpdateRunCompletionParams) error {
-	m.updateRunCompletionCalled = true
-	m.updateRunCompletionParams = params
 	return m.updateRunCompletionErr
 }
 
@@ -212,8 +204,6 @@ func (m *mockStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
 }
 
 func (m *mockStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
-	m.updateRunResumeCalled = true
-	m.updateRunResumeParam = id.String()
 	return m.updateRunResumeErr
 }
 
@@ -224,8 +214,6 @@ func (m *mockStore) UpdateRunStatsMRURL(ctx context.Context, params store.Update
 }
 
 func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
-	m.listRunsCalled = true
-	m.listRunsParams = params
 	// Simulate pagination: return empty list when offset exceeds available results.
 	if int(params.Offset) >= len(m.listRunsResult) {
 		return []store.Run{}, m.listRunsErr
@@ -247,8 +235,6 @@ func (m *mockStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([
 
 // CountRunReposByStatus — run IDs are now strings (KSUID).
 func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]store.CountRunReposByStatusRow, error) {
-	m.countRunReposByStatusCalled = true
-	m.countRunReposByStatusParam = runID.String()
 	return m.countRunReposByStatusResult, m.countRunReposByStatusErr
 }
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -33,15 +32,9 @@ func TestMods_Archive_Success(t *testing.T) {
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store methods called.
 	if !st.getModCalled {
@@ -79,16 +72,10 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
 	// Should return OK (idempotent) without calling ArchiveMig again.
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if st.archiveMigCalled {
 		t.Error("store.ArchiveMig should not be called for already-archived mig")
 	}
@@ -101,15 +88,9 @@ func TestMods_Archive_NotFound(t *testing.T) {
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/nonexistent/archive", nil)
-	req.SetPathValue("mig_ref", "nonexistent")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/nonexistent/archive", nil, "mig_ref", "nonexistent")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 // TestMods_Archive_RefusesWithActiveJobs verifies PATCH /v1/migs/{mig_ref}/archive
@@ -141,15 +122,9 @@ func TestMods_Archive_RefusesWithActiveJobs(t *testing.T) {
 			}
 			handler := archiveMigHandler(st)
 
-			req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-			req.SetPathValue("mig_ref", "mod123")
-			rr := httptest.NewRecorder()
+			rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
-			handler.ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusConflict {
-				t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusConflict, rr.Body.String())
-			}
+			assertStatus(t, rr, http.StatusConflict)
 			if st.archiveMigCalled {
 				t.Fatal("store.ArchiveMig should not be called when active jobs exist")
 			}
@@ -176,15 +151,9 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.archiveMigCalled {
 		t.Error("store.ArchiveMig should be called when only completed jobs exist")
 	}
@@ -198,15 +167,9 @@ func TestMods_Archive_ByName(t *testing.T) {
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/my-mig/archive", nil)
-	req.SetPathValue("mig_ref", "my-mig")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/my-mig/archive", nil, "mig_ref", "my-mig")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if !st.getModByNameCalled {
 		t.Error("store.GetMigByName was not called")
 	}
@@ -228,15 +191,9 @@ func TestMods_Archive_StoreError(t *testing.T) {
 	}
 	handler := archiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/archive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // =============================================================================
@@ -255,15 +212,9 @@ func TestMods_Unarchive_Success(t *testing.T) {
 	}
 	handler := unarchiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/unarchive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/unarchive", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store methods called.
 	if !st.unarchiveMigCalled {
@@ -298,16 +249,10 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 	}
 	handler := unarchiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/unarchive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/unarchive", nil, "mig_ref", "mod123")
 
 	// Should return OK (idempotent) without calling UnarchiveMig.
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
+	assertStatus(t, rr, http.StatusOK)
 	if st.unarchiveMigCalled {
 		t.Error("store.UnarchiveMig should not be called for already-unarchived mig")
 	}
@@ -320,15 +265,9 @@ func TestMods_Unarchive_NotFound(t *testing.T) {
 	}
 	handler := unarchiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/nonexistent/unarchive", nil)
-	req.SetPathValue("mig_ref", "nonexistent")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/nonexistent/unarchive", nil, "mig_ref", "nonexistent")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNotFound)
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 // TestMods_Unarchive_StoreError verifies PATCH /v1/migs/{mig_ref}/unarchive returns 500 on store error.
@@ -343,13 +282,7 @@ func TestMods_Unarchive_StoreError(t *testing.T) {
 	}
 	handler := unarchiveMigHandler(st)
 
-	req := httptest.NewRequest(http.MethodPatch, "/v1/migs/mod123/unarchive", nil)
-	req.SetPathValue("mig_ref", "mod123")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/unarchive", nil, "mig_ref", "mod123")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusInternalServerError)
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }

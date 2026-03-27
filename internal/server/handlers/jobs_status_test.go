@@ -26,9 +26,7 @@ func TestGetJobStatusHandler_Success(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", rr.Code, http.StatusOK, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 	assertJSONValue(t, rr.Body.String(), "job_id", f.JobID.String())
 	assertJSONValue(t, rr.Body.String(), "status", string(domaintypes.JobStatusRunning))
 }
@@ -47,9 +45,7 @@ func TestGetJobStatusHandler_ForbiddenWhenNodeMismatched(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want %d, body=%s", rr.Code, http.StatusForbidden, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusForbidden)
 }
 
 func TestGetJobStatusHandler_NotFound(t *testing.T) {
@@ -66,9 +62,7 @@ func TestGetJobStatusHandler_NotFound(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d, body=%s", rr.Code, http.StatusNotFound, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 func TestGetJobStatusHandler_StoreError(t *testing.T) {
@@ -85,9 +79,7 @@ func TestGetJobStatusHandler_StoreError(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d, body=%s", rr.Code, http.StatusInternalServerError, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 func assertJSONValue(t *testing.T, body, key, want string) {

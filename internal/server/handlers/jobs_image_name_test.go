@@ -45,9 +45,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 	if !st.updateJobImageNameCalled {
 		t.Fatalf("expected UpdateJobImageName to be called")
 	}
@@ -79,9 +77,7 @@ func TestSaveJobImageName_EmptyImage(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 	if st.updateJobImageNameCalled {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
@@ -118,9 +114,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusForbidden)
 	if st.updateJobImageNameCalled {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
@@ -155,9 +149,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 	if st.updateJobImageNameCalled {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
@@ -191,9 +183,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNoContent)
 	if !st.updateJobImageNameCalled {
 		t.Fatalf("expected UpdateJobImageName to be called")
 	}
@@ -227,9 +217,7 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusConflict {
-		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusConflict)
 	if st.updateJobImageNameCalled {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}

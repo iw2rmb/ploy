@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,15 +30,9 @@ func TestGetRunTiming_Success(t *testing.T) {
 
 	handler := getRunTimingHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/timing", nil)
-	req.SetPathValue("id", runID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/timing", nil, "id", runID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusOK)
 
 	// Verify GetRunTiming was called with correct run ID.
 	if !st.getRunTimingCalled {
@@ -50,10 +43,7 @@ func TestGetRunTiming_Success(t *testing.T) {
 	}
 
 	// Parse and verify response body.
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
+	resp := decodeBody[map[string]any](t, rr)
 
 	if resp["id"] != runID.String() {
 		t.Errorf("expected id %s, got %v", runID.String(), resp["id"])
@@ -78,15 +68,9 @@ func TestGetRunTiming_NotFound(t *testing.T) {
 
 	handler := getRunTimingHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/timing", nil)
-	req.SetPathValue("id", runID.String())
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/timing", nil, "id", runID.String())
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusNotFound)
 }
 
 // TestGetRunTiming_EmptyID verifies 400 for empty or whitespace ID.
@@ -103,9 +87,7 @@ func TestGetRunTiming_EmptyID(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
 
 // TestGetRunTiming_MissingID verifies 400 is returned when id is missing.
@@ -115,13 +97,7 @@ func TestGetRunTiming_MissingID(t *testing.T) {
 	st := &mockStore{}
 	handler := getRunTimingHandler(st)
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs//timing", nil)
-	req.SetPathValue("id", "")
-	rr := httptest.NewRecorder()
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs//timing", nil, "id", "")
 
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+	assertStatus(t, rr, http.StatusBadRequest)
 }
