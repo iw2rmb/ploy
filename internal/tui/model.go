@@ -11,6 +11,7 @@ import (
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -42,6 +43,11 @@ const jobsListWidth = 30
 
 // jobsContentWidth is an item text budget (excluding list delegate chrome).
 const jobsContentWidth = 26
+
+var (
+	jobsCompleteGlyphStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#98c379"))
+	jobsFailedGlyphStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#e06c75"))
+)
 
 // listItem is the default item type used in all TUI lists.
 type listItem struct {
@@ -497,12 +503,12 @@ func renderJobsPrimaryLine(job clitui.JobItem) string {
 	}
 	duration := formatDurationShort(job.DurationMs)
 	prefix := glyph + " "
-	availableNameWidth := jobsContentWidth - utf8.RuneCountInString(prefix) - 1 - utf8.RuneCountInString(duration)
+	availableNameWidth := jobsContentWidth - lipgloss.Width(prefix) - 1 - lipgloss.Width(duration)
 	if availableNameWidth < 1 {
 		availableNameWidth = 1
 	}
 	name = truncateRunes(name, availableNameWidth)
-	name = name + strings.Repeat(" ", availableNameWidth-utf8.RuneCountInString(name))
+	name = name + strings.Repeat(" ", availableNameWidth-lipgloss.Width(name))
 	return prefix + name + " " + duration
 }
 
@@ -515,11 +521,11 @@ func renderJobsSecondaryLine(job clitui.JobItem) string {
 }
 
 func jobsStatusGlyph(status domaintypes.JobStatus) string {
-	switch strings.ToLower(strings.TrimSpace(status.String())) {
-	case "success", "succeeded", "finished", "completed":
-		return "✓"
-	case "fail", "failed", "crash", "crashed", "error", "cancelled", "canceled":
-		return "X"
+	switch status {
+	case domaintypes.JobStatusSuccess:
+		return jobsCompleteGlyphStyle.Render("⏺")
+	case domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
+		return jobsFailedGlyphStyle.Render("⏺")
 	default:
 		return "⣾"
 	}
