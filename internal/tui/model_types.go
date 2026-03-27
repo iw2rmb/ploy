@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/list"
-	"charm.land/lipgloss/v2"
 
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
 // Screen represents the current TUI state in the six-screen navigation contract.
@@ -32,17 +32,6 @@ const ployListWidth = 30
 
 // runsListWidth is the fixed width for RUNS items in the right panel.
 const runsListWidth = 30
-
-// jobsListWidth is the fixed width for JOBS items in the right panel.
-const jobsListWidth = 30
-
-// jobsContentWidth is an item text budget (excluding list delegate chrome).
-const jobsContentWidth = 26
-
-var (
-	jobsCompleteGlyphStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#98c379"))
-	jobsFailedGlyphStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#e06c75"))
-)
 
 // listItem is the default item type used in all TUI lists.
 type listItem struct {
@@ -97,8 +86,8 @@ type model struct {
 	// runs caches the latest runs list so run selection can resolve mig context.
 	runs []runSummary
 
-	// jobs caches the latest jobs list so job selection can resolve context.
-	jobs []clitui.JobItem
+	// jobList is the JobList domain component owning job rows, selection, and rendering.
+	jobList joblist.Model
 
 	// lastErr holds the most recent error returned by an async command.
 	lastErr error

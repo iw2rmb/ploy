@@ -4,7 +4,7 @@ Scope: Extract and integrate a reusable JobList component across PLOY root and J
 
 Documentation: `design/job.md`
 
-- [ ] 1.1 Extract JobList domain component (`determined`)
+- [x] 1.1 Extract JobList domain component (`determined`)
   - Component: `internal/tui` (new `joblist` domain module), existing model/view wiring in `internal/tui/model_core.go`, `internal/tui/model_navigation.go`, `internal/tui/view.go`
   - Implementation:
     1. Introduce a standalone `JobList` model with explicit state/update/view contract for job rows, selected job, and details payload.

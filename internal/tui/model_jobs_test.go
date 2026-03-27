@@ -8,20 +8,37 @@ import (
 	"charm.land/lipgloss/v2"
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
-// TestS6JobsListTitle verifies the JOBS secondary list title.
+// defaultItem is a local interface matching the title/description contract
+// implemented by all list rows built by the joblist component.
+type defaultItem interface {
+	Title() string
+	Description() string
+}
+
+func mustDefaultItem(t *testing.T, v interface{}) defaultItem {
+	t.Helper()
+	di, ok := v.(defaultItem)
+	if !ok {
+		t.Fatalf("item does not implement defaultItem: %T", v)
+	}
+	return di
+}
+
+// TestS6JobsListTitle verifies the JOBS jobList title and width.
 func TestS6JobsListTitle(t *testing.T) {
 	m := InitialModel(nil, nil)
 	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
 		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "alpha", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
-	if nm.secondary.Title != "JOBS" {
-		t.Errorf("secondary list title: got %q, want %q", nm.secondary.Title, "JOBS")
+	if nm.jobList.Title() != "JOBS" {
+		t.Errorf("jobList title: got %q, want %q", nm.jobList.Title(), "JOBS")
 	}
-	if nm.secondary.Width() != jobsListWidth {
-		t.Errorf("secondary list width: got %d, want %d", nm.secondary.Width(), jobsListWidth)
+	if nm.jobList.Width() != joblist.ListWidth {
+		t.Errorf("jobList width: got %d, want %d", nm.jobList.Width(), joblist.ListWidth)
 	}
 }
 
@@ -44,35 +61,35 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	}})
 	nm := next.(model)
 
-	items := nm.secondary.Items()
+	items := nm.jobList.Items()
 	if len(items) != 1 {
-		t.Fatalf("secondary items: got %d, want 1", len(items))
+		t.Fatalf("jobList items: got %d, want 1", len(items))
 	}
 
-	item, ok := items[0].(listItem)
-	if !ok {
-		t.Fatalf("item 0: unexpected type %T", items[0])
+	row := mustDefaultItem(t, items[0])
+	title := row.Title()
+	desc := row.Description()
+
+	if !strings.Contains(title, "⏺") || !strings.Contains(title, "deploy") {
+		t.Errorf("item title: expected status glyph and name, got %q", title)
 	}
-	if !strings.Contains(item.title, "⏺") || !strings.Contains(item.title, "deploy") {
-		t.Errorf("item title: expected status glyph and name, got %q", item.title)
+	if !strings.Contains(title, "\x1b[") {
+		t.Errorf("item title: expected ANSI color sequence for terminal status glyph, got %q", title)
 	}
-	if !strings.Contains(item.title, "\x1b[") {
-		t.Errorf("item title: expected ANSI color sequence for terminal status glyph, got %q", item.title)
+	if !strings.HasSuffix(strings.TrimSpace(title), "2s") {
+		t.Errorf("item title: expected duration suffix %q, got %q", "2s", title)
 	}
-	if !strings.HasSuffix(strings.TrimSpace(item.title), "2s") {
-		t.Errorf("item title: expected duration suffix %q, got %q", "2s", item.title)
+	if !strings.HasSuffix(title, " 2s") {
+		t.Errorf("item title: expected right-aligned duration with spacing, got %q", title)
 	}
-	if !strings.HasSuffix(item.title, " 2s") {
-		t.Errorf("item title: expected right-aligned duration with spacing, got %q", item.title)
+	if got := lipgloss.Width(title); got != joblist.ContentWidth {
+		t.Errorf("item title visible width: got %d, want %d", got, joblist.ContentWidth)
 	}
-	if got := lipgloss.Width(item.title); got != jobsContentWidth {
-		t.Errorf("item title visible width: got %d, want %d", got, jobsContentWidth)
+	if strings.Contains(title, "...") || strings.Contains(title, "…") {
+		t.Errorf("item title: duration/name must not be ellipsized, got %q", title)
 	}
-	if strings.Contains(item.title, "...") || strings.Contains(item.title, "…") {
-		t.Errorf("item title: duration/name must not be ellipsized, got %q", item.title)
-	}
-	if want := "job-abc"; item.description != want {
-		t.Errorf("item description: got %q, want %q", item.description, want)
+	if want := "job-abc"; desc != want {
+		t.Errorf("item description: got %q, want %q", desc, want)
 	}
 }
 
@@ -87,18 +104,15 @@ func TestS6JobsOrderingDeterministic(t *testing.T) {
 	next, _ := m.Update(jobsLoadedMsg{jobs: jobs})
 	nm := next.(model)
 
-	items := nm.secondary.Items()
+	items := nm.jobList.Items()
 	if len(items) != 3 {
 		t.Fatalf("items count: got %d, want 3", len(items))
 	}
 	wantOrder := []string{"job-first", "job-second", "job-third"}
 	for i, want := range wantOrder {
-		item, ok := items[i].(listItem)
-		if !ok {
-			t.Fatalf("item %d: unexpected type %T", i, items[i])
-		}
-		if !strings.Contains(item.title, want) {
-			t.Errorf("ordering: item %d title %q missing job name %q", i, item.title, want)
+		row := mustDefaultItem(t, items[i])
+		if !strings.Contains(row.Title(), want) {
+			t.Errorf("ordering: item %d title %q missing job name %q", i, row.Title(), want)
 		}
 	}
 }
@@ -114,7 +128,7 @@ func TestS6EscTransitionsToS1(t *testing.T) {
 	}
 }
 
-// TestS6ViewRendersSideBySide verifies that S6 view joins ploy and secondary lists.
+// TestS6ViewRendersSideBySide verifies that S6 view joins ploy and jobList.
 func TestS6ViewRendersSideBySide(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenJobsList
@@ -154,7 +168,7 @@ func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.jobList = nm.jobList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
@@ -197,8 +211,8 @@ func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 }
 
 func TestJobsStatusGlyphUsesColoredDotForTerminalStates(t *testing.T) {
-	successGlyph := jobsStatusGlyph(domaintypes.JobStatusSuccess)
-	failGlyph := jobsStatusGlyph(domaintypes.JobStatusFail)
+	successGlyph := joblist.StatusGlyph(domaintypes.JobStatusSuccess)
+	failGlyph := joblist.StatusGlyph(domaintypes.JobStatusFail)
 
 	if !strings.Contains(successGlyph, "⏺") || !strings.Contains(successGlyph, "\x1b[") {
 		t.Fatalf("success glyph should be a colored dot, got %q", successGlyph)

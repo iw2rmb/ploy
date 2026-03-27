@@ -2,6 +2,8 @@ package tui
 
 import (
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
 // TestModelInit verifies that InitialModel produces a well-formed starting state.
@@ -139,14 +141,14 @@ func TestNewListInvariants(t *testing.T) {
 	}
 }
 
-func TestNewJobsListInvariants(t *testing.T) {
-	l := newJobsList("JOBS", nil)
+func TestJobListInvariants(t *testing.T) {
+	jl := joblist.New("JOBS")
 
-	if l.Width() != jobsListWidth {
-		t.Errorf("jobs list width: got %d, want %d", l.Width(), jobsListWidth)
+	if jl.Width() != joblist.ListWidth {
+		t.Errorf("jobList width: got %d, want %d", jl.Width(), joblist.ListWidth)
 	}
-	if l.Title != "JOBS" {
-		t.Errorf("jobs list title: got %q, want %q", l.Title, "JOBS")
+	if jl.Title() != "JOBS" {
+		t.Errorf("jobList title: got %q, want %q", jl.Title(), "JOBS")
 	}
 }
 
