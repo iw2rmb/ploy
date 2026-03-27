@@ -7,7 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
+	clitui "github.com/iw2rmb/ploy/internal/client/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 

@@ -57,6 +57,6 @@ When the PLOY selection moves away from `Jobs`, the right pane is hidden and onl
 
 `JobList` fetches job data through the unified CLI command layer:
 
-- Job rows are populated from `internal/cli/tui` job items.
+- Job rows are populated from `internal/client/tui` job items.
 - Job detail payloads are fetched via `internal/cli/runs` run-repo commands (`RepoJobEntry`).
-- No TUI-only HTTP client is introduced; `internal/cli/tui` acts as a thin adapter.
+- No TUI-only HTTP client is introduced; `internal/client/tui` acts as a thin adapter.

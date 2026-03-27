@@ -8,7 +8,7 @@ import (
 	"charm.land/bubbles/v2/list"
 
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
-	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
+	clitui "github.com/iw2rmb/ploy/internal/client/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
@@ -74,7 +74,7 @@ type model struct {
 	hasSelectedRun       bool
 	hasSelectedJob       bool
 
-	// client and baseURL are used to fetch list data via internal/cli/tui commands.
+	// client and baseURL are used to fetch list data via internal/client/tui commands.
 	client  *http.Client
 	baseURL *url.URL
 
