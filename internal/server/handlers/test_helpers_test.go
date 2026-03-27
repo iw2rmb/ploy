@@ -91,6 +91,16 @@ func newJobFixture(jobType domaintypes.JobType, _ float64) jobTestFixture {
 	}
 }
 
+// newRepoScopedFixture creates a job fixture pre-configured with a repo ID,
+// base ref "main", and attempt 1 — the common setup for repo-scoped tests.
+func newRepoScopedFixture(jobType domaintypes.JobType, nextID float64) jobTestFixture {
+	f := newJobFixture(jobType, nextID)
+	f.Job.RepoID = domaintypes.NewRepoID()
+	f.Job.RepoBaseRef = "main"
+	f.Job.Attempt = 1
+	return f
+}
+
 // completeJobReq builds an HTTP request for POST /v1/jobs/{job_id}/complete
 // with the given body map and worker auth context.
 func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
@@ -107,12 +117,40 @@ func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
 
 // newMockStoreForJob returns a mockStore pre-configured for a standard running job fixture.
 // The store has getRunResult (Started), getJobResult, and listJobsByRunResult set.
-func newMockStoreForJob(f jobTestFixture) *mockStore {
-	return &mockStore{
+// Pass functional options to override or extend the defaults.
+func newMockStoreForJob(f jobTestFixture, opts ...func(*mockStore)) *mockStore {
+	st := &mockStore{
 		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
+	for _, o := range opts {
+		o(st)
+	}
+	return st
+}
+
+func withRepoAttemptJobs(jobs []store.Job) func(*mockStore) {
+	return func(st *mockStore) { st.listJobsByRunRepoAttemptResult = jobs }
+}
+
+func withRunRepoStatusCounts(rows []store.CountRunReposByStatusRow) func(*mockStore) {
+	return func(st *mockStore) { st.countRunReposByStatusResult = rows }
+}
+
+func withSpec(specID domaintypes.SpecID, specBytes []byte) func(*mockStore) {
+	return func(st *mockStore) {
+		st.getRunResult.SpecID = specID
+		st.getSpecResult = store.Spec{ID: specID, Spec: specBytes}
+	}
+}
+
+func withRunStatus(status domaintypes.RunStatus) func(*mockStore) {
+	return func(st *mockStore) { st.getRunResult.Status = status }
+}
+
+func withJobResults(m map[domaintypes.JobID]store.Job) func(*mockStore) {
+	return func(st *mockStore) { st.getJobResults = m }
 }
 
 // doJSON sends a JSON request to handler and returns the recorder.
@@ -161,6 +199,22 @@ func assertStatus(t *testing.T, rr *httptest.ResponseRecorder, want int) {
 	}
 }
 
+// assertCalled fails the test if called is false.
+func assertCalled(t *testing.T, name string, called bool) {
+	t.Helper()
+	if !called {
+		t.Fatalf("expected %s to be called", name)
+	}
+}
+
+// assertNotCalled fails the test if called is true.
+func assertNotCalled(t *testing.T, name string, called bool) {
+	t.Helper()
+	if called {
+		t.Fatalf("did not expect %s to be called", name)
+	}
+}
+
 // decodeBody decodes rr.Body as JSON into T.
 func decodeBody[T any](t *testing.T, rr *httptest.ResponseRecorder) T {
 	t.Helper()
@@ -169,6 +223,34 @@ func decodeBody[T any](t *testing.T, rr *httptest.ResponseRecorder) T {
 		t.Fatalf("decode response body: %v", err)
 	}
 	return v
+}
+
+// healingSpecBytes returns a serialized spec with standard build_gate healing config.
+// Used by orchestration tests that exercise gate-failure healing insertion.
+func healingSpecBytes(t *testing.T) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": 1,
+						"image":   "migs-codex:latest",
+					},
+				},
+			},
+			"router": map[string]any{
+				"image": "migs-router:latest",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal healing spec: %v", err)
+	}
+	return b
 }
 
 // newTestServerWithRole creates an HTTP server with routes registered and

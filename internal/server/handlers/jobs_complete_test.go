@@ -32,12 +32,8 @@ func TestCompleteJob_Success(t *testing.T) {
 	if rr.Body.Len() != 0 {
 		t.Fatalf("expected empty 204 response body, got %q", rr.Body.String())
 	}
-	if !st.getJobCalled {
-		t.Fatal("expected GetJob to be called")
-	}
-	if !st.updateJobCompletionCalled {
-		t.Fatal("expected UpdateJobCompletion to be called")
-	}
+	assertCalled(t, "GetJob", st.getJobCalled)
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 }
 
 // TestCompleteJob_WithExitCodeAndStats verifies job completion with exit_code and stats.
@@ -106,9 +102,7 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.upsertJobMetricCalled {
-		t.Fatal("expected UpsertJobMetric to be called")
-	}
+	assertCalled(t, "UpsertJobMetric", st.upsertJobMetricCalled)
 	if st.upsertJobMetricParams.NodeID != f.NodeID {
 		t.Fatalf("upsert node_id = %q, want %q", st.upsertJobMetricParams.NodeID, f.NodeID)
 	}
@@ -135,11 +129,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	f := newJobFixture("mr", 9000)
 	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
 
-	st := &mockStore{
-		getRunResult:        store.Run{ID: f.RunID, Status: domaintypes.RunStatusFinished},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
+	st := newMockStoreForJob(f, withRunStatus(domaintypes.RunStatusFinished))
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -153,9 +143,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateRunStatsMRURLCalled {
-		t.Fatal("expected UpdateRunStatsMRURL to be called")
-	}
+	assertCalled(t, "UpdateRunStatsMRURL", st.updateRunStatsMRURLCalled)
 	if st.updateRunStatsMRURLParams.ID != f.RunID {
 		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", f.RunID, st.updateRunStatsMRURLParams.ID)
 	}
@@ -189,9 +177,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
+	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 	if st.updateJobCompletionCalled {
 		t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
 	}
@@ -231,12 +217,8 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionCalled {
-		t.Fatal("expected UpdateJobCompletion to be called")
-	}
-	if st.updateJobCompletionWithMetaCalled {
-		t.Fatal("did not expect UpdateJobCompletionWithMeta to be called")
-	}
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
+	assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 }
 
 // ===== Error Propagation Tests =====
@@ -246,8 +228,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewRepoID()
+	f := newRepoScopedFixture("mig", 2000)
 
 	st := newMockStoreForJob(f)
 
@@ -259,9 +240,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateRunRepoErrorCalled {
-		t.Fatal("expected UpdateRunRepoError to be called")
-	}
+	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
 	if st.updateRunRepoErrorParams.RunID != f.RunID {
 		t.Fatalf("expected RunID %s, got %s", f.RunID, st.updateRunRepoErrorParams.RunID)
 	}
@@ -282,8 +261,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 func TestCompleteJob_Exit137SetsLastError_WhenRunLookupFails(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewRepoID()
+	f := newRepoScopedFixture("mig", 2000)
 
 	st := &mockStore{
 		getRunErr:           errors.New("transient run lookup failure"),
@@ -309,8 +287,7 @@ func TestCompleteJob_Exit137SetsLastError_WhenRunLookupFails(t *testing.T) {
 func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("pre_gate", 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
+	f := newRepoScopedFixture("pre_gate", 1000)
 
 	st := newMockStoreForJob(f)
 
@@ -352,9 +329,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusNoContent)
 
-	if !st.updateRunRepoErrorCalled {
-		t.Fatal("expected UpdateRunRepoError to be called")
-	}
+	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
 	if st.updateRunRepoErrorParams.RunID != f.RunID {
 		t.Fatalf("expected RunID %s, got %s", f.RunID, st.updateRunRepoErrorParams.RunID)
 	}

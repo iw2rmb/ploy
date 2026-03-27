@@ -114,9 +114,7 @@ func TestCompleteJob_BadNodeHeader(t *testing.T) {
 			handler.ServeHTTP(rr, req)
 
 			assertStatus(t, rr, http.StatusBadRequest)
-			if st.updateJobCompletionCalled {
-				t.Fatal("did not expect UpdateJobCompletion to be called")
-			}
+			assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 		})
 	}
 }
@@ -157,9 +155,7 @@ func TestCompleteJob_WrongNode(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusForbidden)
-	if st.updateJobCompletionCalled {
-		t.Fatal("did not expect UpdateJobCompletion to be called")
-	}
+	assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 }
 
 func TestCompleteJob_NonRunningConflict(t *testing.T) {
@@ -192,12 +188,8 @@ func TestCompleteJob_NonRunningConflict(t *testing.T) {
 			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
 			assertStatus(t, rr, http.StatusConflict)
-			if st.updateJobCompletionCalled {
-				t.Fatal("did not expect UpdateJobCompletion to be called")
-			}
-			if st.updateJobCompletionWithMetaCalled {
-				t.Fatal("did not expect UpdateJobCompletionWithMeta to be called")
-			}
+			assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
+			assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 		})
 	}
 }
@@ -333,9 +325,7 @@ func TestCompleteJob_StatsMustBeObject(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	if st.updateJobCompletionCalled {
-		t.Fatal("did not expect UpdateJobCompletion to be called")
-	}
+	assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 }
 
 func TestCompleteJob_JobNotFound(t *testing.T) {
@@ -505,9 +495,7 @@ func TestCompleteJob_ValidJobMetaKinds(t *testing.T) {
 			}))
 
 			assertStatus(t, rr, http.StatusNoContent)
-			if !st.updateJobCompletionWithMetaCalled {
-				t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-			}
+			assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 			if st.updateJobCompletionCalled {
 				t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
 			}
@@ -541,9 +529,7 @@ func TestCompleteJob_EmptyJobMeta_NoPersist(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionCalled {
-		t.Fatal("expected UpdateJobCompletion to be called")
-	}
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 	if st.updateJobCompletionWithMetaCalled {
 		t.Fatal("did not expect UpdateJobCompletionWithMeta for empty job_meta")
 	}
@@ -567,9 +553,7 @@ func TestCompleteJob_NullJobMeta_NoPersist(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionCalled {
-		t.Fatal("expected UpdateJobCompletion to be called")
-	}
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
 	if st.updateJobCompletionWithMetaCalled {
 		t.Fatal("did not expect UpdateJobCompletionWithMeta for null job_meta")
 	}
@@ -598,9 +582,7 @@ func TestCompleteJob_ValidJobMeta_GateWithBugSummary(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
+	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 	var meta map[string]any
 	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
 		t.Fatalf("failed to unmarshal persisted meta: %v", err)
@@ -634,9 +616,7 @@ func TestCompleteJob_ValidJobMeta_ModWithActionSummary(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobCompletionWithMetaCalled {
-		t.Fatal("expected UpdateJobCompletionWithMeta to be called")
-	}
+	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 	var meta map[string]any
 	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
 		t.Fatalf("failed to unmarshal persisted meta: %v", err)

@@ -48,9 +48,7 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	if count != 1 {
 		t.Fatalf("persisted row count = %d, want 1", count)
 	}
-	if !st.deleteSBOMRowsByJobCalled {
-		t.Fatal("expected DeleteSBOMRowsByJob to be called")
-	}
+	assertCalled(t, "DeleteSBOMRowsByJob", st.deleteSBOMRowsByJobCalled)
 	if st.deleteSBOMRowsByJobParam != jobID {
 		t.Fatalf("deleteSBOMRowsByJob job_id = %q, want %q", st.deleteSBOMRowsByJobParam, jobID)
 	}

@@ -21,21 +21,12 @@ import (
 func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture("mig", 2000)
 
 	// Single job per repo, completing it should mark repo as terminal.
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: domaintypes.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
+	st := newMockStoreForJob(f,
 		// All jobs (1 total) are now Success after completion.
-		listJobsByRunRepoAttemptResult: []store.Job{
+		withRepoAttemptJobs([]store.Job{
 			{
 				ID:          f.JobID,
 				RunID:       f.RunID,
@@ -47,12 +38,12 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
-		},
+		}),
 		// All repos terminal (1 Success), so run becomes Finished.
-		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+		withRunRepoStatusCounts([]store.CountRunReposByStatusRow{
 			{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
-		},
-	}
+		}),
+	)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -68,9 +59,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify ListJobsByRunRepoAttempt was called to check repo terminal state.
-	if !st.listJobsByRunRepoAttemptCalled {
-		t.Fatal("expected ListJobsByRunRepoAttempt to be called")
-	}
+	assertCalled(t, "ListJobsByRunRepoAttempt", st.listJobsByRunRepoAttemptCalled)
 	if st.listJobsByRunRepoAttemptParams.RunID != f.RunID {
 		t.Errorf("expected run_id %s, got %s", f.RunID, st.listJobsByRunRepoAttemptParams.RunID)
 	}
@@ -79,9 +68,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	}
 
 	// Verify UpdateRunRepoStatus was called to update repo to Success.
-	if !st.updateRunRepoStatusCalled {
-		t.Fatal("expected UpdateRunRepoStatus to be called")
-	}
+	assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatusCalled)
 	if len(st.updateRunRepoStatusParams) == 0 {
 		t.Fatal("expected at least one UpdateRunRepoStatus call")
 	}
@@ -91,9 +78,7 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 	}
 
 	// Verify UpdateRunStatus was called to set run to Finished.
-	if !st.updateRunStatusCalled {
-		t.Fatal("expected UpdateRunStatus to be called")
-	}
+	assertCalled(t, "UpdateRunStatus", st.updateRunStatusCalled)
 	if st.updateRunStatusParams.Status != domaintypes.RunStatusFinished {
 		t.Errorf("expected run status Finished, got %s", st.updateRunStatusParams.Status)
 	}
@@ -104,20 +89,11 @@ func TestCompleteJob_RepoStatusUpdatedOnLastJob(t *testing.T) {
 func TestCompleteJob_RepoStatusFail(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture("mig", 2000)
 
 	// Job that will fail.
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: domaintypes.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-		listJobsByRunRepoAttemptResult: []store.Job{
+	st := newMockStoreForJob(f,
+		withRepoAttemptJobs([]store.Job{
 			{
 				ID:          f.JobID,
 				RunID:       f.RunID,
@@ -129,12 +105,12 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
-		},
+		}),
 		// All repos terminal.
-		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+		withRunRepoStatusCounts([]store.CountRunReposByStatusRow{
 			{Status: domaintypes.RunRepoStatusFail, Count: 1},
-		},
-	}
+		}),
+	)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -149,9 +125,7 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify repo status was updated to Fail.
-	if !st.updateRunRepoStatusCalled {
-		t.Fatal("expected UpdateRunRepoStatus to be called")
-	}
+	assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatusCalled)
 	if len(st.updateRunRepoStatusParams) == 0 {
 		t.Fatal("expected at least one UpdateRunRepoStatus call")
 	}
@@ -166,10 +140,7 @@ func TestCompleteJob_RepoStatusFail(t *testing.T) {
 func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("pre_gate", 1000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture("pre_gate", 1000)
 	f.Job.Name = "pre-gate"
 
 	// Two jobs: first completes, second is still Created.
@@ -245,9 +216,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	}
 
 	// Verify linked successor was promoted.
-	if !st.promoteJobByIDIfUnblockedCalled {
-		t.Fatal("expected PromoteJobByIDIfUnblocked to be called")
-	}
+	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblockedCalled)
 }
 
 // TestCompleteJob_RepoStatusUsesLastJobStatus verifies that when all jobs are
@@ -256,10 +225,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("post_gate", 3000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture("post_gate", 3000)
 	f.Job.Name = "post-gate"
 
 	// Complete the last job (post-gate) successfully. Earlier gate failure exists.
@@ -346,9 +312,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusNoContent)
 
-	if !st.updateRunRepoStatusCalled {
-		t.Fatal("expected UpdateRunRepoStatus to be called")
-	}
+	assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatusCalled)
 	lastRepoUpdate := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1]
 	if lastRepoUpdate.Status != domaintypes.RunRepoStatusSuccess {
 		t.Errorf("expected repo status Success, got %s", lastRepoUpdate.Status)
@@ -360,21 +324,11 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mr", 9000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture("mr", 9000)
 	f.Job.Name = "mr-0"
 
 	// MR job (auxiliary, should not affect repo/run status).
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: domaintypes.RunStatusFinished, // MR jobs run after run is Finished.
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
-	}
+	st := newMockStoreForJob(f, withRunStatus(domaintypes.RunStatusFinished))
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -409,23 +363,14 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 2000)
-	f.Job.RepoID = domaintypes.NewRepoID()
-	f.Job.RepoBaseRef = "main"
-	f.Job.Attempt = 1
+	f := newRepoScopedFixture("mig", 2000)
 	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatusResult).
 	_ = domaintypes.NewRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
 
 	// Job for repo A completing (repo B still has work).
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID:     f.RunID,
-			Status: domaintypes.RunStatusStarted,
-		},
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
+	st := newMockStoreForJob(f,
 		// Repo A is now terminal (all jobs Success).
-		listJobsByRunRepoAttemptResult: []store.Job{
+		withRepoAttemptJobs([]store.Job{
 			{
 				ID:          f.JobID,
 				RunID:       f.RunID,
@@ -437,13 +382,13 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 				JobType:     "mig",
 				Meta:        withNextIDMeta([]byte(`{}`), 2000),
 			},
-		},
+		}),
 		// But repo B is still Running, so run should NOT become Finished.
-		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
+		withRunRepoStatusCounts([]store.CountRunReposByStatusRow{
 			{Status: domaintypes.RunRepoStatusSuccess, Count: 1}, // Repo A
 			{Status: domaintypes.RunRepoStatusRunning, Count: 1}, // Repo B still running
-		},
-	}
+		}),
+	)
 
 	handler := completeJobHandler(st, nil, nil)
 
