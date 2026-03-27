@@ -68,7 +68,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - No local duplicate of `JobStatusFromRunError` in nodeagent (rg `func.*StatusFrom|func.*jobStatus` `internal/nodeagent/*.go` returns no match).
     - Gate infra error path (`execution_orchestrator_gate.go`) intentionally uses explicit `Cancelled` (not `JobStatusFromRunError`) to prevent healing activation on infrastructure failures — a deliberate semantic divergence documented inline, not a missing adoption.
     - Server completion paths (`jobs_complete_service_post_actions.go:{onFail,onCancelled,onSuccess}`) route through `lifecycle.EvaluateCompletionDecision` and `lifecycle.IsGateJobType`. No server-local transition branch remains.
-    - Parity fixtures: `internal/workflow/lifecycle/cross_path_parity_test.go` — `TestCrossPathParity_StandardJobErrorToChainAction` locks the joint nodeagent (`JobStatusFromRunError`) + server (`EvaluateCompletionDecision`) path for mig/heal/MR jobs; `TestCrossPathParity_GateJobStatusToChainAction` locks the server's handling of all three statuses emitted by the gate nodeagent path.
+    - Parity fixtures: `internal/server/handlers/cross_path_parity_test.go` — `TestCrossPathParity_StandardJobErrorToChainAction` locks the joint nodeagent (`JobStatusFromRunError`) + server (`EvaluateCompletionDecision`) path for mig/heal/MR jobs; `TestCrossPathParity_GateJobStatusToChainAction` locks the server's handling of all three statuses emitted by the gate nodeagent path.
 
 - [x] 1.3.1 Reconcile item 1.3 closure with redundancy-removal contract
   - Type: determined
@@ -84,7 +84,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     3. Add structural proof in completion notes: parity fixtures present, and removed nodeagent-local transition branches/call paths replaced by lifecycle-owned outputs.
   - Reasoning: high (9 CFP)
   - Structural proof:
-    - Parity fixture added: `internal/workflow/lifecycle/cross_path_parity_test.go` with `TestCrossPathParity_StandardJobErrorToChainAction` (6 cases — context.Canceled/DeadlineExceeded and runtime errors across mig/heal/MR job types) and `TestCrossPathParity_GateJobStatusToChainAction` (6 cases — gate infra Cancelled, gate test Fail, gate Success across pre/post/re-gate types).
+    - Parity fixture added: `internal/server/handlers/cross_path_parity_test.go` with `TestCrossPathParity_StandardJobErrorToChainAction` (6 cases — context.Canceled/DeadlineExceeded and runtime errors across mig/heal/MR job types) and `TestCrossPathParity_GateJobStatusToChainAction` (6 cases — gate infra Cancelled, gate test Fail, gate Success across pre/post/re-gate types).
     - Adoption confirmed (rg evidence): all standard job error-to-status paths in scope (`execution_orchestrator.go`, `execution_orchestrator_jobs.go`, `execution_mr.go`) call `lifecycle.JobStatusFromRunError`; no in-scope file duplicates this logic locally.
     - Remaining explicit status assignments in `execution_orchestrator_gate.go` (gate infra error → `Cancelled`, gate result → `Fail`/`Success`) are deliberate semantic choices, not lifecycle-mirrorings: the gate infra path intentionally diverges from `JobStatusFromRunError` to force `Cancelled` regardless of error type, preventing healing activation on infrastructure failures.
     - 1.3 re-marked complete with structural evidence above; no dual-path branches remain in the listed components.
