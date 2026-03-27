@@ -12,6 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // ===== Recovery Flow Tests =====
@@ -204,7 +205,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 			},
 		},
 	}
-	if _, stack, _ := resolveFailedGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
+	if _, stack, _ := lifecycle.ResolveGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
 		t.Fatal("expected failed gate metadata to expose detected stack")
 	}
 

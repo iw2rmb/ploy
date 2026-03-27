@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -11,55 +10,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
-
-func shouldEvaluateInfraCandidate(
-	recoveryMeta *contracts.BuildGateRecoveryMetadata,
-	action contracts.HealingActionSpec,
-) bool {
-	if recoveryMeta == nil {
-		return false
-	}
-	kind, ok := contracts.ParseRecoveryErrorKind(recoveryMeta.ErrorKind)
-	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
-		return false
-	}
-	if action.Expectations == nil {
-		return false
-	}
-	for _, artifact := range action.Expectations.Artifacts {
-		if strings.TrimSpace(artifact.Schema) == contracts.GateProfileCandidateSchemaID {
-			return true
-		}
-	}
-	return false
-}
-
-func resolveRecoveryCandidateArtifactPath(expectations json.RawMessage) (string, bool) {
-	if len(expectations) == 0 {
-		return "", false
-	}
-	var ex struct {
-		Artifacts []struct {
-			Path   string `json:"path"`
-			Schema string `json:"schema"`
-		} `json:"artifacts"`
-	}
-	if err := json.Unmarshal(expectations, &ex); err != nil {
-		return "", false
-	}
-	for _, artifact := range ex.Artifacts {
-		if strings.TrimSpace(artifact.Schema) != contracts.GateProfileCandidateSchemaID {
-			continue
-		}
-		path := strings.TrimSpace(artifact.Path)
-		if path == "" {
-			continue
-		}
-		return path, true
-	}
-	return "", false
-}
 
 func evaluateAndAttachInfraCandidate(
 	ctx context.Context,
@@ -132,7 +84,7 @@ func resolvePreviousHealJob(
 	failedJob store.Job,
 	jobsByID map[domaintypes.JobID]store.Job,
 ) *store.Job {
-	prev := recoveryChainPredecessor(failedJob.ID, jobsByID)
+	prev := lifecycle.RecoveryChainPredecessor(failedJob.ID, jobsByID)
 	if prev == nil {
 		return nil
 	}

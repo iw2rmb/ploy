@@ -7,6 +7,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // ClaimResult is the domain output from claim orchestration.
@@ -103,8 +104,8 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 		return ClaimResult{}, claimInternal("failed to get run repo for claimed job", err)
 	}
 
-	isMRJob := job.JobType == domaintypes.JobTypeMR
-	if !isMRJob && rr.Status == domaintypes.RunRepoStatusQueued {
+	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), rr.Status)
+	if claimDecision.AdvanceRunRepoToRunning {
 		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
 			RunID:  job.RunID,
 			RepoID: job.RepoID,

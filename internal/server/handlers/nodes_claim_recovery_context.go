@@ -10,6 +10,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 func buildRecoveryClaimContext(
@@ -42,7 +43,7 @@ func buildRecoveryClaimContext(
 		Expectations:      cloneRawJSON(recovery.Expectations),
 	}
 	if kind == contracts.RecoveryErrorKindDeps && recovery.DepsBumps != nil {
-		ctxPayload.DepsBumps = cloneDepsBumpsMap(recovery.DepsBumps)
+		ctxPayload.DepsBumps = lifecycle.CloneDepsBumpsMap(recovery.DepsBumps)
 	}
 	if loopKind, ok := contracts.ParseRecoveryLoopKind(ctxPayload.LoopKind); ok {
 		ctxPayload.LoopKind = loopKind.String()
@@ -91,7 +92,7 @@ func buildRecoveryClaimContext(
 		}
 	}
 	if detectedExpectation == nil {
-		detectedExpectation = stackExpectationFromModStack(ctxPayload.DetectedStack)
+		detectedExpectation = lifecycle.StackExpectationFromModStack(ctxPayload.DetectedStack)
 	}
 	if kind == contracts.RecoveryErrorKindDeps {
 		ctxPayload.DepsCompatEndpoint = buildDepsCompatEndpoint(detectedExpectation)
@@ -118,19 +119,19 @@ func resolveRecoverySourceJobs(
 	switch domaintypes.JobType(current.JobType) {
 	case domaintypes.JobTypeHeal:
 		heal := current
-		prev := recoveryChainPredecessor(current.ID, jobsByID)
+		prev := lifecycle.RecoveryChainPredecessor(current.ID, jobsByID)
 		if prev != nil && isGateJobTypeForClaim(domaintypes.JobType(prev.JobType)) {
 			return prev, &heal
 		}
 		return nil, &heal
 	case domaintypes.JobTypeReGate:
-		prev := recoveryChainPredecessor(current.ID, jobsByID)
+		prev := lifecycle.RecoveryChainPredecessor(current.ID, jobsByID)
 		if prev == nil {
 			return nil, nil
 		}
 		if domaintypes.JobType(prev.JobType) == domaintypes.JobTypeHeal {
 			heal := *prev
-			prevGate := recoveryChainPredecessor(prev.ID, jobsByID)
+			prevGate := lifecycle.RecoveryChainPredecessor(prev.ID, jobsByID)
 			if prevGate != nil && isGateJobTypeForClaim(domaintypes.JobType(prevGate.JobType)) {
 				return prevGate, &heal
 			}
