@@ -10,6 +10,38 @@ import (
 
 const defaultDockerHostSocket = "unix:///var/run/docker.sock"
 
+// ProfilePrecedence represents the precedence tier of a resolved gate profile.
+// Higher values take precedence over lower values.
+type ProfilePrecedence int
+
+const (
+	ProfilePrecedenceDefault ProfilePrecedence = iota + 1 // stack-level default
+	ProfilePrecedenceLatest                               // latest repo-level profile
+	ProfilePrecedenceExact                                // sha-exact matched profile
+)
+
+// ProfileCandidate holds a resolved gate profile record at a given precedence tier.
+type ProfileCandidate struct {
+	ID         int64
+	ObjectKey  string
+	Precedence ProfilePrecedence
+}
+
+// SelectProfile applies default/exact/latest precedence rules and returns the
+// highest-priority non-nil candidate.
+//
+// Priority (highest first): exact > latest > def.
+// Returns nil if all inputs are nil.
+func SelectProfile(exact, latest, def *ProfileCandidate) *ProfileCandidate {
+	if exact != nil {
+		return exact
+	}
+	if latest != nil {
+		return latest
+	}
+	return def
+}
+
 // GateOverrideForJobType derives the gate phase and build gate override from a
 // resolved gate profile for the given job type.
 //

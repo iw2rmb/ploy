@@ -17,6 +17,76 @@ func buildTestProfile(t *testing.T, raw string) *contracts.GateProfile {
 	return p
 }
 
+func TestSelectProfile(t *testing.T) {
+	t.Parallel()
+
+	exact := &ProfileCandidate{ID: 1, ObjectKey: "exact", Precedence: ProfilePrecedenceExact}
+	latest := &ProfileCandidate{ID: 2, ObjectKey: "latest", Precedence: ProfilePrecedenceLatest}
+	def := &ProfileCandidate{ID: 3, ObjectKey: "default", Precedence: ProfilePrecedenceDefault}
+
+	tests := []struct {
+		name   string
+		exact  *ProfileCandidate
+		latest *ProfileCandidate
+		def    *ProfileCandidate
+		wantID int64
+	}{
+		{
+			name:   "exact wins over all others",
+			exact:  exact,
+			latest: latest,
+			def:    def,
+			wantID: 1,
+		},
+		{
+			name:   "latest wins when exact is absent",
+			exact:  nil,
+			latest: latest,
+			def:    def,
+			wantID: 2,
+		},
+		{
+			name:   "default wins when exact and latest are absent",
+			exact:  nil,
+			latest: nil,
+			def:    def,
+			wantID: 3,
+		},
+		{
+			name:   "all nil returns nil",
+			exact:  nil,
+			latest: nil,
+			def:    nil,
+			wantID: 0,
+		},
+		{
+			name:   "exact only returns exact",
+			exact:  exact,
+			latest: nil,
+			def:    nil,
+			wantID: 1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SelectProfile(tc.exact, tc.latest, tc.def)
+			if tc.wantID == 0 {
+				if got != nil {
+					t.Fatalf("SelectProfile=%v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("SelectProfile=nil, want non-nil")
+			}
+			if got.ID != tc.wantID {
+				t.Fatalf("SelectProfile.ID=%d, want %d", got.ID, tc.wantID)
+			}
+		})
+	}
+}
+
 func TestGateOverrideForJobType(t *testing.T) {
 	t.Parallel()
 
