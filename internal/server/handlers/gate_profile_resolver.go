@@ -98,9 +98,11 @@ func (r *dbGateProfileResolver) ResolveGateProfileForJob(ctx context.Context, jo
 		if err != nil {
 			return nil, fmt.Errorf("lookup latest gate profile: %w", err)
 		}
-		defCand, err = r.fetchDefaultCandidate(ctx, stackID)
-		if err != nil {
-			return nil, fmt.Errorf("lookup default gate profile: %w", err)
+		if latestCand == nil {
+			defCand, err = r.fetchDefaultCandidate(ctx, stackID)
+			if err != nil {
+				return nil, fmt.Errorf("lookup default gate profile: %w", err)
+			}
 		}
 	}
 
