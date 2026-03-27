@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
+	"charm.land/lipgloss/v2"
 	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
@@ -53,8 +53,11 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	if !ok {
 		t.Fatalf("item 0: unexpected type %T", items[0])
 	}
-	if !strings.Contains(item.title, "✓ deploy") {
+	if !strings.Contains(item.title, "⏺") || !strings.Contains(item.title, "deploy") {
 		t.Errorf("item title: expected status glyph and name, got %q", item.title)
+	}
+	if !strings.Contains(item.title, "\x1b[") {
+		t.Errorf("item title: expected ANSI color sequence for terminal status glyph, got %q", item.title)
 	}
 	if !strings.HasSuffix(strings.TrimSpace(item.title), "2s") {
 		t.Errorf("item title: expected duration suffix %q, got %q", "2s", item.title)
@@ -62,8 +65,8 @@ func TestS6JobsItemsPopulated(t *testing.T) {
 	if !strings.HasSuffix(item.title, " 2s") {
 		t.Errorf("item title: expected right-aligned duration with spacing, got %q", item.title)
 	}
-	if got := utf8.RuneCountInString(item.title); got != jobsContentWidth {
-		t.Errorf("item title rune width: got %d, want %d", got, jobsContentWidth)
+	if got := lipgloss.Width(item.title); got != jobsContentWidth {
+		t.Errorf("item title visible width: got %d, want %d", got, jobsContentWidth)
 	}
 	if strings.Contains(item.title, "...") || strings.Contains(item.title, "…") {
 		t.Errorf("item title: duration/name must not be ellipsized, got %q", item.title)
@@ -190,5 +193,20 @@ func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 	}
 	if item2.description != "job-1" {
 		t.Errorf("item 2 description: got %q, want %q", item2.description, "job-1")
+	}
+}
+
+func TestJobsStatusGlyphUsesColoredDotForTerminalStates(t *testing.T) {
+	successGlyph := jobsStatusGlyph(domaintypes.JobStatusSuccess)
+	failGlyph := jobsStatusGlyph(domaintypes.JobStatusFail)
+
+	if !strings.Contains(successGlyph, "⏺") || !strings.Contains(successGlyph, "\x1b[") {
+		t.Fatalf("success glyph should be a colored dot, got %q", successGlyph)
+	}
+	if !strings.Contains(failGlyph, "⏺") || !strings.Contains(failGlyph, "\x1b[") {
+		t.Fatalf("failed glyph should be a colored dot, got %q", failGlyph)
+	}
+	if successGlyph == failGlyph {
+		t.Fatalf("success and failed glyphs should use different colors, got success=%q fail=%q", successGlyph, failGlyph)
 	}
 }
