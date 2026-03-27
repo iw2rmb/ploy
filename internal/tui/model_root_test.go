@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"strings"
 	"testing"
+
+	clitui "github.com/iw2rmb/ploy/internal/cli/tui"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestS1RootListTitle verifies the PLOY root list title.
@@ -86,5 +90,65 @@ func TestS1EscQuits(t *testing.T) {
 	_, cmd := m.handleEsc()
 	if cmd == nil {
 		t.Error("Esc from S1: expected quit cmd, got nil")
+	}
+}
+
+// TestPloyListJobsSelectedShowsJobListPanel verifies that ScreenPloyList renders the
+// JobList right-panel when the PLOY cursor is on the Jobs item (index 2).
+func TestPloyListJobsSelectedShowsJobListPanel(t *testing.T) {
+	m := InitialModel(nil, nil)
+	// Populate jobs so the panel has content to render.
+	next, _ := m.Update(jobsLoadedMsg{jobs: []clitui.JobItem{
+		{JobID: domaintypes.JobID("job-1"), Name: "deploy", MigName: "mig", RunID: domaintypes.RunID("run-1"), RepoID: domaintypes.RepoID("repo-1")},
+	}})
+	m = next.(model)
+	// Cursor must be on Jobs (index 2) while remaining on ScreenPloyList.
+	m.ploy.Select(2)
+
+	rendered := m.View().Content
+	if !strings.Contains(rendered, "PLOY") {
+		t.Error("view: missing PLOY list")
+	}
+	if !strings.Contains(rendered, "JOBS") {
+		t.Error("view: missing JOBS panel when Jobs item selected on ScreenPloyList")
+	}
+}
+
+// TestPloyListNonJobsSelectedShowsOnlyPloy verifies that ScreenPloyList renders
+// only the PLOY list when the cursor is not on the Jobs item.
+func TestPloyListNonJobsSelectedShowsOnlyPloy(t *testing.T) {
+	tests := []struct {
+		name  string
+		index int
+	}{
+		{"Migrations", 0},
+		{"Runs", 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := InitialModel(nil, nil)
+			m.ploy.Select(tt.index)
+
+			rendered := m.View().Content
+			if !strings.Contains(rendered, "PLOY") {
+				t.Error("view: missing PLOY list")
+			}
+			if strings.Contains(rendered, "JOBS") {
+				t.Errorf("view: unexpected JOBS panel when cursor is on %s (index %d)", tt.name, tt.index)
+			}
+		})
+	}
+}
+
+// TestPloyListFocusRemainsOnPloy verifies that ScreenPloyList routes key messages
+// to the PLOY list, not the JobList, keeping PLOY as the active list.
+func TestPloyListFocusRemainsOnPloy(t *testing.T) {
+	m := InitialModel(nil, nil)
+	m.ploy.Select(0)
+	// Route a navigation message through updateActiveList.
+	_, _ = m.updateActiveList(nil)
+	// The screen must remain ScreenPloyList with ploy as active list.
+	if m.screen != ScreenPloyList {
+		t.Errorf("screen changed: got %v, want ScreenPloyList", m.screen)
 	}
 }

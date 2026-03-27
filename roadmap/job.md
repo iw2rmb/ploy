@@ -15,7 +15,7 @@ Documentation: `design/job.md`
     2. Verify existing JOBS list rendering tests still pass after extraction.
   - Reasoning: medium (CFP_delta: 6)
 
-- [ ] 1.2 Compose JobList in both required screens (`determined`)
+- [x] 1.2 Compose JobList in both required screens (`determined`)
   - Component: `internal/tui/model_types.go`, `internal/tui/model_navigation.go`, `internal/tui/model_core.go`, `internal/tui/view.go`
   - Implementation:
     1. Normalize root-screen naming/contract to `ScreenPloyList` semantics in code and comments.

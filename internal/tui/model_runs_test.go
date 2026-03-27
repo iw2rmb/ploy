@@ -173,7 +173,7 @@ func TestS4EscTransitionsToS1(t *testing.T) {
 	m.screen = ScreenRunsList
 	next, _ := m.handleEsc()
 	nm := next.(model)
-	if nm.screen != ScreenRoot {
-		t.Errorf("Esc(S4): got screen %v, want ScreenRoot", nm.screen)
+	if nm.screen != ScreenPloyList {
+		t.Errorf("Esc(S4): got screen %v, want ScreenPloyList", nm.screen)
 	}
 }

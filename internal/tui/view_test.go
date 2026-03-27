@@ -12,7 +12,7 @@ func TestViewEnablesAltScreen(t *testing.T) {
 		name   string
 		screen Screen
 	}{
-		{name: "root", screen: ScreenRoot},
+		{name: "root", screen: ScreenPloyList},
 		{name: "migrations_list", screen: ScreenMigrationsList},
 		{name: "migration_details", screen: ScreenMigrationDetails},
 		{name: "runs_list", screen: ScreenRunsList},

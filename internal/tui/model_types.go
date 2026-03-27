@@ -16,7 +16,7 @@ import (
 type Screen int
 
 const (
-	ScreenRoot             Screen = iota // PLOY root selector
+	ScreenPloyList         Screen = iota // PLOY root selector
 	ScreenMigrationsList                 // PLOY | MIGRATIONS
 	ScreenMigrationDetails               // PLOY (selected migration context)
 	ScreenRunsList                       // PLOY | RUNS

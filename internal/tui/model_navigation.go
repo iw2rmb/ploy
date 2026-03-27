@@ -9,7 +9,7 @@ import (
 // handleEnter implements Enter-key transitions per the state machine contract.
 func (m model) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.screen {
-	case ScreenRoot:
+	case ScreenPloyList:
 		return m.handleEnterFromRoot()
 	case ScreenMigrationsList:
 		return m.handleEnterFromMigrationsList()
@@ -116,18 +116,18 @@ func (m *model) resolveMigContext(runID domaintypes.RunID) {
 func (m model) handleEsc() (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case ScreenMigrationsList:
-		m.screen = ScreenRoot
+		m.screen = ScreenPloyList
 	case ScreenMigrationDetails:
 		m.screen = ScreenMigrationsList
 		m.setPloySelectionState(true, false, false)
 	case ScreenRunsList:
-		m.screen = ScreenRoot
+		m.screen = ScreenPloyList
 	case ScreenRunDetails:
 		m.screen = ScreenRunsList
 		m.setPloySelectionState(true, true, false)
 	case ScreenJobsList:
-		m.screen = ScreenRoot
-	case ScreenRoot:
+		m.screen = ScreenPloyList
+	case ScreenPloyList:
 		return m, tea.Quit
 	}
 	return m, nil

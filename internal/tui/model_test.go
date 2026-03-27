@@ -10,8 +10,8 @@ import (
 func TestModelInit(t *testing.T) {
 	m := InitialModel(nil, nil)
 
-	if m.screen != ScreenRoot {
-		t.Errorf("initial screen: got %v, want ScreenRoot", m.screen)
+	if m.screen != ScreenPloyList {
+		t.Errorf("initial screen: got %v, want ScreenPloyList", m.screen)
 	}
 
 	// Init must return nil for the base shell (no async commands on start).
@@ -60,8 +60,8 @@ func TestModelPloyListItems(t *testing.T) {
 // TestModelEscFromS1Quits verifies that pressing Esc from S1 (root) quits.
 func TestModelEscFromS1Quits(t *testing.T) {
 	m := InitialModel(nil, nil)
-	if m.screen != ScreenRoot {
-		t.Fatal("expected ScreenRoot")
+	if m.screen != ScreenPloyList {
+		t.Fatal("expected ScreenPloyList")
 	}
 
 	_, cmd := m.handleEsc()
@@ -77,11 +77,11 @@ func TestModelEscTransitions(t *testing.T) {
 		from Screen
 		want Screen
 	}{
-		{"S2 -> S1", ScreenMigrationsList, ScreenRoot},
+		{"S2 -> S1", ScreenMigrationsList, ScreenPloyList},
 		{"S3 -> S2", ScreenMigrationDetails, ScreenMigrationsList},
-		{"S4 -> S1", ScreenRunsList, ScreenRoot},
+		{"S4 -> S1", ScreenRunsList, ScreenPloyList},
 		{"S5 -> S4", ScreenRunDetails, ScreenRunsList},
-		{"S6 -> S1", ScreenJobsList, ScreenRoot},
+		{"S6 -> S1", ScreenJobsList, ScreenPloyList},
 	}
 
 	for _, tt := range tests {

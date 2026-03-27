@@ -19,7 +19,7 @@ func InitialModel(client *http.Client, baseURL *url.URL) model {
 	ploy.SetFilteringEnabled(false)
 
 	return model{
-		screen:    ScreenRoot,
+		screen:    ScreenPloyList,
 		ploy:      ploy,
 		secondary: newList("", nil),
 		detail:    newList("", nil),
@@ -153,8 +153,12 @@ func (m model) handleJobsLoaded(msg jobsLoadedMsg) model {
 func (m model) updateActiveList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.screen {
-	case ScreenRoot:
+	case ScreenPloyList:
+		prevIdx := m.ploy.Index()
 		m.ploy, cmd = m.ploy.Update(msg)
+		if m.ploy.Index() == 2 && prevIdx != 2 && len(m.jobList.Jobs()) == 0 {
+			cmd = tea.Batch(cmd, loadJobsCmd(m.client, m.baseURL, nil), loadRunsCmd(m.client, m.baseURL))
+		}
 	case ScreenMigrationsList:
 		m.secondary, cmd = m.secondary.Update(msg)
 	case ScreenMigrationDetails:

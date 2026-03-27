@@ -9,8 +9,12 @@ import (
 func (m model) View() tea.View {
 	var content string
 	switch m.screen {
-	case ScreenRoot:
-		content = m.ploy.View()
+	case ScreenPloyList:
+		if m.ploy.Index() == 2 {
+			content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.jobList.View())
+		} else {
+			content = m.ploy.View()
+		}
 	case ScreenMigrationsList, ScreenRunsList:
 		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
 	case ScreenJobsList:
