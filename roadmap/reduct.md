@@ -55,7 +55,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
   - Assumptions: Existing nodeagent retry and rehydrate transition behavior matches server transition semantics closely enough to consume shared orchestrator outputs without introducing new nodeagent-only transition types.
   - Implementation:
     1. Route nodeagent claim/complete decisions through `internal/workflow/lifecycle/orchestrator.go` as the only transition owner.
-    2. Route nodeagent retry/rehydrate decisions through shared retry/healing transition outputs and delete superseded nodeagent-local decision branches.
+    2. (n/a) `internal/nodeagent/execution_orchestrator_rehydrate.go` was listed as a migration target, but it contains no retry/healing transition branches — it only implements workspace rehydration (git clone + ordered diff application) and diff upload for mig jobs. No adoption of shared orchestrator retry/healing outputs is applicable here. Route nodeagent retry/rehydrate decisions through shared retry/healing transition outputs and delete superseded nodeagent-local decision branches in the remaining components only.
     3. Add parity fixtures that execute identical transition cases through server and nodeagent paths to lock shared semantics.
     4. Delete now-redundant nodeagent-local transition helpers/wrappers and keep no dual-path fallback branches.
   - Verification:
