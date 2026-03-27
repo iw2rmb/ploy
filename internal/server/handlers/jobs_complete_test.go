@@ -2,16 +2,13 @@ package handlers
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // ===== Happy-Path & Error-Propagation Tests =====
@@ -21,7 +18,7 @@ import (
 func TestCompleteJob_Success(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 1000)
+	f := newJobFixture("mig")
 	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
@@ -40,7 +37,7 @@ func TestCompleteJob_Success(t *testing.T) {
 func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 1000)
+	f := newJobFixture("mig")
 	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
@@ -63,7 +60,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 1000)
+	f := newJobFixture("mig")
 	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
@@ -83,7 +80,7 @@ func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig", 1000)
+	f := newJobFixture("mig")
 	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
@@ -126,7 +123,7 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mr", 9000)
+	f := newJobFixture("mr")
 	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
 
 	st := newMockStoreForJob(f, withRunStatus(domaintypes.RunStatusFinished))
@@ -157,7 +154,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("", 1000)
+	f := newJobFixture("")
 	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
@@ -182,13 +179,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 		t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
 	}
 
-	var meta map[string]any
-	if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
-		t.Fatalf("failed to unmarshal persisted meta: %v", err)
-	}
-	if kind, ok := meta["kind"].(string); !ok || kind != "gate" {
-		t.Fatalf("expected meta.kind == \"gate\", got %#v", meta["kind"])
-	}
+	assertMetaKind(t, st.updateJobCompletionWithMetaParams.Meta, "gate")
 }
 
 // TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
@@ -196,7 +187,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("", 1000)
+	f := newJobFixture("")
 	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
@@ -228,57 +219,33 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture("mig", 2000)
-
-	st := newMockStoreForJob(f)
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Fail",
-		"exit_code": 137,
-	}))
-
-	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
-	if st.updateRunRepoErrorParams.RunID != f.RunID {
-		t.Fatalf("expected RunID %s, got %s", f.RunID, st.updateRunRepoErrorParams.RunID)
-	}
-	if st.updateRunRepoErrorParams.RepoID != f.Job.RepoID {
-		t.Fatalf("expected RepoID %s, got %s", f.Job.RepoID, st.updateRunRepoErrorParams.RepoID)
-	}
-	if st.updateRunRepoErrorParams.LastError == nil {
-		t.Fatal("expected LastError to be set")
-	}
-	msg := *st.updateRunRepoErrorParams.LastError
-	for _, want := range []string{"mig-0", "exit code 137", "out of memory"} {
-		if !strings.Contains(msg, want) {
-			t.Errorf("expected error to contain %q, got: %s", want, msg)
-		}
-	}
-}
-
-func TestCompleteJob_Exit137SetsLastError_WhenRunLookupFails(t *testing.T) {
-	t.Parallel()
-
-	f := newRepoScopedFixture("mig", 2000)
-
-	st := &mockStore{
-		getRunErr:           errors.New("transient run lookup failure"),
-		getJobResult:        f.Job,
-		listJobsByRunResult: []store.Job{f.Job},
+	tests := []struct {
+		name    string
+		storeOpts []func(*mockStore)
+	}{
+		{name: "normal"},
+		{name: "run_lookup_fails", storeOpts: []func(*mockStore){
+			withGetRunErr(errors.New("transient run lookup failure")),
+		}},
 	}
 
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Fail",
-		"exit_code": 137,
-	}))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateRunRepoErrorCalled {
-		t.Fatal("expected UpdateRunRepoError to be called despite run lookup failure")
+			f := newRepoScopedFixture("mig")
+			st := newMockStoreForJob(f, tt.storeOpts...)
+
+			handler := completeJobHandler(st, nil, nil)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":    "Fail",
+				"exit_code": 137,
+			}))
+
+			assertStatus(t, rr, http.StatusNoContent)
+			assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
+		})
 	}
 }
 
@@ -287,7 +254,7 @@ func TestCompleteJob_Exit137SetsLastError_WhenRunLookupFails(t *testing.T) {
 func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture("pre_gate", 1000)
+	f := newRepoScopedFixture("pre_gate")
 
 	st := newMockStoreForJob(f)
 
@@ -328,22 +295,5 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-
-	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
-	if st.updateRunRepoErrorParams.RunID != f.RunID {
-		t.Fatalf("expected RunID %s, got %s", f.RunID, st.updateRunRepoErrorParams.RunID)
-	}
-	if st.updateRunRepoErrorParams.RepoID != f.Job.RepoID {
-		t.Fatalf("expected RepoID %s, got %s", f.Job.RepoID, st.updateRunRepoErrorParams.RepoID)
-	}
-	if st.updateRunRepoErrorParams.LastError == nil {
-		t.Fatal("expected LastError to be set")
-	}
-
-	errMsg := *st.updateRunRepoErrorParams.LastError
-	for _, want := range []string{"inbound", "Expected:", "Detected:", `release: "17"`, `release: "11"`, "Evidence:", "pom.xml"} {
-		if !strings.Contains(errMsg, want) {
-			t.Errorf("expected error to contain %q, got: %s", want, errMsg)
-		}
-	}
+	assertRepoError(t, st, f.RunID, f.Job.RepoID, "inbound", "Expected:", "Detected:", `release: "17"`, `release: "11"`, "Evidence:", "pom.xml")
 }

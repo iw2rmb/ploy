@@ -19,16 +19,14 @@ import (
 func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeReGate, 1000)
+	f := newRepoScopedFixture(domaintypes.JobTypeReGate)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
-	st := &mockStore{
-		getRunResult: store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
-		getJobResult: f.Job,
-		resolveStackRowByLangToolResult: store.ResolveStackRowByLangToolRow{
+	st := newMockStoreForJob(f,
+		withResolveStackRow(store.ResolveStackRowByLangToolRow{
 			ID: 7, Lang: "go", Tool: "go", Release: "",
-		},
-	}
+		}),
+	)
 
 	handler := completeJobHandler(st, nil, nil, bsmock.New())
 	rr := httptest.NewRecorder()
@@ -60,13 +58,10 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeReGate, 1000)
+	f := newRepoScopedFixture(domaintypes.JobTypeReGate)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
-	st := &mockStore{
-		getRunResult: store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
-		getJobResult: f.Job,
-	}
+	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -103,13 +98,10 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeReGate, 1000)
+	f := newRepoScopedFixture(domaintypes.JobTypeReGate)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
 
-	st := &mockStore{
-		getRunResult: store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
-		getJobResult: f.Job,
-	}
+	st := newMockStoreForJob(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -124,7 +116,7 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeHeal, 1000)
+	f := newRepoScopedFixture(domaintypes.JobTypeHeal)
 	reGateID := domaintypes.NewJobID()
 	f.Job.NextID = &reGateID
 	f.Job.Meta = []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`)
@@ -145,15 +137,13 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 		Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"missing"}}`),
 	}
 
-	st := &mockStore{
-		getRunResult:  store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
-		getJobResult:  f.Job,
-		getJobResults: map[domaintypes.JobID]store.Job{reGateID: reGate},
-		listJobsByRunRepoAttemptResult: []store.Job{failedGate, f.Job, reGate},
-		listArtifactBundlesMetaByRunAndJobResult: []store.ArtifactBundle{
+	st := newMockStoreForJob(f,
+		withJobResults(map[domaintypes.JobID]store.Job{reGateID: reGate}),
+		withRepoAttemptJobs([]store.Job{failedGate, f.Job, reGate}),
+		withArtifactBundles([]store.ArtifactBundle{
 			{RunID: f.RunID, JobID: &f.Job.ID, ObjectKey: strPtr("artifacts/run/" + f.RunID.String() + "/bundle/heal.tar.gz")},
-		},
-	}
+		}),
+	)
 	if _, stack, _ := lifecycle.ResolveGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
 		t.Fatal("expected failed gate metadata to expose detected stack")
 	}
@@ -215,7 +205,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeHeal, 1000)
+	f := newRepoScopedFixture(domaintypes.JobTypeHeal)
 	reGateID := domaintypes.NewJobID()
 	f.Job.NextID = &reGateID
 
@@ -235,12 +225,10 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T
 		Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"missing"}}`),
 	}
 
-	st := &mockStore{
-		getRunResult:                   store.Run{ID: f.RunID, Status: domaintypes.RunStatusStarted},
-		getJobResult:                   f.Job,
-		getJobResults:                  map[domaintypes.JobID]store.Job{reGateID: reGate},
-		listJobsByRunRepoAttemptResult: []store.Job{failedGate, f.Job, reGate},
-	}
+	st := newMockStoreForJob(f,
+		withJobResults(map[domaintypes.JobID]store.Job{reGateID: reGate}),
+		withRepoAttemptJobs([]store.Job{failedGate, f.Job, reGate}),
+	)
 	bp := blobpersist.New(st, bsmock.New())
 
 	handler := completeJobHandler(st, nil, bp)

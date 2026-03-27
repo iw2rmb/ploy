@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -12,84 +11,60 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestGetJobStatusHandler_Success(t *testing.T) {
-	f := newJobFixture("mig", 1000)
-	st := &mockStore{
-		getJobResult: f.Job,
+func TestGetJobStatusHandler(t *testing.T) {
+	t.Parallel()
+
+	f := newJobFixture("mig")
+
+	tests := []struct {
+		name           string
+		storeErr       error
+		overrideNodeID string // non-empty → use a different caller identity
+		wantStatus     int
+		wantJSON       map[string]string // nil = skip body assertions
+	}{
+		{
+			name:       "success",
+			wantStatus: http.StatusOK,
+			wantJSON: map[string]string{
+				"job_id": f.JobID.String(),
+				"status": string(domaintypes.JobStatusRunning),
+			},
+		},
+		{
+			name:           "forbidden_node_mismatch",
+			overrideNodeID: domaintypes.NewNodeKey(),
+			wantStatus:     http.StatusForbidden,
+		},
+		{
+			name:       "not_found",
+			storeErr:   pgx.ErrNoRows,
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "store_error",
+			storeErr:   errors.New("db down"),
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
-	handler := getJobStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+f.JobID.String()+"/status", nil)
-	req.SetPathValue("job_id", f.JobID.String())
-	req.Header.Set(nodeUUIDHeader, f.NodeIDStr)
-	rr := httptest.NewRecorder()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	handler.ServeHTTP(rr, req)
+			st := &mockStore{
+				getJobResult: f.Job,
+				getJobErr:    tt.storeErr,
+			}
 
-	assertStatus(t, rr, http.StatusOK)
-	assertJSONValue(t, rr.Body.String(), "job_id", f.JobID.String())
-	assertJSONValue(t, rr.Body.String(), "status", string(domaintypes.JobStatusRunning))
-}
+			handler := getJobStatusHandler(st)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.jobStatusReq(tt.overrideNodeID))
 
-func TestGetJobStatusHandler_ForbiddenWhenNodeMismatched(t *testing.T) {
-	f := newJobFixture("mig", 1000)
-	st := &mockStore{
-		getJobResult: f.Job,
-	}
-
-	handler := getJobStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+f.JobID.String()+"/status", nil)
-	req.SetPathValue("job_id", f.JobID.String())
-	req.Header.Set(nodeUUIDHeader, domaintypes.NewNodeKey())
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusForbidden)
-}
-
-func TestGetJobStatusHandler_NotFound(t *testing.T) {
-	jobID := domaintypes.NewJobID()
-	st := &mockStore{
-		getJobErr: pgx.ErrNoRows,
-	}
-
-	handler := getJobStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/status", nil)
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, domaintypes.NewNodeKey())
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusNotFound)
-}
-
-func TestGetJobStatusHandler_StoreError(t *testing.T) {
-	jobID := domaintypes.NewJobID()
-	st := &mockStore{
-		getJobErr: errors.New("db down"),
-	}
-
-	handler := getJobStatusHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/status", nil)
-	req.SetPathValue("job_id", jobID.String())
-	req.Header.Set(nodeUUIDHeader, domaintypes.NewNodeKey())
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusInternalServerError)
-}
-
-func assertJSONValue(t *testing.T, body, key, want string) {
-	t.Helper()
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(body), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	got, _ := payload[key].(string)
-	if got != want {
-		t.Fatalf("response[%q] = %q, want %q", key, got, want)
+			assertStatus(t, rr, tt.wantStatus)
+			for k, v := range tt.wantJSON {
+				assertJSONValue(t, rr.Body.String(), k, v)
+			}
+		})
 	}
 }
