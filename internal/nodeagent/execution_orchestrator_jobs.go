@@ -775,9 +775,13 @@ func (r *runController) uploadHealingJobDiff(
 		return
 	}
 
+	patchStats := step.CountPatchStats(diffBytes)
 	summary := types.NewDiffSummaryBuilder().
 		JobType(types.DiffJobTypeHealing.String()).
 		ExitCode(result.ExitCode).
+		FilesChanged(patchStats.FilesChanged).
+		LinesAdded(patchStats.LinesAdded).
+		LinesRemoved(patchStats.LinesRemoved).
 		Timings(
 			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
 			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),

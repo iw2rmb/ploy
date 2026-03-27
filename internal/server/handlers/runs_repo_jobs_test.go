@@ -414,6 +414,72 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 	}
 }
 
+func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	jobID := domaintypes.NewJobID()
+
+	// Gate job metadata with detected_stack populated.
+	metaJSON := `{"kind":"gate","gate":{"detected_stack":{"language":"java","tool":"maven","release":"17"},"bug_summary":"build failed"}}`
+
+	st := &mockStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:      jobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				Name:    "pre-gate",
+				JobType: "pre_gate",
+				Status:  domaintypes.JobStatusFail,
+				Meta:    []byte(metaJSON),
+			},
+		},
+	}
+
+	handler := listRunRepoJobsHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		Jobs []struct {
+			Lang    string `json:"lang"`
+			Tooling string `json:"tooling"`
+			Version string `json:"version"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
+	}
+	if got, want := resp.Jobs[0].Lang, "java"; got != want {
+		t.Fatalf("lang = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Tooling, "maven"; got != want {
+		t.Fatalf("tooling = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].Version, "17"; got != want {
+		t.Fatalf("version = %q, want %q", got, want)
+	}
+}
+
 func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
 	t.Parallel()
 

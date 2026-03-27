@@ -23,6 +23,8 @@ type DiffSummary json.RawMessage
 type diffSummaryAccessor struct {
 	ExitCode     *int                `json:"exit_code,omitempty"`
 	FilesChanged *int                `json:"files_changed,omitempty"`
+	LinesAdded   *int                `json:"lines_added,omitempty"`
+	LinesRemoved *int                `json:"lines_removed,omitempty"`
 	JobType      *string             `json:"job_type,omitempty"`
 	Timings      *diffSummaryTimings `json:"timings,omitempty"`
 }
@@ -96,6 +98,24 @@ func (d DiffSummary) FilesChanged() (int, bool) {
 	return *acc.FilesChanged, true
 }
 
+// LinesAdded returns the lines_added field as an int when present.
+func (d DiffSummary) LinesAdded() (int, bool) {
+	acc := d.decode()
+	if acc.LinesAdded == nil {
+		return 0, false
+	}
+	return *acc.LinesAdded, true
+}
+
+// LinesRemoved returns the lines_removed field as an int when present.
+func (d DiffSummary) LinesRemoved() (int, bool) {
+	acc := d.decode()
+	if acc.LinesRemoved == nil {
+		return 0, false
+	}
+	return *acc.LinesRemoved, true
+}
+
 // JobType returns the job_type field when present.
 // Common values: "mig", "healing".
 func (d DiffSummary) JobType() string {
@@ -126,6 +146,18 @@ func (b *DiffSummaryBuilder) ExitCode(code int) *DiffSummaryBuilder {
 // FilesChanged sets the files_changed field.
 func (b *DiffSummaryBuilder) FilesChanged(count int) *DiffSummaryBuilder {
 	b.acc.FilesChanged = &count
+	return b
+}
+
+// LinesAdded sets the lines_added field.
+func (b *DiffSummaryBuilder) LinesAdded(count int) *DiffSummaryBuilder {
+	b.acc.LinesAdded = &count
+	return b
+}
+
+// LinesRemoved sets the lines_removed field.
+func (b *DiffSummaryBuilder) LinesRemoved(count int) *DiffSummaryBuilder {
+	b.acc.LinesRemoved = &count
 	return b
 }
 

@@ -112,6 +112,13 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 					} else if meta.Gate != nil && meta.Gate.Recovery != nil {
 						jr.Recovery = newRecoveryView(meta.Gate.Recovery)
 					}
+					if meta.Gate != nil {
+						if exp := meta.Gate.DetectedStackExpectation(); exp != nil {
+							jr.Lang = exp.Language
+							jr.Tooling = exp.Tool
+							jr.Version = exp.Release
+						}
+					}
 				}
 			}
 

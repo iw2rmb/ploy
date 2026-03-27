@@ -10,10 +10,74 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
+
+// RepoDiffEntry is a single diff item from the repo-scoped diffs listing.
+type RepoDiffEntry struct {
+	ID        domaintypes.DiffID      `json:"id"`
+	JobID     domaintypes.JobID       `json:"job_id"`
+	CreatedAt time.Time               `json:"created_at"`
+	Size      int                     `json:"gzipped_size"`
+	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
+}
+
+// ListRepoDiffsResult is the response from ListRepoDiffsCommand.
+type ListRepoDiffsResult struct {
+	Diffs []RepoDiffEntry
+}
+
+// ListRepoDiffsCommand fetches the diff listing for a repo execution.
+// It returns structured data suitable for machine consumption (e.g., TUI).
+type ListRepoDiffsCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   domaintypes.RunID
+	RepoID  domaintypes.MigRepoID
+}
+
+// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs and returns structured diffs.
+func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, error) {
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: %w", err)
+	}
+	if c.RunID.IsZero() {
+		return ListRepoDiffsResult{}, errors.New("list repo diffs: run id required")
+	}
+	if c.RepoID.IsZero() {
+		return ListRepoDiffsResult{}, errors.New("list repo diffs: repo id required")
+	}
+
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: http request failed: %w", err)
+	}
+	defer httpx.DrainAndClose(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return ListRepoDiffsResult{}, httpx.WrapError("list repo diffs", resp.Status, resp.Body)
+	}
+
+	var raw struct {
+		Diffs []RepoDiffEntry `json:"diffs"`
+	}
+	if err := httpx.DecodeJSON(resp.Body, &raw, httpx.MaxJSONBodyBytes); err != nil {
+		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: decode response: %w", err)
+	}
+	if raw.Diffs == nil {
+		raw.Diffs = []RepoDiffEntry{}
+	}
+	return ListRepoDiffsResult{Diffs: raw.Diffs}, nil
+}
 
 // RepoDiffsCommand lists diffs for a specific repo execution within a run and
 // optionally downloads the newest patch. This is the v1 repo-scoped version
@@ -65,7 +129,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 		return httpx.WrapError("run repo diffs", resp.Status, resp.Body)
 	}
 	var listing struct {
-		Diffs []repoDiffEntry `json:"diffs"`
+		Diffs []RepoDiffEntry `json:"diffs"`
 	}
 	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
 		return err
