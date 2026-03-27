@@ -11,6 +11,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/batchscheduler"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // BatchRepoStarter starts execution for pending repos in batch runs.
@@ -36,7 +37,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domainty
 	}
 
 	// Skip terminal runs — no more repos to start.
-	if isTerminalRunStatus(run.Status) {
+	if lifecycle.IsTerminalRunStatus(run.Status) {
 		return result, nil
 	}
 
@@ -50,7 +51,7 @@ func (s *BatchRepoStarter) StartPendingRepos(ctx context.Context, runID domainty
 		return result, fmt.Errorf("list run repos: %w", err)
 	}
 	for _, rr := range allRepos {
-		if isTerminalRunRepoStatus(rr.Status) {
+		if lifecycle.IsTerminalRunRepoStatus(rr.Status) {
 			result.AlreadyDone++
 			continue
 		}

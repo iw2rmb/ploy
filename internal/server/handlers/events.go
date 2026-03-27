@@ -21,6 +21,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
+	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
 // parseLastEventID parses the Last-Event-ID header to support SSE resumption.
@@ -119,7 +120,7 @@ func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, b
 	}
 
 	// If run is terminal, write done and return.
-	if isTerminalRunStatus(run.Status) {
+	if lifecycle.IsTerminalRunStatus(run.Status) {
 		doneData, _ := json.Marshal(map[string]string{"status": string(run.Status)})
 		_ = logstream.WriteEventFrame(w, logstream.Event{Type: domaintypes.SSEEventDone, Data: doneData})
 		flusher.Flush()
