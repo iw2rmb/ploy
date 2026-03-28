@@ -18,7 +18,7 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 	st.listRunReposByRun.val = []store.RunRepo{
@@ -59,7 +59,7 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 	st.listRunReposByRun.val = []store.RunRepo{
@@ -101,7 +101,7 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	ctx := context.Background()
 	runID := domaintypes.RunID("run_1")
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.RunStatusFinished}
 
 	starter := NewBatchRepoStarter(st)

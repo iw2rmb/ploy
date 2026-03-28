@@ -14,7 +14,7 @@ import (
 
 func TestCreateNodeLogs_Success(t *testing.T) {
 	t.Parallel()
-	st := &mockStore{}
+	st := &nodeStore{}
 	nodeIDStr := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()

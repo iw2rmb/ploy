@@ -15,7 +15,7 @@ import (
 )
 
 type transientGetRunStore struct {
-	*mockStore
+	*jobStore
 	failCount int
 	err       error
 	calls     int
@@ -24,11 +24,11 @@ type transientGetRunStore struct {
 func (s *transientGetRunStore) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
 	s.calls++
 	if s.calls <= s.failCount {
-		s.mockStore.getRun.called = true
-		s.mockStore.getRun.params = id.String()
+		s.jobStore.getRun.called = true
+		s.jobStore.getRun.params = id.String()
 		return store.Run{}, s.err
 	}
-	return s.mockStore.GetRun(ctx, id)
+	return s.jobStore.GetRun(ctx, id)
 }
 
 // ===== Side Effects & Orchestration Tests =====
@@ -45,7 +45,7 @@ func TestCompleteJob_PublishesEvents(t *testing.T) {
 	f := newRepoScopedFixture("mig")
 	now := time.Now()
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withGetRunCreatedAt(now),
 		// v1: repo-scoped progression requires all non-MR jobs to be terminal and
 		// derives run_repos.status from the last job.
@@ -126,7 +126,7 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 		Status: domaintypes.JobStatusCreated,
 	}
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withListJobsByRun([]store.Job{f.Job, nextJob}),
 		withPromoteResult(nextJob),
 	)
@@ -154,7 +154,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -209,7 +209,7 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	jobs[0].NextID = &f.Job.ID
 	jobs[1].NextID = &postJobID
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withListJobsByRun(jobs),
 		withRepoAttemptJobs(jobs),
 	)
@@ -256,7 +256,7 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -288,7 +288,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	f.Job.Attempt = 1
 	f.Job.NextID = &nextJob.ID
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withListJobsByRun([]store.Job{f.Job, nextJob}),
 		withRepoAttemptJobs([]store.Job{f.Job, nextJob}),
 		withPromoteResult(nextJob),
@@ -359,7 +359,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 
 	gf := newGateFailureFixture(t, []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`))
 	st := &transientGetRunStore{
-		mockStore: gf.Store,
+		jobStore: gf.Store,
 		failCount: 1,
 		err:       errors.New("transient get run failure"),
 	}

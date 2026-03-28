@@ -25,7 +25,7 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
-	st := &mockStore{
+	st := &jobStore{
 		createRunResult: store.Run{
 			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -140,7 +140,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &mockStore{}
+			st := &jobStore{}
 
 			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, testRepoSHA0, tt.spec)
 			if err != nil {
@@ -155,7 +155,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 func TestCreateJobsFromSpec_InvalidRepoSHA0(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	spec := []byte(`{"steps":[{"image":"a"}]}`)
 	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, "not-a-sha", spec)
 	if err == nil || !strings.Contains(err.Error(), "repo_sha0 must match") {
@@ -190,7 +190,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := &mockStore{}
+			st := &jobStore{}
 
 			err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, tc.spec)
 			if err != nil {
@@ -234,7 +234,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
@@ -266,7 +266,7 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
 
 	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
@@ -288,7 +288,7 @@ func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) 
 func TestCreateSingleRepoRunHandler_MissingFields(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	handler := createSingleRepoRunHandler(st, nil)
 
 	cases := []struct {
@@ -324,7 +324,7 @@ func TestCreateSingleRepoRunHandler_MissingFields(t *testing.T) {
 func TestCreateSingleRepoRunHandler_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	handler := createSingleRepoRunHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader("{invalid json"))
@@ -341,7 +341,7 @@ func TestCreateSingleRepoRunHandler_InvalidJSON(t *testing.T) {
 func TestCreateSingleRepoRunHandler_InvalidRepoURL(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	handler := createSingleRepoRunHandler(st, nil)
 
 	cases := []struct {
@@ -380,7 +380,7 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC()
-	st := &mockStore{
+	st := &jobStore{
 		createRunResult: store.Run{
 			Status:    domaintypes.RunStatusStarted,
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
@@ -446,7 +446,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	nextJobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
-	st := &mockStore{
+	st := &jobStore{
 		listJobsByRunResult: []store.Job{
 			{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		},
@@ -508,7 +508,7 @@ func TestGetRunStatusHandler_NotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID().String()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.getRun.err = pgx.ErrNoRows
 
 	handler := getRunStatusHandler(st)
@@ -523,7 +523,7 @@ func TestGetRunStatusHandler_NotFound(t *testing.T) {
 func TestGetRunStatusHandler_EmptyID(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	handler := getRunStatusHandler(st)
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs//status", nil, "id", "")

@@ -158,33 +158,33 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 func TestModRuns_Create_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name       string
-		store      *mockStore
+		store      *migStore
 		body       any
 		wantStatus int
 	}{
 		{
 			name:       "InvalidMode",
-			store:      &mockStore{},
+			store:      &migStore{},
 			body:       map[string]any{"repo_selector": map[string]any{"mode": "invalid"}},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "ExplicitEmptyRepos",
-			store:      &mockStore{},
+			store:      &migStore{},
 			body:       map[string]any{"repo_selector": map[string]any{"mode": "explicit", "repos": []string{}}},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "ModNotFound",
-			store:      &mockStore{getModErr: pgx.ErrNoRows},
+			store:      &migStore{getModErr: pgx.ErrNoRows},
 			body:       allReposSelector(),
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name: "ArchivedMod",
-			store: func() *mockStore {
+			store: func() *migStore {
 				specID := domaintypes.SpecID("spec123")
-				return &mockStore{
+				return &migStore{
 					getModResult: store.Mig{
 						ID:         "mod123",
 						Name:       "test-mig",
@@ -198,7 +198,7 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 		},
 		{
 			name: "NoSpec",
-			store: &mockStore{
+			store: &migStore{
 				getModResult: store.Mig{
 					ID:         "mod123",
 					Name:       "test-mig",
@@ -211,7 +211,7 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 		},
 		{
 			name: "NoReposSelected",
-			store: func() *mockStore {
+			store: func() *migStore {
 				specID := domaintypes.SpecID("spec123")
 				st := activeMigWithSpec(specID)
 				st.listFailedRepoIDsByMod.val = []domaintypes.RepoID{}
@@ -222,7 +222,7 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 		},
 		{
 			name:       "InvalidJSON",
-			store:      &mockStore{},
+			store:      &migStore{},
 			body:       "not json",
 			wantStatus: http.StatusBadRequest,
 		},
@@ -245,38 +245,38 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 func TestModRuns_Create_StoreErrors(t *testing.T) {
 	tests := []struct {
 		name    string
-		setupFn func(st *mockStore)
+		setupFn func(st *migStore)
 		body    any
 	}{
 		{
 			name:    "GetMigError",
-			setupFn: func(st *mockStore) { st.getModErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.getModErr = errors.New("database connection failed") },
 			body:    allReposSelector(),
 		},
 		{
 			name: "ListModReposError",
-			setupFn: func(st *mockStore) {
+			setupFn: func(st *migStore) {
 				st.listMigReposByModErr = errors.New("database connection failed")
 			},
 			body: allReposSelector(),
 		},
 		{
 			name: "CreateRunError",
-			setupFn: func(st *mockStore) {
+			setupFn: func(st *migStore) {
 				st.createRunErr = errors.New("database connection failed")
 			},
 			body: allReposSelector(),
 		},
 		{
 			name: "CreateRunRepoError",
-			setupFn: func(st *mockStore) {
+			setupFn: func(st *migStore) {
 				st.createRunRepoErr = errors.New("database connection failed")
 			},
 			body: allReposSelector(),
 		},
 		{
 			name: "ListFailedReposError",
-			setupFn: func(st *mockStore) {
+			setupFn: func(st *migStore) {
 				st.listFailedRepoIDsByMod.err = errors.New("database connection failed")
 			},
 			body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}},

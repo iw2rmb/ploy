@@ -20,7 +20,7 @@ import (
 
 // TestMods_Create_Success verifies POST /v1/migs creates a mig with valid input.
 func TestMods_Create_Success(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	handler := createMigHandler(st)
 
 	rr := doRequest(t, handler, http.MethodPost, "/v1/migs", map[string]any{"name": "my-mig"})
@@ -49,7 +49,7 @@ func TestMods_Create_Success(t *testing.T) {
 
 // TestMods_Create_WithSpec verifies POST /v1/migs with spec creates both mig and spec.
 func TestMods_Create_WithSpec(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	handler := createMigHandler(st)
 
 	reqBody := map[string]any{
@@ -85,20 +85,20 @@ func TestMods_Create_WithSpec(t *testing.T) {
 func TestMods_Create_ErrorPaths(t *testing.T) {
 	tests := []struct {
 		name       string
-		store      *mockStore
+		store      *migStore
 		body       any
 		wantStatus int
 		wantNoCalls bool // if true, createMigCalled must be false
 	}{
-		{name: "empty name", store: &mockStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "invalid name (spaces)", store: &mockStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "invalid JSON", store: &mockStore{}, body: "not json", wantStatus: http.StatusBadRequest},
-		{name: "invalid spec (legacy)", store: &mockStore{}, body: map[string]any{
+		{name: "empty name", store: &migStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "invalid name (spaces)", store: &migStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
+		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
+		{name: "invalid spec (legacy)", store: &migStore{}, body: map[string]any{
 			"name": "mig-invalid-spec",
 			"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}},
 		}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
-		{name: "duplicate name", store: &mockStore{createMigErr: &pgconn.PgError{Code: "23505"}}, body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
-		{name: "store error", store: &mockStore{createMigErr: errors.New("database connection failed")}, body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},
+		{name: "duplicate name", store: &migStore{createMigErr: &pgconn.PgError{Code: "23505"}}, body: map[string]any{"name": "existing-mig"}, wantStatus: http.StatusConflict},
+		{name: "store error", store: &migStore{createMigErr: errors.New("database connection failed")}, body: map[string]any{"name": "test-mig"}, wantStatus: http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {
@@ -120,7 +120,7 @@ func TestMods_Create_ErrorPaths(t *testing.T) {
 // TestMods_List_Success verifies GET /v1/migs returns migs list.
 func TestMods_List_Success(t *testing.T) {
 	now := time.Now()
-	st := &mockStore{
+	st := &migStore{
 		listMigsResult: []store.Mig{
 			{ID: "mod001", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 			{ID: "mod002", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
@@ -147,7 +147,7 @@ func TestMods_List_Success(t *testing.T) {
 
 // TestMods_List_WithPagination verifies GET /v1/migs respects limit/offset.
 func TestMods_List_WithPagination(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 
 	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?limit=10&offset=5", nil)
 	assertStatus(t, rr, http.StatusOK)
@@ -165,7 +165,7 @@ func TestMods_List_WithPagination(t *testing.T) {
 
 // TestMods_List_WithNameFilter verifies GET /v1/migs respects name_substring filter.
 func TestMods_List_WithNameFilter(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 
 	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?name_substring=alpha", nil)
 	assertStatus(t, rr, http.StatusOK)
@@ -190,7 +190,7 @@ func TestMods_List_ArchivedFilter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.query, func(t *testing.T) {
-			st := &mockStore{}
+			st := &migStore{}
 
 			rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs?"+tt.query, nil)
 			assertStatus(t, rr, http.StatusOK)
@@ -216,7 +216,7 @@ func TestMods_List_InvalidQueryParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rr := doRequest(t, listMigsHandler(&mockStore{}), http.MethodGet, "/v1/migs?"+tt.query, nil)
+			rr := doRequest(t, listMigsHandler(&migStore{}), http.MethodGet, "/v1/migs?"+tt.query, nil)
 			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
@@ -226,7 +226,7 @@ func TestMods_List_InvalidQueryParams(t *testing.T) {
 // uses types.NormalizeRepoURL for matching.
 func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 	now := time.Now()
-	st := &mockStore{
+	st := &migStore{
 		listMigsResult: []store.Mig{
 			{ID: "mod001", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 			{ID: "mod002", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
@@ -260,7 +260,7 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 // TestMods_List_WithRepoURLFilter_Paginates verifies limit/offset apply after repo_url filtering.
 func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 	now := time.Now()
-	st := &mockStore{
+	st := &migStore{
 		listMigsResult: []store.Mig{
 			{ID: "mod00A", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
 			{ID: "mod00B", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
@@ -293,7 +293,7 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 
 // TestMods_List_StoreError verifies GET /v1/migs returns 500 on store error.
 func TestMods_List_StoreError(t *testing.T) {
-	st := &mockStore{listMigsErr: errors.New("database connection failed")}
+	st := &migStore{listMigsErr: errors.New("database connection failed")}
 
 	rr := doRequest(t, listMigsHandler(st), http.MethodGet, "/v1/migs", nil)
 	assertStatus(t, rr, http.StatusInternalServerError)
@@ -306,7 +306,7 @@ func TestMods_List_StoreError(t *testing.T) {
 // TestMods_Delete_Success verifies DELETE /v1/migs/{mig_ref} deletes a mig.
 // Tests mig deletion when no runs exist.
 func TestMods_Delete_Success(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		// No runs exist for this mig.
 		listRunsResult: []store.Run{},
 	}
@@ -330,7 +330,7 @@ func TestMods_Delete_Success(t *testing.T) {
 
 // TestMods_Delete_NotFound verifies DELETE /v1/migs/{mig_ref} returns 404 for missing mig.
 func TestMods_Delete_NotFound(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModErr: pgx.ErrNoRows,
 	}
 	handler := deleteMigHandler(st)
@@ -349,7 +349,7 @@ func TestMods_Delete_NotFound(t *testing.T) {
 // when runs exist for the mig.
 // Deletion is refused if any runs exist for the mig.
 func TestMods_Delete_RefusesWithRuns(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		// Runs exist for this mig.
 		listRunsResult: []store.Run{
 			{ID: "run1", MigID: "mod123"},
@@ -368,7 +368,7 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 }
 
 func TestMods_Delete_ByName(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModErr:          pgx.ErrNoRows,
 		getModByNameResult: store.Mig{ID: "mod123", Name: "my-mig"},
 		// No runs exist for this mig.
@@ -389,7 +389,7 @@ func TestMods_Delete_ByName(t *testing.T) {
 
 // TestMods_Delete_StoreError verifies DELETE /v1/migs/{mig_ref} returns 500 on store error.
 func TestMods_Delete_StoreError(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		listRunsResult: []store.Run{}, // No runs.
 	}
 	st.deleteMig.err = errors.New("database connection failed")

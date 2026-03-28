@@ -21,7 +21,7 @@ import (
 // TestMods_Archive_Success verifies PATCH /v1/migs/{mig_ref}/archive archives a mig.
 // Tests mig archiving to prevent execution.
 func TestMods_Archive_Success(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -63,7 +63,7 @@ func TestMods_Archive_Success(t *testing.T) {
 
 // TestMods_Archive_AlreadyArchived verifies idempotent archive behavior.
 func TestMods_Archive_AlreadyArchived(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -83,7 +83,7 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 
 // TestMods_Archive_NotFound verifies PATCH /v1/migs/{mig_ref}/archive returns 404.
 func TestMods_Archive_NotFound(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModErr: pgx.ErrNoRows,
 	}
 	handler := archiveMigHandler(st)
@@ -107,7 +107,7 @@ func TestMods_Archive_RefusesWithActiveJobs(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			st := &mockStore{
+			st := &migStore{
 				getModResult: store.Mig{
 					ID:         "mod123",
 					Name:       "test-mig",
@@ -135,7 +135,7 @@ func TestMods_Archive_RefusesWithActiveJobs(t *testing.T) {
 // TestMods_Archive_AllowsWithCompletedJobs verifies archive succeeds when
 // only completed jobs exist.
 func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -160,7 +160,7 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 }
 
 func TestMods_Archive_ByName(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModErr:          pgx.ErrNoRows,
 		getModByNameResult: store.Mig{ID: "mod123", Name: "my-mig", ArchivedAt: pgtype.Timestamptz{Valid: false}},
 		listRunsResult:     []store.Run{},
@@ -180,7 +180,7 @@ func TestMods_Archive_ByName(t *testing.T) {
 
 // TestMods_Archive_StoreError verifies PATCH /v1/migs/{mig_ref}/archive returns 500 on store error.
 func TestMods_Archive_StoreError(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -203,7 +203,7 @@ func TestMods_Archive_StoreError(t *testing.T) {
 // TestMods_Unarchive_Success verifies PATCH /v1/migs/{mig_ref}/unarchive unarchives a mig.
 // Tests mig unarchiving to allow execution again.
 func TestMods_Unarchive_Success(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -240,7 +240,7 @@ func TestMods_Unarchive_Success(t *testing.T) {
 
 // TestMods_Unarchive_AlreadyUnarchived verifies idempotent unarchive behavior.
 func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -260,7 +260,7 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 
 // TestMods_Unarchive_NotFound verifies PATCH /v1/migs/{mig_ref}/unarchive returns 404.
 func TestMods_Unarchive_NotFound(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModErr: pgx.ErrNoRows,
 	}
 	handler := unarchiveMigHandler(st)
@@ -272,7 +272,7 @@ func TestMods_Unarchive_NotFound(t *testing.T) {
 
 // TestMods_Unarchive_StoreError verifies PATCH /v1/migs/{mig_ref}/unarchive returns 500 on store error.
 func TestMods_Unarchive_StoreError(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",

@@ -23,7 +23,7 @@ func TestClaimJob_ClaimErrorWithPanickingIs_Panics(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	st := &mockStore{
+	st := &jobStore{
 		claimJobErr:   panicInIsError{},
 	}
 	st.getNode.val = store.Node{ID: nodeID}
@@ -45,7 +45,7 @@ func TestClaimJob_ClaimErrorWithPanickingErrorString_DoesNotPanic(t *testing.T) 
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	st := &mockStore{
+	st := &jobStore{
 		claimJobErr:   panicInErrorString{},
 	}
 	st.getNode.val = store.Node{ID: nodeID}

@@ -17,7 +17,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	nextID := domaintypes.NewJobID()
 
-	st := &mockStore{
+	st := &runStore{
 		getRunRepoResult: store.RunRepo{
 			RunID:   runID,
 			RepoID:  repoID,
@@ -82,7 +82,7 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{
+	st := &runStore{
 		getRunRepoResult: store.RunRepo{
 			RunID:   runID,
 			RepoID:  repoID,
@@ -110,7 +110,7 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 	mig1 := domaintypes.NewJobID()
 	post := domaintypes.NewJobID()
 
-	st := &mockStore{
+	st := &runStore{
 		getRunRepoResult: store.RunRepo{
 			RunID:   runID,
 			RepoID:  repoID,

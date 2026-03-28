@@ -28,7 +28,7 @@ func TestSaveJobImageName_Success(t *testing.T) {
 		JobType: "mig",
 	}
 
-	st := &mockStore{
+	st := &jobStore{
 		getJobResult: job,
 	}
 
@@ -63,7 +63,7 @@ func TestSaveJobImageName_EmptyImage(t *testing.T) {
 	nodeIDStr := domaintypes.NewNodeKey()
 	jobID := domaintypes.NewJobID()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{
@@ -100,7 +100,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 		JobType: "mig",
 	}
 
-	st := &mockStore{
+	st := &jobStore{
 		getJobResult: job,
 	}
 	handler := saveJobImageNameHandler(st)
@@ -137,7 +137,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 		JobType: "mig",
 	}
 
-	st := &mockStore{getJobResult: job}
+	st := &jobStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
@@ -171,7 +171,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 		JobType: "pre_gate",
 	}
 
-	st := &mockStore{getJobResult: job}
+	st := &jobStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})
@@ -205,7 +205,7 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 		JobType: "mr",
 	}
 
-	st := &mockStore{getJobResult: job}
+	st := &jobStore{getJobResult: job}
 	handler := saveJobImageNameHandler(st)
 
 	body, _ := json.Marshal(map[string]any{"image": "docker.io/example/migs:latest"})

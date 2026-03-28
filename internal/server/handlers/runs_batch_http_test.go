@@ -22,7 +22,7 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{
 		ID:        runID,
 		MigID:     domaintypes.NewMigID(),
@@ -50,7 +50,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{
 		ID:        runID,
 		MigID:     domaintypes.NewMigID(),
@@ -76,7 +76,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{
 		ID:        runID,
 		MigID:     domaintypes.NewMigID(),
@@ -105,7 +105,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 	modRepoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
-	st := &mockStore{
+	st := &runStore{
 		createMigRepoResult: store.MigRepo{
 			ID:        modRepoID,
 			RepoID:    repoID,
@@ -152,7 +152,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
 			RunID:         runID,
@@ -195,7 +195,7 @@ func TestListRunReposHandler_ListError(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &mockStore{}
+	st := &runStore{}
 	st.listRunReposWithURLByRun.err = errors.New("db exploded")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos", nil)
@@ -212,7 +212,7 @@ func TestCancelRunRepoHandlerV1_NotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	st := &mockStore{
+	st := &runStore{
 		getRunRepoErr: pgx.ErrNoRows,
 	}
 
@@ -234,7 +234,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 	modRepoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
-	st := &mockStore{
+	st := &runStore{
 		getRunRepoResults: []store.RunRepo{
 			{
 				RunID:         runID,
@@ -322,7 +322,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 		CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 	}
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{
 		ID:        runID,
 		MigID:     domaintypes.NewMigID(),
@@ -358,7 +358,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{
 		ID:        runID,
 		MigID:     domaintypes.NewMigID(),

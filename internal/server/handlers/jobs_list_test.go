@@ -17,7 +17,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	nodeID := domaintypes.NodeID("abc123")
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listJobsForTUI.val = []store.ListJobsForTUIRow{
 		{
 			JobID:      jobID,
@@ -90,7 +90,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 func TestListJobsHandler_EmptyResult(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
 	st.countJobsForTUI.val = 0
 
@@ -116,7 +116,7 @@ func TestListJobsHandler_RunIDFilter(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
 	st.countJobsForTUI.val = 0
 
@@ -141,7 +141,7 @@ func TestListJobsHandler_RunIDFilter(t *testing.T) {
 func TestListJobsHandler_DefaultPagination(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
 	st.countJobsForTUI.val = 0
 
@@ -172,7 +172,7 @@ func TestListJobsHandler_InvalidPagination(t *testing.T) {
 		{"negative offset", "/v1/jobs?offset=-1"},
 	}
 
-	st := &mockStore{}
+	st := &jobStore{}
 	handler := listJobsHandler(st)
 
 	for _, tc := range tests {
@@ -188,7 +188,7 @@ func TestListJobsHandler_InvalidPagination(t *testing.T) {
 func TestListJobsHandler_ListError(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listJobsForTUI.err = errMockDatabase
 
 	handler := listJobsHandler(st)
@@ -203,7 +203,7 @@ func TestListJobsHandler_ListError(t *testing.T) {
 func TestListJobsHandler_CountError(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listJobsForTUI.val = []store.ListJobsForTUIRow{}
 	st.countJobsForTUI.err = errMockDatabase
 

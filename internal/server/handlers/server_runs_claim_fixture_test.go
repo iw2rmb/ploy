@@ -31,7 +31,7 @@ type claimJobFixture struct {
 	specID  domaintypes.SpecID
 	jobID   domaintypes.JobID
 
-	store  *mockStore
+	store  *jobStore
 	config *ConfigHolder
 }
 
@@ -65,7 +65,7 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		opts.jobMeta = []byte(`{}`)
 	}
 
-	st := &mockStore{
+	st := &jobStore{
 		claimJobResult: store.Job{
 			ID:          jobID,
 			RunID:       runID,

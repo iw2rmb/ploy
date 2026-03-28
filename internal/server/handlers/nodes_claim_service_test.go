@@ -17,7 +17,7 @@ func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	st := &mockStore{
+	st := &jobStore{
 		claimJobErr:   pgx.ErrNoRows,
 	}
 	st.getNode.val = store.Node{ID: nodeID}
@@ -40,7 +40,7 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	jobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
-	st := &mockStore{
+	st := &jobStore{
 		claimJobResult: store.Job{
 			ID:          jobID,
 			RunID:       runID,

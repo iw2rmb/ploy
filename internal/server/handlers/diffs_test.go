@@ -18,7 +18,7 @@ import (
 )
 
 func TestRunRepoDiffs_Download(t *testing.T) {
-	st := &mockStore{}
+	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA"
 	jobID := domaintypes.NewJobID()
@@ -69,7 +69,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 // - A query for repo B
 // - Expects an empty result (repo A's diff excluded from repo B listing)
 func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
-	st := &mockStore{}
+	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoAID := "repoAAAA" // NanoID-backed
 	repoBID := "repoBBBB" // NanoID-backed
@@ -129,7 +129,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 // TestRunRepoDiffs_ReturnsOwnDiffs verifies that a repo sees its own diffs.
 // This tests the positive case: querying repo A returns repo A's diffs.
 func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
-	st := &mockStore{}
+	st := &artifactStore{}
 	runID := domaintypes.NewRunID()
 	repoID := "repoAAAA" // NanoID-backed
 	jobID := domaintypes.NewJobID()
@@ -181,7 +181,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 
 // TestRunRepoDiffs_MissingRunID verifies that missing run_id returns 400.
 func TestRunRepoDiffs_MissingRunID(t *testing.T) {
-	st := &mockStore{}
+	st := &artifactStore{}
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs//repos/repoAAAA/diffs", nil)
@@ -194,7 +194,7 @@ func TestRunRepoDiffs_MissingRunID(t *testing.T) {
 
 // TestRunRepoDiffs_MissingRepoID verifies that missing repo_id returns 400.
 func TestRunRepoDiffs_MissingRepoID(t *testing.T) {
-	st := &mockStore{}
+	st := &artifactStore{}
 	bs := bsmock.New()
 	runID := domaintypes.NewRunID()
 	rr := httptest.NewRecorder()

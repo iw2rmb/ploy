@@ -82,7 +82,7 @@ func TestDrainUndrain(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			nodeIDStr, node := newNodeFixture(tc.initialDrained)
-			st := &mockStore{}
+			st := &nodeStore{}
 			st.getNode.val = node
 			st.getNode.err = tc.nodeErr
 
@@ -129,7 +129,7 @@ func TestDrainUndrain_InvalidID(t *testing.T) {
 	for _, h := range handlers {
 		for _, tc := range ids {
 			t.Run(h.name+"/"+tc.name, func(t *testing.T) {
-				st := &mockStore{}
+				st := &nodeStore{}
 				rr := doRequest(t, h.handler(st), http.MethodPost, "/v1/nodes/"+tc.urlID+"/"+h.action, nil, "id", tc.id)
 				assertStatus(t, rr, http.StatusBadRequest)
 			})
@@ -239,7 +239,7 @@ func TestListNodesHandler(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := func() *mockStore { st := &mockStore{}; st.listNodes.val = tc.nodes; return st }()
+			st := func() *nodeStore { st := &nodeStore{}; st.listNodes.val = tc.nodes; return st }()
 			rr := doRequest(t, listNodesHandler(st), http.MethodGet, "/v1/nodes", nil)
 			assertStatus(t, rr, http.StatusOK)
 			resp := decodeBody[[]map[string]any](t, rr)

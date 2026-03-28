@@ -12,7 +12,7 @@ import (
 func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = false
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a", nil)
@@ -31,7 +31,7 @@ func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
 func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = true
 	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
 		{Lib: "lib-a", Ver: "1.0.0"},
@@ -61,7 +61,7 @@ func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
 func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = true
 	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
 		{Lib: "lib-a", Ver: "1.2.0"},
@@ -86,7 +86,7 @@ func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
 func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = true
 	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
 		{Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
@@ -125,7 +125,7 @@ func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 func TestSBOMCompatHandler_SupportsSingleColonLibraryNamesWithoutDot(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = true
 	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
 		{Lib: "svc:api", Ver: "1.0.0"},
@@ -151,7 +151,7 @@ func TestSBOMCompatHandler_SupportsSingleColonLibraryNamesWithoutDot(t *testing.
 func TestSBOMCompatHandler_SupportsFloorForColonLibraryNamesWithoutDot(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = true
 	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
 		{Lib: "svc:api", Ver: "1.0.0"},
@@ -177,7 +177,7 @@ func TestSBOMCompatHandler_SupportsFloorForColonLibraryNamesWithoutDot(t *testin
 func TestSBOMCompatHandler_PrefersExactSingleColonLibraryName(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &artifactStore{}
 	st.hasSBOMEvidenceForStack.val = true
 	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
 		{Lib: "lib-a:1.1.0", Ver: "0.0.2"},
@@ -223,7 +223,7 @@ func TestSBOMCompatHandler_ValidatesInput(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			handler := sbomCompatHandler(&mockStore{})
+			handler := sbomCompatHandler(&artifactStore{})
 			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, req)

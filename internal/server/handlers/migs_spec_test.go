@@ -19,7 +19,7 @@ import (
 func TestMods_GetLatestSpec_Success(t *testing.T) {
 	specID := store.Spec{ID: "spec123", Spec: []byte(`{"version":"0.2.0","steps":[{"image":"alpine"}]}`)}
 	migSpecID := specID.ID
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -48,7 +48,7 @@ func TestMods_GetLatestSpec_Success(t *testing.T) {
 }
 
 func TestMods_GetLatestSpec_MigWithoutSpec(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -67,7 +67,7 @@ func TestMods_GetLatestSpec_MigWithoutSpec(t *testing.T) {
 }
 
 func TestMods_GetLatestSpec_MigNotFound(t *testing.T) {
-	st := &mockStore{getModErr: pgx.ErrNoRows}
+	st := &migStore{getModErr: pgx.ErrNoRows}
 	handler := getMigLatestSpecHandler(st)
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/missing/specs/latest", nil, "mig_ref", "missing")
@@ -84,7 +84,7 @@ func TestMods_GetLatestSpec_MigNotFound(t *testing.T) {
 
 // TestMods_SetSpec_Success verifies POST /v1/migs/{mig_ref}/specs creates a new spec and updates migs.spec_id.
 func TestMods_SetSpec_Success(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -120,7 +120,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 
 // TestMods_SetSpec_WithName verifies POST /v1/migs/{mig_ref}/specs accepts optional name.
 func TestMods_SetSpec_WithName(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -144,7 +144,7 @@ func TestMods_SetSpec_WithName(t *testing.T) {
 
 // TestMods_SetSpec_RepeatedCalls verifies that repeated set spec calls create new spec rows and update migs.spec_id.
 func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
-	st := &mockStore{
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -186,37 +186,37 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 func TestMods_SetSpec_ErrorPaths(t *testing.T) {
 	tests := []struct {
 		name       string
-		store      *mockStore
+		store      *migStore
 		body       any
 		wantStatus int
 	}{
 		{
 			name:       "MissingSpec",
-			store:      &mockStore{},
+			store:      &migStore{},
 			body:       map[string]any{"name": "no-spec"},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "InvalidSpec",
-			store:      &mockStore{},
+			store:      &migStore{},
 			body:       map[string]any{"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}}},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "InvalidJSON",
-			store:      &mockStore{},
+			store:      &migStore{},
 			body:       "not json",
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "ModNotFound",
-			store:      &mockStore{getModErr: pgx.ErrNoRows},
+			store:      &migStore{getModErr: pgx.ErrNoRows},
 			body:       map[string]any{"spec": validSpecBody()},
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name: "ArchivedMod",
-			store: &mockStore{
+			store: &migStore{
 				getModResult: store.Mig{
 					ID:         "mod123",
 					Name:       "test-mig",
@@ -244,11 +244,11 @@ func TestMods_SetSpec_ErrorPaths(t *testing.T) {
 func TestMods_SetSpec_StoreErrors(t *testing.T) {
 	tests := []struct {
 		name  string
-		store *mockStore
+		store *migStore
 	}{
 		{
 			name: "CreateSpecError",
-			store: &mockStore{
+			store: &migStore{
 				getModResult: store.Mig{
 					ID:         "mod123",
 					Name:       "test-mig",
@@ -259,8 +259,8 @@ func TestMods_SetSpec_StoreErrors(t *testing.T) {
 		},
 		{
 			name: "UpdateMigSpecError",
-			store: func() *mockStore {
-				st := &mockStore{
+			store: func() *migStore {
+				st := &migStore{
 					getModResult: store.Mig{
 						ID:         "mod123",
 						Name:       "test-mig",

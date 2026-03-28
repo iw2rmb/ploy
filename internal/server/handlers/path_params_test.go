@@ -17,7 +17,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/runs/{id} rejects empty id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &mockStore{}
+		st := &runStore{}
 		h := getRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
@@ -35,7 +35,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/runs/{id} rejects whitespace id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &mockStore{}
+		st := &runStore{}
 		h := getRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/runs/", nil)
@@ -53,7 +53,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/runs/{run_id}/jobs/{job_id}/diff rejects empty ids before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &mockStore{}
+		st := &runStore{}
 		bp := blobpersist.New(st, bsmock.New())
 		h := createJobDiffHandler(st, bp)
 
@@ -73,7 +73,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/migs/{mig_id}/runs rejects empty mig_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &mockStore{}
+		st := &migStore{}
 		h := createMigRunHandler(st)
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/migs//runs", nil)
@@ -91,7 +91,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("GET /v1/repos/{repo_id}/runs rejects empty repo_id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &mockStore{}
+		st := &repoListStore{}
 		h := listRunsForRepoHandler(st)
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/repos//runs", nil)
@@ -109,7 +109,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 	t.Run("POST /v1/nodes/{id}/heartbeat rejects empty node id before store calls", func(t *testing.T) {
 		t.Parallel()
 
-		st := &mockStore{}
+		st := &nodeStore{}
 		h := heartbeatHandler(st)
 
 		req := httptest.NewRequest(http.MethodPost, "/v1/nodes//heartbeat", nil)
