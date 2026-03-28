@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -207,13 +208,12 @@ func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st 
 // backfillOneChunk fetches a single gzipped log chunk from object store,
 // decompresses it, and writes each line as an SSE log frame.
 func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg store.Log) error {
-	rc, _, err := bs.Get(ctx, *lg.ObjectKey)
+	data, err := blobstore.ReadAll(ctx, bs, *lg.ObjectKey)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = rc.Close() }()
 
-	zr, err := gzip.NewReader(rc)
+	zr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
