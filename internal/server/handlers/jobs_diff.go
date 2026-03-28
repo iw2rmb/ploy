@@ -26,21 +26,21 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 	const maxBodySize = 16 << 20  // 16 MiB
 	const maxPatchSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "run_id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		jobID, err := parseParam[domaintypes.JobID](r, "job_id")
+		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -50,19 +50,19 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			Summary domaintypes.DiffSummary `json:"summary"` // optional summary metadata
 		}
 
-		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 
 		// Validate patch is present.
 		if len(req.Patch) == 0 {
-			httpErr(w, http.StatusBadRequest, "patch is required")
+			writeHTTPError(w, http.StatusBadRequest, "patch is required")
 			return
 		}
 
 		// Enforce decoded patch size cap (≤ 10 MiB gzipped, base64-decoded here).
 		if len(req.Patch) > maxPatchSize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "diff size exceeds 10 MiB cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "diff size exceeds 10 MiB cap")
 			return
 		}
 
@@ -70,10 +70,10 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
+				writeHTTPError(w, http.StatusNotFound, "run not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to check run: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check run: %v", err)
 			slog.Error("diff: run check failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -82,17 +82,17 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		job, err := st.GetJob(r.Context(), jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "job not found")
+				writeHTTPError(w, http.StatusNotFound, "job not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to check job: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check job: %v", err)
 			slog.Error("diff: job check failed", "job_id", jobID.String(), "err", err)
 			return
 		}
 
 		// Ensure the job belongs to the provided run.
 		if job.RunID != runID {
-			httpErr(w, http.StatusBadRequest, "job does not belong to run")
+			writeHTTPError(w, http.StatusBadRequest, "job does not belong to run")
 			return
 		}
 
@@ -100,23 +100,23 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		// PLOY_NODE_UUID header, which is required for worker requests.
 		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeaderStr == "" {
-			httpErr(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
+			writeHTTPError(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
 			return
 		}
 		var nodeIDHeader domaintypes.NodeID
 		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			httpErr(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
+			writeHTTPError(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
 			return
 		}
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			httpErr(w, http.StatusForbidden, "job not assigned to this node")
+			writeHTTPError(w, http.StatusForbidden, "job not assigned to this node")
 			return
 		}
 
 		// Create diff params.
 		summaryBytes, err := json.Marshal(req.Summary)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "failed to marshal summary: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "failed to marshal summary: %v", err)
 			return
 		}
 
@@ -130,7 +130,7 @@ func createJobDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		// Persist diff metadata to database and upload blob to object storage.
 		diff, err := bp.CreateDiff(r.Context(), params, req.Patch)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create diff: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create diff: %v", err)
 			slog.Error("diff: create failed", "run_id", runID.String(), "job_id", jobID.String(), "err", err)
 			return
 		}

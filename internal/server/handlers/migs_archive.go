@@ -33,17 +33,17 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 		// Check for running jobs in this mig's runs.
 		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, mig.ID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
 			slog.Error("archive mig: check jobs failed", "mig_id", mig.ID, "err", err)
 			return
 		}
 		if hasRunningJobs {
-			httpErr(w, http.StatusConflict, "cannot archive mig with running jobs")
+			writeHTTPError(w, http.StatusConflict, "cannot archive mig with running jobs")
 			return
 		}
 
 		if err := st.ArchiveMig(r.Context(), mig.ID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to archive mig: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to archive mig: %v", err)
 			slog.Error("archive mig: database error", "mig_id", mig.ID, "err", err)
 			return
 		}
@@ -91,7 +91,7 @@ func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if err := st.UnarchiveMig(r.Context(), mig.ID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to unarchive mig: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to unarchive mig: %v", err)
 			slog.Error("unarchive mig: database error", "mig_id", mig.ID, "err", err)
 			return
 		}

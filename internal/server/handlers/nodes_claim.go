@@ -21,9 +21,9 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, gateProfileReso
 	service := NewClaimService(st, configHolder, resolver)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
+		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -31,25 +31,25 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder, gateProfileReso
 		if err != nil {
 			switch e := err.(type) {
 			case *ClaimBadRequest:
-				httpErr(w, http.StatusBadRequest, "%s", e.Message)
+				writeHTTPError(w, http.StatusBadRequest, "%s", e.Message)
 				return
 			case *ClaimNotFound:
-				httpErr(w, http.StatusNotFound, "%s", e.Message)
+				writeHTTPError(w, http.StatusNotFound, "%s", e.Message)
 				return
 			case *ClaimNoWork:
 				w.WriteHeader(http.StatusNoContent)
 				return
 			case *ClaimInternal:
-				httpErr(w, http.StatusInternalServerError, "%s", e.Error())
+				writeHTTPError(w, http.StatusInternalServerError, "%s", e.Error())
 				return
 			default:
-				httpErr(w, http.StatusInternalServerError, "claim failed: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "claim failed: %v", err)
 				return
 			}
 		}
 
 		if err := writeClaimResponse(w, result.Payload); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to encode claim response: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to encode claim response: %v", err)
 			return
 		}
 	}

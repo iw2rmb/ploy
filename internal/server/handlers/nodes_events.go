@@ -21,15 +21,15 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 	const maxRequestSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
+		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxRequestSize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds 1 MiB size cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds 1 MiB size cap")
 			return
 		}
 
@@ -46,19 +46,19 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 			} `json:"events"`
 		}
 
-		if err := DecodeJSON(w, r, &req, maxRequestSize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxRequestSize); err != nil {
 			return
 		}
 
 		// Validate run_id is present using domain type's IsZero method.
 		if req.RunID.IsZero() {
-			httpErr(w, http.StatusBadRequest, "run_id is required")
+			writeHTTPError(w, http.StatusBadRequest, "run_id is required")
 			return
 		}
 
 		// Validate events array is not empty.
 		if len(req.Events) == 0 {
-			httpErr(w, http.StatusBadRequest, "events array is required and must not be empty")
+			writeHTTPError(w, http.StatusBadRequest, "events array is required and must not be empty")
 			return
 		}
 
@@ -66,10 +66,10 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "node not found")
+				writeHTTPError(w, http.StatusNotFound, "node not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check node: %v", err)
 			slog.Error("node events: check failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -79,11 +79,11 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 		for i, evt := range req.Events {
 			// Validate required fields.
 			if strings.TrimSpace(evt.Level) == "" {
-				httpErr(w, http.StatusBadRequest, "events[%d]: level is required", i)
+				writeHTTPError(w, http.StatusBadRequest, "events[%d]: level is required", i)
 				return
 			}
 			if strings.TrimSpace(evt.Message) == "" {
-				httpErr(w, http.StatusBadRequest, "events[%d]: message is required", i)
+				writeHTTPError(w, http.StatusBadRequest, "events[%d]: message is required", i)
 				return
 			}
 
@@ -98,7 +98,7 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 			if evt.Time != nil && strings.TrimSpace(*evt.Time) != "" {
 				parsedTime, err := time.Parse(time.RFC3339, strings.TrimSpace(*evt.Time))
 				if err != nil {
-					httpErr(w, http.StatusBadRequest, "events[%d]: invalid time format: %v", i, err)
+					writeHTTPError(w, http.StatusBadRequest, "events[%d]: invalid time format: %v", i, err)
 					return
 				}
 				eventTime = parsedTime.UTC()
@@ -113,7 +113,7 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 			// Marshal meta to JSON.
 			metaBytes, err := json.Marshal(meta)
 			if err != nil {
-				httpErr(w, http.StatusBadRequest, "events[%d]: failed to marshal meta: %v", i, err)
+				writeHTTPError(w, http.StatusBadRequest, "events[%d]: failed to marshal meta: %v", i, err)
 				return
 			}
 
@@ -136,7 +136,7 @@ func createNodeEventsHandler(st store.Store, eventsService *server.EventsService
 			// Persist event to DB and fan out to SSE.
 			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
 			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to create event: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to create event: %v", err)
 				slog.Error("node events: create failed", "node_id", nodeID.String(), "run_id", req.RunID.String(), "index", i, "err", err)
 				return
 			}

@@ -22,14 +22,14 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cid := strings.TrimSpace(r.URL.Query().Get("cid"))
 		if cid == "" {
-			httpErr(w, http.StatusBadRequest, "cid query parameter is required")
+			writeHTTPError(w, http.StatusBadRequest, "cid query parameter is required")
 			return
 		}
 
 		// Query artifacts by CID (metadata only; excludes bundle bytes).
 		bundles, err := st.ListArtifactBundlesMetaByCID(r.Context(), &cid)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to query artifacts: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to query artifacts: %v", err)
 			return
 		}
 
@@ -55,14 +55,14 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr, err := requiredPathParam(r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Parse and validate artifact ID.
 		artifactUUID, err := uuid.Parse(idStr)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "invalid id: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "invalid id: %v", err)
 			return
 		}
 
@@ -70,10 +70,10 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 		bundle, err := st.GetArtifactBundle(r.Context(), pgtype.UUID{Bytes: artifactUUID, Valid: true})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "artifact not found")
+				writeHTTPError(w, http.StatusNotFound, "artifact not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to retrieve artifact: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to retrieve artifact: %v", err)
 			return
 		}
 
@@ -82,14 +82,14 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 		if download {
 			// Stream from object storage.
 			if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
-				httpErr(w, http.StatusNotFound, "artifact blob not found")
+				writeHTTPError(w, http.StatusNotFound, "artifact blob not found")
 				slog.Error("download artifact: no object_key", "artifact_id", idStr)
 				return
 			}
 
 			rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
 			if err != nil {
-				httpErr(w, http.StatusServiceUnavailable, "failed to retrieve artifact blob")
+				writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve artifact blob")
 				slog.Error("download artifact: blob get failed", "artifact_id", idStr, "object_key", *bundle.ObjectKey, "err", err)
 				return
 			}

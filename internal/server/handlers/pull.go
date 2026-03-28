@@ -72,21 +72,21 @@ type pullResponse struct {
 func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run_id from path.
-		runID, err := parseParam[domaintypes.RunID](r, "run_id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Parse request body with strict validation.
 		var req runPullRequest
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
 		// Validate repo_url is provided.
 		if req.RepoURL == "" {
-			httpErr(w, http.StatusBadRequest, "repo_url is required")
+			writeHTTPError(w, http.StatusBadRequest, "repo_url is required")
 			return
 		}
 
@@ -97,10 +97,10 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
+				writeHTTPError(w, http.StatusNotFound, "run not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
 			slog.Error("pull run repo: get run failed", "run_id", runID, "err", err)
 			return
 		}
@@ -109,7 +109,7 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 		// We need to iterate and compare normalized URLs to find matches.
 		runRepos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
 			slog.Error("pull run repo: list run repos failed", "run_id", runID, "err", err)
 			return
 		}
@@ -124,12 +124,12 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		// Handle match results.
 		if len(matches) == 0 {
-			httpErr(w, http.StatusNotFound, "no matching repo found in run")
+			writeHTTPError(w, http.StatusNotFound, "no matching repo found in run")
 			return
 		}
 		if len(matches) > 1 {
 			// Multiple repos match the same normalized URL — this is ambiguous.
-			httpErr(w, http.StatusConflict, "multiple repos match the given repo_url")
+			writeHTTPError(w, http.StatusConflict, "multiple repos match the given repo_url")
 			slog.Warn("pull run repo: multiple matches",
 				"run_id", runID,
 				"repo_url", req.RepoURL,
@@ -178,21 +178,21 @@ func pullRunRepoHandler(st store.Store) http.HandlerFunc {
 func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract mig_id from path.
-		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
+		modID, err := parseRequiredPathID[domaintypes.MigID](r, "mig_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Parse request body with strict validation.
 		var req modPullRequest
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
 		// Validate repo_url is provided.
 		if req.RepoURL == "" {
-			httpErr(w, http.StatusBadRequest, "repo_url is required")
+			writeHTTPError(w, http.StatusBadRequest, "repo_url is required")
 			return
 		}
 
@@ -213,7 +213,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		case "last-failed":
 			targetStatus = domaintypes.RunRepoStatusFail
 		default:
-			httpErr(w, http.StatusBadRequest, "invalid mode: %q (must be 'last-succeeded' or 'last-failed')", mode)
+			writeHTTPError(w, http.StatusBadRequest, "invalid mode: %q (must be 'last-succeeded' or 'last-failed')", mode)
 			return
 		}
 
@@ -221,10 +221,10 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetMig(r.Context(), modID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
+				writeHTTPError(w, http.StatusNotFound, "mig not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
 			slog.Error("pull mig repo: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
@@ -232,7 +232,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		// List all repos for this mig to find matching repo by normalized URL.
 		modRepos, err := st.ListMigReposByMig(r.Context(), modID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
 			slog.Error("pull mig repo: list mig repos failed", "mig_id", modID, "err", err)
 			return
 		}
@@ -242,7 +242,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		for _, mr := range modRepos {
 			repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
 			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 				slog.Error("pull mig repo: get repo failed", "mig_id", modID, "repo_id", mr.RepoID, "err", err)
 				return
 			}
@@ -253,7 +253,7 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if matchedRepoID.IsZero() {
-			httpErr(w, http.StatusNotFound, "no matching repo found in mig")
+			writeHTTPError(w, http.StatusNotFound, "no matching repo found in mig")
 			return
 		}
 
@@ -266,10 +266,10 @@ func pullMigRepoHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "no run with status %q found for this repo", mode)
+				writeHTTPError(w, http.StatusNotFound, "no run with status %q found for this repo", mode)
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get run repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get run repo: %v", err)
 			slog.Error("pull mig repo: get latest run repo failed",
 				"mig_id", modID,
 				"repo_id", matchedRepoID,

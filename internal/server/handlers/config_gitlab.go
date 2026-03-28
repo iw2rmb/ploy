@@ -139,7 +139,7 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 			Token  string `json:"token"`
 		}
 
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 

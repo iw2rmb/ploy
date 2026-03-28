@@ -52,9 +52,9 @@ func parseLastEventID(header string) domaintypes.EventID {
 // streaming from the hub after backfill completes.
 func getRunLogsHandler(st store.Store, bs blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -72,7 +72,7 @@ func getRunLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 		// Ensure the stream exists (creates if not present).
 		if err := hub.Ensure(runID); err != nil {
 			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
-			httpErr(w, http.StatusBadRequest, "invalid run id")
+			writeHTTPError(w, http.StatusBadRequest, "invalid run id")
 			return
 		}
 
@@ -272,14 +272,14 @@ func timestampToString(ts pgtype.Timestamptz) string {
 // GET /v1/runs/{run_id}/repos/{repo_id}/logs
 func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "run_id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
+		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -287,10 +287,10 @@ func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *se
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
-				httpErr(w, http.StatusNotFound, "repo not found")
+				writeHTTPError(w, http.StatusNotFound, "repo not found")
 			default:
 				slog.Error("get run repo logs: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
-				httpErr(w, http.StatusInternalServerError, "failed to get repo")
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo")
 			}
 			return
 		}
@@ -307,7 +307,7 @@ func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *se
 		})
 		if err != nil {
 			slog.Error("get run repo logs: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", rr.Attempt, "err", err)
-			httpErr(w, http.StatusInternalServerError, "failed to list jobs")
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs")
 			return
 		}
 
@@ -320,7 +320,7 @@ func getRunRepoLogsHandler(st store.Store, bs blobstore.Store, eventsService *se
 		hub := eventsService.Hub()
 		if err := hub.Ensure(runID); err != nil {
 			slog.Error("ensure stream failed", "run_id", runID.String(), "err", err)
-			httpErr(w, http.StatusBadRequest, "invalid run id")
+			writeHTTPError(w, http.StatusBadRequest, "invalid run id")
 			return
 		}
 

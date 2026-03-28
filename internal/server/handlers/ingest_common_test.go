@@ -73,7 +73,7 @@ func TestParseParam(t *testing.T) {
 				req := httptest.NewRequest(http.MethodGet, "/test", nil)
 				req.SetPathValue(tt.pathKey, tt.pathValue)
 
-				id, err := parseParam[domaintypes.RunID](req, tt.pathKey)
+				id, err := parseRequiredPathID[domaintypes.RunID](req, tt.pathKey)
 				assertIDResult(t, id, err, tt.wantID, tt.wantErr, tt.errMsg, tt.wantErrIs)
 			})
 		}
@@ -85,7 +85,7 @@ func TestParseParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.SetPathValue("job_id", validJobID)
-		id, err := parseParam[domaintypes.JobID](req, "job_id")
+		id, err := parseRequiredPathID[domaintypes.JobID](req, "job_id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -95,14 +95,14 @@ func TestParseParam(t *testing.T) {
 
 		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req2.SetPathValue("job_id", "")
-		_, err = parseParam[domaintypes.JobID](req2, "job_id")
+		_, err = parseRequiredPathID[domaintypes.JobID](req2, "job_id")
 		if err == nil {
 			t.Error("expected error for empty value")
 		}
 
 		req3 := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req3.SetPathValue("job_id", "job123")
-		_, err = parseParam[domaintypes.JobID](req3, "job_id")
+		_, err = parseRequiredPathID[domaintypes.JobID](req3, "job_id")
 		if err == nil || !errors.Is(err, domaintypes.ErrInvalidJobID) {
 			t.Errorf("expected ErrInvalidJobID, got %v", err)
 		}
@@ -114,7 +114,7 @@ func TestParseParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.SetPathValue("id", validNodeID)
-		id, err := parseParam[domaintypes.NodeID](req, "id")
+		id, err := parseRequiredPathID[domaintypes.NodeID](req, "id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -128,7 +128,7 @@ func TestParseParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.SetPathValue("mig_id", "mod123")
-		id, err := parseParam[domaintypes.MigID](req, "mig_id")
+		id, err := parseRequiredPathID[domaintypes.MigID](req, "mig_id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -142,7 +142,7 @@ func TestParseParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.SetPathValue("mig_ref", "my-mig")
-		ref, err := parseParam[domaintypes.MigRef](req, "mig_ref")
+		ref, err := parseRequiredPathID[domaintypes.MigRef](req, "mig_ref")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -153,7 +153,7 @@ func TestParseParam(t *testing.T) {
 		// Invalid chars
 		req2 := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req2.SetPathValue("mig_ref", "my/mig")
-		_, err = parseParam[domaintypes.MigRef](req2, "mig_ref")
+		_, err = parseRequiredPathID[domaintypes.MigRef](req2, "mig_ref")
 		if err == nil {
 			t.Error("expected error for invalid mig ref")
 		}
@@ -165,7 +165,7 @@ func TestParseParam(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
 		req.SetPathValue("repo_id", validRepoID)
-		id, err := parseParam[domaintypes.MigRepoID](req, "repo_id")
+		id, err := parseRequiredPathID[domaintypes.MigRepoID](req, "repo_id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -399,7 +399,7 @@ func TestOptionalQuery(t *testing.T) {
 	}
 }
 
-// assertIDResult is a test helper for parseParam/parseQuery assertions.
+// assertIDResult is a test helper for parseRequiredPathID/parseQuery assertions.
 func assertIDResult[T comparable](t *testing.T, got T, err error, want T, wantErr bool, errMsg string, wantErrIs error) {
 	t.Helper()
 	if wantErr {

@@ -37,25 +37,25 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			CreatedBy *string          `json:"created_by,omitempty"`
 		}
 
-		if err := DecodeJSON(w, r, &req, maxModSpecSize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxModSpecSize); err != nil {
 			return
 		}
 
 		// Validate and normalize name.
 		name := strings.TrimSpace(req.Name)
 		if name == "" {
-			httpErr(w, http.StatusBadRequest, "name is required")
+			writeHTTPError(w, http.StatusBadRequest, "name is required")
 			return
 		}
 		if err := domaintypes.MigRef(name).Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "name: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "name: %v", err)
 			return
 		}
 
 		// Validate spec early so invalid specs do not create a mig row.
 		if req.Spec != nil && len(*req.Spec) > 0 {
 			if _, err := contracts.ParseModsSpecJSON(*req.Spec); err != nil {
-				httpErr(w, http.StatusBadRequest, "spec: %v", err)
+				writeHTTPError(w, http.StatusBadRequest, "spec: %v", err)
 				return
 			}
 		}
@@ -73,10 +73,10 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			// Check for unique constraint violation (duplicate name)
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				httpErr(w, http.StatusConflict, "mig with this name already exists")
+				writeHTTPError(w, http.StatusConflict, "mig with this name already exists")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to create mig: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig: %v", err)
 			slog.Error("create mig: create mig failed", "mig_id", modID.String(), "err", err)
 			return
 		}
@@ -92,12 +92,12 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 				CreatedBy: req.CreatedBy,
 			})
 			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
 				slog.Error("create mig: create spec failed", "mig_id", modID.String(), "err", err)
 				return
 			}
 			if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
 				slog.Error("create mig: update spec failed", "mig_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
 				return
 			}
@@ -154,7 +154,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		limit, offset, err := parsePagination(r)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -169,7 +169,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 		if archivedStr != "" {
 			parsed, err := strconv.ParseBool(archivedStr)
 			if err != nil {
-				httpErr(w, http.StatusBadRequest, "invalid archived parameter")
+				writeHTTPError(w, http.StatusBadRequest, "invalid archived parameter")
 				return
 			}
 			archivedOnly = &parsed
@@ -179,7 +179,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 		if repoURLFilter != "" {
 			repoURLFilter = domaintypes.NormalizeRepoURL(repoURLFilter)
 			if err := domaintypes.RepoURL(repoURLFilter).Validate(); err != nil {
-				httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
+				writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
 				return
 			}
 		}
@@ -199,7 +199,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 					NameFilter:   nameFilter,
 				})
 				if err != nil {
-					httpErr(w, http.StatusInternalServerError, "failed to list migs: %v", err)
+					writeHTTPError(w, http.StatusInternalServerError, "failed to list migs: %v", err)
 					slog.Error("list migs: fetch failed", "err", err)
 					return
 				}
@@ -209,14 +209,14 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 				for _, mig := range page {
 					repos, err := st.ListMigReposByMig(r.Context(), mig.ID)
 					if err != nil {
-						httpErr(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
+						writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
 						slog.Error("list migs: list mig repos failed", "mig_id", mig.ID, "err", err)
 						return
 					}
 					for _, mr := range repos {
 						repoURL, err := repoURLForID(r.Context(), st, mr.RepoID)
 						if err != nil {
-							httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+							writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 							slog.Error("list migs: get repo failed", "mig_id", mig.ID, "repo_id", mr.RepoID, "err", err)
 							return
 						}
@@ -251,7 +251,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 			NameFilter:   nameFilter,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list migs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list migs: %v", err)
 			slog.Error("list migs: fetch failed", "err", err)
 			return
 		}
@@ -314,18 +314,18 @@ func deleteMigHandler(st store.Store) http.HandlerFunc {
 		// Check if any runs exist for this mig
 		hasRuns, err := migHasAnyRuns(r.Context(), st, modID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to check runs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check runs: %v", err)
 			slog.Error("delete mig: check runs failed", "mig_id", modID, "err", err)
 			return
 		}
 		if hasRuns {
-			httpErr(w, http.StatusConflict, "cannot delete mig with existing runs")
+			writeHTTPError(w, http.StatusConflict, "cannot delete mig with existing runs")
 			return
 		}
 
 		// Delete the mig
 		if err := st.DeleteMig(r.Context(), modID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to delete mig: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to delete mig: %v", err)
 			slog.Error("delete mig: database error", "mig_id", modID, "err", err)
 			return
 		}

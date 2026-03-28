@@ -84,13 +84,13 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		key, err := requiredPathParam(r, "key")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		v, ok := holder.GetGlobalEnvVar(key)
 		if !ok {
-			httpErr(w, http.StatusNotFound, "global env key not found: %s", key)
+			writeHTTPError(w, http.StatusNotFound, "global env key not found: %s", key)
 			return
 		}
 
@@ -122,12 +122,12 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 	return func(w http.ResponseWriter, r *http.Request) {
 		key, err := requiredPathParam(r, "key")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		var req globalEnvPutRequest
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
@@ -136,7 +136,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		// against known values (all, migs, heal, gate).
 		scope, err := domaintypes.ParseGlobalEnvScope(req.Scope)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -155,7 +155,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			Secret: secret,
 		}); err != nil {
 			slog.Error("config env put: store upsert failed", "err", err, "key", key)
-			httpErr(w, http.StatusInternalServerError, "failed to persist global env: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to persist global env: %v", err)
 			return
 		}
 
@@ -195,14 +195,14 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 	return func(w http.ResponseWriter, r *http.Request) {
 		key, err := requiredPathParam(r, "key")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Delete from store first (idempotent operation).
 		if err := st.DeleteGlobalEnv(r.Context(), key); err != nil {
 			slog.Error("config env delete: store delete failed", "err", err, "key", key)
-			httpErr(w, http.StatusInternalServerError, "failed to delete global env: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to delete global env: %v", err)
 			return
 		}
 

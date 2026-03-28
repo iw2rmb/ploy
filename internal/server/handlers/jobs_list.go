@@ -16,13 +16,13 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		limit, offset, err := parsePagination(r)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		runID, err := optionalQuery[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -32,14 +32,14 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			RunID:  runID,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
 			slog.Error("list jobs: fetch failed", "err", err)
 			return
 		}
 
 		total, err := st.CountJobsForTUI(r.Context(), runID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to count jobs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to count jobs: %v", err)
 			slog.Error("list jobs: count failed", "err", err)
 			return
 		}

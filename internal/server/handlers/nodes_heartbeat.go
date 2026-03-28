@@ -19,9 +19,9 @@ import (
 func heartbeatHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
-		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
+		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -36,37 +36,37 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			Version        string `json:"version,omitempty"`
 		}
 
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
 		// Validate fit-range and invariants.
 		if req.CPUFreeMillis < 0 || req.CPUTotalMillis < 0 {
-			httpErr(w, http.StatusBadRequest, "invalid request: cpu millis must be non-negative")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: cpu millis must be non-negative")
 			return
 		}
 		if req.CPUFreeMillis > req.CPUTotalMillis {
-			httpErr(w, http.StatusBadRequest, "invalid request: cpu_free_millis must be <= cpu_total_millis")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: cpu_free_millis must be <= cpu_total_millis")
 			return
 		}
 		if req.CPUFreeMillis > math.MaxInt32 || req.CPUTotalMillis > math.MaxInt32 {
-			httpErr(w, http.StatusBadRequest, "invalid request: cpu millis out of range")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: cpu millis out of range")
 			return
 		}
 		if req.MemFreeBytes < 0 || req.MemTotalBytes < 0 {
-			httpErr(w, http.StatusBadRequest, "invalid request: mem bytes must be non-negative")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: mem bytes must be non-negative")
 			return
 		}
 		if req.MemFreeBytes > req.MemTotalBytes {
-			httpErr(w, http.StatusBadRequest, "invalid request: mem_free_bytes must be <= mem_total_bytes")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: mem_free_bytes must be <= mem_total_bytes")
 			return
 		}
 		if req.DiskFreeBytes < 0 || req.DiskTotalBytes < 0 {
-			httpErr(w, http.StatusBadRequest, "invalid request: disk bytes must be non-negative")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: disk bytes must be non-negative")
 			return
 		}
 		if req.DiskFreeBytes > req.DiskTotalBytes {
-			httpErr(w, http.StatusBadRequest, "invalid request: disk_free_bytes must be <= disk_total_bytes")
+			writeHTTPError(w, http.StatusBadRequest, "invalid request: disk_free_bytes must be <= disk_total_bytes")
 			return
 		}
 
@@ -74,10 +74,10 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "node not found")
+				writeHTTPError(w, http.StatusNotFound, "node not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to check node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check node: %v", err)
 			slog.Error("heartbeat: check failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -98,7 +98,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			Version:        strings.TrimSpace(req.Version),
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to update heartbeat: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to update heartbeat: %v", err)
 			slog.Error("heartbeat: update failed", "node_id", nodeID, "err", err)
 			return
 		}

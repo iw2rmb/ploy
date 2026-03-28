@@ -4,7 +4,7 @@ Scope: Remove ambiguous, overloaded, and conflicting names in high-usage `intern
 
 Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `internal/tui/README.md`, `internal/client/README.md`.
 
-- [ ] 1.1 Rename shared server handler helpers to explicit request/error names
+- [x] 1.1 Rename shared server handler helpers to explicit request/error names
   - Type: determined
   - Component: `internal/server/handlers/ingest_common.go`, `internal/server/handlers/*.go`, `internal/server/handlers/ingest_common_test.go`
   - Implementation:

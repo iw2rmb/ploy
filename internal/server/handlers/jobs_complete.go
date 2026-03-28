@@ -35,25 +35,25 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		jobID, err := parseParam[domaintypes.JobID](r, "job_id")
+		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		if _, ok := auth.IdentityFromContext(ctx); !ok {
-			httpErr(w, http.StatusUnauthorized, "unauthorized: no identity in context")
+			writeHTTPError(w, http.StatusUnauthorized, "unauthorized: no identity in context")
 			return
 		}
 
 		var req completeJobRequest
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
 		normalizedStatus, statsPayload, statsBytes, repoSHAOut, nodeID, err := validateCompleteJobRequest(r, req)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -69,23 +69,23 @@ func completeJobHandler(st store.Store, eventsService *server.EventsService, bp 
 		if err != nil {
 			switch e := err.(type) {
 			case *CompleteJobBadRequest:
-				httpErr(w, http.StatusBadRequest, "%s", e.Message)
+				writeHTTPError(w, http.StatusBadRequest, "%s", e.Message)
 				return
 			case *CompleteJobForbidden:
-				httpErr(w, http.StatusForbidden, "%s", e.Message)
+				writeHTTPError(w, http.StatusForbidden, "%s", e.Message)
 				return
 			case *CompleteJobConflict:
-				httpErr(w, http.StatusConflict, "%s", e.Message)
+				writeHTTPError(w, http.StatusConflict, "%s", e.Message)
 				return
 			case *CompleteJobNotFound:
-				httpErr(w, http.StatusNotFound, "%s", e.Message)
+				writeHTTPError(w, http.StatusNotFound, "%s", e.Message)
 				return
 			case *CompleteJobInternal:
-				httpErr(w, http.StatusInternalServerError, "%s", e.Error())
+				writeHTTPError(w, http.StatusInternalServerError, "%s", e.Error())
 				return
 			default:
 				slog.Error("complete job: unhandled service error", "job_id", jobID, "err", err)
-				httpErr(w, http.StatusInternalServerError, "complete job failed: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "complete job failed: %v", err)
 				return
 			}
 		}

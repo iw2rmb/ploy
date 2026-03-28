@@ -41,7 +41,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			ExpiresInMinutes int                `json:"expires_in_minutes"`
 		}
 
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
@@ -55,7 +55,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		// Get cluster ID from environment.
 		clusterID := os.Getenv("PLOY_CLUSTER_ID")
 		if clusterID == "" {
-			httpErr(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
+			writeHTTPError(w, http.StatusInternalServerError, "server misconfigured: PLOY_CLUSTER_ID not set")
 			slog.Error("create bootstrap token: PLOY_CLUSTER_ID not set")
 			return
 		}
@@ -65,7 +65,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		expiresAt := now.Add(time.Duration(req.ExpiresInMinutes) * time.Minute)
 		token, err := auth.GenerateBootstrapToken(tokenSecret, clusterID, nodeID, expiresAt)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to generate token: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to generate token: %v", err)
 			slog.Error("create bootstrap token: generation failed", "err", err)
 			return
 		}
@@ -73,7 +73,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 		// Parse token to extract token ID.
 		claims, err := auth.ValidateToken(token, tokenSecret)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to validate generated token: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to validate generated token: %v", err)
 			slog.Error("create bootstrap token: validation failed", "err", err)
 			return
 		}
@@ -99,7 +99,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			IssuedBy:  issuedBy,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to store token: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to store token: %v", err)
 			slog.Error("create bootstrap token: database insert failed", "err", err)
 			return
 		}
@@ -140,7 +140,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, err := validateBootstrapToken(r, st, tokenSecret)
 		if err != nil {
-			httpErr(w, http.StatusUnauthorized, "%s", err)
+			writeHTTPError(w, http.StatusUnauthorized, "%s", err)
 			return
 		}
 
@@ -148,13 +148,13 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		var req struct {
 			CSR string `json:"csr"`
 		}
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
 		parsedCSR, err := parseAndVerifyCSR(req.CSR, "node:"+claims.NodeID.String())
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 		_ = parsedCSR // signature/CN already verified
@@ -163,9 +163,9 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 		ca, rawCACert, err := loadClusterCA()
 		if err != nil {
 			if errors.Is(err, errCANotConfigured) {
-				httpErr(w, http.StatusServiceUnavailable, "PKI not configured")
+				writeHTTPError(w, http.StatusServiceUnavailable, "PKI not configured")
 			} else {
-				httpErr(w, http.StatusInternalServerError, "failed to load CA")
+				writeHTTPError(w, http.StatusInternalServerError, "failed to load CA")
 			}
 			slog.Error("bootstrap certificate: load CA failed", "err", err)
 			return
@@ -173,13 +173,13 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		cert, err := pki.SignNodeCSR(ca, []byte(req.CSR), time.Now())
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "sign failed: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "sign failed: %v", err)
 			slog.Warn("bootstrap certificate: sign CSR failed", "node_id", claims.NodeID, "err", err)
 			return
 		}
 
 		if err := registerNodeIfNew(r.Context(), st, claims.NodeID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to register node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to register node: %v", err)
 			return
 		}
 
@@ -193,7 +193,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		workerToken, err := issueWorkerToken()
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "%s", err)
+			writeHTTPError(w, http.StatusInternalServerError, "%s", err)
 			return
 		}
 
