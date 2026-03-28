@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestModsSpecValidate_TmpBundleStep(t *testing.T) {
+func TestMigSpecValidate_TmpBundleStep(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -107,7 +107,7 @@ func TestModsSpecValidate_TmpBundleStep(t *testing.T) {
 	}
 }
 
-func TestModsSpecValidate_TmpBundleHealing(t *testing.T) {
+func TestMigSpecValidate_TmpBundleHealing(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
 		"build_gate": {
@@ -158,7 +158,7 @@ func TestModsSpecValidate_TmpBundleHealing(t *testing.T) {
 	}
 }
 
-func TestModsSpecValidate_TmpBundleRouter(t *testing.T) {
+func TestMigSpecValidate_TmpBundleRouter(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
 		"build_gate": {"router": {"image": "router:latest", %s}}
@@ -206,7 +206,7 @@ func TestModsSpecValidate_TmpBundleRouter(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_TmpBundleEntriesCanonicalized(t *testing.T) {
+func TestParseMigSpecJSON_TmpBundleEntriesCanonicalized(t *testing.T) {
 	spec, err := ParseMigSpecJSON([]byte(`{
 		"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "c1", "digest": "d1", "entries": [" config.json "]}}]
 	}`))

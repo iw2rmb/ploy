@@ -308,8 +308,8 @@ func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_BuildGateImages tests parsing build_gate.images.
-func TestParseModsSpecJSON_BuildGateImages(t *testing.T) {
+// TestParseMigSpecJSON_BuildGateImages tests parsing build_gate.images.
+func TestParseMigSpecJSON_BuildGateImages(t *testing.T) {
 	input := `{
 		"steps": [{"image": "test:latest"}],
 		"build_gate": {
@@ -362,8 +362,8 @@ func TestParseModsSpecJSON_BuildGateImages(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_BuildGateImages_NumericRelease tests numeric release handling.
-func TestParseModsSpecJSON_BuildGateImages_NumericRelease(t *testing.T) {
+// TestParseMigSpecJSON_BuildGateImages_NumericRelease tests numeric release handling.
+func TestParseMigSpecJSON_BuildGateImages_NumericRelease(t *testing.T) {
 	input := `{
 		"steps": [{"image": "test:latest"}],
 		"build_gate": {
@@ -394,8 +394,8 @@ func TestParseModsSpecJSON_BuildGateImages_NumericRelease(t *testing.T) {
 	}
 }
 
-// TestModsSpec_Validate_BuildGateImages tests validation integration.
-func TestModsSpec_Validate_BuildGateImages(t *testing.T) {
+// TestMigSpec_Validate_BuildGateImages tests validation integration.
+func TestMigSpec_Validate_BuildGateImages(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string

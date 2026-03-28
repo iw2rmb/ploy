@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
+func TestParseMigSpecJSON_HealingValidation(t *testing.T) {
 	// Healing with image but no router.
 	input := `{
 		"steps": [{"image": "test:latest"}],
@@ -17,7 +17,7 @@ func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
+func TestParseMigSpecJSON_HealingRequiresImage(t *testing.T) {
 	// Healing configured without an image.
 	input := `{
 		"steps": [{"image": "test:latest"}],
@@ -35,7 +35,7 @@ func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
+func TestParseMigSpecJSON_HealingRetriesCoercion(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -97,4 +97,4 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 	}
 }
 
-// TestModsSpec_RoundTrip tests round-trip conversion via json.Marshal → ParseMigSpecJSON.
+// TestMigSpec_RoundTrip tests round-trip conversion via json.Marshal → ParseMigSpecJSON.

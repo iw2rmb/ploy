@@ -139,8 +139,8 @@ func TestStackExpectation_Equal(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_StackGate tests parsing full stack spec via MigSpec.
-func TestParseModsSpecJSON_StackGate(t *testing.T) {
+// TestParseMigSpecJSON_StackGate tests parsing full stack spec via MigSpec.
+func TestParseMigSpecJSON_StackGate(t *testing.T) {
 	input := `{
 		"steps": [{
 			"name": "java11-to-17",

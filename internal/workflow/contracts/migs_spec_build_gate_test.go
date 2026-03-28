@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
+func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": "docker.io/user/mig:latest"
@@ -86,7 +86,7 @@ func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
+func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -139,7 +139,7 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_BuildGateProfileOverride(t *testing.T) {
+func TestParseMigSpecJSON_BuildGateProfileOverride(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": "docker.io/user/mig:latest"
@@ -195,7 +195,7 @@ func TestParseModsSpecJSON_BuildGateProfileOverride(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
+func TestParseMigSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -232,4 +232,4 @@ func TestParseModsSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_StackSpecificImage tests stack-specific image parsing.
+// TestParseMigSpecJSON_StackSpecificImage tests stack-specific image parsing.

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestParseModsSpecJSON_SingleStep(t *testing.T) {
+func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": "docker.io/user/mig:latest",
@@ -75,8 +75,8 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_MultiStep tests parsing multi-step spec JSON.
-func TestParseModsSpecJSON_MultiStep(t *testing.T) {
+// TestParseMigSpecJSON_MultiStep tests parsing multi-step spec JSON.
+func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	input := `{
 		"steps": [
 			{"name": "step-1", "image": "docker.io/user/mod1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}, "always": true},
@@ -166,7 +166,7 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_RetainContainerForbidden(t *testing.T) {
+func TestParseMigSpecJSON_RetainContainerForbidden(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -215,7 +215,7 @@ func TestParseModsSpecJSON_RetainContainerForbidden(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
+func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": {
@@ -257,9 +257,9 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_APIVersionAndKind tests parsing of optional metadata fields.
+// TestParseMigSpecJSON_APIVersionAndKind tests parsing of optional metadata fields.
 // These fields are informational (typically from YAML manifests converted to JSON).
-func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
+func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
 	input := `{
 		"apiVersion": "ploy.mig/v1alpha1",
 		"kind": "MigRunSpec",
@@ -290,8 +290,8 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_Empty tests empty input handling.
-func TestParseModsSpecJSON_Empty(t *testing.T) {
+// TestParseMigSpecJSON_Empty tests empty input handling.
+func TestParseMigSpecJSON_Empty(t *testing.T) {
 	_, err := ParseMigSpecJSON(nil)
 	if err == nil {
 		t.Fatal("expected error for empty input")
@@ -301,7 +301,7 @@ func TestParseModsSpecJSON_Empty(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_ModIndexForbidden(t *testing.T) {
+func TestParseMigSpecJSON_ModIndexForbidden(t *testing.T) {
 	input := `{"mod_index":0,"steps":[{"image":"docker.io/user/mig:latest"}]}`
 	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
@@ -312,8 +312,8 @@ func TestParseModsSpecJSON_ModIndexForbidden(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_ValidationError tests validation errors.
-func TestParseModsSpecJSON_ValidationError(t *testing.T) {
+// TestParseMigSpecJSON_ValidationError tests validation errors.
+func TestParseMigSpecJSON_ValidationError(t *testing.T) {
 	// Step without image.
 	input := `{"steps": [{"name": "test"}]}`
 	_, err := ParseMigSpecJSON([]byte(input))
@@ -325,9 +325,9 @@ func TestParseModsSpecJSON_ValidationError(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_HealingValidation tests healing spec validation.
+// TestParseMigSpecJSON_HealingValidation tests healing spec validation.
 
-func TestModsSpec_ArtifactFields(t *testing.T) {
+func TestMigSpec_ArtifactFields(t *testing.T) {
 	input := `{
 		"steps": [{"image": "test:latest"}],
 		"artifact_name": "my-bundle",
@@ -350,7 +350,7 @@ func TestModsSpec_ArtifactFields(t *testing.T) {
 	}
 }
 
-func TestParseModsSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
+func TestParseMigSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	input := `{
 		"mig": {
 			"image": "docker.io/user/mig:latest",
@@ -368,8 +368,8 @@ func TestParseModsSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_InvalidJSON tests error handling for invalid JSON.
-func TestParseModsSpecJSON_InvalidJSON(t *testing.T) {
+// TestParseMigSpecJSON_InvalidJSON tests error handling for invalid JSON.
+func TestParseMigSpecJSON_InvalidJSON(t *testing.T) {
 	_, err := ParseMigSpecJSON([]byte(`{invalid json`))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
