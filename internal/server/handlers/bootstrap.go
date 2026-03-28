@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -115,11 +114,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			ExpiresAt: expiresAt,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("create bootstrap token: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("bootstrap token created",
 			"token_id", claims.ID,
@@ -216,11 +211,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			BearerToken: workerToken,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("bootstrap certificate: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("bootstrap certificate issued",
 			"token_id", claims.ID,
