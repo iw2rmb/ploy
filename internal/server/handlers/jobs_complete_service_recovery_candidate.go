@@ -31,9 +31,9 @@ func maybePromoteReGateRecoveryCandidate(
 	if err != nil {
 		return nil
 	}
-	recovery := meta.Recovery
-	if recovery == nil && meta.Gate != nil {
-		recovery = meta.Gate.Recovery
+	recovery := meta.RecoveryMetadata
+	if recovery == nil && meta.GateMetadata != nil {
+		recovery = meta.GateMetadata.Recovery
 	}
 	if recovery == nil {
 		return nil
@@ -91,9 +91,9 @@ func maybeRefreshNextReGateRecoveryCandidate(
 	if err != nil {
 		return nil
 	}
-	recovery := meta.Recovery
-	if recovery == nil && meta.Gate != nil {
-		recovery = meta.Gate.Recovery
+	recovery := meta.RecoveryMetadata
+	if recovery == nil && meta.GateMetadata != nil {
+		recovery = meta.GateMetadata.Recovery
 	}
 	if recovery == nil {
 		return nil
@@ -129,14 +129,14 @@ func maybeRefreshNextReGateRecoveryCandidate(
 
 	updatedRecovery := lifecycle.CloneRecoveryMetadata(recovery)
 	evaluateAndAttachInfraCandidate(ctx, bp, reGateJob.RunID, reGateJob, jobsByID, detectedExpectation, updatedRecovery)
-	if meta.Recovery != nil {
-		meta.Recovery = updatedRecovery
+	if meta.RecoveryMetadata != nil {
+		meta.RecoveryMetadata = updatedRecovery
 	}
-	if meta.Gate != nil && meta.Gate.Recovery != nil {
-		meta.Gate.Recovery = updatedRecovery
+	if meta.GateMetadata != nil && meta.GateMetadata.Recovery != nil {
+		meta.GateMetadata.Recovery = updatedRecovery
 	}
-	if meta.Recovery == nil && (meta.Gate == nil || meta.Gate.Recovery == nil) {
-		meta.Recovery = updatedRecovery
+	if meta.RecoveryMetadata == nil && (meta.GateMetadata == nil || meta.GateMetadata.Recovery == nil) {
+		meta.RecoveryMetadata = updatedRecovery
 	}
 
 	updatedMeta, err := contracts.MarshalJobMeta(meta)

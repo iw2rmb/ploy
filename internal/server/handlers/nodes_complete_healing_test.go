@@ -77,10 +77,10 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unmarshal re-gate meta: %v", err)
 	}
-	if reGateMeta.Recovery == nil || reGateMeta.Recovery.ErrorKind != "infra" {
-		t.Fatalf("expected re-gate recovery.error_kind=infra, got %#v", reGateMeta.Recovery)
+	if reGateMeta.RecoveryMetadata == nil || reGateMeta.RecoveryMetadata.ErrorKind != "infra" {
+		t.Fatalf("expected re-gate recovery.error_kind=infra, got %#v", reGateMeta.RecoveryMetadata)
 	}
-	if got, want := reGateMeta.Recovery.StrategyID, "infra-default"; got != want {
+	if got, want := reGateMeta.RecoveryMetadata.StrategyID, "infra-default"; got != want {
 		t.Fatalf("re-gate recovery.strategy_id = %q, want %q", got, want)
 	}
 
@@ -88,8 +88,8 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unmarshal heal meta: %v", err)
 	}
-	if healMeta.Recovery == nil || healMeta.Recovery.ErrorKind != "infra" {
-		t.Fatalf("expected heal recovery.error_kind=infra, got %#v", healMeta.Recovery)
+	if healMeta.RecoveryMetadata == nil || healMeta.RecoveryMetadata.ErrorKind != "infra" {
+		t.Fatalf("expected heal recovery.error_kind=infra, got %#v", healMeta.RecoveryMetadata)
 	}
 }
 
@@ -252,19 +252,19 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	if err != nil {
 		t.Fatalf("unmarshal re-gate meta: %v", err)
 	}
-	if createdReGateMeta.Recovery == nil {
+	if createdReGateMeta.RecoveryMetadata == nil {
 		t.Fatal("expected recovery metadata")
 	}
-	if got, want := createdReGateMeta.Recovery.CandidateSchemaID, contracts.GateProfileCandidateSchemaID; got != want {
+	if got, want := createdReGateMeta.RecoveryMetadata.CandidateSchemaID, contracts.GateProfileCandidateSchemaID; got != want {
 		t.Fatalf("candidate_schema_id = %q, want %q", got, want)
 	}
-	if got, want := createdReGateMeta.Recovery.CandidateArtifactPath, contracts.GateProfileCandidateArtifactPath; got != want {
+	if got, want := createdReGateMeta.RecoveryMetadata.CandidateArtifactPath, contracts.GateProfileCandidateArtifactPath; got != want {
 		t.Fatalf("candidate_artifact_path = %q, want %q", got, want)
 	}
-	if got, want := createdReGateMeta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
-		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, createdReGateMeta.Recovery.CandidateValidationError)
+	if got, want := createdReGateMeta.RecoveryMetadata.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
+		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, createdReGateMeta.RecoveryMetadata.CandidateValidationError)
 	}
-	if len(createdReGateMeta.Recovery.CandidateGateProfile) == 0 {
+	if len(createdReGateMeta.RecoveryMetadata.CandidateGateProfile) == 0 {
 		t.Fatal("expected candidate_gate_profile to be stored")
 	}
 }
@@ -285,13 +285,13 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 	if err != nil {
 		t.Fatalf("unmarshal re-gate meta: %v", err)
 	}
-	if createdReGateMeta.Recovery == nil {
+	if createdReGateMeta.RecoveryMetadata == nil {
 		t.Fatal("expected recovery metadata")
 	}
-	if got, want := createdReGateMeta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusMissing; got != want {
+	if got, want := createdReGateMeta.RecoveryMetadata.CandidateValidationStatus, contracts.RecoveryCandidateStatusMissing; got != want {
 		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
 	}
-	if createdReGateMeta.Recovery.CandidateValidationError == "" {
+	if createdReGateMeta.RecoveryMetadata.CandidateValidationError == "" {
 		t.Fatal("expected candidate_validation_error for missing candidate")
 	}
 }

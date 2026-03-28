@@ -302,14 +302,14 @@ func firstAttemptCase() gateFailureCase {
 			if chain.OldSuccessorID == nil || *chain.OldSuccessorID != successorID {
 				t.Fatalf("OldSuccessorID = %v, want %s", chain.OldSuccessorID, successorID)
 			}
-			if chain.ReGateMeta == nil || chain.ReGateMeta.Recovery == nil {
-				t.Fatal("expected ReGateMeta.Recovery to be set")
+			if chain.ReGateMeta == nil || chain.ReGateMeta.RecoveryMetadata == nil {
+				t.Fatal("expected ReGateMeta.RecoveryMetadata to be set")
 			}
-			if chain.ReGateMeta.Recovery.ErrorKind != "infra" {
-				t.Fatalf("ReGateMeta.Recovery.ErrorKind = %q, want %q", chain.ReGateMeta.Recovery.ErrorKind, "infra")
+			if chain.ReGateMeta.RecoveryMetadata.ErrorKind != "infra" {
+				t.Fatalf("ReGateMeta.RecoveryMetadata.ErrorKind = %q, want %q", chain.ReGateMeta.RecoveryMetadata.ErrorKind, "infra")
 			}
-			if chain.HealMeta == nil || chain.HealMeta.Recovery == nil {
-				t.Fatal("expected HealMeta.Recovery to be set")
+			if chain.HealMeta == nil || chain.HealMeta.RecoveryMetadata == nil {
+				t.Fatal("expected HealMeta.RecoveryMetadata to be set")
 			}
 		},
 	}

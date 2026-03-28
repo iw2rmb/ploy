@@ -17,12 +17,12 @@ func mergeCompletionJobMeta(existingRaw, incomingRaw []byte) ([]byte, error) {
 	}
 
 	merged := false
-	if incoming.Recovery == nil && existing.Recovery != nil {
-		incoming.Recovery = lifecycle.CloneRecoveryMetadata(existing.Recovery)
+	if incoming.RecoveryMetadata == nil && existing.RecoveryMetadata != nil {
+		incoming.RecoveryMetadata = lifecycle.CloneRecoveryMetadata(existing.RecoveryMetadata)
 		merged = true
 	}
-	if incoming.Gate != nil && incoming.Gate.Recovery == nil && existing.Gate != nil && existing.Gate.Recovery != nil {
-		incoming.Gate.Recovery = lifecycle.CloneRecoveryMetadata(existing.Gate.Recovery)
+	if incoming.GateMetadata != nil && incoming.GateMetadata.Recovery == nil && existing.GateMetadata != nil && existing.GateMetadata.Recovery != nil {
+		incoming.GateMetadata.Recovery = lifecycle.CloneRecoveryMetadata(existing.GateMetadata.Recovery)
 		merged = true
 	}
 	if !merged {

@@ -27,11 +27,11 @@ func buildRecoveryClaimContext(
 		return nil, nil
 	}
 	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
-	if err != nil || jobMeta.Recovery == nil {
+	if err != nil || jobMeta.RecoveryMetadata == nil {
 		return nil, nil
 	}
 
-	recovery := jobMeta.Recovery
+	recovery := jobMeta.RecoveryMetadata
 	kind, ok := contracts.ParseRecoveryErrorKind(recovery.ErrorKind)
 	if !ok {
 		kind = contracts.DefaultRecoveryErrorKind()
@@ -75,18 +75,18 @@ func buildRecoveryClaimContext(
 
 	var detectedExpectation *contracts.StackExpectation
 	if gateJob != nil && len(gateJob.Meta) > 0 {
-		if gateMeta, err := contracts.UnmarshalJobMeta(gateJob.Meta); err == nil && gateMeta.Gate != nil {
-			if stack := gateMeta.Gate.DetectedStack(); stack != "" && stack != contracts.MigStackUnknown {
+		if gateMeta, err := contracts.UnmarshalJobMeta(gateJob.Meta); err == nil && gateMeta.GateMetadata != nil {
+			if stack := gateMeta.GateMetadata.DetectedStack(); stack != "" && stack != contracts.MigStackUnknown {
 				ctxPayload.DetectedStack = stack
 			}
-			if expectation := gateMeta.Gate.DetectedStackExpectation(); expectation != nil {
+			if expectation := gateMeta.GateMetadata.DetectedStackExpectation(); expectation != nil {
 				detectedExpectation = &contracts.StackExpectation{
 					Language: strings.TrimSpace(expectation.Language),
 					Release:  strings.TrimSpace(expectation.Release),
 					Tool:     strings.TrimSpace(expectation.Tool),
 				}
 			}
-			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.Gate); strings.TrimSpace(logPayload) != "" {
+			if logPayload := gateLogPayloadFromClaimMetadata(gateMeta.GateMetadata); strings.TrimSpace(logPayload) != "" {
 				ctxPayload.BuildGateLog = logPayload
 			}
 		}

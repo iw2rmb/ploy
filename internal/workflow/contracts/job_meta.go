@@ -55,9 +55,9 @@ type JobMeta struct {
 	// Kind identifies the job type: "mig", "gate", or "build".
 	Kind JobKind `json:"kind"`
 
-	// Gate contains build gate validation metadata when Kind is JobKindGate.
+	// GateMetadata contains build gate validation metadata when Kind is JobKindGate.
 	// This includes static check results, log findings, and digest information.
-	Gate *BuildGateStageMetadata `json:"gate,omitempty"`
+	GateMetadata *BuildGateStageMetadata `json:"gate,omitempty"`
 
 	// Build contains build tool metadata when Kind is JobKindBuild.
 	// This includes tool name, command, status details, and metrics.
@@ -73,9 +73,9 @@ type JobMeta struct {
 	// Max 200 chars, no newlines.
 	ActionSummary string `json:"action_summary,omitempty"`
 
-	// Recovery stores universal recovery loop metadata.
+	// RecoveryMetadata stores universal recovery loop metadata.
 	// Allowed for gate and mig jobs; rejected for build jobs.
-	Recovery *RecoveryJobMetadata `json:"recovery,omitempty"`
+	RecoveryMetadata *RecoveryJobMetadata `json:"recovery,omitempty"`
 }
 
 // RecoveryJobMetadata captures loop context persisted at job level.
@@ -99,8 +99,8 @@ func (m JobMeta) Validate() error {
 	if !m.Kind.Valid() {
 		return fmt.Errorf("invalid job kind: %q", m.Kind)
 	}
-	// Gate metadata is only valid for gate jobs.
-	if m.Gate != nil && m.Kind != JobKindGate {
+	// GateMetadata is only valid for gate jobs.
+	if m.GateMetadata != nil && m.Kind != JobKindGate {
 		return fmt.Errorf("gate metadata present but kind is %q", m.Kind)
 	}
 	// Build metadata is only valid for build jobs.
@@ -108,17 +108,17 @@ func (m JobMeta) Validate() error {
 		return fmt.Errorf("build metadata present but kind is %q", m.Kind)
 	}
 	// Validate nested gate metadata if present.
-	if m.Gate != nil {
-		if err := m.Gate.Validate(); err != nil {
+	if m.GateMetadata != nil {
+		if err := m.GateMetadata.Validate(); err != nil {
 			return fmt.Errorf("gate metadata invalid: %w", err)
 		}
 	}
-	// Recovery metadata is allowed for gate and mig jobs only.
-	if m.Recovery != nil {
+	// RecoveryMetadata is allowed for gate and mig jobs only.
+	if m.RecoveryMetadata != nil {
 		if m.Kind != JobKindGate && m.Kind != JobKindMig {
 			return fmt.Errorf("recovery metadata present but kind is %q (only allowed for %q or %q)", m.Kind, JobKindGate, JobKindMig)
 		}
-		if err := m.Recovery.Validate(); err != nil {
+		if err := m.RecoveryMetadata.Validate(); err != nil {
 			return fmt.Errorf("recovery metadata invalid: %w", err)
 		}
 	}
@@ -209,8 +209,8 @@ func NewMigJobMetaWithStepName(stepName string) *JobMeta {
 // The gate metadata can be populated later via UpdateGateMeta.
 func NewGateJobMeta(gate *BuildGateStageMetadata) *JobMeta {
 	return &JobMeta{
-		Kind: JobKindGate,
-		Gate: gate,
+		Kind:         JobKindGate,
+		GateMetadata: gate,
 	}
 }
 

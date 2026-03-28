@@ -106,7 +106,7 @@ func maybeCreateHealingJobs(
 	// Attach infra candidate artifact if the orchestrator determined it is needed.
 	if chain.ShouldAttachCandidate {
 		evaluateAndAttachInfraCandidate(
-			ctx, bp, run.ID, failedJob, jobsByID, detectedExpectation, chain.ReGateMeta.Recovery)
+			ctx, bp, run.ID, failedJob, jobsByID, detectedExpectation, chain.ReGateMeta.RecoveryMetadata)
 	}
 
 	reGateMetaBytes, err := contracts.MarshalJobMeta(chain.ReGateMeta)
