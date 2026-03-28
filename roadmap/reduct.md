@@ -154,7 +154,7 @@ Goal lock: every unchecked item below is considered complete only when redundanc
 
 - [x] 2.2 Unify gate-profile input contracts and manifest projection
   - Type: determined
-  - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/step_manifest.go`, `internal/workflow/contracts/build_gate_metadata.go`, `internal/nodeagent/manifest.go`, `internal/server/handlers/claim_spec_mutator_gate.go`, `internal/workflow/step/gate_plan_resolver.go`
+  - Component: `internal/workflow/contracts/migs_spec.go`, `internal/workflow/contracts/step_manifest.go`, `internal/workflow/contracts/build_gate_metadata.go`, `internal/nodeagent/manifest.go`, `internal/server/handlers/claim_spec_mutator_gate.go`, `internal/workflow/step/gate_plan_resolver.go`
   - Implementation:
     1. Add one canonical gate-profile projection function in `workflow/contracts` for spec-to-runtime gate metadata.
     2. Route `nodeagent/manifest.go` and `handlers/claim_spec_mutator_gate.go` to the canonical projection function.

@@ -44,7 +44,7 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
 
 - [x] 1.4.1 Normalize `mod` type terminology to `mig` in workflow contracts
   - Type: determined
-  - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/mod_image.go`, `internal/workflow/contracts/mods_spec_parse.go`, `internal/workflow/contracts/*_test.go`, `internal/workflow/**/*.go`
+  - Component: `internal/workflow/contracts/migs_spec.go`, `internal/workflow/contracts/mod_image.go`, `internal/workflow/contracts/migs_spec_parse.go`, `internal/workflow/contracts/*_test.go`, `internal/workflow/**/*.go`
   - Implementation:
     1. Rename `ModsSpec`/`ModStep`/`ModStack` to `MigSpec`/`MigStep`/`MigStack` in workflow contract definitions.
     2. Rename contract parser/build helpers that encode `mod` naming to `mig` naming in `internal/workflow/contracts`.
@@ -69,9 +69,9 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `rg -n '\bJobKindMod\b|\bNewModJobMeta\b' internal`.
   - Reasoning: high (8 CFP)
 
-- [ ] 1.5 Rename `mods_*.go` files to `migs_*.go` in workflow contracts
+- [x] 1.5 Rename `mods_*.go` files to `migs_*.go` in workflow contracts
   - Type: determined
-  - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/mods_spec_parse.go`, `internal/workflow/contracts/mods_spec_amata_test.go`, `internal/workflow/contracts/mods_spec_tmpdir_test.go`, `internal/workflow/contracts/mods_spec_build_gate_test.go`, `internal/workflow/contracts/mods_spec_healing_test.go`, `internal/workflow/contracts/mods_spec_roundtrip_test.go`, `internal/workflow/contracts/mods_spec_parse_test.go`
+  - Component: `internal/workflow/contracts/migs_spec.go`, `internal/workflow/contracts/migs_spec_parse.go`, `internal/workflow/contracts/migs_spec_amata_test.go`, `internal/workflow/contracts/migs_spec_tmpdir_test.go`, `internal/workflow/contracts/migs_spec_build_gate_test.go`, `internal/workflow/contracts/migs_spec_healing_test.go`, `internal/workflow/contracts/migs_spec_roundtrip_test.go`, `internal/workflow/contracts/migs_spec_parse_test.go`
   - Implementation:
     1. Rename each `mods_*.go` file in `internal/workflow/contracts` to matching `migs_*.go` filename.
     2. Update references in docs/comments/scripts that point to old `mods_*.go` filenames.
