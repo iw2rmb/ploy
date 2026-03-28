@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/server/config"
@@ -19,20 +16,11 @@ func TestConfigGitLabGetReturnsCurrentConfig(t *testing.T) {
 	}, nil)
 
 	handler := getGitLabConfigHandler(holder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/config/gitlab", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/gitlab", nil)
 
 	assertStatus(t, rr, http.StatusOK)
 
-	var resp struct {
-		Domain string `json:"domain"`
-		Token  string `json:"token"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[gitLabConfigResponse](t, rr)
 
 	if resp.Domain != "https://gitlab.example.com" {
 		t.Errorf("Domain = %q, want %q", resp.Domain, "https://gitlab.example.com")
@@ -50,31 +38,18 @@ func TestConfigGitLabPutUpdatesConfig(t *testing.T) {
 		Token:  "old-token",
 	}, nil)
 
+	handler := putGitLabConfigHandler(holder)
+
 	reqBody := map[string]string{
 		"domain": "https://gitlab.new.com",
 		"token":  "new-token-456",
 	}
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		t.Fatalf("marshal request: %v", err)
-	}
 
-	handler := putGitLabConfigHandler(holder)
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/gitlab", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/gitlab", reqBody)
 
 	assertStatus(t, rr, http.StatusOK)
 
-	var resp struct {
-		Domain string `json:"domain"`
-		Token  string `json:"token"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[gitLabConfigResponse](t, rr)
 
 	if resp.Domain != "https://gitlab.new.com" {
 		t.Errorf("response Domain = %q, want %q", resp.Domain, "https://gitlab.new.com")
@@ -99,11 +74,7 @@ func TestConfigGitLabPutInvalidJSON(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putGitLabConfigHandler(holder)
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/gitlab", bytes.NewReader([]byte("not json")))
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/gitlab", "not json")
 
 	assertStatus(t, rr, http.StatusBadRequest)
 }
@@ -115,21 +86,9 @@ func TestConfigGitLabRoundTrip(t *testing.T) {
 		domain string
 		token  string
 	}{
-		{
-			name:   "standard values",
-			domain: "https://gitlab.com",
-			token:  "glpat-abc123",
-		},
-		{
-			name:   "empty values",
-			domain: "",
-			token:  "",
-		},
-		{
-			name:   "custom domain",
-			domain: "https://git.internal.corp",
-			token:  "custom-token-xyz",
-		},
+		{name: "standard values", domain: "https://gitlab.com", token: "glpat-abc123"},
+		{name: "empty values", domain: "", token: ""},
+		{name: "custom domain", domain: "https://git.internal.corp", token: "custom-token-xyz"},
 	}
 
 	for _, tt := range tests {
@@ -137,42 +96,17 @@ func TestConfigGitLabRoundTrip(t *testing.T) {
 			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 			// PUT the configuration.
-			reqBody := map[string]string{
+			putRR := doRequest(t, putGitLabConfigHandler(holder), http.MethodPut, "/v1/config/gitlab", map[string]string{
 				"domain": tt.domain,
 				"token":  tt.token,
-			}
-			body, err := json.Marshal(reqBody)
-			if err != nil {
-				t.Fatalf("marshal request: %v", err)
-			}
-
-			putHandler := putGitLabConfigHandler(holder)
-			putReq := httptest.NewRequest(http.MethodPut, "/v1/config/gitlab", bytes.NewReader(body))
-			putReq.Header.Set("Content-Type", "application/json")
-			putRR := httptest.NewRecorder()
-			putHandler.ServeHTTP(putRR, putReq)
-
-			if putRR.Code != http.StatusOK {
-				t.Fatalf("PUT status = %d, want %d", putRR.Code, http.StatusOK)
-			}
+			})
+			assertStatus(t, putRR, http.StatusOK)
 
 			// GET the configuration.
-			getHandler := getGitLabConfigHandler(holder)
-			getReq := httptest.NewRequest(http.MethodGet, "/v1/config/gitlab", nil)
-			getRR := httptest.NewRecorder()
-			getHandler.ServeHTTP(getRR, getReq)
+			getRR := doRequest(t, getGitLabConfigHandler(holder), http.MethodGet, "/v1/config/gitlab", nil)
+			assertStatus(t, getRR, http.StatusOK)
 
-			if getRR.Code != http.StatusOK {
-				t.Fatalf("GET status = %d, want %d", getRR.Code, http.StatusOK)
-			}
-
-			var resp struct {
-				Domain string `json:"domain"`
-				Token  string `json:"token"`
-			}
-			if err := json.NewDecoder(getRR.Body).Decode(&resp); err != nil {
-				t.Fatalf("decode GET response: %v", err)
-			}
+			resp := decodeBody[gitLabConfigResponse](t, getRR)
 
 			if resp.Domain != tt.domain {
 				t.Errorf("Domain = %q, want %q", resp.Domain, tt.domain)

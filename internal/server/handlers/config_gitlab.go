@@ -98,6 +98,12 @@ func (h *ConfigHolder) DeleteGlobalEnvVar(key string) {
 	delete(h.globalEnv, key)
 }
 
+// gitLabConfigResponse is the wire format for GET/PUT /v1/config/gitlab.
+type gitLabConfigResponse struct {
+	Domain string `json:"domain"`
+	Token  string `json:"token"`
+}
+
 // getGitLabConfigHandler returns an HTTP handler that returns the current GitLab config.
 // It requires mTLS admin role authorization (enforced by middleware).
 // The token field is included in the response for admin access.
@@ -105,10 +111,7 @@ func getGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cfg := holder.GetGitLab()
 
-		resp := struct {
-			Domain string `json:"domain"`
-			Token  string `json:"token"`
-		}{
+		resp := gitLabConfigResponse{
 			Domain: cfg.Domain,
 			Token:  cfg.Token,
 		}
@@ -147,10 +150,7 @@ func putGitLabConfigHandler(holder *ConfigHolder) http.HandlerFunc {
 		})
 
 		// Return the updated configuration.
-		resp := struct {
-			Domain string `json:"domain"`
-			Token  string `json:"token"`
-		}{
+		resp := gitLabConfigResponse{
 			Domain: req.Domain,
 			Token:  req.Token,
 		}
