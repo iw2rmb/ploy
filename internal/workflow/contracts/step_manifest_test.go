@@ -64,13 +64,13 @@ func TestStepManifestValidate(t *testing.T) {
 			},
 			wantErr: "id",
 		},
-		{
-			name: "invalid id characters",
-			mutate: func(m *StepManifest) {
-				m.ID = "Mods Apply"
+			{
+				name: "invalid id characters",
+				mutate: func(m *StepManifest) {
+					m.ID = "migs Apply"
+				},
+				wantErr: "id",
 			},
-			wantErr: "id",
-		},
 		{
 			name: "missing image",
 			mutate: func(m *StepManifest) {
