@@ -78,18 +78,18 @@ func TestSnapshotWorkspaceForNoIndexDiff(t *testing.T) {
 			defer result.cleanup()
 
 			if tt.wantEmpty {
-				if result.dir != "" {
-					t.Fatalf("expected empty dir for non-git workspace, got: %s", result.dir)
+				if result.path != "" {
+					t.Fatalf("expected empty dir for non-git workspace, got: %s", result.path)
 				}
 				return
 			}
 
-			if result.dir == "" {
+			if result.path == "" {
 				t.Fatal("snapshot directory is empty")
 			}
 
 			if tt.addFile {
-				data, err := os.ReadFile(filepath.Join(result.dir, "test.txt"))
+				data, err := os.ReadFile(filepath.Join(result.path, "test.txt"))
 				if err != nil {
 					t.Fatalf("read copied file: %v", err)
 				}
@@ -99,7 +99,7 @@ func TestSnapshotWorkspaceForNoIndexDiff(t *testing.T) {
 			}
 
 			// Verify cleanup removes the directory.
-			snapshotDir := result.dir
+			snapshotDir := result.path
 			result.cleanup()
 			if _, err := os.Stat(snapshotDir); !os.IsNotExist(err) {
 				t.Fatalf("snapshot directory was not cleaned up: %s", snapshotDir)
@@ -168,9 +168,9 @@ func TestWorkspaceRehydrationResult_CleanupRemovesDirectory(t *testing.T) {
 		t.Fatalf("create test file: %v", err)
 	}
 
-	result := workspaceRehydrationResult{
-		workspace: workspace,
-		cleanup:   func() { _ = os.RemoveAll(workspace) },
+	result := tempResource{
+		path:    workspace,
+		cleanup: func() { _ = os.RemoveAll(workspace) },
 	}
 	result.cleanup()
 
@@ -180,8 +180,8 @@ func TestWorkspaceRehydrationResult_CleanupRemovesDirectory(t *testing.T) {
 }
 
 func TestSnapshotResult_CleanupIsSafeWhenEmpty(t *testing.T) {
-	result := snapshotResult{
-		dir:     "",
+	result := tempResource{
+		path:    "",
 		cleanup: func() {},
 	}
 	result.cleanup()

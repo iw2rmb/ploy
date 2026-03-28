@@ -184,12 +184,11 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			var err error
-			if tt.bundleName != "" {
-				err = controller.uploadOutDirBundle(ctx, "test-run", "test-stage", outDir, tt.bundleName)
-			} else {
-				err = controller.uploadOutDir(ctx, "test-run", "test-stage", outDir)
+			bundleName := tt.bundleName
+			if bundleName == "" {
+				bundleName = "mig-out"
 			}
+			err := controller.uploadOutDirBundle(ctx, "test-run", "test-stage", outDir, bundleName)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("upload error = %v, wantErr %v", err, tt.wantErr)
@@ -556,6 +555,72 @@ func TestIsValidArtifactPath(t *testing.T) {
 			if got != tt.wantValid {
 				t.Errorf("isValidArtifactPath(%q, %q) = %v, want %v",
 					tt.artifactPath, tt.workspace, got, tt.wantValid)
+			}
+		})
+	}
+}
+
+func TestRunController_reportTerminalStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		runErr     error
+		exitCode   int
+		wantStatus string
+	}{
+		{
+			name:       "runtime error reports cancelled",
+			runErr:     context.Canceled,
+			wantStatus: types.JobStatusCancelled.String(),
+		},
+		{
+			name:       "nonzero exit code reports fail",
+			exitCode:   1,
+			wantStatus: types.JobStatusFail.String(),
+		},
+		{
+			name:       "zero exit code reports success",
+			exitCode:   0,
+			wantStatus: types.JobStatusSuccess.String(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotStatus string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v1/jobs/test-job/complete" {
+					body, _ := io.ReadAll(r.Body)
+					// Extract status from JSON body: {"status":"..."}
+					for _, field := range []string{types.JobStatusSuccess.String(), types.JobStatusFail.String(), types.JobStatusCancelled.String()} {
+						if bytes.Contains(body, []byte(`"`+field+`"`)) {
+							gotStatus = field
+							break
+						}
+					}
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+
+			controller := newTestController(t, newTestConfig(server.URL))
+			stats := types.NewRunStatsBuilder().ExitCode(tt.exitCode).MustBuild()
+			result := step.Result{ExitCode: tt.exitCode}
+			req := StartRunRequest{
+				RunID: "test-run",
+				JobID: "test-job",
+			}
+
+			controller.reportTerminalStatus(
+				context.Background(), req, tt.runErr, result,
+				stats, "", 100*1e6, // 100ms
+			)
+
+			if gotStatus != tt.wantStatus {
+				t.Errorf("status = %q, want %q", gotStatus, tt.wantStatus)
 			}
 		})
 	}
