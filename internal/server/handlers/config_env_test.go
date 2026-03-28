@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -20,10 +17,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	})
 
 	handler := listGlobalEnvHandler(holder)
-	req := httptest.NewRequest(http.MethodGet, "/v1/config/env", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env", nil)
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -244,39 +238,18 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 			// PUT the entry.
-			putHandler := putGlobalEnvHandler(holder, st)
-			reqBody := map[string]any{
+			putRR := doRequest(t, putGlobalEnvHandler(holder, st), http.MethodPut, "/v1/config/env/"+tt.key, map[string]any{
 				"value":  tt.value,
 				"scope":  tt.scope,
 				"secret": tt.secret,
-			}
-			body, _ := json.Marshal(reqBody)
-
-			putReq := httptest.NewRequest(http.MethodPut, "/v1/config/env/"+tt.key, bytes.NewReader(body))
-			putReq.SetPathValue("key", tt.key)
-			putReq.Header.Set("Content-Type", "application/json")
-			putRR := httptest.NewRecorder()
-			putHandler.ServeHTTP(putRR, putReq)
-
-			if putRR.Code != http.StatusOK {
-				t.Fatalf("PUT status = %d, want %d", putRR.Code, http.StatusOK)
-			}
+			}, "key", tt.key)
+			assertStatus(t, putRR, http.StatusOK)
 
 			// GET the entry.
-			getHandler := getGlobalEnvHandler(holder)
-			getReq := httptest.NewRequest(http.MethodGet, "/v1/config/env/"+tt.key, nil)
-			getReq.SetPathValue("key", tt.key)
-			getRR := httptest.NewRecorder()
-			getHandler.ServeHTTP(getRR, getReq)
+			getRR := doRequest(t, getGlobalEnvHandler(holder), http.MethodGet, "/v1/config/env/"+tt.key, nil, "key", tt.key)
+			assertStatus(t, getRR, http.StatusOK)
 
-			if getRR.Code != http.StatusOK {
-				t.Fatalf("GET status = %d, want %d", getRR.Code, http.StatusOK)
-			}
-
-			var resp globalEnvResponse
-			if err := json.NewDecoder(getRR.Body).Decode(&resp); err != nil {
-				t.Fatalf("decode GET response: %v", err)
-			}
+			resp := decodeBody[globalEnvResponse](t, getRR)
 
 			if resp.Key != tt.key {
 				t.Errorf("Key = %q, want %q", resp.Key, tt.key)
@@ -300,12 +273,7 @@ func TestConfigEnvPutInvalidJSON(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := putGlobalEnvHandler(holder, st)
-	req := httptest.NewRequest(http.MethodPut, "/v1/config/env/TEST", bytes.NewReader([]byte("not json")))
-	req.SetPathValue("key", "TEST")
-	req.Header.Set("Content-Type", "application/json")
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST", "not json", "key", "TEST")
 
 	assertStatus(t, rr, http.StatusBadRequest)
 }
