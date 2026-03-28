@@ -58,11 +58,7 @@ func (m *mockStore) ListSBOMCompatRows(ctx context.Context, arg store.ListSBOMCo
 }
 
 func (m *mockStore) ListDiffsByRunRepo(ctx context.Context, arg store.ListDiffsByRunRepoParams) ([]store.Diff, error) {
-	return m.listDiffsByRunRepo.ret()
-}
-
-func (m *mockStore) ListDiffsMetaByRunRepo(ctx context.Context, arg store.ListDiffsMetaByRunRepoParams) ([]store.Diff, error) {
-	return m.listDiffsMetaByRunRepo.record(arg)
+	return m.listDiffsByRunRepo.record(arg)
 }
 
 func (m *mockStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff, error) {

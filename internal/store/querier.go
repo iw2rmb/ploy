@@ -166,14 +166,12 @@ type Querier interface {
 	// Returns artifact bundle metadata for a run and job.
 	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
+	// Returns diffs for a run.
+	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
 	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 	ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error)
-	// Returns diff metadata for a run.
-	ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
-	// Returns diff metadata for a specific repo within a run.
-	ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]Diff, error)
 	// Lists distinct repos for a mig with last known run metadata,
 	// optionally filtered by repo_url substring.
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
@@ -212,14 +210,6 @@ type Querier interface {
 	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
 	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
-	// Returns log metadata for a run.
-	ListLogsMetaByRun(ctx context.Context, runID types.RunID) ([]Log, error)
-	// Returns log metadata for a run and job.
-	ListLogsMetaByRunAndJob(ctx context.Context, arg ListLogsMetaByRunAndJobParams) ([]Log, error)
-	// Returns log metadata for a run and job since a given id.
-	ListLogsMetaByRunAndJobSince(ctx context.Context, arg ListLogsMetaByRunAndJobSinceParams) ([]Log, error)
-	// Returns log metadata for a run since a given id.
-	ListLogsMetaByRunSince(ctx context.Context, arg ListLogsMetaByRunSinceParams) ([]Log, error)
 	ListMigReposByMig(ctx context.Context, migID types.MigID) ([]MigRepo, error)
 	// Lists migs with optional filtering by archived status and name substring.
 	// archived_only: if true, return only archived migs; if false, return only active migs; if null, return all.

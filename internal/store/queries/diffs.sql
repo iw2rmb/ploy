@@ -32,24 +32,11 @@ ORDER BY
   d.created_at ASC,
   d.id ASC;
 
--- name: ListDiffsMetaByRun :many
+-- name: ListDiffsByRun :many
 -- Returns diff metadata for a run.
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
 WHERE run_id = $1
 ORDER BY created_at ASC, id ASC;
-
--- name: ListDiffsMetaByRunRepo :many
--- Returns diff metadata for a specific repo within a run.
-SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-JOIN jobs j ON j.id = d.job_id
-WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY
-  CASE
-    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-    ELSE 0
-  END ASC,
-  d.created_at ASC,
-  d.id ASC;
 
 -- name: GetLatestDiffByJob :one
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at

@@ -141,8 +141,8 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			return
 		}
 
-		// Query diff metadata only (exclude patch bytes) filtered by repo attribution.
-		diffs, err := st.ListDiffsMetaByRunRepo(r.Context(), store.ListDiffsMetaByRunRepoParams{
+		// Query diff metadata filtered by repo attribution.
+		diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
 			RunID:  runID,
 			RepoID: repoID,
 		})
