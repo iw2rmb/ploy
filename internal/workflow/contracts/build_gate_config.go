@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// BuildGateConfig configures Build Gate validation for a Mods run.
+// BuildGateConfig configures Build Gate validation for a mig run.
 type BuildGateConfig struct {
 	// Enabled controls whether the build gate runs before/after mig execution.
 	Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`

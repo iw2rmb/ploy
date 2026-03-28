@@ -1,10 +1,10 @@
-// job_image.go provides stack-aware image resolution for Mods specs.
+// job_image.go provides stack-aware image resolution for mig specs.
 //
 // This file implements the JobImage type that supports two canonical forms:
 //   - Universal image (string): A single image used for all build stacks.
 //   - Stack-specific image (map): Different images per detected build stack.
 //
-// Both forms are intentionally supported as first-class citizens of the Mods
+// Both forms are intentionally supported as first-class citizens of the mig
 // spec schema. The dual-form design enables:
 //   - Simple configurations using a single image string for stack-agnostic migs.
 //   - Optimized configurations using stack-specific images for tools like Maven
@@ -253,7 +253,7 @@ func (m *JobImage) UnmarshalJSON(data []byte) error {
 //   - "" or unknown → MigStackUnknown
 //
 // This function enables deterministic stack-aware image selection after
-// Build Gate detection, ensuring Mods steps use the correct stack-specific
+// Build Gate detection, ensuring mig steps use the correct stack-specific
 // images based on the workspace's detected build system.
 func ToolToMigStack(tool string) MigStack {
 	switch strings.ToLower(strings.TrimSpace(tool)) {

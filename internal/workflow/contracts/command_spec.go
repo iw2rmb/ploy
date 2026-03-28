@@ -1,10 +1,10 @@
-// command_spec.go provides polymorphic command handling for Mods specs.
+// command_spec.go provides polymorphic command handling for mig specs.
 //
 // CommandSpec represents container commands that can be specified in two forms:
 //   - Shell string: Executed via /bin/sh -c (e.g., "echo hello && ls -la")
 //   - Exec array: Executed directly without shell wrapper (e.g., ["/bin/sh", "-c", "echo"])
 //
-// Both forms are first-class citizens of the Mods spec schema, enabling:
+// Both forms are first-class citizens of the mig spec schema, enabling:
 //   - Simple commands using a single shell string for convenience.
 //   - Complex commands using exec arrays for precise control over arguments.
 //

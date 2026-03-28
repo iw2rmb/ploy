@@ -38,7 +38,7 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// MigSpec is the canonical typed representation of a Mods run specification.
+// MigSpec is the canonical typed representation of a mig run specification.
 // All specs use steps[]; multi-step runs have len(steps) > 1.
 //
 // Wire compatibility: This struct marshals to/from JSON with stable field names

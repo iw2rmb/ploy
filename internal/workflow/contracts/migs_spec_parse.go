@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-// ParseMigSpecJSON parses a Mods specification from JSON bytes.
+// ParseMigSpecJSON parses a mig specification from JSON bytes.
 // Returns a validated MigSpec or an error for invalid/malformed input.
 func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	if len(data) == 0 {
