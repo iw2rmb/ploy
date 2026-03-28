@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"strings"
 	"testing"
@@ -450,6 +451,99 @@ func healingSpecBytes(t *testing.T) []byte {
 		t.Fatalf("marshal healing spec: %v", err)
 	}
 	return b
+}
+
+// healingSpecBytesWithRetries returns a healing spec with a configurable retry count.
+func healingSpecBytesWithRetries(t *testing.T, retries int) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": float64(retries),
+						"image":   "migs-codex:latest",
+					},
+				},
+			},
+			"router": map[string]any{
+				"image": "migs-router:latest",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal healing spec: %v", err)
+	}
+	return b
+}
+
+// healingSpecBytesWithExpectations returns a healing spec with expectations.artifacts block.
+func healingSpecBytesWithExpectations(t *testing.T, retries int) []byte {
+	t.Helper()
+	b, err := json.Marshal(map[string]any{
+		"steps": []any{
+			map[string]any{"image": "migs-orw:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"retries": float64(retries),
+						"image":   "migs-codex:latest",
+						"expectations": map[string]any{
+							"artifacts": []any{
+								map[string]any{
+									"path":   "/out/gate-profile-candidate.json",
+									"schema": "gate_profile_v1",
+								},
+							},
+						},
+					},
+				},
+			},
+			"router": map[string]any{
+				"image": "migs-router:latest",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal healing spec: %v", err)
+	}
+	return b
+}
+
+// newNodeFixture returns a node with generated ID, sensible defaults, and the given Drained flag.
+func newNodeFixture(drained bool) (string, store.Node) {
+	nodeIDStr := domaintypes.NewNodeKey()
+	nodeID := domaintypes.NodeID(nodeIDStr)
+	now := time.Now()
+	return nodeIDStr, store.Node{
+		ID:            nodeID,
+		Name:          "worker-1",
+		IpAddress:     netip.MustParseAddr("10.0.0.1"),
+		Concurrency:   4,
+		Drained:       drained,
+		CreatedAt:     pgtype.Timestamptz{Time: now, Valid: true},
+		LastHeartbeat: pgtype.Timestamptz{Time: now, Valid: true},
+	}
+}
+
+// assertCancelsSuccessor asserts that no jobs were created and exactly one
+// successor was cancelled with the given ID.
+func assertCancelsSuccessor(t *testing.T, st *mockStore, successorID domaintypes.JobID) {
+	t.Helper()
+	if st.createJobCallCount != 0 {
+		t.Fatalf("expected no healing jobs, got %d CreateJob calls", st.createJobCallCount)
+	}
+	if len(st.updateJobStatusCalls) != 1 {
+		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
+	}
+	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
+	}
 }
 
 // expectedJob describes the expected attributes of a single job in a chain.

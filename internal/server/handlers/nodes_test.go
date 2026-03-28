@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"net/netip"
 	"strings"
 	"testing"
@@ -16,47 +15,110 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestDrainNodeHandlerSuccess verifies successful node draining.
-func TestDrainNodeHandlerSuccess(t *testing.T) {
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	now := time.Now()
-
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID:            nodeID,
-			Name:          "worker-1",
-			IpAddress:     netip.MustParseAddr("10.0.0.1"),
-			Concurrency:   4,
-			Drained:       false,
-			CreatedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-			LastHeartbeat: pgtype.Timestamptz{Time: now, Valid: true},
+// TestDrainUndrain covers success, not-found, and conflict cases for both drain and undrain.
+func TestDrainUndrain(t *testing.T) {
+	cases := []struct {
+		name             string
+		handler          func(store.Store) http.HandlerFunc
+		action           string
+		nodeErr          error
+		initialDrained   bool
+		wantStatus       int
+		wantBodyContains string
+		wantDrainCalled  bool
+		wantDrainedFlag  *bool
+	}{
+		{
+			name:            "drain/success",
+			handler:         drainNodeHandler,
+			action:          "drain",
+			initialDrained:  false,
+			wantStatus:      http.StatusNoContent,
+			wantDrainCalled: true,
+			wantDrainedFlag: boolPtr(true),
+		},
+		{
+			name:            "undrain/success",
+			handler:         undrainNodeHandler,
+			action:          "undrain",
+			initialDrained:  true,
+			wantStatus:      http.StatusNoContent,
+			wantDrainCalled: true,
+			wantDrainedFlag: boolPtr(false),
+		},
+		{
+			name:             "drain/not_found",
+			handler:          drainNodeHandler,
+			action:           "drain",
+			nodeErr:          pgx.ErrNoRows,
+			wantStatus:       http.StatusNotFound,
+			wantBodyContains: "node not found",
+		},
+		{
+			name:             "undrain/not_found",
+			handler:          undrainNodeHandler,
+			action:           "undrain",
+			nodeErr:          pgx.ErrNoRows,
+			wantStatus:       http.StatusNotFound,
+			wantBodyContains: "node not found",
+		},
+		{
+			name:             "drain/already_drained",
+			handler:          drainNodeHandler,
+			action:           "drain",
+			initialDrained:   true,
+			wantStatus:       http.StatusConflict,
+			wantBodyContains: "already drained",
+		},
+		{
+			name:             "undrain/not_drained",
+			handler:          undrainNodeHandler,
+			action:           "undrain",
+			initialDrained:   false,
+			wantStatus:       http.StatusConflict,
+			wantBodyContains: "not drained",
 		},
 	}
 
-	handler := drainNodeHandler(st)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil, "id", nodeIDStr)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeIDStr, node := newNodeFixture(tc.initialDrained)
+			st := &mockStore{
+				getNodeResult: node,
+				getNodeErr:    tc.nodeErr,
+			}
 
-	assertStatus(t, rr, http.StatusNoContent)
+			h := tc.handler(st)
+			rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/"+tc.action, nil, "id", nodeIDStr)
 
-	if !st.getNodeCalled {
-		t.Error("expected GetNode to be called")
-	}
-	if !st.updateNodeDrainedCalled {
-		t.Error("expected UpdateNodeDrained to be called")
-	}
-	if !st.updateNodeDrainedParams.Drained {
-		t.Error("expected drained flag to be true")
+			assertStatus(t, rr, tc.wantStatus)
+
+			if tc.wantBodyContains != "" && !strings.Contains(rr.Body.String(), tc.wantBodyContains) {
+				t.Errorf("expected body to contain %q, got: %s", tc.wantBodyContains, rr.Body.String())
+			}
+			if tc.wantDrainCalled {
+				assertCalled(t, "UpdateNodeDrained", st.updateNodeDrainedCalled)
+			} else {
+				assertNotCalled(t, "UpdateNodeDrained", st.updateNodeDrainedCalled)
+			}
+			if tc.wantDrainedFlag != nil && st.updateNodeDrainedParams.Drained != *tc.wantDrainedFlag {
+				t.Errorf("expected drained flag %v, got %v", *tc.wantDrainedFlag, st.updateNodeDrainedParams.Drained)
+			}
+		})
 	}
 }
 
-// TestDrainNodeHandlerInvalidID verifies rejection of invalid node IDs.
-// Node IDs are NanoID(6) strings; invalid IDs are rejected.
-func TestDrainNodeHandlerInvalidID(t *testing.T) {
-	st := &mockStore{}
-	handler := drainNodeHandler(st)
-
-	cases := []struct {
+// TestDrainUndrain_InvalidID verifies rejection of invalid node IDs for both drain and undrain.
+func TestDrainUndrain_InvalidID(t *testing.T) {
+	handlers := []struct {
+		name    string
+		handler func(store.Store) http.HandlerFunc
+		action  string
+	}{
+		{"drain", drainNodeHandler, "drain"},
+		{"undrain", undrainNodeHandler, "undrain"},
+	}
+	ids := []struct {
 		name  string
 		id    string
 		urlID string
@@ -66,163 +128,14 @@ func TestDrainNodeHandlerInvalidID(t *testing.T) {
 		{"invalid nanoid", "not-a-nanoid", "x"},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+tc.urlID+"/drain", nil, "id", tc.id)
-
-			assertStatus(t, rr, http.StatusBadRequest)
-		})
-	}
-}
-
-// TestDrainNodeHandlerNotFound verifies 404 when node doesn't exist.
-func TestDrainNodeHandlerNotFound(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
-	st := &mockStore{
-		getNodeErr: pgx.ErrNoRows,
-	}
-
-	handler := drainNodeHandler(st)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/drain", nil, "id", nodeID)
-
-	assertStatus(t, rr, http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "node not found") {
-		t.Errorf("expected error about node not found, got: %s", rr.Body.String())
-	}
-}
-
-// TestDrainNodeHandlerAlreadyDrained verifies 409 when node is already drained.
-func TestDrainNodeHandlerAlreadyDrained(t *testing.T) {
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	now := time.Now()
-
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID:            nodeID,
-			Name:          "worker-1",
-			IpAddress:     netip.MustParseAddr("10.0.0.1"),
-			Concurrency:   4,
-			Drained:       true, // Already drained
-			CreatedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-			LastHeartbeat: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-	}
-
-	handler := drainNodeHandler(st)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/drain", nil, "id", nodeIDStr)
-
-	assertStatus(t, rr, http.StatusConflict)
-	if !strings.Contains(rr.Body.String(), "already drained") {
-		t.Errorf("expected error about already drained, got: %s", rr.Body.String())
-	}
-	if st.updateNodeDrainedCalled {
-		t.Error("expected UpdateNodeDrained not to be called")
-	}
-}
-
-// TestUndrainNodeHandlerSuccess verifies successful node undraining.
-func TestUndrainNodeHandlerSuccess(t *testing.T) {
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	now := time.Now()
-
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID:            nodeID,
-			Name:          "worker-1",
-			IpAddress:     netip.MustParseAddr("10.0.0.1"),
-			Concurrency:   4,
-			Drained:       true, // Currently drained
-			CreatedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-			LastHeartbeat: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-	}
-
-	handler := undrainNodeHandler(st)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil, "id", nodeIDStr)
-
-	assertStatus(t, rr, http.StatusNoContent)
-
-	if !st.getNodeCalled {
-		t.Error("expected GetNode to be called")
-	}
-	if !st.updateNodeDrainedCalled {
-		t.Error("expected UpdateNodeDrained to be called")
-	}
-	if st.updateNodeDrainedParams.Drained {
-		t.Error("expected drained flag to be false")
-	}
-}
-
-// TestUndrainNodeHandlerInvalidID verifies rejection of invalid node IDs.
-// Node IDs are NanoID(6) strings; invalid IDs are rejected.
-func TestUndrainNodeHandlerInvalidID(t *testing.T) {
-	st := &mockStore{}
-	handler := undrainNodeHandler(st)
-
-	cases := []struct {
-		name  string
-		id    string
-		urlID string
-	}{
-		{"empty id", "", "x"},
-		{"whitespace", "   ", "x"},
-		{"invalid nanoid", "not-a-nanoid", "x"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+tc.urlID+"/undrain", nil, "id", tc.id)
-
-			assertStatus(t, rr, http.StatusBadRequest)
-		})
-	}
-}
-
-// TestUndrainNodeHandlerNotFound verifies 404 when node doesn't exist.
-func TestUndrainNodeHandlerNotFound(t *testing.T) {
-	nodeID := domaintypes.NewNodeKey()
-	st := &mockStore{
-		getNodeErr: pgx.ErrNoRows,
-	}
-
-	handler := undrainNodeHandler(st)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID+"/undrain", nil, "id", nodeID)
-
-	assertStatus(t, rr, http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "node not found") {
-		t.Errorf("expected error about node not found, got: %s", rr.Body.String())
-	}
-}
-
-// TestUndrainNodeHandlerNotDrained verifies 409 when node is not drained.
-func TestUndrainNodeHandlerNotDrained(t *testing.T) {
-	nodeIDStr := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeIDStr)
-	now := time.Now()
-
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID:            nodeID,
-			Name:          "worker-1",
-			IpAddress:     netip.MustParseAddr("10.0.0.1"),
-			Concurrency:   4,
-			Drained:       false, // Not drained
-			CreatedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-			LastHeartbeat: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-	}
-
-	handler := undrainNodeHandler(st)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/undrain", nil, "id", nodeIDStr)
-
-	assertStatus(t, rr, http.StatusConflict)
-	if !strings.Contains(rr.Body.String(), "not drained") {
-		t.Errorf("expected error about not drained, got: %s", rr.Body.String())
-	}
-	if st.updateNodeDrainedCalled {
-		t.Error("expected UpdateNodeDrained not to be called")
+	for _, h := range handlers {
+		for _, tc := range ids {
+			t.Run(h.name+"/"+tc.name, func(t *testing.T) {
+				st := &mockStore{}
+				rr := doRequest(t, h.handler(st), http.MethodPost, "/v1/nodes/"+tc.urlID+"/"+h.action, nil, "id", tc.id)
+				assertStatus(t, rr, http.StatusBadRequest)
+			})
+		}
 	}
 }
 
@@ -272,12 +185,10 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	}
 
 	handler := listNodesHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/nodes", nil)
 
 	assertStatus(t, rr, http.StatusOK)
+	assertCalled(t, "ListNodes", st.listNodesCalled)
 
 	var resp []struct {
 		ID              string  `json:"id"`
@@ -341,10 +252,6 @@ func TestListNodesHandlerSuccess(t *testing.T) {
 	if resp[1].Version != nil {
 		t.Errorf("expected no version for second node")
 	}
-
-	if !st.listNodesCalled {
-		t.Error("expected ListNodes to be called")
-	}
 }
 
 // TestListNodesHandlerEmpty verifies empty list when no nodes exist.
@@ -354,15 +261,11 @@ func TestListNodesHandlerEmpty(t *testing.T) {
 	}
 
 	handler := listNodesHandler(st)
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/nodes", nil)
 
 	assertStatus(t, rr, http.StatusOK)
 
 	resp := decodeBody[[]interface{}](t, rr)
-
 	if len(resp) != 0 {
 		t.Fatalf("expected empty list, got %d items", len(resp))
 	}
