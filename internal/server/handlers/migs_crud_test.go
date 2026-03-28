@@ -122,8 +122,8 @@ func TestMods_List_Success(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
 		listMigsResult: []store.Mig{
-			{ID: "mod1", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-			{ID: "mod2", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
+			{ID: "mod001", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+			{ID: "mod002", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
 		},
 	}
 
@@ -228,12 +228,12 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
 		listMigsResult: []store.Mig{
-			{ID: "mod1", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-			{ID: "mod2", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
+			{ID: "mod001", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+			{ID: "mod002", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
 		},
 		listMigReposByModResults: map[string][]store.MigRepo{
-			"mod1": {{ID: "repo1", MigID: "mod1", RepoID: "repo1"}},
-			"mod2": {{ID: "repo2", MigID: "mod2", RepoID: "repo2"}},
+			"mod001": {{ID: "repo1", MigID: "mod001", RepoID: "repo1"}},
+			"mod002": {{ID: "repo2", MigID: "mod002", RepoID: "repo2"}},
 		},
 		repoByID: map[types.RepoID]store.Repo{
 			"repo1": {ID: "repo1", Url: "https://github.com/org/repo"},
@@ -252,8 +252,8 @@ func TestMods_List_WithRepoURLFilter_Normalizes(t *testing.T) {
 	if len(resp.Migs) != 1 {
 		t.Fatalf("got %d migs, want 1", len(resp.Migs))
 	}
-	if resp.Migs[0].ID != "mod1" {
-		t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mod1")
+	if resp.Migs[0].ID != "mod001" {
+		t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mod001")
 	}
 }
 
@@ -262,14 +262,14 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 	now := time.Now()
 	st := &mockStore{
 		listMigsResult: []store.Mig{
-			{ID: "modA", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-			{ID: "modB", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
-			{ID: "modC", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
+			{ID: "mod00A", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+			{ID: "mod00B", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
+			{ID: "mod00C", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
 		},
 		listMigReposByModResults: map[string][]store.MigRepo{
-			"modA": {{ID: "repoA", MigID: "modA", RepoID: "repoA"}},
-			"modB": {{ID: "repoB", MigID: "modB", RepoID: "repoB"}},
-			"modC": {{ID: "repoC", MigID: "modC", RepoID: "repoC"}},
+			"mod00A": {{ID: "repoA", MigID: "mod00A", RepoID: "repoA"}},
+			"mod00B": {{ID: "repoB", MigID: "mod00B", RepoID: "repoB"}},
+			"mod00C": {{ID: "repoC", MigID: "mod00C", RepoID: "repoC"}},
 		},
 		repoByID: map[types.RepoID]store.Repo{
 			"repoA": {ID: "repoA", Url: "https://github.com/org/repo"},
@@ -286,8 +286,8 @@ func TestMods_List_WithRepoURLFilter_Paginates(t *testing.T) {
 	if len(resp.Migs) != 1 {
 		t.Fatalf("got %d migs, want 1", len(resp.Migs))
 	}
-	if resp.Migs[0].ID != "modB" {
-		t.Errorf("id = %q, want %q", resp.Migs[0].ID, "modB")
+	if resp.Migs[0].ID != "mod00B" {
+		t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mod00B")
 	}
 }
 

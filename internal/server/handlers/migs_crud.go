@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -105,22 +106,14 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			specIDPtr = &createdID
 		}
 
-		// Build response
-		resp := struct {
-			ID        string              `json:"id"`
-			Name      string              `json:"name"`
-			SpecID    *domaintypes.SpecID `json:"spec_id,omitempty"`
-			CreatedBy *string             `json:"created_by,omitempty"`
-			CreatedAt string              `json:"created_at"`
-		}{
-			ID:        mig.ID.String(),
+		writeJSON(w, http.StatusCreated, domainapi.MigSummary{
+			ID:        mig.ID,
 			Name:      mig.Name,
 			SpecID:    specIDPtr,
 			CreatedBy: mig.CreatedBy,
-			CreatedAt: mig.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		}
-
-		writeJSON(w, http.StatusCreated, resp)
+			Archived:  false,
+			CreatedAt: mig.CreatedAt.Time,
+		})
 
 		slog.Info("mig created", "mig_id", mig.ID.String(), "name", mig.Name)
 	}
@@ -257,36 +250,23 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 }
 
 func writeModsListResponse(w http.ResponseWriter, migs []store.Mig) {
-	type modItem struct {
-		ID        string              `json:"id"`
-		Name      string              `json:"name"`
-		SpecID    *domaintypes.SpecID `json:"spec_id,omitempty"`
-		CreatedBy *string             `json:"created_by,omitempty"`
-		Archived  bool                `json:"archived"`
-		CreatedAt string              `json:"created_at"`
-	}
-
-	items := make([]modItem, 0, len(migs))
+	items := make([]domainapi.MigSummary, 0, len(migs))
 	for _, mig := range migs {
 		var specIDPtr *domaintypes.SpecID
 		if mig.SpecID != nil && !mig.SpecID.IsZero() {
 			specIDPtr = mig.SpecID
 		}
-		items = append(items, modItem{
-			ID:        mig.ID.String(),
+		items = append(items, domainapi.MigSummary{
+			ID:        mig.ID,
 			Name:      mig.Name,
 			SpecID:    specIDPtr,
 			CreatedBy: mig.CreatedBy,
 			Archived:  mig.ArchivedAt.Valid,
-			CreatedAt: mig.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+			CreatedAt: mig.CreatedAt.Time,
 		})
 	}
 
-	resp := struct {
-		Migs []modItem `json:"migs"`
-	}{Migs: items}
-
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, domainapi.MigListResponse{Migs: items})
 }
 
 // deleteMigHandler deletes a mig project.
