@@ -132,7 +132,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			BaseRef: types.GitRef("main"),
 		}
 
-		mig := ModContainerSpec{
+		mig := MigContainerSpec{
 			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
@@ -157,7 +157,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			// JobID intentionally omitted.
 		}
 
-		mig := ModContainerSpec{
+		mig := MigContainerSpec{
 			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
@@ -187,7 +187,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 				BaseRef: types.GitRef("main"),
 			}
 
-			mig := ModContainerSpec{
+			mig := MigContainerSpec{
 				Image: contracts.JobImage{Universal: "healer:latest"},
 			}
 

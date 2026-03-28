@@ -243,10 +243,10 @@ func resolveAmataCommand(amata *contracts.AmataRunSpec) []string {
 	return cmd
 }
 
-// buildHealingManifest constructs a StepManifest from a typed ModContainerSpec.
+// buildHealingManifest constructs a StepManifest from a typed MigContainerSpec.
 // The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // When codexSession is non-empty and the image is Codex-based, CODEX_RESUME=1 is injected.
-func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, codexSession string, stack contracts.MigStack) (contracts.StepManifest, error) {
+func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, codexSession string, stack contracts.MigStack) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
@@ -301,7 +301,7 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 
 // buildRouterManifest constructs a StepManifest for the router container that
 // produces bug_summary before healing begins.
-func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack contracts.MigStack, gatePhase types.JobType, loopKind string) (contracts.StepManifest, error) {
+func buildRouterManifest(req StartRunRequest, router MigContainerSpec, stack contracts.MigStack, gatePhase types.JobType, loopKind string) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
@@ -357,7 +357,7 @@ func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack con
 // validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.
 // For steps after the first, it derives inbound expectations from the previous step's outbound
 // when omitted, and rejects mismatched explicit inbound. Modifies steps in place.
-func validateAndDeriveStackGateChaining(steps []StepMod) error {
+func validateAndDeriveStackGateChaining(steps []StepMig) error {
 	if len(steps) <= 1 {
 		return nil
 	}

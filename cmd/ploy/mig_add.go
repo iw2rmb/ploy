@@ -62,7 +62,7 @@ func handleMigAdd(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mig add command.
-	cmd := migs.AddModCommand{
+	cmd := migs.AddMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Name:    *name,

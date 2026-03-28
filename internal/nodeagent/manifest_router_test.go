@@ -14,7 +14,7 @@ func TestBuildRouterManifest_InjectsPhaseAndLoopEnv(t *testing.T) {
 		RunID: types.RunID("run-router-env"),
 		JobID: types.JobID("job-router-env"),
 	}
-	router := ModContainerSpec{
+	router := MigContainerSpec{
 		Image: contracts.JobImage{Universal: "test/router:latest"},
 		Env: map[string]string{
 			"ROUTER_MODE": "classify",
@@ -43,7 +43,7 @@ func TestBuildRouterManifest_ContextEnvOverridesUserValues(t *testing.T) {
 		RunID: types.RunID("run-router-env-override"),
 		JobID: types.JobID("job-router-env-override"),
 	}
-	router := ModContainerSpec{
+	router := MigContainerSpec{
 		Image: contracts.JobImage{Universal: "test/router:latest"},
 		Env: map[string]string{
 			"PLOY_GATE_PHASE": "post_gate",
@@ -77,7 +77,7 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 	t.Run("amata_spec_selects_amata_command", func(t *testing.T) {
 		t.Parallel()
 
-		router := ModContainerSpec{
+		router := MigContainerSpec{
 			Image:   contracts.JobImage{Universal: "test/router:latest"},
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata: &contracts.AmataRunSpec{
@@ -106,7 +106,7 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 	t.Run("nil_amata_uses_direct_command", func(t *testing.T) {
 		t.Parallel()
 
-		router := ModContainerSpec{
+		router := MigContainerSpec{
 			Image:   contracts.JobImage{Universal: "test/router:latest"},
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   nil,
@@ -129,7 +129,7 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 	t.Run("amata_empty_spec_falls_through_to_direct_command", func(t *testing.T) {
 		t.Parallel()
 
-		router := ModContainerSpec{
+		router := MigContainerSpec{
 			Image:   contracts.JobImage{Universal: "test/router:latest"},
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   &contracts.AmataRunSpec{Spec: ""},

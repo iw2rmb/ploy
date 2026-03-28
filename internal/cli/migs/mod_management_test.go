@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestAddModCommand_Run validates AddModCommand responses.
+// TestAddModCommand_Run validates AddMigCommand responses.
 func TestAddModCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -21,7 +21,7 @@ func TestAddModCommand_Run(t *testing.T) {
 		name        string
 		modName     string
 		spec        *json.RawMessage
-		serverResp  AddModResult
+		serverResp  AddMigResult
 		statusCode  int
 		wantErr     bool
 		wantErrText string
@@ -31,7 +31,7 @@ func TestAddModCommand_Run(t *testing.T) {
 			modName:    "test-mig",
 			spec:       nil,
 			statusCode: http.StatusCreated,
-			serverResp: AddModResult{
+			serverResp: AddMigResult{
 				ID:        types.MigID("mod001"),
 				Name:      "test-mig",
 				SpecID:    nil,
@@ -43,7 +43,7 @@ func TestAddModCommand_Run(t *testing.T) {
 			modName:    "test-mig-with-spec",
 			spec:       jsonRawPtr([]byte(`{"version":"v1"}`)),
 			statusCode: http.StatusCreated,
-			serverResp: AddModResult{
+			serverResp: AddMigResult{
 				ID:        types.MigID("mod002"),
 				Name:      "test-mig-with-spec",
 				SpecID:    specIDPtr(types.SpecID("spec-001")),
@@ -93,7 +93,7 @@ func TestAddModCommand_Run(t *testing.T) {
 				client = srv.Client()
 			}
 
-			cmd := AddModCommand{
+			cmd := AddMigCommand{
 				Client:  client,
 				BaseURL: baseURL,
 				Name:    tc.modName,
@@ -131,14 +131,14 @@ func TestListMigsCommand_Run(t *testing.T) {
 		name       string
 		limit      int32
 		offset     int32
-		serverResp []ModSummary
+		serverResp []MigSummary
 		wantCount  int
 	}{
 		{
 			name:   "list migs with results",
 			limit:  50,
 			offset: 0,
-			serverResp: []ModSummary{
+			serverResp: []MigSummary{
 				{ID: types.MigID("mod001"), Name: "mig-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 				{ID: types.MigID("mod002"), Name: "mig-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
@@ -148,7 +148,7 @@ func TestListMigsCommand_Run(t *testing.T) {
 			name:       "empty list",
 			limit:      50,
 			offset:     0,
-			serverResp: []ModSummary{},
+			serverResp: []MigSummary{},
 			wantCount:  0,
 		},
 	}
@@ -166,7 +166,7 @@ func TestListMigsCommand_Run(t *testing.T) {
 				}
 
 				resp := struct {
-					Mods []ModSummary `json:"migs"`
+					Mods []MigSummary `json:"migs"`
 				}{Mods: tc.serverResp}
 
 				w.Header().Set("Content-Type", "application/json")
@@ -194,7 +194,7 @@ func TestListMigsCommand_Run(t *testing.T) {
 	}
 }
 
-// TestRemoveModCommand_Run validates RemoveModCommand responses.
+// TestRemoveModCommand_Run validates RemoveMigCommand responses.
 func TestRemoveModCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -252,7 +252,7 @@ func TestRemoveModCommand_Run(t *testing.T) {
 
 			baseURL, _ := url.Parse(srv.URL)
 
-			cmd := RemoveModCommand{
+			cmd := RemoveMigCommand{
 				Client:  srv.Client(),
 				BaseURL: baseURL,
 				MigRef:  types.MigRef(tc.modID),
@@ -345,7 +345,7 @@ func TestUnarchiveMigCommand_Run(t *testing.T) {
 	}
 }
 
-// TestSetModSpecCommand_Run validates SetModSpecCommand responses.
+// TestSetModSpecCommand_Run validates SetMigSpecCommand responses.
 func TestSetModSpecCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -357,7 +357,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 			t.Errorf("expected path to contain /specs, got %s", r.URL.Path)
 		}
 
-		resp := SetModSpecResult{ID: types.SpecID("spec-001"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+		resp := SetMigSpecResult{ID: types.SpecID("spec-001"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(resp)
@@ -366,7 +366,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := SetModSpecCommand{
+	cmd := SetMigSpecCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		MigRef:  types.MigRef("mod001"),
@@ -382,7 +382,7 @@ func TestSetModSpecCommand_Run(t *testing.T) {
 	}
 }
 
-// TestResolveModByNameNoHeuristic verifies that ResolveModByNameCommand does NOT
+// TestResolveModByNameNoHeuristic verifies that ResolveMigByNameCommand does NOT
 // special-case "UUID-like" inputs. The command should always query the server for
 // name resolution, regardless of input format. This test ensures there are no
 // client-side heuristics that bypass server resolution.
@@ -415,8 +415,8 @@ func TestResolveModByNameNoHeuristic(t *testing.T) {
 
 		// Return empty list (no match).
 		resp := struct {
-			Mods []ModSummary `json:"migs"`
-		}{Mods: []ModSummary{}}
+			Mods []MigSummary `json:"migs"`
+		}{Mods: []MigSummary{}}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -425,7 +425,7 @@ func TestResolveModByNameNoHeuristic(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := ResolveModByNameCommand{
+	cmd := ResolveMigByNameCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		MigRef:  types.MigRef(uuidLike),

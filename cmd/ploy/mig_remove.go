@@ -37,7 +37,7 @@ func handleMigRemove(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mig remove command.
-	cmd := migs.RemoveModCommand{
+	cmd := migs.RemoveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),

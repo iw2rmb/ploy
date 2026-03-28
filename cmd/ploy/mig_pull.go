@@ -136,7 +136,7 @@ func handleMigPull(args []string, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "mig pull: using mig %q\n", modID)
 
 	// Step 6: Resolve repo execution via POST /v1/migs/{mod_id}/pull.
-	pullCmd := migs.ModPullCommand{
+	pullCmd := migs.MigPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modID),

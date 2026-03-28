@@ -122,7 +122,7 @@ const (
 	PullModeLastFailed PullMode = "last-failed"
 )
 
-// ModPullCommand resolves a repo_url to execution identifiers for a mig.
+// MigPullCommand resolves a repo_url to execution identifiers for a mig.
 // Endpoint: POST /v1/migs/{mod_id}/pull
 //
 // Server performs the lookup using mod_id + repo_url to find mod_repos.id,
@@ -133,7 +133,7 @@ const (
 //   - "last-failed": newest run_repos with status=Fail
 //
 // Returns 404 if no repo matches or no run with matching status found.
-type ModPullCommand struct {
+type MigPullCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	MigRef  domaintypes.MigRef
@@ -143,7 +143,7 @@ type ModPullCommand struct {
 
 // Run executes POST /v1/migs/{mod_id}/pull with the provided repo_url and mode.
 // Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
-func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
+func (c MigPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig pull: %w", err)
 	}

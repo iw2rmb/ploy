@@ -14,13 +14,13 @@ type RunOptions struct {
 	BuildGate       BuildGateOptions
 	HealingSelector *contracts.HealingSpec
 	Healing         *HealingConfig
-	Router          *ModContainerSpec
+	Router          *MigContainerSpec
 	MRWiring        MRWiringOptions
 	MRFlagsPresent  MRFlagsPresence
-	Execution       ModContainerSpec
+	Execution       MigContainerSpec
 	Artifacts       ArtifactOptions
 	ServerMetadata  ServerMetadataOptions
-	Steps           []StepMod
+	Steps           []StepMig
 	StackGate       *contracts.StepGateStackSpec
 }
 
@@ -35,16 +35,16 @@ type BuildGateOptions struct {
 // HealingConfig describes the heal → re-gate loop configuration.
 type HealingConfig struct {
 	Retries int
-	Mod     ModContainerSpec
+	Mod     MigContainerSpec
 }
 
 func (o RunOptions) HasHealingSelector() bool {
 	return o.HealingSelector != nil && len(o.HealingSelector.ByErrorKind) > 0
 }
 
-// ModContainerSpec describes a container's image, command, and env.
+// MigContainerSpec describes a container's image, command, and env.
 // Used for healing migs, router, execution options, and step migs.
-type ModContainerSpec struct {
+type MigContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
@@ -82,10 +82,10 @@ type ServerMetadataOptions struct {
 	JobID domaintypes.JobID
 }
 
-// StepMod describes a single mig step in a multi-step run (steps[] array).
+// StepMig describes a single mig step in a multi-step run (steps[] array).
 // Each step has its own container spec and optional Stack Gate validation.
-type StepMod struct {
-	ModContainerSpec
+type StepMig struct {
+	MigContainerSpec
 	Stack  *contracts.StackGateSpec
 	Always bool
 }
@@ -113,7 +113,7 @@ func modsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 					if healing.Retries <= 0 {
 						healing.Retries = 1
 					}
-					healing.Mod = ModContainerSpec{
+					healing.Mod = MigContainerSpec{
 						Image:     action.Image,
 						Command:   action.Command,
 						Env:       copyStringMap(action.Env),
@@ -126,7 +126,7 @@ func modsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		}
 
 		if spec.BuildGate.Router != nil {
-			runOpts.Router = &ModContainerSpec{
+			runOpts.Router = &MigContainerSpec{
 				Image:     spec.BuildGate.Router.Image,
 				Command:   spec.BuildGate.Router.Command,
 				Env:       copyStringMap(spec.BuildGate.Router.Env),
@@ -157,10 +157,10 @@ func modsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 	}
 
 	if len(spec.Steps) > 1 {
-		runOpts.Steps = make([]StepMod, 0, len(spec.Steps))
+		runOpts.Steps = make([]StepMig, 0, len(spec.Steps))
 		for _, step := range spec.Steps {
-			runOpts.Steps = append(runOpts.Steps, StepMod{
-				ModContainerSpec: ModContainerSpec{
+			runOpts.Steps = append(runOpts.Steps, StepMig{
+				MigContainerSpec: MigContainerSpec{
 					Image:     step.Image,
 					Command:   step.Command,
 					Env:       copyStringMap(step.Env),

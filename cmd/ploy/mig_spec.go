@@ -68,7 +68,7 @@ func handleMigSpecSet(args []string, stderr io.Writer) error {
 	}
 
 	// Execute set mig spec command.
-	cmd := migs.SetModSpecCommand{
+	cmd := migs.SetMigSpecCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),

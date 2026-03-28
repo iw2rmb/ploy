@@ -24,7 +24,7 @@ func TestSelectedModAmata(t *testing.T) {
 		{
 			name: "single_step_returns_execution_amata",
 			typed: RunOptions{
-				Execution: ModContainerSpec{Amata: amataExec},
+				Execution: MigContainerSpec{Amata: amataExec},
 			},
 			stepIdx:  0,
 			wantSpec: "exec-spec",
@@ -32,9 +32,9 @@ func TestSelectedModAmata(t *testing.T) {
 		{
 			name: "multi_step_returns_selected_step_amata",
 			typed: RunOptions{
-				Steps: []StepMod{
-					{ModContainerSpec: ModContainerSpec{}},
-					{ModContainerSpec: ModContainerSpec{Amata: amataStep}},
+				Steps: []StepMig{
+					{MigContainerSpec: MigContainerSpec{}},
+					{MigContainerSpec: MigContainerSpec{Amata: amataStep}},
 				},
 			},
 			stepIdx:  1,
@@ -43,7 +43,7 @@ func TestSelectedModAmata(t *testing.T) {
 		{
 			name: "multi_step_out_of_range_returns_nil",
 			typed: RunOptions{
-				Steps: []StepMod{{ModContainerSpec: ModContainerSpec{Amata: amataStep}}},
+				Steps: []StepMig{{MigContainerSpec: MigContainerSpec{Amata: amataStep}}},
 			},
 			stepIdx:  2,
 			wantSpec: "",

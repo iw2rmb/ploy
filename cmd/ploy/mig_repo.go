@@ -96,7 +96,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	}
 
 	// Resolve mig reference to ID.
-	resolveCmd := migs.ResolveModByNameCommand{
+	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),
@@ -107,7 +107,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mig repo add command.
-	cmd := migs.AddModRepoCommand{
+	cmd := migs.AddMigRepoCommand{
 		Client:    httpClient,
 		BaseURL:   base,
 		MigRef:    domaintypes.MigRef(modID),
@@ -148,7 +148,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 	}
 
 	// Resolve mig reference to ID.
-	resolveCmd := migs.ResolveModByNameCommand{
+	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),
@@ -159,7 +159,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mig repo list command.
-	cmd := migs.ListModReposCommand{
+	cmd := migs.ListMigReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modID),
@@ -232,7 +232,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	}
 
 	// Resolve mig reference to ID.
-	resolveCmd := migs.ResolveModByNameCommand{
+	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),
@@ -243,7 +243,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mig repo remove command.
-	cmd := migs.RemoveModRepoCommand{
+	cmd := migs.RemoveMigRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modID),
@@ -304,7 +304,7 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 	}
 
 	// Resolve mig reference to ID.
-	resolveCmd := migs.ResolveModByNameCommand{
+	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),
@@ -315,7 +315,7 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 	}
 
 	// Execute mig repo import command.
-	cmd := migs.ImportModReposCommand{
+	cmd := migs.ImportMigReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modID),

@@ -13,7 +13,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestAddModRepoCommand_Run validates AddModRepoCommand responses.
+// TestAddModRepoCommand_Run validates AddMigRepoCommand responses.
 func TestAddModRepoCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -66,7 +66,7 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 					t.Errorf("expected POST, got %s", r.Method)
 				}
 
-				resp := ModRepoSummary{
+				resp := MigRepoSummary{
 					ID:        domaintypes.MigRepoID("repo-001"),
 					MigID:     domaintypes.MigID(tc.modID),
 					RepoURL:   tc.repoURL,
@@ -83,7 +83,7 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 
 			baseURL, _ := url.Parse(srv.URL)
 
-			cmd := AddModRepoCommand{
+			cmd := AddMigRepoCommand{
 				Client:    srv.Client(),
 				BaseURL:   baseURL,
 				MigRef:    domaintypes.MigRef(tc.modID),
@@ -112,7 +112,7 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 	}
 }
 
-// TestListModReposCommand_Run validates ListModReposCommand responses.
+// TestListModReposCommand_Run validates ListMigReposCommand responses.
 func TestListModReposCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -124,9 +124,9 @@ func TestListModReposCommand_Run(t *testing.T) {
 		}
 
 		resp := struct {
-			Repos []ModRepoSummary `json:"repos"`
+			Repos []MigRepoSummary `json:"repos"`
 		}{
-			Repos: []ModRepoSummary{
+			Repos: []MigRepoSummary{
 				{ID: domaintypes.MigRepoID("repo-001"), MigID: modID, RepoURL: "https://github.com/a/b.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("feat"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 				{ID: domaintypes.MigRepoID("repo-002"), MigID: modID, RepoURL: "https://github.com/c/d.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("fix"), CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
@@ -139,7 +139,7 @@ func TestListModReposCommand_Run(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := ListModReposCommand{
+	cmd := ListMigReposCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef(modID.String()),
@@ -154,7 +154,7 @@ func TestListModReposCommand_Run(t *testing.T) {
 	}
 }
 
-// TestRemoveModRepoCommand_Run validates RemoveModRepoCommand responses.
+// TestRemoveModRepoCommand_Run validates RemoveMigRepoCommand responses.
 func TestRemoveModRepoCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -170,7 +170,7 @@ func TestRemoveModRepoCommand_Run(t *testing.T) {
 
 	baseURL, _ := url.Parse(srv.URL)
 
-	cmd := RemoveModRepoCommand{
+	cmd := RemoveMigRepoCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef(modID.String()),
@@ -183,7 +183,7 @@ func TestRemoveModRepoCommand_Run(t *testing.T) {
 	}
 }
 
-// TestImportModReposCommand_Run validates ImportModReposCommand responses.
+// TestImportModReposCommand_Run validates ImportMigReposCommand responses.
 func TestImportModReposCommand_Run(t *testing.T) {
 	t.Parallel()
 
@@ -200,7 +200,7 @@ func TestImportModReposCommand_Run(t *testing.T) {
 			t.Errorf("expected Content-Type text/csv, got %s", ct)
 		}
 
-		resp := ImportModReposResult{
+		resp := ImportMigReposResult{
 			Created: 2,
 			Updated: 1,
 			Failed:  0,
@@ -216,7 +216,7 @@ func TestImportModReposCommand_Run(t *testing.T) {
 
 	csvData := []byte("repo_url,base_ref,target_ref\nhttps://github.com/a/b.git,main,feat\nhttps://github.com/c/d.git,main,fix\n")
 
-	cmd := ImportModReposCommand{
+	cmd := ImportMigReposCommand{
 		Client:  srv.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef(modID.String()),

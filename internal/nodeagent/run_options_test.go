@@ -395,8 +395,8 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 		stepMutator   func(*contracts.MigStep)
 		healMutator   func(*contracts.HealingActionSpec)
 		routerMutator func(*contracts.RouterSpec)
-		checkPresent  func(t *testing.T, mc ModContainerSpec)
-		checkAbsent   func(t *testing.T, mc ModContainerSpec)
+		checkPresent  func(t *testing.T, mc MigContainerSpec)
+		checkAbsent   func(t *testing.T, mc MigContainerSpec)
 	}
 
 	probes := []fieldProbe{
@@ -405,13 +405,13 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 			stepMutator:   func(s *contracts.MigStep) { s.TmpBundle = bundle },
 			healMutator:   func(a *contracts.HealingActionSpec) { a.TmpBundle = bundle },
 			routerMutator: func(r *contracts.RouterSpec) { r.TmpBundle = bundle },
-			checkPresent: func(t *testing.T, mc ModContainerSpec) {
+			checkPresent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
 				if mc.TmpBundle == nil || mc.TmpBundle.BundleID != "bun-123" {
 					t.Fatalf("TmpBundle: got %v", mc.TmpBundle)
 				}
 			},
-			checkAbsent: func(t *testing.T, mc ModContainerSpec) {
+			checkAbsent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
 				if mc.TmpBundle != nil {
 					t.Errorf("TmpBundle: got non-nil, want nil")
@@ -423,7 +423,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 			stepMutator:   func(s *contracts.MigStep) { s.Amata = amataSpec },
 			healMutator:   func(a *contracts.HealingActionSpec) { a.Amata = amataSpec },
 			routerMutator: func(r *contracts.RouterSpec) { r.Amata = amataSpec },
-			checkPresent: func(t *testing.T, mc ModContainerSpec) {
+			checkPresent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
 				if mc.Amata == nil || mc.Amata.Spec != amataSpec.Spec {
 					t.Fatalf("Amata: got %v", mc.Amata)
@@ -432,7 +432,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 					t.Fatalf("Amata.Set len: got %d, want 2", len(mc.Amata.Set))
 				}
 			},
-			checkAbsent: func(t *testing.T, mc ModContainerSpec) {
+			checkAbsent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
 				if mc.Amata != nil {
 					t.Errorf("Amata: got non-nil, want nil")
@@ -461,8 +461,8 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				if len(opts.Steps) != 2 {
 					t.Fatalf("Steps len: got %d, want 2", len(opts.Steps))
 				}
-				probe.checkPresent(t, opts.Steps[0].ModContainerSpec)
-				probe.checkAbsent(t, opts.Steps[1].ModContainerSpec)
+				probe.checkPresent(t, opts.Steps[0].MigContainerSpec)
+				probe.checkAbsent(t, opts.Steps[1].MigContainerSpec)
 			})
 
 			t.Run("healing", func(t *testing.T) {
