@@ -5,7 +5,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"io"
+	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -85,6 +89,183 @@ func generateTestCerts(t *testing.T) (certPEM, keyPEM, caPEM []byte) {
 
 	return certPEM, keyPEM, caPEM
 }
+
+// checkErr fails the test if the error doesn't match expectations.
+func checkErr(t *testing.T, wantErr bool, err error) {
+	t.Helper()
+	if wantErr && err == nil {
+		t.Error("expected error but got none")
+	}
+	if !wantErr && err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// incompressibleBytes returns deterministic pseudo-random bytes that resist
+// gzip compression. Useful for testing upload size caps.
+func incompressibleBytes(size int) []byte {
+	data := make([]byte, size)
+	rand.New(rand.NewSource(1)).Read(data)
+	return data
+}
+
+// mapKeys returns the keys of a tarEntry map for diagnostic output.
+func mapKeys(m map[string]tarEntry) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// ---------------------------------------------------------------------------
+// TLS / PKI helpers
+// ---------------------------------------------------------------------------
+
+// testPKI holds all PKI material generated for a test.
+type testPKI struct {
+	CA         *pki.CABundle
+	ServerCert *pki.IssuedCert
+	NodeCert   *pki.IssuedCert
+	NodeKey    *pki.IssuedCert // from GenerateNodeCSR (holds KeyPEM)
+}
+
+// generateTestPKI creates a full set of PKI material: CA, server cert, and
+// node cert signed by the same CA. The server cert covers 127.0.0.1.
+func generateTestPKI(t *testing.T) *testPKI {
+	t.Helper()
+	now := time.Now().UTC()
+
+	ca, err := pki.GenerateCA("test-cluster", now)
+	if err != nil {
+		t.Fatalf("generate CA: %v", err)
+	}
+
+	serverCert, err := pki.IssueServerCert(ca, "test-cluster", "127.0.0.1", now)
+	if err != nil {
+		t.Fatalf("issue server cert: %v", err)
+	}
+
+	nodeKey, nodeCSR, err := pki.GenerateNodeCSR(string(testNodeID), "test-cluster", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("generate node CSR: %v", err)
+	}
+
+	nodeCert, err := pki.SignNodeCSR(ca, nodeCSR, now)
+	if err != nil {
+		t.Fatalf("sign node CSR: %v", err)
+	}
+
+	return &testPKI{CA: ca, ServerCert: serverCert, NodeCert: nodeCert, NodeKey: nodeKey}
+}
+
+// testPKIPaths holds file paths for written PKI material.
+type testPKIPaths struct {
+	ServerCert string
+	ServerKey  string
+	NodeCert   string
+	NodeKey    string
+	CA         string
+}
+
+// writeFiles writes all PKI material to dir and returns the paths.
+func (p *testPKI) writeFiles(t *testing.T, dir string) testPKIPaths {
+	t.Helper()
+	paths := testPKIPaths{
+		ServerCert: filepath.Join(dir, "server.crt"),
+		ServerKey:  filepath.Join(dir, "server.key"),
+		NodeCert:   filepath.Join(dir, "node.crt"),
+		NodeKey:    filepath.Join(dir, "node.key"),
+		CA:         filepath.Join(dir, "ca.crt"),
+	}
+	for _, pair := range []struct{ path, content string }{
+		{paths.ServerCert, p.ServerCert.CertPEM},
+		{paths.ServerKey, p.ServerCert.KeyPEM},
+		{paths.NodeCert, p.NodeCert.CertPEM},
+		{paths.NodeKey, p.NodeKey.KeyPEM},
+		{paths.CA, p.CA.CertPEM},
+	} {
+		if err := os.WriteFile(pair.path, []byte(pair.content), 0600); err != nil {
+			t.Fatalf("write %s: %v", pair.path, err)
+		}
+	}
+	return paths
+}
+
+// startTestTLSServer starts an HTTPS server using the provided server cert.
+// If ca is non-nil, the server requires and verifies client certificates (mTLS).
+// Returns the listener address. Server and listener are cleaned up via t.Cleanup.
+func startTestTLSServer(t *testing.T, ca *pki.CABundle, serverCert *pki.IssuedCert, handler http.Handler) string {
+	t.Helper()
+
+	tlsCert, err := tls.X509KeyPair([]byte(serverCert.CertPEM), []byte(serverCert.KeyPEM))
+	if err != nil {
+		t.Fatalf("load server cert: %v", err)
+	}
+
+	serverTLS := &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		MinVersion:   tls.VersionTLS13,
+	}
+	if ca != nil {
+		pool := x509.NewCertPool()
+		pool.AddCert(ca.Cert)
+		serverTLS.ClientAuth = tls.RequireAndVerifyClientCert
+		serverTLS.ClientCAs = pool
+	}
+
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLS)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+
+	srv := &http.Server{Handler: handler}
+	go func() { _ = srv.Serve(listener) }()
+
+	t.Cleanup(func() {
+		_ = srv.Close()
+	})
+
+	return listener.Addr().String()
+}
+
+// startNodeServer creates, starts, and returns a Server with t.Cleanup shutdown.
+func startNodeServer(t *testing.T, cfg Config) *Server {
+	t.Helper()
+	server, err := NewServer(cfg, &mockController{})
+	if err != nil {
+		t.Fatalf("create server: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Start(ctx); err != nil {
+		t.Fatalf("start server: %v", err)
+	}
+	t.Cleanup(func() {
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer shutdownCancel()
+		_ = server.Stop(shutdownCtx)
+	})
+	if server.Address() == "" {
+		t.Fatal("server address is empty")
+	}
+	return server
+}
+
+// bootstrapHandler returns an http.Handler that serves the standard bootstrap
+// response on /v1/pki/bootstrap.
+func bootstrapHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/pki/bootstrap", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"certificate":"cert-data","ca_bundle":"ca-data"}`))
+	})
+	return mux
+}
+
+// ---------------------------------------------------------------------------
+// File helpers
+// ---------------------------------------------------------------------------
 
 // populateTestFiles creates files with the given content under dir.
 func populateTestFiles(t *testing.T, dir string, files []string, content string) {
@@ -173,6 +354,25 @@ func withHeartbeatTimeout(d time.Duration) configOption {
 
 func withConcurrency(n int) configOption {
 	return func(c *Config) { c.Concurrency = n }
+}
+
+func withListen(addr string) configOption {
+	return func(c *Config) { c.HTTP.Listen = addr }
+}
+
+func withHTTPTimeouts(read, write, idle time.Duration) configOption {
+	return func(c *Config) {
+		c.HTTP.ReadTimeout = read
+		c.HTTP.WriteTimeout = write
+		c.HTTP.IdleTimeout = idle
+	}
+}
+
+func withBootstrapCA(path string) configOption {
+	return func(c *Config) {
+		c.HTTP.TLS.Enabled = true
+		c.HTTP.TLS.BootstrapCAPath = path
+	}
 }
 
 // newAgentConfig returns a full Config suitable for agent lifecycle tests.

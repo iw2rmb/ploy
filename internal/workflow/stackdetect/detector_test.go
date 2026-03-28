@@ -8,431 +8,251 @@ import (
 	"testing"
 )
 
-func TestDetect_EmptyWorkspace(t *testing.T) {
+func TestDetect_Success(t *testing.T) {
+	cases := []struct {
+		name     string
+		workspace string
+		wantLang  string
+		wantTool  string
+		wantRel   string
+		evidence  map[string]string // key → value pairs to assert
+	}{
+		{
+			name:      "maven/java11-release",
+			workspace: filepath.Join("testdata", "maven", "java11-release"),
+			wantLang:  "java", wantTool: "maven", wantRel: "11",
+			evidence: map[string]string{"maven.compiler.release": "11"},
+		},
+		{
+			name:      "maven/java17-source-target",
+			workspace: filepath.Join("testdata", "maven", "java17-source-target"),
+			wantLang:  "java", wantTool: "maven", wantRel: "17",
+		},
+		{
+			name:      "maven/java11-property",
+			workspace: filepath.Join("testdata", "maven", "java11-property"),
+			wantLang:  "java", wantTool: "maven", wantRel: "11",
+			evidence: map[string]string{"java.version": "11"},
+		},
+		{
+			name:      "maven/java17-parent",
+			workspace: filepath.Join("testdata", "maven", "java17-parent"),
+			wantLang:  "java", wantTool: "maven", wantRel: "17",
+		},
+		{
+			name:      "maven/precedence-release-over-source-target",
+			workspace: filepath.Join("testdata", "maven", "precedence-release-over-source-target"),
+			wantLang:  "java", wantTool: "maven", wantRel: "17",
+			evidence: map[string]string{"maven.compiler.release": "17"},
+		},
+		{
+			name:      "maven/precedence-source-target-over-java-version",
+			workspace: filepath.Join("testdata", "maven", "precedence-source-target-over-java-version"),
+			wantLang:  "java", wantTool: "maven", wantRel: "17",
+		},
+		{
+			name:      "gradle/java17-compatibility-javaversion",
+			workspace: filepath.Join("testdata", "gradle", "java17-compatibility-javaversion"),
+			wantLang:  "java", wantTool: "gradle", wantRel: "17",
+			evidence: map[string]string{"sourceCompatibility": "17"},
+		},
+		{
+			name:      "gradle/java11-compatibility",
+			workspace: filepath.Join("testdata", "gradle", "java11-compatibility"),
+			wantLang:  "java", wantTool: "gradle", wantRel: "11",
+		},
+		{
+			name:      "gradle/kotlin-jvmtarget-javaversion",
+			workspace: filepath.Join("testdata", "gradle", "kotlin-jvmtarget-javaversion"),
+			wantLang:  "java", wantTool: "gradle", wantRel: "17",
+			evidence: map[string]string{"kotlinOptions.jvmTarget": "17"},
+		},
+		{
+			name:      "gradle/precedence-compatibility-over-kotlin-jvmtarget",
+			workspace: filepath.Join("testdata", "gradle", "precedence-compatibility-over-kotlin-jvmtarget"),
+			wantLang:  "java", wantTool: "gradle", wantRel: "11",
+			evidence: map[string]string{"sourceCompatibility": "11"},
+		},
+		{
+			name:      "go/go122",
+			workspace: filepath.Join("testdata", "go", "go122"),
+			wantLang:  "go", wantTool: "go", wantRel: "1.22",
+			evidence: map[string]string{"go": "1.22"},
+		},
+		{
+			name:      "rust/rust176-cargo",
+			workspace: filepath.Join("testdata", "rust", "rust176-cargo"),
+			wantLang:  "rust", wantTool: "cargo", wantRel: "1.76",
+			evidence: map[string]string{"rust-version": "1.76"},
+		},
+		{
+			name:      "python/python311-version-file",
+			workspace: filepath.Join("testdata", "python", "python311-version-file"),
+			wantLang:  "python", wantTool: "pip", wantRel: "3.11",
+			evidence: map[string]string{"python": "3.11"},
+		},
+	}
+
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "empty")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for empty workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			obs, err := Detect(ctx, tc.workspace)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assertObservation(t, obs, tc.wantLang, tc.wantTool, tc.wantRel)
+			for k, v := range tc.evidence {
+				assertEvidence(t, obs, k, v)
+			}
+		})
 	}
 }
 
-func TestDetect_AmbiguousBothMavenGradle(t *testing.T) {
+func TestDetect_Unknown(t *testing.T) {
+	cases := []struct {
+		name      string
+		workspace string
+	}{
+		{"empty-workspace", filepath.Join("testdata", "empty")},
+		{"maven/unresolved-placeholder", filepath.Join("testdata", "maven", "unresolved-placeholder")},
+		{"maven/no-java-version", filepath.Join("testdata", "maven", "no-java-version")},
+		{"gradle/dynamic-version", filepath.Join("testdata", "gradle", "dynamic-version")},
+		{"gradle/no-java-config", filepath.Join("testdata", "gradle", "no-java-config")},
+	}
+
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "ambiguous", "both-maven-gradle")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsAmbiguous() {
-		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
-	}
-
-	// Verify evidence includes both build files
-	if len(detErr.Evidence) != 2 {
-		t.Errorf("expected 2 evidence items, got %d", len(detErr.Evidence))
-	}
-	hasPoml := false
-	hasGradle := false
-	for _, e := range detErr.Evidence {
-		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
-			hasPoml = true
-		}
-		if e.Path == "build.gradle" && e.Key == "build.file" && e.Value == "exists" {
-			hasGradle = true
-		}
-	}
-	if !hasPoml {
-		t.Error("expected evidence for pom.xml")
-	}
-	if !hasGradle {
-		t.Error("expected evidence for build.gradle")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Detect(ctx, tc.workspace)
+			assertDetectionError(t, err, "unknown")
+		})
 	}
 }
 
-func TestDetect_MavenJava11Release(t *testing.T) {
+func TestDetect_Ambiguous(t *testing.T) {
+	type detectFunc = func(context.Context, string) (*Observation, error)
+
+	cases := []struct {
+		name         string
+		fn           detectFunc
+		workspace    string
+		tempFiles    map[string]string // if set, creates temp dir with these files
+		wantEvidence []string          // evidence paths to verify (empty = skip check)
+		minEvidence  int               // minimum evidence count (0 = skip check)
+	}{
+		{
+			name:         "Detect/both-maven-gradle",
+			fn:           Detect,
+			workspace:    filepath.Join("testdata", "ambiguous", "both-maven-gradle"),
+			wantEvidence: []string{"pom.xml", "build.gradle"},
+		},
+		{
+			name:         "Detect/both-maven-gradle-kts",
+			fn:           Detect,
+			tempFiles:    map[string]string{"pom.xml": "<project/>", "build.gradle.kts": "plugins {}"},
+			wantEvidence: []string{"pom.xml", "build.gradle.kts"},
+		},
+		{
+			name:         "Detect/java-go",
+			fn:           Detect,
+			workspace:    filepath.Join("testdata", "ambiguous", "java-go"),
+			wantEvidence: []string{"pom.xml", goModuleFile},
+		},
+		{
+			name:         "Detect/python-rust",
+			fn:           Detect,
+			workspace:    filepath.Join("testdata", "ambiguous", "python-rust"),
+			wantEvidence: []string{".python-version", "Cargo.toml"},
+		},
+		{
+			name:        "Detect/multiple",
+			fn:          Detect,
+			workspace:   filepath.Join("testdata", "ambiguous", "multiple"),
+			minEvidence: 3,
+		},
+		{
+			name:         "DetectTool/both-maven-gradle",
+			fn:           DetectTool,
+			workspace:    filepath.Join("testdata", "ambiguous", "both-maven-gradle"),
+			wantEvidence: []string{"pom.xml", "build.gradle"},
+		},
+		{
+			name:         "DetectTool/both-maven-gradle-kts",
+			fn:           DetectTool,
+			tempFiles:    map[string]string{"pom.xml": "<project/>", "build.gradle.kts": "plugins {}"},
+			wantEvidence: []string{"pom.xml", "build.gradle.kts"},
+		},
+	}
+
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "java11-release")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			workspace := tc.workspace
+			if tc.tempFiles != nil {
+				workspace = t.TempDir()
+				for name, body := range tc.tempFiles {
+					writeDetectFile(t, workspace, name, body)
+				}
+			}
 
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			_, err := tc.fn(ctx, workspace)
+			detErr := assertDetectionError(t, err, "ambiguous")
 
-	assertObservation(t, obs, "java", "maven", "11")
-	assertEvidence(t, obs, "maven.compiler.release", "11")
-}
-
-func TestDetect_MavenJava17SourceTarget(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "java17-source-target")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "java", "maven", "17")
-}
-
-func TestDetect_MavenJava11Property(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "java11-property")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "java", "maven", "11")
-	assertEvidence(t, obs, "java.version", "11")
-}
-
-func TestDetect_MavenJava17Parent(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "java17-parent")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "java", "maven", "17")
-}
-
-func TestDetect_MavenUnresolvedPlaceholder(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "unresolved-placeholder")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for unresolved placeholder")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
-	}
-}
-
-func TestDetect_MavenNoJavaVersion(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "no-java-version")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error when no Java version configured")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
+			for _, path := range tc.wantEvidence {
+				assertEvidencePath(t, detErr.Evidence, path)
+			}
+			if tc.minEvidence > 0 && len(detErr.Evidence) < tc.minEvidence {
+				t.Errorf("expected at least %d evidence items, got %d", tc.minEvidence, len(detErr.Evidence))
+			}
+		})
 	}
 }
 
-func TestDetectTool_MavenNoJavaVersion_ReturnsTool(t *testing.T) {
+func TestDetectTool_Success(t *testing.T) {
+	cases := []struct {
+		name      string
+		workspace string
+		wantLang  string
+		wantTool  string
+	}{
+		{
+			name:      "maven/no-java-version",
+			workspace: filepath.Join("testdata", "maven", "no-java-version"),
+			wantLang:  "java", wantTool: "maven",
+		},
+		{
+			name:      "python/python311-poetry",
+			workspace: filepath.Join("testdata", "python", "python311-poetry"),
+			wantLang:  "python", wantTool: "poetry",
+		},
+		{
+			name:      "python/python310-pyproject",
+			workspace: filepath.Join("testdata", "python", "python310-pyproject"),
+			wantLang:  "python", wantTool: "pip",
+		},
+	}
+
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "no-java-version")
-
-	obs, err := DetectTool(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if obs.Language != "java" {
-		t.Fatalf("Language = %q, want %q", obs.Language, "java")
-	}
-	if obs.Tool != "maven" {
-		t.Fatalf("Tool = %q, want %q", obs.Tool, "maven")
-	}
-	if obs.Release != nil {
-		t.Fatalf("Release = %v, want nil", *obs.Release)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			obs, err := DetectTool(ctx, tc.workspace)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if obs.Language != tc.wantLang {
+				t.Errorf("Language = %q, want %q", obs.Language, tc.wantLang)
+			}
+			if obs.Tool != tc.wantTool {
+				t.Errorf("Tool = %q, want %q", obs.Tool, tc.wantTool)
+			}
+			if obs.Release != nil {
+				t.Errorf("Release = %v, want nil", *obs.Release)
+			}
+		})
 	}
 }
 
-func TestDetectTool_PythonPoetryPyproject_ReturnsPoetry(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "python", "python311-poetry")
-
-	obs, err := DetectTool(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if obs.Language != "python" {
-		t.Fatalf("Language = %q, want %q", obs.Language, "python")
-	}
-	if obs.Tool != "poetry" {
-		t.Fatalf("Tool = %q, want %q", obs.Tool, "poetry")
-	}
-	if obs.Release != nil {
-		t.Fatalf("Release = %v, want nil", *obs.Release)
-	}
-}
-
-func TestDetectTool_PythonPep621Pyproject_ReturnsPip(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "python", "python310-pyproject")
-
-	obs, err := DetectTool(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if obs.Language != "python" {
-		t.Fatalf("Language = %q, want %q", obs.Language, "python")
-	}
-	if obs.Tool != "pip" {
-		t.Fatalf("Tool = %q, want %q", obs.Tool, "pip")
-	}
-	if obs.Release != nil {
-		t.Fatalf("Release = %v, want nil", *obs.Release)
-	}
-}
-
-func TestDetectTool_AmbiguousBothMavenGradle(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "ambiguous", "both-maven-gradle")
-
-	_, err := DetectTool(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-	if !detErr.IsAmbiguous() {
-		t.Fatalf("expected ambiguous error, got %q", detErr.Reason)
-	}
-
-	hasPom := false
-	hasGradle := false
-	for _, e := range detErr.Evidence {
-		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
-			hasPom = true
-		}
-		if e.Path == "build.gradle" && e.Key == "build.file" && e.Value == "exists" {
-			hasGradle = true
-		}
-	}
-	if !hasPom || !hasGradle {
-		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle, got %+v", detErr.Evidence)
-	}
-}
-
-func TestDetect_AmbiguousBothMavenGradleKts(t *testing.T) {
-	ctx := context.Background()
-	workspace := t.TempDir()
-	writeDetectFile(t, workspace, "pom.xml", "<project/>")
-	writeDetectFile(t, workspace, "build.gradle.kts", "plugins {}")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-	if !detErr.IsAmbiguous() {
-		t.Fatalf("expected ambiguous error, got %q", detErr.Reason)
-	}
-
-	hasPom := false
-	hasGradleKts := false
-	for _, e := range detErr.Evidence {
-		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
-			hasPom = true
-		}
-		if e.Path == "build.gradle.kts" && e.Key == "build.file" && e.Value == "exists" {
-			hasGradleKts = true
-		}
-	}
-	if !hasPom || !hasGradleKts {
-		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle.kts, got %+v", detErr.Evidence)
-	}
-}
-
-func TestDetectTool_AmbiguousBothMavenGradleKts(t *testing.T) {
-	ctx := context.Background()
-	workspace := t.TempDir()
-	writeDetectFile(t, workspace, "pom.xml", "<project/>")
-	writeDetectFile(t, workspace, "build.gradle.kts", "plugins {}")
-
-	_, err := DetectTool(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-	if !detErr.IsAmbiguous() {
-		t.Fatalf("expected ambiguous error, got %q", detErr.Reason)
-	}
-
-	hasPom := false
-	hasGradleKts := false
-	for _, e := range detErr.Evidence {
-		if e.Path == "pom.xml" && e.Key == "build.file" && e.Value == "exists" {
-			hasPom = true
-		}
-		if e.Path == "build.gradle.kts" && e.Key == "build.file" && e.Value == "exists" {
-			hasGradleKts = true
-		}
-	}
-	if !hasPom || !hasGradleKts {
-		t.Fatalf("expected ambiguous evidence for pom.xml and build.gradle.kts, got %+v", detErr.Evidence)
-	}
-}
-
-func TestDetect_GradleJava17CompatibilityJavaVersion(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "java17-compatibility-javaversion")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "java", "gradle", "17")
-	assertEvidence(t, obs, "sourceCompatibility", "17")
-}
-
-func TestDetect_GradleJava11Compatibility(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "java11-compatibility")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "java", "gradle", "11")
-}
-
-func TestDetect_GradleDynamicVersion(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "dynamic-version")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for dynamic version logic")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
-	}
-}
-
-func TestDetect_GradleNoJavaConfig(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "no-java-config")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error when no Java config")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
-	}
-}
-
-func TestDetect_GradleKotlinJvmTargetJavaVersion(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "kotlin-jvmtarget-javaversion")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "java", "gradle", "17")
-	assertEvidence(t, obs, "kotlinOptions.jvmTarget", "17")
-}
-
-// Precedence tests
-
-func TestDetect_MavenPrecedenceReleaseOverSourceTarget(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "precedence-release-over-source-target")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// maven.compiler.release=17 should take precedence over source/target=11
-	assertObservation(t, obs, "java", "maven", "17")
-	assertEvidence(t, obs, "maven.compiler.release", "17")
-}
-
-func TestDetect_MavenPrecedenceSourceTargetOverJavaVersion(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "maven", "precedence-source-target-over-java-version")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// maven.compiler.source/target=17 should take precedence over java.version=11
-	assertObservation(t, obs, "java", "maven", "17")
-}
-
-func TestDetect_GradlePrecedenceCompatibilityOverKotlinJvmTarget(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "gradle", "precedence-compatibility-over-kotlin-jvmtarget")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	// sourceCompatibility/targetCompatibility should take precedence over kotlinOptions.jvmTarget
-	assertObservation(t, obs, "java", "gradle", "11")
-	assertEvidence(t, obs, "sourceCompatibility", "11")
-}
+// --- helpers ---
 
 // assertObservation validates the observation fields.
 func assertObservation(t *testing.T, obs *Observation, language, tool, release string) {
@@ -463,15 +283,12 @@ func assertEvidence(t *testing.T, obs *Observation, key, value string) {
 	t.Errorf("expected evidence with key=%q value=%q, got %+v", key, value, obs.Evidence)
 }
 
-// Cross-language ambiguity tests
+// assertDetectionError asserts the error is a *DetectionError with the expected reason.
+func assertDetectionError(t *testing.T, err error, reason string) *DetectionError {
+	t.Helper()
 
-func TestDetect_AmbiguousJavaGo(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "ambiguous", "java-go")
-
-	_, err := Detect(ctx, workspace)
 	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
+		t.Fatalf("expected error with reason %q, got nil", reason)
 	}
 
 	var detErr *DetectionError
@@ -479,129 +296,32 @@ func TestDetect_AmbiguousJavaGo(t *testing.T) {
 		t.Fatalf("expected DetectionError, got %T", err)
 	}
 
-	if !detErr.IsAmbiguous() {
-		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
+	switch reason {
+	case "unknown":
+		if !detErr.IsUnknown() {
+			t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
+		}
+	case "ambiguous":
+		if !detErr.IsAmbiguous() {
+			t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
+		}
+	default:
+		t.Fatalf("unsupported reason %q in assertDetectionError", reason)
 	}
 
-	// Verify evidence includes both languages.
-	hasPom := false
-	hasGoMod := false
-	for _, e := range detErr.Evidence {
-		if e.Path == "pom.xml" && e.Key == "build.file" {
-			hasPom = true
-		}
-		if e.Path == goModuleFile && e.Key == "build.file" {
-			hasGoMod = true
-		}
-	}
-	if !hasPom {
-		t.Error("expected evidence for pom.xml")
-	}
-	if !hasGoMod {
-		t.Error("expected evidence for Go module file")
-	}
+	return detErr
 }
 
-func TestDetect_AmbiguousPythonRust(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "ambiguous", "python-rust")
+// assertEvidencePath checks that evidence contains an entry with the given path and key "build.file".
+func assertEvidencePath(t *testing.T, evidence []EvidenceItem, path string) {
+	t.Helper()
 
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsAmbiguous() {
-		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
-	}
-
-	// Verify evidence includes both languages.
-	hasPythonVersion := false
-	hasCargo := false
-	for _, e := range detErr.Evidence {
-		if e.Path == ".python-version" && e.Key == "build.file" {
-			hasPythonVersion = true
-		}
-		if e.Path == "Cargo.toml" && e.Key == "build.file" {
-			hasCargo = true
+	for _, e := range evidence {
+		if e.Path == path && e.Key == "build.file" {
+			return
 		}
 	}
-	if !hasPythonVersion {
-		t.Error("expected evidence for .python-version")
-	}
-	if !hasCargo {
-		t.Error("expected evidence for Cargo.toml")
-	}
-}
-
-func TestDetect_AmbiguousMultiple(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "ambiguous", "multiple")
-
-	_, err := Detect(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for ambiguous workspace")
-	}
-
-	var detErr *DetectionError
-	if !errors.As(err, &detErr) {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsAmbiguous() {
-		t.Errorf("expected reason 'ambiguous', got %q", detErr.Reason)
-	}
-
-	// Should have evidence for 3+ languages.
-	if len(detErr.Evidence) < 3 {
-		t.Errorf("expected at least 3 evidence items for multiple languages, got %d", len(detErr.Evidence))
-	}
-}
-
-// New language detection tests via Detect
-
-func TestDetect_Go122(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "go", "go122")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "go", "go", "1.22")
-	assertEvidence(t, obs, "go", "1.22")
-}
-
-func TestDetect_Rust176Cargo(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "rust", "rust176-cargo")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "rust", "cargo", "1.76")
-	assertEvidence(t, obs, "rust-version", "1.76")
-}
-
-func TestDetect_Python311VersionFile(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "python", "python311-version-file")
-
-	obs, err := Detect(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "python", "pip", "3.11")
-	assertEvidence(t, obs, "python", "3.11")
+	t.Errorf("expected evidence for path %q, got %+v", path, evidence)
 }
 
 func writeDetectFile(t *testing.T, dir, name, body string) {
