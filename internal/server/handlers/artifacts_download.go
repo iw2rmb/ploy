@@ -34,29 +34,9 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build response with artifact metadata (exclude bundle bytes).
-		type artifactSummary struct {
-			ID     string  `json:"id"`
-			CID    string  `json:"cid"`
-			Digest string  `json:"digest"`
-			Name   *string `json:"name,omitempty"`
-			Size   int64   `json:"size"`
-		}
 		artifacts := make([]artifactSummary, 0, len(bundles))
 		for _, bundle := range bundles {
-			summary := artifactSummary{
-				ID:   uuid.UUID(bundle.ID.Bytes).String(),
-				Size: bundle.BundleSize,
-			}
-			if bundle.Cid != nil {
-				summary.CID = *bundle.Cid
-			}
-			if bundle.Digest != nil {
-				summary.Digest = *bundle.Digest
-			}
-			if bundle.Name != nil {
-				summary.Name = bundle.Name
-			}
-			artifacts = append(artifacts, summary)
+			artifacts = append(artifacts, bundleToSummary(bundle))
 		}
 
 		w.Header().Set("Content-Type", "application/json")

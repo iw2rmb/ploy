@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -63,13 +62,6 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		type artifactSummary struct {
-			ID     string  `json:"id"`
-			CID    string  `json:"cid"`
-			Digest string  `json:"digest"`
-			Name   *string `json:"name,omitempty"`
-			Size   int64   `json:"size"`
-		}
 		type artifactRow struct {
 			summary   artifactSummary
 			order     int
@@ -86,32 +78,13 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 				continue
 			}
 
-			id := ""
-			if bundle.ID.Valid {
-				id = uuid.UUID(bundle.ID.Bytes).String()
-			}
-
-			summary := artifactSummary{
-				ID:   id,
-				Size: bundle.BundleSize,
-			}
-			if bundle.Cid != nil {
-				summary.CID = *bundle.Cid
-			}
-			if bundle.Digest != nil {
-				summary.Digest = *bundle.Digest
-			}
-			if bundle.Name != nil {
-				summary.Name = bundle.Name
-			}
-
 			createdAt := int64(0)
 			if bundle.CreatedAt.Valid {
 				createdAt = bundle.CreatedAt.Time.UnixNano()
 			}
 
 			artifacts = append(artifacts, artifactRow{
-				summary:   summary,
+				summary:   bundleToSummary(bundle),
 				order:     order,
 				createdAt: createdAt,
 			})

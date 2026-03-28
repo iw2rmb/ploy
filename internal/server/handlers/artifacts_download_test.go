@@ -2,10 +2,9 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/google/uuid"
@@ -17,34 +16,22 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestListArtifactsByCIDHandler verifies the GET /v1/artifacts?cid=... endpoint.
 func TestListArtifactsByCIDHandler(t *testing.T) {
-	t.Run("MissingCIDParameter", func(t *testing.T) {
-		st := &mockStore{}
-		handler := listArtifactsByCIDHandler(st)
+	t.Parallel()
 
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts", nil)
-		w := httptest.NewRecorder()
-		handler(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400, got %d", w.Code)
-		}
-	})
-
-	t.Run("SuccessWithResults", func(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
 		testCID := "bafy123abc"
 		testDigest := "sha256:abcdef"
 		testName := "test-artifact"
 		testBundleSize := int64(len("test-bundle-data"))
 		artifactID := uuid.New()
-		runID := domaintypes.NewRunID()
 
 		st := &mockStore{
 			listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{
 				{
 					ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
-					RunID:      runID,
+					RunID:      domaintypes.NewRunID(),
 					Cid:        &testCID,
 					Digest:     &testDigest,
 					Name:       &testName,
@@ -53,31 +40,17 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 			},
 		}
 
-		handler := listArtifactsByCIDHandler(st)
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts?cid="+testCID, nil)
-		w := httptest.NewRecorder()
-		handler(w, req)
+		rr := doRequest(t, listArtifactsByCIDHandler(st), http.MethodGet, "/v1/artifacts?cid="+testCID, nil)
+		assertStatus(t, rr, http.StatusOK)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		type listResp struct {
+			Artifacts []artifactSummary `json:"artifacts"`
 		}
-
-		var response struct {
-			Artifacts []struct {
-				ID     string  `json:"id"`
-				CID    string  `json:"cid"`
-				Digest string  `json:"digest"`
-				Name   *string `json:"name"`
-				Size   int64   `json:"size"`
-			} `json:"artifacts"`
+		resp := decodeBody[listResp](t, rr)
+		if len(resp.Artifacts) != 1 {
+			t.Fatalf("expected 1 artifact, got %d", len(resp.Artifacts))
 		}
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-		if len(response.Artifacts) != 1 {
-			t.Fatalf("expected 1 artifact, got %d", len(response.Artifacts))
-		}
-		art := response.Artifacts[0]
+		art := resp.Artifacts[0]
 		if art.ID != artifactID.String() {
 			t.Errorf("expected ID %s, got %s", artifactID.String(), art.ID)
 		}
@@ -92,83 +65,48 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		}
 	})
 
-	t.Run("SuccessWithNoResults", func(t *testing.T) {
-		st := &mockStore{
-			listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{},
+	t.Run("Errors", func(t *testing.T) {
+		t.Parallel()
+		cases := []struct {
+			name   string
+			query  string
+			st     *mockStore
+			status int
+		}{
+			{
+				name:   "MissingCID",
+				query:  "",
+				st:     &mockStore{},
+				status: http.StatusBadRequest,
+			},
+			{
+				name:   "DBError",
+				query:  "?cid=bafyerr",
+				st:     &mockStore{listArtifactBundlesMetaByCIDErr: errors.New("boom")},
+				status: http.StatusInternalServerError,
+			},
+			{
+				name:   "NoResults",
+				query:  "?cid=bafy-not-found",
+				st:     &mockStore{listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{}},
+				status: http.StatusOK,
+			},
 		}
-		testCID := "bafy-not-found"
-
-		handler := listArtifactsByCIDHandler(st)
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts?cid="+testCID, nil)
-		w := httptest.NewRecorder()
-		handler(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", w.Code)
-		}
-
-		var response struct {
-			Artifacts []any `json:"artifacts"`
-		}
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
-		}
-		if len(response.Artifacts) != 0 {
-			t.Errorf("expected 0 artifacts, got %d", len(response.Artifacts))
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				rr := doRequest(t, listArtifactsByCIDHandler(tc.st), http.MethodGet, "/v1/artifacts"+tc.query, nil)
+				assertStatus(t, rr, tc.status)
+			})
 		}
 	})
 }
 
-// TestGetArtifactHandler verifies the GET /v1/artifacts/{id} endpoint.
 func TestGetArtifactHandler(t *testing.T) {
-	t.Run("MissingID", func(t *testing.T) {
-		st := &mockStore{}
-		bs := bsmock.New()
-		handler := getArtifactHandler(st, bs)
-
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/", nil)
-		// Simulate missing path value
-		w := httptest.NewRecorder()
-		handler(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400, got %d", w.Code)
-		}
-	})
-
-	t.Run("InvalidID", func(t *testing.T) {
-		st := &mockStore{}
-		bs := bsmock.New()
-		handler := getArtifactHandler(st, bs)
-
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/not-a-uuid", nil)
-		req.SetPathValue("id", "not-a-uuid")
-		w := httptest.NewRecorder()
-		handler(w, req)
-
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400, got %d", w.Code)
-		}
-	})
-
-	t.Run("NotFound", func(t *testing.T) {
-		artifactID := uuid.New()
-		st := &mockStore{
-			getArtifactBundleErr: pgx.ErrNoRows,
-		}
-		bs := bsmock.New()
-		handler := getArtifactHandler(st, bs)
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+artifactID.String(), nil)
-		req.SetPathValue("id", artifactID.String())
-		w := httptest.NewRecorder()
-		handler(w, req)
-
-		if w.Code != http.StatusNotFound {
-			t.Errorf("expected 404, got %d", w.Code)
-		}
-	})
+	t.Parallel()
 
 	t.Run("SuccessMetadata", func(t *testing.T) {
+		t.Parallel()
 		artifactID := uuid.New()
 		runID := domaintypes.NewRunID()
 		testCID := "bafy123xyz"
@@ -187,17 +125,12 @@ func TestGetArtifactHandler(t *testing.T) {
 			},
 		}
 		bs := bsmock.New()
-		handler := getArtifactHandler(st, bs)
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+artifactID.String(), nil)
-		req.SetPathValue("id", artifactID.String())
-		w := httptest.NewRecorder()
-		handler(w, req)
+		rr := doRequest(t, getArtifactHandler(st, bs), http.MethodGet,
+			"/v1/artifacts/"+artifactID.String(), nil,
+			"id", artifactID.String())
+		assertStatus(t, rr, http.StatusOK)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-		}
-
-		var response struct {
+		type detailResp struct {
 			ID     string            `json:"id"`
 			RunID  domaintypes.RunID `json:"run_id"`
 			CID    string            `json:"cid"`
@@ -205,21 +138,20 @@ func TestGetArtifactHandler(t *testing.T) {
 			Name   *string           `json:"name"`
 			Size   int64             `json:"size"`
 		}
-		if err := json.NewDecoder(w.Body).Decode(&response); err != nil {
-			t.Fatalf("failed to decode response: %v", err)
+		resp := decodeBody[detailResp](t, rr)
+		if resp.ID != artifactID.String() {
+			t.Errorf("expected ID %s, got %s", artifactID.String(), resp.ID)
 		}
-		if response.ID != artifactID.String() {
-			t.Errorf("expected ID %s, got %s", artifactID.String(), response.ID)
+		if resp.CID != testCID {
+			t.Errorf("expected CID %s, got %s", testCID, resp.CID)
 		}
-		if response.CID != testCID {
-			t.Errorf("expected CID %s, got %s", testCID, response.CID)
-		}
-		if response.Size != testBundleSize {
-			t.Errorf("expected size %d, got %d", testBundleSize, response.Size)
+		if resp.Size != testBundleSize {
+			t.Errorf("expected size %d, got %d", testBundleSize, resp.Size)
 		}
 	})
 
 	t.Run("SuccessDownload", func(t *testing.T) {
+		t.Parallel()
 		artifactID := uuid.New()
 		runID := domaintypes.NewRunID()
 		testCID := "bafy-download"
@@ -237,36 +169,85 @@ func TestGetArtifactHandler(t *testing.T) {
 				ObjectKey:  &objKey,
 			},
 		}
-
-		// Pre-populate mock blobstore with the bundle data.
 		bs := bsmock.New()
 		_, _ = bs.Put(context.TODO(), objKey, "application/gzip", testBundle)
 
-		handler := getArtifactHandler(st, bs)
-		req := httptest.NewRequest(http.MethodGet, "/v1/artifacts/"+artifactID.String()+"?download=true", nil)
-		req.SetPathValue("id", artifactID.String())
-		w := httptest.NewRecorder()
-		handler(w, req)
+		rr := doRequest(t, getArtifactHandler(st, bs), http.MethodGet,
+			"/v1/artifacts/"+artifactID.String()+"?download=true", nil,
+			"id", artifactID.String())
+		assertStatus(t, rr, http.StatusOK)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-		}
-
-		// Verify content type and disposition headers.
-		if ct := w.Header().Get("Content-Type"); ct != "application/octet-stream" {
+		if ct := rr.Header().Get("Content-Type"); ct != "application/octet-stream" {
 			t.Errorf("expected Content-Type application/octet-stream, got %s", ct)
 		}
-		if cd := w.Header().Get("Content-Disposition"); cd != "attachment; filename="+artifactID.String()+".bin" {
+		if cd := rr.Header().Get("Content-Disposition"); cd != "attachment; filename="+artifactID.String()+".bin" {
 			t.Errorf("unexpected Content-Disposition: %s", cd)
 		}
-
-		// Verify bundle bytes.
-		body, err := io.ReadAll(w.Body)
+		body, err := io.ReadAll(rr.Body)
 		if err != nil {
 			t.Fatalf("failed to read response body: %v", err)
 		}
 		if string(body) != string(testBundle) {
 			t.Errorf("expected bundle %q, got %q", testBundle, body)
+		}
+	})
+
+	t.Run("Errors", func(t *testing.T) {
+		t.Parallel()
+		artifactID := uuid.New()
+		cases := []struct {
+			name   string
+			id     string
+			st     *mockStore
+			status int
+		}{
+			{
+				name:   "MissingID",
+				id:     "",
+				st:     &mockStore{},
+				status: http.StatusBadRequest,
+			},
+			{
+				name:   "InvalidID",
+				id:     "not-a-uuid",
+				st:     &mockStore{},
+				status: http.StatusBadRequest,
+			},
+			{
+				name:   "NotFound",
+				id:     artifactID.String(),
+				st:     &mockStore{getArtifactBundleErr: pgx.ErrNoRows},
+				status: http.StatusNotFound,
+			},
+			{
+				name:   "DBError",
+				id:     artifactID.String(),
+				st:     &mockStore{getArtifactBundleErr: errors.New("db down")},
+				status: http.StatusInternalServerError,
+			},
+			{
+				name: "MetadataNoCreatedAt",
+				id:   artifactID.String(),
+				st: &mockStore{getArtifactBundleResult: store.ArtifactBundle{
+					ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+					RunID:      domaintypes.NewRunID(),
+					BundleSize: 1,
+				}},
+				status: http.StatusOK,
+			},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				bs := bsmock.New()
+				pathParams := []string{}
+				if tc.id != "" {
+					pathParams = []string{"id", tc.id}
+				}
+				rr := doRequest(t, getArtifactHandler(tc.st, bs), http.MethodGet,
+					"/v1/artifacts/"+tc.id, nil, pathParams...)
+				assertStatus(t, rr, tc.status)
+			})
 		}
 	})
 }

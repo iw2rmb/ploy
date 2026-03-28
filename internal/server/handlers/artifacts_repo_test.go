@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -17,17 +15,12 @@ import (
 func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID().String()
-	repoID := domaintypes.NewRepoID().String()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
 
-	job1 := domaintypes.NewJobID().String()
-	job2 := domaintypes.NewJobID().String()
-	otherJob := domaintypes.NewJobID().String()
-	runIDTyped := domaintypes.RunID(runID)
-	repoIDTyped := domaintypes.RepoID(repoID)
-	job1Typed := domaintypes.JobID(job1)
-	job2Typed := domaintypes.JobID(job2)
-	otherJobTyped := domaintypes.JobID(otherJob)
+	job1 := domaintypes.NewJobID()
+	job2 := domaintypes.NewJobID()
+	otherJob := domaintypes.NewJobID()
 
 	t1 := time.Date(2026, 1, 6, 0, 0, 0, 0, time.UTC)
 	t2 := t1.Add(1 * time.Minute)
@@ -47,20 +40,20 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 
 	st := &mockStore{
 		getRunRepoResult: store.RunRepo{
-			RunID:   runIDTyped,
-			RepoID:  repoIDTyped,
+			RunID:   runID,
+			RepoID:  repoID,
 			Status:  domaintypes.RunRepoStatusRunning,
 			Attempt: 1,
 		},
 		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: job1Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
-			{ID: job2Typed, RunID: runIDTyped, RepoID: repoIDTyped, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(2000))},
+			{ID: job1, RunID: runID, RepoID: repoID, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
+			{ID: job2, RunID: runID, RepoID: repoID, Attempt: 1, Meta: withNextIDMeta([]byte(`{}`), float64(2000))},
 		},
 		listArtifactBundlesMetaByRunResult: []store.ArtifactBundle{
 			{
 				ID:         pgtype.UUID{Bytes: id2, Valid: true},
-				RunID:      runIDTyped,
-				JobID:      &job1Typed,
+				RunID:      runID,
+				JobID:      &job1,
 				Name:       &name2,
 				Cid:        &cid2,
 				Digest:     &digest2,
@@ -69,8 +62,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			},
 			{
 				ID:         pgtype.UUID{Bytes: id1, Valid: true},
-				RunID:      runIDTyped,
-				JobID:      &job1Typed,
+				RunID:      runID,
+				JobID:      &job1,
 				Name:       &name1,
 				Cid:        &cid1,
 				Digest:     &digest1,
@@ -79,8 +72,8 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 			},
 			{
 				ID:         pgtype.UUID{Bytes: idOther, Valid: true},
-				RunID:      runIDTyped,
-				JobID:      &otherJobTyped,
+				RunID:      runID,
+				JobID:      &otherJob,
 				Name:       nil,
 				Cid:        &cidOther,
 				Digest:     &digestOther,
@@ -90,37 +83,20 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/repos/"+repoID+"/artifacts", nil)
-	req.SetPathValue("run_id", runID)
-	req.SetPathValue("repo_id", repoID)
-	rr := httptest.NewRecorder()
-
-	listRunRepoArtifactsHandler(st).ServeHTTP(rr, req)
-
+	rr := doRequest(t, listRunRepoArtifactsHandler(st), http.MethodGet,
+		"/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/artifacts", nil,
+		"run_id", runID.String(), "repo_id", repoID.String())
 	assertStatus(t, rr, http.StatusOK)
-	if !st.getRunRepoCalled {
-		t.Fatalf("expected GetRunRepo to be called")
-	}
-	if !st.listJobsByRunRepoAttemptCalled {
-		t.Fatalf("expected ListJobsByRunRepoAttempt to be called")
-	}
-	if !st.listArtifactBundlesMetaByRunCalled {
-		t.Fatalf("expected ListArtifactBundlesMetaByRun to be called")
-	}
 
-	var resp struct {
+	type listResp struct {
 		Artifacts []struct {
 			ID string `json:"id"`
 		} `json:"artifacts"`
 	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	resp := decodeBody[listResp](t, rr)
 	if len(resp.Artifacts) != 2 {
 		t.Fatalf("expected 2 artifacts, got %d", len(resp.Artifacts))
 	}
-	// Expected ordering:
-	// - job1 next_id=1000, created_at ascending (t1 then t2).
 	if resp.Artifacts[0].ID != id1.String() || resp.Artifacts[1].ID != id2.String() {
 		t.Fatalf("unexpected artifact order: %+v", resp.Artifacts)
 	}

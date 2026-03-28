@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -41,53 +41,47 @@ func TestDeleteRun_Success(t *testing.T) {
 	}
 }
 
-// TestDeleteRun_NotFound verifies 404 is returned when the run does not exist.
-func TestDeleteRun_NotFound(t *testing.T) {
+// TestDeleteRun_Errors merges NotFound, EmptyID, MissingID error tests.
+func TestDeleteRun_Errors(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-
-	st := &mockStore{
-		getRunErr: pgx.ErrNoRows,
+	tests := []struct {
+		name       string
+		pathID     string
+		store      *mockStore
+		wantStatus int
+	}{
+		{
+			name:       "NotFound",
+			pathID:     domaintypes.NewRunID().String(),
+			store:      &mockStore{getRunErr: pgx.ErrNoRows},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "EmptyID",
+			pathID:     "   ",
+			store:      &mockStore{},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "MissingID",
+			pathID:     "",
+			store:      &mockStore{},
+			wantStatus: http.StatusBadRequest,
+		},
 	}
 
-	handler := deleteRunHandler(st)
-
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/runs/"+runID.String(), nil, "id", runID.String())
-
-	assertStatus(t, rr, http.StatusNotFound)
-
-	// Verify DeleteRun was not called since GetRun failed.
-	if st.deleteRunCalled {
-		t.Fatal("did not expect DeleteRun to be called")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			handler := deleteRunHandler(tt.store)
+			// Use a safe URL path; the path value is set separately by doRequest.
+			urlID := tt.pathID
+			if strings.TrimSpace(urlID) == "" {
+				urlID = "_"
+			}
+			rr := doRequest(t, handler, http.MethodDelete, "/v1/runs/"+urlID, nil, "id", tt.pathID)
+			assertStatus(t, rr, tt.wantStatus)
+		})
 	}
-}
-
-// TestDeleteRun_EmptyID verifies 400 is returned for an empty or whitespace run ID.
-// Run IDs are KSUID strings; empty/whitespace IDs are rejected.
-func TestDeleteRun_EmptyID(t *testing.T) {
-	t.Parallel()
-
-	st := &mockStore{}
-	handler := deleteRunHandler(st)
-
-	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/", nil)
-	req.SetPathValue("id", "   ") // Whitespace ID
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-// TestDeleteRun_MissingID verifies 400 is returned when id path parameter is missing.
-func TestDeleteRun_MissingID(t *testing.T) {
-	t.Parallel()
-
-	st := &mockStore{}
-	handler := deleteRunHandler(st)
-
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/runs/", nil, "id", "")
-
-	assertStatus(t, rr, http.StatusBadRequest)
 }

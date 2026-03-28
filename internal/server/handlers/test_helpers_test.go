@@ -64,6 +64,70 @@ func validSpecBody() map[string]any {
 	}
 }
 
+// validRunRequestBody returns a canonical single-repo run request body.
+func validRunRequestBody() map[string]any {
+	return map[string]any{
+		"repo_url":   "https://github.com/org/repo",
+		"base_ref":   "main",
+		"target_ref": "feature",
+		"spec":       validSpecBody(),
+	}
+}
+
+// validRunRequestBodyWith returns a canonical run request body with overrides applied.
+// A nil value deletes the key.
+func validRunRequestBodyWith(overrides map[string]any) map[string]any {
+	body := validRunRequestBody()
+	for k, v := range overrides {
+		if v == nil {
+			delete(body, k)
+		} else {
+			body[k] = v
+		}
+	}
+	return body
+}
+
+// validRunRequestBodyWithout returns a canonical run request body with the given keys removed.
+func validRunRequestBodyWithout(keys ...string) map[string]any {
+	body := validRunRequestBody()
+	for _, k := range keys {
+		delete(body, k)
+	}
+	return body
+}
+
+// newRunRepoJobsFixture creates a mock store and handler pre-configured for a single
+// gate-type job with the given meta JSON. Returns the store, handler, runID, and repoID.
+func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*mockStore, http.Handler, domaintypes.RunID, domaintypes.RepoID) {
+	t.Helper()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	jobID := domaintypes.NewJobID()
+
+	st := &mockStore{
+		getRunRepoResult: store.RunRepo{
+			RunID:   runID,
+			RepoID:  repoID,
+			Attempt: 1,
+		},
+		listJobsByRunRepoAttemptResult: []store.Job{
+			{
+				ID:      jobID,
+				RunID:   runID,
+				RepoID:  repoID,
+				Attempt: 1,
+				Name:    "pre-gate",
+				JobType: "pre_gate",
+				Status:  domaintypes.JobStatusFail,
+				Meta:    []byte(metaJSON),
+			},
+		},
+	}
+	handler := listRunRepoJobsHandler(st)
+	return st, handler, runID, repoID
+}
+
 // allReposSelector returns a repo_selector body with mode "all".
 func allReposSelector() map[string]any {
 	return map[string]any{

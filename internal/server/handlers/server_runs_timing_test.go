@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -56,48 +56,47 @@ func TestGetRunTiming_Success(t *testing.T) {
 	}
 }
 
-// TestGetRunTiming_NotFound verifies 404 when run timing is missing.
-func TestGetRunTiming_NotFound(t *testing.T) {
+// TestGetRunTiming_Errors merges NotFound, EmptyID, MissingID error tests.
+func TestGetRunTiming_Errors(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-
-	st := &mockStore{
-		getRunTimingErr: pgx.ErrNoRows,
+	tests := []struct {
+		name       string
+		pathID     string
+		store      *mockStore
+		wantStatus int
+	}{
+		{
+			name:       "NotFound",
+			pathID:     domaintypes.NewRunID().String(),
+			store:      &mockStore{getRunTimingErr: pgx.ErrNoRows},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "EmptyID",
+			pathID:     "   ",
+			store:      &mockStore{},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "MissingID",
+			pathID:     "",
+			store:      &mockStore{},
+			wantStatus: http.StatusBadRequest,
+		},
 	}
 
-	handler := getRunTimingHandler(st)
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/timing", nil, "id", runID.String())
-
-	assertStatus(t, rr, http.StatusNotFound)
-}
-
-// TestGetRunTiming_EmptyID verifies 400 for empty or whitespace ID.
-// Run IDs are KSUID strings; empty/whitespace IDs are rejected.
-func TestGetRunTiming_EmptyID(t *testing.T) {
-	t.Parallel()
-
-	st := &mockStore{}
-	handler := getRunTimingHandler(st)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs//timing", nil)
-	req.SetPathValue("id", "   ") // Whitespace ID
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-// TestGetRunTiming_MissingID verifies 400 is returned when id is missing.
-func TestGetRunTiming_MissingID(t *testing.T) {
-	t.Parallel()
-
-	st := &mockStore{}
-	handler := getRunTimingHandler(st)
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs//timing", nil, "id", "")
-
-	assertStatus(t, rr, http.StatusBadRequest)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			handler := getRunTimingHandler(tt.store)
+			// Use a safe URL path; the path value is set separately by doRequest.
+			urlID := tt.pathID
+			if strings.TrimSpace(urlID) == "" {
+				urlID = "_"
+			}
+			rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+urlID+"/timing", nil, "id", tt.pathID)
+			assertStatus(t, rr, tt.wantStatus)
+		})
+	}
 }
