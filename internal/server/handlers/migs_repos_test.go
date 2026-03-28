@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +20,7 @@ func TestAddModRepoHandler(t *testing.T) {
 		modID          string
 		body           map[string]interface{}
 		setupMock      func(m *mockStore)
-		wantRepoURL    string
+		verify         func(t *testing.T, m *mockStore)
 		wantStatus     int
 		wantBodySubstr string
 	}{
@@ -50,8 +48,14 @@ func TestAddModRepoHandler(t *testing.T) {
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 			},
-			wantRepoURL: "https://github.com/org/repo",
-			wantStatus:  http.StatusCreated,
+			verify: func(t *testing.T, m *mockStore) {
+				t.Helper()
+				assertCalled(t, "CreateMigRepo", m.createMigRepoCalled)
+				if m.createMigRepoParams.Url != "https://github.com/org/repo" {
+					t.Fatalf("CreateMigRepo repo_url mismatch: got=%q want=%q", m.createMigRepoParams.Url, "https://github.com/org/repo")
+				}
+			},
+			wantStatus: http.StatusCreated,
 		},
 		{
 			name:  "error - mig not found",
@@ -138,16 +142,9 @@ func TestAddModRepoHandler(t *testing.T) {
 			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+tt.modID+"/repos", tt.body, "mig_id", tt.modID)
 
 			assertStatus(t, rr, tt.wantStatus)
-			if tt.wantBodySubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rr.Body.String(), tt.wantBodySubstr)
-			}
-			if tt.wantRepoURL != "" {
-				if !ms.createMigRepoCalled {
-					t.Fatalf("expected CreateMigRepo to be called")
-				}
-				if ms.createMigRepoParams.Url != tt.wantRepoURL {
-					t.Fatalf("CreateMigRepo repo_url mismatch: got=%q want=%q", ms.createMigRepoParams.Url, tt.wantRepoURL)
-				}
+			assertBodyContains(t, rr, tt.wantBodySubstr)
+			if tt.verify != nil {
+				tt.verify(t, ms)
 			}
 		})
 	}
@@ -161,7 +158,7 @@ func TestListModReposHandler(t *testing.T) {
 		setupMock      func(m *mockStore)
 		wantStatus     int
 		wantBodySubstr string
-		wantCount      int
+		verify         func(t *testing.T, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name:  "success - lists repos",
@@ -178,7 +175,15 @@ func TestListModReposHandler(t *testing.T) {
 				}
 			},
 			wantStatus: http.StatusOK,
-			wantCount:  2,
+			verify: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				resp := decodeBody[struct {
+					Repos []struct{ ID string } `json:"repos"`
+				}](t, rr)
+				if len(resp.Repos) != 2 {
+					t.Errorf("got %d repos, want 2", len(resp.Repos))
+				}
+			},
 		},
 		{
 			name:  "success - empty list",
@@ -188,7 +193,15 @@ func TestListModReposHandler(t *testing.T) {
 				m.listMigReposByModResult = []store.MigRepo{}
 			},
 			wantStatus: http.StatusOK,
-			wantCount:  0,
+			verify: func(t *testing.T, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				resp := decodeBody[struct {
+					Repos []struct{ ID string } `json:"repos"`
+				}](t, rr)
+				if len(resp.Repos) != 0 {
+					t.Errorf("got %d repos, want 0", len(resp.Repos))
+				}
+			},
 		},
 		{
 			name:  "error - mig not found",
@@ -212,21 +225,9 @@ func TestListModReposHandler(t *testing.T) {
 			rr := doRequest(t, handler, http.MethodGet, "/v1/migs/"+tt.modID+"/repos", nil, "mig_id", tt.modID)
 
 			assertStatus(t, rr, tt.wantStatus)
-			if tt.wantBodySubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rr.Body.String(), tt.wantBodySubstr)
-			}
-			if tt.wantStatus == http.StatusOK {
-				var resp struct {
-					Repos []struct {
-						ID string `json:"id"`
-					} `json:"repos"`
-				}
-				if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-					t.Fatalf("failed to unmarshal response: %v", err)
-				}
-				if len(resp.Repos) != tt.wantCount {
-					t.Errorf("got %d repos, want %d", len(resp.Repos), tt.wantCount)
-				}
+			assertBodyContains(t, rr, tt.wantBodySubstr)
+			if tt.verify != nil {
+				tt.verify(t, rr)
 			}
 		})
 	}
@@ -310,17 +311,23 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 			rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/"+tt.modID+"/repos/"+tt.repoID, nil, "mig_id", tt.modID, "repo_id", tt.repoID)
 
 			assertStatus(t, rr, tt.wantStatus)
-			if tt.wantBodySubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rr.Body.String(), tt.wantBodySubstr)
-			}
+			assertBodyContains(t, rr, tt.wantBodySubstr)
 		})
 	}
 }
 
 // TestBulkUpsertMigReposHandler tests the POST /v1/migs/{mig_id}/repos/bulk endpoint.
-// Uses manual request construction because doRequest() sets application/json Content-Type,
-// but this endpoint requires text/csv.
 func TestBulkUpsertMigReposHandler(t *testing.T) {
+	type bulkResp struct {
+		Created int `json:"created"`
+		Updated int `json:"updated"`
+		Failed  int `json:"failed"`
+		Errors  []struct {
+			Line    int    `json:"line"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
 	tests := []struct {
 		name           string
 		modID          string
@@ -347,8 +354,6 @@ https://github.com/org/repo2,develop,feature2`,
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 2,
-			wantUpdated: 0,
-			wantFailed:  0,
 		},
 		{
 			name:        "success - updates existing repos",
@@ -364,25 +369,7 @@ https://github.com/org/existing,main,new-feature`,
 				}
 			},
 			wantStatus:  http.StatusOK,
-			wantCreated: 0,
 			wantUpdated: 1,
-			wantFailed:  0,
-		},
-		{
-			name:        "success - processes multiple repos (all new)",
-			modID:       "mod123",
-			contentType: "text/csv",
-			body: `repo_url,base_ref,target_ref
-https://github.com/org/new-repo1,main,feature1
-https://github.com/org/new-repo2,develop,feature2`,
-			setupMock: func(m *mockStore) {
-				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLErr = pgx.ErrNoRows
-			},
-			wantStatus:  http.StatusOK,
-			wantCreated: 2,
-			wantUpdated: 0,
-			wantFailed:  0,
 		},
 		{
 			name:        "success - parses quoted fields and unicode",
@@ -396,8 +383,6 @@ https://github.com/org/new-repo2,develop,feature2`,
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
-			wantUpdated: 0,
-			wantFailed:  0,
 		},
 		{
 			name:        "success - normalizes repo URL before upsert",
@@ -411,23 +396,17 @@ https://github.com/org/new-repo2,develop,feature2`,
 			},
 			verify: func(t *testing.T, m *mockStore) {
 				t.Helper()
-				if !m.getModRepoByURLCalled {
-					t.Fatalf("expected GetMigRepoByURL to be called")
-				}
+				assertCalled(t, "GetMigRepoByURL", m.getModRepoByURLCalled)
 				if m.getModRepoByURLParams.Url != "https://github.com/org/repo" {
 					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.Url, "https://github.com/org/repo")
 				}
-				if !m.upsertModRepoCalled {
-					t.Fatalf("expected UpsertMigRepo to be called")
-				}
+				assertCalled(t, "UpsertMigRepo", m.upsertModRepoCalled)
 				if m.upsertModRepoParams.Url != "https://github.com/org/repo" {
 					t.Fatalf("UpsertMigRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.Url, "https://github.com/org/repo")
 				}
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
-			wantUpdated: 0,
-			wantFailed:  0,
 		},
 		{
 			name:        "error - wrong content type",
@@ -493,7 +472,6 @@ ftp://invalid.com/bad-repo,main,feature2`,
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
-			wantUpdated: 0,
 			wantFailed:  1,
 		},
 		{
@@ -506,8 +484,6 @@ https://github.com/org/repo,,feature`,
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 			},
 			wantStatus:     http.StatusOK,
-			wantCreated:    0,
-			wantUpdated:    0,
 			wantFailed:     1,
 			wantBodySubstr: "base_ref is required",
 		},
@@ -520,10 +496,8 @@ https://github.com/org/repo,,feature`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
 			},
-			wantStatus:  http.StatusOK,
-			wantCreated: 0,
-			wantUpdated: 0,
-			wantFailed:  1,
+			wantStatus: http.StatusOK,
+			wantFailed: 1,
 		},
 		{
 			name:        "partial success - store lookup error is a per-line failure",
@@ -537,14 +511,10 @@ https://github.com/org/repo,,feature`,
 			},
 			verify: func(t *testing.T, m *mockStore) {
 				t.Helper()
-				if m.upsertModRepoCalled {
-					t.Fatalf("did not expect UpsertMigRepo to be called when lookup fails")
-				}
+				assertNotCalled(t, "UpsertMigRepo", m.upsertModRepoCalled)
 			},
-			wantStatus:  http.StatusOK,
-			wantCreated: 0,
-			wantUpdated: 0,
-			wantFailed:  1,
+			wantStatus: http.StatusOK,
+			wantFailed: 1,
 		},
 	}
 
@@ -555,32 +525,16 @@ https://github.com/org/repo,,feature`,
 				tt.setupMock(ms)
 			}
 
-			// Manual request construction: bulk-upsert uses text/csv Content-Type.
-			req := httptest.NewRequest(http.MethodPost, "/v1/migs/"+tt.modID+"/repos/bulk", bytes.NewReader([]byte(tt.body)))
-			req.Header.Set("Content-Type", tt.contentType)
-			req.SetPathValue("mig_id", tt.modID)
-
-			rec := httptest.NewRecorder()
 			handler := bulkUpsertMigReposHandler(ms)
-			handler(rec, req)
+			rr := doRequestWithContentType(t, handler, http.MethodPost, "/v1/migs/"+tt.modID+"/repos/bulk", tt.contentType, tt.body, "mig_id", tt.modID)
 
-			assertStatus(t, rec, tt.wantStatus)
-			if tt.wantBodySubstr != "" && !bytes.Contains(rec.Body.Bytes(), []byte(tt.wantBodySubstr)) {
-				t.Errorf("body %q does not contain %q", rec.Body.String(), tt.wantBodySubstr)
+			assertStatus(t, rr, tt.wantStatus)
+			assertBodyContains(t, rr, tt.wantBodySubstr)
+			if tt.verify != nil {
+				tt.verify(t, ms)
 			}
 			if tt.wantStatus == http.StatusOK {
-				var resp struct {
-					Created int `json:"created"`
-					Updated int `json:"updated"`
-					Failed  int `json:"failed"`
-					Errors  []struct {
-						Line    int    `json:"line"`
-						Message string `json:"message"`
-					} `json:"errors"`
-				}
-				if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-					t.Fatalf("failed to unmarshal response: %v", err)
-				}
+				resp := decodeBody[bulkResp](t, rr)
 				if resp.Created != tt.wantCreated {
 					t.Errorf("got created=%d, want %d", resp.Created, tt.wantCreated)
 				}
@@ -589,9 +543,6 @@ https://github.com/org/repo,,feature`,
 				}
 				if resp.Failed != tt.wantFailed {
 					t.Errorf("got failed=%d, want %d", resp.Failed, tt.wantFailed)
-				}
-				if tt.verify != nil {
-					tt.verify(t, ms)
 				}
 			}
 		})

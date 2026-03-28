@@ -328,6 +328,37 @@ func tarEntriesFromBundle(t *testing.T, bundle []byte) map[string]tarEntry {
 	return entries
 }
 
+// assertTarContains verifies that every name in wantHeaders exists as an
+// entry in the gzipped tar bundle.
+func assertTarContains(t *testing.T, bundle []byte, wantHeaders []string) {
+	t.Helper()
+	entries := tarEntriesFromBundle(t, bundle)
+	for _, h := range wantHeaders {
+		if _, ok := entries[h]; !ok {
+			t.Fatalf("expected tar entry %q, got %v", h, mapKeys(entries))
+		}
+	}
+}
+
+// assertUploadOccurred checks whether any artifact upload calls were recorded.
+func assertUploadOccurred(t *testing.T, calls *[]artifactUploadCall, want bool) {
+	t.Helper()
+	if got := len(*calls) > 0; got != want {
+		t.Errorf("upload occurred = %v, want %v", got, want)
+	}
+}
+
+// assertArtifactName checks the artifact name at the given call index.
+func assertArtifactName(t *testing.T, calls *[]artifactUploadCall, index int, wantName string) {
+	t.Helper()
+	if index >= len(*calls) {
+		t.Fatalf("no upload at index %d (got %d calls)", index, len(*calls))
+	}
+	if (*calls)[index].Name != wantName {
+		t.Errorf("artifact name = %q, want %q", (*calls)[index].Name, wantName)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Config builders
 // ---------------------------------------------------------------------------
@@ -550,6 +581,14 @@ func newClaimResponse(opts ...claimOption) ClaimResponse {
 // ---------------------------------------------------------------------------
 
 type startRunOption func(*StartRunRequest)
+
+func withRunID(id string) startRunOption {
+	return func(r *StartRunRequest) { r.RunID = types.RunID(id) }
+}
+
+func withJobID(id string) startRunOption {
+	return func(r *StartRunRequest) { r.JobID = types.JobID(id) }
+}
 
 func withRunRepoURL(u string) startRunOption {
 	return func(r *StartRunRequest) { r.RepoURL = types.RepoURL(u) }

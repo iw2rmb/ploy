@@ -15,10 +15,12 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// mockQuerier embeds a nil pointer to satisfy the interface with defaults,
-// then overrides only the token-related methods needed for testing.
+// ---------------------------------------------------------------------------
+// Mock querier
+// ---------------------------------------------------------------------------
+
 type mockQuerier struct {
-	*store.Queries // Embedded nil pointer provides default panic behavior for unused methods
+	*store.Queries
 
 	mu sync.Mutex
 
@@ -27,7 +29,6 @@ type mockQuerier struct {
 	updateAPITokenLastUsedFunc       func(ctx context.Context, tokenID string) error
 	updateBootstrapTokenLastUsedFunc func(ctx context.Context, tokenID string) error
 
-	// Track calls for verification
 	updateAPITokenLastUsedCalled       bool
 	updateBootstrapTokenLastUsedCalled bool
 }
@@ -36,7 +37,6 @@ func (m *mockQuerier) CheckAPITokenRevoked(ctx context.Context, tokenID string) 
 	if m.checkAPITokenRevokedFunc != nil {
 		return m.checkAPITokenRevokedFunc(ctx, tokenID)
 	}
-	// Default: token not revoked (return no rows error)
 	return pgtype.Timestamptz{}, pgx.ErrNoRows
 }
 
@@ -44,7 +44,6 @@ func (m *mockQuerier) CheckBootstrapTokenRevoked(ctx context.Context, tokenID st
 	if m.checkBootstrapTokenRevokedFunc != nil {
 		return m.checkBootstrapTokenRevokedFunc(ctx, tokenID)
 	}
-	// Default: token not revoked
 	return pgtype.Timestamptz{}, pgx.ErrNoRows
 }
 
@@ -80,49 +79,135 @@ func (m *mockQuerier) BootstrapTokenLastUsedCalled() bool {
 	return m.updateBootstrapTokenLastUsedCalled
 }
 
-func TestAuthorizerBearerToken_ValidToken(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	role := RoleControlPlane
-	expiresAt := time.Now().Add(24 * time.Hour)
+// ---------------------------------------------------------------------------
+// Shared constants and helpers
+// ---------------------------------------------------------------------------
 
-	// Generate valid token
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
+const testClusterID = "test-cluster"
+
+func mustGenerateAPIToken(t *testing.T, role string, expiresAt time.Time) string {
+	t.Helper()
+	tok, err := GenerateAPIToken(testSecret, testClusterID, role, expiresAt)
 	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
+		t.Fatalf("GenerateAPIToken: %v", err)
+	}
+	return tok
+}
+
+// bearerTestHarness bundles common setup for bearer-token middleware tests.
+type bearerTestHarness struct {
+	t     *testing.T
+	auth  *Authorizer
+	mockQ *mockQuerier
+}
+
+func newBearerHarness(t *testing.T, opts Options) *bearerTestHarness {
+	t.Helper()
+	mq, _ := opts.Querier.(*mockQuerier)
+	return &bearerTestHarness{t: t, auth: NewAuthorizer(opts), mockQ: mq}
+}
+
+func (h *bearerTestHarness) do(
+	method, target, authHeader string,
+	allowedRoles []Role,
+	innerFn func(w http.ResponseWriter, r *http.Request),
+) (rr *httptest.ResponseRecorder, called bool) {
+	h.t.Helper()
+	req := httptest.NewRequest(method, target, nil)
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+	rr = httptest.NewRecorder()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		if innerFn != nil {
+			innerFn(w, r)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	})
+	h.auth.Middleware(allowedRoles...)(inner).ServeHTTP(rr, req)
+	return rr, called
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+func TestAuthorizerBearerToken_Rejected(t *testing.T) {
+	validToken := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	expiredToken := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(-1*time.Hour))
+
+	wrongSecretToken := func() string {
+		tok, err := GenerateAPIToken("secret-two-12345678901234567890", testClusterID, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+		if err != nil {
+			t.Fatalf("GenerateAPIToken: %v", err)
+		}
+		return tok
+	}()
+
+	tests := []struct {
+		name       string
+		authHeader string
+		querier    *mockQuerier
+		wantBody   string
+	}{
+		{"expired token", "Bearer " + expiredToken, nil, ""},
+		{"revoked token", "Bearer " + validToken, &mockQuerier{
+			checkAPITokenRevokedFunc: func(context.Context, string) (pgtype.Timestamptz, error) {
+				return pgtype.Timestamptz{Time: time.Now(), Valid: true}, nil
+			},
+		}, "authentication failed"},
+		{"missing Authorization header", "", nil, ""},
+		{"malformed JWT", "Bearer invalid-token", nil, ""},
+		{"missing Bearer prefix", "invalid-token", nil, ""},
+		{"empty Bearer value", "Bearer ", nil, ""},
+		{"Basic auth scheme", "Basic base64encodedcreds", nil, ""},
+		{"wrong signing secret", "Bearer " + wrongSecretToken, nil, ""},
 	}
 
-	// Create authorizer with mock querier
-	mockQ := &mockQuerier{}
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       mockQ,
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := tt.querier
+			if q == nil {
+				q = &mockQuerier{}
+			}
+			h := newBearerHarness(t, Options{
+				TokenSecret: testSecret,
+				Querier:     q,
+			})
 
-	// Create request with bearer token
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenString)
+			rr, called := h.do(http.MethodGet, "/v1/nodes", tt.authHeader, []Role{RoleControlPlane}, nil)
 
-	// Test middleware
-	rr := httptest.NewRecorder()
-	called := false
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
+			if rr.Code != http.StatusUnauthorized {
+				t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
+			}
+			if called {
+				t.Error("handler should not be called")
+			}
+			if tt.wantBody != "" && !contains(rr.Body.String(), tt.wantBody) {
+				t.Errorf("body %q missing %q", rr.Body.String(), tt.wantBody)
+			}
+		})
+	}
+}
 
-		// Verify identity is set in context
-		identity, ok := IdentityFromContext(r.Context())
-		if !ok {
-			t.Error("expected identity in context")
-		}
-		if identity.Role != role {
-			t.Errorf("Role=%s want %s", identity.Role, role)
-		}
+func TestAuthorizerBearerToken_ValidToken(t *testing.T) {
+	token := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	mq := &mockQuerier{}
+	h := newBearerHarness(t, Options{TokenSecret: testSecret, Querier: mq})
 
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
+	rr, called := h.do(http.MethodGet, "/v1/nodes", "Bearer "+token, []Role{RoleControlPlane},
+		func(w http.ResponseWriter, r *http.Request) {
+			identity, ok := IdentityFromContext(r.Context())
+			if !ok {
+				t.Error("expected identity in context")
+			}
+			if identity.Role != RoleControlPlane {
+				t.Errorf("Role=%s want %s", identity.Role, RoleControlPlane)
+			}
+			w.WriteHeader(http.StatusOK)
+		})
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("got status %d, want %d; body: %s", rr.Code, http.StatusOK, rr.Body.String())
@@ -131,153 +216,13 @@ func TestAuthorizerBearerToken_ValidToken(t *testing.T) {
 		t.Error("handler was not called")
 	}
 
-	// Give async updateTokenLastUsed a moment to run
 	time.Sleep(50 * time.Millisecond)
-	if !mockQ.APITokenLastUsedCalled() {
+	if !mq.APITokenLastUsedCalled() {
 		t.Error("expected UpdateAPITokenLastUsed to be called")
 	}
 }
 
-func TestAuthorizerBearerToken_ExpiredToken(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	role := RoleControlPlane
-	expiresAt := time.Now().Add(-1 * time.Hour) // Already expired
-
-	// Generate expired token
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
-
-	mockQ := &mockQuerier{}
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       mockQ,
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenString)
-
-	rr := httptest.NewRecorder()
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("handler should not be called for expired token")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
-	}
-}
-
-func TestAuthorizerBearerToken_RevokedToken(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	role := RoleControlPlane
-	expiresAt := time.Now().Add(24 * time.Hour)
-
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
-
-	// Mock querier that returns a revocation timestamp
-	mockQ := &mockQuerier{
-		checkAPITokenRevokedFunc: func(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
-			// Return a timestamp indicating the token was revoked
-			return pgtype.Timestamptz{Time: time.Now(), Valid: true}, nil
-		},
-	}
-
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       mockQ,
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenString)
-
-	rr := httptest.NewRecorder()
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("handler should not be called for revoked token")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
-	}
-	if !contains(rr.Body.String(), "authentication failed") {
-		t.Errorf("expected generic error message, got: %s", rr.Body.String())
-	}
-}
-
-func TestAuthorizerBearerToken_MissingToken(t *testing.T) {
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   "test-secret",
-	})
-
-	// Request without Authorization header
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	rr := httptest.NewRecorder()
-
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("handler should not be called without token")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
-	}
-}
-
-func TestAuthorizerBearerToken_InvalidFormat(t *testing.T) {
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   "test-secret",
-	})
-
-	tests := []struct {
-		name   string
-		header string
-	}{
-		{"malformed token", "Bearer invalid-token"},
-		{"missing Bearer prefix", "invalid-token"},
-		{"empty Bearer", "Bearer "},
-		{"wrong prefix", "Basic base64encodedcreds"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-			req.Header.Set("Authorization", tt.header)
-			rr := httptest.NewRecorder()
-
-			handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				t.Error("handler should not be called for invalid token")
-				w.WriteHeader(http.StatusOK)
-			}))
-
-			handler.ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusUnauthorized {
-				t.Errorf("got status %d, want %d for %s", rr.Code, http.StatusUnauthorized, tt.name)
-			}
-		})
-	}
-}
-
 func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	tests := []struct {
@@ -288,34 +233,17 @@ func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
 		{RoleControlPlane, []Role{RoleControlPlane}, true},
 		{RoleWorker, []Role{RoleWorker}, true},
 		{RoleCLIAdmin, []Role{RoleCLIAdmin}, true},
-		{RoleCLIAdmin, []Role{RoleControlPlane}, true}, // Admin can access control-plane endpoints
-		{RoleControlPlane, []Role{RoleWorker}, false},  // control-plane cannot access worker endpoints
-		{RoleWorker, []Role{RoleCLIAdmin}, false},      // worker cannot access admin endpoints
+		{RoleCLIAdmin, []Role{RoleControlPlane}, true},  // admin can access control-plane
+		{RoleControlPlane, []Role{RoleWorker}, false},    // control-plane cannot access worker
+		{RoleWorker, []Role{RoleCLIAdmin}, false},        // worker cannot access admin
 	}
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s_accessing_%v", tt.role, tt.allowedRoles), func(t *testing.T) {
-			tokenString, err := GenerateAPIToken(secret, clusterID, string(tt.role), expiresAt)
-			if err != nil {
-				t.Fatalf("GenerateAPIToken error: %v", err)
-			}
+			token := mustGenerateAPIToken(t, string(tt.role), expiresAt)
+			h := newBearerHarness(t, Options{TokenSecret: testSecret, Querier: &mockQuerier{}})
 
-			mockQ := &mockQuerier{}
-			auth := NewAuthorizer(Options{
-				AllowInsecure: false,
-				TokenSecret:   secret,
-				Querier:       mockQ,
-			})
-
-			req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-			req.Header.Set("Authorization", "Bearer "+tokenString)
-			rr := httptest.NewRecorder()
-
-			handler := auth.Middleware(tt.allowedRoles...)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusOK)
-			}))
-
-			handler.ServeHTTP(rr, req)
+			rr, _ := h.do(http.MethodGet, "/v1/test", "Bearer "+token, tt.allowedRoles, nil)
 
 			if tt.wantAllowed {
 				if rr.Code != http.StatusOK {
@@ -331,31 +259,23 @@ func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
 }
 
 func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	expiresAt := time.Now().Add(15 * time.Minute)
-
-	// Generate bootstrap token
-	tokenString, err := GenerateBootstrapToken(secret, clusterID, nodeID, expiresAt)
+	tokenString, err := GenerateBootstrapToken(testSecret, testClusterID, nodeID, time.Now().Add(15*time.Minute))
 	if err != nil {
-		t.Fatalf("GenerateBootstrapToken error: %v", err)
+		t.Fatalf("GenerateBootstrapToken: %v", err)
 	}
 
-	mockQ := &mockQuerier{}
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       mockQ,
-	})
+	mq := &mockQuerier{}
+	auth := NewAuthorizer(Options{TokenSecret: testSecret, Querier: mq})
 
-	// Bootstrap token should work for worker endpoints
 	req := httptest.NewRequest(http.MethodPost, "/v1/pki/bootstrap", nil)
 	req.Header.Set("Authorization", "Bearer "+tokenString)
 	req.Header.Set("PLOY_NODE_UUID", nodeID.String())
 	rr := httptest.NewRecorder()
 
-	handler := auth.Middleware(RoleWorker)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	called := false
+	auth.Middleware(RoleWorker)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
 		identity, ok := IdentityFromContext(r.Context())
 		if !ok {
 			t.Error("expected identity in context")
@@ -364,225 +284,96 @@ func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
 			t.Errorf("Role=%s want %s", identity.Role, RoleWorker)
 		}
 		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
+	})).ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("got status %d, want %d", rr.Code, http.StatusOK)
 	}
+	if !called {
+		t.Error("handler was not called")
+	}
 
-	// Give async updateTokenLastUsed a moment to run
 	time.Sleep(50 * time.Millisecond)
-	if !mockQ.BootstrapTokenLastUsedCalled() {
+	if !mq.BootstrapTokenLastUsedCalled() {
 		t.Error("expected UpdateBootstrapTokenLastUsed to be called")
 	}
 }
 
 func TestAuthorizerBearerToken_NoQuerierConfigured(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	role := RoleControlPlane
-	expiresAt := time.Now().Add(24 * time.Hour)
+	token := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	h := newBearerHarness(t, Options{TokenSecret: testSecret})
 
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
+	rr, _ := h.do(http.MethodGet, "/v1/nodes", "Bearer "+token, []Role{RoleControlPlane}, nil)
 
-	// Authorizer without querier (no database)
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       nil, // No database
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenString)
-	rr := httptest.NewRecorder()
-
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-
-	// Should still work - tokens just can't be revoked without database
 	if rr.Code != http.StatusOK {
 		t.Errorf("got status %d, want %d", rr.Code, http.StatusOK)
-	}
-}
-
-func TestAuthorizerBearerToken_WrongSecret(t *testing.T) {
-	secret1 := "secret-one-12345678901234567890"
-	secret2 := "secret-two-12345678901234567890"
-	clusterID := "test-cluster"
-	role := RoleControlPlane
-	expiresAt := time.Now().Add(24 * time.Hour)
-
-	// Generate token with secret1
-	tokenString, err := GenerateAPIToken(secret1, clusterID, string(role), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
-
-	// Try to validate with secret2
-	auth := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret2, // Different secret
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenString)
-	rr := httptest.NewRecorder()
-
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("handler should not be called for token with wrong secret")
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("got status %d, want %d", rr.Code, http.StatusUnauthorized)
 	}
 }
 
 func TestAuthorizerBearerToken_InsecureModeWithToken(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	role := RoleControlPlane
-	expiresAt := time.Now().Add(24 * time.Hour)
-
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
-
-	// Insecure mode still validates bearer tokens if provided
-	auth := NewAuthorizer(Options{
+	token := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	h := newBearerHarness(t, Options{
 		AllowInsecure: true,
 		DefaultRole:   RoleWorker,
-		TokenSecret:   secret,
+		TokenSecret:   testSecret,
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	req.Header.Set("Authorization", "Bearer "+tokenString)
-	rr := httptest.NewRecorder()
-
-	handler := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		identity, ok := IdentityFromContext(r.Context())
-		if !ok {
-			t.Error("expected identity in context")
-		}
-		// Should use role from token, not DefaultRole
-		if identity.Role != RoleControlPlane {
-			t.Errorf("Role=%s want %s", identity.Role, RoleControlPlane)
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
+	rr, _ := h.do(http.MethodGet, "/v1/nodes", "Bearer "+token, []Role{RoleControlPlane},
+		func(w http.ResponseWriter, r *http.Request) {
+			identity, ok := IdentityFromContext(r.Context())
+			if !ok {
+				t.Error("expected identity in context")
+			}
+			if identity.Role != RoleControlPlane {
+				t.Errorf("Role=%s want %s (should use token role, not DefaultRole)", identity.Role, RoleControlPlane)
+			}
+			w.WriteHeader(http.StatusOK)
+		})
 
 	if rr.Code != http.StatusOK {
 		t.Errorf("got status %d, want %d", rr.Code, http.StatusOK)
 	}
 }
 
-func TestAuthorizerQueryToken_AllowedWhenContextFlagSet(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	expiresAt := time.Now().Add(24 * time.Hour)
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(RoleControlPlane), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
-
-	a := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       &mockQuerier{},
-	})
-
-	// Simulate the registration pattern: WithQueryTokenAllowed wraps
-	// the auth middleware, which mirrors HandleFuncAllowQueryToken.
-	inner := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	handler := WithQueryTokenAllowed(inner)
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs/run-123/logs?auth_token="+tokenString, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("got status %d, want %d; body=%q", rr.Code, http.StatusOK, rr.Body.String())
-	}
-}
-
-func TestAuthorizerQueryToken_RejectedWithoutContextFlag(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	expiresAt := time.Now().Add(24 * time.Hour)
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(RoleControlPlane), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
-
-	a := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       &mockQuerier{},
-	})
-
-	// Without WithQueryTokenAllowed wrapping, query token should be rejected.
-	handler := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+func TestAuthorizerQueryToken(t *testing.T) {
+	token := mustGenerateAPIToken(t, string(RoleControlPlane), time.Now().Add(24*time.Hour))
+	path := "/v1/runs/run-123/logs?auth_token=" + token
 
 	tests := []struct {
-		method string
-		path   string
+		name             string
+		method           string
+		wrapQueryAllowed bool
+		wantCode         int
 	}{
-		// GET with query token but no context flag
-		{http.MethodGet, "/v1/runs/run-123/logs?auth_token=" + tokenString},
-		// POST should never accept query token even with flag
-		{http.MethodPost, "/v1/runs/run-123/logs?auth_token=" + tokenString},
+		{"GET with flag allowed", http.MethodGet, true, http.StatusOK},
+		{"GET without flag rejected", http.MethodGet, false, http.StatusUnauthorized},
+		{"POST without flag rejected", http.MethodPost, false, http.StatusUnauthorized},
+		{"POST with flag still rejected", http.MethodPost, true, http.StatusUnauthorized},
 	}
 
 	for _, tt := range tests {
-		req := httptest.NewRequest(tt.method, tt.path, nil)
-		rr := httptest.NewRecorder()
-		handler.ServeHTTP(rr, req)
-		if rr.Code != http.StatusUnauthorized {
-			t.Fatalf("%s %s: got status %d, want %d", tt.method, tt.path, rr.Code, http.StatusUnauthorized)
-		}
-	}
-}
+		t.Run(tt.name, func(t *testing.T) {
+			auth := NewAuthorizer(Options{
+				TokenSecret: testSecret,
+				Querier:     &mockQuerier{},
+			})
 
-func TestAuthorizerQueryToken_PostRejectedEvenWithFlag(t *testing.T) {
-	secret := "test-secret-key-for-jwt-signing-at-least-32-chars"
-	clusterID := "test-cluster"
-	expiresAt := time.Now().Add(24 * time.Hour)
-	tokenString, err := GenerateAPIToken(secret, clusterID, string(RoleControlPlane), expiresAt)
-	if err != nil {
-		t.Fatalf("GenerateAPIToken error: %v", err)
-	}
+			inner := auth.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}))
 
-	a := NewAuthorizer(Options{
-		AllowInsecure: false,
-		TokenSecret:   secret,
-		Querier:       &mockQuerier{},
-	})
+			var handler http.Handler = inner
+			if tt.wrapQueryAllowed {
+				handler = WithQueryTokenAllowed(inner)
+			}
 
-	inner := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	handler := WithQueryTokenAllowed(inner)
+			req := httptest.NewRequest(tt.method, path, nil)
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run-123/logs?auth_token="+tokenString, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusUnauthorized {
-		t.Fatalf("POST with query token: got status %d, want %d", rr.Code, http.StatusUnauthorized)
+			if rr.Code != tt.wantCode {
+				t.Errorf("got status %d, want %d", rr.Code, tt.wantCode)
+			}
+		})
 	}
 }
