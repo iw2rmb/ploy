@@ -46,12 +46,6 @@ func validateWorkspacePolicy(policy workspaceChangePolicy, preStatus, postStatus
 	return "", false
 }
 
-// uploadHealingNoWorkspaceChangesFailure uploads a terminal failure status when a healing job
-// exits 0 but produces no workspace changes.
-func (r *runController) uploadHealingNoWorkspaceChangesFailure(ctx context.Context, req StartRunRequest, baseStats types.RunStats, duration time.Duration) {
-	r.uploadHealingWorkspacePolicyFailure(ctx, req, "no_workspace_changes", duration)
-}
-
 func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context, req StartRunRequest, warning string, duration time.Duration) {
 	logMsg := fmt.Sprintf("healing job failed (%s)", warning)
 	stats := types.NewRunStatsBuilder().
@@ -83,12 +77,8 @@ func (r *runController) populateHealingInDir(
 		return nil
 	}
 
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	if baseRoot == "" {
-		baseRoot = os.TempDir()
-	}
-	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
-	srcPath := filepath.Join(runDir, "build-gate-first.log")
+	cacheDir := runCacheDir(runID)
+	srcPath := filepath.Join(cacheDir, "build-gate-first.log")
 
 	gateLogAvailable := false
 	var data []byte
@@ -167,7 +157,7 @@ func (r *runController) populateHealingInDir(
 	if recoveryCtx != nil && len(recoveryCtx.GateProfile) > 0 {
 		profileRaw = append([]byte(nil), recoveryCtx.GateProfile...)
 	} else {
-		profilePath := filepath.Join(runDir, "build-gate-profile.json")
+		profilePath := filepath.Join(cacheDir, "build-gate-profile.json")
 		profileRaw, err = os.ReadFile(profilePath)
 		if err != nil {
 			if os.IsNotExist(err) {

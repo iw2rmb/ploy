@@ -3,12 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -30,13 +27,6 @@ import (
 // - Job materialization is deferred to the batch scheduler/start endpoint and gated on prep readiness.
 func createMigRunHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse mig_id from URL path.
-		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
 		// Parse request body with strict validation.
 		var req struct {
 			RepoSelector struct {
@@ -65,18 +55,11 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Verify mig exists and is not archived.
-		mig, err := st.GetMig(r.Context(), modID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("create mig run: get mig failed", "mig_id", modID.String(), "err", err)
+		mig, ok := getMigByIDOrFail(w, r, st, "create mig run")
+		if !ok {
 			return
 		}
-
-		// Archived migs cannot be executed.
+		modID := mig.ID
 		if mig.ArchivedAt.Valid {
 			httpErr(w, http.StatusConflict, "cannot create run for archived mig")
 			return

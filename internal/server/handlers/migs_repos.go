@@ -30,12 +30,6 @@ import (
 // - Returns id (repo_id) and stored fields.
 func addMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
 		// Parse request body with strict validation.
 		var req struct {
 			RepoURL   domaintypes.RepoURL `json:"repo_url"`
@@ -63,16 +57,11 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Verify mig exists and is not archived.
-		mig, err := st.GetMig(r.Context(), modID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("add mig repo: get mig failed", "mig_id", modID, "err", err)
+		mig, ok := getMigByIDOrFail(w, r, st, "add mig repo")
+		if !ok {
 			return
 		}
+		modID := mig.ID
 		if mig.ArchivedAt.Valid {
 			httpErr(w, http.StatusConflict, "cannot add repo to archived mig")
 			return
@@ -134,23 +123,11 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 // - Lists repos: ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
 func listMigReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+		mig, ok := getMigByIDOrFail(w, r, st, "list mig repos")
+		if !ok {
 			return
 		}
-
-		// Verify mig exists.
-		_, err = st.GetMig(r.Context(), modID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("list mig repos: get mig failed", "mig_id", modID, "err", err)
-			return
-		}
+		modID := mig.ID
 
 		// List repos for this mig.
 		repos, err := st.ListMigReposByMig(r.Context(), modID)
@@ -208,27 +185,15 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 // - Refuse deletion if the repo has historical executions (run_repos.repo_id references).
 func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+		mig, ok := getMigByIDOrFail(w, r, st, "delete mig repo")
+		if !ok {
 			return
 		}
+		modID := mig.ID
 
 		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
 			httpErr(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
-		// Verify mig exists.
-		_, err = st.GetMig(r.Context(), modID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("delete mig repo: get mig failed", "mig_id", modID, "err", err)
 			return
 		}
 
@@ -288,23 +253,11 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 //   - within quoted fields, " is escaped as ""
 func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modID, err := parseParam[domaintypes.MigID](r, "mig_id")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+		mig, ok := getMigByIDOrFail(w, r, st, "bulk upsert mig repos")
+		if !ok {
 			return
 		}
-
-		// Verify mig exists and is not archived.
-		mig, err := st.GetMig(r.Context(), modID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("bulk upsert mig repos: get mig failed", "mig_id", modID, "err", err)
-			return
-		}
+		modID := mig.ID
 		if mig.ArchivedAt.Valid {
 			httpErr(w, http.StatusConflict, "cannot modify repos on archived mig")
 			return

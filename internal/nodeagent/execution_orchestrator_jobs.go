@@ -354,33 +354,24 @@ func (r *runController) runContainerJob(
 	}
 
 	// Materialize the manifest tmp bundle into a staging directory.
-	var tmpStagingDir string
-	if manifest.TmpBundle != nil {
-		dir, err := os.MkdirTemp("", "ploy-tmpfiles-*")
-		if err != nil {
-			return fmt.Errorf("create tmp staging dir: %w", err)
-		}
-		defer func() {
-			if rmErr := os.RemoveAll(dir); rmErr != nil {
-				slog.Warn("failed to remove tmp staging dir", "path", dir, "error", rmErr)
-			}
-		}()
-		if err := r.materializeTmpBundle(ctx, manifest.TmpBundle, dir); err != nil {
-			return fmt.Errorf("materialize tmp bundle: %w", err)
-		}
-		tmpStagingDir = dir
+	var result step.Result
+	var runErr error
+	var duration time.Duration
+	if bundleErr := r.withMaterializedTmpBundle(ctx, manifest.TmpBundle, "ploy-tmpfiles-*", func(tmpStagingDir string) error {
+		result, runErr = execCtx.runner.Run(ctx, step.Request{
+			RunID:         req.RunID,
+			JobID:         req.JobID,
+			Manifest:      manifest,
+			Workspace:     workspace,
+			OutDir:        outDir,
+			InDir:         inDir,
+			TmpStagingDir: tmpStagingDir,
+		})
+		duration = time.Since(startTime)
+		return nil
+	}); bundleErr != nil {
+		return bundleErr
 	}
-
-	result, runErr := execCtx.runner.Run(ctx, step.Request{
-		RunID:         req.RunID,
-		JobID:         req.JobID,
-		Manifest:      manifest,
-		Workspace:     workspace,
-		OutDir:        outDir,
-		InDir:         inDir,
-		TmpStagingDir: tmpStagingDir,
-	})
-	duration := time.Since(startTime)
 
 	if cfg.UploadDiff != nil {
 		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
@@ -451,6 +442,20 @@ func withTempDir(prefix string, fn func(path string) error) error {
 	}()
 
 	return fn(dir)
+}
+
+// withMaterializedTmpBundle materializes a TmpBundle into a staging directory
+// and passes the staging path to fn. When bundle is nil, fn receives "".
+func (r *runController) withMaterializedTmpBundle(ctx context.Context, bundle *contracts.TmpBundleRef, prefix string, fn func(stagingDir string) error) error {
+	if bundle == nil {
+		return fn("")
+	}
+	return withTempDir(prefix, func(dir string) error {
+		if err := r.materializeTmpBundle(ctx, bundle, dir); err != nil {
+			return fmt.Errorf("materialize tmp bundle: %w", err)
+		}
+		return fn(dir)
+	})
 }
 
 // tempResource holds a temporary path and its cleanup function.

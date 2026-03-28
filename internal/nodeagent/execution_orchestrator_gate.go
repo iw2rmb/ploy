@@ -61,12 +61,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, modImages)
 				}
-			case types.JobTypePostGate:
-				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
-				}
-			// Note: re_gate uses same expectations as post_gate (verifying output after healing)
-			case types.JobTypeReGate:
+			case types.JobTypePostGate, types.JobTypeReGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
 					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
 				}
@@ -168,37 +163,19 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	// Build stats with gate metadata.
 	stats := r.buildGateJobStats(gateResult, duration)
 
-	// Check if gate passed using shared helper.
-	gatePassed := gateResultPassed(gateResult)
-
-	// Determine status and exit code.
-	// v1 uses capitalized job status values: Success, Fail, Cancelled.
-	if !gatePassed {
-		// Gate failed - exit code 1 signals gate failure for healing.
-		var exitCode int32 = 1
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
-			slog.Error("failed to upload gate failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
-		}
-		slog.Info("gate job failed",
-			"run_id", req.RunID,
-			"job_id", req.JobID,
-			"job_type", req.JobType,
-			"duration", duration,
-		)
-		return
+	// Determine status and exit code based on gate outcome.
+	status := types.JobStatusSuccess
+	var exitCode int32 = 0
+	logVerb := "succeeded"
+	if !gateResultPassed(gateResult) {
+		status = types.JobStatusFail
+		exitCode = 1
+		logVerb = "failed"
 	}
-
-	// Gate passed.
-	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
-		slog.Error("failed to upload gate success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		slog.Error("failed to upload gate status", "run_id", req.RunID, "job_id", req.JobID, "status", status, "error", uploadErr)
 	}
-	slog.Info("gate job succeeded",
-		"run_id", req.RunID,
-		"job_id", req.JobID,
-		"job_type", req.JobType,
-		"duration", duration,
-	)
+	slog.Info("gate job "+logVerb, "run_id", req.RunID, "job_id", req.JobID, "job_type", req.JobType, "duration", duration)
 }
 
 // applyGatePhaseOverrides wires optional per-phase overrides into the gate manifest.
@@ -272,60 +249,50 @@ func gateResultPassed(gateResult *contracts.BuildGateStageMetadata) bool {
 	return gateResult.StaticChecks[0].Passed
 }
 
+// runCacheDir returns the per-run cache directory under PLOYD_CACHE_HOME (or os.TempDir).
+func runCacheDir(runID types.RunID) string {
+	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+	if baseRoot == "" {
+		baseRoot = os.TempDir()
+	}
+	return filepath.Join(baseRoot, "ploy", "run", runID.String())
+}
+
+// persistOnce writes data to dir/filename idempotently: if the file already
+// exists the call is a no-op, preserving the first write.
+func persistOnce(dir, filename string, data []byte, label string, runID types.RunID) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		slog.Warn("failed to create dir for "+label, "run_id", runID, "error", err)
+		return
+	}
+	p := filepath.Join(dir, filename)
+	if _, err := os.Stat(p); err == nil {
+		return
+	}
+	if err := os.WriteFile(p, data, 0o644); err != nil {
+		slog.Warn("failed to persist "+label, "run_id", runID, "path", p, "error", err)
+		return
+	}
+	slog.Info("persisted "+label, "run_id", runID, "path", p)
+}
+
 // persistGateStack writes the detected stack from a gate result to a stable
-// per-run path under the node's cache/temp home. This allows mig and healing
-// jobs to resolve stack-specific images consistently, even when executed as
-// separate jobs on the same or different nodes.
-//
-// The function is idempotent: once a stack has been written for a run,
-// subsequent calls are no-ops to preserve the original detection result.
-// This ensures stability across re-gates and healing retries.
+// per-run path. Idempotent: preserves the first detection result.
 func (r *runController) persistGateStack(runID types.RunID, meta *contracts.BuildGateStageMetadata) {
 	if meta == nil {
 		return
 	}
-
 	stack := meta.DetectedStack()
 	if stack == "" {
 		stack = contracts.ModStackUnknown
 	}
-
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	if baseRoot == "" {
-		baseRoot = os.TempDir()
-	}
-	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		slog.Warn("failed to create run dir for gate stack", "run_id", runID, "error", err)
-		return
-	}
-
-	stackPath := filepath.Join(runDir, "build-gate-stack.txt")
-	if _, err := os.Stat(stackPath); err == nil {
-		// Stack already persisted for this run; keep the first detection.
-		return
-	}
-
-	if err := os.WriteFile(stackPath, []byte(string(stack)), 0o644); err != nil {
-		slog.Warn("failed to persist build gate stack", "run_id", runID, "path", stackPath, "error", err)
-		return
-	}
-
-	slog.Info("persisted build gate stack", "run_id", runID, "stack", stack, "path", stackPath)
+	persistOnce(runCacheDir(runID), "build-gate-stack.txt", []byte(string(stack)), "build gate stack", runID)
 }
 
-// loadPersistedStack reads the persisted stack for a run from the node's
-// cache/temp home. Returns ModStackUnknown if no stack file exists or on error.
-//
-// This allows mig and healing jobs to use the same stack detected during the
-// initial gate execution, ensuring deterministic image selection across jobs.
+// loadPersistedStack reads the persisted stack for a run.
+// Returns ModStackUnknown if no stack file exists or on error.
 func (r *runController) loadPersistedStack(runID types.RunID) contracts.ModStack {
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	if baseRoot == "" {
-		baseRoot = os.TempDir()
-	}
-	stackPath := filepath.Join(baseRoot, "ploy", "run", runID.String(), "build-gate-stack.txt")
-
+	stackPath := filepath.Join(runCacheDir(runID), "build-gate-stack.txt")
 	data, err := os.ReadFile(stackPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -333,54 +300,25 @@ func (r *runController) loadPersistedStack(runID types.RunID) contracts.ModStack
 		}
 		return contracts.ModStackUnknown
 	}
-
 	stack := contracts.ModStack(strings.TrimSpace(string(data)))
 	if stack == "" {
 		return contracts.ModStackUnknown
 	}
-
 	slog.Debug("loaded persisted stack for run", "run_id", runID, "stack", stack)
 	return stack
 }
 
-// persistFirstGateFailureLog writes the first failing gate log for a run to a
-// stable per-run path under the node's cache/temp home. Healing jobs later read
-// this file to hydrate /in/build-gate.log without re-running the gate.
-//
-// The function is idempotent: once a log has been written for a run, subsequent
-// calls are no-ops to preserve the original failure context.
+// persistFirstGateFailureLog writes the first failing gate log for a run.
+// Idempotent: preserves the original failure context.
 func (r *runController) persistFirstGateFailureLog(runID types.RunID, meta *contracts.BuildGateStageMetadata) {
 	if meta == nil {
 		return
 	}
-
 	logPayload := gateLogPayloadFromMetadata(meta)
 	if strings.TrimSpace(logPayload) == "" {
 		return
 	}
-
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	if baseRoot == "" {
-		baseRoot = os.TempDir()
-	}
-	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		slog.Warn("failed to create run dir for gate log", "run_id", runID, "error", err)
-		return
-	}
-
-	logPath := filepath.Join(runDir, "build-gate-first.log")
-	if _, err := os.Stat(logPath); err == nil {
-		// Log already persisted for this run; keep the first failure view.
-		return
-	}
-
-	if err := os.WriteFile(logPath, []byte(logPayload), 0o644); err != nil {
-		slog.Warn("failed to persist first build gate failure log", "run_id", runID, "path", logPath, "error", err)
-		return
-	}
-
-	slog.Info("persisted first build gate failure log", "run_id", runID, "path", logPath)
+	persistOnce(runCacheDir(runID), "build-gate-first.log", []byte(logPayload), "first build gate failure log", runID)
 }
 
 func (r *runController) persistGateProfileSnapshot(
@@ -389,16 +327,12 @@ func (r *runController) persistGateProfileSnapshot(
 	gateSpec *contracts.StepGateSpec,
 	meta *contracts.BuildGateStageMetadata,
 ) {
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	if baseRoot == "" {
-		baseRoot = os.TempDir()
-	}
-	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
+	dir := runCacheDir(runID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		slog.Warn("failed to create run dir for gate profile snapshot", "run_id", runID, "error", err)
 		return
 	}
-	profilePath := filepath.Join(runDir, "build-gate-profile.json")
+	profilePath := filepath.Join(dir, "build-gate-profile.json")
 
 	raw := resolveGateProfileSnapshotRaw(jobType, gateSpec, meta)
 	if len(raw) == 0 {

@@ -229,325 +229,247 @@ func basicHealingSpec(retries int) *contracts.HealingSpec {
 	}
 }
 
-func TestEvaluateGateFailureTransition_TerminalRecoveryKindCancels(t *testing.T) {
-	t.Parallel()
-
-	failedJob := store.Job{
-		ID:        domaintypes.NewJobID(),
-		RepoShaIn: testRepoSHAIn,
-	}
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		map[domaintypes.JobID]store.Job{},
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "mixed"},
-		contracts.RecoveryErrorKindMixed,
-		contracts.ModStackUnknown,
-		basicHealingSpec(1),
-		domaintypes.NewJobID,
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeCancel {
-		t.Fatalf("outcome = %v, want Cancel", decision.Outcome)
-	}
-	if decision.Chain != nil {
-		t.Fatal("expected no chain for cancel decision")
-	}
+type gateFailureCase struct {
+	name          string
+	failedJob     store.Job
+	jobsByID      map[domaintypes.JobID]store.Job
+	recoveryMeta  *contracts.BuildGateRecoveryMetadata
+	recoveryKind  contracts.RecoveryErrorKind
+	detectedStack contracts.ModStack
+	healing       *contracts.HealingSpec
+	newJobID      func() domaintypes.JobID
+	wantOutcome   lifecycle.GateFailureOutcome
+	assertChain   func(*testing.T, *lifecycle.HealChainSpec)
 }
 
-func TestEvaluateGateFailureTransition_NoHealingConfigCancels(t *testing.T) {
-	t.Parallel()
-
-	failedJob := store.Job{
-		ID:        domaintypes.NewJobID(),
-		RepoShaIn: testRepoSHAIn,
-	}
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		map[domaintypes.JobID]store.Job{},
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-		contracts.RecoveryErrorKindInfra,
-		contracts.ModStackUnknown,
-		nil,
-		domaintypes.NewJobID,
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeCancel {
-		t.Fatalf("outcome = %v, want Cancel", decision.Outcome)
-	}
-}
-
-func TestEvaluateGateFailureTransition_NoActionForErrorKindCancels(t *testing.T) {
-	t.Parallel()
-
-	failedJob := store.Job{
-		ID:        domaintypes.NewJobID(),
-		RepoShaIn: testRepoSHAIn,
-	}
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		map[domaintypes.JobID]store.Job{},
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "deps"},
-		contracts.RecoveryErrorKindDeps,
-		contracts.ModStackUnknown,
-		basicHealingSpec(1), // only has "infra" action
-		domaintypes.NewJobID,
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeCancel {
-		t.Fatalf("outcome = %v, want Cancel", decision.Outcome)
-	}
-}
-
-func TestEvaluateGateFailureTransition_RetriesExhaustedCancels(t *testing.T) {
-	t.Parallel()
-
+func retriesExhaustedCase() gateFailureCase {
 	baseGateID := domaintypes.NewJobID()
 	heal1ID := domaintypes.NewJobID()
 	reGate1ID := domaintypes.NewJobID()
-
-	// Simulate: pre-gate → heal-1 → re-gate-1 (already failed)
-	jobsByID := map[domaintypes.JobID]store.Job{
-		baseGateID: {
-			ID:      baseGateID,
-			JobType: domaintypes.JobTypePreGate,
-			NextID:  &heal1ID,
+	return gateFailureCase{
+		name: "retries exhausted cancels",
+		failedJob: store.Job{
+			ID: reGate1ID, JobType: domaintypes.JobTypeReGate, RepoShaIn: testRepoSHAIn,
 		},
-		heal1ID: {
-			ID:      heal1ID,
-			JobType: domaintypes.JobTypeHeal,
-			NextID:  &reGate1ID,
+		jobsByID: map[domaintypes.JobID]store.Job{
+			baseGateID: {ID: baseGateID, JobType: domaintypes.JobTypePreGate, NextID: &heal1ID},
+			heal1ID:    {ID: heal1ID, JobType: domaintypes.JobTypeHeal, NextID: &reGate1ID},
+			reGate1ID:  {ID: reGate1ID, JobType: domaintypes.JobTypeReGate},
 		},
-		reGate1ID: {
-			ID:      reGate1ID,
-			JobType: domaintypes.JobTypeReGate,
-		},
-	}
-
-	failedJob := store.Job{
-		ID:        reGate1ID,
-		JobType:   domaintypes.JobTypeReGate,
-		RepoShaIn: testRepoSHAIn,
-	}
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		jobsByID,
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-		contracts.RecoveryErrorKindInfra,
-		contracts.ModStackUnknown,
-		basicHealingSpec(1), // retries=1, already have 1 attempt
-		domaintypes.NewJobID,
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeCancel {
-		t.Fatalf("outcome = %v, want Cancel", decision.Outcome)
+		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
+		recoveryKind: contracts.RecoveryErrorKindInfra,
+		healing:      basicHealingSpec(1),
+		newJobID:     domaintypes.NewJobID,
+		wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 	}
 }
 
-func TestEvaluateGateFailureTransition_FirstAttemptCreatesChain(t *testing.T) {
-	t.Parallel()
-
+func firstAttemptCase() gateFailureCase {
 	baseGateID := domaintypes.NewJobID()
 	successorID := domaintypes.NewJobID()
-	failedJob := store.Job{
-		ID:        baseGateID,
-		JobType:   domaintypes.JobTypePreGate,
-		RepoShaIn: testRepoSHAIn,
-		NextID:    &successorID,
-	}
-	jobsByID := map[domaintypes.JobID]store.Job{
-		baseGateID: failedJob,
-	}
-
 	healID := domaintypes.NewJobID()
 	reGateID := domaintypes.NewJobID()
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		jobsByID,
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "infra", StrategyID: "infra-default"},
-		contracts.RecoveryErrorKindInfra,
-		contracts.ModStackUnknown,
-		basicHealingSpec(2),
-		newFixedIDSequence(healID, reGateID),
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeHealChain {
-		t.Fatalf("outcome = %v, want HealChain", decision.Outcome)
-	}
-
-	chain := decision.Chain
-	if chain == nil {
-		t.Fatal("expected chain to be set")
-	}
-	if chain.ReGateID != reGateID {
-		t.Fatalf("ReGateID = %s, want %s", chain.ReGateID, reGateID)
-	}
-	if chain.HealID != healID {
-		t.Fatalf("HealID = %s, want %s", chain.HealID, healID)
-	}
-	if chain.AttemptNumber != 1 {
-		t.Fatalf("AttemptNumber = %d, want 1", chain.AttemptNumber)
-	}
-	if chain.HealImage != "heal:latest" {
-		t.Fatalf("HealImage = %q, want %q", chain.HealImage, "heal:latest")
-	}
-	if chain.HealRepoSHAIn != testRepoSHAIn {
-		t.Fatalf("HealRepoSHAIn = %q, want %q", chain.HealRepoSHAIn, testRepoSHAIn)
-	}
-	if chain.OldSuccessorID == nil || *chain.OldSuccessorID != successorID {
-		t.Fatalf("OldSuccessorID = %v, want %s", chain.OldSuccessorID, successorID)
-	}
-	if chain.ReGateMeta == nil || chain.ReGateMeta.Recovery == nil {
-		t.Fatal("expected ReGateMeta.Recovery to be set")
-	}
-	if chain.ReGateMeta.Recovery.ErrorKind != "infra" {
-		t.Fatalf("ReGateMeta.Recovery.ErrorKind = %q, want %q", chain.ReGateMeta.Recovery.ErrorKind, "infra")
-	}
-	if chain.HealMeta == nil || chain.HealMeta.Recovery == nil {
-		t.Fatal("expected HealMeta.Recovery to be set")
-	}
-}
-
-func TestEvaluateGateFailureTransition_InvalidSHACancels(t *testing.T) {
-	t.Parallel()
-
 	failedJob := store.Job{
-		ID:        domaintypes.NewJobID(),
-		JobType:   domaintypes.JobTypePreGate,
-		RepoShaIn: "not-a-valid-sha",
+		ID: baseGateID, JobType: domaintypes.JobTypePreGate,
+		RepoShaIn: testRepoSHAIn, NextID: &successorID,
 	}
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		map[domaintypes.JobID]store.Job{},
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-		contracts.RecoveryErrorKindInfra,
-		contracts.ModStackUnknown,
-		basicHealingSpec(1),
-		domaintypes.NewJobID,
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeCancel {
-		t.Fatalf("outcome = %v, want Cancel for invalid SHA", decision.Outcome)
+	return gateFailureCase{
+		name:         "first attempt creates chain",
+		failedJob:    failedJob,
+		jobsByID:     map[domaintypes.JobID]store.Job{baseGateID: failedJob},
+		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra", StrategyID: "infra-default"},
+		recoveryKind: contracts.RecoveryErrorKindInfra,
+		healing:      basicHealingSpec(2),
+		newJobID:     newFixedIDSequence(healID, reGateID),
+		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
+		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
+			t.Helper()
+			if chain.HealID != healID {
+				t.Fatalf("HealID = %s, want %s", chain.HealID, healID)
+			}
+			if chain.ReGateID != reGateID {
+				t.Fatalf("ReGateID = %s, want %s", chain.ReGateID, reGateID)
+			}
+			if chain.AttemptNumber != 1 {
+				t.Fatalf("AttemptNumber = %d, want 1", chain.AttemptNumber)
+			}
+			if chain.HealImage != "heal:latest" {
+				t.Fatalf("HealImage = %q, want %q", chain.HealImage, "heal:latest")
+			}
+			if chain.HealRepoSHAIn != testRepoSHAIn {
+				t.Fatalf("HealRepoSHAIn = %q, want %q", chain.HealRepoSHAIn, testRepoSHAIn)
+			}
+			if chain.OldSuccessorID == nil || *chain.OldSuccessorID != successorID {
+				t.Fatalf("OldSuccessorID = %v, want %s", chain.OldSuccessorID, successorID)
+			}
+			if chain.ReGateMeta == nil || chain.ReGateMeta.Recovery == nil {
+				t.Fatal("expected ReGateMeta.Recovery to be set")
+			}
+			if chain.ReGateMeta.Recovery.ErrorKind != "infra" {
+				t.Fatalf("ReGateMeta.Recovery.ErrorKind = %q, want %q", chain.ReGateMeta.Recovery.ErrorKind, "infra")
+			}
+			if chain.HealMeta == nil || chain.HealMeta.Recovery == nil {
+				t.Fatal("expected HealMeta.Recovery to be set")
+			}
+		},
 	}
 }
 
-func TestEvaluateGateFailureTransition_SecondAttemptIncreasesNumber(t *testing.T) {
-	t.Parallel()
-
+func secondAttemptCase() gateFailureCase {
 	baseGateID := domaintypes.NewJobID()
 	heal1ID := domaintypes.NewJobID()
 	reGate1ID := domaintypes.NewJobID()
 	successorID := domaintypes.NewJobID()
-
-	// Simulate: pre-gate → heal-1 → re-gate-1 (already done once)
-	jobsByID := map[domaintypes.JobID]store.Job{
-		baseGateID: {
-			ID:      baseGateID,
-			JobType: domaintypes.JobTypePreGate,
-			NextID:  &heal1ID,
-		},
-		heal1ID: {
-			ID:      heal1ID,
-			JobType: domaintypes.JobTypeHeal,
-			NextID:  &reGate1ID,
-		},
-		reGate1ID: {
-			ID:      reGate1ID,
-			JobType: domaintypes.JobTypeReGate,
-			NextID:  &successorID,
-		},
-		successorID: {
-			ID:      successorID,
-			JobType: domaintypes.JobTypeMod,
-		},
-	}
-
-	failedJob := store.Job{
-		ID:        reGate1ID,
-		JobType:   domaintypes.JobTypeReGate,
-		RepoShaIn: testRepoSHAIn,
-		NextID:    &successorID,
-	}
-
 	heal2ID := domaintypes.NewJobID()
 	reGate2ID := domaintypes.NewJobID()
-
-	decision, err := lifecycle.EvaluateGateFailureTransition(
-		failedJob,
-		jobsByID,
-		&contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-		contracts.RecoveryErrorKindInfra,
-		contracts.ModStackUnknown,
-		basicHealingSpec(3), // retries=3, have 1 attempt
-		newFixedIDSequence(heal2ID, reGate2ID),
-	)
-
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	return gateFailureCase{
+		name: "second attempt increases number",
+		failedJob: store.Job{
+			ID: reGate1ID, JobType: domaintypes.JobTypeReGate,
+			RepoShaIn: testRepoSHAIn, NextID: &successorID,
+		},
+		jobsByID: map[domaintypes.JobID]store.Job{
+			baseGateID:  {ID: baseGateID, JobType: domaintypes.JobTypePreGate, NextID: &heal1ID},
+			heal1ID:     {ID: heal1ID, JobType: domaintypes.JobTypeHeal, NextID: &reGate1ID},
+			reGate1ID:   {ID: reGate1ID, JobType: domaintypes.JobTypeReGate, NextID: &successorID},
+			successorID: {ID: successorID, JobType: domaintypes.JobTypeMod},
+		},
+		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
+		recoveryKind: contracts.RecoveryErrorKindInfra,
+		healing:      basicHealingSpec(3),
+		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
+		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
+		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
+			t.Helper()
+			if chain.AttemptNumber != 2 {
+				t.Fatalf("AttemptNumber = %d, want 2", chain.AttemptNumber)
+			}
+		},
 	}
-	if decision.Outcome != lifecycle.GateFailureOutcomeHealChain {
-		t.Fatalf("outcome = %v, want HealChain", decision.Outcome)
+}
+
+func TestEvaluateGateFailureTransition(t *testing.T) {
+	t.Parallel()
+
+	cases := []gateFailureCase{
+		{
+			name:         "terminal recovery kind cancels",
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
+			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "mixed"},
+			recoveryKind: contracts.RecoveryErrorKindMixed,
+			healing:      basicHealingSpec(1),
+			newJobID:     domaintypes.NewJobID,
+			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
+		},
+		{
+			name:         "no healing config cancels",
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
+			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
+			recoveryKind: contracts.RecoveryErrorKindInfra,
+			newJobID:     domaintypes.NewJobID,
+			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
+		},
+		{
+			name:         "no action for error kind cancels",
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
+			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "deps"},
+			recoveryKind: contracts.RecoveryErrorKindDeps,
+			healing:      basicHealingSpec(1), // only has "infra" action
+			newJobID:     domaintypes.NewJobID,
+			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
+		},
+		{
+			name:         "invalid SHA cancels",
+			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePreGate, RepoShaIn: "not-a-valid-sha"},
+			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
+			recoveryKind: contracts.RecoveryErrorKindInfra,
+			healing:      basicHealingSpec(1),
+			newJobID:     domaintypes.NewJobID,
+			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
+		},
+		retriesExhaustedCase(),
+		firstAttemptCase(),
+		secondAttemptCase(),
 	}
-	if decision.Chain.AttemptNumber != 2 {
-		t.Fatalf("AttemptNumber = %d, want 2", decision.Chain.AttemptNumber)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if tc.jobsByID == nil {
+				tc.jobsByID = map[domaintypes.JobID]store.Job{}
+			}
+			if tc.detectedStack == "" {
+				tc.detectedStack = contracts.ModStackUnknown
+			}
+
+			decision, err := lifecycle.EvaluateGateFailureTransition(
+				tc.failedJob, tc.jobsByID, tc.recoveryMeta,
+				tc.recoveryKind, tc.detectedStack, tc.healing, tc.newJobID,
+			)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if decision.Outcome != tc.wantOutcome {
+				t.Fatalf("outcome = %v, want %v", decision.Outcome, tc.wantOutcome)
+			}
+			if tc.wantOutcome == lifecycle.GateFailureOutcomeCancel && decision.Chain != nil {
+				t.Fatal("expected no chain for cancel decision")
+			}
+			if tc.assertChain != nil {
+				if decision.Chain == nil {
+					t.Fatal("expected chain to be set")
+				}
+				tc.assertChain(t, decision.Chain)
+			}
+		})
 	}
 }
 
 // ========== ResolveGateRecoveryContext ==========
 
-func TestResolveGateRecoveryContext_DefaultsWhenNoMeta(t *testing.T) {
+func TestResolveGateRecoveryContext(t *testing.T) {
 	t.Parallel()
 
-	job := store.Job{ID: domaintypes.NewJobID()}
-	meta, stack, _ := lifecycle.ResolveGateRecoveryContext(job)
+	cases := []struct {
+		name           string
+		job            store.Job
+		wantErrorKind  string
+		wantStack      contracts.ModStack
+		wantStrategyID string
+	}{
+		{
+			name:          "defaults when no meta",
+			job:           store.Job{ID: domaintypes.NewJobID()},
+			wantErrorKind: contracts.DefaultRecoveryErrorKind().String(),
+			wantStack:     contracts.ModStackUnknown,
+		},
+		{
+			name: "parses gate recovery",
+			job: store.Job{
+				ID:   domaintypes.NewJobID(),
+				Meta: []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
+			},
+			wantErrorKind:  "infra",
+			wantStack:      contracts.ModStackJavaMaven,
+			wantStrategyID: "infra-default",
+		},
+	}
 
-	if meta.ErrorKind != contracts.DefaultRecoveryErrorKind().String() {
-		t.Fatalf("ErrorKind = %q, want default %q", meta.ErrorKind, contracts.DefaultRecoveryErrorKind())
-	}
-	if stack != contracts.ModStackUnknown {
-		t.Fatalf("stack = %q, want unknown", stack)
-	}
-}
-
-func TestResolveGateRecoveryContext_ParsesGateRecovery(t *testing.T) {
-	t.Parallel()
-
-	job := store.Job{
-		ID:   domaintypes.NewJobID(),
-		Meta: []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
-	}
-	meta, stack, _ := lifecycle.ResolveGateRecoveryContext(job)
-
-	if meta.ErrorKind != "infra" {
-		t.Fatalf("ErrorKind = %q, want infra", meta.ErrorKind)
-	}
-	if meta.StrategyID != "infra-default" {
-		t.Fatalf("StrategyID = %q, want infra-default", meta.StrategyID)
-	}
-	if stack != contracts.ModStackJavaMaven {
-		t.Fatalf("stack = %q, want java-maven", stack)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			meta, stack, _ := lifecycle.ResolveGateRecoveryContext(tc.job)
+			if meta.ErrorKind != tc.wantErrorKind {
+				t.Fatalf("ErrorKind = %q, want %q", meta.ErrorKind, tc.wantErrorKind)
+			}
+			if stack != tc.wantStack {
+				t.Fatalf("stack = %q, want %q", stack, tc.wantStack)
+			}
+			if tc.wantStrategyID != "" && meta.StrategyID != tc.wantStrategyID {
+				t.Fatalf("StrategyID = %q, want %q", meta.StrategyID, tc.wantStrategyID)
+			}
+		})
 	}
 }

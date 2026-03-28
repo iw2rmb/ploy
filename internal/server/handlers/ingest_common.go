@@ -196,6 +196,52 @@ func getActiveRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, 
 	return run, true
 }
 
+// getMigByRefOrFail parses the "mig_ref" path parameter, resolves the mig by
+// ID-or-name, and writes an HTTP error response on failure (400/404/500).
+// Returns (mig, true) on success, (zero, false) when the response has already
+// been written.
+func getMigByRefOrFail(w http.ResponseWriter, r *http.Request, st store.Store, logPrefix string) (store.Mig, bool) {
+	ref, err := parseParam[domaintypes.MigRef](r, "mig_ref")
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, "%s", err)
+		return store.Mig{}, false
+	}
+	mig, err := resolveMigByRef(r.Context(), st, ref)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpErr(w, http.StatusNotFound, "mig not found")
+			return store.Mig{}, false
+		}
+		slog.Error(logPrefix+": get mig failed", "mig_ref", ref, "err", err)
+		httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+		return store.Mig{}, false
+	}
+	return mig, true
+}
+
+// getMigByIDOrFail parses the "mig_id" path parameter, fetches the mig by ID,
+// and writes an HTTP error response on failure (400/404/500).
+// Returns (mig, true) on success, (zero, false) when the response has already
+// been written.
+func getMigByIDOrFail(w http.ResponseWriter, r *http.Request, st store.Store, logPrefix string) (store.Mig, bool) {
+	modID, err := parseParam[domaintypes.MigID](r, "mig_id")
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, "%s", err)
+		return store.Mig{}, false
+	}
+	mig, err := st.GetMig(r.Context(), modID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httpErr(w, http.StatusNotFound, "mig not found")
+			return store.Mig{}, false
+		}
+		slog.Error(logPrefix+": get mig failed", "mig_id", modID, "err", err)
+		httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+		return store.Mig{}, false
+	}
+	return mig, true
+}
+
 // streamBlob writes standard download headers and streams content from r to w.
 // The caller is responsible for opening/closing the reader.
 func streamBlob(w http.ResponseWriter, reader io.Reader, size int64, filename, contentType string) {
