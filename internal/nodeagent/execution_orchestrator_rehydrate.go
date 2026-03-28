@@ -11,7 +11,6 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // rehydrateWorkspaceForStep creates a fresh workspace for the given step by rehydrating
@@ -152,28 +151,4 @@ func (r *runController) rehydrateWorkspaceForStep(
 	}
 
 	return workspacePath, nil
-}
-
-// uploadModDiffWithBaseline generates and uploads a diff for a mig job by comparing
-// the pre-mig baseline snapshot with the post-mig workspace. This ensures that
-// untracked files created by the mig are included in the patch (git diff --no-index
-// semantics via GenerateBetween).
-//
-// Unlike healing diffs, a missing baseline is logged as a warning because mod diffs
-// must use baseline-aware GenerateBetween semantics.
-func (r *runController) uploadModDiffWithBaseline(
-	ctx context.Context,
-	runID types.RunID,
-	jobID types.JobID,
-	jobName string,
-	diffGenerator step.DiffGenerator,
-	baseDir string,
-	workspace string,
-	result step.Result,
-) {
-	if strings.TrimSpace(baseDir) == "" {
-		slog.Warn("mig diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName)
-		return
-	}
-	r.uploadJobDiff(ctx, runID, jobID, diffGenerator, baseDir, workspace, result, types.DiffJobTypeMod)
 }

@@ -15,7 +15,6 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	gitpkg "github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
@@ -100,7 +99,9 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 		OutDirPattern:             "ploy-mig-out-*",
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
-		UploadDiff:                r.uploadModDiffWithBaseline,
+		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
+			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMod, true)
+		},
 		StartTime:                 startTime,
 	}
 	if err := configureModAmataInDir(&cfg, typedOpts, stepIdx); err != nil {
@@ -177,7 +178,9 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			r.mountHealingTLSCerts(m)
 		},
 		WorkspacePolicy: workspacePolicy,
-		UploadDiff:      r.uploadHealingJobDiff,
+		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
+			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeHealing, false)
+		},
 		BuildJobMeta: func(outDir string) json.RawMessage {
 			actionSummary := parseActionSummary(outDir)
 			if actionSummary == "" {
@@ -288,124 +291,6 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 		baselineDir = snapshot.path
 	}
 
-	executeBody := func(outDir, inDir string) error {
-		manifest := cfg.Manifest
-		disableManifestGate(&manifest)
-		clearManifestHydration(&manifest)
-
-		if cfg.PrepareManifest != nil {
-			cfg.PrepareManifest(&manifest, workspace)
-		}
-
-		imageName := strings.TrimSpace(manifest.Image)
-		if imageName == "" {
-			return fmt.Errorf("resolved job image is empty")
-		}
-		if err := r.SaveJobImageName(ctx, req.JobID, imageName); err != nil {
-			return fmt.Errorf("save job image name: %w", err)
-		}
-
-		var preStatus string
-		var preStatusErr error
-		if cfg.WorkspacePolicy != workspaceChangePolicyIgnore {
-			preStatus, preStatusErr = gitpkg.WorkspaceStatus(ctx, workspace)
-			if preStatusErr != nil {
-				slog.Warn("failed to compute workspace status before execution", "run_id", req.RunID, "error", preStatusErr)
-			}
-		}
-		preWorkspaceTree := ""
-		if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
-			slog.Warn("failed to compute pre-execution workspace tree", "run_id", req.RunID, "job_id", req.JobID, "error", treeErr)
-		} else {
-			preWorkspaceTree = tree
-		}
-
-		// Materialize the manifest tmp bundle into a staging directory.
-		// The staging dir is removed deterministically when executeBody returns.
-		var tmpStagingDir string
-		if manifest.TmpBundle != nil {
-			dir, err := os.MkdirTemp("", "ploy-tmpfiles-*")
-			if err != nil {
-				return fmt.Errorf("create tmp staging dir: %w", err)
-			}
-			defer func() {
-				if rmErr := os.RemoveAll(dir); rmErr != nil {
-					slog.Warn("failed to remove tmp staging dir", "path", dir, "error", rmErr)
-				}
-			}()
-			if err := r.materializeTmpBundle(ctx, manifest.TmpBundle, dir); err != nil {
-				return fmt.Errorf("materialize tmp bundle: %w", err)
-			}
-			tmpStagingDir = dir
-		}
-
-		result, runErr := execCtx.runner.Run(ctx, step.Request{
-			RunID:         req.RunID,
-			JobID:         req.JobID,
-			Manifest:      manifest,
-			Workspace:     workspace,
-			OutDir:        outDir,
-			InDir:         inDir,
-			TmpStagingDir: tmpStagingDir,
-		})
-		duration := time.Since(startTime)
-
-		if cfg.UploadDiff != nil {
-			cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
-		}
-
-		if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
-			slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
-		}
-
-		if cfg.UploadConfiguredArtifacts {
-			r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace, outDir)
-		}
-
-		if cfg.WorkspacePolicy != workspaceChangePolicyIgnore && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
-			postStatus, postErr := gitpkg.WorkspaceStatus(ctx, workspace)
-			if postErr == nil {
-				if warning, violated := validateWorkspacePolicy(cfg.WorkspacePolicy, preStatus, postStatus); violated {
-					r.uploadHealingWorkspacePolicyFailure(ctx, req, warning, duration)
-					return nil
-				}
-			}
-		}
-
-		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, preWorkspaceTree)
-
-		statsBuilder := types.NewRunStatsBuilder().
-			ExitCode(result.ExitCode).
-			DurationMs(duration.Milliseconds()).
-			TimingsFromDurations(
-				time.Duration(result.Timings.HydrationDuration).Milliseconds(),
-				time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-				time.Duration(result.Timings.DiffDuration).Milliseconds(),
-				time.Duration(result.Timings.TotalDuration).Milliseconds(),
-			)
-		if resources := runStatsJobResourcesFromStepUsage(result.ContainerResources); resources != nil {
-			statsBuilder.JobResources(resources)
-		}
-
-		if cfg.BuildJobMeta != nil {
-			if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {
-				statsBuilder.JobMeta(meta)
-			}
-		}
-		if orwMeta, orwErr := parseORWFailureMetadata(outDir); orwErr != nil {
-			slog.Warn("failed to parse ORW report metadata", "run_id", req.RunID, "job_id", req.JobID, "error", orwErr)
-		} else {
-			for k, v := range orwMeta {
-				statsBuilder.MetadataEntry(k, v)
-			}
-		}
-
-		stats := statsBuilder.MustBuild()
-
-		r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
-		return nil
-	}
-
 	outDirErr := withTempDir(cfg.OutDirPattern, func(outDir string) error {
 		if cfg.InDirPattern != "" {
 			return withTempDir(cfg.InDirPattern, func(inDir string) error {
@@ -414,16 +299,143 @@ func (r *runController) executeStandardJob(ctx context.Context, req StartRunRequ
 						return fmt.Errorf("populate in dir: %w", err)
 					}
 				}
-				return executeBody(outDir, inDir)
+				return r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, inDir)
 			})
 		}
-		return executeBody(outDir, "")
+		return r.runContainerJob(ctx, req, cfg, execCtx, baselineDir, workspace, startTime, outDir, "")
 	})
 
 	if outDirErr != nil {
 		slog.Error("failed to create temp directories", "run_id", req.RunID, "error", outDirErr)
 		r.uploadFailureStatus(ctx, req, outDirErr, time.Since(startTime))
 	}
+}
+
+// runContainerJob executes the container, uploads artifacts/diffs, and reports terminal status.
+// Extracted from executeStandardJob to keep function sizes under ~100 lines.
+func (r *runController) runContainerJob(
+	ctx context.Context,
+	req StartRunRequest,
+	cfg standardJobConfig,
+	execCtx jobExecutionContext,
+	baselineDir, workspace string,
+	startTime time.Time,
+	outDir, inDir string,
+) error {
+	manifest := cfg.Manifest
+	disableManifestGate(&manifest)
+	clearManifestHydration(&manifest)
+
+	if cfg.PrepareManifest != nil {
+		cfg.PrepareManifest(&manifest, workspace)
+	}
+
+	imageName := strings.TrimSpace(manifest.Image)
+	if imageName == "" {
+		return fmt.Errorf("resolved job image is empty")
+	}
+	if err := r.SaveJobImageName(ctx, req.JobID, imageName); err != nil {
+		return fmt.Errorf("save job image name: %w", err)
+	}
+
+	var preStatus string
+	var preStatusErr error
+	if cfg.WorkspacePolicy != workspaceChangePolicyIgnore {
+		preStatus, preStatusErr = gitpkg.WorkspaceStatus(ctx, workspace)
+		if preStatusErr != nil {
+			slog.Warn("failed to compute workspace status before execution", "run_id", req.RunID, "error", preStatusErr)
+		}
+	}
+	preWorkspaceTree := ""
+	if tree, treeErr := gitpkg.ComputeWorkspaceTreeSHA(ctx, workspace); treeErr != nil {
+		slog.Warn("failed to compute pre-execution workspace tree", "run_id", req.RunID, "job_id", req.JobID, "error", treeErr)
+	} else {
+		preWorkspaceTree = tree
+	}
+
+	// Materialize the manifest tmp bundle into a staging directory.
+	var tmpStagingDir string
+	if manifest.TmpBundle != nil {
+		dir, err := os.MkdirTemp("", "ploy-tmpfiles-*")
+		if err != nil {
+			return fmt.Errorf("create tmp staging dir: %w", err)
+		}
+		defer func() {
+			if rmErr := os.RemoveAll(dir); rmErr != nil {
+				slog.Warn("failed to remove tmp staging dir", "path", dir, "error", rmErr)
+			}
+		}()
+		if err := r.materializeTmpBundle(ctx, manifest.TmpBundle, dir); err != nil {
+			return fmt.Errorf("materialize tmp bundle: %w", err)
+		}
+		tmpStagingDir = dir
+	}
+
+	result, runErr := execCtx.runner.Run(ctx, step.Request{
+		RunID:         req.RunID,
+		JobID:         req.JobID,
+		Manifest:      manifest,
+		Workspace:     workspace,
+		OutDir:        outDir,
+		InDir:         inDir,
+		TmpStagingDir: tmpStagingDir,
+	})
+	duration := time.Since(startTime)
+
+	if cfg.UploadDiff != nil {
+		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
+	}
+
+	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, outDir, "mig-out"); err != nil {
+		slog.Warn("/out artifact upload failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", err)
+	}
+
+	if cfg.UploadConfiguredArtifacts {
+		r.uploadConfiguredArtifacts(ctx, req, req.TypedOptions, manifest, workspace, outDir)
+	}
+
+	if cfg.WorkspacePolicy != workspaceChangePolicyIgnore && runErr == nil && result.ExitCode == 0 && preStatusErr == nil {
+		postStatus, postErr := gitpkg.WorkspaceStatus(ctx, workspace)
+		if postErr == nil {
+			if warning, violated := validateWorkspacePolicy(cfg.WorkspacePolicy, preStatus, postStatus); violated {
+				r.uploadHealingWorkspacePolicyFailure(ctx, req, warning, duration)
+				return nil
+			}
+		}
+	}
+
+	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, preWorkspaceTree)
+
+	statsBuilder := types.NewRunStatsBuilder().
+		ExitCode(result.ExitCode).
+		DurationMs(duration.Milliseconds()).
+		TimingsFromDurations(
+			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
+			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
+			time.Duration(result.Timings.DiffDuration).Milliseconds(),
+			time.Duration(result.Timings.TotalDuration).Milliseconds(),
+		)
+	if resources := runStatsJobResourcesFromStepUsage(result.ContainerResources); resources != nil {
+		statsBuilder.JobResources(resources)
+	}
+
+	if cfg.BuildJobMeta != nil {
+		if meta := cfg.BuildJobMeta(outDir); len(meta) > 0 {
+			statsBuilder.JobMeta(meta)
+		}
+	}
+	if orwMeta, orwErr := parseORWFailureMetadata(outDir); orwErr != nil {
+		slog.Warn("failed to parse ORW report metadata", "run_id", req.RunID, "job_id", req.JobID, "error", orwErr)
+	} else {
+		for k, v := range orwMeta {
+			statsBuilder.MetadataEntry(k, v)
+		}
+	}
+
+	stats := statsBuilder.MustBuild()
+
+	r.reportTerminalStatus(ctx, req, runErr, result, stats, repoSHAOut, duration)
+	return nil
 }
 
 // withTempDir creates a temporary directory, calls fn, then removes the directory.
@@ -448,6 +460,9 @@ type tempResource struct {
 	cleanup func()
 }
 
+// noopTempResource is a zero-value tempResource with a no-op cleanup.
+var noopTempResource = tempResource{path: "", cleanup: func() {}}
+
 // snapshotWorkspaceForNoIndexDiff creates a snapshot of the workspace for baseline comparison.
 func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffType types.DiffJobType, workspace string) tempResource {
 	jobTypeStr := diffType.String()
@@ -456,7 +471,7 @@ func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffT
 	if err != nil {
 		slog.Warn(fmt.Sprintf("%s: failed to create baseline snapshot directory", jobTypeStr),
 			"run_id", runID, "job_id", jobID, "error", err)
-		return tempResource{path: "", cleanup: func() {}}
+		return noopTempResource
 	}
 
 	if err := copyGitClone(workspace, snapshotDir); err != nil {
@@ -465,7 +480,7 @@ func snapshotWorkspaceForNoIndexDiff(runID types.RunID, jobID types.JobID, diffT
 		if rmErr := os.RemoveAll(snapshotDir); rmErr != nil {
 			slog.Warn("failed to remove snapshot dir after copy failure", "path", snapshotDir, "error", rmErr)
 		}
-		return tempResource{path: "", cleanup: func() {}}
+		return noopTempResource
 	}
 
 	return tempResource{
@@ -515,305 +530,4 @@ func clearManifestHydration(manifest *contracts.StepManifest) {
 // disableManifestGate sets Gate.Enabled=false on the manifest.
 func disableManifestGate(manifest *contracts.StepManifest) {
 	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
-}
-
-// uploadConfiguredArtifacts uploads artifact bundles specified in the typed RunOptions.
-// Relative paths resolve in workspace; /out/* paths resolve from outDir and keep
-// deterministic archive names under out/.
-func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, typedOpts RunOptions, manifest contracts.StepManifest, workspace, outDir string) {
-	if len(typedOpts.Artifacts.Paths) == 0 {
-		return
-	}
-
-	entries := make([]ArtifactBundleEntry, 0, len(typedOpts.Artifacts.Paths))
-	for _, p := range typedOpts.Artifacts.Paths {
-		fullPath, archivePath, ok := resolveConfiguredArtifactPath(p, workspace, outDir)
-		if !ok {
-			slog.Warn("artifact path rejected",
-				"run_id", req.RunID, "job_id", req.JobID, "path", p,
-			)
-			continue
-		}
-
-		if _, err := os.Stat(fullPath); err == nil {
-			entries = append(entries, ArtifactBundleEntry{
-				SourcePath:  fullPath,
-				ArchivePath: archivePath,
-			})
-		} else {
-			slog.Warn("artifact path not found", "run_id", req.RunID, "path", p)
-		}
-	}
-
-	if len(entries) == 0 {
-		return
-	}
-
-	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, req.RunID, req.JobID, entries, typedOpts.Artifacts.Name); err != nil {
-		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-	} else {
-		slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "job_id", req.JobID, "paths", len(entries))
-	}
-}
-
-func resolveConfiguredArtifactPath(rawPath, workspace, outDir string) (fullPath string, archivePath string, ok bool) {
-	p := strings.TrimSpace(rawPath)
-	if p == "" {
-		return "", "", false
-	}
-
-	if strings.HasPrefix(p, "/out/") {
-		if strings.TrimSpace(outDir) == "" {
-			return "", "", false
-		}
-		rel := strings.TrimPrefix(p, "/out/")
-		cleanRel := filepath.Clean(rel)
-		if cleanRel == "." || strings.HasPrefix(cleanRel, "..") || filepath.IsAbs(cleanRel) {
-			return "", "", false
-		}
-		return filepath.Join(outDir, cleanRel), filepath.ToSlash(filepath.Join("out", cleanRel)), true
-	}
-
-	if !isValidArtifactPath(p, workspace) {
-		return "", "", false
-	}
-
-	return filepath.Clean(filepath.Join(workspace, p)), "", true
-}
-
-// uploadOutDirBundle bundles and uploads the /out directory when it contains files.
-// Archive paths are rooted at out/ to preserve deterministic in-container paths.
-func (r *runController) uploadOutDirBundle(ctx context.Context, runID types.RunID, jobID types.JobID, outDir, artifactName string) error {
-	if r.artifactUploader == nil {
-		return nil
-	}
-	if outDir == "" {
-		return nil
-	}
-
-	hasFiles, _ := listFilesRecursive(outDir)
-	if !hasFiles {
-		return nil
-	}
-	name := strings.TrimSpace(artifactName)
-	if name == "" {
-		name = "mig-out"
-	}
-
-	entries := []ArtifactBundleEntry{{
-		SourcePath:  outDir,
-		ArchivePath: "out",
-	}}
-	if _, _, err := r.artifactUploader.UploadArtifactEntries(ctx, runID, jobID, entries, name); err != nil {
-		return fmt.Errorf("upload /out bundle: %w", err)
-	}
-
-	return nil
-}
-
-// uploadStatus uploads terminal status and execution statistics to the control plane.
-// Uses a detached context to ensure reporting even if the run context is cancelled.
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, jobID types.JobID, repoSHAOut ...string) error {
-	var loggedExitCode any
-	if exitCode != nil {
-		loggedExitCode = *exitCode
-	}
-	loggedRepoSHAOut := ""
-	if len(repoSHAOut) > 0 {
-		loggedRepoSHAOut = strings.TrimSpace(repoSHAOut[0])
-	}
-
-	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	if uploadErr := r.statusUploader.UploadJobStatus(statusCtx, jobID, status, exitCode, stats, loggedRepoSHAOut); uploadErr != nil {
-		return fmt.Errorf("upload job status: %w", uploadErr)
-	}
-
-	slog.Info("terminal status uploaded successfully", "run_id", runID, "job_id", jobID, "status", status, "exit_code", loggedExitCode, "repo_sha_out", loggedRepoSHAOut)
-	return nil
-}
-
-// reportTerminalStatus uploads the final job status based on execution outcome.
-// Handles three cases: runtime error, nonzero exit code, and success.
-func (r *runController) reportTerminalStatus(
-	ctx context.Context,
-	req StartRunRequest,
-	runErr error,
-	result step.Result,
-	stats types.RunStats,
-	repoSHAOut string,
-	duration time.Duration,
-) {
-	if runErr != nil {
-		status := lifecycle.JobStatusFromRunError(runErr)
-		var exitCode *int32
-		if status == types.JobStatusFail {
-			var runtimeExitCode int32 = -1
-			exitCode = &runtimeExitCode
-		}
-		r.emitRunException(
-			req,
-			"node runtime execution error",
-			runErr,
-			map[string]any{
-				"component":   "run_controller",
-				"status":      status.String(),
-				"duration_ms": duration.Milliseconds(),
-			},
-		)
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
-			slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
-		}
-		slog.Info("job terminated", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "status", status, "duration", duration, "error", runErr)
-		return
-	}
-
-	status := types.JobStatusSuccess
-	logMsg := "job succeeded"
-	if result.ExitCode != 0 {
-		status = types.JobStatusFail
-		logMsg = "job failed"
-	}
-	exitCode := int32(result.ExitCode)
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
-		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
-	}
-	slog.Info(logMsg, "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "exit_code", result.ExitCode, "duration", duration)
-}
-
-// uploadGateLogsArtifact uploads build gate logs as an artifact bundle and attaches
-// artifact IDs to the gate stats payload.
-func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.JobID, logsText, artifactNameSuffix string, phase *types.RunStatsGatePhase) {
-	if phase == nil {
-		return
-	}
-
-	logFile, err := os.CreateTemp("", "ploy-gate-*.log")
-	if err != nil {
-		return
-	}
-	defer func() { _ = os.Remove(logFile.Name()) }()
-
-	_, _ = logFile.WriteString(logsText)
-	_ = logFile.Close()
-
-	artifactName := "build-gate.log"
-	if artifactNameSuffix != "" {
-		artifactName = "build-gate-" + artifactNameSuffix + ".log"
-	}
-
-	if id, cid, uerr := r.artifactUploader.UploadArtifact(context.Background(), runID, jobID, []string{logFile.Name()}, artifactName); uerr == nil {
-		phase.LogsArtifactID = id
-		phase.LogsBundleCID = cid
-	} else {
-		slog.Warn("failed to upload "+artifactName, "run_id", runID, "job_id", jobID, "error", uerr)
-	}
-}
-
-
-func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) string {
-	repoSHAIn := strings.TrimSpace(req.RepoSHAIn.String())
-	if repoSHAIn == "" {
-		slog.Warn("repo_sha_in missing on claimed job; skipping repo_sha_out calculation", "run_id", req.RunID, "job_id", req.JobID)
-		return ""
-	}
-	preTree := strings.TrimSpace(inputTree)
-	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn, preTree)
-	if err != nil {
-		slog.Warn("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_in", repoSHAIn, "error", err)
-		return ""
-	}
-	return repoSHAOut
-}
-
-// uploadHealingJobDiff generates and uploads a diff for a discrete healing job.
-// Silent no-op when baseDir is empty (snapshot creation may have failed gracefully).
-func (r *runController) uploadHealingJobDiff(
-	ctx context.Context,
-	runID types.RunID,
-	jobID types.JobID,
-	jobName string,
-	diffGenerator step.DiffGenerator,
-	baseDir string,
-	workspace string,
-	result step.Result,
-) {
-	if strings.TrimSpace(baseDir) == "" {
-		return
-	}
-	r.uploadJobDiff(ctx, runID, jobID, diffGenerator, baseDir, workspace, result, types.DiffJobTypeHealing)
-}
-
-// uploadJobDiff is the shared implementation for generating, summarizing, and uploading
-// a diff between a baseline snapshot and the post-execution workspace.
-func (r *runController) uploadJobDiff(
-	ctx context.Context,
-	runID types.RunID,
-	jobID types.JobID,
-	diffGenerator step.DiffGenerator,
-	baseDir, workspace string,
-	result step.Result,
-	diffType types.DiffJobType,
-) {
-	if diffGenerator == nil {
-		return
-	}
-
-	label := diffType.String()
-
-	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
-	if err != nil {
-		slog.Error("failed to generate "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
-	if len(diffBytes) == 0 {
-		slog.Info("no diff to upload (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "diff_type", label)
-		return
-	}
-
-	patchStats := step.CountPatchStats(diffBytes)
-	summary := types.NewDiffSummaryBuilder().
-		JobType(label).
-		ExitCode(result.ExitCode).
-		FilesChanged(patchStats.FilesChanged).
-		LinesAdded(patchStats.LinesAdded).
-		LinesRemoved(patchStats.LinesRemoved).
-		Timings(
-			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
-			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-			time.Duration(result.Timings.DiffDuration).Milliseconds(),
-			time.Duration(result.Timings.TotalDuration).Milliseconds(),
-		).
-		MustBuild()
-
-	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
-
-	slog.Info(label+" diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
-}
-
-// isValidArtifactPath validates that an artifact path is safe for upload.
-// Prevents path traversal by ensuring the path is relative and contained within workspace.
-func isValidArtifactPath(artifactPath string, workspace string) bool {
-	if artifactPath == "" || strings.TrimSpace(artifactPath) == "" {
-		return false
-	}
-	if filepath.IsAbs(artifactPath) {
-		return false
-	}
-
-	fullPath := filepath.Clean(filepath.Join(workspace, artifactPath))
-	rel, err := filepath.Rel(workspace, fullPath)
-	if err != nil {
-		return false
-	}
-
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return false
-	}
-
-	return true
 }

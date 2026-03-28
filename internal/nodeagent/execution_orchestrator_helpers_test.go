@@ -189,7 +189,7 @@ func TestTempResource_Cleanup(t *testing.T) {
 		{
 			name: "noop cleanup is safe",
 			setup: func(t *testing.T) tempResource {
-				return tempResource{path: "", cleanup: func() {}}
+				return noopTempResource
 			},
 			check: func(t *testing.T, tr tempResource) {
 				tr.cleanup() // must not panic
