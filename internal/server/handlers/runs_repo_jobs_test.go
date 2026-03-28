@@ -37,7 +37,7 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 			RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
 			NextID:     &nextID,
 			Status:     domaintypes.JobStatusQueued,
-			Meta:       []byte(`{"kind":"mig","mods_step_name":"hello"}`),
+			Meta:       []byte(`{"kind":"mig","mig_step_name":"hello"}`),
 		},
 		}
 
