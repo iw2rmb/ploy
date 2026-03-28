@@ -56,13 +56,13 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	}
 
 	// Register a simple health handler to verify the server is responding.
-	httpSrv.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	httpSrv.RegisterRouteFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
 	// Register a basic runs list handler (requires control-plane role).
-	httpSrv.HandleFunc("GET /v1/runs", func(w http.ResponseWriter, r *http.Request) {
+	httpSrv.RegisterRouteFunc("GET /v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		runs, err := db.ListRuns(r.Context(), store.ListRunsParams{Limit: 10, Offset: 0})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("list runs failed: %v", err), http.StatusInternalServerError)

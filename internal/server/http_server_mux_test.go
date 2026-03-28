@@ -10,11 +10,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// Multiplexer tests cover handler registration via HandleFunc and Handle.
+// Multiplexer tests cover handler registration via RegisterRouteFunc and RegisterRoute.
 
-// TestHTTPServer_HandleFunc verifies the multiplexer API for handler registration.
+// TestHTTPServer_RegisterRouteFunc verifies the multiplexer API for handler registration.
 // It validates both direct registration and role-based middleware enforcement.
-func TestHTTPServer_HandleFunc(t *testing.T) {
+func TestHTTPServer_RegisterRouteFunc(t *testing.T) {
 	t.Run("without_middleware", func(t *testing.T) {
 		// Verify basic handler registration without middleware.
 		authorizer := auth.NewAuthorizer(auth.Options{
@@ -33,7 +33,7 @@ func TestHTTPServer_HandleFunc(t *testing.T) {
 		}
 
 		// Register a test handler without role restrictions.
-		srv.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
+		srv.RegisterRouteFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("ok"))
 		})
@@ -74,7 +74,7 @@ func TestHTTPServer_HandleFunc(t *testing.T) {
 		}
 
 		// Register handler requiring CLIAdmin role (higher than default).
-		srv.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		srv.RegisterRouteFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("admin"))
 		}, auth.RoleCLIAdmin)
@@ -98,9 +98,9 @@ func TestHTTPServer_HandleFunc(t *testing.T) {
 	})
 }
 
-// TestHTTPServer_Handle verifies the Handle method for registering http.Handler.
-// This complements HandleFunc by supporting the full http.Handler interface.
-func TestHTTPServer_Handle(t *testing.T) {
+// TestHTTPServer_RegisterRoute verifies the RegisterRoute method for registering http.Handler.
+// This complements RegisterRouteFunc by supporting the full http.Handler interface.
+func TestHTTPServer_RegisterRoute(t *testing.T) {
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: true,
 		DefaultRole:   auth.RoleControlPlane,
@@ -117,7 +117,7 @@ func TestHTTPServer_Handle(t *testing.T) {
 	}
 
 	// Register a handler using Handle (http.Handler interface).
-	srv.Handle("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv.RegisterRoute("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("test"))
 	}))
@@ -155,10 +155,10 @@ func TestHTTPServer_RecoversHandlerPanic(t *testing.T) {
 		t.Fatalf("NewHTTPServer() error = %v", err)
 	}
 
-	srv.HandleFunc("/panic", func(w http.ResponseWriter, r *http.Request) {
+	srv.RegisterRouteFunc("/panic", func(w http.ResponseWriter, r *http.Request) {
 		panic("boom")
 	})
-	srv.HandleFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
+	srv.RegisterRouteFunc("/alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
@@ -212,7 +212,7 @@ func TestHTTPServer_RecoversPanicWithBrokenError(t *testing.T) {
 		t.Fatalf("NewHTTPServer() error = %v", err)
 	}
 
-	srv.HandleFunc("/panic-error", func(w http.ResponseWriter, r *http.Request) {
+	srv.RegisterRouteFunc("/panic-error", func(w http.ResponseWriter, r *http.Request) {
 		panic(panicErr{})
 	})
 

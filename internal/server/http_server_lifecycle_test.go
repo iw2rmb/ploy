@@ -172,7 +172,7 @@ func TestHTTPServer_GracefulShutdown(t *testing.T) {
 	}
 
 	// Register a slow handler to simulate in-flight request.
-	srv.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
+	srv.RegisterRouteFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 	})

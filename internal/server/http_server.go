@@ -150,23 +150,23 @@ func (s *HTTPServer) handle(pattern string, handler http.Handler, roles []auth.R
 	s.mux.Handle(pattern, handler)
 }
 
-// Handle registers a handler for the given pattern with optional middleware.
+// RegisterRoute registers a handler for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *HTTPServer) Handle(pattern string, handler http.Handler, roles ...auth.Role) {
+func (s *HTTPServer) RegisterRoute(pattern string, handler http.Handler, roles ...auth.Role) {
 	s.handle(pattern, handler, roles)
 }
 
-// HandleFunc registers a handler function for the given pattern with optional middleware.
+// RegisterRouteFunc registers a handler function for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *HTTPServer) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
+func (s *HTTPServer) RegisterRouteFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
 	s.handle(pattern, handlerFunc, roles)
 }
 
-// HandleFuncAllowQueryToken registers a handler that also accepts auth_token
+// RegisterRouteFuncAllowQueryToken registers a handler that also accepts auth_token
 // query parameters for authentication. This is intended for GET endpoints
 // serving downloadable content (logs, diffs, specs) where browser/OSC8
 // links cannot set Authorization headers.
-func (s *HTTPServer) HandleFuncAllowQueryToken(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
+func (s *HTTPServer) RegisterRouteFuncAllowQueryToken(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
 	s.handle(pattern, handlerFunc, roles, auth.WithQueryTokenAllowed)
 }
 
