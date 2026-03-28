@@ -44,7 +44,7 @@ func (c GetStatusCommand) Run(ctx context.Context) (domaintypes.RunSummary, erro
 	}
 
 	var summary domaintypes.RunSummary
-	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return domaintypes.RunSummary{}, fmt.Errorf("run status: decode response: %w", err)
 	}
 

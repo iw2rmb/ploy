@@ -216,7 +216,7 @@ func (e *Engine) refreshRepos(ctx context.Context) error {
 	var result struct {
 		Repos []RepoEntry `json:"repos"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return fmt.Errorf("follow: decode repos: %w", err)
 	}
 

@@ -55,7 +55,7 @@ func (c CountMigReposCommand) Run(ctx context.Context) (int, error) {
 	var result struct {
 		Repos []MigRepoItem `json:"repos"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return 0, fmt.Errorf("count mig repos: decode response: %w", err)
 	}
 

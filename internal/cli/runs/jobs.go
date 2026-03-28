@@ -61,7 +61,7 @@ func (c ListRepoJobsCommand) Run(ctx context.Context) (ListRepoJobsResult, error
 	}
 
 	var result ListRepoJobsResult
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return ListRepoJobsResult{}, fmt.Errorf("list repo jobs: decode response: %w", err)
 	}
 

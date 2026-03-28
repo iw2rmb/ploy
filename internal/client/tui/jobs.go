@@ -75,7 +75,7 @@ func (c ListJobsCommand) Run(ctx context.Context) (ListJobsResult, error) {
 	}
 
 	var result ListJobsResult
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return ListJobsResult{}, fmt.Errorf("list jobs: decode response: %w", err)
 	}
 

@@ -97,7 +97,7 @@ func (c CreateBatchCommand) Run(ctx context.Context) (domaintypes.RunSummary, er
 		var srvResp struct {
 			RunID domaintypes.RunID `json:"run_id"`
 		}
-		if err := httpx.DecodeJSON(resp.Body, &srvResp, httpx.MaxJSONBodyBytes); err != nil {
+		if err := httpx.DecodeResponseJSON(resp.Body, &srvResp, httpx.MaxJSONBodyBytes); err != nil {
 			return domaintypes.RunSummary{}, fmt.Errorf("batch create: decode response: %w", err)
 		}
 
@@ -161,7 +161,7 @@ func (c ListBatchesCommand) Run(ctx context.Context) ([]domaintypes.RunSummary, 
 	var result struct {
 		Runs []domaintypes.RunSummary `json:"runs"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("batch list: decode response: %w", err)
 	}
 

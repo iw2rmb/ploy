@@ -75,7 +75,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.RunSummary, error) {
 			MigID  string `json:"mig_id"`
 			SpecID string `json:"spec_id"`
 		}
-		if err := httpx.DecodeJSON(resp.Body, &created, httpx.MaxJSONBodyBytes); err != nil {
+		if err := httpx.DecodeResponseJSON(resp.Body, &created, httpx.MaxJSONBodyBytes); err != nil {
 			return modsapi.RunSummary{}, fmt.Errorf("migs submit: decode response: %w", err)
 		}
 		runID := domaintypes.RunID(strings.TrimSpace(created.RunID))
@@ -103,7 +103,7 @@ func fetchRunSummary(ctx context.Context, baseURL *url.URL, httpClient *http.Cli
 		return modsapi.RunSummary{}, httpx.WrapError("migs submit", resp.Status, resp.Body)
 	}
 	var summary modsapi.RunSummary
-	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return modsapi.RunSummary{}, fmt.Errorf("migs submit: decode status response: %w", err)
 	}
 	summary.RunID = runID

@@ -101,7 +101,7 @@ func (c AddModRepoCommand) Run(ctx context.Context) (ModRepoSummary, error) {
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
 		var result ModRepoSummary
-		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return ModRepoSummary{}, fmt.Errorf("mig repo add: decode response: %w", err)
 		}
 		return result, nil
@@ -149,7 +149,7 @@ func (c ListModReposCommand) Run(ctx context.Context) ([]ModRepoSummary, error) 
 	var result struct {
 		Repos []ModRepoSummary `json:"repos"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mig repo list: decode response: %w", err)
 	}
 
@@ -258,7 +258,7 @@ func (c ImportModReposCommand) Run(ctx context.Context) (ImportModReposResult, e
 	// Handle 200 OK response (bulk import always returns 200 with counts).
 	if resp.StatusCode == http.StatusOK {
 		var result ImportModReposResult
-		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return ImportModReposResult{}, fmt.Errorf("mig repo import: decode response: %w", err)
 		}
 		return result, nil

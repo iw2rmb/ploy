@@ -67,7 +67,7 @@ func (c ListMigsCommand) Run(ctx context.Context) (ListMigsResult, error) {
 	}
 
 	var result ListMigsResult
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return ListMigsResult{}, fmt.Errorf("list migs: decode response: %w", err)
 	}
 

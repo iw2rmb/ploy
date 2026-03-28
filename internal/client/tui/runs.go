@@ -57,7 +57,7 @@ func (c ListRunsCommand) Run(ctx context.Context) (ListRunsResult, error) {
 	}
 
 	var result ListRunsResult
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return ListRunsResult{}, fmt.Errorf("list runs: decode response: %w", err)
 	}
 

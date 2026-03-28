@@ -101,7 +101,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	var result PullResolution
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run pull: decode response: %w", err)
 	}
 
@@ -197,7 +197,7 @@ func (c ModPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	}
 
 	var result PullResolution
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mig pull: decode response: %w", err)
 	}
 
