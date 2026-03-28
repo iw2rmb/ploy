@@ -25,7 +25,7 @@ import (
 )
 
 // ModRepoSummary represents a repo in a mig's repo set.
-// Matches the server response shape from internal/server/handlers/mods_repos.go.
+// Matches the server response shape from internal/server/handlers/migs_repos.go.
 type ModRepoSummary struct {
 	ID        domaintypes.MigRepoID `json:"id"`
 	MigID     domaintypes.MigID     `json:"mig_id"`
