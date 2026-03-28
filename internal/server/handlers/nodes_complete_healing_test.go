@@ -100,7 +100,7 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	gateMeta := []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`)
 	hc := newHealingChain(t,
 		withHealingMeta(gateMeta),
-		withHealingSpec(func(t *testing.T) []byte { return healingSpecBytesWithRetries(t, 3) }),
+		withHealingSpec(func(t *testing.T) []byte { return buildHealingSpec(t, 3) }),
 		withPriorHeals(
 			priorHealJob{Name: "heal-1-0", JobType: domaintypes.JobTypeHeal, Status: domaintypes.JobStatusSuccess, Meta: []byte(`{}`)},
 			priorHealJob{Name: "re-gate-1", JobType: domaintypes.JobTypeReGate, Status: domaintypes.JobStatusFail, ShaIn: healingTestRepoSHAIn, Meta: gateMeta},
@@ -200,7 +200,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	reGateMeta := []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`)
 	hc := newHealingChain(t,
 		withHealingMeta(nil), // pre-gate has no meta in this scenario
-		withHealingSpec(func(t *testing.T) []byte { return healingSpecBytesWithExpectations(t, 3) }),
+		withHealingSpec(func(t *testing.T) []byte { return buildHealingSpec(t, 3, withArtifactExpectations()) }),
 		withPriorHeals(
 			priorHealJob{Name: "heal-1-0", JobType: domaintypes.JobTypeHeal, Status: domaintypes.JobStatusSuccess, Meta: []byte(`{"kind":"mig"}`)},
 			priorHealJob{Name: "re-gate-1", JobType: domaintypes.JobTypeReGate, Status: domaintypes.JobStatusFail, ShaIn: healingTestRepoSHAIn, Meta: reGateMeta},
@@ -211,7 +211,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	heal1ID := hc.Jobs[1].ID // heal-1-0
 	objKey := "artifacts/run/" + hc.RunID.String() + "/bundle/heal-1.tar.gz"
 	hc.Store.listArtifactBundlesMetaByRunAndJobResult = []store.ArtifactBundle{
-		{RunID: hc.RunID, JobID: &heal1ID, ObjectKey: strPtr(objKey)},
+		{RunID: hc.RunID, JobID: &heal1ID, ObjectKey: ptr(objKey)},
 	}
 
 	candidateJSON := []byte(`{
@@ -274,7 +274,7 @@ func TestMaybeCreateHealingJobs_FirstInsertionInfraCandidateMissing(t *testing.T
 	ctx := context.Background()
 
 	hc := newHealingChain(t,
-		withHealingSpec(func(t *testing.T) []byte { return healingSpecBytesWithExpectations(t, 2) }),
+		withHealingSpec(func(t *testing.T) []byte { return buildHealingSpec(t, 2, withArtifactExpectations()) }),
 	)
 
 	if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
@@ -333,7 +333,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 			{
 				RunID:     runID,
 				JobID:     &jobID,
-				ObjectKey: strPtr(objKey),
+				ObjectKey: ptr(objKey),
 			},
 		},
 	}

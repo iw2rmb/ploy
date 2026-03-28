@@ -590,37 +590,20 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var gotStatus string
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/jobs/test-job/complete" {
-					body, _ := io.ReadAll(r.Body)
-					// Extract status from JSON body: {"status":"..."}
-					for _, field := range []string{types.JobStatusSuccess.String(), types.JobStatusFail.String(), types.JobStatusCancelled.String()} {
-						if bytes.Contains(body, []byte(`"`+field+`"`)) {
-							gotStatus = field
-							break
-						}
-					}
-				}
-				w.WriteHeader(http.StatusOK)
-			}))
-			defer server.Close()
-
+			server, cap := newStatusCaptureServer(t, "test-job")
 			controller := newTestController(t, newTestConfig(server.URL))
+
 			stats := types.NewRunStatsBuilder().ExitCode(tt.exitCode).MustBuild()
 			result := step.Result{ExitCode: tt.exitCode}
-			req := StartRunRequest{
-				RunID: "test-run",
-				JobID: "test-job",
-			}
+			req := StartRunRequest{RunID: "test-run", JobID: "test-job"}
 
 			controller.reportTerminalStatus(
 				context.Background(), req, tt.runErr, result,
 				stats, "", 100*1e6, // 100ms
 			)
 
-			if gotStatus != tt.wantStatus {
-				t.Errorf("status = %q, want %q", gotStatus, tt.wantStatus)
+			if cap.Status != tt.wantStatus {
+				t.Errorf("status = %q, want %q", cap.Status, tt.wantStatus)
 			}
 		})
 	}

@@ -162,27 +162,46 @@ func TestDisableManifestGate(t *testing.T) {
 	}
 }
 
-func TestWorkspaceRehydrationResult_CleanupRemovesDirectory(t *testing.T) {
-	workspace := t.TempDir()
-	if err := os.WriteFile(filepath.Join(workspace, "test.txt"), []byte("test"), 0o644); err != nil {
-		t.Fatalf("create test file: %v", err)
+func TestTempResource_Cleanup(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		setup func(t *testing.T) tempResource
+		check func(t *testing.T, tr tempResource)
+	}{
+		{
+			name: "removes directory",
+			setup: func(t *testing.T) tempResource {
+				dir := t.TempDir()
+				if err := os.WriteFile(filepath.Join(dir, "test.txt"), []byte("test"), 0o644); err != nil {
+					t.Fatalf("create test file: %v", err)
+				}
+				return tempResource{path: dir, cleanup: func() { _ = os.RemoveAll(dir) }}
+			},
+			check: func(t *testing.T, tr tempResource) {
+				tr.cleanup()
+				if _, err := os.Stat(tr.path); !os.IsNotExist(err) {
+					t.Fatalf("directory was not cleaned up: %s", tr.path)
+				}
+			},
+		},
+		{
+			name: "noop cleanup is safe",
+			setup: func(t *testing.T) tempResource {
+				return tempResource{path: "", cleanup: func() {}}
+			},
+			check: func(t *testing.T, tr tempResource) {
+				tr.cleanup() // must not panic
+			},
+		},
 	}
 
-	result := tempResource{
-		path:    workspace,
-		cleanup: func() { _ = os.RemoveAll(workspace) },
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			tr := tt.setup(t)
+			tt.check(t, tr)
+		})
 	}
-	result.cleanup()
-
-	if _, err := os.Stat(workspace); !os.IsNotExist(err) {
-		t.Fatalf("workspace was not cleaned up: %s", workspace)
-	}
-}
-
-func TestSnapshotResult_CleanupIsSafeWhenEmpty(t *testing.T) {
-	result := tempResource{
-		path:    "",
-		cleanup: func() {},
-	}
-	result.cleanup()
 }

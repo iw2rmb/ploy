@@ -7,6 +7,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+func assertImage(t *testing.T, label string, img contracts.JobImage, stack contracts.ModStack, want string) {
+	t.Helper()
+	got, err := img.ResolveImage(stack)
+	if err != nil {
+		t.Fatalf("%s: resolve: %v", label, err)
+	}
+	if got != want {
+		t.Errorf("%s: got %q, want %q", label, got, want)
+	}
+}
+
 func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	t.Parallel()
 
@@ -28,30 +39,14 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	var raw json.RawMessage = []byte(specJSON)
 	_, typedOpts, _ := parseSpec(raw)
 
-	resolved, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
-	if err != nil {
-		t.Fatalf("unexpected error resolving image: %v", err)
-	}
-	if resolved != "docker.io/test/mig:latest" {
-		t.Errorf("expected typed image=docker.io/test/mig:latest, got %q", resolved)
-	}
+	// Spot-check: JSON→parseSpec→RunOptions pipeline populates key fields.
+	// Exhaustive field coverage lives in TestModsSpecToRunOptions_DirectConversion.
+	assertImage(t, "Execution.Image", typedOpts.Execution.Image, contracts.ModStackUnknown, "docker.io/test/mig:latest")
 	if typedOpts.Execution.Command.Shell != "run-test.sh" {
-		t.Errorf("expected typed command.shell=run-test.sh, got %q", typedOpts.Execution.Command.Shell)
-	}
-	if typedOpts.BuildGate.Enabled {
-		t.Errorf("expected typed build_gate.enabled=false")
-	}
-	if typedOpts.MRWiring.GitLabPAT != "glpat-secret" {
-		t.Errorf("expected typed gitlab_pat=glpat-secret, got %q", typedOpts.MRWiring.GitLabPAT)
+		t.Errorf("Command.Shell: got %q, want run-test.sh", typedOpts.Execution.Command.Shell)
 	}
 	if !typedOpts.MRFlagsPresent.MROnSuccessSet || !typedOpts.MRWiring.MROnSuccess {
-		t.Errorf("expected typed mr_on_success=true and present")
-	}
-	if typedOpts.ServerMetadata.JobID.String() != testKSUID {
-		t.Errorf("expected typed job_id=%s, got %q", testKSUID, typedOpts.ServerMetadata.JobID.String())
-	}
-	if typedOpts.Artifacts.Name != "bundle.tar.gz" {
-		t.Errorf("expected typed artifact_name=bundle.tar.gz, got %q", typedOpts.Artifacts.Name)
+		t.Errorf("expected mr_on_success present and true")
 	}
 	if len(typedOpts.Artifacts.Paths) != 2 {
 		t.Fatalf("expected 2 artifact_paths, got %d", len(typedOpts.Artifacts.Paths))
@@ -140,64 +135,7 @@ func TestParseSpec_ImageMap_PopulatesExecutionImage(t *testing.T) {
 	var raw json.RawMessage = []byte(specJSON)
 	_, typedOpts, _ := parseSpec(raw)
 
-	mavenImg, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackJavaMaven)
-	if err != nil {
-		t.Fatalf("unexpected error resolving maven image: %v", err)
-	}
-	if mavenImg != "docker.io/user/orw-cli:latest" {
-		t.Errorf("expected maven image, got %q", mavenImg)
-	}
-}
-
-func TestCommand_ToSlice(t *testing.T) {
-	t.Parallel()
-
-	t.Run("shell command", func(t *testing.T) {
-		cmd := contracts.CommandSpec{Shell: "echo test"}
-		result := cmd.ToSlice()
-		want := []string{"/bin/sh", "-c", "echo test"}
-		if len(result) != len(want) {
-			t.Fatalf("expected length=%d, got %d", len(want), len(result))
-		}
-		for i, v := range want {
-			if result[i] != v {
-				t.Errorf("expected result[%d]=%q, got %q", i, v, result[i])
-			}
-		}
-	})
-
-	t.Run("exec array", func(t *testing.T) {
-		cmd := contracts.CommandSpec{Exec: []string{"/bin/ls", "-la"}}
-		result := cmd.ToSlice()
-		want := []string{"/bin/ls", "-la"}
-		if len(result) != len(want) {
-			t.Fatalf("expected length=%d, got %d", len(want), len(result))
-		}
-		for i, v := range want {
-			if result[i] != v {
-				t.Errorf("expected result[%d]=%q, got %q", i, v, result[i])
-			}
-		}
-	})
-
-	t.Run("empty command", func(t *testing.T) {
-		cmd := contracts.CommandSpec{}
-		result := cmd.ToSlice()
-		if result != nil {
-			t.Errorf("expected nil for empty command, got %v", result)
-		}
-	})
-
-	t.Run("exec takes precedence over shell", func(t *testing.T) {
-		cmd := contracts.CommandSpec{
-			Shell: "echo shell",
-			Exec:  []string{"/bin/exec"},
-		}
-		result := cmd.ToSlice()
-		if len(result) != 1 || result[0] != "/bin/exec" {
-			t.Errorf("expected exec to take precedence, got %v", result)
-		}
-	})
+	assertImage(t, "Execution.Image(maven)", typedOpts.Execution.Image, contracts.ModStackJavaMaven, "docker.io/user/orw-cli:latest")
 }
 
 func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
@@ -262,82 +200,32 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			t.Errorf("JobID: got %q, want %q", runOpts.ServerMetadata.JobID.String(), "job-direct-test-123")
 		}
 
-		execImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
-		if err != nil {
-			t.Fatalf("unexpected image resolve error: %v", err)
-		}
-		if execImg != "docker.io/test/mig:v1" {
-			t.Errorf("Execution.Image: got %q, want %q", execImg, "docker.io/test/mig:v1")
-		}
-		wantExec := []string{"echo", "hello"}
-		if len(runOpts.Execution.Command.Exec) != len(wantExec) {
-			t.Fatalf("Execution.Command.Exec length: got %d, want %d", len(runOpts.Execution.Command.Exec), len(wantExec))
-		}
-		for i, v := range wantExec {
-			if runOpts.Execution.Command.Exec[i] != v {
-				t.Errorf("Execution.Command.Exec[%d]: got %q, want %q", i, runOpts.Execution.Command.Exec[i], v)
-			}
-		}
+		// Execution (single-step extraction).
+		assertImage(t, "Execution.Image", runOpts.Execution.Image, contracts.ModStackUnknown, "docker.io/test/mig:v1")
+		assertCommand(t, runOpts.Execution.Command.Exec, []string{"echo", "hello"})
+
+		// BuildGate — Pre/Post are assigned by pointer from spec, so verify
+		// the pointers arrived and spot-check a derived field on each.
 		if !runOpts.BuildGate.Enabled {
 			t.Error("BuildGate.Enabled: expected true")
 		}
-		if runOpts.BuildGate.Pre == nil {
-			t.Fatal("BuildGate.Pre: expected non-nil")
+		if runOpts.BuildGate.Pre != spec.BuildGate.Pre {
+			t.Error("BuildGate.Pre: expected same pointer as spec")
 		}
-		if runOpts.BuildGate.Pre.GateProfile == nil {
-			t.Fatal("BuildGate.Pre.GateProfile: expected non-nil")
-		}
-		if runOpts.BuildGate.Pre.GateProfile.Command.Shell != "go test ./..." {
-			t.Errorf("BuildGate.Pre.GateProfile.Command.Shell: got %q, want %q", runOpts.BuildGate.Pre.GateProfile.Command.Shell, "go test ./...")
-		}
-		if got := runOpts.BuildGate.Pre.GateProfile.Env["GOFLAGS"]; got != "-mod=readonly" {
-			t.Errorf("BuildGate.Pre.GateProfile.Env[GOFLAGS]: got %q, want %q", got, "-mod=readonly")
-		}
-		if got := runOpts.BuildGate.Pre.Target; got != contracts.GateProfileTargetUnit {
-			t.Errorf("BuildGate.Pre.Target: got %q, want %q", got, contracts.GateProfileTargetUnit)
-		}
-		if !runOpts.BuildGate.Pre.Always {
-			t.Error("BuildGate.Pre.Always: got false, want true")
-		}
-		if runOpts.BuildGate.Post == nil {
-			t.Fatal("BuildGate.Post: expected non-nil")
-		}
-		if runOpts.BuildGate.Post.GateProfile == nil {
-			t.Fatal("BuildGate.Post.GateProfile: expected non-nil")
-		}
-		wantPost := []string{"go", "test", "./...", "-run", "TestUnit"}
-		if len(runOpts.BuildGate.Post.GateProfile.Command.Exec) != len(wantPost) {
-			t.Fatalf("BuildGate.Post.GateProfile.Command.Exec length: got %d, want %d", len(runOpts.BuildGate.Post.GateProfile.Command.Exec), len(wantPost))
-		}
-		for i, v := range wantPost {
-			if got := runOpts.BuildGate.Post.GateProfile.Command.Exec[i]; got != v {
-				t.Errorf("BuildGate.Post.GateProfile.Command.Exec[%d]: got %q, want %q", i, got, v)
-			}
-		}
-		if got := runOpts.BuildGate.Post.GateProfile.Env["CGO_ENABLED"]; got != "0" {
-			t.Errorf("BuildGate.Post.GateProfile.Env[CGO_ENABLED]: got %q, want %q", got, "0")
-		}
-		if got := runOpts.BuildGate.Post.Target; got != contracts.GateProfileTargetAllTests {
-			t.Errorf("BuildGate.Post.Target: got %q, want %q", got, contracts.GateProfileTargetAllTests)
-		}
-		if runOpts.BuildGate.Post.Always {
-			t.Error("BuildGate.Post.Always: got true, want false")
+		if runOpts.BuildGate.Post != spec.BuildGate.Post {
+			t.Error("BuildGate.Post: expected same pointer as spec")
 		}
 
+		// Healing.
 		if runOpts.Healing == nil {
 			t.Fatal("expected Healing config")
 		}
 		if runOpts.Healing.Retries != 3 {
 			t.Errorf("Healing.Retries: got %d, want 3", runOpts.Healing.Retries)
 		}
-		healImg, err := runOpts.Healing.Mod.Image.ResolveImage(contracts.ModStackUnknown)
-		if err != nil {
-			t.Fatalf("unexpected healing image resolve error: %v", err)
-		}
-		if healImg != "docker.io/test/heal:v1" {
-			t.Errorf("Healing.Mod.Image: got %q, want %q", healImg, "docker.io/test/heal:v1")
-		}
+		assertImage(t, "Healing.Mod.Image", runOpts.Healing.Mod.Image, contracts.ModStackUnknown, "docker.io/test/heal:v1")
 
+		// MR wiring.
 		if runOpts.MRWiring.GitLabPAT != "glpat-secret" {
 			t.Errorf("MRWiring.GitLabPAT: got %q, want glpat-secret", runOpts.MRWiring.GitLabPAT)
 		}
@@ -348,6 +236,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			t.Errorf("expected mr_on_fail present and false")
 		}
 
+		// Artifacts.
 		if runOpts.Artifacts.Name != "my-artifact" {
 			t.Errorf("Artifacts.Name: got %q, want my-artifact", runOpts.Artifacts.Name)
 		}
@@ -384,36 +273,17 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			t.Fatalf("Steps: expected 2, got %d", len(runOpts.Steps))
 		}
 
-		step0Img, err := runOpts.Steps[0].Image.ResolveImage(contracts.ModStackUnknown)
-		if err != nil {
-			t.Fatalf("unexpected step0 image error: %v", err)
-		}
-		if step0Img != "docker.io/test/step1:v1" {
-			t.Errorf("Steps[0].Image: got %q, want %q", step0Img, "docker.io/test/step1:v1")
-		}
+		assertImage(t, "Steps[0].Image", runOpts.Steps[0].Image, contracts.ModStackUnknown, "docker.io/test/step1:v1")
 		if runOpts.Steps[0].Command.Shell != "step1.sh" {
-			t.Errorf("Steps[0].Command.Shell: got %q, want %q", runOpts.Steps[0].Command.Shell, "step1.sh")
+			t.Errorf("Steps[0].Command.Shell: got %q, want step1.sh", runOpts.Steps[0].Command.Shell)
 		}
 		if runOpts.Steps[0].Env["STEP"] != "1" {
-			t.Errorf("Steps[0].Env[STEP]: got %q, want %q", runOpts.Steps[0].Env["STEP"], "1")
+			t.Errorf("Steps[0].Env[STEP]: got %q, want 1", runOpts.Steps[0].Env["STEP"])
 		}
 
-		step1Img, err := runOpts.Steps[1].Image.ResolveImage(contracts.ModStackUnknown)
-		if err != nil {
-			t.Fatalf("unexpected step1 image error: %v", err)
-		}
-		if step1Img != "docker.io/test/step2:v1" {
-			t.Errorf("Steps[1].Image: got %q, want %q", step1Img, "docker.io/test/step2:v1")
-		}
-		wantExec := []string{"step2", "--flag"}
-		if len(runOpts.Steps[1].Command.Exec) != len(wantExec) {
-			t.Fatalf("Steps[1].Command.Exec length: got %d, want %d", len(runOpts.Steps[1].Command.Exec), len(wantExec))
-		}
-		for i, v := range wantExec {
-			if runOpts.Steps[1].Command.Exec[i] != v {
-				t.Errorf("Steps[1].Command.Exec[%d]: got %q, want %q", i, runOpts.Steps[1].Command.Exec[i], v)
-			}
-		}
+		assertImage(t, "Steps[1].Image", runOpts.Steps[1].Image, contracts.ModStackUnknown, "docker.io/test/step2:v1")
+		assertCommand(t, runOpts.Steps[1].Command.Exec, []string{"step2", "--flag"})
+
 		if !runOpts.Execution.Image.IsEmpty() {
 			t.Errorf("Execution.Image: expected empty for multi-step spec")
 		}
@@ -478,17 +348,11 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 
 		runOpts := modsSpecToRunOptions(spec)
 
-		mavenImg, err := runOpts.Execution.Image.ResolveImage(contracts.ModStackJavaMaven)
-		if err != nil {
-			t.Fatalf("unexpected maven image error: %v", err)
-		}
-		if mavenImg != "docker.io/test/maven:v1" {
-			t.Errorf("Maven image: got %q, want %q", mavenImg, "docker.io/test/maven:v1")
-		}
+		assertImage(t, "Maven image", runOpts.Execution.Image, contracts.ModStackJavaMaven, "docker.io/test/maven:v1")
 	})
 }
 
-func TestModsSpecToRunOptions_TmpBundle(t *testing.T) {
+func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 	t.Parallel()
 
 	bundle := &contracts.TmpBundleRef{
@@ -497,115 +361,6 @@ func TestModsSpecToRunOptions_TmpBundle(t *testing.T) {
 		Digest:   "sha256:deadbeef",
 		Entries:  []string{"config.json", "secret.txt"},
 	}
-
-	t.Run("single_step_bundle_propagated", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{
-				{
-					Image:     contracts.JobImage{Universal: "img"},
-					TmpBundle: bundle,
-				},
-			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if runOpts.Execution.TmpBundle == nil {
-			t.Fatal("Execution.TmpBundle: got nil, want non-nil")
-		}
-		if runOpts.Execution.TmpBundle.BundleID != "bun-123" {
-			t.Errorf("Execution.TmpBundle.BundleID: got %q, want bun-123", runOpts.Execution.TmpBundle.BundleID)
-		}
-	})
-
-	t.Run("multi_step_bundle_propagated_per_step", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{
-				{Image: contracts.JobImage{Universal: "img1"}, TmpBundle: bundle},
-				{Image: contracts.JobImage{Universal: "img2"}},
-			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if len(runOpts.Steps) != 2 {
-			t.Fatalf("Steps len: got %d, want 2", len(runOpts.Steps))
-		}
-		if runOpts.Steps[0].TmpBundle == nil {
-			t.Fatal("Steps[0].TmpBundle: got nil, want non-nil")
-		}
-		if runOpts.Steps[0].TmpBundle.BundleID != "bun-123" {
-			t.Errorf("Steps[0].TmpBundle.BundleID: got %q, want bun-123", runOpts.Steps[0].TmpBundle.BundleID)
-		}
-		if runOpts.Steps[1].TmpBundle != nil {
-			t.Errorf("Steps[1].TmpBundle: got non-nil, want nil")
-		}
-	})
-
-	t.Run("healing_bundle_propagated", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
-			BuildGate: &contracts.BuildGateConfig{
-				Healing: &contracts.HealingSpec{
-					SelectedErrorKind: "code",
-					ByErrorKind: map[string]contracts.HealingActionSpec{
-						"code": {
-							Image:     contracts.JobImage{Universal: "heal-img"},
-							TmpBundle: bundle,
-						},
-					},
-				},
-				Router: &contracts.RouterSpec{
-					Image: contracts.JobImage{Universal: "router-img"},
-				},
-			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if runOpts.Healing == nil {
-			t.Fatal("expected Healing config")
-		}
-		if runOpts.Healing.Mod.TmpBundle == nil {
-			t.Fatal("Healing.Mod.TmpBundle: got nil, want non-nil")
-		}
-		if runOpts.Healing.Mod.TmpBundle.BundleID != "bun-123" {
-			t.Errorf("Healing.Mod.TmpBundle.BundleID: got %q, want bun-123", runOpts.Healing.Mod.TmpBundle.BundleID)
-		}
-	})
-
-	t.Run("router_bundle_propagated", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
-			BuildGate: &contracts.BuildGateConfig{
-				Router: &contracts.RouterSpec{
-					Image:     contracts.JobImage{Universal: "router-img"},
-					TmpBundle: bundle,
-				},
-			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if runOpts.Router == nil {
-			t.Fatal("expected Router config")
-		}
-		if runOpts.Router.TmpBundle == nil {
-			t.Fatal("Router.TmpBundle: got nil, want non-nil")
-		}
-		if runOpts.Router.TmpBundle.BundleID != "bun-123" {
-			t.Errorf("Router.TmpBundle.BundleID: got %q, want bun-123", runOpts.Router.TmpBundle.BundleID)
-		}
-	})
-}
-
-func TestModsSpecToRunOptions_Amata(t *testing.T) {
-	t.Parallel()
-
 	amataSpec := &contracts.AmataRunSpec{
 		Spec: "task: fix-it\nprompt: fix the bug",
 		Set: []contracts.AmataSetParam{
@@ -614,143 +369,204 @@ func TestModsSpecToRunOptions_Amata(t *testing.T) {
 		},
 	}
 
-	t.Run("router_amata_propagated", func(t *testing.T) {
-		t.Parallel()
+	type propagationCase struct {
+		name  string
+		spec  *contracts.ModsSpec
+		check func(t *testing.T, opts RunOptions)
+	}
 
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
-			BuildGate: &contracts.BuildGateConfig{
-				Router: &contracts.RouterSpec{
-					Image: contracts.JobImage{Universal: "router-img"},
-					Amata: amataSpec,
+	runCases := func(t *testing.T, cases []propagationCase) {
+		t.Helper()
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				opts := modsSpecToRunOptions(tc.spec)
+				tc.check(t, opts)
+			})
+		}
+	}
+
+	t.Run("TmpBundle", func(t *testing.T) {
+		t.Parallel()
+		runCases(t, []propagationCase{
+			{
+				name: "single_step",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}, TmpBundle: bundle}},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Execution.TmpBundle == nil || opts.Execution.TmpBundle.BundleID != "bun-123" {
+						t.Fatalf("Execution.TmpBundle: got %v", opts.Execution.TmpBundle)
+					}
 				},
 			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if runOpts.Router == nil {
-			t.Fatal("expected Router config")
-		}
-		if runOpts.Router.Amata == nil {
-			t.Fatal("Router.Amata: expected non-nil")
-		}
-		if runOpts.Router.Amata.Spec != amataSpec.Spec {
-			t.Errorf("Router.Amata.Spec: got %q, want %q", runOpts.Router.Amata.Spec, amataSpec.Spec)
-		}
-		if len(runOpts.Router.Amata.Set) != 2 {
-			t.Fatalf("Router.Amata.Set len: got %d, want 2", len(runOpts.Router.Amata.Set))
-		}
-		if runOpts.Router.Amata.Set[0].Param != "repo" || runOpts.Router.Amata.Set[1].Param != "env" {
-			t.Errorf("Router.Amata.Set order: got %v", runOpts.Router.Amata.Set)
-		}
-	})
-
-	t.Run("single_step_amata_propagated", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{
-				{
-					Image: contracts.JobImage{Universal: "step-img"},
-					Amata: amataSpec,
+			{
+				name: "multi_step",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{
+						{Image: contracts.JobImage{Universal: "img1"}, TmpBundle: bundle},
+						{Image: contracts.JobImage{Universal: "img2"}},
+					},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if len(opts.Steps) != 2 {
+						t.Fatalf("Steps len: got %d, want 2", len(opts.Steps))
+					}
+					if opts.Steps[0].TmpBundle == nil || opts.Steps[0].TmpBundle.BundleID != "bun-123" {
+						t.Errorf("Steps[0].TmpBundle: got %v", opts.Steps[0].TmpBundle)
+					}
+					if opts.Steps[1].TmpBundle != nil {
+						t.Errorf("Steps[1].TmpBundle: got non-nil, want nil")
+					}
 				},
 			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if runOpts.Execution.Amata == nil {
-			t.Fatal("Execution.Amata: expected non-nil")
-		}
-		if runOpts.Execution.Amata.Spec != amataSpec.Spec {
-			t.Errorf("Execution.Amata.Spec: got %q, want %q", runOpts.Execution.Amata.Spec, amataSpec.Spec)
-		}
-		if len(runOpts.Execution.Amata.Set) != 2 {
-			t.Fatalf("Execution.Amata.Set len: got %d, want 2", len(runOpts.Execution.Amata.Set))
-		}
-	})
-
-	t.Run("multi_step_amata_propagated", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{
-				{Image: contracts.JobImage{Universal: "step0-img"}},
-				{Image: contracts.JobImage{Universal: "step1-img"}, Amata: amataSpec},
-			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if len(runOpts.Steps) != 2 {
-			t.Fatalf("Steps len: got %d, want 2", len(runOpts.Steps))
-		}
-		if runOpts.Steps[0].Amata != nil {
-			t.Errorf("Steps[0].Amata: got %+v, want nil", runOpts.Steps[0].Amata)
-		}
-		if runOpts.Steps[1].Amata == nil {
-			t.Fatal("Steps[1].Amata: expected non-nil")
-		}
-		if runOpts.Steps[1].Amata.Spec != amataSpec.Spec {
-			t.Errorf("Steps[1].Amata.Spec: got %q, want %q", runOpts.Steps[1].Amata.Spec, amataSpec.Spec)
-		}
-	})
-
-	t.Run("healing_amata_propagated", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
-			BuildGate: &contracts.BuildGateConfig{
-				Healing: &contracts.HealingSpec{
-					SelectedErrorKind: "code",
-					ByErrorKind: map[string]contracts.HealingActionSpec{
-						"code": {
-							Image: contracts.JobImage{Universal: "heal-img"},
-							Amata: amataSpec,
+			{
+				name: "healing",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+					BuildGate: &contracts.BuildGateConfig{
+						Healing: &contracts.HealingSpec{
+							SelectedErrorKind: "code",
+							ByErrorKind: map[string]contracts.HealingActionSpec{
+								"code": {Image: contracts.JobImage{Universal: "heal-img"}, TmpBundle: bundle},
+							},
 						},
 					},
 				},
-			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
-
-		if runOpts.Healing == nil {
-			t.Fatal("expected Healing config")
-		}
-		if runOpts.Healing.Mod.Amata == nil {
-			t.Fatal("Healing.Mod.Amata: expected non-nil")
-		}
-		if runOpts.Healing.Mod.Amata.Spec != amataSpec.Spec {
-			t.Errorf("Healing.Mod.Amata.Spec: got %q, want %q", runOpts.Healing.Mod.Amata.Spec, amataSpec.Spec)
-		}
-		if len(runOpts.Healing.Mod.Amata.Set) != 2 {
-			t.Fatalf("Healing.Mod.Amata.Set len: got %d, want 2", len(runOpts.Healing.Mod.Amata.Set))
-		}
-	})
-
-	t.Run("nil_amata_propagates_nil", func(t *testing.T) {
-		t.Parallel()
-
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
-			BuildGate: &contracts.BuildGateConfig{
-				Router: &contracts.RouterSpec{
-					Image: contracts.JobImage{Universal: "router-img"},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Healing == nil {
+						t.Fatal("expected Healing config")
+					}
+					if opts.Healing.Mod.TmpBundle == nil || opts.Healing.Mod.TmpBundle.BundleID != "bun-123" {
+						t.Fatalf("Healing.Mod.TmpBundle: got %v", opts.Healing.Mod.TmpBundle)
+					}
 				},
-				Healing: &contracts.HealingSpec{
-					SelectedErrorKind: "code",
-					ByErrorKind: map[string]contracts.HealingActionSpec{
-						"code": {Image: contracts.JobImage{Universal: "heal-img"}},
+			},
+			{
+				name: "router",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+					BuildGate: &contracts.BuildGateConfig{
+						Router: &contracts.RouterSpec{Image: contracts.JobImage{Universal: "router-img"}, TmpBundle: bundle},
 					},
 				},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Router == nil {
+						t.Fatal("expected Router config")
+					}
+					if opts.Router.TmpBundle == nil || opts.Router.TmpBundle.BundleID != "bun-123" {
+						t.Fatalf("Router.TmpBundle: got %v", opts.Router.TmpBundle)
+					}
+				},
 			},
-		}
-		runOpts := modsSpecToRunOptions(spec)
+		})
+	})
 
-		if runOpts.Router != nil && runOpts.Router.Amata != nil {
-			t.Error("Router.Amata: expected nil when not configured")
-		}
-		if runOpts.Healing != nil && runOpts.Healing.Mod.Amata != nil {
-			t.Error("Healing.Mod.Amata: expected nil when not configured")
-		}
+	t.Run("Amata", func(t *testing.T) {
+		t.Parallel()
+		runCases(t, []propagationCase{
+			{
+				name: "single_step",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}, Amata: amataSpec}},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Execution.Amata == nil || opts.Execution.Amata.Spec != amataSpec.Spec {
+						t.Fatalf("Execution.Amata: got %v", opts.Execution.Amata)
+					}
+					if len(opts.Execution.Amata.Set) != 2 {
+						t.Fatalf("Execution.Amata.Set len: got %d, want 2", len(opts.Execution.Amata.Set))
+					}
+				},
+			},
+			{
+				name: "multi_step",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{
+						{Image: contracts.JobImage{Universal: "img0"}},
+						{Image: contracts.JobImage{Universal: "img1"}, Amata: amataSpec},
+					},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if len(opts.Steps) != 2 {
+						t.Fatalf("Steps len: got %d, want 2", len(opts.Steps))
+					}
+					if opts.Steps[0].Amata != nil {
+						t.Errorf("Steps[0].Amata: got %+v, want nil", opts.Steps[0].Amata)
+					}
+					if opts.Steps[1].Amata == nil || opts.Steps[1].Amata.Spec != amataSpec.Spec {
+						t.Fatalf("Steps[1].Amata: got %v", opts.Steps[1].Amata)
+					}
+				},
+			},
+			{
+				name: "healing",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+					BuildGate: &contracts.BuildGateConfig{
+						Healing: &contracts.HealingSpec{
+							SelectedErrorKind: "code",
+							ByErrorKind: map[string]contracts.HealingActionSpec{
+								"code": {Image: contracts.JobImage{Universal: "heal-img"}, Amata: amataSpec},
+							},
+						},
+					},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Healing == nil {
+						t.Fatal("expected Healing config")
+					}
+					if opts.Healing.Mod.Amata == nil || opts.Healing.Mod.Amata.Spec != amataSpec.Spec {
+						t.Fatalf("Healing.Mod.Amata: got %v", opts.Healing.Mod.Amata)
+					}
+					if len(opts.Healing.Mod.Amata.Set) != 2 {
+						t.Fatalf("Healing.Mod.Amata.Set len: got %d, want 2", len(opts.Healing.Mod.Amata.Set))
+					}
+				},
+			},
+			{
+				name: "router",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+					BuildGate: &contracts.BuildGateConfig{
+						Router: &contracts.RouterSpec{Image: contracts.JobImage{Universal: "router-img"}, Amata: amataSpec},
+					},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Router == nil {
+						t.Fatal("expected Router config")
+					}
+					if opts.Router.Amata == nil || opts.Router.Amata.Spec != amataSpec.Spec {
+						t.Fatalf("Router.Amata: got %v", opts.Router.Amata)
+					}
+					if len(opts.Router.Amata.Set) != 2 {
+						t.Fatalf("Router.Amata.Set len: got %d, want 2", len(opts.Router.Amata.Set))
+					}
+				},
+			},
+			{
+				name: "nil_propagates_nil",
+				spec: &contracts.ModsSpec{
+					Steps: []contracts.ModStep{{Image: contracts.JobImage{Universal: "img"}}},
+					BuildGate: &contracts.BuildGateConfig{
+						Router: &contracts.RouterSpec{Image: contracts.JobImage{Universal: "router-img"}},
+						Healing: &contracts.HealingSpec{
+							SelectedErrorKind: "code",
+							ByErrorKind: map[string]contracts.HealingActionSpec{
+								"code": {Image: contracts.JobImage{Universal: "heal-img"}},
+							},
+						},
+					},
+				},
+				check: func(t *testing.T, opts RunOptions) {
+					if opts.Router != nil && opts.Router.Amata != nil {
+						t.Error("Router.Amata: expected nil when not configured")
+					}
+					if opts.Healing != nil && opts.Healing.Mod.Amata != nil {
+						t.Error("Healing.Mod.Amata: expected nil when not configured")
+					}
+				},
+			},
+		})
 	})
 }

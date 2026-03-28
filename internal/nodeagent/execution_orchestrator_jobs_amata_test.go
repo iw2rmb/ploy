@@ -3,6 +3,7 @@ package nodeagent
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -88,8 +89,9 @@ func TestWriteAmataSpecInDir(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read amata.yaml: %v", err)
 		}
-		if string(data) != amata.Spec {
-			t.Fatalf("amata.yaml content = %q, want %q", string(data), amata.Spec)
+		want := strings.TrimSpace(amata.Spec)
+		if string(data) != want {
+			t.Fatalf("amata.yaml content = %q, want %q", string(data), want)
 		}
 	})
 

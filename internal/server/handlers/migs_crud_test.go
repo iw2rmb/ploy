@@ -104,7 +104,7 @@ func TestMods_Create_ErrorPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := createMigHandler(tt.store)
-			rr := doJSON(t, handler, http.MethodPost, "/v1/migs", tt.body)
+			rr := doRequest(t, handler, http.MethodPost, "/v1/migs", tt.body)
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.wantNoCalls && tt.store.createMigCalled {
 				t.Error("store.CreateMig should not be called")
@@ -184,8 +184,8 @@ func TestMods_List_ArchivedFilter(t *testing.T) {
 		query        string
 		wantArchived *bool
 	}{
-		{"archived=true", boolPtr(true)},
-		{"archived=false", boolPtr(false)},
+		{"archived=true", ptr(true)},
+		{"archived=false", ptr(false)},
 	}
 
 	for _, tt := range tests {
@@ -216,7 +216,7 @@ func TestMods_List_InvalidQueryParams(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rr := doJSON(t, listMigsHandler(&mockStore{}), http.MethodGet, "/v1/migs?"+tt.query, nil)
+			rr := doRequest(t, listMigsHandler(&mockStore{}), http.MethodGet, "/v1/migs?"+tt.query, nil)
 			assertStatus(t, rr, http.StatusBadRequest)
 		})
 	}
