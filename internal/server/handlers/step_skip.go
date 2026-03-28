@@ -17,7 +17,7 @@ import (
 )
 
 type modStepOpsPayload struct {
-	Step         contracts.ModStep          `json:"step"`
+	Step         contracts.MigStep          `json:"step"`
 	GlobalEnv    map[string]string          `json:"global_env,omitempty"`
 	EffectiveEnv map[string]string          `json:"effective_env,omitempty"`
 	Artifacts    []string                   `json:"artifact_paths,omitempty"`
@@ -39,7 +39,7 @@ func resolveAndPersistModStepSkip(
 		return nil, nil
 	}
 
-	spec, err := contracts.ParseModsSpecJSON(mergedSpec)
+	spec, err := contracts.ParseMigSpecJSON(mergedSpec)
 	if err != nil {
 		return nil, fmt.Errorf("parse merged spec for step cache: %w", err)
 	}

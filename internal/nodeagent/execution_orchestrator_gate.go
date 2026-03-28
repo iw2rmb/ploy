@@ -284,25 +284,25 @@ func (r *runController) persistGateStack(runID types.RunID, meta *contracts.Buil
 	}
 	stack := meta.DetectedStack()
 	if stack == "" {
-		stack = contracts.ModStackUnknown
+		stack = contracts.MigStackUnknown
 	}
 	persistOnce(runCacheDir(runID), "build-gate-stack.txt", []byte(string(stack)), "build gate stack", runID)
 }
 
 // loadPersistedStack reads the persisted stack for a run.
-// Returns ModStackUnknown if no stack file exists or on error.
-func (r *runController) loadPersistedStack(runID types.RunID) contracts.ModStack {
+// Returns MigStackUnknown if no stack file exists or on error.
+func (r *runController) loadPersistedStack(runID types.RunID) contracts.MigStack {
 	stackPath := filepath.Join(runCacheDir(runID), "build-gate-stack.txt")
 	data, err := os.ReadFile(stackPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			slog.Warn("failed to read persisted stack", "run_id", runID, "error", err)
 		}
-		return contracts.ModStackUnknown
+		return contracts.MigStackUnknown
 	}
-	stack := contracts.ModStack(strings.TrimSpace(string(data)))
+	stack := contracts.MigStack(strings.TrimSpace(string(data)))
 	if stack == "" {
-		return contracts.ModStackUnknown
+		return contracts.MigStackUnknown
 	}
 	slog.Debug("loaded persisted stack for run", "run_id", runID, "stack", stack)
 	return stack

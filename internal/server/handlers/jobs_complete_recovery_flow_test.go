@@ -144,7 +144,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 			{RunID: f.RunID, JobID: &f.Job.ID, ObjectKey: ptr("artifacts/run/" + f.RunID.String() + "/bundle/heal.tar.gz")},
 		}),
 	)
-	if _, stack, _ := lifecycle.ResolveGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {
+	if _, stack, _ := lifecycle.ResolveGateRecoveryContext(failedGate); stack == contracts.MigStackUnknown {
 		t.Fatal("expected failed gate metadata to expose detected stack")
 	}
 

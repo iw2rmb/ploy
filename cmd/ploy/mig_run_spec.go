@@ -49,7 +49,7 @@ func normalizeModsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 		return nil, fmt.Errorf("marshal spec to JSON: %w", err)
 	}
 
-	if _, err := contracts.ParseModsSpecJSON(jsonBytes); err != nil {
+	if _, err := contracts.ParseMigSpecJSON(jsonBytes); err != nil {
 		return nil, fmt.Errorf("validate spec: %w", err)
 	}
 
@@ -625,7 +625,7 @@ func buildSpecPayload(
 
 	// Validate spec using the canonical parser to catch structural issues early.
 	// This ensures the CLI surfaces validation errors before submission.
-	if _, err := contracts.ParseModsSpecJSON(jsonBytes); err != nil {
+	if _, err := contracts.ParseMigSpecJSON(jsonBytes); err != nil {
 		return nil, fmt.Errorf("validate spec: %w", err)
 	}
 

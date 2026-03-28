@@ -54,7 +54,7 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 
 		// Validate spec early so invalid specs do not create a mig row.
 		if req.Spec != nil && len(*req.Spec) > 0 {
-			if _, err := contracts.ParseModsSpecJSON(*req.Spec); err != nil {
+			if _, err := contracts.ParseMigSpecJSON(*req.Spec); err != nil {
 				writeHTTPError(w, http.StatusBadRequest, "spec: %v", err)
 				return
 			}

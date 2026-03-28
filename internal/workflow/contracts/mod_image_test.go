@@ -13,25 +13,25 @@ func TestJobImage_ResolveImage_Universal(t *testing.T) {
 	tests := []struct {
 		name  string
 		image JobImage
-		stack ModStack
+		stack MigStack
 		want  string
 	}{
 		{
 			name:  "universal image with java-maven stack",
 			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
-			stack: ModStackJavaMaven,
+			stack: MigStackJavaMaven,
 			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "universal image with java-gradle stack",
 			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
-			stack: ModStackJavaGradle,
+			stack: MigStackJavaGradle,
 			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "universal image with unknown stack",
 			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
-			stack: ModStackUnknown,
+			stack: MigStackUnknown,
 			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
@@ -63,41 +63,41 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 
 	// Stack map with exact keys and default.
 	stackMap := JobImage{
-		ByStack: map[ModStack]string{
-			ModStackDefault:    "docker.io/user/migs-orw:latest",
-			ModStackJavaMaven:  "docker.io/user/orw-cli:latest",
-			ModStackJavaGradle: "docker.io/user/orw-cli:latest",
+		ByStack: map[MigStack]string{
+			MigStackDefault:    "docker.io/user/migs-orw:latest",
+			MigStackJavaMaven:  "docker.io/user/orw-cli:latest",
+			MigStackJavaGradle: "docker.io/user/orw-cli:latest",
 		},
 	}
 
 	tests := []struct {
 		name  string
 		image JobImage
-		stack ModStack
+		stack MigStack
 		want  string
 	}{
 		{
 			name:  "exact match java-maven",
 			image: stackMap,
-			stack: ModStackJavaMaven,
+			stack: MigStackJavaMaven,
 			want:  "docker.io/user/orw-cli:latest",
 		},
 		{
 			name:  "exact match java-gradle",
 			image: stackMap,
-			stack: ModStackJavaGradle,
+			stack: MigStackJavaGradle,
 			want:  "docker.io/user/orw-cli:latest",
 		},
 		{
 			name:  "fallback to default for java stack",
 			image: stackMap,
-			stack: ModStackJava,
+			stack: MigStackJava,
 			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for unknown stack",
 			image: stackMap,
-			stack: ModStackUnknown,
+			stack: MigStackUnknown,
 			want:  "docker.io/user/migs-orw:latest",
 		},
 		{
@@ -109,7 +109,7 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 		{
 			name:  "fallback to default for custom stack",
 			image: stackMap,
-			stack: ModStack("python-pip"),
+			stack: MigStack("python-pip"),
 			want:  "docker.io/user/migs-orw:latest",
 		},
 	}
@@ -135,24 +135,24 @@ func TestJobImage_ResolveImage_NoDefault(t *testing.T) {
 
 	// Stack map without default key.
 	stackMap := JobImage{
-		ByStack: map[ModStack]string{
-			ModStackJavaMaven: "docker.io/user/orw-cli:latest",
+		ByStack: map[MigStack]string{
+			MigStackJavaMaven: "docker.io/user/orw-cli:latest",
 		},
 	}
 
 	tests := []struct {
 		name        string
-		stack       ModStack
+		stack       MigStack
 		wantErrPart string
 	}{
 		{
 			name:        "missing java-gradle with no default",
-			stack:       ModStackJavaGradle,
+			stack:       MigStackJavaGradle,
 			wantErrPart: "no image specified for stack",
 		},
 		{
 			name:        "missing unknown with no default",
-			stack:       ModStackUnknown,
+			stack:       MigStackUnknown,
 			wantErrPart: "no default provided",
 		},
 	}
@@ -177,7 +177,7 @@ func TestJobImage_ResolveImage_Empty(t *testing.T) {
 	t.Parallel()
 
 	empty := JobImage{}
-	_, err := empty.ResolveImage(ModStackJavaMaven)
+	_, err := empty.ResolveImage(MigStackJavaMaven)
 	if err == nil {
 		t.Fatal("expected error for empty JobImage")
 	}
@@ -251,14 +251,14 @@ func TestParseJobImage_Map(t *testing.T) {
 		if len(got.ByStack) != 3 {
 			t.Errorf("expected 3 stack entries, got %d", len(got.ByStack))
 		}
-		if got.ByStack[ModStackDefault] != "docker.io/user/migs-orw:latest" {
-			t.Errorf("default image mismatch: %q", got.ByStack[ModStackDefault])
+		if got.ByStack[MigStackDefault] != "docker.io/user/migs-orw:latest" {
+			t.Errorf("default image mismatch: %q", got.ByStack[MigStackDefault])
 		}
-		if got.ByStack[ModStackJavaMaven] != "docker.io/user/orw-cli:latest" {
-			t.Errorf("java-maven image mismatch: %q", got.ByStack[ModStackJavaMaven])
+		if got.ByStack[MigStackJavaMaven] != "docker.io/user/orw-cli:latest" {
+			t.Errorf("java-maven image mismatch: %q", got.ByStack[MigStackJavaMaven])
 		}
-		if got.ByStack[ModStackJavaGradle] != "docker.io/user/orw-cli:latest" {
-			t.Errorf("java-gradle image mismatch: %q", got.ByStack[ModStackJavaGradle])
+		if got.ByStack[MigStackJavaGradle] != "docker.io/user/orw-cli:latest" {
+			t.Errorf("java-gradle image mismatch: %q", got.ByStack[MigStackJavaGradle])
 		}
 	})
 
@@ -276,8 +276,8 @@ func TestParseJobImage_Map(t *testing.T) {
 		if len(got.ByStack) != 2 {
 			t.Errorf("expected 2 stack entries, got %d", len(got.ByStack))
 		}
-		if got.ByStack[ModStackDefault] != "img:default" {
-			t.Errorf("default image mismatch: %q", got.ByStack[ModStackDefault])
+		if got.ByStack[MigStackDefault] != "img:default" {
+			t.Errorf("default image mismatch: %q", got.ByStack[MigStackDefault])
 		}
 	})
 
@@ -366,8 +366,8 @@ func TestJobImage_IsEmpty(t *testing.T) {
 	}{
 		{name: "empty", image: JobImage{}, want: true},
 		{name: "universal", image: JobImage{Universal: "img:v1"}, want: false},
-		{name: "stack map", image: JobImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: false},
-		{name: "empty stack map", image: JobImage{ByStack: map[ModStack]string{}}, want: true},
+		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, want: false},
+		{name: "empty stack map", image: JobImage{ByStack: map[MigStack]string{}}, want: true},
 	}
 
 	for _, tt := range tests {
@@ -391,9 +391,9 @@ func TestJobImage_IsUniversal(t *testing.T) {
 	}{
 		{name: "universal only", image: JobImage{Universal: "img:v1"}, want: true},
 		{name: "empty", image: JobImage{}, want: false},
-		{name: "stack map only", image: JobImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: false},
+		{name: "stack map only", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, want: false},
 		// When both are set, ByStack takes precedence (not universal).
-		{name: "both set", image: JobImage{Universal: "img:v1", ByStack: map[ModStack]string{"default": "img:v2"}}, want: false},
+		{name: "both set", image: JobImage{Universal: "img:v1", ByStack: map[MigStack]string{"default": "img:v2"}}, want: false},
 	}
 
 	for _, tt := range tests {
@@ -415,10 +415,10 @@ func TestJobImage_IsStackSpecific(t *testing.T) {
 		image JobImage
 		want  bool
 	}{
-		{name: "stack map", image: JobImage{ByStack: map[ModStack]string{"default": "img:v1"}}, want: true},
+		{name: "stack map", image: JobImage{ByStack: map[MigStack]string{"default": "img:v1"}}, want: true},
 		{name: "empty", image: JobImage{}, want: false},
 		{name: "universal only", image: JobImage{Universal: "img:v1"}, want: false},
-		{name: "empty stack map", image: JobImage{ByStack: map[ModStack]string{}}, want: false},
+		{name: "empty stack map", image: JobImage{ByStack: map[MigStack]string{}}, want: false},
 	}
 
 	for _, tt := range tests {
@@ -455,7 +455,7 @@ func TestJobImage_String(t *testing.T) {
 
 	t.Run("stack map", func(t *testing.T) {
 		t.Parallel()
-		img := JobImage{ByStack: map[ModStack]string{
+		img := JobImage{ByStack: map[MigStack]string{
 			"default": "img:default",
 		}}
 		got := img.String()
@@ -465,78 +465,78 @@ func TestJobImage_String(t *testing.T) {
 	})
 }
 
-// TestToolToModStack verifies conversion from Build Gate tool names to ModStack.
+// TestToolToModStack verifies conversion from Build Gate tool names to MigStack.
 func TestToolToModStack(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		tool string
-		want ModStack
+		want MigStack
 	}{
 		{
 			name: "maven lowercase",
 			tool: "maven",
-			want: ModStackJavaMaven,
+			want: MigStackJavaMaven,
 		},
 		{
 			name: "maven mixed case",
 			tool: "Maven",
-			want: ModStackJavaMaven,
+			want: MigStackJavaMaven,
 		},
 		{
 			name: "maven with whitespace",
 			tool: "  maven  ",
-			want: ModStackJavaMaven,
+			want: MigStackJavaMaven,
 		},
 		{
 			name: "gradle lowercase",
 			tool: "gradle",
-			want: ModStackJavaGradle,
+			want: MigStackJavaGradle,
 		},
 		{
 			name: "gradle mixed case",
 			tool: "GRADLE",
-			want: ModStackJavaGradle,
+			want: MigStackJavaGradle,
 		},
 		{
 			name: "java lowercase",
 			tool: "java",
-			want: ModStackJava,
+			want: MigStackJava,
 		},
 		{
 			name: "java mixed case",
 			tool: "Java",
-			want: ModStackJava,
+			want: MigStackJava,
 		},
 		{
 			name: "empty string",
 			tool: "",
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 		{
 			name: "whitespace only",
 			tool: "   ",
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 		{
 			name: "unknown tool",
 			tool: "bazel",
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 		{
 			name: "none tool (gate skipped)",
 			tool: "none",
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ToolToModStack(tt.tool)
+			got := ToolToMigStack(tt.tool)
 			if got != tt.want {
-				t.Errorf("ToolToModStack(%q) = %q, want %q", tt.tool, got, tt.want)
+				t.Errorf("ToolToMigStack(%q) = %q, want %q", tt.tool, got, tt.want)
 			}
 		})
 	}

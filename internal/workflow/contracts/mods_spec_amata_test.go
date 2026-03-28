@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-// amataPlacement describes where an AmataRunSpec can appear in a ModsSpec,
+// amataPlacement describes where an AmataRunSpec can appear in a MigSpec,
 // parameterizing JSON construction and result extraction so behavioral tests
 // are written once and run for every valid placement site.
 type amataPlacement struct {
 	name     string
 	wrapJSON func(amataFragment string) string           // build full spec JSON given an amata JSON object
 	baseJSON string                                      // valid spec JSON without amata (direct codex mode)
-	getAmata func(*ModsSpec) *AmataRunSpec               // extract amata from parsed result
+	getAmata func(*MigSpec) *AmataRunSpec               // extract amata from parsed result
 	errPfx   string                                      // error path prefix, e.g. "build_gate.router.amata"
 	forbid   []struct{ name, input, wantErr string }     // site-specific flat-key forbidden cases
 }
@@ -33,7 +33,7 @@ func amataplacements() []amataPlacement {
 				"steps": [{"image": "test:latest"}],
 				"build_gate": {"router": {"image": "router:latest"}}
 			}`,
-			getAmata: func(s *ModsSpec) *AmataRunSpec { return s.BuildGate.Router.Amata },
+			getAmata: func(s *MigSpec) *AmataRunSpec { return s.BuildGate.Router.Amata },
 			errPfx:   "build_gate.router.amata",
 			forbid: []struct{ name, input, wantErr string }{
 				{
@@ -62,7 +62,7 @@ func amataplacements() []amataPlacement {
 				}`, frag)
 			},
 			baseJSON: `{"steps": [{"image": "test:latest"}]}`,
-			getAmata: func(s *ModsSpec) *AmataRunSpec { return s.Steps[0].Amata },
+			getAmata: func(s *MigSpec) *AmataRunSpec { return s.Steps[0].Amata },
 			errPfx:   "steps[0].amata",
 		},
 		{
@@ -87,7 +87,7 @@ func amataplacements() []amataPlacement {
 					"router": {"image": "router:latest"}
 				}
 			}`,
-			getAmata: func(s *ModsSpec) *AmataRunSpec {
+			getAmata: func(s *MigSpec) *AmataRunSpec {
 				return s.BuildGate.Healing.ByErrorKind["code"].Amata
 			},
 			errPfx: "build_gate.healing.by_error_kind.code.amata",
@@ -132,7 +132,7 @@ func TestParseModsSpecJSON_Amata(t *testing.T) {
 						{"param": "BRANCH", "value": "main"}
 					]
 				}`)
-				spec, err := ParseModsSpecJSON([]byte(input))
+				spec, err := ParseMigSpecJSON([]byte(input))
 				requireValidationErr(t, err, "")
 
 				a := p.getAmata(spec)
@@ -155,7 +155,7 @@ func TestParseModsSpecJSON_Amata(t *testing.T) {
 
 			t.Run("spec_only_no_set", func(t *testing.T) {
 				input := p.wrapJSON(`{"spec": "prompt: fix"}`)
-				spec, err := ParseModsSpecJSON([]byte(input))
+				spec, err := ParseMigSpecJSON([]byte(input))
 				requireValidationErr(t, err, "")
 
 				a := p.getAmata(spec)
@@ -168,7 +168,7 @@ func TestParseModsSpecJSON_Amata(t *testing.T) {
 			})
 
 			t.Run("no_amata_direct_codex", func(t *testing.T) {
-				spec, err := ParseModsSpecJSON([]byte(p.baseJSON))
+				spec, err := ParseMigSpecJSON([]byte(p.baseJSON))
 				requireValidationErr(t, err, "")
 
 				if p.getAmata(spec) != nil {
@@ -178,25 +178,25 @@ func TestParseModsSpecJSON_Amata(t *testing.T) {
 
 			t.Run("empty_spec_required", func(t *testing.T) {
 				input := p.wrapJSON(`{"spec": ""}`)
-				_, err := ParseModsSpecJSON([]byte(input))
+				_, err := ParseMigSpecJSON([]byte(input))
 				requireValidationErr(t, err, p.errPfx+".spec: required")
 			})
 
 			t.Run("whitespace_spec_required", func(t *testing.T) {
 				input := p.wrapJSON(`{"spec": "   "}`)
-				_, err := ParseModsSpecJSON([]byte(input))
+				_, err := ParseMigSpecJSON([]byte(input))
 				requireValidationErr(t, err, p.errPfx+".spec: required")
 			})
 
 			t.Run("empty_param_required", func(t *testing.T) {
 				input := p.wrapJSON(`{"spec": "prompt: fix", "set": [{"param": "", "value": "v"}]}`)
-				_, err := ParseModsSpecJSON([]byte(input))
+				_, err := ParseMigSpecJSON([]byte(input))
 				requireValidationErr(t, err, p.errPfx+".set[0].param: required")
 			})
 
 			t.Run("empty_value_allowed", func(t *testing.T) {
 				input := p.wrapJSON(`{"spec": "prompt: fix", "set": [{"param": "KEY", "value": ""}]}`)
-				spec, err := ParseModsSpecJSON([]byte(input))
+				spec, err := ParseMigSpecJSON([]byte(input))
 				requireValidationErr(t, err, "")
 
 				s := p.getAmata(spec).Set[0]
@@ -207,7 +207,7 @@ func TestParseModsSpecJSON_Amata(t *testing.T) {
 
 			for _, fb := range p.forbid {
 				t.Run(fb.name, func(t *testing.T) {
-					_, err := ParseModsSpecJSON([]byte(fb.input))
+					_, err := ParseMigSpecJSON([]byte(fb.input))
 					requireValidationErr(t, err, fb.wantErr)
 				})
 			}
@@ -354,7 +354,7 @@ func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(tt.input))
+			_, err := ParseMigSpecJSON([]byte(tt.input))
 			requireValidationErr(t, err, tt.wantErr)
 		})
 	}

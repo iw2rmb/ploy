@@ -635,12 +635,12 @@ func newStartRunRequest(opts ...startRunOption) StartRunRequest {
 // Manifest builder helpers
 // ---------------------------------------------------------------------------
 
-// buildManifestDefault calls buildManifestFromRequest with stepIndex=0 and ModStackUnknown.
+// buildManifestDefault calls buildManifestFromRequest with stepIndex=0 and MigStackUnknown.
 func buildManifestDefault(req StartRunRequest) (contracts.StepManifest, error) {
-	return buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
+	return buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
 }
 
-// buildManifestAtStep calls buildManifestFromRequest with the given stepIndex and ModStackUnknown.
+// buildManifestAtStep calls buildManifestFromRequest with the given stepIndex and MigStackUnknown.
 func buildManifestAtStep(req StartRunRequest, step int) (contracts.StepManifest, error) {
-	return buildManifestFromRequest(req, req.TypedOptions, step, contracts.ModStackUnknown)
+	return buildManifestFromRequest(req, req.TypedOptions, step, contracts.MigStackUnknown)
 }

@@ -71,26 +71,26 @@ type BuildGateReportLink struct {
 	DownloadURL string `json:"download_url,omitempty"`
 }
 
-// DetectedStack returns the ModStack derived from the first static check's tool.
+// DetectedStack returns the MigStack derived from the first static check's tool.
 // This provides deterministic stack identification for stack-aware image selection
 // in Mods steps and healing jobs.
 //
 // The detected stack is derived from the Build Gate's tool detection:
-//   - "maven" tool → ModStackJavaMaven
-//   - "gradle" tool → ModStackJavaGradle
-//   - "java" tool → ModStackJava
-//   - unknown/empty → ModStackUnknown
+//   - "maven" tool → MigStackJavaMaven
+//   - "gradle" tool → MigStackJavaGradle
+//   - "java" tool → MigStackJava
+//   - unknown/empty → MigStackUnknown
 //
 // This method ensures the same stack value is visible to both mig and healing
 // executions, enabling consistent image resolution across re-gates.
-func (m BuildGateStageMetadata) DetectedStack() ModStack {
+func (m BuildGateStageMetadata) DetectedStack() MigStack {
 	if m.Detected != nil && strings.TrimSpace(m.Detected.Tool) != "" {
-		return ToolToModStack(m.Detected.Tool)
+		return ToolToMigStack(m.Detected.Tool)
 	}
 	if len(m.StaticChecks) == 0 {
-		return ModStackUnknown
+		return MigStackUnknown
 	}
-	return ToolToModStack(m.StaticChecks[0].Tool)
+	return ToolToMigStack(m.StaticChecks[0].Tool)
 }
 
 // DetectedStackExpectation returns the normalized detected stack expectation.
@@ -224,7 +224,7 @@ type RecoveryClaimContext struct {
 	// SelectedErrorKind is the resolved healing error kind selected by server.
 	SelectedErrorKind string `json:"selected_error_kind,omitempty"`
 	// DetectedStack is the gate-detected stack used for image resolution.
-	DetectedStack ModStack `json:"detected_stack,omitempty"`
+	DetectedStack MigStack `json:"detected_stack,omitempty"`
 	// ResolvedHealingImage is the concrete healing image selected for this chain.
 	ResolvedHealingImage string `json:"resolved_healing_image,omitempty"`
 	// Expectations carries router/recovery expectations payload.

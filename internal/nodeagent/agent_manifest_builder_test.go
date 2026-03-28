@@ -466,9 +466,9 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 	req := newStartRunRequest(withRunOptions(RunOptions{
 		BuildGate: BuildGateOptions{Enabled: true},
 		Steps: []StepMod{{ModContainerSpec: ModContainerSpec{
-			Image: contracts.JobImage{ByStack: map[contracts.ModStack]string{
-				contracts.ModStackJavaMaven:  "docker.io/example/orw-cli:latest",
-				contracts.ModStackJavaGradle: "docker.io/example/orw-cli:latest",
+			Image: contracts.JobImage{ByStack: map[contracts.MigStack]string{
+				contracts.MigStackJavaMaven:  "docker.io/example/orw-cli:latest",
+				contracts.MigStackJavaGradle: "docker.io/example/orw-cli:latest",
 			}},
 		}}},
 	}))

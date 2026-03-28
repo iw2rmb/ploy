@@ -42,19 +42,32 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `rg -n '\bHandleFuncAllowQueryToken\b|\bHandleFunc\b|\bHandle\(' internal/server cmd/ployd`.
   - Reasoning: medium (8 CFP)
 
-- [ ] 1.4 Normalize `mod` terminology to `mig` in workflow contracts and node orchestration
-  - Type: assumption-bound
-  - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/mod_image.go`, `internal/workflow/contracts/job_meta.go`, `internal/workflow/**/*.go`, `internal/nodeagent/**/*.go`, `internal/server/handlers/**/*.go`, `internal/cli/**/*.go`
-  - Assumptions: Renames are API-internal and Go-level only; wire schema keys and persisted JSON values remain unchanged where compatibility is required by stored data contracts (for example `kind:"mig"` and existing JSON field tags).
+- [x] 1.4.1 Normalize `mod` type terminology to `mig` in workflow contracts
+  - Type: determined
+  - Component: `internal/workflow/contracts/mods_spec.go`, `internal/workflow/contracts/mod_image.go`, `internal/workflow/contracts/mods_spec_parse.go`, `internal/workflow/contracts/*_test.go`, `internal/workflow/**/*.go`
   - Implementation:
-    1. Rename core type names from `ModsSpec`/`ModStep`/`ModStack` to `MigSpec`/`MigStep`/`MigStack`.
-    2. Rename `JobKindMod` and constructor/helper names (for example `NewModJobMeta`) to `JobKindMig` and `NewMigJobMeta` family.
-    3. Update all workflow, nodeagent, server, and CLI call sites and tests to renamed symbols.
-    4. Remove old `mod` symbol names so the code surface uses a single `mig` vocabulary.
+    1. Rename `ModsSpec`/`ModStep`/`ModStack` to `MigSpec`/`MigStep`/`MigStack` in workflow contract definitions.
+    2. Rename contract parser/build helpers that encode `mod` naming to `mig` naming in `internal/workflow/contracts`.
+    3. Update workflow package call sites and tests to compile and validate against renamed contract symbols.
+    4. Remove old contract `mod` symbols so workflow contracts expose one `mig` vocabulary.
+  - Verification:
+    1. Run `go test ./internal/workflow/contracts ./internal/workflow/...`.
+    2. Run `rg -n '\bModsSpec\b|\bModStep\b|\bModStack\b' internal/workflow`.
+  - Reasoning: high (10 CFP)
+
+- [ ] 1.4.2 Normalize `mod` job metadata and orchestration symbols to `mig`
+  - Type: assumption-bound
+  - Component: `internal/workflow/contracts/job_meta.go`, `internal/nodeagent/**/*.go`, `internal/server/handlers/**/*.go`, `internal/cli/**/*.go`, `internal/workflow/**/*.go`
+  - Assumptions: Renames are API-internal and Go-level only; wire schema keys and persisted JSON values remain unchanged where required by stored data contracts (for example `kind:"mig"` and existing JSON field tags).
+  - Implementation:
+    1. Rename `JobKindMod` to `JobKindMig` and rename `NewModJobMeta`-style constructors/helpers to `NewMigJobMeta`.
+    2. Update nodeagent orchestration paths to use renamed job metadata symbols end-to-end.
+    3. Update server handler and CLI workflow call sites/tests to use renamed metadata constructors and kind constants.
+    4. Remove old orchestration `mod` symbols so execution paths use one `mig` vocabulary.
   - Verification:
     1. Run `go test ./internal/workflow/... ./internal/nodeagent ./internal/server/handlers ./internal/cli/...`.
-    2. Run `rg -n '\bModsSpec\b|\bModStep\b|\bModStack\b|\bJobKindMod\b|\bNewModJobMeta\b' internal`.
-  - Reasoning: xhigh (19 CFP)
+    2. Run `rg -n '\bJobKindMod\b|\bNewModJobMeta\b' internal`.
+  - Reasoning: high (8 CFP)
 
 - [ ] 1.5 Rename `mods_*.go` files to `migs_*.go` in workflow contracts
   - Type: determined

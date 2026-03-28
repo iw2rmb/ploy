@@ -35,24 +35,24 @@ import (
 	"strings"
 )
 
-// ModStack represents a detected build stack for image resolution.
-type ModStack string
+// MigStack represents a detected build stack for image resolution.
+type MigStack string
 
 const (
-	// ModStackJavaMaven indicates a Maven-based Java project (pom.xml present).
-	ModStackJavaMaven ModStack = "java-maven"
+	// MigStackJavaMaven indicates a Maven-based Java project (pom.xml present).
+	MigStackJavaMaven MigStack = "java-maven"
 
-	// ModStackJavaGradle indicates a Gradle-based Java project (build.gradle present).
-	ModStackJavaGradle ModStack = "java-gradle"
+	// MigStackJavaGradle indicates a Gradle-based Java project (build.gradle present).
+	MigStackJavaGradle MigStack = "java-gradle"
 
-	// ModStackJava indicates a generic Java project (no specific build tool).
-	ModStackJava ModStack = "java"
+	// MigStackJava indicates a generic Java project (no specific build tool).
+	MigStackJava MigStack = "java"
 
-	// ModStackUnknown indicates no recognized stack markers were found.
-	ModStackUnknown ModStack = "unknown"
+	// MigStackUnknown indicates no recognized stack markers were found.
+	MigStackUnknown MigStack = "unknown"
 
-	// ModStackDefault is the fallback key used in stack-specific image maps.
-	ModStackDefault ModStack = "default"
+	// MigStackDefault is the fallback key used in stack-specific image maps.
+	MigStackDefault MigStack = "default"
 )
 
 // JobImage represents a mig container image specification supporting two
@@ -77,7 +77,7 @@ type JobImage struct {
 	// ByStack holds stack-specific images when image is specified as a map.
 	// Keys are stack names (e.g., "java-maven", "java-gradle", "default").
 	// When non-nil and non-empty, stack resolution rules apply.
-	ByStack map[ModStack]string
+	ByStack map[MigStack]string
 }
 
 // IsEmpty returns true if no image is specified in either form.
@@ -104,10 +104,10 @@ func (m JobImage) IsStackSpecific() bool {
 //
 // The stack parameter should come from Build Gate detection (e.g., "java-maven").
 // An empty JobImage returns an error. An empty stack uses "unknown" as default.
-func (m JobImage) ResolveImage(stack ModStack) (string, error) {
+func (m JobImage) ResolveImage(stack MigStack) (string, error) {
 	// Normalize empty stack to "unknown".
 	if stack == "" {
-		stack = ModStackUnknown
+		stack = MigStackUnknown
 	}
 
 	// Case 1: Universal image - return it regardless of stack.
@@ -126,7 +126,7 @@ func (m JobImage) ResolveImage(stack ModStack) (string, error) {
 	}
 
 	// Case 4: Stack map - fall back to "default" key.
-	if img, ok := m.ByStack[ModStackDefault]; ok && strings.TrimSpace(img) != "" {
+	if img, ok := m.ByStack[MigStackDefault]; ok && strings.TrimSpace(img) != "" {
 		return img, nil
 	}
 
@@ -134,7 +134,7 @@ func (m JobImage) ResolveImage(stack ModStack) (string, error) {
 	return "", fmt.Errorf(
 		"no image specified for stack %q and no default provided; "+
 			"add a %q key to the image map or specify the exact stack key",
-		stack, ModStackDefault,
+		stack, MigStackDefault,
 	)
 }
 
@@ -158,7 +158,7 @@ func ParseJobImage(v any) (JobImage, error) {
 	// Handle both map[string]any (from JSON/YAML) and map[string]string.
 	switch m := v.(type) {
 	case map[string]any:
-		byStack := make(map[ModStack]string, len(m))
+		byStack := make(map[MigStack]string, len(m))
 		for k, val := range m {
 			img, ok := val.(string)
 			if !ok {
@@ -166,14 +166,14 @@ func ParseJobImage(v any) (JobImage, error) {
 					"image[%q]: expected string, got %T", k, val,
 				)
 			}
-			byStack[ModStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
+			byStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
 		}
 		return JobImage{ByStack: byStack}, nil
 
 	case map[string]string:
-		byStack := make(map[ModStack]string, len(m))
+		byStack := make(map[MigStack]string, len(m))
 		for k, img := range m {
-			byStack[ModStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
+			byStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(img)
 		}
 		return JobImage{ByStack: byStack}, nil
 
@@ -233,9 +233,9 @@ func (m *JobImage) UnmarshalJSON(data []byte) error {
 	// Try map (stack-specific form).
 	var raw map[string]string
 	if err := json.Unmarshal(data, &raw); err == nil {
-		m.ByStack = make(map[ModStack]string, len(raw))
+		m.ByStack = make(map[MigStack]string, len(raw))
 		for k, v := range raw {
-			m.ByStack[ModStack(strings.TrimSpace(k))] = strings.TrimSpace(v)
+			m.ByStack[MigStack(strings.TrimSpace(k))] = strings.TrimSpace(v)
 		}
 		return nil
 	}
@@ -243,27 +243,27 @@ func (m *JobImage) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("image: expected string or map, got %s", string(data))
 }
 
-// ToolToModStack converts a Build Gate tool name to a ModStack constant.
+// ToolToMigStack converts a Build Gate tool name to a MigStack constant.
 // Tool names come from BuildGateStaticCheckReport.Tool after gate execution.
 //
 // Conversion rules:
-//   - "maven" → ModStackJavaMaven
-//   - "gradle" → ModStackJavaGradle
-//   - "java" → ModStackJava
-//   - "" or unknown → ModStackUnknown
+//   - "maven" → MigStackJavaMaven
+//   - "gradle" → MigStackJavaGradle
+//   - "java" → MigStackJava
+//   - "" or unknown → MigStackUnknown
 //
 // This function enables deterministic stack-aware image selection after
 // Build Gate detection, ensuring Mods steps use the correct stack-specific
 // images based on the workspace's detected build system.
-func ToolToModStack(tool string) ModStack {
+func ToolToMigStack(tool string) MigStack {
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
-		return ModStackJavaMaven
+		return MigStackJavaMaven
 	case "gradle":
-		return ModStackJavaGradle
+		return MigStackJavaGradle
 	case "java":
-		return ModStackJava
+		return MigStackJava
 	default:
-		return ModStackUnknown
+		return MigStackUnknown
 	}
 }

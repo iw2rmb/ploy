@@ -56,7 +56,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
-	// ModStackUnknown which falls back to "default" in stack maps.
+	// MigStackUnknown which falls back to "default" in stack maps.
 	stack := r.loadPersistedStack(req.RunID)
 
 	// Build manifest with stack-aware image resolution using typed options.
@@ -124,7 +124,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 	// Load the persisted stack from the pre-gate phase for stack-aware image
 	// selection. If no stack was persisted (e.g., gate skipped), defaults to
-	// ModStackUnknown which falls back to "default" in stack maps.
+	// MigStackUnknown which falls back to "default" in stack maps.
 	stack := r.loadPersistedStack(req.RunID)
 	if req.RecoveryContext != nil && req.RecoveryContext.DetectedStack != "" {
 		stack = req.RecoveryContext.DetectedStack

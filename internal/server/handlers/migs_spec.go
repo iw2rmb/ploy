@@ -42,7 +42,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Validate spec structure (same validation as in createMigHandler).
-		if _, err := contracts.ParseModsSpecJSON(req.Spec); err != nil {
+		if _, err := contracts.ParseMigSpecJSON(req.Spec); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "spec: %v", err)
 			return
 		}

@@ -235,7 +235,7 @@ type gateFailureCase struct {
 	jobsByID      map[domaintypes.JobID]store.Job
 	recoveryMeta  *contracts.BuildGateRecoveryMetadata
 	recoveryKind  contracts.RecoveryErrorKind
-	detectedStack contracts.ModStack
+	detectedStack contracts.MigStack
 	healing       *contracts.HealingSpec
 	newJobID      func() domaintypes.JobID
 	wantOutcome   lifecycle.GateFailureOutcome
@@ -400,7 +400,7 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 				tc.jobsByID = map[domaintypes.JobID]store.Job{}
 			}
 			if tc.detectedStack == "" {
-				tc.detectedStack = contracts.ModStackUnknown
+				tc.detectedStack = contracts.MigStackUnknown
 			}
 
 			decision, err := lifecycle.EvaluateGateFailureTransition(
@@ -436,14 +436,14 @@ func TestResolveGateRecoveryContext(t *testing.T) {
 		name           string
 		job            store.Job
 		wantErrorKind  string
-		wantStack      contracts.ModStack
+		wantStack      contracts.MigStack
 		wantStrategyID string
 	}{
 		{
 			name:          "defaults when no meta",
 			job:           store.Job{ID: domaintypes.NewJobID()},
 			wantErrorKind: contracts.DefaultRecoveryErrorKind().String(),
-			wantStack:     contracts.ModStackUnknown,
+			wantStack:     contracts.MigStackUnknown,
 		},
 		{
 			name: "parses gate recovery",
@@ -452,7 +452,7 @@ func TestResolveGateRecoveryContext(t *testing.T) {
 				Meta: []byte(`{"kind":"gate","gate":{"static_checks":[{"language":"java","tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
 			},
 			wantErrorKind:  "infra",
-			wantStack:      contracts.ModStackJavaMaven,
+			wantStack:      contracts.MigStackJavaMaven,
 			wantStrategyID: "infra-default",
 		},
 	}

@@ -133,8 +133,8 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-			manifest, err := buildHealingManifest(tc.req, tc.mig, 0, "", contracts.ModStackUnknown)
+			// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+			manifest, err := buildHealingManifest(tc.req, tc.mig, 0, "", contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -184,8 +184,8 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 		Env:   originalEnv,
 	}
 
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	_, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	_, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -219,8 +219,8 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 		Env:   nil, // explicitly nil
 	}
 
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -267,8 +267,8 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-			_, err := buildHealingManifest(req, tc.mig, 0, "", contracts.ModStackUnknown)
+			// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+			_, err := buildHealingManifest(req, tc.mig, 0, "", contracts.MigStackUnknown)
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -380,8 +380,8 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-			manifest, err := buildHealingManifest(req, tc.mig, 0, tc.codexSession, contracts.ModStackUnknown)
+			// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+			manifest, err := buildHealingManifest(req, tc.mig, 0, tc.codexSession, contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -420,8 +420,8 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 		},
 	}
 
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, mig, 0, "session-id-123", contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildHealingManifest(req, mig, 0, "session-id-123", contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -467,7 +467,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 				},
 			},
 		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 		if err != nil {
 			t.Fatalf("buildHealingManifest() error = %v", err)
 		}
@@ -489,7 +489,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 			Image: testJobImage("migs-codex:latest"),
 			Amata: &contracts.AmataRunSpec{Spec: "task: fix"},
 		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 		if err != nil {
 			t.Fatalf("buildHealingManifest() error = %v", err)
 		}
@@ -512,7 +512,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   nil,
 		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 		if err != nil {
 			t.Fatalf("buildHealingManifest() error = %v", err)
 		}
@@ -535,7 +535,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   &contracts.AmataRunSpec{Spec: "   "},
 		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 		if err != nil {
 			t.Fatalf("buildHealingManifest() error = %v", err)
 		}

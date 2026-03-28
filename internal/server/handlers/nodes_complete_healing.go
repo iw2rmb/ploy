@@ -75,7 +75,7 @@ func maybeCreateHealingJobs(
 	if err != nil {
 		return fmt.Errorf("get spec: %w", err)
 	}
-	spec, err := contracts.ParseModsSpecJSON(specRow.Spec)
+	spec, err := contracts.ParseMigSpecJSON(specRow.Spec)
 	if err != nil {
 		return fmt.Errorf("parse run spec: %w", err)
 	}

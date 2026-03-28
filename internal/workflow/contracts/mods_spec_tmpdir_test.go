@@ -90,7 +90,7 @@ func TestModsSpecValidate_TmpBundleStep(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(tc.input))
+			_, err := ParseMigSpecJSON([]byte(tc.input))
 			if tc.wantErr == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -141,7 +141,7 @@ func TestModsSpecValidate_TmpBundleHealing(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			input := strings.ReplaceAll(base, "%s", tc.field)
-			_, err := ParseModsSpecJSON([]byte(input))
+			_, err := ParseMigSpecJSON([]byte(input))
 			if tc.wantErr == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -189,7 +189,7 @@ func TestModsSpecValidate_TmpBundleRouter(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			input := strings.ReplaceAll(base, "%s", tc.field)
-			_, err := ParseModsSpecJSON([]byte(input))
+			_, err := ParseMigSpecJSON([]byte(input))
 			if tc.wantErr == "" {
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
@@ -207,11 +207,11 @@ func TestModsSpecValidate_TmpBundleRouter(t *testing.T) {
 }
 
 func TestParseModsSpecJSON_TmpBundleEntriesCanonicalized(t *testing.T) {
-	spec, err := ParseModsSpecJSON([]byte(`{
+	spec, err := ParseMigSpecJSON([]byte(`{
 		"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "c1", "digest": "d1", "entries": [" config.json "]}}]
 	}`))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON() unexpected error: %v", err)
+		t.Fatalf("ParseMigSpecJSON() unexpected error: %v", err)
 	}
 	if got, want := spec.Steps[0].TmpBundle.Entries[0], "config.json"; got != want {
 		t.Fatalf("tmp_bundle.entries[0] got %q, want %q", got, want)

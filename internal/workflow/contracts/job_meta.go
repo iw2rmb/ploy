@@ -63,7 +63,7 @@ type JobMeta struct {
 	// This includes tool name, command, status details, and metrics.
 	Build *BuildMeta `json:"build,omitempty"`
 
-	// ModsStepName stores the user-defined step name from ModsSpec.Steps[i].Name
+	// ModsStepName stores the user-defined step name from MigSpec.Steps[i].Name
 	// for mig jobs. Used by the CLI to display a friendly name in --follow mode.
 	// Only populated for mig jobs (kind="mig") when a step name is provided.
 	ModsStepName string `json:"mods_step_name,omitempty"`

@@ -13,7 +13,7 @@ import (
 
 // resolveImage validates and resolves a JobImage to a concrete image string using the
 // given stack. Returns an error if the image is empty after resolution.
-func resolveImage(img contracts.JobImage, stack contracts.ModStack, label string) (string, error) {
+func resolveImage(img contracts.JobImage, stack contracts.MigStack, label string) (string, error) {
 	if img.IsEmpty() {
 		return "", fmt.Errorf("%s: image required", label)
 	}
@@ -49,8 +49,8 @@ func injectRepoMetadataEnv(env map[string]string, req StartRunRequest) {
 
 // buildManifestFromRequest converts a StartRunRequest into a StepManifest.
 // For multi-step runs, stepIndex selects the step; for single-step runs it is ignored.
-// The stack parameter resolves stack-specific images (pass ModStackUnknown if unknown).
-func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.ModStack) (contracts.StepManifest, error) {
+// The stack parameter resolves stack-specific images (pass MigStackUnknown if unknown).
+func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int, stack contracts.MigStack) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -215,7 +215,7 @@ func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (co
 	sanitized.Execution.Image = contracts.JobImage{}
 	sanitized.Execution.Command = contracts.CommandSpec{}
 
-	manifest, err := buildManifestFromRequest(req, sanitized, 0, contracts.ModStackUnknown)
+	manifest, err := buildManifestFromRequest(req, sanitized, 0, contracts.MigStackUnknown)
 	if err != nil {
 		return manifest, err
 	}
@@ -246,7 +246,7 @@ func resolveAmataCommand(amata *contracts.AmataRunSpec) []string {
 // buildHealingManifest constructs a StepManifest from a typed ModContainerSpec.
 // The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // When codexSession is non-empty and the image is Codex-based, CODEX_RESUME=1 is injected.
-func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, codexSession string, stack contracts.ModStack) (contracts.StepManifest, error) {
+func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, codexSession string, stack contracts.MigStack) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}
@@ -301,7 +301,7 @@ func buildHealingManifest(req StartRunRequest, mig ModContainerSpec, index int, 
 
 // buildRouterManifest constructs a StepManifest for the router container that
 // produces bug_summary before healing begins.
-func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack contracts.ModStack, gatePhase types.JobType, loopKind string) (contracts.StepManifest, error) {
+func buildRouterManifest(req StartRunRequest, router ModContainerSpec, stack contracts.MigStack, gatePhase types.JobType, loopKind string) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
 	}

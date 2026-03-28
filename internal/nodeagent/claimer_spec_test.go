@@ -56,7 +56,7 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	env, typedOpts, _ := parseSpec(raw)
 
 	// Verify execution options are extracted.
-	img, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+	img, err := typedOpts.Execution.Image.ResolveImage(contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected image resolve error: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
 	env, typedOpts, _ := parseSpec(raw)
 
 	// steps[0] should drive single-step extraction; unknown top-level "mig" is ignored.
-	img, err := typedOpts.Execution.Image.ResolveImage(contracts.ModStackUnknown)
+	img, err := typedOpts.Execution.Image.ResolveImage(contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected image resolve error: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	}
 
 	// Verify first step entry.
-	step0Img, err := typedOpts.Steps[0].Image.ResolveImage(contracts.ModStackUnknown)
+	step0Img, err := typedOpts.Steps[0].Image.ResolveImage(contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected steps[0] image resolve error: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	}
 
 	// Verify second mig entry has command array preserved.
-	step1Img, err := typedOpts.Steps[1].Image.ResolveImage(contracts.ModStackUnknown)
+	step1Img, err := typedOpts.Steps[1].Image.ResolveImage(contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected steps[1] image resolve error: %v", err)
 	}
@@ -203,7 +203,7 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	}
 
 	// Verify third mig entry has shell command preserved.
-	step2Img, err := typedOpts.Steps[2].Image.ResolveImage(contracts.ModStackUnknown)
+	step2Img, err := typedOpts.Steps[2].Image.ResolveImage(contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("unexpected steps[2] image resolve error: %v", err)
 	}
