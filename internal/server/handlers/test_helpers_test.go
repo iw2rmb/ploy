@@ -306,6 +306,20 @@ func withGetRunCreatedAt(t time.Time) func(*mockStore) {
 	}
 }
 
+// doRequestWithContentType sends a request with a custom Content-Type and string body.
+// pathParams are key-value pairs: "mig_id", "mod123", "repo_id", "repo1".
+func doRequestWithContentType(t *testing.T, handler http.Handler, method, path, contentType, body string, pathParams ...string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
+	req.Header.Set("Content-Type", contentType)
+	for i := 0; i+1 < len(pathParams); i += 2 {
+		req.SetPathValue(pathParams[i], pathParams[i+1])
+	}
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	return rr
+}
+
 // doRequest sends a request to handler and returns the recorder.
 // body: nil → no body; string → raw body; otherwise → JSON-marshaled.
 // pathParams are key-value pairs: "mig_ref", "mod123", "run_id", "run1".
@@ -335,6 +349,14 @@ func doRequest(t *testing.T, handler http.Handler, method, path string, body any
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, r)
 	return rr
+}
+
+// assertBodyContains fails if wantSubstr is non-empty and not found in the response body.
+func assertBodyContains(t *testing.T, rr *httptest.ResponseRecorder, wantSubstr string) {
+	t.Helper()
+	if wantSubstr != "" && !bytes.Contains(rr.Body.Bytes(), []byte(wantSubstr)) {
+		t.Errorf("body %q does not contain %q", rr.Body.String(), wantSubstr)
+	}
 }
 
 // assertStatus fails the test if rr.Code != want.

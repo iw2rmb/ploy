@@ -1,13 +1,8 @@
 package nodeagent
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -100,11 +95,11 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 					Name:  "test-artifact",
 				},
 			}
-			req := StartRunRequest{
-				RunID:        types.RunID("test-run-123"),
-				JobID:        "test-job-id",
-				TypedOptions: typedOpts,
-			}
+			req := newStartRunRequest(
+				withRunID("test-run-123"),
+				withJobID("test-job-id"),
+				withRunOptions(typedOpts),
+			)
 			manifest := contracts.StepManifest{
 				Image:   "test-image",
 				Command: []string{"test"},
@@ -116,20 +111,12 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			controller.uploadConfiguredArtifacts(context.Background(), req, typedOpts, manifest, workspace, outDir)
 
-			uploaded := len(*calls) > 0
-			if uploaded != tt.wantUpload {
-				t.Errorf("uploadCalled = %v, want %v", uploaded, tt.wantUpload)
-			}
-			if tt.wantUpload && (*calls)[0].Name != "test-artifact" {
-				t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, "test-artifact")
+			assertUploadOccurred(t, calls, tt.wantUpload)
+			if tt.wantUpload {
+				assertArtifactName(t, calls, 0, "test-artifact")
 			}
 			if len(tt.wantHeaders) > 0 {
-				headers := tarHeadersFromBundle(t, (*calls)[0].Bundle)
-				for _, h := range tt.wantHeaders {
-					if _, ok := headers[h]; !ok {
-						t.Fatalf("expected header %q, got %v", h, keys(headers))
-					}
-				}
+				assertTarContains(t, (*calls)[0].Bundle, tt.wantHeaders)
 			}
 		})
 	}
@@ -184,30 +171,19 @@ func TestRunController_uploadOutDir(t *testing.T) {
 				populateTestFiles(t, outDir, tt.createFiles, "test output")
 			}
 
-			ctx := context.Background()
 			bundleName := tt.bundleName
 			if bundleName == "" {
 				bundleName = "mig-out"
 			}
-			err := controller.uploadOutDirBundle(ctx, "test-run", "test-stage", outDir, bundleName)
+			err := controller.uploadOutDirBundle(context.Background(), "test-run", "test-stage", outDir, bundleName)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("upload error = %v, wantErr %v", err, tt.wantErr)
-			}
-			uploaded := len(*calls) > 0
-			if uploaded != tt.wantUpload {
-				t.Errorf("uploadCalled = %v, want %v", uploaded, tt.wantUpload)
-			}
-			if tt.bundleName != "" && uploaded && (*calls)[0].Name != tt.bundleName {
-				t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, tt.bundleName)
+			checkErr(t, tt.wantErr, err)
+			assertUploadOccurred(t, calls, tt.wantUpload)
+			if tt.bundleName != "" && len(*calls) > 0 {
+				assertArtifactName(t, calls, 0, tt.bundleName)
 			}
 			if len(tt.wantHeaders) > 0 {
-				headers := tarHeadersFromBundle(t, (*calls)[0].Bundle)
-				for _, h := range tt.wantHeaders {
-					if _, ok := headers[h]; !ok {
-						t.Fatalf("expected header %q, got %v", h, keys(headers))
-					}
-				}
+				assertTarContains(t, (*calls)[0].Bundle, tt.wantHeaders)
 			}
 		})
 	}
@@ -242,23 +218,14 @@ func TestRunController_uploadStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/jobs/test-job-id/complete" {
-					w.WriteHeader(tt.serverStatus)
-				}
-			}))
-			defer server.Close()
-
+			server, _ := newStatusCaptureServer(t, "test-job-id", withStatusHTTPCode(tt.serverStatus))
 			controller := newTestController(t, newTestConfig(server.URL))
 
-			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
-			err := controller.uploadStatus(ctx, "test-run", types.JobStatusSuccess.String(), &exitCode, stats, "test-job-id")
+			err := controller.uploadStatus(context.Background(), "test-run", types.JobStatusSuccess.String(), &exitCode, stats, "test-job-id")
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("uploadStatus() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			checkErr(t, tt.wantErr, err)
 		})
 	}
 }
@@ -325,9 +292,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 				if phase.LogsBundleCID == "" {
 					t.Error("LogsBundleCID not set in gate phase")
 				}
-				if (*calls)[0].Name != tt.wantArtifactName {
-					t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, tt.wantArtifactName)
-				}
+				assertArtifactName(t, calls, 0, tt.wantArtifactName)
 			} else {
 				if phase.LogsArtifactID != "" {
 					t.Error("LogsArtifactID should not be set on upload failure")
@@ -337,114 +302,121 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 	}
 }
 
-func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
+func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 	t.Parallel()
 
-	server, calls := newArtifactUploadServer(t, "test-run", "test-gate")
-	controller := newTestController(t, newTestConfig(server.URL))
+	type wantLink struct {
+		Type string
+		Path string
+	}
 
-	workspace := t.TempDir()
-	outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
-	populateTestFiles(t, outDir, []string{"gradle-test-results/TEST-Example.xml"}, `<testsuite/>`)
-	populateTestFiles(t, outDir, []string{"gradle-test-report/index.html"}, `<html/>`)
-
-	meta := &contracts.BuildGateStageMetadata{
-		Detected: &contracts.StackExpectation{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  "17",
+	tests := []struct {
+		name            string
+		tool            string
+		language        string
+		outDirFiles     map[string]string // path -> content
+		wantUploadCount int
+		wantNames       []string
+		wantLinks       []wantLink
+	}{
+		{
+			name:     "gradle gate uploads junit xml and html report",
+			tool:     "gradle",
+			language: "java",
+			outDirFiles: map[string]string{
+				"gradle-test-results/TEST-Example.xml": "<testsuite/>",
+				"gradle-test-report/index.html":        "<html/>",
+			},
+			wantUploadCount: 2,
+			wantNames: []string{
+				"build-gate-gradle-junit-xml",
+				"build-gate-gradle-html-report",
+			},
+			wantLinks: []wantLink{
+				{Type: contracts.BuildGateReportTypeGradleJUnitXML, Path: "/out/gradle-test-results"},
+				{Type: contracts.BuildGateReportTypeGradleHTML, Path: "/out/gradle-test-report"},
+			},
 		},
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{
-			Language: "java",
-			Tool:     "gradle",
-			Passed:   true,
-		}},
-	}
-
-	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", workspace, meta)
-
-	if len(*calls) != 2 {
-		t.Fatalf("upload call count = %d, want 2", len(*calls))
-	}
-	if len(meta.ReportLinks) != 2 {
-		t.Fatalf("report_links count = %d, want 2", len(meta.ReportLinks))
-	}
-
-	wantNames := map[string]bool{
-		"build-gate-gradle-junit-xml":   false,
-		"build-gate-gradle-html-report": false,
-	}
-	for _, c := range *calls {
-		if _, ok := wantNames[c.Name]; !ok {
-			t.Fatalf("unexpected artifact name %q", c.Name)
-		}
-		wantNames[c.Name] = true
-		headers := tarHeadersFromBundle(t, c.Bundle)
-		if c.Name == "build-gate-gradle-junit-xml" {
-			if _, ok := headers["out/gradle-test-results/TEST-Example.xml"]; !ok {
-				t.Fatalf("junit bundle missing expected file, headers=%v", keys(headers))
-			}
-		}
-		if c.Name == "build-gate-gradle-html-report" {
-			if _, ok := headers["out/gradle-test-report/index.html"]; !ok {
-				t.Fatalf("html bundle missing expected file, headers=%v", keys(headers))
-			}
-		}
-	}
-	for name, seen := range wantNames {
-		if !seen {
-			t.Fatalf("expected artifact upload name %q", name)
-		}
-	}
-
-	foundJUnit := false
-	foundHTML := false
-	for _, link := range meta.ReportLinks {
-		if link.Type == contracts.BuildGateReportTypeGradleJUnitXML {
-			foundJUnit = true
-			if link.Path != "/out/gradle-test-results" {
-				t.Fatalf("junit link path = %q, want /out/gradle-test-results", link.Path)
-			}
-		}
-		if link.Type == contracts.BuildGateReportTypeGradleHTML {
-			foundHTML = true
-			if link.Path != "/out/gradle-test-report" {
-				t.Fatalf("html link path = %q, want /out/gradle-test-report", link.Path)
-			}
-		}
-		if link.ArtifactID == "" || link.BundleCID == "" || link.URL == "" || link.DownloadURL == "" {
-			t.Fatalf("expected populated link fields, got %+v", link)
-		}
-	}
-	if !foundJUnit || !foundHTML {
-		t.Fatalf("missing expected report link types: %+v", meta.ReportLinks)
-	}
-}
-
-func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) {
-	t.Parallel()
-
-	server, calls := newArtifactUploadServer(t, "test-run", "test-gate")
-	controller := newTestController(t, newTestConfig(server.URL))
-
-	meta := &contracts.BuildGateStageMetadata{
-		Detected: &contracts.StackExpectation{
-			Language: "java",
-			Tool:     "maven",
+		{
+			name:            "non-gradle gate produces no uploads",
+			tool:            "maven",
+			language:        "java",
+			wantUploadCount: 0,
 		},
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{
-			Tool:   "maven",
-			Passed: true,
-		}},
 	}
 
-	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", t.TempDir(), meta)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	if len(*calls) > 0 {
-		t.Fatal("expected no upload for non-gradle gate")
-	}
-	if len(meta.ReportLinks) != 0 {
-		t.Fatalf("expected no report links for non-gradle gate, got %+v", meta.ReportLinks)
+			server, calls := newArtifactUploadServer(t, "test-run", "test-gate")
+			controller := newTestController(t, newTestConfig(server.URL))
+
+			workspace := t.TempDir()
+			if len(tt.outDirFiles) > 0 {
+				outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
+				for path, content := range tt.outDirFiles {
+					populateTestFiles(t, outDir, []string{path}, content)
+				}
+			}
+
+			meta := &contracts.BuildGateStageMetadata{
+				Detected: &contracts.StackExpectation{
+					Language: tt.language,
+					Tool:     tt.tool,
+				},
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{
+					Language: tt.language,
+					Tool:     tt.tool,
+					Passed:   true,
+				}},
+			}
+
+			controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", workspace, meta)
+
+			if len(*calls) != tt.wantUploadCount {
+				t.Fatalf("upload call count = %d, want %d", len(*calls), tt.wantUploadCount)
+			}
+
+			if tt.wantUploadCount == 0 {
+				if len(meta.ReportLinks) != 0 {
+					t.Fatalf("expected no report links, got %+v", meta.ReportLinks)
+				}
+				return
+			}
+
+			// Verify artifact names.
+			seen := make(map[string]bool, len(tt.wantNames))
+			for _, c := range *calls {
+				seen[c.Name] = true
+			}
+			for _, name := range tt.wantNames {
+				if !seen[name] {
+					t.Fatalf("expected artifact upload name %q", name)
+				}
+			}
+
+			// Verify report links.
+			if len(meta.ReportLinks) != len(tt.wantLinks) {
+				t.Fatalf("report_links count = %d, want %d", len(meta.ReportLinks), len(tt.wantLinks))
+			}
+			linkByType := make(map[string]contracts.BuildGateReportLink, len(meta.ReportLinks))
+			for _, link := range meta.ReportLinks {
+				linkByType[link.Type] = link
+			}
+			for _, wl := range tt.wantLinks {
+				link, ok := linkByType[wl.Type]
+				if !ok {
+					t.Fatalf("missing report link type %q in %+v", wl.Type, meta.ReportLinks)
+				}
+				if link.Path != wl.Path {
+					t.Fatalf("%s link path = %q, want %q", wl.Type, link.Path, wl.Path)
+				}
+				if link.ArtifactID == "" || link.BundleCID == "" || link.URL == "" || link.DownloadURL == "" {
+					t.Fatalf("expected populated link fields, got %+v", link)
+				}
+			}
+		})
 	}
 }
 
@@ -457,7 +429,6 @@ func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) 
 func TestIsValidArtifactPath(t *testing.T) {
 	t.Parallel()
 
-	// Use a realistic workspace path for testing.
 	workspace := "/workspace"
 
 	tests := []struct {
@@ -466,87 +437,22 @@ func TestIsValidArtifactPath(t *testing.T) {
 		workspace    string
 		wantValid    bool
 	}{
-		// Valid paths — should be accepted.
-		{
-			name:         "simple relative path",
-			artifactPath: "file.txt",
-			workspace:    workspace,
-			wantValid:    true,
-		},
-		{
-			name:         "nested relative path",
-			artifactPath: "dir/subdir/file.txt",
-			workspace:    workspace,
-			wantValid:    true,
-		},
-		{
-			name:         "path with safe relative component",
-			artifactPath: "dir/../file.txt",
-			workspace:    workspace,
-			wantValid:    true, // Resolves to /workspace/file.txt, still inside workspace
-		},
-		{
-			name:         "path with dot",
-			artifactPath: "./file.txt",
-			workspace:    workspace,
-			wantValid:    true,
-		},
+		// Valid paths.
+		{name: "simple relative path", artifactPath: "file.txt", workspace: workspace, wantValid: true},
+		{name: "nested relative path", artifactPath: "dir/subdir/file.txt", workspace: workspace, wantValid: true},
+		{name: "path with safe relative component", artifactPath: "dir/../file.txt", workspace: workspace, wantValid: true},
+		{name: "path with dot", artifactPath: "./file.txt", workspace: workspace, wantValid: true},
 
-		// Invalid paths — should be rejected.
-		{
-			name:         "path traversal with ../../",
-			artifactPath: "../../etc/passwd",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "path traversal with multiple ..",
-			artifactPath: "../../../var/log/secret.log",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "path traversal at start",
-			artifactPath: "../sibling/file.txt",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "absolute path unix style",
-			artifactPath: "/etc/passwd",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "absolute path to sensitive file",
-			artifactPath: "/root/.ssh/id_rsa",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "empty path",
-			artifactPath: "",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "whitespace only path",
-			artifactPath: "   ",
-			workspace:    workspace,
-			wantValid:    false,
-		},
-		{
-			name:         "nested traversal escaping workspace",
-			artifactPath: "subdir/../../secrets.txt",
-			workspace:    workspace,
-			wantValid:    false, // Resolves to /secrets.txt, outside workspace
-		},
-		{
-			name:         "deep nested traversal",
-			artifactPath: "a/b/c/../../../../etc/hosts",
-			workspace:    workspace,
-			wantValid:    false,
-		},
+		// Invalid paths.
+		{name: "path traversal with ../../", artifactPath: "../../etc/passwd", workspace: workspace, wantValid: false},
+		{name: "path traversal with multiple ..", artifactPath: "../../../var/log/secret.log", workspace: workspace, wantValid: false},
+		{name: "path traversal at start", artifactPath: "../sibling/file.txt", workspace: workspace, wantValid: false},
+		{name: "absolute path unix style", artifactPath: "/etc/passwd", workspace: workspace, wantValid: false},
+		{name: "absolute path to sensitive file", artifactPath: "/root/.ssh/id_rsa", workspace: workspace, wantValid: false},
+		{name: "empty path", artifactPath: "", workspace: workspace, wantValid: false},
+		{name: "whitespace only path", artifactPath: "   ", workspace: workspace, wantValid: false},
+		{name: "nested traversal escaping workspace", artifactPath: "subdir/../../secrets.txt", workspace: workspace, wantValid: false},
+		{name: "deep nested traversal", artifactPath: "a/b/c/../../../../etc/hosts", workspace: workspace, wantValid: false},
 	}
 
 	for _, tt := range tests {
@@ -609,35 +515,4 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			}
 		})
 	}
-}
-
-func tarHeadersFromBundle(t *testing.T, bundle []byte) map[string]struct{} {
-	t.Helper()
-	gz, err := gzip.NewReader(bytes.NewReader(bundle))
-	if err != nil {
-		t.Fatalf("gzip reader: %v", err)
-	}
-	defer func() { _ = gz.Close() }()
-
-	tr := tar.NewReader(gz)
-	headers := map[string]struct{}{}
-	for {
-		hdr, err := tr.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			t.Fatalf("tar read: %v", err)
-		}
-		headers[hdr.Name] = struct{}{}
-	}
-	return headers
-}
-
-func keys(m map[string]struct{}) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
 }

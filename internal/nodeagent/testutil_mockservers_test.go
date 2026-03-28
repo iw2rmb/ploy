@@ -222,10 +222,25 @@ type statusCapture struct {
 	Status string
 }
 
+type statusServerConfig struct {
+	httpStatus int
+}
+
+type statusServerOption func(*statusServerConfig)
+
+// withStatusHTTPCode sets the HTTP response code for the status capture server.
+func withStatusHTTPCode(code int) statusServerOption {
+	return func(c *statusServerConfig) { c.httpStatus = code }
+}
+
 // newStatusCaptureServer returns an httptest server that captures the status
 // field from POST /v1/jobs/{jobID}/complete requests.
-func newStatusCaptureServer(t *testing.T, jobID string) (*httptest.Server, *statusCapture) {
+func newStatusCaptureServer(t *testing.T, jobID string, opts ...statusServerOption) (*httptest.Server, *statusCapture) {
 	t.Helper()
+	sc := statusServerConfig{httpStatus: http.StatusOK}
+	for _, o := range opts {
+		o(&sc)
+	}
 	cap := &statusCapture{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/jobs/"+jobID+"/complete" {
@@ -236,7 +251,7 @@ func newStatusCaptureServer(t *testing.T, jobID string) (*httptest.Server, *stat
 				cap.Status = body.Status
 			}
 		}
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(sc.httpStatus)
 	}))
 	t.Cleanup(ts.Close)
 	return ts, cap
