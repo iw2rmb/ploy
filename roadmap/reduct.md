@@ -117,7 +117,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **`parsePagination` adoption** (`repos.go`): `listRunsForRepoHandler` replaced its 20-line inline limit/offset parsing block with a single `parsePagination(r)` call. `strconv` import dropped from file.
     - **Test proof**: `go test ./internal/server/handlers` passes; `go test ./internal/... -run 'Handler|HTTP|DecodeJSON|invalid request'` passes (all packages).
 
-- [ ] 4.2a Create canonical domain-level DTO package for shared API payloads
+- [x] 4.2a Create canonical domain-level DTO package for shared API payloads
   - Type: assumption-bound
   - Component: `internal/domain/api`, `internal/domain/types`, `internal/migs/api`
   - Assumptions: Shared payloads moved in this slice are stable across server/client/cli (`run`, `repo`, `mig` summary and common list envelopes).
@@ -133,6 +133,14 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+180/-70` (net `+110`) for package introduction.
   - Clarity / complexity check: Introduces one shared boundary package, but only for concretely duplicated payloads.
   - Reasoning: high (10 CFP)
+  - Completion notes:
+    - **New `internal/domain/api` package** (6 files): `mig.go`, `mig_repo.go`, `run_submit.go` for canonical DTO types; `mig_test.go`, `mig_repo_test.go`, `run_submit_test.go` for JSON field-parity and roundtrip tests.
+    - **`MigSummary`** (`domain/api/mig.go`): canonical GET /v1/migs list item and POST /v1/migs create response shape — `{id: MigID, name: string, spec_id?: SpecID, created_by?: string, archived: bool, created_at: time.Time}`. Supersedes: handler inline `modItem` (migrated in 4.2b), `cli/migs.MigSummary` (migrated in 4.2c), `client/tui.MigItem` (migrated in 4.2c).
+    - **`MigListResponse`** (`domain/api/mig.go`): canonical `{"migs": [...]}` envelope for GET /v1/migs.
+    - **`MigRepoSummary`** (`domain/api/mig_repo.go`): canonical GET /v1/migs/{id}/repos list item and POST response shape — `{id: MigRepoID, mig_id: MigID, repo_url: string, base_ref: string, target_ref: string, created_at: time.Time}`. Supersedes: handler inline `repoItem` (migrated in 4.2b), `cli/migs.MigRepoSummary` (migrated in 4.2c).
+    - **`MigRepoListResponse`** (`domain/api/mig_repo.go`): canonical `{"repos": [...]}` envelope for GET /v1/migs/{id}/repos.
+    - **`RunSubmitRequest`** moved from `internal/migs/api/types.go` to `domain/api/run_submit.go`. `migs/api/types.go` replaces the struct definition with a type alias `type RunSubmitRequest = domainapi.RunSubmitRequest` for backward compatibility; canonical ownership is now `domain/api`.
+    - **Test proof**: `go test ./internal/domain/... ./internal/migs/api` passes; `go test ./internal/... -run 'DTO|Payload|Schema'` passes (`internal/domain/api` runs `TestMigSummaryDTO`, `TestMigListResponseDTO`, `TestMigRepoSummaryDTO`, `TestMigRepoListResponseDTO`, `TestRunSubmitPayload`).
 
 - [ ] 4.2b Migrate handlers to canonical DTOs and delete handler-local contract duplicates
   - Type: determined

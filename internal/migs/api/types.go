@@ -1,14 +1,18 @@
 package api
 
 import (
-	"encoding/json"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Package api defines the Mods run and stage types shared by the CLI,
 // control plane (/v1/runs + /v1/migs/{id}*) and SSE hub. JSON tags mirror the wire shape.
+
+// RunSubmitRequest is the canonical request shape for POST /v1/runs.
+// Canonical definition lives in internal/domain/api; re-exported here for backward compatibility.
+type RunSubmitRequest = domainapi.RunSubmitRequest
 
 // StageState mirrors Mods stage lifecycle states exposed over the API.
 type StageState string
@@ -34,22 +38,6 @@ const (
 	RunStateCancelling RunState = "cancelling"
 	RunStateCancelled  RunState = "cancelled"
 )
-
-// RunSubmitRequest represents the submit payload for POST /v1/runs.
-//
-// This mirrors docs/api/components/schemas/controlplane.yaml#/RunSubmitRequest:
-//   - repo_url: Git repository URL (https/ssh/file)
-//   - base_ref: base Git ref (branch or tag)
-//   - target_ref: target Git ref (branch or tag)
-//   - spec: arbitrary JSON spec (YAML/JSON from CLI after normalisation)
-//   - created_by: optional submitter identifier (email, CI job, etc.)
-type RunSubmitRequest struct {
-	RepoURL   domaintypes.RepoURL `json:"repo_url"`
-	BaseRef   domaintypes.GitRef  `json:"base_ref"`
-	TargetRef domaintypes.GitRef  `json:"target_ref"`
-	Spec      json.RawMessage     `json:"spec"`
-	CreatedBy string              `json:"created_by,omitempty"`
-}
 
 // RunSummary is the canonical response type for GET /v1/runs/{id}/status (status)
 // and SSE `event: run` payloads. No wrapper types are used — the JSON shape is
