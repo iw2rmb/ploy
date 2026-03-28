@@ -80,17 +80,12 @@ func EvaluateCompletionDecision(
 			return CompletionDecision{ChainAction: CompletionChainAdvanceNext}
 		}
 		return CompletionDecision{ChainAction: CompletionChainNoAction}
-	case domaintypes.JobStatusFail:
+	case domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
 		if jobType == domaintypes.JobTypeMR {
 			return CompletionDecision{ChainAction: CompletionChainNoAction}
 		}
-		if IsGateJobType(jobType) {
+		if jobStatus == domaintypes.JobStatusFail && IsGateJobType(jobType) {
 			return CompletionDecision{ChainAction: CompletionChainEvaluateGateFailure}
-		}
-		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
-	case domaintypes.JobStatusCancelled:
-		if jobType == domaintypes.JobTypeMR {
-			return CompletionDecision{ChainAction: CompletionChainNoAction}
 		}
 		return CompletionDecision{ChainAction: CompletionChainCancelRemainder}
 	default:
@@ -143,6 +138,10 @@ type GateFailureDecision struct {
 	Chain        *HealChainSpec // non-nil when Outcome == GateFailureOutcomeHealChain
 }
 
+func cancelDecision(reason string) (GateFailureDecision, error) {
+	return GateFailureDecision{Outcome: GateFailureOutcomeCancel, CancelReason: reason}, nil
+}
+
 // EvaluateGateFailureTransition computes what to do after a gate job fails.
 // It is pure: all inputs are pre-loaded and no I/O is performed.
 // newJobID is called to generate IDs for heal and re-gate jobs; pass
@@ -157,25 +156,16 @@ func EvaluateGateFailureTransition(
 	newJobID func() domaintypes.JobID,
 ) (GateFailureDecision, error) {
 	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
-		return GateFailureDecision{
-			Outcome:      GateFailureOutcomeCancel,
-			CancelReason: "terminal recovery classification",
-		}, nil
+		return cancelDecision("terminal recovery classification")
 	}
 
 	if healing == nil || len(healing.ByErrorKind) == 0 {
-		return GateFailureDecision{
-			Outcome:      GateFailureOutcomeCancel,
-			CancelReason: "no healing config",
-		}, nil
+		return cancelDecision("no healing config")
 	}
 
 	action, ok := healing.ByErrorKind[recoveryKind.String()]
 	if !ok {
-		return GateFailureDecision{
-			Outcome:      GateFailureOutcomeCancel,
-			CancelReason: fmt.Sprintf("no healing action for error_kind %q", recoveryKind),
-		}, nil
+		return cancelDecision(fmt.Sprintf("no healing action for error_kind %q", recoveryKind))
 	}
 
 	retries := action.Retries
@@ -187,10 +177,7 @@ func EvaluateGateFailureTransition(
 	healingAttempts := countExistingHealingAttempts(baseGateID, jobsByID)
 	attemptNumber := healingAttempts + 1
 	if attemptNumber > retries {
-		return GateFailureDecision{
-			Outcome:      GateFailureOutcomeCancel,
-			CancelReason: "healing retries exhausted",
-		}, nil
+		return cancelDecision("healing retries exhausted")
 	}
 
 	healImage, err := action.Image.ResolveImage(detectedStack)
@@ -200,21 +187,18 @@ func EvaluateGateFailureTransition(
 
 	healRepoSHAIn := strings.TrimSpace(strings.ToLower(failedJob.RepoShaIn))
 	if !sha40Pattern.MatchString(healRepoSHAIn) {
-		return GateFailureDecision{
-			Outcome:      GateFailureOutcomeCancel,
-			CancelReason: "invalid failed job repo_sha_in",
-		}, nil
+		return cancelDecision("invalid failed job repo_sha_in")
 	}
 
 	// Enrich recovery meta expectations from action spec if not already set.
-	enrichedMeta := cloneRecoveryMetadata(recoveryMeta)
+	enrichedMeta := CloneRecoveryMetadata(recoveryMeta)
 	if len(enrichedMeta.Expectations) == 0 && action.Expectations != nil {
 		if b, marshalErr := json.Marshal(action.Expectations); marshalErr == nil {
 			enrichedMeta.Expectations = b
 		}
 	}
 
-	reGateRecoveryMeta := cloneRecoveryMetadata(enrichedMeta)
+	reGateRecoveryMeta := CloneRecoveryMetadata(enrichedMeta)
 	shouldAttachCandidate := shouldEvaluateInfraCandidate(enrichedMeta, action)
 	if shouldAttachCandidate {
 		artifactPath := contracts.GateProfileCandidateArtifactPath
@@ -239,7 +223,7 @@ func EvaluateGateFailureTransition(
 			OldSuccessorID: failedJob.NextID,
 			HealMeta: &contracts.JobMeta{
 				Kind:     contracts.JobKindMod,
-				Recovery: cloneRecoveryMetadata(enrichedMeta),
+				Recovery: CloneRecoveryMetadata(enrichedMeta),
 			},
 			ReGateMeta: &contracts.JobMeta{
 				Kind:     contracts.JobKindGate,
@@ -276,14 +260,14 @@ func ResolveGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecove
 		detectedStack = jobMeta.Gate.DetectedStack()
 		detectedExpectation = jobMeta.Gate.DetectedStackExpectation()
 		if jobMeta.Gate.Recovery != nil {
-			meta = cloneRecoveryMetadata(jobMeta.Gate.Recovery)
+			meta = CloneRecoveryMetadata(jobMeta.Gate.Recovery)
 		}
 	}
 	if detectedExpectation == nil {
-		detectedExpectation = stackExpectationFromModStack(detectedStack)
+		detectedExpectation = StackExpectationFromModStack(detectedStack)
 	}
 	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); (!ok || kind == contracts.RecoveryErrorKindUnknown) && jobMeta.Recovery != nil {
-		meta = cloneRecoveryMetadata(jobMeta.Recovery)
+		meta = CloneRecoveryMetadata(jobMeta.Recovery)
 	}
 	if loopKind, ok := contracts.ParseRecoveryLoopKind(meta.LoopKind); ok {
 		meta.LoopKind = loopKind.String()
@@ -314,6 +298,14 @@ func RecoveryChainPredecessor(jobID domaintypes.JobID, jobsByID map[domaintypes.
 }
 
 // ========== Internal helpers ==========
+
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
 
 func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store.Job) domaintypes.JobID {
 	failedType := domaintypes.JobType(failedJob.JobType)
@@ -369,22 +361,12 @@ func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[dom
 
 // CloneRecoveryMetadata returns a deep copy of src, or nil if src is nil.
 func CloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
-	return cloneRecoveryMetadata(src)
-}
-
-func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.BuildGateRecoveryMetadata {
 	if src == nil {
 		return nil
 	}
 	out := *src
-	if src.Confidence != nil {
-		v := *src.Confidence
-		out.Confidence = &v
-	}
-	if src.CandidatePromoted != nil {
-		v := *src.CandidatePromoted
-		out.CandidatePromoted = &v
-	}
+	out.Confidence = clonePtr(src.Confidence)
+	out.CandidatePromoted = clonePtr(src.CandidatePromoted)
 	if len(src.Expectations) > 0 {
 		out.Expectations = append([]byte(nil), src.Expectations...)
 	}
@@ -392,17 +374,13 @@ func cloneRecoveryMetadata(src *contracts.BuildGateRecoveryMetadata) *contracts.
 		out.CandidateGateProfile = append([]byte(nil), src.CandidateGateProfile...)
 	}
 	if src.DepsBumps != nil {
-		out.DepsBumps = cloneDepsBumpsMap(src.DepsBumps)
+		out.DepsBumps = CloneDepsBumpsMap(src.DepsBumps)
 	}
 	return &out
 }
 
 // CloneDepsBumpsMap returns a deep copy of a dependency-bump version map.
 func CloneDepsBumpsMap(src map[string]*string) map[string]*string {
-	return cloneDepsBumpsMap(src)
-}
-
-func cloneDepsBumpsMap(src map[string]*string) map[string]*string {
 	if src == nil {
 		return nil
 	}
@@ -469,10 +447,6 @@ func resolveRecoveryCandidateArtifactPath(expectations json.RawMessage) (string,
 // StackExpectationFromModStack converts a detected ModStack to a StackExpectation,
 // or returns nil for unknown stacks.
 func StackExpectationFromModStack(stack contracts.ModStack) *contracts.StackExpectation {
-	return stackExpectationFromModStack(stack)
-}
-
-func stackExpectationFromModStack(stack contracts.ModStack) *contracts.StackExpectation {
 	switch stack {
 	case contracts.ModStackJavaMaven:
 		return &contracts.StackExpectation{Language: "java", Tool: "maven"}

@@ -316,7 +316,7 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 
 	const wantBugSummary = "javac: cannot find symbol FooBar"
 
-	mc := &mockRouterContainerRuntime{}
+	mc := &mockContainerRuntime{}
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		if strings.Contains(spec.Image, "router") {
 			if got, want := spec.Env["PLOY_GATE_PHASE"], "pre_gate"; got != want {
@@ -396,7 +396,7 @@ func TestRunRouterForGateFailure_AmataRouterCmdPersistsAfterParse(t *testing.T) 
 	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
 	workspace := t.TempDir()
 
-	mc := &mockRouterContainerRuntime{}
+	mc := &mockContainerRuntime{}
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		if strings.Contains(spec.Image, "router") {
 			for _, m := range spec.Mounts {
@@ -469,7 +469,7 @@ func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing
 
 	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
 	workspace := t.TempDir()
-	mc := &mockRouterContainerRuntime{}
+	mc := &mockContainerRuntime{}
 	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
 		if strings.Contains(spec.Image, "router") {
 			for _, m := range spec.Mounts {
@@ -521,45 +521,4 @@ func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing
 	}
 }
 
-type mockRouterContainerRuntime struct {
-	createFn func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error)
-	startFn  func(ctx context.Context, handle step.ContainerHandle) error
-	waitFn   func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error)
-	logsFn   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error)
-	removeFn func(ctx context.Context, handle step.ContainerHandle) error
-}
-
-func (m *mockRouterContainerRuntime) Create(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-	if m.createFn != nil {
-		return m.createFn(ctx, spec)
-	}
-	return step.ContainerHandle("mock"), nil
-}
-
-func (m *mockRouterContainerRuntime) Start(ctx context.Context, handle step.ContainerHandle) error {
-	if m.startFn != nil {
-		return m.startFn(ctx, handle)
-	}
-	return nil
-}
-
-func (m *mockRouterContainerRuntime) Wait(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
-	if m.waitFn != nil {
-		return m.waitFn(ctx, handle)
-	}
-	return step.ContainerResult{ExitCode: 0}, nil
-}
-
-func (m *mockRouterContainerRuntime) Logs(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
-	if m.logsFn != nil {
-		return m.logsFn(ctx, handle)
-	}
-	return []byte{}, nil
-}
-
-func (m *mockRouterContainerRuntime) Remove(ctx context.Context, handle step.ContainerHandle) error {
-	if m.removeFn != nil {
-		return m.removeFn(ctx, handle)
-	}
-	return nil
-}
+// mockContainerRuntime is defined in testutil_docker_test.go.

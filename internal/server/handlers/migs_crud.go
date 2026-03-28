@@ -152,27 +152,10 @@ func resolveMigByRef(ctx context.Context, st store.Store, ref domaintypes.MigRef
 // - Optional filters: name_substring, archived (true/false), repo_url.
 func listMigsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		limit := int32(50)
-		offset := int32(0)
-
-		if l := r.URL.Query().Get("limit"); l != "" {
-			parsed, err := strconv.ParseInt(l, 10, 32)
-			if err != nil || parsed < 1 {
-				httpErr(w, http.StatusBadRequest, "invalid limit parameter")
-				return
-			}
-			limit = int32(parsed)
-			if limit > 100 {
-				limit = 100
-			}
-		}
-		if o := r.URL.Query().Get("offset"); o != "" {
-			parsed, err := strconv.ParseInt(o, 10, 32)
-			if err != nil || parsed < 0 {
-				httpErr(w, http.StatusBadRequest, "invalid offset parameter")
-				return
-			}
-			offset = int32(parsed)
+		limit, offset, err := parsePagination(r)
+		if err != nil {
+			httpErr(w, http.StatusBadRequest, "%s", err)
+			return
 		}
 
 		nameSubstring := strings.TrimSpace(r.URL.Query().Get("name_substring"))
@@ -322,21 +305,8 @@ func writeModsListResponse(w http.ResponseWriter, migs []store.Mig) {
 // - Refuses deletion if any runs exist for the mig.
 func deleteMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
-		// Resolve mig by ID-or-name.
-		mig, err := resolveMigByRef(r.Context(), st, modRef)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("delete mig: get mig failed", "mig_ref", modRef, "err", err)
+		mig, ok := getMigByRefOrFail(w, r, st, "delete mig")
+		if !ok {
 			return
 		}
 		modID := mig.ID
@@ -366,6 +336,14 @@ func deleteMigHandler(st store.Store) http.HandlerFunc {
 }
 
 func migHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.MigID) (bool, error) {
+	return scanRunPages(ctx, st, func(run store.Run) (bool, error) {
+		return run.MigID == modID, nil
+	})
+}
+
+// scanRunPages iterates over all runs in pages of 200 and calls match for each run.
+// Returns true on the first run where match returns true.
+func scanRunPages(ctx context.Context, st store.Store, match func(store.Run) (bool, error)) (bool, error) {
 	const pageLimit = int32(200)
 	pageOffset := int32(0)
 	for {
@@ -377,7 +355,11 @@ func migHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.MigID)
 			return false, nil
 		}
 		for _, run := range page {
-			if run.MigID == modID {
+			matched, err := match(run)
+			if err != nil {
+				return false, err
+			}
+			if matched {
 				return true, nil
 			}
 		}

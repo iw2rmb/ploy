@@ -9,8 +9,10 @@ import (
 	"sync"
 
 	containertypes "github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/client"
+
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // ---------------------------------------------------------------------------
@@ -154,4 +156,53 @@ func multiplexedDockerLogs(payload string, stream stdcopy.StdType) []byte {
 	binary.BigEndian.PutUint32(frame[4:8], uint32(len(data)))
 	copy(frame[8:], data)
 	return frame
+}
+
+// ---------------------------------------------------------------------------
+// step.ContainerRuntime test double
+// ---------------------------------------------------------------------------
+
+// mockContainerRuntime is a composable test double for the step.ContainerRuntime
+// interface. Each method delegates to a configurable function field.
+type mockContainerRuntime struct {
+	createFn func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error)
+	startFn  func(ctx context.Context, handle step.ContainerHandle) error
+	waitFn   func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error)
+	logsFn   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error)
+	removeFn func(ctx context.Context, handle step.ContainerHandle) error
+}
+
+func (m *mockContainerRuntime) Create(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, spec)
+	}
+	return step.ContainerHandle("mock"), nil
+}
+
+func (m *mockContainerRuntime) Start(ctx context.Context, handle step.ContainerHandle) error {
+	if m.startFn != nil {
+		return m.startFn(ctx, handle)
+	}
+	return nil
+}
+
+func (m *mockContainerRuntime) Wait(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+	if m.waitFn != nil {
+		return m.waitFn(ctx, handle)
+	}
+	return step.ContainerResult{ExitCode: 0}, nil
+}
+
+func (m *mockContainerRuntime) Logs(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+	if m.logsFn != nil {
+		return m.logsFn(ctx, handle)
+	}
+	return []byte{}, nil
+}
+
+func (m *mockContainerRuntime) Remove(ctx context.Context, handle step.ContainerHandle) error {
+	if m.removeFn != nil {
+		return m.removeFn(ctx, handle)
+	}
+	return nil
 }

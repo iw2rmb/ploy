@@ -3,11 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
-
-	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -22,48 +19,22 @@ import (
 // - Cannot archive a mig with running jobs.
 func archiveMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+		mig, ok := getMigByRefOrFail(w, r, st, "archive mig")
+		if !ok {
 			return
 		}
 
-		// Resolve mig by ID-or-name.
-		mig, err := resolveMigByRef(r.Context(), st, modRef)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("archive mig: get mig failed", "mig_ref", modRef, "err", err)
-			return
-		}
-		modID := mig.ID
-
-		// Check if already archived
+		// Already archived — return current state (idempotent).
 		if mig.ArchivedAt.Valid {
-			// Already archived, return current state (idempotent)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			resp := struct {
-				ID       string `json:"id"`
-				Name     string `json:"name"`
-				Archived bool   `json:"archived"`
-			}{
-				ID:       mig.ID.String(),
-				Name:     mig.Name,
-				Archived: true,
-			}
-			_ = json.NewEncoder(w).Encode(resp)
+			writeMigArchiveResponse(w, mig, true)
 			return
 		}
 
-		// Check for running jobs in this mig's runs
-		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, modID)
+		// Check for running jobs in this mig's runs.
+		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, mig.ID)
 		if err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
-			slog.Error("archive mig: check jobs failed", "mig_id", modID, "err", err)
+			slog.Error("archive mig: check jobs failed", "mig_id", mig.ID, "err", err)
 			return
 		}
 		if hasRunningJobs {
@@ -71,57 +42,33 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Archive the mig
-		if err := st.ArchiveMig(r.Context(), modID); err != nil {
+		if err := st.ArchiveMig(r.Context(), mig.ID); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to archive mig: %v", err)
-			slog.Error("archive mig: database error", "mig_id", modID, "err", err)
+			slog.Error("archive mig: database error", "mig_id", mig.ID, "err", err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		resp := struct {
-			ID       string `json:"id"`
-			Name     string `json:"name"`
-			Archived bool   `json:"archived"`
-		}{
-			ID:       mig.ID.String(),
-			Name:     mig.Name,
-			Archived: true,
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-
-		slog.Info("mig archived", "mig_id", modID)
+		writeMigArchiveResponse(w, mig, true)
+		slog.Info("mig archived", "mig_id", mig.ID)
 	}
 }
 
 func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes.MigID) (bool, error) {
-	const pageLimit = int32(200)
-	pageOffset := int32(0)
-	for {
-		page, err := st.ListRuns(ctx, store.ListRunsParams{Limit: pageLimit, Offset: pageOffset})
+	return scanRunPages(ctx, st, func(run store.Run) (bool, error) {
+		if run.MigID != modID {
+			return false, nil
+		}
+		jobs, err := st.ListJobsByRun(ctx, run.ID)
 		if err != nil {
 			return false, err
 		}
-		if len(page) == 0 {
-			return false, nil
-		}
-		for _, run := range page {
-			if run.MigID != modID {
-				continue
-			}
-			jobs, err := st.ListJobsByRun(ctx, run.ID)
-			if err != nil {
-				return false, err
-			}
-			for _, job := range jobs {
-				if job.Status == domaintypes.JobStatusRunning || job.Status == domaintypes.JobStatusQueued {
-					return true, nil
-				}
+		for _, job := range jobs {
+			if job.Status == domaintypes.JobStatusRunning || job.Status == domaintypes.JobStatusQueued {
+				return true, nil
 			}
 		}
-		pageOffset += pageLimit
-	}
+		return false, nil
+	})
 }
 
 // unarchiveMigHandler unarchives a mig project.
@@ -132,63 +79,39 @@ func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes
 // - Unarchives a mig (allows execution again).
 func unarchiveMigHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+		mig, ok := getMigByRefOrFail(w, r, st, "unarchive mig")
+		if !ok {
 			return
 		}
 
-		// Resolve mig by ID-or-name.
-		mig, err := resolveMigByRef(r.Context(), st, modRef)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("unarchive mig: get mig failed", "mig_ref", modRef, "err", err)
-			return
-		}
-		modID := mig.ID
-
-		// Check if not archived
+		// Already unarchived — return current state (idempotent).
 		if !mig.ArchivedAt.Valid {
-			// Already unarchived, return current state (idempotent)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			resp := struct {
-				ID       string `json:"id"`
-				Name     string `json:"name"`
-				Archived bool   `json:"archived"`
-			}{
-				ID:       mig.ID.String(),
-				Name:     mig.Name,
-				Archived: false,
-			}
-			_ = json.NewEncoder(w).Encode(resp)
+			writeMigArchiveResponse(w, mig, false)
 			return
 		}
 
-		// Unarchive the mig
-		if err := st.UnarchiveMig(r.Context(), modID); err != nil {
+		if err := st.UnarchiveMig(r.Context(), mig.ID); err != nil {
 			httpErr(w, http.StatusInternalServerError, "failed to unarchive mig: %v", err)
-			slog.Error("unarchive mig: database error", "mig_id", modID, "err", err)
+			slog.Error("unarchive mig: database error", "mig_id", mig.ID, "err", err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		resp := struct {
-			ID       string `json:"id"`
-			Name     string `json:"name"`
-			Archived bool   `json:"archived"`
-		}{
-			ID:       mig.ID.String(),
-			Name:     mig.Name,
-			Archived: false,
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-
-		slog.Info("mig unarchived", "mig_id", modID)
+		writeMigArchiveResponse(w, mig, false)
+		slog.Info("mig unarchived", "mig_id", mig.ID)
 	}
+}
+
+// writeMigArchiveResponse writes the standard archive/unarchive JSON response.
+func writeMigArchiveResponse(w http.ResponseWriter, mig store.Mig, archived bool) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Archived bool   `json:"archived"`
+	}{
+		ID:       mig.ID.String(),
+		Name:     mig.Name,
+		Archived: archived,
+	})
 }

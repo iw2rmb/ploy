@@ -219,11 +219,15 @@ func newUncalledServer(t *testing.T) *httptest.Server {
 
 // statusCapture records the status string sent to a job-complete endpoint.
 type statusCapture struct {
-	Status string
+	Status   string
+	ExitCode *float64
+	Stats    map[string]any
+	Payload  map[string]any
 }
 
 type statusServerConfig struct {
-	httpStatus int
+	httpStatus    int
+	extraHandler  http.Handler // handler for non-status paths
 }
 
 type statusServerOption func(*statusServerConfig)
@@ -231,6 +235,11 @@ type statusServerOption func(*statusServerConfig)
 // withStatusHTTPCode sets the HTTP response code for the status capture server.
 func withStatusHTTPCode(code int) statusServerOption {
 	return func(c *statusServerConfig) { c.httpStatus = code }
+}
+
+// withStatusExtraHandler adds a fallback handler for paths not matching the status endpoint.
+func withStatusExtraHandler(h http.Handler) statusServerOption {
+	return func(c *statusServerConfig) { c.extraHandler = h }
 }
 
 // newStatusCaptureServer returns an httptest server that captures the status
@@ -244,12 +253,25 @@ func newStatusCaptureServer(t *testing.T, jobID string, opts ...statusServerOpti
 	cap := &statusCapture{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/jobs/"+jobID+"/complete" {
-			var body struct {
-				Status string `json:"status"`
+			var payload map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&payload); err == nil {
+				cap.Payload = payload
+				if s, ok := payload["status"].(string); ok {
+					cap.Status = s
+				}
+				if ec, ok := payload["exit_code"].(float64); ok {
+					cap.ExitCode = &ec
+				}
+				if s, ok := payload["stats"].(map[string]any); ok {
+					cap.Stats = s
+				}
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
-				cap.Status = body.Status
-			}
+			w.WriteHeader(sc.httpStatus)
+			return
+		}
+		if sc.extraHandler != nil {
+			sc.extraHandler.ServeHTTP(w, r)
+			return
 		}
 		w.WriteHeader(sc.httpStatus)
 	}))

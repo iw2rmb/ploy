@@ -38,21 +38,26 @@ func (r *runController) runRouterForGateFailure(
 		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
 	}
 
-	// Create temp /in and /out for router.
-	routerInDir, err := os.MkdirTemp("", "ploy-gate-router-in-*")
-	if err != nil {
-		slog.Warn("failed to create router /in directory", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		return
+	// Use nested withTempDir for router /in and /out directories.
+	if err := withTempDir("ploy-gate-router-in-*", func(routerInDir string) error {
+		return withTempDir("ploy-gate-router-out-*", func(routerOutDir string) error {
+			return r.executeRouter(ctx, runner, req, typedOpts, workspace, gateResult, routerInDir, routerOutDir)
+		})
+	}); err != nil {
+		slog.Warn("router setup failed", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	}
-	defer os.RemoveAll(routerInDir)
+}
 
-	routerOutDir, err := os.MkdirTemp("", "ploy-gate-router-out-*")
-	if err != nil {
-		slog.Warn("failed to create router /out directory", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-		return
-	}
-	defer os.RemoveAll(routerOutDir)
-
+// executeRouter runs the router container and parses its output.
+func (r *runController) executeRouter(
+	ctx context.Context,
+	runner step.Runner,
+	req StartRunRequest,
+	typedOpts RunOptions,
+	workspace string,
+	gateResult *contracts.BuildGateStageMetadata,
+	routerInDir, routerOutDir string,
+) error {
 	// Write /in/build-gate.log with the same trimmed preference used for healing hydration.
 	logPayload := gateResult.LogsText
 	if len(gateResult.LogFindings) > 0 {
@@ -72,7 +77,7 @@ func (r *runController) runRouterForGateFailure(
 	// For amata-mode router: write /in/amata.yaml with deterministic overwrite.
 	if writeErr := writeAmataSpecInDir(routerInDir, typedOpts.Router.Amata); writeErr != nil {
 		slog.Warn("failed to write router /in/amata.yaml", "run_id", req.RunID, "job_id", req.JobID, "error", writeErr)
-		return
+		return nil
 	}
 
 	stack := gateResult.DetectedStack()
@@ -83,7 +88,7 @@ func (r *runController) runRouterForGateFailure(
 	routerManifest, buildErr := buildRouterManifest(req, *typedOpts.Router, stack, req.JobType, contracts.RecoveryLoopKindHealing.String())
 	if buildErr != nil {
 		slog.Warn("failed to build router manifest", "run_id", req.RunID, "job_id", req.JobID, "error", buildErr)
-		return
+		return nil
 	}
 	r.injectHealingEnvVars(&routerManifest, workspace)
 	r.mountHealingTLSCerts(&routerManifest)
@@ -95,59 +100,40 @@ func (r *runController) runRouterForGateFailure(
 	}
 
 	// Materialize the router tmp bundle into a staging directory.
-	// The staging dir is removed deterministically when runRouterForGateFailure returns.
-	var routerTmpStagingDir string
-	if routerManifest.TmpBundle != nil {
-		dir, err := os.MkdirTemp("", "ploy-router-tmpfiles-*")
-		if err != nil {
-			slog.Warn("failed to create router tmp staging dir", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-			return
+	return r.withMaterializedTmpBundle(ctx, routerManifest.TmpBundle, "ploy-router-tmpfiles-*", func(routerTmpStagingDir string) error {
+		_, runErr := runner.Run(ctx, step.Request{
+			RunID:         req.RunID,
+			JobID:         req.JobID,
+			Manifest:      routerManifest,
+			Workspace:     workspace,
+			OutDir:        routerOutDir,
+			InDir:         routerInDir,
+			TmpStagingDir: routerTmpStagingDir,
+		})
+		if runErr != nil {
+			slog.Warn("router execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr)
+			return nil
 		}
-		defer func() {
-			if rmErr := os.RemoveAll(dir); rmErr != nil {
-				slog.Warn("failed to remove router tmp staging dir", "path", dir, "error", rmErr)
-			}
-		}()
-		if routerManifest.TmpBundle != nil {
-			if err := r.materializeTmpBundle(ctx, routerManifest.TmpBundle, dir); err != nil {
-				slog.Warn("failed to materialize router tmp bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-				return
-			}
-		}
-		routerTmpStagingDir = dir
-	}
 
-	_, runErr := runner.Run(ctx, step.Request{
-		RunID:         req.RunID,
-		JobID:         req.JobID,
-		Manifest:      routerManifest,
-		Workspace:     workspace,
-		OutDir:        routerOutDir,
-		InDir:         routerInDir,
-		TmpStagingDir: routerTmpStagingDir,
+		if bugSummary := parseBugSummary(routerOutDir); bugSummary != "" {
+			gateResult.BugSummary = bugSummary
+			slog.Info("router produced bug_summary", "run_id", req.RunID, "job_id", req.JobID, "bug_summary", bugSummary)
+		}
+		parsedRecovery := parseRouterDecision(routerOutDir)
+		if parsedRecovery == nil {
+			return nil
+		}
+		if gateResult.Recovery == nil {
+			gateResult.Recovery = parsedRecovery
+			return nil
+		}
+
+		// Preserve pre-populated context (router_cmd) while applying parsed classifier fields.
+		routerCmd := append([]string{}, gateResult.Recovery.RouterCmd...)
+		*gateResult.Recovery = *parsedRecovery
+		if len(routerCmd) > 0 {
+			gateResult.Recovery.RouterCmd = routerCmd
+		}
+		return nil
 	})
-	if runErr != nil {
-		slog.Warn("router execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr)
-		return
-	}
-
-	if bugSummary := parseBugSummary(routerOutDir); bugSummary != "" {
-		gateResult.BugSummary = bugSummary
-		slog.Info("router produced bug_summary", "run_id", req.RunID, "job_id", req.JobID, "bug_summary", bugSummary)
-	}
-	parsedRecovery := parseRouterDecision(routerOutDir)
-	if parsedRecovery == nil {
-		return
-	}
-	if gateResult.Recovery == nil {
-		gateResult.Recovery = parsedRecovery
-		return
-	}
-
-	// Preserve pre-populated context (router_cmd) while applying parsed classifier fields.
-	routerCmd := append([]string{}, gateResult.Recovery.RouterCmd...)
-	*gateResult.Recovery = *parsedRecovery
-	if len(routerCmd) > 0 {
-		gateResult.Recovery.RouterCmd = routerCmd
-	}
 }

@@ -25,12 +25,6 @@ import (
 // - This is the canonical way to "set" or "update" a mig's spec.
 func setMigSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		modRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
 		// Parse request body with strict validation.
 		var req struct {
 			Name      string          `json:"name,omitempty"`
@@ -54,14 +48,8 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Resolve mig by ID-or-name.
-		mig, err := resolveMigByRef(r.Context(), st, modRef)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("set mig spec: get mig failed", "mig_ref", modRef, "err", err)
+		mig, ok := getMigByRefOrFail(w, r, st, "set mig spec")
+		if !ok {
 			return
 		}
 		modID := mig.ID
@@ -117,20 +105,8 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 // Response: raw spec JSON body.
 func getMigLatestSpecHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		migRef, err := parseParam[domaintypes.MigRef](r, "mig_ref")
-		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
-			return
-		}
-
-		mig, err := resolveMigByRef(r.Context(), st, migRef)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "mig not found")
-				return
-			}
-			httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
-			slog.Error("get mig latest spec: get mig failed", "mig_ref", migRef, "err", err)
+		mig, ok := getMigByRefOrFail(w, r, st, "get mig latest spec")
+		if !ok {
 			return
 		}
 		if mig.SpecID == nil || mig.SpecID.IsZero() {
