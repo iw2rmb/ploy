@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -251,22 +250,8 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 	// 3. Each request has its own timeout to prevent indefinite blocking
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := ls.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
+	if err := postJSONBytes(ctx, ls.httpClient, url, body, "send log chunk"); err != nil {
+		return err
 	}
 
 	slog.Debug("log chunk sent", "run_id", ls.runID, "chunk_no", chunkNo, "size", len(data))

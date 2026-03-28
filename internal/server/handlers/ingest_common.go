@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
@@ -252,4 +253,28 @@ func streamBlob(w http.ResponseWriter, reader io.Reader, size int64, filename, c
 	if _, err := io.Copy(w, reader); err != nil {
 		slog.Error("stream blob failed", "filename", filename, "err", err)
 	}
+}
+
+// openBlobForHTTP validates the object key, opens the blob from bs, and maps errors to
+// HTTP responses. Returns (rc, size, true) on success; (nil, 0, false) after writing the
+// HTTP error response. Caller must Close rc on success.
+// logAttrs are slog key/value pairs appended to all log lines emitted on failure.
+func openBlobForHTTP(w http.ResponseWriter, r *http.Request, bs blobstore.Store, key *string, entityName string, logAttrs ...any) (io.ReadCloser, int64, bool) {
+	if key == nil || *key == "" {
+		writeHTTPError(w, http.StatusNotFound, "%s blob not found", entityName)
+		slog.Error("blob download: no object_key", append([]any{"entity", entityName}, logAttrs...)...)
+		return nil, 0, false
+	}
+	rc, size, err := bs.Get(r.Context(), *key)
+	if err != nil {
+		if errors.Is(err, blobstore.ErrNotFound) {
+			writeHTTPError(w, http.StatusNotFound, "%s blob not found", entityName)
+			slog.Error("blob download: missing from object store", append([]any{"entity", entityName, "object_key", *key}, logAttrs...)...)
+			return nil, 0, false
+		}
+		writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve %s blob", entityName)
+		slog.Error("blob download: get failed", append([]any{"entity", entityName, "object_key", *key, "err", err}, logAttrs...)...)
+		return nil, 0, false
+	}
+	return rc, size, true
 }

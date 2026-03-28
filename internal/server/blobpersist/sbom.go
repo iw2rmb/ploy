@@ -3,10 +3,10 @@ package blobpersist
 import (
 	"context"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/blobstore"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/sbom"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -39,15 +39,9 @@ func (s *Service) ExtractSBOMRowsForJob(
 		if bundle.ObjectKey == nil || strings.TrimSpace(*bundle.ObjectKey) == "" {
 			continue
 		}
-		rc, _, getErr := s.blobstore.Get(ctx, *bundle.ObjectKey)
+		raw, getErr := blobstore.ReadAll(ctx, s.blobstore, *bundle.ObjectKey)
 		if getErr != nil {
-			return nil, fmt.Errorf("get artifact bundle %q: %w", *bundle.ObjectKey, getErr)
-		}
-
-		raw, readErr := io.ReadAll(rc)
-		_ = rc.Close()
-		if readErr != nil {
-			return nil, fmt.Errorf("read artifact bundle %q: %w", *bundle.ObjectKey, readErr)
+			return nil, fmt.Errorf("read artifact bundle %q: %w", *bundle.ObjectKey, getErr)
 		}
 
 		parsedRows, parseErr := sbom.ExtractRowsFromBundle(raw, jobID, repoID)

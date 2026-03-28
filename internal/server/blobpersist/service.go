@@ -153,15 +153,9 @@ func (s *Service) CloneLatestDiffByJob(ctx context.Context, sourceJobID, targetR
 		return nil
 	}
 
-	rc, _, err := s.blobstore.Get(ctx, *sourceDiff.ObjectKey)
+	patch, err := blobstore.ReadAll(ctx, s.blobstore, *sourceDiff.ObjectKey)
 	if err != nil {
 		return fmt.Errorf("clone latest diff: read source blob: %w", err)
-	}
-	defer rc.Close()
-
-	patch, err := io.ReadAll(rc)
-	if err != nil {
-		return fmt.Errorf("clone latest diff: read source patch: %w", err)
 	}
 	if len(patch) == 0 {
 		return nil
@@ -241,19 +235,18 @@ func (s *Service) LoadRecoveryArtifact(ctx context.Context, runID types.RunID, j
 			continue
 		}
 
-		rc, _, getErr := s.blobstore.Get(ctx, *bundle.ObjectKey)
+		bundleBytes, getErr := blobstore.ReadAll(ctx, s.blobstore, *bundle.ObjectKey)
 		if getErr != nil {
 			if firstUnreadable == nil {
-				firstUnreadable = fmt.Errorf("get object %q: %w", *bundle.ObjectKey, getErr)
+				firstUnreadable = fmt.Errorf("read bundle %q: %w", *bundle.ObjectKey, getErr)
 			}
 			continue
 		}
 
-		raw, found, readErr := readArtifactFromTarGz(rc, canonicalPath)
-		_ = rc.Close()
+		raw, found, readErr := readArtifactFromTarGz(bytes.NewReader(bundleBytes), canonicalPath)
 		if readErr != nil {
 			if firstUnreadable == nil {
-				firstUnreadable = fmt.Errorf("read bundle %q: %w", *bundle.ObjectKey, readErr)
+				firstUnreadable = fmt.Errorf("parse bundle %q: %w", *bundle.ObjectKey, readErr)
 			}
 			continue
 		}

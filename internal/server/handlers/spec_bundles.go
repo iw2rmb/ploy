@@ -169,23 +169,8 @@ func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerF
 			return
 		}
 
-		if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
-			writeHTTPError(w, http.StatusNotFound, "spec bundle blob not found")
-			slog.Error("spec bundle download: no object_key", "bundle_id", bundleID.String())
-			return
-		}
-
-		rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
-		if err != nil {
-			if errors.Is(err, blobstore.ErrNotFound) {
-				writeHTTPError(w, http.StatusNotFound, "spec bundle blob not found")
-				slog.Error("spec bundle download: blob missing from object store",
-					"bundle_id", bundleID.String(), "object_key", *bundle.ObjectKey)
-				return
-			}
-			writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve spec bundle blob")
-			slog.Error("spec bundle download: blob get failed",
-				"bundle_id", bundleID.String(), "object_key", *bundle.ObjectKey, "err", err)
+		rc, size, ok := openBlobForHTTP(w, r, bs, bundle.ObjectKey, "spec bundle", "bundle_id", bundleID.String())
+		if !ok {
 			return
 		}
 		defer rc.Close()

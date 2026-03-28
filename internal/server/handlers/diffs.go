@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -117,27 +115,14 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			}
 
 			// Stream from object storage.
-			if d.ObjectKey == nil || *d.ObjectKey == "" {
-				writeHTTPError(w, http.StatusNotFound, "diff blob not found")
-				slog.Error("download run repo diff: no object_key", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
-				return
-			}
-
-			rc, size, err := bs.Get(r.Context(), *d.ObjectKey)
-			if err != nil {
-				writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve diff blob")
-				slog.Error("download run repo diff: blob get failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *d.ObjectKey, "err", err)
+			rc, size, ok := openBlobForHTTP(w, r, bs, d.ObjectKey, "diff",
+				"run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+			if !ok {
 				return
 			}
 			defer rc.Close()
 
-			w.Header().Set("Content-Type", "application/gzip")
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=diff-%s.patch.gz", diffUUID.String()))
-			w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-			w.WriteHeader(http.StatusOK)
-			if _, err := io.Copy(w, rc); err != nil {
-				slog.Error("download run repo diff: stream failed", "diff_id", diffID.String(), "err", err)
-			}
+			streamBlob(w, rc, size, fmt.Sprintf("diff-%s.patch.gz", diffUUID.String()), "application/gzip")
 			return
 		}
 

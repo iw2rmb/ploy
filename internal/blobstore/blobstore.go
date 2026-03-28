@@ -23,3 +23,14 @@ type Store interface {
 	// Delete removes an object from the store.
 	Delete(ctx context.Context, key string) error
 }
+
+// ReadAll reads and returns all bytes from the blob at key.
+// Returns any error from Get or from reading the stream.
+func ReadAll(ctx context.Context, bs Store, key string) ([]byte, error) {
+	rc, _, err := bs.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(rc)
+}
