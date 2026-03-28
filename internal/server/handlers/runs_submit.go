@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server"
@@ -33,16 +34,13 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Decode request body with strict validation and domain types for VCS fields.
 		// JSON unmarshaling will automatically validate repo URL scheme and non-empty refs.
-		var req struct {
-			RepoURL   domaintypes.RepoURL `json:"repo_url"`
-			BaseRef   domaintypes.GitRef  `json:"base_ref"`
-			TargetRef domaintypes.GitRef  `json:"target_ref"`
-			Spec      json.RawMessage     `json:"spec"`
-			CreatedBy *string             `json:"created_by,omitempty"`
-		}
-
+		var req domainapi.RunSubmitRequest
 		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
 			return
+		}
+		var createdByPtr *string
+		if req.CreatedBy != "" {
+			createdByPtr = &req.CreatedBy
 		}
 
 		// Validate domain types explicitly to catch missing/zero-value fields.
@@ -75,7 +73,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			ID:        specID,
 			Name:      "",
 			Spec:      req.Spec,
-			CreatedBy: req.CreatedBy,
+			CreatedBy: createdByPtr,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
@@ -89,7 +87,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			ID:        modID,
 			Name:      modID.String(),
 			SpecID:    &createdSpec.ID,
-			CreatedBy: req.CreatedBy,
+			CreatedBy: createdByPtr,
 		}); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig: %v", err)
 			slog.Error("create single-repo run: create mig failed", "mig_id", modID, "err", err)
@@ -118,7 +116,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			ID:        runID,
 			MigID:     modID,
 			SpecID:    createdSpec.ID,
-			CreatedBy: req.CreatedBy,
+			CreatedBy: createdByPtr,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create run: %v", err)

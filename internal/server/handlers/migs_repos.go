@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -88,28 +89,14 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build response with repo details.
-		resp := struct {
-			ID        domaintypes.MigRepoID `json:"id"`
-			MigID     domaintypes.MigID     `json:"mig_id"`
-			RepoURL   string                `json:"repo_url"`
-			BaseRef   string                `json:"base_ref"`
-			TargetRef string                `json:"target_ref"`
-			CreatedAt string                `json:"created_at"`
-		}{
+		writeJSON(w, http.StatusCreated, domainapi.MigRepoSummary{
 			ID:        repo.ID,
 			MigID:     repo.MigID,
 			RepoURL:   normalizedURL,
 			BaseRef:   repo.BaseRef,
 			TargetRef: repo.TargetRef,
-			CreatedAt: repo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("add mig repo: encode response failed", "err", err)
-		}
+			CreatedAt: repo.CreatedAt.Time,
+		})
 
 		slog.Info("mig repo added", "mig_id", modID, "repo_id", repo.ID, "repo_url", normalizedURL)
 	}
@@ -137,16 +124,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		type repoItem struct {
-			ID        domaintypes.MigRepoID `json:"id"`
-			MigID     domaintypes.MigID     `json:"mig_id"`
-			RepoURL   string                `json:"repo_url"`
-			BaseRef   string                `json:"base_ref"`
-			TargetRef string                `json:"target_ref"`
-			CreatedAt string                `json:"created_at"`
-		}
-
-		items := make([]repoItem, 0, len(repos))
+		items := make([]domainapi.MigRepoSummary, 0, len(repos))
 		for _, repo := range repos {
 			repoURL, err := repoURLForID(r.Context(), st, repo.RepoID)
 			if err != nil {
@@ -154,25 +132,17 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 				slog.Error("list mig repos: get repo failed", "mig_id", modID, "repo_id", repo.RepoID, "err", err)
 				return
 			}
-			items = append(items, repoItem{
+			items = append(items, domainapi.MigRepoSummary{
 				ID:        repo.ID,
 				MigID:     repo.MigID,
 				RepoURL:   repoURL,
 				BaseRef:   repo.BaseRef,
 				TargetRef: repo.TargetRef,
-				CreatedAt: repo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
+				CreatedAt: repo.CreatedAt.Time,
 			})
 		}
 
-		resp := struct {
-			Repos []repoItem `json:"repos"`
-		}{Repos: items}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("list mig repos: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, domainapi.MigRepoListResponse{Repos: items})
 	}
 }
 

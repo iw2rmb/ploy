@@ -142,7 +142,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **`RunSubmitRequest`** moved from `internal/migs/api/types.go` to `domain/api/run_submit.go`. `migs/api/types.go` replaces the struct definition with a type alias `type RunSubmitRequest = domainapi.RunSubmitRequest` for backward compatibility; canonical ownership is now `domain/api`.
     - **Test proof**: `go test ./internal/domain/... ./internal/migs/api` passes; `go test ./internal/... -run 'DTO|Payload|Schema'` passes (`internal/domain/api` runs `TestMigSummaryDTO`, `TestMigListResponseDTO`, `TestMigRepoSummaryDTO`, `TestMigRepoListResponseDTO`, `TestRunSubmitPayload`).
 
-- [ ] 4.2b Migrate handlers to canonical DTOs and delete handler-local contract duplicates
+- [x] 4.2b Migrate handlers to canonical DTOs and delete handler-local contract duplicates
   - Type: determined
   - Component: `internal/server/handlers/*.go`, `internal/domain/api`
   - Implementation:
@@ -157,6 +157,12 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+70/-170` (net `-100`) in handlers.
   - Clarity / complexity check: Reduces contract drift by importing canonical DTOs; no runtime behavior change.
   - Reasoning: high (9 CFP)
+  - Completion notes:
+    - **`migs_crud.go`**: Deleted inline `modItem` type and anonymous response struct in `writeModsListResponse`; replaced with `domainapi.MigSummary` items and `domainapi.MigListResponse` envelope. Deleted anonymous create-response struct in `createMigHandler`; replaced with `domainapi.MigSummary` (adds `Archived: false` for new migs). Import `domainapi "github.com/iw2rmb/ploy/internal/domain/api"` added.
+    - **`migs_repos.go`**: Deleted inline `repoItem` type and anonymous response struct in `listMigReposHandler`; replaced with `domainapi.MigRepoSummary` items and `domainapi.MigRepoListResponse` envelope via `writeJSON`. Deleted anonymous create-response struct and manual `json.NewEncoder` / header-setting block in `addMigRepoHandler`; replaced with a single `writeJSON(w, http.StatusCreated, domainapi.MigRepoSummary{...})` call. Import added.
+    - **`runs_submit.go`**: Deleted local inline `req` struct (duplicate of `domainapi.RunSubmitRequest`); replaced with `var req domainapi.RunSubmitRequest`. Added `createdByPtr` conversion (`*string` adapter) for store calls that require `*string` while the canonical DTO uses `string`. Import added.
+    - **Test fixtures** (`migs_crud_test.go`): Updated three list-test fixtures that used short invalid MigIDs (`"mod1"`, `"mod2"`, `"modA"`, `"modB"`, `"modC"` — 4 chars, failing `validateNanoID(6)`) to valid 6-char NanoIDs (`"mod001"`, `"mod002"`, `"mod00A"`, `"mod00B"`, `"mod00C"`). Updated matching map keys, `MigID` fields in `store.MigRepo`, and ID assertions.
+    - **Test proof**: `go test ./internal/server/handlers ./internal/domain/api` passes; `go test ./internal/... -run 'Handler|DTO|Decode|Encode'` passes (all packages).
 
 - [ ] 4.2c Migrate client and CLI decode paths to canonical DTOs and delete duplicate decode structs
   - Type: determined
