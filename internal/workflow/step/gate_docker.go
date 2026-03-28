@@ -19,7 +19,7 @@
 //     only. The node agent always re-runs this Docker gate after healing migs
 //     complete, regardless of any intermediate validation results.
 //
-// ## Usage Note for Healing Mods
+// ## Usage Note for Healing Migs
 //
 // Direct HTTP Build Gate API calls from healing migs are now DISCOURAGED for
 // migs-codex. The node agent handles all gate orchestration, ensuring consistent
