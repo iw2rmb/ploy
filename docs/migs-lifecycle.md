@@ -1,12 +1,12 @@
-# Mods Lifecycle and Architecture
+# Migs Lifecycle and Architecture
 
-This document is the canonical reference for how Mods runs are represented and
+This document is the canonical reference for how Migs runs are represented and
 executed across the CLI, control plane, and node agents. It replaces the older
 checkpoint notes in the repository.
 
 ## 1. Core Concepts
 
-- **Run** — A Mods run submitted to the control plane. Runs are stored as
+- **Run** — A Migs run submitted to the control plane. Runs are stored as
   `runs` rows in PostgreSQL and exposed via the `/v1/runs` API.
 - **Job** — A unit of work inside a  run (for example `pre-gate`, `mig-0`,
   `post-gate`). Jobs are stored as `jobs` rows. Persisted job fields are
@@ -35,7 +35,7 @@ and no further steps execute.
 ### Single-step runs (`steps[]` with one entry)
 
 > **Note:** A single-repo submission is internally a degenerate batch with one
-> `run_repos` entry. See § 1.4 (Batched Mods Runs) for the batch model
+> `run_repos` entry. See § 1.4 (Batched Migs Runs) for the batch model
 > (`runs` + `run_repos`) and how single-repo runs fit into the unified architecture.
 
 When `steps[]` contains exactly one entry, the execution sequence is:
@@ -389,7 +389,7 @@ Key invariants:
 
 ## 1.2 Stack-Aware Image Selection
 
-Mods supports stack-aware image selection, allowing different container images to be
+Migs supports stack-aware image selection, allowing different container images to be
 used based on the detected build stack. The image field accepts two canonical forms:
 universal images (string) for simple configurations, and stack-specific images (map)
 for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images).
@@ -422,7 +422,7 @@ The Build Gate detects the workspace stack during validation based on file marke
 | `java`         | JDK markers but no build tool detected       | Generic    |
 | `unknown`      | No recognized stack markers found            | None       |
 
-The detected stack is propagated from the Build Gate to Mods steps via
+The detected stack is propagated from the Build Gate to Migs steps via
 `BuildGateStageMetadata.Tool`, which is converted to a `MigStack` using
 `ToolToModStack()` in runtime implementation.
 
@@ -469,7 +469,7 @@ When resolving an image for a given stack:
 ### Consistency across run lifecycle
 
 Stack detection occurs during the pre-mig Build Gate execution. The detected stack
-is then used consistently for all subsequent Mods steps within the same run:
+is then used consistently for all subsequent Migs steps within the same run:
 
 1. **Pre-mig gate**: Build Gate detects workspace stack (e.g., `java-maven`).
 2. **Stack propagation**: The stack is stored in run context/metadata.
@@ -505,7 +505,7 @@ When the same spec runs against a Gradle project (`build.gradle` present):
 ### Example: Parameterized OpenRewrite via rewrite.yml
 
 When OpenRewrite recipes require parameters, you can generate a `rewrite.yml`
-config as a code change, then let the stack-aware ORW Mods apply it.
+config as a code change, then let the stack-aware ORW Migs apply it.
 
 1. **Generate rewrite.yml with mig-shell** (scripts live in the repo):
 
@@ -547,12 +547,12 @@ migs:
       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
 
-The ORW Mods honor an existing `rewrite.yml` in the workspace:
+The ORW Migs honor an existing `rewrite.yml` in the workspace:
 
 - `rewrite.configLocation` points to `rewrite.yml`.
 - `rewrite.activeRecipes` defaults to the top-level `name:` in `rewrite.yml`
   (or `REWRITE_ACTIVE_RECIPES` if provided).
-- If no `rewrite.yml` exists, ORW Mods fall back to running the class recipe
+- If no `rewrite.yml` exists, ORW Migs fall back to running the class recipe
   directly using `RECIPE_CLASSNAME` and the artifact coordinates.
 
 When `/out/report.json` contains an ORW failure payload (`success=false`), the
@@ -571,7 +571,7 @@ node agent propagates deterministic failure fields into run stats metadata:
 
 ## 1.3 Job Order (DAG)
 
-Mods runs form a directed acyclic graph (DAG) of jobs linked through `next_id`
+Migs runs form a directed acyclic graph (DAG) of jobs linked through `next_id`
 successor pointers. Healing updates this chain by rewiring links in a single
 transaction.
 
@@ -664,7 +664,7 @@ post-gate  ───────────────▶├─▶ heal-a → 
 - Infra candidate evaluation: runtime implementation
 - Linked-job cancellation traversal: runtime implementation
 
-## 1.4 Batched Mods Runs (`runs` + `run_repos`)
+## 1.4 Batched Migs Runs (`runs` + `run_repos`)
 
 This section describes how batch runs coordinate multiple repositories under a
 single specification. A batch run allows executing the same mig workflow across
@@ -850,7 +850,7 @@ Gate env precedence:
 ### Pulling Diffs Locally (`run pull` / `mig pull`)
 
 The `ploy run pull <run-id>` and `ploy mig pull` commands enable developers to reconstruct
-Mods-generated changes in their local git repository. This is useful for reviewing,
+Migs-generated changes in their local git repository. This is useful for reviewing,
 testing, or continuing work on changes produced by a run without relying on MR-based
 workflows.
 
@@ -969,7 +969,7 @@ This section is the canonical CLI reference for local pull workflows.
 
 ### 2.1 Run summary (runtime implementation)
 
-`RunSummary` is the **canonical wire type** for Mods run status. It is the single
+`RunSummary` is the **canonical wire type** for Migs run status. It is the single
 response schema for:
 
 - `GET /v1/runs/{id}/status` (status) — 200 response body.
@@ -1113,12 +1113,12 @@ value is a `StageStatus` object describing that job's execution state.
 
 ## 3. Control Plane HTTP Surfaces
 
-### 3.1 Mods endpoints (runtime implementation)
+### 3.1 Migs endpoints (runtime implementation)
 
-- `POST /v1/runs` — submit a single-repo Mods run.
+- `POST /v1/runs` — submit a single-repo Migs run.
   - Shape: `{repo_url, base_ref, target_ref, spec, created_by?}`.
   - Handler: `createSingleRepoRunHandler`.
-  - Behaviour (single source of truth for Mods execution):
+  - Behaviour (single source of truth for Migs execution):
     - Creates a spec (`specs`), a mig project (`migs`), a managed repo membership (`mig_repos`)
       backed by global repo identity (`repos`),
       a run (`runs`, `status=Started`), and a run repo (`run_repos`, `status=Queued`).
@@ -1306,9 +1306,9 @@ This design guarantees that:
   prior diffs.
 - Jobs execute sequentially due to ClaimJob dependency enforcement.
 
-## 5. Container Contract for Mods Images
+## 5. Container Contract for Migs Images
 
-Mods container images are standard OCI images with the following expectations:
+Migs container images are standard OCI images with the following expectations:
 
 - **Workspace mounts**
   - `/workspace` — repository working tree (read-write) for the step.
@@ -1371,9 +1371,9 @@ Mods container images are standard OCI images with the following expectations:
   - Cleanup policy: remove only stopped ploy-managed containers in FIFO order (oldest created first) until threshold is restored or candidates are exhausted.
   - Logs are still streamed through `CreateAndPublishLog` and SSE.
 
-## 6. CLI Surfaces for Mods
+## 6. CLI Surfaces for Migs
 
-The CLI entry points for Mods are implemented in CLI implementation:
+The CLI entry points for Migs are implemented in CLI implementation:
 
 - `ploy mig run`:
   - Parses flags in CLI implementation.
@@ -1434,7 +1434,7 @@ The CLI entry points for Mods are implemented in CLI implementation:
 ## 7. SSE Contract
 
 The event hub (runtime implementation) and HTTP wrapper (runtime implementation)
-implement a minimal SSE protocol used by the Mods endpoints.
+implement a minimal SSE protocol used by the Migs endpoints.
 
 **OpenAPI reference:** See `docs/api/paths/runs_id_logs.yaml` for the formal
 endpoint specification and event payload schemas.
@@ -1472,7 +1472,7 @@ correlate log lines with specific nodes, jobs, and pipeline stages.
 |--------------|--------|------------------------------------------------------------------------|
 | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line        |
 | `job_id`     | string | Job ID (KSUID string) that produced this log line                      |
-| `job_type`   | string | Mods step type: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`      |
+| `job_type`   | string | Migs step type: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`      |
 | `next_id` | number | Optional step metadata used for log enrichment                          |
 
 **Example SSE frame:**
