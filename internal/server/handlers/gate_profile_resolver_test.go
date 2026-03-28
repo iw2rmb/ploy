@@ -178,506 +178,368 @@ func (s *stubBlobStore) Delete(_ context.Context, _ string) error {
 	return nil
 }
 
-func TestGateProfileResolver_ExactHit(t *testing.T) {
+type gateProfileResolverCase struct {
+	name        string
+	st          *stubGateProfileResolverStore
+	bs          *stubBlobStore
+	job         store.Job
+	constraints GateProfileLookupConstraints
+
+	wantNil       bool
+	wantProfileID int64
+	wantPayload   []byte
+	wantExactHit  bool
+
+	wantUpsert  bool
+	wantLink    bool
+	wantBlobPut bool
+
+	wantResolveImage    bool
+	wantResolveRepo     bool
+	wantResolveAny      bool
+	wantResolveExact    bool
+	wantResolveRequired bool
+
+	wantUpsertRepoID          *types.RepoID
+	wantUpsertStackID         *int64
+	wantUpsertObjectKeyPrefix string
+	wantResolvedRequiredTool  string
+}
+
+func assertGateProfileResolution(t *testing.T, tc gateProfileResolverCase, resolution *GateProfileResolution, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
+	}
+	if tc.wantNil {
+		if resolution != nil {
+			t.Fatalf("expected nil resolution, got %+v", resolution)
+		}
+	} else {
+		if resolution == nil {
+			t.Fatal("expected non-nil resolution")
+		}
+		if resolution.ProfileID != tc.wantProfileID {
+			t.Fatalf("ProfileID = %d, want %d", resolution.ProfileID, tc.wantProfileID)
+		}
+		if tc.wantPayload != nil && string(resolution.Payload) != string(tc.wantPayload) {
+			t.Fatalf("Payload = %q, want %q", resolution.Payload, tc.wantPayload)
+		}
+		if resolution.ExactHit != tc.wantExactHit {
+			t.Fatalf("ExactHit = %v, want %v", resolution.ExactHit, tc.wantExactHit)
+		}
+	}
+	if tc.st.upsertCalled != tc.wantUpsert {
+		t.Fatalf("upsertCalled = %v, want %v", tc.st.upsertCalled, tc.wantUpsert)
+	}
+	if tc.st.linkCalled != tc.wantLink {
+		t.Fatalf("linkCalled = %v, want %v", tc.st.linkCalled, tc.wantLink)
+	}
+	if tc.bs.putCalled != tc.wantBlobPut {
+		t.Fatalf("putCalled = %v, want %v", tc.bs.putCalled, tc.wantBlobPut)
+	}
+	if (tc.st.resolveImageCall != "") != tc.wantResolveImage {
+		t.Fatalf("resolveImageCall = %q, wantResolveImage = %v", tc.st.resolveImageCall, tc.wantResolveImage)
+	}
+	if tc.st.resolveRepoCall != tc.wantResolveRepo {
+		t.Fatalf("resolveRepoCall = %v, want %v", tc.st.resolveRepoCall, tc.wantResolveRepo)
+	}
+	if tc.st.resolveAnyCall != tc.wantResolveAny {
+		t.Fatalf("resolveAnyCall = %v, want %v", tc.st.resolveAnyCall, tc.wantResolveAny)
+	}
+	if tc.st.resolveExactCall != tc.wantResolveExact {
+		t.Fatalf("resolveExactCall = %v, want %v", tc.st.resolveExactCall, tc.wantResolveExact)
+	}
+	if (tc.st.resolveRequired != nil) != tc.wantResolveRequired {
+		t.Fatalf("resolveRequired = %v, wantResolveRequired = %v", tc.st.resolveRequired, tc.wantResolveRequired)
+	}
+	if tc.wantUpsertRepoID != nil && tc.st.upsertRepoID != *tc.wantUpsertRepoID {
+		t.Fatalf("upsertRepoID = %s, want %s", tc.st.upsertRepoID, *tc.wantUpsertRepoID)
+	}
+	if tc.wantUpsertStackID != nil && tc.st.upsertStackID != *tc.wantUpsertStackID {
+		t.Fatalf("upsertStackID = %d, want %d", tc.st.upsertStackID, *tc.wantUpsertStackID)
+	}
+	if tc.wantUpsertObjectKeyPrefix != "" && !strings.HasPrefix(tc.st.upsertObjectKey, tc.wantUpsertObjectKeyPrefix) {
+		t.Fatalf("upsertObjectKey = %q, want prefix %q", tc.st.upsertObjectKey, tc.wantUpsertObjectKeyPrefix)
+	}
+	if tc.wantResolvedRequiredTool != "" {
+		if tc.st.resolveRequired == nil {
+			t.Fatal("expected resolveRequired to be set for tool assertion")
+		}
+		if tc.st.resolveRequired.Tool != tc.wantResolvedRequiredTool {
+			t.Fatalf("resolveRequired.Tool = %q, want %q", tc.st.resolveRequired.Tool, tc.wantResolvedRequiredTool)
+		}
+	}
+}
+
+func TestGateProfileResolver_NormalResolution(t *testing.T) {
 	t.Parallel()
 
-	repoID := types.NewRepoID()
-	const shaIn = "0123456789abcdef0123456789abcdef01234567"
-	exactKey := "gate-profiles/exact.json"
+	repoA := types.NewRepoID()
+	repoB := types.NewRepoID()
+	repoC := types.NewRepoID()
+	repoD := types.NewRepoID()
+
+	const sha1 = "0123456789abcdef0123456789abcdef01234567"
+	const sha2 = "fedcba9876543210fedcba9876543210fedcba98"
+
+	stackID3 := int64(3)
 	exactPayload := []byte(`{"schema_version":1}`)
-
-	st := &stubGateProfileResolverStore{
-		stackByImage: map[string]int64{"docker.io/stack:latest": 7},
-		exactRow: gateProfileRow{
-			ID:        11,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   7,
-			ObjectKey: exactKey,
-		},
-	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			exactKey: exactPayload,
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
-
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	profileID := resolution.ProfileID
-	profilePayload := resolution.Payload
-	if profileID != 11 {
-		t.Fatalf("profile_id = %d, want 11", profileID)
-	}
-	if string(profilePayload) != string(exactPayload) {
-		t.Fatalf("profile payload mismatch: got %q want %q", profilePayload, exactPayload)
-	}
-	if bs.putCalled {
-		t.Fatal("did not expect blob copy on exact hit")
-	}
-	if st.upsertCalled {
-		t.Fatal("did not expect exact upsert on exact hit")
-	}
-	if !st.linkCalled {
-		t.Fatal("expected gate link upsert on exact hit")
-	}
-	if st.linkJobID != job.ID || st.linkProfileID != 11 {
-		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
-	}
-	if !resolution.ExactHit {
-		t.Fatal("ExactHit=false, want true")
-	}
-}
-
-func TestGateProfileResolver_FallbackRepoStackCopiesAndUpsertsExact(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "0123456789abcdef0123456789abcdef01234567"
-	fallbackKey := "gate-profiles/repo-latest.json"
-	fallbackPayload := []byte(`{"schema_version":1,"runner_mode":"simple"}`)
-
-	st := &stubGateProfileResolverStore{
-		stackByImage: map[string]int64{"docker.io/stack:latest": 3},
-		exactErr:     pgx.ErrNoRows,
-		latestRow: gateProfileRow{
-			ID:        21,
-			RepoID:    repoID,
-			StackID:   3,
-			ObjectKey: fallbackKey,
-		},
-		upsertRow: gateProfileRow{
-			ID:        22,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   3,
-			ObjectKey: "gate-profiles/copied.json",
-		},
-	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			fallbackKey: fallbackPayload,
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
-
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	profileID := resolution.ProfileID
-	profilePayload := resolution.Payload
-	if profileID != 22 {
-		t.Fatalf("profile_id = %d, want 22", profileID)
-	}
-	if string(profilePayload) != string(fallbackPayload) {
-		t.Fatalf("profile payload mismatch: got %q want %q", profilePayload, fallbackPayload)
-	}
-	if !bs.putCalled {
-		t.Fatal("expected fallback blob copy")
-	}
-	if !st.upsertCalled {
-		t.Fatal("expected exact upsert after fallback copy")
-	}
-	if st.upsertRepoID != repoID || st.upsertRepoSHA != shaIn || st.upsertStackID != 3 {
-		t.Fatalf("unexpected upsert args: repo=%s sha=%s stack=%d", st.upsertRepoID, st.upsertRepoSHA, st.upsertStackID)
-	}
-	if st.upsertObjectKey == "" || !strings.HasPrefix(st.upsertObjectKey, "gate-profiles/repos/") {
-		t.Fatalf("unexpected upsert object key %q", st.upsertObjectKey)
-	}
-	if !st.linkCalled {
-		t.Fatal("expected gate link upsert after fallback upsert")
-	}
-	if st.linkJobID != job.ID || st.linkProfileID != 22 {
-		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
-	}
-	if resolution.ExactHit {
-		t.Fatal("ExactHit=true, want false on fallback")
-	}
-}
-
-func TestGateProfileResolver_FallbackDefaultStack(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "fedcba9876543210fedcba9876543210fedcba98"
-	defaultKey := "gate-profiles/default.json"
+	latestPayload := []byte(`{"schema_version":1,"runner_mode":"simple"}`)
 	defaultPayload := []byte(`{"schema_version":1,"targets":{"active":"unit"}}`)
 
-	st := &stubGateProfileResolverStore{
-		stackByImage: map[string]int64{},
-		anyStackID:   9,
-		exactErr:     pgx.ErrNoRows,
-		latestErr:    pgx.ErrNoRows,
-		defaultRow: gateProfileRow{
-			ID:        31,
-			StackID:   9,
-			ObjectKey: defaultKey,
+	cases := []gateProfileResolverCase{
+		{
+			name: "exact_hit",
+			st: &stubGateProfileResolverStore{
+				stackByImage: map[string]int64{"docker.io/stack:latest": 7},
+				exactRow: gateProfileRow{
+					ID: 11, RepoID: repoA, RepoSHA: sha1, RepoSHA8: sha1[:8],
+					StackID: 7, ObjectKey: "gate-profiles/exact.json",
+				},
+			},
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/exact.json": exactPayload,
+			}},
+			job:              store.Job{RepoID: repoA, RepoShaIn: sha1, JobImage: "docker.io/stack:latest"},
+			wantProfileID:    11,
+			wantPayload:      exactPayload,
+			wantExactHit:     true,
+			wantLink:         true,
+			wantResolveExact: true,
+			wantResolveImage: true,
 		},
-		upsertRow: gateProfileRow{
-			ID:        32,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   9,
-			ObjectKey: "gate-profiles/default-copied.json",
+		{
+			name: "fallback_repo_latest",
+			st: &stubGateProfileResolverStore{
+				stackByImage: map[string]int64{"docker.io/stack:latest": 3},
+				exactErr:     pgx.ErrNoRows,
+				latestRow: gateProfileRow{
+					ID: 21, RepoID: repoB, StackID: 3,
+					ObjectKey: "gate-profiles/repo-latest.json",
+				},
+				upsertRow: gateProfileRow{
+					ID: 22, RepoID: repoB, RepoSHA: sha1, RepoSHA8: sha1[:8],
+					StackID: 3, ObjectKey: "gate-profiles/copied.json",
+				},
+			},
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/repo-latest.json": latestPayload,
+			}},
+			job:                       store.Job{RepoID: repoB, RepoShaIn: sha1, JobImage: "docker.io/stack:latest"},
+			wantProfileID:             22,
+			wantPayload:               latestPayload,
+			wantUpsert:                true,
+			wantBlobPut:               true,
+			wantLink:                  true,
+			wantResolveExact:          true,
+			wantResolveImage:          true,
+			wantUpsertRepoID:          &repoB,
+			wantUpsertStackID:         &stackID3,
+			wantUpsertObjectKeyPrefix: "gate-profiles/repos/",
+		},
+		{
+			name: "fallback_default",
+			st: &stubGateProfileResolverStore{
+				stackByImage: map[string]int64{},
+				anyStackID:   9,
+				exactErr:     pgx.ErrNoRows,
+				latestErr:    pgx.ErrNoRows,
+				defaultRow: gateProfileRow{
+					ID: 31, StackID: 9, ObjectKey: "gate-profiles/default.json",
+				},
+				upsertRow: gateProfileRow{
+					ID: 32, RepoID: repoC, RepoSHA: sha2, RepoSHA8: sha2[:8],
+					StackID: 9, ObjectKey: "gate-profiles/default-copied.json",
+				},
+			},
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/default.json": defaultPayload,
+			}},
+			job:              store.Job{RepoID: repoC, RepoShaIn: sha2},
+			wantProfileID:    32,
+			wantPayload:      defaultPayload,
+			wantUpsert:       true,
+			wantBlobPut:      true,
+			wantLink:         true,
+			wantResolveExact: true,
+			wantResolveRepo:  true,
+			wantResolveAny:   true,
+		},
+		{
+			name: "exact_hit_short_circuits_errors",
+			st: &stubGateProfileResolverStore{
+				stackByImage: map[string]int64{"docker.io/stack:latest": 7},
+				exactRow: gateProfileRow{
+					ID: 11, RepoID: repoA, RepoSHA: sha1, RepoSHA8: sha1[:8],
+					StackID: 7, ObjectKey: "gate-profiles/exact.json",
+				},
+				latestErr:  fmt.Errorf("db connection reset"),
+				defaultErr: fmt.Errorf("db connection reset"),
+			},
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/exact.json": exactPayload,
+			}},
+			job:              store.Job{RepoID: repoA, RepoShaIn: sha1, JobImage: "docker.io/stack:latest"},
+			wantProfileID:    11,
+			wantPayload:      exactPayload,
+			wantExactHit:     true,
+			wantLink:         true,
+			wantResolveExact: true,
+			wantResolveImage: true,
+		},
+		{
+			name: "latest_hit_short_circuits_errors",
+			st: &stubGateProfileResolverStore{
+				stackByImage: map[string]int64{"docker.io/stack:latest": 5},
+				exactErr:     pgx.ErrNoRows,
+				latestRow: gateProfileRow{
+					ID: 41, RepoID: repoD, StackID: 5,
+					ObjectKey: "gate-profiles/latest.json",
+				},
+				defaultErr: fmt.Errorf("db connection reset"),
+				upsertRow: gateProfileRow{
+					ID: 42, RepoID: repoD, RepoSHA: sha1, RepoSHA8: sha1[:8],
+					StackID: 5, ObjectKey: "gate-profiles/promoted.json",
+				},
+			},
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/latest.json": latestPayload,
+			}},
+			job:              store.Job{RepoID: repoD, RepoShaIn: sha1, JobImage: "docker.io/stack:latest"},
+			wantProfileID:    42,
+			wantPayload:      latestPayload,
+			wantUpsert:       true,
+			wantBlobPut:      true,
+			wantLink:         true,
+			wantResolveExact: true,
+			wantResolveImage: true,
 		},
 	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			defaultKey: defaultPayload,
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
 
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	profileID := resolution.ProfileID
-	profilePayload := resolution.Payload
-	if profileID != 32 {
-		t.Fatalf("profile_id = %d, want 32", profileID)
-	}
-	if string(profilePayload) != string(defaultPayload) {
-		t.Fatalf("profile payload mismatch: got %q want %q", profilePayload, defaultPayload)
-	}
-	if !bs.putCalled {
-		t.Fatal("expected default fallback blob copy")
-	}
-	if !st.upsertCalled {
-		t.Fatal("expected exact upsert after default fallback copy")
-	}
-	if !st.linkCalled {
-		t.Fatal("expected gate link upsert after default fallback upsert")
-	}
-	if st.linkJobID != job.ID || st.linkProfileID != 32 {
-		t.Fatalf("unexpected gate link args: job=%s profile=%d", st.linkJobID, st.linkProfileID)
-	}
-	if resolution.ExactHit {
-		t.Fatal("ExactHit=true, want false on default fallback")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			resolver := &dbGateProfileResolver{st: tc.st, bs: tc.bs}
+			resolution, err := resolver.ResolveGateProfileForJob(context.Background(), tc.job, tc.constraints)
+			assertGateProfileResolution(t, tc, resolution, err)
+		})
 	}
 }
 
-func TestGateProfileResolver_ExactHit_LatestDefaultErrorsNotReached(t *testing.T) {
+func TestGateProfileResolver_StrictStack(t *testing.T) {
 	t.Parallel()
 
-	repoID := types.NewRepoID()
-	const shaIn = "0123456789abcdef0123456789abcdef01234567"
-	exactKey := "gate-profiles/exact.json"
+	repoA := types.NewRepoID()
+	repoB := types.NewRepoID()
+	repoC := types.NewRepoID()
+	repoD := types.NewRepoID()
+
+	const sha1 = "1234567890abcdef1234567890abcdef12345678"
+	const sha2 = "89abcdef0123456789abcdef0123456789abcdef"
+	const sha3 = "fedcba9876543210fedcba9876543210fedcba98"
+	const sha4 = "0123456789abcdef0123456789abcdef01234567"
+
 	exactPayload := []byte(`{"schema_version":1}`)
 
-	st := &stubGateProfileResolverStore{
-		stackByImage: map[string]int64{"docker.io/stack:latest": 7},
-		exactRow: gateProfileRow{
-			ID:        11,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   7,
-			ObjectKey: exactKey,
-		},
-		latestErr:  fmt.Errorf("db connection reset"),
-		defaultErr: fmt.Errorf("db connection reset"),
-	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			exactKey: exactPayload,
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
-
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v; want nil (exact hit must not reach latest/default lookups)", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	if resolution.ProfileID != 11 {
-		t.Fatalf("profile_id = %d, want 11", resolution.ProfileID)
-	}
-	if string(resolution.Payload) != string(exactPayload) {
-		t.Fatalf("profile payload mismatch: got %q want %q", resolution.Payload, exactPayload)
-	}
-	if !resolution.ExactHit {
-		t.Fatal("ExactHit=false, want true")
-	}
-}
-
-func TestGateProfileResolver_LatestFound_DefaultErrorNotReached(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "0123456789abcdef0123456789abcdef01234567"
-	latestKey := "gate-profiles/latest.json"
-	latestPayload := []byte(`{"schema_version":1,"runner_mode":"simple"}`)
-
-	st := &stubGateProfileResolverStore{
-		stackByImage: map[string]int64{"docker.io/stack:latest": 5},
-		exactErr:     pgx.ErrNoRows,
-		latestRow: gateProfileRow{
-			ID:        41,
-			RepoID:    repoID,
-			StackID:   5,
-			ObjectKey: latestKey,
-		},
-		defaultErr: fmt.Errorf("db connection reset"),
-		upsertRow: gateProfileRow{
-			ID:        42,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   5,
-			ObjectKey: "gate-profiles/promoted.json",
-		},
-	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			latestKey: latestPayload,
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
-
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v; want nil (default error must not be reached when latest is found)", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	if resolution.ProfileID != 42 {
-		t.Fatalf("profile_id = %d, want 42", resolution.ProfileID)
-	}
-	if resolution.ExactHit {
-		t.Fatal("ExactHit=true, want false on latest fallback")
-	}
-}
-
-func TestGateProfileResolver_StrictStackUsesRequiredLookup(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "1234567890abcdef1234567890abcdef12345678"
-	exactKey := "gate-profiles/strict.json"
-	exactPayload := []byte(`{"schema_version":1}`)
-
-	st := &stubGateProfileResolverStore{
-		stackByRequired: map[string]int64{strictStackKey("java", "maven", "17"): 11},
-		exactRow: gateProfileRow{
-			ID:        81,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   11,
-			ObjectKey: exactKey,
-		},
-	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			exactKey: exactPayload,
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn}
-
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{
-		StrictStack: &GateProfileLookupStack{
-			Language: "java",
-			Tool:     "maven",
-			Release:  "17",
-		},
-	})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	if resolution.ProfileID != 81 {
-		t.Fatalf("profile_id = %d, want 81", resolution.ProfileID)
-	}
-	if st.resolveRequired == nil {
-		t.Fatal("expected required-stack lookup")
-	}
-	if st.resolveImageCall != "" {
-		t.Fatalf("unexpected image stack lookup %q", st.resolveImageCall)
-	}
-	if st.resolveRepoCall {
-		t.Fatal("unexpected repo-sha stack fallback")
-	}
-	if st.resolveAnyCall {
-		t.Fatal("unexpected any-stack fallback")
-	}
-}
-
-func TestGateProfileResolver_StrictStackNoMatchSkipsFallbacks(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "89abcdef0123456789abcdef0123456789abcdef"
-
-	st := &stubGateProfileResolverStore{
-		repoSHAStackID: 7,
-		anyStackID:     9,
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: &stubBlobStore{}}
-	job := store.Job{RepoID: repoID, RepoShaIn: shaIn, JobImage: "docker.io/stack:latest"}
-
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), job, GateProfileLookupConstraints{
-		StrictStack: &GateProfileLookupStack{
-			Language: "java",
-			Tool:     "gradle",
-			Release:  "17",
-		},
-	})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution != nil {
-		t.Fatalf("expected nil resolution, got %+v", resolution)
-	}
-	if st.resolveRequired == nil {
-		t.Fatal("expected required-stack lookup")
-	}
-	if st.resolveRepoCall {
-		t.Fatal("unexpected repo-sha stack fallback")
-	}
-	if st.resolveAnyCall {
-		t.Fatal("unexpected any-stack fallback")
-	}
-	if st.resolveExactCall {
-		t.Fatal("unexpected profile lookup when strict stack is unresolved")
-	}
-}
-
-func TestGateProfileResolver_StrictToollessPrefersImageMatchedStack(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "fedcba9876543210fedcba9876543210fedcba98"
-	exactKey := "gate-profiles/strict-toolless.json"
-
-	st := &stubGateProfileResolverStore{
-		stackRowByImage: map[string]gateProfileStackRow{
-			"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11": {
-				ID:      3,
-				Lang:    "java",
-				Tool:    "gradle",
-				Release: "11",
+	cases := []gateProfileResolverCase{
+		{
+			name: "required_lookup_exact_hit",
+			st: &stubGateProfileResolverStore{
+				stackByRequired: map[string]int64{strictStackKey("java", "maven", "17"): 11},
+				exactRow: gateProfileRow{
+					ID: 81, RepoID: repoA, RepoSHA: sha1, RepoSHA8: sha1[:8],
+					StackID: 11, ObjectKey: "gate-profiles/strict.json",
+				},
 			},
-		},
-		stackByRequired: map[string]int64{
-			strictStackKey("java", "gradle", "11"): 3,
-		},
-		exactRow: gateProfileRow{
-			ID:        91,
-			RepoID:    repoID,
-			RepoSHA:   shaIn,
-			RepoSHA8:  shaIn[:8],
-			StackID:   3,
-			ObjectKey: exactKey,
-		},
-	}
-	bs := &stubBlobStore{
-		getPayloadByKey: map[string][]byte{
-			exactKey: []byte(`{"schema_version":1}`),
-		},
-	}
-	resolver := &dbGateProfileResolver{st: st, bs: bs}
-
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), store.Job{
-		RepoID:    repoID,
-		RepoShaIn: shaIn,
-		JobImage:  "127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11",
-	}, GateProfileLookupConstraints{
-		StrictStack: &GateProfileLookupStack{
-			Language: "java",
-			Release:  "11",
-		},
-	})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution == nil {
-		t.Fatal("expected non-nil gate profile resolution")
-	}
-	if resolution.ProfileID != 91 {
-		t.Fatalf("profile_id = %d, want 91", resolution.ProfileID)
-	}
-	if st.resolveRequired == nil {
-		t.Fatal("expected required-stack lookup with image-filled strict stack")
-	}
-	if st.resolveRequired.Tool != "gradle" {
-		t.Fatalf("expected filled strict tool %q, got %q", "gradle", st.resolveRequired.Tool)
-	}
-}
-
-func TestGateProfileResolver_StrictToollessImageMismatchSkipsFallbacks(t *testing.T) {
-	t.Parallel()
-
-	repoID := types.NewRepoID()
-	const shaIn = "0123456789abcdef0123456789abcdef01234567"
-
-	st := &stubGateProfileResolverStore{
-		stackRowByImage: map[string]gateProfileStackRow{
-			"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17": {
-				ID:      4,
-				Lang:    "java",
-				Tool:    "gradle",
-				Release: "17",
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/strict.json": exactPayload,
+			}},
+			job: store.Job{RepoID: repoA, RepoShaIn: sha1},
+			constraints: GateProfileLookupConstraints{
+				StrictStack: &GateProfileLookupStack{Language: "java", Tool: "maven", Release: "17"},
 			},
+			wantProfileID:       81,
+			wantPayload:         exactPayload,
+			wantExactHit:        true,
+			wantLink:            true,
+			wantResolveRequired: true,
+			wantResolveExact:    true,
 		},
-		repoSHAStackID: 7,
-		anyStackID:     9,
+		{
+			name: "no_match_skips_all",
+			st: &stubGateProfileResolverStore{
+				repoSHAStackID: 7,
+				anyStackID:     9,
+			},
+			bs:  &stubBlobStore{},
+			job: store.Job{RepoID: repoB, RepoShaIn: sha2, JobImage: "docker.io/stack:latest"},
+			constraints: GateProfileLookupConstraints{
+				StrictStack: &GateProfileLookupStack{Language: "java", Tool: "gradle", Release: "17"},
+			},
+			wantNil:             true,
+			wantResolveRequired: true,
+			wantResolveImage:    true,
+		},
+		{
+			name: "toolless_fills_from_image",
+			st: &stubGateProfileResolverStore{
+				stackRowByImage: map[string]gateProfileStackRow{
+					"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11": {
+						ID: 3, Lang: "java", Tool: "gradle", Release: "11",
+					},
+				},
+				stackByRequired: map[string]int64{
+					strictStackKey("java", "gradle", "11"): 3,
+				},
+				exactRow: gateProfileRow{
+					ID: 91, RepoID: repoC, RepoSHA: sha3, RepoSHA8: sha3[:8],
+					StackID: 3, ObjectKey: "gate-profiles/strict-toolless.json",
+				},
+			},
+			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
+				"gate-profiles/strict-toolless.json": exactPayload,
+			}},
+			job: store.Job{RepoID: repoC, RepoShaIn: sha3, JobImage: "127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11"},
+			constraints: GateProfileLookupConstraints{
+				StrictStack: &GateProfileLookupStack{Language: "java", Release: "11"},
+			},
+			wantProfileID:            91,
+			wantPayload:              exactPayload,
+			wantExactHit:             true,
+			wantLink:                 true,
+			wantResolveRequired:      true,
+			wantResolveImage:         true,
+			wantResolveExact:         true,
+			wantResolvedRequiredTool: "gradle",
+		},
+		{
+			name: "toolless_image_mismatch_skips",
+			st: &stubGateProfileResolverStore{
+				stackRowByImage: map[string]gateProfileStackRow{
+					"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17": {
+						ID: 4, Lang: "java", Tool: "gradle", Release: "17",
+					},
+				},
+				repoSHAStackID: 7,
+				anyStackID:     9,
+			},
+			bs:  &stubBlobStore{},
+			job: store.Job{RepoID: repoD, RepoShaIn: sha4, JobImage: "127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17"},
+			constraints: GateProfileLookupConstraints{
+				StrictStack: &GateProfileLookupStack{Language: "java", Release: "11"},
+			},
+			wantNil:          true,
+			wantResolveImage: true,
+		},
 	}
-	resolver := &dbGateProfileResolver{st: st, bs: &stubBlobStore{}}
 
-	resolution, err := resolver.ResolveGateProfileForJob(context.Background(), store.Job{
-		RepoID:    repoID,
-		RepoShaIn: shaIn,
-		JobImage:  "127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17",
-	}, GateProfileLookupConstraints{
-		StrictStack: &GateProfileLookupStack{
-			Language: "java",
-			Release:  "11",
-		},
-	})
-	if err != nil {
-		t.Fatalf("ResolveGateProfileForJob() error = %v", err)
-	}
-	if resolution != nil {
-		t.Fatalf("expected nil resolution, got %+v", resolution)
-	}
-	if st.resolveRequired != nil {
-		t.Fatalf("unexpected required-stack lookup when image mismatched strict stack: %+v", st.resolveRequired)
-	}
-	if st.resolveRepoCall {
-		t.Fatal("unexpected repo-sha stack fallback")
-	}
-	if st.resolveAnyCall {
-		t.Fatal("unexpected any-stack fallback")
-	}
-	if st.resolveExactCall {
-		t.Fatal("unexpected profile lookup when strict stack image mismatched")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			resolver := &dbGateProfileResolver{st: tc.st, bs: tc.bs}
+			resolution, err := resolver.ResolveGateProfileForJob(context.Background(), tc.job, tc.constraints)
+			assertGateProfileResolution(t, tc, resolution, err)
+		})
 	}
 }
