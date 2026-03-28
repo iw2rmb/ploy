@@ -21,7 +21,7 @@ func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType do
 	if err != nil {
 		return nil
 	}
-	if jobMeta.Recovery == nil || strings.TrimSpace(jobMeta.Recovery.ErrorKind) == "" {
+	if jobMeta.RecoveryMetadata == nil || strings.TrimSpace(jobMeta.RecoveryMetadata.ErrorKind) == "" {
 		return nil
 	}
 
@@ -33,18 +33,18 @@ func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType do
 	if err != nil {
 		return err
 	}
-	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.Recovery.ErrorKind)
+	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.RecoveryMetadata.ErrorKind)
 	if !ok {
 		kind = contracts.DefaultRecoveryErrorKind()
 	}
 	healing["selected_error_kind"] = kind.String()
-	if len(jobMeta.Recovery.Expectations) > 0 {
+	if len(jobMeta.RecoveryMetadata.Expectations) > 0 {
 		var ex struct {
 			Artifacts []struct {
 				Path string `json:"path"`
 			} `json:"artifacts"`
 		}
-		if err := json.Unmarshal(jobMeta.Recovery.Expectations, &ex); err == nil && len(ex.Artifacts) > 0 {
+		if err := json.Unmarshal(jobMeta.RecoveryMetadata.Expectations, &ex); err == nil && len(ex.Artifacts) > 0 {
 			existing := map[string]struct{}{}
 			var paths []any
 			if cur, ok := m["artifact_paths"]; ok && cur != nil {
@@ -85,10 +85,10 @@ func applyHealingSchemaMutator(m map[string]any, job store.Job, jobType domainty
 		return nil
 	}
 	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
-	if err != nil || jobMeta.Recovery == nil {
+	if err != nil || jobMeta.RecoveryMetadata == nil {
 		return nil
 	}
-	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.Recovery.ErrorKind)
+	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.RecoveryMetadata.ErrorKind)
 	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
 		return nil
 	}

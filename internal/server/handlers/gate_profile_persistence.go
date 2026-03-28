@@ -41,10 +41,10 @@ func persistSuccessfulGateProfile(
 	}
 
 	meta, err := contracts.UnmarshalJobMeta(rawMeta)
-	if err != nil || meta == nil || meta.Gate == nil {
+	if err != nil || meta == nil || meta.GateMetadata == nil {
 		return nil
 	}
-	if len(meta.Gate.StaticChecks) == 0 || !meta.Gate.StaticChecks[0].Passed {
+	if len(meta.GateMetadata.StaticChecks) == 0 || !meta.GateMetadata.StaticChecks[0].Passed {
 		return nil
 	}
 
@@ -58,12 +58,12 @@ func persistSuccessfulGateProfile(
 		return err
 	}
 
-	stackRow, err := resolveGateProfileStackRow(ctx, st, job, meta.Gate)
+	stackRow, err := resolveGateProfileStackRow(ctx, st, job, meta.GateMetadata)
 	if err != nil {
 		return err
 	}
 
-	payload, err := buildSuccessfulGateProfilePayload(job.RepoID, target, stackRow, meta.Gate)
+	payload, err := buildSuccessfulGateProfilePayload(job.RepoID, target, stackRow, meta.GateMetadata)
 	if err != nil {
 		return err
 	}

@@ -50,8 +50,8 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unmarshal promoted meta: %v", err)
 	}
-	if meta.Recovery == nil || meta.Recovery.CandidatePromoted == nil || !*meta.Recovery.CandidatePromoted {
-		t.Fatalf("candidate_promoted = %#v, want true", meta.Recovery)
+	if meta.RecoveryMetadata == nil || meta.RecoveryMetadata.CandidatePromoted == nil || !*meta.RecoveryMetadata.CandidatePromoted {
+		t.Fatalf("candidate_promoted = %#v, want true", meta.RecoveryMetadata)
 	}
 }
 
@@ -84,14 +84,14 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 	if err != nil {
 		t.Fatalf("unmarshal persisted meta: %v", err)
 	}
-	if meta.Recovery == nil {
+	if meta.RecoveryMetadata == nil {
 		t.Fatal("expected merged job-level recovery metadata")
 	}
-	if got, want := meta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
+	if got, want := meta.RecoveryMetadata.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
 		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
 	}
-	if meta.Recovery.CandidatePromoted == nil || *meta.Recovery.CandidatePromoted {
-		t.Fatalf("candidate_promoted = %#v, want false before promotion write", meta.Recovery.CandidatePromoted)
+	if meta.RecoveryMetadata.CandidatePromoted == nil || *meta.RecoveryMetadata.CandidatePromoted {
+		t.Fatalf("candidate_promoted = %#v, want false before promotion write", meta.RecoveryMetadata.CandidatePromoted)
 	}
 }
 
@@ -191,13 +191,13 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unmarshal updated re-gate meta: %v", err)
 	}
-	if meta.Recovery == nil {
+	if meta.RecoveryMetadata == nil {
 		t.Fatal("expected recovery metadata")
 	}
-	if got, want := meta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
-		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, meta.Recovery.CandidateValidationError)
+	if got, want := meta.RecoveryMetadata.CandidateValidationStatus, contracts.RecoveryCandidateStatusValid; got != want {
+		t.Fatalf("candidate_validation_status = %q, want %q (error=%q)", got, want, meta.RecoveryMetadata.CandidateValidationError)
 	}
-	if len(meta.Recovery.CandidateGateProfile) == 0 {
+	if len(meta.RecoveryMetadata.CandidateGateProfile) == 0 {
 		t.Fatal("expected candidate_gate_profile payload")
 	}
 }
@@ -246,13 +246,13 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T
 	if err != nil {
 		t.Fatalf("unmarshal updated re-gate meta: %v", err)
 	}
-	if meta.Recovery == nil {
+	if meta.RecoveryMetadata == nil {
 		t.Fatal("expected recovery metadata")
 	}
-	if got, want := meta.Recovery.CandidateValidationStatus, contracts.RecoveryCandidateStatusMissing; got != want {
+	if got, want := meta.RecoveryMetadata.CandidateValidationStatus, contracts.RecoveryCandidateStatusMissing; got != want {
 		t.Fatalf("candidate_validation_status = %q, want %q", got, want)
 	}
-	if meta.Recovery.CandidateValidationError == "" {
+	if meta.RecoveryMetadata.CandidateValidationError == "" {
 		t.Fatal("expected candidate_validation_error for missing artifact")
 	}
 }

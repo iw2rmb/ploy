@@ -104,16 +104,16 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 					if meta.ActionSummary != "" {
 						jr.ActionSummary = meta.ActionSummary
 					}
-					if meta.Gate != nil && strings.TrimSpace(meta.Gate.BugSummary) != "" {
-						jr.BugSummary = strings.TrimSpace(meta.Gate.BugSummary)
+					if meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
+						jr.BugSummary = strings.TrimSpace(meta.GateMetadata.BugSummary)
 					}
-					if meta.Recovery != nil {
-						jr.Recovery = newRecoveryView(meta.Recovery)
-					} else if meta.Gate != nil && meta.Gate.Recovery != nil {
-						jr.Recovery = newRecoveryView(meta.Gate.Recovery)
+					if meta.RecoveryMetadata != nil {
+						jr.Recovery = newRecoveryView(meta.RecoveryMetadata)
+					} else if meta.GateMetadata != nil && meta.GateMetadata.Recovery != nil {
+						jr.Recovery = newRecoveryView(meta.GateMetadata.Recovery)
 					}
-					if meta.Gate != nil {
-						if exp := meta.Gate.DetectedStackExpectation(); exp != nil {
+					if meta.GateMetadata != nil {
+						if exp := meta.GateMetadata.DetectedStackExpectation(); exp != nil {
 							jr.Lang = exp.Language
 							jr.Tooling = exp.Tool
 							jr.Version = exp.Release

@@ -37,10 +37,10 @@ func applyRecoveryCandidatePrepMutator(m map[string]any, job store.Job, jobType 
 		return nil
 	}
 	jobMeta, err := contracts.UnmarshalJobMeta(job.Meta)
-	if err != nil || jobMeta.Recovery == nil {
+	if err != nil || jobMeta.RecoveryMetadata == nil {
 		return nil
 	}
-	recovery := jobMeta.Recovery
+	recovery := jobMeta.RecoveryMetadata
 	if recovery.CandidateValidationStatus != contracts.RecoveryCandidateStatusValid {
 		return nil
 	}

@@ -282,8 +282,8 @@ func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
 	if decoded.JobMeta.Kind != contracts.JobKindGate {
 		t.Fatalf("job_meta.Kind = %q, want %q", decoded.JobMeta.Kind, contracts.JobKindGate)
 	}
-	if decoded.JobMeta.Gate == nil || decoded.JobMeta.Gate.LogDigest != testLogDigest(1) {
-		t.Fatalf("job_meta.Gate.LogDigest = %#v, want %q", decoded.JobMeta.Gate, testLogDigest(1))
+	if decoded.JobMeta.GateMetadata == nil || decoded.JobMeta.GateMetadata.LogDigest != testLogDigest(1) {
+		t.Fatalf("job_meta.GateMetadata.LogDigest = %#v, want %q", decoded.JobMeta.GateMetadata, testLogDigest(1))
 	}
 }
 

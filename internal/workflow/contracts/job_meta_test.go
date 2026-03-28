@@ -47,7 +47,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			name: "valid gate job with metadata",
 			meta: JobMeta{
 				Kind: JobKindGate,
-				Gate: &BuildGateStageMetadata{
+				GateMetadata: &BuildGateStageMetadata{
 					LogDigest: types.Sha256Digest(testDigestA),
 					StaticChecks: []BuildGateStaticCheckReport{
 						{Tool: "maven", Passed: true},
@@ -60,7 +60,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			name: "valid gate job with recovery metadata",
 			meta: JobMeta{
 				Kind: JobKindGate,
-				Recovery: &RecoveryJobMetadata{
+				RecoveryMetadata: &RecoveryJobMetadata{
 					LoopKind:  "healing",
 					ErrorKind: "infra",
 				},
@@ -71,7 +71,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			name: "valid mig job with recovery metadata",
 			meta: JobMeta{
 				Kind: JobKindMig,
-				Recovery: &RecoveryJobMetadata{
+				RecoveryMetadata: &RecoveryJobMetadata{
 					LoopKind:  "healing",
 					ErrorKind: "code",
 				},
@@ -97,8 +97,8 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "gate metadata on mig job",
 			meta: JobMeta{
-				Kind: JobKindMig,
-				Gate: &BuildGateStageMetadata{},
+				Kind:         JobKindMig,
+				GateMetadata: &BuildGateStageMetadata{},
 			},
 			wantErr: true,
 		},
@@ -113,8 +113,8 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "gate metadata on build job",
 			meta: JobMeta{
-				Kind: JobKindBuild,
-				Gate: &BuildGateStageMetadata{},
+				Kind:         JobKindBuild,
+				GateMetadata: &BuildGateStageMetadata{},
 			},
 			wantErr: true,
 		},
@@ -122,7 +122,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			name: "recovery metadata on build job",
 			meta: JobMeta{
 				Kind: JobKindBuild,
-				Recovery: &RecoveryJobMetadata{
+				RecoveryMetadata: &RecoveryJobMetadata{
 					LoopKind:  "healing",
 					ErrorKind: "infra",
 				},
@@ -133,7 +133,7 @@ func TestJobMeta_Validate(t *testing.T) {
 			name: "invalid recovery metadata",
 			meta: JobMeta{
 				Kind: JobKindGate,
-				Recovery: &RecoveryJobMetadata{
+				RecoveryMetadata: &RecoveryJobMetadata{
 					LoopKind:  "healing",
 					ErrorKind: "invalid",
 				},
@@ -171,8 +171,8 @@ func TestMarshalJobMeta(t *testing.T) {
 		{
 			name: "gate metadata on mig job returns error",
 			meta: &JobMeta{
-				Kind: JobKindMig,
-				Gate: &BuildGateStageMetadata{},
+				Kind:         JobKindMig,
+				GateMetadata: &BuildGateStageMetadata{},
 			},
 			wantErr: true,
 		},
@@ -185,7 +185,7 @@ func TestMarshalJobMeta(t *testing.T) {
 			name: "gate job with metadata",
 			meta: &JobMeta{
 				Kind: JobKindGate,
-				Gate: &BuildGateStageMetadata{
+				GateMetadata: &BuildGateStageMetadata{
 					LogDigest: types.Sha256Digest(testDigestA),
 				},
 			},
@@ -306,7 +306,7 @@ func TestJobMeta_RoundTrip(t *testing.T) {
 	// Test that marshaling and unmarshaling preserves data.
 	original := &JobMeta{
 		Kind: JobKindGate,
-		Gate: &BuildGateStageMetadata{
+		GateMetadata: &BuildGateStageMetadata{
 			LogDigest: types.Sha256Digest(testDigestB),
 			StaticChecks: []BuildGateStaticCheckReport{
 				{
@@ -348,17 +348,17 @@ func TestJobMeta_RoundTrip(t *testing.T) {
 	if got.Kind != original.Kind {
 		t.Errorf("Kind = %v, want %v", got.Kind, original.Kind)
 	}
-	if got.Gate == nil {
-		t.Fatal("Gate = nil, want non-nil")
+	if got.GateMetadata == nil {
+		t.Fatal("GateMetadata = nil, want non-nil")
 	}
-	if got.Gate.LogDigest != original.Gate.LogDigest {
-		t.Errorf("Gate.LogDigest = %v, want %v", got.Gate.LogDigest, original.Gate.LogDigest)
+	if got.GateMetadata.LogDigest != original.GateMetadata.LogDigest {
+		t.Errorf("GateMetadata.LogDigest = %v, want %v", got.GateMetadata.LogDigest, original.GateMetadata.LogDigest)
 	}
-	if len(got.Gate.StaticChecks) != len(original.Gate.StaticChecks) {
-		t.Errorf("Gate.StaticChecks len = %d, want %d", len(got.Gate.StaticChecks), len(original.Gate.StaticChecks))
+	if len(got.GateMetadata.StaticChecks) != len(original.GateMetadata.StaticChecks) {
+		t.Errorf("GateMetadata.StaticChecks len = %d, want %d", len(got.GateMetadata.StaticChecks), len(original.GateMetadata.StaticChecks))
 	}
-	if len(got.Gate.LogFindings) != len(original.Gate.LogFindings) {
-		t.Errorf("Gate.LogFindings len = %d, want %d", len(got.Gate.LogFindings), len(original.Gate.LogFindings))
+	if len(got.GateMetadata.LogFindings) != len(original.GateMetadata.LogFindings) {
+		t.Errorf("GateMetadata.LogFindings len = %d, want %d", len(got.GateMetadata.LogFindings), len(original.GateMetadata.LogFindings))
 	}
 }
 
@@ -368,8 +368,8 @@ func TestNewJobMetaConstructors(t *testing.T) {
 		if m.Kind != JobKindMig {
 			t.Errorf("Kind = %v, want %v", m.Kind, JobKindMig)
 		}
-		if m.Gate != nil {
-			t.Error("Gate should be nil")
+		if m.GateMetadata != nil {
+			t.Error("GateMetadata should be nil")
 		}
 		if m.Build != nil {
 			t.Error("Build should be nil")
@@ -382,8 +382,8 @@ func TestNewJobMetaConstructors(t *testing.T) {
 		if m.Kind != JobKindGate {
 			t.Errorf("Kind = %v, want %v", m.Kind, JobKindGate)
 		}
-		if m.Gate != gate {
-			t.Error("Gate should be the provided metadata")
+		if m.GateMetadata != gate {
+			t.Error("GateMetadata should be the provided metadata")
 		}
 		if m.Build != nil {
 			t.Error("Build should be nil")
@@ -399,8 +399,8 @@ func TestNewJobMetaConstructors(t *testing.T) {
 		if m.Build != build {
 			t.Error("Build should be the provided metadata")
 		}
-		if m.Gate != nil {
-			t.Error("Gate should be nil")
+		if m.GateMetadata != nil {
+			t.Error("GateMetadata should be nil")
 		}
 	})
 }
@@ -470,7 +470,7 @@ func TestJobMeta_ActionSummary_OnGateJob_Rejected(t *testing.T) {
 	t.Parallel()
 	m := &JobMeta{
 		Kind:          JobKindGate,
-		Gate:          &BuildGateStageMetadata{},
+		GateMetadata:  &BuildGateStageMetadata{},
 		ActionSummary: "should not be here",
 	}
 	err := m.Validate()
@@ -499,7 +499,7 @@ func TestJobMeta_Recovery_RoundTrip(t *testing.T) {
 	t.Parallel()
 	original := &JobMeta{
 		Kind: JobKindMig,
-		Recovery: &RecoveryJobMetadata{
+		RecoveryMetadata: &RecoveryJobMetadata{
 			LoopKind:   "healing",
 			ErrorKind:  "code",
 			StrategyID: "code-default",
@@ -514,17 +514,17 @@ func TestJobMeta_Recovery_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UnmarshalJobMeta() error = %v", err)
 	}
-	if got.Recovery == nil {
-		t.Fatal("Recovery = nil, want non-nil")
+	if got.RecoveryMetadata == nil {
+		t.Fatal("RecoveryMetadata = nil, want non-nil")
 	}
-	if got.Recovery.LoopKind != original.Recovery.LoopKind {
-		t.Fatalf("Recovery.LoopKind = %q, want %q", got.Recovery.LoopKind, original.Recovery.LoopKind)
+	if got.RecoveryMetadata.LoopKind != original.RecoveryMetadata.LoopKind {
+		t.Fatalf("RecoveryMetadata.LoopKind = %q, want %q", got.RecoveryMetadata.LoopKind, original.RecoveryMetadata.LoopKind)
 	}
-	if got.Recovery.ErrorKind != original.Recovery.ErrorKind {
-		t.Fatalf("Recovery.ErrorKind = %q, want %q", got.Recovery.ErrorKind, original.Recovery.ErrorKind)
+	if got.RecoveryMetadata.ErrorKind != original.RecoveryMetadata.ErrorKind {
+		t.Fatalf("RecoveryMetadata.ErrorKind = %q, want %q", got.RecoveryMetadata.ErrorKind, original.RecoveryMetadata.ErrorKind)
 	}
-	if got.Recovery.StrategyID != original.Recovery.StrategyID {
-		t.Fatalf("Recovery.StrategyID = %q, want %q", got.Recovery.StrategyID, original.Recovery.StrategyID)
+	if got.RecoveryMetadata.StrategyID != original.RecoveryMetadata.StrategyID {
+		t.Fatalf("RecoveryMetadata.StrategyID = %q, want %q", got.RecoveryMetadata.StrategyID, original.RecoveryMetadata.StrategyID)
 	}
 }
 

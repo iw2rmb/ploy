@@ -82,7 +82,7 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     3. Run `rg --files internal/workflow/contracts | rg 'migs_.*\.go$'`.
   - Reasoning: medium (4 CFP)
 
-- [ ] 1.6 Rename overloaded `JobMeta` fields to explicit metadata names
+- [x] 1.6 Rename overloaded `JobMeta` fields to explicit metadata names
   - Type: determined
   - Component: `internal/workflow/contracts/job_meta.go`, `internal/workflow/**/*.go`, `internal/server/handlers/**/*.go`, `internal/nodeagent/**/*.go`
   - Implementation:

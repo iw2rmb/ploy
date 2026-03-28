@@ -222,12 +222,12 @@ func EvaluateGateFailureTransition(
 			HealRepoSHAIn:  healRepoSHAIn,
 			OldSuccessorID: failedJob.NextID,
 			HealMeta: &contracts.JobMeta{
-				Kind:     contracts.JobKindMig,
-				Recovery: CloneRecoveryMetadata(enrichedMeta),
+				Kind:             contracts.JobKindMig,
+				RecoveryMetadata: CloneRecoveryMetadata(enrichedMeta),
 			},
 			ReGateMeta: &contracts.JobMeta{
-				Kind:     contracts.JobKindGate,
-				Recovery: reGateRecoveryMeta,
+				Kind:             contracts.JobKindGate,
+				RecoveryMetadata: reGateRecoveryMeta,
 			},
 			ShouldAttachCandidate: shouldAttachCandidate,
 		},
@@ -256,18 +256,18 @@ func ResolveGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecove
 		return meta, detectedStack, detectedExpectation
 	}
 
-	if jobMeta.Gate != nil {
-		detectedStack = jobMeta.Gate.DetectedStack()
-		detectedExpectation = jobMeta.Gate.DetectedStackExpectation()
-		if jobMeta.Gate.Recovery != nil {
-			meta = CloneRecoveryMetadata(jobMeta.Gate.Recovery)
+	if jobMeta.GateMetadata != nil {
+		detectedStack = jobMeta.GateMetadata.DetectedStack()
+		detectedExpectation = jobMeta.GateMetadata.DetectedStackExpectation()
+		if jobMeta.GateMetadata.Recovery != nil {
+			meta = CloneRecoveryMetadata(jobMeta.GateMetadata.Recovery)
 		}
 	}
 	if detectedExpectation == nil {
 		detectedExpectation = StackExpectationFromMigStack(detectedStack)
 	}
-	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); (!ok || kind == contracts.RecoveryErrorKindUnknown) && jobMeta.Recovery != nil {
-		meta = CloneRecoveryMetadata(jobMeta.Recovery)
+	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); (!ok || kind == contracts.RecoveryErrorKindUnknown) && jobMeta.RecoveryMetadata != nil {
+		meta = CloneRecoveryMetadata(jobMeta.RecoveryMetadata)
 	}
 	if loopKind, ok := contracts.ParseRecoveryLoopKind(meta.LoopKind); ok {
 		meta.LoopKind = loopKind.String()
