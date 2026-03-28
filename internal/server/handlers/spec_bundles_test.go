@@ -27,7 +27,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	t.Run("UploadSuccess", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()
 		objKey := "spec-bundles/" + bundleID.String() + ".gz"
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundleByCID.err = pgx.ErrNoRows // no existing bundle
 		st.createSpecBundle.val = store.SpecBundle{
 			ID:        bundleID,
@@ -65,7 +65,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 
 	t.Run("Deduplicated", func(t *testing.T) {
 		existingID := domaintypes.NewSpecBundleID()
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundleByCID.val = store.SpecBundle{
 			ID:     existingID,
 			Cid:    cid,
@@ -100,7 +100,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("EmptyBody", func(t *testing.T) {
-		st := &mockStore{}
+		st := &configStore{}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -114,7 +114,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("ExceedsSizeLimit", func(t *testing.T) {
-		st := &mockStore{}
+		st := &configStore{}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -131,7 +131,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	t.Run("CreatedByQueryParam", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()
 		objKey := "spec-bundles/" + bundleID.String() + ".gz"
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundleByCID.err = pgx.ErrNoRows
 		st.createSpecBundle.val = store.SpecBundle{
 			ID:        bundleID,
@@ -163,7 +163,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	bundleContent := []byte("fake bundle bytes")
 
 	t.Run("DownloadSuccess", func(t *testing.T) {
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        bundleID,
 			ObjectKey: &objectKey,
@@ -194,7 +194,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
@@ -209,7 +209,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("InvalidID", func(t *testing.T) {
-		st := &mockStore{}
+		st := &configStore{}
 		bs := bsmock.New()
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/not-valid-id", nil)
@@ -224,7 +224,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 
 	t.Run("BlobNotFound", func(t *testing.T) {
 		// Metadata row exists but blob is absent from object store: expect 404, not 503.
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        bundleID,
 			ObjectKey: &objectKey,
@@ -242,7 +242,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("MissingObjectKey", func(t *testing.T) {
-		st := &mockStore{}
+		st := &configStore{}
 		st.getSpecBundle.val = store.SpecBundle{
 			ID:        bundleID,
 			ObjectKey: nil, // no object key
@@ -266,7 +266,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	objectKey := "spec-bundles/" + bundleID.String() + ".gz"
 	bundleContent := []byte("fake bundle bytes")
 
-	st := &mockStore{
+	st := &configStore{
 		updateSpecBundleLastRefAtStarted: make(chan struct{}),
 		updateSpecBundleLastRefAtProceed: make(chan struct{}),
 		updateSpecBundleLastRefAtDone:    make(chan struct{}),

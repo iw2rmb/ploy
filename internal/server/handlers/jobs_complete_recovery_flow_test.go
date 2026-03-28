@@ -22,7 +22,7 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	f := newRepoScopedFixture(domaintypes.JobTypeReGate)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withResolveStackRow(store.ResolveStackRowByLangToolRow{
 			ID: 7, Lang: "go", Tool: "go", Release: "",
 		}),
@@ -61,7 +61,7 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 	f := newRepoScopedFixture(domaintypes.JobTypeReGate)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}},"candidate_promoted":false}}`)
 
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -101,7 +101,7 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	f := newRepoScopedFixture(domaintypes.JobTypeReGate)
 	f.Job.Meta = []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"valid","candidate_gate_profile":{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"build","build":{"status":"passed","command":"go test ./...","env":{},"failure_code":null},"unit":{"status":"not_attempted","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}}}`)
 
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -137,7 +137,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 		Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"missing"}}`),
 	}
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withJobResults(map[domaintypes.JobID]store.Job{reGateID: reGate}),
 		withRepoAttemptJobs([]store.Job{failedGate, f.Job, reGate}),
 		withArtifactBundles([]store.ArtifactBundle{
@@ -225,7 +225,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T
 		Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"missing"}}`),
 	}
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withJobResults(map[domaintypes.JobID]store.Job{reGateID: reGate}),
 		withRepoAttemptJobs([]store.Job{failedGate, f.Job, reGate}),
 	)

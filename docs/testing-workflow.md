@@ -119,6 +119,22 @@ func TestRepoHandler(t *testing.T) {
 - If a shared helper already exists, do not add a duplicated local helper.
 - Keep `internal/testutil` packages dependency-light to avoid import cycles.
 
+### Handler Test Fixture Stores
+
+Handler tests use domain-focused fixture stores instead of a single monolithic mock. Each store embeds `store.Store` and implements only the methods its handler domain calls:
+
+| Store | File | Domain |
+|-------|------|--------|
+| `jobStore` | `test_fixture_job_test.go` | Job completion, status, claiming, healing, stale recovery |
+| `migStore` | `test_fixture_mig_test.go` | Mig CRUD, spec, mig-repo, run submission |
+| `runStore` | `test_fixture_run_test.go` | Run listing, timing, delete, batch ops, pull, ingest |
+| `artifactStore` | `test_fixture_artifact_test.go` | Artifact download/repo, diffs, SBOM compat |
+| `configStore` | `test_fixture_config_test.go` | Global env, spec bundles |
+| `nodeStore` | `test_fixture_node_test.go` | Node CRUD, heartbeat, draining |
+| `repoListStore` | `test_fixture_repolist_test.go` | Repo listing |
+
+Shared generic helpers (`mockResult`, `mockCall`) live in `test_mock_helpers_test.go`. Fixture builders and assertion helpers live in `test_helpers_test.go`.
+
 ### Oversized Test Files
 
 - Split oversized test files by behavior domain instead of keeping multi-domain monoliths.

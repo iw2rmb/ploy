@@ -19,7 +19,7 @@ func TestCompleteJob_Success(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -38,7 +38,7 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -81,7 +81,7 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -126,7 +126,7 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	f := newJobFixture("mr")
 	mrURL := "https://gitlab.com/org/repo/-/merge_requests/42"
 
-	st := newMockStoreForJob(f, withRunStatus(domaintypes.RunStatusFinished))
+	st := newJobStoreForFixture(f, withRunStatus(domaintypes.RunStatusFinished))
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -155,7 +155,7 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()
@@ -188,7 +188,7 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	t.Parallel()
 
 	f := newJobFixture("")
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -221,10 +221,10 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		storeOpts []func(*mockStore)
+		storeOpts []func(*jobStore)
 	}{
 		{name: "normal"},
-		{name: "run_lookup_fails", storeOpts: []func(*mockStore){
+		{name: "run_lookup_fails", storeOpts: []func(*jobStore){
 			withGetRunErr(errors.New("transient run lookup failure")),
 		}},
 	}
@@ -234,7 +234,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 			t.Parallel()
 
 			f := newRepoScopedFixture("mig")
-			st := newMockStoreForJob(f, tt.storeOpts...)
+			st := newJobStoreForFixture(f, tt.storeOpts...)
 
 			handler := completeJobHandler(st, nil, nil)
 			rr := httptest.NewRecorder()
@@ -256,7 +256,7 @@ func TestCompleteJob_GateFailureSetsLastError(t *testing.T) {
 
 	f := newRepoScopedFixture("pre_gate")
 
-	st := newMockStoreForJob(f)
+	st := newJobStoreForFixture(f)
 
 	handler := completeJobHandler(st, nil, nil)
 	rr := httptest.NewRecorder()

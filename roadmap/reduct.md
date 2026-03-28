@@ -192,7 +192,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **Tests updated**: `mod_management_test.go` uses `domainapi.MigSummary` and `domainapi.MigListResponse`; `mod_repos_test.go` uses `domainapi.MigRepoSummary`/`domainapi.MigRepoListResponse` with plain `string` refs; `model_migrations_test.go`, `model_migration_details_test.go`, `model_window_size_test.go` use `domainapi.MigSummary` with `time.Time` `CreatedAt`.
     - **Test proof**: `go test ./internal/cli/... ./internal/client/... ./internal/domain/api ./internal/tui/...` passes; `make test` passes (all packages).
 
-- [ ] 5.1 Replace monolithic mockStore in handlers with focused fixture builders
+- [x] 5.1 Replace monolithic mockStore in handlers with focused fixture builders
   - Type: determined
   - Component: `internal/server/handlers/test_mock_store_core_test.go`, `internal/server/handlers/test_mock_store_jobs_test.go`, `internal/server/handlers/test_mock_store_migs_runs_test.go`, `internal/server/handlers/test_mock_store_artifacts_diffs_test.go`, `internal/server/handlers/test_mock_store_spec_bundles_test.go`, `internal/server/handlers/test_helpers_test.go`
   - Implementation:
@@ -207,6 +207,15 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+240/-620` (net `-380`) in handler test scaffolding.
   - Clarity / complexity check: Reduces cognitive load in tests; fixture scope remains domain-local, not global.
   - Reasoning: high (15 CFP)
+  - Completion notes:
+    - **Monolithic `mockStore` removed**: Deleted 7 mock store files (`test_mock_store_core_test.go`, `test_mock_store_jobs_test.go`, `test_mock_store_migs_runs_test.go`, `test_mock_store_repos_test.go`, `test_mock_store_artifacts_diffs_test.go`, `test_mock_store_spec_bundles_test.go`, `test_mock_store_tokens_env_test.go`) totaling 1,297 lines. The single 366-field `mockStore` struct and all its method implementations across 7 files are fully deleted. No `mockStore` type reference remains in any handler test.
+    - **7 focused fixture stores created** (`test_fixture_*_test.go`): `jobStore` (749 lines — job completion, status, listing, claiming, healing, stale recovery, orchestration), `migStore` (437 lines — mig CRUD, spec, mig-repo, run submission), `runStore` (367 lines — run listing, timing, delete, batch ops, pull, ingest, events, run-repo-jobs), `artifactStore` (89 lines — artifact download/repo, diffs, SBOM compat), `configStore` (87 lines — global env, spec bundles), `nodeStore` (46 lines — node CRUD, heartbeat, draining), `repoListStore` (22 lines — repo listing). Each store embeds `store.Store` and implements only the methods its handler domain calls.
+    - **Dead code removed**: Token/bootstrap mock methods (~110 lines of fields + methods in old `mockStore`) that were defined but never called by any handler test — not included in any focused store.
+    - **Fixture builders migrated**: `activeMigWithSpec()` now returns `*migStore`; `newJobStoreForFixture()` (renamed from `newMockStoreForJob`) returns `*jobStore`; all 12 functional options (`withSpec`, `withRunStatus`, `withRepoAttemptJobs`, etc.) accept `*jobStore`; `assertNoCompletion` and `assertRepoError` accept `*jobStore`; `claimJobFixture` contains `*jobStore`.
+    - **45 test files migrated**: All 236 `&mockStore{...}` construction sites across 45 test files replaced with the appropriate focused store type. `path_params_test.go` uses per-subtest stores matching each handler's domain.
+    - **Generic helpers preserved**: `mockResult[R]` and `mockCall[P, R]` in `test_mock_helpers_test.go` (24 lines) remain shared by all focused stores.
+    - **Actual LOC influence**: `+1797/-1297` in mock infrastructure (net `+500`); cross-domain method duplication (e.g., `GetRun` in `jobStore`, `runStore`, `migStore`) accounts for the difference from the estimated `-380`. The cognitive load per test is reduced: each store documents its domain scope through its field set.
+    - **Test proof**: `go test ./internal/server/handlers` passes (288 tests, 0.45s); `go test ./internal/server/...` passes (all 9 packages).
 
 - [ ] 5.2 Create shared internal testkit for cross-module orchestration scenarios
   - Type: determined

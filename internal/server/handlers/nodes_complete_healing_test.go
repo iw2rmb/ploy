@@ -140,8 +140,8 @@ func TestMaybeCreateHealingJobs_CancelsRemaining(t *testing.T) {
 		name        string
 		errorKind   string
 		repoShaIn   string
-		specSetup   func(st *mockStore)
-		extraAssert func(t *testing.T, st *mockStore)
+		specSetup   func(st *jobStore)
+		extraAssert func(t *testing.T, st *jobStore)
 	}{
 		{
 			name:      "mixed_classification",
@@ -157,10 +157,10 @@ func TestMaybeCreateHealingJobs_CancelsRemaining(t *testing.T) {
 			name:      "terminal_without_spec_fetch",
 			errorKind: "mixed",
 			repoShaIn: healingTestRepoSHAIn,
-			specSetup: func(st *mockStore) {
+			specSetup: func(st *jobStore) {
 				st.getSpec.err = errors.New("db unavailable")
 			},
-			extraAssert: func(t *testing.T, st *mockStore) {
+			extraAssert: func(t *testing.T, st *jobStore) {
 				t.Helper()
 				assertNotCalled(t, "GetSpec", st.getSpec.called)
 			},
@@ -302,7 +302,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.countRunReposByStatus.val = []store.CountRunReposByStatusRow{
 		{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
 		{Status: domaintypes.RunRepoStatusFail, Count: 1},
@@ -327,7 +327,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	objKey := "artifacts/run/" + runID.String() + "/bundle/test.tar.gz"
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{
 			RunID:     runID,
@@ -357,7 +357,7 @@ func TestLoadRecoveryArtifact_TypedErrors(t *testing.T) {
 	t.Parallel()
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
-	st := &mockStore{}
+	st := &jobStore{}
 	bp := blobpersist.New(st, bsmock.New())
 
 	_, err := loadRecoveryArtifact(context.Background(), bp, runID, jobID, "/out/gate-profile-candidate.json")

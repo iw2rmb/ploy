@@ -27,7 +27,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		testBundleSize := int64(len("test-bundle-data"))
 		artifactID := uuid.New()
 
-		st := &mockStore{}
+		st := &artifactStore{}
 		st.listArtifactBundlesByCID.val = []store.ArtifactBundle{
 			{
 				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
@@ -69,25 +69,25 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		cases := []struct {
 			name   string
 			query  string
-			st     *mockStore
+			st     *artifactStore
 			status int
 		}{
 			{
 				name:   "MissingCID",
 				query:  "",
-				st:     &mockStore{},
+				st:     &artifactStore{},
 				status: http.StatusBadRequest,
 			},
 			{
 				name:   "DBError",
 				query:  "?cid=bafyerr",
-				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesByCID.err = errors.New("boom"); return st }(),
+				st:     func() *artifactStore { st := &artifactStore{}; st.listArtifactBundlesByCID.err = errors.New("boom"); return st }(),
 				status: http.StatusInternalServerError,
 			},
 			{
 				name:   "NoResults",
 				query:  "?cid=bafy-not-found",
-				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesByCID.val = []store.ArtifactBundle{}; return st }(),
+				st:     func() *artifactStore { st := &artifactStore{}; st.listArtifactBundlesByCID.val = []store.ArtifactBundle{}; return st }(),
 				status: http.StatusOK,
 			},
 		}
@@ -113,7 +113,7 @@ func TestGetArtifactHandler(t *testing.T) {
 		testName := "metadata-test"
 		testBundleSize := int64(15)
 
-		st := &mockStore{}
+		st := &artifactStore{}
 		st.getArtifactBundle.val = store.ArtifactBundle{
 			ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
 			RunID:      runID,
@@ -157,7 +157,7 @@ func TestGetArtifactHandler(t *testing.T) {
 		testBundle := []byte("download-bundle-data")
 		objKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactID.String() + ".tar.gz"
 
-		st := &mockStore{}
+		st := &artifactStore{}
 		st.getArtifactBundle.val = store.ArtifactBundle{
 			ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
 			RunID:      runID,
@@ -195,38 +195,38 @@ func TestGetArtifactHandler(t *testing.T) {
 		cases := []struct {
 			name   string
 			id     string
-			st     *mockStore
+			st     *artifactStore
 			status int
 		}{
 			{
 				name:   "MissingID",
 				id:     "",
-				st:     &mockStore{},
+				st:     &artifactStore{},
 				status: http.StatusBadRequest,
 			},
 			{
 				name:   "InvalidID",
 				id:     "not-a-uuid",
-				st:     &mockStore{},
+				st:     &artifactStore{},
 				status: http.StatusBadRequest,
 			},
 			{
 				name:   "NotFound",
 				id:     artifactID.String(),
-				st:     func() *mockStore { st := &mockStore{}; st.getArtifactBundle.err = pgx.ErrNoRows; return st }(),
+				st:     func() *artifactStore { st := &artifactStore{}; st.getArtifactBundle.err = pgx.ErrNoRows; return st }(),
 				status: http.StatusNotFound,
 			},
 			{
 				name:   "DBError",
 				id:     artifactID.String(),
-				st:     func() *mockStore { st := &mockStore{}; st.getArtifactBundle.err = errors.New("db down"); return st }(),
+				st:     func() *artifactStore { st := &artifactStore{}; st.getArtifactBundle.err = errors.New("db down"); return st }(),
 				status: http.StatusInternalServerError,
 			},
 			{
 				name: "MetadataNoCreatedAt",
 				id:   artifactID.String(),
-				st: func() *mockStore {
-					st := &mockStore{}
+				st: func() *artifactStore {
+					st := &artifactStore{}
 					st.getArtifactBundle.val = store.ArtifactBundle{
 						ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
 						RunID:      domaintypes.NewRunID(),

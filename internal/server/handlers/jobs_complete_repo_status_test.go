@@ -53,7 +53,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 
 			f := newRepoScopedFixture("mig")
 
-			st := newMockStoreForJob(f,
+			st := newJobStoreForFixture(f,
 				withRepoAttemptJobs([]store.Job{
 					{
 						ID:          f.JobID,
@@ -121,7 +121,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 		Meta:        withNextIDMeta([]byte(`{}`), 2000),
 	}
 
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withListJobsByRun([]store.Job{f.Job, job2}),
 		withPromoteResult(job2),
 		withRepoAttemptJobs([]store.Job{
@@ -187,7 +187,7 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	f.Job.Name = "post-gate"
 
 	// Complete the last job (post-gate) successfully. Earlier gate failure exists.
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withRepoAttemptJobs([]store.Job{
 			// Earlier pre-gate failure (healed later).
 			{
@@ -280,7 +280,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	f.Job.Name = "mr-0"
 
 	// MR job (auxiliary, should not affect repo/run status).
-	st := newMockStoreForJob(f, withRunStatus(domaintypes.RunStatusFinished))
+	st := newJobStoreForFixture(f, withRunStatus(domaintypes.RunStatusFinished))
 
 	handler := completeJobHandler(st, nil, nil)
 
@@ -320,7 +320,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	_ = domaintypes.NewRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
 
 	// Job for repo A completing (repo B still has work).
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		// Repo A is now terminal (all jobs Success).
 		withRepoAttemptJobs([]store.Job{
 			{
@@ -374,7 +374,7 @@ func TestCompleteJob_RejectsV0Status(t *testing.T) {
 		t.Run(v0status, func(t *testing.T) {
 			t.Parallel()
 			f := newJobFixture("mig")
-			st := &mockStore{}
+			st := &jobStore{}
 			handler := completeJobHandler(st, nil, nil)
 
 			req := f.completeJobReq(map[string]any{"status": v0status})

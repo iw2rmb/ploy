@@ -24,7 +24,7 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 		JobType: domaintypes.JobTypePreGate,
 	}
 
-	st := &mockStore{}
+	st := &jobStore{}
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 		}
@@ -69,7 +69,7 @@ func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) 
 		RepoID:  domaintypes.NewRepoID(),
 		JobType: domaintypes.JobTypeMod,
 	}
-	st := &mockStore{}
+	st := &jobStore{}
 
 	count, err := maybePersistGateSuccessSBOMRows(context.Background(), st, nil, job, domaintypes.JobStatusSuccess)
 	if err != nil {

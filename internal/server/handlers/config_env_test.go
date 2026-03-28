@@ -88,7 +88,7 @@ func TestConfigEnvGetNotFound(t *testing.T) {
 // TestConfigEnvPutUpsertsEntry verifies PUT /v1/config/env/{key}
 // persists to store and updates the holder.
 func TestConfigEnvPutUpsertsEntry(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -124,7 +124,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 // TestConfigEnvPutDefaultsSecretToTrue verifies that secret defaults to true
 // when not explicitly set in the request.
 func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -152,7 +152,7 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 
 // TestConfigEnvPutInvalidScope verifies that invalid scope values return 400.
 func TestConfigEnvPutInvalidScope(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -175,7 +175,7 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 // TestConfigEnvDeleteRemovesEntry verifies DELETE /v1/config/env/{key}
 // removes from store and holder.
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
 		"OLD_KEY": {Value: "old-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	})
@@ -234,7 +234,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &mockStore{}
+			st := &configStore{}
 			holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 			// PUT the entry.
@@ -269,7 +269,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 
 // TestConfigEnvPutInvalidJSON verifies that malformed JSON returns 400.
 func TestConfigEnvPutInvalidJSON(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -280,7 +280,7 @@ func TestConfigEnvPutInvalidJSON(t *testing.T) {
 
 // TestConfigEnvPutStoreError verifies that store errors return 500.
 func TestConfigEnvPutStoreError(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	st.upsertGlobalEnv.err = errMockDatabase
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
@@ -300,7 +300,7 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 
 // TestConfigEnvDeleteStoreError verifies that store errors return 500.
 func TestConfigEnvDeleteStoreError(t *testing.T) {
-	st := &mockStore{}
+	st := &configStore{}
 	st.deleteGlobalEnv.err = errMockDatabase
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
 		"OLD_KEY": {Value: "val", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},

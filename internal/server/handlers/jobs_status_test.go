@@ -52,7 +52,7 @@ func TestGetJobStatusHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := &mockStore{
+			st := &jobStore{
 				getJobResult: f.Job,
 				getJobErr:    tt.storeErr,
 			}

@@ -23,7 +23,7 @@ import (
 //   - Creates a run and run repo row.
 //   - Response includes run_id, mig_id, spec_id.
 func TestRunsCreateSingleRepo_Success(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
@@ -84,7 +84,7 @@ func TestRunsCreateSingleRepo_Success(t *testing.T) {
 
 // TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately verifies submission defers job materialization.
 func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
@@ -99,7 +99,7 @@ func TestRunsCreateSingleRepo_DoesNotCreateJobsImmediately(t *testing.T) {
 // TestRunsCreateSingleRepo_RepoURLNormalized verifies repo URLs are normalized.
 // Uses types.NormalizeRepoURL for URL normalization.
 func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
@@ -166,7 +166,7 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &mockStore{}
+			st := &migStore{}
 			handler := createSingleRepoRunHandler(st, nil)
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", tt.body)
 			assertStatus(t, rr, tt.wantStatus)
@@ -176,7 +176,7 @@ func TestRunsCreateSingleRepo_ValidationErrors(t *testing.T) {
 
 // TestRunsCreateSingleRepo_WithCreatedBy verifies POST /v1/runs accepts optional created_by.
 func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
@@ -199,7 +199,7 @@ func TestRunsCreateSingleRepo_WithCreatedBy(t *testing.T) {
 
 // TestRunsCreateSingleRepo_MultiStepSpec verifies POST /v1/runs accepts multi-step spec without job creation.
 func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
@@ -230,33 +230,33 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 	tests := []struct {
 		name    string
-		setupFn func(st *mockStore)
+		setupFn func(st *migStore)
 	}{
 		{
 			name:    "CreateSpecError",
-			setupFn: func(st *mockStore) { st.createSpecErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createSpecErr = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateMigError",
-			setupFn: func(st *mockStore) { st.createMigErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createMigErr = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateMigRepoError",
-			setupFn: func(st *mockStore) { st.createMigRepoErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createMigRepoErr = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateRunError",
-			setupFn: func(st *mockStore) { st.createRunErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createRunErr = errors.New("database connection failed") },
 		},
 		{
 			name:    "CreateRunRepoError",
-			setupFn: func(st *mockStore) { st.createRunRepoErr = errors.New("database connection failed") },
+			setupFn: func(st *migStore) { st.createRunRepoErr = errors.New("database connection failed") },
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &mockStore{}
+			st := &migStore{}
 			tt.setupFn(st)
 			handler := createSingleRepoRunHandler(st, nil)
 			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
@@ -266,7 +266,7 @@ func TestRunsCreateSingleRepo_StoreErrors(t *testing.T) {
 }
 
 func TestRunsCreateSingleRepo_RejectsWhenSourceCommitSeedFails(t *testing.T) {
-	st := &mockStore{}
+	st := &migStore{}
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 

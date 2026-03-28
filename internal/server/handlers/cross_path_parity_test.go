@@ -79,7 +79,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 				Attempt: 1,
 			}
 
-			st := &mockStore{
+			st := &jobStore{
 				getJobResult:                   job,
 			}
 			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
@@ -214,7 +214,7 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 				Attempt: 1,
 			}
 
-			st := &mockStore{
+			st := &jobStore{
 				getJobResult:                   job,
 			}
 			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}

@@ -18,7 +18,7 @@ type gateFailureFixture struct {
 	Successor store.Job
 	SpecID    domaintypes.SpecID
 	SpecBytes []byte
-	Store     *mockStore
+	Store     *jobStore
 }
 
 // newGateFailureFixture creates a pre-gate job fixture with recovery metadata,
@@ -45,7 +45,7 @@ func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture
 	f.Job.NextID = &successor.ID
 
 	jobs := []store.Job{f.Job, successor}
-	st := newMockStoreForJob(f,
+	st := newJobStoreForFixture(f,
 		withSpec(specID, specBytes),
 		withListJobsByRun(jobs),
 		withRepoAttemptJobs(jobs),
@@ -119,7 +119,7 @@ func buildHealingSpec(t *testing.T, retries int, opts ...healingSpecOpt) []byte 
 
 // assertCancelsSuccessor asserts that no jobs were created and exactly one
 // successor was cancelled with the given ID.
-func assertCancelsSuccessor(t *testing.T, st *mockStore, successorID domaintypes.JobID) {
+func assertCancelsSuccessor(t *testing.T, st *jobStore, successorID domaintypes.JobID) {
 	t.Helper()
 	if st.createJobCallCount != 0 {
 		t.Fatalf("expected no healing jobs, got %d CreateJob calls", st.createJobCallCount)
@@ -212,7 +212,7 @@ type healingChainFixture struct {
 	FailedJob   store.Job
 	SuccessorID domaintypes.JobID // ID of the terminal mig-0 job
 	Run         store.Run
-	Store       *mockStore
+	Store       *jobStore
 }
 
 // priorHealJob describes an intermediate job to insert between pre-gate and mig-0.
@@ -229,7 +229,7 @@ type healingChainConfig struct {
 	specFn      func(*testing.T) []byte
 	repoShaIn   string
 	priorHeals  []priorHealJob
-	storeOpts   []func(*mockStore)
+	storeOpts   []func(*jobStore)
 }
 
 func withHealingMeta(meta []byte) func(*healingChainConfig) {
@@ -248,12 +248,12 @@ func withPriorHeals(heals ...priorHealJob) func(*healingChainConfig) {
 	return func(c *healingChainConfig) { c.priorHeals = heals }
 }
 
-func withHealingStoreOpts(opts ...func(*mockStore)) func(*healingChainConfig) {
+func withHealingStoreOpts(opts ...func(*jobStore)) func(*healingChainConfig) {
 	return func(c *healingChainConfig) { c.storeOpts = opts }
 }
 
 // newHealingChain builds a chain of jobs: pre-gate → [prior heals] → mig-0,
-// wires NextID pointers, and configures a mockStore with the chain and spec.
+// wires NextID pointers, and configures a jobStore with the chain and spec.
 //
 // The "failed" job is the last gate/re-gate type in the chain (pre-gate when
 // there are no prior heals, or the last re-gate when there are).
@@ -317,7 +317,7 @@ func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingCha
 	}
 
 	specBytes := cfg.specFn(t)
-	st := &mockStore{}
+	st := &jobStore{}
 	st.getSpec.val = store.Spec{ID: specID, Spec: specBytes}
 	st.listJobsByRunRepoAttempt.val = jobs
 	for _, o := range cfg.storeOpts {

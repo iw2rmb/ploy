@@ -20,7 +20,7 @@ func TestDeleteRun_Success(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{
 		ID: runID,
 		}
@@ -47,25 +47,25 @@ func TestDeleteRun_Errors(t *testing.T) {
 	tests := []struct {
 		name       string
 		pathID     string
-		store      *mockStore
+		store      *runStore
 		wantStatus int
 	}{
 		{
 			name:       "NotFound",
 			pathID:     domaintypes.NewRunID().String(),
-			store:      func() *mockStore { st := &mockStore{}; st.getRun.err = pgx.ErrNoRows; return st }(),
+			store:      func() *runStore { st := &runStore{}; st.getRun.err = pgx.ErrNoRows; return st }(),
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:       "EmptyID",
 			pathID:     "   ",
-			store:      &mockStore{},
+			store:      &runStore{},
 			wantStatus: http.StatusBadRequest,
 		},
 		{
 			name:       "MissingID",
 			pathID:     "",
-			store:      &mockStore{},
+			store:      &runStore{},
 			wantStatus: http.StatusBadRequest,
 		},
 	}

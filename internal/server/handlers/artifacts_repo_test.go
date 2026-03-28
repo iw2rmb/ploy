@@ -38,7 +38,7 @@ func TestListRunRepoArtifactsHandler_Success_FiltersAndOrders(t *testing.T) {
 	digestOther := "sha256:other"
 	cidOther := "bafy-other"
 
-	st := &mockStore{
+	st := &artifactStore{
 		getRunRepoResult: store.RunRepo{
 			RunID:   runID,
 			RepoID:  repoID,

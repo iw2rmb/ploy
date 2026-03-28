@@ -19,7 +19,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	objKey := "logs/run/" + runID.String() + "/log/1.gz"
-	st := &mockStore{}
+	st := &runStore{}
 	st.createLog.val = store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey}
 	eventsService, err := createTestEventsServiceWithStore(st)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 }
 
 func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
-	st := &mockStore{}
+	st := &runStore{}
 	eventsService, err := createTestEventsServiceWithStore(st)
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
@@ -61,7 +61,7 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	objKey := "diffs/run/" + runID.String() + "/diff/1.patch.gz"
-	st := &mockStore{
+	st := &runStore{
 		getJobResult:    store.Job{ID: jobID, RunID: runID},
 	}
 	st.getRun.val = store.Run{ID: runID}
@@ -86,7 +86,7 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	objKey := "artifacts/run/" + runID.String() + "/bundle/1.tar.gz"
 	cid := "bafy-test"
 	digest := "sha256:test"
-	st := &mockStore{
+	st := &runStore{
 		getJobResult: store.Job{ID: jobID, RunID: runID, NodeID: &nodeID},
 	}
 	st.getRun.val = store.Run{ID: runID}

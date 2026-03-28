@@ -96,13 +96,13 @@ func validRunRequestBodyWithout(keys ...string) map[string]any {
 
 // newRunRepoJobsFixture creates a mock store and handler pre-configured for a single
 // gate-type job with the given meta JSON. Returns the store, handler, runID, and repoID.
-func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*mockStore, http.Handler, domaintypes.RunID, domaintypes.RepoID) {
+func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handler, domaintypes.RunID, domaintypes.RepoID) {
 	t.Helper()
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 	jobID := domaintypes.NewJobID()
 
-	st := &mockStore{
+	st := &runStore{
 		getRunRepoResult: store.RunRepo{
 			RunID:   runID,
 			RepoID:  repoID,
@@ -134,11 +134,10 @@ func allReposSelector() map[string]any {
 	}
 }
 
-// activeMigWithSpec returns a mockStore pre-configured with an active (non-archived)
-// mig (ID "mod123"), a spec row, and one MigRepo. Eliminates repeated setup blocks
-// across migs_runs and migs_spec tests.
-func activeMigWithSpec(specID domaintypes.SpecID) *mockStore {
-	st := &mockStore{
+// activeMigWithSpec returns a migStore pre-configured with an active (non-archived)
+// mig (ID "mod123"), a spec row, and one MigRepo.
+func activeMigWithSpec(specID domaintypes.SpecID) *migStore {
+	st := &migStore{
 		getModResult: store.Mig{
 			ID:         "mod123",
 			Name:       "test-mig",
@@ -233,11 +232,11 @@ func (f jobTestFixture) completeJobReq(bodyMap map[string]any) *http.Request {
 	return req.WithContext(ctx)
 }
 
-// newMockStoreForJob returns a mockStore pre-configured for a standard running job fixture.
+// newJobStoreForFixture returns a jobStore pre-configured for a standard running job fixture.
 // The store has getRun.val (Started), getJobResult, and listJobsByRunResult set.
 // Pass functional options to override or extend the defaults.
-func newMockStoreForJob(f jobTestFixture, opts ...func(*mockStore)) *mockStore {
-	st := &mockStore{
+func newJobStoreForFixture(f jobTestFixture, opts ...func(*jobStore)) *jobStore {
+	st := &jobStore{
 		getJobResult:        f.Job,
 		listJobsByRunResult: []store.Job{f.Job},
 	}
@@ -248,61 +247,61 @@ func newMockStoreForJob(f jobTestFixture, opts ...func(*mockStore)) *mockStore {
 	return st
 }
 
-func withRepoAttemptJobs(jobs []store.Job) func(*mockStore) {
-	return func(st *mockStore) { st.listJobsByRunRepoAttempt.val = jobs }
+func withRepoAttemptJobs(jobs []store.Job) func(*jobStore) {
+	return func(st *jobStore) { st.listJobsByRunRepoAttempt.val = jobs }
 }
 
-func withRunRepoStatusCounts(rows []store.CountRunReposByStatusRow) func(*mockStore) {
-	return func(st *mockStore) { st.countRunReposByStatus.val = rows }
+func withRunRepoStatusCounts(rows []store.CountRunReposByStatusRow) func(*jobStore) {
+	return func(st *jobStore) { st.countRunReposByStatus.val = rows }
 }
 
-func withSpec(specID domaintypes.SpecID, specBytes []byte) func(*mockStore) {
-	return func(st *mockStore) {
+func withSpec(specID domaintypes.SpecID, specBytes []byte) func(*jobStore) {
+	return func(st *jobStore) {
 		st.getRun.val.SpecID = specID
 		st.getSpec.val = store.Spec{ID: specID, Spec: specBytes}
 	}
 }
 
-func withRunStatus(status domaintypes.RunStatus) func(*mockStore) {
-	return func(st *mockStore) { st.getRun.val.Status = status }
+func withRunStatus(status domaintypes.RunStatus) func(*jobStore) {
+	return func(st *jobStore) { st.getRun.val.Status = status }
 }
 
-func withJobResults(m map[domaintypes.JobID]store.Job) func(*mockStore) {
-	return func(st *mockStore) { st.getJobResults = m }
+func withJobResults(m map[domaintypes.JobID]store.Job) func(*jobStore) {
+	return func(st *jobStore) { st.getJobResults = m }
 }
 
-func withPromoteResult(job store.Job) func(*mockStore) {
-	return func(st *mockStore) { st.promoteJobByIDIfUnblockedResult = job }
+func withPromoteResult(job store.Job) func(*jobStore) {
+	return func(st *jobStore) { st.promoteJobByIDIfUnblockedResult = job }
 }
 
-func withGetRunErr(err error) func(*mockStore) {
-	return func(st *mockStore) {
+func withGetRunErr(err error) func(*jobStore) {
+	return func(st *jobStore) {
 		st.getRun.err = err
 		st.getRun.val = store.Run{}
 	}
 }
 
-func withGetJobErr(err error) func(*mockStore) {
-	return func(st *mockStore) {
+func withGetJobErr(err error) func(*jobStore) {
+	return func(st *jobStore) {
 		st.getJobErr = err
 		st.getJobResult = store.Job{}
 	}
 }
 
-func withListJobsByRun(jobs []store.Job) func(*mockStore) {
-	return func(st *mockStore) { st.listJobsByRunResult = jobs }
+func withListJobsByRun(jobs []store.Job) func(*jobStore) {
+	return func(st *jobStore) { st.listJobsByRunResult = jobs }
 }
 
-func withArtifactBundles(bundles []store.ArtifactBundle) func(*mockStore) {
-	return func(st *mockStore) { st.listArtifactBundlesByRunAndJob.val = bundles }
+func withArtifactBundles(bundles []store.ArtifactBundle) func(*jobStore) {
+	return func(st *jobStore) { st.listArtifactBundlesByRunAndJob.val = bundles }
 }
 
-func withResolveStackRow(row store.ResolveStackRowByLangToolRow) func(*mockStore) {
-	return func(st *mockStore) { st.resolveStackRowByLangToolResult = row }
+func withResolveStackRow(row store.ResolveStackRowByLangToolRow) func(*jobStore) {
+	return func(st *jobStore) { st.resolveStackRowByLangToolResult = row }
 }
 
-func withGetRunCreatedAt(t time.Time) func(*mockStore) {
-	return func(st *mockStore) {
+func withGetRunCreatedAt(t time.Time) func(*jobStore) {
+	return func(st *jobStore) {
 		st.getRun.val.CreatedAt = pgtype.Timestamptz{Time: t, Valid: true}
 	}
 }
@@ -398,7 +397,7 @@ func assertNotCalled(t *testing.T, name string, called bool) {
 }
 
 // assertNoCompletion fails if either UpdateJobCompletion or UpdateJobCompletionWithMeta was called.
-func assertNoCompletion(t *testing.T, st *mockStore) {
+func assertNoCompletion(t *testing.T, st *jobStore) {
 	t.Helper()
 	if st.updateJobCompletion.called || st.updateJobCompletionWithMeta.called {
 		t.Fatal("did not expect any completion persistence")
@@ -407,7 +406,7 @@ func assertNoCompletion(t *testing.T, st *mockStore) {
 
 // assertRepoError fails if UpdateRunRepoError was not called with the expected
 // run/repo IDs and error substrings.
-func assertRepoError(t *testing.T, st *mockStore, runID domaintypes.RunID, repoID domaintypes.RepoID, substrings ...string) {
+func assertRepoError(t *testing.T, st *jobStore, runID domaintypes.RunID, repoID domaintypes.RepoID, substrings ...string) {
 	t.Helper()
 	assertCalled(t, "UpdateRunRepoError", st.updateRunRepoError.called)
 	if st.updateRunRepoError.params.RunID != runID {
@@ -478,7 +477,7 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *server.HTTPServer {
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
-	st := &mockStore{}
+	st := &jobStore{}
 	bs := bsmock.New()
 	bp := blobpersist.New(st, bs)
 	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")

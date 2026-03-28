@@ -114,7 +114,7 @@ func TestCompleteJob_RequestRejection(t *testing.T) {
 			t.Parallel()
 
 			f := newJobFixture("mig")
-			st := newMockStoreForJob(f)
+			st := newJobStoreForFixture(f)
 			handler := completeJobHandler(st, nil, nil)
 
 			rr := httptest.NewRecorder()
@@ -134,7 +134,7 @@ func TestCompleteJob_PayloadRejection(t *testing.T) {
 	tests := []struct {
 		name      string
 		tweakJob  func(*store.Job)
-		storeOpts []func(*mockStore)
+		storeOpts []func(*jobStore)
 		body      map[string]any
 		wantStatus int
 	}{
@@ -170,7 +170,7 @@ func TestCompleteJob_PayloadRejection(t *testing.T) {
 		{name: "conflict/cancelled", tweakJob: func(j *store.Job) { j.Status = domaintypes.JobStatusCancelled }, body: map[string]any{"status": "Fail"}, wantStatus: http.StatusConflict},
 		{
 			name:       "job_not_found",
-			storeOpts:  []func(*mockStore){withGetJobErr(pgx.ErrNoRows)},
+			storeOpts:  []func(*jobStore){withGetJobErr(pgx.ErrNoRows)},
 			body:       map[string]any{"status": "Fail"},
 			wantStatus: http.StatusNotFound,
 		},
@@ -192,7 +192,7 @@ func TestCompleteJob_PayloadRejection(t *testing.T) {
 			if tt.tweakJob != nil {
 				tt.tweakJob(&f.Job)
 			}
-			st := newMockStoreForJob(f, tt.storeOpts...)
+			st := newJobStoreForFixture(f, tt.storeOpts...)
 			handler := completeJobHandler(st, nil, nil)
 
 			rr := httptest.NewRecorder()
@@ -232,7 +232,7 @@ func TestCompleteJob_InvalidJobMeta(t *testing.T) {
 			t.Parallel()
 
 			f := newJobFixture("")
-			st := newMockStoreForJob(f)
+			st := newJobStoreForFixture(f)
 			handler := completeJobHandler(st, nil, nil)
 
 			rr := httptest.NewRecorder()
@@ -337,7 +337,7 @@ func TestCompleteJob_ValidCompletion(t *testing.T) {
 			t.Parallel()
 
 			f := newJobFixture("")
-			st := newMockStoreForJob(f)
+			st := newJobStoreForFixture(f)
 			handler := completeJobHandler(st, nil, nil)
 
 			rr := httptest.NewRecorder()

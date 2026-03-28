@@ -1,0 +1,749 @@
+package handlers
+
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// jobStore is a focused mock for job completion, status, listing, claiming,
+// healing, stale recovery, and related orchestration handler tests.
+type jobStore struct {
+	store.Store
+
+	// Job queries
+	getJobCalled  bool
+	getJobParams  string
+	getJobResult  store.Job
+	getJobResults map[types.JobID]store.Job
+	getJobErr     error
+
+	createJobCalled    bool
+	createJobCallCount int
+	createJobParams    []store.CreateJobParams
+	createJobResult    store.Job
+	createJobErr       error
+
+	listJobsByRunCalled bool
+	listJobsByRunParam  string
+	listJobsByRunResult []store.Job
+	listJobsByRunErr    error
+
+	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
+
+	// Job status/completion
+	updateJobStatusCalled bool
+	updateJobStatusParams store.UpdateJobStatusParams
+	updateJobStatusCalls  []store.UpdateJobStatusParams
+	updateJobStatusErr    error
+
+	updateJobCompletion         mockCall[store.UpdateJobCompletionParams, struct{}]
+	updateJobCompletionWithMeta mockCall[store.UpdateJobCompletionWithMetaParams, struct{}]
+	updateJobMeta               mockCall[store.UpdateJobMetaParams, struct{}]
+	updateJobImageName          mockCall[store.UpdateJobImageNameParams, struct{}]
+	upsertJobMetric             mockCall[store.UpsertJobMetricParams, struct{}]
+
+	updateJobNextIDParams []store.UpdateJobNextIDParams
+	updateJobNextIDErr    error
+
+	// Job scheduling/promotion
+	scheduleNextJobCalled bool
+	scheduleNextJobParam  store.ScheduleNextJobParams
+	scheduleNextJobResult store.Job
+	scheduleNextJobErr    error
+
+	promoteJobByIDIfUnblockedCalled bool
+	promoteJobByIDIfUnblockedParam  types.JobID
+	promoteJobByIDIfUnblockedResult store.Job
+	promoteJobByIDIfUnblockedErr    error
+
+	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
+	promoteReGateRecoveryCandidateGateProfileErr    error
+
+	// Job counts
+	countJobsByRunResult          int64
+	countJobsByRunErr             error
+	countJobsByRunAndStatusResult int64
+	countJobsByRunAndStatusErr    error
+	countJobsByRunRepoAttemptGroupByStatus mockResult[[]store.CountJobsByRunRepoAttemptGroupByStatusRow]
+
+	// Job listing (TUI)
+	listJobsForTUI  mockCall[store.ListJobsForTUIParams, []store.ListJobsForTUIRow]
+	countJobsForTUI mockCall[*types.RunID, int64]
+
+	// Claiming
+	claimJobCalled bool
+	claimJobParams types.NodeID
+	claimJobResult store.Job
+	claimJobErr    error
+
+	claimRun mockResult[store.Run]
+
+	// SBOM
+	listSBOMRowsByJob       mockResult[[]store.Sbom]
+	hasSBOMEvidenceForStack mockResult[bool]
+	deleteSBOMRowsByJob     mockCall[types.JobID, struct{}]
+
+	upsertSBOMRowCalled bool
+	upsertSBOMRowParams []store.UpsertSBOMRowParams
+	upsertSBOMRowErr    error
+
+	// Stack/Gate profile resolution
+	resolveStackRowByImageResult store.ResolveStackRowByImageRow
+	resolveStackRowByImageErr    error
+
+	resolveStackRowByLangToolResult store.ResolveStackRowByLangToolRow
+	resolveStackRowByLangToolErr    error
+
+	resolveStackRowByLangToolReleaseResult store.ResolveStackRowByLangToolReleaseRow
+	resolveStackRowByLangToolReleaseErr    error
+
+	upsertExactGateProfileCalled bool
+	upsertExactGateProfileParam  store.UpsertExactGateProfileParams
+	upsertExactGateProfileResult store.UpsertExactGateProfileRow
+	upsertExactGateProfileErr    error
+
+	upsertGateJobProfileLink mockCall[store.UpsertGateJobProfileLinkParams, struct{}]
+
+	// Artifact/Diff (for job completion)
+	createDiff           mockCall[store.CreateDiffParams, store.Diff]
+	createArtifactBundle mockResult[store.ArtifactBundle]
+
+	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
+
+	// Run queries (for orchestration)
+	getRun       mockCall[string, store.Run]
+	getSpec      mockCall[string, store.Spec]
+	getRunTiming mockCall[string, store.RunsTiming]
+
+	listRunsTimings mockResult[[]store.RunsTiming]
+
+	ackRunStart         mockResult[struct{}]
+	updateRunCompletion mockResult[struct{}]
+	updateRunStatus     mockCall[store.UpdateRunStatusParams, struct{}]
+	cancelRunV1         mockCall[string, struct{}]
+	updateRunResume     mockResult[struct{}]
+	updateRunStatsMRURL mockCall[store.UpdateRunStatsMRURLParams, struct{}]
+
+	// Run repo (for orchestration)
+	getRunRepoCalled  bool
+	getRunRepoParam   store.GetRunRepoParams
+	getRunRepoResult  store.RunRepo
+	getRunRepoResults []store.RunRepo
+	getRunRepoCalls   int
+	getRunRepoErr     error
+
+	updateRunRepoStatusCalled bool
+	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
+	updateRunRepoStatusErr    error
+
+	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
+	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
+	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
+
+	createRunRepoCalled bool
+	createRunRepoParams store.CreateRunRepoParams
+	createRunRepoResult store.RunRepo
+	createRunRepoErr    error
+
+	listRunReposByRun       mockCall[string, []store.RunRepo]
+	listQueuedRunReposByRun mockCall[string, []store.RunRepo]
+	listRunReposWithURLByRun mockCall[string, []store.ListRunReposWithURLByRunRow]
+
+	countRunReposByStatus mockResult[[]store.CountRunReposByStatusRow]
+
+	cancelActiveJobsByRunRepoAttemptCalled bool
+	cancelActiveJobsByRunRepoAttemptParams []store.CancelActiveJobsByRunRepoAttemptParams
+	cancelActiveJobsByRunRepoAttemptResult int64
+	cancelActiveJobsByRunRepoAttemptErr    error
+
+	getLatestRunRepoByModAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
+
+	// Stale recovery
+	listStaleRunningJobs          mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
+	countStaleNodesWithRunningJobs mockResult[int64]
+
+	// Node (for claim)
+	getNode             mockCall[string, store.Node]
+	updateNodeHeartbeat mockCall[store.UpdateNodeHeartbeatParams, struct{}]
+
+	// Mig repo (for claim spec merge)
+	getModRepo              mockResult[store.MigRepo]
+	listMigReposByModResult []store.MigRepo
+
+	// Event
+	createEvent mockResult[store.Event]
+
+	// Spec creation (for migs_ticket flow)
+	createSpecCalled bool
+	createSpecParams store.CreateSpecParams
+	createSpecErr    error
+
+	// Mig creation (for migs_ticket flow)
+	createMigCalled    bool
+	createMigParams    store.CreateMigParams
+	createMigRepoCalled bool
+
+	// Run creation (for migs_ticket flow)
+	createRunCalled    bool
+	createRunParams    store.CreateRunParams
+	createRunResult    store.Run
+
+	listRunsResult []store.Run
+}
+
+// Job query methods
+
+func (m *jobStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error) {
+	m.getJobCalled = true
+	m.getJobParams = id.String()
+	if len(m.getJobResults) > 0 {
+		if result, ok := m.getJobResults[id]; ok {
+			return result, m.getJobErr
+		}
+	}
+	return m.getJobResult, m.getJobErr
+}
+
+func (m *jobStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
+	m.createJobCalled = true
+	m.createJobCallCount++
+	m.createJobParams = append(m.createJobParams, params)
+	result := m.createJobResult
+	if result.ID.IsZero() {
+		result.ID = types.NewJobID()
+	}
+	result.RunID = params.RunID
+	result.RepoID = params.RepoID
+	result.RepoBaseRef = params.RepoBaseRef
+	result.Attempt = params.Attempt
+	result.Name = params.Name
+	result.Status = params.Status
+	result.JobType = params.JobType
+	result.JobImage = params.JobImage
+	result.NextID = params.NextID
+	result.RepoShaIn = params.RepoShaIn
+	result.Meta = params.Meta
+	return result, m.createJobErr
+}
+
+func (m *jobStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]store.Job, error) {
+	m.listJobsByRunCalled = true
+	m.listJobsByRunParam = runID.String()
+	result := make([]store.Job, len(m.listJobsByRunResult))
+	for i, j := range m.listJobsByRunResult {
+		result[i] = j
+		if m.updateJobCompletion.called && j.ID == m.updateJobCompletion.params.ID {
+			result[i].Status = m.updateJobCompletion.params.Status
+		}
+	}
+	return result, m.listJobsByRunErr
+}
+
+func (m *jobStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
+	return m.listJobsByRunRepoAttempt.record(arg)
+}
+
+// Job status/completion methods
+
+func (m *jobStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
+	m.updateJobStatusCalled = true
+	m.updateJobStatusParams = params
+	m.updateJobStatusCalls = append(m.updateJobStatusCalls, params)
+	return m.updateJobStatusErr
+}
+
+func (m *jobStore) UpdateJobCompletion(ctx context.Context, params store.UpdateJobCompletionParams) error {
+	_, err := m.updateJobCompletion.record(params)
+	return err
+}
+
+func (m *jobStore) UpdateJobCompletionWithMeta(ctx context.Context, params store.UpdateJobCompletionWithMetaParams) error {
+	_, err := m.updateJobCompletionWithMeta.record(params)
+	return err
+}
+
+func (m *jobStore) UpdateJobMeta(ctx context.Context, params store.UpdateJobMetaParams) error {
+	_, err := m.updateJobMeta.record(params)
+	return err
+}
+
+func (m *jobStore) UpdateJobImageName(ctx context.Context, params store.UpdateJobImageNameParams) error {
+	_, err := m.updateJobImageName.record(params)
+	return err
+}
+
+func (m *jobStore) UpsertJobMetric(ctx context.Context, params store.UpsertJobMetricParams) error {
+	_, err := m.upsertJobMetric.record(params)
+	return err
+}
+
+func (m *jobStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {
+	m.updateJobNextIDParams = append(m.updateJobNextIDParams, params)
+	if m.updateJobNextIDErr != nil {
+		return m.updateJobNextIDErr
+	}
+	for i := range m.listJobsByRunRepoAttempt.val {
+		if m.listJobsByRunRepoAttempt.val[i].ID == params.ID {
+			m.listJobsByRunRepoAttempt.val[i].NextID = params.NextID
+		}
+	}
+	for i := range m.listJobsByRunResult {
+		if m.listJobsByRunResult[i].ID == params.ID {
+			m.listJobsByRunResult[i].NextID = params.NextID
+		}
+	}
+	return nil
+}
+
+// Job scheduling/promotion methods
+
+func (m *jobStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error) {
+	m.scheduleNextJobCalled = true
+	m.scheduleNextJobParam = arg
+	if m.scheduleNextJobErr != nil {
+		return store.Job{}, m.scheduleNextJobErr
+	}
+	if m.scheduleNextJobResult.ID.IsZero() {
+		return store.Job{}, pgx.ErrNoRows
+	}
+	return m.scheduleNextJobResult, nil
+}
+
+func (m *jobStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (store.Job, error) {
+	m.promoteJobByIDIfUnblockedCalled = true
+	m.promoteJobByIDIfUnblockedParam = id
+	if m.promoteJobByIDIfUnblockedErr != nil {
+		return store.Job{}, m.promoteJobByIDIfUnblockedErr
+	}
+	if !m.promoteJobByIDIfUnblockedResult.ID.IsZero() {
+		return m.promoteJobByIDIfUnblockedResult, nil
+	}
+	for i := range m.listJobsByRunRepoAttempt.val {
+		if m.listJobsByRunRepoAttempt.val[i].ID != id {
+			continue
+		}
+		if m.listJobsByRunRepoAttempt.val[i].Status != types.JobStatusCreated {
+			return store.Job{}, pgx.ErrNoRows
+		}
+		m.listJobsByRunRepoAttempt.val[i].Status = types.JobStatusQueued
+		return m.listJobsByRunRepoAttempt.val[i], nil
+	}
+	for i := range m.listJobsByRunResult {
+		if m.listJobsByRunResult[i].ID != id {
+			continue
+		}
+		if m.listJobsByRunResult[i].Status != types.JobStatusCreated {
+			return store.Job{}, pgx.ErrNoRows
+		}
+		m.listJobsByRunResult[i].Status = types.JobStatusQueued
+		return m.listJobsByRunResult[i], nil
+	}
+	return store.Job{}, pgx.ErrNoRows
+}
+
+func (m *jobStore) PromoteReGateRecoveryCandidateGateProfile(ctx context.Context, arg store.PromoteReGateRecoveryCandidateGateProfileParams) (types.RepoID, error) {
+	if m.promoteReGateRecoveryCandidateGateProfileErr != nil {
+		return "", m.promoteReGateRecoveryCandidateGateProfileErr
+	}
+	if !m.promoteReGateRecoveryCandidateGateProfileResult.IsZero() {
+		return m.promoteReGateRecoveryCandidateGateProfileResult, nil
+	}
+	if !m.getJobResult.RepoID.IsZero() {
+		return m.getJobResult.RepoID, nil
+	}
+	return "", pgx.ErrNoRows
+}
+
+// Job count methods
+
+func (m *jobStore) CountJobsByRun(ctx context.Context, runID types.RunID) (int64, error) {
+	if m.countJobsByRunErr != nil {
+		return 0, m.countJobsByRunErr
+	}
+	if m.countJobsByRunResult == 0 && len(m.listJobsByRunResult) > 0 {
+		return int64(len(m.listJobsByRunResult)), nil
+	}
+	return m.countJobsByRunResult, nil
+}
+
+func (m *jobStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJobsByRunAndStatusParams) (int64, error) {
+	if m.countJobsByRunAndStatusErr != nil {
+		return 0, m.countJobsByRunAndStatusErr
+	}
+	if m.countJobsByRunAndStatusResult == 0 && len(m.listJobsByRunResult) > 0 {
+		var count int64
+		for _, j := range m.listJobsByRunResult {
+			effectiveStatus := j.Status
+			if m.updateJobCompletion.called && j.ID == m.updateJobCompletion.params.ID {
+				effectiveStatus = m.updateJobCompletion.params.Status
+			}
+			if effectiveStatus == arg.Status {
+				count++
+			}
+		}
+		return count, nil
+	}
+	return m.countJobsByRunAndStatusResult, nil
+}
+
+func (m *jobStore) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunRepoAttemptGroupByStatusParams) ([]store.CountJobsByRunRepoAttemptGroupByStatusRow, error) {
+	return m.countJobsByRunRepoAttemptGroupByStatus.ret()
+}
+
+// Job listing methods
+
+func (m *jobStore) ListJobsForTUI(ctx context.Context, arg store.ListJobsForTUIParams) ([]store.ListJobsForTUIRow, error) {
+	return m.listJobsForTUI.record(arg)
+}
+
+func (m *jobStore) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error) {
+	return m.countJobsForTUI.record(runID)
+}
+
+// Claim methods
+
+func (m *jobStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job, error) {
+	m.claimJobCalled = true
+	m.claimJobParams = nodeID
+	if nodeID.IsZero() {
+		return store.Job{}, store.ErrEmptyNodeID
+	}
+	if m.claimJobErr != nil {
+		return store.Job{}, m.claimJobErr
+	}
+	if m.claimJobResult.ID.IsZero() {
+		return store.Job{}, pgx.ErrNoRows
+	}
+	return m.claimJobResult, nil
+}
+
+func (m *jobStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, error) {
+	return m.claimRun.ret()
+}
+
+// SBOM methods
+
+func (m *jobStore) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]store.Sbom, error) {
+	return m.listSBOMRowsByJob.ret()
+}
+
+func (m *jobStore) HasSBOMEvidenceForStack(ctx context.Context, arg store.HasSBOMEvidenceForStackParams) (bool, error) {
+	return m.hasSBOMEvidenceForStack.ret()
+}
+
+func (m *jobStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error {
+	_, err := m.deleteSBOMRowsByJob.record(jobID)
+	return err
+}
+
+func (m *jobStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
+	m.upsertSBOMRowCalled = true
+	m.upsertSBOMRowParams = append(m.upsertSBOMRowParams, arg)
+	return m.upsertSBOMRowErr
+}
+
+// Stack/Gate profile methods
+
+func (m *jobStore) ResolveStackRowByImage(ctx context.Context, image string) (store.ResolveStackRowByImageRow, error) {
+	if m.resolveStackRowByImageErr != nil {
+		return store.ResolveStackRowByImageRow{}, m.resolveStackRowByImageErr
+	}
+	if m.resolveStackRowByImageResult.ID == 0 {
+		return store.ResolveStackRowByImageRow{}, pgx.ErrNoRows
+	}
+	return m.resolveStackRowByImageResult, nil
+}
+
+func (m *jobStore) ResolveStackRowByLangTool(ctx context.Context, arg store.ResolveStackRowByLangToolParams) (store.ResolveStackRowByLangToolRow, error) {
+	if m.resolveStackRowByLangToolErr != nil {
+		return store.ResolveStackRowByLangToolRow{}, m.resolveStackRowByLangToolErr
+	}
+	if m.resolveStackRowByLangToolResult.ID == 0 {
+		return store.ResolveStackRowByLangToolRow{}, pgx.ErrNoRows
+	}
+	return m.resolveStackRowByLangToolResult, nil
+}
+
+func (m *jobStore) ResolveStackRowByLangToolRelease(ctx context.Context, arg store.ResolveStackRowByLangToolReleaseParams) (store.ResolveStackRowByLangToolReleaseRow, error) {
+	if m.resolveStackRowByLangToolReleaseErr != nil {
+		return store.ResolveStackRowByLangToolReleaseRow{}, m.resolveStackRowByLangToolReleaseErr
+	}
+	if m.resolveStackRowByLangToolReleaseResult.ID == 0 {
+		return store.ResolveStackRowByLangToolReleaseRow{}, pgx.ErrNoRows
+	}
+	return m.resolveStackRowByLangToolReleaseResult, nil
+}
+
+func (m *jobStore) UpsertExactGateProfile(ctx context.Context, arg store.UpsertExactGateProfileParams) (store.UpsertExactGateProfileRow, error) {
+	m.upsertExactGateProfileCalled = true
+	m.upsertExactGateProfileParam = arg
+	if m.upsertExactGateProfileErr != nil {
+		return store.UpsertExactGateProfileRow{}, m.upsertExactGateProfileErr
+	}
+	if m.upsertExactGateProfileResult.ID != 0 {
+		return m.upsertExactGateProfileResult, nil
+	}
+	return store.UpsertExactGateProfileRow{
+		ID:       1,
+		RepoID:   arg.RepoID,
+		RepoSha:  arg.RepoSha,
+		RepoSha8: "",
+		StackID:  arg.StackID,
+		Url:      arg.Url,
+	}, nil
+}
+
+func (m *jobStore) UpsertGateJobProfileLink(ctx context.Context, arg store.UpsertGateJobProfileLinkParams) error {
+	_, err := m.upsertGateJobProfileLink.record(arg)
+	return err
+}
+
+// Artifact/Diff methods
+
+func (m *jobStore) CreateDiff(ctx context.Context, params store.CreateDiffParams) (store.Diff, error) {
+	return m.createDiff.record(params)
+}
+
+func (m *jobStore) CreateArtifactBundle(ctx context.Context, params store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
+	return m.createArtifactBundle.ret()
+}
+
+func (m *jobStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
+	return m.listArtifactBundlesByRunAndJob.ret()
+}
+
+// Run query methods
+
+func (m *jobStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
+	return m.getRun.record(id.String())
+}
+
+func (m *jobStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
+	return m.getSpec.record(id.String())
+}
+
+func (m *jobStore) GetRunTiming(ctx context.Context, id types.RunID) (store.RunsTiming, error) {
+	return m.getRunTiming.record(id.String())
+}
+
+func (m *jobStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimingsParams) ([]store.RunsTiming, error) {
+	return m.listRunsTimings.ret()
+}
+
+func (m *jobStore) AckRunStart(ctx context.Context, id string) error {
+	return m.ackRunStart.err
+}
+
+func (m *jobStore) UpdateRunCompletion(ctx context.Context, params store.UpdateRunCompletionParams) error {
+	return m.updateRunCompletion.err
+}
+
+func (m *jobStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
+	_, err := m.updateRunStatus.record(params)
+	return err
+}
+
+func (m *jobStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
+	_, err := m.cancelRunV1.record(runID.String())
+	return err
+}
+
+func (m *jobStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
+	return m.updateRunResume.err
+}
+
+func (m *jobStore) UpdateRunStatsMRURL(ctx context.Context, params store.UpdateRunStatsMRURLParams) error {
+	_, err := m.updateRunStatsMRURL.record(params)
+	return err
+}
+
+// Run repo methods
+
+func (m *jobStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
+	m.getRunRepoCalled = true
+	m.getRunRepoParam = arg
+	if m.getRunRepoErr != nil {
+		return store.RunRepo{}, m.getRunRepoErr
+	}
+	if len(m.getRunRepoResults) > 0 {
+		idx := m.getRunRepoCalls
+		if idx >= len(m.getRunRepoResults) {
+			idx = len(m.getRunRepoResults) - 1
+		}
+		m.getRunRepoCalls++
+		return m.getRunRepoResults[idx], nil
+	}
+	return m.getRunRepoResult, nil
+}
+
+func (m *jobStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
+	m.updateRunRepoStatusCalled = true
+	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
+	return m.updateRunRepoStatusErr
+}
+
+func (m *jobStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
+	_, err := m.updateRunRepoError.record(params)
+	return err
+}
+
+func (m *jobStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
+	_, err := m.updateRunRepoRefs.record(params)
+	return err
+}
+
+func (m *jobStore) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
+	_, err := m.incrementRunRepoAttempt.record(arg)
+	return err
+}
+
+func (m *jobStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
+	m.createRunRepoCalled = true
+	m.createRunRepoParams = params
+	result := m.createRunRepoResult
+	if result.MigID.IsZero() {
+		result.MigID = params.MigID
+	}
+	if result.RunID.IsZero() {
+		result.RunID = params.RunID
+	}
+	if result.RepoID.IsZero() {
+		result.RepoID = params.RepoID
+	}
+	if result.RepoBaseRef == "" {
+		result.RepoBaseRef = params.RepoBaseRef
+	}
+	if result.RepoTargetRef == "" {
+		result.RepoTargetRef = params.RepoTargetRef
+	}
+	if result.Status == "" {
+		result.Status = types.RunRepoStatusQueued
+	}
+	if result.Attempt == 0 {
+		result.Attempt = 1
+	}
+	return result, m.createRunRepoErr
+}
+
+func (m *jobStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
+	return m.listRunReposByRun.record(runID.String())
+}
+
+func (m *jobStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
+	return m.listQueuedRunReposByRun.record(runID.String())
+}
+
+func (m *jobStore) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
+	return m.listRunReposWithURLByRun.record(runID.String())
+}
+
+func (m *jobStore) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]store.CountRunReposByStatusRow, error) {
+	return m.countRunReposByStatus.ret()
+}
+
+func (m *jobStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
+	m.cancelActiveJobsByRunRepoAttemptCalled = true
+	m.cancelActiveJobsByRunRepoAttemptParams = append(m.cancelActiveJobsByRunRepoAttemptParams, params)
+	return m.cancelActiveJobsByRunRepoAttemptResult, m.cancelActiveJobsByRunRepoAttemptErr
+}
+
+func (m *jobStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
+	return m.getLatestRunRepoByModAndRepoStatus.record(arg)
+}
+
+// Stale recovery methods
+
+func (m *jobStore) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
+	return m.listStaleRunningJobs.record(lastHeartbeat)
+}
+
+func (m *jobStore) CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error) {
+	return m.countStaleNodesWithRunningJobs.ret()
+}
+
+// Node methods (for claim)
+
+func (m *jobStore) GetNode(ctx context.Context, id types.NodeID) (store.Node, error) {
+	return m.getNode.record(id.String())
+}
+
+func (m *jobStore) UpdateNodeHeartbeat(ctx context.Context, params store.UpdateNodeHeartbeatParams) error {
+	_, err := m.updateNodeHeartbeat.record(params)
+	return err
+}
+
+// Mig repo methods (for claim spec merge)
+
+func (m *jobStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
+	return m.getModRepo.ret()
+}
+
+func (m *jobStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([]store.MigRepo, error) {
+	return m.listMigReposByModResult, nil
+}
+
+// Event methods
+
+func (m *jobStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
+	return m.createEvent.ret()
+}
+
+// Spec creation (for migs_ticket flow)
+
+func (m *jobStore) CreateSpec(ctx context.Context, params store.CreateSpecParams) (store.Spec, error) {
+	m.createSpecCalled = true
+	m.createSpecParams = params
+	result := store.Spec{ID: params.ID, Spec: params.Spec, CreatedBy: params.CreatedBy}
+	return result, m.createSpecErr
+}
+
+func (m *jobStore) CreateMig(ctx context.Context, params store.CreateMigParams) (store.Mig, error) {
+	m.createMigCalled = true
+	m.createMigParams = params
+	return store.Mig{ID: params.ID, Name: params.Name, SpecID: params.SpecID, CreatedBy: params.CreatedBy}, nil
+}
+
+func (m *jobStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepoParams) (store.MigRepo, error) {
+	m.createMigRepoCalled = true
+	return store.MigRepo{ID: params.ID, MigID: params.MigID, RepoID: types.NewRepoID(), BaseRef: params.BaseRef, TargetRef: params.TargetRef}, nil
+}
+
+func (m *jobStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, error) {
+	if !id.IsZero() {
+		return store.Repo{ID: id, Url: "https://github.com/user/repo.git"}, nil
+	}
+	return store.Repo{}, pgx.ErrNoRows
+}
+
+func (m *jobStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
+	m.createRunCalled = true
+	m.createRunParams = params
+	result := m.createRunResult
+	if result.ID.IsZero() {
+		result.ID = params.ID
+	}
+	if result.MigID.IsZero() {
+		result.MigID = params.MigID
+	}
+	if result.SpecID.IsZero() {
+		result.SpecID = params.SpecID
+	}
+	result.CreatedBy = params.CreatedBy
+	return result, nil
+}
+
+func (m *jobStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
+	if int(params.Offset) >= len(m.listRunsResult) {
+		return []store.Run{}, nil
+	}
+	end := int(params.Offset) + int(params.Limit)
+	if end > len(m.listRunsResult) {
+		end = len(m.listRunsResult)
+	}
+	return m.listRunsResult[params.Offset:end], nil
+}

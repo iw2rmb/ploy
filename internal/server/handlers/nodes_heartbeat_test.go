@@ -8,7 +8,7 @@ import (
 )
 
 func TestHeartbeatHandler_BytesContract(t *testing.T) {
-	st := &mockStore{}
+	st := &nodeStore{}
 	st.getNode.val = store.Node{} // handler only checks err
 
 	h := heartbeatHandler(st)
@@ -89,7 +89,7 @@ func TestHeartbeatHandler_RejectsInvalidBodies(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := &mockStore{}
+			st := &nodeStore{}
 			h := heartbeatHandler(st)
 			nodeID := "aB3xY9"
 

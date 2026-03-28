@@ -23,7 +23,7 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 	modID := domaintypes.NewMigID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID, MigID: modID}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
@@ -75,7 +75,7 @@ func TestPullRunRepoHandler_URLNormalization(t *testing.T) {
 
 	// Test that .git suffix normalization works.
 	// Server stores URL without .git, client sends with .git.
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
@@ -101,7 +101,7 @@ func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 
 	// Test that trailing slash normalization works.
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
@@ -125,7 +125,7 @@ func TestPullRunRepoHandler_RunNotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.err = pgx.ErrNoRows
 	handler := pullRunRepoHandler(st)
 
@@ -141,7 +141,7 @@ func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
@@ -169,7 +169,7 @@ func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
 
 	// This shouldn't happen in practice (mig_repos has unique constraint on
 	// (mig_id, repo_url)), but the handler should return an error if it does.
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
@@ -198,7 +198,7 @@ func TestPullRunRepoHandler_MissingRepoURL(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	handler := pullRunRepoHandler(st)
 
 	body := `{}`
@@ -210,7 +210,7 @@ func TestPullRunRepoHandler_MissingRepoURL(t *testing.T) {
 func TestPullRunRepoHandler_MissingRunID(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &runStore{}
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
@@ -224,7 +224,7 @@ func TestPullRunRepoHandler_StoreError(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	st.getRun.val = store.Run{ID: runID}
 	st.listRunReposWithURLByRun.err = errors.New("database error")
 	handler := pullRunRepoHandler(st)
@@ -247,7 +247,7 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult: store.Mig{ID: modID, Name: "test-mig"},
 		listMigReposByModResult: []store.MigRepo{
 			{
@@ -307,7 +307,7 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult: store.Mig{ID: modID, Name: "test-mig"},
 		listMigReposByModResult: []store.MigRepo{
 			{
@@ -357,7 +357,7 @@ func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult: store.Mig{ID: modID},
 		listMigReposByModResult: []store.MigRepo{
 			{
@@ -391,7 +391,7 @@ func TestPullModRepoHandler_ModNotFound(t *testing.T) {
 
 	modID := domaintypes.NewMigID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModErr: pgx.ErrNoRows,
 	}
 	handler := pullMigRepoHandler(st)
@@ -409,7 +409,7 @@ func TestPullModRepoHandler_RepoNotInMod(t *testing.T) {
 	modRepoID := domaintypes.NewMigRepoID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult: store.Mig{ID: modID},
 		listMigReposByModResult: []store.MigRepo{
 			{
@@ -439,7 +439,7 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 	modRepoID := domaintypes.NewMigRepoID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult: store.Mig{ID: modID},
 		listMigReposByModResult: []store.MigRepo{
 			{
@@ -468,7 +468,7 @@ func TestPullModRepoHandler_InvalidMode(t *testing.T) {
 
 	modID := domaintypes.NewMigID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult: store.Mig{ID: modID},
 	}
 	handler := pullMigRepoHandler(st)
@@ -484,7 +484,7 @@ func TestPullModRepoHandler_MissingRepoURL(t *testing.T) {
 
 	modID := domaintypes.NewMigID()
 
-	st := &mockStore{}
+	st := &runStore{}
 	handler := pullMigRepoHandler(st)
 
 	body := `{}`
@@ -496,7 +496,7 @@ func TestPullModRepoHandler_MissingRepoURL(t *testing.T) {
 func TestPullModRepoHandler_MissingModID(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{}
+	st := &runStore{}
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
@@ -510,7 +510,7 @@ func TestPullModRepoHandler_StoreError(t *testing.T) {
 
 	modID := domaintypes.NewMigID()
 
-	st := &mockStore{
+	st := &runStore{
 		getModResult:         store.Mig{ID: modID},
 		listMigReposByModErr: errors.New("database error"),
 	}

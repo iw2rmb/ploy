@@ -56,7 +56,7 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 		if err != nil {
 			t.Fatalf("events: %v", err)
 		}
-		st := &mockStore{} // minimal store; handlers may still return 4xx
+		st := &jobStore{} // minimal store; handlers may still return 4xx
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 		cfg := NewConfigHolder(config.GitLabConfig{}, nil)

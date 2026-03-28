@@ -147,7 +147,7 @@ func TestBuildAndSendJobClaimResponse_GateSkipScenarios(t *testing.T) {
 			if err := buildAndSendJobClaimResponse(
 				rr,
 				req,
-				&mockStore{},
+				&jobStore{},
 				&ConfigHolder{},
 				baseRun,
 				tc.spec,
