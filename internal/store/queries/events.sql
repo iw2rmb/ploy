@@ -3,12 +3,12 @@ SELECT * FROM events
 WHERE id = $1;
 
 -- name: ListEventsByRun :many
-SELECT * FROM events
+SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = $1
 ORDER BY time ASC, id ASC;
 
 -- name: ListEventsByRunSince :many
-SELECT * FROM events
+SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = $1 AND id > $2
 ORDER BY time ASC, id ASC;
 
