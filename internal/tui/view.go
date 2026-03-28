@@ -10,17 +10,17 @@ func (m model) View() tea.View {
 	var content string
 	switch m.screen {
 	case ScreenPloyList:
-		if m.ploy.Index() == 2 {
-			content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.jobList.View())
+		if m.rootList.Index() == 2 {
+			content = lipgloss.JoinHorizontal(lipgloss.Top, m.rootList.View(), "  ", m.jobList.View())
 		} else {
-			content = m.ploy.View()
+			content = m.rootList.View()
 		}
 	case ScreenMigrationsList, ScreenRunsList:
-		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.secondary.View())
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.rootList.View(), "  ", m.rightPaneList.View())
 	case ScreenJobsList:
-		content = lipgloss.JoinHorizontal(lipgloss.Top, m.ploy.View(), "  ", m.jobList.View())
+		content = lipgloss.JoinHorizontal(lipgloss.Top, m.rootList.View(), "  ", m.jobList.View())
 	case ScreenMigrationDetails, ScreenRunDetails:
-		content = m.ploy.View()
+		content = m.rootList.View()
 	}
 	view := tea.NewView(content)
 	view.AltScreen = true

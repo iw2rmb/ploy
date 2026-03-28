@@ -22,15 +22,15 @@ func (m model) handleEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleEnterFromRoot() (tea.Model, tea.Cmd) {
-	switch m.ploy.Index() {
+	switch m.rootList.Index() {
 	case 0: // Migrations
 		m.screen = ScreenMigrationsList
-		m.secondary = newList("MIGRATIONS", nil)
+		m.rightPaneList = newList("MIGRATIONS", nil)
 		m.applyWindowHeight()
 		return m, loadMigsCmd(m.client, m.baseURL)
 	case 1: // Runs
 		m.screen = ScreenRunsList
-		m.secondary = newRunsList("RUNS", nil)
+		m.rightPaneList = newRunsList("RUNS", nil)
 		m.applyWindowHeight()
 		return m, loadRunsCmd(m.client, m.baseURL)
 	case 2: // Jobs
@@ -42,7 +42,7 @@ func (m model) handleEnterFromRoot() (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleEnterFromMigrationsList() (tea.Model, tea.Cmd) {
-	item, ok := m.secondary.SelectedItem().(listItem)
+	item, ok := m.rightPaneList.SelectedItem().(listItem)
 	if !ok {
 		return m, nil
 	}
@@ -50,19 +50,19 @@ func (m model) handleEnterFromMigrationsList() (tea.Model, tea.Cmd) {
 	m.selectedMigName = item.title
 	m.selectedRunID = ""
 	m.jobList = m.jobList.SetSelectedJobID("")
-	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
 		{title: m.selectedMigName, desc: m.selectedMigID.String()},
 		{title: "Runs", desc: "total: —"},
 		{title: "Jobs", desc: "select job"},
 	}))
-	m.ploy.Select(0)
+	m.rootList.Select(0)
 	m.applyWindowHeight()
 	m.screen = ScreenMigrationDetails
 	return m, loadMigDetailsCmd(m.client, m.baseURL, m.selectedMigID)
 }
 
 func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
-	item, ok := m.secondary.SelectedItem().(listItem)
+	item, ok := m.rightPaneList.SelectedItem().(listItem)
 	if !ok {
 		return m, nil
 	}
@@ -71,12 +71,12 @@ func (m model) handleEnterFromRunsList() (tea.Model, tea.Cmd) {
 	m.selectedMigID = ""
 	m.selectedMigName = ""
 	m.resolveMigContext(m.selectedRunID)
-	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
 		{title: m.selectedMigName, desc: m.selectedMigID.String()},
 		{title: "Run", desc: m.selectedRunID.String()},
 		{title: "Jobs", desc: "total: —"},
 	}))
-	m.ploy.Select(1)
+	m.rootList.Select(1)
 	m.applyWindowHeight()
 	m.screen = ScreenRunDetails
 	return m, loadRunDetailsCmd(m.client, m.baseURL, m.selectedRunID)
@@ -92,12 +92,12 @@ func (m model) handleEnterFromJobsList() (tea.Model, tea.Cmd) {
 	m.selectedMigName = selectedJob.MigName
 	m.selectedMigID = ""
 	m.resolveMigContext(m.selectedRunID)
-	m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+	m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
 		{title: m.selectedMigName, desc: m.selectedMigID.String()},
 		{title: "Run", desc: m.selectedRunID.String()},
 		{title: "Job", desc: m.jobList.ConfirmedJobID().String()},
 	}))
-	m.ploy.Select(2)
+	m.rootList.Select(2)
 	return m, loadJobDetailsCmd(m.client, m.baseURL, selectedJob.RunID, selectedJob.RepoID, selectedJob.JobID)
 }
 

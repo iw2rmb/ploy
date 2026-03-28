@@ -12,15 +12,15 @@ import (
 // TestS1RootListTitle verifies the PLOY root list title.
 func TestS1RootListTitle(t *testing.T) {
 	m := InitialModel(nil, nil)
-	if m.ploy.Title != "PLOY" {
-		t.Errorf("root list title: got %q, want %q", m.ploy.Title, "PLOY")
+	if m.rootList.Title != "PLOY" {
+		t.Errorf("root list title: got %q, want %q", m.rootList.Title, "PLOY")
 	}
 }
 
 // TestS1RootItemDescriptions verifies the required detail lines for each root item.
 func TestS1RootItemDescriptions(t *testing.T) {
 	m := InitialModel(nil, nil)
-	items := m.ploy.Items()
+	items := m.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("root items: got %d, want 3", len(items))
 	}
@@ -47,7 +47,7 @@ func TestS1RootItemDescriptions(t *testing.T) {
 // TestS1FilteringDisabled verifies that filtering/search is disabled on the root list.
 func TestS1FilteringDisabled(t *testing.T) {
 	m := InitialModel(nil, nil)
-	if m.ploy.FilteringEnabled() {
+	if m.rootList.FilteringEnabled() {
 		t.Error("root list: filtering must be disabled")
 	}
 }
@@ -55,7 +55,7 @@ func TestS1FilteringDisabled(t *testing.T) {
 // TestS1EnterSelectsMigrations verifies Enter on index 0 transitions to S2.
 func TestS1EnterSelectsMigrations(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.ploy.Select(0)
+	m.rootList.Select(0)
 	next, _ := m.handleEnter()
 	nm := next.(model)
 	if nm.screen != ScreenMigrationsList {
@@ -66,7 +66,7 @@ func TestS1EnterSelectsMigrations(t *testing.T) {
 // TestS1EnterSelectsRuns verifies Enter on index 1 transitions to S4.
 func TestS1EnterSelectsRuns(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.ploy.Select(1)
+	m.rootList.Select(1)
 	next, _ := m.handleEnter()
 	nm := next.(model)
 	if nm.screen != ScreenRunsList {
@@ -77,7 +77,7 @@ func TestS1EnterSelectsRuns(t *testing.T) {
 // TestS1EnterSelectsJobs verifies Enter on index 2 transitions to S6.
 func TestS1EnterSelectsJobs(t *testing.T) {
 	m := InitialModel(nil, nil)
-	m.ploy.Select(2)
+	m.rootList.Select(2)
 	next, _ := m.handleEnter()
 	nm := next.(model)
 	if nm.screen != ScreenJobsList {
@@ -104,7 +104,7 @@ func TestPloyListJobsSelectedShowsJobListPanel(t *testing.T) {
 	}})
 	m = next.(model)
 	// Cursor must be on Jobs (index 2) while remaining on ScreenPloyList.
-	m.ploy.Select(2)
+	m.rootList.Select(2)
 
 	rendered := m.View().Content
 	if !strings.Contains(rendered, "PLOY") {
@@ -128,7 +128,7 @@ func TestPloyListNonJobsSelectedShowsOnlyPloy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := InitialModel(nil, nil)
-			m.ploy.Select(tt.index)
+			m.rootList.Select(tt.index)
 
 			rendered := m.View().Content
 			if !strings.Contains(rendered, "PLOY") {
@@ -156,17 +156,17 @@ func TestPloyListFocusRemainsOnPloy(t *testing.T) {
 	m = next.(model)
 
 	// Place ploy cursor on Jobs (index 2) — the jobs panel is visible.
-	m.ploy.Select(2)
+	m.rootList.Select(2)
 	jobListIdxBefore := m.jobList.Index()
 
 	// Send a real "k" (up) key through Update; on ScreenPloyList this must
-	// be routed to m.ploy, not m.jobList.
+	// be routed to m.rootList, not m.jobList.
 	next, _ = m.Update(tea.KeyPressMsg{Code: 'k', Text: "k"})
 	m = next.(model)
 
 	// ploy cursor must have moved up (from 2 → 1).
-	if m.ploy.Index() != 1 {
-		t.Errorf("ploy cursor: got %d, want 1 after 'k' key on ScreenPloyList", m.ploy.Index())
+	if m.rootList.Index() != 1 {
+		t.Errorf("ploy cursor: got %d, want 1 after 'k' key on ScreenPloyList", m.rootList.Index())
 	}
 	// jobList cursor must be untouched.
 	if m.jobList.Index() != jobListIdxBefore {

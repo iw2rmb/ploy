@@ -172,7 +172,7 @@ func TestS6EnterDefinesAllPloyItems(t *testing.T) {
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
-	items := rm.ploy.Items()
+	items := rm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items: got %d, want 3", len(items))
 	}
