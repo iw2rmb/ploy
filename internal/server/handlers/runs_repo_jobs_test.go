@@ -160,31 +160,8 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	jobID := domaintypes.NewJobID()
-
-	st := &mockStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:      jobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				Name:    "pre-gate",
-				JobType: "pre_gate",
-				Status:  domaintypes.JobStatusFail,
-				Meta:    []byte(`{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`),
-			},
-		},
-	}
-
-	handler := listRunRepoJobsHandler(st)
+	metaJSON := `{"kind":"gate","gate":{"bug_summary":"missing ; in Foo.java","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}}`
+	_, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -245,31 +222,13 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	jobID := domaintypes.NewJobID()
+	metaJSON := `{"kind":"mig","action_summary":"updated deps","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default","reason":"compile failure"}}`
+	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
+	// Override job type/status for heal job.
+	st.listJobsByRunRepoAttemptResult[0].Name = "heal"
+	st.listJobsByRunRepoAttemptResult[0].JobType = "heal"
+	st.listJobsByRunRepoAttemptResult[0].Status = domaintypes.JobStatusSuccess
 
-	st := &mockStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:      jobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				Name:    "heal",
-				JobType: "heal",
-				Status:  domaintypes.JobStatusSuccess,
-				Meta:    []byte(`{"kind":"mig","action_summary":"updated deps","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default","reason":"compile failure"}}`),
-			},
-		},
-	}
-
-	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -302,31 +261,13 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	jobID := domaintypes.NewJobID()
+	metaJSON := `{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`
+	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
+	// Override job type/status for re-gate job.
+	st.listJobsByRunRepoAttemptResult[0].Name = "re-gate-1"
+	st.listJobsByRunRepoAttemptResult[0].JobType = "re_gate"
+	st.listJobsByRunRepoAttemptResult[0].Status = domaintypes.JobStatusSuccess
 
-	st := &mockStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:      jobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				Name:    "re-gate-1",
-				JobType: "re_gate",
-				Status:  domaintypes.JobStatusSuccess,
-				Meta:    []byte(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`),
-			},
-		},
-	}
-
-	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -368,34 +309,8 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	jobID := domaintypes.NewJobID()
-
-	// Gate job metadata with detected_stack populated.
 	metaJSON := `{"kind":"gate","gate":{"detected_stack":{"language":"java","tool":"maven","release":"17"},"bug_summary":"build failed"}}`
-
-	st := &mockStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:      jobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				Name:    "pre-gate",
-				JobType: "pre_gate",
-				Status:  domaintypes.JobStatusFail,
-				Meta:    []byte(metaJSON),
-			},
-		},
-	}
-
-	handler := listRunRepoJobsHandler(st)
+	_, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)
@@ -427,31 +342,7 @@ func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
 func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	jobID := domaintypes.NewJobID()
-
-	st := &mockStore{
-		getRunRepoResult: store.RunRepo{
-			RunID:   runID,
-			RepoID:  repoID,
-			Attempt: 1,
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:      jobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				Name:    "pre-gate",
-				JobType: "pre_gate",
-				Status:  domaintypes.JobStatusFail,
-				Meta:    []byte(`{"gate":{"bug_summary":"missing kind"}}`),
-			},
-		},
-	}
-
-	handler := listRunRepoJobsHandler(st)
+	_, handler, runID, repoID := newRunRepoJobsFixture(t, `{"gate":{"bug_summary":"missing kind"}}`)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)

@@ -182,8 +182,6 @@ type mockStore struct {
 	listArtifactBundlesByRunErr    error
 
 	// ListArtifactBundlesMetaByRun tracking
-	listArtifactBundlesMetaByRunCalled bool
-	listArtifactBundlesMetaByRunParam  string
 	listArtifactBundlesMetaByRunResult []store.ArtifactBundle
 	listArtifactBundlesMetaByRunErr    error
 

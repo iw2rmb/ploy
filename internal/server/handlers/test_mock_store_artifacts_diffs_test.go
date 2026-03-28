@@ -32,8 +32,6 @@ func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID types.Ru
 }
 
 func (m *mockStore) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
-	m.listArtifactBundlesMetaByRunCalled = true
-	m.listArtifactBundlesMetaByRunParam = runID.String()
 	return m.listArtifactBundlesMetaByRunResult, m.listArtifactBundlesMetaByRunErr
 }
 
