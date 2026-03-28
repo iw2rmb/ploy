@@ -44,7 +44,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **Handler call sites use selector methods only**: `artifacts_download.go:30` → `ListArtifactBundlesByCID`; `artifacts_repo.go:58` → `ListArtifactBundlesByRun`; `migs_ticket.go:153` → `ListArtifactBundlesByRunAndJob`. No legacy Meta-suffixed calls present.
     - **Test proof** (`internal/store/list_meta_queries_test.go`): `TestArtifactSelectorBehavior` (lines 56–106) asserts explicit column inclusion (`object_key`, `bundle_size`, `cid`, `digest`, `created_at`) and deterministic ordering for all three artifact list queries. `TestEventSelectorBehavior` (lines 112–156) asserts explicit column inclusion (`level`, `message`, `meta`, `time`) and ordering for both event list queries.
 
-- [ ] 3.1c Finalize selector-only store surface and remove remaining duplicate list entrypoints
+- [x] 3.1c Finalize selector-only store surface and remove remaining duplicate list entrypoints
   - Type: determined
   - Component: `internal/store/querier.go`, `internal/store/models.go`, `internal/store/queries`, `internal/server/handlers/test_mock_store_artifacts_diffs_test.go`
   - Implementation:
@@ -59,6 +59,12 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+20/-90` (net `-70`) across store adapters and mocks.
   - Clarity / complexity check: Final cleanup; no additional abstraction layer introduced.
   - Reasoning: medium (8 CFP)
+  - Completion notes:
+    - **No residual duplicate list entrypoints**: After 3.1a and 3.1b, the store surface was already clean — no `*Meta*`-suffixed list methods exist anywhere in `querier.go`, generated SQL files, or handler mocks. No compatibility wiring or proxy aliases were found.
+    - **Selector-only querier surface** (`internal/store/querier.go`): All blob-type list methods (`ListLogsByRun*`, `ListDiffsByRun*`, `ListArtifactBundles*`, `ListEventsByRun*`) use explicit column projection — no `SELECT *` and no parallel Meta-suffixed entrypoints.
+    - **Canonical selector-path tests consolidated** (`internal/store/list_meta_queries_test.go`): Replaced `TestListMetaQueriesDoNotReturnBlobs` (blob-exclusion only, no ordering) with `TestDiffSelectorBehavior` following the same pattern as `TestArtifactSelectorBehavior` and `TestEventSelectorBehavior`: checks explicit column selection (no SELECT *), patch blob exclusion, required metadata columns (`object_key`, `patch_size`, `summary`, `created_at`), and deterministic ordering.
+    - **Transitional duplicate ordering tests removed** (`internal/store/list_queries_ordering_test.go`): Deleted the duplicate ordering assertions for `ListDiffsByRun`, `ListDiffsByRunRepo`, `ListArtifactBundlesByRun`, `ListArtifactBundlesByRunAndJob`, `ListArtifactBundlesByCID`, `ListEventsByRun`, and `ListEventsByRunSince` — all now covered comprehensively by the canonical selector behavior tests in `list_meta_queries_test.go`. Updated file comment to reflect the canonical test locations.
+    - **Test proof**: `go test ./internal/store/... -run 'Log|Diff|List|Artifact|Event'` passes; `go test ./internal/store/...` passes; `go test ./internal/server/handlers/... -run 'Artifact|Diff|Event|Log'` passes.
 
 - [ ] 3.2 Standardize blob transfer/read flow across handlers, blobpersist, and nodeagent rehydration I/O
   - Type: determined

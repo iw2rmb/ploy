@@ -5,26 +5,34 @@ import (
 	"testing"
 )
 
-// TestListMetaQueriesDoNotReturnBlobs verifies that list queries
-// exclude large blob columns to reduce I/O.
-func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
+// TestDiffSelectorBehavior validates the canonical diff list selector path:
+// - uses explicit column selection (not SELECT *)
+// - excludes the patch blob column to avoid unnecessary I/O
+// - includes all metadata columns needed by callers (object_key for retrieval)
+// - has deterministic ordering with id tie-breaker
+func TestDiffSelectorBehavior(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name         string
-		sql          string
-		excludedCols []string
+		name            string
+		sql             string
+		requiredColumns []string
+		excludedCols    []string
+		wantOrder       string
 	}{
-		// diffs.sql - exclude "patch" blob
 		{
-			name:         "ListDiffsByRun",
-			sql:          listDiffsByRun,
-			excludedCols: []string{", patch,", ", patch "},
+			name:            "ListDiffsByRun",
+			sql:             listDiffsByRun,
+			requiredColumns: []string{"object_key", "patch_size", "summary", "created_at"},
+			excludedCols:    []string{", patch,", ", patch "},
+			wantOrder:       "ORDER BY created_at ASC, id ASC",
 		},
 		{
-			name:         "ListDiffsByRunRepo",
-			sql:          listDiffsByRunRepo,
-			excludedCols: []string{", patch,", ", patch ", "d.patch,", "d.patch "},
+			name:            "ListDiffsByRunRepo",
+			sql:             listDiffsByRunRepo,
+			requiredColumns: []string{"object_key", "patch_size", "summary", "created_at"},
+			excludedCols:    []string{", patch,", ", patch ", "d.patch,", "d.patch "},
+			wantOrder:       "d.created_at ASC, d.id ASC",
 		},
 	}
 
@@ -33,16 +41,25 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			sqlLower := strings.ToLower(tc.sql)
+			if strings.Contains(sqlLower, "select *") || strings.Contains(sqlLower, "select d.*") {
+				t.Fatalf("%s must use explicit column selection, not SELECT *; found wildcard in SQL:\n%s",
+					tc.name, tc.sql)
+			}
 			for _, col := range tc.excludedCols {
 				if strings.Contains(sqlLower, strings.ToLower(col)) {
 					t.Fatalf("%s must NOT include blob column; found %q in SQL:\n%s",
 						tc.name, col, tc.sql)
 				}
 			}
-			// Verify SELECT is explicit (not SELECT *)
-			if strings.Contains(sqlLower, "select *") || strings.Contains(sqlLower, "select d.*") {
-				t.Fatalf("%s must not use SELECT *; found wildcard in SQL:\n%s",
-					tc.name, tc.sql)
+			for _, col := range tc.requiredColumns {
+				if !strings.Contains(sqlLower, col) {
+					t.Fatalf("%s selector must include column %q in SQL:\n%s",
+						tc.name, col, tc.sql)
+				}
+			}
+			if !containsOrderBy(tc.sql, tc.wantOrder) {
+				t.Fatalf("%s must have deterministic ordering; want substring %q in SQL:\n%s",
+					tc.name, tc.wantOrder, tc.sql)
 			}
 		})
 	}

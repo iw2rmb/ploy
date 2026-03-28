@@ -39,19 +39,6 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListDistinctRepos", listDistinctRepos, "ORDER BY r.url ASC, mr.repo_id ASC"},
 		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 
-		// diffs.sql - created_at needs id tie-breaker
-		{"ListDiffsByRun", listDiffsByRun, "ORDER BY created_at ASC, id ASC"},
-		{"ListDiffsByRunRepo", listDiffsByRunRepo, "d.created_at ASC, d.id ASC"},
-
-		// artifact_bundles.sql - created_at needs id tie-breaker
-		{"ListArtifactBundlesByRun", listArtifactBundlesByRun, "ORDER BY created_at DESC, id DESC"},
-		{"ListArtifactBundlesByRunAndJob", listArtifactBundlesByRunAndJob, "ORDER BY created_at DESC, id DESC"},
-		{"ListArtifactBundlesByCID", listArtifactBundlesByCID, "ORDER BY created_at DESC, id DESC"},
-
-		// events.sql - time needs id tie-breaker for deterministic pagination
-		{"ListEventsByRun", listEventsByRun, "ORDER BY time ASC, id ASC"},
-		{"ListEventsByRunSince", listEventsByRunSince, "ORDER BY time ASC, id ASC"},
-
 		// tokens.sql - created_at needs token_id tie-breaker
 		{"ListAPITokens", listAPITokens, "ORDER BY created_at DESC, token_id DESC"},
 
@@ -62,7 +49,8 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
 		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
-		// logs.sql has id tie-breakers verified in logs_sql_ordering_test.go
+		// logs.sql ordering is verified in logs_sql_ordering_test.go.
+		// diffs/artifact_bundles/events ordering is verified in list_meta_queries_test.go.
 	}
 
 	for _, tc := range cases {
