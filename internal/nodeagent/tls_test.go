@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -178,7 +179,7 @@ func TestServerTLSWiring(t *testing.T) {
 		}
 
 		// TLS handshake should fail due to missing client certificate.
-		if err != nil && !containsError(err, "certificate") && !containsError(err, "handshake") {
+		if err != nil && !strings.Contains(err.Error(), "certificate") && !strings.Contains(err.Error(), "handshake") {
 			t.Logf("warning: unexpected error message: %v", err)
 		}
 	})
@@ -577,7 +578,7 @@ func TestBootstrapTLS_PinnedCA_WrongCA(t *testing.T) {
 	}
 
 	// Verify the error is related to certificate verification.
-	if !containsError(err, "certificate") {
+	if !strings.Contains(err.Error(), "certificate") {
 		t.Logf("error message: %v", err)
 	}
 }
@@ -711,7 +712,7 @@ func TestBootstrapTLS_CAFileErrors(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			if !containsError(err, tt.errSubstr) {
+			if !strings.Contains(err.Error(), tt.errSubstr) {
 				t.Errorf("expected error containing %q, got: %v", tt.errSubstr, err)
 			}
 		})

@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -202,7 +203,9 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 
 		// Execution (single-step extraction).
 		assertImage(t, "Execution.Image", runOpts.Execution.Image, contracts.ModStackUnknown, "docker.io/test/mig:v1")
-		assertCommand(t, runOpts.Execution.Command.Exec, []string{"echo", "hello"})
+		if want := []string{"echo", "hello"}; !slices.Equal(runOpts.Execution.Command.Exec, want) {
+			t.Fatalf("Execution.Command.Exec = %v, want %v", runOpts.Execution.Command.Exec, want)
+		}
 
 		// BuildGate — Pre/Post are assigned by pointer from spec, so verify
 		// the pointers arrived and spot-check a derived field on each.
@@ -282,7 +285,9 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		}
 
 		assertImage(t, "Steps[1].Image", runOpts.Steps[1].Image, contracts.ModStackUnknown, "docker.io/test/step2:v1")
-		assertCommand(t, runOpts.Steps[1].Command.Exec, []string{"step2", "--flag"})
+		if want := []string{"step2", "--flag"}; !slices.Equal(runOpts.Steps[1].Command.Exec, want) {
+			t.Fatalf("Steps[1].Command.Exec = %v, want %v", runOpts.Steps[1].Command.Exec, want)
+		}
 
 		if !runOpts.Execution.Image.IsEmpty() {
 			t.Errorf("Execution.Image: expected empty for multi-step spec")
