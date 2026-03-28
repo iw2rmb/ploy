@@ -187,7 +187,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 				return nil
 			}
 			meta := &contracts.JobMeta{
-				Kind:          contracts.JobKindMod,
+				Kind:          contracts.JobKindMig,
 				ActionSummary: actionSummary,
 			}
 			data, err := contracts.MarshalJobMeta(meta)

@@ -17,8 +17,8 @@ import (
 type JobKind string
 
 const (
-	// JobKindMod indicates a mig execution job (pre_gate, mig, post_gate, heal, re_gate).
-	JobKindMod JobKind = "mig"
+	// JobKindMig indicates a mig execution job (pre_gate, mig, post_gate, heal, re_gate).
+	JobKindMig JobKind = "mig"
 	// JobKindGate indicates a build gate validation job.
 	JobKindGate JobKind = "gate"
 	// JobKindBuild indicates a build tool invocation job (maven, gradle, npm, etc.).
@@ -28,7 +28,7 @@ const (
 // Valid returns true if the job kind is a recognized value.
 func (k JobKind) Valid() bool {
 	switch k {
-	case JobKindMod, JobKindGate, JobKindBuild:
+	case JobKindMig, JobKindGate, JobKindBuild:
 		return true
 	default:
 		return false
@@ -115,8 +115,8 @@ func (m JobMeta) Validate() error {
 	}
 	// Recovery metadata is allowed for gate and mig jobs only.
 	if m.Recovery != nil {
-		if m.Kind != JobKindGate && m.Kind != JobKindMod {
-			return fmt.Errorf("recovery metadata present but kind is %q (only allowed for %q or %q)", m.Kind, JobKindGate, JobKindMod)
+		if m.Kind != JobKindGate && m.Kind != JobKindMig {
+			return fmt.Errorf("recovery metadata present but kind is %q (only allowed for %q or %q)", m.Kind, JobKindGate, JobKindMig)
 		}
 		if err := m.Recovery.Validate(); err != nil {
 			return fmt.Errorf("recovery metadata invalid: %w", err)
@@ -124,8 +124,8 @@ func (m JobMeta) Validate() error {
 	}
 	// ActionSummary is only valid for mig jobs.
 	if m.ActionSummary != "" {
-		if m.Kind != JobKindMod {
-			return fmt.Errorf("action_summary present but kind is %q (only allowed for %q)", m.Kind, JobKindMod)
+		if m.Kind != JobKindMig {
+			return fmt.Errorf("action_summary present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
 		}
 		if strings.ContainsAny(m.ActionSummary, "\n\r") {
 			return fmt.Errorf("action_summary: must be single-line")
@@ -144,7 +144,7 @@ func (m JobMeta) Validate() error {
 // Callers must provide a valid JobMeta with a recognized Kind field.
 func MarshalJobMeta(m *JobMeta) ([]byte, error) {
 	if m == nil {
-		return nil, fmt.Errorf("job meta is nil; use NewModJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata")
+		return nil, fmt.Errorf("job meta is nil; use NewMigJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata")
 	}
 	// Validate before marshaling to catch invalid state early.
 	if err := m.Validate(); err != nil {
@@ -161,7 +161,7 @@ func MarshalJobMeta(m *JobMeta) ([]byte, error) {
 //   - Payloads that fail JobMeta.Validate() are rejected.
 //
 // All job metadata must now be structured with an explicit kind field.
-// Use NewModJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata.
+// Use NewMigJobMeta/NewGateJobMeta/NewBuildJobMeta to create valid metadata.
 func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 	// Reject empty/null payloads - structured metadata is now required.
 	if len(data) == 0 {
@@ -180,7 +180,7 @@ func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 	// Require explicit kind field - no defaulting to mig for legacy payloads.
 	if m.Kind == "" {
 		return nil, fmt.Errorf("job meta missing required 'kind' field; must be one of: %q, %q, %q",
-			JobKindMod, JobKindGate, JobKindBuild)
+			JobKindMig, JobKindGate, JobKindBuild)
 	}
 
 	// Validate the unmarshaled metadata for structural correctness.
@@ -191,18 +191,18 @@ func UnmarshalJobMeta(data []byte) (*JobMeta, error) {
 	return &m, nil
 }
 
-// NewModJobMeta creates a JobMeta for mig execution jobs.
+// NewMigJobMeta creates a JobMeta for mig execution jobs.
 // This is a convenience constructor for the common case of mig jobs
 // that don't carry gate or build metadata.
-func NewModJobMeta() *JobMeta {
-	return &JobMeta{Kind: JobKindMod}
+func NewMigJobMeta() *JobMeta {
+	return &JobMeta{Kind: JobKindMig}
 }
 
-// NewModJobMetaWithStepName creates a JobMeta for mig execution jobs
+// NewMigJobMetaWithStepName creates a JobMeta for mig execution jobs
 // with a user-defined step name. The step name is used by the CLI
 // to display a friendly name in --follow mode.
-func NewModJobMetaWithStepName(stepName string) *JobMeta {
-	return &JobMeta{Kind: JobKindMod, ModsStepName: stepName}
+func NewMigJobMetaWithStepName(stepName string) *JobMeta {
+	return &JobMeta{Kind: JobKindMig, ModsStepName: stepName}
 }
 
 // NewGateJobMeta creates a JobMeta for gate validation jobs.

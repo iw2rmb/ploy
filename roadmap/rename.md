@@ -55,7 +55,7 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `rg -n '\bModsSpec\b|\bModStep\b|\bModStack\b' internal/workflow`.
   - Reasoning: high (10 CFP)
 
-- [ ] 1.4.2 Normalize `mod` job metadata and orchestration symbols to `mig`
+- [x] 1.4.2 Normalize `mod` job metadata and orchestration symbols to `mig`
   - Type: assumption-bound
   - Component: `internal/workflow/contracts/job_meta.go`, `internal/nodeagent/**/*.go`, `internal/server/handlers/**/*.go`, `internal/cli/**/*.go`, `internal/workflow/**/*.go`
   - Assumptions: Renames are API-internal and Go-level only; wire schema keys and persisted JSON values remain unchanged where required by stored data contracts (for example `kind:"mig"` and existing JSON field tags).
