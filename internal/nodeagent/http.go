@@ -248,6 +248,48 @@ func validateUploadSize(data []byte, dataType string) error {
 	return nil
 }
 
+// getBytesFromURL sends a GET request to fullURL and returns the response body on 200 OK.
+// Returns an error if the request fails, if the server returns a non-200 status, or if reading fails.
+func (b *baseUploader) getBytesFromURL(ctx context.Context, fullURL, action string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer httpx.DrainAndClose(resp)
+	if err := httpx.CheckStatus(resp, http.StatusOK, action); err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	return data, nil
+}
+
+// postJSONBytes sends pre-marshaled JSON bytes as a POST request to u.
+// Returns nil if the response status is 200 or 201. Drains and closes the response body.
+func postJSONBytes(ctx context.Context, client *http.Client, u string, body []byte, action string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer httpx.DrainAndClose(resp)
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		msg := httpx.ReadErrorMessage(resp.Body, resp.Status, httpx.MaxErrorBodyBytes)
+		return fmt.Errorf("%s failed: status %d: %s", action, resp.StatusCode, msg)
+	}
+	return nil
+}
+
 func gzipCompress(data []byte, dataType string) ([]byte, error) {
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)

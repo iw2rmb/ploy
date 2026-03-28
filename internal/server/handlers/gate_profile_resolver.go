@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -281,14 +280,7 @@ func (r *dbGateProfileResolver) resolveStackID(ctx context.Context, job store.Jo
 }
 
 func (r *dbGateProfileResolver) loadObject(ctx context.Context, key string) ([]byte, error) {
-	rc, _, err := r.bs.Get(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = rc.Close()
-	}()
-	return io.ReadAll(rc)
+	return blobstore.ReadAll(ctx, r.bs, key)
 }
 
 type sqlGateProfileResolverStore struct {

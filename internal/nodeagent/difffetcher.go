@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -123,26 +122,5 @@ func (f *DiffFetcher) FetchRunRepoDiffPatch(ctx context.Context, runID types.Run
 	q.Set("download", "true")
 	q.Set("diff_id", diffID)
 	endpoint.RawQuery = q.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	resp, err := f.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("send request: %w", err)
-	}
-	defer httpx.DrainAndClose(resp)
-
-	if err := httpx.CheckStatus(resp, http.StatusOK, "fetch run repo diff patch"); err != nil {
-		return nil, err
-	}
-
-	patchBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read patch bytes: %w", err)
-	}
-
-	return patchBytes, nil
+	return f.getBytesFromURL(ctx, endpoint.String(), "fetch run repo diff patch")
 }

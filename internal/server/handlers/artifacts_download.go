@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -81,16 +80,8 @@ func getArtifactHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 		download := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("download"))) == "true"
 		if download {
 			// Stream from object storage.
-			if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
-				writeHTTPError(w, http.StatusNotFound, "artifact blob not found")
-				slog.Error("download artifact: no object_key", "artifact_id", idStr)
-				return
-			}
-
-			rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
-			if err != nil {
-				writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve artifact blob")
-				slog.Error("download artifact: blob get failed", "artifact_id", idStr, "object_key", *bundle.ObjectKey, "err", err)
+			rc, size, ok := openBlobForHTTP(w, r, bs, bundle.ObjectKey, "artifact", "artifact_id", idStr)
+			if !ok {
 				return
 			}
 			defer rc.Close()
