@@ -82,7 +82,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, cap := newArtifactUploadServer(t, "test-run-123", "test-job-id")
+			server, calls := newArtifactUploadServer(t, "test-run-123", "test-job-id")
 			controller := newTestController(t, newTestConfig(server.URL))
 
 			workspace := t.TempDir()
@@ -116,14 +116,15 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			controller.uploadConfiguredArtifacts(context.Background(), req, typedOpts, manifest, workspace, outDir)
 
-			if cap.Called != tt.wantUpload {
-				t.Errorf("uploadCalled = %v, want %v", cap.Called, tt.wantUpload)
+			uploaded := len(*calls) > 0
+			if uploaded != tt.wantUpload {
+				t.Errorf("uploadCalled = %v, want %v", uploaded, tt.wantUpload)
 			}
-			if tt.wantUpload && cap.Name != "test-artifact" {
-				t.Errorf("artifact name = %q, want %q", cap.Name, "test-artifact")
+			if tt.wantUpload && (*calls)[0].Name != "test-artifact" {
+				t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, "test-artifact")
 			}
 			if len(tt.wantHeaders) > 0 {
-				headers := tarHeadersFromBundle(t, cap.Bundle)
+				headers := tarHeadersFromBundle(t, (*calls)[0].Bundle)
 				for _, h := range tt.wantHeaders {
 					if _, ok := headers[h]; !ok {
 						t.Fatalf("expected header %q, got %v", h, keys(headers))
@@ -174,7 +175,7 @@ func TestRunController_uploadOutDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, cap := newArtifactUploadServer(t, "test-run", "test-stage")
+			server, calls := newArtifactUploadServer(t, "test-run", "test-stage")
 			controller := newTestController(t, newTestConfig(server.URL))
 
 			outDir := ""
@@ -193,14 +194,15 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("upload error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if cap.Called != tt.wantUpload {
-				t.Errorf("uploadCalled = %v, want %v", cap.Called, tt.wantUpload)
+			uploaded := len(*calls) > 0
+			if uploaded != tt.wantUpload {
+				t.Errorf("uploadCalled = %v, want %v", uploaded, tt.wantUpload)
 			}
-			if tt.bundleName != "" && cap.Name != tt.bundleName {
-				t.Errorf("artifact name = %q, want %q", cap.Name, tt.bundleName)
+			if tt.bundleName != "" && uploaded && (*calls)[0].Name != tt.bundleName {
+				t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, tt.bundleName)
 			}
 			if len(tt.wantHeaders) > 0 {
-				headers := tarHeadersFromBundle(t, cap.Bundle)
+				headers := tarHeadersFromBundle(t, (*calls)[0].Bundle)
 				for _, h := range tt.wantHeaders {
 					if _, ok := headers[h]; !ok {
 						t.Fatalf("expected header %q, got %v", h, keys(headers))
@@ -310,7 +312,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, cap := newArtifactUploadServer(t, "test-run", "test-stage", withArtifactStatus(tt.serverStatus))
+			server, calls := newArtifactUploadServer(t, "test-run", "test-stage", withArtifactStatus(tt.serverStatus))
 			controller := newTestController(t, newTestConfig(server.URL))
 
 			phase := &types.RunStatsGatePhase{}
@@ -323,8 +325,8 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 				if phase.LogsBundleCID == "" {
 					t.Error("LogsBundleCID not set in gate phase")
 				}
-				if cap.Name != tt.wantArtifactName {
-					t.Errorf("artifact name = %q, want %q", cap.Name, tt.wantArtifactName)
+				if (*calls)[0].Name != tt.wantArtifactName {
+					t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, tt.wantArtifactName)
 				}
 			} else {
 				if phase.LogsArtifactID != "" {
@@ -338,7 +340,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
 	t.Parallel()
 
-	server, calls := newArtifactUploadServerMulti(t, "test-run", "test-gate")
+	server, calls := newArtifactUploadServer(t, "test-run", "test-gate")
 	controller := newTestController(t, newTestConfig(server.URL))
 
 	workspace := t.TempDir()
@@ -422,7 +424,7 @@ func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
 func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) {
 	t.Parallel()
 
-	server, cap := newArtifactUploadServer(t, "test-run", "test-gate")
+	server, calls := newArtifactUploadServer(t, "test-run", "test-gate")
 	controller := newTestController(t, newTestConfig(server.URL))
 
 	meta := &contracts.BuildGateStageMetadata{
@@ -438,7 +440,7 @@ func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) 
 
 	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", t.TempDir(), meta)
 
-	if cap.Called {
+	if len(*calls) > 0 {
 		t.Fatal("expected no upload for non-gradle gate")
 	}
 	if len(meta.ReportLinks) != 0 {

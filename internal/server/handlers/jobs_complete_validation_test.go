@@ -12,76 +12,101 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 const testLogDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 // ===== Input Validation & Auth Tests =====
-// These tests verify request validation and authorization for completeJobHandler.
 
-func TestCompleteJob_BadJobID(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		jobID string
-	}{
-		{name: "missing", jobID: ""},
-		{name: "whitespace", jobID: "   "},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			nodeID := domaintypes.NewNodeKey()
-			handler := completeJobHandler(&mockStore{}, nil, nil)
-
-			body, _ := json.Marshal(map[string]any{"status": "Success"})
-			req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
-			req.SetPathValue("job_id", tt.jobID)
-			req.Header.Set(nodeUUIDHeader, nodeID)
-			ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-				Role: auth.RoleWorker, CommonName: nodeID,
-			})
-			req = req.WithContext(ctx)
-
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
-
-			assertStatus(t, rr, http.StatusBadRequest)
-		})
-	}
-}
-
-func TestCompleteJob_NoIdentity(t *testing.T) {
-	t.Parallel()
-
-	jobID := domaintypes.NewJobID()
-	handler := completeJobHandler(&mockStore{}, nil, nil)
-
-	body, _ := json.Marshal(map[string]any{"status": "Success"})
-	req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+jobID.String()+"/complete", bytes.NewReader(body))
-	req.SetPathValue("job_id", jobID.String())
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusUnauthorized)
-}
-
-func TestCompleteJob_BadNodeHeader(t *testing.T) {
+func TestCompleteJob_RequestRejection(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name       string
-		setHeader  bool
-		headerVal  string
-		commonName string
+		buildReq   func(f jobTestFixture) *http.Request
+		wantStatus int
 	}{
-		{name: "empty", setHeader: true, headerVal: "   ", commonName: "ignored"},
-		{name: "invalid_format", setHeader: true, headerVal: "not-a-nanoid", commonName: "ignored"},
-		{name: "missing", setHeader: false, headerVal: "", commonName: "tok_abcdef123456"},
+		{
+			name: "bad_job_id/missing",
+			buildReq: func(f jobTestFixture) *http.Request {
+				body, _ := json.Marshal(map[string]any{"status": "Success"})
+				req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
+				req.SetPathValue("job_id", "")
+				req.Header.Set(nodeUUIDHeader, f.NodeIDStr)
+				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: f.NodeIDStr})
+				return req.WithContext(ctx)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "bad_job_id/whitespace",
+			buildReq: func(f jobTestFixture) *http.Request {
+				body, _ := json.Marshal(map[string]any{"status": "Success"})
+				req := httptest.NewRequest(http.MethodPost, "/v1/jobs//complete", bytes.NewReader(body))
+				req.SetPathValue("job_id", "   ")
+				req.Header.Set(nodeUUIDHeader, f.NodeIDStr)
+				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: f.NodeIDStr})
+				return req.WithContext(ctx)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "no_identity",
+			buildReq: func(f jobTestFixture) *http.Request {
+				body, _ := json.Marshal(map[string]any{"status": "Success"})
+				req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+				req.SetPathValue("job_id", f.JobID.String())
+				return req
+			},
+			wantStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "bad_node_header/empty",
+			buildReq: func(f jobTestFixture) *http.Request {
+				body, _ := json.Marshal(map[string]any{"status": "Success"})
+				req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+				req.SetPathValue("job_id", f.JobID.String())
+				req.Header.Set(nodeUUIDHeader, "   ")
+				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: "ignored"})
+				return req.WithContext(ctx)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "bad_node_header/invalid_format",
+			buildReq: func(f jobTestFixture) *http.Request {
+				body, _ := json.Marshal(map[string]any{"status": "Success"})
+				req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+				req.SetPathValue("job_id", f.JobID.String())
+				req.Header.Set(nodeUUIDHeader, "not-a-nanoid")
+				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: "ignored"})
+				return req.WithContext(ctx)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "bad_node_header/missing",
+			buildReq: func(f jobTestFixture) *http.Request {
+				body, _ := json.Marshal(map[string]any{"status": "Success"})
+				req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
+				req.SetPathValue("job_id", f.JobID.String())
+				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: "tok_abcdef123456"})
+				return req.WithContext(ctx)
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "wrong_node",
+			buildReq: func(f jobTestFixture) *http.Request {
+				callerNodeID := domaintypes.NewNodeKey()
+				req := f.completeJobReq(map[string]any{"status": "Success"})
+				req.Header.Set(nodeUUIDHeader, callerNodeID)
+				ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{Role: auth.RoleWorker, CommonName: callerNodeID})
+				return req.WithContext(ctx)
+			},
+			wantStatus: http.StatusForbidden,
+		},
 	}
 
 	for _, tt := range tests {
@@ -90,232 +115,92 @@ func TestCompleteJob_BadNodeHeader(t *testing.T) {
 
 			f := newJobFixture("mig")
 			st := newMockStoreForJob(f)
-
 			handler := completeJobHandler(st, nil, nil)
 
-			body, _ := json.Marshal(map[string]any{"status": "Success"})
-			req := httptest.NewRequest(http.MethodPost, "/v1/jobs/"+f.JobID.String()+"/complete", bytes.NewReader(body))
-			req.SetPathValue("job_id", f.JobID.String())
-			if tt.setHeader {
-				req.Header.Set(nodeUUIDHeader, tt.headerVal)
-			}
-			ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-				Role:       auth.RoleWorker,
-				CommonName: tt.commonName,
-			})
-			req = req.WithContext(ctx)
-
 			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, req)
+			handler.ServeHTTP(rr, tt.buildReq(f))
 
-			assertStatus(t, rr, http.StatusBadRequest)
-			assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-		})
-	}
-}
-
-func TestCompleteJob_WrongNode(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
-
-	// Build a request with a different caller node identity.
-	callerNodeID := domaintypes.NewNodeKey()
-	req := f.completeJobReq(map[string]any{"status": "Success"})
-	req.Header.Set(nodeUUIDHeader, callerNodeID)
-	ctx := auth.ContextWithIdentity(req.Context(), auth.Identity{
-		Role: auth.RoleWorker, CommonName: callerNodeID,
-	})
-	req = req.WithContext(ctx)
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusForbidden)
-	assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-}
-
-func TestCompleteJob_NonRunningConflict(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		jobStatus domaintypes.JobStatus
-	}{
-		{name: "created", jobStatus: domaintypes.JobStatusCreated},
-		{name: "success", jobStatus: domaintypes.JobStatusSuccess},
-		{name: "fail", jobStatus: domaintypes.JobStatusFail},
-		{name: "cancelled", jobStatus: domaintypes.JobStatusCancelled},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			f := newJobFixture("mig")
-			f.Job.Status = tt.jobStatus
-
-			st := newMockStoreForJob(f)
-
-			handler := completeJobHandler(st, nil, nil)
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
-
-			assertStatus(t, rr, http.StatusConflict)
-			assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-			assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
-		})
-	}
-}
-
-func TestCompleteJob_InvalidStatus(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	handler := completeJobHandler(&mockStore{}, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "running"}))
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-func TestCompleteJob_InvalidRepoSHAOut(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		sha  string
-	}{
-		{name: "uppercase", sha: "0123456789ABCDEF0123456789ABCDEF01234567"},
-		{name: "too_short", sha: "0123456789abcdef"},
-		{name: "non_hex", sha: "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			f := newJobFixture("mig")
-			st := newMockStoreForJob(f)
-
-			handler := completeJobHandler(st, nil, nil)
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-				"status":       "Success",
-				"repo_sha_out": tt.sha,
-			}))
-
-			assertStatus(t, rr, http.StatusBadRequest)
+			assertStatus(t, rr, tt.wantStatus)
 			assertNoCompletion(t, st)
 		})
 	}
 }
 
-func TestCompleteJob_MissingRepoSHAOutForSuccessfulLinkedJob(t *testing.T) {
+// ===== Payload & State Rejection Tests =====
+
+func TestCompleteJob_PayloadRejection(t *testing.T) {
 	t.Parallel()
 
-	f := newJobFixture("mig")
-	nextID := domaintypes.NewJobID()
-	f.Job.NextID = &nextID
-	f.Job.RepoShaIn = "0123456789abcdef0123456789abcdef01234567"
-
-	st := newMockStoreForJob(f)
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status": "Success",
-	}))
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	assertNoCompletion(t, st)
-}
-
-func TestCompleteJob_InvalidRepoSHAInForSuccessfulLinkedJob(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	nextID := domaintypes.NewJobID()
-	f.Job.NextID = &nextID
-	f.Job.RepoShaIn = ""
-
-	st := newMockStoreForJob(f)
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":       "Success",
-		"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
-	}))
-
-	assertStatus(t, rr, http.StatusConflict)
-	assertNoCompletion(t, st)
-}
-
-func TestCompleteJob_MissingStatus(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	handler := completeJobHandler(&mockStore{}, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{}))
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-func TestCompleteJob_StatsMustBeObject(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status": "Fail",
-		"stats":  "oops",
-	}))
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-}
-
-func TestCompleteJob_JobNotFound(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	st := newMockStoreForJob(f, withGetJobErr(pgx.ErrNoRows))
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
-
-	assertStatus(t, rr, http.StatusNotFound)
-}
-
-func TestCompleteJob_InvalidJobResources_RejectsRequest(t *testing.T) {
-	t.Parallel()
-
-	f := newJobFixture("mig")
-	st := newMockStoreForJob(f)
-
-	handler := completeJobHandler(st, nil, nil)
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status": "Success",
-		"stats": map[string]any{
-			"job_resources": map[string]any{
-				"cpu_consumed_ns": -1,
+	tests := []struct {
+		name      string
+		tweakJob  func(*store.Job)
+		storeOpts []func(*mockStore)
+		body      map[string]any
+		wantStatus int
+	}{
+		{name: "missing_status", body: map[string]any{}, wantStatus: http.StatusBadRequest},
+		{name: "invalid_status", body: map[string]any{"status": "running"}, wantStatus: http.StatusBadRequest},
+		{name: "stats_not_object", body: map[string]any{"status": "Fail", "stats": "oops"}, wantStatus: http.StatusBadRequest},
+		{name: "repo_sha_out/uppercase", body: map[string]any{"status": "Success", "repo_sha_out": "0123456789ABCDEF0123456789ABCDEF01234567"}, wantStatus: http.StatusBadRequest},
+		{name: "repo_sha_out/too_short", body: map[string]any{"status": "Success", "repo_sha_out": "0123456789abcdef"}, wantStatus: http.StatusBadRequest},
+		{name: "repo_sha_out/non_hex", body: map[string]any{"status": "Success", "repo_sha_out": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"}, wantStatus: http.StatusBadRequest},
+		{
+			name: "linked_job/missing_sha_out",
+			tweakJob: func(j *store.Job) {
+				nextID := domaintypes.NewJobID()
+				j.NextID = &nextID
+				j.RepoShaIn = "0123456789abcdef0123456789abcdef01234567"
 			},
+			body:       map[string]any{"status": "Success"},
+			wantStatus: http.StatusBadRequest,
 		},
-	}))
+		{
+			name: "linked_job/empty_sha_in",
+			tweakJob: func(j *store.Job) {
+				nextID := domaintypes.NewJobID()
+				j.NextID = &nextID
+				j.RepoShaIn = ""
+			},
+			body:       map[string]any{"status": "Success", "repo_sha_out": "0123456789abcdef0123456789abcdef01234567"},
+			wantStatus: http.StatusConflict,
+		},
+		{name: "conflict/created", tweakJob: func(j *store.Job) { j.Status = domaintypes.JobStatusCreated }, body: map[string]any{"status": "Fail"}, wantStatus: http.StatusConflict},
+		{name: "conflict/success", tweakJob: func(j *store.Job) { j.Status = domaintypes.JobStatusSuccess }, body: map[string]any{"status": "Fail"}, wantStatus: http.StatusConflict},
+		{name: "conflict/fail", tweakJob: func(j *store.Job) { j.Status = domaintypes.JobStatusFail }, body: map[string]any{"status": "Fail"}, wantStatus: http.StatusConflict},
+		{name: "conflict/cancelled", tweakJob: func(j *store.Job) { j.Status = domaintypes.JobStatusCancelled }, body: map[string]any{"status": "Fail"}, wantStatus: http.StatusConflict},
+		{
+			name:       "job_not_found",
+			storeOpts:  []func(*mockStore){withGetJobErr(pgx.ErrNoRows)},
+			body:       map[string]any{"status": "Fail"},
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "invalid_job_resources",
+			body: map[string]any{
+				"status": "Success",
+				"stats":  map[string]any{"job_resources": map[string]any{"cpu_consumed_ns": -1}},
+			},
+			wantStatus: http.StatusBadRequest,
+		},
+	}
 
-	assertStatus(t, rr, http.StatusBadRequest)
-	assertNoCompletion(t, st)
-	if st.upsertJobMetricCalled {
-		t.Fatal("did not expect UpsertJobMetric on invalid job_resources")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newJobFixture("mig")
+			if tt.tweakJob != nil {
+				tt.tweakJob(&f.Job)
+			}
+			st := newMockStoreForJob(f, tt.storeOpts...)
+			handler := completeJobHandler(st, nil, nil)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(tt.body))
+
+			assertStatus(t, rr, tt.wantStatus)
+			assertNoCompletion(t, st)
+		})
 	}
 }
 
@@ -330,26 +215,16 @@ func TestCompleteJob_InvalidJobMeta(t *testing.T) {
 		expectBodyContains string
 	}{
 		{
-			name: "missing_kind",
-			jobMeta: map[string]any{
-				"gate": map[string]any{"log_digest": testLogDigest},
-			},
+			name:               "missing_kind",
+			jobMeta:            map[string]any{"gate": map[string]any{"log_digest": testLogDigest}},
 			expectBodyContains: "job_meta",
 		},
 		{
-			name: "invalid_kind",
-			jobMeta: map[string]any{
-				"kind": "invalid_kind",
-			},
+			name:               "invalid_kind",
+			jobMeta:            map[string]any{"kind": "invalid_kind"},
 			expectBodyContains: "job_meta",
 		},
-		{
-			name: "gate_meta_on_mig_kind",
-			jobMeta: map[string]any{
-				"kind": "mig",
-				"gate": map[string]any{"log_digest": testLogDigest},
-			},
-		},
+		{name: "gate_meta_on_mig_kind", jobMeta: map[string]any{"kind": "mig", "gate": map[string]any{"log_digest": testLogDigest}}},
 	}
 
 	for _, tt := range tests {
@@ -362,11 +237,8 @@ func TestCompleteJob_InvalidJobMeta(t *testing.T) {
 
 			rr := httptest.NewRecorder()
 			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-				"status":    "Success",
-				"exit_code": 0,
-				"stats": map[string]any{
-					"job_meta": tt.jobMeta,
-				},
+				"status": "Success", "exit_code": 0,
+				"stats": map[string]any{"job_meta": tt.jobMeta},
 			}))
 
 			assertStatus(t, rr, http.StatusBadRequest)
@@ -378,131 +250,64 @@ func TestCompleteJob_InvalidJobMeta(t *testing.T) {
 	}
 }
 
-func TestCompleteJob_ValidJobMetaKinds(t *testing.T) {
+// ===== Valid Completion Tests =====
+
+func TestCompleteJob_ValidCompletion(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name         string
-		jobMeta      map[string]any
-		expectedKind string
+		body         map[string]any
+		wantWithMeta bool
+		wantMetaKind string
+		checkMeta    func(t *testing.T, meta map[string]any)
 	}{
+		// Absent/empty meta -> plain completion path
 		{
-			name: "gate",
-			jobMeta: map[string]any{
-				"kind": "gate",
-				"gate": map[string]any{
-					"log_digest": testLogDigest,
-					"static_checks": []map[string]any{
-						{"tool": "maven", "passed": true},
-					},
-				},
-			},
-			expectedKind: "gate",
+			name:         "absent_meta/empty",
+			body:         map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{"job_meta": map[string]any{}, "duration_ms": 500}},
+			wantWithMeta: false,
 		},
 		{
-			name: "mig",
-			jobMeta: map[string]any{
-				"kind": "mig",
-			},
-			expectedKind: "mig",
+			name:         "absent_meta/null",
+			body:         map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{"job_meta": nil, "duration_ms": 500}},
+			wantWithMeta: false,
+		},
+		// Valid meta kinds -> completion with meta
+		{
+			name:         "meta_kind/gate",
+			wantWithMeta: true, wantMetaKind: "gate",
+			body: map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{
+				"job_meta": map[string]any{"kind": "gate", "gate": map[string]any{
+					"log_digest":    testLogDigest,
+					"static_checks": []map[string]any{{"tool": "maven", "passed": true}},
+				}},
+			}},
 		},
 		{
-			name: "build",
-			jobMeta: map[string]any{
-				"kind": "build",
-				"build": map[string]any{
-					"tool":    "maven",
-					"command": "mvn clean install",
-				},
-			},
-			expectedKind: "build",
+			name:         "meta_kind/mig",
+			wantWithMeta: true, wantMetaKind: "mig",
+			body: map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{
+				"job_meta": map[string]any{"kind": "mig"},
+			}},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			f := newJobFixture("")
-			st := newMockStoreForJob(f)
-			handler := completeJobHandler(st, nil, nil)
-
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-				"status":    "Success",
-				"exit_code": 0,
-				"stats": map[string]any{
-					"job_meta": tt.jobMeta,
-				},
-			}))
-
-			assertStatus(t, rr, http.StatusNoContent)
-			assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
-			if st.updateJobCompletionCalled {
-				t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
-			}
-			assertMetaKind(t, st.updateJobCompletionWithMetaParams.Meta, tt.expectedKind)
-		})
-	}
-}
-
-func TestCompleteJob_AbsentJobMeta_NoPersist(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		jobMeta any
-	}{
-		{name: "empty", jobMeta: map[string]any{}},
-		{name: "null", jobMeta: nil},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			f := newJobFixture("")
-			st := newMockStoreForJob(f)
-			handler := completeJobHandler(st, nil, nil)
-
-			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-				"status":    "Success",
-				"exit_code": 0,
-				"stats": map[string]any{
-					"job_meta":    tt.jobMeta,
-					"duration_ms": 500,
-				},
-			}))
-
-			assertStatus(t, rr, http.StatusNoContent)
-			assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-			assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
-		})
-	}
-}
-
-func TestCompleteJob_ValidJobMeta_FieldPersistence(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name      string
-		status    string
-		exitCode  int
-		jobMeta   map[string]any
-		checkMeta func(t *testing.T, meta map[string]any)
-	}{
 		{
-			name:     "gate_with_bug_summary",
-			status:   "Fail",
-			exitCode: 1,
-			jobMeta: map[string]any{
-				"kind": "gate",
-				"gate": map[string]any{
+			name:         "meta_kind/build",
+			wantWithMeta: true, wantMetaKind: "build",
+			body: map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{
+				"job_meta": map[string]any{"kind": "build", "build": map[string]any{"tool": "maven", "command": "mvn clean install"}},
+			}},
+		},
+		// Field persistence
+		{
+			name:         "field_persistence/gate_bug_summary",
+			wantWithMeta: true, wantMetaKind: "gate",
+			body: map[string]any{"status": "Fail", "exit_code": 1, "stats": map[string]any{
+				"job_meta": map[string]any{"kind": "gate", "gate": map[string]any{
 					"log_digest":  testLogDigest,
 					"bug_summary": "Missing semicolon on line 42 of Main.java",
-				},
-			},
+				}},
+			}},
 			checkMeta: func(t *testing.T, meta map[string]any) {
 				gate, ok := meta["gate"].(map[string]any)
 				if !ok {
@@ -514,13 +319,11 @@ func TestCompleteJob_ValidJobMeta_FieldPersistence(t *testing.T) {
 			},
 		},
 		{
-			name:     "mod_with_action_summary",
-			status:   "Success",
-			exitCode: 0,
-			jobMeta: map[string]any{
-				"kind":           "mig",
-				"action_summary": "Fixed missing import in Main.java",
-			},
+			name:         "field_persistence/mig_action_summary",
+			wantWithMeta: true, wantMetaKind: "mig",
+			body: map[string]any{"status": "Success", "exit_code": 0, "stats": map[string]any{
+				"job_meta": map[string]any{"kind": "mig", "action_summary": "Fixed missing import in Main.java"},
+			}},
 			checkMeta: func(t *testing.T, meta map[string]any) {
 				if as, ok := meta["action_summary"].(string); !ok || as != "Fixed missing import in Main.java" {
 					t.Fatalf("expected action_summary = %q, got %#v", "Fixed missing import in Main.java", meta["action_summary"])
@@ -538,21 +341,25 @@ func TestCompleteJob_ValidJobMeta_FieldPersistence(t *testing.T) {
 			handler := completeJobHandler(st, nil, nil)
 
 			rr := httptest.NewRecorder()
-			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-				"status":    tt.status,
-				"exit_code": tt.exitCode,
-				"stats": map[string]any{
-					"job_meta": tt.jobMeta,
-				},
-			}))
+			handler.ServeHTTP(rr, f.completeJobReq(tt.body))
 
 			assertStatus(t, rr, http.StatusNoContent)
-			assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
-			var meta map[string]any
-			if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
-				t.Fatalf("failed to unmarshal persisted meta: %v", err)
+
+			if tt.wantWithMeta {
+				assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
+				assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
+				assertMetaKind(t, st.updateJobCompletionWithMetaParams.Meta, tt.wantMetaKind)
+				if tt.checkMeta != nil {
+					var meta map[string]any
+					if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
+						t.Fatalf("failed to unmarshal persisted meta: %v", err)
+					}
+					tt.checkMeta(t, meta)
+				}
+			} else {
+				assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
+				assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
 			}
-			tt.checkMeta(t, meta)
 		})
 	}
 }

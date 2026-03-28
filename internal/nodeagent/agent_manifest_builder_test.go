@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -134,7 +135,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
 		}
-		assertCommand(t, manifest.Command, []string{"/bin/sh", "-c", "echo hi"})
+		if want := []string{"/bin/sh", "-c", "echo hi"}; !slices.Equal(manifest.Command, want) {
+			t.Fatalf("command = %v, want %v", manifest.Command, want)
+		}
 	})
 
 	t.Run("no command injected when custom image provided", func(t *testing.T) {
@@ -159,7 +162,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
 		}
-		assertCommand(t, manifest.Command, []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"})
+		if want := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}; !slices.Equal(manifest.Command, want) {
+			t.Fatalf("command = %v, want %v", manifest.Command, want)
+		}
 	})
 
 	t.Run("gitlab options are extracted and stored in manifest", func(t *testing.T) {
@@ -235,7 +240,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if m0.Image != "migs-orw:latest" {
 			t.Errorf("step 0: image=%q, want migs-orw:latest", m0.Image)
 		}
-		assertCommand(t, m0.Command, []string{"--apply", "--dir", "/workspace"})
+		if want := []string{"--apply", "--dir", "/workspace"}; !slices.Equal(m0.Command, want) {
+			t.Fatalf("step 0: command = %v, want %v", m0.Command, want)
+		}
 		if m0.Env["BASE_VAR"] != "base_value" {
 			t.Errorf("step 0: BASE_VAR=%q, want base_value", m0.Env["BASE_VAR"])
 		}
@@ -251,7 +258,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if m1.Image != "migs-fmt:latest" {
 			t.Errorf("step 1: image=%q, want migs-fmt:latest", m1.Image)
 		}
-		assertCommand(t, m1.Command, []string{"/bin/sh", "-c", "fmt --check"})
+		if want := []string{"/bin/sh", "-c", "fmt --check"}; !slices.Equal(m1.Command, want) {
+			t.Fatalf("step 1: command = %v, want %v", m1.Command, want)
+		}
 		if m1.Env["BASE_VAR"] != "base_value" {
 			t.Errorf("step 1: BASE_VAR=%q, want base_value", m1.Env["BASE_VAR"])
 		}
@@ -274,7 +283,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("buildManifestDefault() error: %v", err)
 		}
-		assertCommand(t, manifest.Command, []string{"amata", "run", "/in/amata.yaml", "--set", "mode=step"})
+		if want := []string{"amata", "run", "/in/amata.yaml", "--set", "mode=step"}; !slices.Equal(manifest.Command, want) {
+			t.Fatalf("command = %v, want %v", manifest.Command, want)
+		}
 	})
 
 	t.Run("multi-step amata uses amata command for selected step", func(t *testing.T) {
@@ -296,7 +307,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("step 1 error: %v", err)
 		}
-		assertCommand(t, manifest.Command, []string{"amata", "run", "/in/amata.yaml", "--set", "model=gpt-5"})
+		if want := []string{"amata", "run", "/in/amata.yaml", "--set", "model=gpt-5"}; !slices.Equal(manifest.Command, want) {
+			t.Fatalf("command = %v, want %v", manifest.Command, want)
+		}
 	})
 
 	t.Run("multi-step run: step env overrides base env", func(t *testing.T) {
@@ -348,7 +361,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if manifest.Image != "single-mig:latest" {
 			t.Errorf("expected image single-mig:latest, got %q", manifest.Image)
 		}
-		assertCommand(t, manifest.Command, []string{"/bin/sh", "-c", "run-single"})
+		if want := []string{"/bin/sh", "-c", "run-single"}; !slices.Equal(manifest.Command, want) {
+			t.Fatalf("command = %v, want %v", manifest.Command, want)
+		}
 	})
 }
 

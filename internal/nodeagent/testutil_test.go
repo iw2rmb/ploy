@@ -5,16 +5,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/binary"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -23,21 +16,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/moby/moby/api/pkg/stdcopy"
-	containertypes "github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 )
 
-// testBackoffPolicy returns a fast backoff policy suitable for tests.
-func testBackoffPolicy() backoff.Policy {
-	return backoff.Policy{
-		InitialInterval: types.Duration(10 * time.Millisecond),
-		MaxInterval:     types.Duration(100 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	}
-}
+// ---------------------------------------------------------------------------
+// Simple utilities
+// ---------------------------------------------------------------------------
 
 // gzipBytes compresses input bytes using gzip (test helper).
 func gzipBytes(t *testing.T, input []byte) []byte {
@@ -103,32 +86,23 @@ func generateTestCerts(t *testing.T) (certPEM, keyPEM, caPEM []byte) {
 	return certPEM, keyPEM, caPEM
 }
 
-// containsError checks if an error message contains a substring.
-func containsError(err error, substr string) bool {
-	if err == nil {
-		return false
-	}
-	return strings.Contains(err.Error(), substr)
-}
-
-// newTestConfig returns a Config with sensible test defaults (TLS disabled).
-func newTestConfig(serverURL string) Config {
-	return Config{
-		ServerURL: serverURL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-}
-
-// newTestUploader returns a baseUploader with sensible test defaults (TLS disabled).
-func newTestUploader(t *testing.T, serverURL string) *baseUploader {
+// populateTestFiles creates files with the given content under dir.
+func populateTestFiles(t *testing.T, dir string, files []string, content string) {
 	t.Helper()
-	u, err := newBaseUploader(newTestConfig(serverURL))
-	if err != nil {
-		t.Fatalf("newBaseUploader: %v", err)
+	for _, f := range files {
+		fullPath := filepath.Join(dir, f)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+			t.Fatalf("failed to create dir: %v", err)
+		}
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
 	}
-	return u
 }
+
+// ---------------------------------------------------------------------------
+// Tar inspection helpers
+// ---------------------------------------------------------------------------
 
 // tarEntry holds the key attributes of a single tar archive entry.
 type tarEntry struct {
@@ -173,239 +147,8 @@ func tarEntriesFromBundle(t *testing.T, bundle []byte) map[string]tarEntry {
 	return entries
 }
 
-// newTestController creates a runController with all uploaders initialized,
-// suitable for tests that call upload methods.
-func newTestController(t *testing.T, cfg Config) *runController {
-	t.Helper()
-	uploader, err := newBaseUploader(cfg)
-	if err != nil {
-		t.Fatalf("newBaseUploader: %v", err)
-	}
-	return &runController{
-		cfg:               cfg,
-		jobs:              make(map[types.JobID]*jobContext),
-		diffUploader:      uploader,
-		artifactUploader:  uploader,
-		statusUploader:    uploader,
-		jobImageNameSaver: uploader,
-		nodeEventUploader: uploader,
-		httpClient:        uploader.client,
-	}
-}
-
-// setupClaimer creates a ClaimManager ready for testing with noop pre-claim
-// cleanup, noop startup reconciler, and fast backoff policy.
-func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimManager {
-	t.Helper()
-	claimer, err := NewClaimManager(cfg, controller)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	claimer.preClaimCleanup = nil // nil means always proceed
-	installNoopStartupReconciler(claimer)
-	claimer.backoff = backoff.NewStatefulBackoff(testBackoffPolicy())
-	return claimer
-}
-
-// runClaimerUntil runs the claim loop in a background goroutine and blocks
-// until the timeout expires.
-func runClaimerUntil(t *testing.T, claimer *ClaimManager, timeout time.Duration) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		_ = claimer.Start(ctx)
-	}()
-	wg.Wait()
-}
-
-// callRecorder is a thread-safe helper for tracking named call events in tests.
-type callRecorder struct {
-	mu    sync.Mutex
-	calls []string
-}
-
-func (r *callRecorder) Record(name string) {
-	r.mu.Lock()
-	r.calls = append(r.calls, name)
-	r.mu.Unlock()
-}
-
-func (r *callRecorder) Count() int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return len(r.calls)
-}
-
-func (r *callRecorder) All() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	out := make([]string, len(r.calls))
-	copy(out, r.calls)
-	return out
-}
-
-// inspectWithState builds a ContainerInspectResult with the given state fields.
-func inspectWithState(running bool, status containertypes.ContainerState, finishedAt string) client.ContainerInspectResult {
-	return client.ContainerInspectResult{
-		Container: containertypes.InspectResponse{
-			State: &containertypes.State{
-				Running:    running,
-				Status:     status,
-				FinishedAt: finishedAt,
-			},
-		},
-	}
-}
-
-// fakeDockerClient is a composable test double that satisfies both
-// crashReconcileDockerClient and claimCleanupDockerClient interfaces.
-type fakeDockerClient struct {
-	listResult client.ContainerListResult
-	listErr    error
-	listCalls  int
-
-	inspectByID    map[string]client.ContainerInspectResult
-	inspectErrByID map[string]error
-
-	waitByID      map[string]containertypes.WaitResponse
-	waitErrByID   map[string]error
-	waitBlockByID map[string]chan struct{}
-
-	logsByID    map[string][]byte
-	logsErrByID map[string]error
-
-	infoResult client.SystemInfoResult
-	infoErr    error
-
-	removeErrByID map[string]error
-	removedIDs    []string
-}
-
-func (f *fakeDockerClient) ContainerList(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
-	f.listCalls++
-	if f.listErr != nil {
-		return client.ContainerListResult{}, f.listErr
-	}
-	return f.listResult, nil
-}
-
-func (f *fakeDockerClient) ContainerInspect(_ context.Context, containerID string, _ client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
-	if err, ok := f.inspectErrByID[containerID]; ok && err != nil {
-		return client.ContainerInspectResult{}, err
-	}
-	if inspect, ok := f.inspectByID[containerID]; ok {
-		return inspect, nil
-	}
-	return client.ContainerInspectResult{}, errors.New("missing inspect result")
-}
-
-func (f *fakeDockerClient) ContainerWait(_ context.Context, containerID string, _ client.ContainerWaitOptions) client.ContainerWaitResult {
-	result := make(chan containertypes.WaitResponse, 1)
-	errCh := make(chan error, 1)
-	if gate, ok := f.waitBlockByID[containerID]; ok && gate != nil {
-		<-gate
-	}
-	if err, ok := f.waitErrByID[containerID]; ok && err != nil {
-		errCh <- err
-		return client.ContainerWaitResult{Result: result, Error: errCh}
-	}
-	waitResp, ok := f.waitByID[containerID]
-	if !ok {
-		waitResp = containertypes.WaitResponse{StatusCode: 0}
-	}
-	result <- waitResp
-	return client.ContainerWaitResult{Result: result, Error: errCh}
-}
-
-func (f *fakeDockerClient) ContainerLogs(_ context.Context, containerID string, _ client.ContainerLogsOptions) (client.ContainerLogsResult, error) {
-	if err, ok := f.logsErrByID[containerID]; ok && err != nil {
-		return nil, err
-	}
-	data, ok := f.logsByID[containerID]
-	if !ok {
-		data = nil
-	}
-	return io.NopCloser(bytes.NewReader(data)), nil
-}
-
-func (f *fakeDockerClient) Info(context.Context, client.InfoOptions) (client.SystemInfoResult, error) {
-	if f.infoErr != nil {
-		return client.SystemInfoResult{}, f.infoErr
-	}
-	return f.infoResult, nil
-}
-
-func (f *fakeDockerClient) ContainerRemove(_ context.Context, containerID string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
-	f.removedIDs = append(f.removedIDs, containerID)
-	if err, ok := f.removeErrByID[containerID]; ok && err != nil {
-		return client.ContainerRemoveResult{}, err
-	}
-	return client.ContainerRemoveResult{}, nil
-}
-
-// multiplexedDockerLogs builds Docker stdcopy-framed log output for testing.
-func multiplexedDockerLogs(payload string, stream stdcopy.StdType) []byte {
-	data := []byte(payload)
-	frame := make([]byte, 8+len(data))
-	frame[0] = byte(stream)
-	binary.BigEndian.PutUint32(frame[4:8], uint32(len(data)))
-	copy(frame[8:], data)
-	return frame
-}
-
 // ---------------------------------------------------------------------------
-// Agent mock-server helpers
-// ---------------------------------------------------------------------------
-
-type agentServerConfig struct {
-	heartbeatStatus  int
-	heartbeatCounter *int
-}
-
-type agentServerOption func(*agentServerConfig)
-
-func withHeartbeatStatus(code int) agentServerOption {
-	return func(c *agentServerConfig) { c.heartbeatStatus = code }
-}
-
-func withHeartbeatCounter(counter *int) agentServerOption {
-	return func(c *agentServerConfig) { c.heartbeatCounter = counter }
-}
-
-// newAgentMockServer creates an httptest.Server that handles heartbeat and claim
-// endpoints for the given nodeID. By default heartbeat returns 200 and claim
-// returns 200 with an empty JSON object (no work).
-func newAgentMockServer(t *testing.T, nodeID string, opts ...agentServerOption) *httptest.Server {
-	t.Helper()
-	sc := agentServerConfig{heartbeatStatus: http.StatusOK}
-	for _, o := range opts {
-		o(&sc)
-	}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/" + nodeID + "/heartbeat":
-			if sc.heartbeatCounter != nil {
-				*sc.heartbeatCounter++
-			}
-			w.WriteHeader(sc.heartbeatStatus)
-		case "/v1/nodes/" + nodeID + "/claim":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(ts.Close)
-	return ts
-}
-
-// ---------------------------------------------------------------------------
-// Agent config helpers
+// Config builders
 // ---------------------------------------------------------------------------
 
 type configOption func(*Config)
@@ -454,6 +197,80 @@ func newAgentConfig(serverURL string, opts ...configOption) Config {
 	return cfg
 }
 
+// newTestConfig returns a Config with sensible test defaults (TLS disabled).
+func newTestConfig(serverURL string) Config {
+	return newAgentConfig(serverURL)
+}
+
+// ---------------------------------------------------------------------------
+// Component builders
+// ---------------------------------------------------------------------------
+
+// newTestUploader returns a baseUploader with sensible test defaults (TLS disabled).
+func newTestUploader(t *testing.T, serverURL string) *baseUploader {
+	t.Helper()
+	u, err := newBaseUploader(newTestConfig(serverURL))
+	if err != nil {
+		t.Fatalf("newBaseUploader: %v", err)
+	}
+	return u
+}
+
+// newTestController creates a runController with all uploaders initialized,
+// suitable for tests that call upload methods.
+func newTestController(t *testing.T, cfg Config) *runController {
+	t.Helper()
+	uploader, err := newBaseUploader(cfg)
+	if err != nil {
+		t.Fatalf("newBaseUploader: %v", err)
+	}
+	return &runController{
+		cfg:               cfg,
+		jobs:              make(map[types.JobID]*jobContext),
+		diffUploader:      uploader,
+		artifactUploader:  uploader,
+		statusUploader:    uploader,
+		jobImageNameSaver: uploader,
+		nodeEventUploader: uploader,
+		httpClient:        uploader.client,
+	}
+}
+
+// setupClaimer creates a ClaimManager ready for testing with noop pre-claim
+// cleanup, noop startup reconciler, and fast backoff policy.
+func setupClaimer(t *testing.T, cfg Config, controller RunController) *ClaimManager {
+	t.Helper()
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	claimer.preClaimCleanup = nil // nil means always proceed
+	installNoopStartupReconciler(claimer)
+	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
+		InitialInterval: types.Duration(10 * time.Millisecond),
+		MaxInterval:     types.Duration(100 * time.Millisecond),
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	})
+	return claimer
+}
+
+// runClaimerUntil runs the claim loop in a background goroutine and blocks
+// until the timeout expires.
+func runClaimerUntil(t *testing.T, claimer *ClaimManager, timeout time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = claimer.Start(ctx)
+	}()
+	wg.Wait()
+}
+
 // runAgentUntil starts the agent, waits startup duration, calls check (if non-nil),
 // then cancels and waits for shutdown within shutdownTimeout. Returns agent.Run error.
 func runAgentUntil(t *testing.T, agent *Agent, startup, shutdownTimeout time.Duration, check func(t *testing.T, agent *Agent)) error {
@@ -482,7 +299,7 @@ func runAgentUntil(t *testing.T, agent *Agent, startup, shutdownTimeout time.Dur
 }
 
 // ---------------------------------------------------------------------------
-// Claim response helpers
+// Claim response builders
 // ---------------------------------------------------------------------------
 
 type claimOption func(*ClaimResponse)
@@ -528,25 +345,8 @@ func newClaimResponse(opts ...claimOption) ClaimResponse {
 	return c
 }
 
-// newSingleClaimServer returns a server that serves the given ClaimResponse
-// on the /v1/nodes/{nodeID}/claim endpoint.
-func newSingleClaimServer(t *testing.T, nodeID string, claim ClaimResponse) *httptest.Server {
-	t.Helper()
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/" + nodeID + "/claim":
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(claim)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(ts.Close)
-	return ts
-}
-
 // ---------------------------------------------------------------------------
-// StartRunRequest helpers
+// StartRunRequest builders
 // ---------------------------------------------------------------------------
 
 type startRunOption func(*StartRunRequest)
@@ -604,148 +404,4 @@ func buildManifestDefault(req StartRunRequest) (contracts.StepManifest, error) {
 // buildManifestAtStep calls buildManifestFromRequest with the given stepIndex and ModStackUnknown.
 func buildManifestAtStep(req StartRunRequest, step int) (contracts.StepManifest, error) {
 	return buildManifestFromRequest(req, req.TypedOptions, step, contracts.ModStackUnknown)
-}
-
-// ---------------------------------------------------------------------------
-// Artifact upload server helpers
-// ---------------------------------------------------------------------------
-
-type artifactServerConfig struct {
-	status int
-}
-
-type artifactServerOption func(*artifactServerConfig)
-
-func withArtifactStatus(code int) artifactServerOption {
-	return func(c *artifactServerConfig) { c.status = code }
-}
-
-// artifactUploadCapture records the last artifact upload call.
-type artifactUploadCapture struct {
-	Called bool
-	Name   string
-	Bundle []byte
-}
-
-// newArtifactUploadServer returns a test server that handles
-// POST /v1/runs/{runID}/jobs/{jobID}/artifact and captures the upload.
-// Default response is 201 Created with a test artifact ID.
-func newArtifactUploadServer(t *testing.T, runID, jobID string, opts ...artifactServerOption) (*httptest.Server, *artifactUploadCapture) {
-	t.Helper()
-	sc := artifactServerConfig{status: http.StatusCreated}
-	for _, o := range opts {
-		o(&sc)
-	}
-	cap := &artifactUploadCapture{}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wantPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID, jobID)
-		if r.URL.Path != wantPath {
-			return
-		}
-		cap.Called = true
-		var payload struct {
-			Name   string `json:"name"`
-			Bundle []byte `json:"bundle"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&payload)
-		cap.Name = payload.Name
-		cap.Bundle = payload.Bundle
-		w.WriteHeader(sc.status)
-		if sc.status == http.StatusCreated {
-			_ = json.NewEncoder(w).Encode(map[string]string{
-				"artifact_bundle_id": "test-id",
-				"cid":                "test-cid",
-			})
-		}
-	}))
-	t.Cleanup(ts.Close)
-	return ts, cap
-}
-
-// artifactUploadCall records a single artifact upload in a multi-call server.
-type artifactUploadCall struct {
-	Name   string
-	Bundle []byte
-}
-
-// newArtifactUploadServerMulti returns a test server that records every
-// artifact upload call. Each response gets a unique artifact ID.
-func newArtifactUploadServerMulti(t *testing.T, runID, jobID string) (*httptest.Server, *[]artifactUploadCall) {
-	t.Helper()
-	calls := &[]artifactUploadCall{}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		wantPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID, jobID)
-		if r.URL.Path != wantPath {
-			return
-		}
-		var payload struct {
-			Name   string `json:"name"`
-			Bundle []byte `json:"bundle"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&payload)
-		*calls = append(*calls, artifactUploadCall{
-			Name:   payload.Name,
-			Bundle: payload.Bundle,
-		})
-		n := len(*calls)
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"artifact_bundle_id": fmt.Sprintf("artifact-id-%d", n),
-			"cid":                fmt.Sprintf("bafy-test-cid-%d", n),
-		})
-	}))
-	t.Cleanup(ts.Close)
-	return ts, calls
-}
-
-// statusCapture records the status string sent to a job-complete endpoint.
-type statusCapture struct {
-	Status string
-}
-
-// newStatusCaptureServer returns an httptest server that captures the status
-// field from POST /v1/jobs/{jobID}/complete requests.
-func newStatusCaptureServer(t *testing.T, jobID string) (*httptest.Server, *statusCapture) {
-	t.Helper()
-	cap := &statusCapture{}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/jobs/"+jobID+"/complete" {
-			var body struct {
-				Status string `json:"status"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
-				cap.Status = body.Status
-			}
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(ts.Close)
-	return ts, cap
-}
-
-// populateTestFiles creates files with the given content under dir.
-func populateTestFiles(t *testing.T, dir string, files []string, content string) {
-	t.Helper()
-	for _, f := range files {
-		fullPath := filepath.Join(dir, f)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
-			t.Fatalf("failed to create dir: %v", err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
-			t.Fatalf("failed to create file: %v", err)
-		}
-	}
-}
-
-// assertCommand checks that got matches want element-by-element.
-func assertCommand(t *testing.T, got, want []string) {
-	t.Helper()
-	if len(got) != len(want) {
-		t.Fatalf("command len=%d, want %d; got %v", len(got), len(want), got)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("command[%d]=%q, want %q", i, got[i], want[i])
-		}
-	}
 }
