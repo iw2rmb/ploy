@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -164,11 +163,7 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 			RunMs:   timing.RunMs,
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("get run timing: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusOK, resp)
 
 		slog.Info("run timing retrieved", "run_id", resp.ID, "queue_ms", resp.QueueMs, "run_ms", resp.RunMs)
 	}
@@ -238,9 +233,7 @@ func listRunsHandler(st store.Store) http.HandlerFunc {
 			Runs []domaintypes.RunSummary `json:"runs"`
 		}{Runs: summaries}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -273,8 +266,6 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 			summary.Counts = counts
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(summary)
+		writeJSON(w, http.StatusOK, summary)
 	}
 }

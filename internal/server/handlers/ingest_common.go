@@ -38,6 +38,16 @@ func writeHTTPError(w http.ResponseWriter, code int, msg string, args ...any) {
 	http.Error(w, msg, code)
 }
 
+// writeJSON sets Content-Type to application/json, writes the status code, and
+// encodes v as JSON. On encode failure a warning is logged (headers are already sent).
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Warn("encode json response failed", "err", err)
+	}
+}
+
 // DefaultMaxBodySize is the default request body size limit (1 MiB).
 const DefaultMaxBodySize = 1 << 20
 

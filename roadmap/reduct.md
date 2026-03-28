@@ -92,7 +92,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **Stable semantics**: `extractTmpBundle` / `withMaterializedTmpBundle` (tmp extraction + materialization) unchanged — `/tmp`/`/in`/`/out` wiring preserved as specified.
     - **Test proof**: `go test ./internal/server/handlers ./internal/server/blobpersist` passes; `go test ./internal/nodeagent ./internal/workflow/step -run 'Uploader|LogStreamer|DiffFetcher|TmpBundle|Artifact|Rehydrate'` passes; `go test ./internal/... -run 'Artifact|Diff|SpecBundle|Blob|SBOM|Rehydrate|TmpBundle'` passes (all packages).
 
-- [ ] 4.1 Expand shared HTTP handler contract helpers and remove ad-hoc decode/respond branches
+- [x] 4.1 Expand shared HTTP handler contract helpers and remove ad-hoc decode/respond branches
   - Type: determined
   - Component: `internal/server/handlers/ingest_common.go`, `internal/server/handlers/bootstrap.go`, `internal/server/handlers/migs_crud.go`, `internal/server/handlers/runs.go`, `internal/server/handlers/repos.go`, `internal/server/handlers/events.go`
   - Implementation:
@@ -107,6 +107,15 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+90/-190` (net `-100`) in handler entrypoints.
   - Clarity / complexity check: Reuses existing helper module instead of introducing a second helper domain.
   - Reasoning: high (16 CFP)
+  - Completion notes:
+    - **Canonical JSON response helper** (`internal/server/handlers/ingest_common.go`): Added `writeJSON(w, status, v)` — sets `Content-Type: application/json`, writes the status code, encodes v as JSON, and logs a warning on encode failure. Single call site replaces the 3–4 line encode block repeated across all handlers.
+    - **Ad-hoc encode fragments removed** (8 call sites across 4 files):
+      - `bootstrap.go`: `createBootstrapTokenHandler` (200 OK) and `bootstrapCertificateHandler` (200 OK) — both replaced with `writeJSON`. `encoding/json` import dropped from file.
+      - `migs_crud.go`: `createMigHandler` (201 Created) and `writeModsListResponse` (200 OK) — both replaced.
+      - `runs.go`: `getRunTimingHandler` (200 OK), `listRunsHandler` (200 OK), `getRunHandler` (200 OK) — all replaced. `encoding/json` import dropped from file.
+      - `repos.go`: `listReposHandler` (200 OK) and `listRunsForRepoHandler` (200 OK) — both replaced.
+    - **`parsePagination` adoption** (`repos.go`): `listRunsForRepoHandler` replaced its 20-line inline limit/offset parsing block with a single `parsePagination(r)` call. `strconv` import dropped from file.
+    - **Test proof**: `go test ./internal/server/handlers` passes; `go test ./internal/... -run 'Handler|HTTP|DecodeJSON|invalid request'` passes (all packages).
 
 - [ ] 4.2a Create canonical domain-level DTO package for shared API payloads
   - Type: assumption-bound

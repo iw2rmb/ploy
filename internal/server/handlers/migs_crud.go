@@ -120,11 +120,7 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			CreatedAt: mig.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00"),
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			slog.Error("create mig: encode response failed", "err", err)
-		}
+		writeJSON(w, http.StatusCreated, resp)
 
 		slog.Info("mig created", "mig_id", mig.ID.String(), "name", mig.Name)
 	}
@@ -290,11 +286,7 @@ func writeModsListResponse(w http.ResponseWriter, migs []store.Mig) {
 		Migs []modItem `json:"migs"`
 	}{Migs: items}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		slog.Error("list migs: encode response failed", "err", err)
-	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // deleteMigHandler deletes a mig project.
