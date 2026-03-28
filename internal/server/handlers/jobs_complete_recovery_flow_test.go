@@ -141,7 +141,7 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 		withJobResults(map[domaintypes.JobID]store.Job{reGateID: reGate}),
 		withRepoAttemptJobs([]store.Job{failedGate, f.Job, reGate}),
 		withArtifactBundles([]store.ArtifactBundle{
-			{RunID: f.RunID, JobID: &f.Job.ID, ObjectKey: strPtr("artifacts/run/" + f.RunID.String() + "/bundle/heal.tar.gz")},
+			{RunID: f.RunID, JobID: &f.Job.ID, ObjectKey: ptr("artifacts/run/" + f.RunID.String() + "/bundle/heal.tar.gz")},
 		}),
 	)
 	if _, stack, _ := lifecycle.ResolveGateRecoveryContext(failedGate); stack == contracts.ModStackUnknown {

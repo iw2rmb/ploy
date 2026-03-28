@@ -94,7 +94,7 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 			ID:        pgtype.UUID{Valid: true},
 			RunID:     runID,
 			JobID:     &jobID,
-			Name:      strPtr("artifact-name"),
+			Name:      ptr("artifact-name"),
 			ObjectKey: &objKey,
 			Cid:       &cid,
 			Digest:    &digest,

@@ -111,7 +111,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if gateErr != nil || gateResult == nil {
 		duration := time.Since(startTime)
 		r.cleanupGateOutDir(workspace)
-		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
+		repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
 		errMsg := gateErr
 		if errMsg == nil {
 			errMsg = errors.New("gate returned nil result with nil error")
@@ -163,7 +163,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	r.cleanupGateOutDir(workspace)
 
 	duration := time.Since(startTime)
-	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
+	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
 
 	// Build stats with gate metadata.
 	stats := r.buildGateJobStats(gateResult, duration)

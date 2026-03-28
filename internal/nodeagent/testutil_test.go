@@ -698,6 +698,31 @@ func newArtifactUploadServerMulti(t *testing.T, runID, jobID string) (*httptest.
 	return ts, calls
 }
 
+// statusCapture records the status string sent to a job-complete endpoint.
+type statusCapture struct {
+	Status string
+}
+
+// newStatusCaptureServer returns an httptest server that captures the status
+// field from POST /v1/jobs/{jobID}/complete requests.
+func newStatusCaptureServer(t *testing.T, jobID string) (*httptest.Server, *statusCapture) {
+	t.Helper()
+	cap := &statusCapture{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/jobs/"+jobID+"/complete" {
+			var body struct {
+				Status string `json:"status"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+				cap.Status = body.Status
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(ts.Close)
+	return ts, cap
+}
+
 // populateTestFiles creates files with the given content under dir.
 func populateTestFiles(t *testing.T, dir string, files []string, content string) {
 	t.Helper()

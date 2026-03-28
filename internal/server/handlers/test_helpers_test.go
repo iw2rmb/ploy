@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -50,12 +51,6 @@ func createTestEventsServiceWithStore(st store.Store) (*server.EventsService, er
 type flushRecorder struct{ *httptest.ResponseRecorder }
 
 func (f *flushRecorder) Flush() {}
-
-// strPtr returns a pointer to s.
-func strPtr(s string) *string { return &s }
-
-// boolPtr returns a pointer to b.
-func boolPtr(b bool) *bool { return &b }
 
 // validSpecBody returns a canonical spec map for test request bodies.
 func validSpecBody() map[string]any {
@@ -160,12 +155,7 @@ func activeMigWithSpec(specID domaintypes.SpecID) *mockStore {
 	}
 }
 
-// mockError is a simple error type for testing store error paths.
-type mockError struct{ msg string }
-
-func (e *mockError) Error() string { return e.msg }
-
-var errMockDatabase = &mockError{msg: "mock database error"}
+var errMockDatabase = errors.New("mock database error")
 
 // jobTestFixture holds the common identifiers and job used across jobs_complete tests.
 type jobTestFixture struct {
@@ -316,61 +306,6 @@ func withGetRunCreatedAt(t time.Time) func(*mockStore) {
 	}
 }
 
-// gateFailureFixture holds the shared setup for gate-failure healing tests.
-type gateFailureFixture struct {
-	jobTestFixture
-	Successor store.Job
-	SpecID    domaintypes.SpecID
-	SpecBytes []byte
-	Store     *mockStore
-}
-
-// newGateFailureFixture creates a pre-gate job fixture with recovery metadata,
-// a successor mig job, healing spec, and a fully wired mock store.
-// recoveryMeta is the raw job meta JSON for the failed gate.
-func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture {
-	t.Helper()
-	f := newRepoScopedFixture(domaintypes.JobTypePreGate)
-	specID := domaintypes.NewSpecID()
-	f.Job.Meta = recoveryMeta
-	specBytes := healingSpecBytes(t)
-
-	successor := store.Job{
-		ID:          domaintypes.NewJobID(),
-		RunID:       f.RunID,
-		RepoID:      f.Job.RepoID,
-		RepoBaseRef: "main",
-		Attempt:     1,
-		Name:        "mig-0",
-		Status:      domaintypes.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod,
-		Meta:        []byte(`{}`),
-	}
-	f.Job.NextID = &successor.ID
-
-	jobs := []store.Job{f.Job, successor}
-	st := newMockStoreForJob(f,
-		withSpec(specID, specBytes),
-		withListJobsByRun(jobs),
-		withRepoAttemptJobs(jobs),
-	)
-
-	return gateFailureFixture{
-		jobTestFixture: f,
-		Successor:      successor,
-		SpecID:         specID,
-		SpecBytes:      specBytes,
-		Store:          st,
-	}
-}
-
-// doJSON sends a JSON request to handler and returns the recorder.
-// body is marshaled to JSON; pass nil for no body.
-func doJSON(t *testing.T, handler http.Handler, method, path string, body any) *httptest.ResponseRecorder {
-	t.Helper()
-	return doRequest(t, handler, method, path, body)
-}
-
 // doRequest sends a request to handler and returns the recorder.
 // body: nil → no body; string → raw body; otherwise → JSON-marshaled.
 // pathParams are key-value pairs: "mig_ref", "mod123", "run_id", "run1".
@@ -491,96 +426,6 @@ func decodeBody[T any](t *testing.T, rr *httptest.ResponseRecorder) T {
 	return v
 }
 
-// healingSpecBytes returns a serialized spec with standard build_gate healing config.
-// Used by orchestration tests that exercise gate-failure healing insertion.
-func healingSpecBytes(t *testing.T) []byte {
-	t.Helper()
-	b, err := json.Marshal(map[string]any{
-		"steps": []any{
-			map[string]any{"image": "migs-orw:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"retries": 1,
-						"image":   "migs-codex:latest",
-					},
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal healing spec: %v", err)
-	}
-	return b
-}
-
-// healingSpecBytesWithRetries returns a healing spec with a configurable retry count.
-func healingSpecBytesWithRetries(t *testing.T, retries int) []byte {
-	t.Helper()
-	b, err := json.Marshal(map[string]any{
-		"steps": []any{
-			map[string]any{"image": "migs-orw:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"retries": float64(retries),
-						"image":   "migs-codex:latest",
-					},
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal healing spec: %v", err)
-	}
-	return b
-}
-
-// healingSpecBytesWithExpectations returns a healing spec with expectations.artifacts block.
-func healingSpecBytesWithExpectations(t *testing.T, retries int) []byte {
-	t.Helper()
-	b, err := json.Marshal(map[string]any{
-		"steps": []any{
-			map[string]any{"image": "migs-orw:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"retries": float64(retries),
-						"image":   "migs-codex:latest",
-						"expectations": map[string]any{
-							"artifacts": []any{
-								map[string]any{
-									"path":   "/out/gate-profile-candidate.json",
-									"schema": "gate_profile_v1",
-								},
-							},
-						},
-					},
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal healing spec: %v", err)
-	}
-	return b
-}
-
 // newNodeFixture returns a node with generated ID, sensible defaults, and the given Drained flag.
 func newNodeFixture(drained bool) (string, store.Node) {
 	nodeIDStr := domaintypes.NewNodeKey()
@@ -594,87 +439,6 @@ func newNodeFixture(drained bool) (string, store.Node) {
 		Drained:       drained,
 		CreatedAt:     pgtype.Timestamptz{Time: now, Valid: true},
 		LastHeartbeat: pgtype.Timestamptz{Time: now, Valid: true},
-	}
-}
-
-// assertCancelsSuccessor asserts that no jobs were created and exactly one
-// successor was cancelled with the given ID.
-func assertCancelsSuccessor(t *testing.T, st *mockStore, successorID domaintypes.JobID) {
-	t.Helper()
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no healing jobs, got %d CreateJob calls", st.createJobCallCount)
-	}
-	if len(st.updateJobStatusCalls) != 1 {
-		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
-	}
-	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
-		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
-	}
-}
-
-// expectedJob describes the expected attributes of a single job in a chain.
-type expectedJob struct {
-	Name       string
-	JobType    domaintypes.JobType
-	Status     domaintypes.JobStatus
-	Image      string
-	RepoShaIn  string // expected repo_sha_in; empty means assert empty
-}
-
-// createJobsByName indexes CreateJobParams by name.
-func createJobsByName(params []store.CreateJobParams) map[string]store.CreateJobParams {
-	byName := make(map[string]store.CreateJobParams, len(params))
-	for _, p := range params {
-		byName[p.Name] = p
-	}
-	return byName
-}
-
-// assertJobChain verifies that the created jobs match the expected chain,
-// checking job_type, status, image, repo_id, repo_base_ref, attempt, run_id, and repo_sha_in.
-func assertJobChain(t *testing.T, params []store.CreateJobParams, runID domaintypes.RunID, repoID domaintypes.RepoID, repoBaseRef string, attempt int32, expected []expectedJob) {
-	t.Helper()
-
-	if len(params) != len(expected) {
-		t.Fatalf("expected %d jobs, got %d", len(expected), len(params))
-	}
-
-	byName := createJobsByName(params)
-	for _, exp := range expected {
-		got, ok := byName[exp.Name]
-		if !ok {
-			t.Fatalf("missing job %q", exp.Name)
-		}
-		if got.JobType != exp.JobType {
-			t.Errorf("job %q: expected job_type %q, got %q", exp.Name, exp.JobType, got.JobType)
-		}
-		if got.Status != exp.Status {
-			t.Errorf("job %q: expected status %s, got %s", exp.Name, exp.Status, got.Status)
-		}
-		if exp.Image != "" && got.JobImage != exp.Image {
-			t.Errorf("job %q: expected job_image %q, got %q", exp.Name, exp.Image, got.JobImage)
-		}
-		if got.RepoID != repoID {
-			t.Errorf("job %q: expected repo_id %q, got %q", exp.Name, repoID, got.RepoID)
-		}
-		if got.RepoBaseRef != repoBaseRef {
-			t.Errorf("job %q: expected repo_base_ref %q, got %q", exp.Name, repoBaseRef, got.RepoBaseRef)
-		}
-		if got.Attempt != attempt {
-			t.Errorf("job %q: expected attempt %d, got %d", exp.Name, attempt, got.Attempt)
-		}
-		if got.RunID != runID {
-			t.Errorf("job %q: expected run_id %q, got %q", exp.Name, runID, got.RunID)
-		}
-		if exp.RepoShaIn != "" {
-			if got.RepoShaIn != exp.RepoShaIn {
-				t.Errorf("job %q: expected repo_sha_in %q, got %q", exp.Name, exp.RepoShaIn, got.RepoShaIn)
-			}
-		} else {
-			if got.RepoShaIn != "" {
-				t.Errorf("job %q: expected empty repo_sha_in, got %q", exp.Name, got.RepoShaIn)
-			}
-		}
 	}
 }
 
@@ -696,143 +460,6 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *server.HTTPServer {
 	bp := blobpersist.New(st, bs)
 	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
 	return srv
-}
-
-// ---------------------------------------------------------------------------
-// Healing chain fixture builder
-// ---------------------------------------------------------------------------
-
-// healingChainFixture provides a pre-wired job chain for testing
-// maybeCreateHealingJobs with minimal boilerplate.
-type healingChainFixture struct {
-	RunID       domaintypes.RunID
-	RepoID      domaintypes.RepoID
-	SpecID      domaintypes.SpecID
-	Jobs        []store.Job
-	FailedJob   store.Job
-	SuccessorID domaintypes.JobID // ID of the terminal mig-0 job
-	Run         store.Run
-	Store       *mockStore
-}
-
-// priorHealJob describes an intermediate job to insert between pre-gate and mig-0.
-type priorHealJob struct {
-	Name    string
-	JobType domaintypes.JobType
-	Status  domaintypes.JobStatus
-	Meta    []byte
-	ShaIn   string
-}
-
-type healingChainConfig struct {
-	preGateMeta []byte
-	specFn      func(*testing.T) []byte
-	repoShaIn   string
-	priorHeals  []priorHealJob
-	storeOpts   []func(*mockStore)
-}
-
-func withHealingMeta(meta []byte) func(*healingChainConfig) {
-	return func(c *healingChainConfig) { c.preGateMeta = meta }
-}
-
-func withHealingSpec(fn func(*testing.T) []byte) func(*healingChainConfig) {
-	return func(c *healingChainConfig) { c.specFn = fn }
-}
-
-func withHealingRepoShaIn(sha string) func(*healingChainConfig) {
-	return func(c *healingChainConfig) { c.repoShaIn = sha }
-}
-
-func withPriorHeals(heals ...priorHealJob) func(*healingChainConfig) {
-	return func(c *healingChainConfig) { c.priorHeals = heals }
-}
-
-func withHealingStoreOpts(opts ...func(*mockStore)) func(*healingChainConfig) {
-	return func(c *healingChainConfig) { c.storeOpts = opts }
-}
-
-// newHealingChain builds a chain of jobs: pre-gate → [prior heals] → mig-0,
-// wires NextID pointers, and configures a mockStore with the chain and spec.
-//
-// The "failed" job is the last gate/re-gate type in the chain (pre-gate when
-// there are no prior heals, or the last re-gate when there are).
-func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingChainFixture {
-	t.Helper()
-
-	cfg := healingChainConfig{
-		preGateMeta: []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
-		specFn:      func(t *testing.T) []byte { return healingSpecBytesWithRetries(t, 2) },
-		repoShaIn:   healingTestRepoSHAIn,
-	}
-	for _, o := range opts {
-		o(&cfg)
-	}
-
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-
-	baseJob := func(name string, jt domaintypes.JobType, status domaintypes.JobStatus) store.Job {
-		return store.Job{
-			ID: domaintypes.NewJobID(), RunID: runID, RepoID: repoID,
-			RepoBaseRef: "main", Attempt: 1,
-			Name: name, JobType: jt, Status: status,
-		}
-	}
-
-	var jobs []store.Job
-
-	preGate := baseJob("pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusFail)
-	preGate.RepoShaIn = cfg.repoShaIn
-	preGate.Meta = cfg.preGateMeta
-	jobs = append(jobs, preGate)
-
-	for _, ph := range cfg.priorHeals {
-		j := baseJob(ph.Name, ph.JobType, ph.Status)
-		j.Meta = ph.Meta
-		if ph.ShaIn != "" {
-			j.RepoShaIn = ph.ShaIn
-		}
-		jobs = append(jobs, j)
-	}
-
-	mig0 := baseJob("mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated)
-	mig0.Meta = []byte(`{}`)
-	jobs = append(jobs, mig0)
-
-	// Wire NextID chain.
-	for i := 0; i < len(jobs)-1; i++ {
-		nextID := jobs[i+1].ID
-		jobs[i].NextID = &nextID
-	}
-
-	// Failed job = last gate/re-gate in the chain.
-	failedIdx := 0
-	for i := len(jobs) - 1; i >= 0; i-- {
-		if jobs[i].JobType == domaintypes.JobTypePreGate || jobs[i].JobType == domaintypes.JobTypeReGate {
-			failedIdx = i
-			break
-		}
-	}
-
-	specBytes := cfg.specFn(t)
-	st := &mockStore{
-		getSpecResult:                 store.Spec{ID: specID, Spec: specBytes},
-		listJobsByRunRepoAttemptResult: jobs,
-	}
-	for _, o := range cfg.storeOpts {
-		o(st)
-	}
-
-	return healingChainFixture{
-		RunID: runID, RepoID: repoID, SpecID: specID,
-		Jobs:        jobs,
-		FailedJob:   jobs[failedIdx],
-		SuccessorID: mig0.ID,
-		Run:         store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted},
-		Store:       st,
-	}
 }
 
 // mustTarGzPayload builds a gzipped tar archive from a map of filename → content.

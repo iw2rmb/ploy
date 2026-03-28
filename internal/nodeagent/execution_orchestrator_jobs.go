@@ -202,7 +202,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 
 func configureModAmataInDir(cfg *standardJobConfig, typedOpts RunOptions, stepIdx int) error {
 	amata := selectedModAmata(typedOpts, stepIdx)
-	if strings.TrimSpace(amataSpecText(amata)) == "" {
+	if amata == nil || strings.TrimSpace(amata.Spec) == "" {
 		return nil
 	}
 	cfg.InDirPattern = "ploy-mig-in-*"
@@ -222,20 +222,16 @@ func selectedModAmata(typedOpts RunOptions, stepIdx int) *contracts.AmataRunSpec
 	return typedOpts.Steps[stepIdx].Amata
 }
 
-func amataSpecText(amata *contracts.AmataRunSpec) string {
-	if amata == nil {
-		return ""
-	}
-	return strings.TrimSpace(amata.Spec)
-}
-
 func writeAmataSpecInDir(inDir string, amata *contracts.AmataRunSpec) error {
-	specText := amataSpecText(amata)
+	if amata == nil {
+		return nil
+	}
+	specText := strings.TrimSpace(amata.Spec)
 	if specText == "" {
 		return nil
 	}
 	amataPath := filepath.Join(inDir, "amata.yaml")
-	if err := os.WriteFile(amataPath, []byte(amata.Spec), 0o644); err != nil {
+	if err := os.WriteFile(amataPath, []byte(specText), 0o644); err != nil {
 		return fmt.Errorf("write /in/amata.yaml: %w", err)
 	}
 	return nil
@@ -673,20 +669,17 @@ func (r *runController) reportTerminalStatus(
 		return
 	}
 
+	status := types.JobStatusSuccess
+	logMsg := "job succeeded"
 	if result.ExitCode != 0 {
-		exitCode := int32(result.ExitCode)
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
-			slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
-		}
-		slog.Info("job failed", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "exit_code", result.ExitCode, "duration", duration)
-		return
+		status = types.JobStatusFail
+		logMsg = "job failed"
 	}
-
-	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusSuccess.String(), &exitCodeZero, stats, req.JobID, repoSHAOut); uploadErr != nil {
-		slog.Error("failed to upload success status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
+	exitCode := int32(result.ExitCode)
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), status.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "error", uploadErr)
 	}
-	slog.Info("job succeeded", "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "duration", duration)
+	slog.Info(logMsg, "run_id", req.RunID, "job_id", req.JobID, "next_id", req.NextID, "exit_code", result.ExitCode, "duration", duration)
 }
 
 // uploadGateLogsArtifact uploads build gate logs as an artifact bundle and attaches
@@ -719,16 +712,13 @@ func (r *runController) uploadGateLogsArtifact(runID types.RunID, jobID types.Jo
 }
 
 
-func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree ...string) string {
+func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunRequest, workspace string, inputTree string) string {
 	repoSHAIn := strings.TrimSpace(req.RepoSHAIn.String())
 	if repoSHAIn == "" {
 		slog.Warn("repo_sha_in missing on claimed job; skipping repo_sha_out calculation", "run_id", req.RunID, "job_id", req.JobID)
 		return ""
 	}
-	preTree := ""
-	if len(inputTree) > 0 {
-		preTree = strings.TrimSpace(inputTree[0])
-	}
+	preTree := strings.TrimSpace(inputTree)
 	repoSHAOut, err := gitpkg.ComputeRepoSHAV1(ctx, workspace, repoSHAIn, preTree)
 	if err != nil {
 		slog.Warn("failed to compute repo_sha_out", "run_id", req.RunID, "job_id", req.JobID, "repo_sha_in", repoSHAIn, "error", err)
@@ -738,6 +728,7 @@ func (r *runController) computeRepoSHAOut(ctx context.Context, req StartRunReque
 }
 
 // uploadHealingJobDiff generates and uploads a diff for a discrete healing job.
+// Silent no-op when baseDir is empty (snapshot creation may have failed gracefully).
 func (r *runController) uploadHealingJobDiff(
 	ctx context.Context,
 	runID types.RunID,
@@ -748,27 +739,42 @@ func (r *runController) uploadHealingJobDiff(
 	workspace string,
 	result step.Result,
 ) {
-	if diffGenerator == nil {
-		return
-	}
 	if strings.TrimSpace(baseDir) == "" {
 		return
 	}
+	r.uploadJobDiff(ctx, runID, jobID, diffGenerator, baseDir, workspace, result, types.DiffJobTypeHealing)
+}
 
-	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
-	if err != nil {
-		slog.Error("failed to generate healing job diff", "run_id", runID, "job_id", jobID, "error", err)
+// uploadJobDiff is the shared implementation for generating, summarizing, and uploading
+// a diff between a baseline snapshot and the post-execution workspace.
+func (r *runController) uploadJobDiff(
+	ctx context.Context,
+	runID types.RunID,
+	jobID types.JobID,
+	diffGenerator step.DiffGenerator,
+	baseDir, workspace string,
+	result step.Result,
+	diffType types.DiffJobType,
+) {
+	if diffGenerator == nil {
 		return
 	}
 
+	label := diffType.String()
+
+	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
+	if err != nil {
+		slog.Error("failed to generate "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
+		return
+	}
 	if len(diffBytes) == 0 {
-		slog.Info("no diff to upload for healing job (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID)
+		slog.Info("no diff to upload (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID, "diff_type", label)
 		return
 	}
 
 	patchStats := step.CountPatchStats(diffBytes)
 	summary := types.NewDiffSummaryBuilder().
-		JobType(types.DiffJobTypeHealing.String()).
+		JobType(label).
 		ExitCode(result.ExitCode).
 		FilesChanged(patchStats.FilesChanged).
 		LinesAdded(patchStats.LinesAdded).
@@ -782,11 +788,11 @@ func (r *runController) uploadHealingJobDiff(
 		MustBuild()
 
 	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload healing job diff", "run_id", runID, "job_id", jobID, "error", err)
+		slog.Error("failed to upload "+label+" diff", "run_id", runID, "job_id", jobID, "error", err)
 		return
 	}
 
-	slog.Info("healing job diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
+	slog.Info(label+" diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
 }
 
 // isValidArtifactPath validates that an artifact path is safe for upload.

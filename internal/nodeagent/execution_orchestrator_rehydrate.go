@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -159,6 +158,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 // the pre-mig baseline snapshot with the post-mig workspace. This ensures that
 // untracked files created by the mig are included in the patch (git diff --no-index
 // semantics via GenerateBetween).
+//
+// Unlike healing diffs, a missing baseline is logged as a warning because mod diffs
+// must use baseline-aware GenerateBetween semantics.
 func (r *runController) uploadModDiffWithBaseline(
 	ctx context.Context,
 	runID types.RunID,
@@ -169,54 +171,9 @@ func (r *runController) uploadModDiffWithBaseline(
 	workspace string,
 	result step.Result,
 ) {
-	if diffGenerator == nil {
-		return
-	}
-
-	// If no baseline snapshot is available, skip diff upload rather than
-	// falling back to legacy baseline-less generation. Mod diffs must use
-	// baseline-aware GenerateBetween semantics.
 	if strings.TrimSpace(baseDir) == "" {
 		slog.Warn("mig diff skipped: baseline snapshot missing", "run_id", runID, "job_id", jobID, "job_name", jobName)
 		return
 	}
-
-	// Generate diff between baseline snapshot and post-mig workspace so untracked
-	// files are included in the patch (git diff --no-index semantics).
-	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, workspace)
-	if err != nil {
-		slog.Error("failed to generate mig diff from baseline", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
-
-	if len(diffBytes) == 0 {
-		// No changes between baseline and workspace; skip upload.
-		slog.Info("no diff to upload for mig (no changes between baseline and workspace)", "run_id", runID, "job_id", jobID)
-		return
-	}
-
-	// Build diff summary with step metadata for database storage.
-	// Uses typed builder to eliminate map[string]any construction.
-	// Mod job diffs use types.DiffJobTypeMod so they participate in the rehydration chain.
-	patchStats := step.CountPatchStats(diffBytes)
-	summary := types.NewDiffSummaryBuilder().
-		JobType(types.DiffJobTypeMod.String()).
-		ExitCode(result.ExitCode).
-		FilesChanged(patchStats.FilesChanged).
-		LinesAdded(patchStats.LinesAdded).
-		LinesRemoved(patchStats.LinesRemoved).
-		Timings(
-			time.Duration(result.Timings.HydrationDuration).Milliseconds(),
-			time.Duration(result.Timings.ExecutionDuration).Milliseconds(),
-			time.Duration(result.Timings.DiffDuration).Milliseconds(),
-			time.Duration(result.Timings.TotalDuration).Milliseconds(),
-		).
-		MustBuild()
-
-	if err := r.diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload mig diff", "run_id", runID, "job_id", jobID, "error", err)
-		return
-	}
-
-	slog.Info("mig diff uploaded successfully", "run_id", runID, "job_id", jobID, "size", len(diffBytes))
+	r.uploadJobDiff(ctx, runID, jobID, diffGenerator, baseDir, workspace, result, types.DiffJobTypeMod)
 }

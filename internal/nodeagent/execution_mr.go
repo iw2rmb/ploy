@@ -206,7 +206,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 
 	mrURL, mrErr := r.createMR(ctx, req, manifest, workspace)
 	duration := time.Since(startTime)
-	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace)
+	repoSHAOut := r.computeRepoSHAOut(ctx, req, workspace, "")
 
 	builder := types.NewRunStatsBuilder().DurationMs(duration.Milliseconds())
 	if mrURL != "" {
