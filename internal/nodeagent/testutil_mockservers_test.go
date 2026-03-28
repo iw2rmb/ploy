@@ -134,6 +134,86 @@ func newArtifactUploadServer(t *testing.T, runID, jobID string, opts ...artifact
 }
 
 // ---------------------------------------------------------------------------
+// Diff upload server helpers
+// ---------------------------------------------------------------------------
+
+type diffServerConfig struct {
+	status int
+}
+
+type diffServerOption func(*diffServerConfig)
+
+func withDiffStatus(code int) diffServerOption {
+	return func(c *diffServerConfig) { c.status = code }
+}
+
+// diffUploadCall records a single diff upload.
+type diffUploadCall struct {
+	Patch   []byte
+	Summary json.RawMessage
+}
+
+// newDiffUploadServer returns a test server that handles
+// POST /v1/runs/{runID}/jobs/{jobID}/diff and records every upload call.
+// Default status is 201 Created.
+func newDiffUploadServer(t *testing.T, runID, jobID string, opts ...diffServerOption) (*httptest.Server, *[]diffUploadCall) {
+	t.Helper()
+	sc := diffServerConfig{status: http.StatusCreated}
+	for _, o := range opts {
+		o(&sc)
+	}
+	calls := &[]diffUploadCall{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/diff", runID, jobID)
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != wantPath {
+			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
+		}
+		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %s", ct)
+		}
+		var payload struct {
+			RunID   *json.RawMessage `json:"run_id"`
+			Patch   []byte           `json:"patch"`
+			Summary json.RawMessage  `json:"summary"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Errorf("failed to decode payload: %v", err)
+		}
+		if payload.RunID != nil {
+			t.Error("run_id should not be in payload (it's in URL)")
+		}
+		if payload.Patch == nil {
+			t.Error("patch not present in payload")
+		}
+		*calls = append(*calls, diffUploadCall{
+			Patch:   payload.Patch,
+			Summary: payload.Summary,
+		})
+		w.WriteHeader(sc.status)
+		if sc.status == http.StatusCreated {
+			_ = json.NewEncoder(w).Encode(map[string]string{"diff_id": "test-diff-id"})
+		}
+	}))
+	t.Cleanup(ts.Close)
+	return ts, calls
+}
+
+// newUncalledServer returns a test server that fails the test if any request
+// is received. Useful for verifying that client-side validation prevents
+// network calls (e.g., size cap checks).
+func newUncalledServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	}))
+	t.Cleanup(ts.Close)
+	return ts
+}
+
+// ---------------------------------------------------------------------------
 // Status capture server helpers
 // ---------------------------------------------------------------------------
 

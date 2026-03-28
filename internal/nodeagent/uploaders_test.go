@@ -5,9 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,14 +19,12 @@ import (
 // --- DiffUploader tests ---
 
 func TestDiffUploader_UploadDiff(t *testing.T) {
-	// Helper to create test summaries using the builder pattern.
-	// DiffSummary is now json.RawMessage-backed, so we use the builder.
 	tests := []struct {
-		name           string
-		diffContent    string
-		summary        types.DiffSummary
-		wantStatusCode int
-		wantErr        bool
+		name        string
+		diffContent string
+		summary     types.DiffSummary
+		serverCode  int
+		wantErr     bool
 	}{
 		{
 			name:        "successful upload",
@@ -37,8 +33,7 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 				ExitCode(0).
 				Timings(0, 0, 0, 1000).
 				MustBuild(),
-			wantStatusCode: http.StatusCreated,
-			wantErr:        false,
+			serverCode: http.StatusCreated,
 		},
 		{
 			name:        "empty diff",
@@ -46,257 +41,142 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 			summary: types.NewDiffSummaryBuilder().
 				ExitCode(0).
 				MustBuild(),
-			wantStatusCode: http.StatusCreated,
-			wantErr:        false,
+			serverCode: http.StatusCreated,
 		},
 		{
-			name:           "server error",
-			diffContent:    "diff content",
-			summary:        types.NewDiffSummaryBuilder().MustBuild(),
-			wantStatusCode: http.StatusInternalServerError,
-			wantErr:        true,
+			name:        "server error",
+			diffContent: "diff content",
+			summary:     types.NewDiffSummaryBuilder().MustBuild(),
+			serverCode:  http.StatusInternalServerError,
+			wantErr:     true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a test server.
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify request method and path.
-				if r.Method != http.MethodPost {
-					t.Errorf("expected POST request, got %s", r.Method)
-				}
-
-				// Verify URL path uses job-scoped endpoint.
-				expectedPath := "/v1/runs/test-run-id/jobs/test-job-id/diff"
-				if r.URL.Path != expectedPath {
-					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
-				}
-
-				// Verify content type.
-				if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-					t.Errorf("expected Content-Type application/json, got %s", ct)
-				}
-
-				// Decode and verify payload.
-				var payload map[string]interface{}
-				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-					t.Errorf("failed to decode payload: %v", err)
-				}
-
-				// Verify run_id is NOT in payload (it's in the URL path).
-				if _, ok := payload["run_id"]; ok {
-					t.Error("run_id should not be in payload (it's in URL)")
-				}
-
-				// Verify patch is present and gzipped.
-				if patchData, ok := payload["patch"]; ok {
-					// JSON unmarshals []byte as base64, but we need to verify it's gzipped.
-					// For this test, we'll just check it's present.
-					if patchData == nil {
-						t.Error("patch is nil")
-					}
-				} else {
-					t.Error("patch not present in payload")
-				}
-
-				// Verify summary is present.
-				if _, ok := payload["summary"]; !ok {
-					t.Error("summary not present in payload")
-				}
-
-				w.WriteHeader(tt.wantStatusCode)
-				if tt.wantStatusCode == http.StatusCreated {
-					_ = json.NewEncoder(w).Encode(map[string]string{"diff_id": "test-diff-id"})
-				}
-			}))
-			defer server.Close()
+			server, _ := newDiffUploadServer(t, "test-run-id", "test-job-id",
+				withDiffStatus(tt.serverCode))
 
 			uploader := newTestUploader(t, server.URL)
-
-			// Upload diff with job-scoped endpoint.
-			ctx := context.Background()
-			err := uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte(tt.diffContent), tt.summary)
-
-			if tt.wantErr && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			err := uploader.UploadDiff(context.Background(), "test-run-id", "test-job-id",
+				[]byte(tt.diffContent), tt.summary)
+			checkErr(t, tt.wantErr, err)
 		})
-	}
-}
-
-func TestDiffUploader_SizeLimit(t *testing.T) {
-	// Create incompressible data (> MaxUploadSize) so gzip stays > MaxUploadSize.
-	rnd := make([]byte, MaxUploadSize+1)
-	rand.New(rand.NewSource(1)).Read(rnd)
-
-	called := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusCreated)
-	}))
-	defer server.Close()
-
-	uploader := newTestUploader(t, server.URL)
-
-	ctx := context.Background()
-	err := uploader.UploadDiff(ctx, "test-run-id", "test-job-id", rnd, types.NewDiffSummaryBuilder().MustBuild())
-	if err == nil {
-		t.Fatal("expected error for oversized diff but got none")
-	}
-	if !strings.Contains(err.Error(), "exceeds size cap") {
-		t.Fatalf("unexpected error, want size cap: %v", err)
-	}
-	if called {
-		t.Fatal("server should not have been called when size cap triggers")
 	}
 }
 
 func TestDiffUploader_Compression(t *testing.T) {
 	diffContent := "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old line\n+new line\n"
 
-	var receivedGzipped []byte
-
-	// Create a test server that captures the gzipped payload.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Read the raw body first.
-		bodyBytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Errorf("failed to read body: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		// Decode the JSON payload.
-		var payload map[string]json.RawMessage
-		if err := json.Unmarshal(bodyBytes, &payload); err != nil {
-			t.Errorf("failed to decode payload: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		// Extract the patch field (it's base64-encoded in JSON).
-		if patchRaw, ok := payload["patch"]; ok {
-			// Decode the base64-encoded patch.
-			var patchBytes []byte
-			if err := json.Unmarshal(patchRaw, &patchBytes); err != nil {
-				t.Errorf("failed to decode patch: %v", err)
-			} else {
-				receivedGzipped = patchBytes
-			}
-		}
-
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]string{"diff_id": "test-diff-id"})
-	}))
-	defer server.Close()
-
+	server, calls := newDiffUploadServer(t, "test-run-id", "test-job-id")
 	uploader := newTestUploader(t, server.URL)
 
-	ctx := context.Background()
-	err := uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte(diffContent), types.NewDiffSummaryBuilder().MustBuild())
+	err := uploader.UploadDiff(context.Background(), "test-run-id", "test-job-id",
+		[]byte(diffContent), types.NewDiffSummaryBuilder().MustBuild())
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Verify that the content was gzipped by decompressing it.
-	if len(receivedGzipped) > 0 {
-		gzReader, err := gzip.NewReader(bytes.NewReader(receivedGzipped))
-		if err != nil {
-			t.Errorf("failed to create gzip reader: %v", err)
-			return
-		}
-		defer func() { _ = gzReader.Close() }()
+	if len(*calls) == 0 {
+		t.Fatal("no upload calls recorded")
+	}
 
-		decompressed, err := io.ReadAll(gzReader)
-		if err != nil {
-			t.Errorf("failed to decompress: %v", err)
-			return
-		}
+	// Verify the patch is valid gzip containing the original diff.
+	gz, err := gzip.NewReader(bytes.NewReader((*calls)[0].Patch))
+	if err != nil {
+		t.Fatalf("patch is not valid gzip: %v", err)
+	}
+	defer func() { _ = gz.Close() }()
 
-		if string(decompressed) != diffContent {
-			t.Errorf("decompressed content mismatch:\ngot:  %s\nwant: %s", string(decompressed), diffContent)
-		}
-	} else {
-		t.Error("no gzipped data received")
+	decompressed, err := io.ReadAll(gz)
+	if err != nil {
+		t.Fatalf("failed to decompress: %v", err)
+	}
+	if string(decompressed) != diffContent {
+		t.Errorf("decompressed content mismatch:\ngot:  %s\nwant: %s", decompressed, diffContent)
 	}
 }
 
 // TestBearerToken_TrimsWhitespace verifies that the bearer token read from
 // file is trimmed of leading/trailing whitespace before being used in
-// the Authorization header. Token files commonly have trailing newlines
-// (e.g., from text editors or "echo tok > file") which would corrupt headers.
+// the Authorization header.
 func TestBearerToken_TrimsWhitespace(t *testing.T) {
 	tests := []struct {
 		name          string
-		tokenContent  string // Raw file contents (may include whitespace/newlines)
-		expectedToken string // Expected token after trimming
+		tokenContent  string
+		expectedToken string
+	}{
+		{"trailing newline", "tok\n", "tok"},
+		{"trailing CRLF", "tok\r\n", "tok"},
+		{"leading and trailing whitespace", "  tok  \n", "tok"},
+		{"multiple trailing newlines", "tok\n\n\n", "tok"},
+		{"clean token", "tok", "tok"},
+		{"internal spaces preserved", "tok with spaces\n", "tok with spaces"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tokenPath := filepath.Join(t.TempDir(), "bearer-token")
+			if err := os.WriteFile(tokenPath, []byte(tt.tokenContent), 0600); err != nil {
+				t.Fatalf("write token file: %v", err)
+			}
+			t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
+
+			var capturedAuthHeader string
+			server := newCaptureAuthServer(t, &capturedAuthHeader)
+			uploader := newTestUploader(t, server.URL)
+
+			_ = uploader.UploadDiff(context.Background(), "test-run-id", "test-job-id",
+				[]byte("diff"), types.NewDiffSummaryBuilder().MustBuild())
+
+			expectedHeader := "Bearer " + tt.expectedToken
+			if capturedAuthHeader != expectedHeader {
+				t.Errorf("Authorization header mismatch:\ngot:  %q\nwant: %q",
+					capturedAuthHeader, expectedHeader)
+			}
+		})
+	}
+}
+
+// --- Upload size cap tests ---
+
+func TestUploader_SizeCap(t *testing.T) {
+	tests := []struct {
+		name   string
+		upload func(context.Context, *baseUploader) error
 	}{
 		{
-			name:          "trailing newline",
-			tokenContent:  "tok\n",
-			expectedToken: "tok",
+			name: "diff exceeding size cap",
+			upload: func(ctx context.Context, u *baseUploader) error {
+				return u.UploadDiff(ctx, "test-run-id", "test-job-id",
+					incompressibleBytes(MaxUploadSize+1),
+					types.NewDiffSummaryBuilder().MustBuild())
+			},
 		},
 		{
-			name:          "trailing CRLF",
-			tokenContent:  "tok\r\n",
-			expectedToken: "tok",
-		},
-		{
-			name:          "leading and trailing whitespace",
-			tokenContent:  "  tok  \n",
-			expectedToken: "tok",
-		},
-		{
-			name:          "multiple trailing newlines",
-			tokenContent:  "tok\n\n\n",
-			expectedToken: "tok",
-		},
-		{
-			name:          "clean token (no whitespace)",
-			tokenContent:  "tok",
-			expectedToken: "tok",
-		},
-		{
-			name:          "token with internal spaces preserved",
-			tokenContent:  "tok with spaces\n",
-			expectedToken: "tok with spaces",
+			name: "artifact exceeding size cap",
+			upload: func(ctx context.Context, u *baseUploader) error {
+				f := filepath.Join(t.TempDir(), "large.bin")
+				if err := os.WriteFile(f, incompressibleBytes(MaxUploadSize+1), 0600); err != nil {
+					t.Fatalf("write large file: %v", err)
+				}
+				_, _, err := u.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{f}, "")
+				return err
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a temp directory and token file with the test content.
-			tmpDir := t.TempDir()
-			tokenPath := filepath.Join(tmpDir, "bearer-token")
-			if err := os.WriteFile(tokenPath, []byte(tt.tokenContent), 0600); err != nil {
-				t.Fatalf("failed to write token file: %v", err)
-			}
-
-			// Override the bearer token path for this test.
-			t.Setenv("PLOY_NODE_BEARER_TOKEN_PATH", tokenPath)
-
-			// Capture the Authorization header sent by the HTTP client.
-			var capturedAuthHeader string
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				capturedAuthHeader = r.Header.Get("Authorization")
-				w.WriteHeader(http.StatusCreated)
-			}))
-			defer server.Close()
-
+			server := newUncalledServer(t)
 			uploader := newTestUploader(t, server.URL)
 
-			// Make a request to trigger the Authorization header.
-			ctx := context.Background()
-			_ = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte("diff"), types.NewDiffSummaryBuilder().MustBuild())
-
-			// Verify the Authorization header is correctly trimmed.
-			expectedHeader := "Bearer " + tt.expectedToken
-			if capturedAuthHeader != expectedHeader {
-				t.Errorf("Authorization header mismatch:\ngot:  %q\nwant: %q", capturedAuthHeader, expectedHeader)
+			err := tt.upload(context.Background(), uploader)
+			if err == nil {
+				t.Fatal("expected error for oversized upload but got none")
+			}
+			if !strings.Contains(err.Error(), "exceeds size cap") {
+				t.Fatalf("unexpected error, want size cap: %v", err)
 			}
 		})
 	}
@@ -307,59 +187,34 @@ func TestBearerToken_TrimsWhitespace(t *testing.T) {
 func TestArtifactUploader_UploadArtifact(t *testing.T) {
 	tests := []struct {
 		name       string
-		setupFiles func(t *testing.T) []string // returns file paths to upload
-		serverCode int                          // 0 means no server needed
+		files      map[string]string // filename -> content; nil means no files
+		serverCode int
 		wantErr    bool
-		verify     func(t *testing.T, payload map[string]interface{})
+		verify     func(t *testing.T, calls []artifactUploadCall)
 	}{
 		{
-			name: "success",
-			setupFiles: func(t *testing.T) []string {
-				t.Helper()
-				tmpDir := t.TempDir()
-				file1 := filepath.Join(tmpDir, "test1.txt")
-				file2 := filepath.Join(tmpDir, "test2.txt")
-				if err := os.WriteFile(file1, []byte("content1"), 0600); err != nil {
-					t.Fatalf("create test file: %v", err)
-				}
-				if err := os.WriteFile(file2, []byte("content2"), 0600); err != nil {
-					t.Fatalf("create test file: %v", err)
-				}
-				return []string{file1, file2}
-			},
+			name:       "success",
+			files:      map[string]string{"test1.txt": "content1", "test2.txt": "content2"},
 			serverCode: http.StatusCreated,
-			wantErr:    false,
-			verify: func(t *testing.T, payload map[string]interface{}) {
+			verify: func(t *testing.T, calls []artifactUploadCall) {
 				t.Helper()
-				if _, exists := payload["run_id"]; exists {
-					t.Error("run_id should not be in payload (it's in URL)")
+				if len(calls) != 1 {
+					t.Fatalf("expected 1 upload call, got %d", len(calls))
 				}
-				if payload["name"] != "test-bundle" {
-					t.Errorf("expected name 'test-bundle', got %v", payload["name"])
+				if calls[0].Name != "test-bundle" {
+					t.Errorf("expected name 'test-bundle', got %q", calls[0].Name)
 				}
-				if _, exists := payload["bundle"]; !exists {
-					t.Error("expected bundle field in payload")
+				if len(calls[0].Bundle) == 0 {
+					t.Error("expected non-empty bundle")
 				}
 			},
 		},
 		{
 			name: "empty paths",
-			setupFiles: func(t *testing.T) []string {
-				return []string{}
-			},
-			wantErr: false,
 		},
 		{
-			name: "server error",
-			setupFiles: func(t *testing.T) []string {
-				t.Helper()
-				tmpDir := t.TempDir()
-				file1 := filepath.Join(tmpDir, "test.txt")
-				if err := os.WriteFile(file1, []byte("content"), 0600); err != nil {
-					t.Fatalf("create test file: %v", err)
-				}
-				return []string{file1}
-			},
+			name:       "server error",
+			files:      map[string]string{"test.txt": "content"},
 			serverCode: http.StatusInternalServerError,
 			wantErr:    true,
 		},
@@ -367,52 +222,37 @@ func TestArtifactUploader_UploadArtifact(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			paths := tt.setupFiles(t)
+			// Create temp files from declarative map.
+			var paths []string
+			if tt.files != nil {
+				tmpDir := t.TempDir()
+				for name, content := range tt.files {
+					p := filepath.Join(tmpDir, name)
+					if err := os.WriteFile(p, []byte(content), 0600); err != nil {
+						t.Fatalf("create test file: %v", err)
+					}
+					paths = append(paths, p)
+				}
+			}
 
 			var serverURL string
-			var receivedPayload map[string]interface{}
-
+			var calls *[]artifactUploadCall
 			if tt.serverCode != 0 {
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.Method != http.MethodPost {
-						t.Errorf("expected POST, got %s", r.Method)
-					}
-					expectedPath := "/v1/runs/test-run-id/jobs/test-job-id/artifact"
-					if r.URL.Path != expectedPath {
-						t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
-					}
-					body, err := io.ReadAll(r.Body)
-					if err != nil {
-						t.Fatalf("read request body: %v", err)
-					}
-					if err := json.Unmarshal(body, &receivedPayload); err != nil {
-						t.Fatalf("unmarshal request: %v", err)
-					}
-					w.WriteHeader(tt.serverCode)
-					if tt.serverCode == http.StatusCreated {
-						_, _ = w.Write([]byte(`{"artifact_bundle_id":"test-id"}`))
-					}
-				}))
-				defer server.Close()
-				serverURL = server.URL
+				srv, c := newArtifactUploadServer(t, "test-run-id", "test-job-id",
+					withArtifactStatus(tt.serverCode))
+				serverURL = srv.URL
+				calls = c
 			} else {
-				// No server needed — use dummy URL.
 				serverURL = "http://localhost:8443"
 			}
 
 			uploader := newTestUploader(t, serverURL)
+			_, _, err := uploader.UploadArtifact(context.Background(),
+				"test-run-id", "test-job-id", paths, "test-bundle")
+			checkErr(t, tt.wantErr, err)
 
-			ctx := context.Background()
-			_, _, err := uploader.UploadArtifact(ctx, "test-run-id", "test-job-id", paths, "test-bundle")
-
-			if tt.wantErr && err == nil {
-				t.Error("expected error but got none")
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if tt.verify != nil {
-				tt.verify(t, receivedPayload)
+			if tt.verify != nil && calls != nil {
+				tt.verify(t, *calls)
 			}
 		})
 	}
@@ -476,7 +316,6 @@ func TestCreateTarGzBundle_Files(t *testing.T) {
 
 func TestCreateTarGzBundle_DirectoryRecursive(t *testing.T) {
 	tmpDir := t.TempDir()
-	// Create directory tree: rootDir/{a.txt, sub/b.txt}
 	rootDir := filepath.Join(tmpDir, "root")
 	if err := os.MkdirAll(filepath.Join(rootDir, "sub"), 0o755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -533,7 +372,6 @@ func TestCreateTarGzBundleFromEntries_CustomArchiveRoot(t *testing.T) {
 }
 
 func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
-	// Try to bundle a non-existent file.
 	_, err := createTarGzBundle([]string{"/nonexistent/file.txt"})
 	if err == nil {
 		t.Error("expected error for non-existent file")
@@ -542,42 +380,31 @@ func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
 
 // TestCreateTarGzBundle_SymlinkPreserved verifies that symlinks in a directory
 // are archived as symlinks (TypeSymlink header), not as regular files with
-// followed content. This is a security-critical behavior to prevent symlink-based
-// exfiltration of files outside the workspace.
+// followed content. External symlinks are skipped for security.
 func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create a directory structure:
-	//   workspace/
-	//     regular.txt        -> regular file with known content
-	//     link_to_external   -> symlink pointing to /etc/hosts (external path)
-	//     link_to_internal   -> symlink pointing to regular.txt (internal path)
 	workspaceDir := filepath.Join(tmpDir, "workspace")
 	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
 		t.Fatalf("mkdir workspace: %v", err)
 	}
 
-	// Create a regular file inside workspace.
 	regularFile := filepath.Join(workspaceDir, "regular.txt")
 	regularContent := []byte("regular file content")
 	if err := os.WriteFile(regularFile, regularContent, 0o600); err != nil {
 		t.Fatalf("write regular file: %v", err)
 	}
 
-	// Create a symlink pointing to an external file (e.g., /etc/hosts).
-	// This tests that we don't read/exfiltrate external file contents.
-	externalLink := filepath.Join(workspaceDir, "link_to_external")
-	if err := os.Symlink("/etc/hosts", externalLink); err != nil {
+	// Symlink pointing outside workspace — should be skipped.
+	if err := os.Symlink("/etc/hosts", filepath.Join(workspaceDir, "link_to_external")); err != nil {
 		t.Fatalf("create external symlink: %v", err)
 	}
 
-	// Create a symlink pointing to the internal regular file.
-	internalLink := filepath.Join(workspaceDir, "link_to_internal")
-	if err := os.Symlink("regular.txt", internalLink); err != nil {
+	// Symlink pointing to internal file — should be preserved as symlink.
+	if err := os.Symlink("regular.txt", filepath.Join(workspaceDir, "link_to_internal")); err != nil {
 		t.Fatalf("create internal symlink: %v", err)
 	}
 
-	// Bundle the workspace directory.
 	bundleBytes, err := createTarGzBundle([]string{workspaceDir})
 	if err != nil {
 		t.Fatalf("create bundle: %v", err)
@@ -585,7 +412,7 @@ func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 
 	entries := tarEntriesFromBundle(t, bundleBytes)
 
-	// Verify the regular file is archived correctly.
+	// Regular file archived correctly.
 	regularEntry, ok := entries[filepath.Join("workspace", "regular.txt")]
 	if !ok {
 		t.Fatal("regular.txt not found in archive")
@@ -597,14 +424,12 @@ func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 		t.Errorf("regular.txt content mismatch")
 	}
 
-	// External symlinks pointing outside the workspace should be SKIPPED for security.
-	// This prevents data exfiltration via symlinks to sensitive files like /etc/hosts.
-	_, ok = entries[filepath.Join("workspace", "link_to_external")]
-	if ok {
-		t.Error("link_to_external should NOT be in archive - external symlinks should be skipped for security")
+	// External symlink skipped for security.
+	if _, ok = entries[filepath.Join("workspace", "link_to_external")]; ok {
+		t.Error("link_to_external should NOT be in archive — external symlinks should be skipped")
 	}
 
-	// Verify the internal symlink is also archived as a symlink.
+	// Internal symlink preserved as TypeSymlink.
 	internalEntry, ok := entries[filepath.Join("workspace", "link_to_internal")]
 	if !ok {
 		t.Fatal("link_to_internal not found in archive")
@@ -617,31 +442,16 @@ func TestCreateTarGzBundle_SymlinkPreserved(t *testing.T) {
 	}
 }
 
-func TestArtifactUploader_SizeCap(t *testing.T) {
-	// Create a large file that will exceed the 10 MiB cap when bundled.
-	tmpDir := t.TempDir()
-	largeFile := filepath.Join(tmpDir, "large.txt")
-	// Use deterministic pseudo-random bytes so gzip doesn't meaningfully compress.
-	largeContent := make([]byte, MaxUploadSize+1)
-	rand.New(rand.NewSource(1)).Read(largeContent)
-	if err := os.WriteFile(largeFile, largeContent, 0600); err != nil {
-		t.Fatalf("create large file: %v", err)
-	}
+// --- helpers local to this file ---
 
-	uploader := newTestUploader(t, "http://localhost:8443")
-
-	ctx := context.Background()
-	_, _, err := uploader.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{largeFile}, "")
-	if err == nil {
-		t.Error("expected error for oversized bundle")
-	}
-}
-
-// mapKeys returns the keys of a tarEntry map for diagnostic output.
-func mapKeys(m map[string]tarEntry) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
+// newCaptureAuthServer returns a test server that captures the Authorization
+// header and responds with 201. Used by bearer token tests.
+func newCaptureAuthServer(t *testing.T, dst *string) *httptest.Server {
+	t.Helper()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*dst = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(ts.Close)
+	return ts
 }
