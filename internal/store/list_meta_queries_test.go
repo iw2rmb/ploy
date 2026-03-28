@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-// TestListMetaQueriesDoNotReturnBlobs verifies that List*Meta queries
-// exclude large blob columns (bundle, meta) to reduce I/O.
+// TestListMetaQueriesDoNotReturnBlobs verifies that list queries
+// exclude large blob columns to reduce I/O.
 func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 	t.Parallel()
 
@@ -25,35 +25,6 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 			name:         "ListDiffsByRunRepo",
 			sql:          listDiffsByRunRepo,
 			excludedCols: []string{", patch,", ", patch ", "d.patch,", "d.patch "},
-		},
-
-		// artifact_bundles.sql - exclude "bundle" blob
-		{
-			name:         "ListArtifactBundlesMetaByRun",
-			sql:          listArtifactBundlesMetaByRun,
-			excludedCols: []string{", bundle,", ", bundle "},
-		},
-		{
-			name:         "ListArtifactBundlesMetaByRunAndJob",
-			sql:          listArtifactBundlesMetaByRunAndJob,
-			excludedCols: []string{", bundle,", ", bundle "},
-		},
-		{
-			name:         "ListArtifactBundlesMetaByCID",
-			sql:          listArtifactBundlesMetaByCID,
-			excludedCols: []string{", bundle,", ", bundle "},
-		},
-
-		// events.sql - exclude "meta" JSONB blob
-		{
-			name:         "ListEventsMetaByRun",
-			sql:          listEventsMetaByRun,
-			excludedCols: []string{", meta\n", ", meta "},
-		},
-		{
-			name:         "ListEventsMetaByRunSince",
-			sql:          listEventsMetaByRunSince,
-			excludedCols: []string{", meta\n", ", meta "},
 		},
 	}
 
@@ -77,8 +48,8 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 	}
 }
 
-// TestListMetaQueriesHaveDeterministicOrder verifies List*Meta queries
-// have deterministic tie-breakers matching their corresponding List* queries.
+// TestListMetaQueriesHaveDeterministicOrder verifies list queries
+// have deterministic tie-breakers.
 func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
 	t.Parallel()
 
@@ -90,15 +61,6 @@ func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
 		// diffs.sql - created_at ASC, id ASC with deterministic tie-breakers
 		{"ListDiffsByRun", listDiffsByRun, "ORDER BY created_at ASC, id ASC"},
 		{"ListDiffsByRunRepo", listDiffsByRunRepo, "d.created_at ASC, d.id ASC"},
-
-		// artifact_bundles.sql - created_at DESC, id DESC
-		{"ListArtifactBundlesMetaByRun", listArtifactBundlesMetaByRun, "ORDER BY created_at DESC, id DESC"},
-		{"ListArtifactBundlesMetaByRunAndJob", listArtifactBundlesMetaByRunAndJob, "ORDER BY created_at DESC, id DESC"},
-		{"ListArtifactBundlesMetaByCID", listArtifactBundlesMetaByCID, "ORDER BY created_at DESC, id DESC"},
-
-		// events.sql - time ASC, id ASC
-		{"ListEventsMetaByRun", listEventsMetaByRun, "ORDER BY time ASC, id ASC"},
-		{"ListEventsMetaByRunSince", listEventsMetaByRunSince, "ORDER BY time ASC, id ASC"},
 	}
 
 	for _, tc := range cases {

@@ -21,7 +21,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Clarity / complexity check: One list family per blob type reduces naming noise without adding new runtime branches.
   - Reasoning: high (14 CFP)
 
-- [ ] 3.1b Collapse duplicated artifact/event list APIs into selector-based store methods
+- [x] 3.1b Collapse duplicated artifact/event list APIs into selector-based store methods
   - Type: assumption-bound
   - Component: `internal/store/querier.go`, `internal/store/artifact_bundles.sql.go`, `internal/store/events.sql.go`, `internal/store/queries/artifact_bundles.sql`, `internal/store/queries/events.sql`, `internal/store/list_meta_queries_test.go`
   - Assumptions: `sqlc` query regeneration remains the source of truth for store interfaces and generated files.

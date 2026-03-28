@@ -123,13 +123,10 @@ type mockStore struct {
 	listNodes mockCall[struct{}, []store.Node]
 
 	// Artifact bundle queries
-	listArtifactBundlesByCID          mockResult[[]store.ArtifactBundle]
-	listArtifactBundlesMetaByCID      mockResult[[]store.ArtifactBundle]
-	listArtifactBundlesByRun          mockResult[[]store.ArtifactBundle]
-	listArtifactBundlesMetaByRun      mockResult[[]store.ArtifactBundle]
-	getArtifactBundle                 mockResult[store.ArtifactBundle]
-	listArtifactBundlesByRunAndJob    mockResult[[]store.ArtifactBundle]
-	listArtifactBundlesMetaByRunAndJob mockResult[[]store.ArtifactBundle]
+	listArtifactBundlesByCID       mockResult[[]store.ArtifactBundle]
+	listArtifactBundlesByRun       mockResult[[]store.ArtifactBundle]
+	getArtifactBundle              mockResult[store.ArtifactBundle]
+	listArtifactBundlesByRunAndJob mockResult[[]store.ArtifactBundle]
 
 	// SBOM row query tracking
 	listSBOMRowsByJob          mockResult[[]store.Sbom]

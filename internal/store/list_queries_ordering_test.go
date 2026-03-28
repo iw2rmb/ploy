@@ -48,6 +48,10 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListArtifactBundlesByRunAndJob", listArtifactBundlesByRunAndJob, "ORDER BY created_at DESC, id DESC"},
 		{"ListArtifactBundlesByCID", listArtifactBundlesByCID, "ORDER BY created_at DESC, id DESC"},
 
+		// events.sql - time needs id tie-breaker for deterministic pagination
+		{"ListEventsByRun", listEventsByRun, "ORDER BY time ASC, id ASC"},
+		{"ListEventsByRunSince", listEventsByRunSince, "ORDER BY time ASC, id ASC"},
+
 		// tokens.sql - created_at needs token_id tie-breaker
 		{"ListAPITokens", listAPITokens, "ORDER BY created_at DESC, token_id DESC"},
 
@@ -58,7 +62,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListRunsForRepo", listRunsForRepo, "ORDER BY rr.created_at DESC, rr.run_id DESC"},
 		{"ListFailedRepoIDsByMig", listFailedRepoIDsByMig, "ORDER BY rr.repo_id, rr.created_at DESC, rr.run_id DESC"},
 
-		// logs.sql and events.sql already have id tie-breakers (verified in logs_sql_ordering_test.go)
+		// logs.sql has id tie-breakers verified in logs_sql_ordering_test.go
 	}
 
 	for _, tc := range cases {

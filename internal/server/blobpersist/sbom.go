@@ -25,7 +25,7 @@ func (s *Service) ExtractSBOMRowsForJob(
 		return nil, err
 	}
 
-	bundles, err := s.store.ListArtifactBundlesMetaByRunAndJob(ctx, store.ListArtifactBundlesMetaByRunAndJobParams{
+	bundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
 		RunID: runID,
 		JobID: &jobID,
 	})

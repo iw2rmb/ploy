@@ -28,7 +28,7 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		artifactID := uuid.New()
 
 		st := &mockStore{}
-		st.listArtifactBundlesMetaByCID.val = []store.ArtifactBundle{
+		st.listArtifactBundlesByCID.val = []store.ArtifactBundle{
 			{
 				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
 				RunID:      domaintypes.NewRunID(),
@@ -81,13 +81,13 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 			{
 				name:   "DBError",
 				query:  "?cid=bafyerr",
-				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesMetaByCID.err = errors.New("boom"); return st }(),
+				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesByCID.err = errors.New("boom"); return st }(),
 				status: http.StatusInternalServerError,
 			},
 			{
 				name:   "NoResults",
 				query:  "?cid=bafy-not-found",
-				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesMetaByCID.val = []store.ArtifactBundle{}; return st }(),
+				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesByCID.val = []store.ArtifactBundle{}; return st }(),
 				status: http.StatusOK,
 			},
 		}
