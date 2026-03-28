@@ -1,7 +1,7 @@
 # Create GitLab Merge Requests with Ploy
 
 Overview
-- Ploy can automatically create GitLab merge requests (MRs) when Mods runs complete
+- Ploy can automatically create GitLab merge requests (MRs) when Migs runs complete
 - MRs can be triggered on success, failure, or both
 - GitLab credentials can be configured globally on the control plane or overridden per run
 
@@ -12,7 +12,7 @@ Prerequisites
 
 ## Method 1: Configure Global GitLab Credentials (Recommended)
 
-Configure GitLab credentials once on the control plane, and all Mods runs can use them automatically.
+Configure GitLab credentials once on the control plane, and all Migs runs can use them automatically.
 
 ### Step 1: Create a GitLab configuration file
 
@@ -183,7 +183,7 @@ echo "Run: $RUN_ID"; echo "MR: ${MR_URL:-<none>}"
 # Copy the MR URL and review in GitLab
 
 # 4. If tests pass, merge the MR
-# Otherwise, iterate with additional Mods runs
+# Otherwise, iterate with additional Migs runs
 ```
 
 ## Batch Workflows with MR Creation
@@ -243,12 +243,12 @@ ploy run status java17-fleet
 ploy run status --json java17-fleet
 ```
 
-See [Mods lifecycle](../migs-lifecycle.md) § "1.4 Batched Mods Runs (`runs` + `run_repos`)"
+See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
 for the full batch command reference.
 
 ### Pull Changes Locally (Alternative to MR)
 
-Instead of reviewing changes via GitLab MRs, you can pull Mods-generated diffs directly
+Instead of reviewing changes via GitLab MRs, you can pull Migs-generated diffs directly
 into your local repository. This is useful for manual inspection, local testing, or
 when MR creation is not needed.
 
@@ -264,15 +264,15 @@ ploy mig pull --dry-run java17-fleet
 The `mig pull` command:
 1. Resolves the run using your local git remote URL.
 2. Creates a new branch at the run's pinned commit.
-3. Applies all stored Mods diffs to reconstruct the changes.
+3. Applies all stored Migs diffs to reconstruct the changes.
 
 This approach complements MR-based workflows—you can use MRs for production changes
 while using `mig pull` for local development and testing.
 
-See [Mods lifecycle](../migs-lifecycle.md) § "Pulling Diffs Locally (`run pull` / `mig pull`)"
+See [Migs lifecycle](../migs-lifecycle.md) § "Pulling Diffs Locally (`run pull` / `mig pull`)"
 for detailed usage.
 
 ## Related Documentation
 
 - [docs/envs/README.md](../envs/README.md) — Environment variables and control plane config options
-- [docs/how-to/publish-migs.md](publish-migs.md) — Publishing custom Mods images
+- [docs/how-to/publish-migs.md](publish-migs.md) — Publishing custom Migs images

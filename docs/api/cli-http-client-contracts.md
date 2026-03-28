@@ -15,7 +15,7 @@ This document describes the current (HEAD) client-side HTTP contracts implemente
 
 - JSON responses decoded into typed structs use strict decoding (`json.Decoder.DisallowUnknownFields`) to fail fast on contract drift.
 - Response bodies are capped with `io.LimitReader` to prevent unbounded reads.
-- Canonical helpers live in `internal/cli/httpx/httpx.go`.
+- Canonical helpers live in the CLI HTTP helper package.
 
 ## Error shaping
 

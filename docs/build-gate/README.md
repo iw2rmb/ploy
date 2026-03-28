@@ -1,8 +1,8 @@
 # Build Gate Contract
 
 Scope
-- Minimal, stable contract to validate a repository after each Mods stage.
-- Works in Mods and standalone CI.
+- Minimal, stable contract to validate a repository after each Migs stage.
+- Works in Migs and standalone CI.
 
 ## Overview: Unified Jobs Pipeline
 
@@ -29,7 +29,7 @@ queue or separate worker mode—all nodes pull from the same jobs queue.
 
 ## Execution Flow
 
-Gate validation is orchestrated by the node agent as part of the Mods run lifecycle:
+Gate validation is orchestrated by the node agent as part of the Migs run lifecycle:
 
 ```
 ┌─────────────────────┐     ┌────────────────────┐     ┌───────────────────────┐
@@ -277,7 +277,7 @@ Build Gate verification. Since gate execution is local (no HTTP API), these vari
 provide repository metadata for healing migs that need Git baseline information.
 
 **Repo metadata (injected from StartRunRequest):**
-- `PLOY_REPO_URL` — Git repository URL for the Mods run.
+- `PLOY_REPO_URL` — Git repository URL for the Migs run.
 - `PLOY_BASE_REF` — Base Git reference (branch or tag).
 - `PLOY_TARGET_REF` — Target Git reference for the run.
 - `PLOY_COMMIT_SHA` — Pinned commit SHA when available.

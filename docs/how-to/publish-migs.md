@@ -1,7 +1,7 @@
-Publish Mods Images to a Garage-Backed Registry
+Publish Migs Images to a Garage-Backed Registry
 
 Overview
-- Mods images live under `deploy/images/migs/` and `deploy/images/mig/`:
+- Migs images live under `deploy/images/migs/` and `deploy/images/mig/`:
   - `orw-cli-maven` (`deploy/images/mig/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`deploy/images/mig/orw-cli-gradle`) -> `orw-cli-gradle`
   - `mig-codex` -> `migs-codex`
@@ -16,7 +16,7 @@ Local Registry Prerequisites
 - Export the registry prefix for specs/scripts:
   - `export PLOY_CONTAINER_REGISTRY=127.0.0.1:5000/ploy`
 
-Publish all Mods images
+Publish all Migs images
 ```bash
 deploy/images/build-and-push-migs.sh
 # Discovers deploy/images/migs/* and deploy/images/mig/* and pushes :latest tags.
@@ -39,7 +39,7 @@ export PLOY_CA_CERTS=/absolute/path/to/ca-bundle.pem
 `deploy/images/garage.sh` passes this bundle as a BuildKit secret (`ploy_ca_bundle`)
 so mig images can trust internal TLS endpoints.
 
-Publish a single Mods image (example: orw-cli-maven)
+Publish a single Migs image (example: orw-cli-maven)
 ```bash
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   docker buildx build --platform linux/amd64 \

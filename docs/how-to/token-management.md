@@ -26,7 +26,7 @@ API tokens are stored in the `api_tokens` table in PostgreSQL.
 Ploy supports three roles:
 
 - **`cli-admin`**: Full administrative access, including token management
-- **`control-plane`**: Standard CLI access for running Mods and viewing cluster state
+- **`control-plane`**: Standard CLI access for running Migs and viewing cluster state
 - **`worker`**: Node agent role
 
 ## Managing API Tokens
@@ -147,7 +147,7 @@ deploy:
   env:
     PLOY_DESCRIPTOR: ${{ secrets.PLOY_CLUSTER_DESCRIPTOR }}
 
-- name: Run Mods
+- name: Run Migs
   run: ploy run --repo ${{ github.repositoryUrl }} --base-ref main --target-ref ploy/${{ github.run_id }} --spec mig.yaml --follow
 ```
 

@@ -14,7 +14,7 @@ defaults change, or components adopt additional configuration.
 ## Dependencies
 
 - Runtime factory wiring and control-plane endpoint resolution are covered in
-  [Mods lifecycle](../migs-lifecycle.md).
+  [Migs lifecycle](../migs-lifecycle.md).
 
 ## CLI
 
@@ -74,7 +74,7 @@ Role model (bearer token claims):
 
 - `cli-admin` — administrative CLI role. Allowed to perform admin operations (e.g., token management, node bootstrap) and all
   standard client operations. For authorization, `cli-admin` is treated as a superset of `control-plane`.
-- `control-plane` — standard CLI role. Allowed to run Mods workflows and use control-plane APIs that do not require
+- `control-plane` — standard CLI role. Allowed to run Migs workflows and use control-plane APIs that do not require
   administrative privileges. Not allowed to hit admin-only endpoints like token creation.
 - `worker` — node agent role. Used by nodes after bootstrap to authenticate with the control plane.
 - `bootstrap` — short-lived token type used during node provisioning to exchange for a node certificate.
@@ -102,7 +102,7 @@ Role model (bearer token claims):
   as `PLOY_CONTAINER_REGISTRY`.
 - `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by the mig image build/push helper.
   Default fallback is `${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}`.
-- `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
+- `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Migs LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
 - Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `migs-codex`).
@@ -170,7 +170,7 @@ build_gate:
   `ploy mig run <mig-id|name> [--follow]`.
   Example: `ploy mig add --name my-batch --spec mig.yaml` followed by
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
-  See [Mods lifecycle](../migs-lifecycle.md) § "1.4 Batched Mods Runs (`runs` + `run_repos`)"
+  See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
 - `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
   - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `env`, `env_from_file`
@@ -193,10 +193,10 @@ build_gate:
 
 The node agent injects the following environment variables into healing containers to support
 Build Gate verification. These vars enable healing migs to derive the same Git baseline used
-by the Mods run.
+by the Migs run.
 
 Repo metadata (injected from StartRunRequest):
-- `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Mods run)
+- `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Migs run)
 - `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
 - `PLOY_TARGET_REF` — Target Git reference for the run
 - `PLOY_COMMIT_SHA` — Pinned commit SHA when available (may be empty)
@@ -322,19 +322,19 @@ Runtime behavior: the node's Docker client is created from standard Docker env v
 
 ## E2E Harness
 
-- `ploy run` executes Mods against the Ploy control plane; no tenant variable is required.
-- `PLOY_E2E_RUN_PREFIX` — Optional run ID prefix for Mods E2E runs
+- `ploy run` executes Migs against the Ploy control plane; no tenant variable is required.
+- `PLOY_E2E_RUN_PREFIX` — Optional run ID prefix for Migs E2E runs
   (default `e2e`).
-- `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
+- `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Migs
   E2E scenarios in place of the default Java sample repo.
 - `PLOY_E2E_GITLAB_TOKEN` — Optional GitLab PAT so the E2E harness can clean up
   branches after creating merge requests.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
-  live Mods smoke test should execute (defaults to `simple-openrewrite`).
+  live Migs smoke test should execute (defaults to `simple-openrewrite`).
 
 ## GitLab Merge Request Integration
 
-Ploy can automatically create GitLab merge requests when Mods runs complete.
+Ploy can automatically create GitLab merge requests when Migs runs complete.
 
 **Recommended approach:** Use `ploy config gitlab set` to store credentials on the control plane
 (see [docs/how-to/create-mr.md](../how-to/create-mr.md) for usage examples).
@@ -703,7 +703,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 
 ## Related Docs
 
-- [Mods lifecycle](../migs-lifecycle.md) — Server/node execution and orchestration flow
+- [Migs lifecycle](../migs-lifecycle.md) — Server/node execution and orchestration flow
 - [Testing workflow](../testing-workflow.md) — Go testing workflow and local validation commands
 - [Local deployment](../how-to/deploy-locally.md) — Local Docker cluster
 - [Offline VPS deployment](../how-to/deploy-vps-offline.md) — Offline SSH deployment of the local stack to a VPS
