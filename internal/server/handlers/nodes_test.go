@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -139,134 +138,113 @@ func TestDrainUndrain_InvalidID(t *testing.T) {
 	}
 }
 
-// TestListNodesHandlerSuccess verifies successful node listing.
-func TestListNodesHandlerSuccess(t *testing.T) {
+// TestListNodesHandler verifies node listing serialization for populated and empty results.
+func TestListNodesHandler(t *testing.T) {
 	node1ID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	node2ID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	now := time.Now()
 
-	st := &mockStore{
-		listNodesResult: []store.Node{
-			{
-				ID:              node1ID,
-				Name:            "worker-1",
-				IpAddress:       netip.MustParseAddr("10.0.0.1"),
-				Version:         strPtr("v1.0.0"),
-				Concurrency:     4,
-				CpuTotalMillis:  4000,
-				CpuFreeMillis:   2000,
-				MemTotalBytes:   8589934592,
-				MemFreeBytes:    4294967296,
-				DiskTotalBytes:  107374182400,
-				DiskFreeBytes:   53687091200,
-				CertSerial:      strPtr("123456"),
-				CertFingerprint: strPtr("aa:bb:cc"),
-				CertNotBefore:   pgtype.Timestamptz{Time: now, Valid: true},
-				CertNotAfter:    pgtype.Timestamptz{Time: now.Add(24 * time.Hour), Valid: true},
-				LastHeartbeat:   pgtype.Timestamptz{Time: now, Valid: true},
-				Drained:         false,
-				CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
+	cases := []struct {
+		name   string
+		nodes  []store.Node
+		assert func(t *testing.T, resp []map[string]any)
+	}{
+		{
+			name: "two_nodes",
+			nodes: []store.Node{
+				{
+					ID:              node1ID,
+					Name:            "worker-1",
+					IpAddress:       netip.MustParseAddr("10.0.0.1"),
+					Version:         strPtr("v1.0.0"),
+					Concurrency:     4,
+					CpuTotalMillis:  4000,
+					CpuFreeMillis:   2000,
+					MemTotalBytes:   8589934592,
+					MemFreeBytes:    4294967296,
+					DiskTotalBytes:  107374182400,
+					DiskFreeBytes:   53687091200,
+					CertSerial:      strPtr("123456"),
+					CertFingerprint: strPtr("aa:bb:cc"),
+					CertNotBefore:   pgtype.Timestamptz{Time: now, Valid: true},
+					CertNotAfter:    pgtype.Timestamptz{Time: now.Add(24 * time.Hour), Valid: true},
+					LastHeartbeat:   pgtype.Timestamptz{Time: now, Valid: true},
+					Drained:         false,
+					CreatedAt:       pgtype.Timestamptz{Time: now, Valid: true},
+				},
+				{
+					ID:             node2ID,
+					Name:           "worker-2",
+					IpAddress:      netip.MustParseAddr("10.0.0.2"),
+					Concurrency:    2,
+					CpuTotalMillis: 2000,
+					CpuFreeMillis:  1000,
+					MemTotalBytes:  4294967296,
+					MemFreeBytes:   2147483648,
+					DiskTotalBytes: 53687091200,
+					DiskFreeBytes:  26843545600,
+					Drained:        true,
+					CreatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+				},
 			},
-			{
-				ID:             node2ID,
-				Name:           "worker-2",
-				IpAddress:      netip.MustParseAddr("10.0.0.2"),
-				Concurrency:    2,
-				CpuTotalMillis: 2000,
-				CpuFreeMillis:  1000,
-				MemTotalBytes:  4294967296,
-				MemFreeBytes:   2147483648,
-				DiskTotalBytes: 53687091200,
-				DiskFreeBytes:  26843545600,
-				Drained:        true,
-				CreatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
+			assert: func(t *testing.T, resp []map[string]any) {
+				t.Helper()
+				if len(resp) != 2 {
+					t.Fatalf("expected 2 nodes, got %d", len(resp))
+				}
+				// First node: full fields including optional version and cert.
+				if got := resp[0]["id"]; got != node1ID.String() {
+					t.Errorf("node[0].id = %v, want %s", got, node1ID)
+				}
+				if got := resp[0]["name"]; got != "worker-1" {
+					t.Errorf("node[0].name = %v, want worker-1", got)
+				}
+				if got := resp[0]["ip_address"]; got != "10.0.0.1" {
+					t.Errorf("node[0].ip_address = %v, want 10.0.0.1", got)
+				}
+				if got := resp[0]["drained"]; got != false {
+					t.Errorf("node[0].drained = %v, want false", got)
+				}
+				if got := resp[0]["version"]; got != "v1.0.0" {
+					t.Errorf("node[0].version = %v, want v1.0.0", got)
+				}
+				if got := resp[0]["cert_serial"]; got != "123456" {
+					t.Errorf("node[0].cert_serial = %v, want 123456", got)
+				}
+				// Second node: drained, no optional fields.
+				if got := resp[1]["id"]; got != node2ID.String() {
+					t.Errorf("node[1].id = %v, want %s", got, node2ID)
+				}
+				if got := resp[1]["name"]; got != "worker-2" {
+					t.Errorf("node[1].name = %v, want worker-2", got)
+				}
+				if got := resp[1]["drained"]; got != true {
+					t.Errorf("node[1].drained = %v, want true", got)
+				}
+				if got, ok := resp[1]["version"]; ok && got != nil {
+					t.Errorf("node[1].version = %v, want nil", got)
+				}
+			},
+		},
+		{
+			name:  "empty",
+			nodes: []store.Node{},
+			assert: func(t *testing.T, resp []map[string]any) {
+				t.Helper()
+				if len(resp) != 0 {
+					t.Fatalf("expected empty list, got %d items", len(resp))
+				}
 			},
 		},
 	}
 
-	handler := listNodesHandler(st)
-	rr := doRequest(t, handler, http.MethodGet, "/v1/nodes", nil)
-
-	assertStatus(t, rr, http.StatusOK)
-	assertCalled(t, "ListNodes", st.listNodesCalled)
-
-	var resp []struct {
-		ID              string  `json:"id"`
-		Name            string  `json:"name"`
-		IPAddress       string  `json:"ip_address"`
-		Version         *string `json:"version,omitempty"`
-		Concurrency     int32   `json:"concurrency"`
-		CPUTotalMillis  int32   `json:"cpu_total_millis"`
-		CPUFreeMillis   int32   `json:"cpu_free_millis"`
-		MemTotalBytes   int64   `json:"mem_total_bytes"`
-		MemFreeBytes    int64   `json:"mem_free_bytes"`
-		DiskTotalBytes  int64   `json:"disk_total_bytes"`
-		DiskFreeBytes   int64   `json:"disk_free_bytes"`
-		CertSerial      *string `json:"cert_serial,omitempty"`
-		CertFingerprint *string `json:"cert_fingerprint,omitempty"`
-		CertNotBefore   *string `json:"cert_not_before,omitempty"`
-		CertNotAfter    *string `json:"cert_not_after,omitempty"`
-		LastHeartbeat   *string `json:"last_heartbeat,omitempty"`
-		Drained         bool    `json:"drained"`
-		CreatedAt       string  `json:"created_at"`
-	}
-
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	if len(resp) != 2 {
-		t.Fatalf("expected 2 nodes, got %d", len(resp))
-	}
-
-	// Check first node.
-	if resp[0].ID != node1ID.String() {
-		t.Errorf("expected id %s, got %s", node1ID.String(), resp[0].ID)
-	}
-	if resp[0].Name != "worker-1" {
-		t.Errorf("expected name worker-1, got %s", resp[0].Name)
-	}
-	if resp[0].IPAddress != "10.0.0.1" {
-		t.Errorf("expected ip_address 10.0.0.1, got %s", resp[0].IPAddress)
-	}
-	if resp[0].Drained {
-		t.Error("expected first node not to be drained")
-	}
-	if resp[0].Version == nil || *resp[0].Version != "v1.0.0" {
-		t.Errorf("expected version v1.0.0")
-	}
-	if resp[0].CertSerial == nil || *resp[0].CertSerial != "123456" {
-		t.Errorf("expected cert_serial 123456")
-	}
-
-	// Check second node.
-	if resp[1].ID != node2ID.String() {
-		t.Errorf("expected id %s, got %s", node2ID.String(), resp[1].ID)
-	}
-	if resp[1].Name != "worker-2" {
-		t.Errorf("expected name worker-2, got %s", resp[1].Name)
-	}
-	if !resp[1].Drained {
-		t.Error("expected second node to be drained")
-	}
-	if resp[1].Version != nil {
-		t.Errorf("expected no version for second node")
-	}
-}
-
-// TestListNodesHandlerEmpty verifies empty list when no nodes exist.
-func TestListNodesHandlerEmpty(t *testing.T) {
-	st := &mockStore{
-		listNodesResult: []store.Node{},
-	}
-
-	handler := listNodesHandler(st)
-	rr := doRequest(t, handler, http.MethodGet, "/v1/nodes", nil)
-
-	assertStatus(t, rr, http.StatusOK)
-
-	resp := decodeBody[[]interface{}](t, rr)
-	if len(resp) != 0 {
-		t.Fatalf("expected empty list, got %d items", len(resp))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			st := &mockStore{listNodesResult: tc.nodes}
+			rr := doRequest(t, listNodesHandler(st), http.MethodGet, "/v1/nodes", nil)
+			assertStatus(t, rr, http.StatusOK)
+			resp := decodeBody[[]map[string]any](t, rr)
+			tc.assert(t, resp)
+		})
 	}
 }

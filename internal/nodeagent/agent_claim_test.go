@@ -28,16 +28,7 @@ func TestClaimLoop(t *testing.T) {
 
 		switch r.URL.Path {
 		case "/v1/nodes/" + testNodeID + "/claim":
-			resp := ClaimResponse{
-				RunID:     types.NewRunID(),
-				RepoID:    types.NewMigRepoID(),
-				JobID:     types.NewJobID(),
-				RepoURL:   types.RepoURL("https://github.com/test/repo"),
-				Status:    "Started",
-				NodeID:    types.NodeID(testNodeID),
-				BaseRef:   types.GitRef("main"),
-				TargetRef: types.GitRef("feature-branch"),
-			}
+			resp := newClaimResponse()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(resp)
@@ -50,7 +41,6 @@ func TestClaimLoop(t *testing.T) {
 
 	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
 
-	// Use longer timeout + explicit cancel to ensure at least one cycle.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	var wg sync.WaitGroup
@@ -85,11 +75,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 	defer ts.Close()
 
 	cfg := newTestConfig(ts.URL)
-	controller := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
-	}
-	claimer := setupClaimer(t, cfg, controller)
+	claimer := setupClaimer(t, cfg, newTestController(t, cfg))
 	runClaimerUntil(t, claimer, 500*time.Millisecond)
 
 	if got := atomic.LoadInt32(&callCount); got < 2 {
@@ -122,18 +108,11 @@ func TestClaimLoopBackoff(t *testing.T) {
 	defer ts.Close()
 
 	cfg := newTestConfig(ts.URL)
-	controller := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
-	}
-	claimer := setupClaimer(t, cfg, controller)
-	// Custom backoff for this specific test.
+	claimer := setupClaimer(t, cfg, newTestController(t, cfg))
 	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
 		InitialInterval: types.Duration(50 * time.Millisecond),
 		MaxInterval:     types.Duration(200 * time.Millisecond),
 		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
 	})
 
 	runClaimerUntil(t, claimer, 1*time.Second)
@@ -176,16 +155,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 				return
 			}
 
-			resp := ClaimResponse{
-				RunID:     types.NewRunID(),
-				RepoID:    types.NewMigRepoID(),
-				JobID:     types.NewJobID(),
-				RepoURL:   types.RepoURL("https://github.com/test/repo"),
-				Status:    "Started",
-				NodeID:    types.NodeID(testNodeID),
-				BaseRef:   types.GitRef("main"),
-				TargetRef: types.GitRef("feature"),
-			}
+			resp := newClaimResponse()
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(resp)
@@ -196,17 +166,11 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 	defer ts.Close()
 
 	cfg := newTestConfig(ts.URL)
-	controller := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
-	}
-	claimer := setupClaimer(t, cfg, controller)
+	claimer := setupClaimer(t, cfg, newTestController(t, cfg))
 	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
 		InitialInterval: types.Duration(50 * time.Millisecond),
 		MaxInterval:     types.Duration(200 * time.Millisecond),
 		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -245,281 +209,92 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 	}
 }
 
-// TestClaimLoop_MapsClaimToStartRunRequest ensures ClaimResponse fields map 1:1 into StartRunRequest.
-func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
+// TestClaimLoop_FieldMapping verifies ClaimResponse fields map correctly into StartRunRequest.
+func TestClaimLoop_FieldMapping(t *testing.T) {
 	t.Parallel()
 
-	commit := types.CommitSHA("deadbeef")
-	runID := types.NewRunID()
-	jobID := types.NewJobID()
-	nodeIDStr := "aB3xY9"
-	repoID := types.NewMigRepoID()
-	claim := ClaimResponse{
-		RunID:     runID,
-		RepoID:    repoID,
-		JobID:     jobID,
-		RepoURL:   types.RepoURL("https://github.com/acme/thing.git"),
-		Status:    "Started",
-		NodeID:    types.NodeID(nodeIDStr),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature/x"),
-		CommitSha: &commit,
-		RecoveryContext: &contracts.RecoveryClaimContext{
-			LoopKind:             "healing",
-			SelectedErrorKind:    "infra",
-			DetectedStack:        contracts.ModStackJavaMaven,
-			ResolvedHealingImage: "docker.io/acme/heal:latest",
-			BuildGateLog:         "[ERROR] build failed\n",
+	tests := []struct {
+		name       string
+		claimOpts  []claimOption
+		assertions func(t *testing.T, got StartRunRequest, claim ClaimResponse)
+	}{
+		{
+			name: "core fields including CommitSHA and RecoveryContext",
+			claimOpts: []claimOption{
+				withCommitSHA("deadbeef"),
+				withRecoveryContext(&contracts.RecoveryClaimContext{
+					LoopKind:             "healing",
+					SelectedErrorKind:    "infra",
+					DetectedStack:        contracts.ModStackJavaMaven,
+					ResolvedHealingImage: "docker.io/acme/heal:latest",
+					BuildGateLog:         "[ERROR] build failed\n",
+				}),
+			},
+			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+				t.Helper()
+				if got.RunID != claim.RunID {
+					t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
+				}
+				if got.RepoID != claim.RepoID {
+					t.Errorf("RepoID=%q want %q", got.RepoID, claim.RepoID)
+				}
+				if got.RepoURL != claim.RepoURL {
+					t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
+				}
+				if got.BaseRef != claim.BaseRef {
+					t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
+				}
+				if got.TargetRef != claim.TargetRef {
+					t.Errorf("TargetRef=%q want %q", got.TargetRef, claim.TargetRef)
+				}
+				if got.CommitSHA != *claim.CommitSha {
+					t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
+				}
+				if got.RecoveryContext == nil {
+					t.Fatalf("RecoveryContext=nil, want non-nil")
+				}
+				if got.RecoveryContext.SelectedErrorKind != "infra" {
+					t.Errorf("RecoveryContext.SelectedErrorKind=%q, want infra", got.RecoveryContext.SelectedErrorKind)
+				}
+			},
 		},
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+		{
+			name:      "NextID propagation",
+			claimOpts: []claimOption{withNextID(types.NewJobID()), withCommitSHA("abc123")},
+			assertions: func(t *testing.T, got StartRunRequest, claim ClaimResponse) {
+				t.Helper()
+				if got.NextID == nil || *got.NextID != *claim.NextID {
+					t.Errorf("NextID=%v want %v", got.NextID, claim.NextID)
+				}
+			},
+		},
 	}
 
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/" + nodeIDStr + "/claim":
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(claim)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer ts.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	mock := &mockRunController{}
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    types.NodeID(nodeIDStr),
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer := setupClaimer(t, cfg, mock)
+			nodeIDStr := testNodeID
+			claim := newClaimResponse(tt.claimOpts...)
+			ts := newSingleClaimServer(t, nodeIDStr, claim)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	_ = claimer.Start(ctx)
+			mock := &mockRunController{}
+			cfg := Config{
+				ServerURL: ts.URL,
+				NodeID:    types.NodeID(nodeIDStr),
+				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+			}
+			claimer := setupClaimer(t, cfg, mock)
 
-	if !mock.startCalled {
-		t.Fatalf("controller.StartRun not called")
-	}
-	got := mock.lastStart
-	if got.RunID != claim.RunID {
-		t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
-	}
-	if got.RepoID != claim.RepoID {
-		t.Errorf("RepoID=%q want %q", got.RepoID, claim.RepoID)
-	}
-	if got.RepoURL != claim.RepoURL {
-		t.Errorf("RepoURL=%q want %q", got.RepoURL.String(), claim.RepoURL.String())
-	}
-	if got.BaseRef != claim.BaseRef {
-		t.Errorf("BaseRef=%q want %q", got.BaseRef.String(), claim.BaseRef.String())
-	}
-	if got.TargetRef != claim.TargetRef {
-		t.Errorf("TargetRef=%q want %q", got.TargetRef.String(), claim.TargetRef.String())
-	}
-	if got.CommitSHA != *claim.CommitSha {
-		t.Errorf("CommitSHA=%q want %q", got.CommitSHA.String(), claim.CommitSha.String())
-	}
-	if got.RecoveryContext == nil {
-		t.Fatalf("RecoveryContext=nil, want non-nil")
-	}
-	if got.RecoveryContext.SelectedErrorKind != "infra" {
-		t.Fatalf("RecoveryContext.SelectedErrorKind=%q, want infra", got.RecoveryContext.SelectedErrorKind)
-	}
-}
+			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			defer cancel()
+			_ = claimer.Start(ctx)
 
-func TestClaimLoop_NextIDMapping(t *testing.T) {
-	t.Parallel()
-
-	commit := types.CommitSHA("abc123")
-	runID := types.NewRunID()
-	jobID := types.NewJobID()
-	nextID := types.NewJobID()
-	nodeIDStr := "aB3xY9"
-	repoID := types.NewMigRepoID()
-	claim := ClaimResponse{
-		RunID:     runID,
-		RepoID:    repoID,
-		JobID:     jobID,
-		JobName:   "mig-0",
-		RepoURL:   types.RepoURL("https://github.com/acme/multi.git"),
-		Status:    "Started",
-		NodeID:    types.NodeID(nodeIDStr),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature/multi-step"),
-		NextID:    &nextID,
-		CommitSha: &commit,
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/" + nodeIDStr + "/claim":
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(claim)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer ts.Close()
-
-	mock := &mockRunController{}
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    types.NodeID(nodeIDStr),
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer := setupClaimer(t, cfg, mock)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	_ = claimer.Start(ctx)
-
-	if !mock.startCalled {
-		t.Fatalf("controller.StartRun not called")
-	}
-	got := mock.lastStart
-
-	if got.NextID == nil || *got.NextID != nextID {
-		t.Errorf("NextID=%v want %v", got.NextID, nextID)
-	}
-	if got.RunID != claim.RunID {
-		t.Errorf("RunID=%q want %q", got.RunID, claim.RunID)
-	}
-	if got.RepoID != claim.RepoID {
-		t.Errorf("RepoID=%q want %q", got.RepoID, claim.RepoID)
-	}
-	if got.RepoURL != claim.RepoURL {
-		t.Errorf("RepoURL=%q want %q", got.RepoURL.String(), claim.RepoURL.String())
-	}
-	if got.BaseRef != claim.BaseRef {
-		t.Errorf("BaseRef=%q want %q", got.BaseRef.String(), claim.BaseRef.String())
-	}
-	if got.TargetRef != claim.TargetRef {
-		t.Errorf("TargetRef=%q want %q", got.TargetRef.String(), claim.TargetRef.String())
-	}
-}
-
-// TestClaimLoop_MultipleNodesSingleRun simulates two distinct nodes claiming
-// different steps of the same multi-step run.
-func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
-	t.Parallel()
-
-	runID := types.NewRunID()
-	repoID := types.NewMigRepoID()
-	commit := types.CommitSHA("deadbeef")
-	nodeID1 := types.NodeID("aB3xY9")
-	nodeID2 := types.NodeID("Z9yX3b")
-
-	nextID0 := types.NewJobID()
-	claim0 := ClaimResponse{
-		RunID:     runID,
-		RepoID:    repoID,
-		JobID:     types.NewJobID(),
-		JobName:   "pre-gate",
-		RepoURL:   types.RepoURL("https://github.com/acme/multi-node.git"),
-		Status:    "Started",
-		NodeID:    nodeID1,
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature/parallel-steps"),
-		NextID:    &nextID0,
-		CommitSha: &commit,
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-
-	nextID1 := types.NewJobID()
-	claim1 := ClaimResponse{
-		RunID:     runID,
-		RepoID:    repoID,
-		JobID:     types.NewJobID(),
-		JobName:   "mig-0",
-		RepoURL:   types.RepoURL("https://github.com/acme/multi-node.git"),
-		Status:    "Started",
-		NodeID:    nodeID2,
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature/parallel-steps"),
-		NextID:    &nextID1,
-		CommitSha: &commit,
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-
-	// Node 1
-	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/" + nodeID1.String() + "/claim":
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(claim0)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer ts1.Close()
-
-	mock1 := &mockRunController{}
-	cfg1 := Config{
-		ServerURL: ts1.URL,
-		NodeID:    nodeID1,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer1 := setupClaimer(t, cfg1, mock1)
-
-	ctx1, cancel1 := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel1()
-	_ = claimer1.Start(ctx1)
-
-	if !mock1.startCalled {
-		t.Fatalf("node-1: controller.StartRun not called")
-	}
-	if mock1.lastStart.NextID == nil || *mock1.lastStart.NextID != nextID0 {
-		t.Errorf("node-1: NextID=%v want %v", mock1.lastStart.NextID, nextID0)
-	}
-	if mock1.lastStart.RunID != runID {
-		t.Errorf("node-1: RunID=%q want %q", mock1.lastStart.RunID, runID)
-	}
-
-	// Node 2
-	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/" + nodeID2.String() + "/claim":
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(claim1)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer ts2.Close()
-
-	mock2 := &mockRunController{}
-	cfg2 := Config{
-		ServerURL: ts2.URL,
-		NodeID:    nodeID2,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	claimer2 := setupClaimer(t, cfg2, mock2)
-
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel2()
-	_ = claimer2.Start(ctx2)
-
-	if !mock2.startCalled {
-		t.Fatalf("node-2: controller.StartRun not called")
-	}
-	if mock2.lastStart.NextID == nil || *mock2.lastStart.NextID != nextID1 {
-		t.Errorf("node-2: NextID=%v want %v", mock2.lastStart.NextID, nextID1)
-	}
-	if mock2.lastStart.RunID != runID {
-		t.Errorf("node-2: RunID=%q want %q", mock2.lastStart.RunID, runID)
-	}
-
-	// Verify both nodes executed the same run but different steps.
-	if mock1.lastStart.RunID != mock2.lastStart.RunID {
-		t.Errorf("nodes executed different runs: node-1=%q node-2=%q", mock1.lastStart.RunID, mock2.lastStart.RunID)
-	}
-	if mock1.lastStart.NextID != nil && mock2.lastStart.NextID != nil && *mock1.lastStart.NextID == *mock2.lastStart.NextID {
-		t.Error("nodes executed jobs with identical next_id pointers; expected different claims")
+			if !mock.startCalled {
+				t.Fatalf("controller.StartRun not called")
+			}
+			tt.assertions(t, mock.lastStart, claim)
+		})
 	}
 }
 
@@ -550,36 +325,22 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeDockerClient{
-			waitByID: map[string]containertypes.WaitResponse{
-				"ctr-recovered": {StatusCode: 0},
-			},
-			waitBlockByID: map[string]chan struct{}{
-				"ctr-recovered": waitGate,
-			},
+			waitByID:      map[string]containertypes.WaitResponse{"ctr-recovered": {StatusCode: 0}},
+			waitBlockByID: map[string]chan struct{}{"ctr-recovered": waitGate},
 			inspectByID: map[string]client.ContainerInspectResult{
-				"ctr-recovered": {
-					Container: containertypes.InspectResponse{
-						State: &containertypes.State{
-							ExitCode:   0,
-							Status:     containertypes.ContainerState("exited"),
-							StartedAt:  "2026-02-26T12:00:00Z",
-							FinishedAt: "2026-02-26T12:00:01Z",
-						},
+				"ctr-recovered": {Container: containertypes.InspectResponse{
+					State: &containertypes.State{
+						ExitCode: 0, Status: containertypes.ContainerState("exited"),
+						StartedAt: "2026-02-26T12:00:00Z", FinishedAt: "2026-02-26T12:00:01Z",
 					},
-				},
+				}},
 			},
-			logsByID: map[string][]byte{
-				"ctr-recovered": multiplexedDockerLogs("recovered\n", stdcopy.Stdout),
-			},
+			logsByID: map[string][]byte{"ctr-recovered": multiplexedDockerLogs("recovered\n", stdcopy.Stdout)},
 		},
 	}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
-		{
-			ContainerID: "ctr-recovered",
-			RunID:       runID,
-			JobID:       jobID,
-		},
+		{ContainerID: "ctr-recovered", RunID: runID, JobID: jobID},
 	})
 
 	claimDone := make(chan struct{})

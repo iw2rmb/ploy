@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
@@ -53,17 +51,9 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 		"chunk_no": chunkNo,
 		"data":     []byte{0x1f, 0x8b},
 	}
-	bodyBytes, err := json.Marshal(reqBody)
-	if err != nil {
-		t.Fatalf("marshal request: %v", err)
-	}
 
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeIDStr+"/logs", bytes.NewReader(bodyBytes))
-	req.SetPathValue("id", nodeIDStr)
-	req.Header.Set("Content-Type", "application/json")
-
-	createNodeLogsHandler(st, bp, eventsService).ServeHTTP(rr, req)
+	handler := createNodeLogsHandler(st, bp, eventsService)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/logs", reqBody, "id", nodeIDStr)
 
 	assertStatus(t, rr, http.StatusCreated)
 

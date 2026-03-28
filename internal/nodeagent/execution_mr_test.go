@@ -76,152 +76,96 @@ func TestBuildPushRemoteURL(t *testing.T) {
 	})
 }
 
-func TestCreateMR_OrchestratesPushAndMR(t *testing.T) {
-	fakeP := &fakePusher{}
-	fakeMR := &fakeMRClient{url: "http://example/mr/1"}
+func TestCreateMR(t *testing.T) {
+	t.Parallel()
 
-	r := &runController{
-		newPusher:   func() git.Pusher { return fakeP },
-		newMRClient: func() mrCreator { return fakeMR },
-	}
-	req := StartRunRequest{
-		RunID:        types.RunID("t-123"),
-		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
-		BaseRef:      types.GitRef("main"),
-		TargetRef:    types.GitRef("feature"),
-		TypedOptions: RunOptions{},
-	}
-	manifest := contracts.StepManifest{Options: map[string]any{
-		"gitlab_pat":    "glpat-xyz",
-		"gitlab_domain": "https://gitlab.example.com/",
-	}}
-
-	// Workspace dir is irrelevant for this orchestration test.
-	// Use a temp dir for workspace to avoid committing to the project repo.
-	workspace := t.TempDir()
-	initGitRepo(t, workspace)
-	ctx := context.Background()
-	gotURL, err := r.createMR(ctx, req, manifest, workspace)
-	if err != nil {
-		t.Fatalf("createMR error: %v", err)
-	}
-	if gotURL != "http://example/mr/1" {
-		t.Fatalf("mr url = %q, want fixed fake", gotURL)
-	}
-
-	// Verify push options.
-	wantBranch := req.TargetRef.String()
-	if fakeP.opts.TargetRef != wantBranch {
-		t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, wantBranch)
-	}
-	if fakeP.opts.RemoteURL != "https://gitlab.example.com/acme/proj.git" {
-		t.Fatalf("push remote = %q, want https://gitlab.example.com/acme/proj.git", fakeP.opts.RemoteURL)
+	tests := []struct {
+		name      string
+		targetRef string
+		runName   string
+		wantBranch string
+		wantMRURL  string
+	}{
+		{
+			name:       "orchestrates_push_and_mr",
+			targetRef:  "feature",
+			runName:    "",
+			wantBranch: "feature",
+			wantMRURL:  "http://example/mr/1",
+		},
+		{
+			name:       "defaults_source_branch_when_target_ref_empty",
+			targetRef:  "",
+			runName:    "",
+			wantBranch: "ploy/t-empty-target",
+			wantMRURL:  "http://example/mr/2",
+		},
+		{
+			name:       "defaults_source_branch_from_run_name",
+			targetRef:  "",
+			runName:    "batch-foo",
+			wantBranch: "ploy/batch-foo",
+			wantMRURL:  "http://example/mr/3",
+		},
 	}
 
-	// Verify MR request parameters captured by fake client.
-	if fakeMR.req.Domain != "gitlab.example.com" {
-		t.Fatalf("mr domain = %q, want gitlab.example.com", fakeMR.req.Domain)
-	}
-	if fakeMR.req.ProjectID != "acme%2Fproj" {
-		t.Fatalf("mr project_id = %q, want acme%%2Fproj", fakeMR.req.ProjectID)
-	}
-	if fakeMR.req.SourceBranch != wantBranch || fakeMR.req.TargetBranch != req.BaseRef.String() {
-		t.Fatalf("mr branches = %q -> %q, want %q -> %q", fakeMR.req.SourceBranch, fakeMR.req.TargetBranch, wantBranch, req.BaseRef.String())
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestCreateMR_DefaultsSourceBranchWhenTargetRefEmpty(t *testing.T) {
-	fakeP := &fakePusher{}
-	fakeMR := &fakeMRClient{url: "http://example/mr/2"}
+			fakeP := &fakePusher{}
+			fakeMR := &fakeMRClient{url: tt.wantMRURL}
 
-	runID := types.RunID("t-empty-target")
-	r := &runController{
-		newPusher:   func() git.Pusher { return fakeP },
-		newMRClient: func() mrCreator { return fakeMR },
-	}
-	req := StartRunRequest{
-		RunID:        runID,
-		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
-		BaseRef:      types.GitRef("main"),
-		TargetRef:    "", // Unspecified target ref.
-		TypedOptions: RunOptions{},
-	}
-	manifest := contracts.StepManifest{Options: map[string]any{
-		"gitlab_pat":    "glpat-xyz",
-		"gitlab_domain": "gitlab.example.com",
-	}}
+			r := &runController{
+				newPusher:   func() git.Pusher { return fakeP },
+				newMRClient: func() mrCreator { return fakeMR },
+			}
+			req := StartRunRequest{
+				RunID:        types.RunID("t-empty-target"),
+				Name:         tt.runName,
+				RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
+				BaseRef:      types.GitRef("main"),
+				TargetRef:    types.GitRef(tt.targetRef),
+				TypedOptions: RunOptions{},
+			}
+			manifest := contracts.StepManifest{Options: map[string]any{
+				"gitlab_pat":    "glpat-xyz",
+				"gitlab_domain": "gitlab.example.com",
+			}}
 
-	// Use a temp dir for workspace to avoid committing to the project repo.
-	workspace := t.TempDir()
-	initGitRepo(t, workspace)
-	ctx := context.Background()
-	gotURL, err := r.createMR(ctx, req, manifest, workspace)
-	if err != nil {
-		t.Fatalf("createMR error: %v", err)
-	}
-	if gotURL != "http://example/mr/2" {
-		t.Fatalf("mr url = %q, want fixed fake", gotURL)
-	}
+			workspace := t.TempDir()
+			initGitRepo(t, workspace)
 
-	// Expect default branch ploy/<run-id> when no run name is provided.
-	wantBranch := "ploy/" + runID.String()
-	if fakeP.opts.TargetRef != wantBranch {
-		t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, wantBranch)
-	}
-	if fakeMR.req.SourceBranch != wantBranch {
-		t.Fatalf("mr source branch = %q, want %q", fakeMR.req.SourceBranch, wantBranch)
-	}
-	if fakeMR.req.TargetBranch != req.BaseRef.String() {
-		t.Fatalf("mr target branch = %q, want %q", fakeMR.req.TargetBranch, req.BaseRef.String())
-	}
-}
+			gotURL, err := r.createMR(context.Background(), req, manifest, workspace)
+			if err != nil {
+				t.Fatalf("createMR error: %v", err)
+			}
+			if gotURL != tt.wantMRURL {
+				t.Fatalf("mr url = %q, want %q", gotURL, tt.wantMRURL)
+			}
 
-func TestCreateMR_DefaultsSourceBranchFromRunName(t *testing.T) {
-	fakeP := &fakePusher{}
-	fakeMR := &fakeMRClient{url: "http://example/mr/3"}
+			// Verify push branch.
+			if fakeP.opts.TargetRef != tt.wantBranch {
+				t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, tt.wantBranch)
+			}
+			if fakeP.opts.RemoteURL != "https://gitlab.example.com/acme/proj.git" {
+				t.Fatalf("push remote = %q, want https://gitlab.example.com/acme/proj.git", fakeP.opts.RemoteURL)
+			}
 
-	runID := types.RunID("t-named-run")
-	runName := "batch-foo"
-
-	r := &runController{
-		newPusher:   func() git.Pusher { return fakeP },
-		newMRClient: func() mrCreator { return fakeMR },
-	}
-	req := StartRunRequest{
-		RunID:        runID,
-		Name:         runName,
-		RepoURL:      types.RepoURL("ssh://git@gitlab.example.com/acme/proj.git"),
-		BaseRef:      types.GitRef("main"),
-		TargetRef:    "", // Unspecified target ref.
-		TypedOptions: RunOptions{},
-	}
-	manifest := contracts.StepManifest{Options: map[string]any{
-		"gitlab_pat":    "glpat-xyz",
-		"gitlab_domain": "gitlab.example.com",
-	}}
-
-	// Use a temp dir for workspace to avoid committing to the project repo.
-	workspace := t.TempDir()
-	initGitRepo(t, workspace)
-	ctx := context.Background()
-	gotURL, err := r.createMR(ctx, req, manifest, workspace)
-	if err != nil {
-		t.Fatalf("createMR error: %v", err)
-	}
-	if gotURL != "http://example/mr/3" {
-		t.Fatalf("mr url = %q, want fixed fake", gotURL)
-	}
-
-	// Expect default branch ploy/<run_name> when run name is provided.
-	wantBranch := "ploy/" + runName
-	if fakeP.opts.TargetRef != wantBranch {
-		t.Fatalf("push target ref = %q, want %q", fakeP.opts.TargetRef, wantBranch)
-	}
-	if fakeMR.req.SourceBranch != wantBranch {
-		t.Fatalf("mr source branch = %q, want %q", fakeMR.req.SourceBranch, wantBranch)
-	}
-	if fakeMR.req.TargetBranch != req.BaseRef.String() {
-		t.Fatalf("mr target branch = %q, want %q", fakeMR.req.TargetBranch, req.BaseRef.String())
+			// Verify MR request parameters.
+			if fakeMR.req.Domain != "gitlab.example.com" {
+				t.Fatalf("mr domain = %q, want gitlab.example.com", fakeMR.req.Domain)
+			}
+			if fakeMR.req.ProjectID != "acme%2Fproj" {
+				t.Fatalf("mr project_id = %q, want acme%%2Fproj", fakeMR.req.ProjectID)
+			}
+			if fakeMR.req.SourceBranch != tt.wantBranch {
+				t.Fatalf("mr source branch = %q, want %q", fakeMR.req.SourceBranch, tt.wantBranch)
+			}
+			if fakeMR.req.TargetBranch != "main" {
+				t.Fatalf("mr target branch = %q, want main", fakeMR.req.TargetBranch)
+			}
+		})
 	}
 }
 

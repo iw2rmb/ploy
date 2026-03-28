@@ -1,585 +1,150 @@
 package nodeagent
 
 import (
-	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/iw2rmb/ploy/internal/domain/types"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-func testLogDigest(n int) types.Sha256Digest {
-	suffix := string(rune('a' + (n % 6)))
-	return types.Sha256Digest("sha256:" + strings.Repeat("0", 63) + suffix)
-}
-
-// TestPersistFirstGateFailureLog_UsesTrimmedFinding verifies that the first failing
-// gate log persisted for healing prefers the trimmed LogFindings view over LogsText.
-func TestPersistFirstGateFailureLog_UsesTrimmedFinding(t *testing.T) {
-	t.Setenv("PLOYD_CACHE_HOME", t.TempDir())
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-trimmed-log")
-
-	full := "[INFO] noise\n[ERROR] important failure\nstack\n"
-	trimmed := "[ERROR] important failure\nstack\n"
-
-	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "maven", Passed: false},
-		},
-		LogsText: full,
-		LogFindings: []contracts.BuildGateLogFinding{
-			{Severity: "error", Message: trimmed},
-		},
+func TestApplyGatePhaseOverrides(t *testing.T) {
+	pre := &contracts.BuildGateStackConfig{Enabled: true, Language: "java", Release: "11"}
+	post := &contracts.BuildGateStackConfig{Enabled: true, Language: "java", Release: "17"}
+	preGateProfile := &contracts.BuildGateProfileOverride{
+		Command: contracts.CommandSpec{Shell: "go test ./..."},
+		Env:     map[string]string{"GOFLAGS": "-mod=readonly"},
+	}
+	postGateProfile := &contracts.BuildGateProfileOverride{
+		Command: contracts.CommandSpec{Shell: "go test ./... -run TestUnit"},
+		Env:     map[string]string{"CGO_ENABLED": "0"},
 	}
 
-	rc.persistFirstGateFailureLog(runID, meta)
-
-	baseRoot := os.Getenv("PLOYD_CACHE_HOME")
-	runDir := filepath.Join(baseRoot, "ploy", "run", runID.String())
-	logPath := filepath.Join(runDir, "build-gate-first.log")
-
-	data, err := os.ReadFile(logPath)
-	if err != nil {
-		t.Fatalf("failed to read persisted gate log: %v", err)
-	}
-
-	got := string(data)
-	if got != trimmed && got != trimmed+"\n" {
-		t.Fatalf("persisted gate log = %q, want trimmed log %q", got, trimmed)
-	}
-}
-
-func TestPersistGateProfileSnapshot_DerivesFromOverride(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-profile-derived")
-
-	rc.persistGateProfileSnapshot(
-		runID,
-		types.JobTypePreGate,
-		&contracts.StepGateSpec{
-			RepoID: types.MigRepoID("repo_2"),
-			GateProfile: &contracts.BuildGateProfileOverride{
-				Command: contracts.CommandSpec{Shell: "mvn -q -DskipTests compile"},
-				Env:     map[string]string{"MAVEN_OPTS": "-Xmx2g"},
-				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "21"},
+	cases := []struct {
+		name                  string
+		jobType               types.JobType
+		gateSkip              *contracts.BuildGateSkipMetadata
+		recoveryCtx           *contracts.RecoveryClaimContext
+		buildPreConfig        *contracts.BuildGatePhaseConfig  // nil for case 4
+		buildPostConfig       *contracts.BuildGatePhaseConfig
+		wantStackDetect       *contracts.BuildGateStackConfig  // nil for re_gate
+		wantGateProfile       *contracts.BuildGateProfileOverride
+		wantTarget            string
+		wantAlways            bool
+		wantEnforceTargetLock bool
+		wantSkip              *contracts.BuildGateSkipMetadata
+	}{
+		{
+			name:    "pre_gate uses pre stack",
+			jobType: types.JobTypePreGate,
+			gateSkip: &contracts.BuildGateSkipMetadata{
+				Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit,
+			},
+			buildPreConfig: &contracts.BuildGatePhaseConfig{
+				Stack: pre, GateProfile: preGateProfile,
+				Target: contracts.GateProfileTargetUnit, Always: true,
+			},
+			buildPostConfig: &contracts.BuildGatePhaseConfig{
+				Stack: post, GateProfile: postGateProfile,
+				Target: contracts.GateProfileTargetAllTests, Always: false,
+			},
+			wantStackDetect: pre,
+			wantGateProfile: preGateProfile,
+			wantTarget:      contracts.GateProfileTargetUnit,
+			wantAlways:      true,
+			wantSkip: &contracts.BuildGateSkipMetadata{
+				Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit,
 			},
 		},
-		nil,
-	)
-
-	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("failed to read profile snapshot: %v", err)
-	}
-	profile, err := contracts.ParseGateProfileJSON(data)
-	if err != nil {
-		t.Fatalf("snapshot profile invalid: %v", err)
-	}
-	if got, want := profile.Stack.Language, "java"; got != want {
-		t.Fatalf("stack.language = %q, want %q", got, want)
-	}
-	if got, want := profile.Stack.Tool, "maven"; got != want {
-		t.Fatalf("stack.tool = %q, want %q", got, want)
-	}
-	if got, want := profile.Targets.Active, contracts.GateProfileTargetAllTests; got != want {
-		t.Fatalf("targets.active = %q, want %q", got, want)
-	}
-	if profile.Targets.AllTests == nil || profile.Targets.AllTests.Command != "mvn -q -DskipTests compile" {
-		t.Fatalf("targets.all_tests.command = %#v, want mvn command", profile.Targets.AllTests)
-	}
-	if profile.Targets.AllTests.Env["MAVEN_OPTS"] != "-Xmx2g" {
-		t.Fatalf("targets.all_tests.env[MAVEN_OPTS] = %q, want %q", profile.Targets.AllTests.Env["MAVEN_OPTS"], "-Xmx2g")
-	}
-}
-
-func TestPersistGateProfileSnapshot_UsesPinnedTarget(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-profile-pinned-target")
-
-	rc.persistGateProfileSnapshot(
-		runID,
-		types.JobTypePreGate,
-		&contracts.StepGateSpec{
-			RepoID: types.MigRepoID("repo_3"),
-			Target: contracts.GateProfileTargetBuild,
-			GateProfile: &contracts.BuildGateProfileOverride{
-				Command: contracts.CommandSpec{Shell: "mvn -q -DskipTests compile"},
-				Target:  contracts.GateProfileTargetAllTests,
-				Env:     map[string]string{"MAVEN_OPTS": "-Xmx2g"},
-				Stack:   &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "11"},
+		{
+			name:    "post_gate uses post stack",
+			jobType: types.JobTypePostGate,
+			gateSkip: &contracts.BuildGateSkipMetadata{
+				Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests,
+			},
+			buildPreConfig: &contracts.BuildGatePhaseConfig{
+				Stack: pre, GateProfile: preGateProfile,
+				Target: contracts.GateProfileTargetUnit, Always: true,
+			},
+			buildPostConfig: &contracts.BuildGatePhaseConfig{
+				Stack: post, GateProfile: postGateProfile,
+				Target: contracts.GateProfileTargetAllTests, Always: false,
+			},
+			wantStackDetect: post,
+			wantGateProfile: postGateProfile,
+			wantTarget:      contracts.GateProfileTargetAllTests,
+			wantAlways:      false,
+			wantSkip: &contracts.BuildGateSkipMetadata{
+				Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests,
 			},
 		},
-		nil,
-	)
-
-	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("failed to read profile snapshot: %v", err)
-	}
-	profile, err := contracts.ParseGateProfileJSON(data)
-	if err != nil {
-		t.Fatalf("snapshot profile invalid: %v", err)
-	}
-	if got, want := profile.Targets.Active, contracts.GateProfileTargetBuild; got != want {
-		t.Fatalf("targets.active = %q, want %q", got, want)
-	}
-	if profile.Targets.Build == nil || profile.Targets.Build.Command != "mvn -q -DskipTests compile" {
-		t.Fatalf("targets.build.command = %#v, want mvn command", profile.Targets.Build)
-	}
-	if got := profile.Targets.AllTests.Command; got != "" {
-		t.Fatalf("targets.all_tests.command = %q, want empty", got)
-	}
-}
-
-func TestPersistGateProfileSnapshot_RemovesStaleSnapshot(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-profile-stale")
-	path := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-profile.json")
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatalf("mkdir run dir: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(`{"schema_version":1}`), 0o644); err != nil {
-		t.Fatalf("write stale snapshot: %v", err)
-	}
-
-	rc.persistGateProfileSnapshot(runID, types.JobTypePreGate, nil, nil)
-
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatalf("expected stale snapshot removed, stat err=%v", err)
-	}
-}
-
-func TestPersistGateStack_WritesStack(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-stack-persist")
-
-	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "maven", Passed: true}},
-	}
-
-	rc.persistGateStack(runID, meta)
-
-	stackPath := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-stack.txt")
-	data, err := os.ReadFile(stackPath)
-	if err != nil {
-		t.Fatalf("failed to read persisted stack file: %v", err)
-	}
-
-	got := string(data)
-	if got != "java-maven" {
-		t.Errorf("persisted stack = %q, want %q", got, "java-maven")
-	}
-}
-
-// TestPersistGateStack_Idempotent verifies that persistGateStack only writes
-// the first detection and ignores subsequent calls.
-func TestPersistGateStack_Idempotent(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-stack-idempotent")
-
-	rc.persistGateStack(runID, &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "maven", Passed: true}}})
-	rc.persistGateStack(runID, &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "gradle", Passed: true}}})
-
-	stackPath := filepath.Join(cacheHome, "ploy", "run", runID.String(), "build-gate-stack.txt")
-	data, err := os.ReadFile(stackPath)
-	if err != nil {
-		t.Fatalf("failed to read persisted stack file: %v", err)
-	}
-
-	got := string(data)
-	if got != "java-maven" {
-		t.Errorf("persisted stack = %q, want first stack %q", got, "java-maven")
-	}
-}
-
-func TestLoadPersistedStack_ReturnsStack(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-stack-load")
-
-	runDir := filepath.Join(cacheHome, "ploy", "run", runID.String())
-	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		t.Fatalf("mkdir runDir: %v", err)
-	}
-	stackPath := filepath.Join(runDir, "build-gate-stack.txt")
-	if err := os.WriteFile(stackPath, []byte("java-gradle"), 0o644); err != nil {
-		t.Fatalf("write stack file: %v", err)
-	}
-
-	got := rc.loadPersistedStack(runID)
-	if got != contracts.ModStackJavaGradle {
-		t.Errorf("loadPersistedStack() = %q, want %q", got, contracts.ModStackJavaGradle)
-	}
-}
-
-func TestLoadPersistedStack_DefaultsToUnknown(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-stack-missing")
-
-	got := rc.loadPersistedStack(runID)
-	if got != contracts.ModStackUnknown {
-		t.Errorf("loadPersistedStack() = %q, want %q", got, contracts.ModStackUnknown)
-	}
-}
-
-// TestPersistAndLoadGateStack_RoundTrip verifies the complete flow of persisting
-// a stack during gate execution and loading it for mig/healing execution.
-func TestPersistAndLoadGateStack_RoundTrip(t *testing.T) {
-	cacheHome := t.TempDir()
-	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
-
-	rc := &runController{cfg: Config{}}
-	runID := types.RunID("run-stack-roundtrip")
-
-	meta := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "gradle", Passed: false}},
-	}
-
-	rc.persistGateStack(runID, meta)
-
-	got := rc.loadPersistedStack(runID)
-	if got != contracts.ModStackJavaGradle {
-		t.Errorf("round-trip stack = %q, want %q", got, contracts.ModStackJavaGradle)
-	}
-}
-
-// TestBuildGateJobStats_IncludesJobMeta verifies that gate job stats embed
-// JobMeta so that jobs.meta can carry structured gate metadata.
-func TestBuildGateJobStats_IncludesJobMeta(t *testing.T) {
-	t.Parallel()
-
-	rc := &runController{cfg: Config{}}
-
-	gateMeta := &contracts.BuildGateStageMetadata{
-		LogDigest: testLogDigest(1),
-		StaticChecks: []contracts.BuildGateStaticCheckReport{
-			{Tool: "maven", Passed: true},
+		{
+			name:    "re_gate uses stack detection output and post gate_profile override",
+			jobType: types.JobTypeReGate,
+			recoveryCtx: &contracts.RecoveryClaimContext{
+				SelectedErrorKind: "infra",
+			},
+			buildPreConfig: &contracts.BuildGatePhaseConfig{
+				Stack: pre, GateProfile: preGateProfile,
+				Target: contracts.GateProfileTargetUnit, Always: true,
+			},
+			buildPostConfig: &contracts.BuildGatePhaseConfig{
+				Stack: post, GateProfile: postGateProfile,
+				Target: contracts.GateProfileTargetAllTests, Always: false,
+			},
+			wantStackDetect:       nil,
+			wantGateProfile:       postGateProfile,
+			wantTarget:            contracts.GateProfileTargetAllTests,
+			wantAlways:            false,
+			wantEnforceTargetLock: true,
+		},
+		{
+			name:    "re_gate does not enforce target lock for non-infra recovery",
+			jobType: types.JobTypeReGate,
+			recoveryCtx: &contracts.RecoveryClaimContext{
+				SelectedErrorKind: "code",
+			},
+			buildPostConfig: &contracts.BuildGatePhaseConfig{
+				Target: contracts.GateProfileTargetAllTests,
+			},
+			wantEnforceTargetLock: false,
 		},
 	}
 
-	stats := rc.buildGateJobStats(gateMeta, 250*time.Millisecond)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			manifest := contracts.StepManifest{Gate: &contracts.StepGateSpec{}}
+			typedOpts := RunOptions{}
+			typedOpts.BuildGate.Pre = tc.buildPreConfig
+			typedOpts.BuildGate.Post = tc.buildPostConfig
 
-	var decoded struct {
-		JobMeta *contracts.JobMeta `json:"job_meta"`
-	}
-	if err := json.Unmarshal(stats, &decoded); err != nil {
-		t.Fatalf("failed to unmarshal stats: %v", err)
-	}
-	if decoded.JobMeta == nil {
-		t.Fatalf("expected job_meta key in gate stats, got nil")
-	}
-
-	if decoded.JobMeta.Kind != contracts.JobKindGate {
-		t.Fatalf("job_meta.Kind = %q, want %q", decoded.JobMeta.Kind, contracts.JobKindGate)
-	}
-	if decoded.JobMeta.Gate == nil || decoded.JobMeta.Gate.LogDigest != testLogDigest(1) {
-		t.Fatalf("job_meta.Gate.LogDigest = %#v, want %q", decoded.JobMeta.Gate, testLogDigest(1))
-	}
-}
-
-func TestCleanupGateOutDir_RemovesWorkspaceOutputDir(t *testing.T) {
-	t.Parallel()
-
-	workspace := t.TempDir()
-	gateOutDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
-	if err := os.MkdirAll(gateOutDir, 0o755); err != nil {
-		t.Fatalf("mkdir gate out dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(gateOutDir, "test.txt"), []byte("x"), 0o644); err != nil {
-		t.Fatalf("write gate out file: %v", err)
-	}
-
-	rc := &runController{cfg: Config{}}
-	rc.cleanupGateOutDir(workspace)
-
-	if _, err := os.Stat(gateOutDir); !os.IsNotExist(err) {
-		t.Fatalf("expected gate out dir removed, stat err=%v", err)
-	}
-}
-
-func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
-	t.Parallel()
-
-	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
-
-	workspace := t.TempDir()
-
-	const wantBugSummary = "javac: cannot find symbol FooBar"
-
-	mc := &mockRouterContainerRuntime{}
-	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-		if strings.Contains(spec.Image, "router") {
-			if got, want := spec.Env["PLOY_GATE_PHASE"], "pre_gate"; got != want {
-				t.Fatalf("router env PLOY_GATE_PHASE = %q, want %q", got, want)
+			req := StartRunRequest{
+				JobType:         tc.jobType,
+				GateSkip:        tc.gateSkip,
+				RecoveryContext: tc.recoveryCtx,
 			}
-			if got, want := spec.Env["PLOY_LOOP_KIND"], "healing"; got != want {
-				t.Fatalf("router env PLOY_LOOP_KIND = %q, want %q", got, want)
+
+			applyGatePhaseOverrides(&manifest, req, typedOpts)
+
+			if manifest.Gate.StackDetect != tc.wantStackDetect {
+				t.Fatalf("Gate.StackDetect=%v; want %v", manifest.Gate.StackDetect, tc.wantStackDetect)
 			}
-			for _, m := range spec.Mounts {
-				if m.Target == "/out" {
-					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"bug_summary":"`+wantBugSummary+`","error_kind":"infra","strategy_id":"infra-default","confidence":0.8,"reason":"docker socket missing","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}`+"\n"), 0o644)
+			if tc.wantGateProfile != nil && manifest.Gate.GateProfile != tc.wantGateProfile {
+				t.Fatalf("Gate.GateProfile=%v; want %v", manifest.Gate.GateProfile, tc.wantGateProfile)
+			}
+			if tc.wantTarget != "" {
+				if got, want := manifest.Gate.Target, tc.wantTarget; got != want {
+					t.Fatalf("Gate.Target=%q; want %q", got, want)
 				}
 			}
-		}
-		return step.ContainerHandle("mock-" + spec.Image), nil
-	}
-
-	runner := step.Runner{Containers: mc}
-
-	req := StartRunRequest{
-		RunID:   types.RunID("run-router-gate"),
-		JobID:   types.JobID("job-router-gate"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		JobType: types.JobTypePreGate,
-	}
-
-	typedOpts := RunOptions{
-		HealingSelector: &contracts.HealingSpec{
-			ByErrorKind: map[string]contracts.HealingActionSpec{
-				"infra": {Image: contracts.JobImage{Universal: "test/healer:latest"}},
-			},
-		},
-		Healing: &HealingConfig{
-			Retries: 1,
-			Mod: ModContainerSpec{
-				Image: contracts.JobImage{Universal: "test/healer:latest"},
-			},
-		},
-		Router: &ModContainerSpec{
-			Image: contracts.JobImage{Universal: "test/router:latest"},
-		},
-	}
-
-	gateResult := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
-		LogsText:     "[ERROR] build failed\n",
-	}
-
-	rc.runRouterForGateFailure(context.Background(), runner, req, typedOpts, workspace, gateResult)
-
-	if gateResult.BugSummary != wantBugSummary {
-		t.Fatalf("gateResult.BugSummary = %q, want %q", gateResult.BugSummary, wantBugSummary)
-	}
-	if gateResult.Recovery == nil {
-		t.Fatal("gateResult.Recovery is nil, want classifier metadata")
-	}
-	if got, want := gateResult.Recovery.ErrorKind, "infra"; got != want {
-		t.Fatalf("gateResult.Recovery.ErrorKind = %q, want %q", got, want)
-	}
-	if got, want := gateResult.Recovery.StrategyID, "infra-default"; got != want {
-		t.Fatalf("gateResult.Recovery.StrategyID = %q, want %q", got, want)
-	}
-	if gateResult.Recovery.Confidence == nil || *gateResult.Recovery.Confidence != 0.8 {
-		t.Fatalf("gateResult.Recovery.Confidence = %#v, want %v", gateResult.Recovery.Confidence, 0.8)
-	}
-	if got, want := gateResult.Recovery.Reason, "docker socket missing"; got != want {
-		t.Fatalf("gateResult.Recovery.Reason = %q, want %q", got, want)
-	}
-	if len(gateResult.Recovery.Expectations) == 0 {
-		t.Fatal("gateResult.Recovery.Expectations is empty")
-	}
-}
-
-func TestRunRouterForGateFailure_AmataRouterCmdPersistsAfterParse(t *testing.T) {
-	t.Parallel()
-
-	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
-	workspace := t.TempDir()
-
-	mc := &mockRouterContainerRuntime{}
-	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-		if strings.Contains(spec.Image, "router") {
-			for _, m := range spec.Mounts {
-				if m.Target == "/out" {
-					payload := `{"error_kind":"infra","strategy_id":"infra-default","confidence":0.9,"reason":"docker socket missing"}` + "\n"
-					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(payload), 0o644)
-				}
+			if got, want := manifest.Gate.Always, tc.wantAlways; got != want {
+				t.Fatalf("Gate.Always=%v; want %v", got, want)
 			}
-		}
-		return step.ContainerHandle("mock-" + spec.Image), nil
-	}
-
-	runner := step.Runner{Containers: mc}
-	req := StartRunRequest{
-		RunID:   types.RunID("run-router-amata-cmd"),
-		JobID:   types.JobID("job-router-amata-cmd"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		JobType: types.JobTypePreGate,
-	}
-	typedOpts := RunOptions{
-		HealingSelector: &contracts.HealingSpec{
-			ByErrorKind: map[string]contracts.HealingActionSpec{
-				"infra": {Image: contracts.JobImage{Universal: "test/healer:latest"}},
-			},
-		},
-		Healing: &HealingConfig{
-			Retries: 1,
-			Mod: ModContainerSpec{
-				Image: contracts.JobImage{Universal: "test/healer:latest"},
-			},
-		},
-		Router: &ModContainerSpec{
-			Image: contracts.JobImage{Universal: "test/router:latest"},
-			Amata: &contracts.AmataRunSpec{
-				Spec: "task: route",
-				Set: []contracts.AmataSetParam{
-					{Param: "repo", Value: "svc"},
-					{Param: "env", Value: "ci"},
-				},
-			},
-		},
-	}
-	gateResult := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
-		LogsText:     "[ERROR] build failed\n",
-	}
-
-	rc.runRouterForGateFailure(context.Background(), runner, req, typedOpts, workspace, gateResult)
-
-	if gateResult.Recovery == nil {
-		t.Fatal("gateResult.Recovery is nil")
-	}
-	if got, want := gateResult.Recovery.ErrorKind, "infra"; got != want {
-		t.Fatalf("ErrorKind = %q, want %q", got, want)
-	}
-
-	wantRouterCmd := []string{"amata", "run", "/in/amata.yaml", "--set", "repo=svc", "--set", "env=ci"}
-	if len(gateResult.Recovery.RouterCmd) != len(wantRouterCmd) {
-		t.Fatalf("RouterCmd len = %d, want %d: %v", len(gateResult.Recovery.RouterCmd), len(wantRouterCmd), gateResult.Recovery.RouterCmd)
-	}
-	for i, want := range wantRouterCmd {
-		if got := gateResult.Recovery.RouterCmd[i]; got != want {
-			t.Fatalf("RouterCmd[%d] = %q, want %q", i, got, want)
-		}
-	}
-}
-
-func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing.T) {
-	t.Parallel()
-
-	rc := &runController{cfg: Config{ServerURL: "http://localhost:9999"}}
-	workspace := t.TempDir()
-	mc := &mockRouterContainerRuntime{}
-	mc.createFn = func(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-		if strings.Contains(spec.Image, "router") {
-			for _, m := range spec.Mounts {
-				if m.Target == "/out" {
-					_ = os.WriteFile(filepath.Join(m.Source, "codex-last.txt"), []byte(`{"error_kind":"routing"}`+"\n"), 0o644)
-				}
+			if got, want := manifest.Gate.EnforceTargetLock, tc.wantEnforceTargetLock; got != want {
+				t.Fatalf("Gate.EnforceTargetLock=%v; want %v", got, want)
 			}
-		}
-		return step.ContainerHandle("mock-" + spec.Image), nil
+			if tc.wantSkip != nil && manifest.Gate.Skip != tc.gateSkip {
+				t.Fatalf("Gate.Skip=%v; want skip payload", manifest.Gate.Skip)
+			}
+		})
 	}
-	runner := step.Runner{Containers: mc}
-	req := StartRunRequest{
-		RunID:   types.RunID("run-router-default"),
-		JobID:   types.JobID("job-router-default"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		JobType: types.JobTypeReGate,
-	}
-	typedOpts := RunOptions{
-		HealingSelector: &contracts.HealingSpec{
-			ByErrorKind: map[string]contracts.HealingActionSpec{
-				"infra": {Image: contracts.JobImage{Universal: "test/healer:latest"}},
-			},
-		},
-		Healing: &HealingConfig{
-			Retries: 1,
-			Mod: ModContainerSpec{
-				Image: contracts.JobImage{Universal: "test/healer:latest"},
-			},
-		},
-		Router: &ModContainerSpec{
-			Image: contracts.JobImage{Universal: "test/router:latest"},
-		},
-	}
-	gateResult := &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
-		LogsText:     "[ERROR] build failed\n",
-	}
-
-	rc.runRouterForGateFailure(context.Background(), runner, req, typedOpts, workspace, gateResult)
-
-	if gateResult.Recovery == nil {
-		t.Fatal("gateResult.Recovery is nil")
-	}
-	if got, want := gateResult.Recovery.LoopKind, "healing"; got != want {
-		t.Fatalf("LoopKind = %q, want %q", got, want)
-	}
-	if got, want := gateResult.Recovery.ErrorKind, "unknown"; got != want {
-		t.Fatalf("ErrorKind = %q, want %q", got, want)
-	}
-}
-
-type mockRouterContainerRuntime struct {
-	createFn func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error)
-	startFn  func(ctx context.Context, handle step.ContainerHandle) error
-	waitFn   func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error)
-	logsFn   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error)
-	removeFn func(ctx context.Context, handle step.ContainerHandle) error
-}
-
-func (m *mockRouterContainerRuntime) Create(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
-	if m.createFn != nil {
-		return m.createFn(ctx, spec)
-	}
-	return step.ContainerHandle("mock"), nil
-}
-
-func (m *mockRouterContainerRuntime) Start(ctx context.Context, handle step.ContainerHandle) error {
-	if m.startFn != nil {
-		return m.startFn(ctx, handle)
-	}
-	return nil
-}
-
-func (m *mockRouterContainerRuntime) Wait(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
-	if m.waitFn != nil {
-		return m.waitFn(ctx, handle)
-	}
-	return step.ContainerResult{ExitCode: 0}, nil
-}
-
-func (m *mockRouterContainerRuntime) Logs(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
-	if m.logsFn != nil {
-		return m.logsFn(ctx, handle)
-	}
-	return []byte{}, nil
-}
-
-func (m *mockRouterContainerRuntime) Remove(ctx context.Context, handle step.ContainerHandle) error {
-	if m.removeFn != nil {
-		return m.removeFn(ctx, handle)
-	}
-	return nil
 }
