@@ -1,6 +1,6 @@
 // Package contracts defines shared workflow types.
 //
-// mods_spec.go provides the core typed model for Mods run specifications.
+// migs_spec.go provides the core typed model for Mig run specifications.
 // This eliminates drift between CLI/server/nodeagent spec parsing by providing
 // a single source of truth for spec structure.
 //
@@ -12,15 +12,15 @@
 //
 // ## Related Files
 //
-// The Mods spec implementation is split across several files:
-//   - mods_spec.go: Core types (MigSpec, MigStep) and validation
+// The Mig spec implementation is split across several files:
+//   - migs_spec.go: Core types (MigSpec, MigStep) and validation
 //   - command_spec.go: Polymorphic command handling (CommandSpec)
 //   - build_gate_config.go: Build gate and healing configuration types
-//   - mods_spec_parse.go: JSON parsing functions
+//   - migs_spec_parse.go: JSON parsing functions
 //
 // ## Usage
 //
-// Parse specs using ParseMigSpecJSON (in mods_spec_parse.go):
+// Parse specs using ParseMigSpecJSON (in migs_spec_parse.go):
 //
 //	spec, err := contracts.ParseMigSpecJSON(jsonBytes)
 //	if err != nil {

@@ -1,4 +1,4 @@
-// mods_spec_parse.go provides JSON parsing for Mods specifications.
+// migs_spec_parse.go provides JSON parsing for Mig specifications.
 //
 // Usage:
 //
