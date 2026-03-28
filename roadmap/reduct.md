@@ -175,9 +175,9 @@ Goal lock: every unchecked item below is considered complete only when redundanc
     - Test files updated: `execution_orchestrator_gate_stackdetect_test.go` and `run_options_test.go` migrated to `Pre`/`Post` phase-config accessors.
     - New table-driven suite: `internal/workflow/contracts/build_gate_projection_test.go` (15 cases for both canonical functions).
 
-- Open items revalidated against codebase on `2026-03-27`:
+- Open items revalidated against codebase on `2026-03-28`:
   - `3.1*`: still needed (`internal/store/querier.go` still exposes parallel `List*` + `List*Meta*` families for logs/diffs/artifacts/events).
-  - `3.2`: still needed, but scope narrowed to handler/blobpersist read-path unification; nodeagent decoder unification is not currently justified.
+  - `3.2`: still needed, with expanded scope covering server read-path unification plus nodeagent diff/spec-bundle transfer wiring used by rehydration and `/tmp`/`/in`/`/out` execution flows.
   - `4.1`: still needed, but should extend existing `ingest_common.go` helpers instead of adding a parallel helper stack.
   - `4.2*`: still needed (`internal/domain/api` does not exist; DTO duplication remains spread across handlers/client/cli).
   - `5.1`: still needed (monolithic `mockStore` still anchored in `test_mock_store_core_test.go`).
@@ -234,20 +234,22 @@ Goal lock: every unchecked item below is considered complete only when redundanc
   - Clarity / complexity check: Final cleanup; no additional abstraction layer introduced.
   - Reasoning: medium (8 CFP)
 
-- [ ] 3.2 Standardize blob download/read flow across handlers and blobpersist
+- [ ] 3.2 Standardize blob transfer/read flow across handlers, blobpersist, and nodeagent rehydration I/O
   - Type: determined
-  - Component: `internal/server/handlers/artifacts_download.go`, `internal/server/handlers/diffs.go`, `internal/server/handlers/spec_bundles.go`, `internal/server/blobpersist/service.go`, `internal/server/blobpersist/sbom.go`, `internal/server/handlers/ingest_common.go`
+  - Component: `internal/server/handlers/artifacts_download.go`, `internal/server/handlers/diffs.go`, `internal/server/handlers/spec_bundles.go`, `internal/server/handlers/events.go`, `internal/server/handlers/gate_profile_resolver.go`, `internal/server/blobpersist/service.go`, `internal/server/blobpersist/sbom.go`, `internal/server/handlers/ingest_common.go`, `internal/nodeagent/uploaders.go`, `internal/nodeagent/difffetcher.go`, `internal/nodeagent/logstreamer.go`, `internal/nodeagent/execution_orchestrator_rehydrate.go`, `internal/nodeagent/execution_orchestrator_tmpbundle.go`, `internal/nodeagent/execution_orchestrator_jobs.go`, `internal/nodeagent/execution_orchestrator_jobs_upload.go`, `internal/workflow/step/container_spec.go`
   - Implementation:
-    1. Add one shared blob-read helper (key validation + `blobstore.Get` error mapping + stream/read utilities) for artifact/diff/spec-bundle flows.
-    2. Route artifact/diff/spec-bundle download handlers through the shared helper and delete local read/error branches.
-    3. Route blobpersist recovery/SBOM bundle reads through the same helper and delete local loader branches.
-    4. Keep nodeagent decoder contracts out of this item scope unless duplicate blob-metadata decoders are introduced.
+    1. Add one shared server blob-read helper family (key validation + `blobstore.Get` error mapping + stream/read utilities).
+    2. Route artifact/diff/spec-bundle/download handlers, SSE log backfill reads, and gate-profile resolver object reads through shared helpers and delete local read/error branches.
+    3. Route blobpersist recovery/SBOM/diff-clone bundle reads through the same helper family and delete local loader branches.
+    4. Route nodeagent diff/spec-bundle download request mechanics through canonical transfer helpers and remove duplicate request/status/response branches (`uploaders`, `difffetcher`, `logstreamer`).
+    5. Keep rehydration patch application semantics and `/tmp` extraction semantics stable while consolidating `/tmp` materialization and `/in`/`/out` wiring scaffolding where duplicated.
   - Verification:
     1. Run `go test ./internal/server/handlers ./internal/server/blobpersist`.
-    2. Run `go test ./internal/... -run 'Artifact|Diff|SpecBundle|Blob|SBOM'`.
-    3. Add structural proof in completion notes: removed local blob-read branches and shared-reader call sites.
-  - Estimated LOC influence: `+120/-140` (net `-20`) with branch-count reduction in handlers.
-  - Clarity / complexity check: Centralizes repeated I/O/error mapping without collapsing endpoint-specific response contracts.
+    2. Run `go test ./internal/nodeagent ./internal/workflow/step -run 'Uploader|LogStreamer|DiffFetcher|TmpBundle|Artifact|Rehydrate'`.
+    3. Run `go test ./internal/... -run 'Artifact|Diff|SpecBundle|Blob|SBOM|Rehydrate|TmpBundle'`.
+    4. Add structural proof in completion notes: removed local blob-read/transfer branches and canonical helper call sites in server + nodeagent.
+  - Estimated LOC influence: `+190/-280` (net `-90`) with branch-count reduction across server and nodeagent transfer paths.
+  - Clarity / complexity check: Centralizes repeated I/O and transfer plumbing while preserving endpoint/runtime-specific semantics.
   - Reasoning: high (13 CFP)
 
 - [ ] 4.1 Expand shared HTTP handler contract helpers and remove ad-hoc decode/respond branches
