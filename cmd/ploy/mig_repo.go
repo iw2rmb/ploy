@@ -182,8 +182,8 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			repo.ID.String(),
 			domaintypes.NormalizeRepoURLSchemless(repo.RepoURL),
-			repo.BaseRef.String(),
-			repo.TargetRef.String(),
+			repo.BaseRef,
+			repo.TargetRef,
 			repo.CreatedAt.Format(time.RFC3339),
 		)
 	}

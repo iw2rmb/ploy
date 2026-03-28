@@ -18,22 +18,11 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// MigRepoSummary represents a repo in a mig's repo set.
-// Matches the server response shape from internal/server/handlers/migs_repos.go.
-type MigRepoSummary struct {
-	ID        domaintypes.MigRepoID `json:"id"`
-	MigID     domaintypes.MigID     `json:"mig_id"`
-	RepoURL   string                `json:"repo_url"`
-	BaseRef   domaintypes.GitRef    `json:"base_ref"`
-	TargetRef domaintypes.GitRef    `json:"target_ref"`
-	CreatedAt time.Time             `json:"created_at"`
-}
 
 // AddMigRepoCommand adds a repo to a mig's repo set.
 // Endpoint: POST /v1/migs/{mod_id}/repos
@@ -48,24 +37,24 @@ type AddMigRepoCommand struct {
 }
 
 // Run executes POST /v1/migs/{mod_id}/repos to add a repo.
-func (c AddMigRepoCommand) Run(ctx context.Context) (MigRepoSummary, error) {
+func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: %w", err)
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: mig id is required")
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: mig id is required")
 	}
 	repoURL := domaintypes.RepoURL(strings.TrimSpace(c.RepoURL))
 	if err := repoURL.Validate(); err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: repo url is required")
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: repo url is required")
 	}
 	baseRef := domaintypes.GitRef(strings.TrimSpace(c.BaseRef))
 	if err := baseRef.Validate(); err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: base ref is required")
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: base ref is required")
 	}
 	targetRef := domaintypes.GitRef(strings.TrimSpace(c.TargetRef))
 	if err := targetRef.Validate(); err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: target ref is required")
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: target ref is required")
 	}
 
 	// Build request payload with repo_url, base_ref, and target_ref.
@@ -81,33 +70,33 @@ func (c AddMigRepoCommand) Run(ctx context.Context) (MigRepoSummary, error) {
 
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: marshal request: %w", err)
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: marshal request: %w", err)
 	}
 
 	// POST /v1/migs/{mod_id}/repos
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: build request: %w", err)
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return MigRepoSummary{}, fmt.Errorf("mig repo add: http request failed: %w", err)
+		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: http request failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
-		var result MigRepoSummary
+		var result domainapi.MigRepoSummary
 		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return MigRepoSummary{}, fmt.Errorf("mig repo add: decode response: %w", err)
+			return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return MigRepoSummary{}, httpx.WrapError("mig repo add", resp.Status, resp.Body)
+	return domainapi.MigRepoSummary{}, httpx.WrapError("mig repo add", resp.Status, resp.Body)
 }
 
 // ListMigReposCommand lists repos in a mig's repo set.
@@ -120,7 +109,7 @@ type ListMigReposCommand struct {
 }
 
 // Run executes GET /v1/migs/{mod_id}/repos to list repos.
-func (c ListMigReposCommand) Run(ctx context.Context) ([]MigRepoSummary, error) {
+func (c ListMigReposCommand) Run(ctx context.Context) ([]domainapi.MigRepoSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig repo list: %w", err)
 	}
@@ -145,10 +134,7 @@ func (c ListMigReposCommand) Run(ctx context.Context) ([]MigRepoSummary, error) 
 		return nil, httpx.WrapError("mig repo list", resp.Status, resp.Body)
 	}
 
-	// Response structure: {"repos": [...]}
-	var result struct {
-		Repos []MigRepoSummary `json:"repos"`
-	}
+	var result domainapi.MigRepoListResponse
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mig repo list: decode response: %w", err)
 	}

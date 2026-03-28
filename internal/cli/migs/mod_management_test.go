@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -131,14 +132,14 @@ func TestListMigsCommand_Run(t *testing.T) {
 		name       string
 		limit      int32
 		offset     int32
-		serverResp []MigSummary
+		serverResp []domainapi.MigSummary
 		wantCount  int
 	}{
 		{
 			name:   "list migs with results",
 			limit:  50,
 			offset: 0,
-			serverResp: []MigSummary{
+			serverResp: []domainapi.MigSummary{
 				{ID: types.MigID("mod001"), Name: "mig-one", Archived: false, CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 				{ID: types.MigID("mod002"), Name: "mig-two", Archived: true, CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
@@ -148,7 +149,7 @@ func TestListMigsCommand_Run(t *testing.T) {
 			name:       "empty list",
 			limit:      50,
 			offset:     0,
-			serverResp: []MigSummary{},
+			serverResp: []domainapi.MigSummary{},
 			wantCount:  0,
 		},
 	}
@@ -165,9 +166,7 @@ func TestListMigsCommand_Run(t *testing.T) {
 					t.Errorf("expected path /v1/migs, got %s", r.URL.Path)
 				}
 
-				resp := struct {
-					Mods []MigSummary `json:"migs"`
-				}{Mods: tc.serverResp}
+				resp := domainapi.MigListResponse{Migs: tc.serverResp}
 
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(resp)
@@ -414,9 +413,7 @@ func TestResolveModByNameNoHeuristic(t *testing.T) {
 		}
 
 		// Return empty list (no match).
-		resp := struct {
-			Mods []MigSummary `json:"migs"`
-		}{Mods: []MigSummary{}}
+		resp := domainapi.MigListResponse{}
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

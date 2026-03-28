@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -66,12 +67,12 @@ func TestAddModRepoCommand_Run(t *testing.T) {
 					t.Errorf("expected POST, got %s", r.Method)
 				}
 
-				resp := MigRepoSummary{
+				resp := domainapi.MigRepoSummary{
 					ID:        domaintypes.MigRepoID("repo-001"),
 					MigID:     domaintypes.MigID(tc.modID),
 					RepoURL:   tc.repoURL,
-					BaseRef:   domaintypes.GitRef(tc.baseRef),
-					TargetRef: domaintypes.GitRef(tc.targetRef),
+					BaseRef:   tc.baseRef,
+					TargetRef: tc.targetRef,
 					CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 				}
 
@@ -123,12 +124,10 @@ func TestListModReposCommand_Run(t *testing.T) {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
 
-		resp := struct {
-			Repos []MigRepoSummary `json:"repos"`
-		}{
-			Repos: []MigRepoSummary{
-				{ID: domaintypes.MigRepoID("repo-001"), MigID: modID, RepoURL: "https://github.com/a/b.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("feat"), CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
-				{ID: domaintypes.MigRepoID("repo-002"), MigID: modID, RepoURL: "https://github.com/c/d.git", BaseRef: domaintypes.GitRef("main"), TargetRef: domaintypes.GitRef("fix"), CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+		resp := domainapi.MigRepoListResponse{
+			Repos: []domainapi.MigRepoSummary{
+				{ID: domaintypes.MigRepoID("repo-001"), MigID: modID, RepoURL: "https://github.com/a/b.git", BaseRef: "main", TargetRef: "feat", CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+				{ID: domaintypes.MigRepoID("repo-002"), MigID: modID, RepoURL: "https://github.com/c/d.git", BaseRef: "main", TargetRef: "fix", CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 			},
 		}
 

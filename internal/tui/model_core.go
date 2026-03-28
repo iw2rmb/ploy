@@ -9,7 +9,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
 
@@ -72,10 +72,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) handleMigsLoaded(msg migsLoadedMsg) model {
-	sorted := make([]clitui.MigItem, len(msg.migs))
+	sorted := make([]domainapi.MigSummary, len(msg.migs))
 	copy(sorted, msg.migs)
 	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].CreatedAt > sorted[j].CreatedAt
+		return sorted[i].CreatedAt.After(sorted[j].CreatedAt)
 	})
 	items := make([]list.Item, len(sorted))
 	for i, mig := range sorted {

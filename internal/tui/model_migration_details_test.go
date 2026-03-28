@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -11,7 +11,7 @@ func makeS3Model(t *testing.T) model {
 	t.Helper()
 	m := InitialModel(nil, nil)
 	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
 		{ID: domaintypes.MigID("mig-abc"), Name: "my-mig"},
 	}})
 	nm := next.(model)
