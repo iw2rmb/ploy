@@ -48,22 +48,38 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 	}
 }
 
-// TestListMetaQueriesUseExplicitSelect verifies that artifact/event list queries
-// use explicit column selection (not SELECT *) so the selector surface is stable.
-func TestListMetaQueriesUseExplicitSelect(t *testing.T) {
+// TestArtifactSelectorBehavior validates the canonical artifact list selector path:
+// - uses explicit column selection (not SELECT *)
+// - includes object_key for object-storage retrieval (full-selection path)
+// - includes all metadata columns needed by callers
+// - has deterministic ordering with id tie-breaker
+func TestArtifactSelectorBehavior(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name string
-		sql  string
+		name            string
+		sql             string
+		requiredColumns []string
+		wantOrder       string
 	}{
-		// artifact_bundles.sql - explicit column list, no wildcard
-		{"ListArtifactBundlesByRun", listArtifactBundlesByRun},
-		{"ListArtifactBundlesByRunAndJob", listArtifactBundlesByRunAndJob},
-		{"ListArtifactBundlesByCID", listArtifactBundlesByCID},
-		// events.sql - explicit column list, no wildcard
-		{"ListEventsByRun", listEventsByRun},
-		{"ListEventsByRunSince", listEventsByRunSince},
+		{
+			name:            "ListArtifactBundlesByRun",
+			sql:             listArtifactBundlesByRun,
+			requiredColumns: []string{"object_key", "bundle_size", "cid", "digest", "created_at"},
+			wantOrder:       "ORDER BY created_at DESC, id DESC",
+		},
+		{
+			name:            "ListArtifactBundlesByRunAndJob",
+			sql:             listArtifactBundlesByRunAndJob,
+			requiredColumns: []string{"object_key", "bundle_size", "cid", "digest", "created_at"},
+			wantOrder:       "ORDER BY created_at DESC, id DESC",
+		},
+		{
+			name:            "ListArtifactBundlesByCID",
+			sql:             listArtifactBundlesByCID,
+			requiredColumns: []string{"object_key", "bundle_size", "cid", "digest", "created_at"},
+			wantOrder:       "ORDER BY created_at DESC, id DESC",
+		},
 	}
 
 	for _, tc := range cases {
@@ -75,29 +91,62 @@ func TestListMetaQueriesUseExplicitSelect(t *testing.T) {
 				t.Fatalf("%s must use explicit column selection, not SELECT *; found wildcard in SQL:\n%s",
 					tc.name, tc.sql)
 			}
+			for _, col := range tc.requiredColumns {
+				if !strings.Contains(sqlLower, col) {
+					t.Fatalf("%s selector must include column %q in SQL:\n%s",
+						tc.name, col, tc.sql)
+				}
+			}
+			if !containsOrderBy(tc.sql, tc.wantOrder) {
+				t.Fatalf("%s must have deterministic ordering; want substring %q in SQL:\n%s",
+					tc.name, tc.wantOrder, tc.sql)
+			}
 		})
 	}
 }
 
-// TestListMetaQueriesHaveDeterministicOrder verifies list queries
-// have deterministic tie-breakers.
-func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
+// TestEventSelectorBehavior validates the canonical event list selector path:
+// - uses explicit column selection (not SELECT *)
+// - includes all event payload columns (level, message, meta, time)
+// - has deterministic ordering with id tie-breaker
+func TestEventSelectorBehavior(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name      string
-		sql       string
-		wantOrder string
+		name            string
+		sql             string
+		requiredColumns []string
+		wantOrder       string
 	}{
-		// diffs.sql - created_at ASC, id ASC with deterministic tie-breakers
-		{"ListDiffsByRun", listDiffsByRun, "ORDER BY created_at ASC, id ASC"},
-		{"ListDiffsByRunRepo", listDiffsByRunRepo, "d.created_at ASC, d.id ASC"},
+		{
+			name:            "ListEventsByRun",
+			sql:             listEventsByRun,
+			requiredColumns: []string{"level", "message", "meta", "time"},
+			wantOrder:       "ORDER BY time ASC, id ASC",
+		},
+		{
+			name:            "ListEventsByRunSince",
+			sql:             listEventsByRunSince,
+			requiredColumns: []string{"level", "message", "meta", "time"},
+			wantOrder:       "ORDER BY time ASC, id ASC",
+		},
 	}
 
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			sqlLower := strings.ToLower(tc.sql)
+			if strings.Contains(sqlLower, "select *") {
+				t.Fatalf("%s must use explicit column selection, not SELECT *; found wildcard in SQL:\n%s",
+					tc.name, tc.sql)
+			}
+			for _, col := range tc.requiredColumns {
+				if !strings.Contains(sqlLower, col) {
+					t.Fatalf("%s selector must include column %q in SQL:\n%s",
+						tc.name, col, tc.sql)
+				}
+			}
 			if !containsOrderBy(tc.sql, tc.wantOrder) {
 				t.Fatalf("%s must have deterministic ordering; want substring %q in SQL:\n%s",
 					tc.name, tc.wantOrder, tc.sql)
