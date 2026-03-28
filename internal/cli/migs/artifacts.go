@@ -47,7 +47,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	}
 	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
 	var summary modsapi.RunSummary
-	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 	if c.Output == nil {

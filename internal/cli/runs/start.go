@@ -52,7 +52,7 @@ func (c StartCommand) Run(ctx context.Context) (StartResult, error) {
 	}
 
 	var result StartResult
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return StartResult{}, fmt.Errorf("run start: decode response: %w", err)
 	}
 

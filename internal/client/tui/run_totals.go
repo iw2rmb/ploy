@@ -51,7 +51,7 @@ func (c GetRunTotalsCommand) Run(ctx context.Context) (RunTotals, error) {
 	}
 
 	var summary domaintypes.RunSummary
-	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return RunTotals{}, fmt.Errorf("get run totals: decode response: %w", err)
 	}
 

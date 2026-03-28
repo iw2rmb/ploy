@@ -174,7 +174,7 @@ func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL
 	var result struct {
 		Repos []runRepoReportSource `json:"repos"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run report: decode run repos: %w", err)
 	}
 	if result.Repos == nil {
@@ -207,7 +207,7 @@ func listRunStageArtifacts(
 	}
 
 	var summary modsapi.RunSummary
-	if err := httpx.DecodeJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run report: decode run stage artifacts: %w", err)
 	}
 
@@ -252,7 +252,7 @@ func listRunRepoDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	var result struct {
 		Diffs []RepoDiffEntry `json:"diffs"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run report: decode diffs: %w", err)
 	}
 	if result.Diffs == nil {

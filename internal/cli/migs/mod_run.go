@@ -112,7 +112,7 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
 		var result CreateMigRunResult
-		if err := httpx.DecodeJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
+		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 			return CreateMigRunResult{}, fmt.Errorf("mig run: decode response: %w", err)
 		}
 		return result, nil

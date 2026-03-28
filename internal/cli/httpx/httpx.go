@@ -23,7 +23,7 @@ const (
 	MaxGunzipOutputBytes int64 = 256 << 20 // 256 MiB
 )
 
-func DecodeJSON(r io.Reader, out any, limit int64) error {
+func DecodeResponseJSON(r io.Reader, out any, limit int64) error {
 	if limit > 0 {
 		r = io.LimitReader(r, limit)
 	}

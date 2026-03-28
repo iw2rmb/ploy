@@ -70,7 +70,7 @@ func (c ListRepoDiffsCommand) Run(ctx context.Context) (ListRepoDiffsResult, err
 	var raw struct {
 		Diffs []RepoDiffEntry `json:"diffs"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &raw, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &raw, httpx.MaxJSONBodyBytes); err != nil {
 		return ListRepoDiffsResult{}, fmt.Errorf("list repo diffs: decode response: %w", err)
 	}
 	if raw.Diffs == nil {
@@ -131,7 +131,7 @@ func (c RepoDiffsCommand) Run(ctx context.Context) error {
 	var listing struct {
 		Diffs []RepoDiffEntry `json:"diffs"`
 	}
-	if err := httpx.DecodeJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
+	if err := httpx.DecodeResponseJSON(resp.Body, &listing, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}
 

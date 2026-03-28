@@ -17,7 +17,7 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `rg -n '\b(httpErr|parseParam|DecodeJSON)\b' internal/server/handlers`.
   - Reasoning: high (10 CFP)
 
-- [ ] 1.2 Disambiguate CLI JSON decode helper from server request decode helper
+- [x] 1.2 Disambiguate CLI JSON decode helper from server request decode helper
   - Type: determined
   - Component: `internal/cli/httpx/httpx.go`, `internal/cli/**/*.go`
   - Implementation:
