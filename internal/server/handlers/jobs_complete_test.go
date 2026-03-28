@@ -30,7 +30,7 @@ func TestCompleteJob_Success(t *testing.T) {
 		t.Fatalf("expected empty 204 response body, got %q", rr.Body.String())
 	}
 	assertCalled(t, "GetJob", st.getJobCalled)
-	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
 }
 
 // TestCompleteJob_WithExitCodeAndStats verifies job completion with exit_code and stats.
@@ -49,11 +49,11 @@ func TestCompleteJob_WithExitCodeAndStats(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if st.updateJobCompletionParams.ExitCode == nil {
+	if st.updateJobCompletion.params.ExitCode == nil {
 		t.Fatal("expected exit_code to be set")
 	}
-	if *st.updateJobCompletionParams.ExitCode != 0 {
-		t.Fatalf("expected exit_code 0, got %d", *st.updateJobCompletionParams.ExitCode)
+	if *st.updateJobCompletion.params.ExitCode != 0 {
+		t.Fatalf("expected exit_code 0, got %d", *st.updateJobCompletion.params.ExitCode)
 	}
 }
 
@@ -72,8 +72,8 @@ func TestCompleteJob_WithRepoSHAOut_Persists(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if st.updateJobCompletionParams.RepoShaOut != shaOut {
-		t.Fatalf("expected repo_sha_out %q, got %q", shaOut, st.updateJobCompletionParams.RepoShaOut)
+	if st.updateJobCompletion.params.RepoShaOut != shaOut {
+		t.Fatalf("expected repo_sha_out %q, got %q", shaOut, st.updateJobCompletion.params.RepoShaOut)
 	}
 }
 
@@ -99,21 +99,21 @@ func TestCompleteJob_WithJobResources_PersistsJobMetrics(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpsertJobMetric", st.upsertJobMetricCalled)
-	if st.upsertJobMetricParams.NodeID != f.NodeID {
-		t.Fatalf("upsert node_id = %q, want %q", st.upsertJobMetricParams.NodeID, f.NodeID)
+	assertCalled(t, "UpsertJobMetric", st.upsertJobMetric.called)
+	if st.upsertJobMetric.params.NodeID != f.NodeID {
+		t.Fatalf("upsert node_id = %q, want %q", st.upsertJobMetric.params.NodeID, f.NodeID)
 	}
-	if st.upsertJobMetricParams.JobID != f.JobID {
-		t.Fatalf("upsert job_id = %q, want %q", st.upsertJobMetricParams.JobID, f.JobID)
+	if st.upsertJobMetric.params.JobID != f.JobID {
+		t.Fatalf("upsert job_id = %q, want %q", st.upsertJobMetric.params.JobID, f.JobID)
 	}
-	if st.upsertJobMetricParams.CpuConsumedNs != 42_000_000 {
-		t.Fatalf("cpu_consumed_ns = %d, want %d", st.upsertJobMetricParams.CpuConsumedNs, int64(42_000_000))
+	if st.upsertJobMetric.params.CpuConsumedNs != 42_000_000 {
+		t.Fatalf("cpu_consumed_ns = %d, want %d", st.upsertJobMetric.params.CpuConsumedNs, int64(42_000_000))
 	}
-	if st.upsertJobMetricParams.DiskConsumedBytes != 512*1024 {
-		t.Fatalf("disk_consumed_bytes = %d, want %d", st.upsertJobMetricParams.DiskConsumedBytes, int64(512*1024))
+	if st.upsertJobMetric.params.DiskConsumedBytes != 512*1024 {
+		t.Fatalf("disk_consumed_bytes = %d, want %d", st.upsertJobMetric.params.DiskConsumedBytes, int64(512*1024))
 	}
-	if st.upsertJobMetricParams.MemConsumedBytes != 128*1024*1024 {
-		t.Fatalf("mem_consumed_bytes = %d, want %d", st.upsertJobMetricParams.MemConsumedBytes, int64(128*1024*1024))
+	if st.upsertJobMetric.params.MemConsumedBytes != 128*1024*1024 {
+		t.Fatalf("mem_consumed_bytes = %d, want %d", st.upsertJobMetric.params.MemConsumedBytes, int64(128*1024*1024))
 	}
 }
 
@@ -140,12 +140,12 @@ func TestCompleteJob_MRJobUpdatesRunStatsMRURL(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateRunStatsMRURL", st.updateRunStatsMRURLCalled)
-	if st.updateRunStatsMRURLParams.ID != f.RunID {
-		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", f.RunID, st.updateRunStatsMRURLParams.ID)
+	assertCalled(t, "UpdateRunStatsMRURL", st.updateRunStatsMRURL.called)
+	if st.updateRunStatsMRURL.params.ID != f.RunID {
+		t.Fatalf("expected UpdateRunStatsMRURL run_id %s, got %s", f.RunID, st.updateRunStatsMRURL.params.ID)
 	}
-	if st.updateRunStatsMRURLParams.MrUrl != mrURL {
-		t.Fatalf("expected UpdateRunStatsMRURL mr_url %q, got %q", mrURL, st.updateRunStatsMRURLParams.MrUrl)
+	if st.updateRunStatsMRURL.params.MrUrl != mrURL {
+		t.Fatalf("expected UpdateRunStatsMRURL mr_url %q, got %q", mrURL, st.updateRunStatsMRURL.params.MrUrl)
 	}
 }
 
@@ -174,12 +174,12 @@ func TestCompleteJob_WithJobMetaInStats(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
-	if st.updateJobCompletionCalled {
+	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMeta.called)
+	if st.updateJobCompletion.called {
 		t.Fatal("did not expect UpdateJobCompletion to be called when meta is provided")
 	}
 
-	assertMetaKind(t, st.updateJobCompletionWithMetaParams.Meta, "gate")
+	assertMetaKind(t, st.updateJobCompletionWithMeta.params.Meta, "gate")
 }
 
 // TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored verifies that an empty
@@ -208,8 +208,8 @@ func TestCompleteJob_EmptyJobMetaObjectWithWhitespaceIsIgnored(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-	assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
+	assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMeta.called)
 }
 
 // ===== Error Propagation Tests =====
@@ -244,7 +244,7 @@ func TestCompleteJob_Exit137SetsLastError(t *testing.T) {
 			}))
 
 			assertStatus(t, rr, http.StatusNoContent)
-			assertCalled(t, "UpdateRunRepoError", st.updateRunRepoErrorCalled)
+			assertCalled(t, "UpdateRunRepoError", st.updateRunRepoError.called)
 		})
 	}
 }

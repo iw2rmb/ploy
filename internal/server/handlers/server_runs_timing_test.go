@@ -20,13 +20,12 @@ func TestGetRunTiming_Success(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
-		getRunTimingResult: store.RunsTiming{
-			ID:      runID,
-			QueueMs: 1500,
-			RunMs:   3000,
-		},
-	}
+	st := &mockStore{}
+	st.getRunTiming.val = store.RunsTiming{
+		ID:      runID,
+		QueueMs: 1500,
+		RunMs:   3000,
+		}
 
 	handler := getRunTimingHandler(st)
 
@@ -35,11 +34,11 @@ func TestGetRunTiming_Success(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify GetRunTiming was called with correct run ID.
-	if !st.getRunTimingCalled {
+	if !st.getRunTiming.called {
 		t.Fatal("expected GetRunTiming to be called")
 	}
-	if st.getRunTimingParams != runID.String() {
-		t.Fatalf("GetRunTiming called with wrong run id: %v", st.getRunTimingParams)
+	if st.getRunTiming.params != runID.String() {
+		t.Fatalf("GetRunTiming called with wrong run id: %v", st.getRunTiming.params)
 	}
 
 	// Parse and verify response body.
@@ -69,7 +68,7 @@ func TestGetRunTiming_Errors(t *testing.T) {
 		{
 			name:       "NotFound",
 			pathID:     domaintypes.NewRunID().String(),
-			store:      &mockStore{getRunTimingErr: pgx.ErrNoRows},
+			store:      func() *mockStore { st := &mockStore{}; st.getRunTiming.err = pgx.ErrNoRows; return st }(),
 			wantStatus: http.StatusNotFound,
 		},
 		{

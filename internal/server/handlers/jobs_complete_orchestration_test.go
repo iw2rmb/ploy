@@ -24,8 +24,8 @@ type transientGetRunStore struct {
 func (s *transientGetRunStore) GetRun(ctx context.Context, id domaintypes.RunID) (store.Run, error) {
 	s.calls++
 	if s.calls <= s.failCount {
-		s.mockStore.getRunCalled = true
-		s.mockStore.getRunParams = id.String()
+		s.mockStore.getRun.called = true
+		s.mockStore.getRun.params = id.String()
 		return store.Run{}, s.err
 	}
 	return s.mockStore.GetRun(ctx, id)
@@ -225,9 +225,9 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify UpdateJobCompletion was called for the mig job.
-	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-	if st.updateJobCompletionParams.ID != jobs[1].ID {
-		t.Fatalf("expected UpdateJobCompletion for mig job, got %v", st.updateJobCompletionParams.ID)
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
+	if st.updateJobCompletion.params.ID != jobs[1].ID {
+		t.Fatalf("expected UpdateJobCompletion for mig job, got %v", st.updateJobCompletion.params.ID)
 	}
 
 	// Verify UpdateJobStatus was called to cancel the post-gate job.
@@ -264,9 +264,9 @@ func TestCompleteJob_CanceledStatus(t *testing.T) {
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Cancelled"}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-	if st.updateJobCompletionParams.Status != domaintypes.JobStatusCancelled {
-		t.Fatalf("expected job status canceled, got %s", st.updateJobCompletionParams.Status)
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
+	if st.updateJobCompletion.params.Status != domaintypes.JobStatusCancelled {
+		t.Fatalf("expected job status canceled, got %s", st.updateJobCompletion.params.Status)
 	}
 }
 

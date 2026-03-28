@@ -11,15 +11,11 @@ import (
 )
 
 func (m *mockStore) ListJobsForTUI(ctx context.Context, arg store.ListJobsForTUIParams) ([]store.ListJobsForTUIRow, error) {
-	m.listJobsForTUICalled = true
-	m.listJobsForTUIParams = arg
-	return m.listJobsForTUIResult, m.listJobsForTUIErr
+	return m.listJobsForTUI.record(arg)
 }
 
 func (m *mockStore) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error) {
-	m.countJobsForTUICalled = true
-	m.countJobsForTUIParam = runID
-	return m.countJobsForTUIResult, m.countJobsForTUIErr
+	return m.countJobsForTUI.record(runID)
 }
 
 func (m *mockStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job, error) {
@@ -84,27 +80,23 @@ func (m *mockStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]sto
 	for i, j := range m.listJobsByRunResult {
 		result[i] = j
 		// If this job was updated via UpdateJobCompletion, reflect the new status.
-		if m.updateJobCompletionCalled && j.ID == m.updateJobCompletionParams.ID {
-			result[i].Status = m.updateJobCompletionParams.Status
+		if m.updateJobCompletion.called && j.ID == m.updateJobCompletion.params.ID {
+			result[i].Status = m.updateJobCompletion.params.Status
 		}
 	}
 	return result, m.listJobsByRunErr
 }
 
 func (m *mockStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJobsByRunRepoAttemptParams) ([]store.Job, error) {
-	m.listJobsByRunRepoAttemptCalled = true
-	m.listJobsByRunRepoAttemptParams = arg
-	return m.listJobsByRunRepoAttemptResult, m.listJobsByRunRepoAttemptErr
+	return m.listJobsByRunRepoAttempt.record(arg)
 }
 
 func (m *mockStore) ListStaleRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) ([]store.ListStaleRunningJobsRow, error) {
-	m.listStaleRunningJobsCalled = true
-	m.listStaleRunningJobsParam = lastHeartbeat
-	return m.listStaleRunningJobsResult, m.listStaleRunningJobsErr
+	return m.listStaleRunningJobs.record(lastHeartbeat)
 }
 
 func (m *mockStore) CountStaleNodesWithRunningJobs(ctx context.Context, lastHeartbeat pgtype.Timestamptz) (int64, error) {
-	return m.countStaleNodesWithRunningJobsResult, m.countStaleNodesWithRunningJobsErr
+	return m.countStaleNodesWithRunningJobs.ret()
 }
 
 func (m *mockStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
@@ -134,8 +126,8 @@ func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.Count
 		for _, j := range m.listJobsByRunResult {
 			// If this job was marked as completed via UpdateJobCompletion, use the completed status.
 			effectiveStatus := j.Status
-			if m.updateJobCompletionCalled && j.ID == m.updateJobCompletionParams.ID {
-				effectiveStatus = m.updateJobCompletionParams.Status
+			if m.updateJobCompletion.called && j.ID == m.updateJobCompletion.params.ID {
+				effectiveStatus = m.updateJobCompletion.params.Status
 			}
 			if effectiveStatus == arg.Status {
 				count++
@@ -146,10 +138,8 @@ func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.Count
 	return m.countJobsByRunAndStatusResult, nil
 }
 
-// CountJobsByRunRepoAttemptGroupByStatus returns job counts by status for a repo attempt.
-// Used by maybeUpdateRunRepoStatus for v1 repo-scoped terminal detection.
 func (m *mockStore) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg store.CountJobsByRunRepoAttemptGroupByStatusParams) ([]store.CountJobsByRunRepoAttemptGroupByStatusRow, error) {
-	return m.countJobsByRunRepoAttemptGroupByStatusResult, m.countJobsByRunRepoAttemptGroupByStatusErr
+	return m.countJobsByRunRepoAttemptGroupByStatus.ret()
 }
 
 func (m *mockStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
@@ -160,27 +150,23 @@ func (m *mockStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobS
 }
 
 func (m *mockStore) UpdateJobCompletion(ctx context.Context, params store.UpdateJobCompletionParams) error {
-	m.updateJobCompletionCalled = true
-	m.updateJobCompletionParams = params
-	return m.updateJobCompletionErr
+	_, err := m.updateJobCompletion.record(params)
+	return err
 }
 
 func (m *mockStore) UpdateJobCompletionWithMeta(ctx context.Context, params store.UpdateJobCompletionWithMetaParams) error {
-	m.updateJobCompletionWithMetaCalled = true
-	m.updateJobCompletionWithMetaParams = params
-	return m.updateJobCompletionWithMetaErr
+	_, err := m.updateJobCompletionWithMeta.record(params)
+	return err
 }
 
 func (m *mockStore) UpdateJobMeta(ctx context.Context, params store.UpdateJobMetaParams) error {
-	m.updateJobMetaCalled = true
-	m.updateJobMetaParams = params
-	return m.updateJobMetaErr
+	_, err := m.updateJobMeta.record(params)
+	return err
 }
 
 func (m *mockStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error {
-	m.deleteSBOMRowsByJobCalled = true
-	m.deleteSBOMRowsByJobParam = jobID
-	return m.deleteSBOMRowsByJobErr
+	_, err := m.deleteSBOMRowsByJob.record(jobID)
+	return err
 }
 
 func (m *mockStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
@@ -190,15 +176,13 @@ func (m *mockStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowPa
 }
 
 func (m *mockStore) UpsertJobMetric(ctx context.Context, params store.UpsertJobMetricParams) error {
-	m.upsertJobMetricCalled = true
-	m.upsertJobMetricParams = params
-	return m.upsertJobMetricErr
+	_, err := m.upsertJobMetric.record(params)
+	return err
 }
 
 func (m *mockStore) UpdateJobImageName(ctx context.Context, params store.UpdateJobImageNameParams) error {
-	m.updateJobImageNameCalled = true
-	m.updateJobImageNameParams = params
-	return m.updateJobImageNameErr
+	_, err := m.updateJobImageName.record(params)
+	return err
 }
 
 func (m *mockStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error) {
@@ -223,15 +207,15 @@ func (m *mockStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobI
 	if !m.promoteJobByIDIfUnblockedResult.ID.IsZero() {
 		return m.promoteJobByIDIfUnblockedResult, nil
 	}
-	for i := range m.listJobsByRunRepoAttemptResult {
-		if m.listJobsByRunRepoAttemptResult[i].ID != id {
+	for i := range m.listJobsByRunRepoAttempt.val {
+		if m.listJobsByRunRepoAttempt.val[i].ID != id {
 			continue
 		}
-		if m.listJobsByRunRepoAttemptResult[i].Status != types.JobStatusCreated {
+		if m.listJobsByRunRepoAttempt.val[i].Status != types.JobStatusCreated {
 			return store.Job{}, pgx.ErrNoRows
 		}
-		m.listJobsByRunRepoAttemptResult[i].Status = types.JobStatusQueued
-		return m.listJobsByRunRepoAttemptResult[i], nil
+		m.listJobsByRunRepoAttempt.val[i].Status = types.JobStatusQueued
+		return m.listJobsByRunRepoAttempt.val[i], nil
 	}
 	for i := range m.listJobsByRunResult {
 		if m.listJobsByRunResult[i].ID != id {
@@ -310,9 +294,8 @@ func (m *mockStore) UpsertExactGateProfile(ctx context.Context, arg store.Upsert
 }
 
 func (m *mockStore) UpsertGateJobProfileLink(ctx context.Context, arg store.UpsertGateJobProfileLinkParams) error {
-	m.upsertGateJobProfileLinkCalled = true
-	m.upsertGateJobProfileLinkParam = arg
-	return m.upsertGateJobProfileLinkErr
+	_, err := m.upsertGateJobProfileLink.record(arg)
+	return err
 }
 
 func (m *mockStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNextIDParams) error {
@@ -320,9 +303,9 @@ func (m *mockStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobN
 	if m.updateJobNextIDErr != nil {
 		return m.updateJobNextIDErr
 	}
-	for i := range m.listJobsByRunRepoAttemptResult {
-		if m.listJobsByRunRepoAttemptResult[i].ID == params.ID {
-			m.listJobsByRunRepoAttemptResult[i].NextID = params.NextID
+	for i := range m.listJobsByRunRepoAttempt.val {
+		if m.listJobsByRunRepoAttempt.val[i].ID == params.ID {
+			m.listJobsByRunRepoAttempt.val[i].NextID = params.NextID
 		}
 	}
 	for i := range m.listJobsByRunResult {

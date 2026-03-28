@@ -37,7 +37,7 @@ func (m *mockStore) CreateMigRepo(ctx context.Context, params store.CreateMigRep
 }
 
 func (m *mockStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
-	return m.getModRepoResult, m.getModRepoErr
+	return m.getModRepo.ret()
 }
 
 func (m *mockStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([]store.MigRepo, error) {
@@ -53,22 +53,15 @@ func (m *mockStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([
 }
 
 func (m *mockStore) ListDistinctRepos(ctx context.Context, filter string) ([]store.ListDistinctReposRow, error) {
-	m.listDistinctReposCalled = true
-	m.listDistinctReposParam = filter
-	return m.listDistinctReposResult, m.listDistinctReposErr
+	return m.listDistinctRepos.record(filter)
 }
 
-// ListRunsForRepo returns runs for a specific repository URL.
 func (m *mockStore) ListRunsForRepo(ctx context.Context, arg store.ListRunsForRepoParams) ([]store.ListRunsForRepoRow, error) {
-	m.listRunsForRepoCalled = true
-	m.listRunsForRepoParams = arg
-	return m.listRunsForRepoResult, m.listRunsForRepoErr
+	return m.listRunsForRepo.record(arg)
 }
 
 func (m *mockStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByURLParams) (store.MigRepo, error) {
-	m.getModRepoByURLCalled = true
-	m.getModRepoByURLParams = arg
-	return m.getModRepoByURLResult, m.getModRepoByURLErr
+	return m.getModRepoByURL.record(arg)
 }
 
 // UpsertMigRepo upserts a mod_repo by mig_id and repo_url.
@@ -110,27 +103,19 @@ func (m *mockStore) GetRepo(ctx context.Context, id types.RepoID) (store.Repo, e
 	return store.Repo{}, pgx.ErrNoRows
 }
 
-// DeleteMigRepo deletes a mod_repo by id.
 func (m *mockStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
-	return m.deleteMigRepoErr
+	return m.deleteMigRepo.err
 }
 
-// HasMigRepoHistory checks if a mod_repo has any historical executions.
 func (m *mockStore) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
-	return m.hasModRepoHistoryResult, m.hasModRepoHistoryErr
+	return m.hasModRepoHistory.ret()
 }
 
-// ListFailedRepoIDsByMig returns repo IDs whose last terminal status is 'Fail'.
 func (m *mockStore) ListFailedRepoIDsByMig(ctx context.Context, modID types.MigID) ([]types.RepoID, error) {
-	m.listFailedRepoIDsByModCalled = true
-	m.listFailedRepoIDsByModParam = modID.String()
-	return m.listFailedRepoIDsByModResult, m.listFailedRepoIDsByModErr
+	return m.listFailedRepoIDsByMod.record(modID.String())
 }
 
 func (m *mockStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
-	m.updateMigRepoRefsCalled = true
-	m.updateMigRepoRefsParams = params
-	return m.updateMigRepoRefsErr
+	_, err := m.updateMigRepoRefs.record(params)
+	return err
 }
-
-// ListRunReposWithURLByRun returns run repos with their repo_url for pull resolution.

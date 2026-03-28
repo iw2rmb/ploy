@@ -249,8 +249,8 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 			repoID: "repoX789",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoResult = store.MigRepo{ID: "repoX789", MigID: "mod123"}
-				m.hasModRepoHistoryResult = false
+				m.getModRepo.val = store.MigRepo{ID: "repoX789", MigID: "mod123"}
+				m.hasModRepoHistory.val = false
 			},
 			wantStatus: http.StatusNoContent,
 		},
@@ -270,7 +270,7 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 			repoID: "repo4040",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoErr = pgx.ErrNoRows
+				m.getModRepo.err = pgx.ErrNoRows
 			},
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "repo not found",
@@ -281,7 +281,7 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 			repoID: "repo0003",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoResult = store.MigRepo{ID: "repo0003", MigID: "moddif"}
+				m.getModRepo.val = store.MigRepo{ID: "repo0003", MigID: "moddif"}
 			},
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "repo does not belong to this mig",
@@ -292,8 +292,8 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 			repoID: "repohist",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoResult = store.MigRepo{ID: "repohist", MigID: "mod123"}
-				m.hasModRepoHistoryResult = true
+				m.getModRepo.val = store.MigRepo{ID: "repohist", MigID: "mod123"}
+				m.hasModRepoHistory.val = true
 			},
 			wantStatus:     http.StatusConflict,
 			wantBodySubstr: "cannot delete repo with historical executions",
@@ -350,7 +350,7 @@ https://github.com/org/repo1,main,feature1
 https://github.com/org/repo2,develop,feature2`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLErr = pgx.ErrNoRows
+				m.getModRepoByURL.err = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 2,
@@ -363,7 +363,7 @@ https://github.com/org/repo2,develop,feature2`,
 https://github.com/org/existing,main,new-feature`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLResult = store.MigRepo{
+				m.getModRepoByURL.val = store.MigRepo{
 					ID:    "repoexst",
 					MigID: "mod123",
 				}
@@ -379,7 +379,7 @@ https://github.com/org/existing,main,new-feature`,
 				"\"https://github.com/org/привет\",\"main\",\"feature\"\"one\"",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLErr = pgx.ErrNoRows
+				m.getModRepoByURL.err = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
@@ -392,13 +392,13 @@ https://github.com/org/existing,main,new-feature`,
 				"https://github.com/org/repo.git/,main,feature",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLErr = pgx.ErrNoRows
+				m.getModRepoByURL.err = pgx.ErrNoRows
 			},
 			verify: func(t *testing.T, m *mockStore) {
 				t.Helper()
-				assertCalled(t, "GetMigRepoByURL", m.getModRepoByURLCalled)
-				if m.getModRepoByURLParams.Url != "https://github.com/org/repo" {
-					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURLParams.Url, "https://github.com/org/repo")
+				assertCalled(t, "GetMigRepoByURL", m.getModRepoByURL.called)
+				if m.getModRepoByURL.params.Url != "https://github.com/org/repo" {
+					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURL.params.Url, "https://github.com/org/repo")
 				}
 				assertCalled(t, "UpsertMigRepo", m.upsertModRepoCalled)
 				if m.upsertModRepoParams.Url != "https://github.com/org/repo" {
@@ -468,7 +468,7 @@ https://github.com/org/good-repo,main,feature1
 ftp://invalid.com/bad-repo,main,feature2`,
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLErr = pgx.ErrNoRows
+				m.getModRepoByURL.err = pgx.ErrNoRows
 			},
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
@@ -507,7 +507,7 @@ https://github.com/org/repo,,feature`,
 				"https://github.com/org/repo,main,feature",
 			setupMock: func(m *mockStore) {
 				m.getModResult = store.Mig{ID: "mod123", Name: "test-mig"}
-				m.getModRepoByURLErr = errors.New("db down")
+				m.getModRepoByURL.err = errors.New("db down")
 			},
 			verify: func(t *testing.T, m *mockStore) {
 				t.Helper()

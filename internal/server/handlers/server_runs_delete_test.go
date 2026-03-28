@@ -20,11 +20,10 @@ func TestDeleteRun_Success(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
-		getRunResult: store.Run{
-			ID: runID,
-		},
-	}
+	st := &mockStore{}
+	st.getRun.val = store.Run{
+		ID: runID,
+		}
 
 	handler := deleteRunHandler(st)
 
@@ -33,11 +32,11 @@ func TestDeleteRun_Success(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify DeleteRun was called with correct run ID.
-	if !st.deleteRunCalled {
+	if !st.deleteRun.called {
 		t.Fatal("expected DeleteRun to be called")
 	}
-	if st.deleteRunParams != runID.String() {
-		t.Fatalf("DeleteRun called with wrong run id: %v", st.deleteRunParams)
+	if st.deleteRun.params != runID.String() {
+		t.Fatalf("DeleteRun called with wrong run id: %v", st.deleteRun.params)
 	}
 }
 
@@ -54,7 +53,7 @@ func TestDeleteRun_Errors(t *testing.T) {
 		{
 			name:       "NotFound",
 			pathID:     domaintypes.NewRunID().String(),
-			store:      &mockStore{getRunErr: pgx.ErrNoRows},
+			store:      func() *mockStore { st := &mockStore{}; st.getRun.err = pgx.ErrNoRows; return st }(),
 			wantStatus: http.StatusNotFound,
 		},
 		{

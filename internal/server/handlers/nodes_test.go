@@ -82,10 +82,9 @@ func TestDrainUndrain(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			nodeIDStr, node := newNodeFixture(tc.initialDrained)
-			st := &mockStore{
-				getNodeResult: node,
-				getNodeErr:    tc.nodeErr,
-			}
+			st := &mockStore{}
+			st.getNode.val = node
+			st.getNode.err = tc.nodeErr
 
 			h := tc.handler(st)
 			rr := doRequest(t, h, http.MethodPost, "/v1/nodes/"+nodeIDStr+"/"+tc.action, nil, "id", nodeIDStr)
@@ -96,12 +95,12 @@ func TestDrainUndrain(t *testing.T) {
 				t.Errorf("expected body to contain %q, got: %s", tc.wantBodyContains, rr.Body.String())
 			}
 			if tc.wantDrainCalled {
-				assertCalled(t, "UpdateNodeDrained", st.updateNodeDrainedCalled)
+				assertCalled(t, "UpdateNodeDrained", st.updateNodeDrained.called)
 			} else {
-				assertNotCalled(t, "UpdateNodeDrained", st.updateNodeDrainedCalled)
+				assertNotCalled(t, "UpdateNodeDrained", st.updateNodeDrained.called)
 			}
-			if tc.wantDrainedFlag != nil && st.updateNodeDrainedParams.Drained != *tc.wantDrainedFlag {
-				t.Errorf("expected drained flag %v, got %v", *tc.wantDrainedFlag, st.updateNodeDrainedParams.Drained)
+			if tc.wantDrainedFlag != nil && st.updateNodeDrained.params.Drained != *tc.wantDrainedFlag {
+				t.Errorf("expected drained flag %v, got %v", *tc.wantDrainedFlag, st.updateNodeDrained.params.Drained)
 			}
 		})
 	}
@@ -240,7 +239,7 @@ func TestListNodesHandler(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := &mockStore{listNodesResult: tc.nodes}
+			st := func() *mockStore { st := &mockStore{}; st.listNodes.val = tc.nodes; return st }()
 			rr := doRequest(t, listNodesHandler(st), http.MethodGet, "/v1/nodes", nil)
 			assertStatus(t, rr, http.StatusOK)
 			resp := decodeBody[[]map[string]any](t, rr)

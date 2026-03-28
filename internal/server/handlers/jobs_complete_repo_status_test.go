@@ -78,7 +78,7 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 
 			assertStatus(t, rr, http.StatusNoContent)
 
-			assertCalled(t, "ListJobsByRunRepoAttempt", st.listJobsByRunRepoAttemptCalled)
+			assertCalled(t, "ListJobsByRunRepoAttempt", st.listJobsByRunRepoAttempt.called)
 			assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatusCalled)
 			if len(st.updateRunRepoStatusParams) == 0 {
 				t.Fatal("expected at least one UpdateRunRepoStatus call")
@@ -89,9 +89,9 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 			}
 
 			if tt.wantRunFinished {
-				assertCalled(t, "UpdateRunStatus", st.updateRunStatusCalled)
-				if st.updateRunStatusParams.Status != domaintypes.RunStatusFinished {
-					t.Errorf("expected run status Finished, got %s", st.updateRunStatusParams.Status)
+				assertCalled(t, "UpdateRunStatus", st.updateRunStatus.called)
+				if st.updateRunStatus.params.Status != domaintypes.RunStatusFinished {
+					t.Errorf("expected run status Finished, got %s", st.updateRunStatus.params.Status)
 				}
 			}
 		})
@@ -169,7 +169,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	}
 
 	// Verify run status was NOT updated to Finished.
-	if st.updateRunStatusCalled {
+	if st.updateRunStatus.called {
 		t.Error("did not expect UpdateRunStatus to be called while repo not terminal")
 	}
 
@@ -295,7 +295,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify ListJobsByRunRepoAttempt was NOT called for MR jobs.
-	if st.listJobsByRunRepoAttemptCalled {
+	if st.listJobsByRunRepoAttempt.called {
 		t.Error("did not expect ListJobsByRunRepoAttempt to be called for MR job")
 	}
 
@@ -305,7 +305,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	}
 
 	// Verify run status was NOT updated (already Finished, MR doesn't change it).
-	if st.updateRunStatusCalled {
+	if st.updateRunStatus.called {
 		t.Error("did not expect UpdateRunStatus to be called for MR job")
 	}
 }
@@ -316,7 +316,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	t.Parallel()
 
 	f := newRepoScopedFixture("mig")
-	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatusResult).
+	// repoIDB is another repo in the run, still Running (not explicitly used but modeled in countRunReposByStatus.val).
 	_ = domaintypes.NewRepoID() // repoIDB - unused but conceptually part of the multi-repo scenario
 
 	// Job for repo A completing (repo B still has work).
@@ -360,7 +360,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	}
 
 	// Verify run status was NOT updated to Finished (repo B still in progress).
-	if st.updateRunStatusCalled {
+	if st.updateRunStatus.called {
 		t.Error("did not expect UpdateRunStatus to be called when not all repos are terminal")
 	}
 }
@@ -385,7 +385,7 @@ func TestCompleteJob_RejectsV0Status(t *testing.T) {
 			if !strings.Contains(rr.Body.String(), "status") {
 				t.Errorf("expected error message to mention status, got: %s", rr.Body.String())
 			}
-			if st.updateJobCompletionCalled {
+			if st.updateJobCompletion.called {
 				t.Fatal("did not expect UpdateJobCompletion to be called for v0 status")
 			}
 		})

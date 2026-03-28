@@ -27,7 +27,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	repoIDTyped := domaintypes.RepoID(repoID)
 	objKey := "diffs/run/" + runID.String() + "/diff/" + diffID.String() + ".patch.gz"
 
-	st.getDiffResult = store.Diff{
+	st.getDiff.val = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,
@@ -52,7 +52,7 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	if !bytes.Equal(rr.Body.Bytes(), patch) {
 		t.Fatalf("patch len=%d, want %d", rr.Body.Len(), len(patch))
 	}
-	if !st.getDiffCalled {
+	if !st.getDiff.called {
 		t.Fatal("expected GetDiff to be called")
 	}
 	if !st.getJobCalled {
@@ -93,7 +93,7 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	_ = repoAID   // repo A owns the diff
 
 	// Query for repo B: expect empty list (repo A's diff filtered out)
-	st.listDiffsMetaByRunRepoResult = []store.Diff{} // Empty: repo A's diff excluded
+	st.listDiffsMetaByRunRepo.val = []store.Diff{} // Empty: repo A's diff excluded
 
 	bs := bsmock.New()
 	rr := httptest.NewRecorder()
@@ -105,14 +105,14 @@ func TestRunRepoDiffs_ReturnsRepoFilteredItems(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify the query was called with correct parameters
-	if !st.listDiffsMetaByRunRepoCalled {
+	if !st.listDiffsMetaByRunRepo.called {
 		t.Fatal("expected ListDiffsMetaByRunRepo to be called")
 	}
-	if st.listDiffsMetaByRunRepoParams.RunID != runID {
-		t.Errorf("run_id=%q, want %q", st.listDiffsMetaByRunRepoParams.RunID, runID)
+	if st.listDiffsMetaByRunRepo.params.RunID != runID {
+		t.Errorf("run_id=%q, want %q", st.listDiffsMetaByRunRepo.params.RunID, runID)
 	}
-	if st.listDiffsMetaByRunRepoParams.RepoID != repoBIDTyped {
-		t.Errorf("repo_id=%q, want %q", st.listDiffsMetaByRunRepoParams.RepoID, repoBIDTyped)
+	if st.listDiffsMetaByRunRepo.params.RepoID != repoBIDTyped {
+		t.Errorf("repo_id=%q, want %q", st.listDiffsMetaByRunRepo.params.RepoID, repoBIDTyped)
 	}
 
 	var resp diffListResponse
@@ -137,7 +137,7 @@ func TestRunRepoDiffs_ReturnsOwnDiffs(t *testing.T) {
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 
 	// Store returns the diff that belongs to this repo
-	st.listDiffsMetaByRunRepoResult = []store.Diff{{
+	st.listDiffsMetaByRunRepo.val = []store.Diff{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     runID,
 		JobID:     &jobID,

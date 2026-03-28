@@ -24,9 +24,9 @@ func TestClaimJob_ClaimErrorWithPanickingIs_Panics(t *testing.T) {
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
 		claimJobErr:   panicInIsError{},
 	}
+	st.getNode.val = store.Node{ID: nodeID}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
@@ -46,9 +46,9 @@ func TestClaimJob_ClaimErrorWithPanickingErrorString_DoesNotPanic(t *testing.T) 
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
 		claimJobErr:   panicInErrorString{},
 	}
+	st.getNode.val = store.Node{ID: nodeID}
 
 	handler := claimJobHandler(st, &ConfigHolder{})
 	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil, "id", nodeID.String())

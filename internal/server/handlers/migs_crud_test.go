@@ -66,7 +66,7 @@ func TestMods_Create_WithSpec(t *testing.T) {
 	if !st.createSpecCalled {
 		t.Error("store.CreateSpec was not called")
 	}
-	if !st.updateModSpecCalled {
+	if !st.updateModSpec.called {
 		t.Error("store.UpdateMigSpec was not called")
 	}
 
@@ -320,11 +320,11 @@ func TestMods_Delete_Success(t *testing.T) {
 	if !st.getModCalled {
 		t.Error("store.GetMig was not called")
 	}
-	if !st.deleteMigCalled {
+	if !st.deleteMig.called {
 		t.Error("store.DeleteMig was not called")
 	}
-	if st.deleteMigParam != "mod123" {
-		t.Errorf("DeleteMig param = %q, want %q", st.deleteMigParam, "mod123")
+	if st.deleteMig.params != "mod123" {
+		t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mod123")
 	}
 }
 
@@ -340,7 +340,7 @@ func TestMods_Delete_NotFound(t *testing.T) {
 	assertStatus(t, rr, http.StatusNotFound)
 
 	// DeleteMig should not be called.
-	if st.deleteMigCalled {
+	if st.deleteMig.called {
 		t.Error("store.DeleteMig should not be called for missing mig")
 	}
 }
@@ -362,7 +362,7 @@ func TestMods_Delete_RefusesWithRuns(t *testing.T) {
 	assertStatus(t, rr, http.StatusConflict)
 
 	// DeleteMig should not be called.
-	if st.deleteMigCalled {
+	if st.deleteMig.called {
 		t.Error("store.DeleteMig should not be called when runs exist")
 	}
 }
@@ -382,8 +382,8 @@ func TestMods_Delete_ByName(t *testing.T) {
 	if !st.getModByNameCalled {
 		t.Error("store.GetMigByName was not called")
 	}
-	if st.deleteMigParam != "mod123" {
-		t.Errorf("DeleteMig param = %q, want %q", st.deleteMigParam, "mod123")
+	if st.deleteMig.params != "mod123" {
+		t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mod123")
 	}
 }
 
@@ -391,8 +391,8 @@ func TestMods_Delete_ByName(t *testing.T) {
 func TestMods_Delete_StoreError(t *testing.T) {
 	st := &mockStore{
 		listRunsResult: []store.Run{}, // No runs.
-		deleteMigErr:   errors.New("database connection failed"),
 	}
+	st.deleteMig.err = errors.New("database connection failed")
 	handler := deleteMigHandler(st)
 
 	rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/mod123", nil, "mig_ref", "mod123")

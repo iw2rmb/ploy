@@ -158,11 +158,11 @@ func TestMaybeCreateHealingJobs_CancelsRemaining(t *testing.T) {
 			errorKind: "mixed",
 			repoShaIn: healingTestRepoSHAIn,
 			specSetup: func(st *mockStore) {
-				st.getSpecErr = errors.New("db unavailable")
+				st.getSpec.err = errors.New("db unavailable")
 			},
 			extraAssert: func(t *testing.T, st *mockStore) {
 				t.Helper()
-				assertNotCalled(t, "GetSpec", st.getSpecCalled)
+				assertNotCalled(t, "GetSpec", st.getSpec.called)
 			},
 		},
 	}
@@ -210,7 +210,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	// Set up blob store with candidate artifact from the prior heal job.
 	heal1ID := hc.Jobs[1].ID // heal-1-0
 	objKey := "artifacts/run/" + hc.RunID.String() + "/bundle/heal-1.tar.gz"
-	hc.Store.listArtifactBundlesMetaByRunAndJobResult = []store.ArtifactBundle{
+	hc.Store.listArtifactBundlesMetaByRunAndJob.val = []store.ArtifactBundle{
 		{RunID: hc.RunID, JobID: &heal1ID, ObjectKey: ptr(objKey)},
 	}
 
@@ -302,23 +302,22 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	ctx := context.Background()
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
-		countRunReposByStatusResult: []store.CountRunReposByStatusRow{
-			{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
-			{Status: domaintypes.RunRepoStatusFail, Count: 1},
-		},
-	}
+	st := &mockStore{}
+	st.countRunReposByStatus.val = []store.CountRunReposByStatusRow{
+		{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
+		{Status: domaintypes.RunRepoStatusFail, Count: 1},
+		}
 
 	run := store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	if _, err := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, nil, run); err != nil {
 		t.Fatalf("maybeCompleteRunIfAllReposTerminal returned error: %v", err)
 	}
 
-	if !st.updateRunStatusCalled {
+	if !st.updateRunStatus.called {
 		t.Fatalf("expected UpdateRunStatus to be called")
 	}
-	if st.updateRunStatusParams.ID != runID || st.updateRunStatusParams.Status != domaintypes.RunStatusFinished {
-		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatusParams)
+	if st.updateRunStatus.params.ID != runID || st.updateRunStatus.params.Status != domaintypes.RunStatusFinished {
+		t.Fatalf("unexpected UpdateRunStatus params: %+v", st.updateRunStatus.params)
 	}
 }
 
@@ -328,15 +327,14 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	objKey := "artifacts/run/" + runID.String() + "/bundle/test.tar.gz"
 
-	st := &mockStore{
-		listArtifactBundlesMetaByRunAndJobResult: []store.ArtifactBundle{
-			{
-				RunID:     runID,
-				JobID:     &jobID,
-				ObjectKey: ptr(objKey),
-			},
+	st := &mockStore{}
+	st.listArtifactBundlesMetaByRunAndJob.val = []store.ArtifactBundle{
+		{
+			RunID:     runID,
+			JobID:     &jobID,
+			ObjectKey: ptr(objKey),
 		},
-	}
+		}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
 		"out/gate-profile-candidate.json": []byte(`{"schema_version":1}`),

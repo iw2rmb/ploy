@@ -8,16 +8,15 @@ import (
 )
 
 func (m *mockStore) CreateSpecBundle(ctx context.Context, params store.CreateSpecBundleParams) (store.SpecBundle, error) {
-	m.createSpecBundleParams = params
-	return m.createSpecBundleResult, m.createSpecBundleErr
+	return m.createSpecBundle.record(params)
 }
 
 func (m *mockStore) GetSpecBundle(ctx context.Context, id types.SpecBundleID) (store.SpecBundle, error) {
-	return m.getSpecBundleResult, m.getSpecBundleErr
+	return m.getSpecBundle.ret()
 }
 
 func (m *mockStore) GetSpecBundleByCID(ctx context.Context, cid string) (store.SpecBundle, error) {
-	return m.getSpecBundleByCIDResult, m.getSpecBundleByCIDErr
+	return m.getSpecBundleByCID.ret()
 }
 
 func (m *mockStore) UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error {
@@ -37,5 +36,5 @@ func (m *mockStore) UpdateSpecBundleLastRefAt(ctx context.Context, id types.Spec
 }
 
 func (m *mockStore) DeleteSpecBundle(ctx context.Context, id types.SpecBundleID) error {
-	return m.deleteSpecBundleErr
+	return m.deleteSpecBundle.err
 }

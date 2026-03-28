@@ -27,7 +27,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getRunCalled {
+		if st.getRun.called {
 			t.Fatalf("expected no store calls, but GetRun was called")
 		}
 	})
@@ -45,7 +45,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getRunCalled {
+		if st.getRun.called {
 			t.Fatalf("expected no store calls, but GetRun was called")
 		}
 	})
@@ -65,8 +65,8 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getRunCalled || st.getJobCalled || st.createDiffCalled {
-			t.Fatalf("expected no store calls, but got GetRun=%v GetJob=%v CreateDiff=%v", st.getRunCalled, st.getJobCalled, st.createDiffCalled)
+		if st.getRun.called || st.getJobCalled || st.createDiff.called {
+			t.Fatalf("expected no store calls, but got GetRun=%v GetJob=%v CreateDiff=%v", st.getRun.called, st.getJobCalled, st.createDiff.called)
 		}
 	})
 
@@ -101,7 +101,7 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.listRunsForRepoCalled {
+		if st.listRunsForRepo.called {
 			t.Fatalf("expected no store calls, but ListRunsForRepo was called")
 		}
 	})
@@ -119,8 +119,8 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getNodeCalled || st.updateNodeHeartbeatCalled {
-			t.Fatalf("expected no store calls, but got GetNode=%v UpdateNodeHeartbeat=%v", st.getNodeCalled, st.updateNodeHeartbeatCalled)
+		if st.getNode.called || st.updateNodeHeartbeat.called {
+			t.Fatalf("expected no store calls, but got GetNode=%v UpdateNodeHeartbeat=%v", st.getNode.called, st.updateNodeHeartbeat.called)
 		}
 	})
 }

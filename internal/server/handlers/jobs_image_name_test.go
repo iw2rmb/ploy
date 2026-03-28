@@ -46,14 +46,14 @@ func TestSaveJobImageName_Success(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobImageNameCalled {
+	if !st.updateJobImageName.called {
 		t.Fatalf("expected UpdateJobImageName to be called")
 	}
-	if st.updateJobImageNameParams.ID != jobID {
-		t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageNameParams.ID, jobID)
+	if st.updateJobImageName.params.ID != jobID {
+		t.Fatalf("UpdateJobImageName ID = %s, want %s", st.updateJobImageName.params.ID, jobID)
 	}
-	if st.updateJobImageNameParams.JobImage != "docker.io/example/migs:latest" {
-		t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageNameParams.JobImage, "docker.io/example/migs:latest")
+	if st.updateJobImageName.params.JobImage != "docker.io/example/migs:latest" {
+		t.Fatalf("UpdateJobImageName JobImage = %q, want %q", st.updateJobImageName.params.JobImage, "docker.io/example/migs:latest")
 	}
 }
 
@@ -78,7 +78,7 @@ func TestSaveJobImageName_EmptyImage(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	if st.updateJobImageNameCalled {
+	if st.updateJobImageName.called {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
 }
@@ -115,7 +115,7 @@ func TestSaveJobImageName_ForbiddenWrongNode(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusForbidden)
-	if st.updateJobImageNameCalled {
+	if st.updateJobImageName.called {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
 	_ = nodeID // avoid unused in case of future refactors
@@ -150,7 +150,7 @@ func TestSaveJobImageName_ConflictJobNotRunning(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusConflict)
-	if st.updateJobImageNameCalled {
+	if st.updateJobImageName.called {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
 }
@@ -184,7 +184,7 @@ func TestSaveJobImageName_SuccessGateJob(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobImageNameCalled {
+	if !st.updateJobImageName.called {
 		t.Fatalf("expected UpdateJobImageName to be called")
 	}
 }
@@ -218,7 +218,7 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusConflict)
-	if st.updateJobImageNameCalled {
+	if st.updateJobImageName.called {
 		t.Fatalf("expected UpdateJobImageName NOT to be called")
 	}
 }

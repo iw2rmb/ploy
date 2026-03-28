@@ -17,9 +17,8 @@ import (
 func TestListReposHandler_Success_Empty(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		listDistinctReposResult: []store.ListDistinctReposRow{},
-	}
+	st := &mockStore{}
+	st.listDistinctRepos.val = []store.ListDistinctReposRow{}
 	handler := listReposHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/repos", nil)
@@ -38,11 +37,11 @@ func TestListReposHandler_Success_Empty(t *testing.T) {
 		t.Fatalf("expected 0 repos, got %d", len(resp.Repos))
 	}
 
-	if !st.listDistinctReposCalled {
+	if !st.listDistinctRepos.called {
 		t.Fatalf("expected ListDistinctRepos to be called")
 	}
-	if st.listDistinctReposParam != "" {
-		t.Fatalf("expected empty filter, got %q", st.listDistinctReposParam)
+	if st.listDistinctRepos.params != "" {
+		t.Fatalf("expected empty filter, got %q", st.listDistinctRepos.params)
 	}
 }
 
@@ -50,22 +49,21 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	st := &mockStore{
-		listDistinctReposResult: []store.ListDistinctReposRow{
-			{
-				RepoID:     "repo0001",
-				RepoUrl:    "https://github.com/org/repo1.git",
-				LastRunAt:  pgtype.Timestamptz{Time: now, Valid: true},
-				LastStatus: "Success",
-			},
-			{
-				RepoID:     "repo0002",
-				RepoUrl:    "https://github.com/org/repo2.git",
-				LastRunAt:  pgtype.Timestamptz{Valid: false},
-				LastStatus: "",
-			},
+	st := &mockStore{}
+	st.listDistinctRepos.val = []store.ListDistinctReposRow{
+		{
+			RepoID:     "repo0001",
+			RepoUrl:    "https://github.com/org/repo1.git",
+			LastRunAt:  pgtype.Timestamptz{Time: now, Valid: true},
+			LastStatus: "Success",
 		},
-	}
+		{
+			RepoID:     "repo0002",
+			RepoUrl:    "https://github.com/org/repo2.git",
+			LastRunAt:  pgtype.Timestamptz{Valid: false},
+			LastStatus: "",
+		},
+		}
 	handler := listReposHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/repos", nil)
@@ -107,9 +105,8 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 func TestListReposHandler_WithFilter(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		listDistinctReposResult: []store.ListDistinctReposRow{},
-	}
+	st := &mockStore{}
+	st.listDistinctRepos.val = []store.ListDistinctReposRow{}
 	handler := listReposHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/repos?contains=org/project", nil)
@@ -117,17 +114,16 @@ func TestListReposHandler_WithFilter(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusOK)
-	if st.listDistinctReposParam != "org/project" {
-		t.Fatalf("expected filter 'org/project', got %q", st.listDistinctReposParam)
+	if st.listDistinctRepos.params != "org/project" {
+		t.Fatalf("expected filter 'org/project', got %q", st.listDistinctRepos.params)
 	}
 }
 
 func TestListReposHandler_StoreError(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		listDistinctReposErr: errors.New("database connection failed"),
-	}
+	st := &mockStore{}
+	st.listDistinctRepos.err = errors.New("database connection failed")
 	handler := listReposHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/repos", nil)
@@ -143,21 +139,20 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	runID := domaintypes.NewRunID()
 	modID := domaintypes.NewMigID()
-	st := &mockStore{
-		listRunsForRepoResult: []store.ListRunsForRepoRow{
-			{
-				RunID:         runID,
-				MigID:         modID,
-				RunStatus:     domaintypes.RunStatusFinished,
-				RepoStatus:    domaintypes.RunRepoStatusSuccess,
-				RepoBaseRef:   "main",
-				RepoTargetRef: "feature-branch",
-				Attempt:       1,
-				StartedAt:     pgtype.Timestamptz{Time: now, Valid: true},
-				FinishedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
-			},
+	st := &mockStore{}
+	st.listRunsForRepo.val = []store.ListRunsForRepoRow{
+		{
+			RunID:         runID,
+			MigID:         modID,
+			RunStatus:     domaintypes.RunStatusFinished,
+			RepoStatus:    domaintypes.RunRepoStatusSuccess,
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature-branch",
+			Attempt:       1,
+			StartedAt:     pgtype.Timestamptz{Time: now, Valid: true},
+			FinishedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
 		},
-	}
+		}
 	handler := listRunsForRepoHandler(st)
 
 	repoID := "repo_123"
@@ -198,26 +193,25 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 		t.Fatalf("unexpected attempt: %d", run.Attempt)
 	}
 
-	if !st.listRunsForRepoCalled {
+	if !st.listRunsForRepo.called {
 		t.Fatalf("expected ListRunsForRepo to be called")
 	}
-	if st.listRunsForRepoParams.RepoID.String() != repoID {
-		t.Fatalf("expected repo_id %q, got %q", repoID, st.listRunsForRepoParams.RepoID.String())
+	if st.listRunsForRepo.params.RepoID.String() != repoID {
+		t.Fatalf("expected repo_id %q, got %q", repoID, st.listRunsForRepo.params.RepoID.String())
 	}
-	if st.listRunsForRepoParams.Limit != 50 {
-		t.Fatalf("expected default limit 50, got %d", st.listRunsForRepoParams.Limit)
+	if st.listRunsForRepo.params.Limit != 50 {
+		t.Fatalf("expected default limit 50, got %d", st.listRunsForRepo.params.Limit)
 	}
-	if st.listRunsForRepoParams.Offset != 0 {
-		t.Fatalf("expected default offset 0, got %d", st.listRunsForRepoParams.Offset)
+	if st.listRunsForRepo.params.Offset != 0 {
+		t.Fatalf("expected default offset 0, got %d", st.listRunsForRepo.params.Offset)
 	}
 }
 
 func TestListRunsForRepoHandler_WithPagination(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		listRunsForRepoResult: []store.ListRunsForRepoRow{},
-	}
+	st := &mockStore{}
+	st.listRunsForRepo.val = []store.ListRunsForRepoRow{}
 	handler := listRunsForRepoHandler(st)
 
 	repoID := "repo_123"
@@ -225,11 +219,11 @@ func TestListRunsForRepoHandler_WithPagination(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusOK)
 
-	if st.listRunsForRepoParams.Limit != 25 {
-		t.Fatalf("expected limit 25, got %d", st.listRunsForRepoParams.Limit)
+	if st.listRunsForRepo.params.Limit != 25 {
+		t.Fatalf("expected limit 25, got %d", st.listRunsForRepo.params.Limit)
 	}
-	if st.listRunsForRepoParams.Offset != 10 {
-		t.Fatalf("expected offset 10, got %d", st.listRunsForRepoParams.Offset)
+	if st.listRunsForRepo.params.Offset != 10 {
+		t.Fatalf("expected offset 10, got %d", st.listRunsForRepo.params.Offset)
 	}
 }
 
@@ -246,7 +240,7 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := &mockStore{listRunsForRepoErr: errors.New("should not be called")}
+			st := func() *mockStore { st := &mockStore{}; st.listRunsForRepo.err = errors.New("should not be called"); return st }()
 			handler := listRunsForRepoHandler(st)
 
 			rr := doRequest(t, handler, http.MethodGet, tc.url, nil, "repo_id", "repo_123")
@@ -259,7 +253,7 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 func TestListRunsForRepoHandler_MissingRepoID(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{listRunsForRepoErr: errors.New("should not be called")}
+	st := func() *mockStore { st := &mockStore{}; st.listRunsForRepo.err = errors.New("should not be called"); return st }()
 	handler := listRunsForRepoHandler(st)
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/repos//runs", nil, "repo_id", "")

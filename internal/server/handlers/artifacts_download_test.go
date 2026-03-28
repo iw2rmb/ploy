@@ -27,18 +27,17 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 		testBundleSize := int64(len("test-bundle-data"))
 		artifactID := uuid.New()
 
-		st := &mockStore{
-			listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{
-				{
-					ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
-					RunID:      domaintypes.NewRunID(),
-					Cid:        &testCID,
-					Digest:     &testDigest,
-					Name:       &testName,
-					BundleSize: testBundleSize,
-				},
+		st := &mockStore{}
+		st.listArtifactBundlesMetaByCID.val = []store.ArtifactBundle{
+			{
+				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+				RunID:      domaintypes.NewRunID(),
+				Cid:        &testCID,
+				Digest:     &testDigest,
+				Name:       &testName,
+				BundleSize: testBundleSize,
 			},
-		}
+			}
 
 		rr := doRequest(t, listArtifactsByCIDHandler(st), http.MethodGet, "/v1/artifacts?cid="+testCID, nil)
 		assertStatus(t, rr, http.StatusOK)
@@ -82,13 +81,13 @@ func TestListArtifactsByCIDHandler(t *testing.T) {
 			{
 				name:   "DBError",
 				query:  "?cid=bafyerr",
-				st:     &mockStore{listArtifactBundlesMetaByCIDErr: errors.New("boom")},
+				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesMetaByCID.err = errors.New("boom"); return st }(),
 				status: http.StatusInternalServerError,
 			},
 			{
 				name:   "NoResults",
 				query:  "?cid=bafy-not-found",
-				st:     &mockStore{listArtifactBundlesMetaByCIDResult: []store.ArtifactBundle{}},
+				st:     func() *mockStore { st := &mockStore{}; st.listArtifactBundlesMetaByCID.val = []store.ArtifactBundle{}; return st }(),
 				status: http.StatusOK,
 			},
 		}
@@ -114,16 +113,15 @@ func TestGetArtifactHandler(t *testing.T) {
 		testName := "metadata-test"
 		testBundleSize := int64(15)
 
-		st := &mockStore{
-			getArtifactBundleResult: store.ArtifactBundle{
-				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
-				RunID:      runID,
-				Cid:        &testCID,
-				Digest:     &testDigest,
-				Name:       &testName,
-				BundleSize: testBundleSize,
-			},
-		}
+		st := &mockStore{}
+		st.getArtifactBundle.val = store.ArtifactBundle{
+			ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+			RunID:      runID,
+			Cid:        &testCID,
+			Digest:     &testDigest,
+			Name:       &testName,
+			BundleSize: testBundleSize,
+			}
 		bs := bsmock.New()
 		rr := doRequest(t, getArtifactHandler(st, bs), http.MethodGet,
 			"/v1/artifacts/"+artifactID.String(), nil,
@@ -159,16 +157,15 @@ func TestGetArtifactHandler(t *testing.T) {
 		testBundle := []byte("download-bundle-data")
 		objKey := "artifacts/run/" + runID.String() + "/bundle/" + artifactID.String() + ".tar.gz"
 
-		st := &mockStore{
-			getArtifactBundleResult: store.ArtifactBundle{
-				ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
-				RunID:      runID,
-				Cid:        &testCID,
-				Digest:     &testDigest,
-				BundleSize: int64(len(testBundle)),
-				ObjectKey:  &objKey,
-			},
-		}
+		st := &mockStore{}
+		st.getArtifactBundle.val = store.ArtifactBundle{
+			ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+			RunID:      runID,
+			Cid:        &testCID,
+			Digest:     &testDigest,
+			BundleSize: int64(len(testBundle)),
+			ObjectKey:  &objKey,
+			}
 		bs := bsmock.New()
 		_, _ = bs.Put(context.TODO(), objKey, "application/gzip", testBundle)
 
@@ -216,23 +213,27 @@ func TestGetArtifactHandler(t *testing.T) {
 			{
 				name:   "NotFound",
 				id:     artifactID.String(),
-				st:     &mockStore{getArtifactBundleErr: pgx.ErrNoRows},
+				st:     func() *mockStore { st := &mockStore{}; st.getArtifactBundle.err = pgx.ErrNoRows; return st }(),
 				status: http.StatusNotFound,
 			},
 			{
 				name:   "DBError",
 				id:     artifactID.String(),
-				st:     &mockStore{getArtifactBundleErr: errors.New("db down")},
+				st:     func() *mockStore { st := &mockStore{}; st.getArtifactBundle.err = errors.New("db down"); return st }(),
 				status: http.StatusInternalServerError,
 			},
 			{
 				name: "MetadataNoCreatedAt",
 				id:   artifactID.String(),
-				st: &mockStore{getArtifactBundleResult: store.ArtifactBundle{
-					ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
-					RunID:      domaintypes.NewRunID(),
-					BundleSize: 1,
-				}},
+				st: func() *mockStore {
+					st := &mockStore{}
+					st.getArtifactBundle.val = store.ArtifactBundle{
+						ID:         pgtype.UUID{Bytes: artifactID, Valid: true},
+						RunID:      domaintypes.NewRunID(),
+						BundleSize: 1,
+					}
+					return st
+				}(),
 				status: http.StatusOK,
 			},
 		}

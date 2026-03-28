@@ -317,10 +317,9 @@ func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingCha
 	}
 
 	specBytes := cfg.specFn(t)
-	st := &mockStore{
-		getSpecResult:                 store.Spec{ID: specID, Spec: specBytes},
-		listJobsByRunRepoAttemptResult: jobs,
-	}
+	st := &mockStore{}
+	st.getSpec.val = store.Spec{ID: specID, Spec: specBytes}
+	st.listJobsByRunRepoAttempt.val = jobs
 	for _, o := range cfg.storeOpts {
 		o(st)
 	}

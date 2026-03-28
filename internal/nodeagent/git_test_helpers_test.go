@@ -1,6 +1,8 @@
 package nodeagent
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/testutil/gitrepo"
@@ -46,6 +48,25 @@ func assertGitRepo(t *testing.T, dir string) {
 func generateGitDiff(t *testing.T, workspace string) []byte {
 	t.Helper()
 	return gitrepo.DiffHEAD(t, workspace)
+}
+
+// initRepoWithFile initializes a git repo, writes a single file, and commits.
+func initRepoWithFile(t *testing.T, dir, file, content string) {
+	t.Helper()
+	initGitRepo(t, dir)
+	writeFile(t, filepath.Join(dir, file), content)
+	gitCommit(t, dir, "initial commit")
+}
+
+// removedTempDir returns a path to a temp directory that has been removed,
+// suitable for functions that expect to create the directory themselves.
+func removedTempDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.Remove(dir); err != nil {
+		t.Fatalf("failed to remove temp dir: %v", err)
+	}
+	return dir
 }
 
 // setupGitRepoWithChange initializes a git repo with an initial commit and an uncommitted change.

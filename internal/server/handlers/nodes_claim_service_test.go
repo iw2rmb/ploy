@@ -18,9 +18,9 @@ func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
 		claimJobErr:   pgx.ErrNoRows,
 	}
+	st.getNode.val = store.Node{ID: nodeID}
 
 	svc := NewClaimService(st, &ConfigHolder{}, nil)
 	_, err := svc.Claim(context.Background(), nodeID)
@@ -41,7 +41,6 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	now := time.Now().UTC()
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
 		claimJobResult: store.Job{
 			ID:          jobID,
 			RunID:       runID,
@@ -54,13 +53,6 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 			JobType:     domaintypes.JobTypeMod,
 			Meta:        []byte(`{}`),
 		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
 		getRunRepoResult: store.RunRepo{
 			RunID:         runID,
 			RepoID:        repoID,
@@ -69,8 +61,16 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 			Status:        domaintypes.RunRepoStatusQueued,
 			Attempt:       1,
 		},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"img"}]}`)},
 	}
+	st.getNode.val = store.Node{ID: nodeID}
+	st.getRun.val = store.Run{
+		ID:        runID,
+		SpecID:    specID,
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"img"}]}`)}
 
 	svc := NewClaimService(st, &ConfigHolder{}, nil)
 	result, err := svc.Claim(context.Background(), nodeID)
