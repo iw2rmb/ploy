@@ -16,9 +16,9 @@ import (
 // drainNodeHandler marks a node as drained.
 func drainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
+		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -26,24 +26,24 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 		node, err := st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "node not found")
+				writeHTTPError(w, http.StatusNotFound, "node not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get node: %v", err)
 			slog.Error("drain node: lookup failed", "node_id", nodeID, "err", err)
 			return
 		}
 
 		// Check if already drained (409 Conflict).
 		if node.Drained {
-			httpErr(w, http.StatusConflict, "node is already drained")
+			writeHTTPError(w, http.StatusConflict, "node is already drained")
 			return
 		}
 
 		// Update drained flag.
 		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: true})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to drain node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to drain node: %v", err)
 			slog.Error("drain node: update failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -56,9 +56,9 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 // undrainNodeHandler marks a node as undrained (active).
 func undrainNodeHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		nodeID, err := parseParam[domaintypes.NodeID](r, "id")
+		nodeID, err := parseRequiredPathID[domaintypes.NodeID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -66,24 +66,24 @@ func undrainNodeHandler(st store.Store) http.HandlerFunc {
 		node, err := st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "node not found")
+				writeHTTPError(w, http.StatusNotFound, "node not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get node: %v", err)
 			slog.Error("undrain node: lookup failed", "node_id", nodeID, "err", err)
 			return
 		}
 
 		// Check if already undrained (409 Conflict).
 		if !node.Drained {
-			httpErr(w, http.StatusConflict, "node is not drained")
+			writeHTTPError(w, http.StatusConflict, "node is not drained")
 			return
 		}
 
 		// Update drained flag.
 		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: false})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to undrain node: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to undrain node: %v", err)
 			slog.Error("undrain node: update failed", "node_id", nodeID, "err", err)
 			return
 		}
@@ -98,7 +98,7 @@ func listNodesHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		nodes, err := st.ListNodes(r.Context())
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list nodes: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list nodes: %v", err)
 			slog.Error("list nodes: query failed", "err", err)
 			return
 		}

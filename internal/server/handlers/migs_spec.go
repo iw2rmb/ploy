@@ -31,19 +31,19 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			Spec      json.RawMessage `json:"spec"`
 			CreatedBy *string         `json:"created_by,omitempty"`
 		}
-		if err := DecodeJSON(w, r, &req, maxModSpecSize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxModSpecSize); err != nil {
 			return
 		}
 
 		// Validate spec is present and non-empty.
 		if len(req.Spec) == 0 {
-			httpErr(w, http.StatusBadRequest, "spec is required")
+			writeHTTPError(w, http.StatusBadRequest, "spec is required")
 			return
 		}
 
 		// Validate spec structure (same validation as in createMigHandler).
 		if _, err := contracts.ParseModsSpecJSON(req.Spec); err != nil {
-			httpErr(w, http.StatusBadRequest, "spec: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "spec: %v", err)
 			return
 		}
 
@@ -56,7 +56,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 
 		// Check if mig is archived — cannot update spec on archived migs.
 		if mig.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot set spec on archived mig")
+			writeHTTPError(w, http.StatusConflict, "cannot set spec on archived mig")
 			return
 		}
 
@@ -69,14 +69,14 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create spec: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
 			slog.Error("set mig spec: create spec failed", "mig_id", modID, "err", err)
 			return
 		}
 
 		// Update migs.spec_id to point at the new spec.
 		if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
 			slog.Error("set mig spec: update mig failed", "mig_id", modID, "spec_id", createdSpec.ID, "err", err)
 			return
 		}
@@ -110,17 +110,17 @@ func getMigLatestSpecHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 		if mig.SpecID == nil || mig.SpecID.IsZero() {
-			httpErr(w, http.StatusNotFound, "mig has no spec")
+			writeHTTPError(w, http.StatusNotFound, "mig has no spec")
 			return
 		}
 
 		spec, err := st.GetSpec(r.Context(), *mig.SpecID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "spec not found")
+				writeHTTPError(w, http.StatusNotFound, "spec not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get spec: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get spec: %v", err)
 			slog.Error("get mig latest spec: get spec failed", "mig_id", mig.ID, "spec_id", mig.SpecID.String(), "err", err)
 			return
 		}

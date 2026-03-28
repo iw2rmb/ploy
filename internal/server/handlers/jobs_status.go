@@ -21,35 +21,35 @@ func getJobStatusHandler(st store.Store) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		jobID, err := parseParam[domaintypes.JobID](r, "job_id")
+		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		nodeIDHeaderStr := strings.TrimSpace(r.Header.Get(nodeUUIDHeader))
 		if nodeIDHeaderStr == "" {
-			httpErr(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
+			writeHTTPError(w, http.StatusBadRequest, "PLOY_NODE_UUID header is required")
 			return
 		}
 		var nodeIDHeader domaintypes.NodeID
 		if err := nodeIDHeader.UnmarshalText([]byte(nodeIDHeaderStr)); err != nil {
-			httpErr(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
+			writeHTTPError(w, http.StatusBadRequest, "invalid PLOY_NODE_UUID header")
 			return
 		}
 
 		job, err := st.GetJob(r.Context(), jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "job not found")
+				writeHTTPError(w, http.StatusNotFound, "job not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get job: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get job: %v", err)
 			return
 		}
 
 		if job.NodeID == nil || *job.NodeID != nodeIDHeader {
-			httpErr(w, http.StatusForbidden, "job not assigned to this node")
+			writeHTTPError(w, http.StatusForbidden, "job not assigned to this node")
 			return
 		}
 

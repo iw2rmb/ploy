@@ -28,9 +28,9 @@ func requiredPathParam(r *http.Request, key string) (string, error) {
 	return val, nil
 }
 
-// httpErr writes a plain-text HTTP error response. It accepts printf-style
+// writeHTTPError writes a plain-text HTTP error response. It accepts printf-style
 // formatting for the message body.
-func httpErr(w http.ResponseWriter, code int, msg string, args ...any) {
+func writeHTTPError(w http.ResponseWriter, code int, msg string, args ...any) {
 	if len(args) > 0 {
 		msg = fmt.Sprintf(msg, args...)
 	}
@@ -40,13 +40,13 @@ func httpErr(w http.ResponseWriter, code int, msg string, args ...any) {
 // DefaultMaxBodySize is the default request body size limit (1 MiB).
 const DefaultMaxBodySize = 1 << 20
 
-// DecodeJSON decodes a JSON request body with strict validation:
+// decodeRequestJSON decodes a JSON request body with strict validation:
 //   - Caps request body at maxBytes using http.MaxBytesReader
 //   - Rejects unknown JSON fields (fails fast on contract drift)
 //
 // Returns nil on success. On error, writes an appropriate HTTP response and returns the error.
 // Callers should return immediately after a non-nil error.
-func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) error {
+func decodeRequestJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) error {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -54,14 +54,14 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) e
 		// Return 413 when MaxBytesReader trips the size cap.
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return err
 		}
-		httpErr(w, http.StatusBadRequest, "invalid request: %v", err)
+		writeHTTPError(w, http.StatusBadRequest, "invalid request: %v", err)
 		return err
 	}
 	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		httpErr(w, http.StatusBadRequest, "invalid request: request body must contain exactly one JSON value")
+		writeHTTPError(w, http.StatusBadRequest, "invalid request: request body must contain exactly one JSON value")
 		if err == nil {
 			return errors.New("request body must contain exactly one JSON value")
 		}
@@ -70,10 +70,10 @@ func DecodeJSON(w http.ResponseWriter, r *http.Request, v any, maxBytes int64) e
 	return nil
 }
 
-// parseParam extracts and validates a typed ID from a path parameter.
+// parseRequiredPathID extracts and validates a typed ID from a path parameter.
 // T must implement encoding.TextUnmarshaler (all domain ID types do).
 // Returns an error if the parameter is missing, empty, or fails validation.
-func parseParam[T any, PT interface {
+func parseRequiredPathID[T any, PT interface {
 	*T
 	encoding.TextUnmarshaler
 }](r *http.Request, key string) (T, error) {
@@ -173,11 +173,11 @@ func getRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, runID 
 	run, err := st.GetRun(r.Context(), runID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			httpErr(w, http.StatusNotFound, "run not found")
+			writeHTTPError(w, http.StatusNotFound, "run not found")
 			return store.Run{}, false
 		}
 		slog.Error(logPrefix+": database error", "run_id", runID.String(), "err", err)
-		httpErr(w, http.StatusInternalServerError, "failed to get run: %v", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to get run: %v", err)
 		return store.Run{}, false
 	}
 	return run, true
@@ -190,7 +190,7 @@ func getActiveRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, 
 		return store.Run{}, false
 	}
 	if lifecycle.IsTerminalRunStatus(run.Status) {
-		httpErr(w, http.StatusConflict, "run is in terminal state")
+		writeHTTPError(w, http.StatusConflict, "run is in terminal state")
 		return store.Run{}, false
 	}
 	return run, true
@@ -201,19 +201,19 @@ func getActiveRunOrFail(w http.ResponseWriter, r *http.Request, st store.Store, 
 // Returns (mig, true) on success, (zero, false) when the response has already
 // been written.
 func getMigByRefOrFail(w http.ResponseWriter, r *http.Request, st store.Store, logPrefix string) (store.Mig, bool) {
-	ref, err := parseParam[domaintypes.MigRef](r, "mig_ref")
+	ref, err := parseRequiredPathID[domaintypes.MigRef](r, "mig_ref")
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, "%s", err)
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
 		return store.Mig{}, false
 	}
 	mig, err := resolveMigByRef(r.Context(), st, ref)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			httpErr(w, http.StatusNotFound, "mig not found")
+			writeHTTPError(w, http.StatusNotFound, "mig not found")
 			return store.Mig{}, false
 		}
 		slog.Error(logPrefix+": get mig failed", "mig_ref", ref, "err", err)
-		httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
 		return store.Mig{}, false
 	}
 	return mig, true
@@ -224,19 +224,19 @@ func getMigByRefOrFail(w http.ResponseWriter, r *http.Request, st store.Store, l
 // Returns (mig, true) on success, (zero, false) when the response has already
 // been written.
 func getMigByIDOrFail(w http.ResponseWriter, r *http.Request, st store.Store, logPrefix string) (store.Mig, bool) {
-	modID, err := parseParam[domaintypes.MigID](r, "mig_id")
+	modID, err := parseRequiredPathID[domaintypes.MigID](r, "mig_id")
 	if err != nil {
-		httpErr(w, http.StatusBadRequest, "%s", err)
+		writeHTTPError(w, http.StatusBadRequest, "%s", err)
 		return store.Mig{}, false
 	}
 	mig, err := st.GetMig(r.Context(), modID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			httpErr(w, http.StatusNotFound, "mig not found")
+			writeHTTPError(w, http.StatusNotFound, "mig not found")
 			return store.Mig{}, false
 		}
 		slog.Error(logPrefix+": get mig failed", "mig_id", modID, "err", err)
-		httpErr(w, http.StatusInternalServerError, "failed to get mig: %v", err)
+		writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
 		return store.Mig{}, false
 	}
 	return mig, true

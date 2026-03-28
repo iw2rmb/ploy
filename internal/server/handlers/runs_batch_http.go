@@ -24,9 +24,9 @@ import (
 // - Cancels waiting/running jobs (Created/Queued/Running → Cancelled)
 func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -48,7 +48,7 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 		}
 
 		if err := st.CancelRunV1(r.Context(), runID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to cancel run: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to cancel run: %v", err)
 			slog.Error("cancel run: transactional cancel failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -69,9 +69,9 @@ func cancelRunHandlerV1(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{id}/repos — Body {repo_url, base_ref, target_ref}.
 func addRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -85,19 +85,19 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			BaseRef   domaintypes.GitRef  `json:"base_ref"`
 			TargetRef domaintypes.GitRef  `json:"target_ref"`
 		}
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 		if err := req.RepoURL.Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
 			return
 		}
 		if err := req.BaseRef.Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
 			return
 		}
 		if err := req.TargetRef.Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
 			return
 		}
 
@@ -112,22 +112,22 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		if err != nil {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				httpErr(w, http.StatusConflict, "repo already exists for mig")
+				writeHTTPError(w, http.StatusConflict, "repo already exists for mig")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
 			slog.Error("add run repo: create mig repo failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
 		repoURL, err := repoURLForID(r.Context(), st, modRepo.RepoID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
 			return
 		}
 		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, modRepo.BaseRef)
 		if seedErr != nil {
-			httpErr(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
+			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
 			slog.Error("add run repo: resolve source commit failed",
 				"run_id", runID.String(),
 				"repo_id", modRepo.RepoID,
@@ -148,7 +148,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", modRepo.RepoID, "err", err)
 			return
 		}
@@ -163,15 +163,15 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 // GET /v1/runs/{id}/repos
 func listRunReposHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		repos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
 			slog.Error("list run repos: fetch failed", "run_id", runID.String(), "err", err)
 			return
 		}
@@ -207,24 +207,24 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{run_id}/repos/{repo_id}/cancel
 func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "run_id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
+		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		rr, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "repo not found")
+				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 			slog.Error("cancel run repo: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
@@ -282,14 +282,14 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 // POST /v1/runs/{id}/repos/{repo_id}/restart
 func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
+		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -301,10 +301,10 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		runRepo, err := st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "repo not found")
+				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 			slog.Error("restart run repo: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
@@ -314,18 +314,18 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 			TargetRef *domaintypes.GitRef `json:"target_ref,omitempty"`
 		}
 		if r.ContentLength > 0 || r.Header.Get("Transfer-Encoding") == "chunked" {
-			if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+			if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 				return
 			}
 			if req.BaseRef != nil {
 				if err := req.BaseRef.Validate(); err != nil {
-					httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
+					writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
 					return
 				}
 			}
 			if req.TargetRef != nil {
 				if err := req.TargetRef.Validate(); err != nil {
-					httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
+					writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
 					return
 				}
 			}
@@ -334,7 +334,7 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		// If the run is terminal, reopen it to Started for the restart attempt.
 		if lifecycle.IsTerminalRunStatus(run.Status) {
 			if err := st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{ID: runID, Status: domaintypes.RunStatusStarted}); err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to reopen run: %v", err)
 				return
 			}
 		}
@@ -360,24 +360,24 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if err := st.IncrementRunRepoAttempt(r.Context(), store.IncrementRunRepoAttemptParams{RunID: runID, RepoID: repoID}); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to restart repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to restart repo: %v", err)
 			slog.Error("restart run repo: increment attempt failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}
 
 		runRepo, err = st.GetRunRepo(r.Context(), store.GetRunRepoParams{RunID: runID, RepoID: repoID})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to reload repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to reload repo: %v", err)
 			return
 		}
 
 		spec, err := st.GetSpec(r.Context(), run.SpecID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to load spec: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to load spec: %v", err)
 			return
 		}
 		if err := createJobsFromSpec(r.Context(), st, runID, runRepo.RepoID, runRepo.RepoBaseRef, runRepo.Attempt, runRepo.RepoSha0, spec.Spec); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create jobs: %v", err)
 			return
 		}
 
@@ -406,9 +406,9 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 	starter := NewBatchRepoStarter(st)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -418,7 +418,7 @@ func startRunHandler(st store.Store) http.HandlerFunc {
 
 		result, err := starter.StartPendingRepos(r.Context(), runID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to start queued repos: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to start queued repos: %v", err)
 			slog.Error("start run: start queued repos failed", "run_id", runID.String(), "err", err)
 			return
 		}

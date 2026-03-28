@@ -36,7 +36,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			BaseRef   domaintypes.GitRef  `json:"base_ref"`
 			TargetRef domaintypes.GitRef  `json:"target_ref"`
 		}
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
@@ -44,15 +44,15 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		normalizedURL := domaintypes.NormalizeRepoURL(string(req.RepoURL))
 		req.RepoURL = domaintypes.RepoURL(normalizedURL)
 		if err := req.RepoURL.Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "repo_url: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "repo_url: %v", err)
 			return
 		}
 		if err := req.BaseRef.Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "base_ref: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "base_ref: %v", err)
 			return
 		}
 		if err := req.TargetRef.Validate(); err != nil {
-			httpErr(w, http.StatusBadRequest, "target_ref: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "target_ref: %v", err)
 			return
 		}
 
@@ -63,7 +63,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := mig.ID
 		if mig.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot add repo to archived mig")
+			writeHTTPError(w, http.StatusConflict, "cannot add repo to archived mig")
 			return
 		}
 
@@ -80,10 +80,10 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			// Check for unique constraint violation (duplicate repo_url in mig).
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				httpErr(w, http.StatusConflict, "repo already exists in this mig")
+				writeHTTPError(w, http.StatusConflict, "repo already exists in this mig")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
 			slog.Error("add mig repo: create failed", "mig_id", modID, "repo_url", normalizedURL, "err", err)
 			return
 		}
@@ -132,7 +132,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 		// List repos for this mig.
 		repos, err := st.ListMigReposByMig(r.Context(), modID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
 			slog.Error("list mig repos: list failed", "mig_id", modID, "err", err)
 			return
 		}
@@ -150,7 +150,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 		for _, repo := range repos {
 			repoURL, err := repoURLForID(r.Context(), st, repo.RepoID)
 			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 				slog.Error("list mig repos: get repo failed", "mig_id", modID, "repo_id", repo.RepoID, "err", err)
 				return
 			}
@@ -191,9 +191,9 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := mig.ID
 
-		repoID, err := parseParam[domaintypes.MigRepoID](r, "repo_id")
+		repoID, err := parseRequiredPathID[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -201,33 +201,33 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		repo, err := st.GetMigRepo(r.Context(), repoID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "repo not found")
+				writeHTTPError(w, http.StatusNotFound, "repo not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 			slog.Error("delete mig repo: get repo failed", "repo_id", repoID, "err", err)
 			return
 		}
 		if repo.MigID != modID {
-			httpErr(w, http.StatusNotFound, "repo does not belong to this mig")
+			writeHTTPError(w, http.StatusNotFound, "repo does not belong to this mig")
 			return
 		}
 
 		// Check if repo has historical executions (run_repos references).
 		hasHistory, err := st.HasMigRepoHistory(r.Context(), repo.RepoID)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to check repo history: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check repo history: %v", err)
 			slog.Error("delete mig repo: check history failed", "repo_id", repoID, "err", err)
 			return
 		}
 		if hasHistory {
-			httpErr(w, http.StatusConflict, "cannot delete repo with historical executions")
+			writeHTTPError(w, http.StatusConflict, "cannot delete repo with historical executions")
 			return
 		}
 
 		// Delete the repo.
 		if err := st.DeleteMigRepo(r.Context(), repoID); err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to delete mig repo: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to delete mig repo: %v", err)
 			slog.Error("delete mig repo: delete failed", "repo_id", repoID, "err", err)
 			return
 		}
@@ -259,14 +259,14 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := mig.ID
 		if mig.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot modify repos on archived mig")
+			writeHTTPError(w, http.StatusConflict, "cannot modify repos on archived mig")
 			return
 		}
 
 		// Validate Content-Type is text/csv.
 		contentType := r.Header.Get("Content-Type")
 		if !strings.HasPrefix(contentType, "text/csv") {
-			httpErr(w, http.StatusBadRequest, "Content-Type must be text/csv")
+			writeHTTPError(w, http.StatusBadRequest, "Content-Type must be text/csv")
 			return
 		}
 
@@ -297,7 +297,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			// Skip header row (first line).
 			if !headerRead {
 				if err != nil {
-					httpErr(w, http.StatusBadRequest, "CSV parse error in header: %v", err)
+					writeHTTPError(w, http.StatusBadRequest, "CSV parse error in header: %v", err)
 					return
 				}
 				headerRead = true
@@ -305,7 +305,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 				if len(record) != 3 || strings.ToLower(strings.TrimSpace(record[0])) != "repo_url" ||
 					strings.ToLower(strings.TrimSpace(record[1])) != "base_ref" ||
 					strings.ToLower(strings.TrimSpace(record[2])) != "target_ref" {
-					httpErr(w, http.StatusBadRequest, "CSV header must be: repo_url,base_ref,target_ref")
+					writeHTTPError(w, http.StatusBadRequest, "CSV header must be: repo_url,base_ref,target_ref")
 					return
 				}
 				continue
@@ -388,7 +388,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if !headerRead {
-			httpErr(w, http.StatusBadRequest, "CSV file is empty or missing header")
+			writeHTTPError(w, http.StatusBadRequest, "CSV file is empty or missing header")
 			return
 		}
 

@@ -53,22 +53,22 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Reject oversized requests before reading.
 		if r.ContentLength > maxSpecBundleSize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "spec bundle exceeds size cap of 50 MiB")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "spec bundle exceeds size cap of 50 MiB")
 			return
 		}
 
 		limited := io.LimitReader(r.Body, maxSpecBundleSize+1)
 		data, err := io.ReadAll(limited)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "failed to read request body: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "failed to read request body: %v", err)
 			return
 		}
 		if len(data) == 0 {
-			httpErr(w, http.StatusBadRequest, "request body is required")
+			writeHTTPError(w, http.StatusBadRequest, "request body is required")
 			return
 		}
 		if int64(len(data)) > maxSpecBundleSize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "spec bundle exceeds size cap of 50 MiB")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "spec bundle exceeds size cap of 50 MiB")
 			return
 		}
 
@@ -88,7 +88,7 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 			return
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
-			httpErr(w, http.StatusInternalServerError, "failed to check for existing bundle: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check for existing bundle: %v", err)
 			slog.Error("spec bundle upload: cid lookup failed", "cid", cid, "err", err)
 			return
 		}
@@ -108,7 +108,7 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 
 		bundle, err := bp.CreateSpecBundle(r.Context(), params, data)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to persist spec bundle: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to persist spec bundle: %v", err)
 			slog.Error("spec bundle upload: persist failed", "bundle_id", bundleID.String(), "err", err)
 			return
 		}
@@ -152,25 +152,25 @@ func writeSpecBundleUploadResponse(w http.ResponseWriter, bundle store.SpecBundl
 // Auth:  RoleWorker, RoleControlPlane
 func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		bundleID, err := parseParam[domaintypes.SpecBundleID](r, "id")
+		bundleID, err := parseRequiredPathID[domaintypes.SpecBundleID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		bundle, err := st.GetSpecBundle(r.Context(), bundleID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "spec bundle not found")
+				writeHTTPError(w, http.StatusNotFound, "spec bundle not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to retrieve spec bundle: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to retrieve spec bundle: %v", err)
 			slog.Error("spec bundle download: metadata lookup failed", "bundle_id", bundleID.String(), "err", err)
 			return
 		}
 
 		if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
-			httpErr(w, http.StatusNotFound, "spec bundle blob not found")
+			writeHTTPError(w, http.StatusNotFound, "spec bundle blob not found")
 			slog.Error("spec bundle download: no object_key", "bundle_id", bundleID.String())
 			return
 		}
@@ -178,12 +178,12 @@ func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerF
 		rc, size, err := bs.Get(r.Context(), *bundle.ObjectKey)
 		if err != nil {
 			if errors.Is(err, blobstore.ErrNotFound) {
-				httpErr(w, http.StatusNotFound, "spec bundle blob not found")
+				writeHTTPError(w, http.StatusNotFound, "spec bundle blob not found")
 				slog.Error("spec bundle download: blob missing from object store",
 					"bundle_id", bundleID.String(), "object_key", *bundle.ObjectKey)
 				return
 			}
-			httpErr(w, http.StatusServiceUnavailable, "failed to retrieve spec bundle blob")
+			writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve spec bundle blob")
 			slog.Error("spec bundle download: blob get failed",
 				"bundle_id", bundleID.String(), "object_key", *bundle.ObjectKey, "err", err)
 			return

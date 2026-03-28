@@ -59,16 +59,16 @@ type diffListResponse struct {
 func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Parse the run ID from the URL path parameter using the shared helper.
-		runID, err := parseParam[domaintypes.RunID](r, "run_id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Parse the repo ID from the URL path parameter using the shared helper.
-		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
+		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -76,7 +76,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 		if r.URL.Query().Get("download") == "true" {
 			diffID, err := parseQuery[domaintypes.DiffID](r, "diff_id")
 			if err != nil {
-				httpErr(w, http.StatusBadRequest, "%s", err)
+				writeHTTPError(w, http.StatusBadRequest, "%s", err)
 				return
 			}
 			diffUUID := uuid.MustParse(diffID.String())
@@ -84,48 +84,48 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					httpErr(w, http.StatusNotFound, "diff not found")
+					writeHTTPError(w, http.StatusNotFound, "diff not found")
 					return
 				}
-				httpErr(w, http.StatusInternalServerError, "failed to get diff: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get diff: %v", err)
 				slog.Error("download run repo diff: get diff failed", "run_id", runID, "repo_id", repoID, "diff_id", diffID.String(), "err", err)
 				return
 			}
 			// Ensure the diff belongs to this run.
 			if d.RunID != runID {
-				httpErr(w, http.StatusNotFound, "diff not found")
+				writeHTTPError(w, http.StatusNotFound, "diff not found")
 				return
 			}
 			// Ensure the diff belongs to this repo via job attribution.
 			if d.JobID == nil || d.JobID.IsZero() {
-				httpErr(w, http.StatusNotFound, "diff not found")
+				writeHTTPError(w, http.StatusNotFound, "diff not found")
 				return
 			}
 			job, err := st.GetJob(r.Context(), *d.JobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					httpErr(w, http.StatusNotFound, "diff not found")
+					writeHTTPError(w, http.StatusNotFound, "diff not found")
 					return
 				}
-				httpErr(w, http.StatusInternalServerError, "failed to get diff job: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get diff job: %v", err)
 				slog.Error("download run repo diff: get job failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "job_id", d.JobID.String(), "err", err)
 				return
 			}
 			if job.RepoID != repoID {
-				httpErr(w, http.StatusNotFound, "diff not found")
+				writeHTTPError(w, http.StatusNotFound, "diff not found")
 				return
 			}
 
 			// Stream from object storage.
 			if d.ObjectKey == nil || *d.ObjectKey == "" {
-				httpErr(w, http.StatusNotFound, "diff blob not found")
+				writeHTTPError(w, http.StatusNotFound, "diff blob not found")
 				slog.Error("download run repo diff: no object_key", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
 				return
 			}
 
 			rc, size, err := bs.Get(r.Context(), *d.ObjectKey)
 			if err != nil {
-				httpErr(w, http.StatusServiceUnavailable, "failed to retrieve diff blob")
+				writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve diff blob")
 				slog.Error("download run repo diff: blob get failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *d.ObjectKey, "err", err)
 				return
 			}
@@ -147,7 +147,7 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			RepoID: repoID,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
 			slog.Error("list run repo diffs: query failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			return
 		}

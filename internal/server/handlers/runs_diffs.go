@@ -24,14 +24,14 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 	const maxBodySize = 16 << 20  // 16 MiB
 	const maxPatchSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		if r.ContentLength > maxBodySize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -41,15 +41,15 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			Summary domaintypes.DiffSummary `json:"summary"`
 		}
 
-		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 		if len(req.Patch) == 0 {
-			httpErr(w, http.StatusBadRequest, "patch is required")
+			writeHTTPError(w, http.StatusBadRequest, "patch is required")
 			return
 		}
 		if len(req.Patch) > maxPatchSize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "diff size exceeds 10 MiB cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "diff size exceeds 10 MiB cap")
 			return
 		}
 
@@ -59,15 +59,15 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 			job, err := st.GetJob(r.Context(), *req.JobID)
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					httpErr(w, http.StatusNotFound, "job not found")
+					writeHTTPError(w, http.StatusNotFound, "job not found")
 					return
 				}
-				httpErr(w, http.StatusInternalServerError, "failed to check job: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to check job: %v", err)
 				slog.Error("run diff: job check failed", "job_id", req.JobID.String(), "err", err)
 				return
 			}
 			if job.RunID != runID {
-				httpErr(w, http.StatusBadRequest, "job does not belong to run")
+				writeHTTPError(w, http.StatusBadRequest, "job does not belong to run")
 				return
 			}
 			jobID = &job.ID
@@ -76,17 +76,17 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		// Ensure the run exists.
 		if _, err := st.GetRun(r.Context(), runID); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				httpErr(w, http.StatusNotFound, "run not found")
+				writeHTTPError(w, http.StatusNotFound, "run not found")
 				return
 			}
-			httpErr(w, http.StatusInternalServerError, "failed to check run: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to check run: %v", err)
 			slog.Error("run diff: run check failed", "run_id", runID.String(), "err", err)
 			return
 		}
 
 		summaryBytes, err := json.Marshal(req.Summary)
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "failed to marshal summary: %v", err)
+			writeHTTPError(w, http.StatusBadRequest, "failed to marshal summary: %v", err)
 			return
 		}
 		params := store.CreateDiffParams{
@@ -98,7 +98,7 @@ func createRunDiffHandler(st store.Store, bp *blobpersist.Service) http.HandlerF
 		// Persist diff metadata to database and upload blob to object storage.
 		diff, err := bp.CreateDiff(r.Context(), params, req.Patch)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create diff: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create diff: %v", err)
 			slog.Error("run diff: create failed", "run_id", runID.String(), "err", err)
 			return
 		}

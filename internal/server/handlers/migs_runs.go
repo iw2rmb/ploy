@@ -35,7 +35,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			} `json:"repo_selector"`
 			CreatedBy *string `json:"created_by,omitempty"`
 		}
-		if err := DecodeJSON(w, r, &req, DefaultMaxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
 			return
 		}
 
@@ -44,13 +44,13 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		case "all", "failed", "explicit":
 			// Valid modes.
 		default:
-			httpErr(w, http.StatusBadRequest, `repo_selector.mode must be "all", "failed", or "explicit"`)
+			writeHTTPError(w, http.StatusBadRequest, `repo_selector.mode must be "all", "failed", or "explicit"`)
 			return
 		}
 
 		// For explicit mode, validate repos array is non-empty.
 		if req.RepoSelector.Mode == "explicit" && len(req.RepoSelector.Repos) == 0 {
-			httpErr(w, http.StatusBadRequest, "repo_selector.repos must be non-empty for explicit mode")
+			writeHTTPError(w, http.StatusBadRequest, "repo_selector.repos must be non-empty for explicit mode")
 			return
 		}
 
@@ -61,27 +61,27 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		}
 		modID := mig.ID
 		if mig.ArchivedAt.Valid {
-			httpErr(w, http.StatusConflict, "cannot create run for archived mig")
+			writeHTTPError(w, http.StatusConflict, "cannot create run for archived mig")
 			return
 		}
 
 		// Validate migs.spec_id is non-NULL.
 		if mig.SpecID == nil {
-			httpErr(w, http.StatusBadRequest, "mig has no spec; set a spec before creating runs")
+			writeHTTPError(w, http.StatusBadRequest, "mig has no spec; set a spec before creating runs")
 			return
 		}
 
 		// Select repos based on mode.
 		selectedRepos, err := selectReposForRun(r.Context(), st, modID, req.RepoSelector.Mode, req.RepoSelector.Repos)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to select repos: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to select repos: %v", err)
 			slog.Error("create mig run: select repos failed", "mig_id", modID.String(), "mode", req.RepoSelector.Mode, "err", err)
 			return
 		}
 
 		// If no repos are selected, return an error.
 		if len(selectedRepos) == 0 {
-			httpErr(w, http.StatusBadRequest, "no repos selected for run")
+			writeHTTPError(w, http.StatusBadRequest, "no repos selected for run")
 			return
 		}
 
@@ -94,7 +94,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create run: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create run: %v", err)
 			slog.Error("create mig run: create run failed", "mig_id", modID.String(), "run_id", runID, "err", err)
 			return
 		}
@@ -104,13 +104,13 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		for _, modRepo := range selectedRepos {
 			repoURL, urlErr := repoURLForID(r.Context(), st, modRepo.RepoID)
 			if urlErr != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", urlErr)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", urlErr)
 				slog.Error("create mig run: get repo failed", "repo_id", modRepo.RepoID, "err", urlErr)
 				return
 			}
 			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, modRepo.BaseRef)
 			if seedErr != nil {
-				httpErr(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
+				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
 				slog.Error("create mig run: resolve source commit failed",
 					"run_id", run.ID,
 					"repo_id", modRepo.RepoID,
@@ -131,7 +131,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				RepoSha0:        sourceCommitSHA,
 			})
 			if err != nil {
-				httpErr(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 				slog.Error("create mig run: create run repo failed",
 					"run_id", run.ID,
 					"repo_id", modRepo.RepoID,

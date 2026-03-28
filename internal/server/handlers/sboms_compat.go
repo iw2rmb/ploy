@@ -29,13 +29,13 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 		libsRaw := strings.TrimSpace(r.URL.Query().Get("libs"))
 
 		if lang == "" || release == "" || tool == "" || libsRaw == "" {
-			httpErr(w, http.StatusBadRequest, "lang, release, tool, and libs are required")
+			writeHTTPError(w, http.StatusBadRequest, "lang, release, tool, and libs are required")
 			return
 		}
 
 		selectorInputs, libs, parseErr := parseSBOMCompatSelectors(libsRaw)
 		if parseErr != nil {
-			httpErr(w, http.StatusBadRequest, "invalid libs selector: %v", parseErr)
+			writeHTTPError(w, http.StatusBadRequest, "invalid libs selector: %v", parseErr)
 			return
 		}
 
@@ -45,7 +45,7 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 			Tool:    tool,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to query sbom evidence: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to query sbom evidence: %v", err)
 			return
 		}
 		if !hasEvidence {
@@ -62,7 +62,7 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 			Libs:    libs,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to query sbom compatibility rows: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to query sbom compatibility rows: %v", err)
 			return
 		}
 
@@ -85,7 +85,7 @@ func sbomCompatHandler(st store.Store) http.HandlerFunc {
 			}
 			if prevFloor, exists := seen[selected.Name]; exists {
 				if prevFloor != selected.Floor {
-					httpErr(w, http.StatusBadRequest, "invalid libs selector: %v", errCompatSelector(input.Raw))
+					writeHTTPError(w, http.StatusBadRequest, "invalid libs selector: %v", errCompatSelector(input.Raw))
 					return
 				}
 				continue

@@ -34,15 +34,15 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 	const maxChunkSize = 10 << 20 // 10 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract run id from path parameter using domain type helper.
-		runID, err := parseParam[domaintypes.RunID](r, "id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
 		// Check payload size before reading body.
 		if r.ContentLength > maxBodySize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "payload exceeds body size cap")
 			return
 		}
 
@@ -54,16 +54,16 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 			Data    []byte             `json:"data"`
 		}
 
-		if err := DecodeJSON(w, r, &req, maxBodySize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxBodySize); err != nil {
 			return
 		}
 
 		if len(req.Data) == 0 {
-			httpErr(w, http.StatusBadRequest, "data is required and must not be empty")
+			writeHTTPError(w, http.StatusBadRequest, "data is required and must not be empty")
 			return
 		}
 		if len(req.Data) > maxChunkSize {
-			httpErr(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
+			writeHTTPError(w, http.StatusRequestEntityTooLarge, "data exceeds 10 MiB: %d bytes", len(req.Data))
 			return
 		}
 
@@ -77,7 +77,7 @@ func createRunLogHandler(st store.Store, bp *blobpersist.Service, eventsService 
 		// Persist log metadata to database and upload blob to object storage.
 		logRow, err := bp.CreateLog(r.Context(), params, req.Data)
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to create log: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to create log: %v", err)
 			slog.Error("run logs: create failed", "run_id", runID, "chunk_no", req.ChunkNo, "err", err)
 			return
 		}

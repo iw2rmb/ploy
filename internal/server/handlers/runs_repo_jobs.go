@@ -22,14 +22,14 @@ import (
 // Query params: ?attempt=N (optional, defaults to current attempt)
 func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		runID, err := parseParam[domaintypes.RunID](r, "run_id")
+		runID, err := parseRequiredPathID[domaintypes.RunID](r, "run_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
-		repoID, err := parseParam[domaintypes.RepoID](r, "repo_id")
+		repoID, err := parseRequiredPathID[domaintypes.RepoID](r, "repo_id")
 		if err != nil {
-			httpErr(w, http.StatusBadRequest, "%s", err)
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
@@ -37,9 +37,9 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
-				httpErr(w, http.StatusNotFound, "repo not found")
+				writeHTTPError(w, http.StatusNotFound, "repo not found")
 			default:
-				httpErr(w, http.StatusInternalServerError, "failed to get repo: %v", err)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
 				slog.Error("list run repo jobs: get repo failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			}
 			return
@@ -50,7 +50,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 		if q := r.URL.Query().Get("attempt"); q != "" {
 			parsed, err := strconv.ParseInt(q, 10, 32)
 			if err != nil {
-				httpErr(w, http.StatusBadRequest, "invalid attempt parameter")
+				writeHTTPError(w, http.StatusBadRequest, "invalid attempt parameter")
 				return
 			}
 			attempt = int32(parsed)
@@ -62,7 +62,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			Attempt: attempt,
 		})
 		if err != nil {
-			httpErr(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
+			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
 			slog.Error("list run repo jobs: list jobs failed", "run_id", runID.String(), "repo_id", repoID.String(), "attempt", attempt, "err", err)
 			return
 		}
