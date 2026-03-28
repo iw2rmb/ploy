@@ -159,12 +159,6 @@ type Querier interface {
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata for a given cid.
-	ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata for a run.
-	ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
-	// Returns artifact bundle metadata for a run and job.
-	ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg ListArtifactBundlesMetaByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns diffs for a run.
 	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
@@ -179,12 +173,6 @@ type Querier interface {
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
-	// Returns event metadata (without the meta blob) for a run.
-	// Use GetEvent to fetch the full event with meta by id.
-	ListEventsMetaByRun(ctx context.Context, runID types.RunID) ([]ListEventsMetaByRunRow, error)
-	// Returns event metadata (without the meta blob) for a run since a given id.
-	// Use GetEvent to fetch the full event with meta by id.
-	ListEventsMetaByRunSince(ctx context.Context, arg ListEventsMetaByRunSinceParams) ([]ListEventsMetaByRunSinceRow, error)
 	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mig.
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
 	// row where status in (Fail, Success, Cancelled) and selecting those where status='Fail'.

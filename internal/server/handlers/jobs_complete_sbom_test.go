@@ -25,7 +25,7 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	}
 
 	st := &mockStore{}
-	st.listArtifactBundlesMetaByRunAndJob.val = []store.ArtifactBundle{
+	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{RunID: runID, JobID: &jobID, ObjectKey: &objKey},
 		}
 	bs := bsmock.New()

@@ -21,16 +21,8 @@ func (m *mockStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) (
 	return m.listArtifactBundlesByCID.ret()
 }
 
-func (m *mockStore) ListArtifactBundlesMetaByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
-	return m.listArtifactBundlesMetaByCID.ret()
-}
-
 func (m *mockStore) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRun.ret()
-}
-
-func (m *mockStore) ListArtifactBundlesMetaByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
-	return m.listArtifactBundlesMetaByRun.ret()
 }
 
 func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (store.ArtifactBundle, error) {
@@ -39,10 +31,6 @@ func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (stor
 
 func (m *mockStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRunAndJob.ret()
-}
-
-func (m *mockStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
-	return m.listArtifactBundlesMetaByRunAndJob.ret()
 }
 
 func (m *mockStore) ListSBOMRowsByJob(ctx context.Context, jobID types.JobID) ([]store.Sbom, error) {

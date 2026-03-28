@@ -28,7 +28,7 @@ type stubStore struct {
 	getLatestDiffByJob                 func(ctx context.Context, jobID *types.JobID) (store.Diff, error)
 	createArtifactBundle               func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error)
 	deleteArtifactBundle               func(ctx context.Context, id pgtype.UUID) error
-	listArtifactBundlesMetaByRunAndJob func(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error)
+	listArtifactBundlesByRunAndJob func(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error)
 }
 
 func (s *stubStore) CreateLog(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
@@ -59,8 +59,8 @@ func (s *stubStore) DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) er
 	return s.deleteArtifactBundle(ctx, id)
 }
 
-func (s *stubStore) ListArtifactBundlesMetaByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
-	return s.listArtifactBundlesMetaByRunAndJob(ctx, arg)
+func (s *stubStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
+	return s.listArtifactBundlesByRunAndJob(ctx, arg)
 }
 
 type stubBlobstore struct {
@@ -332,7 +332,7 @@ func TestLoadRecoveryArtifact(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &stubStore{
-				listArtifactBundlesMetaByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+				listArtifactBundlesByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 					return []store.ArtifactBundle{{ID: artifactID, RunID: runID, JobID: &jobID, ObjectKey: &objectKey}}, nil
 				},
 			}
@@ -388,7 +388,7 @@ func TestExtractSBOMRowsForJob_Success(t *testing.T) {
 	})
 
 	st := &stubStore{
-		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, arg store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+		listArtifactBundlesByRunAndJob: func(_ context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 			if arg.RunID != runID || arg.JobID == nil || *arg.JobID != jobID {
 				t.Fatalf("unexpected list params: %+v", arg)
 			}
@@ -437,7 +437,7 @@ func TestExtractSBOMRowsForJob_BlobReadError(t *testing.T) {
 	objKey := "artifacts/run/" + runID.String() + "/bundle/one.tar.gz"
 
 	st := &stubStore{
-		listArtifactBundlesMetaByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesMetaByRunAndJobParams) ([]store.ArtifactBundle, error) {
+		listArtifactBundlesByRunAndJob: func(_ context.Context, _ store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
 			return []store.ArtifactBundle{{RunID: runID, JobID: &jobID, ObjectKey: &objKey}}, nil
 		},
 	}

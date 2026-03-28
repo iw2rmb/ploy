@@ -210,7 +210,7 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	// Set up blob store with candidate artifact from the prior heal job.
 	heal1ID := hc.Jobs[1].ID // heal-1-0
 	objKey := "artifacts/run/" + hc.RunID.String() + "/bundle/heal-1.tar.gz"
-	hc.Store.listArtifactBundlesMetaByRunAndJob.val = []store.ArtifactBundle{
+	hc.Store.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{RunID: hc.RunID, JobID: &heal1ID, ObjectKey: ptr(objKey)},
 	}
 
@@ -328,7 +328,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 	objKey := "artifacts/run/" + runID.String() + "/bundle/test.tar.gz"
 
 	st := &mockStore{}
-	st.listArtifactBundlesMetaByRunAndJob.val = []store.ArtifactBundle{
+	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{
 			RunID:     runID,
 			JobID:     &jobID,

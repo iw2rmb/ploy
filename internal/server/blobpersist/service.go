@@ -224,7 +224,7 @@ func (s *Service) LoadRecoveryArtifact(ctx context.Context, runID types.RunID, j
 		return nil, fmt.Errorf("%w: %v", ErrRecoveryArtifactUnreadable, err)
 	}
 
-	bundles, err := s.store.ListArtifactBundlesMetaByRunAndJob(ctx, store.ListArtifactBundlesMetaByRunAndJobParams{
+	bundles, err := s.store.ListArtifactBundlesByRunAndJob(ctx, store.ListArtifactBundlesByRunAndJobParams{
 		RunID: runID,
 		JobID: &jobID,
 	})

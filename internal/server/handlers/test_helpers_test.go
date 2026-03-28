@@ -294,7 +294,7 @@ func withListJobsByRun(jobs []store.Job) func(*mockStore) {
 }
 
 func withArtifactBundles(bundles []store.ArtifactBundle) func(*mockStore) {
-	return func(st *mockStore) { st.listArtifactBundlesMetaByRunAndJob.val = bundles }
+	return func(st *mockStore) { st.listArtifactBundlesByRunAndJob.val = bundles }
 }
 
 func withResolveStackRow(row store.ResolveStackRowByLangToolRow) func(*mockStore) {
