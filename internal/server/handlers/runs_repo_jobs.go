@@ -98,8 +98,8 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			if len(job.Meta) > 0 {
 				meta, err := contracts.UnmarshalJobMeta(job.Meta)
 				if err == nil {
-					if meta.ModsStepName != "" {
-						jr.DisplayName = meta.ModsStepName
+					if meta.MigStepName != "" {
+						jr.DisplayName = meta.MigStepName
 					}
 					if meta.ActionSummary != "" {
 						jr.ActionSummary = meta.ActionSummary

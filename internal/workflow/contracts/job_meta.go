@@ -63,10 +63,10 @@ type JobMeta struct {
 	// This includes tool name, command, status details, and metrics.
 	Build *BuildMeta `json:"build,omitempty"`
 
-	// ModsStepName stores the user-defined step name from MigSpec.Steps[i].Name
+	// MigStepName stores the user-defined step name from MigSpec.Steps[i].Name
 	// for mig jobs. Used by the CLI to display a friendly name in --follow mode.
 	// Only populated for mig jobs (kind="mig") when a step name is provided.
-	ModsStepName string `json:"mods_step_name,omitempty"`
+	MigStepName string `json:"mig_step_name,omitempty"`
 
 	// ActionSummary is a short one-line description of what the healing mig did,
 	// produced by the healing container. Only allowed for mig jobs (kind="mig").
@@ -202,7 +202,7 @@ func NewMigJobMeta() *JobMeta {
 // with a user-defined step name. The step name is used by the CLI
 // to display a friendly name in --follow mode.
 func NewMigJobMetaWithStepName(stepName string) *JobMeta {
-	return &JobMeta{Kind: JobKindMig, ModsStepName: stepName}
+	return &JobMeta{Kind: JobKindMig, MigStepName: stepName}
 }
 
 // NewGateJobMeta creates a JobMeta for gate validation jobs.
