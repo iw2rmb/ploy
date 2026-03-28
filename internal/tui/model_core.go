@@ -19,10 +19,10 @@ func InitialModel(client *http.Client, baseURL *url.URL) model {
 	ploy.SetFilteringEnabled(false)
 
 	return model{
-		screen:    ScreenPloyList,
-		ploy:      ploy,
-		secondary: newList("", nil),
-		detail:    newList("", nil),
+		screen:        ScreenPloyList,
+		rootList:      ploy,
+		rightPaneList: newList("", nil),
+		detailsList:   newList("", nil),
 		jobList:   joblist.New("JOBS"),
 		client:    client,
 		baseURL:   baseURL,
@@ -84,7 +84,7 @@ func (m model) handleMigsLoaded(msg migsLoadedMsg) model {
 			description: mig.ID.String(),
 		}
 	}
-	m.secondary = newList("MIGRATIONS", items)
+	m.rightPaneList = newList("MIGRATIONS", items)
 	m.applyWindowHeight()
 	return m
 }
@@ -103,45 +103,45 @@ func (m model) handleRunsLoaded(msg runsLoadedMsg) model {
 		}
 	}
 	m.runs = sorted
-	m.secondary = newRunsList("RUNS", items)
+	m.rightPaneList = newRunsList("RUNS", items)
 	m.applyWindowHeight()
 	return m
 }
 
 func (m model) handleMigDetailsLoaded(msg migDetailsLoadedMsg) model {
 	if m.screen == ScreenMigrationDetails {
-		m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+		m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
 			{title: m.selectedMigName, desc: m.selectedMigID.String()},
 			{title: "Runs", desc: fmt.Sprintf("total: %d", msg.runTotal)},
 			{title: "Jobs", desc: "select job"},
 		}))
-		m.ploy.Select(0)
+		m.rootList.Select(0)
 		return m
 	}
-	items := m.detail.Items()
+	items := m.detailsList.Items()
 	if len(items) >= 2 {
 		items[0] = listItem{title: "repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
 		items[1] = listItem{title: "runs", description: fmt.Sprintf("total: %d", msg.runTotal)}
-		m.detail.SetItems(items)
+		m.detailsList.SetItems(items)
 	}
 	return m
 }
 
 func (m model) handleRunDetailsLoaded(msg runDetailsLoadedMsg) model {
 	if m.screen == ScreenRunDetails {
-		m.ploy.SetItems(buildDetailsPloyItems([]ployEntry{
+		m.rootList.SetItems(buildDetailsPloyItems([]ployEntry{
 			{title: m.selectedMigName, desc: m.selectedMigID.String()},
 			{title: "Run", desc: m.selectedRunID.String()},
 			{title: "Jobs", desc: fmt.Sprintf("total: %d", msg.jobTotal)},
 		}))
-		m.ploy.Select(1)
+		m.rootList.Select(1)
 		return m
 	}
-	items := m.detail.Items()
+	items := m.detailsList.Items()
 	if len(items) >= 2 {
 		items[0] = listItem{title: "Repositories", description: fmt.Sprintf("total: %d", msg.repoTotal)}
 		items[1] = listItem{title: "Jobs", description: fmt.Sprintf("total: %d", msg.jobTotal)}
-		m.detail.SetItems(items)
+		m.detailsList.SetItems(items)
 	}
 	return m
 }
@@ -161,19 +161,19 @@ func (m model) updateActiveList(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.screen {
 	case ScreenPloyList:
-		prevIdx := m.ploy.Index()
-		m.ploy, cmd = m.ploy.Update(msg)
-		if m.ploy.Index() == 2 && prevIdx != 2 && len(m.jobList.Jobs()) == 0 {
+		prevIdx := m.rootList.Index()
+		m.rootList, cmd = m.rootList.Update(msg)
+		if m.rootList.Index() == 2 && prevIdx != 2 && len(m.jobList.Jobs()) == 0 {
 			cmd = tea.Batch(cmd, loadJobsCmd(m.client, m.baseURL, nil), loadRunsCmd(m.client, m.baseURL))
 		}
 	case ScreenMigrationsList:
-		m.secondary, cmd = m.secondary.Update(msg)
+		m.rightPaneList, cmd = m.rightPaneList.Update(msg)
 	case ScreenMigrationDetails:
-		m.ploy, cmd = m.ploy.Update(msg)
+		m.rootList, cmd = m.rootList.Update(msg)
 	case ScreenRunsList:
-		m.secondary, cmd = m.secondary.Update(msg)
+		m.rightPaneList, cmd = m.rightPaneList.Update(msg)
 	case ScreenRunDetails:
-		m.ploy, cmd = m.ploy.Update(msg)
+		m.rootList, cmd = m.rootList.Update(msg)
 	case ScreenJobsList:
 		m.jobList, cmd = m.jobList.Update(msg)
 	}

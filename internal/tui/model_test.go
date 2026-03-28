@@ -26,12 +26,12 @@ func TestModelInit(t *testing.T) {
 func TestModelPloyListInvariants(t *testing.T) {
 	m := InitialModel(nil, nil)
 
-	if m.ploy.Width() != ployListWidth {
-		t.Errorf("ploy list width: got %d, want %d", m.ploy.Width(), ployListWidth)
+	if m.rootList.Width() != ployListWidth {
+		t.Errorf("ploy list width: got %d, want %d", m.rootList.Width(), ployListWidth)
 	}
 
 	// Filtering must be disabled on the root PLOY list.
-	if m.ploy.FilteringEnabled() {
+	if m.rootList.FilteringEnabled() {
 		t.Error("ploy list: filtering must be disabled")
 	}
 }
@@ -40,7 +40,7 @@ func TestModelPloyListInvariants(t *testing.T) {
 func TestModelPloyListItems(t *testing.T) {
 	m := InitialModel(nil, nil)
 
-	items := m.ploy.Items()
+	items := m.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy list items: got %d, want 3", len(items))
 	}
@@ -116,7 +116,7 @@ func TestModelEnterTransitionsFromRoot(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := InitialModel(nil, nil)
-			m.ploy.Select(tt.index)
+			m.rootList.Select(tt.index)
 			next, _ := m.handleEnter()
 			nm, ok := next.(model)
 			if !ok {

@@ -15,11 +15,11 @@ func TestS4RunsListTitle(t *testing.T) {
 		{ID: domaintypes.RunID("run-1"), MigName: "alpha", CreatedAt: time.Now()},
 	}})
 	nm := next.(model)
-	if nm.secondary.Title != "RUNS" {
-		t.Errorf("secondary list title: got %q, want %q", nm.secondary.Title, "RUNS")
+	if nm.rightPaneList.Title != "RUNS" {
+		t.Errorf("secondary list title: got %q, want %q", nm.rightPaneList.Title, "RUNS")
 	}
-	if nm.secondary.Width() != runsListWidth {
-		t.Errorf("secondary list width: got %d, want %d", nm.secondary.Width(), runsListWidth)
+	if nm.rightPaneList.Width() != runsListWidth {
+		t.Errorf("secondary list width: got %d, want %d", nm.rightPaneList.Width(), runsListWidth)
 	}
 }
 
@@ -32,7 +32,7 @@ func TestS4RunsItemsPopulated(t *testing.T) {
 	}})
 	nm := next.(model)
 
-	items := nm.secondary.Items()
+	items := nm.rightPaneList.Items()
 	if len(items) != 1 {
 		t.Fatalf("secondary items: got %d, want 1", len(items))
 	}
@@ -66,7 +66,7 @@ func TestS4RunsOrderingEnforced(t *testing.T) {
 	next, _ := m.Update(runsLoadedMsg{runs: runs})
 	nm := next.(model)
 
-	items := nm.secondary.Items()
+	items := nm.rightPaneList.Items()
 	if len(items) != 3 {
 		t.Fatalf("items count: got %d, want 3", len(items))
 	}
@@ -91,7 +91,7 @@ func TestS4EnterTransitionsToS5(t *testing.T) {
 		{ID: domaintypes.RunID("run-xyz"), MigName: "mig", CreatedAt: time.Now()},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
@@ -109,7 +109,7 @@ func TestS4EnterSetsSelectedRunID(t *testing.T) {
 		{ID: domaintypes.RunID(wantID), MigName: "mig", CreatedAt: time.Now()},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
@@ -125,11 +125,11 @@ func TestS4EnterDefinesMigrationAndRunInPloy(t *testing.T) {
 		{ID: domaintypes.RunID("run-xyz"), MigID: domaintypes.MigID("mig-123"), MigName: "mig", CreatedAt: time.Now()},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
-	items := rm.ploy.Items()
+	items := rm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items: got %d, want 3", len(items))
 	}

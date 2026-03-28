@@ -15,7 +15,7 @@ func makeS3Model(t *testing.T) model {
 		{ID: domaintypes.MigID("mig-abc"), Name: "my-mig"},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 	result, _ := nm.handleEnter()
 	return result.(model)
 }
@@ -29,7 +29,7 @@ func TestS3ScreenSetOnEnterFromS2(t *testing.T) {
 
 func TestS3PloyItemsPlaceholder(t *testing.T) {
 	rm := makeS3Model(t)
-	items := rm.ploy.Items()
+	items := rm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items count: got %d, want 3", len(items))
 	}
@@ -62,7 +62,7 @@ func TestS3MigDetailsLoadedUpdatesRunsTotalInPloy(t *testing.T) {
 	afterLoad, _ := s3m.Update(migDetailsLoadedMsg{repoTotal: 5, runTotal: 3})
 	lm := afterLoad.(model)
 
-	items := lm.ploy.Items()
+	items := lm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items count: got %d, want 3", len(items))
 	}

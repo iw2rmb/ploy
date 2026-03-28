@@ -95,7 +95,7 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `rg -n '\.Gate\b|\.Recovery\b' internal/workflow internal/server internal/nodeagent`.
   - Reasoning: medium (7 CFP)
 
-- [ ] 1.7 Rename ambiguous TUI root list fields to intent-revealing names
+- [x] 1.7 Rename ambiguous TUI root list fields to intent-revealing names
   - Type: determined
   - Component: `internal/tui/model_types.go`, `internal/tui/model_*.go`, `internal/tui/view.go`, `internal/tui/*_test.go`
   - Implementation:

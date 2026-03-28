@@ -48,17 +48,17 @@ func (i listItem) FilterValue() string { return i.title }
 type model struct {
 	screen Screen
 
-	// ploy is the root list (PLOY), always rendered in S1 and as the left
+	// rootList is the root list (PLOY), always rendered in S1 and as the left
 	// panel in S2/S4/S6.
-	ploy list.Model
+	rootList list.Model
 
-	// secondary is the right-panel list rendered in S2 (MIGRATIONS), S4
+	// rightPaneList is the right-panel list rendered in S2 (MIGRATIONS), S4
 	// (RUNS), and S6 (JOBS).
-	secondary list.Model
+	rightPaneList list.Model
 
-	// detail is the single-list rendered in S3 (migration details) and S5
+	// detailsList is the single-list rendered in S3 (migration details) and S5
 	// (run details) as the right panel.
-	detail list.Model
+	detailsList list.Model
 
 	// selectedMigID tracks the migration chosen in S2 for drill-down to S3.
 	selectedMigID domaintypes.MigID

@@ -20,7 +20,7 @@ func makeS5Model(t *testing.T) model {
 		},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 	result, _ := nm.handleEnter()
 	return result.(model)
 }
@@ -34,7 +34,7 @@ func TestS5ScreenSetOnEnterFromS4(t *testing.T) {
 
 func TestS5PloyItemsPlaceholder(t *testing.T) {
 	rm := makeS5Model(t)
-	items := rm.ploy.Items()
+	items := rm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items count: got %d, want 3", len(items))
 	}
@@ -67,7 +67,7 @@ func TestS5RunDetailsLoadedUpdatesJobsTotalInPloy(t *testing.T) {
 	afterLoad, _ := s5m.Update(runDetailsLoadedMsg{repoTotal: 4, jobTotal: 7})
 	lm := afterLoad.(model)
 
-	items := lm.ploy.Items()
+	items := lm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items count: got %d, want 3", len(items))
 	}

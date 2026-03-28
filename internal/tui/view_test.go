@@ -50,9 +50,9 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 			m := InitialModel(nil, nil)
 			m.screen = tt.screen
 			if tt.detailPane {
-				m.detail = newList(tt.rightTitle, nil)
+				m.detailsList = newList(tt.rightTitle, nil)
 			} else {
-				m.secondary = newList(tt.rightTitle, nil)
+				m.rightPaneList = newList(tt.rightTitle, nil)
 			}
 
 			rendered := m.View().Content
@@ -75,7 +75,7 @@ func TestSplitScreensRenderColumns(t *testing.T) {
 func TestMigrationDetailsRendersOnlyPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenMigrationDetails
-	m.ploy.SetItems([]list.Item{
+	m.rootList.SetItems([]list.Item{
 		listItem{title: "my-mig", description: "mig-abc"},
 		listItem{title: "Runs", description: "total: 1"},
 		listItem{title: "Jobs", description: "select job"},
@@ -93,7 +93,7 @@ func TestMigrationDetailsRendersOnlyPloy(t *testing.T) {
 func TestRunDetailsRendersOnlyPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenRunDetails
-	m.ploy.SetItems([]list.Item{
+	m.rootList.SetItems([]list.Item{
 		listItem{title: "my-mig", description: "mig-abc"},
 		listItem{title: "Run", description: "run-abc"},
 		listItem{title: "Jobs", description: "total: 8"},

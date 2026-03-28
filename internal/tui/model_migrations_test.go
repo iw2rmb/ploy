@@ -14,8 +14,8 @@ func TestS2MigrationsListTitle(t *testing.T) {
 		{ID: domaintypes.MigID("mig-1"), Name: "alpha"},
 	}})
 	nm := next.(model)
-	if nm.secondary.Title != "MIGRATIONS" {
-		t.Errorf("secondary list title: got %q, want %q", nm.secondary.Title, "MIGRATIONS")
+	if nm.rightPaneList.Title != "MIGRATIONS" {
+		t.Errorf("secondary list title: got %q, want %q", nm.rightPaneList.Title, "MIGRATIONS")
 	}
 }
 
@@ -30,7 +30,7 @@ func TestS2MigrationsItemsPopulated(t *testing.T) {
 	next, _ := m.Update(migsLoadedMsg{migs: migs})
 	nm := next.(model)
 
-	items := nm.secondary.Items()
+	items := nm.rightPaneList.Items()
 	if len(items) != 2 {
 		t.Fatalf("secondary items: got %d, want 2", len(items))
 	}
@@ -63,7 +63,7 @@ func TestS2MigrationsOrderingEnforced(t *testing.T) {
 	next, _ := m.Update(migsLoadedMsg{migs: migs})
 	nm := next.(model)
 
-	items := nm.secondary.Items()
+	items := nm.rightPaneList.Items()
 	if len(items) != 3 {
 		t.Fatalf("items count: got %d, want 3", len(items))
 	}
@@ -88,7 +88,7 @@ func TestS2EnterTransitionsToS3(t *testing.T) {
 		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
@@ -106,7 +106,7 @@ func TestS2EnterSetsSelectedMigID(t *testing.T) {
 		{ID: domaintypes.MigID(wantID), Name: "my-migration"},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
@@ -122,11 +122,11 @@ func TestS2EnterDefinesSelectedMigrationInPloy(t *testing.T) {
 		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
 	}})
 	nm := next.(model)
-	nm.secondary.Select(0)
+	nm.rightPaneList.Select(0)
 
 	result, _ := nm.handleEnter()
 	rm := result.(model)
-	items := rm.ploy.Items()
+	items := rm.rootList.Items()
 	if len(items) != 3 {
 		t.Fatalf("ploy items: got %d, want 3", len(items))
 	}

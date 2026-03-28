@@ -45,9 +45,9 @@ func (m *model) applyWindowHeight() {
 	if m.windowHeight <= 0 {
 		return
 	}
-	m.ploy.SetHeight(m.windowHeight)
-	m.secondary.SetHeight(m.windowHeight)
-	m.detail.SetHeight(m.windowHeight)
+	m.rootList.SetHeight(m.windowHeight)
+	m.rightPaneList.SetHeight(m.windowHeight)
+	m.detailsList.SetHeight(m.windowHeight)
 	m.jobList.SetHeight(m.windowHeight)
 }
 
@@ -90,16 +90,16 @@ func (m *model) setPloySelectionState(hasMigration, hasRun, hasJob bool) {
 	m.hasSelectedRun = hasRun
 	m.hasSelectedJob = hasJob
 
-	selectedIdx := m.ploy.Index()
-	m.ploy.SetItems(buildPloyItems(hasMigration, hasRun, hasJob))
+	selectedIdx := m.rootList.Index()
+	m.rootList.SetItems(buildPloyItems(hasMigration, hasRun, hasJob))
 	if selectedIdx < 0 {
 		selectedIdx = 0
 	}
-	if itemCount := len(m.ploy.Items()); itemCount > 0 {
+	if itemCount := len(m.rootList.Items()); itemCount > 0 {
 		if selectedIdx >= itemCount {
 			selectedIdx = itemCount - 1
 		}
-		m.ploy.Select(selectedIdx)
+		m.rootList.Select(selectedIdx)
 	}
 }
 
