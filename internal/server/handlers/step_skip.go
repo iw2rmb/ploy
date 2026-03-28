@@ -29,7 +29,7 @@ func resolveAndPersistModStepSkip(
 	st store.Store,
 	job store.Job,
 	mergedSpec []byte,
-) (*contracts.ModStepSkipMetadata, error) {
+) (*contracts.MigStepSkipMetadata, error) {
 	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeMod {
 		return nil, nil
 	}
@@ -72,7 +72,7 @@ func resolveAndPersistModStepSkip(
 	}
 
 	var refJobID *string
-	var skip *contracts.ModStepSkipMetadata
+	var skip *contracts.MigStepSkipMetadata
 	repoSHAIn := strings.TrimSpace(job.RepoShaIn)
 	if !stepCfg.Always && sha40Pattern.MatchString(repoSHAIn) {
 		row, err := pgStore.ResolveReusableStepByHash(ctx, store.ResolveReusableStepByHashParams{
@@ -84,7 +84,7 @@ func resolveAndPersistModStepSkip(
 			ref := row.RefJobID.String()
 			refJobID = &ref
 			if sha40Pattern.MatchString(strings.TrimSpace(row.RefRepoShaOut)) {
-				skip = &contracts.ModStepSkipMetadata{
+				skip = &contracts.MigStepSkipMetadata{
 					Enabled:       true,
 					RefJobID:      row.RefJobID,
 					RefRepoSHAOut: strings.TrimSpace(row.RefRepoShaOut),

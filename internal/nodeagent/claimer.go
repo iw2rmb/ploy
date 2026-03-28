@@ -62,7 +62,7 @@ type ClaimResponse struct {
 	Spec                   json.RawMessage                  `json:"spec,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
-	StepSkip               *contracts.ModStepSkipMetadata   `json:"step_skip,omitempty"`
+	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager for the unified jobs queue.

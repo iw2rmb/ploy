@@ -13,17 +13,17 @@ var (
 	sha256HexPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
-// ModStepSkipMetadata records claim-time step cache reuse decisions.
+// MigStepSkipMetadata records claim-time step cache reuse decisions.
 // When present on a claimed mig job, node runtime must skip container execution
 // and finish the job by reporting the provided ref_repo_sha_out.
-type ModStepSkipMetadata struct {
+type MigStepSkipMetadata struct {
 	Enabled       bool        `json:"enabled"`
 	RefJobID      types.JobID `json:"ref_job_id,omitempty"`
 	RefRepoSHAOut string      `json:"ref_repo_sha_out,omitempty"`
 	Hash          string      `json:"hash,omitempty"`
 }
 
-func (m *ModStepSkipMetadata) Validate() error {
+func (m *MigStepSkipMetadata) Validate() error {
 	if m == nil {
 		return nil
 	}
