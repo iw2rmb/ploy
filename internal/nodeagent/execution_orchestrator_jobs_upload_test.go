@@ -52,6 +52,30 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			createFiles:   []string{},
 			wantUpload:    false,
 		},
+		{
+			name:          "path traversal ../../etc/passwd rejected",
+			artifactPaths: []string{"../../etc/passwd"},
+			createFiles:   []string{},
+			wantUpload:    false,
+		},
+		{
+			name:          "mixed valid and traversal paths",
+			artifactPaths: []string{"valid.txt", "../../etc/passwd", "another_valid.txt"},
+			createFiles:   []string{"valid.txt", "another_valid.txt"},
+			wantUpload:    true,
+		},
+		{
+			name:          "absolute path /etc/hosts rejected",
+			artifactPaths: []string{"/etc/hosts"},
+			createFiles:   []string{},
+			wantUpload:    false,
+		},
+		{
+			name:          "all paths are traversal attempts",
+			artifactPaths: []string{"../secret", "../../etc/shadow", "../../../root/.bashrc"},
+			createFiles:   []string{},
+			wantUpload:    false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -78,11 +102,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			defer server.Close()
 
 			// Create workspace with test files.
-			workspace, err := os.MkdirTemp("", "ploy-test-workspace-*")
-			if err != nil {
-				t.Fatalf("failed to create workspace: %v", err)
-			}
-			defer func() { _ = os.RemoveAll(workspace) }()
+			workspace := t.TempDir()
 
 			for _, f := range tt.createFiles {
 				fullPath := filepath.Join(workspace, f)
@@ -195,12 +215,7 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			// Create /out directory with test files.
 			outDir := ""
 			if !tt.emptyOutDir {
-				var err error
-				outDir, err = os.MkdirTemp("", "ploy-test-out-*")
-				if err != nil {
-					t.Fatalf("failed to create out dir: %v", err)
-				}
-				defer func() { _ = os.RemoveAll(outDir) }()
+				outDir = t.TempDir()
 
 				for _, f := range tt.createFiles {
 					fullPath := filepath.Join(outDir, f)
@@ -737,131 +752,6 @@ func TestIsValidArtifactPath(t *testing.T) {
 			if got != tt.wantValid {
 				t.Errorf("isValidArtifactPath(%q, %q) = %v, want %v",
 					tt.artifactPath, tt.workspace, got, tt.wantValid)
-			}
-		})
-	}
-}
-
-// TestRunController_uploadConfiguredArtifacts_PathTraversal verifies that
-// path traversal attempts in artifact_paths are rejected and do not trigger uploads.
-// Security: prevents uploads of files outside the workspace via traversal/absolute paths.
-func TestRunController_uploadConfiguredArtifacts_PathTraversal(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name          string
-		artifactPaths []string
-		createFiles   []string // Files to create relative to workspace
-		wantUpload    bool     // Whether upload should be called at all
-		description   string   // Security context
-	}{
-		{
-			name:          "path traversal ../../etc/passwd rejected",
-			artifactPaths: []string{"../../etc/passwd"},
-			createFiles:   []string{}, // Nothing to create — the path would be outside workspace
-			wantUpload:    false,
-			description:   "Malicious path attempting to exfiltrate /etc/passwd should be rejected",
-		},
-		{
-			name:          "mixed valid and traversal paths",
-			artifactPaths: []string{"valid.txt", "../../etc/passwd", "another_valid.txt"},
-			createFiles:   []string{"valid.txt", "another_valid.txt"},
-			wantUpload:    true, // Valid paths should still be uploaded
-			description:   "Valid paths should be uploaded even when mixed with invalid paths",
-		},
-		{
-			name:          "absolute path /etc/hosts rejected",
-			artifactPaths: []string{"/etc/hosts"},
-			createFiles:   []string{},
-			wantUpload:    false,
-			description:   "Absolute paths should be rejected to prevent arbitrary file access",
-		},
-		{
-			name:          "all paths are traversal attempts",
-			artifactPaths: []string{"../secret", "../../etc/shadow", "../../../root/.bashrc"},
-			createFiles:   []string{},
-			wantUpload:    false,
-			description:   "When all paths are invalid, no upload should occur",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			uploadCalled := false
-
-			// Mock server (job-scoped endpoint).
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
-				if r.URL.Path == "/v1/runs/test-run-traversal/jobs/test-job-traversal/artifact" {
-					uploadCalled = true
-					w.WriteHeader(http.StatusCreated)
-					_ = json.NewEncoder(w).Encode(map[string]string{
-						"artifact_bundle_id": "test-id",
-						"cid":                "test-cid",
-					})
-				}
-			}))
-			defer server.Close()
-
-			// Create workspace with test files.
-			workspace, err := os.MkdirTemp("", "ploy-test-traversal-*")
-			if err != nil {
-				t.Fatalf("failed to create workspace: %v", err)
-			}
-			defer func() { _ = os.RemoveAll(workspace) }()
-
-			// Create files that should be uploadable.
-			for _, f := range tt.createFiles {
-				fullPath := filepath.Join(workspace, f)
-				if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-					t.Fatalf("failed to create dir: %v", err)
-				}
-				if err := os.WriteFile(fullPath, []byte("test content"), 0644); err != nil {
-					t.Fatalf("failed to create file: %v", err)
-				}
-			}
-
-			// Initialize test infrastructure.
-			// Uploaders are eagerly initialized; tests must set them explicitly.
-			cfg := Config{
-				ServerURL: server.URL,
-				NodeID:    testNodeID,
-				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-			}
-
-			controller := newTestController(t, cfg)
-
-			typedOpts := RunOptions{
-				Artifacts: ArtifactOptions{
-					Paths: tt.artifactPaths,
-					Name:  "test-artifact",
-				},
-			}
-
-			req := StartRunRequest{
-				RunID:        types.RunID("test-run-traversal"),
-				JobID:        "test-job-traversal",
-				TypedOptions: typedOpts,
-			}
-
-			manifest := contracts.StepManifest{
-				Image:   "test-image",
-				Command: []string{"test"},
-				Options: map[string]interface{}{
-					"job_id":        "test-job",
-					"artifact_name": "test-artifact",
-				},
-			}
-
-			// Execute upload with typed RunOptions.
-			ctx := context.Background()
-			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace, "")
-
-			// Verify upload call matches expectation.
-			if uploadCalled != tt.wantUpload {
-				t.Errorf("[%s] uploadCalled = %v, want %v", tt.description, uploadCalled, tt.wantUpload)
 			}
 		})
 	}

@@ -7,118 +7,61 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Run controller unit tests: StartRun / StopRun behavior.
+func TestRunController(t *testing.T) {
+	t.Parallel()
 
-func TestRunControllerStartRun(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
-	rc := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
+	newRC := func() *runController {
+		return &runController{
+			cfg:  newTestConfig("http://127.0.0.1:8080"),
+			jobs: make(map[types.JobID]*jobContext),
+		}
 	}
+	baseReq := newStartRunRequest()
 
-	req := StartRunRequest{
-		RunID:   types.RunID("run-001"),
-		JobID:   types.JobID("job-001"),
-		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
+	t.Run("StartRun registers job", func(t *testing.T) {
+		rc := newRC()
+		if err := rc.StartRun(context.Background(), baseReq); err != nil {
+			t.Fatalf("StartRun() error = %v", err)
+		}
+		rc.mu.Lock()
+		defer rc.mu.Unlock()
+		if _, exists := rc.jobs[baseReq.JobID]; !exists {
+			t.Errorf("job %s not found in controller", baseReq.JobID)
+		}
+	})
 
-	ctx := context.Background()
-	if err := rc.StartRun(ctx, req); err != nil {
-		t.Fatalf("StartRun() error = %v", err)
-	}
+	t.Run("StartRun rejects duplicate", func(t *testing.T) {
+		rc := newRC()
+		ctx := context.Background()
+		if err := rc.StartRun(ctx, baseReq); err != nil {
+			t.Fatalf("first StartRun() error = %v", err)
+		}
+		if err := rc.StartRun(ctx, baseReq); err == nil {
+			t.Error("expected error for duplicate job, got nil")
+		}
+	})
 
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
+	t.Run("StopRun removes job", func(t *testing.T) {
+		rc := newRC()
+		ctx := context.Background()
+		if err := rc.StartRun(ctx, baseReq); err != nil {
+			t.Fatalf("StartRun() error = %v", err)
+		}
+		if err := rc.StopRun(ctx, StopRunRequest{RunID: baseReq.RunID, Reason: "test"}); err != nil {
+			t.Errorf("StopRun() error = %v", err)
+		}
+		rc.mu.Lock()
+		defer rc.mu.Unlock()
+		if _, exists := rc.jobs[baseReq.JobID]; exists {
+			t.Errorf("job %s still exists after stop", baseReq.JobID)
+		}
+	})
 
-	// Use typed JobID key directly — no .String() conversion needed.
-	if _, exists := rc.jobs[req.JobID]; !exists {
-		t.Errorf("job %s not found in controller", req.JobID)
-	}
-}
-
-func TestRunControllerStartRunDuplicate(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
-	rc := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
-	}
-
-	req := StartRunRequest{
-		RunID:   types.RunID("run-001"),
-		JobID:   types.JobID("job-001"),
-		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
-
-	ctx := context.Background()
-
-	// Start the job once.
-	if err := rc.StartRun(ctx, req); err != nil {
-		t.Fatalf("first StartRun() error = %v", err)
-	}
-
-	// Try to start the same job again.
-	err := rc.StartRun(ctx, req)
-	if err == nil {
-		t.Errorf("expected error for duplicate job, got nil")
-	}
-}
-
-func TestRunControllerStopRun(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
-	rc := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
-	}
-
-	// Start a job first.
-	startReq := StartRunRequest{
-		RunID:   types.RunID("run-001"),
-		JobID:   types.JobID("job-001"),
-		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
-
-	ctx := context.Background()
-	if err := rc.StartRun(ctx, startReq); err != nil {
-		t.Fatalf("StartRun() error = %v", err)
-	}
-
-	// Stop the run (which stops all jobs).
-	stopReq := StopRunRequest{
-		RunID:  types.RunID("run-001"),
-		Reason: "test",
-	}
-
-	if err := rc.StopRun(ctx, stopReq); err != nil {
-		t.Errorf("StopRun() error = %v", err)
-	}
-
-	rc.mu.Lock()
-	defer rc.mu.Unlock()
-
-	// Use typed JobID key directly — no .String() conversion needed.
-	if _, exists := rc.jobs[startReq.JobID]; exists {
-		t.Errorf("job %s still exists after stop", startReq.JobID)
-	}
-}
-
-func TestRunControllerStopNonExistent(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
-	rc := &runController{
-		cfg:  cfg,
-		jobs: make(map[types.JobID]*jobContext),
-	}
-
-	stopReq := StopRunRequest{
-		RunID:  types.RunID("nonexistent"),
-		Reason: "test",
-	}
-
-	ctx := context.Background()
-	err := rc.StopRun(ctx, stopReq)
-	if err == nil {
-		t.Errorf("expected error for stopping nonexistent run, got nil")
-	}
+	t.Run("StopRun errors for nonexistent run", func(t *testing.T) {
+		rc := newRC()
+		err := rc.StopRun(context.Background(), StopRunRequest{RunID: "nonexistent", Reason: "test"})
+		if err == nil {
+			t.Error("expected error for stopping nonexistent run, got nil")
+		}
+	})
 }

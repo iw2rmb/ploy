@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -694,4 +696,164 @@ func newTestServerWithRole(t *testing.T, role auth.Role) *server.HTTPServer {
 	bp := blobpersist.New(st, bs)
 	RegisterRoutes(srv, st, bs, bp, ev, NewConfigHolder(config.GitLabConfig{}, nil), "test-secret")
 	return srv
+}
+
+// ---------------------------------------------------------------------------
+// Healing chain fixture builder
+// ---------------------------------------------------------------------------
+
+// healingChainFixture provides a pre-wired job chain for testing
+// maybeCreateHealingJobs with minimal boilerplate.
+type healingChainFixture struct {
+	RunID       domaintypes.RunID
+	RepoID      domaintypes.RepoID
+	SpecID      domaintypes.SpecID
+	Jobs        []store.Job
+	FailedJob   store.Job
+	SuccessorID domaintypes.JobID // ID of the terminal mig-0 job
+	Run         store.Run
+	Store       *mockStore
+}
+
+// priorHealJob describes an intermediate job to insert between pre-gate and mig-0.
+type priorHealJob struct {
+	Name    string
+	JobType domaintypes.JobType
+	Status  domaintypes.JobStatus
+	Meta    []byte
+	ShaIn   string
+}
+
+type healingChainConfig struct {
+	preGateMeta []byte
+	specFn      func(*testing.T) []byte
+	repoShaIn   string
+	priorHeals  []priorHealJob
+	storeOpts   []func(*mockStore)
+}
+
+func withHealingMeta(meta []byte) func(*healingChainConfig) {
+	return func(c *healingChainConfig) { c.preGateMeta = meta }
+}
+
+func withHealingSpec(fn func(*testing.T) []byte) func(*healingChainConfig) {
+	return func(c *healingChainConfig) { c.specFn = fn }
+}
+
+func withHealingRepoShaIn(sha string) func(*healingChainConfig) {
+	return func(c *healingChainConfig) { c.repoShaIn = sha }
+}
+
+func withPriorHeals(heals ...priorHealJob) func(*healingChainConfig) {
+	return func(c *healingChainConfig) { c.priorHeals = heals }
+}
+
+func withHealingStoreOpts(opts ...func(*mockStore)) func(*healingChainConfig) {
+	return func(c *healingChainConfig) { c.storeOpts = opts }
+}
+
+// newHealingChain builds a chain of jobs: pre-gate → [prior heals] → mig-0,
+// wires NextID pointers, and configures a mockStore with the chain and spec.
+//
+// The "failed" job is the last gate/re-gate type in the chain (pre-gate when
+// there are no prior heals, or the last re-gate when there are).
+func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingChainFixture {
+	t.Helper()
+
+	cfg := healingChainConfig{
+		preGateMeta: []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`),
+		specFn:      func(t *testing.T) []byte { return healingSpecBytesWithRetries(t, 2) },
+		repoShaIn:   healingTestRepoSHAIn,
+	}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	specID := domaintypes.NewSpecID()
+
+	baseJob := func(name string, jt domaintypes.JobType, status domaintypes.JobStatus) store.Job {
+		return store.Job{
+			ID: domaintypes.NewJobID(), RunID: runID, RepoID: repoID,
+			RepoBaseRef: "main", Attempt: 1,
+			Name: name, JobType: jt, Status: status,
+		}
+	}
+
+	var jobs []store.Job
+
+	preGate := baseJob("pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusFail)
+	preGate.RepoShaIn = cfg.repoShaIn
+	preGate.Meta = cfg.preGateMeta
+	jobs = append(jobs, preGate)
+
+	for _, ph := range cfg.priorHeals {
+		j := baseJob(ph.Name, ph.JobType, ph.Status)
+		j.Meta = ph.Meta
+		if ph.ShaIn != "" {
+			j.RepoShaIn = ph.ShaIn
+		}
+		jobs = append(jobs, j)
+	}
+
+	mig0 := baseJob("mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated)
+	mig0.Meta = []byte(`{}`)
+	jobs = append(jobs, mig0)
+
+	// Wire NextID chain.
+	for i := 0; i < len(jobs)-1; i++ {
+		nextID := jobs[i+1].ID
+		jobs[i].NextID = &nextID
+	}
+
+	// Failed job = last gate/re-gate in the chain.
+	failedIdx := 0
+	for i := len(jobs) - 1; i >= 0; i-- {
+		if jobs[i].JobType == domaintypes.JobTypePreGate || jobs[i].JobType == domaintypes.JobTypeReGate {
+			failedIdx = i
+			break
+		}
+	}
+
+	specBytes := cfg.specFn(t)
+	st := &mockStore{
+		getSpecResult:                 store.Spec{ID: specID, Spec: specBytes},
+		listJobsByRunRepoAttemptResult: jobs,
+	}
+	for _, o := range cfg.storeOpts {
+		o(st)
+	}
+
+	return healingChainFixture{
+		RunID: runID, RepoID: repoID, SpecID: specID,
+		Jobs:        jobs,
+		FailedJob:   jobs[failedIdx],
+		SuccessorID: mig0.ID,
+		Run:         store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted},
+		Store:       st,
+	}
+}
+
+// mustTarGzPayload builds a gzipped tar archive from a map of filename → content.
+func mustTarGzPayload(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	tw := tar.NewWriter(gz)
+	for name, data := range files {
+		if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o644, Size: int64(len(data))}); err != nil {
+			t.Fatalf("write header %q: %v", name, err)
+		}
+		if _, err := tw.Write(data); err != nil {
+			t.Fatalf("write payload %q: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip: %v", err)
+	}
+	return b.Bytes()
 }
