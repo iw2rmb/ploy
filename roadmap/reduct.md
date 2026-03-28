@@ -37,6 +37,12 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+130/-240` (net `-110`) in `internal/store/*`.
   - Clarity / complexity check: Keeps existing filter shapes; only list-surface naming is unified.
   - Reasoning: high (14 CFP)
+  - Completion notes:
+    - **Removed duplicate entrypoints**: No `*Meta*` artifact or event list methods exist anywhere in the codebase. The pre-refactor `List*Meta*` parallel family is fully deleted.
+    - **Selector-only querier surface** (`internal/store/querier.go`): Artifact list methods — `ListArtifactBundlesByRun` (line 154), `ListArtifactBundlesByRunAndJob` (line 158), `ListArtifactBundlesByCID` (line 161) — all return `[]ArtifactBundle` with explicit column projection (no `SELECT *`). Event list methods — `ListEventsByRun` (line 172), `ListEventsByRunSince` (line 175) — all return `[]Event` with explicit column projection.
+    - **SQL query surface** (`internal/store/queries/artifact_bundles.sql`, `internal/store/queries/events.sql`): Every list query uses explicit `SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at` / `SELECT id, run_id, job_id, time, level, message, meta` — `SELECT *` is absent from all list paths.
+    - **Handler call sites use selector methods only**: `artifacts_download.go:30` → `ListArtifactBundlesByCID`; `artifacts_repo.go:58` → `ListArtifactBundlesByRun`; `migs_ticket.go:153` → `ListArtifactBundlesByRunAndJob`. No legacy Meta-suffixed calls present.
+    - **Test proof** (`internal/store/list_meta_queries_test.go`): `TestArtifactSelectorBehavior` (lines 56–106) asserts explicit column inclusion (`object_key`, `bundle_size`, `cid`, `digest`, `created_at`) and deterministic ordering for all three artifact list queries. `TestEventSelectorBehavior` (lines 112–156) asserts explicit column inclusion (`level`, `message`, `meta`, `time`) and ordering for both event list queries.
 
 - [ ] 3.1c Finalize selector-only store surface and remove remaining duplicate list entrypoints
   - Type: determined
