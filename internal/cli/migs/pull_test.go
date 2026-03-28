@@ -178,7 +178,7 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 }
 
 // =============================================================================
-// ModPullCommand Tests
+// MigPullCommand Tests
 // =============================================================================
 
 // TestModPullCommand_Success verifies successful pull resolution for a mig.
@@ -224,7 +224,7 @@ func TestModPullCommand_Success(t *testing.T) {
 
 	baseURL, _ := url.Parse(server.URL + basePathPrefix)
 
-	cmd := ModPullCommand{
+	cmd := MigPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef("my-mig"),
@@ -282,7 +282,7 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 
 	baseURL, _ := url.Parse(server.URL + basePathPrefix)
 
-	cmd := ModPullCommand{
+	cmd := MigPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef("my-mig"),
@@ -336,7 +336,7 @@ func TestModPullCommand_DefaultMode(t *testing.T) {
 
 	baseURL, _ := url.Parse(server.URL)
 
-	cmd := ModPullCommand{
+	cmd := MigPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef("my-mig"),
@@ -356,17 +356,17 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		cmd     ModPullCommand
+		cmd     MigPullCommand
 		wantErr string
 	}{
 		{
 			name:    "nil client",
-			cmd:     ModPullCommand{MigRef: domaintypes.MigRef("my-mig"), RepoURL: "https://example.com"},
+			cmd:     MigPullCommand{MigRef: domaintypes.MigRef("my-mig"), RepoURL: "https://example.com"},
 			wantErr: "http client required",
 		},
 		{
 			name: "nil base url",
-			cmd: ModPullCommand{
+			cmd: MigPullCommand{
 				Client:  http.DefaultClient,
 				MigRef:  domaintypes.MigRef("my-mig"),
 				RepoURL: "https://example.com",
@@ -375,7 +375,7 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 		},
 		{
 			name: "empty mig id",
-			cmd: ModPullCommand{
+			cmd: MigPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
 				RepoURL: "https://example.com",
@@ -384,7 +384,7 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 		},
 		{
 			name: "empty repo url",
-			cmd: ModPullCommand{
+			cmd: MigPullCommand{
 				Client:  http.DefaultClient,
 				BaseURL: &url.URL{Scheme: "http", Host: "localhost"},
 				MigRef:  domaintypes.MigRef("my-mig"),
@@ -419,7 +419,7 @@ func TestModPullCommand_NotFound(t *testing.T) {
 
 	baseURL, _ := url.Parse(server.URL)
 
-	cmd := ModPullCommand{
+	cmd := MigPullCommand{
 		Client:  server.Client(),
 		BaseURL: baseURL,
 		MigRef:  domaintypes.MigRef("nonexistent"),

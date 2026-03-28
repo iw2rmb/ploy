@@ -25,9 +25,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// ModSummary represents a mig project returned by the server.
+// MigSummary represents a mig project returned by the server.
 // Matches the server response shape from internal/server/handlers/migs.go.
-type ModSummary struct {
+type MigSummary struct {
 	ID        types.MigID   `json:"id"`
 	Name      string        `json:"name"`
 	SpecID    *types.SpecID `json:"spec_id,omitempty"`
@@ -36,10 +36,10 @@ type ModSummary struct {
 	CreatedAt time.Time     `json:"created_at"`
 }
 
-// AddModCommand creates a new mig project.
+// AddMigCommand creates a new mig project.
 // Endpoint: POST /v1/migs
 // Creates a mig with unique name and optional initial spec.
-type AddModCommand struct {
+type AddMigCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
 	Name      string           // Required: unique mig name.
@@ -47,8 +47,8 @@ type AddModCommand struct {
 	CreatedBy *string          // Optional: creator identifier.
 }
 
-// AddModResult contains the response from creating a mig.
-type AddModResult struct {
+// AddMigResult contains the response from creating a mig.
+type AddMigResult struct {
 	ID        types.MigID   `json:"id"`
 	Name      string        `json:"name"`
 	SpecID    *types.SpecID `json:"spec_id,omitempty"`
@@ -56,12 +56,12 @@ type AddModResult struct {
 }
 
 // Run executes POST /v1/migs to create a mig project.
-func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
+func (c AddMigCommand) Run(ctx context.Context) (AddMigResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return AddModResult{}, fmt.Errorf("mig add: %w", err)
+		return AddMigResult{}, fmt.Errorf("mig add: %w", err)
 	}
 	if strings.TrimSpace(c.Name) == "" {
-		return AddModResult{}, fmt.Errorf("mig add: name is required")
+		return AddMigResult{}, fmt.Errorf("mig add: name is required")
 	}
 
 	// Build request payload with name, optional spec, and optional created_by.
@@ -77,34 +77,34 @@ func (c AddModCommand) Run(ctx context.Context) (AddModResult, error) {
 
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return AddModResult{}, fmt.Errorf("mig add: marshal request: %w", err)
+		return AddMigResult{}, fmt.Errorf("mig add: marshal request: %w", err)
 	}
 
 	// POST /v1/migs to create the mig.
 	endpoint := c.BaseURL.JoinPath("v1", "migs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return AddModResult{}, fmt.Errorf("mig add: build request: %w", err)
+		return AddMigResult{}, fmt.Errorf("mig add: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return AddModResult{}, fmt.Errorf("mig add: http request failed: %w", err)
+		return AddMigResult{}, fmt.Errorf("mig add: http request failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
-		var result AddModResult
+		var result AddMigResult
 		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return AddModResult{}, fmt.Errorf("mig add: decode response: %w", err)
+			return AddMigResult{}, fmt.Errorf("mig add: decode response: %w", err)
 		}
 		return result, nil
 	}
 
 	// Non-success: read error body and return error.
-	return AddModResult{}, httpx.WrapError("mig add", resp.Status, resp.Body)
+	return AddMigResult{}, httpx.WrapError("mig add", resp.Status, resp.Body)
 }
 
 // ListMigsCommand lists mig projects with optional filters.
@@ -121,7 +121,7 @@ type ListMigsCommand struct {
 }
 
 // Run executes GET /v1/migs to list migs with pagination and filters.
-func (c ListMigsCommand) Run(ctx context.Context) ([]ModSummary, error) {
+func (c ListMigsCommand) Run(ctx context.Context) ([]MigSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig list: %w", err)
 	}
@@ -163,7 +163,7 @@ func (c ListMigsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 
 	// Response structure: {"migs": [...]}
 	var result struct {
-		Mods []ModSummary `json:"migs"`
+		Mods []MigSummary `json:"migs"`
 	}
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mig list: decode response: %w", err)
@@ -172,17 +172,17 @@ func (c ListMigsCommand) Run(ctx context.Context) ([]ModSummary, error) {
 	return result.Mods, nil
 }
 
-// RemoveModCommand deletes a mig project.
+// RemoveMigCommand deletes a mig project.
 // Endpoint: DELETE /v1/migs/{mod_ref}
 // Refuses deletion if the mig has any runs.
-type RemoveModCommand struct {
+type RemoveMigCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	MigRef  types.MigRef // Required: mig ID or name to delete.
 }
 
 // Run executes DELETE /v1/migs/{mod_ref} to delete a mig.
-func (c RemoveModCommand) Run(ctx context.Context) error {
+func (c RemoveMigCommand) Run(ctx context.Context) error {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return fmt.Errorf("mig remove: %w", err)
 	}
@@ -309,10 +309,10 @@ func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error
 	return UnarchiveMigResult{}, httpx.WrapError("mig unarchive", resp.Status, resp.Body)
 }
 
-// SetModSpecCommand creates a new spec row and updates migs.spec_id.
+// SetMigSpecCommand creates a new spec row and updates migs.spec_id.
 // Endpoint: POST /v1/migs/{mod_ref}/specs
 // Sets the mig's current spec by creating a new spec row.
-type SetModSpecCommand struct {
+type SetMigSpecCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
 	MigRef    types.MigRef    // Required: mig ID or name.
@@ -321,22 +321,22 @@ type SetModSpecCommand struct {
 	CreatedBy *string         // Optional: creator identifier.
 }
 
-// SetModSpecResult contains the response from setting a mig spec.
-type SetModSpecResult struct {
+// SetMigSpecResult contains the response from setting a mig spec.
+type SetMigSpecResult struct {
 	ID        types.SpecID `json:"id"` // spec_id
 	CreatedAt time.Time    `json:"created_at"`
 }
 
 // Run executes POST /v1/migs/{mod_ref}/specs to set the mig's spec.
-func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
+func (c SetMigSpecCommand) Run(ctx context.Context) (SetMigSpecResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: %w", err)
+		return SetMigSpecResult{}, fmt.Errorf("mig spec set: %w", err)
 	}
 	if err := c.MigRef.Validate(); err != nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: mig ref is required")
+		return SetMigSpecResult{}, fmt.Errorf("mig spec set: mig ref is required")
 	}
 	if len(c.Spec) == 0 {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: spec is required")
+		return SetMigSpecResult{}, fmt.Errorf("mig spec set: spec is required")
 	}
 
 	// Build request payload with spec content, optional name, and created_by.
@@ -354,40 +354,40 @@ func (c SetModSpecCommand) Run(ctx context.Context) (SetModSpecResult, error) {
 
 	payload, err := json.Marshal(req)
 	if err != nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: marshal request: %w", err)
+		return SetMigSpecResult{}, fmt.Errorf("mig spec set: marshal request: %w", err)
 	}
 
 	// POST /v1/migs/{mod_ref}/specs
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "specs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: build request: %w", err)
+		return SetMigSpecResult{}, fmt.Errorf("mig spec set: build request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Client.Do(httpReq)
 	if err != nil {
-		return SetModSpecResult{}, fmt.Errorf("mig spec set: http request failed: %w", err)
+		return SetMigSpecResult{}, fmt.Errorf("mig spec set: http request failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	// Handle 201 Created response.
 	if resp.StatusCode == http.StatusCreated {
-		var result SetModSpecResult
+		var result SetMigSpecResult
 		if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-			return SetModSpecResult{}, fmt.Errorf("mig spec set: decode response: %w", err)
+			return SetMigSpecResult{}, fmt.Errorf("mig spec set: decode response: %w", err)
 		}
 		return result, nil
 	}
 
-	return SetModSpecResult{}, httpx.WrapError("mig spec set", resp.Status, resp.Body)
+	return SetMigSpecResult{}, httpx.WrapError("mig spec set", resp.Status, resp.Body)
 }
 
-// ResolveModByNameCommand attempts to resolve a mig reference (ID or name) to a mig ID.
+// ResolveMigByNameCommand attempts to resolve a mig reference (ID or name) to a mig ID.
 // It queries the server to find an exact name match, supporting both ID and name lookups.
 // This command does NOT use any client-side heuristics to distinguish IDs from names;
 // it always queries the server for resolution.
-type ResolveModByNameCommand struct {
+type ResolveMigByNameCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	MigRef  types.MigRef // Mod reference (could be ID or name).
@@ -396,7 +396,7 @@ type ResolveModByNameCommand struct {
 // Run attempts to resolve a mig ID from a name reference.
 // Returns the mig ID if found by exact name match, or the reference as-is if no match.
 // No client-side heuristics are used to distinguish IDs from names.
-func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
+func (c ResolveMigByNameCommand) Run(ctx context.Context) (string, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return "", fmt.Errorf("resolve mig: %w", err)
 	}
@@ -420,7 +420,7 @@ func (c ResolveModByNameCommand) Run(ctx context.Context) (string, error) {
 	}
 
 	// Find exact name match.
-	var matches []ModSummary
+	var matches []MigSummary
 	for _, mig := range migs {
 		if mig.Name == ref {
 			matches = append(matches, mig)

@@ -85,7 +85,7 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 	}
 
 	// Resolve mig reference to ID (supports both name and ID).
-	resolveCmd := climods.ResolveModByNameCommand{
+	resolveCmd := climods.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(modRef),

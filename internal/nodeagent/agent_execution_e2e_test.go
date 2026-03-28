@@ -98,7 +98,7 @@ func TestEndToEndFlow(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/iw2rmb/ploy-nodeagent-e2e-synthetic.git"),
 			BaseRef: types.GitRef("main"),
 			TypedOptions: RunOptions{
-				Execution: ModContainerSpec{
+				Execution: MigContainerSpec{
 					Image:   contracts.JobImage{Universal: "alpine:latest"},
 					Command: contracts.CommandSpec{Shell: "echo 'test execution'"},
 				},

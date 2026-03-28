@@ -129,7 +129,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("command option string maps to shell", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ModContainerSpec{Command: contracts.CommandSpec{Shell: "echo hi"}},
+			Execution: MigContainerSpec{Command: contracts.CommandSpec{Shell: "echo hi"}},
 		}))
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
@@ -142,7 +142,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("no command injected when custom image provided", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ModContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"}},
+			Execution: MigContainerSpec{Image: contracts.JobImage{Universal: "docker.io/example/migs-openrewrite:latest"}},
 		}))
 		manifest, err := buildManifestDefault(req)
 		if err != nil {
@@ -217,13 +217,13 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"BASE_VAR": "base_value"}),
 			withRunOptions(RunOptions{
-				Steps: []StepMod{
-					{ModContainerSpec: ModContainerSpec{
+				Steps: []StepMig{
+					{MigContainerSpec: MigContainerSpec{
 						Image:   contracts.JobImage{Universal: "migs-orw:latest"},
 						Command: contracts.CommandSpec{Exec: []string{"--apply", "--dir", "/workspace"}},
 						Env:     map[string]string{"STEP_VAR": "step0"},
 					}},
-					{ModContainerSpec: ModContainerSpec{
+					{MigContainerSpec: MigContainerSpec{
 						Image:   contracts.JobImage{Universal: "migs-fmt:latest"},
 						Command: contracts.CommandSpec{Shell: "fmt --check"},
 						Env:     map[string]string{"STEP_VAR": "step1"},
@@ -271,7 +271,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("single-step amata uses amata command", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ModContainerSpec{
+			Execution: MigContainerSpec{
 				Image: contracts.JobImage{Universal: "migs-codex:latest"},
 				Amata: &contracts.AmataRunSpec{
 					Spec: "version: amata/v1\n",
@@ -290,11 +290,11 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("multi-step amata uses amata command for selected step", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Steps: []StepMod{
-				{ModContainerSpec: ModContainerSpec{
+			Steps: []StepMig{
+				{MigContainerSpec: MigContainerSpec{
 					Image: contracts.JobImage{Universal: "migs-orw:latest"}, Command: contracts.CommandSpec{Shell: "echo plain"},
 				}},
-				{ModContainerSpec: ModContainerSpec{
+				{MigContainerSpec: MigContainerSpec{
 					Image: contracts.JobImage{Universal: "migs-codex:latest"},
 					Amata: &contracts.AmataRunSpec{
 						Spec: "version: amata/v1\n",
@@ -316,7 +316,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"}),
 			withRunOptions(RunOptions{
-				Steps: []StepMod{{ModContainerSpec: ModContainerSpec{
+				Steps: []StepMig{{MigContainerSpec: MigContainerSpec{
 					Image: contracts.JobImage{Universal: "migs-step:latest"},
 					Env:   map[string]string{"SHARED_VAR": "step_override"},
 				}}},
@@ -336,7 +336,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("multi-step run: step index out of range returns error", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Steps: []StepMod{{ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}}},
+			Steps: []StepMig{{MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "migs-step:latest"}}}},
 		}))
 		_, err := buildManifestAtStep(req, 1)
 		if err == nil {
@@ -349,7 +349,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("single-step run: stepIndex is ignored when Steps is empty", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: ModContainerSpec{
+			Execution: MigContainerSpec{
 				Image:   contracts.JobImage{Universal: "single-mig:latest"},
 				Command: contracts.CommandSpec{Shell: "run-single"},
 			},
@@ -465,7 +465,7 @@ func TestBuildGateManifestFromRequest_IgnoresStackAwareJobImages(t *testing.T) {
 
 	req := newStartRunRequest(withRunOptions(RunOptions{
 		BuildGate: BuildGateOptions{Enabled: true},
-		Steps: []StepMod{{ModContainerSpec: ModContainerSpec{
+		Steps: []StepMig{{MigContainerSpec: MigContainerSpec{
 			Image: contracts.JobImage{ByStack: map[contracts.MigStack]string{
 				contracts.MigStackJavaMaven:  "docker.io/example/orw-cli:latest",
 				contracts.MigStackJavaGradle: "docker.io/example/orw-cli:latest",

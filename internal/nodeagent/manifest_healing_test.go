@@ -22,7 +22,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 	tests := []struct {
 		name      string
 		req       StartRunRequest
-		mig       ModContainerSpec
+		mig       MigContainerSpec
 		wantEnv   map[string]string
 		wantAbsnt []string // keys that should NOT be present
 	}{
@@ -36,7 +36,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				TargetRef: types.GitRef("e2e/fail-missing-symbol"),
 				CommitSHA: types.CommitSHA("abc123def456"),
 			},
-			mig: ModContainerSpec{
+			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
@@ -54,7 +54,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("develop"),
 			},
-			mig: ModContainerSpec{
+			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
@@ -73,7 +73,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				TargetRef: types.GitRef("   "), // whitespace only
 				CommitSHA: types.CommitSHA(""),
 			},
-			mig: ModContainerSpec{
+			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 			},
 			wantEnv: map[string]string{
@@ -89,7 +89,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
-			mig: ModContainerSpec{
+			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
 					"CUSTOM_VAR":   "custom_value",
@@ -113,7 +113,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
 				BaseRef: types.GitRef("main"),
 			},
-			mig: ModContainerSpec{
+			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
 					"PLOY_REPO_URL": "https://custom.override/repo.git",
@@ -179,7 +179,7 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 		CommitSHA: types.CommitSHA("sha123"),
 	}
 
-	mig := ModContainerSpec{
+	mig := MigContainerSpec{
 		Image: testJobImage("test/healer:latest"),
 		Env:   originalEnv,
 	}
@@ -214,7 +214,7 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 		BaseRef: types.GitRef("main"),
 	}
 
-	mig := ModContainerSpec{
+	mig := MigContainerSpec{
 		Image: testJobImage("test/healer:latest"),
 		Env:   nil, // explicitly nil
 	}
@@ -241,17 +241,17 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		mig     ModContainerSpec
+		mig     MigContainerSpec
 		wantErr string
 	}{
 		{
 			name:    "empty image",
-			mig:     ModContainerSpec{Image: contracts.JobImage{}}, // empty JobImage
+			mig:     MigContainerSpec{Image: contracts.JobImage{}}, // empty JobImage
 			wantErr: "image required",
 		},
 		{
 			name:    "whitespace only image",
-			mig:     ModContainerSpec{Image: contracts.JobImage{Universal: "   "}},
+			mig:     MigContainerSpec{Image: contracts.JobImage{Universal: "   "}},
 			wantErr: "image required",
 		},
 	}
@@ -327,43 +327,43 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		mig          ModContainerSpec
+		mig          MigContainerSpec
 		codexSession string
 		wantResume   bool // true if CODEX_RESUME=1 should be set
 	}{
 		{
 			name:         "codex image with session sets CODEX_RESUME=1",
-			mig:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
+			mig:          MigContainerSpec{Image: testJobImage("migs-codex:latest")},
 			codexSession: "session-abc-123",
 			wantResume:   true,
 		},
 		{
 			name:         "codex image without session does not set CODEX_RESUME",
-			mig:          ModContainerSpec{Image: testJobImage("migs-codex:latest")},
+			mig:          MigContainerSpec{Image: testJobImage("migs-codex:latest")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
 			name:         "non-codex image with session does not set CODEX_RESUME",
-			mig:          ModContainerSpec{Image: testJobImage("standard-healer:v1")},
+			mig:          MigContainerSpec{Image: testJobImage("standard-healer:v1")},
 			codexSession: "session-xyz-456",
 			wantResume:   false,
 		},
 		{
 			name:         "non-codex image without session does not set CODEX_RESUME",
-			mig:          ModContainerSpec{Image: testJobImage("maven:3.8")},
+			mig:          MigContainerSpec{Image: testJobImage("maven:3.8")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
 			name:         "registry prefixed codex image with session",
-			mig:          ModContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/migs-codex:v2")},
+			mig:          MigContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/migs-codex:v2")},
 			codexSession: "session-def-789",
 			wantResume:   true,
 		},
 		{
 			name:         "case insensitive codex detection",
-			mig:          ModContainerSpec{Image: testJobImage("my-CODEX-fixer:latest")},
+			mig:          MigContainerSpec{Image: testJobImage("my-CODEX-fixer:latest")},
 			codexSession: "session-ghi-012",
 			wantResume:   true,
 		},
@@ -412,7 +412,7 @@ func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
 		BaseRef: types.GitRef("main"),
 	}
 
-	mig := ModContainerSpec{
+	mig := MigContainerSpec{
 		Image: testJobImage("migs-codex:latest"),
 		Env: map[string]string{
 			"CUSTOM_VAR": "custom_value",
@@ -456,7 +456,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 	t.Run("amata_spec_selects_amata_command", func(t *testing.T) {
 		t.Parallel()
 
-		mig := ModContainerSpec{
+		mig := MigContainerSpec{
 			Image:   testJobImage("migs-codex:latest"),
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata: &contracts.AmataRunSpec{
@@ -485,7 +485,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 	t.Run("amata_no_set_params", func(t *testing.T) {
 		t.Parallel()
 
-		mig := ModContainerSpec{
+		mig := MigContainerSpec{
 			Image: testJobImage("migs-codex:latest"),
 			Amata: &contracts.AmataRunSpec{Spec: "task: fix"},
 		}
@@ -507,7 +507,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 	t.Run("nil_amata_uses_direct_command", func(t *testing.T) {
 		t.Parallel()
 
-		mig := ModContainerSpec{
+		mig := MigContainerSpec{
 			Image:   testJobImage("migs-codex:latest"),
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   nil,
@@ -530,7 +530,7 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 	t.Run("amata_with_empty_spec_falls_through_to_direct_command", func(t *testing.T) {
 		t.Parallel()
 
-		mig := ModContainerSpec{
+		mig := MigContainerSpec{
 			Image:   testJobImage("migs-codex:latest"),
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   &contracts.AmataRunSpec{Spec: "   "},

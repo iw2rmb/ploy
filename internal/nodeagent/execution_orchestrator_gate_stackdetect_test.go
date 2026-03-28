@@ -351,11 +351,11 @@ func TestRunRouterForGateFailure_SetsBugSummary(t *testing.T) {
 		},
 		Healing: &HealingConfig{
 			Retries: 1,
-			Mod: ModContainerSpec{
+			Mod: MigContainerSpec{
 				Image: contracts.JobImage{Universal: "test/healer:latest"},
 			},
 		},
-		Router: &ModContainerSpec{
+		Router: &MigContainerSpec{
 			Image: contracts.JobImage{Universal: "test/router:latest"},
 		},
 	}
@@ -424,11 +424,11 @@ func TestRunRouterForGateFailure_AmataRouterCmdPersistsAfterParse(t *testing.T) 
 		},
 		Healing: &HealingConfig{
 			Retries: 1,
-			Mod: ModContainerSpec{
+			Mod: MigContainerSpec{
 				Image: contracts.JobImage{Universal: "test/healer:latest"},
 			},
 		},
-		Router: &ModContainerSpec{
+		Router: &MigContainerSpec{
 			Image: contracts.JobImage{Universal: "test/router:latest"},
 			Amata: &contracts.AmataRunSpec{
 				Spec: "task: route",
@@ -495,11 +495,11 @@ func TestRunRouterForGateFailure_DefaultsToUnknownOnInvalidClassifier(t *testing
 		},
 		Healing: &HealingConfig{
 			Retries: 1,
-			Mod: ModContainerSpec{
+			Mod: MigContainerSpec{
 				Image: contracts.JobImage{Universal: "test/healer:latest"},
 			},
 		},
-		Router: &ModContainerSpec{
+		Router: &MigContainerSpec{
 			Image: contracts.JobImage{Universal: "test/router:latest"},
 		},
 	}

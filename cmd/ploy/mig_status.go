@@ -41,7 +41,7 @@ func handleMigStatus(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	repos, err := migs.ListModReposCommand{
+	repos, err := migs.ListMigReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		MigRef:  domaintypes.MigRef(migID),
@@ -81,7 +81,7 @@ func handleMigStatus(args []string, stderr io.Writer) error {
 	return nil
 }
 
-func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL, migID string) (migs.ModSummary, error) {
+func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL, migID string) (migs.MigSummary, error) {
 	const pageSize int32 = 100
 	var offset int32
 	for {
@@ -92,7 +92,7 @@ func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL,
 			Offset:  offset,
 		}.Run(ctx)
 		if err != nil {
-			return migs.ModSummary{}, err
+			return migs.MigSummary{}, err
 		}
 		for _, item := range page {
 			if item.ID.String() == migID {
@@ -100,7 +100,7 @@ func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL,
 			}
 		}
 		if len(page) < int(pageSize) {
-			return migs.ModSummary{}, fmt.Errorf("mig %q not found", migID)
+			return migs.MigSummary{}, fmt.Errorf("mig %q not found", migID)
 		}
 		offset += pageSize
 	}

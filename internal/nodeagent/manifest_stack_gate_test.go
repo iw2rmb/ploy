@@ -10,8 +10,8 @@ import (
 // TestValidateAndDeriveStackGateChaining tests the chaining validation logic.
 func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	t.Run("single step no chaining", func(t *testing.T) {
-		steps := []StepMod{{
-			ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
+		steps := []StepMig{{
+			MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
 			Stack: &contracts.StackGateSpec{
 				Inbound: &contracts.StackGatePhaseSpec{
 					Enabled: true,
@@ -27,9 +27,9 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("derives inbound from previous outbound", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -38,7 +38,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				// No Stack config; should derive inbound from previous outbound.
 			},
 		}
@@ -70,9 +70,9 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("derives inbound when Stack exists but Inbound is nil", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -81,7 +81,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				Stack: &contracts.StackGateSpec{
 					// Inbound is nil but Stack exists.
 					Outbound: &contracts.StackGatePhaseSpec{
@@ -107,9 +107,9 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("rejects mismatched explicit inbound", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -118,7 +118,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Inbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -142,9 +142,9 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("matching explicit inbound passes", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -153,7 +153,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Inbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -170,9 +170,9 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("skips chaining when previous outbound disabled", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: false, // Disabled.
@@ -181,7 +181,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				// No Stack; should not derive since previous outbound is disabled.
 			},
 		}
@@ -198,13 +198,13 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("skips chaining when previous has no Stack", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				// No Stack config.
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				// No Stack config.
 			},
 		}
@@ -221,9 +221,9 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 	})
 
 	t.Run("three step chain", func(t *testing.T) {
-		steps := []StepMod{
+		steps := []StepMig{
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Inbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
@@ -236,7 +236,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				Stack: &contracts.StackGateSpec{
 					// Inbound will be derived from step 0 outbound (release: 11).
 					Outbound: &contracts.StackGatePhaseSpec{
@@ -246,7 +246,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				},
 			},
 			{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "mod3:latest"}},
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod3:latest"}},
 				// Inbound will be derived from step 1 outbound (release: 17).
 			},
 		}
@@ -403,8 +403,8 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 		// Simulate post_gate scenario where outbound expectations are used.
 		req := baseStartRunRequest()
 		typedOpts := RunOptions{
-			Steps: []StepMod{{
-				ModContainerSpec: ModContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
+			Steps: []StepMig{{
+				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Inbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
