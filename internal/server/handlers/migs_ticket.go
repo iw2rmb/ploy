@@ -384,9 +384,9 @@ func createPlannedJob(ctx context.Context, st store.Store, runID domaintypes.Run
 	// Build job metadata with step name for mig jobs.
 	var meta *contracts.JobMeta
 	if planned.StepName != "" {
-		meta = contracts.NewModJobMetaWithStepName(planned.StepName)
+		meta = contracts.NewMigJobMetaWithStepName(planned.StepName)
 	} else {
-		meta = contracts.NewModJobMeta()
+		meta = contracts.NewMigJobMeta()
 	}
 	metaBytes, err := contracts.MarshalJobMeta(meta)
 	if err != nil {

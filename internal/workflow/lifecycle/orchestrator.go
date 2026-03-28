@@ -222,7 +222,7 @@ func EvaluateGateFailureTransition(
 			HealRepoSHAIn:  healRepoSHAIn,
 			OldSuccessorID: failedJob.NextID,
 			HealMeta: &contracts.JobMeta{
-				Kind:     contracts.JobKindMod,
+				Kind:     contracts.JobKindMig,
 				Recovery: CloneRecoveryMetadata(enrichedMeta),
 			},
 			ReGateMeta: &contracts.JobMeta{

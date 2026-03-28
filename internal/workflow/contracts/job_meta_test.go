@@ -17,7 +17,7 @@ func TestJobKind_Valid(t *testing.T) {
 		kind JobKind
 		want bool
 	}{
-		{JobKindMod, true},
+		{JobKindMig, true},
 		{JobKindGate, true},
 		{JobKindBuild, true},
 		{"", false},
@@ -40,7 +40,7 @@ func TestJobMeta_Validate(t *testing.T) {
 	}{
 		{
 			name:    "valid mig job",
-			meta:    JobMeta{Kind: JobKindMod},
+			meta:    JobMeta{Kind: JobKindMig},
 			wantErr: false,
 		},
 		{
@@ -70,7 +70,7 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "valid mig job with recovery metadata",
 			meta: JobMeta{
-				Kind: JobKindMod,
+				Kind: JobKindMig,
 				Recovery: &RecoveryJobMetadata{
 					LoopKind:  "healing",
 					ErrorKind: "code",
@@ -97,7 +97,7 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "gate metadata on mig job",
 			meta: JobMeta{
-				Kind: JobKindMod,
+				Kind: JobKindMig,
 				Gate: &BuildGateStageMetadata{},
 			},
 			wantErr: true,
@@ -105,7 +105,7 @@ func TestJobMeta_Validate(t *testing.T) {
 		{
 			name: "build metadata on mig job",
 			meta: JobMeta{
-				Kind:  JobKindMod,
+				Kind:  JobKindMig,
 				Build: &BuildMeta{Tool: "maven"},
 			},
 			wantErr: true,
@@ -171,14 +171,14 @@ func TestMarshalJobMeta(t *testing.T) {
 		{
 			name: "gate metadata on mig job returns error",
 			meta: &JobMeta{
-				Kind: JobKindMod,
+				Kind: JobKindMig,
 				Gate: &BuildGateStageMetadata{},
 			},
 			wantErr: true,
 		},
 		{
 			name: "mig job",
-			meta: &JobMeta{Kind: JobKindMod},
+			meta: &JobMeta{Kind: JobKindMig},
 			want: `{"kind":"mig"}`,
 		},
 		{
@@ -264,7 +264,7 @@ func TestUnmarshalJobMeta(t *testing.T) {
 		{
 			name:     "mig job",
 			data:     []byte(`{"kind":"mig"}`),
-			wantKind: JobKindMod,
+			wantKind: JobKindMig,
 		},
 		{
 			name:     "gate job",
@@ -363,10 +363,10 @@ func TestJobMeta_RoundTrip(t *testing.T) {
 }
 
 func TestNewJobMetaConstructors(t *testing.T) {
-	t.Run("NewModJobMeta", func(t *testing.T) {
-		m := NewModJobMeta()
-		if m.Kind != JobKindMod {
-			t.Errorf("Kind = %v, want %v", m.Kind, JobKindMod)
+	t.Run("NewMigJobMeta", func(t *testing.T) {
+		m := NewMigJobMeta()
+		if m.Kind != JobKindMig {
+			t.Errorf("Kind = %v, want %v", m.Kind, JobKindMig)
 		}
 		if m.Gate != nil {
 			t.Error("Gate should be nil")
@@ -445,7 +445,7 @@ func TestBuildMeta_JSON(t *testing.T) {
 func TestJobMeta_ActionSummary_Valid(t *testing.T) {
 	t.Parallel()
 	m := &JobMeta{
-		Kind:          JobKindMod,
+		Kind:          JobKindMig,
 		ActionSummary: "Fixed missing import in Main.java",
 	}
 	if err := m.Validate(); err != nil {
@@ -486,7 +486,7 @@ func TestJobMeta_ActionSummary_TooLong(t *testing.T) {
 		long += "x"
 	}
 	m := &JobMeta{
-		Kind:          JobKindMod,
+		Kind:          JobKindMig,
 		ActionSummary: long,
 	}
 	err := m.Validate()
@@ -498,7 +498,7 @@ func TestJobMeta_ActionSummary_TooLong(t *testing.T) {
 func TestJobMeta_Recovery_RoundTrip(t *testing.T) {
 	t.Parallel()
 	original := &JobMeta{
-		Kind: JobKindMod,
+		Kind: JobKindMig,
 		Recovery: &RecoveryJobMetadata{
 			LoopKind:   "healing",
 			ErrorKind:  "code",
