@@ -1,10 +1,10 @@
 // stack_gate_spec.go defines Stack Gate types for explicit stack expectations.
 //
-// Stack Gate allows Mods specs to declare explicit expectations about the
+// Stack Gate allows mig specs to declare explicit expectations about the
 // repository's technology stack (language, build tool, release version).
 // This enables:
 //   - Validation of contradictory multi-step runs before execution
-//   - Stack-based image selection for Mods containers
+//   - Stack-based image selection for mig containers
 //   - Chain validation across step boundaries (outbound → inbound)
 //
 // ## Wire Format

@@ -49,7 +49,7 @@ func (k JobKind) Valid() bool {
 //	}
 //
 // The kind field is always present and determines which optional
-// metadata section (gate/build) is populated. Mod jobs typically
+// metadata section (gate/build) is populated. Mig jobs typically
 // have kind="mig" with no gate or build metadata.
 type JobMeta struct {
 	// Kind identifies the job type: "mig", "gate", or "build".

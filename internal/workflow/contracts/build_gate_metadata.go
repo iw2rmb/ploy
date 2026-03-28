@@ -73,7 +73,7 @@ type BuildGateReportLink struct {
 
 // DetectedStack returns the MigStack derived from the first static check's tool.
 // This provides deterministic stack identification for stack-aware image selection
-// in Mods steps and healing jobs.
+// in mig steps and healing jobs.
 //
 // The detected stack is derived from the Build Gate's tool detection:
 //   - "maven" tool → MigStackJavaMaven
