@@ -10,18 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// mergeJobIDIntoSpec injects job_id into the spec JSONB for downstream execution.
-func mergeJobIDIntoSpec(spec []byte, jobID domaintypes.JobID) (json.RawMessage, error) {
-	m, err := parseSpecObjectStrict(json.RawMessage(spec))
-	if err != nil {
-		return nil, err
-	}
-	if err := applyJobIDMutator(m, jobID); err != nil {
-		return nil, err
-	}
-	return marshalSpecObject(m)
-}
-
 func parseSpecObjectStrict(spec json.RawMessage) (map[string]any, error) {
 	if len(bytes.TrimSpace(spec)) == 0 {
 		return nil, fmt.Errorf("spec: expected JSON object, got empty")
@@ -48,26 +36,6 @@ func marshalSpecObject(m map[string]any) (json.RawMessage, error) {
 func applyJobIDMutator(m map[string]any, jobID domaintypes.JobID) error {
 	m["job_id"] = jobID.String()
 	return nil
-}
-
-// mergeGlobalEnvIntoSpec injects global environment variables into the spec's "env" map.
-// Global env vars are only merged if their scope matches the job type.
-// Per-run env vars (already in spec) take precedence over global env.
-func mergeGlobalEnvIntoSpec(spec json.RawMessage, env map[string]GlobalEnvVar, jobType domaintypes.JobType) (json.RawMessage, error) {
-	if len(env) == 0 {
-		return spec, nil
-	}
-
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyGlobalEnvMutator(m, env, jobType); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
 }
 
 func applyGlobalEnvMutator(m map[string]any, env map[string]GlobalEnvVar, jobType domaintypes.JobType) error {
@@ -97,25 +65,6 @@ func applyGlobalEnvMutator(m map[string]any, env map[string]GlobalEnvVar, jobTyp
 	}
 	m["env"] = em
 	return nil
-}
-
-// mergeGitLabConfigIntoSpec merges GitLab default token and domain into the JSON spec payload.
-// Only merges values if they are non-empty and not already present in the spec.
-func mergeGitLabConfigIntoSpec(spec json.RawMessage, cfg config.GitLabConfig) (json.RawMessage, error) {
-	if strings.TrimSpace(cfg.Token) == "" && strings.TrimSpace(cfg.Domain) == "" {
-		return spec, nil
-	}
-
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyGitLabConfigMutator(m, cfg); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
 }
 
 func applyGitLabConfigMutator(m map[string]any, cfg config.GitLabConfig) error {

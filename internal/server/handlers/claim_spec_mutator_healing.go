@@ -10,26 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func mergeHealingSelectedKindIntoSpec(spec json.RawMessage, job store.Job, jobType domaintypes.JobType) (json.RawMessage, error) {
-	if jobType != domaintypes.JobTypeHeal {
-		return spec, nil
-	}
-	if len(job.Meta) == 0 {
-		return spec, nil
-	}
-
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyHealingSelectedKindMutator(m, job, jobType); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
-}
-
 func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType domaintypes.JobType) error {
 	if jobType != domaintypes.JobTypeHeal {
 		return nil
@@ -95,26 +75,6 @@ func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType do
 		}
 	}
 	return nil
-}
-
-func mergeHealingSchemaIntoSpec(spec json.RawMessage, job store.Job, jobType domaintypes.JobType) (json.RawMessage, error) {
-	if jobType != domaintypes.JobTypeHeal {
-		return spec, nil
-	}
-	if len(job.Meta) == 0 {
-		return spec, nil
-	}
-
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyHealingSchemaMutator(m, job, jobType); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
 }
 
 func applyHealingSchemaMutator(m map[string]any, job store.Job, jobType domaintypes.JobType) error {

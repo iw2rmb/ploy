@@ -7,163 +7,102 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// TestMergeGitLabConfigIntoSpec_EmptyConfig verifies that when GitLab config is empty,
-// the spec is returned unchanged.
-func TestMergeGitLabConfigIntoSpec_EmptyConfig(t *testing.T) {
-	t.Parallel()
-
-	spec := json.RawMessage(`{"job_id":"abc123"}`)
-	cfg := config.GitLabConfig{}
-
-	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
-	if err != nil {
-		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-
-	if _, hasToken := m["gitlab_pat"]; hasToken {
-		t.Error("gitlab_pat should not be present when config is empty")
-	}
-	if _, hasDomain := m["gitlab_domain"]; hasDomain {
-		t.Error("gitlab_domain should not be present when config is empty")
-	}
-	if m["job_id"] != "abc123" {
-		t.Errorf("job_id = %v, want abc123", m["job_id"])
-	}
-}
-
-// TestMergeGitLabConfigIntoSpec_ServerDefaults verifies that server defaults
-// are merged into spec when spec does not contain per-run overrides.
-func TestMergeGitLabConfigIntoSpec_ServerDefaults(t *testing.T) {
-	t.Parallel()
-
-	spec := json.RawMessage(`{"job_id":"abc123"}`)
-	cfg := config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-		Token:  "server-token-default",
-	}
-
-	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
-	if err != nil {
-		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-
-	if m["gitlab_pat"] != "server-token-default" {
-		t.Errorf("gitlab_pat = %v, want server-token-default", m["gitlab_pat"])
-	}
-	if m["gitlab_domain"] != "https://gitlab.example.com" {
-		t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", m["gitlab_domain"])
-	}
-	if m["job_id"] != "abc123" {
-		t.Errorf("job_id = %v, want abc123", m["job_id"])
-	}
-}
-
-// TestMergeGitLabConfigIntoSpec_PerRunOverrides verifies that per-run overrides
-// in spec take precedence over server defaults.
-func TestMergeGitLabConfigIntoSpec_PerRunOverrides(t *testing.T) {
-	t.Parallel()
-
-	spec := json.RawMessage(`{
-		"job_id":"abc123",
-		"gitlab_pat":"per-run-token",
-		"gitlab_domain":"https://gitlab.custom.com"
-	}`)
-	cfg := config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-		Token:  "server-token-default",
-	}
-
-	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
-	if err != nil {
-		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-
-	// Per-run overrides should be preserved.
-	if m["gitlab_pat"] != "per-run-token" {
-		t.Errorf("gitlab_pat = %v, want per-run-token", m["gitlab_pat"])
-	}
-	if m["gitlab_domain"] != "https://gitlab.custom.com" {
-		t.Errorf("gitlab_domain = %v, want https://gitlab.custom.com", m["gitlab_domain"])
-	}
-	if m["job_id"] != "abc123" {
-		t.Errorf("job_id = %v, want abc123", m["job_id"])
-	}
-}
-
-// TestMergeGitLabConfigIntoSpec_PartialOverrides verifies that if only one field
-// has a per-run override, the other field gets the server default.
-func TestMergeGitLabConfigIntoSpec_PartialOverrides(t *testing.T) {
-	t.Parallel()
-
-	spec := json.RawMessage(`{
-		"job_id":"abc123",
-		"gitlab_pat":"per-run-token"
-	}`)
-	cfg := config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-		Token:  "server-token-default",
-	}
-
-	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
-	if err != nil {
-		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-
-	// Per-run token should be preserved.
-	if m["gitlab_pat"] != "per-run-token" {
-		t.Errorf("gitlab_pat = %v, want per-run-token", m["gitlab_pat"])
-	}
-	// Server default domain should be added.
-	if m["gitlab_domain"] != "https://gitlab.example.com" {
-		t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", m["gitlab_domain"])
-	}
-}
-
-// TestMergeGitLabConfigIntoSpec_EmptySpec verifies that merging works even when
-// spec is empty or nil.
-func TestMergeGitLabConfigIntoSpec_EmptySpec(t *testing.T) {
+func TestApplyGitLabConfigMutator(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		spec    json.RawMessage
-		wantErr bool
+		name       string
+		spec       json.RawMessage
+		cfg        config.GitLabConfig
+		wantErr    bool
+		wantToken  string // "" means absent
+		wantDomain string // "" means absent
+		checkJobID string // if non-empty, check job_id preserved
 	}{
-		{"empty spec object", json.RawMessage(`{}`), false},
-		{"nil spec", nil, true},
-		{"whitespace spec", json.RawMessage(`   `), true},
-		{"invalid json", json.RawMessage(`{invalid`), true},
-		{"non-object json", json.RawMessage(`[]`), true},
-	}
+		{
+			name:       "empty config leaves spec unchanged",
+			spec:       json.RawMessage(`{"job_id":"abc123"}`),
+			cfg:        config.GitLabConfig{},
+			wantToken:  "",
+			wantDomain: "",
+			checkJobID: "abc123",
+		},
+		{
+			name:       "server defaults merged when spec has no overrides",
+			spec:       json.RawMessage(`{"job_id":"abc123"}`),
+			cfg:        config.GitLabConfig{Domain: "https://gitlab.example.com", Token: "server-token-default"},
+			wantToken:  "server-token-default",
+			wantDomain: "https://gitlab.example.com",
+			checkJobID: "abc123",
+		},
+		{
+			name: "per-run overrides take precedence",
+			spec: json.RawMessage(`{"job_id":"abc123","gitlab_pat":"per-run-token","gitlab_domain":"https://gitlab.custom.com"}`),
+			cfg:  config.GitLabConfig{Domain: "https://gitlab.example.com", Token: "server-token-default"},
 
-	cfg := config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-		Token:  "server-token-default",
+			wantToken:  "per-run-token",
+			wantDomain: "https://gitlab.custom.com",
+			checkJobID: "abc123",
+		},
+		{
+			name:       "partial override: per-run token preserved, server domain added",
+			spec:       json.RawMessage(`{"job_id":"abc123","gitlab_pat":"per-run-token"}`),
+			cfg:        config.GitLabConfig{Domain: "https://gitlab.example.com", Token: "server-token-default"},
+			wantToken:  "per-run-token",
+			wantDomain: "https://gitlab.example.com",
+		},
+		{
+			name:       "only token in config",
+			spec:       json.RawMessage(`{"job_id":"abc123"}`),
+			cfg:        config.GitLabConfig{Token: "server-token-only"},
+			wantToken:  "server-token-only",
+			wantDomain: "",
+		},
+		{
+			name:       "only domain in config",
+			spec:       json.RawMessage(`{"job_id":"abc123"}`),
+			cfg:        config.GitLabConfig{Domain: "https://gitlab.example.com"},
+			wantToken:  "",
+			wantDomain: "https://gitlab.example.com",
+		},
+		{
+			name:    "nil spec",
+			spec:    nil,
+			cfg:     config.GitLabConfig{Domain: "d", Token: "t"},
+			wantErr: true,
+		},
+		{
+			name:    "whitespace spec",
+			spec:    json.RawMessage(`   `),
+			cfg:     config.GitLabConfig{Domain: "d", Token: "t"},
+			wantErr: true,
+		},
+		{
+			name:    "invalid json",
+			spec:    json.RawMessage(`{invalid`),
+			cfg:     config.GitLabConfig{Domain: "d", Token: "t"},
+			wantErr: true,
+		},
+		{
+			name:    "non-object json",
+			spec:    json.RawMessage(`[]`),
+			cfg:     config.GitLabConfig{Domain: "d", Token: "t"},
+			wantErr: true,
+		},
+		{
+			name:       "empty spec object",
+			spec:       json.RawMessage(`{}`),
+			cfg:        config.GitLabConfig{Domain: "https://gitlab.example.com", Token: "server-token-default"},
+			wantToken:  "server-token-default",
+			wantDomain: "https://gitlab.example.com",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := mergeGitLabConfigIntoSpec(tt.spec, cfg)
+			t.Parallel()
+
+			m, err := parseSpecObjectStrict(tt.spec)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -171,76 +110,48 @@ func TestMergeGitLabConfigIntoSpec_EmptySpec(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
+				t.Fatalf("parseSpecObjectStrict: %v", err)
 			}
 
-			var m map[string]any
-			if err := json.Unmarshal(result, &m); err != nil {
+			if err := applyGitLabConfigMutator(m, tt.cfg); err != nil {
+				t.Fatalf("applyGitLabConfigMutator: %v", err)
+			}
+
+			result, err := marshalSpecObject(m)
+			if err != nil {
+				t.Fatalf("marshalSpecObject: %v", err)
+			}
+
+			var out map[string]any
+			if err := json.Unmarshal(result, &out); err != nil {
 				t.Fatalf("unmarshal result: %v", err)
 			}
 
-			if m["gitlab_pat"] != "server-token-default" {
-				t.Errorf("gitlab_pat = %v, want server-token-default", m["gitlab_pat"])
+			if tt.wantToken != "" {
+				if out["gitlab_pat"] != tt.wantToken {
+					t.Errorf("gitlab_pat = %v, want %s", out["gitlab_pat"], tt.wantToken)
+				}
+			} else {
+				if _, has := out["gitlab_pat"]; has {
+					t.Error("gitlab_pat should not be present")
+				}
 			}
-			if m["gitlab_domain"] != "https://gitlab.example.com" {
-				t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", m["gitlab_domain"])
+
+			if tt.wantDomain != "" {
+				if out["gitlab_domain"] != tt.wantDomain {
+					t.Errorf("gitlab_domain = %v, want %s", out["gitlab_domain"], tt.wantDomain)
+				}
+			} else {
+				if _, has := out["gitlab_domain"]; has {
+					t.Error("gitlab_domain should not be present")
+				}
+			}
+
+			if tt.checkJobID != "" {
+				if out["job_id"] != tt.checkJobID {
+					t.Errorf("job_id = %v, want %s", out["job_id"], tt.checkJobID)
+				}
 			}
 		})
-	}
-}
-
-// TestMergeGitLabConfigIntoSpec_OnlyToken verifies that only token is merged
-// when domain is empty in config.
-func TestMergeGitLabConfigIntoSpec_OnlyToken(t *testing.T) {
-	t.Parallel()
-
-	spec := json.RawMessage(`{"job_id":"abc123"}`)
-	cfg := config.GitLabConfig{
-		Token: "server-token-only",
-	}
-
-	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
-	if err != nil {
-		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-
-	if m["gitlab_pat"] != "server-token-only" {
-		t.Errorf("gitlab_pat = %v, want server-token-only", m["gitlab_pat"])
-	}
-	if _, hasDomain := m["gitlab_domain"]; hasDomain {
-		t.Error("gitlab_domain should not be present when config domain is empty")
-	}
-}
-
-// TestMergeGitLabConfigIntoSpec_OnlyDomain verifies that only domain is merged
-// when token is empty in config.
-func TestMergeGitLabConfigIntoSpec_OnlyDomain(t *testing.T) {
-	t.Parallel()
-
-	spec := json.RawMessage(`{"job_id":"abc123"}`)
-	cfg := config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-	}
-
-	result, err := mergeGitLabConfigIntoSpec(spec, cfg)
-	if err != nil {
-		t.Fatalf("mergeGitLabConfigIntoSpec: %v", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(result, &m); err != nil {
-		t.Fatalf("unmarshal result: %v", err)
-	}
-
-	if _, hasToken := m["gitlab_pat"]; hasToken {
-		t.Error("gitlab_pat should not be present when config token is empty")
-	}
-	if m["gitlab_domain"] != "https://gitlab.example.com" {
-		t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", m["gitlab_domain"])
 	}
 }

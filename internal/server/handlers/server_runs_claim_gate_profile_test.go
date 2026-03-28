@@ -5,12 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -55,17 +51,8 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
-			nodeKey := domaintypes.NewNodeKey()
-			nodeID := domaintypes.NodeID(nodeKey)
-			runID := domaintypes.NewRunID()
-			repoID := domaintypes.NewRepoID()
-			specID := domaintypes.NewSpecID()
-			jobID := domaintypes.NewJobID()
-			now := time.Now().UTC()
 
 			meta := fmt.Sprintf(`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_gate_profile":%s}}`,
 				contracts.GateProfileCandidateSchemaID,
@@ -73,44 +60,14 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 				contracts.RecoveryCandidateStatusValid,
 				candidateProfile,
 			)
-			st := &mockStore{
-				getNodeResult: store.Node{ID: nodeID},
-				claimJobResult: store.Job{
-					ID:          jobID,
-					RunID:       runID,
-					RepoID:      repoID,
-					RepoBaseRef: "main",
-					Attempt:     1,
-					NodeID:      &nodeID,
-					Name:        "re-gate-1",
-					Status:      domaintypes.JobStatusRunning,
-					JobType:     domaintypes.JobTypeReGate,
-					Meta:        []byte(meta),
-				},
-				getRunResult: store.Run{
-					ID:        runID,
-					SpecID:    specID,
-					Status:    domaintypes.RunStatusStarted,
-					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-					StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-				},
-				getRunRepoResult: store.RunRepo{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoBaseRef:   "main",
-					RepoTargetRef: "feature-branch",
-					Status:        domaintypes.RunRepoStatusQueued,
-					Attempt:       1,
-				},
-				getModRepoResult: store.MigRepo{
-					ID:     domaintypes.NewMigRepoID(),
-					RepoID: repoID,
-				},
-				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
-			}
 
-			handler := claimJobHandler(st, &ConfigHolder{})
-			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
+			f := newClaimJobFixture(t, claimJobFixtureOptions{
+				jobType:  domaintypes.JobTypeReGate,
+				jobName:  "re-gate-1",
+				specJSON: tc.spec,
+				jobMeta:  []byte(meta),
+			})
+			rr := f.serve()
 			assertStatus(t, rr, http.StatusOK)
 
 			resp := decodeBody[map[string]any](t, rr)
@@ -147,57 +104,19 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 func TestClaimJob_InvalidRecoveryCandidateGateProfileReturnsError(t *testing.T) {
 	t.Parallel()
 
-	nodeKey := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeKey)
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-	jobID := domaintypes.NewJobID()
-	now := time.Now().UTC()
+	meta := fmt.Sprintf(
+		`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_gate_profile":{"schema_version":1}}}`,
+		contracts.GateProfileCandidateSchemaID,
+		contracts.GateProfileCandidateArtifactPath,
+		contracts.RecoveryCandidateStatusValid,
+	)
 
-	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        "re-gate-0",
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeReGate,
-			Meta: []byte(fmt.Sprintf(
-				`{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"%s","candidate_artifact_path":"%s","candidate_validation_status":"%s","candidate_gate_profile":{"schema_version":1}}}`,
-				contracts.GateProfileCandidateSchemaID,
-				contracts.GateProfileCandidateArtifactPath,
-				contracts.RecoveryCandidateStatusValid,
-			)),
-		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
-		getModRepoResult: store.MigRepo{
-			ID:     domaintypes.NewMigRepoID(),
-			RepoID: repoID,
-		},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
-	}
-
-	handler := claimJobHandler(st, &ConfigHolder{})
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType: domaintypes.JobTypeReGate,
+		jobName: "re-gate-0",
+		jobMeta: []byte(meta),
+	})
+	rr := f.serve()
 
 	assertStatus(t, rr, http.StatusInternalServerError)
 	if !strings.Contains(rr.Body.String(), "gate_profile") {

@@ -5,9 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -17,65 +14,24 @@ import (
 func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) {
 	t.Parallel()
 
-	nodeKey := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeKey)
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-	jobID := domaintypes.NewJobID()
-	now := time.Now().UTC()
-
-	spec := []byte(`{
-		"steps":[{"image":"docker.io/acme/mod:latest"}],
-		"build_gate":{
-			"healing":{
-				"by_error_kind":{
-					"infra":{"retries":2,"image":"docker.io/acme/heal:latest"}
-				}
-			},
-			"router":{"image":"docker.io/acme/router:latest"}
-		}
-	}`)
-
-	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        "heal-1-0",
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeHeal,
-			JobImage:    "docker.io/acme/heal:latest",
-			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`),
-		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
-		getModRepoResult: store.MigRepo{
-			ID:     domaintypes.NewMigRepoID(),
-			RepoID: repoID,
-		},
-		getSpecResult: store.Spec{ID: specID, Spec: spec},
-	}
-
-	handler := claimJobHandler(st, &ConfigHolder{})
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType: domaintypes.JobTypeHeal,
+		jobName: "heal-1-0",
+		specJSON: []byte(`{
+			"steps":[{"image":"docker.io/acme/mod:latest"}],
+			"build_gate":{
+				"healing":{
+					"by_error_kind":{
+						"infra":{"retries":2,"image":"docker.io/acme/heal:latest"}
+					}
+				},
+				"router":{"image":"docker.io/acme/router:latest"}
+			}
+		}`),
+		jobImage: "docker.io/acme/heal:latest",
+		jobMeta:  []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default","expectations":{"artifacts":[{"path":"/out/gate-profile-candidate.json","schema":"gate_profile_v1"}]}}}`),
+	})
+	rr := f.serve()
 	assertStatus(t, rr, http.StatusOK)
 
 	resp := decodeBody[map[string]any](t, rr)
@@ -137,65 +93,24 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 	t.Parallel()
 
-	nodeKey := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeKey)
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-	jobID := domaintypes.NewJobID()
-	now := time.Now().UTC()
-
-	spec := []byte(`{
-		"steps":[{"image":"docker.io/acme/mod:latest"}],
-		"build_gate":{
-			"healing":{
-				"by_error_kind":{
-					"infra":{"retries":2,"image":"docker.io/acme/heal:latest"},
-					"code":{"retries":1,"image":"docker.io/acme/heal:latest"}
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType: domaintypes.JobTypeHeal,
+		jobName: "heal-1-0",
+		specJSON: []byte(`{
+			"steps":[{"image":"docker.io/acme/mod:latest"}],
+			"build_gate":{
+				"healing":{
+					"by_error_kind":{
+						"infra":{"retries":2,"image":"docker.io/acme/heal:latest"},
+						"code":{"retries":1,"image":"docker.io/acme/heal:latest"}
+					}
 				}
 			}
-		}
-	}`)
-
-	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        "heal-1-0",
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeHeal,
-			JobImage:    "docker.io/acme/heal:latest",
-			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
-		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
-		getModRepoResult: store.MigRepo{
-			ID:     domaintypes.NewMigRepoID(),
-			RepoID: repoID,
-		},
-		getSpecResult: store.Spec{ID: specID, Spec: spec},
-	}
-
-	handler := claimJobHandler(st, &ConfigHolder{})
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
+		}`),
+		jobImage: "docker.io/acme/heal:latest",
+		jobMeta:  []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default"}}`),
+	})
+	rr := f.serve()
 	assertStatus(t, rr, http.StatusOK)
 
 	resp := decodeBody[map[string]any](t, rr)
@@ -224,83 +139,45 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T) {
 	t.Parallel()
 
-	nodeKey := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeKey)
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-	jobID := domaintypes.NewJobID()
 	gateJobID := domaintypes.NewJobID()
-	now := time.Now().UTC()
 
-	spec := []byte(`{
-		"steps":[{"image":"docker.io/acme/mod:latest"}],
-		"build_gate":{
-			"healing":{
-				"by_error_kind":{
-					"deps":{"retries":2,"image":"docker.io/acme/heal:latest"}
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		jobType:  domaintypes.JobTypeHeal,
+		jobName:  "heal-1-0",
+		jobImage: "docker.io/acme/heal:latest",
+		specJSON: []byte(`{
+			"steps":[{"image":"docker.io/acme/mod:latest"}],
+			"build_gate":{
+				"healing":{
+					"by_error_kind":{
+						"deps":{"retries":2,"image":"docker.io/acme/heal:latest"}
+					}
 				}
 			}
-		}
-	}`)
+		}`),
+		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"deps","strategy_id":"deps-default","deps_bumps":{"org.slf4j:slf4j-api":"2.0.13","legacy:shim":null}}}`),
+	})
 
-	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        "heal-1-0",
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeHeal,
-			JobImage:    "docker.io/acme/heal:latest",
-			Meta:        []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"deps","strategy_id":"deps-default","deps_bumps":{"org.slf4j:slf4j-api":"2.0.13","legacy:shim":null}}}`),
+	f.store.listJobsByRunRepoAttemptResult = []store.Job{
+		{
+			ID:      gateJobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypePreGate,
+			NextID:  &f.jobID,
+			Meta:    []byte(`{"kind":"gate","gate":{"detected_stack":{"language":"java","release":"17","tool":"maven"}}}`),
 		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
-		getModRepoResult: store.MigRepo{
-			ID:     domaintypes.NewMigRepoID(),
-			RepoID: repoID,
-		},
-		getSpecResult: store.Spec{ID: specID, Spec: spec},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:      gateJobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				JobType: domaintypes.JobTypePreGate,
-				NextID:  &jobID,
-				Meta:    []byte(`{"kind":"gate","gate":{"detected_stack":{"language":"java","release":"17","tool":"maven"}}}`),
-			},
-			{
-				ID:      jobID,
-				RunID:   runID,
-				RepoID:  repoID,
-				Attempt: 1,
-				JobType: domaintypes.JobTypeHeal,
-			},
+		{
+			ID:      f.jobID,
+			RunID:   f.runID,
+			RepoID:  f.repoID,
+			Attempt: 1,
+			JobType: domaintypes.JobTypeHeal,
 		},
 	}
 
-	handler := claimJobHandler(st, &ConfigHolder{})
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
+	rr := f.serve()
 	assertStatus(t, rr, http.StatusOK)
 
 	resp := decodeBody[map[string]any](t, rr)
