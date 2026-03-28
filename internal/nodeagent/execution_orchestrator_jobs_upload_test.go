@@ -5,12 +5,9 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -27,6 +24,8 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		artifactPaths []string
 		createFiles   []string
 		wantUpload    bool
+		outDirFiles   []string
+		wantHeaders   []string
 	}{
 		{
 			name:          "valid paths trigger upload",
@@ -37,25 +36,21 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		{
 			name:          "missing paths skip upload",
 			artifactPaths: []string{"missing.txt"},
-			createFiles:   []string{},
 			wantUpload:    false,
 		},
 		{
 			name:          "empty paths skip upload",
 			artifactPaths: []string{"", "  "},
-			createFiles:   []string{},
 			wantUpload:    false,
 		},
 		{
 			name:          "nil artifact_paths skip upload",
 			artifactPaths: nil,
-			createFiles:   []string{},
 			wantUpload:    false,
 		},
 		{
 			name:          "path traversal ../../etc/passwd rejected",
 			artifactPaths: []string{"../../etc/passwd"},
-			createFiles:   []string{},
 			wantUpload:    false,
 		},
 		{
@@ -67,14 +62,19 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		{
 			name:          "absolute path /etc/hosts rejected",
 			artifactPaths: []string{"/etc/hosts"},
-			createFiles:   []string{},
 			wantUpload:    false,
 		},
 		{
 			name:          "all paths are traversal attempts",
 			artifactPaths: []string{"../secret", "../../etc/shadow", "../../../root/.bashrc"},
-			createFiles:   []string{},
 			wantUpload:    false,
+		},
+		{
+			name:          "resolves /out path deterministically",
+			artifactPaths: []string{"/out/gate-profile-candidate.json"},
+			wantUpload:    true,
+			outDirFiles:   []string{"gate-profile-candidate.json"},
+			wantHeaders:   []string{"out/gate-profile-candidate.json"},
 		},
 	}
 
@@ -82,47 +82,17 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			uploadCalled := false
+			server, cap := newArtifactUploadServer(t, "test-run-123", "test-job-id")
+			controller := newTestController(t, newTestConfig(server.URL))
 
-			// Mock server (job-scoped endpoint).
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
-				if r.URL.Path == "/v1/runs/test-run-123/jobs/test-job-id/artifact" {
-					uploadCalled = true
-					// Verify name matches manifest OptionString("artifact_name").
-					var payload map[string]any
-					_ = json.NewDecoder(r.Body).Decode(&payload)
-					if name, ok := payload["name"].(string); !ok || name != "test-artifact" {
-						t.Errorf("artifact name = %v, want test-artifact", payload["name"])
-					}
-					w.WriteHeader(http.StatusCreated)
-					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
-				}
-			}))
-			defer server.Close()
-
-			// Create workspace with test files.
 			workspace := t.TempDir()
+			populateTestFiles(t, workspace, tt.createFiles, "test")
 
-			for _, f := range tt.createFiles {
-				fullPath := filepath.Join(workspace, f)
-				if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-					t.Fatalf("failed to create dir: %v", err)
-				}
-				if err := os.WriteFile(fullPath, []byte("test"), 0644); err != nil {
-					t.Fatalf("failed to create file: %v", err)
-				}
+			outDir := ""
+			if len(tt.outDirFiles) > 0 {
+				outDir = t.TempDir()
+				populateTestFiles(t, outDir, tt.outDirFiles, "test")
 			}
-
-			// Initialize test infrastructure.
-			// Uploaders are eagerly initialized; tests must set them explicitly.
-			cfg := Config{
-				ServerURL: server.URL,
-				NodeID:    testNodeID,
-				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-			}
-
-			controller := newTestController(t, cfg)
 
 			typedOpts := RunOptions{
 				Artifacts: ArtifactOptions{
@@ -130,13 +100,11 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 					Name:  "test-artifact",
 				},
 			}
-
 			req := StartRunRequest{
 				RunID:        types.RunID("test-run-123"),
 				JobID:        "test-job-id",
 				TypedOptions: typedOpts,
 			}
-
 			manifest := contracts.StepManifest{
 				Image:   "test-image",
 				Command: []string{"test"},
@@ -146,13 +114,21 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 				},
 			}
 
-			// Execute upload with typed RunOptions.
-			ctx := context.Background()
-			controller.uploadConfiguredArtifacts(ctx, req, typedOpts, manifest, workspace, "")
+			controller.uploadConfiguredArtifacts(context.Background(), req, typedOpts, manifest, workspace, outDir)
 
-			// Verify upload call.
-			if uploadCalled != tt.wantUpload {
-				t.Errorf("uploadCalled = %v, want %v", uploadCalled, tt.wantUpload)
+			if cap.Called != tt.wantUpload {
+				t.Errorf("uploadCalled = %v, want %v", cap.Called, tt.wantUpload)
+			}
+			if tt.wantUpload && cap.Name != "test-artifact" {
+				t.Errorf("artifact name = %q, want %q", cap.Name, "test-artifact")
+			}
+			if len(tt.wantHeaders) > 0 {
+				headers := tarHeadersFromBundle(t, cap.Bundle)
+				for _, h := range tt.wantHeaders {
+					if _, ok := headers[h]; !ok {
+						t.Fatalf("expected header %q, got %v", h, keys(headers))
+					}
+				}
 			}
 		})
 	}
@@ -167,25 +143,30 @@ func TestRunController_uploadOutDir(t *testing.T) {
 		wantUpload  bool
 		wantErr     bool
 		emptyOutDir bool
-		nilOutDir   bool
+		bundleName  string
+		wantHeaders []string
 	}{
 		{
 			name:        "directory with files triggers upload",
 			createFiles: []string{"result.txt", "subdir/output.log"},
 			wantUpload:  true,
-			wantErr:     false,
+			wantHeaders: []string{"out/result.txt", "out/subdir/output.log"},
 		},
 		{
-			name:        "empty directory skips upload",
-			createFiles: []string{},
-			wantUpload:  false,
-			wantErr:     false,
+			name:       "empty directory skips upload",
+			wantUpload: false,
 		},
 		{
 			name:        "empty outDir string skips upload",
 			emptyOutDir: true,
 			wantUpload:  false,
-			wantErr:     false,
+		},
+		{
+			name:        "custom bundle name",
+			createFiles: []string{"nested/artifact.txt"},
+			wantUpload:  true,
+			bundleName:  "build-gate-out",
+			wantHeaders: []string{"out/nested/artifact.txt"},
 		},
 	}
 
@@ -193,130 +174,41 @@ func TestRunController_uploadOutDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			uploadCalled := false
-			var uploadedBundle []byte
+			server, cap := newArtifactUploadServer(t, "test-run", "test-stage")
+			controller := newTestController(t, newTestConfig(server.URL))
 
-			// Mock server (job-scoped endpoint).
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
-				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
-					uploadCalled = true
-					var payload struct {
-						Bundle []byte `json:"bundle"`
-					}
-					_ = json.NewDecoder(r.Body).Decode(&payload)
-					uploadedBundle = payload.Bundle
-					w.WriteHeader(http.StatusCreated)
-					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
-				}
-			}))
-			defer server.Close()
-
-			// Create /out directory with test files.
 			outDir := ""
 			if !tt.emptyOutDir {
 				outDir = t.TempDir()
-
-				for _, f := range tt.createFiles {
-					fullPath := filepath.Join(outDir, f)
-					if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-						t.Fatalf("failed to create dir: %v", err)
-					}
-					if err := os.WriteFile(fullPath, []byte("test output"), 0644); err != nil {
-						t.Fatalf("failed to create file: %v", err)
-					}
-				}
+				populateTestFiles(t, outDir, tt.createFiles, "test output")
 			}
 
-			// Initialize test infrastructure.
-			// Uploaders are eagerly initialized; tests must set them explicitly.
-			cfg := Config{
-				ServerURL: server.URL,
-				NodeID:    testNodeID,
-				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-			}
-
-			controller := newTestController(t, cfg)
-
-			// Execute upload.
 			ctx := context.Background()
-			err := controller.uploadOutDir(ctx, "test-run", "test-stage", outDir)
+			var err error
+			if tt.bundleName != "" {
+				err = controller.uploadOutDirBundle(ctx, "test-run", "test-stage", outDir, tt.bundleName)
+			} else {
+				err = controller.uploadOutDir(ctx, "test-run", "test-stage", outDir)
+			}
 
-			// Verify error expectation.
 			if (err != nil) != tt.wantErr {
-				t.Errorf("uploadOutDir() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("upload error = %v, wantErr %v", err, tt.wantErr)
 			}
-
-			// Verify upload call.
-			if uploadCalled != tt.wantUpload {
-				t.Errorf("uploadCalled = %v, want %v", uploadCalled, tt.wantUpload)
+			if cap.Called != tt.wantUpload {
+				t.Errorf("uploadCalled = %v, want %v", cap.Called, tt.wantUpload)
 			}
-			if tt.wantUpload && len(tt.createFiles) > 0 {
-				headers := tarHeadersFromBundle(t, uploadedBundle)
-				if _, ok := headers["out/result.txt"]; !ok {
-					t.Fatalf("expected /out upload to include out/result.txt, got headers=%v", keys(headers))
-				}
-				if _, ok := headers["out/subdir/output.log"]; !ok {
-					t.Fatalf("expected /out upload to include out/subdir/output.log, got headers=%v", keys(headers))
+			if tt.bundleName != "" && cap.Name != tt.bundleName {
+				t.Errorf("artifact name = %q, want %q", cap.Name, tt.bundleName)
+			}
+			if len(tt.wantHeaders) > 0 {
+				headers := tarHeadersFromBundle(t, cap.Bundle)
+				for _, h := range tt.wantHeaders {
+					if _, ok := headers[h]; !ok {
+						t.Fatalf("expected header %q, got %v", h, keys(headers))
+					}
 				}
 			}
 		})
-	}
-}
-
-func TestRunController_uploadOutDirBundle_CustomName(t *testing.T) {
-	t.Parallel()
-
-	var (
-		uploadCalled bool
-		uploadedName string
-		uploadedBody []byte
-	)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/runs/test-run/jobs/test-stage/artifact" {
-			return
-		}
-		uploadCalled = true
-		var payload struct {
-			Name   string `json:"name"`
-			Bundle []byte `json:"bundle"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&payload)
-		uploadedName = payload.Name
-		uploadedBody = payload.Bundle
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
-	}))
-	defer server.Close()
-
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := newTestController(t, cfg)
-
-	outDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(outDir, "nested"), 0o755); err != nil {
-		t.Fatalf("mkdir nested: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(outDir, "nested", "artifact.txt"), []byte("ok"), 0o644); err != nil {
-		t.Fatalf("write out file: %v", err)
-	}
-
-	if err := controller.uploadOutDirBundle(context.Background(), "test-run", "test-stage", outDir, "build-gate-out"); err != nil {
-		t.Fatalf("uploadOutDirBundle() error = %v", err)
-	}
-	if !uploadCalled {
-		t.Fatal("expected upload to be called")
-	}
-	if uploadedName != "build-gate-out" {
-		t.Fatalf("artifact name = %q, want %q", uploadedName, "build-gate-out")
-	}
-	headers := tarHeadersFromBundle(t, uploadedBody)
-	if _, ok := headers["out/nested/artifact.txt"]; !ok {
-		t.Fatalf("expected out/nested/artifact.txt in bundle, got headers=%v", keys(headers))
 	}
 }
 
@@ -349,7 +241,6 @@ func TestRunController_uploadStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Mock server.
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/v1/jobs/test-job-id/complete" {
 					w.WriteHeader(tt.serverStatus)
@@ -357,24 +248,13 @@ func TestRunController_uploadStatus(t *testing.T) {
 			}))
 			defer server.Close()
 
-			// Initialize test infrastructure.
-			// Uploaders are eagerly initialized; tests must set them explicitly.
-			cfg := Config{
-				ServerURL: server.URL,
-				NodeID:    testNodeID,
-				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-			}
+			controller := newTestController(t, newTestConfig(server.URL))
 
-			controller := newTestController(t, cfg)
-
-			// Execute upload with job_id.
-			// v1 uses capitalized job status values: Success, Fail, Cancelled.
 			ctx := context.Background()
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
 			err := controller.uploadStatus(ctx, "test-run", types.JobStatusSuccess.String(), &exitCode, stats, "test-job-id")
 
-			// Verify error expectation.
 			if (err != nil) != tt.wantErr {
 				t.Errorf("uploadStatus() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -431,43 +311,21 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Mock server (job-scoped endpoint).
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
-				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
-					w.WriteHeader(tt.serverStatus)
-					if tt.serverStatus == http.StatusCreated {
-						_ = json.NewEncoder(w).Encode(map[string]string{
-							"artifact_bundle_id": "test-artifact-id",
-							"cid":                "test-cid",
-						})
-					}
-				}
-			}))
-			defer server.Close()
-
-			// Initialize test infrastructure.
-			// Uploaders are eagerly initialized; tests must set them explicitly.
-			cfg := Config{
-				ServerURL: server.URL,
-				NodeID:    testNodeID,
-				HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-			}
-
-			controller := newTestController(t, cfg)
+			server, cap := newArtifactUploadServer(t, "test-run", "test-stage", withArtifactStatus(tt.serverStatus))
+			controller := newTestController(t, newTestConfig(server.URL))
 
 			phase := &types.RunStatsGatePhase{}
-
-			// Execute upload.
 			controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, phase)
 
-			// Verify artifact ID attachment.
 			if tt.wantArtifactID {
 				if phase.LogsArtifactID == "" {
 					t.Error("LogsArtifactID not set in gate phase")
 				}
 				if phase.LogsBundleCID == "" {
 					t.Error("LogsBundleCID not set in gate phase")
+				}
+				if cap.Name != tt.wantArtifactName {
+					t.Errorf("artifact name = %q, want %q", cap.Name, tt.wantArtifactName)
 				}
 			} else {
 				if phase.LogsArtifactID != "" {
@@ -481,56 +339,13 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
 	t.Parallel()
 
-	type uploadCall struct {
-		name    string
-		headers map[string]struct{}
-	}
-
-	var calls []uploadCall
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/runs/test-run/jobs/test-gate/artifact" {
-			return
-		}
-		var payload struct {
-			Name   string `json:"name"`
-			Bundle []byte `json:"bundle"`
-		}
-		_ = json.NewDecoder(r.Body).Decode(&payload)
-		calls = append(calls, uploadCall{
-			name:    payload.Name,
-			headers: tarHeadersFromBundle(t, payload.Bundle),
-		})
-
-		n := len(calls)
-		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"artifact_bundle_id": fmt.Sprintf("artifact-id-%d", n),
-			"cid":                fmt.Sprintf("bafy-test-cid-%d", n),
-		})
-	}))
-	defer server.Close()
-
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := newTestController(t, cfg)
+	server, calls := newArtifactUploadServerMulti(t, "test-run", "test-gate")
+	controller := newTestController(t, newTestConfig(server.URL))
 
 	workspace := t.TempDir()
 	outDir := filepath.Join(workspace, step.BuildGateWorkspaceOutDir)
-	if err := os.MkdirAll(filepath.Join(outDir, "gradle-test-results"), 0o755); err != nil {
-		t.Fatalf("mkdir junit dir: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(outDir, "gradle-test-report"), 0o755); err != nil {
-		t.Fatalf("mkdir html dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(outDir, "gradle-test-results", "TEST-Example.xml"), []byte(`<testsuite/>`), 0o644); err != nil {
-		t.Fatalf("write junit xml: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(outDir, "gradle-test-report", "index.html"), []byte(`<html/>`), 0o644); err != nil {
-		t.Fatalf("write html report: %v", err)
-	}
+	populateTestFiles(t, outDir, []string{"gradle-test-results/TEST-Example.xml"}, `<testsuite/>`)
+	populateTestFiles(t, outDir, []string{"gradle-test-report/index.html"}, `<html/>`)
 
 	meta := &contracts.BuildGateStageMetadata{
 		Detected: &contracts.StackExpectation{
@@ -547,8 +362,8 @@ func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
 
 	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", workspace, meta)
 
-	if len(calls) != 2 {
-		t.Fatalf("upload call count = %d, want 2", len(calls))
+	if len(*calls) != 2 {
+		t.Fatalf("upload call count = %d, want 2", len(*calls))
 	}
 	if len(meta.ReportLinks) != 2 {
 		t.Fatalf("report_links count = %d, want 2", len(meta.ReportLinks))
@@ -558,19 +373,20 @@ func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
 		"build-gate-gradle-junit-xml":   false,
 		"build-gate-gradle-html-report": false,
 	}
-	for _, c := range calls {
-		if _, ok := wantNames[c.name]; !ok {
-			t.Fatalf("unexpected artifact name %q", c.name)
+	for _, c := range *calls {
+		if _, ok := wantNames[c.Name]; !ok {
+			t.Fatalf("unexpected artifact name %q", c.Name)
 		}
-		wantNames[c.name] = true
-		if c.name == "build-gate-gradle-junit-xml" {
-			if _, ok := c.headers["out/gradle-test-results/TEST-Example.xml"]; !ok {
-				t.Fatalf("junit bundle missing expected file, headers=%v", keys(c.headers))
+		wantNames[c.Name] = true
+		headers := tarHeadersFromBundle(t, c.Bundle)
+		if c.Name == "build-gate-gradle-junit-xml" {
+			if _, ok := headers["out/gradle-test-results/TEST-Example.xml"]; !ok {
+				t.Fatalf("junit bundle missing expected file, headers=%v", keys(headers))
 			}
 		}
-		if c.name == "build-gate-gradle-html-report" {
-			if _, ok := c.headers["out/gradle-test-report/index.html"]; !ok {
-				t.Fatalf("html bundle missing expected file, headers=%v", keys(c.headers))
+		if c.Name == "build-gate-gradle-html-report" {
+			if _, ok := headers["out/gradle-test-report/index.html"]; !ok {
+				t.Fatalf("html bundle missing expected file, headers=%v", keys(headers))
 			}
 		}
 	}
@@ -607,20 +423,8 @@ func TestRunController_uploadGateReportArtifacts_Gradle(t *testing.T) {
 func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) {
 	t.Parallel()
 
-	uploadCalled := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/runs/test-run/jobs/test-gate/artifact" {
-			uploadCalled = true
-		}
-	}))
-	defer server.Close()
-
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := newTestController(t, cfg)
+	server, cap := newArtifactUploadServer(t, "test-run", "test-gate")
+	controller := newTestController(t, newTestConfig(server.URL))
 
 	meta := &contracts.BuildGateStageMetadata{
 		Detected: &contracts.StackExpectation{
@@ -635,7 +439,7 @@ func TestRunController_uploadGateReportArtifacts_NonGradleIgnored(t *testing.T) 
 
 	controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", t.TempDir(), meta)
 
-	if uploadCalled {
+	if cap.Called {
 		t.Fatal("expected no upload for non-gradle gate")
 	}
 	if len(meta.ReportLinks) != 0 {
@@ -754,69 +558,6 @@ func TestIsValidArtifactPath(t *testing.T) {
 					tt.artifactPath, tt.workspace, got, tt.wantValid)
 			}
 		})
-	}
-}
-
-func TestRunController_uploadConfiguredArtifacts_ResolvesOutPathDeterministically(t *testing.T) {
-	t.Parallel()
-
-	uploadCalled := false
-	var uploadedBundle []byte
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/runs/test-run-out/jobs/test-job-out/artifact" {
-			uploadCalled = true
-			var payload struct {
-				Bundle []byte `json:"bundle"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&payload)
-			uploadedBundle = payload.Bundle
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]string{
-				"artifact_bundle_id": "test-id",
-				"cid":                "test-cid",
-			})
-		}
-	}))
-	defer server.Close()
-
-	workspace := t.TempDir()
-	outDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(outDir, "gate-profile-candidate.json"), []byte(`{"schema_version":1}`), 0o644); err != nil {
-		t.Fatalf("write candidate: %v", err)
-	}
-
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    testNodeID,
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-	controller := newTestController(t, cfg)
-
-	typedOpts := RunOptions{
-		Artifacts: ArtifactOptions{
-			Paths: []string{"/out/gate-profile-candidate.json"},
-			Name:  "test-artifact",
-		},
-	}
-	req := StartRunRequest{
-		RunID:        "test-run-out",
-		JobID:        "test-job-out",
-		TypedOptions: typedOpts,
-	}
-	manifest := contracts.StepManifest{
-		Image:   "test-image",
-		Command: []string{"test"},
-	}
-
-	controller.uploadConfiguredArtifacts(context.Background(), req, typedOpts, manifest, workspace, outDir)
-	if !uploadCalled {
-		t.Fatal("expected upload to be called for /out artifact path")
-	}
-
-	headers := tarHeadersFromBundle(t, uploadedBundle)
-	if _, ok := headers["out/gate-profile-candidate.json"]; !ok {
-		t.Fatalf("expected header out/gate-profile-candidate.json, got %v", keys(headers))
 	}
 }
 

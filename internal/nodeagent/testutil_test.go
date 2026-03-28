@@ -7,10 +7,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -548,6 +550,112 @@ func buildManifestDefault(req StartRunRequest) (contracts.StepManifest, error) {
 // buildManifestAtStep calls buildManifestFromRequest with the given stepIndex and ModStackUnknown.
 func buildManifestAtStep(req StartRunRequest, step int) (contracts.StepManifest, error) {
 	return buildManifestFromRequest(req, req.TypedOptions, step, contracts.ModStackUnknown)
+}
+
+// ---------------------------------------------------------------------------
+// Artifact upload server helpers
+// ---------------------------------------------------------------------------
+
+type artifactServerConfig struct {
+	status int
+}
+
+type artifactServerOption func(*artifactServerConfig)
+
+func withArtifactStatus(code int) artifactServerOption {
+	return func(c *artifactServerConfig) { c.status = code }
+}
+
+// artifactUploadCapture records the last artifact upload call.
+type artifactUploadCapture struct {
+	Called bool
+	Name   string
+	Bundle []byte
+}
+
+// newArtifactUploadServer returns a test server that handles
+// POST /v1/runs/{runID}/jobs/{jobID}/artifact and captures the upload.
+// Default response is 201 Created with a test artifact ID.
+func newArtifactUploadServer(t *testing.T, runID, jobID string, opts ...artifactServerOption) (*httptest.Server, *artifactUploadCapture) {
+	t.Helper()
+	sc := artifactServerConfig{status: http.StatusCreated}
+	for _, o := range opts {
+		o(&sc)
+	}
+	cap := &artifactUploadCapture{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID, jobID)
+		if r.URL.Path != wantPath {
+			return
+		}
+		cap.Called = true
+		var payload struct {
+			Name   string `json:"name"`
+			Bundle []byte `json:"bundle"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		cap.Name = payload.Name
+		cap.Bundle = payload.Bundle
+		w.WriteHeader(sc.status)
+		if sc.status == http.StatusCreated {
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"artifact_bundle_id": "test-id",
+				"cid":                "test-cid",
+			})
+		}
+	}))
+	t.Cleanup(ts.Close)
+	return ts, cap
+}
+
+// artifactUploadCall records a single artifact upload in a multi-call server.
+type artifactUploadCall struct {
+	Name   string
+	Bundle []byte
+}
+
+// newArtifactUploadServerMulti returns a test server that records every
+// artifact upload call. Each response gets a unique artifact ID.
+func newArtifactUploadServerMulti(t *testing.T, runID, jobID string) (*httptest.Server, *[]artifactUploadCall) {
+	t.Helper()
+	calls := &[]artifactUploadCall{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := fmt.Sprintf("/v1/runs/%s/jobs/%s/artifact", runID, jobID)
+		if r.URL.Path != wantPath {
+			return
+		}
+		var payload struct {
+			Name   string `json:"name"`
+			Bundle []byte `json:"bundle"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		*calls = append(*calls, artifactUploadCall{
+			Name:   payload.Name,
+			Bundle: payload.Bundle,
+		})
+		n := len(*calls)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"artifact_bundle_id": fmt.Sprintf("artifact-id-%d", n),
+			"cid":                fmt.Sprintf("bafy-test-cid-%d", n),
+		})
+	}))
+	t.Cleanup(ts.Close)
+	return ts, calls
+}
+
+// populateTestFiles creates files with the given content under dir.
+func populateTestFiles(t *testing.T, dir string, files []string, content string) {
+	t.Helper()
+	for _, f := range files {
+		fullPath := filepath.Join(dir, f)
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+			t.Fatalf("failed to create dir: %v", err)
+		}
+		if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+	}
 }
 
 // assertCommand checks that got matches want element-by-element.
