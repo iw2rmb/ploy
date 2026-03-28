@@ -119,9 +119,9 @@ func amataplacements() []amataPlacement {
 	}
 }
 
-// TestParseModsSpecJSON_Amata covers amata parsing and validation for every
+// TestParseMigSpecJSON_Amata covers amata parsing and validation for every
 // valid placement site: router, step, and healing action.
-func TestParseModsSpecJSON_Amata(t *testing.T) {
+func TestParseMigSpecJSON_Amata(t *testing.T) {
 	for _, p := range amataplacements() {
 		t.Run(p.name, func(t *testing.T) {
 			t.Run("spec_and_set", func(t *testing.T) {
@@ -215,9 +215,9 @@ func TestParseModsSpecJSON_Amata(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_AmataForbiddenPlacements verifies that amata is rejected
+// TestParseMigSpecJSON_AmataForbiddenPlacements verifies that amata is rejected
 // outside of steps[].amata, build_gate.router.amata, and build_gate.healing.by_error_kind.<kind>.amata.
-func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
+func TestParseMigSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string

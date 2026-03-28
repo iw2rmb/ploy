@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestModsSpec_RoundTrip(t *testing.T) {
+func TestMigSpec_RoundTrip(t *testing.T) {
 	mrOnSuccess := true
 	original := &MigSpec{
 		Steps: []MigStep{{
@@ -42,8 +42,8 @@ func TestModsSpec_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestModsSpec_RoundTrip_MultiStep tests round-trip for multi-step specs.
-func TestModsSpec_RoundTrip_MultiStep(t *testing.T) {
+// TestMigSpec_RoundTrip_MultiStep tests round-trip for multi-step specs.
+func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 	original := &MigSpec{
 		Steps: []MigStep{
 			{Name: "step-1", Image: JobImage{Universal: "mod1:latest"}},
