@@ -29,7 +29,7 @@ Documentation: `roadmap/rename.md`, `README.md`, `internal/server/README.md`, `i
     2. Run `rg -n '\bDecodeJSON\b' internal/cli`.
   - Reasoning: medium (6 CFP)
 
-- [ ] 1.3 Rename server route registration API to avoid `net/http` naming collision
+- [x] 1.3 Rename server route registration API to avoid `net/http` naming collision
   - Type: determined
   - Component: `internal/server/http_server.go`, `internal/server/**/*.go`, `cmd/ployd/**/*.go`
   - Implementation:

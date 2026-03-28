@@ -193,7 +193,7 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 
 	// Fallback for browser/OSC8 artifact links:
 	// allow auth_token query parameter on routes registered with
-	// HandleFuncAllowQueryToken (indicated via context flag).
+	// RegisterRouteFuncAllowQueryToken (indicated via context flag).
 	if r.Method == http.MethodGet && isQueryTokenAllowed(r) {
 		if token := strings.TrimSpace(r.URL.Query().Get("auth_token")); token != "" {
 			a.logger.Debug("auth: attempting query token authentication",
