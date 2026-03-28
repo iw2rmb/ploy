@@ -234,9 +234,8 @@ type mockStore struct {
 	updateJobNextIDErr    error
 
 	// Diff tracking
-	listDiffsByRunRepo    mockResult[[]store.Diff]
-	listDiffsMetaByRunRepo mockCall[store.ListDiffsMetaByRunRepoParams, []store.Diff]
-	getDiff                mockCall[pgtype.UUID, store.Diff]
+	listDiffsByRunRepo mockCall[store.ListDiffsByRunRepoParams, []store.Diff]
+	getDiff            mockCall[pgtype.UUID, store.Diff]
 
 	// CreateLog tracking
 	createLog mockResult[store.Log]

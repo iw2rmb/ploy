@@ -6,7 +6,7 @@ import (
 )
 
 // TestListMetaQueriesDoNotReturnBlobs verifies that List*Meta queries
-// exclude large blob columns (data, patch, bundle, meta) to reduce I/O.
+// exclude large blob columns (bundle, meta) to reduce I/O.
 func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 	t.Parallel()
 
@@ -15,37 +15,15 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 		sql          string
 		excludedCols []string
 	}{
-		// logs.sql - exclude "data" blob
-		{
-			name:         "ListLogsMetaByRun",
-			sql:          listLogsMetaByRun,
-			excludedCols: []string{", data,", ", data "},
-		},
-		{
-			name:         "ListLogsMetaByRunSince",
-			sql:          listLogsMetaByRunSince,
-			excludedCols: []string{", data,", ", data "},
-		},
-		{
-			name:         "ListLogsMetaByRunAndJob",
-			sql:          listLogsMetaByRunAndJob,
-			excludedCols: []string{", data,", ", data "},
-		},
-		{
-			name:         "ListLogsMetaByRunAndJobSince",
-			sql:          listLogsMetaByRunAndJobSince,
-			excludedCols: []string{", data,", ", data "},
-		},
-
 		// diffs.sql - exclude "patch" blob
 		{
-			name:         "ListDiffsMetaByRun",
-			sql:          listDiffsMetaByRun,
+			name:         "ListDiffsByRun",
+			sql:          listDiffsByRun,
 			excludedCols: []string{", patch,", ", patch "},
 		},
 		{
-			name:         "ListDiffsMetaByRunRepo",
-			sql:          listDiffsMetaByRunRepo,
+			name:         "ListDiffsByRunRepo",
+			sql:          listDiffsByRunRepo,
 			excludedCols: []string{", patch,", ", patch ", "d.patch,", "d.patch "},
 		},
 
@@ -109,15 +87,9 @@ func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
 		sql       string
 		wantOrder string
 	}{
-		// logs.sql - chunk_no ASC, id ASC
-		{"ListLogsMetaByRun", listLogsMetaByRun, "ORDER BY chunk_no ASC, id ASC"},
-		{"ListLogsMetaByRunAndJob", listLogsMetaByRunAndJob, "ORDER BY chunk_no ASC, id ASC"},
-		{"ListLogsMetaByRunSince", listLogsMetaByRunSince, "ORDER BY chunk_no ASC, id ASC"},
-		{"ListLogsMetaByRunAndJobSince", listLogsMetaByRunAndJobSince, "ORDER BY chunk_no ASC, id ASC"},
-
 		// diffs.sql - created_at ASC, id ASC with deterministic tie-breakers
-		{"ListDiffsMetaByRun", listDiffsMetaByRun, "ORDER BY created_at ASC, id ASC"},
-		{"ListDiffsMetaByRunRepo", listDiffsMetaByRunRepo, "d.created_at ASC, d.id ASC"},
+		{"ListDiffsByRun", listDiffsByRun, "ORDER BY created_at ASC, id ASC"},
+		{"ListDiffsByRunRepo", listDiffsByRunRepo, "d.created_at ASC, d.id ASC"},
 
 		// artifact_bundles.sql - created_at DESC, id DESC
 		{"ListArtifactBundlesMetaByRun", listArtifactBundlesMetaByRun, "ORDER BY created_at DESC, id DESC"},

@@ -40,6 +40,7 @@ func TestListQueriesDeterministicOrder(t *testing.T) {
 		{"ListDistinctRepos (lateral)", listDistinctRepos, "ORDER BY rrr.started_at DESC NULLS LAST, rrr.created_at DESC, rrr.run_id DESC"},
 
 		// diffs.sql - created_at needs id tie-breaker
+		{"ListDiffsByRun", listDiffsByRun, "ORDER BY created_at ASC, id ASC"},
 		{"ListDiffsByRunRepo", listDiffsByRunRepo, "d.created_at ASC, d.id ASC"},
 
 		// artifact_bundles.sql - created_at needs id tie-breaker

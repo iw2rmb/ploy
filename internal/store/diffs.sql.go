@@ -159,62 +159,15 @@ func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepo
 	return items, nil
 }
 
-const listDiffsMetaByRun = `-- name: ListDiffsMetaByRun :many
+const listDiffsByRun = `-- name: ListDiffsByRun :many
 SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
 WHERE run_id = $1
 ORDER BY created_at ASC, id ASC
 `
 
 // Returns diff metadata for a run.
-func (q *Queries) ListDiffsMetaByRun(ctx context.Context, runID types.RunID) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsMetaByRun, runID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Diff{}
-	for rows.Next() {
-		var i Diff
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.JobID,
-			&i.PatchSize,
-			&i.ObjectKey,
-			&i.Summary,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listDiffsMetaByRunRepo = `-- name: ListDiffsMetaByRunRepo :many
-SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-JOIN jobs j ON j.id = d.job_id
-WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY
-  CASE
-    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-    ELSE 0
-  END ASC,
-  d.created_at ASC,
-  d.id ASC
-`
-
-type ListDiffsMetaByRunRepoParams struct {
-	RunID  types.RunID  `json:"run_id"`
-	RepoID types.RepoID `json:"repo_id"`
-}
-
-// Returns diff metadata for a specific repo within a run.
-func (q *Queries) ListDiffsMetaByRunRepo(ctx context.Context, arg ListDiffsMetaByRunRepoParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsMetaByRunRepo, arg.RunID, arg.RepoID)
+func (q *Queries) ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error) {
+	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
 	if err != nil {
 		return nil, err
 	}
