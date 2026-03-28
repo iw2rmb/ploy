@@ -8,7 +8,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
+func TestApplyRepoGateProfileMutator(t *testing.T) {
 	t.Parallel()
 
 	profile := []byte(`{
@@ -155,7 +155,14 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			merged, err := mergeRepoGateProfileIntoSpec(tc.spec, tc.profile, tc.jobType)
+			t.Parallel()
+
+			m, err := parseSpecObjectStrict(json.RawMessage(tc.spec))
+			if err != nil {
+				t.Fatalf("parseSpecObjectStrict: %v", err)
+			}
+
+			err = applyRepoGateProfileMutator(m, tc.profile, tc.jobType)
 			if tc.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.wantErr)
@@ -166,24 +173,19 @@ func TestMergeRepoGateProfileIntoSpec(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("mergeRepoGateProfileIntoSpec: %v", err)
-			}
-
-			var specMap map[string]any
-			if err := json.Unmarshal(merged, &specMap); err != nil {
-				t.Fatalf("unmarshal merged spec: %v", err)
+				t.Fatalf("applyRepoGateProfileMutator: %v", err)
 			}
 
 			if tc.wantPhase == "" {
-				if _, ok := specMap["build_gate"]; ok {
-					t.Fatalf("build_gate unexpectedly present: %v", specMap["build_gate"])
+				if _, ok := m["build_gate"]; ok {
+					t.Fatalf("build_gate unexpectedly present: %v", m["build_gate"])
 				}
 				return
 			}
 
-			bg, ok := specMap["build_gate"].(map[string]any)
+			bg, ok := m["build_gate"].(map[string]any)
 			if !ok {
-				t.Fatalf("build_gate missing or invalid: %T", specMap["build_gate"])
+				t.Fatalf("build_gate missing or invalid: %T", m["build_gate"])
 			}
 			phaseObj, ok := bg[tc.wantPhase].(map[string]any)
 			if !ok {

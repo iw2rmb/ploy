@@ -3,71 +3,22 @@ package handlers
 import (
 	"net/http"
 	"testing"
-	"time"
-
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	"github.com/iw2rmb/ploy/internal/store"
 )
 
 func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()
 
-	nodeKey := domaintypes.NewNodeKey()
-	nodeID := domaintypes.NodeID(nodeKey)
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewRepoID()
-	specID := domaintypes.NewSpecID()
-	jobID := domaintypes.NewJobID()
-	now := time.Now().UTC()
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		specJSON: []byte(`{"env":{"CA_CERTS_PEM_BUNDLE":"per-run-cert","PER_RUN_ONLY":"value"}}`),
+	})
 
-	runSpec := []byte(`{"env":{"CA_CERTS_PEM_BUNDLE":"per-run-cert","PER_RUN_ONLY":"value"}}`)
+	f.config.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{Value: "global-cert", Scope: domaintypes.GlobalEnvScopeAll, Secret: true})
+	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Scope: domaintypes.GlobalEnvScopeMods, Secret: true})
+	f.config.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false})
 
-	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        "mig-0",
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeMod,
-			Meta:        []byte(`{}`),
-		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunRepoResult: store.RunRepo{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature-branch",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-		},
-		getModRepoResult: store.MigRepo{
-			ID:     domaintypes.NewMigRepoID(),
-			RepoID: repoID,
-		},
-		getSpecResult: store.Spec{ID: specID, Spec: runSpec},
-	}
-
-	configHolder := &ConfigHolder{}
-	configHolder.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{Value: "global-cert", Scope: domaintypes.GlobalEnvScopeAll, Secret: true})
-	configHolder.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Scope: domaintypes.GlobalEnvScopeMods, Secret: true})
-	configHolder.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false})
-
-	handler := claimJobHandler(st, configHolder)
-	rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
-
+	rr := f.serve()
 	assertStatus(t, rr, http.StatusOK)
 
 	resp := decodeBody[map[string]any](t, rr)
@@ -139,57 +90,15 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			nodeKey := domaintypes.NewNodeKey()
-			nodeID := domaintypes.NodeID(nodeKey)
-			runID := domaintypes.NewRunID()
-			repoID := domaintypes.NewRepoID()
-			specID := domaintypes.NewSpecID()
-			jobID := domaintypes.NewJobID()
-			now := time.Now().UTC()
-
-			st := &mockStore{
-				getNodeResult: store.Node{ID: nodeID},
-				claimJobResult: store.Job{
-					ID:          jobID,
-					RunID:       runID,
-					RepoID:      repoID,
-					RepoBaseRef: "main",
-					Attempt:     1,
-					NodeID:      &nodeID,
-					Name:        "gate-0",
-					Status:      domaintypes.JobStatusRunning,
-					JobType:     tc.jobType,
-					Meta:        []byte(`{}`),
-				},
-				getRunResult: store.Run{
-					ID:        runID,
-					SpecID:    specID,
-					Status:    domaintypes.RunStatusStarted,
-					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-					StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-				},
-				getRunRepoResult: store.RunRepo{
-					RunID:         runID,
-					RepoID:        repoID,
-					RepoBaseRef:   "main",
-					RepoTargetRef: "feature-branch",
-					Status:        domaintypes.RunRepoStatusQueued,
-					Attempt:       1,
-				},
-				getModRepoResult: store.MigRepo{
-					ID:     domaintypes.NewMigRepoID(),
-					RepoID: repoID,
-				},
-				getSpecResult: store.Spec{ID: specID, Spec: tc.spec},
-			}
-
-			handler := claimJobHandler(st, &ConfigHolder{})
-			rr := doRequest(t, handler, http.MethodPost, "/v1/nodes/"+nodeKey+"/claim", nil, "id", nodeKey)
-
+			f := newClaimJobFixture(t, claimJobFixtureOptions{
+				jobType:  tc.jobType,
+				jobName:  "gate-0",
+				specJSON: tc.spec,
+			})
+			rr := f.serve()
 			assertStatus(t, rr, http.StatusOK)
 
 			resp := decodeBody[map[string]any](t, rr)

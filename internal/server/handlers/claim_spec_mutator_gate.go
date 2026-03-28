@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -10,23 +9,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/gateprofile"
 )
-
-func mergeRepoGateProfileIntoSpec(spec json.RawMessage, gateProfile []byte, jobType domaintypes.JobType) (json.RawMessage, error) {
-	if len(bytes.TrimSpace(gateProfile)) == 0 {
-		return spec, nil
-	}
-
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyRepoGateProfileMutator(m, gateProfile, jobType); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
-}
 
 func applyRepoGateProfileMutator(m map[string]any, gateProfile []byte, jobType domaintypes.JobType) error {
 	if len(bytes.TrimSpace(gateProfile)) == 0 {
@@ -45,26 +27,6 @@ func applyRepoGateProfileMutator(m map[string]any, gateProfile []byte, jobType d
 		return nil
 	}
 	return applyGatePrepOverrideMutator(m, phase, override)
-}
-
-func mergeRecoveryCandidatePrepIntoSpec(spec json.RawMessage, job store.Job, jobType domaintypes.JobType) (json.RawMessage, error) {
-	if jobType != domaintypes.JobTypeReGate {
-		return spec, nil
-	}
-	if len(job.Meta) == 0 {
-		return spec, nil
-	}
-
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyRecoveryCandidatePrepMutator(m, job, jobType); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
 }
 
 func applyRecoveryCandidatePrepMutator(m map[string]any, job store.Job, jobType domaintypes.JobType) error {
@@ -97,23 +59,6 @@ func applyRecoveryCandidatePrepMutator(m map[string]any, job store.Job, jobType 
 		return nil
 	}
 	return applyGatePrepOverrideMutator(m, phase, override)
-}
-
-func mergeGatePrepOverrideIntoSpec(
-	spec json.RawMessage,
-	phase contracts.BuildGateProfilePhase,
-	override *contracts.BuildGateProfileOverride,
-) (json.RawMessage, error) {
-	m, err := parseSpecObjectStrict(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := applyGatePrepOverrideMutator(m, phase, override); err != nil {
-		return nil, err
-	}
-
-	return marshalSpecObject(m)
 }
 
 func applyGatePrepOverrideMutator(
