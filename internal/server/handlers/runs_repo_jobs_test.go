@@ -23,29 +23,29 @@ func TestListRunRepoJobsHandler_NextIDContract(t *testing.T) {
 			RepoID:  repoID,
 			Attempt: 1,
 		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{
-				ID:         jobID,
-				RunID:      runID,
-				RepoID:     repoID,
-				Attempt:    1,
-				Name:       "mig-0",
-				JobType:    "mig",
-				JobImage:   "docker.io/example/mig:latest",
-				RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
-				RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
-				NextID:     &nextID,
-				Status:     domaintypes.JobStatusQueued,
-				Meta:       []byte(`{"kind":"mig","mods_step_name":"hello"}`),
-			},
-		},
 	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{
+			ID:         jobID,
+			RunID:      runID,
+			RepoID:     repoID,
+			Attempt:    1,
+			Name:       "mig-0",
+			JobType:    "mig",
+			JobImage:   "docker.io/example/mig:latest",
+			RepoShaIn:  "0123456789abcdef0123456789abcdef01234567",
+			RepoShaOut: "89abcdef0123456789abcdef0123456789abcdef",
+			NextID:     &nextID,
+			Status:     domaintypes.JobStatusQueued,
+			Meta:       []byte(`{"kind":"mig","mods_step_name":"hello"}`),
+		},
+		}
 
 	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)
-	if !st.listJobsByRunRepoAttemptCalled {
+	if !st.listJobsByRunRepoAttempt.called {
 		t.Fatal("expected ListJobsByRunRepoAttempt to be called")
 	}
 
@@ -88,14 +88,14 @@ func TestListRunRepoJobsHandler_AttemptQueryOverride(t *testing.T) {
 			RepoID:  repoID,
 			Attempt: 1,
 		},
-		listJobsByRunRepoAttemptResult: []store.Job{},
 	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
 	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs?attempt=3", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
 	assertStatus(t, rr, http.StatusOK)
-	if got := st.listJobsByRunRepoAttemptParams.Attempt; got != 3 {
+	if got := st.listJobsByRunRepoAttempt.params.Attempt; got != 3 {
 		t.Fatalf("query attempt override not applied: got %d want %d", got, 3)
 	}
 }
@@ -116,13 +116,13 @@ func TestListRunRepoJobsHandler_OrdersJobsByChain(t *testing.T) {
 			RepoID:  repoID,
 			Attempt: 1,
 		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: post, RunID: runID, RepoID: repoID, Attempt: 1, Name: "post-gate", JobType: "post_gate", Status: domaintypes.JobStatusCreated},
-			{ID: mig1, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-1", JobType: "mig", NextID: &post, Status: domaintypes.JobStatusCreated},
-			{ID: mig0, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-0", JobType: "mig", NextID: &mig1, Status: domaintypes.JobStatusCreated},
-			{ID: pre, RunID: runID, RepoID: repoID, Attempt: 1, Name: "pre-gate", JobType: "pre_gate", NextID: &mig0, Status: domaintypes.JobStatusQueued},
-		},
 	}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{ID: post, RunID: runID, RepoID: repoID, Attempt: 1, Name: "post-gate", JobType: "post_gate", Status: domaintypes.JobStatusCreated},
+		{ID: mig1, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-1", JobType: "mig", NextID: &post, Status: domaintypes.JobStatusCreated},
+		{ID: mig0, RunID: runID, RepoID: repoID, Attempt: 1, Name: "mig-0", JobType: "mig", NextID: &mig1, Status: domaintypes.JobStatusCreated},
+		{ID: pre, RunID: runID, RepoID: repoID, Attempt: 1, Name: "pre-gate", JobType: "pre_gate", NextID: &mig0, Status: domaintypes.JobStatusQueued},
+		}
 
 	handler := listRunRepoJobsHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
@@ -225,9 +225,9 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	metaJSON := `{"kind":"mig","action_summary":"updated deps","recovery":{"loop_kind":"healing","error_kind":"code","strategy_id":"code-default","reason":"compile failure"}}`
 	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
 	// Override job type/status for heal job.
-	st.listJobsByRunRepoAttemptResult[0].Name = "heal"
-	st.listJobsByRunRepoAttemptResult[0].JobType = "heal"
-	st.listJobsByRunRepoAttemptResult[0].Status = domaintypes.JobStatusSuccess
+	st.listJobsByRunRepoAttempt.val[0].Name = "heal"
+	st.listJobsByRunRepoAttempt.val[0].JobType = "heal"
+	st.listJobsByRunRepoAttempt.val[0].Status = domaintypes.JobStatusSuccess
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 
@@ -264,9 +264,9 @@ func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T
 	metaJSON := `{"kind":"gate","recovery":{"loop_kind":"healing","error_kind":"infra","candidate_schema_id":"gate_profile_v1","candidate_artifact_path":"/out/gate-profile-candidate.json","candidate_validation_status":"invalid","candidate_validation_error":"schema mismatch","candidate_promoted":false}}`
 	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
 	// Override job type/status for re-gate job.
-	st.listJobsByRunRepoAttemptResult[0].Name = "re-gate-1"
-	st.listJobsByRunRepoAttemptResult[0].JobType = "re_gate"
-	st.listJobsByRunRepoAttemptResult[0].Status = domaintypes.JobStatusSuccess
+	st.listJobsByRunRepoAttempt.val[0].Name = "re-gate-1"
+	st.listJobsByRunRepoAttempt.val[0].JobType = "re_gate"
+	st.listJobsByRunRepoAttempt.val[0].Status = domaintypes.JobStatusSuccess
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
 

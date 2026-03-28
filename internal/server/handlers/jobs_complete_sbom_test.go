@@ -24,11 +24,10 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 		JobType: domaintypes.JobTypePreGate,
 	}
 
-	st := &mockStore{
-		listArtifactBundlesMetaByRunAndJobResult: []store.ArtifactBundle{
-			{RunID: runID, JobID: &jobID, ObjectKey: &objKey},
-		},
-	}
+	st := &mockStore{}
+	st.listArtifactBundlesMetaByRunAndJob.val = []store.ArtifactBundle{
+		{RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+		}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
 		"out/sbom.spdx.json": []byte(`{
@@ -48,9 +47,9 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	if count != 1 {
 		t.Fatalf("persisted row count = %d, want 1", count)
 	}
-	assertCalled(t, "DeleteSBOMRowsByJob", st.deleteSBOMRowsByJobCalled)
-	if st.deleteSBOMRowsByJobParam != jobID {
-		t.Fatalf("deleteSBOMRowsByJob job_id = %q, want %q", st.deleteSBOMRowsByJobParam, jobID)
+	assertCalled(t, "DeleteSBOMRowsByJob", st.deleteSBOMRowsByJob.called)
+	if st.deleteSBOMRowsByJob.params != jobID {
+		t.Fatalf("deleteSBOMRowsByJob job_id = %q, want %q", st.deleteSBOMRowsByJob.params, jobID)
 	}
 	if len(st.upsertSBOMRowParams) != 1 {
 		t.Fatalf("upsertSBOMRow params count = %d, want 1", len(st.upsertSBOMRowParams))
@@ -87,7 +86,7 @@ func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) 
 	if count != 0 {
 		t.Fatalf("count = %d, want 0", count)
 	}
-	if st.deleteSBOMRowsByJobCalled || st.upsertSBOMRowCalled {
+	if st.deleteSBOMRowsByJob.called || st.upsertSBOMRowCalled {
 		t.Fatal("expected no sbom persistence calls")
 	}
 }

@@ -25,7 +25,7 @@ func TestGetRunLogsHandler_TicketNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
-	st := &mockStore{getRunErr: pgx.ErrNoRows}
+	st := func() *mockStore { st := &mockStore{}; st.getRun.err = pgx.ErrNoRows; return st }()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	runID := testRunIDKSUID
@@ -47,7 +47,7 @@ func TestGetRunLogsHandler_InvalidRunID(t *testing.T) {
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusBadRequest)
-	if st.getRunCalled {
+	if st.getRun.called {
 		t.Fatal("expected GetRun not to be called")
 	}
 }
@@ -68,7 +68,7 @@ func TestGetRunLogsHandler_MissingID(t *testing.T) {
 func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
-	st := &mockStore{getRunErr: pgx.ErrTxClosed}
+	st := func() *mockStore { st := &mockStore{}; st.getRun.err = pgx.ErrTxClosed; return st }()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	runID := testRunIDKSUID
@@ -77,7 +77,7 @@ func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	assertStatus(t, rr, http.StatusInternalServerError)
-	if !st.getRunCalled {
+	if !st.getRun.called {
 		t.Fatal("expected GetRun to be called")
 	}
 }
@@ -87,7 +87,7 @@ func TestGetRunLogsHandler_Success(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := &mockStore{getRunResult: store.Run{ID: domaintypes.RunID(runID)}}
+	st := func() *mockStore { st := &mockStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
@@ -126,7 +126,7 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
 	runID := testRunIDKSUID
-	st := &mockStore{getRunResult: store.Run{ID: domaintypes.RunID(runID)}}
+	st := func() *mockStore { st := &mockStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	// Pre-publish an event so history contains id=1 before subscriber joins.
@@ -179,7 +179,7 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	hub := eventsService.Hub()
 
 	runID := testRunIDKSUID
-	st := &mockStore{getRunResult: store.Run{ID: domaintypes.RunID(runID)}}
+	st := func() *mockStore { st := &mockStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
 	h := getRunLogsHandler(st, nil, eventsService)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)

@@ -44,9 +44,9 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusNoContent)
 	assertCalled(t, "UpsertExactGateProfile", st.upsertExactGateProfileCalled)
-	assertCalled(t, "UpsertGateJobProfileLink", st.upsertGateJobProfileLinkCalled)
-	assertCalled(t, "UpdateJobMeta", st.updateJobMetaCalled)
-	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
+	assertCalled(t, "UpsertGateJobProfileLink", st.upsertGateJobProfileLink.called)
+	assertCalled(t, "UpdateJobMeta", st.updateJobMeta.called)
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobMeta.params.Meta)
 	if err != nil {
 		t.Fatalf("unmarshal promoted meta: %v", err)
 	}
@@ -78,9 +78,9 @@ func TestCompleteJob_ReGateCompletionMergesExistingRecoveryMetadata(t *testing.T
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
+	assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMeta.called)
 
-	meta, err := contracts.UnmarshalJobMeta(st.updateJobCompletionWithMetaParams.Meta)
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobCompletionWithMeta.params.Meta)
 	if err != nil {
 		t.Fatalf("unmarshal persisted meta: %v", err)
 	}
@@ -181,13 +181,13 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidate(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobMetaCalled {
+	if !st.updateJobMeta.called {
 		t.Fatal("expected UpdateJobMeta to be called for next re-gate")
 	}
-	if st.updateJobMetaParams.ID != reGateID {
-		t.Fatalf("updated meta job_id = %s, want %s", st.updateJobMetaParams.ID, reGateID)
+	if st.updateJobMeta.params.ID != reGateID {
+		t.Fatalf("updated meta job_id = %s, want %s", st.updateJobMeta.params.ID, reGateID)
 	}
-	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobMeta.params.Meta)
 	if err != nil {
 		t.Fatalf("unmarshal updated re-gate meta: %v", err)
 	}
@@ -239,10 +239,10 @@ func TestCompleteJob_HealSuccessRefreshesNextReGateCandidateMissing(t *testing.T
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if !st.updateJobMetaCalled {
+	if !st.updateJobMeta.called {
 		t.Fatal("expected UpdateJobMeta to be called for next re-gate")
 	}
-	meta, err := contracts.UnmarshalJobMeta(st.updateJobMetaParams.Meta)
+	meta, err := contracts.UnmarshalJobMeta(st.updateJobMeta.params.Meta)
 	if err != nil {
 		t.Fatalf("unmarshal updated re-gate meta: %v", err)
 	}

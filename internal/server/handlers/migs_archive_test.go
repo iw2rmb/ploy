@@ -40,11 +40,11 @@ func TestMods_Archive_Success(t *testing.T) {
 	if !st.getModCalled {
 		t.Error("store.GetMig was not called")
 	}
-	if !st.archiveMigCalled {
+	if !st.archiveMig.called {
 		t.Error("store.ArchiveMig was not called")
 	}
-	if st.archiveMigParam != "mod123" {
-		t.Errorf("ArchiveMig param = %q, want %q", st.archiveMigParam, "mod123")
+	if st.archiveMig.params != "mod123" {
+		t.Errorf("ArchiveMig param = %q, want %q", st.archiveMig.params, "mod123")
 	}
 
 	// Verify response.
@@ -76,7 +76,7 @@ func TestMods_Archive_AlreadyArchived(t *testing.T) {
 
 	// Should return OK (idempotent) without calling ArchiveMig again.
 	assertStatus(t, rr, http.StatusOK)
-	if st.archiveMigCalled {
+	if st.archiveMig.called {
 		t.Error("store.ArchiveMig should not be called for already-archived mig")
 	}
 }
@@ -125,7 +125,7 @@ func TestMods_Archive_RefusesWithActiveJobs(t *testing.T) {
 			rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
 			assertStatus(t, rr, http.StatusConflict)
-			if st.archiveMigCalled {
+			if st.archiveMig.called {
 				t.Fatal("store.ArchiveMig should not be called when active jobs exist")
 			}
 		})
@@ -154,7 +154,7 @@ func TestMods_Archive_AllowsWithCompletedJobs(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
 
 	assertStatus(t, rr, http.StatusOK)
-	if !st.archiveMigCalled {
+	if !st.archiveMig.called {
 		t.Error("store.ArchiveMig should be called when only completed jobs exist")
 	}
 }
@@ -173,8 +173,8 @@ func TestMods_Archive_ByName(t *testing.T) {
 	if !st.getModByNameCalled {
 		t.Error("store.GetMigByName was not called")
 	}
-	if st.archiveMigParam != "mod123" {
-		t.Errorf("ArchiveMig param = %q, want %q", st.archiveMigParam, "mod123")
+	if st.archiveMig.params != "mod123" {
+		t.Errorf("ArchiveMig param = %q, want %q", st.archiveMig.params, "mod123")
 	}
 }
 
@@ -187,8 +187,8 @@ func TestMods_Archive_StoreError(t *testing.T) {
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 		listRunsResult: []store.Run{},
-		archiveMigErr:  errors.New("database connection failed"),
 	}
+	st.archiveMig.err = errors.New("database connection failed")
 	handler := archiveMigHandler(st)
 
 	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/archive", nil, "mig_ref", "mod123")
@@ -217,11 +217,11 @@ func TestMods_Unarchive_Success(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store methods called.
-	if !st.unarchiveMigCalled {
+	if !st.unarchiveMig.called {
 		t.Error("store.UnarchiveMig was not called")
 	}
-	if st.unarchiveMigParam != "mod123" {
-		t.Errorf("UnarchiveMig param = %q, want %q", st.unarchiveMigParam, "mod123")
+	if st.unarchiveMig.params != "mod123" {
+		t.Errorf("UnarchiveMig param = %q, want %q", st.unarchiveMig.params, "mod123")
 	}
 
 	// Verify response.
@@ -253,7 +253,7 @@ func TestMods_Unarchive_AlreadyUnarchived(t *testing.T) {
 
 	// Should return OK (idempotent) without calling UnarchiveMig.
 	assertStatus(t, rr, http.StatusOK)
-	if st.unarchiveMigCalled {
+	if st.unarchiveMig.called {
 		t.Error("store.UnarchiveMig should not be called for already-unarchived mig")
 	}
 }
@@ -278,8 +278,8 @@ func TestMods_Unarchive_StoreError(t *testing.T) {
 			Name:       "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		},
-		unarchiveMigErr: errors.New("database connection failed"),
 	}
+	st.unarchiveMig.err = errors.New("database connection failed")
 	handler := unarchiveMigHandler(st)
 
 	rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/unarchive", nil, "mig_ref", "mod123")

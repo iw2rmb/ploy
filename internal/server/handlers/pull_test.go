@@ -23,17 +23,16 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 	modID := domaintypes.NewMigID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{
-		getRunResult: store.Run{ID: runID, MigID: modID},
-		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
-			{
-				RunID:         runID,
-				RepoID:        repoID,
-				RepoTargetRef: "feature-branch",
-				RepoUrl:       "https://github.com/org/repo.git",
-			},
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID, MigID: modID}
+	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+		{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoTargetRef: "feature-branch",
+			RepoUrl:       "https://github.com/org/repo.git",
 		},
-	}
+		}
 	handler := pullRunRepoHandler(st)
 
 	// Request with repo_url that matches (with .git suffix that normalizes away)
@@ -57,14 +56,14 @@ func TestPullRunRepoHandler_Success(t *testing.T) {
 		t.Fatalf("expected repo_target_ref 'feature-branch', got %q", resp.RepoTargetRef)
 	}
 
-	if !st.getRunCalled {
+	if !st.getRun.called {
 		t.Fatalf("expected GetRun to be called")
 	}
-	if !st.listRunReposWithURLByRunCalled {
+	if !st.listRunReposWithURLByRun.called {
 		t.Fatalf("expected ListRunReposWithURLByRun to be called")
 	}
-	if st.listRunReposWithURLByRunParam != runID.String() {
-		t.Fatalf("expected run_id %q, got %q", runID.String(), st.listRunReposWithURLByRunParam)
+	if st.listRunReposWithURLByRun.params != runID.String() {
+		t.Fatalf("expected run_id %q, got %q", runID.String(), st.listRunReposWithURLByRun.params)
 	}
 }
 
@@ -76,17 +75,16 @@ func TestPullRunRepoHandler_URLNormalization(t *testing.T) {
 
 	// Test that .git suffix normalization works.
 	// Server stores URL without .git, client sends with .git.
-	st := &mockStore{
-		getRunResult: store.Run{ID: runID},
-		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
-			{
-				RunID:         runID,
-				RepoID:        repoID,
-				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/repo", // stored without .git
-			},
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID}
+	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+		{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoTargetRef: "main",
+			RepoUrl:       "https://github.com/org/repo", // stored without .git
 		},
-	}
+		}
 	handler := pullRunRepoHandler(st)
 
 	// Client sends with .git
@@ -103,17 +101,16 @@ func TestPullRunRepoHandler_URLNormalization_TrailingSlash(t *testing.T) {
 	repoID := domaintypes.NewRepoID()
 
 	// Test that trailing slash normalization works.
-	st := &mockStore{
-		getRunResult: store.Run{ID: runID},
-		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
-			{
-				RunID:         runID,
-				RepoID:        repoID,
-				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/repo/",
-			},
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID}
+	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+		{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoTargetRef: "main",
+			RepoUrl:       "https://github.com/org/repo/",
 		},
-	}
+		}
 	handler := pullRunRepoHandler(st)
 
 	// Client sends without trailing slash
@@ -128,9 +125,8 @@ func TestPullRunRepoHandler_RunNotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
-		getRunErr: pgx.ErrNoRows,
-	}
+	st := &mockStore{}
+	st.getRun.err = pgx.ErrNoRows
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
@@ -145,17 +141,16 @@ func TestPullRunRepoHandler_RepoNotFound(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &mockStore{
-		getRunResult: store.Run{ID: runID},
-		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
-			{
-				RunID:         runID,
-				RepoID:        repoID,
-				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/other-repo",
-			},
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID}
+	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+		{
+			RunID:         runID,
+			RepoID:        repoID,
+			RepoTargetRef: "main",
+			RepoUrl:       "https://github.com/org/other-repo",
 		},
-	}
+		}
 	handler := pullRunRepoHandler(st)
 
 	// Request with non-matching repo_url
@@ -174,23 +169,22 @@ func TestPullRunRepoHandler_MultipleMatches(t *testing.T) {
 
 	// This shouldn't happen in practice (mig_repos has unique constraint on
 	// (mig_id, repo_url)), but the handler should return an error if it does.
-	st := &mockStore{
-		getRunResult: store.Run{ID: runID},
-		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
-			{
-				RunID:         runID,
-				RepoID:        repoID1,
-				RepoTargetRef: "main",
-				RepoUrl:       "https://github.com/org/repo",
-			},
-			{
-				RunID:         runID,
-				RepoID:        repoID2,
-				RepoTargetRef: "develop",
-				RepoUrl:       "https://github.com/org/repo.git", // same after normalization
-			},
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID}
+	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+		{
+			RunID:         runID,
+			RepoID:        repoID1,
+			RepoTargetRef: "main",
+			RepoUrl:       "https://github.com/org/repo",
 		},
-	}
+		{
+			RunID:         runID,
+			RepoID:        repoID2,
+			RepoTargetRef: "develop",
+			RepoUrl:       "https://github.com/org/repo.git", // same after normalization
+		},
+		}
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
@@ -230,10 +224,9 @@ func TestPullRunRepoHandler_StoreError(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 
-	st := &mockStore{
-		getRunResult:                store.Run{ID: runID},
-		listRunReposWithURLByRunErr: errors.New("database error"),
-	}
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID}
+	st.listRunReposWithURLByRun.err = errors.New("database error")
 	handler := pullRunRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`
@@ -268,12 +261,12 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
 		},
-		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: "feature-branch",
-		},
 	}
+	st.getLatestRunRepoByModAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
+		RunID:         runID,
+		RepoID:        repoID,
+		RepoTargetRef: "feature-branch",
+		}
 	handler := pullMigRepoHandler(st)
 
 	// Default mode is "last-succeeded"
@@ -298,11 +291,11 @@ func TestPullModRepoHandler_Success_LastSucceeded(t *testing.T) {
 	}
 
 	// Verify the store call used the correct status filter
-	if !st.getLatestRunRepoByModAndRepoStatusCalled {
+	if !st.getLatestRunRepoByModAndRepoStatus.called {
 		t.Fatalf("expected GetLatestRunRepoByMigAndRepoStatus to be called")
 	}
-	if st.getLatestRunRepoByModAndRepoStatusParams.Status != domaintypes.RunRepoStatusSuccess {
-		t.Fatalf("expected status filter 'Success', got %q", st.getLatestRunRepoByModAndRepoStatusParams.Status)
+	if st.getLatestRunRepoByModAndRepoStatus.params.Status != domaintypes.RunRepoStatusSuccess {
+		t.Fatalf("expected status filter 'Success', got %q", st.getLatestRunRepoByModAndRepoStatus.params.Status)
 	}
 }
 
@@ -328,12 +321,12 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
 		},
-		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: "bugfix-branch",
-		},
 	}
+	st.getLatestRunRepoByModAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
+		RunID:         runID,
+		RepoID:        repoID,
+		RepoTargetRef: "bugfix-branch",
+		}
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo", "mode": "last-failed"}`
@@ -351,8 +344,8 @@ func TestPullModRepoHandler_Success_LastFailed(t *testing.T) {
 	}
 
 	// Verify the store call used the correct status filter
-	if st.getLatestRunRepoByModAndRepoStatusParams.Status != domaintypes.RunRepoStatusFail {
-		t.Fatalf("expected status filter 'Fail', got %q", st.getLatestRunRepoByModAndRepoStatusParams.Status)
+	if st.getLatestRunRepoByModAndRepoStatus.params.Status != domaintypes.RunRepoStatusFail {
+		t.Fatalf("expected status filter 'Fail', got %q", st.getLatestRunRepoByModAndRepoStatus.params.Status)
 	}
 }
 
@@ -378,12 +371,12 @@ func TestPullModRepoHandler_URLNormalization(t *testing.T) {
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
 		},
-		getLatestRunRepoByModAndRepoStatusResult: store.GetLatestRunRepoByMigAndRepoStatusRow{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoTargetRef: "feature",
-		},
 	}
+	st.getLatestRunRepoByModAndRepoStatus.val = store.GetLatestRunRepoByMigAndRepoStatusRow{
+		RunID:         runID,
+		RepoID:        repoID,
+		RepoTargetRef: "feature",
+		}
 	handler := pullMigRepoHandler(st)
 
 	// Request without .git suffix
@@ -460,8 +453,8 @@ func TestPullModRepoHandler_NoMatchingRun(t *testing.T) {
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo"},
 		},
-		getLatestRunRepoByModAndRepoStatusErr: pgx.ErrNoRows,
 	}
+	st.getLatestRunRepoByModAndRepoStatus.err = pgx.ErrNoRows
 	handler := pullMigRepoHandler(st)
 
 	body := `{"repo_url": "https://github.com/org/repo"}`

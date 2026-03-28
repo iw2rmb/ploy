@@ -26,8 +26,8 @@ func TestMods_GetLatestSpec_Success(t *testing.T) {
 			SpecID:     &migSpecID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
-		getSpecResult: specID,
 	}
+	st.getSpec.val = specID
 	handler := getMigLatestSpecHandler(st)
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/mod123/specs/latest", nil, "mig_ref", "mod123")
@@ -42,7 +42,7 @@ func TestMods_GetLatestSpec_Success(t *testing.T) {
 	if !st.getModCalled {
 		t.Fatal("expected GetMig/GetMigByName to be called")
 	}
-	if !st.getSpecCalled {
+	if !st.getSpec.called {
 		t.Fatal("expected GetSpec to be called")
 	}
 }
@@ -61,7 +61,7 @@ func TestMods_GetLatestSpec_MigWithoutSpec(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/mod123/specs/latest", nil, "mig_ref", "mod123")
 
 	assertStatus(t, rr, http.StatusNotFound)
-	if st.getSpecCalled {
+	if st.getSpec.called {
 		t.Fatal("GetSpec must not be called when mig has no spec")
 	}
 }
@@ -73,7 +73,7 @@ func TestMods_GetLatestSpec_MigNotFound(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodGet, "/v1/migs/missing/specs/latest", nil, "mig_ref", "missing")
 
 	assertStatus(t, rr, http.StatusNotFound)
-	if st.getSpecCalled {
+	if st.getSpec.called {
 		t.Fatal("GetSpec must not be called when mig is missing")
 	}
 }
@@ -102,7 +102,7 @@ func TestMods_SetSpec_Success(t *testing.T) {
 	if !st.createSpecCalled {
 		t.Error("store.CreateSpec was not called")
 	}
-	if !st.updateModSpecCalled {
+	if !st.updateModSpec.called {
 		t.Error("store.UpdateMigSpec was not called")
 	}
 
@@ -161,7 +161,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 
 	// Reset mock tracking for second call.
 	st.createSpecCalled = false
-	st.updateModSpecCalled = false
+	st.updateModSpec.called = false
 
 	// Second call with different spec.
 	spec2 := validSpecBody()
@@ -172,7 +172,7 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	if !st.createSpecCalled {
 		t.Error("store.CreateSpec was not called on second invocation")
 	}
-	if !st.updateModSpecCalled {
+	if !st.updateModSpec.called {
 		t.Error("store.UpdateMigSpec was not called on second invocation")
 	}
 
@@ -259,14 +259,17 @@ func TestMods_SetSpec_StoreErrors(t *testing.T) {
 		},
 		{
 			name: "UpdateMigSpecError",
-			store: &mockStore{
-				getModResult: store.Mig{
-					ID:         "mod123",
-					Name:       "test-mig",
-					ArchivedAt: pgtype.Timestamptz{Valid: false},
-				},
-				updateModSpecErr: errors.New("database connection failed"),
-			},
+			store: func() *mockStore {
+				st := &mockStore{
+					getModResult: store.Mig{
+						ID:         "mod123",
+						Name:       "test-mig",
+						ArchivedAt: pgtype.Timestamptz{Valid: false},
+					},
+				}
+				st.updateModSpec.err = errors.New("database connection failed")
+				return st
+			}(),
 		},
 	}
 

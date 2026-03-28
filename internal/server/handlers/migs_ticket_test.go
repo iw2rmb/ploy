@@ -447,24 +447,24 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	now := time.Now().UTC()
 
 	st := &mockStore{
-		getRunResult: store.Run{
-			ID:        runID,
-			Status:    domaintypes.RunStatusStarted,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		listRunReposWithURLByRunResult: []store.ListRunReposWithURLByRunRow{
-			{
-				RunID:         runID,
-				RepoID:        "repo_123",
-				RepoBaseRef:   "main",
-				RepoTargetRef: "feature",
-				RepoUrl:       "https://github.com/user/repo.git",
-			},
-		},
 		listJobsByRunResult: []store.Job{
 			{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
 		},
 	}
+	st.getRun.val = store.Run{
+		ID:        runID,
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+		{
+			RunID:         runID,
+			RepoID:        "repo_123",
+			RepoBaseRef:   "main",
+			RepoTargetRef: "feature",
+			RepoUrl:       "https://github.com/user/repo.git",
+		},
+		}
 
 	handler := getRunStatusHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runIDStr+"/status", nil, "id", runIDStr)
@@ -498,7 +498,7 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 		t.Fatalf("expected stage next_id %s, got %v", nextJobID, got)
 	}
 
-	if !st.getRunCalled || !st.listRunReposWithURLByRunCalled || !st.listJobsByRunCalled {
+	if !st.getRun.called || !st.listRunReposWithURLByRun.called || !st.listJobsByRunCalled {
 		t.Fatalf("expected run status handler to read run+repos_with_url+jobs")
 	}
 }
@@ -508,9 +508,8 @@ func TestGetRunStatusHandler_NotFound(t *testing.T) {
 
 	runID := domaintypes.NewRunID().String()
 
-	st := &mockStore{
-		getRunErr: pgx.ErrNoRows,
-	}
+	st := &mockStore{}
+	st.getRun.err = pgx.ErrNoRows
 
 	handler := getRunStatusHandler(st)
 	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID+"/status", nil, "id", runID)

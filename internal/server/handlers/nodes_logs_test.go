@@ -22,13 +22,13 @@ func TestCreateNodeLogs_Success(t *testing.T) {
 	chunkNo := int32(5)
 
 	// Mock GetNode to succeed (node exists).
-	st.getNodeResult = store.Node{
+	st.getNode.val = store.Node{
 		ID: nodeID,
 	}
 
 	// Mock CreateLog to return a log with specified ID and ChunkNo.
 	objKey := fmt.Sprintf("logs/run/%s/job/none/chunk/%d/log/%d.gz", runID.String(), chunkNo, logID)
-	st.createLogResult = store.Log{
+	st.createLog.val = store.Log{
 		ID:        logID,
 		RunID:     runID,
 		ChunkNo:   chunkNo,

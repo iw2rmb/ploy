@@ -18,17 +18,16 @@ func TestBatchRepoStarter_StartPendingRepos_CreatesJobsWhenNone(t *testing.T) {
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &mockStore{
-		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
-		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		},
-		listQueuedRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{},
-	}
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
+	st.listRunReposByRun.val = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+		}
+	st.listQueuedRunReposByRun.val = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+		}
+	st.listJobsByRunRepoAttempt.val = []store.Job{}
 
 	starter := NewBatchRepoStarter(st)
 	got, err := starter.StartPendingRepos(ctx, runID)
@@ -60,20 +59,19 @@ func TestBatchRepoStarter_StartPendingRepos_SchedulesNextJobWhenNoActive(t *test
 	specID := domaintypes.SpecID("spec_1")
 	repoID := domaintypes.RepoID("repo_1")
 
-	st := &mockStore{
-		getRunResult:  store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted},
-		getSpecResult: store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)},
-		listRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		},
-		listQueuedRunReposByRunResult: []store.RunRepo{
-			{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
-		},
-		listJobsByRunRepoAttemptResult: []store.Job{
-			{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
-			{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
-		},
-	}
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID, SpecID: specID, Status: domaintypes.RunStatusStarted}
+	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
+	st.listRunReposByRun.val = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+		}
+	st.listQueuedRunReposByRun.val = []store.RunRepo{
+		{RunID: runID, RepoID: repoID, Status: domaintypes.RunRepoStatusQueued, RepoBaseRef: "main", RepoSha0: testRunRepoSHA0, Attempt: 1},
+		}
+	st.listJobsByRunRepoAttempt.val = []store.Job{
+		{ID: domaintypes.JobID("job_1"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
+		{ID: domaintypes.JobID("job_2"), RunID: runID, RepoID: repoID, Attempt: 1, Status: domaintypes.JobStatusCreated},
+		}
 
 	starter := NewBatchRepoStarter(st)
 	got, err := starter.StartPendingRepos(ctx, runID)
@@ -103,9 +101,8 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	ctx := context.Background()
 	runID := domaintypes.RunID("run_1")
 
-	st := &mockStore{
-		getRunResult: store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.RunStatusFinished},
-	}
+	st := &mockStore{}
+	st.getRun.val = store.Run{ID: runID, SpecID: domaintypes.SpecID("spec_1"), Status: domaintypes.RunStatusFinished}
 
 	starter := NewBatchRepoStarter(st)
 	got, err := starter.StartPendingRepos(ctx, runID)
@@ -115,7 +112,7 @@ func TestBatchRepoStarter_StartPendingRepos_SkipsTerminalRun(t *testing.T) {
 	if got.Started != 0 || got.Pending != 0 || got.AlreadyDone != 0 {
 		t.Fatalf("expected zero result for terminal run, got %+v", got)
 	}
-	if st.listRunReposByRunCalled || st.listQueuedRunReposByRunCalled {
+	if st.listRunReposByRun.called || st.listQueuedRunReposByRun.called {
 		t.Fatalf("expected no repo queries for terminal run")
 	}
 	if st.createRunCalled {

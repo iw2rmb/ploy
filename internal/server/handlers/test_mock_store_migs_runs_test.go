@@ -40,9 +40,8 @@ func (m *mockStore) CreateMig(ctx context.Context, params store.CreateMigParams)
 }
 
 func (m *mockStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpecParams) error {
-	m.updateModSpecCalled = true
-	m.updateModSpecParams = params
-	return m.updateModSpecErr
+	_, err := m.updateModSpec.record(params)
+	return err
 }
 
 func (m *mockStore) ListMigs(ctx context.Context, params store.ListMigsParams) ([]store.Mig, error) {
@@ -95,21 +94,18 @@ func (m *mockStore) GetMigByName(ctx context.Context, name string) (store.Mig, e
 }
 
 func (m *mockStore) DeleteMig(ctx context.Context, id types.MigID) error {
-	m.deleteMigCalled = true
-	m.deleteMigParam = id.String()
-	return m.deleteMigErr
+	_, err := m.deleteMig.record(id.String())
+	return err
 }
 
 func (m *mockStore) ArchiveMig(ctx context.Context, id types.MigID) error {
-	m.archiveMigCalled = true
-	m.archiveMigParam = id.String()
-	return m.archiveMigErr
+	_, err := m.archiveMig.record(id.String())
+	return err
 }
 
 func (m *mockStore) UnarchiveMig(ctx context.Context, id types.MigID) error {
-	m.unarchiveMigCalled = true
-	m.unarchiveMigParam = id.String()
-	return m.unarchiveMigErr
+	_, err := m.unarchiveMig.record(id.String())
+	return err
 }
 
 func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
@@ -150,67 +146,55 @@ func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams)
 }
 
 func (m *mockStore) GetRun(ctx context.Context, id types.RunID) (store.Run, error) {
-	m.getRunCalled = true
-	m.getRunParams = id.String()
-	return m.getRunResult, m.getRunErr
+	return m.getRun.record(id.String())
 }
 
 func (m *mockStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, error) {
-	m.getSpecCalled = true
-	m.getSpecParam = id.String()
-	return m.getSpecResult, m.getSpecErr
+	return m.getSpec.record(id.String())
 }
 
 func (m *mockStore) GetRunTiming(ctx context.Context, id types.RunID) (store.RunsTiming, error) {
-	m.getRunTimingCalled = true
-	m.getRunTimingParams = id.String()
-	return m.getRunTimingResult, m.getRunTimingErr
+	return m.getRunTiming.record(id.String())
 }
 
 func (m *mockStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimingsParams) ([]store.RunsTiming, error) {
-	return m.listRunsTimingsResult, m.listRunsTimingsErr
+	return m.listRunsTimings.ret()
 }
 
 func (m *mockStore) DeleteRun(ctx context.Context, id types.RunID) error {
-	m.deleteRunCalled = true
-	m.deleteRunParams = id.String()
-	return m.deleteRunErr
+	_, err := m.deleteRun.record(id.String())
+	return err
 }
 
 func (m *mockStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, error) {
-	return m.claimRunResult, m.claimRunErr
+	return m.claimRun.ret()
 }
 
-// ClaimJob implements job claiming for the new unified job model.
-
 func (m *mockStore) AckRunStart(ctx context.Context, id string) error {
-	return m.ackRunStartErr
+	return m.ackRunStart.err
 }
 
 func (m *mockStore) UpdateRunCompletion(ctx context.Context, params store.UpdateRunCompletionParams) error {
-	return m.updateRunCompletionErr
+	return m.updateRunCompletion.err
 }
 
 func (m *mockStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
-	m.updateRunStatusCalled = true
-	m.updateRunStatusParams = params
-	return m.updateRunStatusErr
+	_, err := m.updateRunStatus.record(params)
+	return err
 }
 
 func (m *mockStore) CancelRunV1(ctx context.Context, runID types.RunID) error {
-	m.cancelRunV1Called = true
-	m.cancelRunV1Param = runID.String()
-	return m.cancelRunV1Err
+	_, err := m.cancelRunV1.record(runID.String())
+	return err
 }
 
 func (m *mockStore) UpdateRunResume(ctx context.Context, id types.RunID) error {
-	return m.updateRunResumeErr
+	return m.updateRunResume.err
 }
 
 func (m *mockStore) UpdateRunStatsMRURL(ctx context.Context, params store.UpdateRunStatsMRURLParams) error {
-	m.updateRunStatsMRURLCalled = true
-	m.updateRunStatsMRURLParams = params
-	return m.updateRunStatsMRURLErr
+	_, err := m.updateRunStatsMRURL.record(params)
+	return err
 }
 
 func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) ([]store.Run, error) {
@@ -226,22 +210,17 @@ func (m *mockStore) ListRuns(ctx context.Context, params store.ListRunsParams) (
 	return m.listRunsResult[params.Offset:end], m.listRunsErr
 }
 
-// ListRunReposByRun — run IDs are now strings (KSUID).
 func (m *mockStore) ListRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
-	m.listRunReposByRunCalled = true
-	m.listRunReposByRunParam = runID.String()
-	return m.listRunReposByRunResult, m.listRunReposByRunErr
+	return m.listRunReposByRun.record(runID.String())
 }
 
-// CountRunReposByStatus — run IDs are now strings (KSUID).
 func (m *mockStore) CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]store.CountRunReposByStatusRow, error) {
-	return m.countRunReposByStatusResult, m.countRunReposByStatusErr
+	return m.countRunReposByStatus.ret()
 }
 
 func (m *mockStore) UpdateRunRepoRefs(ctx context.Context, params store.UpdateRunRepoRefsParams) error {
-	m.updateRunRepoRefsCalled = true
-	m.updateRunRepoRefsParams = params
-	return m.updateRunRepoRefsErr
+	_, err := m.updateRunRepoRefs.record(params)
+	return err
 }
 
 func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
@@ -251,9 +230,8 @@ func (m *mockStore) UpdateRunRepoStatus(ctx context.Context, params store.Update
 }
 
 func (m *mockStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
-	m.updateRunRepoErrorCalled = true
-	m.updateRunRepoErrorParams = params
-	return m.updateRunRepoErrorErr
+	_, err := m.updateRunRepoError.record(params)
+	return err
 }
 
 func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRepoParams) (store.RunRepo, error) {
@@ -284,7 +262,6 @@ func (m *mockStore) CreateRunRepo(ctx context.Context, params store.CreateRunRep
 	return result, m.createRunRepoErr
 }
 
-// GetRunRepo — repo IDs are now strings (NanoID).
 func (m *mockStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (store.RunRepo, error) {
 	m.getRunRepoCalled = true
 	m.getRunRepoParam = arg
@@ -302,31 +279,19 @@ func (m *mockStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) 
 	return m.getRunRepoResult, nil
 }
 
-// IncrementRunRepoAttempt — repo IDs are now strings (NanoID).
 func (m *mockStore) IncrementRunRepoAttempt(ctx context.Context, arg store.IncrementRunRepoAttemptParams) error {
-	m.incrementRunRepoAttemptCalled = true
-	m.incrementRunRepoAttemptParam = arg
-	return m.incrementRunRepoAttemptErr
+	_, err := m.incrementRunRepoAttempt.record(arg)
+	return err
 }
 
-// ListQueuedRunReposByRun — run IDs are now strings (KSUID).
 func (m *mockStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
-	m.listQueuedRunReposByRunCalled = true
-	m.listQueuedRunReposByRunParam = runID.String()
-	return m.listQueuedRunReposByRunResult, m.listQueuedRunReposByRunErr
+	return m.listQueuedRunReposByRun.record(runID.String())
 }
-
-// ListDistinctRepos returns distinct repos with optional substring filter.
 
 func (m *mockStore) ListRunReposWithURLByRun(ctx context.Context, runID types.RunID) ([]store.ListRunReposWithURLByRunRow, error) {
-	m.listRunReposWithURLByRunCalled = true
-	m.listRunReposWithURLByRunParam = runID.String()
-	return m.listRunReposWithURLByRunResult, m.listRunReposWithURLByRunErr
+	return m.listRunReposWithURLByRun.record(runID.String())
 }
 
-// GetLatestRunRepoByMigAndRepoStatus returns the latest run_repos row for a repo in a mig filtered by status.
 func (m *mockStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
-	m.getLatestRunRepoByModAndRepoStatusCalled = true
-	m.getLatestRunRepoByModAndRepoStatusParams = arg
-	return m.getLatestRunRepoByModAndRepoStatusResult, m.getLatestRunRepoByModAndRepoStatusErr
+	return m.getLatestRunRepoByModAndRepoStatus.record(arg)
 }

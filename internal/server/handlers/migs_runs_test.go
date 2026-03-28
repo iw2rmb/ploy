@@ -67,7 +67,7 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 		{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
 		{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
 	}
-	st.listFailedRepoIDsByModResult = []domaintypes.RepoID{"repo2"}
+	st.listFailedRepoIDsByMod.val = []domaintypes.RepoID{"repo2"}
 	handler := createMigRunHandler(st)
 
 	reqBody := map[string]any{
@@ -77,11 +77,11 @@ func TestModRuns_Create_FailedRepos(t *testing.T) {
 	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
 	assertStatus(t, rr, http.StatusCreated)
 
-	if !st.listFailedRepoIDsByModCalled {
+	if !st.listFailedRepoIDsByMod.called {
 		t.Error("store.ListFailedRepoIDsByMig was not called")
 	}
-	if st.listFailedRepoIDsByModParam != "mod123" {
-		t.Errorf("ListFailedRepoIDsByMig param = %q, want %q", st.listFailedRepoIDsByModParam, "mod123")
+	if st.listFailedRepoIDsByMod.params != "mod123" {
+		t.Errorf("ListFailedRepoIDsByMig param = %q, want %q", st.listFailedRepoIDsByMod.params, "mod123")
 	}
 	if !st.createRunRepoCalled {
 		t.Error("store.CreateRunRepo was not called")
@@ -214,7 +214,7 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 			store: func() *mockStore {
 				specID := domaintypes.SpecID("spec123")
 				st := activeMigWithSpec(specID)
-				st.listFailedRepoIDsByModResult = []domaintypes.RepoID{}
+				st.listFailedRepoIDsByMod.val = []domaintypes.RepoID{}
 				return st
 			}(),
 			body:       map[string]any{"repo_selector": map[string]any{"mode": "failed"}},
@@ -277,7 +277,7 @@ func TestModRuns_Create_StoreErrors(t *testing.T) {
 		{
 			name: "ListFailedReposError",
 			setupFn: func(st *mockStore) {
-				st.listFailedRepoIDsByModErr = errors.New("database connection failed")
+				st.listFailedRepoIDsByMod.err = errors.New("database connection failed")
 			},
 			body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}},
 		},

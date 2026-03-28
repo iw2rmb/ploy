@@ -81,8 +81,8 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 
 			st := &mockStore{
 				getJobResult:                   job,
-				listJobsByRunRepoAttemptResult: []store.Job{job, successor},
 			}
+			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
 
 			svc := NewCompleteJobService(st, nil, nil, nil)
 
@@ -216,8 +216,8 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 
 			st := &mockStore{
 				getJobResult:                   job,
-				listJobsByRunRepoAttemptResult: []store.Job{job, successor},
 			}
+			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
 
 			svc := NewCompleteJobService(st, nil, nil, nil)
 
@@ -236,10 +236,10 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 				t.Fatalf("Complete() error = %v", err)
 			}
 
-			// getRunCalled uniquely identifies the healing evaluation path (loadRunForPostCompletion).
-			if tc.wantGetRunCalled != st.getRunCalled {
+			// getRun.called uniquely identifies the healing evaluation path (loadRunForPostCompletion).
+			if tc.wantGetRunCalled != st.getRun.called {
 				t.Fatalf("GetRun called = %v, want %v (jobType=%s status=%s — healing path entered?)",
-					st.getRunCalled, tc.wantGetRunCalled, tc.jobType, tc.status)
+					st.getRun.called, tc.wantGetRunCalled, tc.jobType, tc.status)
 			}
 
 			// updateJobStatusCalled signals that cancelRemainingJobsAfterFailure cancelled a successor.

@@ -66,7 +66,6 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	}
 
 	st := &mockStore{
-		getNodeResult: store.Node{ID: nodeID},
 		claimJobResult: store.Job{
 			ID:          jobID,
 			RunID:       runID,
@@ -80,13 +79,6 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 			JobImage:    opts.jobImage,
 			Meta:        opts.jobMeta,
 		},
-		getRunResult: store.Run{
-			ID:        runID,
-			SpecID:    specID,
-			Status:    opts.runStatus,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
 		getRunRepoResult: store.RunRepo{
 			RunID:         runID,
 			RepoID:        repoID,
@@ -95,9 +87,17 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 			Status:        opts.runRepoStatus,
 			Attempt:       1,
 		},
-		getModRepoResult: store.MigRepo{ID: domaintypes.NewMigRepoID(), RepoID: repoID},
-		getSpecResult:    store.Spec{ID: specID, Spec: opts.specJSON},
 	}
+	st.getNode.val = store.Node{ID: nodeID}
+	st.getRun.val = store.Run{
+		ID:        runID,
+		SpecID:    specID,
+		Status:    opts.runStatus,
+		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	st.getModRepo.val = store.MigRepo{ID: domaintypes.NewMigRepoID(), RepoID: repoID}
+	st.getSpec.val = store.Spec{ID: specID, Spec: opts.specJSON}
 
 	return &claimJobFixture{
 		nodeKey: nodeKey,

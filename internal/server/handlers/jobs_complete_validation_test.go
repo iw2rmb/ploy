@@ -346,19 +346,19 @@ func TestCompleteJob_ValidCompletion(t *testing.T) {
 			assertStatus(t, rr, http.StatusNoContent)
 
 			if tt.wantWithMeta {
-				assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
-				assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-				assertMetaKind(t, st.updateJobCompletionWithMetaParams.Meta, tt.wantMetaKind)
+				assertCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMeta.called)
+				assertNotCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
+				assertMetaKind(t, st.updateJobCompletionWithMeta.params.Meta, tt.wantMetaKind)
 				if tt.checkMeta != nil {
 					var meta map[string]any
-					if err := json.Unmarshal(st.updateJobCompletionWithMetaParams.Meta, &meta); err != nil {
+					if err := json.Unmarshal(st.updateJobCompletionWithMeta.params.Meta, &meta); err != nil {
 						t.Fatalf("failed to unmarshal persisted meta: %v", err)
 					}
 					tt.checkMeta(t, meta)
 				}
 			} else {
-				assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
-				assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMetaCalled)
+				assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
+				assertNotCalled(t, "UpdateJobCompletionWithMeta", st.updateJobCompletionWithMeta.called)
 			}
 		})
 	}

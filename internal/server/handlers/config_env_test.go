@@ -104,11 +104,11 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify store was called.
-	if !st.upsertGlobalEnvCalled {
+	if !st.upsertGlobalEnv.called {
 		t.Error("store.UpsertGlobalEnv was not called")
 	}
-	if st.upsertGlobalEnvParams.Key != "CA_CERTS_PEM_BUNDLE" {
-		t.Errorf("store Key = %q, want %q", st.upsertGlobalEnvParams.Key, "CA_CERTS_PEM_BUNDLE")
+	if st.upsertGlobalEnv.params.Key != "CA_CERTS_PEM_BUNDLE" {
+		t.Errorf("store Key = %q, want %q", st.upsertGlobalEnv.params.Key, "CA_CERTS_PEM_BUNDLE")
 	}
 
 	// Verify holder was updated.
@@ -140,7 +140,7 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	// Verify secret defaults to true.
-	if !st.upsertGlobalEnvParams.Secret {
+	if !st.upsertGlobalEnv.params.Secret {
 		t.Error("store Secret = false, want true (default)")
 	}
 
@@ -167,7 +167,7 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 	assertStatus(t, rr, http.StatusBadRequest)
 
 	// Store should not be called.
-	if st.upsertGlobalEnvCalled {
+	if st.upsertGlobalEnv.called {
 		t.Error("store.UpsertGlobalEnv should not be called for invalid scope")
 	}
 }
@@ -187,11 +187,11 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify store was called.
-	if !st.deleteGlobalEnvCalled {
+	if !st.deleteGlobalEnv.called {
 		t.Error("store.DeleteGlobalEnv was not called")
 	}
-	if st.deleteGlobalEnvParam != "OLD_KEY" {
-		t.Errorf("store Key = %q, want %q", st.deleteGlobalEnvParam, "OLD_KEY")
+	if st.deleteGlobalEnv.params != "OLD_KEY" {
+		t.Errorf("store Key = %q, want %q", st.deleteGlobalEnv.params, "OLD_KEY")
 	}
 
 	// Verify holder was updated.
@@ -280,9 +280,8 @@ func TestConfigEnvPutInvalidJSON(t *testing.T) {
 
 // TestConfigEnvPutStoreError verifies that store errors return 500.
 func TestConfigEnvPutStoreError(t *testing.T) {
-	st := &mockStore{
-		upsertGlobalEnvErr: errMockDatabase,
-	}
+	st := &mockStore{}
+	st.upsertGlobalEnv.err = errMockDatabase
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
 	handler := putGlobalEnvHandler(holder, st)
@@ -301,9 +300,8 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 
 // TestConfigEnvDeleteStoreError verifies that store errors return 500.
 func TestConfigEnvDeleteStoreError(t *testing.T) {
-	st := &mockStore{
-		deleteGlobalEnvErr: errMockDatabase,
-	}
+	st := &mockStore{}
+	st.deleteGlobalEnv.err = errMockDatabase
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
 		"OLD_KEY": {Value: "val", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
 	})

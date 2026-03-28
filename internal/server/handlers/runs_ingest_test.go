@@ -19,9 +19,8 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	objKey := "logs/run/" + runID.String() + "/log/1.gz"
-	st := &mockStore{
-		createLogResult: store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey},
-	}
+	st := &mockStore{}
+	st.createLog.val = store.Log{ID: 1, RunID: runID, JobID: &jobID, ChunkNo: 2, DataSize: 5, ObjectKey: &objKey}
 	eventsService, err := createTestEventsServiceWithStore(st)
 	if err != nil {
 		t.Fatalf("failed to create events service: %v", err)
@@ -64,9 +63,9 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 	objKey := "diffs/run/" + runID.String() + "/diff/1.patch.gz"
 	st := &mockStore{
 		getJobResult:    store.Job{ID: jobID, RunID: runID},
-		getRunResult:    store.Run{ID: runID},
-		createDiffResult: store.Diff{ID: pgtype.UUID{Valid: true}, PatchSize: 7, ObjectKey: &objKey},
 	}
+	st.getRun.val = store.Run{ID: runID}
+	st.createDiff.val = store.Diff{ID: pgtype.UUID{Valid: true}, PatchSize: 7, ObjectKey: &objKey}
 	bp := blobpersist.New(st, bsmock.New())
 	h := createRunDiffHandler(st, bp)
 	payload := map[string]any{"job_id": jobID.String(), "patch": []byte("gz-diff"), "summary": map[string]any{"k": "v"}}
@@ -89,17 +88,17 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	digest := "sha256:test"
 	st := &mockStore{
 		getJobResult: store.Job{ID: jobID, RunID: runID, NodeID: &nodeID},
-		getRunResult: store.Run{ID: runID},
-		createArtifactBundleResult: store.ArtifactBundle{
-			ID:        pgtype.UUID{Valid: true},
-			RunID:     runID,
-			JobID:     &jobID,
-			Name:      ptr("artifact-name"),
-			ObjectKey: &objKey,
-			Cid:       &cid,
-			Digest:    &digest,
-		},
 	}
+	st.getRun.val = store.Run{ID: runID}
+	st.createArtifactBundle.val = store.ArtifactBundle{
+		ID:        pgtype.UUID{Valid: true},
+		RunID:     runID,
+		JobID:     &jobID,
+		Name:      ptr("artifact-name"),
+		ObjectKey: &objKey,
+		Cid:       &cid,
+		Digest:    &digest,
+		}
 	bp := blobpersist.New(st, bsmock.New())
 	h := createJobArtifactHandler(st, bp)
 	payload := map[string]any{"name": "artifact-name", "bundle": []byte("gz-tar")}

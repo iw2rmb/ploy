@@ -76,10 +76,9 @@ func TestGetRunRepoCounts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			st := &mockStore{
-				countRunReposByStatusResult: tc.rows,
-				countRunReposByStatusErr:    tc.err,
-			}
+			st := &mockStore{}
+			st.countRunReposByStatus.val = tc.rows
+			st.countRunReposByStatus.err = tc.err
 
 			counts, err := getRunRepoCounts(context.Background(), st, runID)
 			if tc.wantErr {

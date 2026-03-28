@@ -158,7 +158,7 @@ func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T
 		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"deps","strategy_id":"deps-default","deps_bumps":{"org.slf4j:slf4j-api":"2.0.13","legacy:shim":null}}}`),
 	})
 
-	f.store.listJobsByRunRepoAttemptResult = []store.Job{
+	f.store.listJobsByRunRepoAttempt.val = []store.Job{
 		{
 			ID:      gateJobID,
 			RunID:   f.runID,

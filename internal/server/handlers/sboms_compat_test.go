@@ -12,9 +12,8 @@ import (
 func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: false,
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = false
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a", nil)
 	rr := httptest.NewRecorder()
@@ -24,7 +23,7 @@ func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
 	if body := rr.Body.String(); body != "null" {
 		t.Fatalf("body = %q, want null", body)
 	}
-	if st.listSBOMCompatRowsCalled {
+	if st.listSBOMCompatRows.called {
 		t.Fatal("expected ListSBOMCompatRows not to be called without stack evidence")
 	}
 }
@@ -32,15 +31,14 @@ func TestSBOMCompatHandler_ReturnsNullWhenNoStackEvidence(t *testing.T) {
 func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: true,
-		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
-			{Lib: "lib-a", Ver: "1.0.0"},
-			{Lib: "lib-a", Ver: "1.2.0"},
-			{Lib: "lib-a", Ver: "2.0.0"},
-			{Lib: "lib-b", Ver: "3.5.1"},
-		},
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = true
+	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
+		{Lib: "lib-a", Ver: "1.0.0"},
+		{Lib: "lib-a", Ver: "1.2.0"},
+		{Lib: "lib-a", Ver: "2.0.0"},
+		{Lib: "lib-b", Ver: "3.5.1"},
+		}
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.1.0,lib-b", nil)
 	rr := httptest.NewRecorder()
@@ -63,14 +61,13 @@ func TestSBOMCompatHandler_ReturnsMinAndFloorFilteredVersions(t *testing.T) {
 func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: true,
-		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
-			{Lib: "lib-a", Ver: "1.2.0"},
-			{Lib: "lib-a", Ver: "1.10.0"},
-			{Lib: "lib-a", Ver: "2.0.0"},
-		},
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = true
+	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
+		{Lib: "lib-a", Ver: "1.2.0"},
+		{Lib: "lib-a", Ver: "1.10.0"},
+		{Lib: "lib-a", Ver: "2.0.0"},
+		}
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.3.0", nil)
 	rr := httptest.NewRecorder()
@@ -89,14 +86,13 @@ func TestSBOMCompatHandler_UsesEcosystemAwareVersionOrdering(t *testing.T) {
 func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: true,
-		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
-			{Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
-			{Lib: "org.slf4j:slf4j-api", Ver: "2.0.13"},
-			{Lib: "ch.qos.logback:logback-classic", Ver: "1.5.6"},
-		},
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = true
+	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
+		{Lib: "org.slf4j:slf4j-api", Ver: "1.7.36"},
+		{Lib: "org.slf4j:slf4j-api", Ver: "2.0.13"},
+		{Lib: "ch.qos.logback:logback-classic", Ver: "1.5.6"},
+		}
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=org.slf4j:slf4j-api,ch.qos.logback:logback-classic:1.5.0", nil)
 	rr := httptest.NewRecorder()
@@ -105,12 +101,12 @@ func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 	assertStatus(t, rr, http.StatusOK)
 
 	wantLibs := []string{"ch.qos.logback:logback-classic", "org.slf4j", "org.slf4j:slf4j-api"}
-	if len(st.listSBOMCompatRowsParams.Libs) != len(wantLibs) {
-		t.Fatalf("query libs len = %d, want %d (%v)", len(st.listSBOMCompatRowsParams.Libs), len(wantLibs), st.listSBOMCompatRowsParams.Libs)
+	if len(st.listSBOMCompatRows.params.Libs) != len(wantLibs) {
+		t.Fatalf("query libs len = %d, want %d (%v)", len(st.listSBOMCompatRows.params.Libs), len(wantLibs), st.listSBOMCompatRows.params.Libs)
 	}
 	for i := range wantLibs {
-		if st.listSBOMCompatRowsParams.Libs[i] != wantLibs[i] {
-			t.Fatalf("query libs[%d] = %q, want %q", i, st.listSBOMCompatRowsParams.Libs[i], wantLibs[i])
+		if st.listSBOMCompatRows.params.Libs[i] != wantLibs[i] {
+			t.Fatalf("query libs[%d] = %q, want %q", i, st.listSBOMCompatRows.params.Libs[i], wantLibs[i])
 		}
 	}
 
@@ -129,14 +125,13 @@ func TestSBOMCompatHandler_SupportsMavenCoordinateSelectors(t *testing.T) {
 func TestSBOMCompatHandler_SupportsSingleColonLibraryNamesWithoutDot(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: true,
-		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
-			{Lib: "svc:api", Ver: "1.0.0"},
-			{Lib: "svc:api", Ver: "1.2.0"},
-			{Lib: "svc", Ver: "0.9.0"},
-		},
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = true
+	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
+		{Lib: "svc:api", Ver: "1.0.0"},
+		{Lib: "svc:api", Ver: "1.2.0"},
+		{Lib: "svc", Ver: "0.9.0"},
+		}
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=svc:api", nil)
 	rr := httptest.NewRecorder()
@@ -156,14 +151,13 @@ func TestSBOMCompatHandler_SupportsSingleColonLibraryNamesWithoutDot(t *testing.
 func TestSBOMCompatHandler_SupportsFloorForColonLibraryNamesWithoutDot(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: true,
-		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
-			{Lib: "svc:api", Ver: "1.0.0"},
-			{Lib: "svc:api", Ver: "1.2.0"},
-			{Lib: "svc", Ver: "0.9.0"},
-		},
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = true
+	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
+		{Lib: "svc:api", Ver: "1.0.0"},
+		{Lib: "svc:api", Ver: "1.2.0"},
+		{Lib: "svc", Ver: "0.9.0"},
+		}
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=svc:api:1.1.0", nil)
 	rr := httptest.NewRecorder()
@@ -183,13 +177,12 @@ func TestSBOMCompatHandler_SupportsFloorForColonLibraryNamesWithoutDot(t *testin
 func TestSBOMCompatHandler_PrefersExactSingleColonLibraryName(t *testing.T) {
 	t.Parallel()
 
-	st := &mockStore{
-		hasSBOMEvidenceForStackResult: true,
-		listSBOMCompatRowsResult: []store.ListSBOMCompatRowsRow{
-			{Lib: "lib-a:1.1.0", Ver: "0.0.2"},
-			{Lib: "lib-a", Ver: "1.2.0"},
-		},
-	}
+	st := &mockStore{}
+	st.hasSBOMEvidenceForStack.val = true
+	st.listSBOMCompatRows.val = []store.ListSBOMCompatRowsRow{
+		{Lib: "lib-a:1.1.0", Ver: "0.0.2"},
+		{Lib: "lib-a", Ver: "1.2.0"},
+		}
 	handler := sbomCompatHandler(st)
 	req := httptest.NewRequest(http.MethodGet, "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=lib-a:1.1.0", nil)
 	rr := httptest.NewRecorder()

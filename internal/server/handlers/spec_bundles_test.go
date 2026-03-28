@@ -27,15 +27,14 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	t.Run("UploadSuccess", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()
 		objKey := "spec-bundles/" + bundleID.String() + ".gz"
-		st := &mockStore{
-			getSpecBundleByCIDErr: pgx.ErrNoRows, // no existing bundle
-			createSpecBundleResult: store.SpecBundle{
-				ID:        bundleID,
-				Cid:       cid,
-				Digest:    digest,
-				Size:      int64(len(bundleData)),
-				ObjectKey: &objKey,
-			},
+		st := &mockStore{}
+		st.getSpecBundleByCID.err = pgx.ErrNoRows // no existing bundle
+		st.createSpecBundle.val = store.SpecBundle{
+			ID:        bundleID,
+			Cid:       cid,
+			Digest:    digest,
+			Size:      int64(len(bundleData)),
+			ObjectKey: &objKey,
 		}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
@@ -66,15 +65,14 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 
 	t.Run("Deduplicated", func(t *testing.T) {
 		existingID := domaintypes.NewSpecBundleID()
-		st := &mockStore{
-			getSpecBundleByCIDResult: store.SpecBundle{
-				ID:     existingID,
-				Cid:    cid,
-				Digest: digest,
-				Size:   int64(len(bundleData)),
-			},
-			getSpecBundleByCIDErr: nil, // found
+		st := &mockStore{}
+		st.getSpecBundleByCID.val = store.SpecBundle{
+			ID:     existingID,
+			Cid:    cid,
+			Digest: digest,
+			Size:   int64(len(bundleData)),
 		}
+		st.getSpecBundleByCID.err = nil // found
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -133,16 +131,15 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 	t.Run("CreatedByQueryParam", func(t *testing.T) {
 		bundleID := domaintypes.NewSpecBundleID()
 		objKey := "spec-bundles/" + bundleID.String() + ".gz"
-		st := &mockStore{
-			getSpecBundleByCIDErr: pgx.ErrNoRows,
-			createSpecBundleResult: store.SpecBundle{
-				ID:        bundleID,
-				Cid:       cid,
-				Digest:    digest,
-				Size:      int64(len(bundleData)),
-				ObjectKey: &objKey,
-			},
-		}
+		st := &mockStore{}
+		st.getSpecBundleByCID.err = pgx.ErrNoRows
+		st.createSpecBundle.val = store.SpecBundle{
+			ID:        bundleID,
+			Cid:       cid,
+			Digest:    digest,
+			Size:      int64(len(bundleData)),
+			ObjectKey: &objKey,
+			}
 		bs := bsmock.New()
 		bp := blobpersist.New(st, bs)
 
@@ -153,8 +150,8 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		if w.Code != http.StatusCreated {
 			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 		}
-		if st.createSpecBundleParams.CreatedBy == nil || *st.createSpecBundleParams.CreatedBy != "ci-bot" {
-			t.Errorf("expected created_by=ci-bot, got %v", st.createSpecBundleParams.CreatedBy)
+		if st.createSpecBundle.params.CreatedBy == nil || *st.createSpecBundle.params.CreatedBy != "ci-bot" {
+			t.Errorf("expected created_by=ci-bot, got %v", st.createSpecBundle.params.CreatedBy)
 		}
 	})
 }
@@ -166,12 +163,11 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	bundleContent := []byte("fake bundle bytes")
 
 	t.Run("DownloadSuccess", func(t *testing.T) {
-		st := &mockStore{
-			getSpecBundleResult: store.SpecBundle{
-				ID:        bundleID,
-				ObjectKey: &objectKey,
-			},
-		}
+		st := &mockStore{}
+		st.getSpecBundle.val = store.SpecBundle{
+			ID:        bundleID,
+			ObjectKey: &objectKey,
+			}
 		bs := bsmock.New()
 		if _, err := bs.Put(context.Background(), objectKey, "application/gzip", bundleContent); err != nil {
 			t.Fatalf("seed blob store: %v", err)
@@ -198,9 +194,8 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("NotFound", func(t *testing.T) {
-		st := &mockStore{
-			getSpecBundleErr: pgx.ErrNoRows,
-		}
+		st := &mockStore{}
+		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
@@ -229,12 +224,11 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 
 	t.Run("BlobNotFound", func(t *testing.T) {
 		// Metadata row exists but blob is absent from object store: expect 404, not 503.
-		st := &mockStore{
-			getSpecBundleResult: store.SpecBundle{
-				ID:        bundleID,
-				ObjectKey: &objectKey,
-			},
-		}
+		st := &mockStore{}
+		st.getSpecBundle.val = store.SpecBundle{
+			ID:        bundleID,
+			ObjectKey: &objectKey,
+			}
 		bs := bsmock.New() // empty: key not seeded
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
@@ -248,12 +242,11 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	})
 
 	t.Run("MissingObjectKey", func(t *testing.T) {
-		st := &mockStore{
-			getSpecBundleResult: store.SpecBundle{
-				ID:        bundleID,
-				ObjectKey: nil, // no object key
-			},
-		}
+		st := &mockStore{}
+		st.getSpecBundle.val = store.SpecBundle{
+			ID:        bundleID,
+			ObjectKey: nil, // no object key
+			}
 		bs := bsmock.New()
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/"+bundleID.String(), nil)
@@ -274,14 +267,14 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 	bundleContent := []byte("fake bundle bytes")
 
 	st := &mockStore{
-		getSpecBundleResult: store.SpecBundle{
-			ID:        bundleID,
-			ObjectKey: &objectKey,
-		},
 		updateSpecBundleLastRefAtStarted: make(chan struct{}),
 		updateSpecBundleLastRefAtProceed: make(chan struct{}),
 		updateSpecBundleLastRefAtDone:    make(chan struct{}),
 	}
+	st.getSpecBundle.val = store.SpecBundle{
+		ID:        bundleID,
+		ObjectKey: &objectKey,
+		}
 	bs := bsmock.New()
 	if _, err := bs.Put(context.Background(), objectKey, "application/gzip", bundleContent); err != nil {
 		t.Fatalf("seed blob store: %v", err)

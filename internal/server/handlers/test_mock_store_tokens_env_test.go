@@ -9,65 +9,63 @@ import (
 )
 
 func (m *mockStore) InsertAPIToken(ctx context.Context, params store.InsertAPITokenParams) error {
-	return m.insertAPITokenErr
+	return m.insertAPIToken.err
 }
 
 func (m *mockStore) ListAPITokens(ctx context.Context, clusterID *string) ([]store.ListAPITokensRow, error) {
-	return m.listAPITokensResult, m.listAPITokensErr
+	return m.listAPITokens.ret()
 }
 
 func (m *mockStore) RevokeAPIToken(ctx context.Context, tokenID string) error {
-	return m.revokeAPITokenErr
+	return m.revokeAPIToken.err
 }
 
 func (m *mockStore) CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
-	return m.checkAPITokenRevokedResult, m.checkAPITokenRevokedErr
+	return m.checkAPITokenRevoked.ret()
 }
 
 func (m *mockStore) UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error {
-	return m.updateAPITokenLastUsedErr
+	return m.updateAPITokenLastUsed.err
 }
 
 // Bootstrap Token methods
 
 func (m *mockStore) InsertBootstrapToken(ctx context.Context, params store.InsertBootstrapTokenParams) error {
-	return m.insertBootstrapTokenErr
+	return m.insertBootstrapToken.err
 }
 
 func (m *mockStore) GetBootstrapToken(ctx context.Context, tokenID string) (store.GetBootstrapTokenRow, error) {
-	return m.getBootstrapTokenResult, m.getBootstrapTokenErr
+	return m.getBootstrapToken.ret()
 }
 
 func (m *mockStore) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
-	return m.checkBootstrapTokenRevokedResult, m.checkBootstrapTokenRevokedErr
+	return m.checkBootstrapTokenRevoked.ret()
 }
 
 func (m *mockStore) UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error {
-	return m.updateBootstrapTokenLastUsedErr
+	return m.updateBootstrapTokenLastUsed.err
 }
 
 func (m *mockStore) MarkBootstrapTokenUsed(ctx context.Context, tokenID string) error {
-	return m.markBootstrapTokenUsedErr
+	return m.markBootstrapTokenUsed.err
 }
 
-// RunRepo methods for batch run handlers
+// Global Env methods
 
 func (m *mockStore) ListGlobalEnv(ctx context.Context) ([]store.ConfigEnv, error) {
-	return m.listGlobalEnvResult, m.listGlobalEnvErr
+	return m.listGlobalEnv.ret()
 }
 
 func (m *mockStore) GetGlobalEnv(ctx context.Context, key string) (store.ConfigEnv, error) {
-	return m.getGlobalEnvResult, m.getGlobalEnvErr
+	return m.getGlobalEnv.ret()
 }
 
 func (m *mockStore) UpsertGlobalEnv(ctx context.Context, params store.UpsertGlobalEnvParams) error {
-	m.upsertGlobalEnvCalled = true
-	m.upsertGlobalEnvParams = params
-	return m.upsertGlobalEnvErr
+	_, err := m.upsertGlobalEnv.record(params)
+	return err
 }
 
 func (m *mockStore) DeleteGlobalEnv(ctx context.Context, key string) error {
-	m.deleteGlobalEnvCalled = true
-	m.deleteGlobalEnvParam = key
-	return m.deleteGlobalEnvErr
+	_, err := m.deleteGlobalEnv.record(key)
+	return err
 }

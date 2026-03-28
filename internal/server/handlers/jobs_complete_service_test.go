@@ -75,7 +75,7 @@ func TestCompleteJobService_Complete_SuccessPromotesNextJob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Complete() error = %v", err)
 	}
-	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletionCalled)
+	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
 	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblockedCalled)
 	if st.promoteJobByIDIfUnblockedParam != nextID {
 		t.Fatalf("promoted next_id = %s, want %s", st.promoteJobByIDIfUnblockedParam, nextID)
