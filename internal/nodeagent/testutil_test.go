@@ -1,6 +1,7 @@
 package nodeagent
 
 import (
+	"archive/tar"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -117,6 +118,59 @@ func newTestConfig(serverURL string) Config {
 		NodeID:    testNodeID,
 		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
 	}
+}
+
+// newTestUploader returns a baseUploader with sensible test defaults (TLS disabled).
+func newTestUploader(t *testing.T, serverURL string) *baseUploader {
+	t.Helper()
+	u, err := newBaseUploader(newTestConfig(serverURL))
+	if err != nil {
+		t.Fatalf("newBaseUploader: %v", err)
+	}
+	return u
+}
+
+// tarEntry holds the key attributes of a single tar archive entry.
+type tarEntry struct {
+	Typeflag byte
+	Linkname string
+	Content  []byte
+}
+
+// tarEntriesFromBundle decompresses a gzipped tar bundle and returns a map
+// of entry name to tarEntry (typeflag, linkname, content).
+func tarEntriesFromBundle(t *testing.T, bundle []byte) map[string]tarEntry {
+	t.Helper()
+	gz, err := gzip.NewReader(bytes.NewReader(bundle))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer func() { _ = gz.Close() }()
+
+	tr := tar.NewReader(gz)
+	entries := make(map[string]tarEntry)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar read: %v", err)
+		}
+		var content []byte
+		if hdr.Typeflag == tar.TypeReg {
+			content, err = io.ReadAll(tr)
+			if err != nil {
+				t.Fatalf("read content for %s: %v", hdr.Name, err)
+			}
+		}
+		entries[hdr.Name] = tarEntry{
+			Typeflag: hdr.Typeflag,
+			Linkname: hdr.Linkname,
+			Content:  content,
+		}
+	}
+	return entries
 }
 
 // newTestController creates a runController with all uploaders initialized,

@@ -1,468 +1,215 @@
 package contracts
 
 import (
-	"strings"
+	"fmt"
 	"testing"
 )
 
-// TestParseModsSpecJSON_RouterAmata covers amata parsing and validation for router.
-func TestParseModsSpecJSON_RouterAmata(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr string
-		check   func(t *testing.T, spec *ModsSpec)
-	}{
+// amataPlacement describes where an AmataRunSpec can appear in a ModsSpec,
+// parameterizing JSON construction and result extraction so behavioral tests
+// are written once and run for every valid placement site.
+type amataPlacement struct {
+	name     string
+	wrapJSON func(amataFragment string) string           // build full spec JSON given an amata JSON object
+	baseJSON string                                      // valid spec JSON without amata (direct codex mode)
+	getAmata func(*ModsSpec) *AmataRunSpec               // extract amata from parsed result
+	errPfx   string                                      // error path prefix, e.g. "build_gate.router.amata"
+	forbid   []struct{ name, input, wantErr string }     // site-specific flat-key forbidden cases
+}
+
+func amataplacements() []amataPlacement {
+	return []amataPlacement{
 		{
-			name: "router amata with spec and set",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {
-							"spec": "version: 1\nprompt: fix it",
-							"set": [
-								{"param": "REPO", "value": "my-repo"},
-								{"param": "BRANCH", "value": "main"}
-							]
-						}
+			name: "Router",
+			wrapJSON: func(frag string) string {
+				return fmt.Sprintf(`{
+					"steps": [{"image": "test:latest"}],
+					"build_gate": {
+						"router": {"image": "router:latest", "amata": %s}
 					}
-				}
+				}`, frag)
+			},
+			baseJSON: `{
+				"steps": [{"image": "test:latest"}],
+				"build_gate": {"router": {"image": "router:latest"}}
 			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				r := spec.BuildGate.Router
-				if r.Amata == nil {
-					t.Fatal("router.amata is nil")
-				}
-				if r.Amata.Spec != "version: 1\nprompt: fix it" {
-					t.Errorf("router.amata.spec = %q, want %q", r.Amata.Spec, "version: 1\nprompt: fix it")
-				}
-				if len(r.Amata.Set) != 2 {
-					t.Fatalf("router.amata.set len = %d, want 2", len(r.Amata.Set))
-				}
-				if r.Amata.Set[0].Param != "REPO" || r.Amata.Set[0].Value != "my-repo" {
-					t.Errorf("router.amata.set[0] = %+v, want {REPO my-repo}", r.Amata.Set[0])
-				}
-				if r.Amata.Set[1].Param != "BRANCH" || r.Amata.Set[1].Value != "main" {
-					t.Errorf("router.amata.set[1] = %+v, want {BRANCH main}", r.Amata.Set[1])
-				}
+			getAmata: func(s *ModsSpec) *AmataRunSpec { return s.BuildGate.Router.Amata },
+			errPfx:   "build_gate.router.amata",
+			forbid: []struct{ name, input, wantErr string }{
+				{
+					name: "flat_spec_forbidden",
+					input: `{
+						"steps": [{"image": "test:latest"}],
+						"build_gate": {"router": {"image": "router:latest", "spec": "bad"}}
+					}`,
+					wantErr: "build_gate.router.spec: forbidden",
+				},
+				{
+					name: "flat_set_forbidden",
+					input: `{
+						"steps": [{"image": "test:latest"}],
+						"build_gate": {"router": {"image": "router:latest", "set": []}}
+					}`,
+					wantErr: "build_gate.router.set: forbidden",
+				},
 			},
 		},
 		{
-			name: "router amata with spec only (no set)",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {"spec": "prompt: fix"}
-					}
-				}
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				r := spec.BuildGate.Router
-				if r.Amata == nil {
-					t.Fatal("router.amata is nil")
-				}
-				if len(r.Amata.Set) != 0 {
-					t.Errorf("router.amata.set len = %d, want 0", len(r.Amata.Set))
-				}
+			name: "Step",
+			wrapJSON: func(frag string) string {
+				return fmt.Sprintf(`{
+					"steps": [{"image": "test:latest", "amata": %s}]
+				}`, frag)
 			},
+			baseJSON: `{"steps": [{"image": "test:latest"}]}`,
+			getAmata: func(s *ModsSpec) *AmataRunSpec { return s.Steps[0].Amata },
+			errPfx:   "steps[0].amata",
 		},
 		{
-			name: "router without amata (direct codex mode)",
-			input: `{
+			name: "Healing",
+			wrapJSON: func(frag string) string {
+				return fmt.Sprintf(`{
+					"steps": [{"image": "test:latest"}],
+					"build_gate": {
+						"healing": {
+							"by_error_kind": {
+								"code": {"image": "heal:latest", "amata": %s}
+							}
+						},
+						"router": {"image": "router:latest"}
+					}
+				}`, frag)
+			},
+			baseJSON: `{
 				"steps": [{"image": "test:latest"}],
 				"build_gate": {
+					"healing": {"by_error_kind": {"infra": {"image": "heal:latest"}}},
 					"router": {"image": "router:latest"}
 				}
 			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				if spec.BuildGate.Router.Amata != nil {
-					t.Errorf("router.amata = %+v, want nil (direct codex mode)", spec.BuildGate.Router.Amata)
-				}
+			getAmata: func(s *ModsSpec) *AmataRunSpec {
+				return s.BuildGate.Healing.ByErrorKind["code"].Amata
+			},
+			errPfx: "build_gate.healing.by_error_kind.code.amata",
+			forbid: []struct{ name, input, wantErr string }{
+				{
+					name: "flat_spec_forbidden",
+					input: `{
+						"steps": [{"image": "test:latest"}],
+						"build_gate": {
+							"healing": {"by_error_kind": {"infra": {"image": "heal:latest", "spec": "bad"}}},
+							"router": {"image": "router:latest"}
+						}
+					}`,
+					wantErr: "build_gate.healing.by_error_kind.infra.spec: forbidden",
+				},
+				{
+					name: "flat_set_forbidden",
+					input: `{
+						"steps": [{"image": "test:latest"}],
+						"build_gate": {
+							"healing": {"by_error_kind": {"code": {"image": "heal:latest", "set": []}}},
+							"router": {"image": "router:latest"}
+						}
+					}`,
+					wantErr: "build_gate.healing.by_error_kind.code.set: forbidden",
+				},
 			},
 		},
-		{
-			name: "router amata with empty spec",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {"spec": ""}
-					}
-				}
-			}`,
-			wantErr: "build_gate.router.amata.spec: required",
-		},
-		{
-			name: "router amata with whitespace-only spec",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {"spec": "   "}
-					}
-				}
-			}`,
-			wantErr: "build_gate.router.amata.spec: required",
-		},
-		{
-			name: "router amata set entry with empty param",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {
-							"spec": "prompt: fix",
-							"set": [{"param": "", "value": "v"}]
-						}
-					}
-				}
-			}`,
-			wantErr: "build_gate.router.amata.set[0].param: required",
-		},
-		{
-			name: "router amata set entry with whitespace param",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {
-							"spec": "prompt: fix",
-							"set": [{"param": "  ", "value": "v"}]
-						}
-					}
-				}
-			}`,
-			wantErr: "build_gate.router.amata.set[0].param: required",
-		},
-		{
-			name: "router amata set entry with empty value is allowed",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {
-						"image": "router:latest",
-						"amata": {
-							"spec": "prompt: fix",
-							"set": [{"param": "KEY", "value": ""}]
-						}
-					}
-				}
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				p := spec.BuildGate.Router.Amata.Set[0]
-				if p.Param != "KEY" || p.Value != "" {
-					t.Errorf("set[0] = %+v, want {KEY }", p)
-				}
-			},
-		},
-		{
-			name: "router flat spec key forbidden",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {"image": "router:latest", "spec": "bad"}
-				}
-			}`,
-			wantErr: "build_gate.router.spec: forbidden",
-		},
-		{
-			name: "router flat set key forbidden",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"router": {"image": "router:latest", "set": []}
-				}
-			}`,
-			wantErr: "build_gate.router.set: forbidden",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spec, err := ParseModsSpecJSON([]byte(tt.input))
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if tt.check != nil {
-				tt.check(t, spec)
-			}
-		})
 	}
 }
 
-// TestParseModsSpecJSON_StepAmata covers amata parsing and validation for steps[] entries.
-func TestParseModsSpecJSON_StepAmata(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr string
-		check   func(t *testing.T, spec *ModsSpec)
-	}{
-		{
-			name: "step amata with spec and set",
-			input: `{
-				"steps": [{
-					"image": "test:latest",
-					"amata": {
-						"spec": "version: 1\nprompt: run codex",
-						"set": [{"param": "REPO", "value": "my-repo"}]
-					}
-				}]
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				step := spec.Steps[0]
-				if step.Amata == nil {
-					t.Fatal("steps[0].amata is nil")
-				}
-				if step.Amata.Spec != "version: 1\nprompt: run codex" {
-					t.Errorf("steps[0].amata.spec = %q, want %q", step.Amata.Spec, "version: 1\nprompt: run codex")
-				}
-				if len(step.Amata.Set) != 1 || step.Amata.Set[0].Param != "REPO" {
-					t.Errorf("steps[0].amata.set = %+v, want [{REPO my-repo}]", step.Amata.Set)
-				}
-			},
-		},
-		{
-			name: "step amata with spec only",
-			input: `{
-				"steps": [{
-					"image": "test:latest",
-					"amata": {"spec": "prompt: run codex"}
-				}]
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				step := spec.Steps[0]
-				if step.Amata == nil {
-					t.Fatal("steps[0].amata is nil")
-				}
-				if len(step.Amata.Set) != 0 {
-					t.Errorf("steps[0].amata.set len = %d, want 0", len(step.Amata.Set))
-				}
-			},
-		},
-		{
-			name: "step without amata",
-			input: `{
-				"steps": [{"image": "test:latest"}]
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				if spec.Steps[0].Amata != nil {
-					t.Errorf("steps[0].amata = %+v, want nil (direct codex mode)", spec.Steps[0].Amata)
-				}
-			},
-		},
-		{
-			name: "step amata with empty spec",
-			input: `{
-				"steps": [{
-					"image": "test:latest",
-					"amata": {"spec": ""}
-				}]
-			}`,
-			wantErr: "steps[0].amata.spec: required",
-		},
-		{
-			name: "step amata set entry with empty param",
-			input: `{
-				"steps": [{
-					"image": "test:latest",
-					"amata": {
-						"spec": "prompt: run codex",
-						"set": [{"param": "", "value": "v"}]
-					}
-				}]
-			}`,
-			wantErr: "steps[0].amata.set[0].param: required",
-		},
-	}
+// TestParseModsSpecJSON_Amata covers amata parsing and validation for every
+// valid placement site: router, step, and healing action.
+func TestParseModsSpecJSON_Amata(t *testing.T) {
+	for _, p := range amataplacements() {
+		t.Run(p.name, func(t *testing.T) {
+			t.Run("spec_and_set", func(t *testing.T) {
+				input := p.wrapJSON(`{
+					"spec": "version: 1\nprompt: fix it",
+					"set": [
+						{"param": "REPO", "value": "my-repo"},
+						{"param": "BRANCH", "value": "main"}
+					]
+				}`)
+				spec, err := ParseModsSpecJSON([]byte(input))
+				requireValidationErr(t, err, "")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spec, err := ParseModsSpecJSON([]byte(tt.input))
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatal("expected error, got nil")
+				a := p.getAmata(spec)
+				if a == nil {
+					t.Fatal("amata is nil")
 				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+				if a.Spec != "version: 1\nprompt: fix it" {
+					t.Errorf("spec = %q, want %q", a.Spec, "version: 1\nprompt: fix it")
 				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if tt.check != nil {
-				tt.check(t, spec)
-			}
-		})
-	}
-}
+				if len(a.Set) != 2 {
+					t.Fatalf("set len = %d, want 2", len(a.Set))
+				}
+				if a.Set[0].Param != "REPO" || a.Set[0].Value != "my-repo" {
+					t.Errorf("set[0] = %+v, want {REPO my-repo}", a.Set[0])
+				}
+				if a.Set[1].Param != "BRANCH" || a.Set[1].Value != "main" {
+					t.Errorf("set[1] = %+v, want {BRANCH main}", a.Set[1])
+				}
+			})
 
-// TestParseModsSpecJSON_HealingAmata covers amata parsing and validation for healing actions.
-func TestParseModsSpecJSON_HealingAmata(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr string
-		check   func(t *testing.T, spec *ModsSpec)
-	}{
-		{
-			name: "healing action with amata spec and set",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"by_error_kind": {
-							"code": {
-								"image": "heal:latest",
-								"amata": {
-									"spec": "prompt: heal the code",
-									"set": [{"param": "ERR", "value": "compile"}]
-								}
-							}
-						}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				action := spec.BuildGate.Healing.ByErrorKind["code"]
-				if action.Amata == nil {
-					t.Fatal("healing.by_error_kind.code.amata is nil")
-				}
-				if action.Amata.Spec != "prompt: heal the code" {
-					t.Errorf("amata.spec = %q, want %q", action.Amata.Spec, "prompt: heal the code")
-				}
-				if len(action.Amata.Set) != 1 || action.Amata.Set[0].Param != "ERR" {
-					t.Errorf("amata.set = %+v, want [{ERR compile}]", action.Amata.Set)
-				}
-			},
-		},
-		{
-			name: "healing action without amata (direct codex mode)",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"by_error_kind": {
-							"infra": {"image": "heal:latest"}
-						}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			check: func(t *testing.T, spec *ModsSpec) {
-				action := spec.BuildGate.Healing.ByErrorKind["infra"]
-				if action.Amata != nil {
-					t.Errorf("amata = %+v, want nil (direct codex mode)", action.Amata)
-				}
-			},
-		},
-		{
-			name: "healing action amata with empty spec",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"by_error_kind": {
-							"code": {
-								"image": "heal:latest",
-								"amata": {"spec": ""}
-							}
-						}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			wantErr: "build_gate.healing.by_error_kind.code.amata.spec: required",
-		},
-		{
-			name: "healing action amata set with empty param",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"by_error_kind": {
-							"deps": {
-								"image": "heal:latest",
-								"amata": {
-									"spec": "prompt: fix deps",
-									"set": [{"param": "", "value": "v"}, {"param": "OK", "value": "1"}]
-								}
-							}
-						}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			wantErr: "build_gate.healing.by_error_kind.deps.amata.set[0].param: required",
-		},
-		{
-			name: "healing action flat spec key forbidden",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"by_error_kind": {
-							"infra": {"image": "heal:latest", "spec": "bad"}
-						}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			wantErr: "build_gate.healing.by_error_kind.infra.spec: forbidden",
-		},
-		{
-			name: "healing action flat set key forbidden",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"by_error_kind": {
-							"code": {"image": "heal:latest", "set": []}
-						}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			wantErr: "build_gate.healing.by_error_kind.code.set: forbidden",
-		},
-	}
+			t.Run("spec_only_no_set", func(t *testing.T) {
+				input := p.wrapJSON(`{"spec": "prompt: fix"}`)
+				spec, err := ParseModsSpecJSON([]byte(input))
+				requireValidationErr(t, err, "")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spec, err := ParseModsSpecJSON([]byte(tt.input))
-			if tt.wantErr != "" {
-				if err == nil {
-					t.Fatal("expected error, got nil")
+				a := p.getAmata(spec)
+				if a == nil {
+					t.Fatal("amata is nil")
 				}
-				if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+				if len(a.Set) != 0 {
+					t.Errorf("set len = %d, want 0", len(a.Set))
 				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if tt.check != nil {
-				tt.check(t, spec)
+			})
+
+			t.Run("no_amata_direct_codex", func(t *testing.T) {
+				spec, err := ParseModsSpecJSON([]byte(p.baseJSON))
+				requireValidationErr(t, err, "")
+
+				if p.getAmata(spec) != nil {
+					t.Errorf("amata = %+v, want nil (direct codex mode)", p.getAmata(spec))
+				}
+			})
+
+			t.Run("empty_spec_required", func(t *testing.T) {
+				input := p.wrapJSON(`{"spec": ""}`)
+				_, err := ParseModsSpecJSON([]byte(input))
+				requireValidationErr(t, err, p.errPfx+".spec: required")
+			})
+
+			t.Run("whitespace_spec_required", func(t *testing.T) {
+				input := p.wrapJSON(`{"spec": "   "}`)
+				_, err := ParseModsSpecJSON([]byte(input))
+				requireValidationErr(t, err, p.errPfx+".spec: required")
+			})
+
+			t.Run("empty_param_required", func(t *testing.T) {
+				input := p.wrapJSON(`{"spec": "prompt: fix", "set": [{"param": "", "value": "v"}]}`)
+				_, err := ParseModsSpecJSON([]byte(input))
+				requireValidationErr(t, err, p.errPfx+".set[0].param: required")
+			})
+
+			t.Run("empty_value_allowed", func(t *testing.T) {
+				input := p.wrapJSON(`{"spec": "prompt: fix", "set": [{"param": "KEY", "value": ""}]}`)
+				spec, err := ParseModsSpecJSON([]byte(input))
+				requireValidationErr(t, err, "")
+
+				s := p.getAmata(spec).Set[0]
+				if s.Param != "KEY" || s.Value != "" {
+					t.Errorf("set[0] = %+v, want {KEY }", s)
+				}
+			})
+
+			for _, fb := range p.forbid {
+				t.Run(fb.name, func(t *testing.T) {
+					_, err := ParseModsSpecJSON([]byte(fb.input))
+					requireValidationErr(t, err, fb.wantErr)
+				})
 			}
 		})
 	}
@@ -608,69 +355,7 @@ func TestParseModsSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := ParseModsSpecJSON([]byte(tt.input))
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if !strings.Contains(err.Error(), tt.wantErr) {
-				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
-			}
+			requireValidationErr(t, err, tt.wantErr)
 		})
-	}
-}
-
-// TestParseModsSpecJSON_AmataValidateRoundtrip confirms AmataRunSpec survives
-// marshal → ParseModsSpecJSON intact.
-func TestParseModsSpecJSON_AmataValidateRoundtrip(t *testing.T) {
-	input := `{
-		"steps": [{"image": "test:latest"}],
-		"build_gate": {
-			"healing": {
-				"by_error_kind": {
-					"code": {
-						"image": "heal:latest",
-						"amata": {
-							"spec": "prompt: fix",
-							"set": [{"param": "A", "value": "1"}, {"param": "B", "value": "2"}]
-						}
-					}
-				}
-			},
-			"router": {
-				"image": "router:latest",
-				"amata": {
-					"spec": "router-spec",
-					"set": [{"param": "MODE", "value": "route"}]
-				}
-			}
-		}
-	}`
-
-	spec, err := ParseModsSpecJSON([]byte(input))
-	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
-	}
-
-	// Router amata.
-	ra := spec.BuildGate.Router.Amata
-	if ra == nil || ra.Spec != "router-spec" {
-		t.Errorf("router.amata.spec = %v, want router-spec", ra)
-	}
-	if len(ra.Set) != 1 || ra.Set[0].Param != "MODE" || ra.Set[0].Value != "route" {
-		t.Errorf("router.amata.set = %+v", ra.Set)
-	}
-
-	// Healing amata.
-	ha := spec.BuildGate.Healing.ByErrorKind["code"].Amata
-	if ha == nil || ha.Spec != "prompt: fix" {
-		t.Errorf("healing.amata.spec = %v, want prompt: fix", ha)
-	}
-	if len(ha.Set) != 2 {
-		t.Fatalf("healing.amata.set len = %d, want 2", len(ha.Set))
-	}
-	if ha.Set[0].Param != "A" || ha.Set[0].Value != "1" {
-		t.Errorf("healing.amata.set[0] = %+v, want {A 1}", ha.Set[0])
-	}
-	if ha.Set[1].Param != "B" || ha.Set[1].Value != "2" {
-		t.Errorf("healing.amata.set[1] = %+v, want {B 2}", ha.Set[1])
 	}
 }

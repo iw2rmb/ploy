@@ -52,7 +52,7 @@ func TestUploadOutDirIfPresent_UploadsWhenFilesExist(t *testing.T) {
 
 	cfg := Config{ServerURL: server.URL, NodeID: testNodeID, HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}
 	controller := newTestController(t, cfg)
-	if err := controller.uploadOutDir(context.Background(), "run-1", "stage-1", outDir); err != nil {
+	if err := controller.uploadOutDirBundle(context.Background(), "run-1", "stage-1", outDir, "mig-out"); err != nil {
 		t.Fatalf("uploadOutDir error: %v", err)
 	}
 	if !seen {
@@ -70,7 +70,7 @@ func TestUploadOutDirIfPresent_SkipsWhenEmpty(t *testing.T) {
 
 	cfg := Config{ServerURL: server.URL, NodeID: "n", HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}
 	controller := newTestController(t, cfg)
-	if err := controller.uploadOutDir(context.Background(), "run-1", "stage-1", outDir); err != nil {
+	if err := controller.uploadOutDirBundle(context.Background(), "run-1", "stage-1", outDir, "mig-out"); err != nil {
 		t.Fatalf("uploadOutDir error: %v", err)
 	}
 }
