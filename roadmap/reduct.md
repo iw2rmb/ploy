@@ -108,7 +108,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Clarity / complexity check: Reuses existing helper module instead of introducing a second helper domain.
   - Reasoning: high (16 CFP)
   - Completion notes:
-    - **Canonical JSON response helper** (`internal/server/handlers/ingest_common.go`): Added `writeJSON(w, status, v)` — sets `Content-Type: application/json`, writes the status code, encodes v as JSON, and logs a warning on encode failure. Single call site replaces the 3–4 line encode block repeated across all handlers.
+    - **Canonical JSON response helpers** (`internal/server/handlers/ingest_common.go`): Added `writeJSON(w, status, v)` — sets `Content-Type: application/json`, writes the status code, encodes v as JSON, and logs a warning on encode failure. Added `writeJSONStatus(w, status, msg)` — thin wrapper over `writeJSON` that emits `{"status": "<msg>"}` for responses with no structured payload beyond a short status string.
     - **Ad-hoc encode fragments removed** (8 call sites across 4 files):
       - `bootstrap.go`: `createBootstrapTokenHandler` (200 OK) and `bootstrapCertificateHandler` (200 OK) — both replaced with `writeJSON`. `encoding/json` import dropped from file.
       - `migs_crud.go`: `createMigHandler` (201 Created) and `writeModsListResponse` (200 OK) — both replaced.

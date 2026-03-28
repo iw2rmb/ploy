@@ -48,6 +48,15 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
+// writeJSONStatus writes a JSON response body of the form {"status": "<msg>"}
+// with the given HTTP status code. Use this for responses that carry no
+// structured payload beyond a short human-readable status string.
+func writeJSONStatus(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, struct {
+		Status string `json:"status"`
+	}{Status: msg})
+}
+
 // DefaultMaxBodySize is the default request body size limit (1 MiB).
 const DefaultMaxBodySize = 1 << 20
 
