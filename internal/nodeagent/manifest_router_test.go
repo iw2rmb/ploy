@@ -20,7 +20,7 @@ func TestBuildRouterManifest_InjectsPhaseAndLoopEnv(t *testing.T) {
 			"ROUTER_MODE": "classify",
 		},
 	}
-	manifest, err := buildRouterManifest(req, router, contracts.ModStackUnknown, types.JobTypePreGate, "healing")
+	manifest, err := buildRouterManifest(req, router, contracts.MigStackUnknown, types.JobTypePreGate, "healing")
 	if err != nil {
 		t.Fatalf("buildRouterManifest() error = %v", err)
 	}
@@ -50,7 +50,7 @@ func TestBuildRouterManifest_ContextEnvOverridesUserValues(t *testing.T) {
 			"PLOY_LOOP_KIND":  "custom",
 		},
 	}
-	manifest, err := buildRouterManifest(req, router, contracts.ModStackUnknown, types.JobTypeReGate, "healing")
+	manifest, err := buildRouterManifest(req, router, contracts.MigStackUnknown, types.JobTypeReGate, "healing")
 	if err != nil {
 		t.Fatalf("buildRouterManifest() error = %v", err)
 	}
@@ -88,7 +88,7 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 				},
 			},
 		}
-		manifest, err := buildRouterManifest(req, router, contracts.ModStackUnknown, types.JobTypePreGate, "healing")
+		manifest, err := buildRouterManifest(req, router, contracts.MigStackUnknown, types.JobTypePreGate, "healing")
 		if err != nil {
 			t.Fatalf("buildRouterManifest() error = %v", err)
 		}
@@ -111,7 +111,7 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   nil,
 		}
-		manifest, err := buildRouterManifest(req, router, contracts.ModStackUnknown, types.JobTypePreGate, "healing")
+		manifest, err := buildRouterManifest(req, router, contracts.MigStackUnknown, types.JobTypePreGate, "healing")
 		if err != nil {
 			t.Fatalf("buildRouterManifest() error = %v", err)
 		}
@@ -134,7 +134,7 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 			Command: contracts.CommandSpec{Shell: "codex exec"},
 			Amata:   &contracts.AmataRunSpec{Spec: ""},
 		}
-		manifest, err := buildRouterManifest(req, router, contracts.ModStackUnknown, types.JobTypePreGate, "healing")
+		manifest, err := buildRouterManifest(req, router, contracts.MigStackUnknown, types.JobTypePreGate, "healing")
 		if err != nil {
 			t.Fatalf("buildRouterManifest() error = %v", err)
 		}

@@ -183,7 +183,7 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
 	typedOpts := req.TypedOptions
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
 		slog.Error("failed to build manifest for MR job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))

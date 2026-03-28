@@ -96,7 +96,7 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 }
 
 // parseSpec parses a spec JSON payload into environment variables and typed options.
-// It uses the canonical contracts.ParseModsSpecJSON parser for structured
+// It uses the canonical contracts.ParseMigSpecJSON parser for structured
 // validation, then converts to the internal RunOptions format.
 //
 // ## Return Values
@@ -117,7 +117,7 @@ func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
 	}
 
 	// Parse using the canonical parser for structural validation.
-	modsSpec, err := contracts.ParseModsSpecJSON(spec)
+	modsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
 		return env, typedOpts, err
 	}
@@ -129,13 +129,13 @@ func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
 	//   at manifest build time via typedOpts.Steps[stepIndex].Env.
 	env = modsSpecToEnv(modsSpec)
 
-	// Direct conversion from typed ModsSpec to RunOptions.
+	// Direct conversion from typed MigSpec to RunOptions.
 	typedOpts = modsSpecToRunOptions(modsSpec)
 
 	return env, typedOpts, nil
 }
 
-func modsSpecToEnv(spec *contracts.ModsSpec) map[string]string {
+func modsSpecToEnv(spec *contracts.MigSpec) map[string]string {
 	if spec == nil {
 		return map[string]string{}
 	}

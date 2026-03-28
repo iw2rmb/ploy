@@ -260,7 +260,7 @@ func resolveSnapshotTarget(explicit, fallback string) string {
 }
 
 // resolveSnapshotStack derives the GateProfileStack for a snapshot.
-// Precedence: override.Stack > DetectedStackExpectation from meta > ModStack name.
+// Precedence: override.Stack > DetectedStackExpectation from meta > MigStack name.
 func resolveSnapshotStack(
 	override *contracts.BuildGateProfileOverride,
 	meta *contracts.BuildGateStageMetadata,
@@ -281,16 +281,16 @@ func resolveSnapshotStack(
 			}
 		}
 	}
-	stack := contracts.ModStackUnknown
+	stack := contracts.MigStackUnknown
 	if meta != nil {
 		stack = meta.DetectedStack()
 	}
 	switch stack {
-	case contracts.ModStackJavaMaven:
+	case contracts.MigStackJavaMaven:
 		return contracts.GateProfileStack{Language: "java", Tool: "maven"}
-	case contracts.ModStackJavaGradle:
+	case contracts.MigStackJavaGradle:
 		return contracts.GateProfileStack{Language: "java", Tool: "gradle"}
-	case contracts.ModStackJava:
+	case contracts.MigStackJava:
 		return contracts.GateProfileStack{Language: "java", Tool: "java"}
 	default:
 		return contracts.GateProfileStack{}

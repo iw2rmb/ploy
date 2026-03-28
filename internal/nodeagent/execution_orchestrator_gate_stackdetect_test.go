@@ -188,14 +188,14 @@ func TestGateStackPersistAndLoad(t *testing.T) {
 		name         string
 		seedStack    string
 		persistCalls []persistCall
-		wantStack    contracts.ModStack
+		wantStack    contracts.MigStack
 	}{
 		{
 			name: "WritesStack",
 			persistCalls: []persistCall{
 				{meta: &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "maven", Passed: true}}}},
 			},
-			wantStack: contracts.ModStackJavaMaven,
+			wantStack: contracts.MigStackJavaMaven,
 		},
 		{
 			name: "Idempotent",
@@ -203,23 +203,23 @@ func TestGateStackPersistAndLoad(t *testing.T) {
 				{meta: &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "maven", Passed: true}}}},
 				{meta: &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "gradle", Passed: true}}}},
 			},
-			wantStack: contracts.ModStackJavaMaven,
+			wantStack: contracts.MigStackJavaMaven,
 		},
 		{
 			name:      "LoadsExisting",
 			seedStack: "java-gradle",
-			wantStack: contracts.ModStackJavaGradle,
+			wantStack: contracts.MigStackJavaGradle,
 		},
 		{
 			name:      "DefaultsToUnknown",
-			wantStack: contracts.ModStackUnknown,
+			wantStack: contracts.MigStackUnknown,
 		},
 		{
 			name: "RoundTrip",
 			persistCalls: []persistCall{
 				{meta: &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Language: "java", Tool: "gradle", Passed: false}}}},
 			},
-			wantStack: contracts.ModStackJavaGradle,
+			wantStack: contracts.MigStackJavaGradle,
 		},
 	}
 

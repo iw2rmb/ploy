@@ -225,7 +225,7 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				withRecoveryContext(&contracts.RecoveryClaimContext{
 					LoopKind:             "healing",
 					SelectedErrorKind:    "infra",
-					DetectedStack:        contracts.ModStackJavaMaven,
+					DetectedStack:        contracts.MigStackJavaMaven,
 					ResolvedHealingImage: "docker.io/acme/heal:latest",
 					BuildGateLog:         "[ERROR] build failed\n",
 				}),

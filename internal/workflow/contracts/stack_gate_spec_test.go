@@ -13,14 +13,14 @@ var (
 	javaMaven11Exp = StackExpectation{Language: "java", Tool: "maven", Release: "11"}
 )
 
-// stackGateJSON wraps a stack JSON fragment in a minimal ModsSpec envelope.
+// stackGateJSON wraps a stack JSON fragment in a minimal MigSpec envelope.
 func stackGateJSON(stackFragment string) string {
 	return `{"steps":[{"image":"test:latest","stack":` + stackFragment + `}]}`
 }
 
-// marshalStep0Map marshals a ModsSpec to JSON and returns step[0] as a
+// marshalStep0Map marshals a MigSpec to JSON and returns step[0] as a
 // map[string]any, failing the test on any error.
-func marshalStep0Map(t *testing.T, spec *ModsSpec) map[string]any {
+func marshalStep0Map(t *testing.T, spec *MigSpec) map[string]any {
 	t.Helper()
 	data, err := json.Marshal(spec)
 	if err != nil {
@@ -139,7 +139,7 @@ func TestStackExpectation_Equal(t *testing.T) {
 	}
 }
 
-// TestParseModsSpecJSON_StackGate tests parsing full stack spec via ModsSpec.
+// TestParseModsSpecJSON_StackGate tests parsing full stack spec via MigSpec.
 func TestParseModsSpecJSON_StackGate(t *testing.T) {
 	input := `{
 		"steps": [{
@@ -152,9 +152,9 @@ func TestParseModsSpecJSON_StackGate(t *testing.T) {
 		}]
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 	if len(spec.Steps) != 1 {
 		t.Fatalf("len(steps) = %d, want 1", len(spec.Steps))
@@ -193,9 +193,9 @@ func TestParseStackExpectation_NumericRelease(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spec, err := ParseModsSpecJSON([]byte(stackGateJSON(tt.stack)))
+			spec, err := ParseMigSpecJSON([]byte(stackGateJSON(tt.stack)))
 			if err != nil {
-				t.Fatalf("ParseModsSpecJSON failed: %v", err)
+				t.Fatalf("ParseMigSpecJSON failed: %v", err)
 			}
 			got := spec.Steps[0].Stack.Inbound.Expect.Release
 			if got != tt.wantRelease {
@@ -251,7 +251,7 @@ func TestValidateStackGatePhaseSpec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(stackGateJSON(tt.stack)))
+			_, err := ParseMigSpecJSON([]byte(stackGateJSON(tt.stack)))
 			requireValidationErr(t, err, tt.wantErr)
 		})
 	}
@@ -259,8 +259,8 @@ func TestValidateStackGatePhaseSpec(t *testing.T) {
 
 // TestStackGateSpec_RoundTrip tests parse-wire-parse round-trip.
 func TestStackGateSpec_RoundTrip(t *testing.T) {
-	original := &ModsSpec{
-		Steps: []ModStep{{
+	original := &MigSpec{
+		Steps: []MigStep{{
 			Image: JobImage{Universal: "docker.io/user/mig:latest"},
 			Stack: &StackGateSpec{
 				Inbound:  &StackGatePhaseSpec{Enabled: true, Expect: copyStackExp(javaMaven11Exp)},
@@ -274,9 +274,9 @@ func TestStackGateSpec_RoundTrip(t *testing.T) {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
 
-	parsed, err := ParseModsSpecJSON(data)
+	parsed, err := ParseMigSpecJSON(data)
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if parsed.Steps[0].Stack == nil {
@@ -392,18 +392,18 @@ func TestStackGateSpec_Equal(t *testing.T) {
 func TestStackGateWire_Omission(t *testing.T) {
 	tests := []struct {
 		name string
-		spec *ModsSpec
+		spec *MigSpec
 	}{
 		{
 			name: "nil stack omitted",
-			spec: &ModsSpec{Steps: []ModStep{{
+			spec: &MigSpec{Steps: []MigStep{{
 				Image: JobImage{Universal: "test:latest"},
 				Stack: nil,
 			}}},
 		},
 		{
 			name: "disabled-only stack omitted",
-			spec: &ModsSpec{Steps: []ModStep{{
+			spec: &MigSpec{Steps: []MigStep{{
 				Image: JobImage{Universal: "test:latest"},
 				Stack: &StackGateSpec{
 					Inbound: &StackGatePhaseSpec{Enabled: false},

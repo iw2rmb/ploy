@@ -36,9 +36,9 @@ func TestParseModsSpecJSON_BuildGateStackConfig(t *testing.T) {
 		}
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if spec.BuildGate == nil {
@@ -128,7 +128,7 @@ func TestParseModsSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(tt.input))
+			_, err := ParseMigSpecJSON([]byte(tt.input))
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -164,9 +164,9 @@ func TestParseModsSpecJSON_BuildGateProfileOverride(t *testing.T) {
 		}
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 	if spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.GateProfile == nil {
 		t.Fatal("build_gate.pre.gate_profile is nil")
@@ -221,7 +221,7 @@ func TestParseModsSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(tt.input))
+			_, err := ParseMigSpecJSON([]byte(tt.input))
 			if err == nil {
 				t.Fatal("expected error")
 			}

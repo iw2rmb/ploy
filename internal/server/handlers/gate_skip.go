@@ -18,7 +18,7 @@ func gatePhasePolicyForJobSpec(rawSpec []byte, jobType domaintypes.JobType) (gat
 	if !shouldResolveGateProfile(jobType) {
 		return gatePhasePolicy{}, nil
 	}
-	spec, err := contracts.ParseModsSpecJSON(rawSpec)
+	spec, err := contracts.ParseMigSpecJSON(rawSpec)
 	if err != nil {
 		return gatePhasePolicy{}, fmt.Errorf("parse build gate phase policy from spec: %w", err)
 	}

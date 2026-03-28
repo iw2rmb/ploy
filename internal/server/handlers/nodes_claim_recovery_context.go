@@ -76,7 +76,7 @@ func buildRecoveryClaimContext(
 	var detectedExpectation *contracts.StackExpectation
 	if gateJob != nil && len(gateJob.Meta) > 0 {
 		if gateMeta, err := contracts.UnmarshalJobMeta(gateJob.Meta); err == nil && gateMeta.Gate != nil {
-			if stack := gateMeta.Gate.DetectedStack(); stack != "" && stack != contracts.ModStackUnknown {
+			if stack := gateMeta.Gate.DetectedStack(); stack != "" && stack != contracts.MigStackUnknown {
 				ctxPayload.DetectedStack = stack
 			}
 			if expectation := gateMeta.Gate.DetectedStackExpectation(); expectation != nil {
@@ -92,7 +92,7 @@ func buildRecoveryClaimContext(
 		}
 	}
 	if detectedExpectation == nil {
-		detectedExpectation = lifecycle.StackExpectationFromModStack(ctxPayload.DetectedStack)
+		detectedExpectation = lifecycle.StackExpectationFromMigStack(ctxPayload.DetectedStack)
 	}
 	if kind == contracts.RecoveryErrorKindDeps {
 		ctxPayload.DepsCompatEndpoint = buildDepsCompatEndpoint(detectedExpectation)

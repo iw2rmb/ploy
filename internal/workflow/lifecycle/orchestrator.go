@@ -151,7 +151,7 @@ func EvaluateGateFailureTransition(
 	jobsByID map[domaintypes.JobID]store.Job,
 	recoveryMeta *contracts.BuildGateRecoveryMetadata,
 	recoveryKind contracts.RecoveryErrorKind,
-	detectedStack contracts.ModStack,
+	detectedStack contracts.MigStack,
 	healing *contracts.HealingSpec,
 	newJobID func() domaintypes.JobID,
 ) (GateFailureDecision, error) {
@@ -239,12 +239,12 @@ func EvaluateGateFailureTransition(
 // ResolveGateRecoveryContext extracts recovery classification and stack detection
 // from the failed gate job's metadata. Returns safe defaults when metadata is
 // absent or unparseable.
-func ResolveGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.ModStack, *contracts.StackExpectation) {
+func ResolveGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecoveryMetadata, contracts.MigStack, *contracts.StackExpectation) {
 	meta := &contracts.BuildGateRecoveryMetadata{
 		LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
 		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
 	}
-	detectedStack := contracts.ModStackUnknown
+	detectedStack := contracts.MigStackUnknown
 	var detectedExpectation *contracts.StackExpectation
 
 	if len(failedJob.Meta) == 0 {
@@ -264,7 +264,7 @@ func ResolveGateRecoveryContext(failedJob store.Job) (*contracts.BuildGateRecove
 		}
 	}
 	if detectedExpectation == nil {
-		detectedExpectation = StackExpectationFromModStack(detectedStack)
+		detectedExpectation = StackExpectationFromMigStack(detectedStack)
 	}
 	if kind, ok := contracts.ParseRecoveryErrorKind(meta.ErrorKind); (!ok || kind == contracts.RecoveryErrorKindUnknown) && jobMeta.Recovery != nil {
 		meta = CloneRecoveryMetadata(jobMeta.Recovery)
@@ -444,15 +444,15 @@ func resolveRecoveryCandidateArtifactPath(expectations json.RawMessage) (string,
 	return "", false
 }
 
-// StackExpectationFromModStack converts a detected ModStack to a StackExpectation,
+// StackExpectationFromMigStack converts a detected MigStack to a StackExpectation,
 // or returns nil for unknown stacks.
-func StackExpectationFromModStack(stack contracts.ModStack) *contracts.StackExpectation {
+func StackExpectationFromMigStack(stack contracts.MigStack) *contracts.StackExpectation {
 	switch stack {
-	case contracts.ModStackJavaMaven:
+	case contracts.MigStackJavaMaven:
 		return &contracts.StackExpectation{Language: "java", Tool: "maven"}
-	case contracts.ModStackJavaGradle:
+	case contracts.MigStackJavaGradle:
 		return &contracts.StackExpectation{Language: "java", Tool: "gradle"}
-	case contracts.ModStackJava:
+	case contracts.MigStackJava:
 		return &contracts.StackExpectation{Language: "java", Tool: "java"}
 	default:
 		return nil

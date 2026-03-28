@@ -64,7 +64,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			writeHTTPError(w, http.StatusBadRequest, "spec is required")
 			return
 		}
-		if _, err := contracts.ParseModsSpecJSON(req.Spec); err != nil {
+		if _, err := contracts.ParseMigSpecJSON(req.Spec); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "spec: %v", err)
 			return
 		}

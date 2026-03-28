@@ -82,7 +82,7 @@ func (r *runController) executeRouter(
 
 	stack := gateResult.DetectedStack()
 	if stack == "" {
-		stack = contracts.ModStackUnknown
+		stack = contracts.MigStackUnknown
 	}
 
 	routerManifest, buildErr := buildRouterManifest(req, *typedOpts.Router, stack, req.JobType, contracts.RecoveryLoopKindHealing.String())

@@ -171,8 +171,8 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	}
 
 	// Step 3: Build manifest (simulates manifest.go).
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest() error: %v", err)
 	}
@@ -327,8 +327,8 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 
 	// Build manifest for step 0 (should have step override).
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest0, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest0, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest(step=0) error: %v", err)
 	}
@@ -348,8 +348,8 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 
 	// Build manifest for step 1 (should not have step0 override).
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest1, err := buildManifestFromRequest(req, typedOpts, 1, contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest1, err := buildManifestFromRequest(req, typedOpts, 1, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest(step=1) error: %v", err)
 	}
@@ -394,8 +394,8 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		},
 	}
 
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, healingMod, 0, "", contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildHealingManifest(req, healingMod, 0, "", contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error: %v", err)
 	}
@@ -454,8 +454,8 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 		Env:          env,
 	}
 
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest() error: %v", err)
 	}

@@ -6,23 +6,23 @@
 //
 // ## Canonical Spec Shape
 //
-// The ModsSpec type supports a single canonical shape:
+// The MigSpec type supports a single canonical shape:
 //   - All runs use steps[] (even single-step runs).
 //   - Global build gate policy lives under build_gate (including healing).
 //
 // ## Related Files
 //
 // The Mods spec implementation is split across several files:
-//   - mods_spec.go: Core types (ModsSpec, ModStep) and validation
+//   - mods_spec.go: Core types (MigSpec, MigStep) and validation
 //   - command_spec.go: Polymorphic command handling (CommandSpec)
 //   - build_gate_config.go: Build gate and healing configuration types
 //   - mods_spec_parse.go: JSON parsing functions
 //
 // ## Usage
 //
-// Parse specs using ParseModsSpecJSON (in mods_spec_parse.go):
+// Parse specs using ParseMigSpecJSON (in mods_spec_parse.go):
 //
-//	spec, err := contracts.ParseModsSpecJSON(jsonBytes)
+//	spec, err := contracts.ParseMigSpecJSON(jsonBytes)
 //	if err != nil {
 //	    return err // structured validation error
 //	}
@@ -38,7 +38,7 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// ModsSpec is the canonical typed representation of a Mods run specification.
+// MigSpec is the canonical typed representation of a Mods run specification.
 // All specs use steps[]; multi-step runs have len(steps) > 1.
 //
 // Wire compatibility: This struct marshals to/from JSON with stable field names
@@ -46,9 +46,9 @@ import (
 // for wire format compatibility.
 //
 // Validation: Use Validate() to check structural correctness after parsing.
-// ParseModsSpecJSON calls Validate() automatically and returns structured
+// ParseMigSpecJSON calls Validate() automatically and returns structured
 // errors for invalid input.
-type ModsSpec struct {
+type MigSpec struct {
 	// --- Server-injected metadata (claim-time) ---
 	//
 	// These fields may be injected by the server when a job is claimed. They are
@@ -69,7 +69,7 @@ type ModsSpec struct {
 
 	// Steps holds the ordered list of mig steps.
 	// A spec must contain at least one step.
-	Steps []ModStep `json:"steps,omitempty" yaml:"steps,omitempty"`
+	Steps []MigStep `json:"steps,omitempty" yaml:"steps,omitempty"`
 
 	// Env holds environment variables applied to every step (step env overrides on conflicts).
 	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
@@ -128,10 +128,10 @@ type TmpBundleRef struct {
 	Entries []string `json:"entries" yaml:"entries"`
 }
 
-// ModStep describes a single mig step in a run (steps[] array).
+// MigStep describes a single mig step in a run (steps[] array).
 // Each step has its own image, command, and environment configuration.
 // Steps execute sequentially with shared workspace, each running gate+mig.
-type ModStep struct {
+type MigStep struct {
 	// Name is an optional human-readable name for this step.
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
@@ -179,7 +179,7 @@ type ModStep struct {
 //   - build_gate.router must be configured when healing is configured.
 //   - Retries must be non-negative.
 //   - Stack Gate phases must not be disabled with expectations set.
-func (s ModsSpec) Validate() error {
+func (s MigSpec) Validate() error {
 	// Validate steps.
 	if len(s.Steps) == 0 {
 		return fmt.Errorf("steps: required")

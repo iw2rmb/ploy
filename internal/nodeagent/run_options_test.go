@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func assertImage(t *testing.T, label string, img contracts.JobImage, stack contracts.ModStack, want string) {
+func assertImage(t *testing.T, label string, img contracts.JobImage, stack contracts.MigStack, want string) {
 	t.Helper()
 	got, err := img.ResolveImage(stack)
 	if err != nil {
@@ -21,8 +21,8 @@ func assertImage(t *testing.T, label string, img contracts.JobImage, stack contr
 
 // --- spec-builder helpers ---
 
-func makeStep(img string, mutators ...func(*contracts.ModStep)) contracts.ModStep {
-	s := contracts.ModStep{Image: testJobImage(img)}
+func makeStep(img string, mutators ...func(*contracts.MigStep)) contracts.MigStep {
+	s := contracts.MigStep{Image: testJobImage(img)}
 	for _, m := range mutators {
 		m(&s)
 	}
@@ -44,8 +44,8 @@ func withRouter(r contracts.RouterSpec) *contracts.BuildGateConfig {
 	}
 }
 
-func singleStepSpec(img string, mutators ...func(*contracts.ModsSpec)) *contracts.ModsSpec {
-	s := &contracts.ModsSpec{Steps: []contracts.ModStep{makeStep(img)}}
+func singleStepSpec(img string, mutators ...func(*contracts.MigSpec)) *contracts.MigSpec {
+	s := &contracts.MigSpec{Steps: []contracts.MigStep{makeStep(img)}}
 	for _, m := range mutators {
 		m(s)
 	}
@@ -77,7 +77,7 @@ func TestParseSpec(t *testing.T) {
 				"artifact_paths": ["a.txt", "b/"]
 			}`,
 			check: func(t *testing.T, _ map[string]string, opts RunOptions, _ error) {
-				assertImage(t, "Execution.Image", opts.Execution.Image, contracts.ModStackUnknown, "docker.io/test/mig:latest")
+				assertImage(t, "Execution.Image", opts.Execution.Image, contracts.MigStackUnknown, "docker.io/test/mig:latest")
 				if opts.Execution.Command.Shell != "run-test.sh" {
 					t.Errorf("Command.Shell: got %q, want run-test.sh", opts.Execution.Command.Shell)
 				}
@@ -152,7 +152,7 @@ func TestParseSpec(t *testing.T) {
 				}]
 			}`,
 			check: func(t *testing.T, _ map[string]string, opts RunOptions, _ error) {
-				assertImage(t, "Execution.Image(maven)", opts.Execution.Image, contracts.ModStackJavaMaven, "docker.io/user/orw-cli:latest")
+				assertImage(t, "Execution.Image(maven)", opts.Execution.Image, contracts.MigStackJavaMaven, "docker.io/user/orw-cli:latest")
 			},
 		},
 	}
@@ -178,9 +178,9 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		mrOnSuccess := true
 		mrOnFail := false
 
-		spec := &contracts.ModsSpec{
+		spec := &contracts.MigSpec{
 			JobID: "job-direct-test-123",
-			Steps: []contracts.ModStep{
+			Steps: []contracts.MigStep{
 				{
 					Image:   testJobImage("docker.io/test/mig:v1"),
 					Command: contracts.CommandSpec{Exec: []string{"echo", "hello"}},
@@ -231,7 +231,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			t.Errorf("JobID: got %q, want %q", runOpts.ServerMetadata.JobID.String(), "job-direct-test-123")
 		}
 
-		assertImage(t, "Execution.Image", runOpts.Execution.Image, contracts.ModStackUnknown, "docker.io/test/mig:v1")
+		assertImage(t, "Execution.Image", runOpts.Execution.Image, contracts.MigStackUnknown, "docker.io/test/mig:v1")
 		if want := []string{"echo", "hello"}; !slices.Equal(runOpts.Execution.Command.Exec, want) {
 			t.Fatalf("Execution.Command.Exec = %v, want %v", runOpts.Execution.Command.Exec, want)
 		}
@@ -252,7 +252,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		if runOpts.Healing.Retries != 3 {
 			t.Errorf("Healing.Retries: got %d, want 3", runOpts.Healing.Retries)
 		}
-		assertImage(t, "Healing.Mod.Image", runOpts.Healing.Mod.Image, contracts.ModStackUnknown, "docker.io/test/heal:v1")
+		assertImage(t, "Healing.Mod.Image", runOpts.Healing.Mod.Image, contracts.MigStackUnknown, "docker.io/test/heal:v1")
 
 		if runOpts.MRWiring.GitLabPAT != "glpat-secret" {
 			t.Errorf("MRWiring.GitLabPAT: got %q, want glpat-secret", runOpts.MRWiring.GitLabPAT)
@@ -278,8 +278,8 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Run("multi_step_spec", func(t *testing.T) {
 		t.Parallel()
 
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{
+		spec := &contracts.MigSpec{
+			Steps: []contracts.MigStep{
 				{
 					Image:   testJobImage("docker.io/test/step1:v1"),
 					Command: contracts.CommandSpec{Shell: "step1.sh"},
@@ -299,7 +299,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			t.Fatalf("Steps: expected 2, got %d", len(runOpts.Steps))
 		}
 
-		assertImage(t, "Steps[0].Image", runOpts.Steps[0].Image, contracts.ModStackUnknown, "docker.io/test/step1:v1")
+		assertImage(t, "Steps[0].Image", runOpts.Steps[0].Image, contracts.MigStackUnknown, "docker.io/test/step1:v1")
 		if runOpts.Steps[0].Command.Shell != "step1.sh" {
 			t.Errorf("Steps[0].Command.Shell: got %q, want step1.sh", runOpts.Steps[0].Command.Shell)
 		}
@@ -307,7 +307,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 			t.Errorf("Steps[0].Env[STEP]: got %q, want 1", runOpts.Steps[0].Env["STEP"])
 		}
 
-		assertImage(t, "Steps[1].Image", runOpts.Steps[1].Image, contracts.ModStackUnknown, "docker.io/test/step2:v1")
+		assertImage(t, "Steps[1].Image", runOpts.Steps[1].Image, contracts.MigStackUnknown, "docker.io/test/step2:v1")
 		if want := []string{"step2", "--flag"}; !slices.Equal(runOpts.Steps[1].Command.Exec, want) {
 			t.Fatalf("Steps[1].Command.Exec = %v, want %v", runOpts.Steps[1].Command.Exec, want)
 		}
@@ -332,7 +332,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Run("healing_retries_defaults_to_1", func(t *testing.T) {
 		t.Parallel()
 
-		spec := singleStepSpec("img", func(s *contracts.ModsSpec) {
+		spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 			s.BuildGate = withHealing("infra", contracts.HealingActionSpec{
 				Retries: 0,
 				Image:   testJobImage("heal"),
@@ -352,14 +352,14 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Run("stack_aware_image_preserved", func(t *testing.T) {
 		t.Parallel()
 
-		spec := &contracts.ModsSpec{
-			Steps: []contracts.ModStep{
+		spec := &contracts.MigSpec{
+			Steps: []contracts.MigStep{
 				{
 					Image: contracts.JobImage{
-						ByStack: map[contracts.ModStack]string{
-							contracts.ModStackDefault:    "docker.io/test/default:v1",
-							contracts.ModStackJavaMaven:  "docker.io/test/maven:v1",
-							contracts.ModStackJavaGradle: "docker.io/test/gradle:v1",
+						ByStack: map[contracts.MigStack]string{
+							contracts.MigStackDefault:    "docker.io/test/default:v1",
+							contracts.MigStackJavaMaven:  "docker.io/test/maven:v1",
+							contracts.MigStackJavaGradle: "docker.io/test/gradle:v1",
 						},
 					},
 				},
@@ -367,7 +367,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 		}
 
 		runOpts := modsSpecToRunOptions(spec)
-		assertImage(t, "Maven image", runOpts.Execution.Image, contracts.ModStackJavaMaven, "docker.io/test/maven:v1")
+		assertImage(t, "Maven image", runOpts.Execution.Image, contracts.MigStackJavaMaven, "docker.io/test/maven:v1")
 	})
 }
 
@@ -392,7 +392,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 
 	type fieldProbe struct {
 		name          string
-		stepMutator   func(*contracts.ModStep)
+		stepMutator   func(*contracts.MigStep)
 		healMutator   func(*contracts.HealingActionSpec)
 		routerMutator func(*contracts.RouterSpec)
 		checkPresent  func(t *testing.T, mc ModContainerSpec)
@@ -402,7 +402,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 	probes := []fieldProbe{
 		{
 			name:          "TmpBundle",
-			stepMutator:   func(s *contracts.ModStep) { s.TmpBundle = bundle },
+			stepMutator:   func(s *contracts.MigStep) { s.TmpBundle = bundle },
 			healMutator:   func(a *contracts.HealingActionSpec) { a.TmpBundle = bundle },
 			routerMutator: func(r *contracts.RouterSpec) { r.TmpBundle = bundle },
 			checkPresent: func(t *testing.T, mc ModContainerSpec) {
@@ -420,7 +420,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 		},
 		{
 			name:          "Amata",
-			stepMutator:   func(s *contracts.ModStep) { s.Amata = amataSpec },
+			stepMutator:   func(s *contracts.MigStep) { s.Amata = amataSpec },
 			healMutator:   func(a *contracts.HealingActionSpec) { a.Amata = amataSpec },
 			routerMutator: func(r *contracts.RouterSpec) { r.Amata = amataSpec },
 			checkPresent: func(t *testing.T, mc ModContainerSpec) {
@@ -449,7 +449,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				t.Parallel()
 				step := makeStep("img")
 				probe.stepMutator(&step)
-				opts := modsSpecToRunOptions(&contracts.ModsSpec{Steps: []contracts.ModStep{step}})
+				opts := modsSpecToRunOptions(&contracts.MigSpec{Steps: []contracts.MigStep{step}})
 				probe.checkPresent(t, opts.Execution)
 			})
 
@@ -457,7 +457,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				t.Parallel()
 				step0 := makeStep("img0")
 				probe.stepMutator(&step0)
-				opts := modsSpecToRunOptions(&contracts.ModsSpec{Steps: []contracts.ModStep{step0, makeStep("img1")}})
+				opts := modsSpecToRunOptions(&contracts.MigSpec{Steps: []contracts.MigStep{step0, makeStep("img1")}})
 				if len(opts.Steps) != 2 {
 					t.Fatalf("Steps len: got %d, want 2", len(opts.Steps))
 				}
@@ -469,7 +469,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				t.Parallel()
 				action := contracts.HealingActionSpec{Image: testJobImage("heal-img")}
 				probe.healMutator(&action)
-				spec := singleStepSpec("img", func(s *contracts.ModsSpec) {
+				spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 					s.BuildGate = withHealing("code", action)
 				})
 				opts := modsSpecToRunOptions(spec)
@@ -483,7 +483,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				t.Parallel()
 				router := contracts.RouterSpec{Image: testJobImage("router-img")}
 				probe.routerMutator(&router)
-				spec := singleStepSpec("img", func(s *contracts.ModsSpec) {
+				spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 					s.BuildGate = withRouter(router)
 				})
 				opts := modsSpecToRunOptions(spec)
@@ -497,7 +497,7 @@ func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
 
 	t.Run("nil_propagates_nil", func(t *testing.T) {
 		t.Parallel()
-		spec := singleStepSpec("img", func(s *contracts.ModsSpec) {
+		spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 			s.BuildGate = &contracts.BuildGateConfig{
 				Router: &contracts.RouterSpec{Image: testJobImage("router-img")},
 				Healing: &contracts.HealingSpec{

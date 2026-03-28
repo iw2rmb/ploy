@@ -7,8 +7,8 @@ import (
 
 func TestModsSpec_RoundTrip(t *testing.T) {
 	mrOnSuccess := true
-	original := &ModsSpec{
-		Steps: []ModStep{{
+	original := &MigSpec{
+		Steps: []MigStep{{
 			Image:   JobImage{Universal: "docker.io/user/mig:latest"},
 			Command: CommandSpec{Shell: "echo hello"},
 			Env:     map[string]string{"FOO": "bar"},
@@ -23,9 +23,9 @@ func TestModsSpec_RoundTrip(t *testing.T) {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
 
-	parsed, err := ParseModsSpecJSON(data)
+	parsed, err := ParseMigSpecJSON(data)
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if parsed.Steps[0].Image.Universal != original.Steps[0].Image.Universal {
@@ -44,13 +44,13 @@ func TestModsSpec_RoundTrip(t *testing.T) {
 
 // TestModsSpec_RoundTrip_MultiStep tests round-trip for multi-step specs.
 func TestModsSpec_RoundTrip_MultiStep(t *testing.T) {
-	original := &ModsSpec{
-		Steps: []ModStep{
+	original := &MigSpec{
+		Steps: []MigStep{
 			{Name: "step-1", Image: JobImage{Universal: "mod1:latest"}},
-			{Name: "step-2", Image: JobImage{ByStack: map[ModStack]string{
-				ModStackDefault:    "mod2:default",
-				ModStackJavaMaven:  "mod2:maven",
-				ModStackJavaGradle: "mod2:gradle",
+			{Name: "step-2", Image: JobImage{ByStack: map[MigStack]string{
+				MigStackDefault:    "mod2:default",
+				MigStackJavaMaven:  "mod2:maven",
+				MigStackJavaGradle: "mod2:gradle",
 			}}},
 		},
 		BuildGate: &BuildGateConfig{
@@ -73,9 +73,9 @@ func TestModsSpec_RoundTrip_MultiStep(t *testing.T) {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
 
-	parsed, err := ParseModsSpecJSON(data)
+	parsed, err := ParseMigSpecJSON(data)
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if len(parsed.Steps) != 2 {

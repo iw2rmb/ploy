@@ -214,7 +214,7 @@ func createJobsFromSpec(
 	repoSHA0 string,
 	spec []byte,
 ) error {
-	modsSpec, err := contracts.ParseModsSpecJSON(spec)
+	modsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse migs spec: %w", err)
 	}
@@ -313,7 +313,7 @@ func resolvePreGateCreationBindingFromStore(
 	st store.Store,
 	repoID domaintypes.RepoID,
 	repoSHA string,
-	spec *contracts.ModsSpec,
+	spec *contracts.MigSpec,
 ) (*preGateCreationBinding, error) {
 	pgStore, ok := st.(*store.PgStore)
 	if !ok || pgStore == nil {
@@ -358,7 +358,7 @@ func resolvePreGateCreationBindingFromStore(
 	return nil, nil
 }
 
-func preGateStackHintsFromSpec(spec *contracts.ModsSpec) (lang, tool, release string) {
+func preGateStackHintsFromSpec(spec *contracts.MigSpec) (lang, tool, release string) {
 	if spec == nil || spec.BuildGate == nil || spec.BuildGate.Pre == nil || spec.BuildGate.Pre.Stack == nil {
 		return "", "", ""
 	}

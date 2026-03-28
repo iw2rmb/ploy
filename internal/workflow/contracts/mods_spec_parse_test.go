@@ -19,9 +19,9 @@ func TestParseModsSpecJSON_SingleStep(t *testing.T) {
 		"mr_on_fail": false
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if len(spec.Steps) != 1 {
@@ -100,9 +100,9 @@ func TestParseModsSpecJSON_MultiStep(t *testing.T) {
 		}
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	// Verify multi-step detection.
@@ -204,7 +204,7 @@ func TestParseModsSpecJSON_RetainContainerForbidden(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(tt.input))
+			_, err := ParseMigSpecJSON([]byte(tt.input))
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -226,9 +226,9 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 		}]
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if spec.Steps[0].Image.IsUniversal() {
@@ -239,7 +239,7 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	}
 
 	// Verify resolution.
-	img, err := spec.Steps[0].Image.ResolveImage(ModStackJavaMaven)
+	img, err := spec.Steps[0].Image.ResolveImage(MigStackJavaMaven)
 	if err != nil {
 		t.Fatalf("ResolveImage(java-maven) failed: %v", err)
 	}
@@ -248,7 +248,7 @@ func TestParseModsSpecJSON_StackSpecificImage(t *testing.T) {
 	}
 
 	// Verify default fallback.
-	img, err = spec.Steps[0].Image.ResolveImage(ModStackUnknown)
+	img, err = spec.Steps[0].Image.ResolveImage(MigStackUnknown)
 	if err != nil {
 		t.Fatalf("ResolveImage(unknown) failed: %v", err)
 	}
@@ -271,9 +271,9 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 		"build_gate": {"enabled": true}
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if spec.APIVersion != "ploy.mig/v1alpha1" {
@@ -292,7 +292,7 @@ func TestParseModsSpecJSON_APIVersionAndKind(t *testing.T) {
 
 // TestParseModsSpecJSON_Empty tests empty input handling.
 func TestParseModsSpecJSON_Empty(t *testing.T) {
-	_, err := ParseModsSpecJSON(nil)
+	_, err := ParseMigSpecJSON(nil)
 	if err == nil {
 		t.Fatal("expected error for empty input")
 	}
@@ -303,7 +303,7 @@ func TestParseModsSpecJSON_Empty(t *testing.T) {
 
 func TestParseModsSpecJSON_ModIndexForbidden(t *testing.T) {
 	input := `{"mod_index":0,"steps":[{"image":"docker.io/user/mig:latest"}]}`
-	_, err := ParseModsSpecJSON([]byte(input))
+	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected error for mod_index")
 	}
@@ -316,7 +316,7 @@ func TestParseModsSpecJSON_ModIndexForbidden(t *testing.T) {
 func TestParseModsSpecJSON_ValidationError(t *testing.T) {
 	// Step without image.
 	input := `{"steps": [{"name": "test"}]}`
-	_, err := ParseModsSpecJSON([]byte(input))
+	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected validation error for mig without image")
 	}
@@ -334,9 +334,9 @@ func TestModsSpec_ArtifactFields(t *testing.T) {
 		"artifact_paths": ["output/", "logs/app.log"]
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if spec.ArtifactName != "my-bundle" {
@@ -358,7 +358,7 @@ func TestParseModsSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 		}
 	}`
 
-	_, err := ParseModsSpecJSON([]byte(input))
+	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected error for missing steps")
 	}
@@ -370,7 +370,7 @@ func TestParseModsSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 
 // TestParseModsSpecJSON_InvalidJSON tests error handling for invalid JSON.
 func TestParseModsSpecJSON_InvalidJSON(t *testing.T) {
-	_, err := ParseModsSpecJSON([]byte(`{invalid json`))
+	_, err := ParseMigSpecJSON([]byte(`{invalid json`))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}

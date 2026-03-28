@@ -11,7 +11,7 @@ func TestParseModsSpecJSON_HealingValidation(t *testing.T) {
 		"steps": [{"image": "test:latest"}],
 		"build_gate": {"healing": {"by_error_kind":{"infra":{"retries": 1, "image": "codex:latest", "command": "fix"}}}}
 	}`
-	_, err := ParseModsSpecJSON([]byte(input))
+	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected validation error for healing without router")
 	}
@@ -26,7 +26,7 @@ func TestParseModsSpecJSON_HealingRequiresImage(t *testing.T) {
 			"router": {"image": "router:latest"}
 		}
 	}`
-	_, err := ParseModsSpecJSON([]byte(input))
+	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
 		t.Fatal("expected validation error for healing without image")
 	}
@@ -70,7 +70,7 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spec, err := ParseModsSpecJSON([]byte(tt.input))
+			spec, err := ParseMigSpecJSON([]byte(tt.input))
 			if tt.wantErr != "" {
 				if err == nil {
 					t.Fatal("expected error")
@@ -97,4 +97,4 @@ func TestParseModsSpecJSON_HealingRetriesCoercion(t *testing.T) {
 	}
 }
 
-// TestModsSpec_RoundTrip tests round-trip conversion via json.Marshal → ParseModsSpecJSON.
+// TestModsSpec_RoundTrip tests round-trip conversion via json.Marshal → ParseMigSpecJSON.

@@ -24,7 +24,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 			TypedOptions: RunOptions{},
 		}
 
-		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest error: %v", err)
 		}
@@ -45,7 +45,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 			// JobID intentionally omitted.
 		}
 
-		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
+		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
 		if err == nil {
 			t.Fatalf("expected error when JobID is missing")
 		}
@@ -75,7 +75,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 				TypedOptions: RunOptions{},
 			}
 
-			manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
+			manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildManifestFromRequest error for job %s: %v", jobID, err)
 			}
@@ -136,7 +136,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 		if err != nil {
 			t.Fatalf("buildHealingManifest error: %v", err)
 		}
@@ -161,7 +161,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			Image: contracts.JobImage{Universal: "healer:latest"},
 		}
 
-		_, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+		_, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 		if err == nil {
 			t.Fatalf("expected error when JobID is missing")
 		}
@@ -191,7 +191,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 				Image: contracts.JobImage{Universal: "healer:latest"},
 			}
 
-			manifest, err := buildHealingManifest(req, mig, 0, "", contracts.ModStackUnknown)
+			manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest error for job %s: %v", jobID, err)
 			}
@@ -224,8 +224,8 @@ func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 		},
 	}
 
-	// Pass ModStackUnknown explicitly to indicate tests operate without stack detection.
-	m, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.ModStackUnknown)
+	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
+	m, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest error: %v", err)
 	}

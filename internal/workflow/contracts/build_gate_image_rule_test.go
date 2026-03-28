@@ -255,8 +255,8 @@ func TestBuildGateImageMapping_Validate(t *testing.T) {
 
 // TestBuildGateImageRule_ParseRoundTrip tests parse → wire → parse consistency.
 func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
-	original := &ModsSpec{
-		Steps: []ModStep{{
+	original := &MigSpec{
+		Steps: []MigStep{{
 			Image: JobImage{Universal: "docker.io/user/mig:latest"},
 		}},
 		BuildGate: &BuildGateConfig{
@@ -275,9 +275,9 @@ func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 		t.Fatalf("json.Marshal failed: %v", err)
 	}
 
-	parsed, err := ParseModsSpecJSON(data)
+	parsed, err := ParseMigSpecJSON(data)
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	// Verify round-trip.
@@ -327,9 +327,9 @@ func TestParseModsSpecJSON_BuildGateImages(t *testing.T) {
 		}
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if spec.BuildGate == nil {
@@ -381,9 +381,9 @@ func TestParseModsSpecJSON_BuildGateImages_NumericRelease(t *testing.T) {
 		}
 	}`
 
-	spec, err := ParseModsSpecJSON([]byte(input))
+	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {
-		t.Fatalf("ParseModsSpecJSON failed: %v", err)
+		t.Fatalf("ParseMigSpecJSON failed: %v", err)
 	}
 
 	if spec.BuildGate.Images[0].Stack.Release != "17" {
@@ -454,7 +454,7 @@ func TestModsSpec_Validate_BuildGateImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseModsSpecJSON([]byte(tt.input))
+			_, err := ParseMigSpecJSON([]byte(tt.input))
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)

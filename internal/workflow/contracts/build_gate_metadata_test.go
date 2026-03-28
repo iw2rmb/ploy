@@ -16,14 +16,14 @@ func boolPtr(v bool) *bool {
 }
 
 // TestBuildGateStageMetadata_DetectedStack verifies that DetectedStack correctly
-// derives the ModStack from the first static check's tool name.
+// derives the MigStack from the first static check's tool name.
 func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		meta BuildGateStageMetadata
-		want ModStack
+		want MigStack
 	}{
 		{
 			name: "maven tool detected",
@@ -32,7 +32,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 					{Language: "java", Tool: "maven", Passed: true},
 				},
 			},
-			want: ModStackJavaMaven,
+			want: MigStackJavaMaven,
 		},
 		{
 			name: "gradle tool detected",
@@ -41,7 +41,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 					{Language: "java", Tool: "gradle", Passed: false},
 				},
 			},
-			want: ModStackJavaGradle,
+			want: MigStackJavaGradle,
 		},
 		{
 			name: "java tool detected",
@@ -50,7 +50,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 					{Language: "java", Tool: "java", Passed: true},
 				},
 			},
-			want: ModStackJava,
+			want: MigStackJava,
 		},
 		{
 			name: "none tool (gate skipped)",
@@ -59,19 +59,19 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 					{Tool: "none", Passed: true},
 				},
 			},
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 		{
 			name: "empty static checks",
 			meta: BuildGateStageMetadata{
 				StaticChecks: []BuildGateStaticCheckReport{},
 			},
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 		{
 			name: "nil static checks",
 			meta: BuildGateStageMetadata{},
-			want: ModStackUnknown,
+			want: MigStackUnknown,
 		},
 		{
 			name: "multiple checks uses first",
@@ -81,7 +81,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 					{Language: "java", Tool: "gradle", Passed: true},
 				},
 			},
-			want: ModStackJavaMaven,
+			want: MigStackJavaMaven,
 		},
 		{
 			name: "detected_stack tool takes precedence",
@@ -95,7 +95,7 @@ func TestBuildGateStageMetadata_DetectedStack(t *testing.T) {
 					{Language: "java", Tool: "maven", Passed: true},
 				},
 			},
-			want: ModStackJavaGradle,
+			want: MigStackJavaGradle,
 		},
 	}
 

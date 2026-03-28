@@ -90,8 +90,8 @@ type StepMod struct {
 	Always bool
 }
 
-// modsSpecToRunOptions converts contracts.ModsSpec directly to RunOptions.
-func modsSpecToRunOptions(spec *contracts.ModsSpec) RunOptions {
+// modsSpecToRunOptions converts contracts.MigSpec directly to RunOptions.
+func modsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 	if spec == nil {
 		return RunOptions{}
 	}
