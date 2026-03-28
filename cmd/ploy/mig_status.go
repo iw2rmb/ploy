@@ -12,6 +12,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/iw2rmb/ploy/internal/cli/migs"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -81,7 +82,7 @@ func handleMigStatus(args []string, stderr io.Writer) error {
 	return nil
 }
 
-func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL, migID string) (migs.MigSummary, error) {
+func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL, migID string) (domainapi.MigSummary, error) {
 	const pageSize int32 = 100
 	var offset int32
 	for {
@@ -92,7 +93,7 @@ func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL,
 			Offset:  offset,
 		}.Run(ctx)
 		if err != nil {
-			return migs.MigSummary{}, err
+			return domainapi.MigSummary{}, err
 		}
 		for _, item := range page {
 			if item.ID.String() == migID {
@@ -100,7 +101,7 @@ func findMigByID(ctx context.Context, httpClient *http.Client, baseURL *url.URL,
 			}
 		}
 		if len(page) < int(pageSize) {
-			return migs.MigSummary{}, fmt.Errorf("mig %q not found", migID)
+			return domainapi.MigSummary{}, fmt.Errorf("mig %q not found", migID)
 		}
 		offset += pageSize
 	}

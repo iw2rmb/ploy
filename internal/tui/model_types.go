@@ -9,6 +9,7 @@ import (
 
 	cliruns "github.com/iw2rmb/ploy/internal/cli/runs"
 	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/tui/joblist"
 )
@@ -92,7 +93,7 @@ type model struct {
 }
 
 // migsLoadedMsg carries migrations fetched from the API.
-type migsLoadedMsg struct{ migs []clitui.MigItem }
+type migsLoadedMsg struct{ migs []domainapi.MigSummary }
 
 // runsLoadedMsg carries runs fetched from the API.
 type runsLoadedMsg struct{ runs []runSummary }

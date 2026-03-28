@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -38,7 +38,7 @@ func TestWindowHeightPersistsAcrossListRecreation(t *testing.T) {
 		t.Fatalf("secondary height after enter = %d, want 29", nm.rightPaneList.Height())
 	}
 
-	next, _ = nm.Update(migsLoadedMsg{migs: []clitui.MigItem{
+	next, _ = nm.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
 		{ID: domaintypes.MigID("mig-1"), Name: "alpha"},
 	}})
 	nm = next.(model)

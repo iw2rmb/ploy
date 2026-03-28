@@ -6,24 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// MigItem represents a single migration entry from the list API.
-type MigItem struct {
-	ID        domaintypes.MigID   `json:"id"`
-	Name      string              `json:"name"`
-	SpecID    *domaintypes.SpecID `json:"spec_id,omitempty"`
-	CreatedBy *string             `json:"created_by,omitempty"`
-	Archived  bool                `json:"archived"`
-	CreatedAt string              `json:"created_at"`
-}
-
-// ListMigsResult is the response from GET /v1/migs.
-type ListMigsResult struct {
-	Migs []MigItem `json:"migs"`
-}
 
 // ListMigsCommand fetches a paginated list of migrations.
 type ListMigsCommand struct {
@@ -34,9 +19,9 @@ type ListMigsCommand struct {
 }
 
 // Run executes GET /v1/migs.
-func (c ListMigsCommand) Run(ctx context.Context) (ListMigsResult, error) {
+func (c ListMigsCommand) Run(ctx context.Context) (domainapi.MigListResponse, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
-		return ListMigsResult{}, fmt.Errorf("list migs: %w", err)
+		return domainapi.MigListResponse{}, fmt.Errorf("list migs: %w", err)
 	}
 
 	endpoint := c.BaseURL.JoinPath("v1", "migs")
@@ -53,22 +38,22 @@ func (c ListMigsCommand) Run(ctx context.Context) (ListMigsResult, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
-		return ListMigsResult{}, fmt.Errorf("list migs: build request: %w", err)
+		return domainapi.MigListResponse{}, fmt.Errorf("list migs: build request: %w", err)
 	}
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		return ListMigsResult{}, fmt.Errorf("list migs: http request failed: %w", err)
+		return domainapi.MigListResponse{}, fmt.Errorf("list migs: http request failed: %w", err)
 	}
 	defer httpx.DrainAndClose(resp)
 
 	if resp.StatusCode != http.StatusOK {
-		return ListMigsResult{}, httpx.WrapError("list migs", resp.Status, resp.Body)
+		return domainapi.MigListResponse{}, httpx.WrapError("list migs", resp.Status, resp.Body)
 	}
 
-	var result ListMigsResult
+	var result domainapi.MigListResponse
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
-		return ListMigsResult{}, fmt.Errorf("list migs: decode response: %w", err)
+		return domainapi.MigListResponse{}, fmt.Errorf("list migs: decode response: %w", err)
 	}
 
 	return result, nil

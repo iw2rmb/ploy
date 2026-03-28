@@ -22,19 +22,9 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// MigSummary represents a mig project returned by the server.
-// Matches the server response shape from internal/server/handlers/migs.go.
-type MigSummary struct {
-	ID        types.MigID   `json:"id"`
-	Name      string        `json:"name"`
-	SpecID    *types.SpecID `json:"spec_id,omitempty"`
-	CreatedBy *string       `json:"created_by,omitempty"`
-	Archived  bool          `json:"archived"`
-	CreatedAt time.Time     `json:"created_at"`
-}
 
 // AddMigCommand creates a new mig project.
 // Endpoint: POST /v1/migs
@@ -121,7 +111,7 @@ type ListMigsCommand struct {
 }
 
 // Run executes GET /v1/migs to list migs with pagination and filters.
-func (c ListMigsCommand) Run(ctx context.Context) ([]MigSummary, error) {
+func (c ListMigsCommand) Run(ctx context.Context) ([]domainapi.MigSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig list: %w", err)
 	}
@@ -161,15 +151,12 @@ func (c ListMigsCommand) Run(ctx context.Context) ([]MigSummary, error) {
 		return nil, httpx.WrapError("mig list", resp.Status, resp.Body)
 	}
 
-	// Response structure: {"migs": [...]}
-	var result struct {
-		Mods []MigSummary `json:"migs"`
-	}
+	var result domainapi.MigListResponse
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("mig list: decode response: %w", err)
 	}
 
-	return result.Mods, nil
+	return result.Migs, nil
 }
 
 // RemoveMigCommand deletes a mig project.
@@ -420,7 +407,7 @@ func (c ResolveMigByNameCommand) Run(ctx context.Context) (string, error) {
 	}
 
 	// Find exact name match.
-	var matches []MigSummary
+	var matches []domainapi.MigSummary
 	for _, mig := range migs {
 		if mig.Name == ref {
 			matches = append(matches, mig)

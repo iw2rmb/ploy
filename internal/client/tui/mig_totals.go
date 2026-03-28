@@ -6,19 +6,10 @@ import (
 	"net/http"
 	"net/url"
 
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
-
-// MigRepoItem represents a single repo entry in a migration's repo set.
-type MigRepoItem struct {
-	ID        domaintypes.MigRepoID `json:"id"`
-	MigID     domaintypes.MigID     `json:"mig_id"`
-	RepoURL   string                `json:"repo_url"`
-	BaseRef   string                `json:"base_ref"`
-	TargetRef string                `json:"target_ref"`
-	CreatedAt string                `json:"created_at"`
-}
 
 // CountMigReposCommand counts the repos in a migration's repo set.
 type CountMigReposCommand struct {
@@ -52,9 +43,7 @@ func (c CountMigReposCommand) Run(ctx context.Context) (int, error) {
 		return 0, httpx.WrapError("count mig repos", resp.Status, resp.Body)
 	}
 
-	var result struct {
-		Repos []MigRepoItem `json:"repos"`
-	}
+	var result domainapi.MigRepoListResponse
 	if err := httpx.DecodeResponseJSON(resp.Body, &result, httpx.MaxJSONBodyBytes); err != nil {
 		return 0, fmt.Errorf("count mig repos: decode response: %w", err)
 	}

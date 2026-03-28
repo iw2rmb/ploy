@@ -164,7 +164,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **Test fixtures** (`migs_crud_test.go`): Updated three list-test fixtures that used short invalid MigIDs (`"mod1"`, `"mod2"`, `"modA"`, `"modB"`, `"modC"` — 4 chars, failing `validateNanoID(6)`) to valid 6-char NanoIDs (`"mod001"`, `"mod002"`, `"mod00A"`, `"mod00B"`, `"mod00C"`). Updated matching map keys, `MigID` fields in `store.MigRepo`, and ID assertions.
     - **Test proof**: `go test ./internal/server/handlers ./internal/domain/api` passes; `go test ./internal/... -run 'Handler|DTO|Decode|Encode'` passes (all packages).
 
-- [ ] 4.2c Migrate client and CLI decode paths to canonical DTOs and delete duplicate decode structs
+- [x] 4.2c Migrate client and CLI decode paths to canonical DTOs and delete duplicate decode structs
   - Type: determined
   - Component: `internal/client/tui`, `internal/cli/migs`, `internal/cli/runs`, `internal/domain/api`
   - Implementation:
@@ -179,6 +179,18 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+60/-130` (net `-70`) across client/cli adapters.
   - Clarity / complexity check: Unifies decode contracts without changing transport behavior.
   - Reasoning: high (9 CFP)
+
+  - Completion notes:
+    - **`MigItem` removed** (`internal/client/tui/migs.go`): Deleted `MigItem` and `ListMigsResult` structs; `ListMigsCommand.Run` now returns `domainapi.MigListResponse` directly and decodes via `domainapi.MigListResponse`. Import of `domaintypes` dropped from file.
+    - **`MigRepoItem` removed** (`internal/client/tui/mig_totals.go`): Deleted `MigRepoItem` struct; `CountMigReposCommand.Run` decodes into `domainapi.MigRepoListResponse` inline.
+    - **`MigSummary` removed** (`internal/cli/migs/mod_management.go`): Deleted local `MigSummary`; `ListMigsCommand.Run` decodes via `domainapi.MigListResponse` and returns `[]domainapi.MigSummary`; `ResolveMigByNameCommand.Run` accumulates `[]domainapi.MigSummary`. Import `domainapi` added.
+    - **`MigRepoSummary` removed** (`internal/cli/migs/mod_repos.go`): Deleted local `MigRepoSummary` (which had `domaintypes.GitRef` for `BaseRef`/`TargetRef`); `AddMigRepoCommand.Run` and `ListMigReposCommand.Run` return `domainapi.MigRepoSummary` / `[]domainapi.MigRepoSummary`; list decode uses `domainapi.MigRepoListResponse`. `"time"` import dropped.
+    - **`migsLoadedMsg` updated** (`internal/tui/model_types.go`): Changed `migs []clitui.MigItem` → `migs []domainapi.MigSummary`. Import `domainapi` added.
+    - **Sort fixed** (`internal/tui/model_core.go`): `handleMigsLoaded` sorts `[]domainapi.MigSummary` using `.After()` (was `>` string compare on `CreatedAt string`). Import `clitui` removed; `domainapi` added.
+    - **`findMigByID` updated** (`cmd/ploy/mig_status.go`): Return type changed from `migs.MigSummary` to `domainapi.MigSummary`. Import `domainapi` added.
+    - **`BaseRef`/`TargetRef` display fixed** (`cmd/ploy/mig_repo.go`): `repo.BaseRef.String()` / `repo.TargetRef.String()` → `repo.BaseRef` / `repo.TargetRef` (canonical fields are `string`, not `domaintypes.GitRef`).
+    - **Tests updated**: `mod_management_test.go` uses `domainapi.MigSummary` and `domainapi.MigListResponse`; `mod_repos_test.go` uses `domainapi.MigRepoSummary`/`domainapi.MigRepoListResponse` with plain `string` refs; `model_migrations_test.go`, `model_migration_details_test.go`, `model_window_size_test.go` use `domainapi.MigSummary` with `time.Time` `CreatedAt`.
+    - **Test proof**: `go test ./internal/cli/... ./internal/client/... ./internal/domain/api ./internal/tui/...` passes; `make test` passes (all packages).
 
 - [ ] 5.1 Replace monolithic mockStore in handlers with focused fixture builders
   - Type: determined

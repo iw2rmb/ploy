@@ -2,15 +2,16 @@ package tui
 
 import (
 	"testing"
+	"time"
 
-	clitui "github.com/iw2rmb/ploy/internal/client/tui"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestS2MigrationsListTitle verifies the MIGRATIONS secondary list title.
 func TestS2MigrationsListTitle(t *testing.T) {
 	m := InitialModel(nil, nil)
-	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
 		{ID: domaintypes.MigID("mig-1"), Name: "alpha"},
 	}})
 	nm := next.(model)
@@ -23,9 +24,9 @@ func TestS2MigrationsListTitle(t *testing.T) {
 func TestS2MigrationsItemsPopulated(t *testing.T) {
 	m := InitialModel(nil, nil)
 	// Provide distinct CreatedAt values so sort order is deterministic.
-	migs := []clitui.MigItem{
-		{ID: domaintypes.MigID("mig-aaa"), Name: "alpha", CreatedAt: "2024-01-02T00:00:00Z"},
-		{ID: domaintypes.MigID("mig-bbb"), Name: "beta", CreatedAt: "2024-01-01T00:00:00Z"},
+	migs := []domainapi.MigSummary{
+		{ID: domaintypes.MigID("mig-aaa"), Name: "alpha", CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+		{ID: domaintypes.MigID("mig-bbb"), Name: "beta", CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 	}
 	next, _ := m.Update(migsLoadedMsg{migs: migs})
 	nm := next.(model)
@@ -55,10 +56,10 @@ func TestS2MigrationsItemsPopulated(t *testing.T) {
 func TestS2MigrationsOrderingEnforced(t *testing.T) {
 	m := InitialModel(nil, nil)
 	// Provide items intentionally out of order (oldest first).
-	migs := []clitui.MigItem{
-		{ID: domaintypes.MigID("mig-oldest"), Name: "oldest", CreatedAt: "2024-01-01T00:00:00Z"},
-		{ID: domaintypes.MigID("mig-middle"), Name: "middle", CreatedAt: "2024-01-02T00:00:00Z"},
-		{ID: domaintypes.MigID("mig-newest"), Name: "newest", CreatedAt: "2024-01-03T00:00:00Z"},
+	migs := []domainapi.MigSummary{
+		{ID: domaintypes.MigID("mig-oldest"), Name: "oldest", CreatedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{ID: domaintypes.MigID("mig-middle"), Name: "middle", CreatedAt: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+		{ID: domaintypes.MigID("mig-newest"), Name: "newest", CreatedAt: time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)},
 	}
 	next, _ := m.Update(migsLoadedMsg{migs: migs})
 	nm := next.(model)
@@ -84,7 +85,7 @@ func TestS2MigrationsOrderingEnforced(t *testing.T) {
 func TestS2EnterTransitionsToS3(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
 		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
 	}})
 	nm := next.(model)
@@ -102,7 +103,7 @@ func TestS2EnterSetsSelectedMigID(t *testing.T) {
 	const wantID = "mig-xyz"
 	m := InitialModel(nil, nil)
 	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
 		{ID: domaintypes.MigID(wantID), Name: "my-migration"},
 	}})
 	nm := next.(model)
@@ -118,7 +119,7 @@ func TestS2EnterSetsSelectedMigID(t *testing.T) {
 func TestS2EnterDefinesSelectedMigrationInPloy(t *testing.T) {
 	m := InitialModel(nil, nil)
 	m.screen = ScreenMigrationsList
-	next, _ := m.Update(migsLoadedMsg{migs: []clitui.MigItem{
+	next, _ := m.Update(migsLoadedMsg{migs: []domainapi.MigSummary{
 		{ID: domaintypes.MigID("mig-xyz"), Name: "my-migration"},
 	}})
 	nm := next.(model)
