@@ -423,7 +423,7 @@ The Build Gate detects the workspace stack during validation based on file marke
 | `unknown`      | No recognized stack markers found            | None       |
 
 The detected stack is propagated from the Build Gate to Mods steps via
-`BuildGateStageMetadata.Tool`, which is converted to a `ModStack` using
+`BuildGateStageMetadata.Tool`, which is converted to a `MigStack` using
 `ToolToModStack()` in runtime implementation.
 
 ### Image resolution rules
