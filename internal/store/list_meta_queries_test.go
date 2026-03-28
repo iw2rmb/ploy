@@ -48,6 +48,37 @@ func TestListMetaQueriesDoNotReturnBlobs(t *testing.T) {
 	}
 }
 
+// TestListMetaQueriesUseExplicitSelect verifies that artifact/event list queries
+// use explicit column selection (not SELECT *) so the selector surface is stable.
+func TestListMetaQueriesUseExplicitSelect(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		sql  string
+	}{
+		// artifact_bundles.sql - explicit column list, no wildcard
+		{"ListArtifactBundlesByRun", listArtifactBundlesByRun},
+		{"ListArtifactBundlesByRunAndJob", listArtifactBundlesByRunAndJob},
+		{"ListArtifactBundlesByCID", listArtifactBundlesByCID},
+		// events.sql - explicit column list, no wildcard
+		{"ListEventsByRun", listEventsByRun},
+		{"ListEventsByRunSince", listEventsByRunSince},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			sqlLower := strings.ToLower(tc.sql)
+			if strings.Contains(sqlLower, "select *") {
+				t.Fatalf("%s must use explicit column selection, not SELECT *; found wildcard in SQL:\n%s",
+					tc.name, tc.sql)
+			}
+		})
+	}
+}
+
 // TestListMetaQueriesHaveDeterministicOrder verifies list queries
 // have deterministic tie-breakers.
 func TestListMetaQueriesHaveDeterministicOrder(t *testing.T) {
