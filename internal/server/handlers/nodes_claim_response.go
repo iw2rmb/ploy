@@ -36,7 +36,7 @@ type claimResponsePayload struct {
 	Spec                   json.RawMessage                  `json:"spec,omitempty"`
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
-	StepSkip               *contracts.ModStepSkipMetadata   `json:"step_skip,omitempty"`
+	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
 }
 
 func buildClaimResponsePayload(
@@ -96,7 +96,7 @@ func buildClaimResponsePayload(
 		return claimResponsePayload{}, err
 	}
 
-	var stepSkip *contracts.ModStepSkipMetadata
+	var stepSkip *contracts.MigStepSkipMetadata
 	if jobType == domaintypes.JobTypeMod {
 		stepSkip, err = resolveAndPersistModStepSkip(ctx, st, job, mergedSpec)
 		if err != nil {
