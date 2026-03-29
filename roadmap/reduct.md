@@ -280,6 +280,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Completion notes:
     - **Baseline findings**: `make redundancy-check` reports `OK (0 findings across 4 hotspot packages)` — no pre-existing duplicate-symbol or parallel-entrypoint findings in the scoped hotspot packages (`internal/server/handlers`, `internal/nodeagent`, `internal/workflow/contracts`, `internal/store`).
     - **Scoped-hotspot duplicate-path status**: 0 newly introduced duplicate paths detected across all 4 hotspot packages. Guard is wired into CI (`.github/workflows/`) and will block any PR that introduces new duplicate-symbol or parallel-entrypoint findings.
+    - **Gap fix (validation baseline)**: Validate `roadmap/reduct.md` end-to-end against a clean commit baseline, not the current dirty worktree state (`MM tests/integration/contents.md`, `D tests/integration/migs/contents.md`, `?? tests/integration/migs/contents.md`), because that index/worktree mismatch is pre-existing and can skew review confidence.
   - Estimated LOC influence: `+130/-10` (net `+120`) for guardrail script and docs.
   - Clarity / complexity check: Adds tooling overhead but reduces future review ambiguity and regression risk.
   - Reasoning: medium (8 CFP)
