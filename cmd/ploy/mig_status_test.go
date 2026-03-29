@@ -15,7 +15,7 @@ import (
 func TestMigStatusPrintsMigrationSummary(t *testing.T) {
 	t.Helper()
 
-	migID := domaintypes.NewMigID()
+	migID := domaintypes.MigID("mig001")
 	specID := domaintypes.NewSpecID()
 	repoID1 := domaintypes.NewMigRepoID()
 	repoID2 := domaintypes.NewMigRepoID()
