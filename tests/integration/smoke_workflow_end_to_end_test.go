@@ -328,7 +328,10 @@ index abc1234..def5678 100644
 	t.Logf("✓ Verified %d diff(s) with correct job association", len(diffs))
 
 	// Verify events are ordered chronologically
-	events, err := db.ListEventsByRun(ctx, run.ID)
+	events, err := db.ListEventsByRun(ctx, store.ListEventsByRunParams{
+		RunID:        run.ID,
+		MetadataOnly: false,
+	})
 	if err != nil {
 		t.Fatalf("ListEventsByRun() failed: %v", err)
 	}
