@@ -18,7 +18,7 @@ jobs:
       matrix:
         include:
           - name: mods
-            path: ./internal/mods
+            path: ./internal/migs
             min: 80
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +77,7 @@ jobs:
         run: |
           set -euo pipefail
           components=(
-            "mods ./internal/mods"
+            "mods ./internal/migs"
           )
           mkdir -p badges
           gen_badge() {
@@ -147,7 +147,7 @@ jobs:
         run: |
           set -euo pipefail
           components=(
-            "mods ./internal/mods"
+            "mods ./internal/migs"
           )
           echo "mode: atomic" > coverage_all.out
           for entry in "${components[@]}"; do
