@@ -197,17 +197,18 @@ Split the file by behavior domain before adding more cases.
 ```
 FAIL: PARALLEL_FAMILY: internal/server/handlers: 'Compute' and 'ComputeV2' coexist
 ```
-Delete the superseded form or, if both are still needed, document why in the
-PR and bump the guardrail exemption in `scripts/redundancy-check.sh`.
+Delete the superseded form or consolidate the two into one. There is no
+exemption mechanism — the finding must be resolved in source code.
 
 ### Remediation flow
 
 1. Run `make redundancy-check` locally to see the full finding list.
 2. For LOC findings: split the file by behavior domain and move shared fixtures
    to a `*_fixture_test.go` file.
-3. For parallel-family findings: remove the superseded symbol. If both symbols
-   are genuinely needed (for example, a migration period), add an inline
-   `# allow:` comment above the symbol and update the allowlist in the script.
+3. For parallel-family findings: remove the superseded symbol or consolidate
+   the versioned forms into one. The script has no allowlist mechanism — the
+   only way to clear a finding is to eliminate the parallel family from the
+   source code.
 4. Re-run `make redundancy-check` to confirm findings are resolved.
 
 ## References
