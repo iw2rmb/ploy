@@ -12,6 +12,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/workflowkit"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	containertypes "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -20,8 +21,7 @@ import (
 func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	t.Parallel()
 
-	jobID := types.NewJobID()
-	runID := types.NewRunID()
+	s := workflowkit.NewRunOrchestrationScenario()
 	var (
 		mu    sync.Mutex
 		calls []string
@@ -31,7 +31,7 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 		calls = append(calls, r.URL.Path)
 		mu.Unlock()
 		switch {
-		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
 			w.WriteHeader(http.StatusOK)
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/claim":
 			w.WriteHeader(http.StatusNoContent)
@@ -48,7 +48,7 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
 				{
 					ID:     "ctr-terminal",
-					Labels: map[string]string{types.LabelRunID: runID.String(), types.LabelJobID: jobID.String()},
+					Labels: map[string]string{types.LabelRunID: s.RunID.String(), types.LabelJobID: s.JobID.String()},
 				},
 			}},
 			inspectByID: map[string]client.ContainerInspectResult{
@@ -85,7 +85,7 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	completeIdx := -1
 	claimIdx := -1
 	for i, path := range calls {
-		if path == "/v1/jobs/"+jobID.String()+"/complete" && completeIdx == -1 {
+		if path == "/v1/jobs/"+s.JobID.String()+"/complete" && completeIdx == -1 {
 			completeIdx = i
 		}
 		if path == "/v1/nodes/"+testNodeID+"/claim" && claimIdx == -1 {
@@ -283,33 +283,23 @@ func TestCrashReconcile_SkipsStaleTerminalContainers_Contract(t *testing.T) {
 func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *testing.T) {
 	t.Parallel()
 
-	runID := types.NewRunID()
-	jobID := types.NewJobID()
+	s := workflowkit.NewRunOrchestrationScenario()
 	containerID := "ctr-running-1"
 	var logsCalled bool
 	var completeCalled bool
+	var completePayload struct {
+		Status   string `json:"status"`
+		ExitCode int32  `json:"exit_code"`
+	}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
 			logsCalled = true
 			w.WriteHeader(http.StatusCreated)
-		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
 			completeCalled = true
-			var payload struct {
-				Status   string         `json:"status"`
-				ExitCode int32          `json:"exit_code"`
-				Stats    map[string]any `json:"stats"`
-			}
-			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-				t.Fatalf("decode complete payload: %v", err)
-			}
-			if payload.Status != types.JobStatusSuccess.String() {
-				t.Fatalf("status = %q, want %q", payload.Status, types.JobStatusSuccess.String())
-			}
-			if payload.ExitCode != 0 {
-				t.Fatalf("exit_code = %d, want 0", payload.ExitCode)
-			}
+			_ = json.NewDecoder(r.Body).Decode(&completePayload)
 			w.WriteHeader(http.StatusOK)
 		default:
 			http.NotFound(w, r)
@@ -343,7 +333,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
-		{ContainerID: containerID, RunID: runID, JobID: jobID},
+		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
 	deadline := time.After(2 * time.Second)
@@ -359,6 +349,12 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 		}
 	}
 
+	if completePayload.Status != types.JobStatusSuccess.String() {
+		t.Fatalf("status = %q, want %q", completePayload.Status, types.JobStatusSuccess.String())
+	}
+	if completePayload.ExitCode != 0 {
+		t.Fatalf("exit_code = %d, want 0", completePayload.ExitCode)
+	}
 	if controller.acquireCalls != 1 {
 		t.Fatalf("AcquireSlot calls = %d, want 1", controller.acquireCalls)
 	}
@@ -370,8 +366,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *testing.T) {
 	t.Parallel()
 
-	runID := types.NewRunID()
-	jobID := types.NewJobID()
+	s := workflowkit.NewRunOrchestrationScenario()
 	containerID := "ctr-running-conflict"
 	var logsCalled bool
 	completeCalls := 0
@@ -381,7 +376,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
 			logsCalled = true
 			w.WriteHeader(http.StatusCreated)
-		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
 			completeCalls++
 			w.WriteHeader(http.StatusConflict)
 		default:
@@ -416,7 +411,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
-		{ContainerID: containerID, RunID: runID, JobID: jobID},
+		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
 	deadline := time.After(2 * time.Second)
@@ -451,10 +446,12 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	t.Parallel()
 
-	jobFail := types.NewJobID()
-	jobOK := types.NewJobID()
-	runFail := types.NewRunID()
-	runOK := types.NewRunID()
+	sFail := workflowkit.NewRunOrchestrationScenario()
+	sOK := workflowkit.NewRunOrchestrationScenario()
+	jobFail := sFail.JobID
+	jobOK := sOK.JobID
+	runFail := sFail.RunID
+	runOK := sOK.RunID
 	failContainer := "ctr-fail"
 	okContainer := "ctr-ok"
 

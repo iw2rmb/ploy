@@ -1,1 +1,1 @@
-[reduct.md](reduct.md) Implementation roadmap for removing redundant internal orchestration/store/handler surfaces with verification checkpoints.
+[reduct.md](reduct.md) Execution roadmap for removing duplicated internal orchestration, handler, transfer, and test-harness surfaces with verification checkpoints.
