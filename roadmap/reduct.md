@@ -139,7 +139,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **`MigListResponse`** (`domain/api/mig.go`): canonical `{"migs": [...]}` envelope for GET /v1/migs.
     - **`MigRepoSummary`** (`domain/api/mig_repo.go`): canonical GET /v1/migs/{id}/repos list item and POST response shape — `{id: MigRepoID, mig_id: MigID, repo_url: string, base_ref: string, target_ref: string, created_at: time.Time}`. Supersedes: handler inline `repoItem` (migrated in 4.2b), `cli/migs.MigRepoSummary` (migrated in 4.2c).
     - **`MigRepoListResponse`** (`domain/api/mig_repo.go`): canonical `{"repos": [...]}` envelope for GET /v1/migs/{id}/repos.
-    - **`RunSubmitRequest`** moved from `internal/migs/api/types.go` to `domain/api/run_submit.go`. `migs/api/types.go` replaces the struct definition with a type alias `type RunSubmitRequest = domainapi.RunSubmitRequest` for backward compatibility; canonical ownership is now `domain/api`.
+    - **`RunSubmitRequest`** moved from `internal/migs/api/types.go` to `internal/domain/api/run_submit.go`; canonical ownership is now `domain/api`. No compatibility alias remains in `internal/migs/api/types.go`, and call sites are expected to import `domainapi.RunSubmitRequest` directly.
     - **Test proof**: `go test ./internal/domain/... ./internal/migs/api` passes; `go test ./internal/... -run 'DTO|Payload|Schema'` passes (`internal/domain/api` runs `TestMigSummaryDTO`, `TestMigListResponseDTO`, `TestMigRepoSummaryDTO`, `TestMigRepoListResponseDTO`, `TestRunSubmitPayload`).
 
 - [x] 4.2b Migrate handlers to canonical DTOs and delete handler-local contract duplicates
