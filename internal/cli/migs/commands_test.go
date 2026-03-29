@@ -15,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
@@ -106,7 +107,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	sum, err := (SubmitCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		Request: modsapi.RunSubmitRequest{
+		Request: domainapi.RunSubmitRequest{
 			RepoURL:   domaintypes.RepoURL("https://example.com/repo.git"),
 			BaseRef:   domaintypes.GitRef("main"),
 			TargetRef: domaintypes.GitRef("feature"),
@@ -134,7 +135,7 @@ func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
 	_, err := (SubmitCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		Request: modsapi.RunSubmitRequest{
+		Request: domainapi.RunSubmitRequest{
 			RepoURL:   domaintypes.RepoURL("http://example.com/repo.git"),
 			BaseRef:   domaintypes.GitRef("main"),
 			TargetRef: domaintypes.GitRef("feature"),
@@ -213,7 +214,7 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 	if _, err := (SubmitCommand{
 		Client:  srv.Client(),
 		BaseURL: base,
-		Request: modsapi.RunSubmitRequest{
+		Request: domainapi.RunSubmitRequest{
 			RepoURL:   domaintypes.RepoURL("https://example.com/repo.git"),
 			BaseRef:   domaintypes.GitRef("main"),
 			TargetRef: domaintypes.GitRef("feature"),

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/runs"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
@@ -155,7 +156,7 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	}
 
 	// Build run request from parsed flags.
-	request := modsapi.RunSubmitRequest{
+	request := domainapi.RunSubmitRequest{
 		RepoURL:   domaintypes.RepoURL(strings.TrimSpace(*flags.RepoURL)),
 		BaseRef:   domaintypes.GitRef(strings.TrimSpace(*flags.BaseRef)),
 		TargetRef: domaintypes.GitRef(strings.TrimSpace(*flags.TargetRef)),
@@ -538,7 +539,7 @@ func deriveRunStateFromReport(report runs.RunReport) modsapi.RunState {
 	return ""
 }
 
-func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request modsapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.MigID, error) {
+func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request domainapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.MigID, error) {
 	if base == nil {
 		return "", "", fmt.Errorf("run submit: base url required")
 	}
