@@ -169,10 +169,7 @@ index 1234567..abcdefg 100644
 	t.Logf("Created diff: id=%v, run_id=%v, job_id=%v, patch_size=%d", diff.ID, diff.RunID, diff.JobID, diff.PatchSize)
 
 	// Step 7: Assert logs are stored - Verify logs can be listed by run.
-	logs, err := db.ListLogsByRun(ctx, store.ListLogsByRunParams{
-		MetadataOnly: false,
-		RunID:        run.ID,
-	})
+	logs, err := db.ListLogsByRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("ListLogsByRun() failed: %v", err)
 	}
@@ -195,9 +192,8 @@ index 1234567..abcdefg 100644
 
 	// Step 8: Assert diffs are stored - Verify diffs can be listed by run.
 	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		MetadataOnly: false,
-		RunID:        run.ID,
-		RepoID:       job.RepoID,
+		RunID:  run.ID,
+		RepoID: job.RepoID,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
@@ -256,10 +252,7 @@ index 1234567..abcdefg 100644
 	t.Logf("Created event: id=%d, level=%s, message=%s", event.ID, event.Level, event.Message)
 
 	// Verify event was stored.
-	events, err := db.ListEventsByRun(ctx, store.ListEventsByRunParams{
-		RunID:        run.ID,
-		MetadataOnly: false,
-	})
+	events, err := db.ListEventsByRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("ListEventsByRun() failed: %v", err)
 	}

@@ -32,7 +32,6 @@ SELECT
 FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = sqlc.arg(run_id) AND j.repo_id = sqlc.arg(repo_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY
   CASE
     WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
@@ -53,7 +52,6 @@ SELECT
   created_at
 FROM diffs
 WHERE run_id = sqlc.arg(run_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY created_at ASC, id ASC;
 
 -- name: GetLatestDiffByJob :one

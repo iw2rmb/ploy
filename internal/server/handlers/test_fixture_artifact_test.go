@@ -39,11 +39,11 @@ type artifactStore struct {
 	listSBOMCompatRows      mockCall[store.ListSBOMCompatRowsParams, []store.ListSBOMCompatRowsRow]
 }
 
-func (m *artifactStore) ListArtifactBundlesByCID(ctx context.Context, arg store.ListArtifactBundlesByCIDParams) ([]store.ArtifactBundle, error) {
+func (m *artifactStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByCID.ret()
 }
 
-func (m *artifactStore) ListArtifactBundlesByRun(ctx context.Context, arg store.ListArtifactBundlesByRunParams) ([]store.ArtifactBundle, error) {
+func (m *artifactStore) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]store.ArtifactBundle, error) {
 	return m.listArtifactBundlesByRun.ret()
 }
 

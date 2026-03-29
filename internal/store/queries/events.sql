@@ -5,13 +5,11 @@ WHERE id = $1;
 -- name: ListEventsByRun :many
 SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = sqlc.arg(run_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY time ASC, id ASC;
 
 -- name: ListEventsByRunSince :many
 SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = sqlc.arg(run_id) AND id > sqlc.arg(id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY time ASC, id ASC;
 
 -- name: CreateEvent :one

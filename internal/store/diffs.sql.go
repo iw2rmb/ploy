@@ -121,18 +121,12 @@ SELECT
   created_at
 FROM diffs
 WHERE run_id = $1
-  AND ($2::boolean OR NOT $2::boolean)
 ORDER BY created_at ASC, id ASC
 `
 
-type ListDiffsByRunParams struct {
-	RunID        types.RunID `json:"run_id"`
-	MetadataOnly bool        `json:"metadata_only"`
-}
-
 // Returns diff metadata for a run.
-func (q *Queries) ListDiffsByRun(ctx context.Context, arg ListDiffsByRunParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsByRun, arg.RunID, arg.MetadataOnly)
+func (q *Queries) ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error) {
+	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +165,6 @@ SELECT
 FROM diffs d
 JOIN jobs j ON j.id = d.job_id
 WHERE d.run_id = $1 AND j.repo_id = $2
-  AND ($3::boolean OR NOT $3::boolean)
 ORDER BY
   CASE
     WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
@@ -182,16 +175,15 @@ ORDER BY
 `
 
 type ListDiffsByRunRepoParams struct {
-	RunID        types.RunID  `json:"run_id"`
-	RepoID       types.RepoID `json:"repo_id"`
-	MetadataOnly bool         `json:"metadata_only"`
+	RunID  types.RunID  `json:"run_id"`
+	RepoID types.RepoID `json:"repo_id"`
 }
 
 // Returns diffs for a specific repo execution within a run.
 // Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 // This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID, arg.MetadataOnly)
+	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID)
 	if err != nil {
 		return nil, err
 	}

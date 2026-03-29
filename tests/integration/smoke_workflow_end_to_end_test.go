@@ -278,10 +278,7 @@ index abc1234..def5678 100644
 	t.Logf("✓ Verified %d jobs with correct names", len(jobs))
 
 	// Verify logs are ordered and complete
-	logs, err := db.ListLogsByRun(ctx, store.ListLogsByRunParams{
-		MetadataOnly: false,
-		RunID:        run.ID,
-	})
+	logs, err := db.ListLogsByRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("ListLogsByRun() failed: %v", err)
 	}
@@ -306,9 +303,8 @@ index abc1234..def5678 100644
 
 	// Verify diffs are retrievable
 	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		MetadataOnly: false,
-		RunID:        run.ID,
-		RepoID:       jobMain.RepoID,
+		RunID:  run.ID,
+		RepoID: jobMain.RepoID,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)
@@ -330,10 +326,7 @@ index abc1234..def5678 100644
 	t.Logf("✓ Verified %d diff(s) with correct job association", len(diffs))
 
 	// Verify events are ordered chronologically
-	events, err := db.ListEventsByRun(ctx, store.ListEventsByRunParams{
-		RunID:        run.ID,
-		MetadataOnly: false,
-	})
+	events, err := db.ListEventsByRun(ctx, run.ID)
 	if err != nil {
 		t.Fatalf("ListEventsByRun() failed: %v", err)
 	}

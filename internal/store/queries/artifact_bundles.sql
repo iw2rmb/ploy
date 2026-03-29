@@ -7,14 +7,12 @@ WHERE id = $1;
 -- Returns artifact bundle metadata including object_key for object-storage retrieval.
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = sqlc.arg(run_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY created_at DESC, id DESC;
 
 -- name: ListArtifactBundlesByRunAndJob :many
 -- Returns artifact bundle metadata including object_key for object-storage retrieval.
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = sqlc.arg(run_id) AND job_id = sqlc.arg(job_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY created_at DESC, id DESC;
 
 -- name: CreateArtifactBundle :one
@@ -36,5 +34,4 @@ WHERE created_at < $1;
 -- Returns artifact bundle metadata including object_key for object-storage retrieval.
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE cid = sqlc.arg(cid)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY created_at DESC, id DESC;

@@ -154,14 +154,14 @@ type Querier interface {
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
-	ListArtifactBundlesByCID(ctx context.Context, arg ListArtifactBundlesByCIDParams) ([]ArtifactBundle, error)
+	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
-	ListArtifactBundlesByRun(ctx context.Context, arg ListArtifactBundlesByRunParams) ([]ArtifactBundle, error)
+	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns diff metadata for a run.
-	ListDiffsByRun(ctx context.Context, arg ListDiffsByRunParams) ([]Diff, error)
+	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
 	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
@@ -171,7 +171,7 @@ type Querier interface {
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
-	ListEventsByRun(ctx context.Context, arg ListEventsByRunParams) ([]Event, error)
+	ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
 	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mig.
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos
@@ -191,7 +191,7 @@ type Querier interface {
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	// Returns log metadata including object_key for object-storage retrieval.
-	ListLogsByRun(ctx context.Context, arg ListLogsByRunParams) ([]Log, error)
+	ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error)
 	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
 	// Returns log metadata including object_key for object-storage retrieval.
