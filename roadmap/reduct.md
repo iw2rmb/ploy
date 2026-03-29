@@ -217,21 +217,43 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **Actual LOC influence**: `+1797/-1297` in mock infrastructure (net `+500`); cross-domain method duplication (e.g., `GetRun` in `jobStore`, `runStore`, `migStore`) accounts for the difference from the estimated `-380`. The cognitive load per test is reduced: each store documents its domain scope through its field set.
     - **Test proof**: `go test ./internal/server/handlers` passes (288 tests, 0.45s); `go test ./internal/server/...` passes (all 9 packages).
 
-- [ ] 5.2 Create shared internal testkit for cross-module orchestration scenarios
+- [x] 5.2a Create `workflowkit` foundation for server/nodeagent orchestration recovery scenarios
   - Type: determined
-  - Component: `internal/testutil/workflowkit`, `internal/server/recovery`, `internal/nodeagent`, `internal/workflow/step`, `internal/store`, `internal/cli/follow`
+  - Component: `internal/testutil/workflowkit`, `internal/server/recovery`, `internal/nodeagent`
   - Implementation:
-    1. Add `internal/testutil/workflowkit` as the canonical owner for cross-module scenario builders only.
-    2. Route cross-module orchestration tests (claim/complete/recover/heal/gate-profile override) through `workflowkit`; keep local unit fixtures local.
-    3. Keep one canonical scenario per behavior path with explicit assertions.
+    1. Add `internal/testutil/workflowkit` as the canonical owner for cross-module run/repo/job scenario builders.
+    2. Route claim/complete/recover/heal orchestration tests in `internal/server/recovery` and `internal/nodeagent` through `workflowkit`.
+    3. Keep local unit fixtures local and reserve `workflowkit` for cross-module assembly only.
+    4. Delete duplicate recovery/orchestration builders superseded by `workflowkit` in these two modules.
+  - Verification:
+    1. Run `go test ./internal/server/recovery/... ./internal/nodeagent/... -run 'Claim|Complete|Recover|Heal'`.
+    2. Run `go test ./internal/server/recovery/... ./internal/nodeagent/...`.
+    3. Add structural proof in completion notes: workflowkit-owned recovery scenario builders and removed duplicate assembly paths.
+  - Estimated LOC influence: `+180/-110` (net `+70`) while centralizing cross-module recovery setup.
+  - Clarity / complexity check: Limits first migration slice to server/nodeagent recovery seams to keep ownership explicit.
+  - Reasoning: high (12 CFP)
+  - Completion notes:
+    - **New `internal/testutil/workflowkit` package** (2 files): `recovery_store.go` (~155 lines) — `RecoveryStore` implementing `store.Store` with configurable response fields and tracked-call fields; `AttemptKey` type (exported equivalent of the deleted `staleKey`). `scenario.go` (~20 lines) — `RunOrchestrationScenario` with `RunID`, `RepoID`, `JobID` fields; `NewRunOrchestrationScenario()` builder.
+    - **`RecoveryStore`** (`internal/testutil/workflowkit/recovery_store.go`): Implements all store methods used by server/recovery recovery cycle: `ListStaleRunningJobs`, `CountStaleNodesWithRunningJobs`, `CancelActiveJobsByRunRepoAttempt`, `ListJobsByRunRepoAttempt`, `UpdateRunRepoStatus`, `CountRunReposByStatus`, `GetRun`, `UpdateRunStatus`, `ListRunReposByRun`, `ListRunReposWithURLByRun`, `GetMigRepo`. Response fields configure return values; tracked-call fields (`StaleJobsParam`, `StaleNodeParam`, `GetRunCalled`, `CountStatusCalled`, `CancelCalls`, `UpdateRepoCalls`, `UpdateRunCalls`) record calls for assertions.
+    - **Duplicate `mockStore` removed** (`internal/server/recovery/stale_job_recovery_task_test.go`): Deleted local `staleKey` struct and `mockStore` struct with all 9 method implementations (~165 lines). All 4 test functions (`TestStaleJobRecoveryTask_Run_*`, `TestNewStaleJobRecoveryTask`) now construct `&workflowkit.RecoveryStore{...}` with exported fields. Assertion patterns updated: `st.listStaleRunningJobsCalled` → `st.StaleJobsParam.Valid`; `st.cancelCalls` → `st.CancelCalls`; `st.updateRunRepoStatusParams` → `st.UpdateRepoCalls`; `st.updateRunStatusParams` → `st.UpdateRunCalls`.
+    - **`RunOrchestrationScenario` routes crash-reconcile and claim tests** (`internal/nodeagent/crash_reconcile_test.go`, `internal/nodeagent/agent_claim_test.go`): Replaced inline `types.NewRunID()` / `types.NewJobID()` ID construction in 5 tests with `workflowkit.NewRunOrchestrationScenario()` — `TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract`, `TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus`, `TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal`, `TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures`, `TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease`. Local Docker mocks, `fakeDockerClient`, `mockRunController` remain in the nodeagent package (local unit fixtures, not cross-module assembly).
+    - **Test proof**: `go test ./internal/server/recovery/... ./internal/nodeagent/... -run 'Claim|Complete|Recover|Heal'` passes (all 4 packages); `go test ./internal/server/recovery/... ./internal/nodeagent/... -run 'Claim|Complete|Recover|Heal|Stale|Reconcile|Crash'` passes.
+
+- [ ] 5.2b Expand `workflowkit` to workflow/store/CLI follow orchestration and prune duplicate scenarios
+  - Type: determined
+  - Component: `internal/testutil/workflowkit`, `internal/workflow/step`, `internal/store`, `internal/cli/follow`
+  - Implementation:
+    1. Add `workflowkit` scenario builders for gate-profile override and follow-stream orchestration paths.
+    2. Route cross-module orchestration scenarios in `internal/workflow/step`, `internal/store`, and `internal/cli/follow` through `workflowkit` with explicit behavior assertions.
+    3. Keep one canonical scenario per behavior path and keep boundary-specific assertions in package-local tests.
     4. Delete redundant near-duplicate cross-module scenarios that provide no additional assertions.
   - Verification:
-    1. Run `go test ./internal/server/... ./internal/nodeagent/... ./internal/workflow/... ./internal/store/... ./internal/cli/follow/...`.
+    1. Run `go test ./internal/workflow/step/... ./internal/store/... ./internal/cli/follow/...`.
     2. Run `make test`.
-    3. Add structural proof in completion notes: removed duplicate cross-module builders/tests and workflowkit-only assembly paths.
-  - Estimated LOC influence: `+260/-170` (net `+90`) while reducing duplicated scenario setup.
-  - Clarity / complexity check: Scope is constrained to cross-module tests to prevent framework overreach.
-  - Reasoning: xhigh (19 CFP)
+    3. Add structural proof in completion notes: workflowkit-only cross-module assembly paths and removed duplicate scenario coverage.
+  - Estimated LOC influence: `+140/-120` (net `+20`) while collapsing duplicate orchestration coverage.
+  - Clarity / complexity check: Second slice extends coverage after foundation is stable without broadening `workflowkit` into unit-fixture territory.
+  - Reasoning: high (10 CFP)
 
 - [ ] 5.3 Add LOC and duplication guardrails to keep reductions from regressing
   - Type: determined

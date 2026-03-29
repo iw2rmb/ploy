@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/workflowkit"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -302,8 +303,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 	t.Parallel()
 
 	var claimCalls int32
-	jobID := types.NewJobID()
-	runID := types.NewRunID()
+	s := workflowkit.NewRunOrchestrationScenario()
 	waitGate := make(chan struct{})
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -313,7 +313,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
 			w.WriteHeader(http.StatusCreated)
-		case r.URL.Path == "/v1/jobs/"+jobID.String()+"/complete":
+		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
 			w.WriteHeader(http.StatusOK)
 		default:
 			http.NotFound(w, r)
@@ -340,7 +340,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 	}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
-		{ContainerID: "ctr-recovered", RunID: runID, JobID: jobID},
+		{ContainerID: "ctr-recovered", RunID: s.RunID, JobID: s.JobID},
 	})
 
 	claimDone := make(chan struct{})
