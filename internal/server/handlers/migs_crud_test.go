@@ -21,11 +21,12 @@ import (
 
 func TestMods_Create(t *testing.T) {
 	tests := []struct {
-		name       string
-		store      *migStore
-		body       any
-		wantStatus int
-		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		name        string
+		store       *migStore
+		body        any
+		wantStatus  int
+		wantNoCalls bool
+		verify      func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name:       "basic",
@@ -72,28 +73,7 @@ func TestMods_Create(t *testing.T) {
 				}
 			},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := createMigHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs", tt.body)
-			assertStatus(t, rr, tt.wantStatus)
-			if tt.verify != nil {
-				tt.verify(t, tt.store, rr)
-			}
-		})
-	}
-}
-
-func TestMods_Create_ErrorPaths(t *testing.T) {
-	tests := []struct {
-		name        string
-		store       *migStore
-		body        any
-		wantStatus  int
-		wantNoCalls bool
-	}{
+		// Error paths
 		{name: "empty name", store: &migStore{}, body: map[string]any{"name": ""}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
 		{name: "invalid name (spaces)", store: &migStore{}, body: map[string]any{"name": "my mig"}, wantStatus: http.StatusBadRequest, wantNoCalls: true},
 		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
@@ -112,6 +92,9 @@ func TestMods_Create_ErrorPaths(t *testing.T) {
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.wantNoCalls {
 				assertNotCalled(t, "CreateMig", tt.store.createMigCalled)
+			}
+			if tt.verify != nil {
+				tt.verify(t, tt.store, rr)
 			}
 		})
 	}

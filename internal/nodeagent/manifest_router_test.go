@@ -68,9 +68,9 @@ func TestBuildRouterManifest_PhaseAndLoopEnv(t *testing.T) {
 	}
 }
 
-// TestBuildRouterManifest_AmataCommand verifies amata command resolution
-// for router manifests: amata spec with set params, nil amata, empty spec.
-func TestBuildRouterManifest_AmataCommand(t *testing.T) {
+// TestBuildRouterManifest_AmataVsShellCommand verifies the router builder
+// picks amata command when spec is present and falls through to shell otherwise.
+func TestBuildRouterManifest_AmataVsShellCommand(t *testing.T) {
 	t.Parallel()
 
 	req := newStartRunRequest(
@@ -85,33 +85,16 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 		{
 			name: "amata spec selects amata command",
 			router: MigContainerSpec{
-				Image:   contracts.JobImage{Universal: "test/router:latest"},
-				Command: contracts.CommandSpec{Shell: "codex exec"},
-				Amata: &contracts.AmataRunSpec{
-					Spec: "task: route",
-					Set: []contracts.AmataSetParam{
-						{Param: "mode", Value: "classify"},
-						{Param: "strict", Value: "true"},
-					},
-				},
+				Image: contracts.JobImage{Universal: "test/router:latest"},
+				Amata: &contracts.AmataRunSpec{Spec: "task: route"},
 			},
-			wantCmd: []string{"amata", "run", "/in/amata.yaml", "--set", "mode=classify", "--set", "strict=true"},
+			wantCmd: []string{"amata", "run", "/in/amata.yaml"},
 		},
 		{
-			name: "nil amata uses direct command",
+			name: "nil amata uses shell command",
 			router: MigContainerSpec{
 				Image:   contracts.JobImage{Universal: "test/router:latest"},
 				Command: contracts.CommandSpec{Shell: "codex exec"},
-				Amata:   nil,
-			},
-			wantCmd: []string{"/bin/sh", "-c", "codex exec"},
-		},
-		{
-			name: "amata empty spec falls through to direct command",
-			router: MigContainerSpec{
-				Image:   contracts.JobImage{Universal: "test/router:latest"},
-				Command: contracts.CommandSpec{Shell: "codex exec"},
-				Amata:   &contracts.AmataRunSpec{Spec: ""},
 			},
 			wantCmd: []string{"/bin/sh", "-c", "codex exec"},
 		},
@@ -120,7 +103,6 @@ func TestBuildRouterManifest_AmataCommand(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
 			manifest, err := buildRouterManifest(req, tc.router, contracts.MigStackUnknown, types.JobTypePreGate, "healing")
 			if err != nil {
 				t.Fatalf("buildRouterManifest() error = %v", err)

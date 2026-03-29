@@ -404,9 +404,45 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 	}
 }
 
-// TestBuildHealingManifest_AmataCommand verifies amata command resolution
-// for healing manifests: amata spec, no set params, nil amata, empty spec.
-func TestBuildHealingManifest_AmataCommand(t *testing.T) {
+// TestResolveAmataCommand tests the shared amata command resolution used by
+// both healing and router manifest builders.
+func TestResolveAmataCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		amata   *contracts.AmataRunSpec
+		wantCmd []string
+	}{
+		{
+			name: "spec with set params",
+			amata: &contracts.AmataRunSpec{
+				Spec: "task: fix",
+				Set: []contracts.AmataSetParam{
+					{Param: "repo", Value: "myrepo"},
+					{Param: "env", Value: "prod"},
+				},
+			},
+			wantCmd: []string{"amata", "run", "/in/amata.yaml", "--set", "repo=myrepo", "--set", "env=prod"},
+		},
+		{
+			name:    "no set params",
+			amata:   &contracts.AmataRunSpec{Spec: "task: fix"},
+			wantCmd: []string{"amata", "run", "/in/amata.yaml"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assertCommandEqual(t, resolveAmataCommand(tc.amata), tc.wantCmd)
+		})
+	}
+}
+
+// TestBuildHealingManifest_AmataVsShellCommand verifies that the healing builder
+// picks amata command when spec is present and falls through to shell otherwise.
+func TestBuildHealingManifest_AmataVsShellCommand(t *testing.T) {
 	t.Parallel()
 
 	req := newStartRunRequest(
@@ -425,35 +461,20 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 			mig: MigContainerSpec{
 				Image:   testJobImage("migs-codex:latest"),
 				Command: contracts.CommandSpec{Shell: "codex exec"},
-				Amata: &contracts.AmataRunSpec{
-					Spec: "task: fix",
-					Set: []contracts.AmataSetParam{
-						{Param: "repo", Value: "myrepo"},
-						{Param: "env", Value: "prod"},
-					},
-				},
-			},
-			wantCmd: []string{"amata", "run", "/in/amata.yaml", "--set", "repo=myrepo", "--set", "env=prod"},
-		},
-		{
-			name: "amata no set params",
-			mig: MigContainerSpec{
-				Image: testJobImage("migs-codex:latest"),
-				Amata: &contracts.AmataRunSpec{Spec: "task: fix"},
+				Amata:   &contracts.AmataRunSpec{Spec: "task: fix"},
 			},
 			wantCmd: []string{"amata", "run", "/in/amata.yaml"},
 		},
 		{
-			name: "nil amata uses direct command",
+			name: "nil amata uses shell command",
 			mig: MigContainerSpec{
 				Image:   testJobImage("migs-codex:latest"),
 				Command: contracts.CommandSpec{Shell: "codex exec"},
-				Amata:   nil,
 			},
 			wantCmd: []string{"/bin/sh", "-c", "codex exec"},
 		},
 		{
-			name: "amata with empty spec falls through to direct command",
+			name: "empty amata spec uses shell command",
 			mig: MigContainerSpec{
 				Image:   testJobImage("migs-codex:latest"),
 				Command: contracts.CommandSpec{Shell: "codex exec"},
@@ -466,7 +487,6 @@ func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-
 			manifest, err := buildHealingManifest(req, tc.mig, 0, "", contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)

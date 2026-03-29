@@ -103,10 +103,12 @@ func TestMods_SetSpec(t *testing.T) {
 
 	tests := []struct {
 		name       string
+		store      *migStore // nil = default active mig store
 		body       any
 		wantStatus int
 		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
 	}{
+		// Success paths
 		{
 			name:       "success",
 			body:       map[string]any{"spec": validSpecBody()},
@@ -139,11 +141,44 @@ func TestMods_SetSpec(t *testing.T) {
 				}
 			},
 		},
+		// Error paths
+		{name: "missing spec", store: &migStore{}, body: map[string]any{"name": "no-spec"}, wantStatus: http.StatusBadRequest},
+		{name: "invalid spec", store: &migStore{}, body: map[string]any{"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}}}, wantStatus: http.StatusBadRequest},
+		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
+		{name: "mig not found", store: &migStore{getModErr: pgx.ErrNoRows}, body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusNotFound},
+		{
+			name: "archived mig",
+			store: &migStore{getModResult: store.Mig{
+				ID: "mod123", Name: "test-mig",
+				ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}},
+			body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusConflict,
+		},
+		{
+			name: "CreateSpec store error",
+			store: &migStore{
+				getModResult:  activeMig,
+				createSpecErr: errors.New("database connection failed"),
+			},
+			body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusInternalServerError,
+		},
+		{
+			name: "UpdateMigSpec store error",
+			store: func() *migStore {
+				st := &migStore{getModResult: activeMig}
+				st.updateModSpec.err = errors.New("database connection failed")
+				return st
+			}(),
+			body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &migStore{getModResult: activeMig}
+			st := tt.store
+			if st == nil {
+				st = &migStore{getModResult: activeMig}
+			}
 			handler := setMigSpecHandler(st)
 			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", tt.body, "mig_ref", "mod123")
 			assertStatus(t, rr, tt.wantStatus)
@@ -184,82 +219,3 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 	}
 }
 
-func TestMods_SetSpec_Errors(t *testing.T) {
-	tests := []struct {
-		name       string
-		store      *migStore
-		body       any
-		wantStatus int
-	}{
-		{
-			name:       "missing spec",
-			store:      &migStore{},
-			body:       map[string]any{"name": "no-spec"},
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "invalid spec",
-			store:      &migStore{},
-			body:       map[string]any{"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}}},
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "invalid JSON",
-			store:      &migStore{},
-			body:       "not json",
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "mig not found",
-			store:      &migStore{getModErr: pgx.ErrNoRows},
-			body:       map[string]any{"spec": validSpecBody()},
-			wantStatus: http.StatusNotFound,
-		},
-		{
-			name: "archived mig",
-			store: &migStore{
-				getModResult: store.Mig{
-					ID: "mod123", Name: "test-mig",
-					ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-				},
-			},
-			body:       map[string]any{"spec": validSpecBody()},
-			wantStatus: http.StatusConflict,
-		},
-		{
-			name: "CreateSpec store error",
-			store: &migStore{
-				getModResult: store.Mig{
-					ID: "mod123", Name: "test-mig",
-					ArchivedAt: pgtype.Timestamptz{Valid: false},
-				},
-				createSpecErr: errors.New("database connection failed"),
-			},
-			body:       map[string]any{"spec": validSpecBody()},
-			wantStatus: http.StatusInternalServerError,
-		},
-		{
-			name: "UpdateMigSpec store error",
-			store: func() *migStore {
-				st := &migStore{
-					getModResult: store.Mig{
-						ID: "mod123", Name: "test-mig",
-						ArchivedAt: pgtype.Timestamptz{Valid: false},
-					},
-				}
-				st.updateModSpec.err = errors.New("database connection failed")
-				return st
-			}(),
-			body:       map[string]any{"spec": validSpecBody()},
-			wantStatus: http.StatusInternalServerError,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			handler := setMigSpecHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", tt.body, "mig_ref", "mod123")
-			assertStatus(t, rr, tt.wantStatus)
-		})
-	}
-}

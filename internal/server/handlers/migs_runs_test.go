@@ -145,62 +145,41 @@ func TestModRuns_Create(t *testing.T) {
 }
 
 // =============================================================================
-// Validation Tests (table-driven)
+// Error Tests (validation + store errors, table-driven)
 // =============================================================================
 
-func TestModRuns_Create_ValidationErrors(t *testing.T) {
+func TestModRuns_Create_Errors(t *testing.T) {
 	tests := []struct {
 		name       string
-		store      *migStore
+		store      *migStore       // use directly when set
+		setupFn    func(*migStore) // applied to activeMigWithSpec when store is nil
 		body       any
 		wantStatus int
 	}{
-		{
-			name:       "InvalidMode",
-			store:      &migStore{},
-			body:       map[string]any{"repo_selector": map[string]any{"mode": "invalid"}},
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "ExplicitEmptyRepos",
-			store:      &migStore{},
-			body:       map[string]any{"repo_selector": map[string]any{"mode": "explicit", "repos": []string{}}},
-			wantStatus: http.StatusBadRequest,
-		},
-		{
-			name:       "ModNotFound",
-			store:      &migStore{getModErr: pgx.ErrNoRows},
-			body:       allReposSelector(),
-			wantStatus: http.StatusNotFound,
-		},
+		// Validation errors
+		{name: "InvalidMode", store: &migStore{}, body: map[string]any{"repo_selector": map[string]any{"mode": "invalid"}}, wantStatus: http.StatusBadRequest},
+		{name: "ExplicitEmptyRepos", store: &migStore{}, body: map[string]any{"repo_selector": map[string]any{"mode": "explicit", "repos": []string{}}}, wantStatus: http.StatusBadRequest},
+		{name: "InvalidJSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
+		{name: "ModNotFound", store: &migStore{getModErr: pgx.ErrNoRows}, body: allReposSelector(), wantStatus: http.StatusNotFound},
 		{
 			name: "ArchivedMod",
 			store: func() *migStore {
 				specID := domaintypes.SpecID("spec123")
 				return &migStore{
 					getModResult: store.Mig{
-						ID:         "mod123",
-						Name:       "test-mig",
-						SpecID:     &specID,
+						ID: "mod123", Name: "test-mig", SpecID: &specID,
 						ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 					},
 				}
 			}(),
-			body:       allReposSelector(),
-			wantStatus: http.StatusConflict,
+			body: allReposSelector(), wantStatus: http.StatusConflict,
 		},
 		{
 			name: "NoSpec",
 			store: &migStore{
-				getModResult: store.Mig{
-					ID:         "mod123",
-					Name:       "test-mig",
-					SpecID:     nil,
-					ArchivedAt: pgtype.Timestamptz{Valid: false},
-				},
+				getModResult: store.Mig{ID: "mod123", Name: "test-mig", SpecID: nil, ArchivedAt: pgtype.Timestamptz{Valid: false}},
 			},
-			body:       allReposSelector(),
-			wantStatus: http.StatusBadRequest,
+			body: allReposSelector(), wantStatus: http.StatusBadRequest,
 		},
 		{
 			name: "NoReposSelected",
@@ -210,80 +189,26 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 				st.listFailedRepoIDsByMod.val = []domaintypes.RepoID{}
 				return st
 			}(),
-			body:       map[string]any{"repo_selector": map[string]any{"mode": "failed"}},
-			wantStatus: http.StatusBadRequest,
+			body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}}, wantStatus: http.StatusBadRequest,
 		},
-		{
-			name:       "InvalidJSON",
-			store:      &migStore{},
-			body:       "not json",
-			wantStatus: http.StatusBadRequest,
-		},
+		// Store errors
+		{name: "GetMigError", setupFn: func(st *migStore) { st.getModErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "ListModReposError", setupFn: func(st *migStore) { st.listMigReposByModErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "CreateRunError", setupFn: func(st *migStore) { st.createRunErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "CreateRunRepoError", setupFn: func(st *migStore) { st.createRunRepoErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
+		{name: "ListFailedReposError", setupFn: func(st *migStore) { st.listFailedRepoIDsByMod.err = errors.New("database connection failed") }, body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}}, wantStatus: http.StatusInternalServerError},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			handler := createMigRunHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", tt.body, "mig_id", "mod123")
-			assertStatus(t, rr, tt.wantStatus)
-		})
-	}
-}
-
-// =============================================================================
-// Store Error Tests (table-driven)
-// =============================================================================
-
-func TestModRuns_Create_StoreErrors(t *testing.T) {
-	tests := []struct {
-		name    string
-		setupFn func(st *migStore)
-		body    any
-	}{
-		{
-			name:    "GetMigError",
-			setupFn: func(st *migStore) { st.getModErr = errors.New("database connection failed") },
-			body:    allReposSelector(),
-		},
-		{
-			name: "ListModReposError",
-			setupFn: func(st *migStore) {
-				st.listMigReposByModErr = errors.New("database connection failed")
-			},
-			body: allReposSelector(),
-		},
-		{
-			name: "CreateRunError",
-			setupFn: func(st *migStore) {
-				st.createRunErr = errors.New("database connection failed")
-			},
-			body: allReposSelector(),
-		},
-		{
-			name: "CreateRunRepoError",
-			setupFn: func(st *migStore) {
-				st.createRunRepoErr = errors.New("database connection failed")
-			},
-			body: allReposSelector(),
-		},
-		{
-			name: "ListFailedReposError",
-			setupFn: func(st *migStore) {
-				st.listFailedRepoIDsByMod.err = errors.New("database connection failed")
-			},
-			body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			specID := domaintypes.SpecID("spec123")
-			st := activeMigWithSpec(specID)
-			tt.setupFn(st)
-
+			st := tt.store
+			if st == nil {
+				st = activeMigWithSpec(domaintypes.SpecID("spec123"))
+				tt.setupFn(st)
+			}
 			handler := createMigRunHandler(st)
 			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", tt.body, "mig_id", "mod123")
-			assertStatus(t, rr, http.StatusInternalServerError)
+			assertStatus(t, rr, tt.wantStatus)
 		})
 	}
 }
