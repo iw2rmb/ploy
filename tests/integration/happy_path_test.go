@@ -225,7 +225,10 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	// Verify logs can be listed by run.
-	logs, err := db.ListLogsByRun(ctx, run.ID)
+	logs, err := db.ListLogsByRun(ctx, store.ListLogsByRunParams{
+		MetadataOnly: false,
+		RunID:        run.ID,
+	})
 	if err != nil {
 		t.Fatalf("ListLogsByRun() failed: %v", err)
 	}
@@ -249,7 +252,11 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	// Also verify ListLogsByRunSince returns only newer chunks.
-	logsSince, err := db.ListLogsByRunSince(ctx, store.ListLogsByRunSinceParams{RunID: run.ID, ID: log.ID})
+	logsSince, err := db.ListLogsByRunSince(ctx, store.ListLogsByRunSinceParams{
+		MetadataOnly: false,
+		RunID:        run.ID,
+		ID:           log.ID,
+	})
 	if err != nil {
 		t.Fatalf("ListLogsByRunSince() failed: %v", err)
 	}

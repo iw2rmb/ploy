@@ -276,7 +276,10 @@ index abc1234..def5678 100644
 	t.Logf("✓ Verified %d jobs with correct names", len(jobs))
 
 	// Verify logs are ordered and complete
-	logs, err := db.ListLogsByRun(ctx, run.ID)
+	logs, err := db.ListLogsByRun(ctx, store.ListLogsByRunParams{
+		MetadataOnly: false,
+		RunID:        run.ID,
+	})
 	if err != nil {
 		t.Fatalf("ListLogsByRun() failed: %v", err)
 	}
@@ -301,8 +304,9 @@ index abc1234..def5678 100644
 
 	// Verify diffs are retrievable
 	diffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		RunID:  run.ID,
-		RepoID: jobMain.RepoID,
+		MetadataOnly: false,
+		RunID:        run.ID,
+		RepoID:       jobMain.RepoID,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)

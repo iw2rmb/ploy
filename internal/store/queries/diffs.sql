@@ -21,9 +21,18 @@ WHERE created_at < $1;
 -- Returns diffs for a specific repo execution within a run.
 -- Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 -- This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
+SELECT
+  d.id,
+  d.run_id,
+  d.job_id,
+  d.patch_size,
+  d.object_key,
+  d.summary,
+  d.created_at
+FROM diffs d
 JOIN jobs j ON j.id = d.job_id
-WHERE d.run_id = $1 AND j.repo_id = $2
+WHERE d.run_id = sqlc.arg(run_id) AND j.repo_id = sqlc.arg(repo_id)
+  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY
   CASE
     WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
@@ -34,8 +43,17 @@ ORDER BY
 
 -- name: ListDiffsByRun :many
 -- Returns diff metadata for a run.
-SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
-WHERE run_id = $1
+SELECT
+  id,
+  run_id,
+  job_id,
+  patch_size,
+  object_key,
+  summary,
+  created_at
+FROM diffs
+WHERE run_id = sqlc.arg(run_id)
+  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY created_at ASC, id ASC;
 
 -- name: GetLatestDiffByJob :one

@@ -128,8 +128,9 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 
 		// Query diff metadata filtered by repo attribution.
 		diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
-			RunID:  runID,
-			RepoID: repoID,
+			MetadataOnly: false,
+			RunID:        runID,
+			RepoID:       repoID,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)

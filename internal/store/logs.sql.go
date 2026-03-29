@@ -89,14 +89,28 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 }
 
 const listLogsByRun = `-- name: ListLogsByRun :many
-SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
+SELECT
+  id,
+  run_id,
+  job_id,
+  chunk_no,
+  data_size,
+  object_key,
+  created_at
+FROM logs
 WHERE run_id = $1
+  AND ($2::boolean OR NOT $2::boolean)
 ORDER BY chunk_no ASC, id ASC
 `
 
+type ListLogsByRunParams struct {
+	RunID        types.RunID `json:"run_id"`
+	MetadataOnly bool        `json:"metadata_only"`
+}
+
 // Returns log metadata including object_key for object-storage retrieval.
-func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRun, runID)
+func (q *Queries) ListLogsByRun(ctx context.Context, arg ListLogsByRunParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRun, arg.RunID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -124,19 +138,29 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, 
 }
 
 const listLogsByRunAndJob = `-- name: ListLogsByRunAndJob :many
-SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
+SELECT
+  id,
+  run_id,
+  job_id,
+  chunk_no,
+  data_size,
+  object_key,
+  created_at
+FROM logs
 WHERE run_id = $1 AND job_id = $2
+  AND ($3::boolean OR NOT $3::boolean)
 ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndJobParams struct {
-	RunID types.RunID  `json:"run_id"`
-	JobID *types.JobID `json:"job_id"`
+	RunID        types.RunID  `json:"run_id"`
+	JobID        *types.JobID `json:"job_id"`
+	MetadataOnly bool         `json:"metadata_only"`
 }
 
 // Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunAndJob, arg.RunID, arg.JobID)
+	rows, err := q.db.Query(ctx, listLogsByRunAndJob, arg.RunID, arg.JobID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -164,20 +188,35 @@ func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJ
 }
 
 const listLogsByRunAndJobSince = `-- name: ListLogsByRunAndJobSince :many
-SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
+SELECT
+  id,
+  run_id,
+  job_id,
+  chunk_no,
+  data_size,
+  object_key,
+  created_at
+FROM logs
 WHERE run_id = $1 AND job_id = $2 AND id > $3
+  AND ($4::boolean OR NOT $4::boolean)
 ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndJobSinceParams struct {
-	RunID types.RunID  `json:"run_id"`
-	JobID *types.JobID `json:"job_id"`
-	ID    int64        `json:"id"`
+	RunID        types.RunID  `json:"run_id"`
+	JobID        *types.JobID `json:"job_id"`
+	ID           int64        `json:"id"`
+	MetadataOnly bool         `json:"metadata_only"`
 }
 
 // Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunAndJobSince, arg.RunID, arg.JobID, arg.ID)
+	rows, err := q.db.Query(ctx, listLogsByRunAndJobSince,
+		arg.RunID,
+		arg.JobID,
+		arg.ID,
+		arg.MetadataOnly,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -205,19 +244,29 @@ func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRu
 }
 
 const listLogsByRunSince = `-- name: ListLogsByRunSince :many
-SELECT id, run_id, job_id, chunk_no, data_size, object_key, created_at FROM logs
+SELECT
+  id,
+  run_id,
+  job_id,
+  chunk_no,
+  data_size,
+  object_key,
+  created_at
+FROM logs
 WHERE run_id = $1 AND id > $2
+  AND ($3::boolean OR NOT $3::boolean)
 ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunSinceParams struct {
-	RunID types.RunID `json:"run_id"`
-	ID    int64       `json:"id"`
+	RunID        types.RunID `json:"run_id"`
+	ID           int64       `json:"id"`
+	MetadataOnly bool        `json:"metadata_only"`
 }
 
 // Returns log metadata including object_key for object-storage retrieval.
 func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunSince, arg.RunID, arg.ID)
+	rows, err := q.db.Query(ctx, listLogsByRunSince, arg.RunID, arg.ID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -243,4 +292,3 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 	}
 	return items, nil
 }
-
