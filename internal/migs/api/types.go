@@ -3,16 +3,11 @@ package api
 import (
 	"time"
 
-	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Package api defines the Mods run and stage types shared by the CLI,
 // control plane (/v1/runs + /v1/migs/{id}*) and SSE hub. JSON tags mirror the wire shape.
-
-// RunSubmitRequest is the canonical request shape for POST /v1/runs.
-// Canonical definition lives in internal/domain/api; re-exported here for backward compatibility.
-type RunSubmitRequest = domainapi.RunSubmitRequest
 
 // StageState mirrors Mods stage lifecycle states exposed over the API.
 type StageState string

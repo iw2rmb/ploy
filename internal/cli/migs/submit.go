@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
+	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
@@ -20,7 +21,7 @@ import (
 type SubmitCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	Request modsapi.RunSubmitRequest
+	Request domainapi.RunSubmitRequest
 }
 
 // Run executes the submission against the control plane endpoint.
