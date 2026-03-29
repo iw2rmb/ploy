@@ -11,6 +11,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
+// testRunID and testJobID are fixed IDs used across upload tests to match mock servers.
+const (
+	testUploadRunID = "test-run-123"
+	testUploadJobID = "test-job-id"
+)
+
 func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 	t.Parallel()
 
@@ -77,8 +83,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, calls := newArtifactUploadServer(t, "test-run-123", "test-job-id")
-			controller := newTestController(t, newTestConfig(server.URL))
+			env := newUploadTestEnv(t, testUploadRunID, testUploadJobID)
 
 			workspace := t.TempDir()
 			populateTestFiles(t, workspace, tt.createFiles, "test")
@@ -89,34 +94,17 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 				populateTestFiles(t, outDir, tt.outDirFiles, "test")
 			}
 
-			typedOpts := RunOptions{
-				Artifacts: ArtifactOptions{
-					Paths: tt.artifactPaths,
-					Name:  "test-artifact",
-				},
-			}
-			req := newStartRunRequest(
-				withRunID("test-run-123"),
-				withJobID("test-job-id"),
-				withRunOptions(typedOpts),
-			)
-			manifest := contracts.StepManifest{
-				Image:   "test-image",
-				Command: []string{"test"},
-				Options: map[string]interface{}{
-					"job_id":        "test-job",
-					"artifact_name": "test-artifact",
-				},
-			}
+			opts := RunOptions{Artifacts: ArtifactOptions{Paths: tt.artifactPaths, Name: "test-artifact"}}
+			req := StartRunRequest{RunID: testUploadRunID, JobID: testUploadJobID}
 
-			controller.uploadConfiguredArtifacts(context.Background(), req, typedOpts, manifest, workspace, outDir)
+			env.Controller.uploadConfiguredArtifacts(context.Background(), req, opts, contracts.StepManifest{}, workspace, outDir)
 
-			assertUploadOccurred(t, calls, tt.wantUpload)
+			assertUploadOccurred(t, env.Calls, tt.wantUpload)
 			if tt.wantUpload {
-				assertArtifactName(t, calls, 0, "test-artifact")
+				assertArtifactName(t, env.Calls, 0, "test-artifact")
 			}
 			if len(tt.wantHeaders) > 0 {
-				assertTarContains(t, (*calls)[0].Bundle, tt.wantHeaders)
+				assertTarContains(t, (*env.Calls)[0].Bundle, tt.wantHeaders)
 			}
 		})
 	}
@@ -138,15 +126,18 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			name:        "directory with files triggers upload",
 			createFiles: []string{"result.txt", "subdir/output.log"},
 			wantUpload:  true,
+			bundleName:  "mig-out",
 			wantHeaders: []string{"out/result.txt", "out/subdir/output.log"},
 		},
 		{
 			name:       "empty directory skips upload",
+			bundleName: "mig-out",
 			wantUpload: false,
 		},
 		{
 			name:        "empty outDir string skips upload",
 			emptyOutDir: true,
+			bundleName:  "mig-out",
 			wantUpload:  false,
 		},
 		{
@@ -162,8 +153,7 @@ func TestRunController_uploadOutDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, calls := newArtifactUploadServer(t, "test-run", "test-stage")
-			controller := newTestController(t, newTestConfig(server.URL))
+			env := newUploadTestEnv(t, "test-run", "test-stage")
 
 			outDir := ""
 			if !tt.emptyOutDir {
@@ -171,19 +161,15 @@ func TestRunController_uploadOutDir(t *testing.T) {
 				populateTestFiles(t, outDir, tt.createFiles, "test output")
 			}
 
-			bundleName := tt.bundleName
-			if bundleName == "" {
-				bundleName = "mig-out"
-			}
-			err := controller.uploadOutDirBundle(context.Background(), "test-run", "test-stage", outDir, bundleName)
+			err := env.Controller.uploadOutDirBundle(context.Background(), "test-run", "test-stage", outDir, tt.bundleName)
 
 			checkErr(t, tt.wantErr, err)
-			assertUploadOccurred(t, calls, tt.wantUpload)
-			if tt.bundleName != "" && len(*calls) > 0 {
-				assertArtifactName(t, calls, 0, tt.bundleName)
+			assertUploadOccurred(t, env.Calls, tt.wantUpload)
+			if tt.wantUpload {
+				assertArtifactName(t, env.Calls, 0, tt.bundleName)
 			}
 			if len(tt.wantHeaders) > 0 {
-				assertTarContains(t, (*calls)[0].Bundle, tt.wantHeaders)
+				assertTarContains(t, (*env.Calls)[0].Bundle, tt.wantHeaders)
 			}
 		})
 	}
@@ -279,24 +265,14 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, calls := newArtifactUploadServer(t, "test-run", "test-stage", withArtifactStatus(tt.serverStatus))
-			controller := newTestController(t, newTestConfig(server.URL))
+			env := newUploadTestEnv(t, "test-run", "test-stage", withArtifactStatus(tt.serverStatus))
 
 			phase := &types.RunStatsGatePhase{}
-			controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, phase)
+			env.Controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, phase)
 
+			assertGatePhaseIDs(t, phase, tt.wantArtifactID)
 			if tt.wantArtifactID {
-				if phase.LogsArtifactID == "" {
-					t.Error("LogsArtifactID not set in gate phase")
-				}
-				if phase.LogsBundleCID == "" {
-					t.Error("LogsBundleCID not set in gate phase")
-				}
-				assertArtifactName(t, calls, 0, tt.wantArtifactName)
-			} else {
-				if phase.LogsArtifactID != "" {
-					t.Error("LogsArtifactID should not be set on upload failure")
-				}
+				assertArtifactName(t, env.Calls, 0, tt.wantArtifactName)
 			}
 		})
 	}
@@ -305,11 +281,6 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 	t.Parallel()
 
-	type wantLink struct {
-		Type string
-		Path string
-	}
-
 	tests := []struct {
 		name            string
 		tool            string
@@ -317,7 +288,7 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 		outDirFiles     map[string]string // path -> content
 		wantUploadCount int
 		wantNames       []string
-		wantLinks       []wantLink
+		wantLinks       []wantReportLink
 	}{
 		{
 			name:     "gradle gate uploads junit xml and html report",
@@ -332,7 +303,7 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 				"build-gate-gradle-junit-xml",
 				"build-gate-gradle-html-report",
 			},
-			wantLinks: []wantLink{
+			wantLinks: []wantReportLink{
 				{Type: contracts.BuildGateReportTypeGradleJUnitXML, Path: "/out/gradle-test-results"},
 				{Type: contracts.BuildGateReportTypeGradleHTML, Path: "/out/gradle-test-report"},
 			},
@@ -349,8 +320,7 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			server, calls := newArtifactUploadServer(t, "test-run", "test-gate")
-			controller := newTestController(t, newTestConfig(server.URL))
+			env := newUploadTestEnv(t, "test-run", "test-gate")
 
 			workspace := t.TempDir()
 			if len(tt.outDirFiles) > 0 {
@@ -372,12 +342,11 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 				}},
 			}
 
-			controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", workspace, meta)
+			env.Controller.uploadGateReportArtifacts(context.Background(), "test-run", "test-gate", workspace, meta)
 
-			if len(*calls) != tt.wantUploadCount {
-				t.Fatalf("upload call count = %d, want %d", len(*calls), tt.wantUploadCount)
+			if len(*env.Calls) != tt.wantUploadCount {
+				t.Fatalf("upload call count = %d, want %d", len(*env.Calls), tt.wantUploadCount)
 			}
-
 			if tt.wantUploadCount == 0 {
 				if len(meta.ReportLinks) != 0 {
 					t.Fatalf("expected no report links, got %+v", meta.ReportLinks)
@@ -385,37 +354,8 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 				return
 			}
 
-			// Verify artifact names.
-			seen := make(map[string]bool, len(tt.wantNames))
-			for _, c := range *calls {
-				seen[c.Name] = true
-			}
-			for _, name := range tt.wantNames {
-				if !seen[name] {
-					t.Fatalf("expected artifact upload name %q", name)
-				}
-			}
-
-			// Verify report links.
-			if len(meta.ReportLinks) != len(tt.wantLinks) {
-				t.Fatalf("report_links count = %d, want %d", len(meta.ReportLinks), len(tt.wantLinks))
-			}
-			linkByType := make(map[string]contracts.BuildGateReportLink, len(meta.ReportLinks))
-			for _, link := range meta.ReportLinks {
-				linkByType[link.Type] = link
-			}
-			for _, wl := range tt.wantLinks {
-				link, ok := linkByType[wl.Type]
-				if !ok {
-					t.Fatalf("missing report link type %q in %+v", wl.Type, meta.ReportLinks)
-				}
-				if link.Path != wl.Path {
-					t.Fatalf("%s link path = %q, want %q", wl.Type, link.Path, wl.Path)
-				}
-				if link.ArtifactID == "" || link.BundleCID == "" || link.URL == "" || link.DownloadURL == "" {
-					t.Fatalf("expected populated link fields, got %+v", link)
-				}
-			}
+			assertArtifactNames(t, env.Calls, tt.wantNames)
+			assertReportLinks(t, meta.ReportLinks, tt.wantLinks)
 		})
 	}
 }

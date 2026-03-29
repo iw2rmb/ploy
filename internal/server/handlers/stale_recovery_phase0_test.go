@@ -17,9 +17,8 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &jobStore{
-		cancelActiveJobsByRunRepoAttemptResult: 2,
-	}
+	st := &jobStore{}
+	st.cancelActiveJobsByRunRepoAttempt.val = 2
 	st.listStaleRunningJobs.val = []store.ListStaleRunningJobsRow{
 		{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 2},
 		}
@@ -58,19 +57,19 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 	if !st.listStaleRunningJobs.called {
 		t.Fatal("expected ListStaleRunningJobs to be called")
 	}
-	if !st.cancelActiveJobsByRunRepoAttemptCalled {
+	if !st.cancelActiveJobsByRunRepoAttempt.called {
 		t.Fatal("expected CancelActiveJobsByRunRepoAttempt to be called")
 	}
-	if !st.updateRunRepoStatusCalled {
+	if !st.updateRunRepoStatus.called {
 		t.Fatal("expected UpdateRunRepoStatus to be called during stale recovery")
 	}
 	if !st.updateRunStatus.called {
 		t.Fatal("expected UpdateRunStatus to be called when all repos are terminal")
 	}
-	if len(st.updateRunRepoStatusParams) == 0 {
+	if len(st.updateRunRepoStatus.calls) == 0 {
 		t.Fatal("expected at least one UpdateRunRepoStatus call")
 	}
-	if got := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1].Status; got != domaintypes.RunRepoStatusCancelled {
+	if got := st.updateRunRepoStatus.calls[len(st.updateRunRepoStatus.calls)-1].Status; got != domaintypes.RunRepoStatusCancelled {
 		t.Fatalf("run repo status=%q, want %q", got, domaintypes.RunRepoStatusCancelled)
 	}
 	if st.updateRunStatus.params.Status != domaintypes.RunStatusFinished {
@@ -85,9 +84,8 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 
-	st := &jobStore{
-		cancelActiveJobsByRunRepoAttemptResult: 1,
-	}
+	st := &jobStore{}
+	st.cancelActiveJobsByRunRepoAttempt.val = 1
 	st.listStaleRunningJobs.val = []store.ListStaleRunningJobsRow{
 		{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1},
 		}
@@ -124,7 +122,7 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	if !st.updateRunRepoStatusCalled {
+	if !st.updateRunRepoStatus.called {
 		t.Fatal("expected stale repo attempt status update")
 	}
 	if st.updateRunStatus.called {

@@ -121,14 +121,14 @@ func buildHealingSpec(t *testing.T, retries int, opts ...healingSpecOpt) []byte 
 // successor was cancelled with the given ID.
 func assertCancelsSuccessor(t *testing.T, st *jobStore, successorID domaintypes.JobID) {
 	t.Helper()
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no healing jobs, got %d CreateJob calls", st.createJobCallCount)
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no healing jobs, got %d CreateJob calls", len(st.createJob.calls))
 	}
-	if len(st.updateJobStatusCalls) != 1 {
-		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatusCalls))
+	if len(st.updateJobStatus.calls) != 1 {
+		t.Fatalf("expected one cancelled successor, got %d calls", len(st.updateJobStatus.calls))
 	}
-	if st.updateJobStatusCalls[0].ID != successorID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
-		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatusCalls[0])
+	if st.updateJobStatus.calls[0].ID != successorID || st.updateJobStatus.calls[0].Status != domaintypes.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation params: %+v", st.updateJobStatus.calls[0])
 	}
 }
 

@@ -74,8 +74,8 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	if !st.createSpecCalled || !st.createMigCalled || !st.createMigRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
 		t.Fatalf("expected spec/mig/repo/run creation calls to be made")
 	}
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no jobs on submission, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no jobs on submission, got %d", len(st.createJob.calls))
 	}
 }
 
@@ -147,7 +147,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 				t.Fatalf("createJobsFromSpec failed: %v", err)
 			}
 
-			assertJobChain(t, st.createJobParams, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, tt.expected)
+			assertJobChain(t, st.createJob.calls, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, tt.expected)
 		})
 	}
 }
@@ -197,13 +197,13 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				t.Fatalf("createJobsFromSpec failed: %v", err)
 			}
 
-			if st.createJobCallCount != tc.expectedJobs {
-				t.Fatalf("expected %d jobs, got %d", tc.expectedJobs, st.createJobCallCount)
+			if len(st.createJob.calls) != tc.expectedJobs {
+				t.Fatalf("expected %d jobs, got %d", tc.expectedJobs, len(st.createJob.calls))
 			}
 
 			// Count jobs with Queued status — exactly one should be Queued.
 			queuedCount := 0
-			for _, p := range st.createJobParams {
+			for _, p := range st.createJob.calls {
 				if p.Status == domaintypes.JobStatusQueued {
 					queuedCount++
 				}
@@ -213,13 +213,13 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
 			}
 
-			byName := createJobsByName(st.createJobParams)
+			byName := createJobsByName(st.createJob.calls)
 			if byName["pre-gate"].Status != domaintypes.JobStatusQueued {
 				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 			}
 
 			// Verify all non-head jobs are Created.
-			for _, p := range st.createJobParams {
+			for _, p := range st.createJob.calls {
 				if p.Name == "pre-gate" {
 					continue
 				}
@@ -243,7 +243,7 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 	}
 
 	// Verify chain ordering by name: pre-gate -> mig-0 -> mig-1 -> post-gate.
-	byName := createJobsByName(st.createJobParams)
+	byName := createJobsByName(st.createJob.calls)
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
 	mig1 := byName["mig-1"]
@@ -274,8 +274,8 @@ func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) 
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	inserted := make(map[domaintypes.JobID]struct{}, len(st.createJobParams))
-	for i, p := range st.createJobParams {
+	inserted := make(map[domaintypes.JobID]struct{}, len(st.createJob.calls))
+	for i, p := range st.createJob.calls {
 		if p.NextID != nil {
 			if _, ok := inserted[*p.NextID]; !ok {
 				t.Fatalf("insert %d (%s) references next_id %s before it was inserted", i, p.Name, *p.NextID)

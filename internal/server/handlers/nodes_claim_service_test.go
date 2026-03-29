@@ -17,9 +17,8 @@ func TestClaimService_Claim_ReturnsNoWorkWhenQueueEmpty(t *testing.T) {
 	t.Parallel()
 
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-	st := &jobStore{
-		claimJobErr:   pgx.ErrNoRows,
-	}
+	st := &jobStore{}
+	st.claimJob.err = pgx.ErrNoRows
 	st.getNode.val = store.Node{ID: nodeID}
 
 	svc := NewClaimService(st, &ConfigHolder{}, nil)
@@ -41,18 +40,6 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 	now := time.Now().UTC()
 
 	st := &jobStore{
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        "mig-0",
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeMod,
-			Meta:        []byte(`{}`),
-		},
 		getRunRepoResult: store.RunRepo{
 			RunID:         runID,
 			RepoID:        repoID,
@@ -71,13 +58,25 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"img"}]}`)}
+	st.claimJob.val = store.Job{
+		ID:          jobID,
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeID,
+		Name:        "mig-0",
+		Status:      domaintypes.JobStatusRunning,
+		JobType:     domaintypes.JobTypeMod,
+		Meta:        []byte(`{}`),
+	}
 
 	svc := NewClaimService(st, &ConfigHolder{}, nil)
 	result, err := svc.Claim(context.Background(), nodeID)
 	if err != nil {
 		t.Fatalf("Claim() error = %v", err)
 	}
-	if !st.updateRunRepoStatusCalled {
+	if !st.updateRunRepoStatus.called {
 		t.Fatal("expected UpdateRunRepoStatus to be called")
 	}
 	if result.Payload.JobID != jobID {

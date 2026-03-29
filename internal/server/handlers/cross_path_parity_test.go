@@ -102,12 +102,12 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 
 			// UpdateJobStatus is called by cancelRemainingJobsAfterFailure when a non-terminal
 			// successor exists. Its presence or absence locks the CancelRemainder/NoAction branch.
-			if tc.wantCancelSuccessor != st.updateJobStatusCalled {
+			if tc.wantCancelSuccessor != st.updateJobStatus.called {
 				t.Fatalf("UpdateJobStatus called = %v, want %v (err=%v → status=%s, jobType=%s)",
-					st.updateJobStatusCalled, tc.wantCancelSuccessor, tc.err, status, tc.jobType)
+					st.updateJobStatus.called, tc.wantCancelSuccessor, tc.err, status, tc.jobType)
 			}
 			// AdvanceNext is not expected for any error-originated status.
-			if st.promoteJobByIDIfUnblockedCalled {
+			if st.promoteJobByIDIfUnblocked.called {
 				t.Fatalf("PromoteJobByIDIfUnblocked unexpectedly called (err=%v → status=%s)", tc.err, status)
 			}
 		})
@@ -243,15 +243,15 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			}
 
 			// updateJobStatusCalled signals that cancelRemainingJobsAfterFailure cancelled a successor.
-			if tc.wantCancelSuccessor != st.updateJobStatusCalled {
+			if tc.wantCancelSuccessor != st.updateJobStatus.called {
 				t.Fatalf("UpdateJobStatus called = %v, want %v (jobType=%s status=%s — CancelRemainder path?)",
-					st.updateJobStatusCalled, tc.wantCancelSuccessor, tc.jobType, tc.status)
+					st.updateJobStatus.called, tc.wantCancelSuccessor, tc.jobType, tc.status)
 			}
 
 			// promoteJobByIDIfUnblockedCalled signals that the AdvanceNext path was taken.
-			if tc.wantAdvanceNext != st.promoteJobByIDIfUnblockedCalled {
+			if tc.wantAdvanceNext != st.promoteJobByIDIfUnblocked.called {
 				t.Fatalf("PromoteJobByIDIfUnblocked called = %v, want %v (jobType=%s status=%s)",
-					st.promoteJobByIDIfUnblockedCalled, tc.wantAdvanceNext, tc.jobType, tc.status)
+					st.promoteJobByIDIfUnblocked.called, tc.wantAdvanceNext, tc.jobType, tc.status)
 			}
 		})
 	}

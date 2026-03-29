@@ -644,3 +644,98 @@ func buildManifestDefault(req StartRunRequest) (contracts.StepManifest, error) {
 func buildManifestAtStep(req StartRunRequest, step int) (contracts.StepManifest, error) {
 	return buildManifestFromRequest(req, req.TypedOptions, step, contracts.MigStackUnknown)
 }
+
+// ---------------------------------------------------------------------------
+// Upload test environment
+// ---------------------------------------------------------------------------
+
+// uploadTestEnv bundles the artifact upload mock server, its call recorder,
+// and the runController — the trio that every upload test needs.
+type uploadTestEnv struct {
+	Controller *runController
+	Calls      *[]artifactUploadCall
+}
+
+// newUploadTestEnv creates a mock artifact-upload server for the given
+// runID/jobID pair and a runController wired to it.
+func newUploadTestEnv(t *testing.T, runID, jobID string, opts ...artifactServerOption) uploadTestEnv {
+	t.Helper()
+	server, calls := newArtifactUploadServer(t, runID, jobID, opts...)
+	controller := newTestController(t, newTestConfig(server.URL))
+	return uploadTestEnv{Controller: controller, Calls: calls}
+}
+
+// ---------------------------------------------------------------------------
+// Upload assertion helpers
+// ---------------------------------------------------------------------------
+
+// assertGatePhaseIDs verifies that LogsArtifactID and LogsBundleCID on a
+// RunStatsGatePhase are populated (when wantSet is true) or empty (when false).
+func assertGatePhaseIDs(t *testing.T, phase *types.RunStatsGatePhase, wantSet bool) {
+	t.Helper()
+	if wantSet {
+		if phase.LogsArtifactID == "" {
+			t.Error("LogsArtifactID not set in gate phase")
+		}
+		if phase.LogsBundleCID == "" {
+			t.Error("LogsBundleCID not set in gate phase")
+		}
+	} else {
+		if phase.LogsArtifactID != "" {
+			t.Error("LogsArtifactID should not be set on upload failure")
+		}
+		if phase.LogsBundleCID != "" {
+			t.Error("LogsBundleCID should not be set on upload failure")
+		}
+	}
+}
+
+// assertArtifactNames verifies that every name in wantNames appears among the
+// recorded artifact upload calls (order-independent).
+func assertArtifactNames(t *testing.T, calls *[]artifactUploadCall, wantNames []string) {
+	t.Helper()
+	seen := make(map[string]bool, len(*calls))
+	for _, c := range *calls {
+		seen[c.Name] = true
+	}
+	for _, name := range wantNames {
+		if !seen[name] {
+			got := make([]string, 0, len(*calls))
+			for _, c := range *calls {
+				got = append(got, c.Name)
+			}
+			t.Fatalf("expected artifact upload name %q; got %v", name, got)
+		}
+	}
+}
+
+// wantReportLink describes an expected BuildGateReportLink for assertion.
+type wantReportLink struct {
+	Type string
+	Path string
+}
+
+// assertReportLinks verifies that links contains exactly the expected entries
+// (matched by Type), each with the correct Path and non-empty ID fields.
+func assertReportLinks(t *testing.T, links []contracts.BuildGateReportLink, want []wantReportLink) {
+	t.Helper()
+	if len(links) != len(want) {
+		t.Fatalf("report_links count = %d, want %d", len(links), len(want))
+	}
+	linkByType := make(map[string]contracts.BuildGateReportLink, len(links))
+	for _, link := range links {
+		linkByType[link.Type] = link
+	}
+	for _, wl := range want {
+		link, ok := linkByType[wl.Type]
+		if !ok {
+			t.Fatalf("missing report link type %q in %+v", wl.Type, links)
+		}
+		if link.Path != wl.Path {
+			t.Fatalf("%s link path = %q, want %q", wl.Type, link.Path, wl.Path)
+		}
+		if link.ArtifactID == "" || link.BundleCID == "" || link.URL == "" || link.DownloadURL == "" {
+			t.Fatalf("expected populated link fields, got %+v", link)
+		}
+	}
+}
