@@ -32,7 +32,7 @@
 [migrate_test.go](migrate_test.go) Tests schema migration runner, version table setup, and version detection.
 [migrations.go](migrations.go) Migration/version orchestration over embedded schema for store initialization.
 [migs.sql.go](migs.sql.go) sqlc-generated v1 migration entity queries and filters.
-[minio_reference_guard_test.go](minio_reference_guard_test.go) Guard test that fails on MinIO mentions outside an explicit allowlist of historical docs.
+[minio_reference_guard_test.go](minio_reference_guard_test.go) Guard test that fails if new MinIO mentions appear outside the small historical allowlist.
 [models.go](models.go) sqlc-generated row/param model types shared by generated queries.
 [node_metrics_heartbeat_test.go](node_metrics_heartbeat_test.go) Validates node heartbeat updates and metrics history append behavior.
 [nodes.sql.go](nodes.sql.go) sqlc-generated node heartbeat, liveness, and node metadata queries.
