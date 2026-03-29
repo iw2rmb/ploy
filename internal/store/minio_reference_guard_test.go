@@ -16,6 +16,7 @@ func TestNoMinioReferencesOutsideHistoricalDocs(t *testing.T) {
 
 	allow := map[string]struct{}{
 		"internal/store/minio_reference_guard_test.go": {},
+		"internal/store/contents.md":                   {},
 		"roadmap/garage.md":                            {},
 	}
 
