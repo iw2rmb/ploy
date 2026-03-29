@@ -14,7 +14,6 @@ func resolveORWCLIScript(t *testing.T) string {
 	t.Helper()
 	root := repoRoot(t)
 	candidates := []string{
-		filepath.Join(root, "deploy", "images", "mig", "orw-cli", "orw-cli.sh"),
 		filepath.Join(root, "deploy", "images", "mig", "orw-cli-maven", "orw-cli.sh"),
 		filepath.Join(root, "deploy", "images", "mig", "orw-cli-gradle", "orw-cli.sh"),
 	}
