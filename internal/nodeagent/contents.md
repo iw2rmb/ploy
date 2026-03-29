@@ -1,5 +1,3 @@
-[git/](git) Git helpers for workspace status, commit/push operations, SHA lookup, and secret redaction used by job execution.
-[gitlab/](gitlab) GitLab client and config helpers for merge-request creation with validation, retry, and credential-safe error handling.
 [agent.go](agent.go) Top-level node agent bootstrap that wires HTTP server, heartbeat, claim loop, TLS bootstrap, and lifecycle shutdown.
 [agent_bootstrap_test.go](agent_bootstrap_test.go) Unit tests covering agent bootstrap behavior, edge cases, and contract expectations for nodeagent flows.
 [agent_claim_test.go](agent_claim_test.go) Unit tests covering agent claim behavior, edge cases, and contract expectations for nodeagent flows.
@@ -56,7 +54,9 @@
 [execution_orchestrator_tmpbundle_test.go](execution_orchestrator_tmpbundle_test.go) Unit tests covering execution orchestrator tmpbundle behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_rehydrate_test.go](execution_rehydrate_test.go) Unit tests covering execution rehydrate behavior, edge cases, and contract expectations for nodeagent flows.
 [gate_context.go](gate_context.go) Gate execution context structures and helpers used to pass gate-profile and decision state across phases.
+[git/](git) Git helpers for workspace status, commit/push operations, SHA lookup, and secret redaction used by job execution.
 [git_test_helpers_test.go](git_test_helpers_test.go) Unit tests covering git test helpers behavior, edge cases, and contract expectations for nodeagent flows.
+[gitlab/](gitlab) GitLab client and config helpers for merge-request creation with validation, retry, and credential-safe error handling.
 [handlers.go](handlers.go) HTTP handlers that expose node control endpoints for run start/stop and related control-plane interactions.
 [handlers_test.go](handlers_test.go) Unit tests covering handlers behavior, edge cases, and contract expectations for nodeagent flows.
 [heartbeat.go](heartbeat.go) Heartbeat manager that reports node liveness to the control plane with retry/backoff and timing controls.
