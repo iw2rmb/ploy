@@ -22,11 +22,7 @@ type jobStore struct {
 	getJobResults map[types.JobID]store.Job
 	getJobErr     error
 
-	createJobCalled    bool
-	createJobCallCount int
-	createJobParams    []store.CreateJobParams
-	createJobResult    store.Job
-	createJobErr       error
+	createJob mockCallSlice[store.CreateJobParams, store.Job]
 
 	listJobsByRunCalled bool
 	listJobsByRunParam  string
@@ -36,10 +32,7 @@ type jobStore struct {
 	listJobsByRunRepoAttempt mockCall[store.ListJobsByRunRepoAttemptParams, []store.Job]
 
 	// Job status/completion
-	updateJobStatusCalled bool
-	updateJobStatusParams store.UpdateJobStatusParams
-	updateJobStatusCalls  []store.UpdateJobStatusParams
-	updateJobStatusErr    error
+	updateJobStatus mockCallSlice[store.UpdateJobStatusParams, struct{}]
 
 	updateJobCompletion         mockCall[store.UpdateJobCompletionParams, struct{}]
 	updateJobCompletionWithMeta mockCall[store.UpdateJobCompletionWithMetaParams, struct{}]
@@ -51,15 +44,8 @@ type jobStore struct {
 	updateJobNextIDErr    error
 
 	// Job scheduling/promotion
-	scheduleNextJobCalled bool
-	scheduleNextJobParam  store.ScheduleNextJobParams
-	scheduleNextJobResult store.Job
-	scheduleNextJobErr    error
-
-	promoteJobByIDIfUnblockedCalled bool
-	promoteJobByIDIfUnblockedParam  types.JobID
-	promoteJobByIDIfUnblockedResult store.Job
-	promoteJobByIDIfUnblockedErr    error
+	scheduleNextJob          mockCall[store.ScheduleNextJobParams, store.Job]
+	promoteJobByIDIfUnblocked mockCall[types.JobID, store.Job]
 
 	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
 	promoteReGateRecoveryCandidateGateProfileErr    error
@@ -76,10 +62,7 @@ type jobStore struct {
 	countJobsForTUI mockCall[*types.RunID, int64]
 
 	// Claiming
-	claimJobCalled bool
-	claimJobParams types.NodeID
-	claimJobResult store.Job
-	claimJobErr    error
+	claimJob mockCall[types.NodeID, store.Job]
 
 	claimRun mockResult[store.Run]
 
@@ -88,24 +71,14 @@ type jobStore struct {
 	hasSBOMEvidenceForStack mockResult[bool]
 	deleteSBOMRowsByJob     mockCall[types.JobID, struct{}]
 
-	upsertSBOMRowCalled bool
-	upsertSBOMRowParams []store.UpsertSBOMRowParams
-	upsertSBOMRowErr    error
+	upsertSBOMRow mockCallSlice[store.UpsertSBOMRowParams, struct{}]
 
 	// Stack/Gate profile resolution
-	resolveStackRowByImageResult store.ResolveStackRowByImageRow
-	resolveStackRowByImageErr    error
+	resolveStackRowByImage            mockResult[store.ResolveStackRowByImageRow]
+	resolveStackRowByLangTool         mockResult[store.ResolveStackRowByLangToolRow]
+	resolveStackRowByLangToolRelease  mockResult[store.ResolveStackRowByLangToolReleaseRow]
 
-	resolveStackRowByLangToolResult store.ResolveStackRowByLangToolRow
-	resolveStackRowByLangToolErr    error
-
-	resolveStackRowByLangToolReleaseResult store.ResolveStackRowByLangToolReleaseRow
-	resolveStackRowByLangToolReleaseErr    error
-
-	upsertExactGateProfileCalled bool
-	upsertExactGateProfileParam  store.UpsertExactGateProfileParams
-	upsertExactGateProfileResult store.UpsertExactGateProfileRow
-	upsertExactGateProfileErr    error
+	upsertExactGateProfile mockCall[store.UpsertExactGateProfileParams, store.UpsertExactGateProfileRow]
 
 	upsertGateJobProfileLink mockCall[store.UpsertGateJobProfileLinkParams, struct{}]
 
@@ -137,9 +110,7 @@ type jobStore struct {
 	getRunRepoCalls   int
 	getRunRepoErr     error
 
-	updateRunRepoStatusCalled bool
-	updateRunRepoStatusParams []store.UpdateRunRepoStatusParams
-	updateRunRepoStatusErr    error
+	updateRunRepoStatus mockCallSlice[store.UpdateRunRepoStatusParams, struct{}]
 
 	updateRunRepoError      mockCall[store.UpdateRunRepoErrorParams, struct{}]
 	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
@@ -156,10 +127,7 @@ type jobStore struct {
 
 	countRunReposByStatus mockResult[[]store.CountRunReposByStatusRow]
 
-	cancelActiveJobsByRunRepoAttemptCalled bool
-	cancelActiveJobsByRunRepoAttemptParams []store.CancelActiveJobsByRunRepoAttemptParams
-	cancelActiveJobsByRunRepoAttemptResult int64
-	cancelActiveJobsByRunRepoAttemptErr    error
+	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunRepoAttemptParams, int64]
 
 	getLatestRunRepoByModAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
 
@@ -210,10 +178,9 @@ func (m *jobStore) GetJob(ctx context.Context, id types.JobID) (store.Job, error
 }
 
 func (m *jobStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
-	m.createJobCalled = true
-	m.createJobCallCount++
-	m.createJobParams = append(m.createJobParams, params)
-	result := m.createJobResult
+	m.createJob.called = true
+	m.createJob.calls = append(m.createJob.calls, params)
+	result := m.createJob.val
 	if result.ID.IsZero() {
 		result.ID = types.NewJobID()
 	}
@@ -228,7 +195,7 @@ func (m *jobStore) CreateJob(ctx context.Context, params store.CreateJobParams) 
 	result.NextID = params.NextID
 	result.RepoShaIn = params.RepoShaIn
 	result.Meta = params.Meta
-	return result, m.createJobErr
+	return result, m.createJob.err
 }
 
 func (m *jobStore) ListJobsByRun(ctx context.Context, runID types.RunID) ([]store.Job, error) {
@@ -251,10 +218,8 @@ func (m *jobStore) ListJobsByRunRepoAttempt(ctx context.Context, arg store.ListJ
 // Job status/completion methods
 
 func (m *jobStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
-	m.updateJobStatusCalled = true
-	m.updateJobStatusParams = params
-	m.updateJobStatusCalls = append(m.updateJobStatusCalls, params)
-	return m.updateJobStatusErr
+	_, err := m.updateJobStatus.record(params)
+	return err
 }
 
 func (m *jobStore) UpdateJobCompletion(ctx context.Context, params store.UpdateJobCompletionParams) error {
@@ -303,25 +268,25 @@ func (m *jobStore) UpdateJobNextID(ctx context.Context, params store.UpdateJobNe
 // Job scheduling/promotion methods
 
 func (m *jobStore) ScheduleNextJob(ctx context.Context, arg store.ScheduleNextJobParams) (store.Job, error) {
-	m.scheduleNextJobCalled = true
-	m.scheduleNextJobParam = arg
-	if m.scheduleNextJobErr != nil {
-		return store.Job{}, m.scheduleNextJobErr
+	m.scheduleNextJob.called = true
+	m.scheduleNextJob.params = arg
+	if m.scheduleNextJob.err != nil {
+		return store.Job{}, m.scheduleNextJob.err
 	}
-	if m.scheduleNextJobResult.ID.IsZero() {
+	if m.scheduleNextJob.val.ID.IsZero() {
 		return store.Job{}, pgx.ErrNoRows
 	}
-	return m.scheduleNextJobResult, nil
+	return m.scheduleNextJob.val, nil
 }
 
 func (m *jobStore) PromoteJobByIDIfUnblocked(ctx context.Context, id types.JobID) (store.Job, error) {
-	m.promoteJobByIDIfUnblockedCalled = true
-	m.promoteJobByIDIfUnblockedParam = id
-	if m.promoteJobByIDIfUnblockedErr != nil {
-		return store.Job{}, m.promoteJobByIDIfUnblockedErr
+	m.promoteJobByIDIfUnblocked.called = true
+	m.promoteJobByIDIfUnblocked.params = id
+	if m.promoteJobByIDIfUnblocked.err != nil {
+		return store.Job{}, m.promoteJobByIDIfUnblocked.err
 	}
-	if !m.promoteJobByIDIfUnblockedResult.ID.IsZero() {
-		return m.promoteJobByIDIfUnblockedResult, nil
+	if !m.promoteJobByIDIfUnblocked.val.ID.IsZero() {
+		return m.promoteJobByIDIfUnblocked.val, nil
 	}
 	for i := range m.listJobsByRunRepoAttempt.val {
 		if m.listJobsByRunRepoAttempt.val[i].ID != id {
@@ -408,18 +373,18 @@ func (m *jobStore) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int
 // Claim methods
 
 func (m *jobStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job, error) {
-	m.claimJobCalled = true
-	m.claimJobParams = nodeID
+	m.claimJob.called = true
+	m.claimJob.params = nodeID
 	if nodeID.IsZero() {
 		return store.Job{}, store.ErrEmptyNodeID
 	}
-	if m.claimJobErr != nil {
-		return store.Job{}, m.claimJobErr
+	if m.claimJob.err != nil {
+		return store.Job{}, m.claimJob.err
 	}
-	if m.claimJobResult.ID.IsZero() {
+	if m.claimJob.val.ID.IsZero() {
 		return store.Job{}, pgx.ErrNoRows
 	}
-	return m.claimJobResult, nil
+	return m.claimJob.val, nil
 }
 
 func (m *jobStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, error) {
@@ -442,51 +407,32 @@ func (m *jobStore) DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) e
 }
 
 func (m *jobStore) UpsertSBOMRow(ctx context.Context, arg store.UpsertSBOMRowParams) error {
-	m.upsertSBOMRowCalled = true
-	m.upsertSBOMRowParams = append(m.upsertSBOMRowParams, arg)
-	return m.upsertSBOMRowErr
+	_, err := m.upsertSBOMRow.record(arg)
+	return err
 }
 
 // Stack/Gate profile methods
 
 func (m *jobStore) ResolveStackRowByImage(ctx context.Context, image string) (store.ResolveStackRowByImageRow, error) {
-	if m.resolveStackRowByImageErr != nil {
-		return store.ResolveStackRowByImageRow{}, m.resolveStackRowByImageErr
-	}
-	if m.resolveStackRowByImageResult.ID == 0 {
-		return store.ResolveStackRowByImageRow{}, pgx.ErrNoRows
-	}
-	return m.resolveStackRowByImageResult, nil
+	return resolveOrNoRows(&m.resolveStackRowByImage, func(r store.ResolveStackRowByImageRow) int64 { return r.ID })
 }
 
 func (m *jobStore) ResolveStackRowByLangTool(ctx context.Context, arg store.ResolveStackRowByLangToolParams) (store.ResolveStackRowByLangToolRow, error) {
-	if m.resolveStackRowByLangToolErr != nil {
-		return store.ResolveStackRowByLangToolRow{}, m.resolveStackRowByLangToolErr
-	}
-	if m.resolveStackRowByLangToolResult.ID == 0 {
-		return store.ResolveStackRowByLangToolRow{}, pgx.ErrNoRows
-	}
-	return m.resolveStackRowByLangToolResult, nil
+	return resolveOrNoRows(&m.resolveStackRowByLangTool, func(r store.ResolveStackRowByLangToolRow) int64 { return r.ID })
 }
 
 func (m *jobStore) ResolveStackRowByLangToolRelease(ctx context.Context, arg store.ResolveStackRowByLangToolReleaseParams) (store.ResolveStackRowByLangToolReleaseRow, error) {
-	if m.resolveStackRowByLangToolReleaseErr != nil {
-		return store.ResolveStackRowByLangToolReleaseRow{}, m.resolveStackRowByLangToolReleaseErr
-	}
-	if m.resolveStackRowByLangToolReleaseResult.ID == 0 {
-		return store.ResolveStackRowByLangToolReleaseRow{}, pgx.ErrNoRows
-	}
-	return m.resolveStackRowByLangToolReleaseResult, nil
+	return resolveOrNoRows(&m.resolveStackRowByLangToolRelease, func(r store.ResolveStackRowByLangToolReleaseRow) int64 { return r.ID })
 }
 
 func (m *jobStore) UpsertExactGateProfile(ctx context.Context, arg store.UpsertExactGateProfileParams) (store.UpsertExactGateProfileRow, error) {
-	m.upsertExactGateProfileCalled = true
-	m.upsertExactGateProfileParam = arg
-	if m.upsertExactGateProfileErr != nil {
-		return store.UpsertExactGateProfileRow{}, m.upsertExactGateProfileErr
+	m.upsertExactGateProfile.called = true
+	m.upsertExactGateProfile.params = arg
+	if m.upsertExactGateProfile.err != nil {
+		return store.UpsertExactGateProfileRow{}, m.upsertExactGateProfile.err
 	}
-	if m.upsertExactGateProfileResult.ID != 0 {
-		return m.upsertExactGateProfileResult, nil
+	if m.upsertExactGateProfile.val.ID != 0 {
+		return m.upsertExactGateProfile.val, nil
 	}
 	return store.UpsertExactGateProfileRow{
 		ID:       1,
@@ -582,9 +528,8 @@ func (m *jobStore) GetRunRepo(ctx context.Context, arg store.GetRunRepoParams) (
 }
 
 func (m *jobStore) UpdateRunRepoStatus(ctx context.Context, params store.UpdateRunRepoStatusParams) error {
-	m.updateRunRepoStatusCalled = true
-	m.updateRunRepoStatusParams = append(m.updateRunRepoStatusParams, params)
-	return m.updateRunRepoStatusErr
+	_, err := m.updateRunRepoStatus.record(params)
+	return err
 }
 
 func (m *jobStore) UpdateRunRepoError(ctx context.Context, params store.UpdateRunRepoErrorParams) error {
@@ -647,9 +592,7 @@ func (m *jobStore) CountRunReposByStatus(ctx context.Context, runID types.RunID)
 }
 
 func (m *jobStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params store.CancelActiveJobsByRunRepoAttemptParams) (int64, error) {
-	m.cancelActiveJobsByRunRepoAttemptCalled = true
-	m.cancelActiveJobsByRunRepoAttemptParams = append(m.cancelActiveJobsByRunRepoAttemptParams, params)
-	return m.cancelActiveJobsByRunRepoAttemptResult, m.cancelActiveJobsByRunRepoAttemptErr
+	return m.cancelActiveJobsByRunRepoAttempt.record(params)
 }
 
 func (m *jobStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {

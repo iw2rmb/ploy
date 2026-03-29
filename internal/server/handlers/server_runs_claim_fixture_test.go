@@ -66,19 +66,6 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	}
 
 	st := &jobStore{
-		claimJobResult: store.Job{
-			ID:          jobID,
-			RunID:       runID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &nodeID,
-			Name:        opts.jobName,
-			Status:      domaintypes.JobStatusRunning,
-			JobType:     opts.jobType,
-			JobImage:    opts.jobImage,
-			Meta:        opts.jobMeta,
-		},
 		getRunRepoResult: store.RunRepo{
 			RunID:         runID,
 			RepoID:        repoID,
@@ -89,6 +76,19 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		},
 	}
 	st.getNode.val = store.Node{ID: nodeID}
+	st.claimJob.val = store.Job{
+		ID:          jobID,
+		RunID:       runID,
+		RepoID:      repoID,
+		RepoBaseRef: "main",
+		Attempt:     1,
+		NodeID:      &nodeID,
+		Name:        opts.jobName,
+		Status:      domaintypes.JobStatusRunning,
+		JobType:     opts.jobType,
+		JobImage:    opts.jobImage,
+		Meta:        opts.jobMeta,
+	}
 	st.getRun.val = store.Run{
 		ID:        runID,
 		SpecID:    specID,

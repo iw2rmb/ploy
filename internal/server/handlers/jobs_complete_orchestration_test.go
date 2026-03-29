@@ -142,9 +142,9 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify PromoteJobByIDIfUnblocked was called with the linked successor.
-	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblockedCalled)
-	if st.promoteJobByIDIfUnblockedParam != nextJobID {
-		t.Fatalf("expected PromoteJobByIDIfUnblocked(%s), got %s", nextJobID, st.promoteJobByIDIfUnblockedParam)
+	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblocked.called)
+	if st.promoteJobByIDIfUnblocked.params != nextJobID {
+		t.Fatalf("expected PromoteJobByIDIfUnblocked(%s), got %s", nextJobID, st.promoteJobByIDIfUnblocked.params)
 	}
 }
 
@@ -164,7 +164,7 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify successor promotion was NOT called for failed jobs.
-	if st.promoteJobByIDIfUnblockedCalled {
+	if st.promoteJobByIDIfUnblocked.called {
 		t.Fatal("did not expect PromoteJobByIDIfUnblocked to be called for failed job")
 	}
 }
@@ -231,14 +231,14 @@ func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
 	}
 
 	// Verify UpdateJobStatus was called to cancel the post-gate job.
-	if !st.updateJobStatusCalled {
+	if !st.updateJobStatus.called {
 		t.Fatal("expected UpdateJobStatus to be called to cancel remaining jobs")
 	}
-	if len(st.updateJobStatusCalls) == 0 {
+	if len(st.updateJobStatus.calls) == 0 {
 		t.Fatal("expected at least one UpdateJobStatus call")
 	}
 	foundPostCancel := false
-	for _, call := range st.updateJobStatusCalls {
+	for _, call := range st.updateJobStatus.calls {
 		if call.ID == jobs[2].ID {
 			foundPostCancel = true
 			if call.Status != domaintypes.JobStatusCancelled {
@@ -303,10 +303,10 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if st.scheduleNextJobCalled {
+	if st.scheduleNextJob.called {
 		t.Fatal("expected success completion to avoid next_id scheduler path")
 	}
-	if !st.promoteJobByIDIfUnblockedCalled {
+	if !st.promoteJobByIDIfUnblocked.called {
 		t.Fatal("expected linked successor promotion to be called")
 	}
 }
@@ -326,14 +326,14 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if st.createJobCallCount == 0 {
+	if len(st.createJob.calls) == 0 {
 		t.Fatal("expected healing insertion to create follow-up jobs")
 	}
-	if st.createJobCallCount != 2 {
-		t.Fatalf("expected 2 healing jobs, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 2 {
+		t.Fatalf("expected 2 healing jobs, got %d", len(st.createJob.calls))
 	}
-	reGate := st.createJobParams[0]
-	heal := st.createJobParams[1]
+	reGate := st.createJob.calls[0]
+	heal := st.createJob.calls[1]
 	if reGate.Name != "re-gate-1" {
 		t.Fatalf("expected first created healing job to be re-gate-1, got %q", reGate.Name)
 	}
@@ -375,8 +375,8 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 	if st.calls < 2 {
 		t.Fatalf("expected run lookup retry after transient failure, calls=%d", st.calls)
 	}
-	if gf.Store.createJobCallCount != 2 {
-		t.Fatalf("expected healing insertion to create 2 jobs after run lookup retry, got %d", gf.Store.createJobCallCount)
+	if len(gf.Store.createJob.calls) != 2 {
+		t.Fatalf("expected healing insertion to create 2 jobs after run lookup retry, got %d", len(gf.Store.createJob.calls))
 	}
 }
 
@@ -397,14 +397,14 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if st.createJobCallCount != 0 {
-		t.Fatalf("expected no healing insertion jobs, got %d", st.createJobCallCount)
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no healing insertion jobs, got %d", len(st.createJob.calls))
 	}
-	if len(st.updateJobStatusCalls) != 1 {
-		t.Fatalf("expected one cancellation call, got %d", len(st.updateJobStatusCalls))
+	if len(st.updateJobStatus.calls) != 1 {
+		t.Fatalf("expected one cancellation call, got %d", len(st.updateJobStatus.calls))
 	}
-	if st.updateJobStatusCalls[0].ID != gf.Successor.ID || st.updateJobStatusCalls[0].Status != domaintypes.JobStatusCancelled {
-		t.Fatalf("unexpected cancellation call: %+v", st.updateJobStatusCalls[0])
+	if st.updateJobStatus.calls[0].ID != gf.Successor.ID || st.updateJobStatus.calls[0].Status != domaintypes.JobStatusCancelled {
+		t.Fatalf("unexpected cancellation call: %+v", st.updateJobStatus.calls[0])
 	}
 }
 

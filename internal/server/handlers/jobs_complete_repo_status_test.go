@@ -79,11 +79,11 @@ func TestCompleteJob_RepoTerminalStatus(t *testing.T) {
 			assertStatus(t, rr, http.StatusNoContent)
 
 			assertCalled(t, "ListJobsByRunRepoAttempt", st.listJobsByRunRepoAttempt.called)
-			assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatusCalled)
-			if len(st.updateRunRepoStatusParams) == 0 {
+			assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatus.called)
+			if len(st.updateRunRepoStatus.calls) == 0 {
 				t.Fatal("expected at least one UpdateRunRepoStatus call")
 			}
-			lastRepoUpdate := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1]
+			lastRepoUpdate := st.updateRunRepoStatus.calls[len(st.updateRunRepoStatus.calls)-1]
 			if lastRepoUpdate.Status != tt.wantRepoStatus {
 				t.Errorf("expected repo status %s, got %s", tt.wantRepoStatus, lastRepoUpdate.Status)
 			}
@@ -164,7 +164,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify repo status was NOT updated (jobs still in progress).
-	if st.updateRunRepoStatusCalled {
+	if st.updateRunRepoStatus.called {
 		t.Error("did not expect UpdateRunRepoStatus to be called while jobs still in progress")
 	}
 
@@ -174,7 +174,7 @@ func TestCompleteJob_RepoNotTerminalWhileJobsInProgress(t *testing.T) {
 	}
 
 	// Verify linked successor was promoted.
-	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblockedCalled)
+	assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblocked.called)
 }
 
 // TestCompleteJob_RepoStatusUsesLastJobStatus verifies that when all jobs are
@@ -264,8 +264,8 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 
 	assertStatus(t, rr, http.StatusNoContent)
 
-	assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatusCalled)
-	lastRepoUpdate := st.updateRunRepoStatusParams[len(st.updateRunRepoStatusParams)-1]
+	assertCalled(t, "UpdateRunRepoStatus", st.updateRunRepoStatus.called)
+	lastRepoUpdate := st.updateRunRepoStatus.calls[len(st.updateRunRepoStatus.calls)-1]
 	if lastRepoUpdate.Status != domaintypes.RunRepoStatusSuccess {
 		t.Errorf("expected repo status Success, got %s", lastRepoUpdate.Status)
 	}
@@ -300,7 +300,7 @@ func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
 	}
 
 	// Verify repo status was NOT updated.
-	if st.updateRunRepoStatusCalled {
+	if st.updateRunRepoStatus.called {
 		t.Error("did not expect UpdateRunRepoStatus to be called for MR job")
 	}
 
@@ -355,7 +355,7 @@ func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
 	assertStatus(t, rr, http.StatusNoContent)
 
 	// Verify repo A status was updated to Success.
-	if !st.updateRunRepoStatusCalled {
+	if !st.updateRunRepoStatus.called {
 		t.Fatal("expected UpdateRunRepoStatus to be called for repo A")
 	}
 

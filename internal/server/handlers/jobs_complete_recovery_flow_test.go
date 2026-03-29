@@ -43,7 +43,7 @@ func TestCompleteJob_ReGateSuccessPromotesValidatedCandidate(t *testing.T) {
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	assertCalled(t, "UpsertExactGateProfile", st.upsertExactGateProfileCalled)
+	assertCalled(t, "UpsertExactGateProfile", st.upsertExactGateProfile.called)
 	assertCalled(t, "UpsertGateJobProfileLink", st.upsertGateJobProfileLink.called)
 	assertCalled(t, "UpdateJobMeta", st.updateJobMeta.called)
 	meta, err := contracts.UnmarshalJobMeta(st.updateJobMeta.params.Meta)
@@ -108,7 +108,7 @@ func TestCompleteJob_ReGateFailureDoesNotPromoteCandidate(t *testing.T) {
 	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{"status": "Fail"}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if st.upsertExactGateProfileCalled {
+	if st.upsertExactGateProfile.called {
 		t.Fatal("did not expect gate profile persistence on failed re-gate")
 	}
 }

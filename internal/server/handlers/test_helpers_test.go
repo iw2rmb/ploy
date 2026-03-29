@@ -271,7 +271,7 @@ func withJobResults(m map[domaintypes.JobID]store.Job) func(*jobStore) {
 }
 
 func withPromoteResult(job store.Job) func(*jobStore) {
-	return func(st *jobStore) { st.promoteJobByIDIfUnblockedResult = job }
+	return func(st *jobStore) { st.promoteJobByIDIfUnblocked.val = job }
 }
 
 func withGetRunErr(err error) func(*jobStore) {
@@ -297,7 +297,7 @@ func withArtifactBundles(bundles []store.ArtifactBundle) func(*jobStore) {
 }
 
 func withResolveStackRow(row store.ResolveStackRowByLangToolRow) func(*jobStore) {
-	return func(st *jobStore) { st.resolveStackRowByLangToolResult = row }
+	return func(st *jobStore) { st.resolveStackRowByLangTool.val = row }
 }
 
 func withGetRunCreatedAt(t time.Time) func(*jobStore) {

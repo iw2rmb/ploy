@@ -24,10 +24,10 @@ func TestClaimJob_HappyPath(t *testing.T) {
 			opts: claimJobFixtureOptions{},
 			assert: func(t *testing.T, rr *httptest.ResponseRecorder, f *claimJobFixture) {
 				t.Helper()
-				if !f.store.claimJobCalled || string(f.store.claimJobParams) != f.nodeID.String() {
+				if !f.store.claimJob.called || string(f.store.claimJob.params) != f.nodeID.String() {
 					t.Fatalf("expected ClaimJob to be called with node id")
 				}
-				if len(f.store.updateRunRepoStatusParams) == 0 {
+				if len(f.store.updateRunRepoStatus.calls) == 0 {
 					t.Fatalf("expected UpdateRunRepoStatus to be called")
 				}
 
@@ -79,7 +79,7 @@ func TestClaimJob_HappyPath(t *testing.T) {
 			},
 			assert: func(t *testing.T, rr *httptest.ResponseRecorder, f *claimJobFixture) {
 				t.Helper()
-				if len(f.store.updateRunRepoStatusParams) != 0 {
+				if len(f.store.updateRunRepoStatus.calls) != 0 {
 					t.Fatalf("expected UpdateRunRepoStatus not to be called for MR jobs")
 				}
 

@@ -51,10 +51,10 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	if st.deleteSBOMRowsByJob.params != jobID {
 		t.Fatalf("deleteSBOMRowsByJob job_id = %q, want %q", st.deleteSBOMRowsByJob.params, jobID)
 	}
-	if len(st.upsertSBOMRowParams) != 1 {
-		t.Fatalf("upsertSBOMRow params count = %d, want 1", len(st.upsertSBOMRowParams))
+	if len(st.upsertSBOMRow.calls) != 1 {
+		t.Fatalf("upsertSBOMRow params count = %d, want 1", len(st.upsertSBOMRow.calls))
 	}
-	got := st.upsertSBOMRowParams[0]
+	got := st.upsertSBOMRow.calls[0]
 	if got.JobID != jobID || got.RepoID != repoID || got.Lib != "org.example:lib-a" || got.Ver != "1.0.0" {
 		t.Fatalf("unexpected upsert row: %+v", got)
 	}
@@ -86,7 +86,7 @@ func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) 
 	if count != 0 {
 		t.Fatalf("count = %d, want 0", count)
 	}
-	if st.deleteSBOMRowsByJob.called || st.upsertSBOMRowCalled {
+	if st.deleteSBOMRowsByJob.called || st.upsertSBOMRow.called {
 		t.Fatal("expected no sbom persistence calls")
 	}
 }
