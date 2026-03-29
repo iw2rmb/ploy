@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
 
 func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
@@ -27,24 +29,14 @@ func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 
 	out, lines := RenderFollowFrameText(frame)
 
-	if !strings.Contains(out, "Repos: 1") {
-		t.Fatalf("expected repo count in output, got %q", out)
-	}
-	if !strings.Contains(out, "Repo 1/1: example.com/acme/repo") {
-		t.Fatalf("expected repo block header, got %q", out)
-	}
-	if !strings.Contains(out, "Step") || !strings.Contains(out, "Duration") {
-		t.Fatalf("expected table headers, got %q", out)
-	}
-	if !strings.Contains(out, "⣾") || !strings.Contains(out, "mig") {
-		t.Fatalf("expected row content, got %q", out)
-	}
-	if !strings.Contains(out, "└ build failed") {
-		t.Fatalf("expected exit one-liner row, got %q", out)
-	}
-	if !strings.Contains(out, "\n\x1b[31m└ build failed\x1b[0m\n") {
-		t.Fatalf("expected exit row to start at column 0 on a dedicated line, got %q", out)
-	}
+	assertx.Contains(t, out, "Repos: 1")
+	assertx.Contains(t, out, "Repo 1/1: example.com/acme/repo")
+	assertx.Contains(t, out, "Step")
+	assertx.Contains(t, out, "Duration")
+	assertx.Contains(t, out, "⣾")
+	assertx.Contains(t, out, "mig")
+	assertx.Contains(t, out, "└ build failed")
+	assertx.Contains(t, out, "\n\x1b[31m└ build failed\x1b[0m\n")
 	if lines != strings.Count(out, "\n") {
 		t.Fatalf("line count mismatch: got %d want %d", lines, strings.Count(out, "\n"))
 	}
@@ -68,14 +60,8 @@ func TestRenderFollowFrameText_RendersMultiLineExitOneLiner(t *testing.T) {
 	}
 
 	out, lines := RenderFollowFrameText(frame)
-	assertContains := func(needle string) {
-		t.Helper()
-		if !strings.Contains(out, needle) {
-			t.Fatalf("expected output to contain %q, got %q", needle, out)
-		}
-	}
-	assertContains("└  Exit 1: first line")
-	assertContains("             second line")
+	assertx.Contains(t, out, "└  Exit 1: first line")
+	assertx.Contains(t, out, "             second line")
 	if lines != strings.Count(out, "\n") {
 		t.Fatalf("line count mismatch: got %d want %d", lines, strings.Count(out, "\n"))
 	}
@@ -224,10 +210,6 @@ func TestRenderFollowFrameText_RendersEmptyLineForRepoWithoutRows(t *testing.T) 
 	}
 
 	out, _ := RenderFollowFrameText(frame)
-	if !strings.Contains(out, "Repo:  [1/1] example.com/acme/repo main -> feature") {
-		t.Fatalf("expected repo header, got %q", out)
-	}
-	if !strings.Contains(out, "Jobs: none") {
-		t.Fatalf("expected empty jobs line, got %q", out)
-	}
+	assertx.Contains(t, out, "Repo:  [1/1] example.com/acme/repo main -> feature")
+	assertx.Contains(t, out, "Jobs: none")
 }

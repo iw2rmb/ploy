@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +15,6 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 )
-
 
 const testRepoSHA0 = "0123456789abcdef0123456789abcdef01234567"
 
@@ -33,56 +30,34 @@ func TestCreateSingleRepoRunHandler_SingleRepo(t *testing.T) {
 	}
 
 	handler := createSingleRepoRunHandler(st, nil)
-
-	reqBody := map[string]any{
-		"repo_url":   "https://github.com/user/repo.git",
-		"base_ref":   "main",
-		"target_ref": "feature",
-		"spec": map[string]any{
-			"steps": []any{
-				map[string]any{"image": "img1:latest"},
-			},
-		},
-	}
-	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 
 	assertStatus(t, rr, http.StatusCreated)
 
-	var resp struct {
+	resp := decodeBody[struct {
 		RunID  string `json:"run_id"`
 		MigID  string `json:"mig_id"`
 		SpecID string `json:"spec_id"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, rr)
 
 	if resp.RunID == "" {
-		t.Fatalf("expected run_id to be set")
+		t.Fatal("expected run_id to be set")
 	}
 	if resp.MigID == "" {
-		t.Fatalf("expected mig_id to be set")
+		t.Fatal("expected mig_id to be set")
 	}
 	if resp.SpecID == "" {
-		t.Fatalf("expected spec_id to be set")
+		t.Fatal("expected spec_id to be set")
 	}
 
 	if !st.createSpecCalled || !st.createMigCalled || !st.createMigRepoCalled || !st.createRunCalled || !st.createRunRepoCalled {
-		t.Fatalf("expected spec/mig/repo/run creation calls to be made")
+		t.Fatal("expected spec/mig/repo/run creation calls to be made")
 	}
 	if len(st.createJob.calls) != 0 {
 		t.Fatalf("expected no jobs on submission, got %d", len(st.createJob.calls))
 	}
 }
 
-// TestCreateJobsFromSpec verifies v1 job creation behavior:
-// - Jobs are created directly for (runs.id, run_repos.repo_id)
-// - jobs.repo_id and jobs.repo_base_ref are persisted correctly
-// - First job is Queued, remaining jobs are Created per repo attempt
 func TestCreateJobsFromSpec(t *testing.T) {
 	t.Parallel()
 
@@ -201,7 +176,6 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				t.Fatalf("expected %d jobs, got %d", tc.expectedJobs, len(st.createJob.calls))
 			}
 
-			// Count jobs with Queued status — exactly one should be Queued.
 			queuedCount := 0
 			for _, p := range st.createJob.calls {
 				if p.Status == domaintypes.JobStatusQueued {
@@ -218,7 +192,6 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 			}
 
-			// Verify all non-head jobs are Created.
 			for _, p := range st.createJob.calls {
 				if p.Name == "pre-gate" {
 					continue
@@ -242,7 +215,6 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
-	// Verify chain ordering by name: pre-gate -> mig-0 -> mig-1 -> post-gate.
 	byName := createJobsByName(st.createJob.calls)
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
@@ -285,93 +257,35 @@ func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) 
 	}
 }
 
-func TestCreateSingleRepoRunHandler_MissingFields(t *testing.T) {
+func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	st := &jobStore{}
 	handler := createSingleRepoRunHandler(st, nil)
 
-	cases := []struct {
-		name string
-		body map[string]any
-		err  string
+	tests := []struct {
+		name       string
+		body       any
+		wantSubstr string
 	}{
-		{"empty repo_url", map[string]any{"repo_url": "", "base_ref": "main", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
-		{"no repo_url", map[string]any{"base_ref": "main", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
-		{"empty base_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
-		{"no base_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "target_ref": "feature", "spec": map[string]any{}}, "empty"},
-		{"empty target_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "", "spec": map[string]any{}}, "empty"},
-		{"no target_ref", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "spec": map[string]any{}}, "empty"},
-		{"no spec", map[string]any{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "feature"}, "spec is required"},
+		{"empty repo_url", validRunRequestBodyWith(map[string]any{"repo_url": ""}), "empty"},
+		{"no repo_url", validRunRequestBodyWithout("repo_url"), "empty"},
+		{"empty base_ref", validRunRequestBodyWith(map[string]any{"base_ref": ""}), "empty"},
+		{"no base_ref", validRunRequestBodyWithout("base_ref"), "empty"},
+		{"empty target_ref", validRunRequestBodyWith(map[string]any{"target_ref": ""}), "empty"},
+		{"no target_ref", validRunRequestBodyWithout("target_ref"), "empty"},
+		{"no spec", validRunRequestBodyWithout("spec"), "spec is required"},
+		{"invalid JSON", "not json", "invalid request"},
+		{"http scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "http://github.com/user/repo.git"}), "invalid repo url"},
+		{"git scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "git://github.com/user/repo.git"}), "invalid repo url"},
+		{"no scheme repo_url", validRunRequestBodyWith(map[string]any{"repo_url": "github.com/user/repo.git"}), "invalid repo url"},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			body, _ := json.Marshal(tc.body)
-			req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
-			rr := httptest.NewRecorder()
-
-			handler.ServeHTTP(rr, req)
-
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := doRequest(t, handler, http.MethodPost, "/v1/runs", tt.body)
 			assertStatus(t, rr, http.StatusBadRequest)
-			if !strings.Contains(rr.Body.String(), tc.err) {
-				t.Fatalf("expected error %q, got: %s", tc.err, rr.Body.String())
-			}
-		})
-	}
-}
-
-func TestCreateSingleRepoRunHandler_InvalidJSON(t *testing.T) {
-	t.Parallel()
-
-	st := &jobStore{}
-	handler := createSingleRepoRunHandler(st, nil)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader("{invalid json"))
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if !strings.Contains(rr.Body.String(), "invalid request") {
-		t.Fatalf("expected 'invalid request' error, got: %s", rr.Body.String())
-	}
-}
-
-func TestCreateSingleRepoRunHandler_InvalidRepoURL(t *testing.T) {
-	t.Parallel()
-
-	st := &jobStore{}
-	handler := createSingleRepoRunHandler(st, nil)
-
-	cases := []struct {
-		name    string
-		repoURL string
-		errMsg  string
-	}{
-		{"http scheme", "http://github.com/user/repo.git", "invalid repo url"},
-		{"git scheme", "git://github.com/user/repo.git", "invalid repo url"},
-		{"no scheme", "github.com/user/repo.git", "invalid repo url"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			body := map[string]any{
-				"repo_url":   tc.repoURL,
-				"base_ref":   "main",
-				"target_ref": "feature",
-				"spec":       map[string]any{},
-			}
-			bodyBytes, _ := json.Marshal(body)
-			req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(bodyBytes))
-			rr := httptest.NewRecorder()
-
-			handler.ServeHTTP(rr, req)
-
-			assertStatus(t, rr, http.StatusBadRequest)
-			if !strings.Contains(rr.Body.String(), tc.errMsg) {
-				t.Fatalf("expected error %q, got: %s", tc.errMsg, rr.Body.String())
-			}
+			assertBodyContains(t, rr, tt.wantSubstr)
 		})
 	}
 }
@@ -390,35 +304,17 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 	eventsService, _ := createTestEventsService()
 	handler := createSingleRepoRunHandler(st, eventsService)
 
-	reqBody := map[string]any{
-		"repo_url":   "https://github.com/user/repo.git",
-		"base_ref":   "main",
-		"target_ref": "feature",
-		"spec": map[string]any{
-			"steps": []any{
-				map[string]any{"image": "docker.io/test/mig:latest"},
-			},
-		},
-	}
-	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(body))
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
+	rr := doRequest(t, handler, http.MethodPost, "/v1/runs", validRunRequestBody())
 	assertStatus(t, rr, http.StatusCreated)
 
-	var resp struct {
+	resp := decodeBody[struct {
 		RunID string `json:"run_id"`
-	}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, rr)
 	runID := resp.RunID
 
 	snapshot := eventsService.Hub().Snapshot(domaintypes.RunID(runID))
 	if len(snapshot) == 0 {
-		t.Fatalf("expected at least one run event to be published")
+		t.Fatal("expected at least one run event to be published")
 	}
 
 	foundRunEvent := false
@@ -432,11 +328,11 @@ func TestCreateSingleRepoRunHandler_PublishesEvent(t *testing.T) {
 		}
 	}
 	if !foundRunEvent {
-		t.Fatalf("expected to find a 'run' event in the snapshot")
+		t.Fatal("expected to find a 'run' event in the snapshot")
 	}
 }
 
-func TestGetRunStatusHandler_Success(t *testing.T) {
+func TestGetRunStatusHandler(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -446,90 +342,109 @@ func TestGetRunStatusHandler_Success(t *testing.T) {
 	nextJobID := domaintypes.NewJobID()
 	now := time.Now().UTC()
 
-	st := &jobStore{
-		listJobsByRunResult: []store.Job{
-			{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
-		},
-	}
-	st.getRun.val = store.Run{
-		ID:        runID,
-		Status:    domaintypes.RunStatusStarted,
-		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		}
-	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+	tests := []struct {
+		name       string
+		setupStore func() *jobStore
+		reqRunID   string
+		wantStatus int
+		verify     func(t *testing.T, st *jobStore, rr *httptest.ResponseRecorder)
+	}{
 		{
-			RunID:         runID,
-			RepoID:        "repo_123",
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature",
-			RepoUrl:       "https://github.com/user/repo.git",
+			name: "success",
+			setupStore: func() *jobStore {
+				st := &jobStore{
+					listJobsByRunResult: []store.Job{
+						{ID: jobID, RunID: runID, Status: domaintypes.JobStatusQueued, NextID: &nextJobID, Meta: withNextIDMeta([]byte(`{}`), float64(1000))},
+					},
+				}
+				st.getRun.val = store.Run{
+					ID:        runID,
+					Status:    domaintypes.RunStatusStarted,
+					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+				}
+				st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
+					{
+						RunID:         runID,
+						RepoID:        "repo_123",
+						RepoBaseRef:   "main",
+						RepoTargetRef: "feature",
+						RepoUrl:       "https://github.com/user/repo.git",
+					},
+				}
+				return st
+			},
+			reqRunID:   runIDStr,
+			wantStatus: http.StatusOK,
+			verify: func(t *testing.T, st *jobStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				resp := decodeBody[modsapi.RunSummary](t, rr)
+				if resp.RunID.String() != runIDStr {
+					t.Fatalf("expected run_id %s, got %s", runIDStr, resp.RunID.String())
+				}
+				if resp.State != modsapi.RunStateRunning {
+					t.Fatalf("expected status running, got %s", resp.State)
+				}
+				if resp.Repository != "https://github.com/user/repo.git" {
+					t.Fatalf("expected repo_url https://github.com/user/repo.git, got %s", resp.Repository)
+				}
+				if resp.Metadata["repo_base_ref"] != "main" {
+					t.Fatalf("expected base_ref main, got %s", resp.Metadata["repo_base_ref"])
+				}
+				if resp.Metadata["repo_target_ref"] != "feature" {
+					t.Fatalf("expected target_ref feature, got %s", resp.Metadata["repo_target_ref"])
+				}
+				if len(resp.Stages) != 1 {
+					t.Fatalf("expected 1 stage, got %d", len(resp.Stages))
+				}
+				if got := resp.Stages[domaintypes.JobID(jobIDStr)].State; got != modsapi.StageStatePending {
+					t.Fatalf("expected stage to be pending, got %s", got)
+				}
+				if got := resp.Stages[domaintypes.JobID(jobIDStr)].NextID; got == nil || *got != nextJobID {
+					t.Fatalf("expected stage next_id %s, got %v", nextJobID, got)
+				}
+				assertCalled(t, "GetRun", st.getRun.called)
+				assertCalled(t, "ListRunReposWithURLByRun", st.listRunReposWithURLByRun.called)
+				assertCalled(t, "ListJobsByRun", st.listJobsByRunCalled)
+			},
 		},
-		}
-
-	handler := getRunStatusHandler(st)
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runIDStr+"/status", nil, "id", runIDStr)
-
-	assertStatus(t, rr, http.StatusOK)
-
-	resp := decodeBody[modsapi.RunSummary](t, rr)
-
-	if resp.RunID.String() != runIDStr {
-		t.Fatalf("expected run_id %s, got %s", runIDStr, resp.RunID.String())
-	}
-	if resp.State != modsapi.RunStateRunning {
-		t.Fatalf("expected status running, got %s", resp.State)
-	}
-	if resp.Repository != "https://github.com/user/repo.git" {
-		t.Fatalf("expected repo_url https://github.com/user/repo.git, got %s", resp.Repository)
-	}
-	if resp.Metadata["repo_base_ref"] != "main" {
-		t.Fatalf("expected base_ref main, got %s", resp.Metadata["repo_base_ref"])
-	}
-	if resp.Metadata["repo_target_ref"] != "feature" {
-		t.Fatalf("expected target_ref feature, got %s", resp.Metadata["repo_target_ref"])
-	}
-	if len(resp.Stages) != 1 {
-		t.Fatalf("expected 1 stage, got %d", len(resp.Stages))
-	}
-	if got := resp.Stages[domaintypes.JobID(jobIDStr)].State; got != modsapi.StageStatePending {
-		t.Fatalf("expected stage to be pending, got %s", got)
-	}
-	if got := resp.Stages[domaintypes.JobID(jobIDStr)].NextID; got == nil || *got != nextJobID {
-		t.Fatalf("expected stage next_id %s, got %v", nextJobID, got)
+		{
+			name: "not found",
+			setupStore: func() *jobStore {
+				st := &jobStore{}
+				st.getRun.err = pgx.ErrNoRows
+				return st
+			},
+			reqRunID:   domaintypes.NewRunID().String(),
+			wantStatus: http.StatusNotFound,
+			verify: func(t *testing.T, _ *jobStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertBodyContains(t, rr, "not found")
+			},
+		},
+		{
+			name: "empty ID",
+			setupStore: func() *jobStore {
+				return &jobStore{}
+			},
+			reqRunID:   "",
+			wantStatus: http.StatusBadRequest,
+			verify: func(t *testing.T, _ *jobStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertBodyContains(t, rr, "path parameter is required")
+			},
+		},
 	}
 
-	if !st.getRun.called || !st.listRunReposWithURLByRun.called || !st.listJobsByRunCalled {
-		t.Fatalf("expected run status handler to read run+repos_with_url+jobs")
-	}
-}
-
-func TestGetRunStatusHandler_NotFound(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID().String()
-
-	st := &jobStore{}
-	st.getRun.err = pgx.ErrNoRows
-
-	handler := getRunStatusHandler(st)
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID+"/status", nil, "id", runID)
-
-	assertStatus(t, rr, http.StatusNotFound)
-	if !strings.Contains(rr.Body.String(), "not found") {
-		t.Fatalf("expected 'not found' error, got: %s", rr.Body.String())
-	}
-}
-
-func TestGetRunStatusHandler_EmptyID(t *testing.T) {
-	t.Parallel()
-
-	st := &jobStore{}
-	handler := getRunStatusHandler(st)
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/runs//status", nil, "id", "")
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if !strings.Contains(rr.Body.String(), "path parameter is required") {
-		t.Fatalf("expected required path parameter error, got: %s", rr.Body.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := tt.setupStore()
+			handler := getRunStatusHandler(st)
+			path := "/v1/runs/" + tt.reqRunID + "/status"
+			rr := doRequest(t, handler, http.MethodGet, path, nil, "id", tt.reqRunID)
+			assertStatus(t, rr, tt.wantStatus)
+			if tt.verify != nil {
+				tt.verify(t, st, rr)
+			}
+		})
 	}
 }

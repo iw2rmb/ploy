@@ -11,6 +11,38 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
 
+// singleJobReport builds a minimal RunReport with one repo and one job,
+// reducing boilerplate in tests that only vary job-level fields.
+func singleJobReport(migName string, repoStatus domaintypes.RunRepoStatus, job RunJobEntry) RunReport {
+	repoID := domaintypes.NewMigRepoID()
+	return RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: migName,
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/" + migName + ".git",
+				BaseRef:   "main",
+				TargetRef: "ploy/" + migName,
+				Status:    repoStatus,
+				Attempt:   1,
+				Jobs:      []RunJobEntry{job},
+			},
+		},
+	}
+}
+
+func renderText(t *testing.T, report RunReport, opts TextRenderOptions) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := RenderRunReportText(&buf, report, opts); err != nil {
+		t.Fatalf("RenderRunReportText error: %v", err)
+	}
+	return buf.String()
+}
+
 func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	t.Parallel()
 
@@ -61,12 +93,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 		t.Fatalf("parse base url: %v", err)
 	}
 
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
-	}
-
-	out := buf.String()
+	out := renderText(t, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL})
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
@@ -137,12 +164,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 		},
 	}
 
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
-	}
-	out := buf.String()
-
+	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
 	assertx.Contains(t, out, "\x1b[91m✗\x1b[0m")
 	assertx.Contains(t, out, "pre_gate")
 	assertx.Contains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
@@ -152,137 +174,82 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
 }
 
-func TestRenderRunReportTextExitOneLinerPrefersBugSummary(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
-	failID := domaintypes.NewJobID()
-	failCode := int32(1)
-
-	report := RunReport{
-		RunID:   runID,
-		MigID:   domaintypes.NewMigID(),
-		MigName: "bug-summary",
-		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RunEntry{
-			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/summary.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/summary",
-				Status:    "Fail",
-				Attempt:   1,
-				Jobs: []RunJobEntry{
-					{
-						JobID:      failID,
-						JobType:    "pre_gate",
-						JobImage:   "ghcr.io/acme/pre-gate:1",
-						Status:     "Failed",
-						ExitCode:   &failCode,
-						DurationMs: 750,
-						BugSummary: "missing ; in Foo.java",
-						Recovery:   &RunJobRecovery{ErrorKind: "code"},
-					},
-				},
-			},
-		},
-	}
-
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
-	}
-	out := buf.String()
-	assertx.Contains(t, out, "└  Exit 1: \x1b[91mcode missing ; in Foo.java\x1b[0m")
-	assertx.NotContains(t, out, "<code>")
-	assertx.Contains(t, out, "0.8s")
-}
-
-func TestRenderRunReportTextGateExitOneLinerDefaultsUnknownErrorKind(t *testing.T) {
+func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 	t.Parallel()
 
 	failCode := int32(1)
-	report := RunReport{
-		RunID:   domaintypes.NewRunID(),
-		MigID:   domaintypes.NewMigID(),
-		MigName: "unknown-kind",
-		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RunEntry{
-			{
-				RepoID:    domaintypes.NewMigRepoID(),
-				RepoURL:   "https://github.com/acme/unknown.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/unknown",
-				Status:    "Fail",
-				Attempt:   1,
-				Jobs: []RunJobEntry{
-					{
-						JobID:      domaintypes.NewJobID(),
-						JobType:    "re_gate",
-						JobImage:   "ghcr.io/acme/re-gate:1",
-						Status:     "Failed",
-						ExitCode:   &failCode,
-						DurationMs: 1000,
-						BugSummary: "re-gate failed",
-					},
-				},
-			},
-		},
-	}
-
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
-	}
-	assertx.Contains(t, buf.String(), "└  Exit 1: \x1b[91munknown re-gate failed\x1b[0m")
-	assertx.NotContains(t, buf.String(), "<unknown>")
-}
-
-func TestRenderRunReportTextExitOneLinerWrapsAt100Symbols(t *testing.T) {
-	t.Parallel()
-
-	failCode := int32(42)
+	failCode42 := int32(42)
 	longSummary := strings.Repeat("x", 210)
-	report := RunReport{
-		RunID:   domaintypes.NewRunID(),
-		MigID:   domaintypes.NewMigID(),
-		MigName: "wrapping",
-		SpecID:  domaintypes.NewSpecID(),
-		Repos: []RunEntry{
-			{
-				RepoID:    domaintypes.NewMigRepoID(),
-				RepoURL:   "https://github.com/acme/wrap.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/wrap",
-				Status:    "Fail",
-				Attempt:   1,
-				Jobs: []RunJobEntry{
-					{
-						JobID:      domaintypes.NewJobID(),
-						JobType:    "mig",
-						JobImage:   "ghcr.io/acme/mig:1",
-						Status:     "Failed",
-						ExitCode:   &failCode,
-						DurationMs: 900,
-						BugSummary: longSummary,
-					},
-				},
+
+	prefix42 := "└  Exit 42: "
+	indent42 := strings.Repeat(" ", len(prefix42))
+	wrappedExpected := prefix42 + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
+		indent42 + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
+		indent42 + "\x1b[91m" + strings.Repeat("x", 10) + "\x1b[0m"
+
+	tests := []struct {
+		name       string
+		job        RunJobEntry
+		contains   []string
+		notContain []string
+	}{
+		{
+			name: "prefers bug summary over error",
+			job: RunJobEntry{
+				JobID:      domaintypes.NewJobID(),
+				JobType:    "pre_gate",
+				JobImage:   "ghcr.io/acme/pre-gate:1",
+				Status:     "Failed",
+				ExitCode:   &failCode,
+				DurationMs: 750,
+				BugSummary: "missing ; in Foo.java",
+				Recovery:   &RunJobRecovery{ErrorKind: "code"},
 			},
+			contains:   []string{"└  Exit 1: \x1b[91mcode missing ; in Foo.java\x1b[0m", "0.8s"},
+			notContain: []string{"<code>"},
+		},
+		{
+			name: "defaults unknown error kind for re_gate",
+			job: RunJobEntry{
+				JobID:      domaintypes.NewJobID(),
+				JobType:    "re_gate",
+				JobImage:   "ghcr.io/acme/re-gate:1",
+				Status:     "Failed",
+				ExitCode:   &failCode,
+				DurationMs: 1000,
+				BugSummary: "re-gate failed",
+			},
+			contains:   []string{"└  Exit 1: \x1b[91munknown re-gate failed\x1b[0m"},
+			notContain: []string{"<unknown>"},
+		},
+		{
+			name: "wraps at 100 symbols",
+			job: RunJobEntry{
+				JobID:      domaintypes.NewJobID(),
+				JobType:    "mig",
+				JobImage:   "ghcr.io/acme/mig:1",
+				Status:     "Failed",
+				ExitCode:   &failCode42,
+				DurationMs: 900,
+				BugSummary: longSummary,
+			},
+			contains: []string{wrappedExpected},
 		},
 	}
 
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			report := singleJobReport("exit-variant", "Fail", tc.job)
+			out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
+			for _, needle := range tc.contains {
+				assertx.Contains(t, out, needle)
+			}
+			for _, needle := range tc.notContain {
+				assertx.NotContains(t, out, needle)
+			}
+		})
 	}
-
-	prefix := "└  Exit 42: "
-	indent := strings.Repeat(" ", len(prefix))
-	expected := prefix + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
-		indent + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
-		indent + "\x1b[91m" + strings.Repeat("x", 10) + "\x1b[0m"
-	assertx.Contains(t, buf.String(), expected)
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
@@ -328,11 +295,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		},
 	}
 
-	var plain bytes.Buffer
-	if err := RenderRunReportText(&plain, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL}); err != nil {
-		t.Fatalf("RenderRunReportText plain error: %v", err)
-	}
-	plainOut := plain.String()
+	plainOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL})
 	assertx.Contains(t, plainOut, "Logs ("+logURL+"?auth_token=test-token)")
 	assertx.Contains(t, plainOut, "Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
 	assertx.Contains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
@@ -345,11 +308,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		t.Fatalf("plain output unexpectedly contains OSC8 sequence: %q", plainOut)
 	}
 
-	var linked bytes.Buffer
-	if err := RenderRunReportText(&linked, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL}); err != nil {
-		t.Fatalf("RenderRunReportText linked error: %v", err)
-	}
-	linkedOut := linked.String()
+	linkedOut := renderText(t, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL})
 	assertx.Contains(t, linkedOut, "\x1b]8;;"+logURL+"?auth_token=test-token")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
@@ -393,12 +352,7 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 		},
 	}
 
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{EnableOSC8: false}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
-	}
-	out := buf.String()
-
+	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
 	assertx.NotContains(t, out, "Logs (")
 }
 
@@ -414,11 +368,7 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 		Repos:   []RunEntry{},
 	}
 
-	var buf bytes.Buffer
-	if err := RenderRunReportText(&buf, report, TextRenderOptions{}); err != nil {
-		t.Fatalf("RenderRunReportText error: %v", err)
-	}
-	out := buf.String()
+	out := renderText(t, report, TextRenderOptions{})
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"\n")
 	firstLine := strings.SplitN(out, "\n", 2)[0]
 	assertx.NotContains(t, firstLine, "|")
@@ -460,29 +410,27 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	}
 
 	now := time.Date(2026, time.February, 26, 10, 0, 5, 0, time.UTC)
-	var frame0 bytes.Buffer
-	if err := RenderRunReportText(&frame0, report, TextRenderOptions{
-		EnableOSC8:    false,
-		SpinnerFrame:  0,
-		LiveDurations: true,
-		Now:           now,
-	}); err != nil {
-		t.Fatalf("RenderRunReportText frame0 error: %v", err)
-	}
-	out0 := frame0.String()
-	assertx.Contains(t, out0, "⣾")
-	assertx.Contains(t, out0, "5.0s")
 
-	var frame1 bytes.Buffer
-	if err := RenderRunReportText(&frame1, report, TextRenderOptions{
-		EnableOSC8:    false,
-		SpinnerFrame:  1,
-		LiveDurations: true,
-		Now:           now,
-	}); err != nil {
-		t.Fatalf("RenderRunReportText frame1 error: %v", err)
+	tests := []struct {
+		name    string
+		frame   int
+		glyph   string
+	}{
+		{"frame 0", 0, "⣾"},
+		{"frame 1", 1, "⣷"},
 	}
-	out1 := frame1.String()
-	assertx.Contains(t, out1, "⣷")
-	assertx.Contains(t, out1, "5.0s")
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			out := renderText(t, report, TextRenderOptions{
+				EnableOSC8:    false,
+				SpinnerFrame:  tc.frame,
+				LiveDurations: true,
+				Now:           now,
+			})
+			assertx.Contains(t, out, tc.glyph)
+			assertx.Contains(t, out, "5.0s")
+		})
+	}
 }

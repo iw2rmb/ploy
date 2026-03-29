@@ -4,13 +4,50 @@ import (
 	"strings"
 	"testing"
 
-	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // testJobImage is a helper to create a JobImage from a string for tests.
 func testJobImage(image string) contracts.JobImage {
 	return contracts.JobImage{Universal: image}
+}
+
+// assertCommandEqual compares two command slices element-by-element with clear diagnostics.
+func assertCommandEqual(t *testing.T, got, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("Command len: got %d, want %d: %v", len(got), len(want), got)
+	}
+	for i, v := range want {
+		if got[i] != v {
+			t.Errorf("Command[%d]: got %q, want %q", i, got[i], v)
+		}
+	}
+}
+
+// assertEnvContains verifies that every key in want is present with the correct value.
+func assertEnvContains(t *testing.T, env, want map[string]string) {
+	t.Helper()
+	for key, wantVal := range want {
+		gotVal, ok := env[key]
+		if !ok {
+			t.Errorf("env missing key %q", key)
+			continue
+		}
+		if gotVal != wantVal {
+			t.Errorf("env[%q] = %q, want %q", key, gotVal, wantVal)
+		}
+	}
+}
+
+// assertEnvAbsent verifies that none of the given keys are present.
+func assertEnvAbsent(t *testing.T, env map[string]string, keys []string) {
+	t.Helper()
+	for _, key := range keys {
+		if val, ok := env[key]; ok {
+			t.Errorf("env[%q] = %q, want key absent", key, val)
+		}
+	}
 }
 
 // TestBuildHealingManifest_RepoMetadataInjection verifies that repo metadata
@@ -28,17 +65,14 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 	}{
 		{
 			name: "all repo metadata present",
-			req: StartRunRequest{
-				RunID:     types.RunID("test-run-1"),
-				JobID:     types.JobID("test-job-1"),
-				RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"),
-				BaseRef:   types.GitRef("main"),
-				TargetRef: types.GitRef("e2e/fail-missing-symbol"),
-				CommitSHA: types.CommitSHA("abc123def456"),
-			},
-			mig: MigContainerSpec{
-				Image: testJobImage("test/healer:latest"),
-			},
+			req: newStartRunRequest(
+				withRunID("test-run-1"), withJobID("test-job-1"),
+				withRunRepoURL("https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"),
+				withRunBaseRef("main"),
+				withRunTargetRef("e2e/fail-missing-symbol"),
+				withRunCommitSHA("abc123def456"),
+			),
+			mig: MigContainerSpec{Image: testJobImage("test/healer:latest")},
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL":   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				"PLOY_BASE_REF":   "main",
@@ -48,15 +82,13 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		},
 		{
 			name: "only repo_url and base_ref present",
-			req: StartRunRequest{
-				RunID:   types.RunID("test-run-2"),
-				JobID:   types.JobID("test-job-2"),
-				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-				BaseRef: types.GitRef("develop"),
-			},
-			mig: MigContainerSpec{
-				Image: testJobImage("test/healer:latest"),
-			},
+			req: newStartRunRequest(
+				withRunID("test-run-2"), withJobID("test-job-2"),
+				withRunRepoURL("https://gitlab.com/test/repo.git"),
+				withRunBaseRef("develop"),
+				withRunTargetRef(""), withRunCommitSHA(""),
+			),
+			mig: MigContainerSpec{Image: testJobImage("test/healer:latest")},
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
 				"PLOY_BASE_REF": "develop",
@@ -65,17 +97,14 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		},
 		{
 			name: "empty strings are not injected",
-			req: StartRunRequest{
-				RunID:     types.RunID("test-run-3"),
-				JobID:     types.JobID("test-job-3"),
-				RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
-				BaseRef:   types.GitRef(""),
-				TargetRef: types.GitRef("   "), // whitespace only
-				CommitSHA: types.CommitSHA(""),
-			},
-			mig: MigContainerSpec{
-				Image: testJobImage("test/healer:latest"),
-			},
+			req: newStartRunRequest(
+				withRunID("test-run-3"), withJobID("test-job-3"),
+				withRunRepoURL("https://gitlab.com/test/repo.git"),
+				withRunBaseRef(""),
+				withRunTargetRef("   "), // whitespace only
+				withRunCommitSHA(""),
+			),
+			mig: MigContainerSpec{Image: testJobImage("test/healer:latest")},
 			wantEnv: map[string]string{
 				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
 			},
@@ -83,12 +112,12 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		},
 		{
 			name: "mig env is preserved alongside repo metadata",
-			req: StartRunRequest{
-				RunID:   types.RunID("test-run-4"),
-				JobID:   types.JobID("test-job-4"),
-				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-				BaseRef: types.GitRef("main"),
-			},
+			req: newStartRunRequest(
+				withRunID("test-run-4"), withJobID("test-job-4"),
+				withRunRepoURL("https://gitlab.com/test/repo.git"),
+				withRunBaseRef("main"),
+				withRunTargetRef(""), withRunCommitSHA(""),
+			),
 			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
@@ -107,12 +136,12 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		},
 		{
 			name: "mig env can override repo metadata if specified",
-			req: StartRunRequest{
-				RunID:   types.RunID("test-run-5"),
-				JobID:   types.JobID("test-job-5"),
-				RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-				BaseRef: types.GitRef("main"),
-			},
+			req: newStartRunRequest(
+				withRunID("test-run-5"), withJobID("test-job-5"),
+				withRunRepoURL("https://gitlab.com/test/repo.git"),
+				withRunBaseRef("main"),
+				withRunTargetRef(""), withRunCommitSHA(""),
+			),
 			mig: MigContainerSpec{
 				Image: testJobImage("test/healer:latest"),
 				Env: map[string]string{
@@ -127,36 +156,36 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				"PLOY_BASE_REF": "main",
 			},
 		},
+		{
+			name: "nil env still injects repo metadata",
+			req: newStartRunRequest(
+				withRunID("test-run-nil-env"), withJobID("test-job-nil-env"),
+				withRunRepoURL("https://gitlab.com/test/repo.git"),
+				withRunBaseRef("main"),
+				withRunTargetRef(""), withRunCommitSHA(""),
+			),
+			mig: MigContainerSpec{
+				Image: testJobImage("test/healer:latest"),
+				Env:   nil, // explicitly nil
+			},
+			wantEnv: map[string]string{
+				"PLOY_REPO_URL": "https://gitlab.com/test/repo.git",
+				"PLOY_BASE_REF": "main",
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
 			manifest, err := buildHealingManifest(tc.req, tc.mig, 0, "", contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
 
-			// Check that expected env vars are present with correct values.
-			for key, wantVal := range tc.wantEnv {
-				gotVal, ok := manifest.Env[key]
-				if !ok {
-					t.Errorf("manifest.Env missing key %q", key)
-					continue
-				}
-				if gotVal != wantVal {
-					t.Errorf("manifest.Env[%q] = %q, want %q", key, gotVal, wantVal)
-				}
-			}
-
-			// Check that absent keys are not present.
-			for _, key := range tc.wantAbsnt {
-				if val, ok := manifest.Env[key]; ok {
-					t.Errorf("manifest.Env[%q] = %q, want key absent", key, val)
-				}
-			}
+			assertEnvContains(t, manifest.Env, tc.wantEnv)
+			assertEnvAbsent(t, manifest.Env, tc.wantAbsnt)
 		})
 	}
 }
@@ -170,27 +199,23 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 		"ORIGINAL_KEY": "original_value",
 	}
 
-	req := StartRunRequest{
-		RunID:     types.RunID("test-run-mutate"),
-		JobID:     types.JobID("test-job-mutate"),
-		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef:   types.GitRef("main"),
-		TargetRef: types.GitRef("feature"),
-		CommitSHA: types.CommitSHA("sha123"),
-	}
+	req := newStartRunRequest(
+		withRunID("test-run-mutate"), withJobID("test-job-mutate"),
+		withRunRepoURL("https://gitlab.com/test/repo.git"),
+		withRunBaseRef("main"),
+		withRunTargetRef("feature"), withRunCommitSHA("sha123"),
+	)
 
 	mig := MigContainerSpec{
 		Image: testJobImage("test/healer:latest"),
 		Env:   originalEnv,
 	}
 
-	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
 	_, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
 
-	// Verify original map was not mutated.
 	if len(originalEnv) != 1 {
 		t.Errorf("original env map was mutated: len = %d, want 1", len(originalEnv))
 	}
@@ -199,38 +224,6 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 	}
 	if originalEnv["ORIGINAL_KEY"] != "original_value" {
 		t.Error("original env map value was mutated")
-	}
-}
-
-// TestBuildHealingManifest_NilEnvHandledGracefully verifies that a nil
-// mig.Env map does not cause panics and repo metadata is still injected.
-func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
-	t.Parallel()
-
-	req := StartRunRequest{
-		RunID:   types.RunID("test-run-nil-env"),
-		JobID:   types.JobID("test-job-nil-env"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
-
-	mig := MigContainerSpec{
-		Image: testJobImage("test/healer:latest"),
-		Env:   nil, // explicitly nil
-	}
-
-	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-	if err != nil {
-		t.Fatalf("buildHealingManifest() error = %v", err)
-	}
-
-	// Should still have repo metadata injected.
-	if manifest.Env["PLOY_REPO_URL"] != "https://gitlab.com/test/repo.git" {
-		t.Errorf("PLOY_REPO_URL = %q, want repo URL", manifest.Env["PLOY_REPO_URL"])
-	}
-	if manifest.Env["PLOY_BASE_REF"] != "main" {
-		t.Errorf("PLOY_BASE_REF = %q, want main", manifest.Env["PLOY_BASE_REF"])
 	}
 }
 
@@ -246,7 +239,7 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 	}{
 		{
 			name:    "empty image",
-			mig:     MigContainerSpec{Image: contracts.JobImage{}}, // empty JobImage
+			mig:     MigContainerSpec{Image: contracts.JobImage{}},
 			wantErr: "image required",
 		},
 		{
@@ -256,18 +249,16 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 		},
 	}
 
-	req := StartRunRequest{
-		RunID:   types.RunID("test-run-validation"),
-		JobID:   types.JobID("test-job-validation"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
+	req := newStartRunRequest(
+		withRunID("test-run-validation"), withJobID("test-job-validation"),
+		withRunRepoURL("https://gitlab.com/test/repo.git"),
+		withRunBaseRef("main"),
+	)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
 			_, err := buildHealingManifest(req, tc.mig, 0, "", contracts.MigStackUnknown)
 			if err == nil {
 				t.Fatal("expected error, got nil")
@@ -316,12 +307,8 @@ func TestIsCodexHealingImage(t *testing.T) {
 	}
 }
 
-// TestBuildHealingManifest_CodexResumeInjection verifies that CODEX_RESUME=1 is
-// injected into the healing manifest environment when:
-//  1. A non-empty codexSession is provided, AND
-//  2. The healing mig image matches the Codex pattern.
-//
-// Non-Codex healing migs should never receive CODEX_RESUME.
+// TestBuildHealingManifest_CodexResumeInjection verifies CODEX_RESUME=1 injection
+// rules and that user env vars are preserved alongside it.
 func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 	t.Parallel()
 
@@ -329,7 +316,8 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 		name         string
 		mig          MigContainerSpec
 		codexSession string
-		wantResume   bool // true if CODEX_RESUME=1 should be set
+		wantResume   bool              // true if CODEX_RESUME=1 should be set
+		wantEnv      map[string]string // additional env assertions (optional)
 	}{
 		{
 			name:         "codex image with session sets CODEX_RESUME=1",
@@ -367,20 +355,34 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 			codexSession: "session-ghi-012",
 			wantResume:   true,
 		},
+		{
+			name: "codex resume preserves user env vars",
+			mig: MigContainerSpec{
+				Image: testJobImage("migs-codex:latest"),
+				Env: map[string]string{
+					"CUSTOM_VAR": "custom_value",
+					"ANOTHER":    "another_value",
+				},
+			},
+			codexSession: "session-id-123",
+			wantResume:   true,
+			wantEnv: map[string]string{
+				"CUSTOM_VAR": "custom_value",
+				"ANOTHER":    "another_value",
+			},
+		},
 	}
 
-	req := StartRunRequest{
-		RunID:   types.RunID("test-run-codex-resume"),
-		JobID:   types.JobID("test-job-codex-resume"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
+	req := newStartRunRequest(
+		withRunID("test-run-codex-resume"), withJobID("test-job-codex-resume"),
+		withRunRepoURL("https://gitlab.com/test/repo.git"),
+		withRunBaseRef("main"),
+	)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
 			manifest, err := buildHealingManifest(req, tc.mig, 0, tc.codexSession, contracts.MigStackUnknown)
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
@@ -396,159 +398,80 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 					t.Errorf("CODEX_RESUME = %q, want absent", gotResume)
 				}
 			}
+
+			assertEnvContains(t, manifest.Env, tc.wantEnv)
 		})
 	}
 }
 
-// TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv verifies that
-// user-specified env vars are preserved when CODEX_RESUME is injected.
-func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
-	t.Parallel()
-
-	req := StartRunRequest{
-		RunID:   types.RunID("test-run-preserve-env"),
-		JobID:   types.JobID("test-job-preserve-env"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
-
-	mig := MigContainerSpec{
-		Image: testJobImage("migs-codex:latest"),
-		Env: map[string]string{
-			"CUSTOM_VAR": "custom_value",
-			"ANOTHER":    "another_value",
-		},
-	}
-
-	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, mig, 0, "session-id-123", contracts.MigStackUnknown)
-	if err != nil {
-		t.Fatalf("buildHealingManifest() error = %v", err)
-	}
-
-	// Verify CODEX_RESUME is set.
-	if manifest.Env["CODEX_RESUME"] != "1" {
-		t.Errorf("CODEX_RESUME = %q, want '1'", manifest.Env["CODEX_RESUME"])
-	}
-
-	// Verify user env vars are preserved.
-	if manifest.Env["CUSTOM_VAR"] != "custom_value" {
-		t.Errorf("CUSTOM_VAR = %q, want 'custom_value'", manifest.Env["CUSTOM_VAR"])
-	}
-	if manifest.Env["ANOTHER"] != "another_value" {
-		t.Errorf("ANOTHER = %q, want 'another_value'", manifest.Env["ANOTHER"])
-	}
-}
-
-// TestBuildHealingManifest_AmataCommand verifies that when Amata.Spec is set,
-// the manifest command resolves to amata run with ordered --set flags, and that
-// when Amata is nil the direct command is preserved.
+// TestBuildHealingManifest_AmataCommand verifies amata command resolution
+// for healing manifests: amata spec, no set params, nil amata, empty spec.
 func TestBuildHealingManifest_AmataCommand(t *testing.T) {
 	t.Parallel()
 
-	req := StartRunRequest{
-		RunID:   types.RunID("run-amata-heal"),
-		JobID:   types.JobID("job-amata-heal"),
-		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
-		BaseRef: types.GitRef("main"),
-	}
+	req := newStartRunRequest(
+		withRunID("run-amata-heal"), withJobID("job-amata-heal"),
+		withRunRepoURL("https://gitlab.com/test/repo.git"),
+		withRunBaseRef("main"),
+	)
 
-	t.Run("amata_spec_selects_amata_command", func(t *testing.T) {
-		t.Parallel()
-
-		mig := MigContainerSpec{
-			Image:   testJobImage("migs-codex:latest"),
-			Command: contracts.CommandSpec{Shell: "codex exec"},
-			Amata: &contracts.AmataRunSpec{
-				Spec: "task: fix",
-				Set: []contracts.AmataSetParam{
-					{Param: "repo", Value: "myrepo"},
-					{Param: "env", Value: "prod"},
+	tests := []struct {
+		name    string
+		mig     MigContainerSpec
+		wantCmd []string
+	}{
+		{
+			name: "amata spec selects amata command",
+			mig: MigContainerSpec{
+				Image:   testJobImage("migs-codex:latest"),
+				Command: contracts.CommandSpec{Shell: "codex exec"},
+				Amata: &contracts.AmataRunSpec{
+					Spec: "task: fix",
+					Set: []contracts.AmataSetParam{
+						{Param: "repo", Value: "myrepo"},
+						{Param: "env", Value: "prod"},
+					},
 				},
 			},
-		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-		if err != nil {
-			t.Fatalf("buildHealingManifest() error = %v", err)
-		}
-		want := []string{"amata", "run", "/in/amata.yaml", "--set", "repo=myrepo", "--set", "env=prod"}
-		if len(manifest.Command) != len(want) {
-			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
-		}
-		for i, v := range want {
-			if manifest.Command[i] != v {
-				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
+			wantCmd: []string{"amata", "run", "/in/amata.yaml", "--set", "repo=myrepo", "--set", "env=prod"},
+		},
+		{
+			name: "amata no set params",
+			mig: MigContainerSpec{
+				Image: testJobImage("migs-codex:latest"),
+				Amata: &contracts.AmataRunSpec{Spec: "task: fix"},
+			},
+			wantCmd: []string{"amata", "run", "/in/amata.yaml"},
+		},
+		{
+			name: "nil amata uses direct command",
+			mig: MigContainerSpec{
+				Image:   testJobImage("migs-codex:latest"),
+				Command: contracts.CommandSpec{Shell: "codex exec"},
+				Amata:   nil,
+			},
+			wantCmd: []string{"/bin/sh", "-c", "codex exec"},
+		},
+		{
+			name: "amata with empty spec falls through to direct command",
+			mig: MigContainerSpec{
+				Image:   testJobImage("migs-codex:latest"),
+				Command: contracts.CommandSpec{Shell: "codex exec"},
+				Amata:   &contracts.AmataRunSpec{Spec: "   "},
+			},
+			wantCmd: []string{"/bin/sh", "-c", "codex exec"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			manifest, err := buildHealingManifest(req, tc.mig, 0, "", contracts.MigStackUnknown)
+			if err != nil {
+				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
-		}
-	})
-
-	t.Run("amata_no_set_params", func(t *testing.T) {
-		t.Parallel()
-
-		mig := MigContainerSpec{
-			Image: testJobImage("migs-codex:latest"),
-			Amata: &contracts.AmataRunSpec{Spec: "task: fix"},
-		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-		if err != nil {
-			t.Fatalf("buildHealingManifest() error = %v", err)
-		}
-		want := []string{"amata", "run", "/in/amata.yaml"}
-		if len(manifest.Command) != len(want) {
-			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
-		}
-		for i, v := range want {
-			if manifest.Command[i] != v {
-				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
-			}
-		}
-	})
-
-	t.Run("nil_amata_uses_direct_command", func(t *testing.T) {
-		t.Parallel()
-
-		mig := MigContainerSpec{
-			Image:   testJobImage("migs-codex:latest"),
-			Command: contracts.CommandSpec{Shell: "codex exec"},
-			Amata:   nil,
-		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-		if err != nil {
-			t.Fatalf("buildHealingManifest() error = %v", err)
-		}
-		want := []string{"/bin/sh", "-c", "codex exec"}
-		if len(manifest.Command) != len(want) {
-			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
-		}
-		for i, v := range want {
-			if manifest.Command[i] != v {
-				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
-			}
-		}
-	})
-
-	t.Run("amata_with_empty_spec_falls_through_to_direct_command", func(t *testing.T) {
-		t.Parallel()
-
-		mig := MigContainerSpec{
-			Image:   testJobImage("migs-codex:latest"),
-			Command: contracts.CommandSpec{Shell: "codex exec"},
-			Amata:   &contracts.AmataRunSpec{Spec: "   "},
-		}
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-		if err != nil {
-			t.Fatalf("buildHealingManifest() error = %v", err)
-		}
-		want := []string{"/bin/sh", "-c", "codex exec"}
-		if len(manifest.Command) != len(want) {
-			t.Fatalf("Command len: got %d, want %d: %v", len(manifest.Command), len(want), manifest.Command)
-		}
-		for i, v := range want {
-			if manifest.Command[i] != v {
-				t.Errorf("Command[%d]: got %q, want %q", i, manifest.Command[i], v)
-			}
-		}
-	})
+			assertCommandEqual(t, manifest.Command, tc.wantCmd)
+		})
+	}
 }
-
-// Note: contains and findSubstring helpers are defined in tls_test.go

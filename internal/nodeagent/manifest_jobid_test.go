@@ -9,27 +9,20 @@ import (
 
 // TestBuildManifestFromRequest_StepIDUsesJobID verifies that manifest.ID uses
 // JobID when available to ensure uniqueness across jobs within the same run.
-// This prevents collisions when multiple jobs (pre_gate, mig, post_gate, heal)
-// exist for a single run.
 func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 	t.Parallel()
 
 	t.Run("uses JobID when provided", func(t *testing.T) {
 		t.Parallel()
-		req := StartRunRequest{
-			RunID:        types.RunID("run-shared-123"),
-			JobID:        types.JobID("job-unique-456"),
-			RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
-			BaseRef:      types.GitRef("main"),
-			TypedOptions: RunOptions{},
-		}
+		req := newStartRunRequest(
+			withRunID("run-shared-123"), withJobID("job-unique-456"),
+		)
 
-		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+		manifest, err := buildManifestDefault(req)
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest error: %v", err)
 		}
 
-		// Manifest ID should be JobID, not RunID.
 		if manifest.ID.String() != req.JobID.String() {
 			t.Errorf("manifest.ID = %q, want JobID %q", manifest.ID, req.JobID)
 		}
@@ -37,15 +30,11 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 
 	t.Run("requires JobID", func(t *testing.T) {
 		t.Parallel()
-		req := StartRunRequest{
-			RunID:        types.RunID("run-fallback-789"),
-			RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
-			BaseRef:      types.GitRef("main"),
-			TypedOptions: RunOptions{},
-			// JobID intentionally omitted.
-		}
+		req := newStartRunRequest(
+			withRunID("run-fallback-789"), withJobID(""),
+		)
 
-		manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+		manifest, err := buildManifestDefault(req)
 		if err == nil {
 			t.Fatalf("expected error when JobID is missing")
 		}
@@ -56,9 +45,7 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 
 	t.Run("different JobIDs produce unique manifest IDs for same RunID", func(t *testing.T) {
 		t.Parallel()
-		runID := types.RunID("run-multi-job-001")
 
-		// Simulate multiple jobs within the same run (e.g., pre_gate, mig, post_gate).
 		jobs := []types.JobID{
 			types.JobID("job-pre-gate-001"),
 			types.JobID("job-mig-001"),
@@ -67,15 +54,11 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 
 		manifestIDs := make(map[string]struct{})
 		for _, jobID := range jobs {
-			req := StartRunRequest{
-				RunID:        runID,
-				JobID:        jobID,
-				RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
-				BaseRef:      types.GitRef("main"),
-				TypedOptions: RunOptions{},
-			}
+			req := newStartRunRequest(
+				withRunID("run-multi-job-001"), withJobID(string(jobID)),
+			)
 
-			manifest, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+			manifest, err := buildManifestDefault(req)
 			if err != nil {
 				t.Fatalf("buildManifestFromRequest error for job %s: %v", jobID, err)
 			}
@@ -87,7 +70,6 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 			manifestIDs[id] = struct{}{}
 		}
 
-		// Verify all three jobs produced unique IDs.
 		if len(manifestIDs) != len(jobs) {
 			t.Errorf("expected %d unique manifest IDs, got %d", len(jobs), len(manifestIDs))
 		}
@@ -99,20 +81,16 @@ func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 func TestBuildGateManifestFromRequest_StepIDUsesJobID(t *testing.T) {
 	t.Parallel()
 
-	req := StartRunRequest{
-		RunID:        types.RunID("run-gate-shared"),
-		JobID:        types.JobID("job-gate-unique"),
-		RepoURL:      types.RepoURL("https://gitlab.com/acme/repo.git"),
-		BaseRef:      types.GitRef("main"),
-		TypedOptions: RunOptions{BuildGate: BuildGateOptions{Enabled: true}},
-	}
+	req := newStartRunRequest(
+		withRunID("run-gate-shared"), withJobID("job-gate-unique"),
+		withRunOptions(RunOptions{BuildGate: BuildGateOptions{Enabled: true}}),
+	)
 
 	manifest, err := buildGateManifestFromRequest(req, req.TypedOptions)
 	if err != nil {
 		t.Fatalf("buildGateManifestFromRequest error: %v", err)
 	}
 
-	// Gate manifest ID should use JobID.
 	if manifest.ID.String() != req.JobID.String() {
 		t.Errorf("gate manifest.ID = %q, want JobID %q", manifest.ID, req.JobID)
 	}
@@ -125,12 +103,9 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 
 	t.Run("uses JobID when provided", func(t *testing.T) {
 		t.Parallel()
-		req := StartRunRequest{
-			RunID:   types.RunID("run-heal-shared"),
-			JobID:   types.JobID("job-heal-unique"),
-			RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
-			BaseRef: types.GitRef("main"),
-		}
+		req := newStartRunRequest(
+			withRunID("run-heal-shared"), withJobID("job-heal-unique"),
+		)
 
 		mig := MigContainerSpec{
 			Image: contracts.JobImage{Universal: "healer:latest"},
@@ -141,7 +116,6 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			t.Fatalf("buildHealingManifest error: %v", err)
 		}
 
-		// Healing manifest ID should use JobID with heal suffix.
 		wantID := "job-heal-unique-heal-0"
 		if manifest.ID.String() != wantID {
 			t.Errorf("healing manifest.ID = %q, want %q", manifest.ID, wantID)
@@ -150,12 +124,9 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 
 	t.Run("requires JobID", func(t *testing.T) {
 		t.Parallel()
-		req := StartRunRequest{
-			RunID:   types.RunID("run-heal-fallback"),
-			RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
-			BaseRef: types.GitRef("main"),
-			// JobID intentionally omitted.
-		}
+		req := newStartRunRequest(
+			withRunID("run-heal-fallback"), withJobID(""),
+		)
 
 		mig := MigContainerSpec{
 			Image: contracts.JobImage{Universal: "healer:latest"},
@@ -169,9 +140,7 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 
 	t.Run("different JobIDs produce unique healing manifest IDs", func(t *testing.T) {
 		t.Parallel()
-		runID := types.RunID("run-heal-multi")
 
-		// Simulate multiple healing jobs within the same run.
 		jobs := []types.JobID{
 			types.JobID("job-heal-a"),
 			types.JobID("job-heal-b"),
@@ -180,12 +149,9 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 
 		manifestIDs := make(map[string]struct{})
 		for _, jobID := range jobs {
-			req := StartRunRequest{
-				RunID:   runID,
-				JobID:   jobID,
-				RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
-				BaseRef: types.GitRef("main"),
-			}
+			req := newStartRunRequest(
+				withRunID("run-heal-multi"), withJobID(string(jobID)),
+			)
 
 			mig := MigContainerSpec{
 				Image: contracts.JobImage{Universal: "healer:latest"},
@@ -203,29 +169,25 @@ func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
 			manifestIDs[id] = struct{}{}
 		}
 
-		// Verify all healing jobs produced unique IDs.
 		if len(manifestIDs) != len(jobs) {
 			t.Errorf("expected %d unique manifest IDs, got %d", len(jobs), len(manifestIDs))
 		}
 	})
 }
 
-// Ensures job_id and artifact_name options are propagated into manifest.Options
-// so that orchestrator uploads can read them.
+// TestBuildManifestFromRequest_PropagatesJobAndArtifactName ensures job_id and
+// artifact_name options are propagated into manifest.Options.
 func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
-	req := StartRunRequest{
-		RunID:   types.RunID("run-opts-1"),
-		JobID:   types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
-		RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
-		BaseRef: types.GitRef("main"),
-		TypedOptions: RunOptions{
+	req := newStartRunRequest(
+		withRunID("run-opts-1"),
+		withJobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+		withRunOptions(RunOptions{
 			ServerMetadata: ServerMetadataOptions{JobID: types.JobID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")},
 			Artifacts:      ArtifactOptions{Name: "custom-bundle"},
-		},
-	}
+		}),
+	)
 
-	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	m, err := buildManifestFromRequest(req, req.TypedOptions, 0, contracts.MigStackUnknown)
+	m, err := buildManifestDefault(req)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest error: %v", err)
 	}

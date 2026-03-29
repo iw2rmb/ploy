@@ -21,132 +21,126 @@ import (
 // POST /v1/migs/{mig_id}/runs — Create Multi-Repo Run
 // =============================================================================
 
-// TestModRuns_Create_AllRepos verifies POST /v1/migs/{mig_id}/runs with mode="all"
-// creates a run with all repos from the mig's repo set.
-func TestModRuns_Create_AllRepos(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
-	st := activeMigWithSpec(specID)
-	st.listMigReposByModResult = []store.MigRepo{
-		{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-		{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
-	}
-	handler := createMigRunHandler(st)
-
-	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", allReposSelector(), "mig_id", "mod123")
-	assertStatus(t, rr, http.StatusCreated)
-
-	if !st.getModCalled {
-		t.Error("store.GetMig was not called")
-	}
-	if !st.listMigReposByModCalled {
-		t.Error("store.ListMigReposByMig was not called")
-	}
-	if !st.createRunCalled {
-		t.Error("store.CreateRun was not called")
-	}
-	if !st.createRunRepoCalled {
-		t.Error("store.CreateRunRepo was not called")
-	}
-	if st.createJobCalled {
-		t.Error("store.CreateJob should not be called during run submission")
-	}
-
-	resp := decodeBody[struct{ RunID string `json:"run_id"` }](t, rr)
-	if resp.RunID == "" {
-		t.Error("response run_id is empty")
-	}
-}
-
-// TestModRuns_Create_FailedRepos verifies POST /v1/migs/{mig_id}/runs with mode="failed"
-// only selects repos whose last terminal status is 'Fail'.
-func TestModRuns_Create_FailedRepos(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
-	st := activeMigWithSpec(specID)
-	st.listMigReposByModResult = []store.MigRepo{
-		{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-		{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
-		{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
-	}
-	st.listFailedRepoIDsByMod.val = []domaintypes.RepoID{"repo2"}
-	handler := createMigRunHandler(st)
-
-	reqBody := map[string]any{
-		"repo_selector": map[string]any{"mode": "failed"},
-	}
-
-	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
-	assertStatus(t, rr, http.StatusCreated)
-
-	if !st.listFailedRepoIDsByMod.called {
-		t.Error("store.ListFailedRepoIDsByMig was not called")
-	}
-	if st.listFailedRepoIDsByMod.params != "mod123" {
-		t.Errorf("ListFailedRepoIDsByMig param = %q, want %q", st.listFailedRepoIDsByMod.params, "mod123")
-	}
-	if !st.createRunRepoCalled {
-		t.Error("store.CreateRunRepo was not called")
-	}
-
-	resp := decodeBody[struct{ RunID string `json:"run_id"` }](t, rr)
-	if resp.RunID == "" {
-		t.Error("response run_id is empty")
-	}
-}
-
-// TestModRuns_Create_ExplicitRepos verifies POST /v1/migs/{mig_id}/runs with mode="explicit"
-// only selects repos matching the provided repo URLs.
-func TestModRuns_Create_ExplicitRepos(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
-	st := activeMigWithSpec(specID)
-	st.listMigReposByModResult = []store.MigRepo{
-		{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
-		{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
-		{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
-	}
-	st.repoByID = map[domaintypes.RepoID]store.Repo{
-		"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},
-		"repo2": {ID: "repo2", Url: "https://github.com/org/repo2"},
-		"repo3": {ID: "repo3", Url: "https://github.com/org/repo3"},
-	}
-	handler := createMigRunHandler(st)
-
-	reqBody := map[string]any{
-		"repo_selector": map[string]any{
-			"mode": "explicit",
-			"repos": []string{
-				"https://github.com/org/repo1.git",
-				"https://github.com/org/repo3/",
+func TestModRuns_Create(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupFn    func(st *migStore)
+		body       any
+		wantStatus int
+		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+	}{
+		{
+			name: "all repos",
+			setupFn: func(st *migStore) {
+				st.listMigReposByModResult = []store.MigRepo{
+					{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
+				}
+			},
+			body:       allReposSelector(),
+			wantStatus: http.StatusCreated,
+			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertCalled(t, "GetMig", st.getModCalled)
+				assertCalled(t, "ListMigReposByMig", st.listMigReposByModCalled)
+				assertCalled(t, "CreateRun", st.createRunCalled)
+				assertCalled(t, "CreateRunRepo", st.createRunRepoCalled)
+				assertNotCalled(t, "CreateJob", st.createJobCalled)
+				resp := decodeBody[struct{ RunID string `json:"run_id"` }](t, rr)
+				if resp.RunID == "" {
+					t.Error("response run_id is empty")
+				}
+			},
+		},
+		{
+			name: "failed repos",
+			setupFn: func(st *migStore) {
+				st.listMigReposByModResult = []store.MigRepo{
+					{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
+					{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
+				}
+				st.listFailedRepoIDsByMod.val = []domaintypes.RepoID{"repo2"}
+			},
+			body:       map[string]any{"repo_selector": map[string]any{"mode": "failed"}},
+			wantStatus: http.StatusCreated,
+			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertCalled(t, "ListFailedRepoIDsByMig", st.listFailedRepoIDsByMod.called)
+				if st.listFailedRepoIDsByMod.params != "mod123" {
+					t.Errorf("ListFailedRepoIDsByMig param = %q, want %q", st.listFailedRepoIDsByMod.params, "mod123")
+				}
+				assertCalled(t, "CreateRunRepo", st.createRunRepoCalled)
+				resp := decodeBody[struct{ RunID string `json:"run_id"` }](t, rr)
+				if resp.RunID == "" {
+					t.Error("response run_id is empty")
+				}
+			},
+		},
+		{
+			name: "explicit repos",
+			setupFn: func(st *migStore) {
+				st.listMigReposByModResult = []store.MigRepo{
+					{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo2", MigID: "mod123", RepoID: "repo2", BaseRef: "main", TargetRef: "feature2"},
+					{ID: "repo3", MigID: "mod123", RepoID: "repo3", BaseRef: "main", TargetRef: "feature3"},
+				}
+				st.repoByID = map[domaintypes.RepoID]store.Repo{
+					"repo1": {ID: "repo1", Url: "https://github.com/org/repo1"},
+					"repo2": {ID: "repo2", Url: "https://github.com/org/repo2"},
+					"repo3": {ID: "repo3", Url: "https://github.com/org/repo3"},
+				}
+			},
+			body: map[string]any{
+				"repo_selector": map[string]any{
+					"mode": "explicit",
+					"repos": []string{
+						"https://github.com/org/repo1.git",
+						"https://github.com/org/repo3/",
+					},
+				},
+			},
+			wantStatus: http.StatusCreated,
+			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
+				t.Helper()
+				assertCalled(t, "ListMigReposByMig", st.listMigReposByModCalled)
+				resp := decodeBody[struct{ RunID string `json:"run_id"` }](t, rr)
+				if resp.RunID == "" {
+					t.Error("response run_id is empty")
+				}
+			},
+		},
+		{
+			name: "with created_by",
+			body: func() map[string]any {
+				b := allReposSelector()
+				b["created_by"] = "test-user@example.com"
+				return b
+			}(),
+			wantStatus: http.StatusCreated,
+			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
+				t.Helper()
+				if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != "test-user@example.com" {
+					t.Errorf("created_by not propagated; got %v, want test-user@example.com", st.createRunParams.CreatedBy)
+				}
 			},
 		},
 	}
 
-	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
-	assertStatus(t, rr, http.StatusCreated)
-
-	if !st.listMigReposByModCalled {
-		t.Error("store.ListMigReposByMig was not called")
-	}
-
-	resp := decodeBody[struct{ RunID string `json:"run_id"` }](t, rr)
-	if resp.RunID == "" {
-		t.Error("response run_id is empty")
-	}
-}
-
-// TestModRuns_Create_WithCreatedBy verifies POST /v1/migs/{mig_id}/runs passes created_by to store.
-func TestModRuns_Create_WithCreatedBy(t *testing.T) {
-	specID := domaintypes.SpecID("spec123")
-	st := activeMigWithSpec(specID)
-	handler := createMigRunHandler(st)
-
-	reqBody := allReposSelector()
-	reqBody["created_by"] = "test-user@example.com"
-
-	rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", reqBody, "mig_id", "mod123")
-	assertStatus(t, rr, http.StatusCreated)
-
-	if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != "test-user@example.com" {
-		t.Errorf("created_by not propagated; got %v, want test-user@example.com", st.createRunParams.CreatedBy)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			specID := domaintypes.SpecID("spec123")
+			st := activeMigWithSpec(specID)
+			if tt.setupFn != nil {
+				tt.setupFn(st)
+			}
+			handler := createMigRunHandler(st)
+			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", tt.body, "mig_id", "mod123")
+			assertStatus(t, rr, tt.wantStatus)
+			if tt.verify != nil {
+				tt.verify(t, st, rr)
+			}
+		})
 	}
 }
 
@@ -154,7 +148,6 @@ func TestModRuns_Create_WithCreatedBy(t *testing.T) {
 // Validation Tests (table-driven)
 // =============================================================================
 
-// TestModRuns_Create_ValidationErrors merges individual validation error tests.
 func TestModRuns_Create_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -241,7 +234,6 @@ func TestModRuns_Create_ValidationErrors(t *testing.T) {
 // Store Error Tests (table-driven)
 // =============================================================================
 
-// TestModRuns_Create_StoreErrors merges individual store error tests.
 func TestModRuns_Create_StoreErrors(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -317,7 +309,5 @@ func TestModRuns_Create_RejectsWhenSourceCommitSeedFails(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
-	if st.createRunRepoCalled {
-		t.Fatal("store.CreateRunRepo should not be called when source commit seed resolution fails")
-	}
+	assertNotCalled(t, "CreateRunRepo", st.createRunRepoCalled)
 }

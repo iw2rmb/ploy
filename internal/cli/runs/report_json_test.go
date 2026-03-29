@@ -119,17 +119,10 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	}
 
 	out := buf.String()
-	if strings.Contains(out, "\"build_log_url\"") {
-		t.Fatalf("expected build_log_url omitted for empty optional fields; got %q", out)
-	}
-	if strings.Contains(out, "\"patch_url\"") {
-		t.Fatalf("expected patch_url omitted for empty optional fields; got %q", out)
-	}
-	if strings.Contains(out, "\"last_error\"") {
-		t.Fatalf("expected last_error omitted for empty optional fields; got %q", out)
-	}
-	if strings.Contains(out, "\"artifacts\"") {
-		t.Fatalf("expected artifacts omitted for empty optional fields; got %q", out)
+	for _, field := range []string{"build_log_url", "patch_url", "last_error", "artifacts"} {
+		if strings.Contains(out, "\""+field+"\"") {
+			t.Fatalf("expected %q omitted for empty optional fields; got %q", field, out)
+		}
 	}
 }
 
