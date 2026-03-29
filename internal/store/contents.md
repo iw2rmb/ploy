@@ -62,6 +62,6 @@
 [ttl.sql.go](ttl.sql.go) sqlc-generated TTL metadata queries for partition cleanup scheduling.
 [uuid.go](uuid.go) UUID bridge helpers between domain string IDs and pgtype UUID values.
 [uuid_test.go](uuid_test.go) Unit tests for UUID conversion helpers and invalid-input handling.
-[v1_fixtures_test.go](v1_fixtures_test.go) Shared fixtures/helpers for legacy v1 SQLC query integration tests.
+[v1_fixtures_test.go](v1_fixtures_test.go) Shared fixtures/helpers for store integration tests: newV1Fixture, createRunRepoForStoreTest, createJobForStoreTest.
 [v1_sqlc_queries_test.go](v1_sqlc_queries_test.go) Integration tests for v1 sqlc query wiring and filter semantics.
 [versioning.go](versioning.go) Schema version table helpers used by migration/version tracking code.

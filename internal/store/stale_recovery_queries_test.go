@@ -22,7 +22,7 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	}
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-list-a", "main", "feature", []byte(`{"type":"stale-list"}`))
-	repoB := createRunRepoForStaleRecoveryQueryTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-list-b", "main", "feature-b")
+	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-list-b", "main", "feature-b", types.RunRepoStatusQueued)
 
 	cutoff := time.Now().UTC().Add(-45 * time.Second)
 	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
@@ -34,11 +34,11 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, staleNode.ID, cutoff.Add(-2*time.Minute))
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, freshNode.ID, cutoff.Add(2*time.Minute))
 
-	staleAttemptOneA := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-attempt1-a", types.JobStatusCreated)
-	staleAttemptOneB := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-attempt1-b", types.JobStatusCreated)
-	staleAttemptTwo := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-attempt2", types.JobStatusCreated)
-	freshRunning := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "fresh-running", types.JobStatusCreated)
-	_ = createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-non-running", types.JobStatusQueued)
+	staleAttemptOneA := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-attempt1-a", types.JobStatusCreated)
+	staleAttemptOneB := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-attempt1-b", types.JobStatusCreated)
+	staleAttemptTwo := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-attempt2", types.JobStatusCreated)
+	freshRunning := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "fresh-running", types.JobStatusCreated)
+	_ = createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-non-running", types.JobStatusQueued)
 
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAttemptOneA.ID, &staleNode.ID, time.Now().UTC().Add(-3*time.Minute))
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAttemptOneB.ID, &nilHeartbeatNode.ID, time.Now().UTC().Add(-2*time.Minute))
@@ -88,7 +88,7 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 	}
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-node-count-a", "main", "feature", []byte(`{"type":"stale-node-count"}`))
-	repoB := createRunRepoForStaleRecoveryQueryTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "main", "feature-b")
+	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-node-count-b", "main", "feature-b", types.RunRepoStatusQueued)
 
 	cutoff := time.Now().UTC().Add(-45 * time.Second)
 	cutoffTS := pgtype.Timestamptz{Time: cutoff, Valid: true}
@@ -102,12 +102,12 @@ func TestCountStaleNodesWithRunningJobs_CountsDistinctAssignedStaleNodes(t *test
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, staleNodeB.ID, cutoff.Add(-3*time.Minute))
 	setNodeHeartbeatForStaleRecoveryQueryTest(t, ctx, db, freshNode.ID, cutoff.Add(2*time.Minute))
 
-	staleAOne := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-a-1", types.JobStatusCreated)
-	staleATwo := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-a-2", types.JobStatusCreated)
-	staleB := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-b", types.JobStatusCreated)
-	nilHeartbeat := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 2, "nil-heartbeat", types.JobStatusCreated)
-	orphaned := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 3, "orphaned", types.JobStatusCreated)
-	fresh := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 3, "fresh", types.JobStatusCreated)
+	staleAOne := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "stale-a-1", types.JobStatusCreated)
+	staleATwo := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "stale-a-2", types.JobStatusCreated)
+	staleB := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "stale-b", types.JobStatusCreated)
+	nilHeartbeat := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 2, "nil-heartbeat", types.JobStatusCreated)
+	orphaned := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 3, "orphaned", types.JobStatusCreated)
+	fresh := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 3, "fresh", types.JobStatusCreated)
 
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleAOne.ID, &staleNodeA.ID, time.Now().UTC().Add(-2*time.Minute))
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, staleATwo.ID, &staleNodeA.ID, time.Now().UTC().Add(-2*time.Minute))
@@ -129,14 +129,14 @@ func TestCancelActiveJobsByRunRepoAttempt_TransitionsOnlyTargetAttempt(t *testin
 	ctx, db := openStoreForCancelBulkTests(t)
 
 	fx := newV1Fixture(t, ctx, db, "https://github.com/test/stale-cancel-a", "main", "feature", []byte(`{"type":"stale-cancel"}`))
-	repoB := createRunRepoForStaleRecoveryQueryTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-cancel-b", "main", "feature-b")
+	repoB := createRunRepoForStoreTest(t, ctx, db, fx.Mig.ID, fx.Run.ID, "https://github.com/test/stale-cancel-b", "main", "feature-b", types.RunRepoStatusQueued)
 
-	targetCreated := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-created", types.JobStatusCreated)
-	targetQueued := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-queued", types.JobStatusQueued)
-	targetRunning := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-running", types.JobStatusCreated)
-	targetSuccess := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-success", types.JobStatusSuccess)
-	otherAttemptQueued := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "other-attempt-queued", types.JobStatusQueued)
-	otherRepoQueued := createJobForStaleRecoveryQueryTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "other-repo-queued", types.JobStatusQueued)
+	targetCreated := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-created", types.JobStatusCreated)
+	targetQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-queued", types.JobStatusQueued)
+	targetRunning := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-running", types.JobStatusCreated)
+	targetSuccess := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 1, "target-success", types.JobStatusSuccess)
+	otherAttemptQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, fx.RunRepo.RepoID, fx.RunRepo.RepoBaseRef, 2, "other-attempt-queued", types.JobStatusQueued)
+	otherRepoQueued := createJobForStoreTest(t, ctx, db, fx.Run.ID, repoB.RepoID, repoB.RepoBaseRef, 1, "other-repo-queued", types.JobStatusQueued)
 
 	setJobRunningForStaleRecoveryQueryTest(t, ctx, db, targetRunning.ID, nil, time.Now().UTC().Add(-3*time.Second))
 
@@ -251,75 +251,6 @@ func setNodeHeartbeatForStaleRecoveryQueryTest(t *testing.T, ctx context.Context
 	}); err != nil {
 		t.Fatalf("UpdateNodeHeartbeat(%s) failed: %v", nodeID, err)
 	}
-}
-
-func createRunRepoForStaleRecoveryQueryTest(
-	t *testing.T,
-	ctx context.Context,
-	db Store,
-	migID types.MigID,
-	runID types.RunID,
-	repoURL, baseRef, targetRef string,
-) RunRepo {
-	t.Helper()
-
-	repoID := types.NewMigRepoID()
-	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        repoID,
-		MigID:     migID,
-		Url:       repoURL,
-		BaseRef:   baseRef,
-		TargetRef: targetRef,
-	})
-	if err != nil {
-		t.Fatalf("CreateMigRepo(%s) failed: %v", repoURL, err)
-	}
-
-	runRepo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:           migID,
-		RunID:           runID,
-		RepoID:          migRepo.RepoID,
-		RepoBaseRef:     migRepo.BaseRef,
-		RepoTargetRef:   migRepo.TargetRef,
-		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
-		RepoSha0:        "0123456789abcdef0123456789abcdef01234567",
-	})
-	if err != nil {
-		t.Fatalf("CreateRunRepo(%s) failed: %v", repoURL, err)
-	}
-
-	return runRepo
-}
-
-func createJobForStaleRecoveryQueryTest(
-	t *testing.T,
-	ctx context.Context,
-	db Store,
-	runID types.RunID,
-	repoID types.RepoID,
-	repoBaseRef string,
-	attempt int32,
-	name string,
-	status types.JobStatus,
-) Job {
-	t.Helper()
-
-	job, err := db.CreateJob(ctx, CreateJobParams{
-		ID:          types.NewJobID(),
-		RunID:       runID,
-		RepoID:      repoID,
-		RepoBaseRef: repoBaseRef,
-		Attempt:     attempt,
-		Name:        name,
-		Status:      status,
-		JobType:     "mig",
-		JobImage:    "test-image",
-		Meta:        []byte(`{}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateJob(%s) failed: %v", name, err)
-	}
-	return job
 }
 
 func setJobRunningForStaleRecoveryQueryTest(
