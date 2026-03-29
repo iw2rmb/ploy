@@ -160,8 +160,8 @@ type Querier interface {
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
-	// Returns diffs for a run.
-	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
+	// Returns diff metadata for a run.
+	ListDiffsByRun(ctx context.Context, arg ListDiffsByRunParams) ([]Diff, error)
 	// Returns diffs for a specific repo execution within a run.
 	// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
 	// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
@@ -191,7 +191,7 @@ type Querier interface {
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	// Returns log metadata including object_key for object-storage retrieval.
-	ListLogsByRun(ctx context.Context, runID types.RunID) ([]Log, error)
+	ListLogsByRun(ctx context.Context, arg ListLogsByRunParams) ([]Log, error)
 	// Returns log metadata including object_key for object-storage retrieval.
 	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
 	// Returns log metadata including object_key for object-storage retrieval.

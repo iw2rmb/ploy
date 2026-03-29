@@ -141,8 +141,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Verify ListDiffsByRunRepo returns all 5 diffs.
 	allDiffs, err := db.ListDiffsByRunRepo(ctx, store.ListDiffsByRunRepoParams{
-		RunID:  run.ID,
-		RepoID: jobStep0.RepoID,
+		MetadataOnly: false,
+		RunID:        run.ID,
+		RepoID:       jobStep0.RepoID,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsByRunRepo() failed: %v", err)

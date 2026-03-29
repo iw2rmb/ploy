@@ -179,7 +179,10 @@ func serveWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store, b
 // decompresses them, and writes them as SSE frames. If allowedJobs is non-nil, only
 // logs belonging to those jobs are included.
 func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st store.Store, bs blobstore.Store, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) error {
-	logs, err := st.ListLogsByRun(ctx, runID)
+	logs, err := st.ListLogsByRun(ctx, store.ListLogsByRunParams{
+		MetadataOnly: false,
+		RunID:        runID,
+	})
 	if err != nil {
 		return err
 	}

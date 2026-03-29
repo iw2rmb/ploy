@@ -110,29 +110,29 @@ func (q *Queries) GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (D
 	return i, err
 }
 
-const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
-SELECT d.id, d.run_id, d.job_id, d.patch_size, d.object_key, d.summary, d.created_at FROM diffs d
-JOIN jobs j ON j.id = d.job_id
-WHERE d.run_id = $1 AND j.repo_id = $2
-ORDER BY
-  CASE
-    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
-    ELSE 0
-  END ASC,
-  d.created_at ASC,
-  d.id ASC
+const listDiffsByRun = `-- name: ListDiffsByRun :many
+SELECT
+  id,
+  run_id,
+  job_id,
+  patch_size,
+  object_key,
+  summary,
+  created_at
+FROM diffs
+WHERE run_id = $1
+  AND ($2::boolean OR NOT $2::boolean)
+ORDER BY created_at ASC, id ASC
 `
 
-type ListDiffsByRunRepoParams struct {
-	RunID  types.RunID  `json:"run_id"`
-	RepoID types.RepoID `json:"repo_id"`
+type ListDiffsByRunParams struct {
+	RunID        types.RunID `json:"run_id"`
+	MetadataOnly bool        `json:"metadata_only"`
 }
 
-// Returns diffs for a specific repo execution within a run.
-// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
-// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
-func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID)
+// Returns diff metadata for a run.
+func (q *Queries) ListDiffsByRun(ctx context.Context, arg ListDiffsByRunParams) ([]Diff, error) {
+	rows, err := q.db.Query(ctx, listDiffsByRun, arg.RunID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -159,15 +159,39 @@ func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepo
 	return items, nil
 }
 
-const listDiffsByRun = `-- name: ListDiffsByRun :many
-SELECT id, run_id, job_id, patch_size, object_key, summary, created_at FROM diffs
-WHERE run_id = $1
-ORDER BY created_at ASC, id ASC
+const listDiffsByRunRepo = `-- name: ListDiffsByRunRepo :many
+SELECT
+  d.id,
+  d.run_id,
+  d.job_id,
+  d.patch_size,
+  d.object_key,
+  d.summary,
+  d.created_at
+FROM diffs d
+JOIN jobs j ON j.id = d.job_id
+WHERE d.run_id = $1 AND j.repo_id = $2
+  AND ($3::boolean OR NOT $3::boolean)
+ORDER BY
+  CASE
+    WHEN jsonb_typeof(d.summary->'next_id') = 'number' THEN (d.summary->>'next_id')::DOUBLE PRECISION
+    ELSE 0
+  END ASC,
+  d.created_at ASC,
+  d.id ASC
 `
 
-// Returns diff metadata for a run.
-func (q *Queries) ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error) {
-	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
+type ListDiffsByRunRepoParams struct {
+	RunID        types.RunID  `json:"run_id"`
+	RepoID       types.RepoID `json:"repo_id"`
+	MetadataOnly bool         `json:"metadata_only"`
+}
+
+// Returns diffs for a specific repo execution within a run.
+// Repo attribution comes from joining diffs.job_id to jobs.repo_id.
+// This supports the repo-scoped endpoint GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
+func (q *Queries) ListDiffsByRunRepo(ctx context.Context, arg ListDiffsByRunRepoParams) ([]Diff, error) {
+	rows, err := q.db.Query(ctx, listDiffsByRunRepo, arg.RunID, arg.RepoID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
