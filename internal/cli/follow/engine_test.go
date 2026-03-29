@@ -12,6 +12,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/workflowkit"
 )
 
 var ansiCSI = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
@@ -23,14 +24,13 @@ func stripANSI(s string) string {
 func TestEngine_refreshRepos_DecodesRunRepoResponseShape(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
+	s := workflowkit.NewFollowStreamScenario()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method=%s, want GET", r.Method)
 		}
-		if want := "/v1/runs/" + runID.String() + "/repos"; r.URL.Path != want {
+		if want := "/v1/runs/" + s.RunID.String() + "/repos"; r.URL.Path != want {
 			t.Fatalf("path=%s, want %s", r.URL.Path, want)
 		}
 
@@ -38,8 +38,8 @@ func TestEngine_refreshRepos_DecodesRunRepoResponseShape(t *testing.T) {
 		_, _ = w.Write([]byte(`{
   "repos": [
     {
-      "run_id": "` + runID.String() + `",
-      "repo_id": "` + repoID.String() + `",
+      "run_id": "` + s.RunID.String() + `",
+      "repo_id": "` + s.MigRepoID.String() + `",
       "repo_url": "https://example.com/org/repo.git",
       "base_ref": "main",
       "target_ref": "feature",
@@ -60,34 +60,32 @@ func TestEngine_refreshRepos_DecodesRunRepoResponseShape(t *testing.T) {
 		t.Fatalf("parse base url: %v", err)
 	}
 
-	e := NewEngine(srv.Client(), baseURL, runID, Config{MaxRetries: 1})
+	e := NewEngine(srv.Client(), baseURL, s.RunID, Config{MaxRetries: 1})
 	if err := e.refreshRepos(context.Background()); err != nil {
 		t.Fatalf("refreshRepos error: %v", err)
 	}
 
-	if len(e.repoOrder) != 1 || e.repoOrder[0] != repoID {
-		t.Fatalf("repoOrder=%v, want [%s]", e.repoOrder, repoID.String())
+	if len(e.repoOrder) != 1 || e.repoOrder[0] != s.MigRepoID {
+		t.Fatalf("repoOrder=%v, want [%s]", e.repoOrder, s.MigRepoID.String())
 	}
-	if got := e.repoURLs[repoID]; !strings.Contains(got, "example.com") {
-		t.Fatalf("repoURLs[%s]=%q, want to contain example.com", repoID.String(), got)
+	if got := e.repoURLs[s.MigRepoID]; !strings.Contains(got, "example.com") {
+		t.Fatalf("repoURLs[%s]=%q, want to contain example.com", s.MigRepoID.String(), got)
 	}
 }
 
 func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
+	s := workflowkit.NewFollowStreamScenario()
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
 	var out strings.Builder
-	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
-	e.repoOrder = []domaintypes.MigRepoID{repoID}
-	e.repoURLs[repoID] = "example.com/org/repo"
+	e := NewEngine(nil, &url.URL{}, s.RunID, Config{Output: &out})
+	e.repoOrder = []domaintypes.MigRepoID{s.MigRepoID}
+	e.repoURLs[s.MigRepoID] = "example.com/org/repo"
 	started := time.Now().Add(-1500 * time.Millisecond).UTC()
-	e.repoJobs[repoID] = []runs.RepoJobEntry{{
-		JobID:       jobID,
+	e.repoJobs[s.MigRepoID] = []runs.RepoJobEntry{{
+		JobID:       s.JobID,
 		Name:        "mig-0",
 		JobType:     "mig",
 		JobImage:    "ubuntu:latest",
@@ -99,28 +97,28 @@ func TestEngine_render_UsesStepAndNodeColumns(t *testing.T) {
 
 	e.render()
 
-	s := stripANSI(out.String())
-	if strings.Contains(s, "human-label-should-not-render") {
-		t.Fatalf("render output included DisplayName, output=%q", s)
+	st := stripANSI(out.String())
+	if strings.Contains(st, "human-label-should-not-render") {
+		t.Fatalf("render output included DisplayName, output=%q", st)
 	}
-	if strings.Contains(s, "mig-0") {
-		t.Fatalf("render output included job name, output=%q", s)
+	if strings.Contains(st, "mig-0") {
+		t.Fatalf("render output included job name, output=%q", st)
 	}
-	if !strings.Contains(s, "Repos: 1") {
-		t.Fatalf("render output missing repo count, output=%q", s)
+	if !strings.Contains(st, "Repos: 1") {
+		t.Fatalf("render output missing repo count, output=%q", st)
 	}
-	if !strings.Contains(s, "Repo 1/1: example.com/org/repo") {
-		t.Fatalf("render output missing repo block header, output=%q", s)
+	if !strings.Contains(st, "Repo 1/1: example.com/org/repo") {
+		t.Fatalf("render output missing repo block header, output=%q", st)
 	}
-	if !strings.Contains(s, "Step") || !strings.Contains(s, "Image") || !strings.Contains(s, "Node") {
-		t.Fatalf("render output missing expected header, output=%q", s)
+	if !strings.Contains(st, "Step") || !strings.Contains(st, "Image") || !strings.Contains(st, "Node") {
+		t.Fatalf("render output missing expected header, output=%q", st)
 	}
-	if strings.Contains(s, "Index") || strings.Contains(s, "NodeID") || strings.Contains(s, "Status") {
-		t.Fatalf("render output included legacy header columns, output=%q", s)
+	if strings.Contains(st, "Index") || strings.Contains(st, "NodeID") || strings.Contains(st, "Status") {
+		t.Fatalf("render output included legacy header columns, output=%q", st)
 	}
-	want := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta("⣾") + `\s+mig\s+` + regexp.QuoteMeta(jobID.String()) + `\s+` + regexp.QuoteMeta(nodeID.String()) + `\s+ubuntu:latest\s+`)
-	if !want.MatchString(s) {
-		t.Fatalf("render output missing expected job row, output=%q", s)
+	want := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta("⣾") + `\s+mig\s+` + regexp.QuoteMeta(s.JobID.String()) + `\s+` + regexp.QuoteMeta(nodeID.String()) + `\s+ubuntu:latest\s+`)
+	if !want.MatchString(st) {
+		t.Fatalf("render output missing expected job row, output=%q", st)
 	}
 }
 
@@ -148,73 +146,69 @@ func TestStatusGlyph_FailedAliasUsesFailGlyph(t *testing.T) {
 	}
 }
 
+// TestEngine_render_DisplaysRepoLastError covers both the canonical "fail" status and
+// the "failed" alias — ensuring error one-liners are rendered for both status strings.
 func TestEngine_render_DisplaysRepoLastError(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
-
-	var out strings.Builder
-	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
-	e.repoOrder = []domaintypes.MigRepoID{repoID}
-	e.repoURLs[repoID] = "example.com/org/repo"
-	e.repoJobs[repoID] = []runs.RepoJobEntry{{
-		JobID:   jobID,
-		Name:    "pre-gate",
-		JobType: "pre_gate",
-		Status:  domaintypes.JobStatusFail,
-	}}
-
-	// Set Stack Gate failure message
-	errMsg := `Stack Gate [inbound]: mismatch
+	stackGateErrMsg := `Stack Gate [inbound]: mismatch
   Expected: {language: java, tool: maven, release: "17"}
   Detected: {language: java, tool: maven, release: "11"}
   Evidence:
     - pom.xml: maven.compiler.release=11`
-	e.repoErrors[repoID] = &errMsg
 
-	e.render()
-
-	raw := out.String()
-	s := stripANSI(raw)
-
-	// Verify output contains one-line error details directly under a failed row.
-	if !strings.Contains(s, "└ Stack Gate [inbound]: mismatch Expected: {language: java, tool: maven, release: \"17\"} Detected: {language: java, tool: maven, release: \"11\"} Evidence: - pom.xml: maven.compiler.release=11") {
-		t.Errorf("expected output to contain Stack Gate failure, got: %q", s)
+	tests := []struct {
+		name      string
+		jobStatus domaintypes.JobStatus
+		errMsg    string
+		wantLine  string
+		checkANSI bool
+	}{
+		{
+			name:      "fail status/stack gate mismatch",
+			jobStatus: domaintypes.JobStatusFail,
+			errMsg:    stackGateErrMsg,
+			wantLine:  `└ Stack Gate [inbound]: mismatch Expected: {language: java, tool: maven, release: "17"} Detected: {language: java, tool: maven, release: "11"} Evidence: - pom.xml: maven.compiler.release=11`,
+			checkANSI: true,
+		},
+		{
+			name:      "failed alias/build error",
+			jobStatus: domaintypes.JobStatus("failed"),
+			errMsg:    "build failed: missing config",
+			wantLine:  "└ build failed: missing config",
+			checkANSI: false,
+		},
 	}
 
-	// Verify ANSI red color is applied to the error one-liner.
-	if !strings.Contains(raw, "\x1b[31m") || !strings.Contains(raw, "\x1b[0m") {
-		t.Errorf("expected output to contain red ANSI color for error line, got: %q", raw)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestEngine_render_DisplaysRepoLastError_WithFailedStatusAlias(t *testing.T) {
-	t.Parallel()
+			s := workflowkit.NewFollowStreamScenario()
 
-	runID := domaintypes.NewRunID()
-	repoID := domaintypes.NewMigRepoID()
-	jobID := domaintypes.NewJobID()
+			var out strings.Builder
+			e := NewEngine(nil, &url.URL{}, s.RunID, Config{Output: &out})
+			e.repoOrder = []domaintypes.MigRepoID{s.MigRepoID}
+			e.repoURLs[s.MigRepoID] = "example.com/org/repo"
+			e.repoJobs[s.MigRepoID] = []runs.RepoJobEntry{{
+				JobID:   s.JobID,
+				Name:    "pre-gate",
+				JobType: "pre_gate",
+				Status:  tt.jobStatus,
+			}}
+			e.repoErrors[s.MigRepoID] = &tt.errMsg
 
-	var out strings.Builder
-	e := NewEngine(nil, &url.URL{}, runID, Config{Output: &out})
-	e.repoOrder = []domaintypes.MigRepoID{repoID}
-	e.repoURLs[repoID] = "example.com/org/repo"
-	e.repoJobs[repoID] = []runs.RepoJobEntry{{
-		JobID:   jobID,
-		Name:    "mig-0",
-		JobType: "mig",
-		Status:  domaintypes.JobStatus("failed"),
-	}}
+			e.render()
 
-	errMsg := "build failed: missing config"
-	e.repoErrors[repoID] = &errMsg
+			raw := out.String()
+			plain := stripANSI(raw)
 
-	e.render()
-
-	s := stripANSI(out.String())
-	if !strings.Contains(s, "└ build failed: missing config") {
-		t.Fatalf("expected output to contain failed status alias error line, got: %q", s)
+			if !strings.Contains(plain, tt.wantLine) {
+				t.Errorf("expected output to contain %q, got: %q", tt.wantLine, plain)
+			}
+			if tt.checkANSI && (!strings.Contains(raw, "\x1b[31m") || !strings.Contains(raw, "\x1b[0m")) {
+				t.Errorf("expected output to contain red ANSI color for error line, got: %q", raw)
+			}
+		})
 	}
 }
