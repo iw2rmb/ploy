@@ -276,6 +276,9 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     1. Run `make redundancy-check`.
     2. Run `make test`.
     3. Add structural proof in completion notes: baseline findings resolved and no newly introduced duplicate paths in scoped hotspots.
+  - Completion notes:
+    - **Baseline findings**: `make redundancy-check` reports `OK (0 findings across 4 hotspot packages)` — no pre-existing duplicate-symbol or parallel-entrypoint findings in the scoped hotspot packages (`internal/server/handlers`, `internal/nodeagent`, `internal/workflow/contracts`, `internal/store`).
+    - **Scoped-hotspot duplicate-path status**: 0 newly introduced duplicate paths detected across all 4 hotspot packages. Guard is wired into CI (`.github/workflows/`) and will block any PR that introduces new duplicate-symbol or parallel-entrypoint findings.
   - Estimated LOC influence: `+130/-10` (net `+120`) for guardrail script and docs.
   - Clarity / complexity check: Adds tooling overhead but reduces future review ambiguity and regression risk.
   - Reasoning: medium (8 CFP)
