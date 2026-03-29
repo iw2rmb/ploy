@@ -21,6 +21,8 @@ import (
 //
 // This test requires a test database accessible via PLOY_TEST_PG_DSN.
 func TestServerStartStop_InsecureMode(t *testing.T) {
+	skipDBIntegrationUnderCoverage(t)
+
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")

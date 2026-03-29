@@ -10,6 +10,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+func resolveORWCLIScript(t *testing.T) string {
+	t.Helper()
+	root := repoRoot(t)
+	candidates := []string{
+		filepath.Join(root, "deploy", "images", "mig", "orw-cli", "orw-cli.sh"),
+		filepath.Join(root, "deploy", "images", "mig", "orw-cli-maven", "orw-cli.sh"),
+		filepath.Join(root, "deploy", "images", "mig", "orw-cli-gradle", "orw-cli.sh"),
+	}
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+	t.Fatalf("orw-cli script not found in expected locations: %v", candidates)
+	return ""
+}
+
 func TestOrwCLI_AppliesWithStandaloneCLIAndNoBuildToolInvocation(t *testing.T) {
 	t.Parallel()
 
@@ -59,7 +76,7 @@ exit 67
 		t.Fatalf("write gradle stub: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "deploy", "images", "mig", "orw-cli", "orw-cli.sh")
+	modScript := resolveORWCLIScript(t)
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
@@ -127,7 +144,7 @@ exit 17
 		t.Fatalf("write rewrite stub: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "deploy", "images", "mig", "orw-cli", "orw-cli.sh")
+	modScript := resolveORWCLIScript(t)
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
@@ -166,7 +183,7 @@ func TestOrwCLI_SelfTestWritesSuccessReport(t *testing.T) {
 
 	workspace := t.TempDir()
 	outdir := t.TempDir()
-	modScript := filepath.Join(repoRoot(t), "deploy", "images", "mig", "orw-cli", "orw-cli.sh")
+	modScript := resolveORWCLIScript(t)
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(), "MODS_SELF_TEST=1")
 

@@ -1,5 +1,6 @@
 [build-gate](build-gate) Shell-driven build-gate integration scenarios that simulate compile failures, healing, and re-gate validation.
 [build_test.go](build_test.go) Verifies `make build` produces an executable `dist/ploy` CLI binary.
+[coverage_guard_test.go](coverage_guard_test.go) Shared helper that skips DB-backed integration tests when coverage mode is enabled with non-isolated test DSN.
 [happy_path_test.go](happy_path_test.go) Integration flow that creates v1 entities, appends events/logs, and validates persisted happy-path data.
 [lab_smoke_test.go](lab_smoke_test.go) Minimal end-to-end store smoke test covering run/job creation plus log and diff ingestion.
 [migs](migs) Integration tests for migration executors (ORW, shell, codex) and related CLI/path behaviors.
