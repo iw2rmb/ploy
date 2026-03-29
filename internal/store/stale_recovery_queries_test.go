@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/testutil/workflowkit/ids"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -49,27 +50,22 @@ func TestListStaleRunningJobs_FiltersByHeartbeatAndStatus(t *testing.T) {
 		t.Fatalf("ListStaleRunningJobs() failed: %v", err)
 	}
 
-	type staleKey struct {
-		runID   types.RunID
-		repoID  types.RepoID
-		attempt int32
-	}
-	got := make(map[staleKey]int32, len(rows))
+	got := make(map[ids.AttemptKey]int32, len(rows))
 	for _, row := range rows {
-		got[staleKey{
-			runID:   row.RunID,
-			repoID:  row.RepoID,
-			attempt: row.Attempt,
+		got[ids.AttemptKey{
+			RunID:   row.RunID,
+			RepoID:  row.RepoID,
+			Attempt: row.Attempt,
 		}] = row.RunningJobs
 	}
 
-	if got[staleKey{runID: fx.Run.ID, repoID: fx.RunRepo.RepoID, attempt: 1}] != 2 {
-		t.Fatalf("attempt 1 stale running count=%d, want 2", got[staleKey{runID: fx.Run.ID, repoID: fx.RunRepo.RepoID, attempt: 1}])
+	if got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 1}] != 2 {
+		t.Fatalf("attempt 1 stale running count=%d, want 2", got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 1}])
 	}
-	if got[staleKey{runID: fx.Run.ID, repoID: fx.RunRepo.RepoID, attempt: 2}] != 1 {
-		t.Fatalf("attempt 2 stale running count=%d, want 1", got[staleKey{runID: fx.Run.ID, repoID: fx.RunRepo.RepoID, attempt: 2}])
+	if got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 2}] != 1 {
+		t.Fatalf("attempt 2 stale running count=%d, want 1", got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: fx.RunRepo.RepoID, Attempt: 2}])
 	}
-	if _, ok := got[staleKey{runID: fx.Run.ID, repoID: repoB.RepoID, attempt: 1}]; ok {
+	if _, ok := got[ids.AttemptKey{RunID: fx.Run.ID, RepoID: repoB.RepoID, Attempt: 1}]; ok {
 		t.Fatal("fresh/non-running repo attempt must not be returned")
 	}
 

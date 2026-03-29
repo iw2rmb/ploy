@@ -7,15 +7,13 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/testutil/workflowkit/ids"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// AttemptKey identifies a unique run-repo-attempt combination.
-type AttemptKey struct {
-	RunID   domaintypes.RunID
-	RepoID  domaintypes.RepoID
-	Attempt int32
-}
+// AttemptKey is a cycle-safe alias for ids.AttemptKey, re-exported here so
+// existing callers (server/recovery tests) need not change their imports.
+type AttemptKey = ids.AttemptKey
 
 // RecoveryStore implements store.Store for recovery scenario tests.
 // It is the canonical fixture for testing claim/complete/recover/heal
