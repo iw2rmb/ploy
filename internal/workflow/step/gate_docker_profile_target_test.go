@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/testutil/workflowkit"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -13,14 +14,9 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	t.Parallel()
 
 	executor, rt, workspace := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-		GateProfile: &contracts.BuildGateProfileOverride{
-			Command: contracts.CommandSpec{Shell: "echo prep-gate"},
-		},
-	}
+	gs := workflowkit.NewGateProfileScenario()
 
-	_, err := executor.Execute(context.Background(), spec, workspace)
+	_, err := executor.Execute(context.Background(), gs.PrepCommandSpec, workspace)
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
@@ -81,19 +77,9 @@ func TestDockerGateExecutor_SkipShortCircuitsExecution(t *testing.T) {
 	t.Parallel()
 
 	executor, rt, _ := newDockerGateTestHarness(t)
-	spec := &contracts.StepGateSpec{
-		Enabled: true,
-		Skip: &contracts.BuildGateSkipMetadata{
-			Enabled:         true,
-			SourceProfileID: 55,
-			MatchedTarget:   contracts.GateProfileTargetBuild,
-		},
-		GateProfile: &contracts.BuildGateProfileOverride{
-			Stack: &contracts.GateProfileStack{Language: "java", Tool: "maven", Release: "17"},
-		},
-	}
+	gs := workflowkit.NewGateProfileScenario()
 
-	meta, err := executor.Execute(context.Background(), spec, "")
+	meta, err := executor.Execute(context.Background(), gs.SkipSpec, "")
 	if err != nil {
 		t.Fatalf("Execute() unexpected error: %v", err)
 	}
