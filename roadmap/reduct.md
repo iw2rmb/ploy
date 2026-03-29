@@ -20,6 +20,12 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Estimated LOC influence: `+140/-260` (net `-120`) in `internal/store/*`.
   - Clarity / complexity check: One list family per blob type reduces naming noise without adding new runtime branches.
   - Reasoning: high (14 CFP)
+  - Completion notes:
+    - **`metadata_only` selector flag not used**: The original plan described a `metadata_only` boolean switch in a single canonical query path per filter shape. During implementation the approach was superseded: since log and diff blob data is stored in object storage (not inline in the DB), all list queries already return only metadata. A runtime boolean flag would have been a tautological guard (`::boolean or not $`) with no column-projection effect. This pattern was explicitly rejected in `list_meta_queries_test.go` (lines 111–113, 165–167) across all selector-behavior tests.
+    - **Removed duplicate entrypoints**: No `*Meta*`-suffixed log or diff list methods exist anywhere in the codebase. The pre-refactor `List*Meta*` parallel family is fully deleted.
+    - **Selector-only querier surface** (`internal/store/querier.go`): Log list methods — `ListLogsByRun` (line 194), `ListLogsByRunSince` (line 200), `ListLogsByRunAndJob` (line 196), `ListLogsByRunAndJobSince` (line 198) — all return `[]Log` with explicit column projection (`id, run_id, job_id, chunk_no, data_size, object_key, created_at`). Diff list methods — `ListDiffsByRun` (line 164), `ListDiffsByRunRepo` (line 168) — all return `[]Diff` with explicit column projection (`id, run_id, job_id, patch_size, object_key, summary, created_at`).
+    - **SQL query surface** (`internal/store/queries/logs.sql`, `internal/store/queries/diffs.sql`): Every list query uses explicit column selection — `SELECT *` and blob-data columns (`data`, `patch`) are absent from all list paths.
+    - **Test proof** (`internal/store/list_meta_queries_test.go`): `TestDiffSelectorBehavior` (lines 13–66) asserts explicit column inclusion (`object_key`, `patch_size`, `summary`, `created_at`), patch blob exclusion (`, patch,` / `, patch `), and deterministic ordering for both diff list queries.
 
 - [x] 3.1b Collapse duplicated artifact/event list APIs into selector-based store methods
   - Type: assumption-bound
