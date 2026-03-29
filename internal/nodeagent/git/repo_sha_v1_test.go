@@ -125,6 +125,9 @@ func initTestRepoWithSingleCommit(t *testing.T) string {
 	if err := runGitCommand(ctx, repoDir, nil, "init"); err != nil {
 		t.Fatalf("git init: %v", err)
 	}
+	if err := runGitCommand(ctx, repoDir, nil, "config", "core.hooksPath", "/dev/null"); err != nil {
+		t.Fatalf("git config core.hooksPath: %v", err)
+	}
 	if err := runGitCommand(ctx, repoDir, nil, "config", "user.name", "Test User"); err != nil {
 		t.Fatalf("git config user.name: %v", err)
 	}
