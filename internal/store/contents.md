@@ -1,7 +1,5 @@
-[batchscheduler/](batchscheduler) Batch scheduler that claims and dispatches runnable jobs in bounded batches with integration tests.
-[queries/](queries) Canonical SQL sources used by sqlc to generate typed store query code.
-[ttlworker/](ttlworker) TTL partition maintenance worker that lists and drops expired partitions safely.
 [artifact_bundles.sql.go](artifact_bundles.sql.go) sqlc-generated queries for persisting and resolving artifact bundle records.
+[batchscheduler/](batchscheduler) Batch scheduler that claims and dispatches runnable jobs in bounded batches with integration tests.
 [cancel_bulk_queries_test.go](cancel_bulk_queries_test.go) Verifies bulk-cancel SQL only transitions active jobs/repos and stays run-scoped.
 [cancel_run_v1_test.go](cancel_run_v1_test.go) Tests v1 run cancellation orchestration, rollback behavior, and scope isolation.
 [claim_lock_scope_test.go](claim_lock_scope_test.go) Guards locking semantics so claim queries lock jobs rows without locking runs.
@@ -37,6 +35,7 @@
 [node_metrics_heartbeat_test.go](node_metrics_heartbeat_test.go) Validates node heartbeat updates and metrics history append behavior.
 [nodes.sql.go](nodes.sql.go) sqlc-generated node heartbeat, liveness, and node metadata queries.
 [querier.go](querier.go) sqlc-generated Querier interface that defines the full typed query surface.
+[queries/](queries) Canonical SQL sources used by sqlc to generate typed store query code.
 [repos.sql.go](repos.sql.go) sqlc-generated repository lookup and persistence queries.
 [run_repos.sql.go](run_repos.sql.go) sqlc-generated run-repo scheduling and status transition queries.
 [runs.sql.go](runs.sql.go) sqlc-generated run lifecycle queries for creation, updates, and listing.
@@ -60,6 +59,7 @@
 [store_test.go](store_test.go) Integration tests for store construction and core read/write flows.
 [tokens.sql.go](tokens.sql.go) sqlc-generated token persistence and validation queries.
 [ttl.sql.go](ttl.sql.go) sqlc-generated TTL metadata queries for partition cleanup scheduling.
+[ttlworker/](ttlworker) TTL partition maintenance worker that lists and drops expired partitions safely.
 [uuid.go](uuid.go) UUID bridge helpers between domain string IDs and pgtype UUID values.
 [uuid_test.go](uuid_test.go) Unit tests for UUID conversion helpers and invalid-input handling.
 [v1_fixtures_test.go](v1_fixtures_test.go) Shared fixtures/helpers for store integration tests: newV1Fixture, createRunRepoForStoreTest, createJobForStoreTest.
