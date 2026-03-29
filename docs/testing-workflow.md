@@ -163,6 +163,53 @@ func NewMockStore(t *testing.T) *MockStore {
 }
 ```
 
+## Redundancy Guardrails
+
+`make redundancy-check` (wired into `make ci-check`) enforces two categories of
+structural signals in the hotspot packages
+(`internal/server/handlers`, `internal/nodeagent`, `internal/workflow/contracts`,
+`internal/store`):
+
+### 1. LOC guardrail
+
+Every `*_test.go` file in a hotspot package must stay below **1000 lines**.
+Files approaching the limit are a sign that the file has grown across behavior
+domains and should be split first (see [Test LOC Guardrails](#test-loc-guardrails)).
+
+### 2. Parallel-entrypoint guardrail
+
+Flags exported production symbols that form parallel families — two copies of
+the same logic coexisting instead of being consolidated:
+
+| Pattern | Example | Diagnosis |
+|---------|---------|-----------|
+| Base + versioned (`FooV2`) | `Compute` + `ComputeV2` | versioned copy was added instead of refactoring |
+| Multiple versioned forms | `FooV1` + `FooV2` | both versions left in the tree |
+| Legacy/deprecated shadow | `Foo` + `FooLegacy` | old form was not removed after replacement |
+
+### Interpreting failures
+
+```
+FAIL: LOC: internal/nodeagent/testutil_test.go: 1043 lines (limit 1000)
+```
+Split the file by behavior domain before adding more cases.
+
+```
+FAIL: PARALLEL_FAMILY: internal/server/handlers: 'Compute' and 'ComputeV2' coexist
+```
+Delete the superseded form or, if both are still needed, document why in the
+PR and bump the guardrail exemption in `scripts/redundancy-check.sh`.
+
+### Remediation flow
+
+1. Run `make redundancy-check` locally to see the full finding list.
+2. For LOC findings: split the file by behavior domain and move shared fixtures
+   to a `*_fixture_test.go` file.
+3. For parallel-family findings: remove the superseded symbol. If both symbols
+   are genuinely needed (for example, a migration period), add an inline
+   `# allow:` comment above the symbol and update the allowlist in the script.
+4. Re-run `make redundancy-check` to confirm findings are resolved.
+
 ## References
 
 - `AGENTS.md` — Engineering policies and local validation requirements

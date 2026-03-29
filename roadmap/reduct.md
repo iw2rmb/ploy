@@ -264,7 +264,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
   - Clarity / complexity check: Second slice extends coverage after foundation is stable without broadening `workflowkit` into unit-fixture territory.
   - Reasoning: high (10 CFP)
 
-- [ ] 5.3 Add LOC and duplication guardrails to keep reductions from regressing
+- [x] 5.3 Add LOC and duplication guardrails to keep reductions from regressing
   - Type: determined
   - Component: `Makefile`, `scripts/`, `internal/server/handlers`, `internal/nodeagent`, `internal/workflow/contracts`, `internal/store`, `docs/testing-workflow.md`
   - Implementation:
