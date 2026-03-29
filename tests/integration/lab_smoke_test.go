@@ -251,7 +251,10 @@ index 1234567..abcdefg 100644
 	t.Logf("Created event: id=%d, level=%s, message=%s", event.ID, event.Level, event.Message)
 
 	// Verify event was stored.
-	events, err := db.ListEventsByRun(ctx, run.ID)
+	events, err := db.ListEventsByRun(ctx, store.ListEventsByRunParams{
+		RunID:        run.ID,
+		MetadataOnly: false,
+	})
 	if err != nil {
 		t.Fatalf("ListEventsByRun() failed: %v", err)
 	}

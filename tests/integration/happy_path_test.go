@@ -192,7 +192,10 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	// Verify events can be listed by run.
-	events, err := db.ListEventsByRun(ctx, run.ID)
+	events, err := db.ListEventsByRun(ctx, store.ListEventsByRunParams{
+		RunID:        run.ID,
+		MetadataOnly: false,
+	})
 	if err != nil {
 		t.Fatalf("ListEventsByRun() failed: %v", err)
 	}
