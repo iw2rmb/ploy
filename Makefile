@@ -108,8 +108,12 @@ lint: ## Run golangci-lint
 staticcheck: verify-go-toolchain ## Run staticcheck
 	go run honnef.co/go/tools/cmd/staticcheck@v0.6.1 -checks=all,-SA1019,-ST1003,-ST1000,-U1000 ./...
 
+.PHONY: redundancy-check
+redundancy-check: ## Check for LOC and duplication regressions in hotspot packages
+	@bash scripts/redundancy-check.sh
+
 .PHONY: ci-check
-ci-check: fmt vet staticcheck test test-coverage ## Run core CI checks locally
+ci-check: fmt vet staticcheck test test-coverage redundancy-check ## Run core CI checks locally
 	@echo "\n=== All CI checks passed ==="
 
 .PHONY: pre-commit-install
@@ -149,6 +153,7 @@ help: ## Show available targets
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"
+	@echo "  make redundancy-check           # Check LOC and duplication guardrails in hotspot packages"
 	@echo "  make ci-check                   # Run core CI checks locally"
 	@echo "  make pre-commit-install         # Install pre-commit hooks"
 	@echo "  make clean                      # Remove build artifacts"
