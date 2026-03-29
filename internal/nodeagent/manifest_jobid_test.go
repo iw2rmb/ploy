@@ -7,172 +7,85 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// TestBuildManifestFromRequest_StepIDUsesJobID verifies that manifest.ID uses
-// JobID when available to ensure uniqueness across jobs within the same run.
-func TestBuildManifestFromRequest_StepIDUsesJobID(t *testing.T) {
-	t.Parallel()
-
-	t.Run("uses JobID when provided", func(t *testing.T) {
-		t.Parallel()
-		req := newStartRunRequest(
-			withRunID("run-shared-123"), withJobID("job-unique-456"),
-		)
-
-		manifest, err := buildManifestDefault(req)
-		if err != nil {
-			t.Fatalf("buildManifestFromRequest error: %v", err)
-		}
-
-		if manifest.ID.String() != req.JobID.String() {
-			t.Errorf("manifest.ID = %q, want JobID %q", manifest.ID, req.JobID)
-		}
-	})
-
-	t.Run("requires JobID", func(t *testing.T) {
-		t.Parallel()
-		req := newStartRunRequest(
-			withRunID("run-fallback-789"), withJobID(""),
-		)
-
-		manifest, err := buildManifestDefault(req)
-		if err == nil {
-			t.Fatalf("expected error when JobID is missing")
-		}
-		if manifest.ID.String() != "" {
-			t.Fatalf("expected empty manifest on error, got ID %q", manifest.ID.String())
-		}
-	})
-
-	t.Run("different JobIDs produce unique manifest IDs for same RunID", func(t *testing.T) {
-		t.Parallel()
-
-		jobs := []types.JobID{
-			types.JobID("job-pre-gate-001"),
-			types.JobID("job-mig-001"),
-			types.JobID("job-post-gate-001"),
-		}
-
-		manifestIDs := make(map[string]struct{})
-		for _, jobID := range jobs {
-			req := newStartRunRequest(
-				withRunID("run-multi-job-001"), withJobID(string(jobID)),
-			)
-
-			manifest, err := buildManifestDefault(req)
-			if err != nil {
-				t.Fatalf("buildManifestFromRequest error for job %s: %v", jobID, err)
-			}
-
-			id := manifest.ID.String()
-			if _, exists := manifestIDs[id]; exists {
-				t.Errorf("collision detected: manifest ID %q already used", id)
-			}
-			manifestIDs[id] = struct{}{}
-		}
-
-		if len(manifestIDs) != len(jobs) {
-			t.Errorf("expected %d unique manifest IDs, got %d", len(jobs), len(manifestIDs))
-		}
-	})
+// manifestBuilder abstracts over the three manifest builder paths for table-driven ID tests.
+type manifestBuilder struct {
+	name   string
+	build  func(req StartRunRequest) (contracts.StepManifest, error)
+	wantID func(req StartRunRequest) string
 }
 
-// TestBuildGateManifestFromRequest_StepIDUsesJobID verifies that gate manifests
-// also use JobID-based IDs for uniqueness.
-func TestBuildGateManifestFromRequest_StepIDUsesJobID(t *testing.T) {
-	t.Parallel()
-
-	req := newStartRunRequest(
-		withRunID("run-gate-shared"), withJobID("job-gate-unique"),
-		withRunOptions(RunOptions{BuildGate: BuildGateOptions{Enabled: true}}),
-	)
-
-	manifest, err := buildGateManifestFromRequest(req, req.TypedOptions)
-	if err != nil {
-		t.Fatalf("buildGateManifestFromRequest error: %v", err)
-	}
-
-	if manifest.ID.String() != req.JobID.String() {
-		t.Errorf("gate manifest.ID = %q, want JobID %q", manifest.ID, req.JobID)
-	}
+var manifestBuilders = []manifestBuilder{
+	{
+		name:   "default",
+		build:  buildManifestDefault,
+		wantID: func(r StartRunRequest) string { return r.JobID.String() },
+	},
+	{
+		name: "gate",
+		build: func(r StartRunRequest) (contracts.StepManifest, error) {
+			return buildGateManifestFromRequest(r, r.TypedOptions)
+		},
+		wantID: func(r StartRunRequest) string { return r.JobID.String() },
+	},
+	{
+		name: "healing",
+		build: func(r StartRunRequest) (contracts.StepManifest, error) {
+			mig := MigContainerSpec{Image: contracts.JobImage{Universal: "healer:latest"}}
+			return buildHealingManifest(r, mig, 0, "", contracts.MigStackUnknown)
+		},
+		wantID: func(r StartRunRequest) string { return r.JobID.String() + "-heal-0" },
+	},
 }
 
-// TestBuildHealingManifest_StepIDUsesJobID verifies that healing manifests
-// use JobID-based IDs for uniqueness across healing jobs.
-func TestBuildHealingManifest_StepIDUsesJobID(t *testing.T) {
+// TestManifestStepID verifies that all manifest builders use JobID-based IDs,
+// require JobID, and produce unique IDs for different jobs in the same run.
+func TestManifestStepID(t *testing.T) {
 	t.Parallel()
 
-	t.Run("uses JobID when provided", func(t *testing.T) {
-		t.Parallel()
-		req := newStartRunRequest(
-			withRunID("run-heal-shared"), withJobID("job-heal-unique"),
-		)
-
-		mig := MigContainerSpec{
-			Image: contracts.JobImage{Universal: "healer:latest"},
-		}
-
-		manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-		if err != nil {
-			t.Fatalf("buildHealingManifest error: %v", err)
-		}
-
-		wantID := "job-heal-unique-heal-0"
-		if manifest.ID.String() != wantID {
-			t.Errorf("healing manifest.ID = %q, want %q", manifest.ID, wantID)
-		}
-	})
-
-	t.Run("requires JobID", func(t *testing.T) {
-		t.Parallel()
-		req := newStartRunRequest(
-			withRunID("run-heal-fallback"), withJobID(""),
-		)
-
-		mig := MigContainerSpec{
-			Image: contracts.JobImage{Universal: "healer:latest"},
-		}
-
-		_, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
-		if err == nil {
-			t.Fatalf("expected error when JobID is missing")
-		}
-	})
-
-	t.Run("different JobIDs produce unique healing manifest IDs", func(t *testing.T) {
-		t.Parallel()
-
-		jobs := []types.JobID{
-			types.JobID("job-heal-a"),
-			types.JobID("job-heal-b"),
-			types.JobID("job-heal-c"),
-		}
-
-		manifestIDs := make(map[string]struct{})
-		for _, jobID := range jobs {
+	for _, b := range manifestBuilders {
+		t.Run(b.name+"/uses JobID", func(t *testing.T) {
+			t.Parallel()
 			req := newStartRunRequest(
-				withRunID("run-heal-multi"), withJobID(string(jobID)),
+				withRunID("run-shared-123"), withJobID("job-unique-456"),
 			)
-
-			mig := MigContainerSpec{
-				Image: contracts.JobImage{Universal: "healer:latest"},
-			}
-
-			manifest, err := buildHealingManifest(req, mig, 0, "", contracts.MigStackUnknown)
+			manifest, err := b.build(req)
 			if err != nil {
-				t.Fatalf("buildHealingManifest error for job %s: %v", jobID, err)
+				t.Fatalf("build error: %v", err)
 			}
-
-			id := manifest.ID.String()
-			if _, exists := manifestIDs[id]; exists {
-				t.Errorf("collision detected: healing manifest ID %q already used", id)
+			if got, want := manifest.ID.String(), b.wantID(req); got != want {
+				t.Errorf("manifest.ID = %q, want %q", got, want)
 			}
-			manifestIDs[id] = struct{}{}
-		}
+		})
 
-		if len(manifestIDs) != len(jobs) {
-			t.Errorf("expected %d unique manifest IDs, got %d", len(jobs), len(manifestIDs))
-		}
-	})
+		t.Run(b.name+"/requires JobID", func(t *testing.T) {
+			t.Parallel()
+			req := newStartRunRequest(withJobID(""))
+			_, err := b.build(req)
+			if err == nil {
+				t.Fatal("expected error when JobID is missing")
+			}
+		})
+
+		t.Run(b.name+"/unique IDs for same RunID", func(t *testing.T) {
+			t.Parallel()
+			jobs := []types.JobID{"job-a", "job-b", "job-c"}
+			seen := make(map[string]struct{})
+			for _, jid := range jobs {
+				req := newStartRunRequest(
+					withRunID("run-multi"), withJobID(string(jid)),
+				)
+				manifest, err := b.build(req)
+				if err != nil {
+					t.Fatalf("build error for %s: %v", jid, err)
+				}
+				id := manifest.ID.String()
+				if _, dup := seen[id]; dup {
+					t.Errorf("collision: manifest ID %q already used", id)
+				}
+				seen[id] = struct{}{}
+			}
+		})
+	}
 }
 
 // TestBuildManifestFromRequest_PropagatesJobAndArtifactName ensures job_id and

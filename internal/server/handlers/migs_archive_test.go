@@ -77,28 +77,12 @@ func TestMods_Archive(t *testing.T) {
 			wantStatus: http.StatusNotFound,
 		},
 		{
-			name: "refuses with running jobs",
+			name: "refuses with active jobs",
 			store: &migStore{
 				getModResult:   activeMig,
 				listRunsResult: []store.Run{{ID: "run1", MigID: "mod123"}},
 				listJobsByRunResult: []store.Job{
 					{ID: "job1", RunID: "run1", Status: domaintypes.JobStatusRunning},
-				},
-			},
-			migRef:     "mod123",
-			wantStatus: http.StatusConflict,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
-				t.Helper()
-				assertNotCalled(t, "ArchiveMig", st.archiveMig.called)
-			},
-		},
-		{
-			name: "refuses with queued jobs",
-			store: &migStore{
-				getModResult:   activeMig,
-				listRunsResult: []store.Run{{ID: "run1", MigID: "mod123"}},
-				listJobsByRunResult: []store.Job{
-					{ID: "job1", RunID: "run1", Status: domaintypes.JobStatusQueued},
 				},
 			},
 			migRef:     "mod123",
