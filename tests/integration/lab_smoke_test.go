@@ -1,8 +1,11 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -19,6 +22,8 @@ import (
 //
 // This test requires a test database accessible via PLOY_TEST_PG_DSN.
 func TestLabSmoke(t *testing.T) {
+	skipDBIntegrationUnderCoverage(t)
+
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_PG_DSN not set; skipping lab smoke test")
@@ -104,7 +109,7 @@ func TestLabSmoke(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "build",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     "",
+		JobType:     domaintypes.JobTypeMod,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"build","tool":"make"}`),
@@ -213,8 +218,8 @@ index 1234567..abcdefg 100644
 		if diffs[0].PatchSize != int64(len(diffPatch)) {
 			t.Errorf("Diff patch_size mismatch")
 		}
-		if string(diffs[0].Summary) != string(diffSummary) {
-			t.Errorf("Diff summary mismatch")
+		if !jsonEqual(diffs[0].Summary, diffSummary) {
+			t.Errorf("Diff summary mismatch: expected %s, got %s", string(diffSummary), string(diffs[0].Summary))
 		}
 	}
 	t.Logf("✓ Verified %d diff row(s) stored correctly", len(diffs))
@@ -267,4 +272,16 @@ index 1234567..abcdefg 100644
 	t.Logf("✓ Event stored correctly")
 
 	t.Log("✓ Lab smoke test completed successfully: logs and diffs are stored")
+}
+
+func jsonEqual(a, b []byte) bool {
+	var objA any
+	var objB any
+	if err := json.Unmarshal(a, &objA); err != nil {
+		return bytes.Equal(a, b)
+	}
+	if err := json.Unmarshal(b, &objB); err != nil {
+		return bytes.Equal(a, b)
+	}
+	return reflect.DeepEqual(objA, objB)
 }

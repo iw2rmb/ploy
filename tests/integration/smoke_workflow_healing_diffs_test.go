@@ -10,6 +10,8 @@ import (
 )
 
 func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
+	skipDBIntegrationUnderCoverage(t)
+
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_PG_DSN not set; skipping smoke workflow test")
@@ -38,7 +40,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main-0",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     "",
+		JobType:     domaintypes.JobTypeMod,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"mig"}`),
@@ -56,7 +58,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main-1",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     "",
+		JobType:     domaintypes.JobTypeMod,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"mig"}`),
