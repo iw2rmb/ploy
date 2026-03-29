@@ -24,6 +24,8 @@ func Init(t testing.TB, dir string) {
 	Run(t, dir, "init")
 	Run(t, dir, "config", "user.name", "Test User")
 	Run(t, dir, "config", "user.email", "test@example.com")
+	// Disable global hooks (e.g. contents.md pre-commit hook) in test repos.
+	Run(t, dir, "config", "core.hooksPath", "/dev/null")
 }
 
 func InitMainBranch(t testing.TB, dir string) {
