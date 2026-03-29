@@ -287,6 +287,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **Baseline findings**: `make redundancy-check` reports `OK (0 findings across 4 hotspot packages)` — no pre-existing duplicate-symbol or parallel-entrypoint findings in the scoped hotspot packages (`internal/server/handlers`, `internal/nodeagent`, `internal/workflow/contracts`, `internal/store`).
     - **Scoped-hotspot duplicate-path status**: 0 newly introduced duplicate paths detected across all 4 hotspot packages. Guard is wired into CI (`.github/workflows/`) and will block any PR that introduces new duplicate-symbol or parallel-entrypoint findings.
     - **Gap fix (CI/toolchain drift)**: `.github/workflows/ci.yml` pins `GO_VERSION: '1.25.5'` while `Makefile` enforces `REQUIRED_GO_TOOLCHAIN := go1.26.1` via `verify-go-toolchain`; align these so CI jobs running `make vet`, `make test`, and related targets cannot fail on version mismatch.
+    - **Gap fix (workspace consistency)**: `git status --short` previously showed `D  design/contents.md` and `?? design/contents.md` (staged delete plus untracked replacement for the same path). Resolved: `design/contents.md` is now tracked and committed; working tree is clean with no staged deletes or untracked replacements.
   - Estimated LOC influence: `+130/-10` (net `+120`) for guardrail script and docs.
   - Clarity / complexity check: Adds tooling overhead but reduces future review ambiguity and regression risk.
   - Reasoning: medium (8 CFP)
