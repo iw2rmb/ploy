@@ -15,7 +15,6 @@ SELECT
   created_at
 FROM logs
 WHERE run_id = sqlc.arg(run_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY chunk_no ASC, id ASC;
 
 -- name: ListLogsByRunSince :many
@@ -30,7 +29,6 @@ SELECT
   created_at
 FROM logs
 WHERE run_id = sqlc.arg(run_id) AND id > sqlc.arg(id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY chunk_no ASC, id ASC;
 
 -- name: ListLogsByRunAndJob :many
@@ -45,7 +43,6 @@ SELECT
   created_at
 FROM logs
 WHERE run_id = sqlc.arg(run_id) AND job_id = sqlc.arg(job_id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY chunk_no ASC, id ASC;
 
 -- name: ListLogsByRunAndJobSince :many
@@ -60,7 +57,6 @@ SELECT
   created_at
 FROM logs
 WHERE run_id = sqlc.arg(run_id) AND job_id = sqlc.arg(job_id) AND id > sqlc.arg(id)
-  AND (sqlc.arg(metadata_only)::boolean OR NOT sqlc.arg(metadata_only)::boolean)
 ORDER BY chunk_no ASC, id ASC;
 
 -- name: CreateLog :one

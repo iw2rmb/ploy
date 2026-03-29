@@ -108,8 +108,8 @@ func TestArtifactSelectorBehavior(t *testing.T) {
 				t.Fatalf("%s must use explicit column selection, not SELECT *; found wildcard in SQL:\n%s",
 					tc.name, tc.sql)
 			}
-			if !strings.Contains(sqlLower, "::boolean or not $") {
-				t.Fatalf("%s must accept selector-flag boolean guard in SQL:\n%s",
+			if strings.Contains(sqlLower, "::boolean or not $") {
+				t.Fatalf("%s must not include tautological selector-flag boolean guard in SQL:\n%s",
 					tc.name, tc.sql)
 			}
 			for _, col := range tc.requiredColumns {
@@ -162,8 +162,8 @@ func TestEventSelectorBehavior(t *testing.T) {
 				t.Fatalf("%s must use explicit column selection, not SELECT *; found wildcard in SQL:\n%s",
 					tc.name, tc.sql)
 			}
-			if !strings.Contains(sqlLower, "::boolean or not $") {
-				t.Fatalf("%s must accept selector-flag boolean guard in SQL:\n%s",
+			if strings.Contains(sqlLower, "::boolean or not $") {
+				t.Fatalf("%s must not include tautological selector-flag boolean guard in SQL:\n%s",
 					tc.name, tc.sql)
 			}
 			for _, col := range tc.requiredColumns {
