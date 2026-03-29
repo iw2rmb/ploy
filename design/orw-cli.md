@@ -157,8 +157,10 @@ Update runtime metadata:
 ## File-Level Change Plan
 
 Create:
-- `deploy/images/mig/orw-cli/Dockerfile`
-- `deploy/images/mig/orw-cli/orw-cli.sh`
+- `deploy/images/mig/orw-cli-gradle/Dockerfile`
+- `deploy/images/mig/orw-cli-gradle/orw-cli.sh`
+- `deploy/images/mig/orw-cli-maven/Dockerfile`
+- `deploy/images/mig/orw-cli-maven/orw-cli.sh`
 - tests for CLI runtime behavior under `tests/integration/migs/` (renamed path in same slice if required)
 
 Update:
