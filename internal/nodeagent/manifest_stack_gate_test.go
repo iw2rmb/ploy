@@ -20,8 +20,7 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			},
 		}}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -39,16 +38,13 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			},
 			{
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
-				// No Stack config; should derive inbound from previous outbound.
 			},
 		}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Verify inbound was derived.
 		if steps[1].Stack == nil {
 			t.Fatal("steps[1].Stack should have been created")
 		}
@@ -83,7 +79,6 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			{
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				Stack: &contracts.StackGateSpec{
-					// Inbound is nil but Stack exists.
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
 						Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
@@ -92,12 +87,10 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			},
 		}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Verify inbound was derived.
 		if steps[1].Stack.Inbound == nil {
 			t.Fatal("steps[1].Stack.Inbound should have been derived")
 		}
@@ -157,14 +150,13 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				Stack: &contracts.StackGateSpec{
 					Inbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
-						Expect:  &contracts.StackExpectation{Language: "java", Release: "17"}, // Matches!
+						Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
 					},
 				},
 			},
 		}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
@@ -175,23 +167,20 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
 				Stack: &contracts.StackGateSpec{
 					Outbound: &contracts.StackGatePhaseSpec{
-						Enabled: false, // Disabled.
+						Enabled: false,
 						Expect:  &contracts.StackExpectation{Language: "java"},
 					},
 				},
 			},
 			{
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
-				// No Stack; should not derive since previous outbound is disabled.
 			},
 		}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Verify no derivation occurred.
 		if steps[1].Stack != nil {
 			t.Error("steps[1].Stack should remain nil when previous outbound is disabled")
 		}
@@ -199,22 +188,14 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 
 	t.Run("skips chaining when previous has no Stack", func(t *testing.T) {
 		steps := []StepMig{
-			{
-				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}},
-				// No Stack config.
-			},
-			{
-				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
-				// No Stack config.
-			},
+			{MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod1:latest"}}},
+			{MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}}},
 		}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Verify no derivation occurred.
 		if steps[1].Stack != nil {
 			t.Error("steps[1].Stack should remain nil")
 		}
@@ -238,7 +219,6 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			{
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod2:latest"}},
 				Stack: &contracts.StackGateSpec{
-					// Inbound will be derived from step 0 outbound (release: 11).
 					Outbound: &contracts.StackGatePhaseSpec{
 						Enabled: true,
 						Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
@@ -247,16 +227,13 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			},
 			{
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "mod3:latest"}},
-				// Inbound will be derived from step 1 outbound (release: 17).
 			},
 		}
 
-		err := validateAndDeriveStackGateChaining(steps)
-		if err != nil {
+		if err := validateAndDeriveStackGateChaining(steps); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Verify step 1 inbound.
 		if steps[1].Stack.Inbound == nil {
 			t.Fatal("steps[1].Stack.Inbound should have been derived")
 		}
@@ -264,7 +241,6 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 			t.Errorf("steps[1] inbound.expect.release = %q, want 11", steps[1].Stack.Inbound.Expect.Release)
 		}
 
-		// Verify step 2 inbound.
 		if steps[2].Stack == nil || steps[2].Stack.Inbound == nil {
 			t.Fatal("steps[2].Stack.Inbound should have been derived")
 		}
@@ -276,51 +252,70 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 
 // TestStackGatePhaseSpecToStepGate tests the conversion helper.
 func TestStackGatePhaseSpecToStepGate(t *testing.T) {
-	t.Run("nil input", func(t *testing.T) {
-		result := stackGatePhaseSpecToStepGate(nil, nil)
-		if result != nil {
-			t.Error("expected nil for nil input")
-		}
-	})
+	tests := []struct {
+		name        string
+		phase       *contracts.StackGatePhaseSpec
+		wantNil     bool
+		wantEnabled bool
+		wantLang    string
+		wantRelease string
+	}{
+		{
+			name:    "nil input",
+			phase:   nil,
+			wantNil: true,
+		},
+		{
+			name:    "disabled phase",
+			phase:   &contracts.StackGatePhaseSpec{Enabled: false},
+			wantNil: true,
+		},
+		{
+			name: "enabled phase with expect",
+			phase: &contracts.StackGatePhaseSpec{
+				Enabled: true,
+				Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
+			},
+			wantNil:     false,
+			wantEnabled: true,
+			wantLang:    "java",
+			wantRelease: "17",
+		},
+	}
 
-	t.Run("disabled phase", func(t *testing.T) {
-		phase := &contracts.StackGatePhaseSpec{Enabled: false}
-		result := stackGatePhaseSpecToStepGate(phase, nil)
-		if result != nil {
-			t.Error("expected nil for disabled phase")
-		}
-	})
-
-	t.Run("enabled phase with expect", func(t *testing.T) {
-		phase := &contracts.StackGatePhaseSpec{
-			Enabled: true,
-			Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
-		}
-		result := stackGatePhaseSpecToStepGate(phase, nil)
-		if result == nil {
-			t.Fatal("expected non-nil result")
-		}
-		if !result.Enabled {
-			t.Error("result.Enabled should be true")
-		}
-		if result.Expect == nil {
-			t.Fatal("result.Expect should not be nil")
-		}
-		if result.Expect.Language != "java" {
-			t.Errorf("result.Expect.Language = %q, want java", result.Expect.Language)
-		}
-		if result.Expect.Release != "17" {
-			t.Errorf("result.Expect.Release = %q, want 17", result.Expect.Release)
-		}
-	})
-
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := stackGatePhaseSpecToStepGate(tc.phase, nil)
+			if tc.wantNil {
+				if result != nil {
+					t.Fatalf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.Enabled != tc.wantEnabled {
+				t.Errorf("Enabled = %v, want %v", result.Enabled, tc.wantEnabled)
+			}
+			if result.Expect == nil {
+				t.Fatal("Expect should not be nil")
+			}
+			if result.Expect.Language != tc.wantLang {
+				t.Errorf("Expect.Language = %q, want %q", result.Expect.Language, tc.wantLang)
+			}
+			if result.Expect.Release != tc.wantRelease {
+				t.Errorf("Expect.Release = %q, want %q", result.Expect.Release, tc.wantRelease)
+			}
+		})
+	}
 }
 
 // TestBuildGateManifestFromRequest_StackGateThreading tests that StackGate
 // is correctly threaded into gate manifests via typedOpts.StackGate.
 func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 	t.Run("threads StackGate when set", func(t *testing.T) {
-		req := baseStartRunRequest()
+		req := newStartRunRequest()
 		typedOpts := RunOptions{
 			StackGate: &contracts.StepGateStackSpec{
 				Enabled: true,
@@ -354,10 +349,8 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 	})
 
 	t.Run("no StackGate when not set", func(t *testing.T) {
-		req := baseStartRunRequest()
-		typedOpts := RunOptions{
-			StackGate: nil,
-		}
+		req := newStartRunRequest()
+		typedOpts := RunOptions{StackGate: nil}
 
 		manifest, err := buildGateManifestFromRequest(req, typedOpts)
 		if err != nil {
@@ -373,7 +366,7 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 	})
 
 	t.Run("threads build_gate.images into Gate.ImageOverrides", func(t *testing.T) {
-		req := baseStartRunRequest()
+		req := newStartRunRequest()
 		typedOpts := RunOptions{
 			BuildGate: BuildGateOptions{
 				Enabled: true,
@@ -400,8 +393,7 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 	})
 
 	t.Run("outbound expectations for post gate", func(t *testing.T) {
-		// Simulate post_gate scenario where outbound expectations are used.
-		req := baseStartRunRequest()
+		req := newStartRunRequest()
 		typedOpts := RunOptions{
 			Steps: []StepMig{{
 				MigContainerSpec: MigContainerSpec{Image: contracts.JobImage{Universal: "test:latest"}},
@@ -416,7 +408,6 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 					},
 				},
 			}},
-			// Set StackGate to outbound expectations (as would be done by executeGateJob for post_gate).
 			StackGate: &contracts.StepGateStackSpec{
 				Enabled: true,
 				Expect:  &contracts.StackExpectation{Language: "java", Release: "17"},
@@ -428,7 +419,6 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// Verify outbound (release: 17) is threaded, not inbound (release: 11).
 		if manifest.Gate.StackGate == nil {
 			t.Fatal("manifest.Gate.StackGate should be set")
 		}
@@ -436,13 +426,4 @@ func TestBuildGateManifestFromRequest_StackGateThreading(t *testing.T) {
 			t.Errorf("StackGate.Expect.Release = %q, want 17 (outbound)", manifest.Gate.StackGate.Expect.Release)
 		}
 	})
-}
-
-// baseStartRunRequest creates a minimal valid StartRunRequest for testing.
-func baseStartRunRequest() StartRunRequest {
-	return StartRunRequest{
-		RunID:   "run-test-12345678",
-		JobID:   "job-test-12345678",
-		RepoURL: "https://github.com/example/repo.git",
-	}
 }
