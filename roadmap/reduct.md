@@ -191,7 +191,7 @@ Documentation: `roadmap/reduct.md`, `README.md`, `internal/server/README.md`, `i
     - **`BaseRef`/`TargetRef` display fixed** (`cmd/ploy/mig_repo.go`): `repo.BaseRef.String()` / `repo.TargetRef.String()` → `repo.BaseRef` / `repo.TargetRef` (canonical fields are `string`, not `domaintypes.GitRef`).
     - **Tests updated**: `mod_management_test.go` uses `domainapi.MigSummary` and `domainapi.MigListResponse`; `mod_repos_test.go` uses `domainapi.MigRepoSummary`/`domainapi.MigRepoListResponse` with plain `string` refs; `model_migrations_test.go`, `model_migration_details_test.go`, `model_window_size_test.go` use `domainapi.MigSummary` with `time.Time` `CreatedAt`.
     - **Test proof**: `go test ./internal/cli/... ./internal/client/... ./internal/domain/api ./internal/tui/...` passes.
-    - **Gap item (verification reliability, `cmd/ploy`)**: `make test` is currently not a reliable proof for this step because `cmd/ploy` includes a flaky failure in `TestMigStatusPrintsMigrationSummary` (`flag provided but not defined` with random short flags such as `-PEwEl`). Stabilization requirement: isolate `cmd/ploy` tests from process-global flag state (and any random arg leakage) before claiming full-suite verification via `make test`.
+    - **Gap item (integration reliability, `tests/integration/migs/orw_cli_test.go`)**: Resolve hardcoded missing script path `deploy/images/mig/orw-cli/orw-cli.sh` by either adding that script path or updating tests to the canonical script locations `deploy/images/mig/orw-cli-gradle/orw-cli.sh` and `deploy/images/mig/orw-cli-maven/orw-cli.sh`.
 
 - [x] 5.1 Replace monolithic mockStore in handlers with focused fixture builders
   - Type: determined
