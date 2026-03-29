@@ -99,12 +99,18 @@ func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (Artifa
 const listArtifactBundlesByCID = `-- name: ListArtifactBundlesByCID :many
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE cid = $1
+  AND ($2::boolean OR NOT $2::boolean)
 ORDER BY created_at DESC, id DESC
 `
 
+type ListArtifactBundlesByCIDParams struct {
+	Cid          *string `json:"cid"`
+	MetadataOnly bool    `json:"metadata_only"`
+}
+
 // Returns artifact bundle metadata including object_key for object-storage retrieval.
-func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error) {
-	rows, err := q.db.Query(ctx, listArtifactBundlesByCID, cid)
+func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, arg ListArtifactBundlesByCIDParams) ([]ArtifactBundle, error) {
+	rows, err := q.db.Query(ctx, listArtifactBundlesByCID, arg.Cid, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -136,12 +142,18 @@ func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]
 const listArtifactBundlesByRun = `-- name: ListArtifactBundlesByRun :many
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1
+  AND ($2::boolean OR NOT $2::boolean)
 ORDER BY created_at DESC, id DESC
 `
 
+type ListArtifactBundlesByRunParams struct {
+	RunID        types.RunID `json:"run_id"`
+	MetadataOnly bool        `json:"metadata_only"`
+}
+
 // Returns artifact bundle metadata including object_key for object-storage retrieval.
-func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error) {
-	rows, err := q.db.Query(ctx, listArtifactBundlesByRun, runID)
+func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, arg ListArtifactBundlesByRunParams) ([]ArtifactBundle, error) {
+	rows, err := q.db.Query(ctx, listArtifactBundlesByRun, arg.RunID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -173,17 +185,19 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID types.RunI
 const listArtifactBundlesByRunAndJob = `-- name: ListArtifactBundlesByRunAndJob :many
 SELECT id, run_id, job_id, name, bundle_size, object_key, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1 AND job_id = $2
+  AND ($3::boolean OR NOT $3::boolean)
 ORDER BY created_at DESC, id DESC
 `
 
 type ListArtifactBundlesByRunAndJobParams struct {
-	RunID types.RunID  `json:"run_id"`
-	JobID *types.JobID `json:"job_id"`
+	RunID        types.RunID  `json:"run_id"`
+	JobID        *types.JobID `json:"job_id"`
+	MetadataOnly bool         `json:"metadata_only"`
 }
 
 // Returns artifact bundle metadata including object_key for object-storage retrieval.
 func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error) {
-	rows, err := q.db.Query(ctx, listArtifactBundlesByRunAndJob, arg.RunID, arg.JobID)
+	rows, err := q.db.Query(ctx, listArtifactBundlesByRunAndJob, arg.RunID, arg.JobID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -211,4 +225,3 @@ func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListAr
 	}
 	return items, nil
 }
-

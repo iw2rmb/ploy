@@ -26,7 +26,10 @@ func listArtifactsByCIDHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Query artifacts by CID.
-		bundles, err := st.ListArtifactBundlesByCID(r.Context(), &cid)
+		bundles, err := st.ListArtifactBundlesByCID(r.Context(), store.ListArtifactBundlesByCIDParams{
+			Cid:          &cid,
+			MetadataOnly: false,
+		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to query artifacts: %v", err)
 			return

@@ -72,11 +72,17 @@ func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
 const listEventsByRun = `-- name: ListEventsByRun :many
 SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = $1
+  AND ($2::boolean OR NOT $2::boolean)
 ORDER BY time ASC, id ASC
 `
 
-func (q *Queries) ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error) {
-	rows, err := q.db.Query(ctx, listEventsByRun, runID)
+type ListEventsByRunParams struct {
+	RunID        types.RunID `json:"run_id"`
+	MetadataOnly bool        `json:"metadata_only"`
+}
+
+func (q *Queries) ListEventsByRun(ctx context.Context, arg ListEventsByRunParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, listEventsByRun, arg.RunID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -106,16 +112,18 @@ func (q *Queries) ListEventsByRun(ctx context.Context, runID types.RunID) ([]Eve
 const listEventsByRunSince = `-- name: ListEventsByRunSince :many
 SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = $1 AND id > $2
+  AND ($3::boolean OR NOT $3::boolean)
 ORDER BY time ASC, id ASC
 `
 
 type ListEventsByRunSinceParams struct {
-	RunID types.RunID `json:"run_id"`
-	ID    int64       `json:"id"`
+	RunID        types.RunID `json:"run_id"`
+	ID           int64       `json:"id"`
+	MetadataOnly bool        `json:"metadata_only"`
 }
 
 func (q *Queries) ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error) {
-	rows, err := q.db.Query(ctx, listEventsByRunSince, arg.RunID, arg.ID)
+	rows, err := q.db.Query(ctx, listEventsByRunSince, arg.RunID, arg.ID, arg.MetadataOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -141,4 +149,3 @@ func (q *Queries) ListEventsByRunSince(ctx context.Context, arg ListEventsByRunS
 	}
 	return items, nil
 }
-

@@ -154,9 +154,9 @@ type Querier interface {
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
-	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
+	ListArtifactBundlesByCID(ctx context.Context, arg ListArtifactBundlesByCIDParams) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
-	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
+	ListArtifactBundlesByRun(ctx context.Context, arg ListArtifactBundlesByRunParams) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
@@ -171,7 +171,7 @@ type Querier interface {
 	ListDistinctRepos(ctx context.Context, filter string) ([]ListDistinctReposRow, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
-	ListEventsByRun(ctx context.Context, runID types.RunID) ([]Event, error)
+	ListEventsByRun(ctx context.Context, arg ListEventsByRunParams) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
 	// Lists repo_ids whose last terminal run_repos status is 'Fail' for a given mig.
 	// "Last terminal state" per repo_id is determined by looking at the newest run_repos

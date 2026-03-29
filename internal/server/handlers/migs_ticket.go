@@ -150,7 +150,11 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			artMap := make(map[string]string)
-			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: run.ID, JobID: &job.ID})
+			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{
+				RunID:        run.ID,
+				JobID:        &job.ID,
+				MetadataOnly: false,
+			})
 			if err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", err)
 				slog.Error("get run status: list artifacts failed", "run_id", run.ID, "job_id", jobIDStr, "err", err)

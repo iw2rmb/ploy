@@ -55,7 +55,10 @@ func listRunRepoArtifactsHandler(st store.Store) http.HandlerFunc {
 		jobOrderByID := deriveJobOrderByChain(jobs)
 
 		// Fetch artifact bundle metadata for this run.
-		bundles, err := st.ListArtifactBundlesByRun(r.Context(), runID)
+		bundles, err := st.ListArtifactBundlesByRun(r.Context(), store.ListArtifactBundlesByRunParams{
+			RunID:        runID,
+			MetadataOnly: false,
+		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list artifacts: %v", err)
 			slog.Error("list run repo artifacts: list bundles failed", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
