@@ -67,8 +67,10 @@ func TestCreateJobsFromSpec(t *testing.T) {
 		repoID      domaintypes.RepoID
 		repoBaseRef string
 		attempt     int32
+		repoSHA0    string
 		spec        []byte
 		expected    []expectedJob
+		wantErr     string
 	}{
 		{
 			name:        "SingleMod",
@@ -76,6 +78,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoID:      domaintypes.RepoID("repo_abc"),
 			repoBaseRef: "main",
 			attempt:     1,
+			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"mod1:v1"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
@@ -89,6 +92,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoID:      domaintypes.RepoID("repo_multi"),
 			repoBaseRef: "develop",
 			attempt:     2,
+			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"mod1:v1"},{"image":"mod2:v2"},{"image":"mod3:v3"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
@@ -104,6 +108,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoID:      domaintypes.RepoID("repo_direct_addr"),
 			repoBaseRef: "feature/test",
 			attempt:     3,
+			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"a"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
@@ -111,30 +116,40 @@ func TestCreateJobsFromSpec(t *testing.T) {
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
+		{
+			name:        "InvalidRepoSHA0",
+			runID:       domaintypes.RunID("run_123"),
+			repoID:      domaintypes.RepoID("repo_456"),
+			repoBaseRef: "main",
+			attempt:     1,
+			repoSHA0:    "not-a-sha",
+			spec:        []byte(`{"steps":[{"image":"a"}]}`),
+			wantErr:     "repo_sha0 must match",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &jobStore{}
+			repoSHA0 := tt.repoSHA0
+			if repoSHA0 == "" {
+				repoSHA0 = testRepoSHA0
+			}
 
-			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, testRepoSHA0, tt.spec)
+			err := createJobsFromSpec(context.Background(), st, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, repoSHA0, tt.spec)
+
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tt.wantErr, err)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("createJobsFromSpec failed: %v", err)
 			}
 
 			assertJobChain(t, st.createJob.calls, tt.runID, tt.repoID, tt.repoBaseRef, tt.attempt, tt.expected)
 		})
-	}
-}
-
-func TestCreateJobsFromSpec_InvalidRepoSHA0(t *testing.T) {
-	t.Parallel()
-
-	st := &jobStore{}
-	spec := []byte(`{"steps":[{"image":"a"}]}`)
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, "not-a-sha", spec)
-	if err == nil || !strings.Contains(err.Error(), "repo_sha0 must match") {
-		t.Fatalf("expected repo_sha0 validation error, got %v", err)
 	}
 }
 
@@ -146,21 +161,9 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		spec         []byte
 		expectedJobs int
 	}{
-		{
-			name:         "single_mod",
-			spec:         []byte(`{"steps":[{"image":"a"}]}`),
-			expectedJobs: 3,
-		},
-		{
-			name:         "two_mods",
-			spec:         []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`),
-			expectedJobs: 4,
-		},
-		{
-			name:         "five_mods",
-			spec:         []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`),
-			expectedJobs: 7,
-		},
+		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 3},
+		{"two_mods", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 4},
+		{"five_mods", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 7},
 	}
 
 	for _, tc := range testCases {
@@ -176,27 +179,13 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 				t.Fatalf("expected %d jobs, got %d", tc.expectedJobs, len(st.createJob.calls))
 			}
 
-			queuedCount := 0
-			for _, p := range st.createJob.calls {
-				if p.Status == domaintypes.JobStatusQueued {
-					queuedCount++
-				}
-			}
-
-			if queuedCount != 1 {
-				t.Errorf("expected exactly 1 Queued job (first job), got %d", queuedCount)
-			}
-
 			byName := createJobsByName(st.createJob.calls)
 			if byName["pre-gate"].Status != domaintypes.JobStatusQueued {
 				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
 			}
 
 			for _, p := range st.createJob.calls {
-				if p.Name == "pre-gate" {
-					continue
-				}
-				if p.Status != domaintypes.JobStatusCreated {
+				if p.Name != "pre-gate" && p.Status != domaintypes.JobStatusCreated {
 					t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
 				}
 			}
@@ -204,7 +193,7 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 	}
 }
 
-func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
+func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 	t.Parallel()
 
 	st := &jobStore{}
@@ -215,6 +204,7 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 		t.Fatalf("createJobsFromSpec failed: %v", err)
 	}
 
+	// Verify next_id chain ordering.
 	byName := createJobsByName(st.createJob.calls)
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
@@ -233,19 +223,8 @@ func TestCreateJobsFromSpec_NextIDChainOrdering(t *testing.T) {
 	if postGate.NextID != nil {
 		t.Fatalf("post-gate next_id = %s, want nil", *postGate.NextID)
 	}
-}
 
-func TestCreateJobsFromSpec_InsertOrderSatisfiesImmediateNextIDFK(t *testing.T) {
-	t.Parallel()
-
-	st := &jobStore{}
-	spec := []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`)
-
-	err := createJobsFromSpec(context.Background(), st, domaintypes.RunID("run_123"), domaintypes.RepoID("repo_456"), "main", 1, testRepoSHA0, spec)
-	if err != nil {
-		t.Fatalf("createJobsFromSpec failed: %v", err)
-	}
-
+	// Verify insert order satisfies immediate next_id FK constraint.
 	inserted := make(map[domaintypes.JobID]struct{}, len(st.createJob.calls))
 	for i, p := range st.createJob.calls {
 		if p.NextID != nil {

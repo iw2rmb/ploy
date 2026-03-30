@@ -41,7 +41,7 @@ func TestClaimLoop_OnlyUnifiedEndpoint(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), &mockRunController{})
 	runClaimerUntil(t, claimer, 200*time.Millisecond)
 
 	mu.Lock()
@@ -70,7 +70,7 @@ func TestClaimAndExecute_PreClaimCleanupBlocksClaim(t *testing.T) {
 	defer ts.Close()
 
 	controller := &mockRunController{}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.preClaimCleanup = func(context.Context) (bool, error) {
 		return false, nil
 	}
@@ -108,7 +108,7 @@ func TestClaimAndExecute_PreClaimCleanupAllowsClaim(t *testing.T) {
 	defer ts.Close()
 
 	controller := &mockRunController{}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.preClaimCleanup = func(context.Context) (bool, error) {
 		return true, nil
 	}
@@ -162,7 +162,7 @@ func TestClaimLoop_StartupReconcileBeforeClaim_Contract(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeDockerClient{
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
@@ -220,7 +220,7 @@ func TestClaimLoop_StartupReconcileFailureStopsClaimLoop(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), &mockRunController{})
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeDockerClient{
 			listErr: context.DeadlineExceeded,
@@ -240,7 +240,7 @@ func TestClaimLoop_StartupReconcileFailureStopsClaimLoop(t *testing.T) {
 func TestClaimLoop_StartupReconcileRunsOncePerProcess(t *testing.T) {
 	t.Parallel()
 
-	claimer := setupClaimer(t, newTestConfig("http://127.0.0.1:8080"), &mockRunController{})
+	claimer := setupClaimer(t, newAgentConfig("http://127.0.0.1:8080"), &mockRunController{})
 
 	fakeDocker := &fakeDockerClient{
 		listResult: client.ContainerListResult{},

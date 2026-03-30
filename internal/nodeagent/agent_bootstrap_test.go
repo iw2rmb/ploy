@@ -116,7 +116,7 @@ func TestRequestCertificate_StatusHandling(t *testing.T) {
 			}))
 			defer server.Close()
 
-			agent := &Agent{cfg: newTestConfig(server.URL)}
+			agent := &Agent{cfg: newAgentConfig(server.URL)}
 
 			cert, caCert, err := agent.requestCertificate(context.Background(), "test-token", []byte("csr-pem-data"))
 
@@ -167,7 +167,7 @@ func TestRequestCertificate_BackoffProgression(t *testing.T) {
 	}))
 	defer server.Close()
 
-	agent := &Agent{cfg: newTestConfig(server.URL)}
+	agent := &Agent{cfg: newAgentConfig(server.URL)}
 	start := time.Now()
 
 	_, _, err := agent.requestCertificate(context.Background(), "test-token", []byte("csr-pem-data"))
@@ -204,7 +204,7 @@ func TestRequestCertificate_ContextCancellation(t *testing.T) {
 	}))
 	defer server.Close()
 
-	agent := &Agent{cfg: newTestConfig(server.URL)}
+	agent := &Agent{cfg: newAgentConfig(server.URL)}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -234,7 +234,7 @@ func TestRequestCertificate_BearerToken(t *testing.T) {
 	}))
 	defer server.Close()
 
-	agent := &Agent{cfg: newTestConfig(server.URL)}
+	agent := &Agent{cfg: newAgentConfig(server.URL)}
 
 	_, _, err := agent.requestCertificate(context.Background(), "test-token", []byte("csr-pem-data"))
 	if err != nil {

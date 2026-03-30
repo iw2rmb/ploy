@@ -99,13 +99,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			env.Controller.uploadConfiguredArtifacts(context.Background(), req, opts, contracts.StepManifest{}, workspace, outDir)
 
-			assertUploadOccurred(t, env.Calls, tt.wantUpload)
-			if tt.wantUpload {
-				assertArtifactName(t, env.Calls, 0, "test-artifact")
-			}
-			if len(tt.wantHeaders) > 0 {
-				assertTarContains(t, (*env.Calls)[0].Bundle, tt.wantHeaders)
-			}
+			assertUpload(t, env.Calls, tt.wantUpload, "test-artifact", tt.wantHeaders)
 		})
 	}
 }
@@ -164,13 +158,7 @@ func TestRunController_uploadOutDir(t *testing.T) {
 			err := env.Controller.uploadOutDirBundle(context.Background(), "test-run", "test-stage", outDir, tt.bundleName)
 
 			checkErr(t, tt.wantErr, err)
-			assertUploadOccurred(t, env.Calls, tt.wantUpload)
-			if tt.wantUpload {
-				assertArtifactName(t, env.Calls, 0, tt.bundleName)
-			}
-			if len(tt.wantHeaders) > 0 {
-				assertTarContains(t, (*env.Calls)[0].Bundle, tt.wantHeaders)
-			}
+			assertUpload(t, env.Calls, tt.wantUpload, tt.bundleName, tt.wantHeaders)
 		})
 	}
 }
@@ -205,7 +193,7 @@ func TestRunController_uploadStatus(t *testing.T) {
 			t.Parallel()
 
 			server, _ := newStatusCaptureServer(t, "test-job-id", withStatusHTTPCode(tt.serverStatus))
-			controller := newTestController(t, newTestConfig(server.URL))
+			controller := newTestController(t, newAgentConfig(server.URL))
 
 			var exitCode int32 = 0
 			stats := types.NewRunStatsBuilder().ExitCode(0).MustBuild()
@@ -271,9 +259,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			env.Controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, phase)
 
 			assertGatePhaseIDs(t, phase, tt.wantArtifactID)
-			if tt.wantArtifactID {
-				assertArtifactName(t, env.Calls, 0, tt.wantArtifactName)
-			}
+			assertUpload(t, env.Calls, true, tt.wantArtifactName, nil)
 		})
 	}
 }
@@ -439,7 +425,7 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			t.Parallel()
 
 			server, cap := newStatusCaptureServer(t, "test-job")
-			controller := newTestController(t, newTestConfig(server.URL))
+			controller := newTestController(t, newAgentConfig(server.URL))
 
 			stats := types.NewRunStatsBuilder().ExitCode(tt.exitCode).MustBuild()
 			result := step.Result{ExitCode: tt.exitCode}

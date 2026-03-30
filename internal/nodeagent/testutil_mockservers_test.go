@@ -80,14 +80,15 @@ func newSingleClaimServer(t *testing.T, nodeID string, claim ClaimResponse) *htt
 // Artifact upload server helpers
 // ---------------------------------------------------------------------------
 
-type artifactServerConfig struct {
+// mockServerConfig holds common configuration for mock test servers.
+type mockServerConfig struct {
 	status int
 }
 
-type artifactServerOption func(*artifactServerConfig)
+type artifactServerOption func(*mockServerConfig)
 
 func withArtifactStatus(code int) artifactServerOption {
-	return func(c *artifactServerConfig) { c.status = code }
+	return func(c *mockServerConfig) { c.status = code }
 }
 
 // artifactUploadCall records a single artifact upload.
@@ -101,7 +102,7 @@ type artifactUploadCall struct {
 // Each response gets a unique artifact ID. Default status is 201 Created.
 func newArtifactUploadServer(t *testing.T, runID, jobID string, opts ...artifactServerOption) (*httptest.Server, *[]artifactUploadCall) {
 	t.Helper()
-	sc := artifactServerConfig{status: http.StatusCreated}
+	sc := mockServerConfig{status: http.StatusCreated}
 	for _, o := range opts {
 		o(&sc)
 	}
@@ -137,14 +138,10 @@ func newArtifactUploadServer(t *testing.T, runID, jobID string, opts ...artifact
 // Diff upload server helpers
 // ---------------------------------------------------------------------------
 
-type diffServerConfig struct {
-	status int
-}
-
-type diffServerOption func(*diffServerConfig)
+type diffServerOption func(*mockServerConfig)
 
 func withDiffStatus(code int) diffServerOption {
-	return func(c *diffServerConfig) { c.status = code }
+	return func(c *mockServerConfig) { c.status = code }
 }
 
 // diffUploadCall records a single diff upload.
@@ -158,7 +155,7 @@ type diffUploadCall struct {
 // Default status is 201 Created.
 func newDiffUploadServer(t *testing.T, runID, jobID string, opts ...diffServerOption) (*httptest.Server, *[]diffUploadCall) {
 	t.Helper()
-	sc := diffServerConfig{status: http.StatusCreated}
+	sc := mockServerConfig{status: http.StatusCreated}
 	for _, o := range opts {
 		o(&sc)
 	}

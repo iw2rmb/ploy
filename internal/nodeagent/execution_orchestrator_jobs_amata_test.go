@@ -3,7 +3,6 @@ package nodeagent
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -74,42 +73,44 @@ func TestSelectedModAmata(t *testing.T) {
 func TestWriteAmataSpecInDir(t *testing.T) {
 	t.Parallel()
 
-	t.Run("writes_amata_yaml_when_spec_present", func(t *testing.T) {
-		t.Parallel()
-		inDir := t.TempDir()
-		amata := &contracts.AmataRunSpec{
-			Spec: "version: amata/v1\nname: test\n",
-		}
+	tests := []struct {
+		name      string
+		amata     *contracts.AmataRunSpec
+		wantFile  bool
+		wantContent string
+	}{
+		{
+			name:        "writes amata yaml when spec present",
+			amata:       &contracts.AmataRunSpec{Spec: "version: amata/v1\nname: test\n"},
+			wantFile:    true,
+			wantContent: "version: amata/v1\nname: test",
+		},
+		{name: "nil spec noop", amata: nil},
+		{name: "empty spec noop", amata: &contracts.AmataRunSpec{Spec: ""}},
+		{name: "whitespace spec noop", amata: &contracts.AmataRunSpec{Spec: "   "}},
+	}
 
-		if err := writeAmataSpecInDir(inDir, amata); err != nil {
-			t.Fatalf("writeAmataSpecInDir() error = %v", err)
-		}
-
-		data, err := os.ReadFile(filepath.Join(inDir, "amata.yaml"))
-		if err != nil {
-			t.Fatalf("read amata.yaml: %v", err)
-		}
-		want := strings.TrimSpace(amata.Spec)
-		if string(data) != want {
-			t.Fatalf("amata.yaml content = %q, want %q", string(data), want)
-		}
-	})
-
-	t.Run("no_op_for_nil_or_empty_spec", func(t *testing.T) {
-		t.Parallel()
-		tests := []*contracts.AmataRunSpec{
-			nil,
-			{Spec: ""},
-			{Spec: "   "},
-		}
-		for _, amata := range tests {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			inDir := t.TempDir()
-			if err := writeAmataSpecInDir(inDir, amata); err != nil {
+			if err := writeAmataSpecInDir(inDir, tt.amata); err != nil {
 				t.Fatalf("writeAmataSpecInDir() error = %v", err)
 			}
-			if _, err := os.Stat(filepath.Join(inDir, "amata.yaml")); !os.IsNotExist(err) {
-				t.Fatalf("expected amata.yaml absent, stat err=%v", err)
+			path := filepath.Join(inDir, "amata.yaml")
+			if !tt.wantFile {
+				if _, err := os.Stat(path); !os.IsNotExist(err) {
+					t.Fatalf("expected amata.yaml absent, stat err=%v", err)
+				}
+				return
 			}
-		}
-	})
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read amata.yaml: %v", err)
+			}
+			if string(data) != tt.wantContent {
+				t.Fatalf("amata.yaml content = %q, want %q", string(data), tt.wantContent)
+			}
+		})
+	}
 }

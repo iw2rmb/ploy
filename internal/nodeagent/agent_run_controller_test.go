@@ -12,7 +12,7 @@ func TestRunController(t *testing.T) {
 
 	newRC := func() *runController {
 		return &runController{
-			cfg:  newTestConfig("http://127.0.0.1:8080"),
+			cfg:  newAgentConfig("http://127.0.0.1:8080"),
 			jobs: make(map[types.JobID]*jobContext),
 		}
 	}

@@ -40,7 +40,7 @@ func TestClaimLoop(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	claimer := setupClaimer(t, newTestConfig(ts.URL), &mockRunController{})
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), &mockRunController{})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -75,7 +75,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := newTestConfig(ts.URL)
+	cfg := newAgentConfig(ts.URL)
 	claimer := setupClaimer(t, cfg, newTestController(t, cfg))
 	runClaimerUntil(t, claimer, 500*time.Millisecond)
 
@@ -108,7 +108,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := newTestConfig(ts.URL)
+	cfg := newAgentConfig(ts.URL)
 	claimer := setupClaimer(t, cfg, newTestController(t, cfg))
 	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
 		InitialInterval: types.Duration(50 * time.Millisecond),
@@ -166,7 +166,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cfg := newTestConfig(ts.URL)
+	cfg := newAgentConfig(ts.URL)
 	claimer := setupClaimer(t, cfg, newTestController(t, cfg))
 	claimer.backoff = backoff.NewStatefulBackoff(backoff.Policy{
 		InitialInterval: types.Duration(50 * time.Millisecond),
@@ -322,7 +322,7 @@ func TestClaimAndExecute_WaitsForRecoveredMonitorSlotRelease(t *testing.T) {
 	defer ts.Close()
 
 	controller := &mockRunController{slotSem: make(chan struct{}, 1)}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeDockerClient{
 			waitByID:      map[string]containertypes.WaitResponse{"ctr-recovered": {StatusCode: 0}},

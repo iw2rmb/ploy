@@ -24,11 +24,13 @@ import (
 func TestModRuns_Create(t *testing.T) {
 	tests := []struct {
 		name       string
-		setupFn    func(st *migStore)
+		store      *migStore       // use directly when set (overrides setupFn)
+		setupFn    func(*migStore) // applied to activeMigWithSpec when store is nil
 		body       any
 		wantStatus int
 		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
 	}{
+		// ── Success paths ────────────────────────────────────────────────
 		{
 			name: "all repos",
 			setupFn: func(st *migStore) {
@@ -125,38 +127,7 @@ func TestModRuns_Create(t *testing.T) {
 				}
 			},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			specID := domaintypes.SpecID("spec123")
-			st := activeMigWithSpec(specID)
-			if tt.setupFn != nil {
-				tt.setupFn(st)
-			}
-			handler := createMigRunHandler(st)
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", tt.body, "mig_id", "mod123")
-			assertStatus(t, rr, tt.wantStatus)
-			if tt.verify != nil {
-				tt.verify(t, st, rr)
-			}
-		})
-	}
-}
-
-// =============================================================================
-// Error Tests (validation + store errors, table-driven)
-// =============================================================================
-
-func TestModRuns_Create_Errors(t *testing.T) {
-	tests := []struct {
-		name       string
-		store      *migStore       // use directly when set
-		setupFn    func(*migStore) // applied to activeMigWithSpec when store is nil
-		body       any
-		wantStatus int
-	}{
-		// Validation errors
+		// ── Validation errors ────────────────────────────────────────────
 		{name: "InvalidMode", store: &migStore{}, body: map[string]any{"repo_selector": map[string]any{"mode": "invalid"}}, wantStatus: http.StatusBadRequest},
 		{name: "ExplicitEmptyRepos", store: &migStore{}, body: map[string]any{"repo_selector": map[string]any{"mode": "explicit", "repos": []string{}}}, wantStatus: http.StatusBadRequest},
 		{name: "InvalidJSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
@@ -191,7 +162,7 @@ func TestModRuns_Create_Errors(t *testing.T) {
 			}(),
 			body: map[string]any{"repo_selector": map[string]any{"mode": "failed"}}, wantStatus: http.StatusBadRequest,
 		},
-		// Store errors
+		// ── Store errors ─────────────────────────────────────────────────
 		{name: "GetMigError", setupFn: func(st *migStore) { st.getModErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
 		{name: "ListModReposError", setupFn: func(st *migStore) { st.listMigReposByModErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
 		{name: "CreateRunError", setupFn: func(st *migStore) { st.createRunErr = errors.New("database connection failed") }, body: allReposSelector(), wantStatus: http.StatusInternalServerError},
@@ -204,11 +175,16 @@ func TestModRuns_Create_Errors(t *testing.T) {
 			st := tt.store
 			if st == nil {
 				st = activeMigWithSpec(domaintypes.SpecID("spec123"))
-				tt.setupFn(st)
+				if tt.setupFn != nil {
+					tt.setupFn(st)
+				}
 			}
 			handler := createMigRunHandler(st)
 			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/runs", tt.body, "mig_id", "mod123")
 			assertStatus(t, rr, tt.wantStatus)
+			if tt.verify != nil {
+				tt.verify(t, st, rr)
+			}
 		})
 	}
 }

@@ -42,7 +42,7 @@ func TestCrashReconcile_StartupRunsBeforeFirstClaim_Contract(t *testing.T) {
 	defer ts.Close()
 
 	controller := &mockRunController{}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{
 		docker: &fakeDockerClient{
 			listResult: client.ContainerListResult{Items: []containertypes.Summary{
@@ -329,7 +329,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	}
 
 	controller := &mockRunController{}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
@@ -407,7 +407,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 	}
 
 	controller := &mockRunController{}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
@@ -502,7 +502,7 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 	}
 
 	controller := &mockRunController{}
-	claimer := setupClaimer(t, newTestConfig(ts.URL), controller)
+	claimer := setupClaimer(t, newAgentConfig(ts.URL), controller)
 	claimer.startupReconciler = &startupCrashReconciler{docker: fakeDocker}
 
 	claimer.startRecoveredRunningMonitors(context.Background(), []recoveredRunningContainer{
