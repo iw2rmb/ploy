@@ -238,7 +238,7 @@ func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleRunStart_InvalidJSON(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
+	cfg := newAgentConfig("http://127.0.0.1:8080")
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -258,7 +258,7 @@ func TestHandleRunStart_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleRunStop_InvalidJSON(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
+	cfg := newAgentConfig("http://127.0.0.1:8080")
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -274,7 +274,7 @@ func TestHandleRunStop_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleHealth(t *testing.T) {
-	cfg := newTestConfig("http://127.0.0.1:8080")
+	cfg := newAgentConfig("http://127.0.0.1:8080")
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 

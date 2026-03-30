@@ -81,10 +81,14 @@ func TestAgentLifecycle(t *testing.T) {
 			name:    "TLS initialization succeeds",
 			startup: 200 * time.Millisecond,
 			configOpts: func() []configOption {
-				certPEM, keyPEM, caPEM := generateTestCerts(t)
+				pk := generateTestPKI(t)
 				return []configOption{
 					withNodeID("tlsTst"),
-					withTLS(writeTempFile(t, certPEM), writeTempFile(t, keyPEM), writeTempFile(t, caPEM)),
+					withTLS(
+						writeTempFile(t, []byte(pk.NodeCert.CertPEM)),
+						writeTempFile(t, []byte(pk.NodeKey.KeyPEM)),
+						writeTempFile(t, []byte(pk.CA.CertPEM)),
+					),
 				}
 			}(),
 			check: func(t *testing.T, agent *Agent) {

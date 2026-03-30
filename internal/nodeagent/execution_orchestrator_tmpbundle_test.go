@@ -66,57 +66,65 @@ func digestOf(data []byte) string {
 
 // --- extractTmpBundle tests ---
 
-func TestExtractTmpBundle_ValidFiles(t *testing.T) {
+func TestExtractTmpBundle_Valid(t *testing.T) {
 	t.Parallel()
 
-	data := buildTestTarGz(t, map[string][]byte{
-		"config.json": []byte(`{"k":"v"}`),
-		"secret.txt":  []byte("s3cr3t"),
-	}, nil)
-
-	stagingDir := t.TempDir()
-	if err := extractTmpBundle(data, stagingDir); err != nil {
-		t.Fatalf("extractTmpBundle error: %v", err)
+	tests := []struct {
+		name      string
+		entries   map[string][]byte
+		wantFiles map[string]string
+		wantDirs  []string
+	}{
+		{
+			name: "flat files",
+			entries: map[string][]byte{
+				"config.json": []byte(`{"k":"v"}`),
+				"secret.txt":  []byte("s3cr3t"),
+			},
+			wantFiles: map[string]string{
+				"config.json": `{"k":"v"}`,
+				"secret.txt":  "s3cr3t",
+			},
+		},
+		{
+			name: "nested directory",
+			entries: map[string][]byte{
+				"scripts/":        nil,
+				"scripts/run.sh":  []byte("#!/bin/sh\necho hello"),
+				"scripts/prep.sh": []byte("#!/bin/sh\necho prep"),
+			},
+			wantFiles: map[string]string{
+				"scripts/run.sh":  "#!/bin/sh\necho hello",
+				"scripts/prep.sh": "#!/bin/sh\necho prep",
+			},
+			wantDirs: []string{"scripts"},
+		},
 	}
 
-	for name, want := range map[string][]byte{
-		"config.json": []byte(`{"k":"v"}`),
-		"secret.txt":  []byte("s3cr3t"),
-	} {
-		got, err := os.ReadFile(filepath.Join(stagingDir, name))
-		if err != nil {
-			t.Errorf("read %q: %v", name, err)
-			continue
-		}
-		if string(got) != string(want) {
-			t.Errorf("%q: got %q, want %q", name, got, want)
-		}
-	}
-}
-
-func TestExtractTmpBundle_ValidDirectory(t *testing.T) {
-	t.Parallel()
-
-	data := buildTestTarGz(t, map[string][]byte{
-		"scripts/":        nil,
-		"scripts/run.sh":  []byte("#!/bin/sh\necho hello"),
-		"scripts/prep.sh": []byte("#!/bin/sh\necho prep"),
-	}, nil)
-
-	stagingDir := t.TempDir()
-	if err := extractTmpBundle(data, stagingDir); err != nil {
-		t.Fatalf("extractTmpBundle error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(stagingDir, "scripts")); err != nil {
-		t.Fatalf("scripts dir not created: %v", err)
-	}
-	got, err := os.ReadFile(filepath.Join(stagingDir, "scripts", "run.sh"))
-	if err != nil {
-		t.Fatalf("read scripts/run.sh: %v", err)
-	}
-	if string(got) != "#!/bin/sh\necho hello" {
-		t.Errorf("scripts/run.sh: got %q", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			data := buildTestTarGz(t, tt.entries, nil)
+			stagingDir := t.TempDir()
+			if err := extractTmpBundle(data, stagingDir); err != nil {
+				t.Fatalf("extractTmpBundle error: %v", err)
+			}
+			for _, dir := range tt.wantDirs {
+				if _, err := os.Stat(filepath.Join(stagingDir, dir)); err != nil {
+					t.Fatalf("dir %q not created: %v", dir, err)
+				}
+			}
+			for path, want := range tt.wantFiles {
+				got, err := os.ReadFile(filepath.Join(stagingDir, path))
+				if err != nil {
+					t.Errorf("read %q: %v", path, err)
+					continue
+				}
+				if string(got) != want {
+					t.Errorf("%q: got %q, want %q", path, got, want)
+				}
+			}
+		})
 	}
 }
 
@@ -233,91 +241,96 @@ func upper(s string) string {
 
 // --- materializeTmpBundle integration: download + verify + extract ---
 
-func TestTmpBundle_Materialization_DownloadVerifyExtract(t *testing.T) {
+func TestTmpBundle_Materialization(t *testing.T) {
 	t.Parallel()
 
-	archiveData := buildTestTarGz(t, map[string][]byte{
+	validArchive := buildTestTarGz(t, map[string][]byte{
 		"config.json": []byte(`{"key":"value"}`),
 	}, nil)
-	digest := digestOf(archiveData)
+	validDigest := digestOf(validArchive)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/gzip")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(archiveData)
-	}))
-	defer srv.Close()
-
-	rc := newTestController(t, newTestConfig(srv.URL))
-
-	bundle := &contracts.TmpBundleRef{
-		BundleID: "bun-test-123",
-		CID:      "bafy123",
-		Digest:   digest,
-		Entries:  []string{"config.json"},
-	}
-
-	stagingDir := t.TempDir()
-	if err := rc.materializeTmpBundle(t.Context(), bundle, stagingDir); err != nil {
-		t.Fatalf("materializeTmpBundle error: %v", err)
-	}
-
-	got, err := os.ReadFile(filepath.Join(stagingDir, "config.json"))
-	if err != nil {
-		t.Fatalf("read config.json: %v", err)
-	}
-	if string(got) != `{"key":"value"}` {
-		t.Errorf("config.json: got %q", got)
-	}
-}
-
-func TestTmpBundle_Materialization_DigestMismatchRejected(t *testing.T) {
-	t.Parallel()
-
-	archiveData := buildTestTarGz(t, map[string][]byte{
+	badDigestArchive := buildTestTarGz(t, map[string][]byte{
 		"file.txt": []byte("data"),
 	}, nil)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(archiveData)
-	}))
-	defer srv.Close()
-
-	rc := newTestController(t, newTestConfig(srv.URL))
-
-	bundle := &contracts.TmpBundleRef{
-		BundleID: "bun-bad-digest",
-		CID:      "bafy123",
-		Digest:   "0000000000000000000000000000000000000000000000000000000000000000",
-		Entries:  []string{"file.txt"},
+	tests := []struct {
+		name     string
+		handler  http.HandlerFunc
+		bundle   *contracts.TmpBundleRef
+		wantErr  bool
+		assertFn func(t *testing.T, stagingDir string)
+	}{
+		{
+			name: "download verify extract",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/gzip")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(validArchive)
+			},
+			bundle: &contracts.TmpBundleRef{
+				BundleID: "bun-test-123", CID: "bafy123",
+				Digest: validDigest, Entries: []string{"config.json"},
+			},
+			assertFn: func(t *testing.T, stagingDir string) {
+				t.Helper()
+				got, err := os.ReadFile(filepath.Join(stagingDir, "config.json"))
+				if err != nil {
+					t.Fatalf("read config.json: %v", err)
+				}
+				if string(got) != `{"key":"value"}` {
+					t.Errorf("config.json: got %q", got)
+				}
+			},
+		},
+		{
+			name: "digest mismatch rejected",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(badDigestArchive)
+			},
+			bundle: &contracts.TmpBundleRef{
+				BundleID: "bun-bad-digest", CID: "bafy123",
+				Digest:  "0000000000000000000000000000000000000000000000000000000000000000",
+				Entries: []string{"file.txt"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "server error rejected",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "not found", http.StatusNotFound)
+			},
+			bundle: &contracts.TmpBundleRef{
+				BundleID: "bun-missing", CID: "bafy123",
+				Digest: "abc", Entries: []string{"file.txt"},
+			},
+			wantErr: true,
+		},
 	}
 
-	stagingDir := t.TempDir()
-	if err := rc.materializeTmpBundle(t.Context(), bundle, stagingDir); err == nil {
-		t.Fatal("expected digest mismatch error, got nil")
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-func TestTmpBundle_Materialization_ServerErrorRejected(t *testing.T) {
-	t.Parallel()
+			srv := httptest.NewServer(tt.handler)
+			defer srv.Close()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not found", http.StatusNotFound)
-	}))
-	defer srv.Close()
+			rc := newTestController(t, newAgentConfig(srv.URL))
+			stagingDir := t.TempDir()
+			err := rc.materializeTmpBundle(t.Context(), tt.bundle, stagingDir)
 
-	rc := newTestController(t, newTestConfig(srv.URL))
-
-	bundle := &contracts.TmpBundleRef{
-		BundleID: "bun-missing",
-		CID:      "bafy123",
-		Digest:   "abc",
-		Entries:  []string{"file.txt"},
-	}
-
-	stagingDir := t.TempDir()
-	if err := rc.materializeTmpBundle(t.Context(), bundle, stagingDir); err == nil {
-		t.Fatal("expected error for 404 response, got nil")
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("materializeTmpBundle error: %v", err)
+			}
+			if tt.assertFn != nil {
+				tt.assertFn(t, stagingDir)
+			}
+		})
 	}
 }

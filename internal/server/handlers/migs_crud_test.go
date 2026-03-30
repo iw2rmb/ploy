@@ -108,11 +108,12 @@ func TestMods_List(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name       string
-		store      *migStore
-		query      string
-		wantStatus int
-		verify     func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
+		name         string
+		store        *migStore
+		query        string
+		wantStatus   int
+		wantArchived *bool // when set, asserts listMigsParams.ArchivedOnly
+		verify       func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name: "returns migs",
@@ -171,34 +172,18 @@ func TestMods_List(t *testing.T) {
 			},
 		},
 		{
-			name:       "archived=true filter",
-			store:      &migStore{},
-			query:      "archived=true",
-			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
-				t.Helper()
-				if st.listMigsParams.ArchivedOnly == nil {
-					t.Fatal("ArchivedOnly is nil")
-				}
-				if *st.listMigsParams.ArchivedOnly != true {
-					t.Errorf("ArchivedOnly = %v, want true", *st.listMigsParams.ArchivedOnly)
-				}
-			},
+			name:         "archived=true filter",
+			store:        &migStore{},
+			query:        "archived=true",
+			wantStatus:   http.StatusOK,
+			wantArchived: ptr(true),
 		},
 		{
-			name:       "archived=false filter",
-			store:      &migStore{},
-			query:      "archived=false",
-			wantStatus: http.StatusOK,
-			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
-				t.Helper()
-				if st.listMigsParams.ArchivedOnly == nil {
-					t.Fatal("ArchivedOnly is nil")
-				}
-				if *st.listMigsParams.ArchivedOnly != false {
-					t.Errorf("ArchivedOnly = %v, want false", *st.listMigsParams.ArchivedOnly)
-				}
-			},
+			name:         "archived=false filter",
+			store:        &migStore{},
+			query:        "archived=false",
+			wantStatus:   http.StatusOK,
+			wantArchived: ptr(false),
 		},
 		{
 			name: "repo_url filter normalizes",
@@ -293,6 +278,14 @@ func TestMods_List(t *testing.T) {
 			}
 			rr := doRequest(t, listMigsHandler(tt.store), http.MethodGet, path, nil)
 			assertStatus(t, rr, tt.wantStatus)
+			if tt.wantArchived != nil {
+				if tt.store.listMigsParams.ArchivedOnly == nil {
+					t.Fatal("ArchivedOnly is nil")
+				}
+				if *tt.store.listMigsParams.ArchivedOnly != *tt.wantArchived {
+					t.Errorf("ArchivedOnly = %v, want %v", *tt.store.listMigsParams.ArchivedOnly, *tt.wantArchived)
+				}
+			}
 			if tt.verify != nil {
 				tt.verify(t, tt.store, rr)
 			}

@@ -62,34 +62,6 @@ func writeTempFile(t *testing.T, content []byte) string {
 	return f.Name()
 }
 
-// generateTestCerts creates test CA, node certificate, and key for mTLS testing.
-func generateTestCerts(t *testing.T) (certPEM, keyPEM, caPEM []byte) {
-	t.Helper()
-
-	now := time.Now().UTC()
-
-	ca, err := pki.GenerateCA("test-cluster", now)
-	if err != nil {
-		t.Fatalf("generate CA: %v", err)
-	}
-
-	nodeKey, nodeCSR, err := pki.GenerateNodeCSR(testNodeID, "test-cluster", "127.0.0.1")
-	if err != nil {
-		t.Fatalf("generate node CSR: %v", err)
-	}
-
-	nodeCert, err := pki.SignNodeCSR(ca, nodeCSR, now)
-	if err != nil {
-		t.Fatalf("sign node CSR: %v", err)
-	}
-
-	certPEM = []byte(nodeCert.CertPEM)
-	keyPEM = []byte(nodeKey.KeyPEM)
-	caPEM = []byte(ca.CertPEM)
-
-	return certPEM, keyPEM, caPEM
-}
-
 // checkErr fails the test if the error doesn't match expectations.
 func checkErr(t *testing.T, wantErr bool, err error) {
 	t.Helper()
@@ -340,22 +312,22 @@ func assertTarContains(t *testing.T, bundle []byte, wantHeaders []string) {
 	}
 }
 
-// assertUploadOccurred checks whether any artifact upload calls were recorded.
-func assertUploadOccurred(t *testing.T, calls *[]artifactUploadCall, want bool) {
+// assertUpload verifies the first upload call: whether it occurred, its artifact
+// name, and (optionally) that the tar bundle contains the expected headers.
+// Pass empty wantName/wantHeaders to skip those checks.
+func assertUpload(t *testing.T, calls *[]artifactUploadCall, wantUpload bool, wantName string, wantHeaders []string) {
 	t.Helper()
-	if got := len(*calls) > 0; got != want {
-		t.Errorf("upload occurred = %v, want %v", got, want)
+	if got := len(*calls) > 0; got != wantUpload {
+		t.Fatalf("upload occurred = %v, want %v", got, wantUpload)
 	}
-}
-
-// assertArtifactName checks the artifact name at the given call index.
-func assertArtifactName(t *testing.T, calls *[]artifactUploadCall, index int, wantName string) {
-	t.Helper()
-	if index >= len(*calls) {
-		t.Fatalf("no upload at index %d (got %d calls)", index, len(*calls))
+	if !wantUpload {
+		return
 	}
-	if (*calls)[index].Name != wantName {
-		t.Errorf("artifact name = %q, want %q", (*calls)[index].Name, wantName)
+	if wantName != "" && (*calls)[0].Name != wantName {
+		t.Errorf("artifact name = %q, want %q", (*calls)[0].Name, wantName)
+	}
+	if len(wantHeaders) > 0 {
+		assertTarContains(t, (*calls)[0].Bundle, wantHeaders)
 	}
 }
 
@@ -428,11 +400,6 @@ func newAgentConfig(serverURL string, opts ...configOption) Config {
 	return cfg
 }
 
-// newTestConfig returns a Config with sensible test defaults (TLS disabled).
-func newTestConfig(serverURL string) Config {
-	return newAgentConfig(serverURL)
-}
-
 // ---------------------------------------------------------------------------
 // Component builders
 // ---------------------------------------------------------------------------
@@ -440,7 +407,7 @@ func newTestConfig(serverURL string) Config {
 // newTestUploader returns a baseUploader with sensible test defaults (TLS disabled).
 func newTestUploader(t *testing.T, serverURL string) *baseUploader {
 	t.Helper()
-	u, err := newBaseUploader(newTestConfig(serverURL))
+	u, err := newBaseUploader(newAgentConfig(serverURL))
 	if err != nil {
 		t.Fatalf("newBaseUploader: %v", err)
 	}
@@ -661,7 +628,7 @@ type uploadTestEnv struct {
 func newUploadTestEnv(t *testing.T, runID, jobID string, opts ...artifactServerOption) uploadTestEnv {
 	t.Helper()
 	server, calls := newArtifactUploadServer(t, runID, jobID, opts...)
-	controller := newTestController(t, newTestConfig(server.URL))
+	controller := newTestController(t, newAgentConfig(server.URL))
 	return uploadTestEnv{Controller: controller, Calls: calls}
 }
 
