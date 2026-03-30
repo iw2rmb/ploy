@@ -59,16 +59,16 @@
 [migs_archive.go](migs_archive.go) Handlers for mig archive/unarchive operations with active-run safeguards.
 [migs_archive_test.go](migs_archive_test.go) Tests mig archive/unarchive semantics including active-job guards and not-found/store errors.
 [migs_crud.go](migs_crud.go) Core mig create/list/delete handlers and request validation utilities.
-[migs_crud_test.go](migs_crud_test.go) Covers mig create/list/delete handlers with pagination, filters, and error-path behavior.
+[migs_crud_test.go](migs_crud_test.go) Tests mig create/list/delete handlers across validation, pagination, filtering, and store error translation paths.
 [migs_repos.go](migs_repos.go) Handlers managing mig-to-repo associations and bulk repo assignments.
-[migs_repos_test.go](migs_repos_test.go) Tests mig repo association handlers for add/list/delete/bulk upsert flows.
+[migs_repos_test.go](migs_repos_test.go) Validates mig-repo add/list/delete flows including URL normalization, archive guards, and association constraints.
 [migs_runs.go](migs_runs.go) Handlers exposing mig run history and related run metadata views.
-[migs_runs_test.go](migs_runs_test.go) Validates mig run listing/detail behavior and translation from store records to API responses.
+[migs_runs_test.go](migs_runs_test.go) Covers mig run-creation selectors and failure modes, plus mig run listing/detail response mapping behavior.
 [migs_spec.go](migs_spec.go) Handlers for reading/updating mig specs and latest-spec retrieval.
 [migs_spec_test.go](migs_spec_test.go) Covers get/set mig spec handlers including named lookup and repeat update scenarios.
 [migs_ticket.go](migs_ticket.go) Ticket/run-creation handlers for launching mig workflows against repos.
 [migs_ticket_fuzz_test.go](migs_ticket_fuzz_test.go) Fuzzes single-repo run creation handler inputs to harden request decoding and validation.
-[migs_ticket_test.go](migs_ticket_test.go) Tests mig ticket/run submission path including validation and store-interaction behavior.
+[migs_ticket_test.go](migs_ticket_test.go) Verifies single-repo run submission and job-chain construction from spec steps, queueing rules, and chain integrity.
 [nodes.go](nodes.go) Node management handlers for registration/state operations.
 [nodes_claim.go](nodes_claim.go) HTTP claim handler that coordinates worker job acquisition.
 [nodes_claim_gate_skip_test.go](nodes_claim_gate_skip_test.go) Validates node claim behavior when gate-skip policy affects claimable work selection.
