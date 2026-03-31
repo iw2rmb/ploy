@@ -6,12 +6,12 @@
 
 **Prereqs**
 
-- Local Docker cluster deployed via `deploy/local/run.sh`.
+- Local Docker cluster deployed via `deploy/runtime/run.sh`.
 - CLI configured for the local cluster:
-  - `export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"`
+  - `export PLOY_CONFIG_HOME="$HOME/.config/ploy/local"`
   - Scenario scripts auto-rebuild/repair `clusters/default` and validate the bearer token before run submission.
-  - Repair first tries `deploy/local/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
-  - If both descriptor and token seed are missing, rerun `deploy/local/run.sh`.
+  - Repair first tries `deploy/runtime/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
+  - If both descriptor and token seed are missing, rerun `deploy/runtime/run.sh`.
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 

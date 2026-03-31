@@ -11,7 +11,7 @@ Overview
 
 Local Registry Prerequisites
 - Deploy the local stack:
-  - `deploy/local/run.sh`
+  - `deploy/runtime/run.sh`
 - Export the registry prefix for specs/scripts:
   - `export PLOY_CONTAINER_REGISTRY=127.0.0.1:5000/ploy`
 

@@ -108,7 +108,7 @@ ploy cluster token revoke abc123 --confirm
 ### CLI Configuration
 
 Store your token in the cluster descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
-The local Docker cluster uses `PLOY_CONFIG_HOME="$PWD/deploy/local/cli"` and
+The local Docker cluster uses `PLOY_CONFIG_HOME="$HOME/.config/ploy/local"` and
 `address: "http://127.0.0.1:${PLOY_SERVER_PORT:-8080}"`.
 
 ```json
@@ -154,7 +154,7 @@ deploy:
 ## Worker Node Authentication (Local Docker)
 
 In the local Docker cluster, the worker node uses a long-lived bearer token stored at
-`/etc/ploy/bearer-token` in the node container. `deploy/local/run.sh` provisions this token.
+`/etc/ploy/bearer-token` in the node container. `deploy/runtime/run.sh` provisions this token.
 
 ## Token Security
 

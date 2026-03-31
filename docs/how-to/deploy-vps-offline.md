@@ -1,6 +1,6 @@
 # Deploy Full Local Stack To The VPS
 
-`deploy/vps/run.sh` deploys the same Docker topology used by `deploy/local/run.sh`
+`deploy/vps/run.sh` deploys the same Docker topology used by `deploy/runtime/run.sh`
 to the fixed VPS target `s_v.v.kovalev@10.120.34.186` over SSH.
 
 The script is intentionally simple:
@@ -76,7 +76,7 @@ To reset the remote `ploy` database before the deploy:
 - Reuses local Docker images when the target tags already exist.
 - Rebuilds both binaries and images when `--clean` is set.
 - Keeps the `server` and `node` binaries in the uploaded `dist/*-linux` bundle and relies on the reused compose bind mounts instead of baking those binaries into the VPS runtime images.
-- Uses `PLOY_CA_CERTS` exactly like `deploy/local/run.sh` on the local machine, and also installs that CA bundle on the VPS before Docker operations there.
+- Uses `PLOY_CA_CERTS` exactly like `deploy/runtime/run.sh` on the local machine, and also installs that CA bundle on the VPS before Docker operations there.
 - Uploads the runtime bundle under `/opt/ploy/current` with `sudo`.
 - Creates `/private/tmp` on the VPS because the reused compose file bind-mounts that path for the node container.
 - Starts `garage`, `garage-init`, `registry`, `gradle-build-cache`, and `server` first.
@@ -88,7 +88,7 @@ To reset the remote `ploy` database before the deploy:
 
 ```bash
 ssh s_v.v.kovalev@10.120.34.186 \
-  'cd /opt/ploy/current && docker compose --project-name local --env-file deploy/vps/stack.env -f deploy/local/docker-compose.yml ps'
+  'cd /opt/ploy/current && docker compose --project-name local --env-file deploy/vps/stack.env -f deploy/runtime/docker-compose.yml ps'
 ```
 
 ```bash

@@ -50,8 +50,8 @@ export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT}/ploy"
 export PLOY_S3_URL='http://localhost:3900'
 export PLOY_S3_ACCESS_KEY='...'
 export PLOY_S3_SECRET_KEY='...'
-./deploy/local/run.sh
-export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
+./deploy/runtime/run.sh
+export PLOY_CONFIG_HOME="$HOME/.config/ploy/local"
 ```
 
 What the script does:
@@ -63,7 +63,7 @@ What the script does:
 - Starts compose services.
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
-- Writes local CLI descriptor in `deploy/local/cli/clusters/local.json`.
+- Writes local CLI descriptor in `$HOME/.config/ploy/local/auth.json`.
 - Local Garage S3 credentials are preseeded in compose:
   - access key: `GK000000000000000000000001`
   - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
@@ -73,7 +73,7 @@ What the script does:
 
 ## Script Flags
 
-`./deploy/local/run.sh` supports:
+`./deploy/runtime/run.sh` supports:
 
 ```bash
 --drop-db   # drop + recreate "ploy" before deploy
@@ -91,7 +91,6 @@ No flags means full deploy (server + node + garage + registry services).
 - Runtime images are built from:
   - `deploy/images/server/Dockerfile`
   - `deploy/images/node/Dockerfile`
-  - `deploy/local/garage/Dockerfile` (bootstrap helper image with `/garage` + shell)
 - Runtime containers execute host-built binaries mounted from `dist/`.
 - Core Dockerfiles are used for local runtime image builds.
 
@@ -118,19 +117,19 @@ curl -fsS "http://localhost:${PLOY_REGISTRY_PORT:-5000}/v2/"
 - Token list (uses local descriptor):
 
 ```bash
-PLOY_CONFIG_HOME="$PWD/deploy/local/cli" ./dist/ploy cluster token list
+PLOY_CONFIG_HOME="$HOME/.config/ploy/local" ./dist/ploy cluster token list
 ```
 
 ## Stop / Clean
 
 ```bash
-docker compose -f deploy/local/docker-compose.yml down -v
+docker compose -f deploy/runtime/docker-compose.yml down -v
 ```
 
 For a full reset including DB recreation:
 
 ```bash
-./deploy/local/run.sh --drop-db
+./deploy/runtime/run.sh --drop-db
 ```
 
 ## Troubleshooting
@@ -145,7 +144,7 @@ For a full reset including DB recreation:
   - For loopback DSNs (`localhost`, `127.0.0.1`, `::1`), local deploy rewrites the container DSN host to `host.docker.internal`.
 - Docker Hub TLS verification fails during image build:
   - Set `PLOY_CA_CERTS` to a PEM bundle path trusted in your environment.
-  - Re-run `./deploy/local/run.sh`; it installs this CA for Docker registry trust (Colima/Linux automation).
+  - Re-run `./deploy/runtime/run.sh`; it installs this CA for Docker registry trust (Colima/Linux automation).
 - Host `localhost` API path is intercepted/proxied:
   - `run.sh` health checks use Docker container health state instead of host `curl`.
   - Global env bootstrap (`PLOY_GRADLE_BUILD_CACHE_*`) falls back to server-container local API calls when host CLI HTTP calls fail.
@@ -156,10 +155,9 @@ For a full reset including DB recreation:
     - Docker script default: `/var/run/docker.sock`
   - Override explicitly if needed: `export PLOY_CONTAINER_SOCKET_PATH=/var/run/docker.sock`
 - Logs:
-  - `docker compose -f deploy/local/docker-compose.yml logs -f server`
-  - `docker compose -f deploy/local/docker-compose.yml logs -f node`
-  - `docker compose -f deploy/local/docker-compose.yml logs -f garage`
-  - `docker compose -f deploy/local/docker-compose.yml logs -f registry`
+  - `docker compose -f deploy/runtime/docker-compose.yml logs -f server`
+  - `docker compose -f deploy/runtime/docker-compose.yml logs -f node`
+
 
 ## Related
 
