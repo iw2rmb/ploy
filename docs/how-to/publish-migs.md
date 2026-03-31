@@ -1,4 +1,4 @@
-Publish Migs Images to a Garage-Backed Registry
+Publish Migs Images to a Local Registry
 
 Overview
 - Migs images live under `deploy/images/orw/`, `deploy/images/codex/`, `deploy/images/amata/`, and `deploy/images/shell/`:
@@ -22,13 +22,8 @@ deploy/images/build-and-push.sh
 # Also builds/pushes runtime images: ploy-server and ploy-node.
 ```
 
-Sync all local workflow images (migs + build-gate base images)
-```bash
-deploy/images/garage.sh
-# Adds build-gate images and mirrored base images required by gates/stacks.yaml.
-# Skips refs that already exist in registry.
-# Use --force to rebuild/repush everything.
-```
+There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
+or targeted `docker buildx build ... --push` commands.
 
 Custom CA support is runtime-only. Do not inject corporate certs during image build.
 Use `PLOY_CA_CERTS` at deployment/runtime so the same bundle is mounted into runtime

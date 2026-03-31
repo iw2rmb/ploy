@@ -52,6 +52,9 @@ Options:
 
 Environment:
   PLOY_DB_DSN             PostgreSQL DSN used by host setup and server container
+  PLOY_S3_URL             S3-compatible endpoint URL used by server object store config
+  PLOY_S3_ACCESS_KEY      S3 access key used by server object store config
+  PLOY_S3_SECRET_KEY      S3 secret key used by server object store config
   PLOY_CA_CERTS           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
   PLOY_VERSION            Runtime version tag (default from ./VERSION, example v0.1.0)
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION})
@@ -565,30 +568,6 @@ wait_for_server_health() {
   exit 1
 }
 
-sync_garage_registry_images() {
-  local -a args=()
-  local force_images="${PLOY_GARAGE_FORCE_IMAGES:-0}"
-  local skip_mirrors="${PLOY_GARAGE_SKIP_MIRRORS:-0}"
-
-  case "$force_images" in
-    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
-      args+=(--force)
-      ;;
-  esac
-
-  log "Syncing mig/build-gate images into ${PLOY_CONTAINER_REGISTRY} ..."
-
-  if [[ ${#args[@]} -gt 0 ]]; then
-    IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
-    SKIP_UPSTREAM_MIRRORS="$skip_mirrors" \
-      ./deploy/images/garage.sh "${args[@]}"
-  else
-    IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
-    SKIP_UPSTREAM_MIRRORS="$skip_mirrors" \
-      ./deploy/images/garage.sh
-  fi
-}
-
 seed_tokens() {
   log "Inserting admin token into api_tokens..."
   psql "$PLOY_DB_DSN_HOST" -v ON_ERROR_STOP=1 -qX -c "
@@ -705,6 +684,10 @@ main() {
     echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
+  if [[ -z "${PLOY_S3_URL:-}" || -z "${PLOY_S3_ACCESS_KEY:-}" || -z "${PLOY_S3_SECRET_KEY:-}" ]]; then
+    echo "error: PLOY_S3_URL, PLOY_S3_ACCESS_KEY, and PLOY_S3_SECRET_KEY are required" >&2
+    exit 1
+  fi
 
   PLOY_DB_DSN_HOST="$(normalize_host_pg_dsn)"
   PLOY_DB_DSN="$PLOY_DB_DSN_HOST"
@@ -736,7 +719,10 @@ main() {
   export PLOY_CA_CERTS
   export PLOY_CA_CERT_PATH
   export PLOY_CONTAINER_REGISTRY
-  PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:${PLOY_REGISTRY_PORT}/ploy}"
+  if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then
+    echo "error: PLOY_CONTAINER_REGISTRY is required (example: 127.0.0.1:${PLOY_REGISTRY_PORT}/ploy)" >&2
+    exit 1
+  fi
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1
@@ -776,7 +762,6 @@ main() {
 
   wait_for_garage_bootstrap
   wait_for_registry_health
-  sync_garage_registry_images
   wait_for_server_health
 
   seed_tokens

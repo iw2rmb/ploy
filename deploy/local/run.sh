@@ -52,14 +52,15 @@ Options:
 
 Environment:
   PLOY_DB_DSN        PostgreSQL DSN used by host setup and server container
+  PLOY_S3_URL        S3-compatible endpoint URL used by server object store config
+  PLOY_S3_ACCESS_KEY S3 access key used by server object store config
+  PLOY_S3_SECRET_KEY S3 secret key used by server object store config
   PLOY_CA_CERTS      Optional path to PEM CA bundle for docker registry trust and runtime container trust
   DOCKER_AUTH_CONFIG Optional Docker auth config JSON used by node image pulls
   PLOY_DOCKER_AUTH_CONFIG Optional override for Docker auth config JSON used by node image pulls
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
-  PLOY_REGISTRY_PORT Host port for local Garage-backed OCI registry (default: 5000)
-  PLOY_CONTAINER_REGISTRY Registry prefix used for local image sync (default: 127.0.0.1:<PLOY_REGISTRY_PORT>/ploy)
-  PLOY_GARAGE_FORCE_IMAGES Set to 1/true to force rebuild+repush in deploy/images/garage.sh
-  PLOY_GARAGE_SKIP_MIRRORS Set to 1/true to skip upstream base-image mirror pulls in deploy/images/garage.sh
+  PLOY_REGISTRY_PORT Host port for local OCI registry (default: 5000)
+  PLOY_CONTAINER_REGISTRY Registry/repository prefix used by runner templates (required)
   PLOY_SKIP_BUILD        Set to 1/true to skip `make build` and reuse existing dist binaries
   WORKER_TOKEN_PATH       Host path mounted to /etc/ploy/bearer-token in node (default: deploy/local/node/bearer-token)
 USAGE
@@ -461,39 +462,6 @@ build_runtime_images() {
   $COMPOSE_CMD build "${services[@]}"
 }
 
-sync_garage_registry_images() {
-  local -a args=()
-  local force_images="${PLOY_GARAGE_FORCE_IMAGES:-0}"
-  local skip_mirrors="${PLOY_GARAGE_SKIP_MIRRORS:-0}"
-  local skip_mirrors_flag=0
-
-  case "$force_images" in
-    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
-      args+=(--force)
-      ;;
-  esac
-  case "$skip_mirrors" in
-    1|true|TRUE|True|yes|YES|Yes|on|ON|On)
-      skip_mirrors_flag=1
-      ;;
-  esac
-
-  log "Syncing mig/build-gate images into ${PLOY_CONTAINER_REGISTRY} ..."
-  if (( skip_mirrors_flag )); then
-    log "Skipping upstream mirror sync (PLOY_GARAGE_SKIP_MIRRORS=${PLOY_GARAGE_SKIP_MIRRORS})"
-  fi
-
-  if [[ ${#args[@]} -gt 0 ]]; then
-    IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
-    SKIP_UPSTREAM_MIRRORS="$skip_mirrors" \
-      ./deploy/images/garage.sh "${args[@]}"
-  else
-    IMAGE_PREFIX="$PLOY_CONTAINER_REGISTRY" \
-    SKIP_UPSTREAM_MIRRORS="$skip_mirrors" \
-      ./deploy/images/garage.sh
-  fi
-}
-
 wait_for_garage_bootstrap() {
   local garage_cid garage_init_cid garage_health init_state init_exit
 
@@ -859,6 +827,10 @@ main() {
     echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
+  if [[ -z "${PLOY_S3_URL:-}" || -z "${PLOY_S3_ACCESS_KEY:-}" || -z "${PLOY_S3_SECRET_KEY:-}" ]]; then
+    echo "error: PLOY_S3_URL, PLOY_S3_ACCESS_KEY, and PLOY_S3_SECRET_KEY are required" >&2
+    exit 1
+  fi
 
   PLOY_DB_DSN_HOST="$(normalize_host_pg_dsn)"
   PLOY_DB_DSN="$PLOY_DB_DSN_HOST"
@@ -925,7 +897,10 @@ main() {
   export PLOY_SERVER_PORT
   export PLOY_REGISTRY_PORT
   export PLOY_CONTAINER_REGISTRY
-  PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:${PLOY_REGISTRY_PORT}/ploy}"
+  if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then
+    echo "error: PLOY_CONTAINER_REGISTRY is required (example: 127.0.0.1:${PLOY_REGISTRY_PORT}/ploy)" >&2
+    exit 1
+  fi
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1
@@ -968,7 +943,6 @@ main() {
 
   wait_for_garage_bootstrap
   wait_for_registry_health
-  sync_garage_registry_images
   wait_for_server_health
 
   seed_tokens
