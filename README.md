@@ -77,15 +77,6 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   - `stale_job_recovery_interval`: stale-running-job recovery cycle interval (default 30s; set `0` to disable)
   - `node_stale_after`: node heartbeat staleness threshold used by recovery (default 1m)
 
-**Quick Start (Local Docker)**
-- Deploy the local Docker stack (server + node + garage services) and write a local CLI descriptor:
-
-  ```bash
-  export PLOY_DB_DSN='postgres://ploy:ploy@host.containers.internal:5432/ploy?sslmode=disable'
-  ./deploy/local/run.sh
-  export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
-  ```
-
 **Quick Start (Runtime Images from GHCR)**
 - Deploy with pre-built GHCR images (pull-before-run enabled by default):
 
@@ -93,9 +84,13 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
   export PLOY_VERSION='v0.1.0'                           # optional; defaults to ./VERSION
   export PLOY_CA_CERTS='/path/to/ca-bundle.pem'          # optional
+  export PLOY_OBJECTSTORE_ENDPOINT='http://localhost:3900'
+  export PLOY_OBJECTSTORE_ACCESS_KEY='...'
+  export PLOY_OBJECTSTORE_SECRET_KEY='...'
   ./deploy/runtime/run.sh
-  export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
   ```
+
+- Runtime auth state is stored at `~/.config/ploy/<cluster>/auth.json` (default cluster: `local`).
 
 - Submit a mig run and follow events:
 
@@ -127,7 +122,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Full reference: `docs/envs/README.md`
 - Key variables:
   - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server.
-  - `PLOY_CONFIG_HOME` — CLI config home; local Docker uses `./deploy/local/cli`.
+  - `PLOY_CONFIG_HOME` — Optional config root used by runtime deploy state (`<root>/<cluster>/auth.json`).
   - `PLOY_BUILDGATE_IMAGE` — Optional Build Gate container image override.
 
 **Contributing**

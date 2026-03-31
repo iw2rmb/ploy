@@ -1,8 +1,8 @@
-retries: 2
+retries: 1
 image: 127.0.0.1:5000/ploy/migs-codex:latest
 env:
   CODEX_API_KEY: $LLM_PROXY_API_KEY
 env_from_file:
-  CODEX_PROMPT: $PLOY_PATH/healing/deps/prompt.md
+  CODEX_PROMPT: $PLOY_PATH/lib/healing/code/prompt.md
   CODEX_CONFIG_TOML: $PLOY_PATH/lib/j11to17/codex-config.toml
   CODEX_AUTH_JSON: ~/.codex/auth.json

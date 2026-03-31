@@ -82,14 +82,14 @@ build_gate:
       language: java
       release: "17"
   router:
-    spec_path: $PLOY_PATH/healing/router/spec.yaml
+    spec_path: $PLOY_PATH/lib/healing/router/spec.yaml
   healing:
     by_error_kind:
       infra:
-        spec_path: $PLOY_PATH/healing/infra/spec.yaml
+        spec_path: $PLOY_PATH/lib/healing/infra/spec.yaml
       code:
-        spec_path: $PLOY_PATH/healing/code/spec.yaml
+        spec_path: $PLOY_PATH/lib/healing/code/spec.yaml
       deps:
-        spec_path: $PLOY_PATH/healing/deps/spec.yaml
+        spec_path: $PLOY_PATH/lib/healing/deps/spec.yaml
 mr_on_fail: false
 mr_on_success: true
