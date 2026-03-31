@@ -39,7 +39,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-COPY deploy/images/amata/mig-amata.sh /usr/local/bin/mig-amata
+COPY deploy/images/amata/entrypoint.sh /usr/local/bin/mig-amata
 COPY deploy/images/amata/amata /usr/local/bin/amata
 RUN chmod +x /usr/local/bin/mig-amata /usr/local/bin/amata && \
     ln -s /usr/local/bin/mig-amata /usr/local/bin/migs-amata

@@ -40,7 +40,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-COPY deploy/images/codex/mig-codex.sh /usr/local/bin/mig-codex
+COPY deploy/images/codex/entrypoint.sh /usr/local/bin/mig-codex
 RUN chmod +x /usr/local/bin/mig-codex && \
     ln -s /usr/local/bin/mig-codex /usr/local/bin/migs-codex
 
