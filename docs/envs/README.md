@@ -36,11 +36,10 @@ defaults change, or components adopt additional configuration.
   (`docker.io`, `registry-1.docker.io`, `auth.docker.io`, `index.docker.io`, `ghcr.io`).
   The script also installs the bundle into system CA trust before restarting
   Docker, so Docker Hub auth/token TLS uses the same root CAs.
-  The same bundle is provided to local `server`/`node` image builds through
-  a BuildKit secret (`ploy_ca_bundle`) so early `apk add` steps can trust
-  your corporate/private CAs without printing certificate content in build logs.
-  In runtime-local deploy (`deploy/runtime/run.sh`), this bundle is only used for
-  Docker daemon trust (image pulls), not baked into any runtime image.
+  The same bundle is mounted into runtime containers (`server`/`node`) as a local file
+  and exported through runtime TLS env vars; it is not baked into images.
+  Local/runtime deploy scripts also seed global `CA_CERTS_PEM_BUNDLE` from this file
+  so mig/build-gate containers receive the same CA bundle at runtime.
   Current automation targets:
   - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
   - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
@@ -49,9 +48,6 @@ defaults change, or components adopt additional configuration.
   port `8080` in the local compose stack. Default: `8080`. Both local
   and runtime-local/VPS deploy scripts pass it through to the compose stack. Use this when the
   host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
-- `PLOY_RUNTIME_CA_CERTS` — Optional path to a PEM CA bundle mounted into runtime-local
-  `server` and `node` containers by `deploy/runtime/run.sh`. This is intended for local-only
-  corporate CA injection at container runtime. Images remain certificate-agnostic.
 - `PLOY_RUNTIME_PULL_IMAGES` — Runtime-local deploy toggle for pull-before-start behavior.
   Defaults to `1` (enabled). Set `0`/`false` to skip `docker compose pull`.
 - `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.

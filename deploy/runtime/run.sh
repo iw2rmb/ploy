@@ -15,8 +15,7 @@ PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
 PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
-PLOY_RUNTIME_CA_CERTS="${PLOY_RUNTIME_CA_CERTS:-}"
-PLOY_RUNTIME_CA_CERT_PATH=""
+PLOY_CA_CERT_PATH=""
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
@@ -52,8 +51,7 @@ Options:
 
 Environment:
   PLOY_DB_DSN             PostgreSQL DSN used by host setup and server container
-  PLOY_CA_CERTS           Optional path to PEM CA bundle for Docker daemon registry trust
-  PLOY_RUNTIME_CA_CERTS   Optional path to PEM CA bundle mounted into server/node containers at runtime
+  PLOY_CA_CERTS           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy-server:latest)
   PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy-node:latest)
   PLOY_RUNTIME_GARAGE_INIT_IMAGE Runtime garage-init image (default ghcr.io/iw2rmb/ploy-garage-init:latest)
@@ -352,11 +350,11 @@ configure_docker_registry_ca_if_needed() {
 }
 
 resolve_runtime_ca_bundle() {
-  local ca_path="${PLOY_RUNTIME_CA_CERTS:-}"
+  local ca_path="${PLOY_CA_CERTS:-}"
 
   if [[ -z "$ca_path" ]]; then
-    PLOY_RUNTIME_CA_CERTS="/dev/null"
-    PLOY_RUNTIME_CA_CERT_PATH=""
+    PLOY_CA_CERTS="/dev/null"
+    PLOY_CA_CERT_PATH=""
     return 0
   fi
 
@@ -364,16 +362,16 @@ resolve_runtime_ca_bundle() {
     ca_path="$ROOT_DIR/$ca_path"
   fi
   if [[ ! -f "$ca_path" ]]; then
-    echo "error: PLOY_RUNTIME_CA_CERTS file not found: $ca_path" >&2
+    echo "error: PLOY_CA_CERTS file not found: $ca_path" >&2
     exit 1
   fi
   if [[ ! -s "$ca_path" ]]; then
-    echo "error: PLOY_RUNTIME_CA_CERTS file is empty: $ca_path" >&2
+    echo "error: PLOY_CA_CERTS file is empty: $ca_path" >&2
     exit 1
   fi
 
-  PLOY_RUNTIME_CA_CERTS="$ca_path"
-  PLOY_RUNTIME_CA_CERT_PATH="/etc/ploy/certs/runtime-ca.pem"
+  PLOY_CA_CERTS="$ca_path"
+  PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.pem"
 }
 
 generate_tokens() {
@@ -617,8 +615,16 @@ PY
   fi
 }
 
+runtime_ca_bundle_value() {
+  if [[ -z "$PLOY_CA_CERTS" || "$PLOY_CA_CERTS" == "/dev/null" ]]; then
+    return 0
+  fi
+  cat "$PLOY_CA_CERTS"
+}
+
 wire_local_cli_descriptor() {
   local server_url="http://127.0.0.1:${PLOY_SERVER_PORT}"
+  local runtime_ca_bundle=""
 
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"
@@ -634,6 +640,12 @@ JSON
   log "Configuring local Gradle Build Cache globals..."
   set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_URL "http://gradle-build-cache:5071/cache/" all
   set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_PUSH "true" all
+
+  runtime_ca_bundle="$(runtime_ca_bundle_value || true)"
+  if [[ -n "$runtime_ca_bundle" ]]; then
+    log "Configuring global CA_CERTS_PEM_BUNDLE from PLOY_CA_CERTS..."
+    set_global_env_via_server_api CA_CERTS_PEM_BUNDLE "$runtime_ca_bundle" all
+  fi
 }
 
 main() {
@@ -694,8 +706,7 @@ main() {
   export PLOY_SERVER_PORT
   export PLOY_REGISTRY_PORT
   export PLOY_CA_CERTS
-  export PLOY_RUNTIME_CA_CERTS
-  export PLOY_RUNTIME_CA_CERT_PATH
+  export PLOY_CA_CERT_PATH
   export PLOY_CONTAINER_REGISTRY
   PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:${PLOY_REGISTRY_PORT}/ploy}"
 

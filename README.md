@@ -91,8 +91,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 
   ```bash
   export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
-  export PLOY_CA_CERTS='/path/to/docker-daemon-ca.pem'   # optional
-  export PLOY_RUNTIME_CA_CERTS='/path/to/runtime-ca.pem' # optional
+  export PLOY_CA_CERTS='/path/to/ca-bundle.pem'          # optional
   ./deploy/runtime/run.sh
   export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
   ```

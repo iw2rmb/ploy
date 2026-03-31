@@ -20,10 +20,10 @@ services:
       - PLOY_OBJECTSTORE_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
       - PLOY_OBJECTSTORE_SECURE=false
       - PLOY_OBJECTSTORE_REGION=garage
-      - PLOY_RUNTIME_CA_CERT_PATH=${PLOY_RUNTIME_CA_CERT_PATH:-}
+      - PLOY_CA_CERT_PATH=${PLOY_CA_CERT_PATH:-}
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
-      - ${PLOY_RUNTIME_CA_CERTS:-/dev/null}:/etc/ploy/certs/runtime-ca.pem:ro
+      - ${PLOY_CA_CERTS:-/dev/null}:/etc/ploy/certs/ca.pem:ro
     command: ["--config", "/etc/ploy/ployd.yaml"]
     ports:
       - "${PLOY_SERVER_PORT:-8080}:8080"
@@ -55,11 +55,11 @@ services:
       - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}
       - PLOYD_CACHE_HOME=/private/tmp
       - TMPDIR=/private/tmp
-      - PLOY_RUNTIME_CA_CERT_PATH=${PLOY_RUNTIME_CA_CERT_PATH:-}
+      - PLOY_CA_CERT_PATH=${PLOY_CA_CERT_PATH:-}
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - ./node/bearer-token:/etc/ploy/bearer-token:ro
-      - ${PLOY_RUNTIME_CA_CERTS:-/dev/null}:/etc/ploy/certs/runtime-ca.pem:ro
+      - ${PLOY_CA_CERTS:-/dev/null}:/etc/ploy/certs/ca.pem:ro
       - ${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - /var/lib/docker:/var/lib/docker:ro
       - /private/tmp:/private/tmp

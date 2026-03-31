@@ -20,6 +20,7 @@ PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
 PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
+PLOY_CA_CERT_PATH=""
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
@@ -51,7 +52,7 @@ Options:
 
 Environment:
   PLOY_DB_DSN        PostgreSQL DSN used by host setup and server container
-  PLOY_CA_CERTS      Optional path to PEM CA bundle for docker.io registry trust
+  PLOY_CA_CERTS      Optional path to PEM CA bundle for docker registry trust and runtime container trust
   DOCKER_AUTH_CONFIG Optional Docker auth config JSON used by node image pulls
   PLOY_DOCKER_AUTH_CONFIG Optional override for Docker auth config JSON used by node image pulls
   PLOY_SERVER_PORT  Host port for server HTTP endpoint (default: 8080)
@@ -774,9 +775,17 @@ PY
   fi
 }
 
+runtime_ca_bundle_value() {
+  if [[ -z "$PLOY_CA_CERTS" || "$PLOY_CA_CERTS" == "/dev/null" ]]; then
+    return 0
+  fi
+  cat "$PLOY_CA_CERTS"
+}
+
 wire_local_cli_descriptor() {
   local server_url="http://127.0.0.1:${PLOY_SERVER_PORT}"
   local local_no_proxy="localhost,127.0.0.1,::1"
+  local runtime_ca_bundle=""
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"
   cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
@@ -799,6 +808,16 @@ JSON
     "true" \
     all \
     "$local_no_proxy"
+
+  runtime_ca_bundle="$(runtime_ca_bundle_value || true)"
+  if [[ -n "$runtime_ca_bundle" ]]; then
+    log "Configuring global CA_CERTS_PEM_BUNDLE from PLOY_CA_CERTS..."
+    set_global_env_with_fallback \
+      CA_CERTS_PEM_BUNDLE \
+      "$runtime_ca_bundle" \
+      all \
+      "$local_no_proxy"
+  fi
 
   log "Smoke testing CLI cluster token list (optional)..."
   if [[ -x "./dist/ploy" ]]; then
@@ -895,6 +914,13 @@ main() {
   export PLOY_DB_DSN
   PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
   export PLOY_CA_CERTS
+  if [[ -n "$PLOY_CA_CERTS" ]]; then
+    export PLOY_CA_CERT_PATH
+    PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.pem"
+  else
+    export PLOY_CA_CERT_PATH
+    PLOY_CA_CERT_PATH=""
+  fi
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
   export PLOY_REGISTRY_PORT

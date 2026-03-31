@@ -8,27 +8,9 @@ LABEL org.opencontainers.image.title="mig-codex" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="Apache-2.0"
 
-RUN --mount=type=secret,id=ploy_ca_bundle,required=false \
-    if [ -s /run/secrets/ploy_ca_bundle ]; then \
-      mkdir -p /etc/ssl/certs /usr/local/share/ca-certificates && \
-      cp /run/secrets/ploy_ca_bundle /etc/ssl/certs/ploy-ca-bundle.pem && \
-      cp /run/secrets/ploy_ca_bundle /usr/local/share/ca-certificates/ploy-ca.crt && \
-      if [ -f /etc/ssl/cert.pem ]; then \
-        cat /run/secrets/ploy_ca_bundle >> /etc/ssl/cert.pem; \
-      fi && \
-      if [ -f /etc/ssl/certs/ca-certificates.crt ]; then \
-        cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; \
-      else \
-        cp /run/secrets/ploy_ca_bundle /etc/ssl/certs/ca-certificates.crt; \
-      fi; \
-    fi && \
-    apk add --no-cache bash git ca-certificates curl jq && \
+RUN apk add --no-cache bash git ca-certificates curl jq && \
     if command -v update-ca-certificates >/dev/null 2>&1; then \
       update-ca-certificates || true; \
-    fi && \
-    if [ -s /etc/ssl/certs/ploy-ca-bundle.pem ]; then \
-      export NPM_CONFIG_CAFILE=/etc/ssl/certs/ploy-ca-bundle.pem; \
-      export NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ploy-ca-bundle.pem; \
     fi && \
     npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
     npm cache clean --force && \

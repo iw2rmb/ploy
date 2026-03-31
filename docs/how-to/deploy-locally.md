@@ -15,8 +15,7 @@ For workstation/runtime deployments that should not build local binaries/images,
 
 ```bash
 export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
-export PLOY_CA_CERTS='/path/to/docker-daemon-ca.pem'        # optional: Docker daemon trust for ghcr/docker.io
-export PLOY_RUNTIME_CA_CERTS='/path/to/runtime-ca.pem'      # optional: mounted into server/node at runtime
+export PLOY_CA_CERTS='/path/to/ca-bundle.pem'               # optional: used for docker daemon trust + runtime container trust
 ./deploy/runtime/run.sh
 export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
 ```
@@ -28,7 +27,8 @@ export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
   - `ghcr.io/iw2rmb/ploy-server:latest`
   - `ghcr.io/iw2rmb/ploy-node:latest`
   - `ghcr.io/iw2rmb/ploy-garage-init:latest`
-- Injects runtime CA bundle locally (when `PLOY_RUNTIME_CA_CERTS` is set) without baking certs into images.
+- Injects runtime CA bundle locally (when `PLOY_CA_CERTS` is set) without baking certs into images.
+- Seeds `CA_CERTS_PEM_BUNDLE` global env from `PLOY_CA_CERTS` so mig/build-gate containers also receive the same CA bundle at runtime.
 
 ## Prerequisites
 
@@ -44,7 +44,7 @@ From repo root:
 
 ```bash
 export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
-export PLOY_CA_CERTS='/path/to/ca-bundle.pem'  # optional: custom CA for docker.io registry trust
+export PLOY_CA_CERTS='/path/to/ca-bundle.pem'  # optional: docker registry + runtime container trust
 export PLOY_SERVER_PORT=18080   # optional; default 8080
 export PLOY_REGISTRY_PORT=5000  # optional; default 5000
 ./deploy/local/run.sh
@@ -145,7 +145,7 @@ For a full reset including DB recreation:
   - For loopback DSNs (`localhost`, `127.0.0.1`, `::1`), local deploy rewrites the container DSN host to `host.docker.internal`.
 - Docker Hub TLS verification fails during image build:
   - Set `PLOY_CA_CERTS` to a PEM bundle path trusted in your environment.
-  - Re-run `./deploy/local/run.sh`; it installs this CA for Docker registry trust (Colima/Linux automation) and injects it into local image build steps (`apk add`).
+  - Re-run `./deploy/local/run.sh`; it installs this CA for Docker registry trust (Colima/Linux automation).
 - Host `localhost` API path is intercepted/proxied:
   - `run.sh` health checks use Docker container health state instead of host `curl`.
   - Global env bootstrap (`PLOY_GRADLE_BUILD_CACHE_*`) falls back to server-container local API calls when host CLI HTTP calls fail.
