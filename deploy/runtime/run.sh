@@ -711,6 +711,7 @@ main() {
   export PLOY_SERVER_PORT
   export PLOY_CA_CERTS
   export PLOY_CA_CERT_PATH
+  export WORKER_TOKEN_PATH
   export PLOY_CONTAINER_REGISTRY
   if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then
     echo "error: PLOY_CONTAINER_REGISTRY is required (example: ghcr.io/iw2rmb/ploy)" >&2
