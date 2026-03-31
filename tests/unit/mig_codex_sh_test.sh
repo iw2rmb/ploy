@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for mig-codex.sh
+# Unit tests for deploy/images/codex/entrypoint.sh (container command: mig-codex)
 # Tests CLI flag detection, JSONL event capture, session ID extraction,
 # and run manifest/session metadata.
 #
@@ -12,9 +12,9 @@
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-SCRIPT="$ROOT_DIR/deploy/images/codex/mig-codex.sh"
+SCRIPT="$ROOT_DIR/deploy/images/codex/entrypoint.sh"
 
-# Create a temporary copy of mig-codex.sh for test execution.
+# Create a temporary copy of the codex entrypoint for test execution.
 create_test_script() {
   local tmp_script
   tmp_script=$(mktemp)
@@ -1333,7 +1333,7 @@ MOCKCODEX
 # ─────────────────────────────────────────────────────────────────────────────
 # Run all tests
 # ─────────────────────────────────────────────────────────────────────────────
-echo "Running mig-codex.sh unit tests..."
+echo "Running codex entrypoint unit tests..."
 echo ""
 
 echo "Test: --help flag"
