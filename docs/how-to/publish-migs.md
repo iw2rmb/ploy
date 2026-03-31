@@ -1,10 +1,11 @@
 Publish Migs Images to a Garage-Backed Registry
 
 Overview
-- Migs images live under `deploy/images/migs/` and `deploy/images/mig/`:
-  - `orw-cli-maven` (`deploy/images/mig/orw-cli-maven`) -> `orw-cli-maven`
-  - `orw-cli-gradle` (`deploy/images/mig/orw-cli-gradle`) -> `orw-cli-gradle`
-  - `mig-codex` -> `migs-codex`
+- Migs images live under `deploy/images/migs/`, `deploy/images/orw/`, `deploy/images/codex/`, `deploy/images/amata/`, and `deploy/images/shell/`:
+  - `orw-cli-maven` (`deploy/images/orw/orw-cli-maven`) -> `orw-cli-maven`
+  - `orw-cli-gradle` (`deploy/images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
+  - `codex` (`deploy/images/codex`) -> `migs-codex`
+  - `amata` (`deploy/images/amata`) -> `migs-amata`
   - `mig-llm` -> `migs-llm`
   - `mig-plan` -> `migs-plan`
 - Local default registry prefix is `127.0.0.1:5000/ploy`.
@@ -19,7 +20,7 @@ Local Registry Prerequisites
 Publish all Migs images
 ```bash
 deploy/images/build-and-push-migs.sh
-# Discovers deploy/images/migs/* and deploy/images/mig/* and pushes :latest tags.
+# Discovers deploy/images/migs/*, deploy/images/orw/*, and top-level codex/amata/shell images; pushes :latest tags.
 # Defaults to IMAGE_PREFIX=${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}.
 ```
 
@@ -39,32 +40,36 @@ Publish a single Migs image (example: orw-cli-maven)
 ```bash
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   docker buildx build --platform linux/amd64 \
-  -f deploy/images/mig/orw-cli-maven/Dockerfile \
+  -f deploy/images/orw/orw-cli-maven/Dockerfile \
   -t "${IMAGE_PREFIX}/orw-cli-maven:latest" \
   --push .
 ```
 
 Publish `migs-codex` (manual one-off)
 
-`migs-codex` embeds a locally built `amata` binary. Build it before the Docker
-image build — the Dockerfile copies the staged binary; no in-image compilation occurs.
-
 ```bash
-# Step 1: build and stage the amata binary (requires ../amata source sibling repo)
-PLATFORM=linux/amd64 deploy/images/migs/mig-codex/build-amata.sh
-
-# Step 2: build and push the migs-codex image
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
 docker buildx build \
   --platform linux/amd64 \
-  -f deploy/images/migs/mig-codex/Dockerfile \
+  -f deploy/images/codex/Dockerfile \
   -t "${IMAGE_PREFIX}/migs-codex:latest" \
   --push .
 ```
 
-`build-amata.sh` expects the `amata` repository to be a sibling of `ploy` at
-`../amata`. It fails fast with a clear error when the source or build output is
-missing.
+Publish `migs-amata` (manual one-off)
+
+```bash
+# Step 1: build and stage the amata binary (requires ../amata source sibling repo)
+PLATFORM=linux/amd64 deploy/images/amata/build-amata.sh
+
+# Step 2: build and push the migs-amata image
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
+docker buildx build \
+  --platform linux/amd64 \
+  -f deploy/images/amata/Dockerfile \
+  -t "${IMAGE_PREFIX}/migs-amata:latest" \
+  --push .
+```
 
 Stack-aware image mapping example
 ```yaml

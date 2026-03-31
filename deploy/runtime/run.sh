@@ -19,6 +19,7 @@ PLOY_CA_CERT_PATH=""
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
+PLOY_VERSION="${PLOY_VERSION:-}"
 WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/deploy/runtime/node/bearer-token}"
 PULL_IMAGES="${PLOY_RUNTIME_PULL_IMAGES:-1}"
 
@@ -52,9 +53,10 @@ Options:
 Environment:
   PLOY_DB_DSN             PostgreSQL DSN used by host setup and server container
   PLOY_CA_CERTS           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
-  PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy-server:latest)
-  PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy-node:latest)
-  PLOY_RUNTIME_GARAGE_INIT_IMAGE Runtime garage-init image (default ghcr.io/iw2rmb/ploy-garage-init:latest)
+  PLOY_VERSION            Runtime version tag (default from ./VERSION, example v0.1.0)
+  PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION})
+  PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy-node:${PLOY_VERSION})
+  PLOY_RUNTIME_GARAGE_INIT_IMAGE Runtime garage-init image (default ghcr.io/iw2rmb/ploy-garage-init:${PLOY_VERSION})
   PLOY_RUNTIME_PULL_IMAGES Set to 0/false to skip pull before up (default: 1)
 USAGE
 }
@@ -86,6 +88,30 @@ parse_args() {
     esac
     shift
   done
+}
+
+resolve_ploy_version() {
+  if [[ -z "$PLOY_VERSION" && -f "$ROOT_DIR/VERSION" ]]; then
+    PLOY_VERSION="$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")"
+  fi
+  if [[ -z "$PLOY_VERSION" ]]; then
+    echo "error: PLOY_VERSION is required (set env or create $ROOT_DIR/VERSION)" >&2
+    exit 1
+  fi
+  if [[ ! "$PLOY_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+    echo "error: PLOY_VERSION must be semver (vX.Y.Z or vX.Y.Z-prerelease), got '$PLOY_VERSION'" >&2
+    exit 1
+  fi
+}
+
+init_runtime_image_defaults() {
+  : "${PLOY_RUNTIME_SERVER_IMAGE:=ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION}}"
+  : "${PLOY_RUNTIME_NODE_IMAGE:=ghcr.io/iw2rmb/ploy-node:${PLOY_VERSION}}"
+  : "${PLOY_RUNTIME_GARAGE_INIT_IMAGE:=ghcr.io/iw2rmb/ploy-garage-init:${PLOY_VERSION}}"
+  export PLOY_VERSION
+  export PLOY_RUNTIME_SERVER_IMAGE
+  export PLOY_RUNTIME_NODE_IMAGE
+  export PLOY_RUNTIME_GARAGE_INIT_IMAGE
 }
 
 derive_admin_pg_dsn() {
@@ -656,6 +682,8 @@ main() {
   local -a compose_services=(garage garage-init registry gradle-build-cache)
 
   parse_args "$@"
+  resolve_ploy_version
+  init_runtime_image_defaults
 
   log "Checking prerequisites..."
   need docker

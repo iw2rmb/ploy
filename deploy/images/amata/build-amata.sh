@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 # Builds the amata binary from ../amata (sibling repo) and stages it into the
-# mig-codex Docker build context so the Dockerfile can COPY it without any
+# amata Docker build context so the Dockerfile can COPY it without any
 # in-image compilation.
 #
-# Output: deploy/images/migs/mig-codex/amata  (ELF binary for PLATFORM, default linux/amd64)
+# Output: deploy/images/amata/amata  (ELF binary for PLATFORM, default linux/amd64)
 #
 # Must be invoked from the ploy repository root, or run directly; the script
 # resolves paths from its own location.

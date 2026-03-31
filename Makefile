@@ -3,13 +3,26 @@ BUILD_DIR := dist
 COVERAGE_FILE := $(BUILD_DIR)/coverage.out
 HTML_COVERAGE_FILE := $(BUILD_DIR)/coverage.html
 REQUIRED_GO_TOOLCHAIN := go1.25.8
+VERSION_FILE := VERSION
+VERSION ?= $(shell tr -d '[:space:]' < $(VERSION_FILE) 2>/dev/null || echo "")
+PLOY_SIGN_BINARIES ?= 0
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
 BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-GIT_TAG := $(shell git describe --tags --dirty --always 2>/dev/null || echo dev)
 LDV := github.com/iw2rmb/ploy/internal/version
-LDFLAGS := -X $(LDV).Version=$(GIT_TAG) -X $(LDV).Commit=$(GIT_COMMIT) -X $(LDV).BuiltAt=$(BUILD_DATE)
+LDFLAGS := -X $(LDV).Version=$(VERSION) -X $(LDV).Commit=$(GIT_COMMIT) -X $(LDV).BuiltAt=$(BUILD_DATE)
+
+.PHONY: verify-version
+verify-version:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "error: VERSION is empty; set VERSION env var or populate $(VERSION_FILE)"; \
+		exit 1; \
+	fi
+	@if ! echo "$(VERSION)" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$$'; then \
+		echo "error: VERSION='$(VERSION)' is not semver (expected vX.Y.Z or vX.Y.Z-prerelease)"; \
+		exit 1; \
+	fi
 
 .PHONY: verify-go-toolchain
 verify-go-toolchain: ## Fail fast when local Go toolchain is not pinned version
@@ -25,7 +38,7 @@ verify-go-toolchain: ## Fail fast when local Go toolchain is not pinned version
 	fi
 
 .PHONY: build
-build: verify-go-toolchain ## Build the Ploy CLI
+build: verify-go-toolchain verify-version ## Build the CLI/server/node binaries
 	@mkdir -p $(BUILD_DIR)
 	GOFLAGS= go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
 	@if [ -d ./cmd/ployd ]; then \
@@ -36,6 +49,36 @@ build: verify-go-toolchain ## Build the Ploy CLI
 		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node ./cmd/ployd-node; \
 		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node-linux ./cmd/ployd-node; \
 	fi
+	@case "$(PLOY_SIGN_BINARIES)" in \
+		1|true|TRUE|yes|YES|on|ON) $(MAKE) sign-binaries VERSION="$(VERSION)" ;; \
+		*) ;; \
+	esac
+
+.PHONY: sign-binaries
+sign-binaries: verify-version ## Sign dist binaries with cosign (keyless or key-based)
+	@if ! command -v cosign >/dev/null 2>&1; then \
+		echo "error: cosign not found; install cosign or set PLOY_SIGN_BINARIES=0"; \
+		exit 1; \
+	fi
+	@mkdir -p $(BUILD_DIR)/signatures
+	@for bin in "$(BUILD_DIR)/ploy" "$(BUILD_DIR)/ployd" "$(BUILD_DIR)/ployd-linux" "$(BUILD_DIR)/ployd-node" "$(BUILD_DIR)/ployd-node-linux"; do \
+		if [ ! -f "$$bin" ]; then \
+			continue; \
+		fi; \
+		base="$$(basename "$$bin")"; \
+		prefix="$(BUILD_DIR)/signatures/$${base}-$(VERSION)"; \
+		if command -v sha256sum >/dev/null 2>&1; then \
+			sha256sum "$$bin" > "$${prefix}.sha256"; \
+		else \
+			shasum -a 256 "$$bin" > "$${prefix}.sha256"; \
+		fi; \
+		COSIGN_YES=true cosign sign-blob --yes \
+			--output-signature "$${prefix}.sig" \
+			--output-certificate "$${prefix}.pem" \
+			--annotation version="$(VERSION)" \
+			--annotation commit="$(GIT_COMMIT)" \
+			"$$bin"; \
+	done
 
 .PHONY: fmt
 fmt: ## Format Go source files
@@ -141,6 +184,8 @@ clean: ## Remove build artifacts
 help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build                      # Build the CLI and server binaries"
+	@echo "  make sign-binaries              # Sign dist binaries with cosign"
+	@echo "  make verify-version             # Enforce semver VERSION (vX.Y.Z)"
 	@echo "  make verify-go-toolchain        # Enforce pinned local Go toolchain ($(REQUIRED_GO_TOOLCHAIN))"
 	@echo "  make fmt                        # Run gofmt over Go source"
 	@echo "  make test                       # Run unit tests"

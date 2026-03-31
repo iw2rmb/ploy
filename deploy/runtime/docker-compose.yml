@@ -1,6 +1,6 @@
 services:
   server:
-    image: ${PLOY_RUNTIME_SERVER_IMAGE:-ghcr.io/iw2rmb/ploy-server:latest}
+    image: ${PLOY_RUNTIME_SERVER_IMAGE:?set PLOY_RUNTIME_SERVER_IMAGE or run deploy/runtime/run.sh}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     platform: linux/amd64
@@ -39,7 +39,7 @@ services:
       retries: 20
 
   node:
-    image: ${PLOY_RUNTIME_NODE_IMAGE:-ghcr.io/iw2rmb/ploy-node:latest}
+    image: ${PLOY_RUNTIME_NODE_IMAGE:?set PLOY_RUNTIME_NODE_IMAGE or run deploy/runtime/run.sh}
     platform: linux/amd64
     user: "0:0"
     security_opt:
@@ -101,7 +101,7 @@ services:
       retries: 20
 
   garage-init:
-    image: ${PLOY_RUNTIME_GARAGE_INIT_IMAGE:-ghcr.io/iw2rmb/ploy-garage-init:latest}
+    image: ${PLOY_RUNTIME_GARAGE_INIT_IMAGE:?set PLOY_RUNTIME_GARAGE_INIT_IMAGE or run deploy/runtime/run.sh}
     platform: linux/amd64
     depends_on:
       garage:

@@ -50,12 +50,14 @@ defaults change, or components adopt additional configuration.
   host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
 - `PLOY_RUNTIME_PULL_IMAGES` — Runtime-local deploy toggle for pull-before-start behavior.
   Defaults to `1` (enabled). Set `0`/`false` to skip `docker compose pull`.
+- `PLOY_VERSION` — Runtime image semver tag used by `deploy/runtime/run.sh` when explicit image
+  overrides are not set. Defaults to `./VERSION` in the repo root.
 - `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.
-  Default: `ghcr.io/iw2rmb/ploy-server:latest`.
+  Default: `ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION}`.
 - `PLOY_RUNTIME_NODE_IMAGE` — Optional runtime-local node image override.
-  Default: `ghcr.io/iw2rmb/ploy-node:latest`.
+  Default: `ghcr.io/iw2rmb/ploy-node:${PLOY_VERSION}`.
 - `PLOY_RUNTIME_GARAGE_INIT_IMAGE` — Optional runtime-local garage bootstrap image override.
-  Default: `ghcr.io/iw2rmb/ploy-garage-init:latest`.
+  Default: `ghcr.io/iw2rmb/ploy-garage-init:${PLOY_VERSION}`.
 - `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
   Default: `node/bearer-token` under the local deploy workspace (file path). If this path is a directory, scripts

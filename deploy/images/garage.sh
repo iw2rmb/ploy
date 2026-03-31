@@ -168,7 +168,10 @@ should_push() {
 
 discover_mig_dirs() {
   local root_migs="deploy/images/migs"
-  local root_mig="deploy/images/mig"
+  local root_orw="deploy/images/orw"
+  local root_shell="deploy/images/shell"
+  local root_codex="deploy/images/codex"
+  local root_amata="deploy/images/amata"
   {
     if [[ -d "$root_migs" ]]; then
       find "$root_migs" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
@@ -177,11 +180,23 @@ discover_mig_dirs() {
       done
     fi
 
-    if [[ -d "$root_mig" ]]; then
-      find "$root_mig" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+    if [[ -d "$root_orw" ]]; then
+      find "$root_orw" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
         name="$(basename "$d")"
-        printf 'mig/%s\n' "$name"
+        printf 'orw/%s\n' "$name"
       done
+    fi
+
+    if [[ -d "$root_shell" ]]; then
+      printf 'shell/shell\n'
+    fi
+
+    if [[ -d "$root_codex" ]]; then
+      printf 'codex/codex\n'
+    fi
+
+    if [[ -d "$root_amata" ]]; then
+      printf 'amata/amata\n'
     fi
   } | sort
 }
@@ -191,6 +206,9 @@ mig_repo_name() {
   local name="${entry##*/}"
   case "$name" in
     mig-*) echo "migs-${name#mig-}" ;;
+    shell) echo "migs-shell" ;;
+    codex) echo "migs-codex" ;;
+    amata) echo "migs-amata" ;;
     *) echo "$name" ;;
   esac
 }
@@ -207,26 +225,48 @@ build_push_mig_image() {
     return 0
   fi
 
-  if [[ "$source_group" == "migs" && "$dir" == "mig-codex" ]]; then
-    bash deploy/images/migs/mig-codex/build-amata.sh
+  if [[ "$source_group" == "codex" && "$dir" == "codex" ]]; then
     context="."
     run_with_retries \
-      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/migs/mig-codex/Dockerfile)" \
+      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/codex/Dockerfile)" \
       docker buildx build \
       --platform "$PLATFORM" \
       --provenance=false --sbom=false --pull --progress=plain \
-      -f deploy/images/migs/mig-codex/Dockerfile \
+      -f deploy/images/codex/Dockerfile \
       -t "$ref" \
       --push \
       "$context"
-  elif [[ "$source_group" == "mig" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
+  elif [[ "$source_group" == "amata" && "$dir" == "amata" ]]; then
+    bash deploy/images/amata/build-amata.sh
     context="."
     run_with_retries \
-      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/mig/${dir}/Dockerfile)" \
+      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/amata/Dockerfile)" \
       docker buildx build \
       --platform "$PLATFORM" \
       --provenance=false --sbom=false --pull --progress=plain \
-      -f "deploy/images/mig/${dir}/Dockerfile" \
+      -f deploy/images/amata/Dockerfile \
+      -t "$ref" \
+      --push \
+      "$context"
+  elif [[ "$source_group" == "orw" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
+    context="."
+    run_with_retries \
+      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/orw/${dir}/Dockerfile)" \
+      docker buildx build \
+      --platform "$PLATFORM" \
+      --provenance=false --sbom=false --pull --progress=plain \
+      -f "deploy/images/orw/${dir}/Dockerfile" \
+      -t "$ref" \
+      --push \
+      "$context"
+  elif [[ "$source_group" == "shell" && "$dir" == "shell" ]]; then
+    context="deploy/images/shell"
+    run_with_retries \
+      "buildx push ${ref} (context=${context}, dockerfile=deploy/images/shell/Dockerfile)" \
+      docker buildx build \
+      --platform "$PLATFORM" \
+      --provenance=false --sbom=false --pull --progress=plain \
+      -f deploy/images/shell/Dockerfile \
       -t "$ref" \
       --push \
       "$context"
@@ -305,7 +345,7 @@ main() {
   local mig_dirs_raw
   mig_dirs_raw="$(discover_mig_dirs)"
   if [[ -z "$mig_dirs_raw" ]]; then
-    echo "error: no mig image directories found under deploy/images/migs or deploy/images/mig" >&2
+    echo "error: no mig image directories found under deploy/images/{migs,orw,codex,amata,shell}" >&2
     exit 1
   fi
   local d

@@ -78,10 +78,35 @@ jobs:
 
       - name: Verify tag matches semantic versioning
         run: |
-          if [[ ! "${GITHUB_REF#refs/tags/}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
-            echo "Tag ${GITHUB_REF#refs/tags/} does not match semantic versioning format (v*.*.* or v*.*.*-prerelease)"
+          if [[ ! "${GITHUB_REF#refs/tags/}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Tag ${GITHUB_REF#refs/tags/} does not match semantic versioning format (vX.Y.Z or vX.Y.Z-prerelease)"
             exit 1
           fi
+
+      - name: Verify VERSION matches release tag
+        run: |
+          FILE_VERSION="$(tr -d '[:space:]' < VERSION)"
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          if [[ "$FILE_VERSION" != "$TAG_VERSION" ]]; then
+            echo "VERSION file ($FILE_VERSION) must match release tag ($TAG_VERSION)"
+            exit 1
+          fi
+
+      - name: Build and sign runtime binaries
+        env:
+          VERSION: ${{ github.ref_name }}
+          PLOY_SIGN_BINARIES: "1"
+        run: make build
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push core runtime images
+        env:
+          VERSION: ${{ github.ref_name }}
+          PUSH_LATEST: "1"
+        run: ./deploy/images/build-and-push-core.sh
 
       - name: Clean dist directory
         run: rm -rf dist

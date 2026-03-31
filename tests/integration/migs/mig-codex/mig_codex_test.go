@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -42,12 +41,7 @@ func mustRun(t *testing.T, name string, args ...string) (string, string) {
 
 func buildMigCodexImage(t *testing.T, repoRoot, imageTag string) {
 	t.Helper()
-	platform := "linux/" + runtime.GOARCH
-	buildScript := filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "build-amata.sh")
-	dockerfile := filepath.Join(repoRoot, "deploy", "images", "migs", "mig-codex", "Dockerfile")
-
-	// Keep tests hermetic: always stage the local amata binary before image build.
-	_, _ = mustRun(t, "env", "PLATFORM="+platform, "bash", buildScript)
+	dockerfile := filepath.Join(repoRoot, "deploy", "images", "codex", "Dockerfile")
 	_, _ = mustRun(t, "docker", "build", "-t", imageTag, "-f", dockerfile, repoRoot)
 }
 

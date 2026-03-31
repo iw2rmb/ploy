@@ -1,10 +1,9 @@
 ARG NODE_IMAGE=node:22-alpine
 
-# --- final image ---
 FROM ${NODE_IMAGE}
 
-LABEL org.opencontainers.image.title="mig-codex" \
-    org.opencontainers.image.description="Ploy Migs: Codex CLI wrapper" \
+LABEL org.opencontainers.image.title="migs-amata" \
+    org.opencontainers.image.description="Ploy Migs: Amata runner image (with codex/cc/cc-router installed)" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="Apache-2.0"
 
@@ -19,9 +18,6 @@ RUN apk add --no-cache bash git ca-certificates curl jq && \
     chmod 700 /out/codex && \
     chmod 755 /etc/ploy/certs
 
-# Codex CLI runs shell snapshots via /bin/sh; Alpine's default (busybox ash)
-# lacks bash syntax support, so point /bin/sh at bash.
-# RUN ln -sf /bin/bash /bin/sh
 RUN apk update
 RUN apk add --no-cache bash ripgrep fd grep findutils gawk coreutils
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
@@ -32,7 +28,6 @@ ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \
     CODEX_HOME=/out/codex \
-    CODEX_PROMPT="" \
     CODEX_MODEL="" \
     CODEX_AUTH_JSON="" \
     CODEX_CONFIG_TOML="" \
@@ -44,14 +39,10 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-# Copy the mig-codex entrypoint and the prebuilt amata binary (staged by
-# deploy/images/migs/mig-codex/build-amata.sh before this build runs).
-# No Build Gate helper binary is included to prevent Codex from running the
-# gate inside the container; Build Gate verification is performed externally.
-COPY deploy/images/migs/mig-codex/mig-codex.sh /usr/local/bin/mig-codex
-COPY deploy/images/migs/mig-codex/amata /usr/local/bin/amata
-RUN chmod +x /usr/local/bin/mig-codex /usr/local/bin/amata && \
-    ln -s /usr/local/bin/mig-codex /usr/local/bin/migs-codex
+COPY deploy/images/amata/mig-amata.sh /usr/local/bin/mig-amata
+COPY deploy/images/amata/amata /usr/local/bin/amata
+RUN chmod +x /usr/local/bin/mig-amata /usr/local/bin/amata && \
+    ln -s /usr/local/bin/mig-amata /usr/local/bin/migs-amata
 
 WORKDIR /workspace
-ENTRYPOINT ["mig-codex"]
+ENTRYPOINT ["mig-amata"]
