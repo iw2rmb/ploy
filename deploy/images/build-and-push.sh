@@ -14,7 +14,7 @@ set -Eeuo pipefail
 # Inputs (env):
 #   PLATFORM - Optional: comma list of platforms (default linux/amd64)
 #   VERSION - Optional semver tag (default from ./VERSION file, format vX.Y.Z)
-#   IMAGE_PREFIX - Optional image prefix (default ghcr.io/iw2rmb)
+#   IMAGE_PREFIX - Optional image prefix (default ghcr.io/iw2rmb/ploy)
 #   PUSH_LATEST - Optional alias toggle for :latest (default 1 for stable releases)
 #
 # Examples:
