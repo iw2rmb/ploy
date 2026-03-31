@@ -24,9 +24,9 @@
   - Amata runner: from repo root run `bash deploy/images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f deploy/images/amata/Dockerfile -t migs-amata:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local Garage-backed registry using the helper script:
-  - `PLOY_CONTAINER_REGISTRY=localhost:5000/ploy deploy/images/build-and-push-migs.sh`
-  - The script special-cases `codex` and `amata` to use repo-root context automatically.
-  - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
+  - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 deploy/images/build-and-push.sh`
+  - The script pushes `migs-amata`, `migs-codex`, `migs-shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `ploy-server` and `ploy-node`.
+  - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 
 Notes:
 - Directory→repo mapping: `mig-foo` (folder) corresponds to registry repo `ploy/migs-foo`; `orw-cli-maven`/`orw-cli-gradle` keep their directory names.
