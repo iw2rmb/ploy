@@ -32,22 +32,34 @@ defaults change, or components adopt additional configuration.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
 - `PLOY_CA_CERTS` — Optional path to a PEM CA bundle used by
-  local and offline-VPS deploy workflows to configure Docker daemon trust for Docker Hub
-  endpoints (`docker.io`, `registry-1.docker.io`, `auth.docker.io`,
-  `index.docker.io`).
+  local, runtime-local, and offline-VPS deploy workflows to configure Docker daemon trust for container registries
+  (`docker.io`, `registry-1.docker.io`, `auth.docker.io`, `index.docker.io`, `ghcr.io`).
   The script also installs the bundle into system CA trust before restarting
   Docker, so Docker Hub auth/token TLS uses the same root CAs.
   The same bundle is provided to local `server`/`node` image builds through
   a BuildKit secret (`ploy_ca_bundle`) so early `apk add` steps can trust
   your corporate/private CAs without printing certificate content in build logs.
+  In runtime-local deploy (`deploy/runtime/run.sh`), this bundle is only used for
+  Docker daemon trust (image pulls), not baked into any runtime image.
   Current automation targets:
   - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
   - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
   The offline-VPS deploy flow also accepts `PLOY_CA_CERT` as an alias for this value.
 - `PLOY_SERVER_PORT` — Optional host port mapped to the server container's internal
   port `8080` in the local compose stack. Default: `8080`. Both local
-  and VPS deploy scripts pass it through to the compose stack. Use this when the
+  and runtime-local/VPS deploy scripts pass it through to the compose stack. Use this when the
   host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
+- `PLOY_RUNTIME_CA_CERTS` — Optional path to a PEM CA bundle mounted into runtime-local
+  `server` and `node` containers by `deploy/runtime/run.sh`. This is intended for local-only
+  corporate CA injection at container runtime. Images remain certificate-agnostic.
+- `PLOY_RUNTIME_PULL_IMAGES` — Runtime-local deploy toggle for pull-before-start behavior.
+  Defaults to `1` (enabled). Set `0`/`false` to skip `docker compose pull`.
+- `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.
+  Default: `ghcr.io/iw2rmb/ploy-server:latest`.
+- `PLOY_RUNTIME_NODE_IMAGE` — Optional runtime-local node image override.
+  Default: `ghcr.io/iw2rmb/ploy-node:latest`.
+- `PLOY_RUNTIME_GARAGE_INIT_IMAGE` — Optional runtime-local garage bootstrap image override.
+  Default: `ghcr.io/iw2rmb/ploy-garage-init:latest`.
 - `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
   Default: `node/bearer-token` under the local deploy workspace (file path). If this path is a directory, scripts
@@ -588,6 +600,7 @@ Optional repository and execution controls:
 | `ORW_REPO_PASSWORD` | Repository password (must be paired with `ORW_REPO_USERNAME`) |
 | `ORW_ACTIVE_RECIPES` | Comma-separated override list of active recipes |
 | `ORW_FAIL_ON_UNSUPPORTED` | Boolean flag, default `true` |
+| `ORW_EXCLUDE_PATHS` | Comma-separated glob patterns excluded from ORW parsing (for example `**/*.proto`) |
 | `ORW_CLI_BIN` | OpenRewrite CLI executable name/path (default: `rewrite`) |
 
 `report.json` contract (`/out/report.json`):

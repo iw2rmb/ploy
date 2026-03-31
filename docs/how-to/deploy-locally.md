@@ -9,10 +9,31 @@ This guide brings up the local Ploy stack using host PostgreSQL plus containers 
 
 The local stack no longer runs a PostgreSQL container. The server uses your host PostgreSQL via `PLOY_DB_DSN`.
 
+## Runtime Mode (GHCR Images + Auto-Update)
+
+For workstation/runtime deployments that should not build local binaries/images, use:
+
+```bash
+export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
+export PLOY_CA_CERTS='/path/to/docker-daemon-ca.pem'        # optional: Docker daemon trust for ghcr/docker.io
+export PLOY_RUNTIME_CA_CERTS='/path/to/runtime-ca.pem'      # optional: mounted into server/node at runtime
+./deploy/runtime/run.sh
+export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
+```
+
+`deploy/runtime/run.sh`:
+- Pulls runtime images (`docker compose pull`) before each start by default.
+- Starts the runtime stack from `deploy/runtime/docker-compose.yml`.
+- Uses GHCR images by default:
+  - `ghcr.io/iw2rmb/ploy-server:latest`
+  - `ghcr.io/iw2rmb/ploy-node:latest`
+  - `ghcr.io/iw2rmb/ploy-garage-init:latest`
+- Injects runtime CA bundle locally (when `PLOY_RUNTIME_CA_CERTS` is set) without baking certs into images.
+
 ## Prerequisites
 
-- Go toolchain `go1.25.5`. `make` targets fail fast on other versions; run with
-  `GOTOOLCHAIN=go1.25.5` when your host default differs.
+- Go toolchain `go1.25.8`. `make` targets fail fast on other versions; run with
+  `GOTOOLCHAIN=go1.25.8` when your host default differs.
 - Local PostgreSQL running and reachable from containers.
 - `psql` and `pg_isready` available on the host.
 - Docker Desktop / Docker Engine with Compose v2.

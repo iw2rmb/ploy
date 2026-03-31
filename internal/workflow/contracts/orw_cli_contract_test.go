@@ -40,6 +40,7 @@ func TestParseORWCLIInputFromEnv(t *testing.T) {
 			ORWRepoUsernameEnv:      "robot",
 			ORWRepoPasswordEnv:      "secret",
 			ORWActiveRecipesEnv:     "com.example.RecipeA, com.example.RecipeB",
+			ORWExcludePathsEnv:      "**/*.proto,build/generated/**",
 			ORWFailOnUnsupportedEnv: "false",
 		}
 
@@ -62,6 +63,12 @@ func TestParseORWCLIInputFromEnv(t *testing.T) {
 		}
 		if len(got.ActiveRecipes) != 2 {
 			t.Fatalf("ActiveRecipes len = %d, want 2", len(got.ActiveRecipes))
+		}
+		if len(got.ExcludePaths) != 2 {
+			t.Fatalf("ExcludePaths len = %d, want 2", len(got.ExcludePaths))
+		}
+		if got.ExcludePaths[0] != "**/*.proto" {
+			t.Fatalf("ExcludePaths[0] = %q, want %q", got.ExcludePaths[0], "**/*.proto")
 		}
 		if got.FailOnUnsupported {
 			t.Fatal("FailOnUnsupported = true, want false")

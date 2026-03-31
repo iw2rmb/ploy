@@ -86,6 +86,17 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
   ```
 
+**Quick Start (Runtime Images from GHCR)**
+- Deploy with pre-built GHCR images (pull-before-run enabled by default):
+
+  ```bash
+  export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
+  export PLOY_CA_CERTS='/path/to/docker-daemon-ca.pem'   # optional
+  export PLOY_RUNTIME_CA_CERTS='/path/to/runtime-ca.pem' # optional
+  ./deploy/runtime/run.sh
+  export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
+  ```
+
 - Submit a mig run and follow events:
 
   ```bash

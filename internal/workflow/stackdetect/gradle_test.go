@@ -283,3 +283,69 @@ ext['log4j2.version'] = '2.16.0'
 		t.Fatalf("language mismatch: got %q want %q", got, want)
 	}
 }
+
+func TestDetectGradle_ToolchainLanguageVersionAssign(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	gradlePath := filepath.Join(workspace, "build.gradle")
+	gradle := `
+plugins { id "java" }
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+`
+	if err := os.WriteFile(gradlePath, []byte(gradle), 0o600); err != nil {
+		t.Fatalf("write build.gradle: %v", err)
+	}
+
+	obs, err := detectGradle(context.Background(), workspace, gradlePath)
+	if err != nil {
+		t.Fatalf("detectGradle returned error: %v", err)
+	}
+	if obs == nil || obs.Release == nil {
+		t.Fatalf("detectGradle returned nil observation or release")
+	}
+	if got, want := *obs.Release, "17"; got != want {
+		t.Fatalf("release mismatch: got %q want %q", got, want)
+	}
+	if got, want := obs.Tool, "gradle"; got != want {
+		t.Fatalf("tool mismatch: got %q want %q", got, want)
+	}
+}
+
+func TestDetectGradle_ToolchainLanguageVersionSetKTS(t *testing.T) {
+	t.Parallel()
+
+	workspace := t.TempDir()
+	gradlePath := filepath.Join(workspace, "build.gradle.kts")
+	gradle := `
+plugins { java }
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of("21"))
+    }
+}
+`
+	if err := os.WriteFile(gradlePath, []byte(gradle), 0o600); err != nil {
+		t.Fatalf("write build.gradle.kts: %v", err)
+	}
+
+	obs, err := detectGradle(context.Background(), workspace, gradlePath)
+	if err != nil {
+		t.Fatalf("detectGradle returned error: %v", err)
+	}
+	if obs == nil || obs.Release == nil {
+		t.Fatalf("detectGradle returned nil observation or release")
+	}
+	if got, want := *obs.Release, "21"; got != want {
+		t.Fatalf("release mismatch: got %q want %q", got, want)
+	}
+	if got, want := obs.Tool, "gradle"; got != want {
+		t.Fatalf("tool mismatch: got %q want %q", got, want)
+	}
+}

@@ -1,0 +1,10 @@
+server_url: "http://server:8080"
+node_id: "local1"
+cluster_id: "local-runtime"
+
+http:
+  listen: ":8444"
+
+heartbeat:
+  interval: 30s
+  timeout: 10s

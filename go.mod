@@ -1,6 +1,6 @@
 module github.com/iw2rmb/ploy
 
-go 1.26.1
+go 1.25.8
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
@@ -29,6 +29,7 @@ require (
 require (
 	charm.land/bubbles/v2 v2.0.0
 	charm.land/bubbletea/v2 v2.0.2
+	charm.land/lipgloss/v2 v2.0.2
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.8
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.8
@@ -39,7 +40,6 @@ require (
 )
 
 require (
-	charm.land/lipgloss/v2 v2.0.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect

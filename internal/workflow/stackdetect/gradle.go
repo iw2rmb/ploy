@@ -25,6 +25,14 @@ var (
 	// kotlinOptions { ... jvmTarget = "17" } or kotlinOptions { ... jvmTarget = JavaVersion.VERSION_17 }
 	kotlinOptionsJvmTargetBlockRegex = regexp.MustCompile(`(?s)kotlinOptions\s*\{.*?jvmTarget\s*=\s*(?:"?(\d+(?:\.\d+)?)"?|(?:JavaVersion\.)?VERSION_([0-9_]+))`)
 
+	// java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+	// java { toolchain { languageVersion = JavaLanguageVersion.of("17") } }
+	toolchainLanguageVersionAssignRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?languageVersion\s*=\s*JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)`)
+
+	// java { toolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }
+	// java { toolchain { languageVersion.set(JavaLanguageVersion.of("17")) } }
+	toolchainLanguageVersionSetRegex = regexp.MustCompile(`(?s)toolchain\s*\{.*?languageVersion\.set\(\s*JavaLanguageVersion\.of\(\s*"?(\d+(?:\.\d+)?)"?\s*\)\s*\)`)
+
 	// Dynamic logic patterns that should trigger "unknown".
 	dynamicPatterns = []*regexp.Regexp{
 		regexp.MustCompile(`findProperty\s*\(`),
@@ -42,6 +50,7 @@ var (
 // Precedence (strict order):
 //  1. sourceCompatibility / targetCompatibility (must match if both present)
 //  2. kotlinOptions.jvmTarget (best-effort; used only if source/target are absent)
+//  3. java.toolchain.languageVersion
 func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observation, error) {
 	content, err := os.ReadFile(gradlePath)
 	if err != nil {
@@ -125,6 +134,45 @@ func detectGradle(ctx context.Context, workspace, gradlePath string) (*Observati
 		version := jvmTargetDirect
 		if version == "" {
 			version = jvmTargetBlock
+		}
+
+		return &Observation{
+			Language: "java",
+			Tool:     "gradle",
+			Release:  &version,
+			Evidence: evidence,
+		}, nil
+	}
+
+	// 3. Java toolchain languageVersion.
+	toolchainVersionAssign := extractCompatibilityVersion(toolchainLanguageVersionAssignRegex, text)
+	toolchainVersionSet := extractCompatibilityVersion(toolchainLanguageVersionSetRegex, text)
+	if toolchainVersionAssign != "" || toolchainVersionSet != "" {
+		var evidence []EvidenceItem
+
+		if toolchainVersionAssign != "" {
+			evidence = append(evidence, EvidenceItem{
+				Path: relativePath, Key: "java.toolchain.languageVersion", Value: toolchainVersionAssign,
+			})
+		}
+		if toolchainVersionSet != "" {
+			evidence = append(evidence, EvidenceItem{
+				Path: relativePath, Key: "java.toolchain.languageVersion", Value: toolchainVersionSet,
+			})
+		}
+
+		// If both forms are present, they must match.
+		if toolchainVersionAssign != "" && toolchainVersionSet != "" && toolchainVersionAssign != toolchainVersionSet {
+			return nil, &DetectionError{
+				Reason:   "unknown",
+				Message:  "toolchain languageVersion differs between assignments",
+				Evidence: evidence,
+			}
+		}
+
+		version := toolchainVersionAssign
+		if version == "" {
+			version = toolchainVersionSet
 		}
 
 		return &Observation{

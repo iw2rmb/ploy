@@ -17,6 +17,7 @@ Optional env:
   ORW_REPO_PASSWORD          Repo password (must pair with ORW_REPO_USERNAME)
   ORW_ACTIVE_RECIPES         Comma-separated active recipe overrides
   ORW_FAIL_ON_UNSUPPORTED    true|false (default: true)
+  ORW_EXCLUDE_PATHS          Comma-separated glob patterns excluded from parsing (e.g. **/*.proto)
   ORW_CLI_BIN                Executable name/path for OpenRewrite CLI (default: rewrite)
   CA_CERTS_PEM_BUNDLE        PEM CA bundle imported into trust stores
 USAGE

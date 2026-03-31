@@ -55,6 +55,7 @@ steps:
       # Optional ORW runtime controls:
       # ORW_REPOS: "https://repo1.maven.org/maven2,https://repo.internal/maven"
       # ORW_FAIL_ON_UNSUPPORTED: "true"
+      # ORW_EXCLUDE_PATHS: "**/*.proto,build/generated/**"
     env_from_file:
       # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
       # CODEX_AUTH_JSON: ~/.codex/auth.json
