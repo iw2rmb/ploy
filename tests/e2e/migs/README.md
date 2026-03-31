@@ -20,12 +20,12 @@
 - Build Mods images (requires Docker):
   - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f deploy/images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
   - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f deploy/images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
-  - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f deploy/images/codex/Dockerfile -t migs-codex:e2e .`
-  - Amata runner: from repo root run `bash deploy/images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f deploy/images/amata/Dockerfile -t migs-amata:e2e .`
+  - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f deploy/images/codex/Dockerfile -t codex:e2e .`
+  - Amata runner: from repo root run `bash deploy/images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f deploy/images/amata/Dockerfile -t amata:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local registry using the helper script:
   - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 deploy/images/build-and-push.sh`
-  - The script pushes `migs-amata`, `migs-codex`, `migs-shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `ploy-server` and `ploy-node`.
+  - The script pushes `amata`, `codex`, `shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
   - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 
 Notes:
@@ -174,7 +174,7 @@ build_gate:
   enabled: true
   # amata mode: CODEX_PROMPT not required
   router:
-    image: docker.io/you/migs-codex:latest
+    image: ghcr.io/iw2rmb/ploy/codex:latest
     amata:
       spec: |
         version: amata/v1
@@ -195,7 +195,7 @@ build_gate:
     by_error_kind:
       code:
         retries: 1
-        image: docker.io/you/migs-codex:latest
+        image: ghcr.io/iw2rmb/ploy/codex:latest
         env:
           CODEX_PROMPT: |-
             Rules:
@@ -221,18 +221,18 @@ Run the failing→healing scenario with a single script:
     - `--follow --artifact-dir ./tmp/migs/scenario-orw-fail/<ts>`
 
 What to verify:
-- First Build Gate fails (Maven compile error), healing runs using `migs-codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
+- First Build Gate fails (Maven compile error), healing runs using `codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
 
 **Notes**
 
-When `migs-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
+When `codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing migs to reference
 - `/in/prompt.txt` — Default prompt location (when provided in spec; node mounts it R/O)
 
 What to expect with the provided E2E images:
-- Spec-driven healing runs with `migs-codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
+- Spec-driven healing runs with `codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
 
 **Follow Mode (`--follow`) and Job Graph**
 

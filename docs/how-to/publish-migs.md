@@ -4,8 +4,8 @@ Overview
 - Migs images live under `deploy/images/orw/`, `deploy/images/codex/`, `deploy/images/amata/`, and `deploy/images/shell/`:
   - `orw-cli-maven` (`deploy/images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`deploy/images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
-  - `codex` (`deploy/images/codex`) -> `migs-codex`
-  - `amata` (`deploy/images/amata`) -> `migs-amata`
+  - `codex` (`deploy/images/codex`) -> `codex`
+  - `amata` (`deploy/images/amata`) -> `amata`
 - Local default registry prefix is `127.0.0.1:5000/ploy`.
 - The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
@@ -18,8 +18,8 @@ Local Registry Prerequisites
 Publish all Migs images
 ```bash
 deploy/images/build-and-push.sh
-# Builds and pushes: migs-amata, migs-codex, migs-shell, orw-cli-maven, orw-cli-gradle.
-# Also builds/pushes runtime images: ploy-server and ploy-node.
+# Builds and pushes: amata, codex, shell, orw-cli-maven, orw-cli-gradle.
+# Also builds/pushes runtime images: server and node.
 ```
 
 There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
@@ -38,29 +38,29 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   --push .
 ```
 
-Publish `migs-codex` (manual one-off)
+Publish `codex` (manual one-off)
 
 ```bash
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
 docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/codex/Dockerfile \
-  -t "${IMAGE_PREFIX}/migs-codex:latest" \
+  -t "${IMAGE_PREFIX}/codex:latest" \
   --push .
 ```
 
-Publish `migs-amata` (manual one-off)
+Publish `amata` (manual one-off)
 
 ```bash
 # Step 1: build and stage the amata binary (requires ../amata source sibling repo)
 PLATFORM=linux/amd64 deploy/images/amata/build-amata.sh
 
-# Step 2: build and push the migs-amata image
+# Step 2: build and push the amata image
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
 docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/amata/Dockerfile \
-  -t "${IMAGE_PREFIX}/migs-amata:latest" \
+  -t "${IMAGE_PREFIX}/amata:latest" \
   --push .
 ```
 
@@ -88,5 +88,5 @@ Verification
 ```bash
 docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/orw-cli-maven:latest"
 docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/orw-cli-gradle:latest"
-docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/migs-codex:latest"
+docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/codex:latest"
 ```

@@ -138,7 +138,7 @@ echo ""
 echo "=== Negative gate: direct mode without CODEX_PROMPT must fail deterministically ==="
 
 # 7. A spec that uses direct codex mode but omits CODEX_PROMPT must be rejected
-#    by mig-codex with "prompt required" before any healing attempt.
+#    by codex with "prompt required" before any healing attempt.
 _NO_PROMPT_SPEC="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-no-prompt.XXXXXX.yaml")"
 cat >"$_NO_PROMPT_SPEC" <<'YAML'
 apiVersion: ploy.mig/v1alpha1
@@ -156,7 +156,7 @@ build_gate:
   enabled: true
   # Router: direct Codex mode — CODEX_PROMPT intentionally omitted to prove enforcement.
   router:
-    image: localhost:5000/ploy/migs-codex:latest
+    image: localhost:5000/ploy/codex:latest
     env_from_file:
       CODEX_AUTH_JSON: ~/.codex/auth.json
 

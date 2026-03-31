@@ -485,7 +485,7 @@ func TestGateProfileResolver_StrictStack(t *testing.T) {
 			name: "toolless_fills_from_image",
 			st: &stubGateProfileResolverStore{
 				stackRowByImage: map[string]gateProfileStackRow{
-					"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11": {
+					"127.0.0.1:5000/ploy/gate-gradle:jdk11": {
 						ID: 3, Lang: "java", Tool: "gradle", Release: "11",
 					},
 				},
@@ -500,7 +500,7 @@ func TestGateProfileResolver_StrictStack(t *testing.T) {
 			bs: &stubBlobStore{getPayloadByKey: map[string][]byte{
 				"gate-profiles/strict-toolless.json": exactPayload,
 			}},
-			job: store.Job{RepoID: repoC, RepoShaIn: sha3, JobImage: "127.0.0.1:5000/ploy/ploy-gate-gradle:jdk11"},
+			job: store.Job{RepoID: repoC, RepoShaIn: sha3, JobImage: "127.0.0.1:5000/ploy/gate-gradle:jdk11"},
 			constraints: GateProfileLookupConstraints{
 				StrictStack: &GateProfileLookupStack{Language: "java", Release: "11"},
 			},
@@ -517,7 +517,7 @@ func TestGateProfileResolver_StrictStack(t *testing.T) {
 			name: "toolless_image_mismatch_skips",
 			st: &stubGateProfileResolverStore{
 				stackRowByImage: map[string]gateProfileStackRow{
-					"127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17": {
+					"127.0.0.1:5000/ploy/gate-gradle:jdk17": {
 						ID: 4, Lang: "java", Tool: "gradle", Release: "17",
 					},
 				},
@@ -525,7 +525,7 @@ func TestGateProfileResolver_StrictStack(t *testing.T) {
 				anyStackID:     9,
 			},
 			bs:  &stubBlobStore{},
-			job: store.Job{RepoID: repoD, RepoShaIn: sha4, JobImage: "127.0.0.1:5000/ploy/ploy-gate-gradle:jdk17"},
+			job: store.Job{RepoID: repoD, RepoShaIn: sha4, JobImage: "127.0.0.1:5000/ploy/gate-gradle:jdk17"},
 			constraints: GateProfileLookupConstraints{
 				StrictStack: &GateProfileLookupStack{Language: "java", Release: "11"},
 			},

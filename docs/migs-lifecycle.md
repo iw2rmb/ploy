@@ -156,7 +156,7 @@ build_gate:
   # Router runs once after gate failure to produce bug_summary.
   router:
     spec_path: ./healing/router/spec.yaml
-    image: docker.io/user/migs-codex:latest
+    image: docker.io/user/codex:latest
     env:
       CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
     env_from_file:
@@ -168,7 +168,7 @@ build_gate:
       infra:
         spec_path: ./healing/infra/spec.yaml
         retries: 2
-        image: docker.io/user/migs-codex:latest
+        image: docker.io/user/codex:latest
         env:
           CODEX_PROMPT: "Fix infra/toolchain issue in /in/build-gate.log"
         expectations:
@@ -178,7 +178,7 @@ build_gate:
       code:
         spec_path: ./healing/code/spec.yaml
         retries: 2
-        image: docker.io/user/migs-codex:latest
+        image: docker.io/user/codex:latest
         env:
           CODEX_PROMPT: "Fix code issue in /in/build-gate.log"
 ```
@@ -197,7 +197,7 @@ from `amata.set`. `CODEX_PROMPT` is not required in this mode.
 
 ```yaml
 router:
-  image: docker.io/user/migs-codex:latest
+  image: docker.io/user/codex:latest
   amata:
     spec: |
       version: amata/v1
@@ -223,7 +223,7 @@ router:
 
 ```yaml
 router:
-  image: docker.io/user/migs-codex:latest
+  image: docker.io/user/codex:latest
   env:
     CODEX_PROMPT: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
   env_from_file:
@@ -512,7 +512,7 @@ config as a code change, then let the stack-aware ORW Migs apply it.
 ```yaml
 migs:
   - name: generate-rewrite-config
-    image: docker.io/user/migs-shell:latest
+    image: docker.io/user/shell:latest
     env:
       MOD_SHELL_SCRIPT: ./generate-rewrite.sh
 ```
@@ -533,7 +533,7 @@ recipeList:
 ```yaml
 migs:
   - name: generate-rewrite-config
-    image: docker.io/user/migs-shell:latest
+    image: docker.io/user/shell:latest
     env:
       MOD_SHELL_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite

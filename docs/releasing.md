@@ -39,8 +39,8 @@ All binaries include:
 - Version information embedded via ldflags
 
 Each release also publishes core runtime images under GHCR with matching tags:
-- `ghcr.io/iw2rmb/ploy/ploy-server:vX.Y.Z`
-- `ghcr.io/iw2rmb/ploy/ploy-node:vX.Y.Z`
+- `ghcr.io/iw2rmb/ploy/server:vX.Y.Z`
+- `ghcr.io/iw2rmb/ploy/node:vX.Y.Z`
 
 ## Prerequisites
 

@@ -23,7 +23,7 @@ ENV WORKSPACE=/workspace \
 RUN mkdir -p /workspace /out
 
 COPY --chmod=755 mig-shell.sh /usr/local/bin/mig-shell
-RUN ln -s /usr/local/bin/mig-shell /usr/local/bin/migs-shell
+RUN ln -s /usr/local/bin/mig-shell /usr/local/bin/shell
 
 ENTRYPOINT ["mig-shell"]
 CMD ["--dir", "/workspace", "--out", "/out"]

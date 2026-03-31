@@ -13,8 +13,8 @@ import (
 var repoSHA40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 const (
-	repoSHAV1AuthorLine  = "author ploy-node <ploy-node@ploy.local> 0 +0000"
-	repoSHAV1CommitLine  = "committer ploy-node <ploy-node@ploy.local> 0 +0000"
+	repoSHAV1AuthorLine  = "author node <node@ploy.local> 0 +0000"
+	repoSHAV1CommitLine  = "committer node <node@ploy.local> 0 +0000"
 	repoSHAV1CommitTitle = "ploy repo_sha_v1"
 )
 

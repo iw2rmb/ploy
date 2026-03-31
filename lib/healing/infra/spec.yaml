@@ -1,5 +1,5 @@
 retries: 2
-image: 127.0.0.1:5000/ploy/migs-codex:latest
+image: 127.0.0.1:5000/ploy/codex:latest
 expectations:
   artifacts:
     - path: /out/gate-profile-candidate.json

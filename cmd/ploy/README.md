@@ -608,10 +608,10 @@ build_gate:
   healing:
     by_error_kind:
       infra:
-        spec_path: ./healing/infra/spec.yaml
+        spec_path: ./lib/healing/infra/spec.yaml
         retries: 1
-        image: docker.io/you/migs-codex:latest
-        command: ["mig-codex", "--input", "/workspace", "--out", "/out"]
+        image: ghcr.io/iw2rmb/ploy/codex:latest
+        command: ["codex", "--input", "/workspace", "--out", "/out"]
         env:
           CODEX_PROMPT: "Fix the infra build error in /in/build-gate.log"
         env_from_file:
@@ -623,7 +623,7 @@ build_gate:
       code:
         spec_path: ./healing/code/spec.yaml
         retries: 1
-        image: docker.io/you/migs-codex:latest
+        image: ghcr.io/iw2rmb/ploy/codex:latest
         env:
           CODEX_PROMPT: "Fix the code build error in /in/build-gate.log"
 ```
@@ -651,7 +651,7 @@ follow-up `re_gate` succeeds. Failed `re_gate` results never promote candidates.
 - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
 
 See `docs/schemas/mig.example.yaml` for a complete example and `tests/e2e/migs/README.md`
-for end-to-end usage with `migs-codex`.
+for end-to-end usage with `codex`.
 
 ## Job Graph and DAG State
 

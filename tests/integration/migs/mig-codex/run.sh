@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run the real mig-codex integration test with build‑gate verification.
-# - Builds the migs-codex image from repo root (includes ploy-buildgate CLI)
+# Run the real codex integration test with build‑gate verification.
+# - Builds the codex image from repo root (includes ploy-buildgate CLI)
 # - Exports CODEX_AUTH_JSON (reads ~/.codex/auth.json if unset)
 # - Executes the Go test: TestModCodex_HealsUsingBuildGateLog_FromFailingBranch
 
@@ -22,8 +22,8 @@ if [[ -z "${CODEX_AUTH_JSON:-}" ]]; then
   fi
 fi
 
-echo "[run] Building migs-codex image (repo root)…" >&2
-docker build -t migs-codex:latest -f deploy/images/codex/Dockerfile . >/dev/null
+echo "[run] Building codex image (repo root)…" >&2
+docker build -t codex:latest -f deploy/images/codex/Dockerfile . >/dev/null
 
 echo "[run] Executing integration test…" >&2
-GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/migs/mig-codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1
+GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/migs/codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1

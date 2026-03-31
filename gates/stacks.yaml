@@ -12,10 +12,10 @@ stacks:
   - lang: java
     release: "11"
     tool: gradle
-    image: ${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk11
+    image: ${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk11
     profile: gates/profiles/java-11-gradle.yaml
   - lang: java
     release: "17"
     tool: gradle
-    image: ${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk17
+    image: ${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk17
     profile: gates/profiles/java-17-gradle.yaml

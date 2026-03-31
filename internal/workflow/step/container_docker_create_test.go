@@ -120,7 +120,7 @@ func TestDockerContainerRuntimeCreate(t *testing.T) {
 		{
 			name: "success_skip_pull_when_image_present",
 			spec: ContainerSpec{
-				Image: "ploy-gate-gradle:jdk11",
+				Image: "gate-gradle:jdk11",
 			},
 			createRes: client.ContainerCreateResult{ID: "local-image-container"},
 			pullImage: true,

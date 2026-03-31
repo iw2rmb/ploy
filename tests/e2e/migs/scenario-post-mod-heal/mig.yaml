@@ -81,7 +81,7 @@ build_gate:
   # Router: direct-Codex fallback mode — CODEX_PROMPT required; no amata.spec.
   # Exercises the direct codex exec path for router.
   router:
-    image: localhost:5000/ploy/migs-codex:latest
+    image: localhost:5000/ploy/codex:latest
     env:
       CODEX_PROMPT: |-
         Rules:
@@ -111,7 +111,7 @@ build_gate:
         retries: 2 # Allow multiple healing attempts for complex errors
         # Healing: amata mode — CODEX_PROMPT not required; amata spec drives the workflow.
         # Exercises the amata execution path for healing.
-        image: localhost:5000/ploy/migs-codex:latest
+        image: localhost:5000/ploy/codex:latest
         amata:
           spec: |
             version: amata/v1

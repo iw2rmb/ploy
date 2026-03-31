@@ -147,7 +147,7 @@ func TestSignNodeCSR(t *testing.T) {
 			CommonName:   "node:test-node-1",
 			Organization: []string{"Ploy"},
 		},
-		DNSNames:    []string{"ploy-node.test-node-1.test-cluster.ploy"},
+		DNSNames:    []string{"node.test-node-1.test-cluster.ploy"},
 		IPAddresses: []net.IP{nodeIP},
 	}
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, nodeKey)
@@ -190,7 +190,7 @@ func TestSignNodeCSR(t *testing.T) {
 	if cert.Cert.Subject.CommonName != "node:test-node-1" {
 		t.Fatalf("expected CN 'node:test-node-1', got: %s", cert.Cert.Subject.CommonName)
 	}
-	if len(cert.Cert.DNSNames) != 1 || cert.Cert.DNSNames[0] != "ploy-node.test-node-1.test-cluster.ploy" {
+	if len(cert.Cert.DNSNames) != 1 || cert.Cert.DNSNames[0] != "node.test-node-1.test-cluster.ploy" {
 		t.Fatalf("expected DNS name preserved, got: %v", cert.Cert.DNSNames)
 	}
 	if len(cert.Cert.IPAddresses) != 1 || !cert.Cert.IPAddresses[0].Equal(nodeIP) {
@@ -343,7 +343,7 @@ func TestGenerateNodeCSR(t *testing.T) {
 	}
 
 	// Check DNS names.
-	expectedDNS := "ploy-node-" + nodeID + "." + clusterID + ".ploy"
+	expectedDNS := "node-" + nodeID + "." + clusterID + ".ploy"
 	if len(csr.DNSNames) != 1 || csr.DNSNames[0] != expectedDNS {
 		t.Fatalf("expected DNS name %q, got: %v", expectedDNS, csr.DNSNames)
 	}

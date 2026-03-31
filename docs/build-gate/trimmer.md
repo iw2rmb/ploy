@@ -103,7 +103,7 @@ for downstream consumers.
 
 ## Healing and Codex Considerations
 
-Healing migs (including `migs-codex`) receive the first failing gate log in
+Healing migs (including `codex`) receive the first failing gate log in
 `/in/build-gate.log`. The node agent now prefers the trimmed view when
 available:
 
@@ -114,7 +114,7 @@ available:
 
 This behavior ensures:
 
-- `migs-codex` and other healing migs see a focused failure slice for known
+- `codex` and other healing migs see a focused failure slice for known
   tools (Maven/Gradle).
 - Full logs remain available via artifacts and `LogsText` for manual inspection.
 

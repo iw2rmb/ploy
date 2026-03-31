@@ -53,9 +53,9 @@ defaults change, or components adopt additional configuration.
 - `PLOY_VERSION` — Runtime image semver tag used by `deploy/runtime/run.sh` when explicit image
   overrides are not set. Defaults to `./VERSION` in the repo root.
 - `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.
-  Default: `ghcr.io/iw2rmb/ploy/ploy-server:${PLOY_VERSION}`.
+  Default: `ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}`.
 - `PLOY_RUNTIME_NODE_IMAGE` — Optional runtime-local node image override.
-  Default: `ghcr.io/iw2rmb/ploy/ploy-node:${PLOY_VERSION}`.
+  Default: `ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}`.
 - `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
   Default: `node/bearer-token` under the local deploy workspace (file path). If this path is a directory, scripts
@@ -113,7 +113,7 @@ Role model (bearer token claims):
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Migs LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
-- Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `migs-codex`).
+- Cross-phase input directory: `/in` is mounted read-only for healing migs (e.g., `codex`).
   - `/in/build-gate.log` — First Build Gate failure log (primarily from claim `recovery_context`; node-local cache fallback)
   - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing context)
   - `/in/gate_profile.schema.json` — Gate profile schema for `infra` healing context (`title: Ploy Build Gate Profile`, includes `$comment` guidance for key fields)
@@ -156,7 +156,7 @@ steps:
 
 build_gate:
   router:
-    image: docker.io/your-dh-user/migs-codex:latest
+    image: docker.io/your-dh-user/codex:latest
     tmp_bundle:
       bundle_id: bun-d4e5f6
       cid: bafyrei...
@@ -165,7 +165,7 @@ build_gate:
   healing:
     by_error_kind:
       code:
-        image: docker.io/your-dh-user/migs-codex:latest
+        image: docker.io/your-dh-user/codex:latest
         tmp_bundle:
           bundle_id: bun-g7h8i9
           cid: bafyrei...
@@ -474,7 +474,7 @@ the config file are treated as unset unless the environment variable is actually
 
 - `PLOY_DOCKER_NETWORK` — Optional Docker network name to attach runtime containers (Build Gate
   and healing migs) to. When set on the node, the node agent's Docker runtime uses this network
-  so containers (e.g., `migs-codex`) can reach the control-plane service by its Docker network
+  so containers (e.g., `codex`) can reach the control-plane service by its Docker network
   hostname (e.g., `server:8080` in the local Docker stack). When unset, the default Docker
   network is used.
 
@@ -572,9 +572,9 @@ The `scope` parameter controls which job types receive each variable:
 | Variable | Consumer | Description |
 |----------|----------|-------------|
 | `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
-| `CODEX_AUTH_JSON` | `mig-codex` | JSON content or file path materialized to `/out/codex/auth.json` at container startup |
-| `CCR_CONFIG_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.claude-code-router/config.json` at container startup |
-| `CRUSH_JSON` | `mig-codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
+| `CODEX_AUTH_JSON` | `codex` | JSON content or file path materialized to `/out/codex/auth.json` at container startup |
+| `CCR_CONFIG_JSON` | `codex` | JSON content or file path materialized to `/root/.claude-code-router/config.json` at container startup |
+| `CRUSH_JSON` | `codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
@@ -632,7 +632,7 @@ Run/API metadata propagation:
 
 ### How Official Images Consume These Variables
 
-**Codex images (`mig-codex`)**: The entrypoint script supports two execution modes:
+**Codex images (`codex`)**: The entrypoint script supports two execution modes:
 - **amata mode**: when `amata.spec` is set on a mig step, router, or healing action, the container runs
   `amata run /in/amata.yaml` (with optional `--set` flags). `CODEX_PROMPT` is not required.
 - **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
@@ -644,13 +644,13 @@ In both modes, the entrypoint materializes config env vars before invoking the C
 - `CCR_CONFIG_JSON` -> `/root/.claude-code-router/config.json`
 - `CRUSH_JSON` -> `/root/.config/crush/crush.json`
 
-`mig-codex` sets `CODEX_HOME=/out/codex` by default, so Codex auth/config files
+`codex` sets `CODEX_HOME=/out/codex` by default, so Codex auth/config files
 are persisted under the mounted `/out` volume.
 
 For each key above, if the env value points to an existing file in the container,
 that file is copied; otherwise the env value is written as inline content.
 
-If `/root/.claude-code-router/config.json` exists at startup, `mig-codex` runs:
+If `/root/.claude-code-router/config.json` exists at startup, `codex` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 
@@ -661,7 +661,7 @@ If `/root/.claude-code-router/config.json` exists at startup, `mig-codex` runs:
 4. Runs `update-ca-certificates` (on Debian/Ubuntu images)
 5. Optionally imports into Java cacerts via `keytool` when available
 
-**Build Gate Gradle images (`ploy-gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
+**Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
 **ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Similar CA bundle handling as build-gate, ensuring
 OpenRewrite can fetch dependencies from internal artifact repositories while
