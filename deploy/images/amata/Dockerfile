@@ -2,7 +2,7 @@ ARG NODE_IMAGE=node:22-alpine
 
 FROM ${NODE_IMAGE}
 
-LABEL org.opencontainers.image.title="migs-amata" \
+LABEL org.opencontainers.image.title="ploy-amata" \
     org.opencontainers.image.description="Ploy Migs: Amata runner image (with codex/cc/cc-router installed)" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="Apache-2.0"
@@ -39,10 +39,9 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-COPY deploy/images/amata/entrypoint.sh /usr/local/bin/mig-amata
+COPY deploy/images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
 COPY deploy/images/amata/amata /usr/local/bin/amata
-RUN chmod +x /usr/local/bin/mig-amata /usr/local/bin/amata && \
-    ln -s /usr/local/bin/mig-amata /usr/local/bin/migs-amata
+RUN chmod +x /usr/local/bin/ploy/entrypoint.sh /usr/local/bin/amata
 
 WORKDIR /workspace
-ENTRYPOINT ["mig-amata"]
+ENTRYPOINT ["/usr/local/bin/ploy/entrypoint.sh"]

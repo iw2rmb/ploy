@@ -88,8 +88,8 @@ deploy/vps/docker-compose-linux-x86_64
 
 # amata
 .amata
-deploy/images/migs/mig-codex/amata
-lib/j11to17/codex*
+deploy/images/amata/amata
+lib/j11to17/codex*/
 
 lib/sb2to3/repos*
 lib/sb2to3/runs*

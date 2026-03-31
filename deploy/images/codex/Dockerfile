@@ -2,7 +2,7 @@ ARG NODE_IMAGE=node:22-alpine
 
 FROM ${NODE_IMAGE}
 
-LABEL org.opencontainers.image.title="mig-codex" \
+LABEL org.opencontainers.image.title="ploy-codex" \
     org.opencontainers.image.description="Ploy Migs: Codex CLI wrapper (direct mode)" \
     org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.licenses="Apache-2.0"
@@ -11,7 +11,7 @@ RUN apk add --no-cache bash git ca-certificates curl jq && \
     if command -v update-ca-certificates >/dev/null 2>&1; then \
       update-ca-certificates || true; \
     fi && \
-    npm install -g @openai/codex @charmland/crush @anthropic-ai/claude-code @musistudio/claude-code-router && \
+    npm install -g @openai/codex && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
     mkdir -p /workspace /out /out/codex /etc/ploy/certs && \
@@ -40,9 +40,8 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-COPY deploy/images/codex/entrypoint.sh /usr/local/bin/mig-codex
-RUN chmod +x /usr/local/bin/mig-codex && \
-    ln -s /usr/local/bin/mig-codex /usr/local/bin/migs-codex
+COPY deploy/images/codex/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
+RUN chmod +x /usr/local/bin/ploy/entrypoint.sh
 
 WORKDIR /workspace
-ENTRYPOINT ["mig-codex"]
+ENTRYPOINT ["/usr/local/bin/ploy/entrypoint.sh"]
