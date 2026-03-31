@@ -12,6 +12,9 @@ Ploy follows [Semantic Versioning 2.0.0](https://semver.org/):
 
 Pre-release versions can use suffixes: `v1.0.0-alpha.1`, `v1.0.0-beta.2`, `v1.0.0-rc.1`
 
+Canonical project version is stored in the repository root `VERSION` file.
+Release tags, binary version metadata, and core image tags must match this value.
+
 ## Release Artifacts
 
 Each release publishes the following binaries:
@@ -34,6 +37,12 @@ All binaries include:
 - SBOMs (Software Bill of Materials)
 - Cosign keyless signatures
 - Version information embedded via ldflags
+
+Each release also publishes core runtime images under GHCR with matching tags:
+- `ghcr.io/iw2rmb/ploy-server:vX.Y.Z`
+- `ghcr.io/iw2rmb/ploy-node:vX.Y.Z`
+- `ghcr.io/iw2rmb/ploy-garage-init:vX.Y.Z`
+- `ghcr.io/iw2rmb/ploy-db:vX.Y.Z`
 
 ## Prerequisites
 
@@ -65,10 +74,11 @@ Before creating a release tag:
   - Acknowledge contributors
 - [ ] Verify all tests pass: `make test`
 - [ ] Run full CI checks locally: `make ci-check`
-- [ ] Verify build succeeds: `make build`
+- [ ] Verify build succeeds with semver stamping: `make build`
 - [ ] Review open issues and PRs for critical fixes
 - [ ] Update documentation if API changes exist
 - [ ] Verify environment variable docs are current (`docs/envs/README.md`)
+- [ ] Update `VERSION` to the release tag value (`vX.Y.Z`)
 
 ## Release Process
 
@@ -86,6 +96,8 @@ git log $(git describe --tags --abbrev=0)..HEAD --oneline
 # View commits by category
 git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%s" | grep -E "^(feat|fix|perf|BREAKING)"
 ```
+
+Then update `VERSION` to that value (example: `v0.1.0`).
 
 ### Step 2: Update CHANGELOG.md
 
@@ -113,8 +125,8 @@ Add a new section at the top of `CHANGELOG.md`:
 Commit the changelog:
 
 ```bash
-git add CHANGELOG.md
-git commit -m "docs: update CHANGELOG for vX.Y.Z"
+git add CHANGELOG.md VERSION
+git commit -m "release: prepare vX.Y.Z"
 git push origin main
 ```
 

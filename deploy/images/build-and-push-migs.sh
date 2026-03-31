@@ -36,7 +36,10 @@ with_timeout() {
 
 discover_images() {
   local root_migs="deploy/images/migs"
-  local root_mig="deploy/images/mig"
+  local root_orw="deploy/images/orw"
+  local root_shell="deploy/images/shell"
+  local root_codex="deploy/images/codex"
+  local root_amata="deploy/images/amata"
   {
     if [[ -d "$root_migs" ]]; then
       find "$root_migs" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
@@ -45,18 +48,30 @@ discover_images() {
       done
     fi
 
-    if [[ -d "$root_mig" ]]; then
-      find "$root_mig" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+    if [[ -d "$root_orw" ]]; then
+      find "$root_orw" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
         name="$(basename "$d")"
-        printf 'mig/%s\n' "$name"
+        printf 'orw/%s\n' "$name"
       done
+    fi
+
+    if [[ -d "$root_shell" ]]; then
+      printf 'shell/shell\n'
+    fi
+
+    if [[ -d "$root_codex" ]]; then
+      printf 'codex/codex\n'
+    fi
+
+    if [[ -d "$root_amata" ]]; then
+      printf 'amata/amata\n'
     fi
   } | sort
 }
 
 images=( $(discover_images) )
 if [[ ${#images[@]} -eq 0 ]]; then
-  echo "no images discovered under deploy/images/migs or deploy/images/mig" >&2
+  echo "no images discovered under deploy/images/{migs,orw,codex,amata,shell}" >&2
   exit 1
 fi
 
@@ -70,22 +85,37 @@ for entry in "${images[@]}"; do
     mig-*)
       image_name="migs-${name#mig-}"
       ;;
+    shell)
+      image_name="migs-shell"
+      ;;
+    codex)
+      image_name="migs-codex"
+      ;;
+    amata)
+      image_name="migs-amata"
+      ;;
   esac
 
   ref="${IMAGE_PREFIX}/${image_name}:latest"
 
   # Build context rules:
   # - Default: use deploy/images/<group>/<dir>
-  # - Special-case mig-codex: Dockerfile expects repo-root context (COPY go.* and internal/ ...)
+  # - Special-case codex/amata: Dockerfile expects repo-root context.
   # - Special-case orw-cli-gradle/orw-cli-maven: Dockerfile expects repo-root context (shared runner src)
   build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "--progress=plain" "-t" "$ref" "--push")
-  if [[ "$source_group" == "migs" && "$name" == "mig-codex" ]]; then
-    bash deploy/images/migs/mig-codex/build-amata.sh
+  if [[ "$source_group" == "codex" && "$name" == "codex" ]]; then
     context="."
-    build_args+=("-f" "deploy/images/migs/mig-codex/Dockerfile" "$context")
-  elif [[ "$source_group" == "mig" && ( "$name" == "orw-cli-gradle" || "$name" == "orw-cli-maven" ) ]]; then
+    build_args+=("-f" "deploy/images/codex/Dockerfile" "$context")
+  elif [[ "$source_group" == "amata" && "$name" == "amata" ]]; then
+    bash deploy/images/amata/build-amata.sh
     context="."
-    build_args+=("-f" "deploy/images/mig/${name}/Dockerfile" "$context")
+    build_args+=("-f" "deploy/images/amata/Dockerfile" "$context")
+  elif [[ "$source_group" == "orw" && ( "$name" == "orw-cli-gradle" || "$name" == "orw-cli-maven" ) ]]; then
+    context="."
+    build_args+=("-f" "deploy/images/orw/${name}/Dockerfile" "$context")
+  elif [[ "$source_group" == "shell" && "$name" == "shell" ]]; then
+    context="deploy/images/shell"
+    build_args+=("-f" "deploy/images/shell/Dockerfile" "$context")
   else
     context="deploy/images/${source_group}/${name}"
     build_args+=("$context")

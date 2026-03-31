@@ -18,13 +18,14 @@
 **Build + Publish Mods Images (Local Garage Registry)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f deploy/images/mig/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
-  - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f deploy/images/mig/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
-  - Codex healer: from repo root run `bash deploy/images/migs/mig-codex/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f deploy/images/migs/mig-codex/Dockerfile -t migs-codex:e2e .`
+  - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f deploy/images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
+  - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f deploy/images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
+  - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f deploy/images/codex/Dockerfile -t migs-codex:e2e .`
+  - Amata runner: from repo root run `bash deploy/images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f deploy/images/amata/Dockerfile -t migs-amata:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local Garage-backed registry using the helper script:
   - `PLOY_CONTAINER_REGISTRY=localhost:5000/ploy deploy/images/build-and-push-migs.sh`
-  - The script special‑cases `mig-codex` to use repo‑root context automatically.
+  - The script special-cases `codex` and `amata` to use repo-root context automatically.
   - Images publish as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Notes:

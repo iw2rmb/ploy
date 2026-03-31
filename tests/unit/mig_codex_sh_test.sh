@@ -12,7 +12,7 @@
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-SCRIPT="$ROOT_DIR/deploy/images/migs/mig-codex/mig-codex.sh"
+SCRIPT="$ROOT_DIR/deploy/images/codex/mig-codex.sh"
 
 # Create a temporary copy of mig-codex.sh for test execution.
 create_test_script() {

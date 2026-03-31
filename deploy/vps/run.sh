@@ -339,7 +339,10 @@ maybe_pull_and_tag() {
 
 discover_mig_dirs() {
   local root_migs="deploy/images/migs"
-  local root_mig="deploy/images/mig"
+  local root_orw="deploy/images/orw"
+  local root_shell="deploy/images/shell"
+  local root_codex="deploy/images/codex"
+  local root_amata="deploy/images/amata"
   {
     if [[ -d "$root_migs" ]]; then
       find "$root_migs" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
@@ -347,10 +350,22 @@ discover_mig_dirs() {
       done
     fi
 
-    if [[ -d "$root_mig" ]]; then
-      find "$root_mig" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
-        printf 'mig/%s\n' "$(basename "$d")"
+    if [[ -d "$root_orw" ]]; then
+      find "$root_orw" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do
+        printf 'orw/%s\n' "$(basename "$d")"
       done
+    fi
+
+    if [[ -d "$root_shell" ]]; then
+      printf 'shell/shell\n'
+    fi
+
+    if [[ -d "$root_codex" ]]; then
+      printf 'codex/codex\n'
+    fi
+
+    if [[ -d "$root_amata" ]]; then
+      printf 'amata/amata\n'
     fi
   } | sort
 }
@@ -360,6 +375,9 @@ mig_repo_name() {
   local name="${entry##*/}"
   case "$name" in
     mig-*) echo "migs-${name#mig-}" ;;
+    shell) echo "migs-shell" ;;
+    codex) echo "migs-codex" ;;
+    amata) echo "migs-amata" ;;
     *) echo "$name" ;;
   esac
 }
@@ -414,11 +432,15 @@ build_workflow_images() {
     source_group="${entry%%/*}"
     dir="${entry##*/}"
     ref="${PLOY_CONTAINER_REGISTRY}/$(mig_repo_name "$entry"):latest"
-    if [[ "$source_group" == "migs" && "$dir" == "mig-codex" ]]; then
-      bash deploy/images/migs/mig-codex/build-amata.sh
-      maybe_run_buildx_load "deploy/images/migs/mig-codex/Dockerfile" "." "$ref"
-    elif [[ "$source_group" == "mig" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
-      maybe_run_buildx_load "deploy/images/mig/${dir}/Dockerfile" "." "$ref"
+    if [[ "$source_group" == "codex" && "$dir" == "codex" ]]; then
+      maybe_run_buildx_load "deploy/images/codex/Dockerfile" "." "$ref"
+    elif [[ "$source_group" == "amata" && "$dir" == "amata" ]]; then
+      bash deploy/images/amata/build-amata.sh
+      maybe_run_buildx_load "deploy/images/amata/Dockerfile" "." "$ref"
+    elif [[ "$source_group" == "orw" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
+      maybe_run_buildx_load "deploy/images/orw/${dir}/Dockerfile" "." "$ref"
+    elif [[ "$source_group" == "shell" && "$dir" == "shell" ]]; then
+      maybe_run_buildx_load "deploy/images/shell/Dockerfile" "deploy/images/shell" "$ref"
     else
       maybe_run_buildx_load "deploy/images/${source_group}/${dir}/Dockerfile" "deploy/images/${source_group}/${dir}" "$ref"
     fi

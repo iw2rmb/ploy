@@ -93,3 +93,5 @@ lib/j11to17/codex*
 
 lib/sb2to3/repos*
 lib/sb2to3/runs*
+
+.crush

@@ -1,12 +1,12 @@
-# orw-cli-maven: standalone OpenRewrite CLI runner for Maven repositories.
+# orw-cli-gradle: standalone OpenRewrite CLI runner for Gradle repositories.
 #
 # This image runs OpenRewrite through a single CLI command path and never
 # invokes Gradle/Maven project tasks.
 FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS rewrite-runner-build
 
 WORKDIR /build
-COPY deploy/images/mig/orw-cli-maven/rewrite-runner/pom.xml rewrite-runner/pom.xml
-COPY deploy/images/shared/orw-cli-runner/src rewrite-runner/src
+COPY deploy/images/orw/orw-cli-gradle/rewrite-runner/pom.xml rewrite-runner/pom.xml
+COPY deploy/images/orw/shared/orw-cli-runner/src rewrite-runner/src
 RUN --mount=type=cache,target=/root/.m2 \
     bash -euxo pipefail -c 'cd rewrite-runner && mvn -q -DskipTests package'
 
@@ -14,8 +14,8 @@ FROM --platform=$TARGETOS/$TARGETARCH eclipse-temurin:17-jdk
 
 ARG BUILD_TS
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
-    org.opencontainers.image.title="orw-cli-maven" \
-    org.opencontainers.image.description="Ploy Migs: standalone OpenRewrite CLI runner (Maven lane)" \
+    org.opencontainers.image.title="orw-cli-gradle" \
+    org.opencontainers.image.description="Ploy Migs: standalone OpenRewrite CLI runner (Gradle lane)" \
     org.opencontainers.image.created="$BUILD_TS"
 
 RUN apt-get update \
@@ -24,7 +24,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
-ENV ORW_BUILD_SYSTEM=maven
+ENV ORW_BUILD_SYSTEM=gradle
 
 COPY --from=rewrite-runner-build /build/rewrite-runner/target/orw-cli-runner.jar /opt/orw-cli-runner/orw-cli-runner.jar
 RUN printf '%s\n' '#!/usr/bin/env bash' \
@@ -32,7 +32,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
     'exec java -jar /opt/orw-cli-runner/orw-cli-runner.jar "$@"' \
     > /usr/local/bin/rewrite && chmod +x /usr/local/bin/rewrite
 
-COPY --chmod=755 deploy/images/mig/orw-cli-maven/orw-cli.sh /usr/local/bin/orw-cli
+COPY --chmod=755 deploy/images/orw/orw-cli-gradle/orw-cli.sh /usr/local/bin/orw-cli
 RUN ln -s /usr/local/bin/orw-cli /usr/local/bin/migs-orw-cli
 
 ENTRYPOINT ["migs-orw-cli"]
