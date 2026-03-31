@@ -113,7 +113,10 @@ build_push amata deploy/images/amata/Dockerfile .
 build_push shell deploy/images/shell/Dockerfile deploy/images/shell
 
 # orw
-mapfile -t orw_dirs < <(
+orw_dirs=()
+while IFS= read -r d; do
+  orw_dirs+=("$d")
+done < <(
   find deploy/images/orw -mindepth 1 -maxdepth 1 -type d \
     -exec test -f "{}/Dockerfile" \; -print | sort
 )
