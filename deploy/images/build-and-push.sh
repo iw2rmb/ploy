@@ -22,7 +22,7 @@ set -Eeuo pipefail
 #   VERSION=v0.1.0 PLATFORM=linux/amd64 deploy/images/build-and-push.sh
 
 PLATFORM=${PLATFORM:-linux/amd64}
-IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb}"
+IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
 PUSH_LATEST="${PUSH_LATEST:-1}"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -113,9 +113,12 @@ build_push migs-amata deploy/images/amata/Dockerfile .
 build_push migs-shell deploy/images/shell/Dockerfile deploy/images/shell
 
 # orw
-mapfile -t orw_dirs < <(find deploy/images/orw -mindepth 1 -maxdepth 1 -type d | sort)
+mapfile -t orw_dirs < <(
+  find deploy/images/orw -mindepth 1 -maxdepth 1 -type d \
+    -exec test -f "{}/Dockerfile" \; -print | sort
+)
 if [[ ${#orw_dirs[@]} -eq 0 ]]; then
-  echo "error: no ORW images found under deploy/images/orw" >&2
+  echo "error: no ORW image directories with Dockerfile found under deploy/images/orw" >&2
   exit 1
 fi
 for d in "${orw_dirs[@]}"; do
