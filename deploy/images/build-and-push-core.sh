@@ -41,6 +41,9 @@ build_push ploy-server deploy/images/server/Dockerfile .
 # node
 build_push ploy-node deploy/images/node/Dockerfile .
 
+# runtime garage bootstrap helper
+build_push ploy-garage-init deploy/local/garage/Dockerfile .
+
 # db
 build_push ploy-db deploy/images/db/Dockerfile .
 

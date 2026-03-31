@@ -10,9 +10,11 @@ RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle,req
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
 COPY dist/ployd-linux /usr/local/bin/ployd
 RUN chmod +x /usr/local/bin/ployd
+COPY deploy/images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
+RUN chmod +x /usr/local/bin/ployd-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 COPY --chown=ploy:ploy docs/schemas/gate_profile.schema.json /etc/ploy/schemas/gate_profile.schema.json
 USER ploy
 EXPOSE 8443 9100
-ENTRYPOINT ["/usr/local/bin/ployd"]
+ENTRYPOINT ["/usr/local/bin/ployd-entrypoint"]
 CMD ["--config","/etc/ploy/ployd.yaml"]

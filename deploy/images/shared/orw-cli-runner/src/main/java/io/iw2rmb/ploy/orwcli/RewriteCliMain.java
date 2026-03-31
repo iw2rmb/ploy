@@ -36,8 +36,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.security.CodeSource;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -58,6 +61,7 @@ public final class RewriteCliMain {
     private static final String BUILD_SYSTEM_MAVEN = "maven";
     private static final String BUILD_SYSTEM_PROP = "orw.build.system";
     private static final String BUILD_SYSTEM_ENV = "ORW_BUILD_SYSTEM";
+    private static final String EXCLUDE_PATHS_ENV = "ORW_EXCLUDE_PATHS";
     private static final String GRADLE_PARSER_CLASS = "org.openrewrite.gradle.GradleParser";
     private static final String MAVEN_PARSER_CLASS = "org.openrewrite.maven.MavenParser";
 
@@ -67,7 +71,7 @@ public final class RewriteCliMain {
     public static void main(String[] args) {
         try {
             CliOptions opts = CliOptions.parse(args);
-            run(opts);
+            runBootstrap(opts, args);
         } catch (InputException e) {
             System.err.println("error: " + e.getMessage());
             System.exit(2);
@@ -84,6 +88,47 @@ public final class RewriteCliMain {
         }
     }
 
+    @SuppressWarnings("unused")
+    public static void runIsolatedEntry(String[] args) throws Exception {
+        CliOptions opts = CliOptions.parse(args);
+        run(opts);
+    }
+
+    private static void runBootstrap(CliOptions opts, String[] rawArgs) throws Exception {
+        Resolution resolution = resolveRecipeArtifacts(opts.coords, opts.repos, opts.repoUsername, opts.repoPassword);
+        URL[] isolatedClasspath = buildIsolatedClasspath(resolution.classpathJars);
+        try (IsolatedRewriteClassLoader isolated = new IsolatedRewriteClassLoader(
+            isolatedClasspath,
+            RewriteCliMain.class.getClassLoader()
+        )) {
+            Class<?> isolatedMain = Class.forName(RewriteCliMain.class.getName(), true, isolated);
+            Method method = isolatedMain.getMethod("runIsolatedEntry", String[].class);
+            method.invoke(null, (Object) rawArgs);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) {
+                throw (Exception) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw new RuntimeException(cause);
+        }
+    }
+
+    private static URL[] buildIsolatedClasspath(List<Path> resolvedJars) throws IOException {
+        LinkedHashSet<URL> urls = new LinkedHashSet<>();
+        for (Path jar : resolvedJars) {
+            urls.add(jar.toUri().toURL());
+        }
+        CodeSource source = RewriteCliMain.class.getProtectionDomain().getCodeSource();
+        if (source == null || source.getLocation() == null) {
+            throw new IllegalStateException("Unable to determine runner code source location");
+        }
+        urls.add(source.getLocation());
+        return urls.toArray(new URL[0]);
+    }
+
     private static void run(CliOptions opts) throws Exception {
         Path workspace = opts.dir.toAbsolutePath().normalize();
         if (!Files.isDirectory(workspace)) {
@@ -98,7 +143,7 @@ public final class RewriteCliMain {
             throw new RuntimeException(t);
         });
 
-        List<SourceFile> sourceFiles = parseWorkspace(workspace, ctx, opts.buildSystem);
+        List<SourceFile> sourceFiles = parseWorkspace(workspace, ctx, opts.buildSystem, opts.excludePathMatchers);
         InMemoryLargeSourceSet before = new InMemoryLargeSourceSet(sourceFiles, recipeClassLoader);
 
         RecipeRun run = recipe.run(before, ctx);
@@ -135,7 +180,12 @@ public final class RewriteCliMain {
         return recipe;
     }
 
-    private static List<SourceFile> parseWorkspace(Path workspace, ExecutionContext ctx, String requestedBuildSystem) {
+    private static List<SourceFile> parseWorkspace(
+        Path workspace,
+        ExecutionContext ctx,
+        String requestedBuildSystem,
+        List<PathMatcher> excludePathMatchers
+    ) {
         List<Parser> parsers = new ArrayList<>();
         parsers.add(newBuildSystemParser(requestedBuildSystem));
         parsers.add(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build());
@@ -143,7 +193,64 @@ public final class RewriteCliMain {
 
         OmniParser parser = OmniParser.builder(parsers).build();
         List<Path> accepted = parser.acceptedPaths(workspace);
-        return parser.parse(accepted, workspace, ctx).collect(Collectors.toList());
+        List<Path> filtered = filterAcceptedPaths(workspace, accepted, excludePathMatchers);
+        if (filtered.size() != accepted.size()) {
+            System.out.println("[rewrite] Excluded paths: " + (accepted.size() - filtered.size()));
+        }
+        return parser.parse(filtered, workspace, ctx).collect(Collectors.toList());
+    }
+
+    private static List<Path> filterAcceptedPaths(Path workspace, List<Path> accepted, List<PathMatcher> excludePathMatchers) {
+        if (excludePathMatchers.isEmpty()) {
+            return accepted;
+        }
+        return accepted.stream()
+            .filter(path -> !matchesAnyExclude(workspace, path, excludePathMatchers))
+            .collect(Collectors.toList());
+    }
+
+    private static boolean matchesAnyExclude(Path workspace, Path path, List<PathMatcher> excludePathMatchers) {
+        Path relative = toWorkspaceRelativePath(workspace, path);
+        Path fileName = relative.getFileName();
+        String portable = relative.toString().replace('\\', '/');
+        Path portablePath = portable.equals(relative.toString()) ? relative : Paths.get(portable);
+        for (PathMatcher matcher : excludePathMatchers) {
+            if (matcher.matches(relative)) {
+                return true;
+            }
+            if (portablePath != relative && matcher.matches(portablePath)) {
+                return true;
+            }
+            if (fileName != null && matcher.matches(fileName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Path toWorkspaceRelativePath(Path workspace, Path path) {
+        Path normalizedPath = path.toAbsolutePath().normalize();
+        Path normalizedWorkspace = workspace.toAbsolutePath().normalize();
+        if (normalizedPath.startsWith(normalizedWorkspace)) {
+            return normalizedWorkspace.relativize(normalizedPath);
+        }
+        return path.normalize();
+    }
+
+    private static List<PathMatcher> compileExcludePathMatchers(String rawPatterns) {
+        List<String> raw = CliOptions.splitCsv(rawPatterns);
+        if (raw.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<PathMatcher> matchers = new ArrayList<>(raw.size());
+        for (String pattern : raw) {
+            try {
+                matchers.add(FileSystems.getDefault().getPathMatcher("glob:" + pattern));
+            } catch (IllegalArgumentException e) {
+                throw new InputException("invalid glob in " + EXCLUDE_PATHS_ENV + ": " + pattern);
+            }
+        }
+        return Collections.unmodifiableList(matchers);
     }
 
     private static Parser newBuildSystemParser(String requestedBuildSystem) {
@@ -395,6 +502,45 @@ public final class RewriteCliMain {
         }
     }
 
+    private static final class IsolatedRewriteClassLoader extends URLClassLoader {
+        private static final String REWRITE_PREFIX = "org.openrewrite.";
+        private static final String RUNNER_PREFIX = "io.iw2rmb.ploy.orwcli.";
+
+        private IsolatedRewriteClassLoader(URL[] urls, ClassLoader parent) {
+            super(urls, parent);
+        }
+
+        @Override
+        protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            synchronized (getClassLoadingLock(name)) {
+                Class<?> loaded = findLoadedClass(name);
+                if (loaded != null) {
+                    if (resolve) {
+                        resolveClass(loaded);
+                    }
+                    return loaded;
+                }
+
+                if (isChildFirst(name)) {
+                    try {
+                        Class<?> childLoaded = findClass(name);
+                        if (resolve) {
+                            resolveClass(childLoaded);
+                        }
+                        return childLoaded;
+                    } catch (ClassNotFoundException ignored) {
+                        // fall back to parent loader below
+                    }
+                }
+                return super.loadClass(name, resolve);
+            }
+        }
+
+        private static boolean isChildFirst(String className) {
+            return className.startsWith(REWRITE_PREFIX) || className.startsWith(RUNNER_PREFIX);
+        }
+    }
+
     private static final class CliOptions {
         private final Path dir;
         private final List<String> recipes;
@@ -404,6 +550,7 @@ public final class RewriteCliMain {
         private final String repoUsername;
         private final String repoPassword;
         private final String buildSystem;
+        private final List<PathMatcher> excludePathMatchers;
 
         private CliOptions(
             Path dir,
@@ -413,7 +560,8 @@ public final class RewriteCliMain {
             List<String> repos,
             String repoUsername,
             String repoPassword,
-            String buildSystem
+            String buildSystem,
+            List<PathMatcher> excludePathMatchers
         ) {
             this.dir = dir;
             this.recipes = recipes;
@@ -423,6 +571,7 @@ public final class RewriteCliMain {
             this.repoUsername = repoUsername;
             this.repoPassword = repoPassword;
             this.buildSystem = buildSystem;
+            this.excludePathMatchers = excludePathMatchers;
         }
 
         private static CliOptions parse(String[] args) {
@@ -434,6 +583,7 @@ public final class RewriteCliMain {
             String repoUsername = null;
             String repoPassword = null;
             String buildSystem = null;
+            List<PathMatcher> excludePathMatchers = Collections.emptyList();
             boolean apply = false;
 
             for (int i = 0; i < args.length; i++) {
@@ -486,6 +636,7 @@ public final class RewriteCliMain {
             if ((repoUsername == null) != (repoPassword == null)) {
                 throw new InputException("--repo-username and --repo-password must be provided together");
             }
+            excludePathMatchers = compileExcludePathMatchers(System.getenv(EXCLUDE_PATHS_ENV));
 
             return new CliOptions(
                 dir,
@@ -495,7 +646,8 @@ public final class RewriteCliMain {
                 Collections.unmodifiableList(repos),
                 repoUsername,
                 repoPassword,
-                buildSystem
+                buildSystem,
+                excludePathMatchers
             );
         }
 

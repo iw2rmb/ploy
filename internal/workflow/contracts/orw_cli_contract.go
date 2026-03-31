@@ -20,6 +20,7 @@ const (
 	ORWRepoPasswordEnv      = "ORW_REPO_PASSWORD"
 	ORWActiveRecipesEnv     = "ORW_ACTIVE_RECIPES"
 	ORWFailOnUnsupportedEnv = "ORW_FAIL_ON_UNSUPPORTED"
+	ORWExcludePathsEnv      = "ORW_EXCLUDE_PATHS"
 )
 
 const (
@@ -95,6 +96,7 @@ type ORWCLIInput struct {
 	RepoUsername      string
 	RepoPassword      string
 	ActiveRecipes     []string
+	ExcludePaths      []string
 	FailOnUnsupported bool
 }
 
@@ -122,6 +124,7 @@ func ParseORWCLIInputFromEnv(env map[string]string) (ORWCLIInput, error) {
 	var err error
 	in.Repositories = parseCommaList(lookup(ORWReposEnv))
 	in.ActiveRecipes = parseCommaList(lookup(ORWActiveRecipesEnv))
+	in.ExcludePaths = parseCommaList(lookup(ORWExcludePathsEnv))
 	in.FailOnUnsupported, err = parseBoolWithDefault(lookup(ORWFailOnUnsupportedEnv), true)
 	if err != nil {
 		return ORWCLIInput{}, fmt.Errorf("%s: %w", ORWFailOnUnsupportedEnv, err)
