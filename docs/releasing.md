@@ -42,7 +42,6 @@ Each release also publishes core runtime images under GHCR with matching tags:
 - `ghcr.io/iw2rmb/ploy-server:vX.Y.Z`
 - `ghcr.io/iw2rmb/ploy-node:vX.Y.Z`
 - `ghcr.io/iw2rmb/ploy-garage-init:vX.Y.Z`
-- `ghcr.io/iw2rmb/ploy-db:vX.Y.Z`
 
 ## Prerequisites
 

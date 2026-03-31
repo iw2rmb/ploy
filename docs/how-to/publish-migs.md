@@ -1,13 +1,11 @@
 Publish Migs Images to a Garage-Backed Registry
 
 Overview
-- Migs images live under `deploy/images/migs/`, `deploy/images/orw/`, `deploy/images/codex/`, `deploy/images/amata/`, and `deploy/images/shell/`:
+- Migs images live under `deploy/images/orw/`, `deploy/images/codex/`, `deploy/images/amata/`, and `deploy/images/shell/`:
   - `orw-cli-maven` (`deploy/images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`deploy/images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
   - `codex` (`deploy/images/codex`) -> `migs-codex`
   - `amata` (`deploy/images/amata`) -> `migs-amata`
-  - `mig-llm` -> `migs-llm`
-  - `mig-plan` -> `migs-plan`
 - Local default registry prefix is `127.0.0.1:5000/ploy`.
 - The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
@@ -19,9 +17,9 @@ Local Registry Prerequisites
 
 Publish all Migs images
 ```bash
-deploy/images/build-and-push-migs.sh
-# Discovers deploy/images/migs/*, deploy/images/orw/*, and top-level codex/amata/shell images; pushes :latest tags.
-# Defaults to IMAGE_PREFIX=${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}.
+deploy/images/build-and-push.sh
+# Builds and pushes: migs-amata, migs-codex, migs-shell, orw-cli-maven, orw-cli-gradle.
+# Also builds/pushes runtime images: ploy-server and ploy-node.
 ```
 
 Sync all local workflow images (migs + build-gate base images)
@@ -81,15 +79,14 @@ image:
 
 Notes
 - Directory mapping:
-  - `mig-foo` -> `migs-foo`
   - `orw-cli-maven` -> `orw-cli-maven`
   - `orw-cli-gradle` -> `orw-cli-gradle`
 - To use a different registry/namespace, override:
-  - `IMAGE_PREFIX=... deploy/images/build-and-push-migs.sh`
+  - `IMAGE_PREFIX=... deploy/images/build-and-push.sh`
 
 Multi-arch push
 ```bash
-PLATFORM=linux/amd64 deploy/images/build-and-push-migs.sh
+PLATFORM=linux/amd64 deploy/images/build-and-push.sh
 ```
 
 Verification
