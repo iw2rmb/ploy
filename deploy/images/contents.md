@@ -1,6 +1,6 @@
 [README.md](README.md) Defines the runtime contract for mig containers, including `/workspace`, `/in`, `/out`, and diff/artifact semantics.
 [amata/](amata) Build context and helper scripts for the `amata` image that runs the amata-based migration workflow.
-[build-and-push.sh](build-and-push.sh) Builds and pushes all ploy runtime and mig images with semver-derived tags via Docker Buildx.
+[build-and-push.sh](build-and-push.sh) Builds and pushes runtime/mig images with semver tags via Docker Buildx, including auto-discovered ORW image directories.
 [codex/](codex) Docker image context for the Codex-based mig runner with CLI setup and container entrypoint wiring.
 [gates/](gates) Container build contexts and Gradle init/props files for gate images with remote build cache configuration.
 [node/](node) Docker image context for the ploy node daemon, including packaged binary, entrypoint, and gate assets.
