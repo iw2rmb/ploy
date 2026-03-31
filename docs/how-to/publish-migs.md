@@ -31,13 +31,9 @@ deploy/images/garage.sh
 # Use --force to rebuild/repush everything.
 ```
 
-If your network requires a custom CA for package downloads during image builds,
-set:
-```bash
-export PLOY_CA_CERTS=/absolute/path/to/ca-bundle.pem
-```
-`deploy/images/garage.sh` passes this bundle as a BuildKit secret (`ploy_ca_bundle`)
-so mig images can trust internal TLS endpoints.
+Custom CA support is runtime-only. Do not inject corporate certs during image build.
+Use `PLOY_CA_CERTS` at deployment/runtime so the same bundle is mounted into runtime
+containers and propagated as `CA_CERTS_PEM_BUNDLE`.
 
 Publish a single Migs image (example: orw-cli-maven)
 ```bash
@@ -45,7 +41,6 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
   docker buildx build --platform linux/amd64 \
   -f deploy/images/mig/orw-cli-maven/Dockerfile \
   -t "${IMAGE_PREFIX}/orw-cli-maven:latest" \
-  ${PLOY_CA_CERTS:+--secret id=ploy_ca_bundle,src=${PLOY_CA_CERTS}} \
   --push .
 ```
 
@@ -64,7 +59,6 @@ docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/migs/mig-codex/Dockerfile \
   -t "${IMAGE_PREFIX}/migs-codex:latest" \
-  ${PLOY_CA_CERTS:+--secret id=ploy_ca_bundle,src=${PLOY_CA_CERTS}} \
   --push .
 ```
 

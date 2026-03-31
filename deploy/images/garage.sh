@@ -22,7 +22,6 @@ IMAGE_PREFIX="${IMAGE_PREFIX:-${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}}"
 REGISTRY_SCHEME="${REGISTRY_SCHEME:-}"
 SKIP_UPSTREAM_MIRRORS="${SKIP_UPSTREAM_MIRRORS:-0}"
 FORCE=0
-CA_CERTS_PATH=""
 
 usage() {
   cat <<'USAGE'
@@ -94,27 +93,6 @@ run_with_retries() {
     fi
     sleep 3
   done
-}
-
-prepare_ca_certs_path() {
-  local raw="${PLOY_CA_CERTS:-}"
-  if [[ -z "$raw" ]]; then
-    CA_CERTS_PATH=""
-    return
-  fi
-
-  if [[ "$raw" != /* ]]; then
-    raw="$(pwd)/$raw"
-  fi
-  if [[ ! -f "$raw" ]]; then
-    echo "error: PLOY_CA_CERTS file not found: $raw" >&2
-    exit 2
-  fi
-  if [[ ! -s "$raw" ]]; then
-    echo "error: PLOY_CA_CERTS file is empty: $raw" >&2
-    exit 2
-  fi
-  CA_CERTS_PATH="$raw"
 }
 
 registry_scheme_for_host() {
@@ -222,13 +200,8 @@ build_push_mig_image() {
   local dir="${entry##*/}"
   local source_group="${entry%%/*}"
   local image_name ref context
-  local -a extra_args=()
   image_name="$(mig_repo_name "$entry")"
   ref="${IMAGE_PREFIX}/${image_name}:latest"
-
-  if [[ -n "$CA_CERTS_PATH" ]]; then
-    extra_args+=(--secret "id=ploy_ca_bundle,src=${CA_CERTS_PATH}")
-  fi
 
   if ! should_push "$ref"; then
     return 0
@@ -241,7 +214,6 @@ build_push_mig_image() {
       "buildx push ${ref} (context=${context}, dockerfile=deploy/images/migs/mig-codex/Dockerfile)" \
       docker buildx build \
       --platform "$PLATFORM" \
-      "${extra_args[@]}" \
       --provenance=false --sbom=false --pull --progress=plain \
       -f deploy/images/migs/mig-codex/Dockerfile \
       -t "$ref" \
@@ -253,7 +225,6 @@ build_push_mig_image() {
       "buildx push ${ref} (context=${context}, dockerfile=deploy/images/mig/${dir}/Dockerfile)" \
       docker buildx build \
       --platform "$PLATFORM" \
-      "${extra_args[@]}" \
       --provenance=false --sbom=false --pull --progress=plain \
       -f "deploy/images/mig/${dir}/Dockerfile" \
       -t "$ref" \
@@ -265,7 +236,6 @@ build_push_mig_image() {
       "buildx push ${ref} (context=${context})" \
       docker buildx build \
       --platform "$PLATFORM" \
-      "${extra_args[@]}" \
       --provenance=false --sbom=false --pull --progress=plain \
       -t "$ref" \
       --push \
@@ -277,12 +247,6 @@ build_push_gate_gradle_image() {
   local jdk="$1"
   local ref="${IMAGE_PREFIX}/ploy-gate-gradle:jdk${jdk}"
   local dockerfile="deploy/images/gates/gradle/Dockerfile.jdk${jdk}"
-  local -a extra_args=()
-
-  if [[ -n "$CA_CERTS_PATH" ]]; then
-    extra_args+=(--secret "id=ploy_ca_bundle,src=${CA_CERTS_PATH}")
-  fi
-
   if ! should_push "$ref"; then
     return 0
   fi
@@ -291,7 +255,6 @@ build_push_gate_gradle_image() {
     "buildx push ${ref} (dockerfile=${dockerfile})" \
     docker buildx build \
     --platform "$PLATFORM" \
-    "${extra_args[@]}" \
     --provenance=false --sbom=false --pull --progress=plain \
     -f "$dockerfile" \
     -t "$ref" \
@@ -332,12 +295,8 @@ main() {
   local root
   root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   cd "$root"
-  prepare_ca_certs_path
 
   log "Target image prefix: ${IMAGE_PREFIX}"
-  if [[ -n "$CA_CERTS_PATH" ]]; then
-    log "Using PLOY_CA_CERTS for build-time CA trust: ${CA_CERTS_PATH}"
-  fi
   if (( FORCE )); then
     log "Force mode enabled: existing registry images will be rebuilt/re-pushed"
   fi

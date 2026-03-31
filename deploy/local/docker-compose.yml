@@ -3,8 +3,6 @@ services:
     build:
       context: ../..
       dockerfile: deploy/images/server/Dockerfile
-      secrets:
-        - ploy_ca_bundle
     image: ploy-server:local
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -25,8 +23,12 @@ services:
       - PLOY_OBJECTSTORE_SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000001
       - PLOY_OBJECTSTORE_SECURE=false
       - PLOY_OBJECTSTORE_REGION=garage
+      - SSL_CERT_FILE=${PLOY_CA_CERT_PATH:-}
+      - CURL_CA_BUNDLE=${PLOY_CA_CERT_PATH:-}
+      - GIT_SSL_CAINFO=${PLOY_CA_CERT_PATH:-}
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
+      - ${PLOY_CA_CERTS:-/dev/null}:/etc/ploy/certs/ca.pem:ro
       - ../../dist/ployd-linux:/usr/local/bin/ployd:ro
     command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
     ports:
@@ -46,8 +48,6 @@ services:
     build:
       context: ../..
       dockerfile: deploy/images/node/Dockerfile
-      secrets:
-        - ploy_ca_bundle
     image: ploy-node:local
     platform: linux/amd64
     user: "0:0"
@@ -64,9 +64,13 @@ services:
       - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}
       - PLOYD_CACHE_HOME=/private/tmp
       - TMPDIR=/private/tmp
+      - SSL_CERT_FILE=${PLOY_CA_CERT_PATH:-}
+      - CURL_CA_BUNDLE=${PLOY_CA_CERT_PATH:-}
+      - GIT_SSL_CAINFO=${PLOY_CA_CERT_PATH:-}
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - ./node/bearer-token:/etc/ploy/bearer-token:ro
+      - ${PLOY_CA_CERTS:-/dev/null}:/etc/ploy/certs/ca.pem:ro
       - ../../dist/ployd-node-linux:/usr/local/bin/ployd-node:ro
       - ${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - /var/lib/docker:/var/lib/docker:ro
@@ -153,7 +157,3 @@ volumes:
   gradle-build-cache-data:
   garage-meta:
   garage-data:
-
-secrets:
-  ploy_ca_bundle:
-    file: ${PLOY_CA_CERTS:-/dev/null}

@@ -365,20 +365,13 @@ mig_repo_name() {
 }
 
 build_runtime_images() {
-  local -a extra_args=()
   local server_dockerfile
   local node_dockerfile
-  if [[ -n "${PLOY_CA_CERTS:-}" ]]; then
-    extra_args=(--secret "id=ploy_ca_bundle,src=${PLOY_CA_CERTS}")
-  fi
 
   read -r -d '' server_dockerfile <<'EOF' || true
 ARG ALPINE_VERSION=3.20
 FROM alpine:${ALPINE_VERSION}
-RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle,required=false \
-    if [ -s /run/secrets/ploy_ca_bundle ]; then mkdir -p /etc/ssl/certs && cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; fi && \
-    apk add --no-cache ca-certificates bash tzdata curl jq git && \
-    if [ -s /run/secrets/ploy_ca_bundle ]; then cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; fi && \
+RUN apk add --no-cache ca-certificates bash tzdata curl jq git && \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /etc/ploy/schemas /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
@@ -393,10 +386,7 @@ EOF
   read -r -d '' node_dockerfile <<'EOF' || true
 ARG ALPINE_VERSION=3.20
 FROM alpine:${ALPINE_VERSION}
-RUN --mount=type=secret,id=ploy_ca_bundle,target=/run/secrets/ploy_ca_bundle,required=false \
-    if [ -s /run/secrets/ploy_ca_bundle ]; then mkdir -p /etc/ssl/certs && cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; fi && \
-    apk add --no-cache ca-certificates bash tzdata curl jq docker-cli git rsync && \
-    if [ -s /run/secrets/ploy_ca_bundle ]; then cat /run/secrets/ploy_ca_bundle >> /etc/ssl/certs/ca-certificates.crt; fi && \
+RUN apk add --no-cache ca-certificates bash tzdata curl jq docker-cli git rsync && \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /etc/ploy/gates /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
@@ -409,19 +399,15 @@ CMD ["/usr/local/bin/ployd-node --config /etc/ploy/ployd-node.yaml"]
 EOF
 
   maybe_run_buildx_load "deploy/local/garage/Dockerfile" "." "ploy-garage-init:local"
-  maybe_run_inline_buildx_load "ploy-server:local" "$server_dockerfile" "${extra_args[@]}"
-  maybe_run_inline_buildx_load "ploy-node:local" "$node_dockerfile" "${extra_args[@]}"
+  maybe_run_inline_buildx_load "ploy-server:local" "$server_dockerfile"
+  maybe_run_inline_buildx_load "ploy-node:local" "$node_dockerfile"
 }
 
 build_workflow_images() {
   local refs_file="$1"
-  local -a extra_args=()
   local entry source_group dir ref
 
   : > "$refs_file"
-  if [[ -n "${PLOY_CA_CERTS:-}" ]]; then
-    extra_args=(--secret "id=ploy_ca_bundle,src=${PLOY_CA_CERTS}")
-  fi
 
   while read -r entry; do
     [[ -n "$entry" ]] || continue
@@ -430,21 +416,21 @@ build_workflow_images() {
     ref="${PLOY_CONTAINER_REGISTRY}/$(mig_repo_name "$entry"):latest"
     if [[ "$source_group" == "migs" && "$dir" == "mig-codex" ]]; then
       bash deploy/images/migs/mig-codex/build-amata.sh
-      maybe_run_buildx_load "deploy/images/migs/mig-codex/Dockerfile" "." "$ref" "${extra_args[@]}"
+      maybe_run_buildx_load "deploy/images/migs/mig-codex/Dockerfile" "." "$ref"
     elif [[ "$source_group" == "mig" && ( "$dir" == "orw-cli-gradle" || "$dir" == "orw-cli-maven" ) ]]; then
-      maybe_run_buildx_load "deploy/images/mig/${dir}/Dockerfile" "." "$ref" "${extra_args[@]}"
+      maybe_run_buildx_load "deploy/images/mig/${dir}/Dockerfile" "." "$ref"
     else
-      maybe_run_buildx_load "deploy/images/${source_group}/${dir}/Dockerfile" "deploy/images/${source_group}/${dir}" "$ref" "${extra_args[@]}"
+      maybe_run_buildx_load "deploy/images/${source_group}/${dir}/Dockerfile" "deploy/images/${source_group}/${dir}" "$ref"
     fi
     printf '%s\n' "$ref" >> "$refs_file"
   done < <(discover_mig_dirs)
 
   ref="${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk11"
-  maybe_run_buildx_load "deploy/images/gates/gradle/Dockerfile.jdk11" "deploy/images/gates/gradle" "$ref" "${extra_args[@]}"
+  maybe_run_buildx_load "deploy/images/gates/gradle/Dockerfile.jdk11" "deploy/images/gates/gradle" "$ref"
   printf '%s\n' "$ref" >> "$refs_file"
 
   ref="${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk17"
-  maybe_run_buildx_load "deploy/images/gates/gradle/Dockerfile.jdk17" "deploy/images/gates/gradle" "$ref" "${extra_args[@]}"
+  maybe_run_buildx_load "deploy/images/gates/gradle/Dockerfile.jdk17" "deploy/images/gates/gradle" "$ref"
   printf '%s\n' "$ref" >> "$refs_file"
 
   maybe_pull_and_tag "maven:3-eclipse-temurin-11" "${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-11"
