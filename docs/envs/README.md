@@ -91,11 +91,11 @@ Role model (bearer token claims):
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
-  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest` (default local value: `127.0.0.1:5000/ploy`).
-- `PLOY_GARAGE_FORCE_IMAGES` — Optional flag for the local deploy image-sync step.
-  When set to `1`, `true`, `yes`, or `on`, local deploy forces image rebuild/repush
-  and rebuilds/repushes mig + build-gate images even if they already exist in Garage-backed registry.
-- `PLOY_REGISTRY_PORT` — Host port for the local Garage-backed OCI registry in the local compose stack
+  Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest`. Deploy scripts expect this to be provided.
+- `PLOY_S3_URL` — S3-compatible endpoint URL provided by environment.
+- `PLOY_S3_ACCESS_KEY` — S3 access key ID provided by environment.
+- `PLOY_S3_SECRET_KEY` — S3 secret access key provided by environment.
+- `PLOY_REGISTRY_PORT` — Host port for the local OCI registry in the local compose stack
   (default: `5000`). Both local and VPS deploy scripts pass it through to the
   compose stack.
 - `AUTH_SECRET_PATH` — Optional path to the auth-secret file used by
@@ -497,6 +497,11 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_SECRET_KEY` | Secret access key | - |
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
 | `PLOY_OBJECTSTORE_REGION` | AWS region (optional; for local Garage use `garage`) | - |
+
+Deploy scripts consume the following S3 envs and map them to server object store settings:
+- `PLOY_S3_URL` -> `PLOY_OBJECTSTORE_ENDPOINT`
+- `PLOY_S3_ACCESS_KEY` -> `PLOY_OBJECTSTORE_ACCESS_KEY`
+- `PLOY_S3_SECRET_KEY` -> `PLOY_OBJECTSTORE_SECRET_KEY`
 
 For local development, these are configured in the local compose stack. The local stack includes:
 - Garage service for S3-compatible storage.

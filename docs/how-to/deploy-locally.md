@@ -47,9 +47,12 @@ export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
 export PLOY_CA_CERTS='/path/to/ca-bundle.pem'  # optional: docker registry + runtime container trust
 export PLOY_SERVER_PORT=18080   # optional; default 8080
 export PLOY_REGISTRY_PORT=5000  # optional; default 5000
+export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT}/ploy"
+export PLOY_S3_URL='http://localhost:3900'
+export PLOY_S3_ACCESS_KEY='...'
+export PLOY_S3_SECRET_KEY='...'
 ./deploy/local/run.sh
 export PLOY_CONFIG_HOME="$PWD/deploy/local/cli"
-export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT:-5000}/ploy"
 ```
 
 What the script does:
@@ -59,8 +62,6 @@ What the script does:
 - Builds local binaries (`make build`).
 - Builds runtime images (including `garage-init`; no Go toolchain in image builds).
 - Starts compose services.
-- Syncs mig/build-gate images into the local Garage-backed registry via `deploy/images/garage.sh`
-  (skips tags that already exist; set `PLOY_GARAGE_FORCE_IMAGES=1` to force repush).
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
 - Writes local CLI descriptor in `deploy/local/cli/clusters/local.json`.

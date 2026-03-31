@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 # Derive GOOS/GOARCH from PLATFORM env var (e.g. linux/amd64, linux/arm64).
-# Callers (build-and-push.sh, garage.sh) expose PLATFORM; default to linux/amd64.
+# Caller scripts expose PLATFORM; default to linux/amd64.
 _PLATFORM="${PLATFORM:-linux/amd64}"
 _GOOS="${_PLATFORM%%/*}"
 _GOARCH="${_PLATFORM##*/}"
