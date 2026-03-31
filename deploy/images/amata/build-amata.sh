@@ -28,10 +28,10 @@ case "$_GOARCH" in
   *) echo "error: unsupported GOARCH '${_GOARCH}' derived from PLATFORM='${_PLATFORM}'" >&2; exit 1 ;;
 esac
 
-AMATA_SRC_CANDIDATE="$(cd "$REPO_ROOT/../amata" 2>/dev/null && pwd)" || true
+AMATA_SRC_CANDIDATE="$(cd "$REPO_ROOT/amata" 2>/dev/null && pwd)" || true
 
 if [[ -z "$AMATA_SRC_CANDIDATE" || ! -d "$AMATA_SRC_CANDIDATE" ]]; then
-  echo "error: amata source directory not found at ${REPO_ROOT}/../amata" >&2
+  echo "error: amata source directory not found at ${REPO_ROOT}/amata" >&2
   exit 1
 fi
 
