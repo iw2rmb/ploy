@@ -923,7 +923,7 @@ if [[ -f "$REMOTE_IMAGES_TAR" ]]; then
 fi
 
 cd "$REMOTE_APP_DIR"
-COMPOSE_CMD=(docker compose --project-name local --env-file deploy/vps/stack.env -f deploy/local/docker-compose.yml)
+COMPOSE_CMD=(docker compose --project-name local --env-file deploy/vps/stack.env -f deploy/runtime/docker-compose.yml)
 
 "${COMPOSE_CMD[@]}" down --remove-orphans || true
 "${COMPOSE_CMD[@]}" up -d --no-build garage garage-init registry gradle-build-cache server
