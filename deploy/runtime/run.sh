@@ -10,7 +10,7 @@ CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/ploy}"
-AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
+AUTH_JSON_PATH="${AUTH_JSON_PATH:-$HOME/.config/ploy/$CLUSTER_ID/auth.json}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
@@ -19,7 +19,7 @@ PLOY_CA_CERT_PATH=""
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_VERSION="${PLOY_VERSION:-}"
-WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/deploy/runtime/node/bearer-token}"
+WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$HOME/.config/ploy/$CLUSTER_ID/bearer-token}"
 PULL_IMAGES="${PLOY_RUNTIME_PULL_IMAGES:-1}"
 
 DROP_DB=0
@@ -125,19 +125,6 @@ init_runtime_image_defaults() {
   export PLOY_VERSION
   export PLOY_RUNTIME_SERVER_IMAGE
   export PLOY_RUNTIME_NODE_IMAGE
-}
-
-init_cluster_paths() {
-  local cluster_dir
-  if [[ "$PLOY_CONFIG_HOME" != /* ]]; then
-    PLOY_CONFIG_HOME="$ROOT_DIR/$PLOY_CONFIG_HOME"
-  fi
-  cluster_dir="$PLOY_CONFIG_HOME/$CLUSTER_ID"
-  if [[ -z "$AUTH_JSON_PATH" ]]; then
-    AUTH_JSON_PATH="$cluster_dir/auth.json"
-  elif [[ "$AUTH_JSON_PATH" != /* ]]; then
-    AUTH_JSON_PATH="$ROOT_DIR/$AUTH_JSON_PATH"
-  fi
 }
 
 derive_admin_pg_dsn() {
@@ -667,7 +654,6 @@ main() {
   local -a compose_services=(gradle-build-cache)
 
   parse_args "$@"
-  init_cluster_paths
   resolve_ploy_version
   init_runtime_image_defaults
 
