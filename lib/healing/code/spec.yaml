@@ -1,5 +1,5 @@
 retries: 1
-image: 127.0.0.1:5000/ploy/migs-codex:latest
+image: 127.0.0.1:5000/ploy/codex:latest
 env:
   CODEX_API_KEY: $LLM_PROXY_API_KEY
 env_from_file:

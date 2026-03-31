@@ -4,11 +4,11 @@ set -Eeuo pipefail
 # Build and push runtime/migs images.
 #
 # Builds and pushes:
-# - server  -> ploy-server
-# - node    -> ploy-node
-# - codex   -> migs-codex
-# - amata   -> migs-amata
-# - shell   -> migs-shell
+# - server  -> server
+# - node    -> node
+# - codex   -> codex
+# - amata   -> amata
+# - shell   -> shell
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
 #
 # Inputs (env):
@@ -97,20 +97,20 @@ build_push_orw() {
 }
 
 # server
-build_push ploy-server deploy/images/server/Dockerfile .
+build_push server deploy/images/server/Dockerfile .
 
 # node
-build_push ploy-node deploy/images/node/Dockerfile .
+build_push node deploy/images/node/Dockerfile .
 
 # codex
-build_push migs-codex deploy/images/codex/Dockerfile .
+build_push codex deploy/images/codex/Dockerfile .
 
 # amata
 bash deploy/images/amata/build-amata.sh
-build_push migs-amata deploy/images/amata/Dockerfile .
+build_push amata deploy/images/amata/Dockerfile .
 
 # shell
-build_push migs-shell deploy/images/shell/Dockerfile deploy/images/shell
+build_push shell deploy/images/shell/Dockerfile deploy/images/shell
 
 # orw
 mapfile -t orw_dirs < <(

@@ -386,7 +386,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 
 	// Healing mig with global env vars pre-merged.
 	healingMod := MigContainerSpec{
-		Image: testJobImage("migs-codex:latest"),
+		Image: testJobImage("codex:latest"),
 		Env: map[string]string{
 			"CA_CERTS_PEM_BUNDLE": "healing-cert-bundle",
 			"CODEX_AUTH_JSON":     `{"healing":"auth"}`,

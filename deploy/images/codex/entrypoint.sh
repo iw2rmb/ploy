@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mig-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>] [--model <name>] [--prompt-file <file>]
+codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>] [--model <name>] [--prompt-file <file>]
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
@@ -126,7 +126,7 @@ fi
 if [[ "$supports_add_dir" == true ]]; then
   cmd+=(--add-dir "$input_dir")
 else
-  echo "[mig-codex] codex exec does not support --add-dir; proceeding without explicit repo mount" >> "$out_dir/codex.log" 2>/dev/null || true
+  echo "[codex] codex exec does not support --add-dir; proceeding without explicit repo mount" >> "$out_dir/codex.log" 2>/dev/null || true
 fi
 if [[ -n "$model" ]]; then
   cmd+=(--model "$model")
@@ -152,9 +152,9 @@ logfile="$out_dir/codex.log"
 manifest="$out_dir/codex-run.json"
 jsonl="$out_dir/codex-events.jsonl"
 
-echo "[mig-codex] starting codex exec with repo context" | tee "$logfile" >&2
+echo "[codex] starting codex exec with repo context" | tee "$logfile" >&2
 if [[ -n "$resume_session" ]]; then
-  echo "[mig-codex] resume mode enabled; session=$resume_session" | tee -a "$logfile" >&2
+  echo "[codex] resume mode enabled; session=$resume_session" | tee -a "$logfile" >&2
 fi
 
 set +e
@@ -163,7 +163,7 @@ status=${PIPESTATUS[1]}
 set -e
 
 if [[ ! -s "$logfile" ]]; then
-  echo "[mig-codex] no output captured from codex" | tee -a "$logfile" >&2
+  echo "[codex] no output captured from codex" | tee -a "$logfile" >&2
 fi
 
 session_id=""

@@ -11,5 +11,5 @@ PLATFORM="$PLATFORM" deploy/images/amata/build-amata.sh
 docker buildx build \
   --platform "$PLATFORM" \
   -f deploy/images/amata/Dockerfile \
-  -t "${IMAGE_PREFIX}/migs-amata:latest" \
+  -t "${IMAGE_PREFIX}/amata:latest" \
   --push .

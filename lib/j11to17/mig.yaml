@@ -25,7 +25,7 @@ steps:
       ORW_REPOS: "https://artifactory.tcsbank.ru/artifactory/maven-all/"
     env_from_file:
       CA_CERTS_PEM_BUNDLE: $PLOY_CA_CERTS
-  - image: 127.0.0.1:5000/ploy/migs-codex:latest
+  - image: 127.0.0.1:5000/ploy/codex:latest
     env:
       CODEX_API_KEY: $LLM_PROXY_API_KEY
     env_from_file:

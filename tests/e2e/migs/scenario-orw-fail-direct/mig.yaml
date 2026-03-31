@@ -33,7 +33,7 @@ build_gate:
   # Router: direct Codex mode — no amata.spec; CODEX_PROMPT required and enforced.
   # Proves direct codex exec path for router in the failing-gate loop.
   router:
-    image: localhost:5000/ploy/migs-codex:latest
+    image: localhost:5000/ploy/codex:latest
     env:
       CODEX_PROMPT: |-
         Rules:
@@ -53,7 +53,7 @@ build_gate:
       code:
         retries: 1
         # Healing: direct Codex mode — no amata.spec; CODEX_PROMPT required and enforced.
-        image: localhost:5000/ploy/migs-codex:latest
+        image: localhost:5000/ploy/codex:latest
         env:
           CODEX_PROMPT: |-
             Rules:

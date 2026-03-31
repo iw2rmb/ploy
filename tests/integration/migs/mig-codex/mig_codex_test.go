@@ -20,7 +20,7 @@ func realTempDir(pattern string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	base := filepath.Join(home, ".mig-codex-test-tmp")
+	base := filepath.Join(home, ".codex-test-tmp")
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", err
 	}
@@ -45,7 +45,7 @@ func buildMigCodexImage(t *testing.T, repoRoot, imageTag string) {
 	_, _ = mustRun(t, "docker", "build", "-t", imageTag, "-f", dockerfile, repoRoot)
 }
 
-// TestMigCodexContainer tests mig-codex.sh dual-mode routing inside the container image.
+// TestMigCodexContainer tests codex.sh dual-mode routing inside the container image.
 // Amata mode: injects a mock amata binary via volume mount and verifies artifact outputs.
 // Direct codex mode: verifies CODEX_PROMPT is required when amata mode is not active.
 func TestMigCodexContainer(t *testing.T) {
@@ -62,13 +62,13 @@ func TestMigCodexContainer(t *testing.T) {
 	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
 	repoRoot = strings.TrimSpace(repoRoot)
 
-	// Build migs-codex image once for both subtests.
-	buildMigCodexImage(t, repoRoot, "migs-codex:test-amata")
+	// Build codex image once for both subtests.
+	buildMigCodexImage(t, repoRoot, "codex:test-amata")
 
 	// Build a test image that includes a mock amata binary on top of the base image.
 	// This avoids volume-mount permission issues with Docker Desktop on macOS.
-	const testImageTag = "migs-codex:test-amata-with-mock"
-	mockDockerfile := "FROM migs-codex:test-amata\n" +
+	const testImageTag = "codex:test-amata-with-mock"
+	mockDockerfile := "FROM codex:test-amata\n" +
 		"RUN printf '#!/bin/sh\\necho amata mock ran\\nexit 0\\n' > /usr/local/bin/amata " +
 		"&& chmod +x /usr/local/bin/amata\n"
 	mockDockerfileDir := t.TempDir()
@@ -78,8 +78,8 @@ func TestMigCodexContainer(t *testing.T) {
 	mustRun(t, "docker", "build", "-t", testImageTag, mockDockerfileDir)
 
 	// Build a test image with mocked ccr + amata to validate startup activation.
-	const ccrTestImageTag = "migs-codex:test-amata-with-mock-ccr"
-	ccrMockDockerfile := `FROM migs-codex:test-amata
+	const ccrTestImageTag = "codex:test-amata-with-mock-ccr"
+	ccrMockDockerfile := `FROM codex:test-amata
 RUN cat <<'EOF' > /usr/local/bin/ccr
 #!/bin/sh
 set -eu
@@ -124,12 +124,12 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 
 	t.Run("amata_mode_routes_to_amata_and_writes_artifacts", func(t *testing.T) {
 		// Resolve symlinks so Docker Desktop on macOS gets the real path (e.g. /private/tmp vs /tmp).
-		outDir, err := realTempDir("mig-codex-test-out-*")
+		outDir, err := realTempDir("codex-test-out-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
 		t.Cleanup(func() { os.RemoveAll(outDir) })
-		inDir, err := realTempDir("mig-codex-test-in-*")
+		inDir, err := realTempDir("codex-test-in-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
@@ -176,12 +176,12 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 	})
 
 	t.Run("default_codex_home_materializes_auth_and_config_under_out_codex", func(t *testing.T) {
-		outDir, err := realTempDir("mig-codex-test-out-codex-home-*")
+		outDir, err := realTempDir("codex-test-out-codex-home-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
 		t.Cleanup(func() { os.RemoveAll(outDir) })
-		inDir, err := realTempDir("mig-codex-test-in-codex-home-*")
+		inDir, err := realTempDir("codex-test-in-codex-home-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
@@ -223,12 +223,12 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 	})
 
 	t.Run("direct_codex_mode_requires_CODEX_PROMPT", func(t *testing.T) {
-		outDir, err := realTempDir("mig-codex-test-out2-*")
+		outDir, err := realTempDir("codex-test-out2-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
 		t.Cleanup(func() { os.RemoveAll(outDir) })
-		wsDir, err := realTempDir("mig-codex-test-ws-*")
+		wsDir, err := realTempDir("codex-test-ws-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
@@ -238,7 +238,7 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 			"-v", outDir+":/out",
 			"-v", wsDir+":/workspace",
 			// Deliberately omit CODEX_PROMPT to trigger the requirement check.
-			"migs-codex:test-amata",
+			"codex:test-amata",
 			"--input", "/workspace", "--out", "/out",
 		)
 		var outBuf bytes.Buffer
@@ -254,12 +254,12 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 	})
 
 	t.Run("ccr_config_env_triggers_startup_activation", func(t *testing.T) {
-		outDir, err := realTempDir("mig-codex-test-out3-*")
+		outDir, err := realTempDir("codex-test-out3-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
 		t.Cleanup(func() { os.RemoveAll(outDir) })
-		inDir, err := realTempDir("mig-codex-test-in3-*")
+		inDir, err := realTempDir("codex-test-in3-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
@@ -323,7 +323,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	// Prefer a pre-captured Build Gate log placed alongside this test.
 	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
 	repoRoot = strings.TrimSpace(repoRoot)
-	testLog := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
+	testLog := filepath.Join(repoRoot, "tests", "integration", "migs", "codex", "build-gate.log")
 	logPath := filepath.Join(inDir, "build-gate.log")
 	if data, err := os.ReadFile(testLog); err == nil && len(data) > 0 {
 		if err := os.WriteFile(logPath, data, 0o644); err != nil {
@@ -346,8 +346,8 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Fatalf("expected compilation error in build-gate.log, got:\n%s", string(b))
 	}
 
-	// Build migs-codex image (tag: migs-codex:latest).
-	buildMigCodexImage(t, repoRoot, "migs-codex:latest")
+	// Build codex image (tag: codex:latest).
+	buildMigCodexImage(t, repoRoot, "codex:latest")
 
 	// Prepare prompt using sentinel protocol. Codex does NOT have access to
 	// any Build Gate helper inside the container; Build Gate is run externally
@@ -373,7 +373,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if strings.TrimSpace(auth) == "" {
 		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
 	}
-	// Run mig-codex; map workspace to the same absolute path inside container.
+	// Run codex; map workspace to the same absolute path inside container.
 	// Inject repo metadata env vars for context; Build Gate is run externally (not by Codex).
 	run := exec.Command("docker", "run", "--rm",
 		"-e", "CODEX_AUTH_JSON="+auth,
@@ -385,11 +385,11 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		"-v", outDir+":/out",
 		"-v", inDir+":/in:ro",
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
-		"migs-codex:latest",
+		"codex:latest",
 		"--input", ws, "--out", "/out", "--prompt-file", filepath.Join(ws, "prompt.txt"),
 	)
 	if out, err := run.CombinedOutput(); err != nil {
-		t.Fatalf("mig-codex container failed: %v\n%s", err, string(out))
+		t.Fatalf("codex container failed: %v\n%s", err, string(out))
 	}
 
 	// Assertions

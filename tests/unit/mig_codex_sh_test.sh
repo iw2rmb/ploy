@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for deploy/images/codex/entrypoint.sh (container command: mig-codex)
+# Unit tests for deploy/images/codex/entrypoint.sh (container command: codex)
 # Tests CLI flag detection, JSONL event capture, session ID extraction,
 # and run manifest/session metadata.
 #

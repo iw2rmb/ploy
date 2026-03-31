@@ -180,7 +180,7 @@ func GenerateNodeCSR(nodeID, clusterID, nodeIP string) (*IssuedCert, []byte, err
 	}
 
 	cn := fmt.Sprintf("node:%s", nodeID)
-	dnsName := fmt.Sprintf("ploy-node-%s.%s.ploy", nodeID, clusterID)
+	dnsName := fmt.Sprintf("node-%s.%s.ploy", nodeID, clusterID)
 
 	var ipAddrs []net.IP
 	if nodeIP != "" {

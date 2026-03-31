@@ -10,5 +10,5 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
 docker buildx build \
   --platform "$PLATFORM" \
   -f deploy/images/codex/Dockerfile \
-  -t "${IMAGE_PREFIX}/migs-codex:latest" \
+  -t "${IMAGE_PREFIX}/codex:latest" \
   --push .

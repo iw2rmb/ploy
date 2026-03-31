@@ -332,7 +332,7 @@ func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHan
 // ensureImageAvailable checks whether the image exists locally and pulls it from
 // a registry only when it is missing.
 //
-// This avoids failing local development runs when tags (e.g. ploy-gate-gradle:jdk11)
+// This avoids failing local development runs when tags (e.g. gate-gradle:jdk11)
 // are built locally and not published to a registry.
 func (r *DockerContainerRuntime) ensureImageAvailable(ctx context.Context, imageRef string) error {
 	_, err := r.images.ImageInspect(ctx, imageRef)

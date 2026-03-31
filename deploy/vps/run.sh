@@ -29,8 +29,8 @@ CLEAN=0
 DROP_DB=0
 
 RUNTIME_IMAGE_REFS=(
-  "ploy-server:local"
-  "ploy-node:local"
+  "server:local"
+  "node:local"
 )
 
 SERVICE_IMAGE_REFS=(
@@ -388,9 +388,9 @@ mig_repo_name() {
   local name="${entry##*/}"
   case "$name" in
     mig-*) echo "migs-${name#mig-}" ;;
-    shell) echo "migs-shell" ;;
-    codex) echo "migs-codex" ;;
-    amata) echo "migs-amata" ;;
+    shell) echo "shell" ;;
+    codex) echo "codex" ;;
+    amata) echo "amata" ;;
     *) echo "$name" ;;
   esac
 }
@@ -429,8 +429,8 @@ ENTRYPOINT ["/bin/sh", "-lc"]
 CMD ["/usr/local/bin/ployd-node --config /etc/ploy/ployd-node.yaml"]
 EOF
 
-  maybe_run_inline_buildx_load "ploy-server:local" "$server_dockerfile"
-  maybe_run_inline_buildx_load "ploy-node:local" "$node_dockerfile"
+  maybe_run_inline_buildx_load "server:local" "$server_dockerfile"
+  maybe_run_inline_buildx_load "node:local" "$node_dockerfile"
 }
 
 build_workflow_images() {
@@ -459,11 +459,11 @@ build_workflow_images() {
     printf '%s\n' "$ref" >> "$refs_file"
   done < <(discover_mig_dirs)
 
-  ref="${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk11"
+  ref="${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk11"
   maybe_run_buildx_load "deploy/images/gates/gradle/Dockerfile.jdk11" "deploy/images/gates/gradle" "$ref"
   printf '%s\n' "$ref" >> "$refs_file"
 
-  ref="${PLOY_CONTAINER_REGISTRY}/ploy-gate-gradle:jdk17"
+  ref="${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk17"
   maybe_run_buildx_load "deploy/images/gates/gradle/Dockerfile.jdk17" "deploy/images/gates/gradle" "$ref"
   printf '%s\n' "$ref" >> "$refs_file"
 

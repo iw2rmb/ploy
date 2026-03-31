@@ -24,8 +24,8 @@ export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
 - Pulls runtime images (`docker compose pull`) before each start by default.
 - Starts the runtime stack from `deploy/runtime/docker-compose.yml`.
 - Uses GHCR images pinned by `PLOY_VERSION` (defaults to `./VERSION`, semver):
-  - `ghcr.io/iw2rmb/ploy/ploy-server:${PLOY_VERSION}`
-  - `ghcr.io/iw2rmb/ploy/ploy-node:${PLOY_VERSION}`
+  - `ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}`
+  - `ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}`
 - Injects runtime CA bundle locally (when `PLOY_CA_CERTS` is set) without baking certs into images.
 - Seeds `CA_CERTS_PEM_BUNDLE` global env from `PLOY_CA_CERTS` so mig/build-gate containers also receive the same CA bundle at runtime.
 

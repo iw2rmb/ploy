@@ -184,7 +184,7 @@ build_gate:
 #
 # build_gate:
 #   router:
-#     image: docker.io/your-dh-user/migs-codex:latest
+#     image: docker.io/your-dh-user/codex:latest
 #     amata:
 #       spec: |
 #         version: amata/v1
@@ -218,7 +218,7 @@ build_gate:
 # build_gate:
 #   router:
 #     spec_path: ./healing/router/spec.yaml
-#     image: docker.io/your-dh-user/migs-codex:latest
+#     image: docker.io/your-dh-user/codex:latest
 #     env:
 #       CODEX_PROMPT: |-
 #         Rules:
@@ -247,7 +247,7 @@ build_gate:
 #       code:
 #         spec_path: ./healing/code/spec.yaml
 #         retries: 2
-#         image: docker.io/your-dh-user/migs-codex:latest
+#         image: docker.io/your-dh-user/codex:latest
 #         amata:
 #           spec: |
 #             version: amata/v1
@@ -285,7 +285,7 @@ build_gate:
 #       infra:
 #         spec_path: ./healing/infra/spec.yaml
 #         retries: 2
-#         image: docker.io/your-dh-user/migs-codex:latest
+#         image: docker.io/your-dh-user/codex:latest
 #         env:
 #           CODEX_PROMPT: |-
 #             Fix infra/toolchain issue in /in/build-gate.log.
@@ -299,7 +299,7 @@ build_gate:
 #       code:
 #         spec_path: ./healing/code/spec.yaml
 #         retries: 2
-#         image: docker.io/your-dh-user/migs-codex:latest
+#         image: docker.io/your-dh-user/codex:latest
 #         env:
 #           CODEX_PROMPT: |-
 #             Fix code-level issue in /in/build-gate.log.

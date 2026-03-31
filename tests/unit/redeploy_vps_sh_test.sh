@@ -71,11 +71,11 @@ test_reuses_existing_buildx_image() {
   run_test
   reset_docker_mock
   CLEAN=0
-  MOCK_EXISTING_IMAGES="ploy-server:local"
+  MOCK_EXISTING_IMAGES="server:local"
 
-  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "ploy-server:local"
+  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "server:local"
 
-  assert_file_contains "$DOCKER_CALLS_FILE" "image inspect ploy-server:local" "inspects existing buildx image"
+  assert_file_contains "$DOCKER_CALLS_FILE" "image inspect server:local" "inspects existing buildx image"
   assert_file_not_contains "$DOCKER_CALLS_FILE" "buildx build" "skips buildx build when image exists"
 }
 
@@ -84,10 +84,10 @@ test_builds_missing_image() {
   reset_docker_mock
   CLEAN=0
 
-  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "ploy-server:local" --secret id=test,src=/tmp/test
+  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "server:local" --secret id=test,src=/tmp/test
 
-  assert_file_contains "$DOCKER_CALLS_FILE" "image inspect ploy-server:local" "checks missing image before build"
-  assert_file_contains "$DOCKER_CALLS_FILE" "buildx build --platform linux/amd64 --secret id=test,src=/tmp/test --provenance=false --sbom=false --pull --progress=plain -f deploy/images/server/Dockerfile -t ploy-server:local --load ." "builds missing image with expected args"
+  assert_file_contains "$DOCKER_CALLS_FILE" "image inspect server:local" "checks missing image before build"
+  assert_file_contains "$DOCKER_CALLS_FILE" "buildx build --platform linux/amd64 --secret id=test,src=/tmp/test --provenance=false --sbom=false --pull --progress=plain -f deploy/images/server/Dockerfile -t server:local --load ." "builds missing image with expected args"
 }
 
 test_buildx_load_without_extra_args() {
@@ -95,20 +95,20 @@ test_buildx_load_without_extra_args() {
   reset_docker_mock
   CLEAN=0
 
-  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "ploy-server:local"
+  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "server:local"
 
-  assert_file_contains "$DOCKER_CALLS_FILE" "buildx build --platform linux/amd64 --provenance=false --sbom=false --pull --progress=plain -f deploy/images/server/Dockerfile -t ploy-server:local --load ." "builds without optional extra args"
+  assert_file_contains "$DOCKER_CALLS_FILE" "buildx build --platform linux/amd64 --provenance=false --sbom=false --pull --progress=plain -f deploy/images/server/Dockerfile -t server:local --load ." "builds without optional extra args"
 }
 
 test_clean_rebuilds_existing_image() {
   run_test
   reset_docker_mock
   CLEAN=1
-  MOCK_EXISTING_IMAGES="ploy-server:local"
+  MOCK_EXISTING_IMAGES="server:local"
 
-  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "ploy-server:local"
+  maybe_run_buildx_load "deploy/images/server/Dockerfile" "." "server:local"
 
-  assert_file_contains "$DOCKER_CALLS_FILE" "buildx build --platform linux/amd64 --provenance=false --sbom=false --pull --progress=plain -f deploy/images/server/Dockerfile -t ploy-server:local --load ." "clean mode rebuilds image even when present"
+  assert_file_contains "$DOCKER_CALLS_FILE" "buildx build --platform linux/amd64 --provenance=false --sbom=false --pull --progress=plain -f deploy/images/server/Dockerfile -t server:local --load ." "clean mode rebuilds image even when present"
 }
 
 test_runtime_images_use_local_dist_binaries() {
@@ -118,8 +118,8 @@ test_runtime_images_use_local_dist_binaries() {
 
   build_runtime_images
 
-  assert_file_contains "$DOCKER_CALLS_FILE" "-t ploy-server:local --load -f - ." "server image is built from inline dockerfile"
-  assert_file_contains "$DOCKER_CALLS_FILE" "-t ploy-node:local --load -f - ." "node image is built from inline dockerfile"
+  assert_file_contains "$DOCKER_CALLS_FILE" "-t server:local --load -f - ." "server image is built from inline dockerfile"
+  assert_file_contains "$DOCKER_CALLS_FILE" "-t node:local --load -f - ." "node image is built from inline dockerfile"
   assert_file_not_contains "$DOCKER_CALLS_FILE" "deploy/images/server/Dockerfile" "runtime server image does not use source-building dockerfile"
   assert_file_not_contains "$DOCKER_CALLS_FILE" "deploy/images/node/Dockerfile" "runtime node image does not use source-building dockerfile"
 }
@@ -131,11 +131,11 @@ test_save_images_combines_base_and_workflow_refs() {
   local refs_file output
   refs_file=$(mktemp)
   output=$(mktemp)
-  printf '%s\n' "example.registry/ploy/migs-shell:latest" > "$refs_file"
+  printf '%s\n' "example.registry/ploy/shell:latest" > "$refs_file"
 
   save_images "$refs_file" "$output"
 
-  assert_file_contains "$DOCKER_CALLS_FILE" "save -o $output ploy-server:local ploy-node:local ploy-garage-init:local dxflrs/amd64_garage:v2.2.0 amd64/registry:3 gradle/build-cache-node:21.2 example.registry/ploy/migs-shell:latest" "saves base and workflow images in one docker save call"
+  assert_file_contains "$DOCKER_CALLS_FILE" "save -o $output server:local node:local ploy-garage-init:local dxflrs/amd64_garage:v2.2.0 amd64/registry:3 gradle/build-cache-node:21.2 example.registry/ploy/shell:latest" "saves base and workflow images in one docker save call"
 
   rm -f "$refs_file" "$output"
 }

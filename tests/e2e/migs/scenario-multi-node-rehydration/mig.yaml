@@ -82,7 +82,7 @@ build_gate:
 
   # Router emits bug_summary + error_kind before healing selection.
   router:
-    image: localhost:5000/ploy/migs-codex:latest
+    image: localhost:5000/ploy/codex:latest
     env:
       CODEX_PROMPT: |-
         Rules:
@@ -107,7 +107,7 @@ build_gate:
         # Codex edits the workspace and exits when done; the node agent inspects
         # the workspace for diffs and re-runs the Build Gate externally when changes exist.
         # Codex never runs the gate itself.
-        image: localhost:5000/ploy/migs-codex:latest
+        image: localhost:5000/ploy/codex:latest
         env:
           CODEX_PROMPT: |-
             Rules:

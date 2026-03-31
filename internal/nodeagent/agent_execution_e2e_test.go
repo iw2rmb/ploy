@@ -95,7 +95,7 @@ func TestEndToEndFlow(t *testing.T) {
 		req := StartRunRequest{
 			RunID:   types.RunID("test-run-e2e"),
 			JobID:   types.JobID("test-job-e2e"),
-			RepoURL: types.RepoURL("https://github.com/iw2rmb/ploy-nodeagent-e2e-synthetic.git"),
+			RepoURL: types.RepoURL("https://github.com/iw2rmb/nodeagent-e2e-synthetic.git"),
 			BaseRef: types.GitRef("main"),
 			TypedOptions: RunOptions{
 				Execution: MigContainerSpec{

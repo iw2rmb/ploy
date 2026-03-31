@@ -57,8 +57,8 @@ Environment:
   PLOY_OBJECTSTORE_SECRET_KEY S3 secret key used by server object store config
   PLOY_CA_CERTS           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
   PLOY_VERSION            Runtime version tag (default from ./VERSION, example v0.1.0)
-  PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy/ploy-server:${PLOY_VERSION})
-  PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy/ploy-node:${PLOY_VERSION})
+  PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION})
+  PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION})
   PLOY_RUNTIME_PULL_IMAGES Set to 0/false to skip pull before up (default: 1)
   PLOY_CONFIG_HOME        Config root (default: ${XDG_CONFIG_HOME:-$HOME/.config}/ploy)
   AUTH_JSON_PATH          Optional explicit auth state path; default: <PLOY_CONFIG_HOME>/<cluster>/auth.json
@@ -120,8 +120,8 @@ resolve_ploy_version() {
 }
 
 init_runtime_image_defaults() {
-  : "${PLOY_RUNTIME_SERVER_IMAGE:=ghcr.io/iw2rmb/ploy/ploy-server:${PLOY_VERSION}}"
-  : "${PLOY_RUNTIME_NODE_IMAGE:=ghcr.io/iw2rmb/ploy/ploy-node:${PLOY_VERSION}}"
+  : "${PLOY_RUNTIME_SERVER_IMAGE:=ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}}"
+  : "${PLOY_RUNTIME_NODE_IMAGE:=ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}}"
   export PLOY_VERSION
   export PLOY_RUNTIME_SERVER_IMAGE
   export PLOY_RUNTIME_NODE_IMAGE

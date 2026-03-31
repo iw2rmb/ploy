@@ -189,7 +189,7 @@ Build Gate resolves its runtime image from an explicit stack→image mapping.
 
 **Default catalog shipping:**
 - The repository default lives at `gates/stacks.yaml`.
-- The `ploy-node` and `ploy-server` Docker images include it at `/etc/ploy/gates/stacks.yaml` by default.
+- The `node` and `server` Docker images include it at `/etc/ploy/gates/stacks.yaml` by default.
 
 **Rule format:**
 ```yaml

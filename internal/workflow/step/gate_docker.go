@@ -22,7 +22,7 @@
 // ## Usage Note for Healing Migs
 //
 // Direct HTTP Build Gate API calls from healing migs are now DISCOURAGED for
-// migs-codex. The node agent handles all gate orchestration, ensuring consistent
+// codex. The node agent handles all gate orchestration, ensuring consistent
 // behavior and complete history capture.
 package step
 
