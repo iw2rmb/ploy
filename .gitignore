@@ -69,10 +69,6 @@ tests/e2e/deploy/e2e-logs/
 .tmp/
 
 # Deployment artifacts
-deploy/*/generated-tokens.env
-deploy/*/auth-secret.txt
-deploy/*/node/bearer-token
-deploy/*/cli/clusters/**
 deploy/*/cli/rollout
 
 # Local deployment
