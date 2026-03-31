@@ -24,7 +24,7 @@ func TestListJobsHandler_Success(t *testing.T) {
 			Name:       "mig-step",
 			Status:     domaintypes.JobStatusRunning,
 			DurationMs: 1234,
-			JobImage:   "ghcr.io/iw2rmb/migs-java17:latest",
+			JobImage:   "ghcr.io/iw2rmb/ploy/migs-java17:latest",
 			NodeID:     &nodeID,
 			MigName:    "java17-upgrade",
 			RunID:      runID,
@@ -75,8 +75,8 @@ func TestListJobsHandler_Success(t *testing.T) {
 	if got := job["duration_ms"]; got != float64(1234) {
 		t.Fatalf("duration_ms = %v, want %d", got, 1234)
 	}
-	if got := job["job_image"]; got != "ghcr.io/iw2rmb/migs-java17:latest" {
-		t.Fatalf("job_image = %v, want %q", got, "ghcr.io/iw2rmb/migs-java17:latest")
+	if got := job["job_image"]; got != "ghcr.io/iw2rmb/ploy/migs-java17:latest" {
+		t.Fatalf("job_image = %v, want %q", got, "ghcr.io/iw2rmb/ploy/migs-java17:latest")
 	}
 	if got := job["node_id"]; got != "abc123" {
 		t.Fatalf("node_id = %v, want %q", got, "abc123")

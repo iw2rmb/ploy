@@ -53,11 +53,9 @@ defaults change, or components adopt additional configuration.
 - `PLOY_VERSION` — Runtime image semver tag used by `deploy/runtime/run.sh` when explicit image
   overrides are not set. Defaults to `./VERSION` in the repo root.
 - `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.
-  Default: `ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION}`.
+  Default: `ghcr.io/iw2rmb/ploy/ploy-server:${PLOY_VERSION}`.
 - `PLOY_RUNTIME_NODE_IMAGE` — Optional runtime-local node image override.
-  Default: `ghcr.io/iw2rmb/ploy-node:${PLOY_VERSION}`.
-- `PLOY_RUNTIME_GARAGE_INIT_IMAGE` — Optional runtime-local garage bootstrap image override.
-  Default: `ghcr.io/iw2rmb/ploy-garage-init:${PLOY_VERSION}`.
+  Default: `ghcr.io/iw2rmb/ploy/ploy-node:${PLOY_VERSION}`.
 - `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
   Default: `node/bearer-token` under the local deploy workspace (file path). If this path is a directory, scripts

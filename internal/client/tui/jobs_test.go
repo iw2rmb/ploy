@@ -39,7 +39,7 @@ func TestListJobsCommand(t *testing.T) {
 							"name":        "mig-step",
 							"status":      "Running",
 							"duration_ms": 1200,
-							"job_image":   "ghcr.io/iw2rmb/migs-java17:latest",
+							"job_image":   "ghcr.io/iw2rmb/ploy/migs-java17:latest",
 							"node_id":     "abc123",
 							"mig_name":    "java17-upgrade",
 							"run_id":      runID.String(),
@@ -133,7 +133,7 @@ func TestListJobsCommand(t *testing.T) {
 					if got, want := job.DurationMs, int64(1200); got != want {
 						t.Fatalf("job duration=%d, want %d", got, want)
 					}
-					if got, want := job.JobImage, "ghcr.io/iw2rmb/migs-java17:latest"; got != want {
+					if got, want := job.JobImage, "ghcr.io/iw2rmb/ploy/migs-java17:latest"; got != want {
 						t.Fatalf("job image=%q, want %q", got, want)
 					}
 					if job.NodeID == nil || job.NodeID.String() != "abc123" {
