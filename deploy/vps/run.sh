@@ -13,13 +13,15 @@ REMOTE_IMAGES_TAR="$REMOTE_HOME/tmp/ploy-images.tar"
 
 SSH_TARGET="s_v.v.kovalev@10.120.34.186"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-$ROOT_DIR/deploy/vps/auth-secret.txt}"
+AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
 #PLOY_DB_DSN="postgres://$REMOTE_USER@host.docker.internal/ploy"
 PLOY_DB_DSN="postgres://$REMOTE_USER@localhost/ploy"
 PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
 PLOY_SERVER_PORT="8080"
-PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
-PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:${PLOY_REGISTRY_PORT}/ploy}"
+PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb}"
+PLOY_OBJECTSTORE_ENDPOINT="${PLOY_OBJECTSTORE_ENDPOINT:-}"
+PLOY_OBJECTSTORE_ACCESS_KEY="${PLOY_OBJECTSTORE_ACCESS_KEY:-}"
+PLOY_OBJECTSTORE_SECRET_KEY="${PLOY_OBJECTSTORE_SECRET_KEY:-}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
 
@@ -29,12 +31,9 @@ DROP_DB=0
 RUNTIME_IMAGE_REFS=(
   "ploy-server:local"
   "ploy-node:local"
-  "ploy-garage-init:local"
 )
 
 SERVICE_IMAGE_REFS=(
-  "dxflrs/amd64_garage:v2.2.0"
-  "amd64/registry:3"
   "gradle/build-cache-node:21.2"
 )
 
@@ -65,10 +64,24 @@ Required environment:
   PLOY_DB_DSN  PostgreSQL DSN reachable from both the VPS host and containers
 
 Optional environment:
-  PLOY_CA_CERTS      PEM CA bundle used the same way as deploy/local/run.sh
+  PLOY_CA_CERTS      PEM CA bundle used the same way as deploy/runtime/run.sh
   PLOY_SERVER_PORT   Remote server port (default: 8080)
-  PLOY_REGISTRY_PORT Remote registry port (default: 5000)
+  PLOY_CONTAINER_REGISTRY Registry namespace/prefix for workflow images
+  PLOY_OBJECTSTORE_ENDPOINT / PLOY_OBJECTSTORE_ACCESS_KEY / PLOY_OBJECTSTORE_SECRET_KEY
 USAGE
+}
+
+init_cluster_paths() {
+  local cfg_root
+  cfg_root="${PLOY_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/ploy}"
+  if [[ "$cfg_root" != /* ]]; then
+    cfg_root="$ROOT_DIR/$cfg_root"
+  fi
+  if [[ -z "$AUTH_JSON_PATH" ]]; then
+    AUTH_JSON_PATH="$cfg_root/$CLUSTER_ID/auth.json"
+  elif [[ "$AUTH_JSON_PATH" != /* ]]; then
+    AUTH_JSON_PATH="$ROOT_DIR/$AUTH_JSON_PATH"
+  fi
 }
 
 parse_args() {
@@ -416,7 +429,6 @@ ENTRYPOINT ["/bin/sh", "-lc"]
 CMD ["/usr/local/bin/ployd-node --config /etc/ploy/ployd-node.yaml"]
 EOF
 
-  maybe_run_buildx_load "deploy/local/garage/Dockerfile" "." "ploy-garage-init:local"
   maybe_run_inline_buildx_load "ploy-server:local" "$server_dockerfile"
   maybe_run_inline_buildx_load "ploy-node:local" "$node_dockerfile"
 }
@@ -544,29 +556,29 @@ prepare_bundle() {
   local remote_ca_path="${3:-}"
 
   mkdir -p \
-    "$bundle_dir/deploy/local" \
+    "$bundle_dir/deploy/runtime" \
     "$bundle_dir/deploy/vps" \
     "$bundle_dir/dist"
 
-  cp -R deploy/local/server "$bundle_dir/deploy/local/"
-  cp -R deploy/local/node "$bundle_dir/deploy/local/"
-  cp -R deploy/local/garage "$bundle_dir/deploy/local/"
-  cp -R deploy/local/registry "$bundle_dir/deploy/local/"
-  cp -R deploy/local/gradle-build-cache "$bundle_dir/deploy/local/"
-  cp deploy/local/docker-compose.yml "$bundle_dir/deploy/local/docker-compose.yml"
+  cp -R deploy/runtime/server "$bundle_dir/deploy/runtime/"
+  cp -R deploy/runtime/node "$bundle_dir/deploy/runtime/"
+  cp -R deploy/runtime/gradle-build-cache "$bundle_dir/deploy/runtime/"
+  cp deploy/runtime/docker-compose.yml "$bundle_dir/deploy/runtime/docker-compose.yml"
   cp dist/ployd-linux "$bundle_dir/dist/ployd-linux"
   cp dist/ployd-node-linux "$bundle_dir/dist/ployd-node-linux"
 
-  printf '%s' "$WORKER_TOKEN" > "$bundle_dir/deploy/local/node/bearer-token"
-  chmod 600 "$bundle_dir/deploy/local/node/bearer-token"
+  printf '%s' "$WORKER_TOKEN" > "$bundle_dir/deploy/runtime/node/bearer-token"
+  chmod 600 "$bundle_dir/deploy/runtime/node/bearer-token"
   cp "$workflow_refs_file" "$bundle_dir/deploy/vps/workflow-images.txt"
 
   write_env_file "$bundle_dir/deploy/vps/stack.env" \
     PLOY_DB_DSN "$PLOY_DB_DSN" \
     PLOY_AUTH_SECRET "$PLOY_AUTH_SECRET" \
     PLOY_SERVER_PORT "$PLOY_SERVER_PORT" \
-    PLOY_REGISTRY_PORT "$PLOY_REGISTRY_PORT" \
     PLOY_CONTAINER_REGISTRY "$PLOY_CONTAINER_REGISTRY" \
+    PLOY_OBJECTSTORE_ENDPOINT "$PLOY_OBJECTSTORE_ENDPOINT" \
+    PLOY_OBJECTSTORE_ACCESS_KEY "$PLOY_OBJECTSTORE_ACCESS_KEY" \
+    PLOY_OBJECTSTORE_SECRET_KEY "$PLOY_OBJECTSTORE_SECRET_KEY" \
     PLOY_CA_CERTS "$remote_ca_path"
 
   write_env_file "$bundle_dir/deploy/vps/tokens.env" \

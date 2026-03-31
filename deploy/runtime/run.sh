@@ -8,9 +8,9 @@ COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f deploy/runtime/docker-compose.yml}
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
-AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-$ROOT_DIR/deploy/runtime/auth-secret.txt}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/deploy/runtime/cli}"
+PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/ploy}"
+AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
@@ -18,7 +18,6 @@ PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
 PLOY_CA_CERT_PATH=""
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
-PLOY_REGISTRY_PORT="${PLOY_REGISTRY_PORT:-5000}"
 PLOY_VERSION="${PLOY_VERSION:-}"
 WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$ROOT_DIR/deploy/runtime/node/bearer-token}"
 PULL_IMAGES="${PLOY_RUNTIME_PULL_IMAGES:-1}"
@@ -40,7 +39,7 @@ need() {
 
 usage() {
   cat <<'USAGE'
-Usage: ./deploy/runtime/run.sh [--drop-db] [--ployd] [--nodes] [--no-pull]
+Usage: ./deploy/runtime/run.sh [--drop-db] [--ployd] [--nodes] [--no-pull] [--cluster <id>] [cluster]
 
 Runtime deploy using pre-built GHCR images.
 
@@ -49,18 +48,20 @@ Options:
   --ployd    Refresh/deploy server only
   --nodes    Refresh/deploy node (includes required server dependency)
   --no-pull  Skip docker compose pull before up
+  --cluster  Cluster id (default: local). You can also pass it as a positional arg.
 
 Environment:
   PLOY_DB_DSN             PostgreSQL DSN used by host setup and server container
-  PLOY_S3_URL             S3-compatible endpoint URL used by server object store config
-  PLOY_S3_ACCESS_KEY      S3 access key used by server object store config
-  PLOY_S3_SECRET_KEY      S3 secret key used by server object store config
+  PLOY_OBJECTSTORE_ENDPOINT   S3-compatible endpoint URL used by server object store config
+  PLOY_OBJECTSTORE_ACCESS_KEY S3 access key used by server object store config
+  PLOY_OBJECTSTORE_SECRET_KEY S3 secret key used by server object store config
   PLOY_CA_CERTS           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
   PLOY_VERSION            Runtime version tag (default from ./VERSION, example v0.1.0)
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION})
   PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy-node:${PLOY_VERSION})
-  PLOY_RUNTIME_GARAGE_INIT_IMAGE Runtime garage-init image (default ghcr.io/iw2rmb/ploy-garage-init:${PLOY_VERSION})
   PLOY_RUNTIME_PULL_IMAGES Set to 0/false to skip pull before up (default: 1)
+  PLOY_CONFIG_HOME        Config root (default: ${XDG_CONFIG_HOME:-$HOME/.config}/ploy)
+  AUTH_JSON_PATH          Optional explicit auth state path; default: <PLOY_CONFIG_HOME>/<cluster>/auth.json
 USAGE
 }
 
@@ -79,14 +80,25 @@ parse_args() {
       --no-pull)
         PULL_IMAGES=0
         ;;
+      --cluster)
+        shift
+        if [[ $# -eq 0 || -z "$1" ]]; then
+          echo "error: --cluster requires a value" >&2
+          exit 1
+        fi
+        CLUSTER_ID="$1"
+        ;;
       -h|--help)
         usage
         exit 0
         ;;
-      *)
+      -*)
         echo "error: unknown argument: $1" >&2
         usage >&2
         exit 1
+        ;;
+      *)
+        CLUSTER_ID="$1"
         ;;
     esac
     shift
@@ -110,11 +122,22 @@ resolve_ploy_version() {
 init_runtime_image_defaults() {
   : "${PLOY_RUNTIME_SERVER_IMAGE:=ghcr.io/iw2rmb/ploy-server:${PLOY_VERSION}}"
   : "${PLOY_RUNTIME_NODE_IMAGE:=ghcr.io/iw2rmb/ploy-node:${PLOY_VERSION}}"
-  : "${PLOY_RUNTIME_GARAGE_INIT_IMAGE:=ghcr.io/iw2rmb/ploy-garage-init:${PLOY_VERSION}}"
   export PLOY_VERSION
   export PLOY_RUNTIME_SERVER_IMAGE
   export PLOY_RUNTIME_NODE_IMAGE
-  export PLOY_RUNTIME_GARAGE_INIT_IMAGE
+}
+
+init_cluster_paths() {
+  local cluster_dir
+  if [[ "$PLOY_CONFIG_HOME" != /* ]]; then
+    PLOY_CONFIG_HOME="$ROOT_DIR/$PLOY_CONFIG_HOME"
+  fi
+  cluster_dir="$PLOY_CONFIG_HOME/$CLUSTER_ID"
+  if [[ -z "$AUTH_JSON_PATH" ]]; then
+    AUTH_JSON_PATH="$cluster_dir/auth.json"
+  elif [[ "$AUTH_JSON_PATH" != /* ]]; then
+    AUTH_JSON_PATH="$ROOT_DIR/$AUTH_JSON_PATH"
+  fi
 }
 
 derive_admin_pg_dsn() {
@@ -446,6 +469,68 @@ print(f"WORKER_TOKEN_HASH={worker_hash}")
 PY
 }
 
+read_auth_json_field() {
+  local field="$1"
+  [[ -f "$AUTH_JSON_PATH" ]] || return 1
+  AUTH_JSON_PATH="$AUTH_JSON_PATH" AUTH_FIELD="$field" "$PYTHON_BIN" <<'PY'
+import json
+import os
+
+path = os.environ["AUTH_JSON_PATH"]
+field = os.environ["AUTH_FIELD"]
+try:
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+except Exception:
+    raise SystemExit(1)
+value = data.get(field, "")
+if value is None:
+    value = ""
+print(str(value))
+PY
+}
+
+write_auth_json() {
+  local auth_dir server_url tmp_file
+  auth_dir="$(dirname "$AUTH_JSON_PATH")"
+  server_url="http://127.0.0.1:${PLOY_SERVER_PORT}"
+  mkdir -p "$auth_dir"
+  tmp_file="$(mktemp)"
+  AUTH_JSON_PATH="$AUTH_JSON_PATH" \
+  CLUSTER_ID="$CLUSTER_ID" \
+  NODE_ID="$NODE_ID" \
+  SERVER_URL="$server_url" \
+  PLOY_AUTH_SECRET="$PLOY_AUTH_SECRET" \
+  ADMIN_TOKEN="$ADMIN_TOKEN" \
+  ADMIN_TOKEN_ID="$ADMIN_TOKEN_ID" \
+  ADMIN_TOKEN_HASH="$ADMIN_TOKEN_HASH" \
+  WORKER_TOKEN="$WORKER_TOKEN" \
+  WORKER_TOKEN_ID="$WORKER_TOKEN_ID" \
+  WORKER_TOKEN_HASH="$WORKER_TOKEN_HASH" \
+  "$PYTHON_BIN" <<'PY' > "$tmp_file"
+import json
+import os
+from datetime import datetime, timezone
+
+payload = {
+    "cluster_id": os.environ["CLUSTER_ID"],
+    "node_id": os.environ["NODE_ID"],
+    "address": os.environ["SERVER_URL"],
+    "auth_secret": os.environ["PLOY_AUTH_SECRET"],
+    "admin_token": os.environ["ADMIN_TOKEN"],
+    "admin_token_id": os.environ["ADMIN_TOKEN_ID"],
+    "admin_token_hash": os.environ["ADMIN_TOKEN_HASH"],
+    "worker_token": os.environ["WORKER_TOKEN"],
+    "worker_token_id": os.environ["WORKER_TOKEN_ID"],
+    "worker_token_hash": os.environ["WORKER_TOKEN_HASH"],
+    "generated_at": datetime.now(timezone.utc).isoformat(),
+}
+print(json.dumps(payload, indent=2, sort_keys=True))
+PY
+  chmod 600 "$tmp_file"
+  mv "$tmp_file" "$AUTH_JSON_PATH"
+}
+
 provision_worker_token_into_node() {
   local token_dir tmp_token_file
 
@@ -459,77 +544,6 @@ provision_worker_token_into_node() {
   printf '%s' "$WORKER_TOKEN" > "$tmp_token_file"
   chmod 600 "$tmp_token_file"
   mv "$tmp_token_file" "$WORKER_TOKEN_PATH"
-}
-
-wait_for_garage_bootstrap() {
-  local garage_cid garage_init_cid garage_health init_state init_exit
-
-  garage_cid="$($COMPOSE_CMD ps -a -q garage)"
-  garage_init_cid="$($COMPOSE_CMD ps -a -q garage-init)"
-  if [[ -z "$garage_cid" || -z "$garage_init_cid" ]]; then
-    echo "error: could not resolve garage container IDs" >&2
-    $COMPOSE_CMD ps || true
-    exit 1
-  fi
-
-  log "Waiting for Garage health and bootstrap completion..."
-  for _ in {1..90}; do
-    garage_health="$($CONTAINER_ENGINE inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$garage_cid" 2>/dev/null || true)"
-    init_state="$($CONTAINER_ENGINE inspect -f '{{.State.Status}}' "$garage_init_cid" 2>/dev/null || true)"
-    init_exit="$($CONTAINER_ENGINE inspect -f '{{.State.ExitCode}}' "$garage_init_cid" 2>/dev/null || true)"
-
-    if [[ "$garage_health" == "healthy" && "$init_state" == "exited" && "$init_exit" == "0" ]]; then
-      return 0
-    fi
-
-    if [[ "$init_state" == "exited" && "$init_exit" != "0" ]]; then
-      echo "error: garage-init failed with exit code ${init_exit}" >&2
-      $COMPOSE_CMD logs garage garage-init || true
-      exit 1
-    fi
-
-    sleep 1
-  done
-
-  echo "error: garage bootstrap did not complete in time" >&2
-  $COMPOSE_CMD logs garage garage-init || true
-  exit 1
-}
-
-wait_for_registry_health() {
-  log "Waiting for local registry readiness on http://127.0.0.1:${PLOY_REGISTRY_PORT}/v2/ ..."
-  for _ in {1..90}; do
-    if "$PYTHON_BIN" - <<PY >/dev/null 2>&1
-import sys
-import urllib.error
-import urllib.request
-
-urls = [
-    "http://127.0.0.1:${PLOY_REGISTRY_PORT}/v2/",
-    "http://localhost:${PLOY_REGISTRY_PORT}/v2/",
-]
-opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-for url in urls:
-    try:
-        with opener.open(url, timeout=2) as resp:
-            if 200 <= resp.status < 500:
-                sys.exit(0)
-    except urllib.error.HTTPError as e:
-        if 200 <= e.code < 500:
-            sys.exit(0)
-    except Exception:
-        pass
-sys.exit(1)
-PY
-    then
-      return 0
-    fi
-    sleep 1
-  done
-
-  echo "error: registry did not become ready in time" >&2
-  $COMPOSE_CMD logs registry || true
-  exit 1
 }
 
 wait_for_server_health() {
@@ -627,22 +641,13 @@ runtime_ca_bundle_value() {
   cat "$PLOY_CA_CERTS"
 }
 
-wire_local_cli_descriptor() {
-  local server_url="http://127.0.0.1:${PLOY_SERVER_PORT}"
+configure_runtime_globals_and_persist_auth() {
   local runtime_ca_bundle=""
 
-  log "Wiring local CLI descriptor..."
-  mkdir -p "$PLOY_CONFIG_HOME/clusters"
-  cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
-{
-  "cluster_id": "${CLUSTER_ID}",
-  "address": "${server_url}",
-  "token": "${ADMIN_TOKEN}"
-}
-JSON
-  ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
+  log "Writing cluster auth state to ${AUTH_JSON_PATH}..."
+  write_auth_json
 
-  log "Configuring local Gradle Build Cache globals..."
+  log "Configuring Gradle Build Cache globals..."
   set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_URL "http://gradle-build-cache:5071/cache/" all
   set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_PUSH "true" all
 
@@ -658,9 +663,11 @@ main() {
   local target_server=0
   local target_node=0
   local pull_images_flag=1
-  local -a compose_services=(garage garage-init registry gradle-build-cache)
+  local existing_auth_secret=""
+  local -a compose_services=(gradle-build-cache)
 
   parse_args "$@"
+  init_cluster_paths
   resolve_ploy_version
   init_runtime_image_defaults
 
@@ -684,8 +691,8 @@ main() {
     echo "error: PLOY_DB_DSN is required (example: postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable)" >&2
     exit 1
   fi
-  if [[ -z "${PLOY_S3_URL:-}" || -z "${PLOY_S3_ACCESS_KEY:-}" || -z "${PLOY_S3_SECRET_KEY:-}" ]]; then
-    echo "error: PLOY_S3_URL, PLOY_S3_ACCESS_KEY, and PLOY_S3_SECRET_KEY are required" >&2
+  if [[ -z "${PLOY_OBJECTSTORE_ENDPOINT:-}" || -z "${PLOY_OBJECTSTORE_ACCESS_KEY:-}" || -z "${PLOY_OBJECTSTORE_SECRET_KEY:-}" ]]; then
+    echo "error: PLOY_OBJECTSTORE_ENDPOINT, PLOY_OBJECTSTORE_ACCESS_KEY, and PLOY_OBJECTSTORE_SECRET_KEY are required" >&2
     exit 1
   fi
 
@@ -702,25 +709,25 @@ main() {
     ensure_ploy_db_exists "$admin_pg_dsn"
   fi
 
-  if [[ ! -f "$AUTH_SECRET_PATH" ]]; then
-    log "Generating auth secret at $AUTH_SECRET_PATH..."
-    mkdir -p "$(dirname "$AUTH_SECRET_PATH")"
-    openssl rand -hex 32 > "$AUTH_SECRET_PATH"
+  if existing_auth_secret="$(read_auth_json_field auth_secret 2>/dev/null)"; then
+    PLOY_AUTH_SECRET="$existing_auth_secret"
+    log "Reusing auth secret from ${AUTH_JSON_PATH}."
+  else
+    log "Generating auth secret for cluster '${CLUSTER_ID}'..."
+    PLOY_AUTH_SECRET="$(openssl rand -hex 32)"
   fi
 
   export PLOY_AUTH_SECRET
-  PLOY_AUTH_SECRET="$(cat "$AUTH_SECRET_PATH")"
   export CLUSTER_ID
   export PLOY_DB_DSN
   PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
-  export PLOY_REGISTRY_PORT
   export PLOY_CA_CERTS
   export PLOY_CA_CERT_PATH
   export PLOY_CONTAINER_REGISTRY
   if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then
-    echo "error: PLOY_CONTAINER_REGISTRY is required (example: 127.0.0.1:${PLOY_REGISTRY_PORT}/ploy)" >&2
+    echo "error: PLOY_CONTAINER_REGISTRY is required (example: ghcr.io/iw2rmb)" >&2
     exit 1
   fi
 
@@ -760,19 +767,17 @@ main() {
   log "Starting runtime docker stack with: $COMPOSE_CMD up -d ${compose_services[*]}"
   $COMPOSE_CMD up -d "${compose_services[@]}"
 
-  wait_for_garage_bootstrap
-  wait_for_registry_health
   wait_for_server_health
 
   seed_tokens
   if [[ $target_node -eq 1 ]]; then
     seed_node_record
   fi
-  wire_local_cli_descriptor
+  configure_runtime_globals_and_persist_auth
 
   log "Runtime Ploy cluster is up."
-  log "Admin JWT (save securely):"
-  echo "$ADMIN_TOKEN"
+  log "Cluster auth state: ${AUTH_JSON_PATH}"
+  log "Admin JWT (save securely): ${ADMIN_TOKEN}"
 }
 
 main "$@"
