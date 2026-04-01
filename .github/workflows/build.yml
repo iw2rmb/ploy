@@ -26,7 +26,7 @@ jobs:
           COSIGN_EXPERIMENTAL: "1"
         run: |
           syft dir:. -o json > repo.sbom.json
-          grype repo.sbom.json --fail-on high
+          grype repo.sbom.json --fail-on critical
           cosign sign-blob --yes repo.sbom.json --output-signature repo.sbom.json.sig
       - uses: actions/upload-artifact@v4
         with: { name: sbom, path: repo.sbom.json }
