@@ -10,16 +10,15 @@ CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/ploy}"
-AUTH_JSON_PATH="${AUTH_JSON_PATH:-$HOME/.config/ploy/$CLUSTER_ID/auth.json}"
+AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
 PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
-PLOY_CA_CERT_PATH=""
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_VERSION="${PLOY_VERSION:-}"
-WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-$HOME/.config/ploy/$CLUSTER_ID/bearer-token}"
+WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-}"
 PULL_IMAGES="${PLOY_RUNTIME_PULL_IMAGES:-1}"
 
 DROP_DB=0
@@ -103,6 +102,28 @@ parse_args() {
     esac
     shift
   done
+}
+
+init_cluster_paths() {
+  local cfg_root
+  cfg_root="${PLOY_CONFIG_HOME}"
+  if [[ "$cfg_root" != /* ]]; then
+    cfg_root="$ROOT_DIR/$cfg_root"
+  fi
+
+  if [[ -z "$AUTH_JSON_PATH" ]]; then
+    AUTH_JSON_PATH="$cfg_root/$CLUSTER_ID/auth.json"
+  elif [[ "$AUTH_JSON_PATH" != /* ]]; then
+    AUTH_JSON_PATH="$ROOT_DIR/$AUTH_JSON_PATH"
+  fi
+
+  if [[ -z "$WORKER_TOKEN_PATH" ]]; then
+    WORKER_TOKEN_PATH="$cfg_root/$CLUSTER_ID/bearer-token"
+  elif [[ "$WORKER_TOKEN_PATH" != /* ]]; then
+    WORKER_TOKEN_PATH="$ROOT_DIR/$WORKER_TOKEN_PATH"
+  fi
+
+  PLOY_CONFIG_HOME="$cfg_root"
 }
 
 resolve_ploy_version() {
@@ -393,7 +414,6 @@ resolve_runtime_ca_bundle() {
 
   if [[ -z "$ca_path" ]]; then
     PLOY_CA_CERTS="/dev/null"
-    PLOY_CA_CERT_PATH=""
     return 0
   fi
 
@@ -410,7 +430,6 @@ resolve_runtime_ca_bundle() {
   fi
 
   PLOY_CA_CERTS="$ca_path"
-  PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.pem"
 }
 
 generate_tokens() {
@@ -503,6 +522,7 @@ payload = {
     "cluster_id": os.environ["CLUSTER_ID"],
     "node_id": os.environ["NODE_ID"],
     "address": os.environ["SERVER_URL"],
+    "token": os.environ["ADMIN_TOKEN"],
     "auth_secret": os.environ["PLOY_AUTH_SECRET"],
     "admin_token": os.environ["ADMIN_TOKEN"],
     "admin_token_id": os.environ["ADMIN_TOKEN_ID"],
@@ -516,6 +536,21 @@ print(json.dumps(payload, indent=2, sort_keys=True))
 PY
   chmod 600 "$tmp_file"
   mv "$tmp_file" "$AUTH_JSON_PATH"
+}
+
+set_default_auth_symlink() {
+  local default_link
+
+  default_link="$PLOY_CONFIG_HOME/default"
+  mkdir -p "$PLOY_CONFIG_HOME"
+
+  if [[ -d "$default_link" && ! -L "$default_link" ]]; then
+    echo "error: cannot set default cluster marker at ${default_link}: path is a directory" >&2
+    exit 1
+  fi
+
+  rm -f "$default_link"
+  ln -s "$AUTH_JSON_PATH" "$default_link"
 }
 
 provision_worker_token_into_node() {
@@ -633,6 +668,7 @@ configure_runtime_globals_and_persist_auth() {
 
   log "Writing cluster auth state to ${AUTH_JSON_PATH}..."
   write_auth_json
+  set_default_auth_symlink
 
   log "Configuring Gradle Build Cache globals..."
   set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_URL "http://gradle-build-cache:5071/cache/" all
@@ -654,6 +690,7 @@ main() {
   local -a compose_services=(gradle-build-cache)
 
   parse_args "$@"
+  init_cluster_paths
   resolve_ploy_version
   init_runtime_image_defaults
 
@@ -710,7 +747,6 @@ main() {
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
   export PLOY_CA_CERTS
-  export PLOY_CA_CERT_PATH
   export WORKER_TOKEN_PATH
   export PLOY_CONTAINER_REGISTRY
   if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then

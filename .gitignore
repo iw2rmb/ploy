@@ -91,3 +91,4 @@ lib/sb2to3/repos*
 lib/sb2to3/runs*
 
 .crush
+deploy/runtime/node/bearer-token
