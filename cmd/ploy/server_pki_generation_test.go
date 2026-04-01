@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/pem"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ func TestServerDeployCAGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateClusterID failed: %v", err)
 	}
-	if clusterID == "" || !strings.HasPrefix(clusterID, "cluster-") {
+	if clusterID == "" || !regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9]{4}$`).MatchString(clusterID) {
 		t.Fatalf("unexpected cluster ID: %q", clusterID)
 	}
 	now := time.Now()

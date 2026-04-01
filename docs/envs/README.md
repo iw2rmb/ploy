@@ -488,7 +488,7 @@ are stored in the object store.
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PLOY_OBJECTSTORE_ENDPOINT` | S3-compatible endpoint URL (e.g., `http://garage:3900`) | - |
-| `PLOY_OBJECTSTORE_BUCKET` | Bucket name for blob storage | - |
+| `PLOY_OBJECTSTORE_BUCKET` | Bucket name for blob storage | `${CLUSTER_ID:-local}` in runtime compose |
 | `PLOY_OBJECTSTORE_ACCESS_KEY` | Access key ID | - |
 | `PLOY_OBJECTSTORE_SECRET_KEY` | Secret access key | - |
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
@@ -502,7 +502,7 @@ Deploy scripts consume the following S3 envs and map them to server object store
 For local development, these are configured in the local compose stack. The local stack includes:
 - Garage service for S3-compatible storage.
 - `garage-init` bootstrap that creates/authorizes:
-  - `ploy` bucket (logs/diffs/artifacts blobs)
+  - `${CLUSTER_ID:-local}` bucket (logs/diffs/artifacts blobs)
   - `ploy-registry` bucket (OCI registry backing storage)
 - Local OCI registry (`registry`) backed by Garage S3 API.
 

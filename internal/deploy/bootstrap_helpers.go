@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	haikunator "github.com/atrox/haikunatorgo/v2"
 	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -59,14 +60,14 @@ func RandomHexString(length int) (string, error) {
 	return hexStr, nil
 }
 
-// GenerateClusterID creates a new cluster identifier using random bytes.
-// Returns a string in the format "cluster-<16 hex chars>".
+// GenerateClusterID creates a new human-readable cluster identifier.
+// Returns a Heroku-style value like "wispy-dust-1337".
 func GenerateClusterID() (string, error) {
-	hexPart, err := RandomHexString(16)
-	if err != nil {
-		return "", fmt.Errorf("generate cluster id: %w", err)
+	id := strings.TrimSpace(haikunator.New().Haikunate())
+	if id == "" {
+		return "", errors.New("generate cluster id: empty value")
 	}
-	return fmt.Sprintf("cluster-%s", hexPart), nil
+	return id, nil
 }
 
 // GenerateNodeID creates a new node identifier using NanoID(6).

@@ -1,9 +1,12 @@
 package deploy
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
+
+var clusterIDPattern = regexp.MustCompile(`^[a-z]+-[a-z]+-[0-9]{4}$`)
 
 func TestGenerateClusterID(t *testing.T) {
 	t.Run("generates valid cluster ID", func(t *testing.T) {
@@ -12,26 +15,12 @@ func TestGenerateClusterID(t *testing.T) {
 			t.Fatalf("GenerateClusterID() error = %v, want nil", err)
 		}
 
-		if !strings.HasPrefix(id, "cluster-") {
-			t.Errorf("GenerateClusterID() = %q, want prefix 'cluster-'", id)
+		if strings.TrimSpace(id) == "" {
+			t.Fatalf("GenerateClusterID() = %q, want non-empty", id)
 		}
 
-		// Expect format: cluster-<16 hex chars>
-		// Total length should be 8 ("cluster-") + 16 = 24
-		if len(id) != 24 {
-			t.Errorf("GenerateClusterID() length = %d, want 24", len(id))
-		}
-
-		// Extract hex part and validate it's hex
-		hexPart := strings.TrimPrefix(id, "cluster-")
-		if len(hexPart) != 16 {
-			t.Errorf("hex part length = %d, want 16", len(hexPart))
-		}
-
-		for _, c := range hexPart {
-			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
-				t.Errorf("invalid hex character %q in cluster ID %q", c, id)
-			}
+		if !clusterIDPattern.MatchString(id) {
+			t.Errorf("GenerateClusterID() = %q, want haikunator pattern adjective-noun-4digit token", id)
 		}
 	})
 

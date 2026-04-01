@@ -306,6 +306,11 @@ func TestExtractClusterIDFromCN(t *testing.T) {
 			wantID: "AbC123DeF",
 		},
 		{
+			name:   "valid format with hyphens",
+			cn:     "ployd-wispy-dust-1337",
+			wantID: "wispy-dust-1337",
+		},
+		{
 			name:   "invalid format - missing prefix",
 			cn:     "abc123def456",
 			wantID: "",
@@ -316,8 +321,8 @@ func TestExtractClusterIDFromCN(t *testing.T) {
 			wantID: "",
 		},
 		{
-			name:   "invalid format - special characters in ID",
-			cn:     "ployd-abc-123",
+			name:   "invalid format - unsupported separator in ID",
+			cn:     "ployd-abc_123",
 			wantID: "",
 		},
 		{
