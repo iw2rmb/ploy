@@ -47,3 +47,7 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 func (m *mockStore) CancelRunV1(ctx context.Context, runID domaintypes.RunID) error {
 	return nil
 }
+
+func (m *mockStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {
+	return nil
+}
