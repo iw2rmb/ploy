@@ -4,7 +4,7 @@ runner_mode: simple
 stack:
   language: go
   tool: go
-  release: "1.22"
+  release: "1.25"
 targets:
   active: all_tests
   build:

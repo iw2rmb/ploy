@@ -87,7 +87,7 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
 	profileJava := filepath.Join(root, "gates", "profiles", "java-17-maven.yaml")
 	profileGo := filepath.Join(root, "gates", "profiles", "go-1.25.8.yaml")
 	writeGateProfileYAML(t, profileJava, "default", "java", "maven", "17", "mvn -q test")
-	writeGateProfileYAML(t, profileGo, "default", "go", "go", "1.22", "go test ./...")
+	writeGateProfileYAML(t, profileGo, "default", "go", "go", "1.25", "go test ./...")
 
 	catalog := `stacks:
   - lang: java

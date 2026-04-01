@@ -8,7 +8,7 @@ import (
 
 func TestDetectGoMod_Go122(t *testing.T) {
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "go", "go122")
+	workspace := filepath.Join("testdata", "go", "go125")
 	goModPath := filepath.Join(workspace, goModuleFile)
 
 	obs, err := detectGo(ctx, workspace, goModPath)
@@ -16,13 +16,13 @@ func TestDetectGoMod_Go122(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assertObservation(t, obs, "go", "go", "1.22")
-	assertEvidence(t, obs, "go", "1.22")
+	assertObservation(t, obs, "go", "go", "1.25")
+	assertEvidence(t, obs, "go", "1.25")
 }
 
 func TestDetectGoMod_Go122Toolchain(t *testing.T) {
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "go", "go122-toolchain")
+	workspace := filepath.Join("testdata", "go", "go125-toolchain")
 	goModPath := filepath.Join(workspace, goModuleFile)
 
 	obs, err := detectGo(ctx, workspace, goModPath)
@@ -30,9 +30,9 @@ func TestDetectGoMod_Go122Toolchain(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assertObservation(t, obs, "go", "go", "1.22")
-	assertEvidence(t, obs, "go", "1.22")
-	assertEvidence(t, obs, "toolchain", "1.22.5")
+	assertObservation(t, obs, "go", "go", "1.25")
+	assertEvidence(t, obs, "go", "1.25")
+	assertEvidence(t, obs, "toolchain", "1.25.8")
 }
 
 func TestDetectGoMod_NoGoDirective(t *testing.T) {
