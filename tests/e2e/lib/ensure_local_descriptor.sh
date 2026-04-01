@@ -6,17 +6,16 @@ set -euo pipefail
 # deploy/runtime/run.sh.
 ensure_local_descriptor() {
   local repo_root="${1:?repo_root is required}"
-  local config_home="${2:?config_home is required}"
-  local clusters_dir="${config_home}/clusters"
-  local marker="${clusters_dir}/default"
+  local base_dir="${2:?config_home is required}"
+  local marker="${base_dir}/default"
   local descriptor_path=""
   local server_url=""
   local cluster_id="${CLUSTER_ID:-local}"
   local token=""
   local generated_tokens=""
 
-  if e2e_descriptor_marker_valid "$marker" "$clusters_dir"; then
-    descriptor_path="$(e2e_resolve_descriptor_path "$marker" "$clusters_dir")"
+  if e2e_descriptor_marker_valid "$marker" "$base_dir"; then
+    descriptor_path="$(e2e_resolve_descriptor_path "$marker" "$base_dir")"
     server_url="$(e2e_descriptor_value "$descriptor_path" "address")"
     token="$(e2e_descriptor_value "$descriptor_path" "token")"
     if token_works "$server_url" "$token"; then
@@ -38,7 +37,7 @@ ensure_local_descriptor() {
     # shellcheck disable=SC1090
     source "$generated_tokens"
     if [[ -n "${ADMIN_TOKEN:-}" ]]; then
-      write_descriptor "$clusters_dir" "$marker" "$cluster_id" "$server_url" "$ADMIN_TOKEN"
+      write_descriptor "$base_dir" "$marker" "$cluster_id" "$server_url" "$ADMIN_TOKEN"
       if token_works "$server_url" "$ADMIN_TOKEN"; then
         return 0
       fi
@@ -47,7 +46,7 @@ ensure_local_descriptor() {
   fi
 
   if token="$(mint_valid_local_admin_token "$server_url" "$cluster_id" "$repo_root")"; then
-    write_descriptor "$clusters_dir" "$marker" "$cluster_id" "$server_url" "$token"
+    write_descriptor "$base_dir" "$marker" "$cluster_id" "$server_url" "$token"
     return 0
   fi
 
@@ -58,7 +57,7 @@ ensure_local_descriptor() {
 
 e2e_descriptor_marker_valid() {
   local marker="$1"
-  local clusters_dir="$2"
+  local base_dir="$2"
 
   if [[ -f "$marker" ]]; then
     return 0
@@ -79,12 +78,12 @@ e2e_descriptor_marker_valid() {
     return
   fi
 
-  [[ -f "${clusters_dir}/${target}" ]]
+  [[ -f "${base_dir}/${target}" ]]
 }
 
 e2e_resolve_descriptor_path() {
   local marker="$1"
-  local clusters_dir="$2"
+  local base_dir="$2"
   local target=""
 
   if [[ -L "$marker" ]]; then
@@ -93,7 +92,7 @@ e2e_resolve_descriptor_path() {
       printf '%s\n' "$target"
       return
     fi
-    printf '%s\n' "${clusters_dir}/${target}"
+    printf '%s\n' "${base_dir}/${target}"
     return
   fi
 
@@ -118,21 +117,21 @@ PY
 }
 
 write_descriptor() {
-  local clusters_dir="$1"
+  local base_dir="$1"
   local marker="$2"
   local cluster_id="$3"
   local server_url="$4"
   local token="$5"
 
-  mkdir -p "$clusters_dir"
-  cat > "${clusters_dir}/local.json" <<JSON
+  mkdir -p "${base_dir}/${cluster_id}"
+  cat > "${base_dir}/${cluster_id}/auth.json" <<JSON
 {
   "cluster_id": "${cluster_id}",
   "address": "${server_url}",
   "token": "${token}"
 }
 JSON
-  ln -sf local.json "$marker"
+  ln -sf "${cluster_id}/auth.json" "$marker"
   echo "[e2e] Rebuilt default descriptor at ${marker}" >&2
 }
 

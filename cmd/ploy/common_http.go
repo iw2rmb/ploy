@@ -14,7 +14,7 @@ import (
 )
 
 // resolveControlPlaneHTTP selects the base URL and HTTP client using the
-// default cluster descriptor at ~/.config/ploy/clusters/default.
+// default cluster descriptor marker at ~/.config/ploy/default.
 // Returns a client configured for bearer token authentication.
 func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) {
 	// Load default cluster descriptor (required).

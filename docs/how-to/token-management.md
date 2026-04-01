@@ -131,8 +131,8 @@ For CI/CD pipelines, store the token as a secret and pass it via environment var
 ```yaml
 deploy:
   script:
-    - mkdir -p ~/.config/ploy/clusters
-    - echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/clusters/prod.json
+    - mkdir -p ~/.config/ploy/<cluster-id>
+    - echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/<cluster-id>/auth.json
     - ploy run --repo $CI_PROJECT_URL --base-ref main --target-ref ploy/$CI_PIPELINE_ID --spec mig.yaml --follow
   variables:
     PLOY_DESCRIPTOR: $PLOY_CLUSTER_DESCRIPTOR  # Set in GitLab CI/CD variables
@@ -142,8 +142,8 @@ deploy:
 ```yaml
 - name: Configure Ploy
   run: |
-    mkdir -p ~/.config/ploy/clusters
-    echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/clusters/prod.json
+    mkdir -p ~/.config/ploy
+    echo "$PLOY_DESCRIPTOR" > ~/.config/ploy/<cluster-id>/auth.json
   env:
     PLOY_DESCRIPTOR: ${{ secrets.PLOY_CLUSTER_DESCRIPTOR }}
 
@@ -169,7 +169,7 @@ In the local Docker cluster, the worker node uses a long-lived bearer token stor
 
 ### Token Storage
 
-- **Local development**: Store in `~/.config/ploy/clusters/<cluster-id>.json` with file permissions `0600`.
+- **Local development**: Store in `~/.config/ploy/<cluster-id>/auth.json` with file permissions `0600`.
 - **CI/CD**: Use CI/CD secret management (GitLab CI/CD variables, GitHub Secrets, etc.).
 - **Production servers**: Use a secrets management service (HashiCorp Vault, AWS Secrets Manager, etc.).
 

@@ -218,8 +218,8 @@ run_e2e_selftest() {
     fi
 
     # Check if cluster is configured
-    if [[ ! -d ~/.config/ploy/clusters/default ]]; then
-        log_warn "Skipping e2e selftest (no cluster configured at ~/.config/ploy/clusters/default)"
+    if [[ ! -d ~/.config/ploy/default ]]; then
+        log_warn "Skipping e2e selftest (no cluster configured at ~/.config/ploy/default)"
         return 0
     fi
 

@@ -19,7 +19,7 @@
 # - Multi-step execution continuing after successful healing
 #
 # Prerequisites:
-# - Cluster descriptor at ~/.config/ploy/clusters/default
+# - Cluster descriptor at ~/.config/ploy/default
 # - Codex auth at ~/.codex/auth.json (for healing)
 # - GitLab PAT for MR creation (optional)
 #
