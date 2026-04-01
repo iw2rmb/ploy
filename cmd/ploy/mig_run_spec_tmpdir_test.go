@@ -528,6 +528,50 @@ steps:
 	}
 }
 
+func TestBuildSpecPayload_TmpDir_RelativePathFromSpecDir(t *testing.T) {
+	srv, _ := newMockBundleServer(t)
+	defer srv.Close()
+	base := parsedBundleBase(t, srv)
+	client := srv.Client()
+
+	specDir := t.TempDir()
+	t.Chdir(t.TempDir())
+
+	if err := os.WriteFile(filepath.Join(specDir, "bundle-file.txt"), []byte("from-spec-dir"), 0o644); err != nil {
+		t.Fatalf("write bundle file: %v", err)
+	}
+
+	specPath := filepath.Join(specDir, "spec.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+    tmp_dir:
+      - name: bundle-file.txt
+        path: bundle-file.txt
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(context.Background(), base, client, specPath, nil, "", false, "", "", "", false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	steps := result["steps"].([]any)
+	step0 := steps[0].(map[string]any)
+	if _, hasTmpDir := step0["tmp_dir"]; hasTmpDir {
+		t.Errorf("expected 'tmp_dir' removed after bundle upload")
+	}
+	if _, hasTmpBundle := step0["tmp_bundle"]; !hasTmpBundle {
+		t.Fatalf("expected 'tmp_bundle' to be set after bundle upload")
+	}
+}
+
 // TestBuildSpecPayload_TmpDir_Mixed verifies mixed valid and invalid tmp_dir entries
 // across steps, router, and healing blocks.
 func TestBuildSpecPayload_TmpDir_Mixed(t *testing.T) {
@@ -846,8 +890,8 @@ func TestBuildSpecBundleArchive_DirectoryInput(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	files := map[string]string{
-		filepath.Join(mydir, "a.txt"):       "alpha",
-		filepath.Join(mydir, "b.txt"):       "beta",
+		filepath.Join(mydir, "a.txt"):        "alpha",
+		filepath.Join(mydir, "b.txt"):        "beta",
 		filepath.Join(mydir, "sub", "c.txt"): "gamma",
 	}
 	for path, content := range files {
@@ -857,7 +901,7 @@ func TestBuildSpecBundleArchive_DirectoryInput(t *testing.T) {
 	}
 
 	entries := []tmpDirEntry{{Name: "mydir", Path: mydir}}
-	archiveBytes, err := buildSpecBundleArchive(entries)
+	archiveBytes, err := buildSpecBundleArchive(entries, "")
 	if err != nil {
 		t.Fatalf("buildSpecBundleArchive: %v", err)
 	}
@@ -912,11 +956,11 @@ func TestBuildSpecBundleArchive_RepeatedRunsDeterminism(t *testing.T) {
 		{Name: "plain.txt", Path: plainFile},
 	}
 
-	first, err := buildSpecBundleArchive(entries)
+	first, err := buildSpecBundleArchive(entries, "")
 	if err != nil {
 		t.Fatalf("first run: %v", err)
 	}
-	second, err := buildSpecBundleArchive(entries)
+	second, err := buildSpecBundleArchive(entries, "")
 	if err != nil {
 		t.Fatalf("second run: %v", err)
 	}
@@ -957,13 +1001,13 @@ func TestBuildSpecBundleArchive_ShuffledInputDeterminism(t *testing.T) {
 		},
 	}
 
-	reference, err := buildSpecBundleArchive(orderings[0])
+	reference, err := buildSpecBundleArchive(orderings[0], "")
 	if err != nil {
 		t.Fatalf("reference archive: %v", err)
 	}
 
 	for i, entries := range orderings[1:] {
-		got, err := buildSpecBundleArchive(entries)
+		got, err := buildSpecBundleArchive(entries, "")
 		if err != nil {
 			t.Fatalf("ordering[%d]: %v", i+1, err)
 		}

@@ -39,7 +39,7 @@ type tmpDirEntry struct {
 // return a validation error so every declared entry is guaranteed to appear in the bundle.
 // All tar headers use zero timestamps for content-addressed determinism.
 // File permissions use 0o644 for files, 0o755 for directories.
-func buildSpecBundleArchive(entries []tmpDirEntry) ([]byte, error) {
+func buildSpecBundleArchive(entries []tmpDirEntry, specBaseDir string) ([]byte, error) {
 	// Sort entries by Name for determinism.
 	sorted := make([]tmpDirEntry, len(entries))
 	copy(sorted, entries)
@@ -52,7 +52,7 @@ func buildSpecBundleArchive(entries []tmpDirEntry) ([]byte, error) {
 	tw := tar.NewWriter(gzw)
 
 	for _, entry := range sorted {
-		resolved, err := resolvePath(entry.Path)
+		resolved, err := resolvePath(entry.Path, specBaseDir)
 		if err != nil {
 			return nil, fmt.Errorf("tmp_dir entry %q: resolve path: %w", entry.Name, err)
 		}
@@ -233,7 +233,7 @@ func uploadSpecBundle(ctx context.Context, base *url.URL, client *http.Client, a
 // If tmp_dir blocks are found but base is nil, returns a descriptive error.
 //
 // Processes: steps[], build_gate.router, build_gate.healing.by_error_kind.*
-func archiveAndUploadTmpDirsInPlace(ctx context.Context, base *url.URL, client *http.Client, spec map[string]any) error {
+func archiveAndUploadTmpDirsInPlace(ctx context.Context, base *url.URL, client *http.Client, spec map[string]any, specBaseDir string) error {
 	// Collect all blocks that have tmp_dir to check if we need client/base.
 	type blockRef struct {
 		block  map[string]any
@@ -283,7 +283,7 @@ func archiveAndUploadTmpDirsInPlace(ctx context.Context, base *url.URL, client *
 	}
 
 	for _, ref := range blocks {
-		if err := processTmpDirBlock(ctx, base, client, ref.block, ref.prefix); err != nil {
+		if err := processTmpDirBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir); err != nil {
 			return err
 		}
 	}
@@ -291,7 +291,7 @@ func archiveAndUploadTmpDirsInPlace(ctx context.Context, base *url.URL, client *
 }
 
 // processTmpDirBlock converts a single block's tmp_dir into a tmp_bundle reference.
-func processTmpDirBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix string) error {
+func processTmpDirBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string) error {
 	raw := block["tmp_dir"]
 	entriesRaw, ok := raw.([]any)
 	if !ok {
@@ -327,7 +327,7 @@ func processTmpDirBlock(ctx context.Context, base *url.URL, client *http.Client,
 		entries = append(entries, tmpDirEntry{Name: name, Path: path})
 	}
 
-	archiveBytes, err := buildSpecBundleArchive(entries)
+	archiveBytes, err := buildSpecBundleArchive(entries, specBaseDir)
 	if err != nil {
 		return fmt.Errorf("%s: build archive: %w", prefix, err)
 	}

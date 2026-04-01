@@ -770,6 +770,46 @@ steps:
 	assertAbsent(t, steps[1], "env_from_file")
 }
 
+func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
+	specDir := t.TempDir()
+	t.Chdir(t.TempDir())
+
+	writeFile(t, filepath.Join(specDir, "secret.txt"), "secret-from-spec-dir")
+	writeFile(t, filepath.Join(specDir, "router-fragment.yaml"), "image: docker.io/test/router-fragment:latest\n")
+	writeFile(t, filepath.Join(specDir, "infra-fragment.yaml"), "image: docker.io/test/healer-fragment:latest\n")
+	amataContent := "version: amata/v1\nname: rel-path\n"
+	writeFile(t, filepath.Join(specDir, "amata.yaml"), amataContent)
+
+	result := buildAndParseSpec(t, specDir, `
+env_from_file:
+  TOKEN: secret.txt
+steps:
+  - image: docker.io/test/mig:latest
+    amata:
+      spec: amata.yaml
+build_gate:
+  healing:
+    by_error_kind:
+      infra:
+        spec_path: infra-fragment.yaml
+  router:
+    spec_path: router-fragment.yaml
+`, ".yaml", specPayloadOpts{})
+
+	env := mustDig(t, result, "env")
+	assertField(t, env, "TOKEN", "secret-from-spec-dir")
+
+	steps := mustSteps(t, result, 1)
+	amata := mustDig(t, steps[0], "amata")
+	assertField(t, amata, "spec", amataContent)
+
+	infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
+	assertField(t, infra, "image", "docker.io/test/healer-fragment:latest")
+
+	router := mustDig(t, result, "build_gate", "router")
+	assertField(t, router, "image", "docker.io/test/router-fragment:latest")
+}
+
 func TestBuildSpecPayload_CanonicalSingleStepWithOverrides(t *testing.T) {
 	t.Parallel()
 	result := runBuildSpecPayload(t, `
