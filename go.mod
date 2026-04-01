@@ -3,6 +3,7 @@ module github.com/iw2rmb/ploy
 go 1.25.8
 
 require (
+	github.com/atrox/haikunatorgo/v2 v2.0.1
 	github.com/cenkalti/backoff/v5 v5.0.3
 	// NOTE: github.com/docker/docker removed — use moby Engine v29 SDK modules only.
 	github.com/docker/go-units v0.5.0

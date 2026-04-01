@@ -94,7 +94,7 @@ func DetectExisting(ctx context.Context, runner Runner, opts ProvisionOptions) (
 // Expected format: "ployd-<clusterID>"
 func extractClusterIDFromCN(cn string) string {
 	// Match pattern: ployd-<clusterID>
-	re := regexp.MustCompile(`^ployd-([a-zA-Z0-9]+)$`)
+	re := regexp.MustCompile(`^ployd-([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)$`)
 	matches := re.FindStringSubmatch(cn)
 	if len(matches) == 2 {
 		return matches[1]
