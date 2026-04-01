@@ -40,8 +40,7 @@ Optional overrides:
 
 ```bash
 export PLOY_SERVER_PORT=8080
-export PLOY_REGISTRY_PORT=5000
-export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT}/ploy"
+export PLOY_CONTAINER_REGISTRY="ghcr.io/iw2rmb/ploy"
 export PLOY_CA_CERTS='/absolute/path/to/ca-bundle.pem'
 export CLUSTER_ID='local'
 export NODE_ID='local1'
