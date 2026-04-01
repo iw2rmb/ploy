@@ -1,13 +1,13 @@
 [README.md](README.md) CLI package overview, usage notes, and development guidance for the ploy command.
-[autocomplete/](autocomplete) Shell completion scripts for bash, zsh, and fish integration.
 [assets/](assets) Embedded runtime deployment archive consumed by `ploy cluster deploy`.
+[autocomplete/](autocomplete) Shell completion scripts for bash, zsh, and fish integration.
 [autocomplete_test.go](autocomplete_test.go) Tests that validate autocomplete command wiring and generated completion output.
 [cli_test.go](cli_test.go) End-to-end CLI behavior tests covering root invocation and shared command setup.
+[cluster_command.go](cluster_command.go) Declares cluster-related CLI command tree and shared cluster command wiring.
+[cluster_command_test.go](cluster_command_test.go) Tests for cluster command registration, help, and argument handling.
 [cluster_deploy.go](cluster_deploy.go) Implements `ploy cluster deploy` via embedded runtime extract/execute/cleanup flow.
 [cluster_deploy_assets.go](cluster_deploy_assets.go) Embeds the runtime deployment archive used by cluster deploy.
 [cluster_deploy_test.go](cluster_deploy_test.go) Tests runtime deploy arg parsing, env defaults, execution, and cleanup.
-[cluster_command.go](cluster_command.go) Declares cluster-related CLI command tree and shared cluster command wiring.
-[cluster_command_test.go](cluster_command_test.go) Tests for cluster command registration, help, and argument handling.
 [commands_config.go](commands_config.go) Registers configuration command group and connects config subcommands.
 [commands_mig.go](commands_mig.go) Registers migration command group and hooks MIG command modules.
 [commands_pull.go](commands_pull.go) Defines pull command entrypoints and maps pull-related subcommands.
