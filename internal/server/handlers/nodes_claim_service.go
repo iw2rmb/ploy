@@ -105,15 +105,6 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	}
 
 	claimDecision := lifecycle.EvaluateClaimDecision(domaintypes.JobType(job.JobType), rr.Status)
-	if claimDecision.AdvanceRunRepoToRunning {
-		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
-			RunID:  job.RunID,
-			RepoID: job.RepoID,
-			Status: domaintypes.RunRepoStatusRunning,
-		}); err != nil {
-			slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
-		}
-	}
 
 	repoURL, err := repoURLForID(ctx, s.store, job.RepoID)
 	if err != nil {
@@ -130,7 +121,22 @@ func (s *ClaimService) Claim(ctx context.Context, nodeID domaintypes.NodeID) (Cl
 	payload, err := buildClaimResponsePayload(ctx, s.store, s.configHolder, run, spec.Spec, rr, repoURL, job, s.gateResolver)
 	if err != nil {
 		slog.Error("claim: failed to build response", "job_id", job.ID, "run_id", run.ID, "err", err)
+		if unclaimErr := s.store.UnclaimJob(ctx, store.UnclaimJobParams{
+			ID:     job.ID,
+			NodeID: nodeID,
+		}); unclaimErr != nil {
+			slog.Error("claim: failed to unclaim job after payload build error", "job_id", job.ID, "run_id", run.ID, "node_id", nodeID, "err", unclaimErr)
+		}
 		return ClaimResult{}, claimInternal("failed to build claim response", err)
+	}
+	if claimDecision.AdvanceRunRepoToRunning {
+		if err := s.store.UpdateRunRepoStatus(ctx, store.UpdateRunRepoStatusParams{
+			RunID:  job.RunID,
+			RepoID: job.RepoID,
+			Status: domaintypes.RunRepoStatusRunning,
+		}); err != nil {
+			slog.Error("claim: failed to transition run repo to Running", "node_id", nodeID, "job_id", job.ID, "run_id", job.RunID, "repo_id", job.RepoID, "err", err)
+		}
 	}
 
 	slog.Info("job claimed",

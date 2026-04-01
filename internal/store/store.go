@@ -22,6 +22,7 @@ var ErrInvalidJSON = errors.New("store: invalid JSON for JSONB column")
 type Store interface {
 	Querier
 	CancelRunV1(ctx context.Context, runID types.RunID) error
+	UnclaimJob(ctx context.Context, arg UnclaimJobParams) error
 	Close()
 	Pool() *pgxpool.Pool
 }
@@ -30,6 +31,12 @@ type Store interface {
 type PgStore struct {
 	pool *pgxpool.Pool
 	*Queries
+}
+
+// UnclaimJobParams identifies a running claimed job assignment to revert.
+type UnclaimJobParams struct {
+	ID     types.JobID
+	NodeID types.NodeID
 }
 
 // NewStore creates a new Store by establishing a connection pool to the PostgreSQL database.
@@ -135,6 +142,30 @@ func (s *PgStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (Job, error
 		return Job{}, ErrEmptyNodeID
 	}
 	return s.Queries.ClaimJob(ctx, nodeID)
+}
+
+// UnclaimJob reverts a claimed Running job back to claimable Queued state.
+// The update is guarded by both job ID and node ID to avoid stealing claims.
+func (s *PgStore) UnclaimJob(ctx context.Context, arg UnclaimJobParams) error {
+	if arg.ID.IsZero() {
+		return errors.New("store: UnclaimJob requires non-empty job ID")
+	}
+	if arg.NodeID.IsZero() {
+		return errors.New("store: UnclaimJob requires non-empty node ID")
+	}
+	_, err := s.pool.Exec(ctx, `
+UPDATE jobs
+SET status = 'Queued',
+    node_id = NULL,
+    started_at = NULL
+WHERE id = $1
+  AND node_id = $2
+  AND status = 'Running'
+`, arg.ID, arg.NodeID)
+	if err != nil {
+		return fmt.Errorf("unclaim job: %w", err)
+	}
+	return nil
 }
 
 // validateJSONB validates that non-empty byte slices contain valid JSON.
