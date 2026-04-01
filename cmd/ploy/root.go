@@ -75,7 +75,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 
 	// Server, node, rollout, and token management commands
 	// NOTE: `ploy server`, `ploy node`, `ploy rollout`, and `ploy token` have been removed as top-level commands.
-	// Server deployment is now accessible only via `ploy cluster deploy`.
+	// Runtime deployment is accessible via `ploy cluster deploy`.
 	// Node operations are now accessible only via `ploy cluster node`.
 	// Rollout operations are now accessible only via `ploy cluster rollout`.
 	// Token operations are now accessible only via `ploy cluster token`.

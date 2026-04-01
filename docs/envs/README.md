@@ -718,7 +718,6 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - [Migs lifecycle](../migs-lifecycle.md) — Server/node execution and orchestration flow
 - [Testing workflow](../testing-workflow.md) — Go testing workflow and local validation commands
 - [Local deployment](../how-to/deploy-locally.md) — Local Docker cluster
-- [Offline VPS deployment](../how-to/deploy-vps-offline.md) — Offline SSH deployment of the local stack to a VPS
 
 ## Build Gate Limits
 

@@ -38,7 +38,7 @@ verify-go-toolchain: ## Fail fast when local Go toolchain is not pinned version
 	fi
 
 .PHONY: build
-build: verify-go-toolchain verify-version ## Build the CLI/server/node binaries
+build: verify-go-toolchain verify-version package-runtime-assets ## Build the CLI/server/node binaries
 	@mkdir -p $(BUILD_DIR)
 	GOFLAGS= go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
 	@if [ -d ./cmd/ployd ]; then \
@@ -53,6 +53,13 @@ build: verify-go-toolchain verify-version ## Build the CLI/server/node binaries
 		1|true|TRUE|yes|YES|on|ON) $(MAKE) sign-binaries VERSION="$(VERSION)" ;; \
 		*) ;; \
 	esac
+
+.PHONY: package-runtime-assets
+package-runtime-assets: ## Pack embedded runtime deploy archive for ploy cluster deploy
+	@mkdir -p cmd/ploy/assets
+	@cd deploy/runtime && \
+		find . -type f ! -name 'contents.md' | LC_ALL=C sort | \
+		tar -czf ../../cmd/ploy/assets/runtime.tgz -T -
 
 .PHONY: sign-binaries
 sign-binaries: verify-version ## Sign dist binaries with cosign (keyless or key-based)
@@ -187,6 +194,7 @@ help: ## Show available targets
 	@echo "  make sign-binaries              # Sign dist binaries with cosign"
 	@echo "  make verify-version             # Enforce semver VERSION (vX.Y.Z)"
 	@echo "  make verify-go-toolchain        # Enforce pinned local Go toolchain ($(REQUIRED_GO_TOOLCHAIN))"
+	@echo "  make package-runtime-assets     # Pack embedded runtime deploy archive for cluster deploy"
 	@echo "  make fmt                        # Run gofmt over Go source"
 	@echo "  make test                       # Run unit tests"
 	@echo "  make test-race                  # Run tests with race detector"
