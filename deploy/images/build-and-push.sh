@@ -9,6 +9,8 @@ set -Eeuo pipefail
 # - codex   -> codex
 # - amata   -> amata
 # - shell   -> shell
+# - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
+# - maven mirrors -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
 #
 # Inputs (env):
@@ -96,6 +98,31 @@ build_push_orw() {
   build_push "$image_name" "$dockerfile" "."
 }
 
+build_push_fixed_tag() {
+  local image_name="$1"
+  local dockerfile="$2"
+  local context="$3"
+  local tag="$4"
+  local ref="${IMAGE_PREFIX}/${image_name}:${tag}"
+
+  echo "==> Building ${ref} (df=${dockerfile}, ctx=${context}, platform=${PLATFORM})"
+  docker buildx build \
+    --platform "${PLATFORM}" \
+    --provenance=false --sbom=false --pull \
+    --label "org.opencontainers.image.version=${VERSION}" \
+    --label "org.opencontainers.image.revision=${GIT_COMMIT}" \
+    -f "${dockerfile}" \
+    -t "${ref}" \
+    --push "${context}" --progress=plain
+}
+
+mirror_remote_image() {
+  local source_ref="$1"
+  local target_ref="$2"
+  echo "==> Mirroring ${source_ref} -> ${target_ref}"
+  docker buildx imagetools create -t "${target_ref}" "${source_ref}" >/dev/null
+}
+
 # server
 build_push server deploy/images/server/Dockerfile .
 
@@ -111,6 +138,14 @@ build_push amata deploy/images/amata/Dockerfile .
 
 # shell
 build_push shell deploy/images/shell/Dockerfile deploy/images/shell
+
+# build gate (gradle)
+build_push_fixed_tag gate-gradle deploy/images/gates/gradle/Dockerfile.jdk11 deploy/images/gates/gradle jdk11
+build_push_fixed_tag gate-gradle deploy/images/gates/gradle/Dockerfile.jdk17 deploy/images/gates/gradle jdk17
+
+# build gate (maven mirrors)
+mirror_remote_image docker.io/library/maven:3-eclipse-temurin-11 "${IMAGE_PREFIX}/maven:3-eclipse-temurin-11"
+mirror_remote_image docker.io/library/maven:3-eclipse-temurin-17 "${IMAGE_PREFIX}/maven:3-eclipse-temurin-17"
 
 # orw
 orw_dirs=()

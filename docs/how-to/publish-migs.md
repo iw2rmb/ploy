@@ -17,12 +17,23 @@ Local Registry Prerequisites
 Publish all Migs images
 ```bash
 deploy/images/build-and-push.sh
-# Builds and pushes: amata, codex, shell, orw-cli-maven, orw-cli-gradle.
+# Builds and pushes: amata, codex, shell, orw-cli-maven, orw-cli-gradle,
+# gate-gradle:jdk11, gate-gradle:jdk17.
+# Also mirrors Maven gate bases into your registry namespace:
+# maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17.
 # Also builds/pushes runtime images: server and node.
 ```
 
 There is no separate registry sync helper script. Publish explicitly via `build-and-push.sh`
 or targeted `docker buildx build ... --push` commands.
+
+Build Gate image mapping source of truth:
+- `gates/stacks.yaml`
+- Java defaults expect:
+  - `${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk11`
+  - `${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk17`
+  - `${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-11`
+  - `${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17`
 
 Custom CA support is runtime-only. Do not inject corporate certs during image build.
 Use `PLOY_CA_CERTS` at deployment/runtime so the same bundle is mounted into runtime
