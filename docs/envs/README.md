@@ -58,8 +58,8 @@ defaults change, or components adopt additional configuration.
   Default: `ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}`.
 - `WORKER_TOKEN_PATH` — Optional host path used by local deploy scripts to persist the worker bearer
   token and mounted into the node container at `/etc/ploy/bearer-token`.
-  Default: `node/bearer-token` under the local deploy workspace (file path). If this path is a directory, scripts
-  replace it with a file automatically.
+  Default: `<PLOY_CONFIG_HOME>/<cluster>/bearer-token` (for example `~/.config/ploy/local/bearer-token`).
+  If this path is a directory, scripts replace it with a file automatically.
 - `PLOY_CONTAINER_SOCKET_PATH` — Optional host socket path mounted into the local
   `node` container at `/var/run/docker.sock`.
   Docker script default: `/var/run/docker.sock`.
@@ -212,7 +212,7 @@ Repo metadata (injected from StartRunRequest):
 Server connection details:
 - `PLOY_SERVER_URL` — Control plane base URL (e.g., `https://<server>:8443`)
 - `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
-- `PLOY_CA_CERT_PATH` — Path to CA certificate inside healing container (`/etc/ploy/certs/ca.crt`)
+- `PLOY_CA_CERTS` — Path to CA certificate inside healing container (`/etc/ploy/certs/ca.crt`)
 - `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
 - `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
