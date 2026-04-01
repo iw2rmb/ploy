@@ -6,14 +6,13 @@ Overview
   - `orw-cli-gradle` (`deploy/images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
   - `codex` (`deploy/images/codex`) -> `codex`
   - `amata` (`deploy/images/amata`) -> `amata`
-- Local default registry prefix is `127.0.0.1:5000/ploy`.
-- The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
+ghcr.io/iw2rmb- The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Local Registry Prerequisites
 - Deploy the local stack:
   - `deploy/runtime/run.sh`
 - Export the registry prefix for specs/scripts:
-  - `export PLOY_CONTAINER_REGISTRY=127.0.0.1:5000/ploy`
+  - `export PLOY_CONTAINER_REGISTRY=ghcr.io/iw2rmb/ploy`
 
 Publish all Migs images
 ```bash
@@ -31,7 +30,7 @@ containers and propagated as `CA_CERTS_PEM_BUNDLE`.
 
 Publish a single Migs image (example: orw-cli-maven)
 ```bash
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}" \
   docker buildx build --platform linux/amd64 \
   -f deploy/images/orw/orw-cli-maven/Dockerfile \
   -t "${IMAGE_PREFIX}/orw-cli-maven:latest" \
@@ -41,7 +40,7 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}" \
 Publish `codex` (manual one-off)
 
 ```bash
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
 docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/codex/Dockerfile \
@@ -56,7 +55,7 @@ Publish `amata` (manual one-off)
 PLATFORM=linux/amd64 deploy/images/amata/build-amata.sh
 
 # Step 2: build and push the amata image
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-127.0.0.1:5000/ploy}"
+IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
 docker buildx build \
   --platform linux/amd64 \
   -f deploy/images/amata/Dockerfile \

@@ -76,6 +76,7 @@ local/**
 
 # VPS
 deploy/vps/docker-compose-linux-x86_64
+deploy/vps/auth-secret.txt
 
 /ploy
 /ployd
