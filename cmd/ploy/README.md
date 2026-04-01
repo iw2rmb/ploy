@@ -608,7 +608,7 @@ build_gate:
   healing:
     by_error_kind:
       infra:
-        spec_path: ./lib/healing/infra/spec.yaml
+        spec_path: ./healing/infra/spec.yaml
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
         command: ["codex", "--input", "/workspace", "--out", "/out"]
