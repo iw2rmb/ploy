@@ -62,10 +62,10 @@ Check:
 **Solution**:
 1. Ensure the CLI descriptor contains a valid token:
    ```bash
-   cat "${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/clusters/default"
+   cat "${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default"
    # Should show the cluster ID
 
-   cat "${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/clusters/<cluster-id>.json"
+   cat "${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/<cluster-id>/auth.json"
    # Should contain "token": "eyJ..."
    ```
 
@@ -79,7 +79,7 @@ Check:
 
 3. Update the descriptor:
    ```bash
-   # Edit ~/.config/ploy/clusters/<cluster-id>.json
+   # Edit ~/.config/ploy/<cluster-id>/auth.json
    {
      "cluster_id": "alpha-cluster",
      "address": "https://ploy.example.com",

@@ -9,7 +9,7 @@
 - Local Docker cluster deployed via `deploy/runtime/run.sh`.
 - CLI configured for the local cluster:
   - `export PLOY_CONFIG_HOME="$HOME/.config/ploy/local"`
-  - Scenario scripts auto-rebuild/repair `clusters/default` and validate the bearer token before run submission.
+  - Scenario scripts auto-rebuild/repair `default` and validate the bearer token before run submission.
   - Repair first tries `deploy/runtime/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
   - If both descriptor and token seed are missing, rerun `deploy/runtime/run.sh`.
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
