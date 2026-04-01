@@ -64,7 +64,7 @@ defaults change, or components adopt additional configuration.
   `node` container at `/var/run/docker.sock`.
   Docker script default: `/var/run/docker.sock`.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
-  default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
+  default descriptor at `~/.config/ploy/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
   descriptor specifies HTTPS.
 - `PLOY_BUILDGATE_TIMEOUT` — Optional maximum duration for Build Gate HTTP polling (e.g., `5m`). When the request
   context has no deadline, HTTP-based gate executors use this value as the polling timeout; defaults to `10m` when unset or invalid.
@@ -75,7 +75,7 @@ defaults change, or components adopt additional configuration.
   (and `PLOY_CONFIG_HOME` is not), the CLI uses `$XDG_CONFIG_HOME/ploy` for cluster
   descriptor storage. Falls back to `~/.config/ploy` when both are unset.
 
-Local cluster descriptors (written under `~/.config/ploy/clusters/`) now use bearer token authentication:
+Local cluster descriptors (written under `~/.config/ploy/{cluster}/`) now use bearer token authentication:
 - `token` — Bearer token for authenticating with the control plane. Generate using `ploy cluster token create`.
 
 Role model (bearer token claims):
