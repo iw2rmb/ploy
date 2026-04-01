@@ -36,11 +36,11 @@ func normalizeModsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 		}
 	}
-	if err := preprocessModsSpecInPlace(raw); err != nil {
+	if err := preprocessModsSpecInPlace(raw, ""); err != nil {
 		return nil, err
 	}
 
-	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, raw); err != nil {
+	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, raw, ""); err != nil {
 		return nil, err
 	}
 
@@ -56,16 +56,16 @@ func normalizeModsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 	return jsonBytes, nil
 }
 
-func preprocessModsSpecInPlace(spec map[string]any) error {
-	if err := resolveBuildGateSpecPathInPlace(spec); err != nil {
+func preprocessModsSpecInPlace(spec map[string]any, specBaseDir string) error {
+	if err := resolveBuildGateSpecPathInPlace(spec, specBaseDir); err != nil {
 		return fmt.Errorf("resolve spec_path (build_gate): %w", err)
 	}
-	if err := resolveAmataSpecPathInPlace(spec); err != nil {
+	if err := resolveAmataSpecPathInPlace(spec, specBaseDir); err != nil {
 		return fmt.Errorf("resolve amata.spec path: %w", err)
 	}
 
 	// Resolve env_from_file references in the canonical top-level env block.
-	if err := resolveEnvFromFileInPlace(spec); err != nil {
+	if err := resolveEnvFromFileInPlace(spec, specBaseDir); err != nil {
 		return fmt.Errorf("resolve env from file (top-level): %w", err)
 	}
 
@@ -78,14 +78,14 @@ func preprocessModsSpecInPlace(spec map[string]any) error {
 					if !ok {
 						continue
 					}
-					if err := resolveEnvFromFileInPlace(action); err != nil {
+					if err := resolveEnvFromFileInPlace(action, specBaseDir); err != nil {
 						return fmt.Errorf("resolve env from file (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
 					}
 				}
 			}
 		}
 		if router, ok := bg["router"].(map[string]any); ok {
-			if err := resolveEnvFromFileInPlace(router); err != nil {
+			if err := resolveEnvFromFileInPlace(router, specBaseDir); err != nil {
 				return fmt.Errorf("resolve env from file (build_gate.router): %w", err)
 			}
 		}
@@ -95,7 +95,7 @@ func preprocessModsSpecInPlace(spec map[string]any) error {
 	if steps, ok := spec["steps"].([]any); ok {
 		for i, s := range steps {
 			if stepEntry, ok := s.(map[string]any); ok {
-				if err := resolveEnvFromFileInPlace(stepEntry); err != nil {
+				if err := resolveEnvFromFileInPlace(stepEntry, specBaseDir); err != nil {
 					return fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
 				}
 			}
@@ -105,7 +105,11 @@ func preprocessModsSpecInPlace(spec map[string]any) error {
 	return nil
 }
 
-func resolvePath(path string) (string, error) {
+func resolvePath(path string, baseDir ...string) (string, error) {
+	resolvedBaseDir := ""
+	if len(baseDir) > 0 {
+		resolvedBaseDir = baseDir[0]
+	}
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
 		return "", fmt.Errorf("path is empty")
@@ -120,6 +124,9 @@ func resolvePath(path string) (string, error) {
 			return "", fmt.Errorf("resolve home dir for path %s: %w", expanded, err)
 		}
 		return filepath.Join(home, expanded[2:]), nil
+	}
+	if !filepath.IsAbs(expanded) && strings.TrimSpace(resolvedBaseDir) != "" {
+		return filepath.Join(resolvedBaseDir, expanded), nil
 	}
 	return expanded, nil
 }
@@ -137,8 +144,8 @@ func parseSpecObject(data []byte) (map[string]any, error) {
 	return obj, nil
 }
 
-func readSpecObjectFromPath(path string) (map[string]any, error) {
-	resolved, err := resolvePath(path)
+func readSpecObjectFromPath(path string, specBaseDir string) (map[string]any, error) {
+	resolved, err := resolvePath(path, specBaseDir)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +182,7 @@ func deepMergeObjects(base, overlay map[string]any) map[string]any {
 	return out
 }
 
-func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
+func resolveBuildGateSpecPathInPlace(spec map[string]any, specBaseDir string) error {
 	bg, ok := spec["build_gate"].(map[string]any)
 	if !ok {
 		return nil
@@ -196,7 +203,7 @@ func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
 				if !ok {
 					return fmt.Errorf("%s.spec_path: expected string path, got %T", errorKind, specPathValue)
 				}
-				fragment, err := readSpecObjectFromPath(specPath)
+				fragment, err := readSpecObjectFromPath(specPath, specBaseDir)
 				if err != nil {
 					return fmt.Errorf("%s.spec_path: %w", errorKind, err)
 				}
@@ -220,7 +227,7 @@ func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
 	if !ok {
 		return fmt.Errorf("router.spec_path: expected string path, got %T", specPathValue)
 	}
-	fragment, err := readSpecObjectFromPath(specPath)
+	fragment, err := readSpecObjectFromPath(specPath, specBaseDir)
 	if err != nil {
 		return fmt.Errorf("router.spec_path: %w", err)
 	}
@@ -231,14 +238,14 @@ func resolveBuildGateSpecPathInPlace(spec map[string]any) error {
 
 // resolveAmataSpecPathInPlace loads amata.spec from file paths and replaces each
 // path with the file content so typed validation/runtime receive canonical spec text.
-func resolveAmataSpecPathInPlace(spec map[string]any) error {
+func resolveAmataSpecPathInPlace(spec map[string]any, specBaseDir string) error {
 	if steps, ok := spec["steps"].([]any); ok {
 		for i, raw := range steps {
 			stepSpec, ok := raw.(map[string]any)
 			if !ok {
 				continue
 			}
-			if err := resolveAmataSpecInSection(stepSpec, fmt.Sprintf("steps[%d].amata", i)); err != nil {
+			if err := resolveAmataSpecInSection(stepSpec, fmt.Sprintf("steps[%d].amata", i), specBaseDir); err != nil {
 				return err
 			}
 		}
@@ -250,7 +257,7 @@ func resolveAmataSpecPathInPlace(spec map[string]any) error {
 	}
 
 	if router, ok := bg["router"].(map[string]any); ok {
-		if err := resolveAmataSpecInSection(router, "build_gate.router.amata"); err != nil {
+		if err := resolveAmataSpecInSection(router, "build_gate.router.amata", specBaseDir); err != nil {
 			return err
 		}
 	}
@@ -262,7 +269,7 @@ func resolveAmataSpecPathInPlace(spec map[string]any) error {
 				if !ok {
 					continue
 				}
-				if err := resolveAmataSpecInSection(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.amata", errorKind)); err != nil {
+				if err := resolveAmataSpecInSection(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.amata", errorKind), specBaseDir); err != nil {
 					return err
 				}
 			}
@@ -271,7 +278,7 @@ func resolveAmataSpecPathInPlace(spec map[string]any) error {
 	return nil
 }
 
-func resolveAmataSpecInSection(section map[string]any, prefix string) error {
+func resolveAmataSpecInSection(section map[string]any, prefix, specBaseDir string) error {
 	amataRaw, hasAmata := section["amata"]
 	if !hasAmata {
 		return nil
@@ -290,7 +297,7 @@ func resolveAmataSpecInSection(section map[string]any, prefix string) error {
 		return fmt.Errorf("%s.spec: expected string path, got %T", prefix, specRaw)
 	}
 
-	resolvedPath, err := resolvePath(specPath)
+	resolvedPath, err := resolvePath(specPath, specBaseDir)
 	if err != nil {
 		return fmt.Errorf("%s.spec: %w", prefix, err)
 	}
@@ -304,8 +311,8 @@ func resolveAmataSpecInSection(section map[string]any, prefix string) error {
 
 // resolveEnvFromFile reads a file path (expanding ~) and returns its content as a string.
 // File content is treated as sensitive, so any errors redact the file path for security.
-func resolveEnvFromFile(path string) (string, error) {
-	path, err := resolvePath(path)
+func resolveEnvFromFile(path string, specBaseDir ...string) (string, error) {
+	path, err := resolvePath(path, specBaseDir...)
 	if err != nil {
 		return "", err
 	}
@@ -326,7 +333,7 @@ func resolveEnvFromFile(path string) (string, error) {
 // 2. Inline syntax within env: {"env": {"KEY": {"from_file": "/path/to/file"}}}
 //
 // Values from env take precedence over env_from_file.
-func resolveEnvFromFileInPlace(spec map[string]any) error {
+func resolveEnvFromFileInPlace(spec map[string]any, specBaseDir ...string) error {
 	// Prepare the merged env map
 	mergedEnv := make(map[string]any)
 
@@ -338,7 +345,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 			if !ok {
 				return fmt.Errorf("env_from_file[%s]: expected string path, got %T", k, v)
 			}
-			content, err := resolveEnvFromFile(path)
+			content, err := resolveEnvFromFile(path, specBaseDir...)
 			if err != nil {
 				return fmt.Errorf("env_from_file[%s]: %w", k, err)
 			}
@@ -348,7 +355,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 		delete(spec, "env_from_file")
 	case map[string]string:
 		for k, path := range envFromFile {
-			content, err := resolveEnvFromFile(path)
+			content, err := resolveEnvFromFile(path, specBaseDir...)
 			if err != nil {
 				return fmt.Errorf("env_from_file[%s]: %w", k, err)
 			}
@@ -372,7 +379,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 			case map[string]any:
 				// Check for {from_file: "path"} syntax
 				if fromFile, ok := val["from_file"].(string); ok {
-					content, err := resolveEnvFromFile(fromFile)
+					content, err := resolveEnvFromFile(fromFile, specBaseDir...)
 					if err != nil {
 						return fmt.Errorf("env[%s].from_file: %w", k, err)
 					}
@@ -382,7 +389,7 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 				}
 			case map[string]string:
 				if fromFile, ok := val["from_file"]; ok {
-					content, err := resolveEnvFromFile(fromFile)
+					content, err := resolveEnvFromFile(fromFile, specBaseDir...)
 					if err != nil {
 						return fmt.Errorf("env[%s].from_file: %w", k, err)
 					}
@@ -486,7 +493,9 @@ func buildSpecPayload(
 
 	// Start with spec from file (if provided)
 	var specMap map[string]any
+	specBaseDir := ""
 	if specFile != "" {
+		specBaseDir = filepath.Dir(specFile)
 		data, err := os.ReadFile(specFile)
 		if err != nil {
 			return nil, fmt.Errorf("read spec file %s: %w", specFile, err)
@@ -502,11 +511,11 @@ func buildSpecPayload(
 		specMap = make(map[string]any)
 	}
 
-	if err := preprocessModsSpecInPlace(specMap); err != nil {
+	if err := preprocessModsSpecInPlace(specMap, specBaseDir); err != nil {
 		return nil, err
 	}
 
-	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, specMap); err != nil {
+	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
 		return nil, err
 	}
 
