@@ -279,7 +279,7 @@ This makes gate health visible without requiring raw artifact inspection.
 **Troubleshooting**
 
 - Images not found / pull errors:
-  - Ensure images are pushed to the configured `$PLOY_CONTAINER_REGISTRY` (local default: `localhost:5000/ploy`) and the node host Docker daemon can pull them.
+  - Ensure images are pushed to the configured `$PLOY_CONTAINER_REGISTRY` (default: `ghcr.io/iw2rmb/ploy`) and the node host Docker daemon can pull them.
   - If you switch to a private remote registry, provide pull auth via `DOCKER_AUTH_CONFIG`/`PLOY_DOCKER_AUTH_CONFIG`.
 - Git access / MR creation:
   - Export `PLOY_GITLAB_PAT` and confirm the control plane has connectivity to GitLab. The sample repo is public for read; MRs require auth for branch writes.

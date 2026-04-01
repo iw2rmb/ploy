@@ -10,7 +10,7 @@ source "${SCRIPT_DIR}/../lib/harness.sh"
 e2e_init "${BASH_SOURCE[0]}"
 e2e_artifacts_init "$REPO_ROOT/tmp/migs/orw-cli"
 
-: "${PLOY_CONTAINER_REGISTRY:?PLOY_CONTAINER_REGISTRY is required (example: localhost:5000/ploy)}"
+: "${PLOY_CONTAINER_REGISTRY:?PLOY_CONTAINER_REGISTRY is required (example: ghcr.io/iw2rmb/ploy)}"
 
 REPO="${PLOY_E2E_REPO_OVERRIDE:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 TARGET_REF="e2e/success"

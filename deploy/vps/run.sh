@@ -11,7 +11,7 @@ REMOTE_ROOT="$REMOTE_HOME/opt/ploy"
 REMOTE_APP_DIR="${REMOTE_ROOT}"
 REMOTE_IMAGES_TAR="$REMOTE_HOME/tmp/ploy-images.tar"
 
-SSH_TARGET="s_v.v.kovalev@10.120.34.186"
+SSH_TARGET="s_v.v.kovalev@$REMOTE_HOST"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
 #PLOY_DB_DSN="postgres://$REMOTE_USER@host.docker.internal/ploy"
@@ -695,69 +695,6 @@ ensure_ploy_db_exists() {
   psql "$admin_dsn" -v ON_ERROR_STOP=1 -qX -c "CREATE DATABASE ploy;" >/dev/null
 }
 
-wait_for_registry_health() {
-  for i in {1..90}; do
-    if python3 <<PY >/dev/null 2>&1
-import sys
-import urllib.error
-import urllib.request
-
-try:
-    with urllib.request.urlopen("http://127.0.0.1:${PLOY_REGISTRY_PORT}/v2/", timeout=2) as resp:
-        sys.exit(0 if 200 <= resp.status < 500 else 1)
-except urllib.error.HTTPError as e:
-    sys.exit(0 if 200 <= e.code < 500 else 1)
-except Exception:
-    sys.exit(1)
-PY
-    then
-      return 0
-    fi
-    sleep 1
-  done
-
-  echo "error: registry did not become ready in time" >&2
-  "${COMPOSE_CMD[@]}" ps || true
-  "${COMPOSE_CMD[@]}" logs registry || true
-  exit 1
-}
-
-wait_for_garage_bootstrap() {
-  local garage_cid garage_init_cid garage_health init_state init_exit
-
-  garage_cid="$("${COMPOSE_CMD[@]}" ps -a -q garage)"
-  garage_init_cid="$("${COMPOSE_CMD[@]}" ps -a -q garage-init)"
-  if [[ -z "$garage_cid" || -z "$garage_init_cid" ]]; then
-    echo "error: could not resolve garage container IDs" >&2
-    "${COMPOSE_CMD[@]}" ps || true
-    exit 1
-  fi
-
-  for i in {1..90}; do
-    garage_health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$garage_cid" 2>/dev/null || true)"
-    init_state="$(docker inspect -f '{{.State.Status}}' "$garage_init_cid" 2>/dev/null || true)"
-    init_exit="$(docker inspect -f '{{.State.ExitCode}}' "$garage_init_cid" 2>/dev/null || true)"
-
-    if [[ "$garage_health" == "healthy" && "$init_state" == "exited" && "$init_exit" == "0" ]]; then
-      return 0
-    fi
-
-    if [[ "$init_state" == "exited" && "$init_exit" != "0" ]]; then
-      echo "error: garage-init failed with exit code ${init_exit}" >&2
-      "${COMPOSE_CMD[@]}" ps || true
-      "${COMPOSE_CMD[@]}" logs garage garage-init || true
-      exit 1
-    fi
-
-    sleep 1
-  done
-
-  echo "error: garage bootstrap did not complete in time" >&2
-  "${COMPOSE_CMD[@]}" ps || true
-  "${COMPOSE_CMD[@]}" logs garage garage-init || true
-  exit 1
-}
-
 wait_for_server_health() {
   local server_cid server_health server_state server_exit
 
@@ -926,10 +863,7 @@ cd "$REMOTE_APP_DIR"
 COMPOSE_CMD=(docker compose --project-name local --env-file deploy/vps/stack.env -f deploy/runtime/docker-compose.yml)
 
 "${COMPOSE_CMD[@]}" down --remove-orphans || true
-"${COMPOSE_CMD[@]}" up -d --no-build garage garage-init registry gradle-build-cache server
-
-wait_for_garage_bootstrap
-wait_for_registry_health
+"${COMPOSE_CMD[@]}" up -d --no-build registry gradle-build-cache server
 
 while IFS= read -r ref || [[ -n "$ref" ]]; do
   [[ -n "$ref" ]] || continue
@@ -1021,8 +955,8 @@ main() {
   remote_deploy "$remote_ca_path"
 
   log "VPS deploy complete."
-  log "Server: http://10.120.34.186:${PLOY_SERVER_PORT}/health"
-  log "Registry: http://10.120.34.186:${PLOY_REGISTRY_PORT}/v2/"
+  log "Server: http://$REMOTE_HOST:${PLOY_SERVER_PORT}/health"
+  log "Registry: http://$REMOTE_HOST:${PLOY_REGISTRY_PORT}/v2/"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

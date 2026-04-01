@@ -16,8 +16,8 @@ For workstation/runtime deployments that should not build local binaries/images,
 ```bash
 export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
 export PLOY_CA_CERTS='/path/to/ca-bundle.pem'               # optional: used for docker daemon trust + runtime container trust
+export PLOY_CONFIG_HOME="$HOME/.config/ploy"
 ./deploy/runtime/run.sh
-export PLOY_CONFIG_HOME="$PWD/deploy/runtime/cli"
 ```
 
 `deploy/runtime/run.sh`:
@@ -45,11 +45,10 @@ From repo root:
 export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
 export PLOY_CA_CERTS='/path/to/ca-bundle.pem'  # optional: docker registry + runtime container trust
 export PLOY_SERVER_PORT=18080   # optional; default 8080
-export PLOY_REGISTRY_PORT=5000  # optional; default 5000
-export PLOY_CONTAINER_REGISTRY="127.0.0.1:${PLOY_REGISTRY_PORT}/ploy"
-export PLOY_S3_URL='http://localhost:3900'
-export PLOY_S3_ACCESS_KEY='...'
-export PLOY_S3_SECRET_KEY='...'
+export PLOY_CONTAINER_REGISTRY="ghcr.io/iw2rmb/ploy"
+export PLOY_OBJECTSTORE_ENDPOINT='http://localhost:3900'
+export PLOY_OBJECTSTORE_ACCESS_KEY='...'
+export PLOY_OBJECTSTORE_SECRET_KEY='...'
 ./deploy/runtime/run.sh
 export PLOY_CONFIG_HOME="$HOME/.config/ploy/local"
 ```
@@ -59,17 +58,12 @@ What the script does:
 - Creates database `ploy` if missing.
 - Optional `--drop-db` drops and recreates `ploy`.
 - Builds local binaries (`make build`).
-- Builds runtime images (including `garage-init`; no Go toolchain in image builds).
+- Builds runtime images (no Go toolchain in image builds).
 - Starts compose services.
 - Generates admin/worker JWTs and inserts them into `api_tokens`.
 - Seeds local node record.
-- Writes local CLI descriptor in `$HOME/.config/ploy/local/auth.json`.
-- Local Garage S3 credentials are preseeded in compose:
-  - access key: `GK000000000000000000000001`
-  - secret key: `0000000000000000000000000000000000000000000000000000000000000001`
-  - region: `garage` (wired via `PLOY_OBJECTSTORE_REGION`)
-  - object bucket: `ploy` (logs/diffs/artifacts)
-  - registry bucket: `ploy-registry` (OCI image blobs/manifests)
+- Writes local CLI descriptor in `$HOME/.config/{cluster}/local/auth.json`.
+
 
 ## Script Flags
 
@@ -83,6 +77,7 @@ What the script does:
 
 No flags means full deploy (server + node + garage + registry services).
 
+
 ## Binary Mount Model
 
 - Host binaries are mounted into containers:
@@ -93,6 +88,7 @@ No flags means full deploy (server + node + garage + registry services).
   - `deploy/images/node/Dockerfile`
 - Runtime containers execute host-built binaries mounted from `dist/`.
 - Core Dockerfiles are used for local runtime image builds.
+
 
 ## Verify
 
@@ -108,16 +104,10 @@ curl -fsS "http://127.0.0.1:${PLOY_SERVER_PORT:-8080}/health"
 curl -fsS http://localhost:9100/metrics | head
 ```
 
-- Registry API health:
-
-```bash
-curl -fsS "http://localhost:${PLOY_REGISTRY_PORT:-5000}/v2/"
-```
-
 - Token list (uses local descriptor):
 
 ```bash
-PLOY_CONFIG_HOME="$HOME/.config/ploy/local" ./dist/ploy cluster token list
+PLOY_CONFIG_HOME="$HOME/.config/ploy" ./dist/ploy cluster token list
 ```
 
 ## Stop / Clean

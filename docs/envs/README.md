@@ -90,12 +90,10 @@ Role model (bearer token claims):
   reads this to populate the `Submitter` field when creating mig runs via `ploy mig run`.
 - `PLOY_CONTAINER_REGISTRY` — Registry/repository prefix used by runner templates.
   Images resolve to `$PLOY_CONTAINER_REGISTRY/<name>:latest`. Deploy scripts expect this to be provided.
-- `PLOY_S3_URL` — S3-compatible endpoint URL provided by environment.
-- `PLOY_S3_ACCESS_KEY` — S3 access key ID provided by environment.
-- `PLOY_S3_SECRET_KEY` — S3 secret access key provided by environment.
-- `PLOY_REGISTRY_PORT` — Host port for the local OCI registry in the local compose stack
-  (default: `5000`). Both local and VPS deploy scripts pass it through to the
-  compose stack.
+- `PLOY_OBJECTSTORE_ENDPOINT` — S3-compatible endpoint URL provided by environment.
+- `PLOY_OBJECTSTORE_ACCESS_KEY` — S3 access key ID provided by environment.
+- `PLOY_OBJECTSTORE_SECRET_KEY` — S3 secret access key provided by environment.
+
 - `AUTH_SECRET_PATH` — Optional path to the auth-secret file used by
   local and offline-VPS deploy workflows for JWT signing secret reuse.
   Defaults:
