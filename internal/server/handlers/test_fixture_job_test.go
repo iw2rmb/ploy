@@ -44,17 +44,17 @@ type jobStore struct {
 	updateJobNextIDErr    error
 
 	// Job scheduling/promotion
-	scheduleNextJob          mockCall[store.ScheduleNextJobParams, store.Job]
+	scheduleNextJob           mockCall[store.ScheduleNextJobParams, store.Job]
 	promoteJobByIDIfUnblocked mockCall[types.JobID, store.Job]
 
 	promoteReGateRecoveryCandidateGateProfileResult types.RepoID
 	promoteReGateRecoveryCandidateGateProfileErr    error
 
 	// Job counts
-	countJobsByRunResult          int64
-	countJobsByRunErr             error
-	countJobsByRunAndStatusResult int64
-	countJobsByRunAndStatusErr    error
+	countJobsByRunResult                   int64
+	countJobsByRunErr                      error
+	countJobsByRunAndStatusResult          int64
+	countJobsByRunAndStatusErr             error
 	countJobsByRunRepoAttemptGroupByStatus mockResult[[]store.CountJobsByRunRepoAttemptGroupByStatusRow]
 
 	// Job listing (TUI)
@@ -62,7 +62,8 @@ type jobStore struct {
 	countJobsForTUI mockCall[*types.RunID, int64]
 
 	// Claiming
-	claimJob mockCall[types.NodeID, store.Job]
+	claimJob   mockCall[types.NodeID, store.Job]
+	unclaimJob mockCall[store.UnclaimJobParams, struct{}]
 
 	claimRun mockResult[store.Run]
 
@@ -74,9 +75,9 @@ type jobStore struct {
 	upsertSBOMRow mockCallSlice[store.UpsertSBOMRowParams, struct{}]
 
 	// Stack/Gate profile resolution
-	resolveStackRowByImage            mockResult[store.ResolveStackRowByImageRow]
-	resolveStackRowByLangTool         mockResult[store.ResolveStackRowByLangToolRow]
-	resolveStackRowByLangToolRelease  mockResult[store.ResolveStackRowByLangToolReleaseRow]
+	resolveStackRowByImage           mockResult[store.ResolveStackRowByImageRow]
+	resolveStackRowByLangTool        mockResult[store.ResolveStackRowByLangToolRow]
+	resolveStackRowByLangToolRelease mockResult[store.ResolveStackRowByLangToolReleaseRow]
 
 	upsertExactGateProfile mockCall[store.UpsertExactGateProfileParams, store.UpsertExactGateProfileRow]
 
@@ -121,8 +122,8 @@ type jobStore struct {
 	createRunRepoResult store.RunRepo
 	createRunRepoErr    error
 
-	listRunReposByRun       mockCall[string, []store.RunRepo]
-	listQueuedRunReposByRun mockCall[string, []store.RunRepo]
+	listRunReposByRun        mockCall[string, []store.RunRepo]
+	listQueuedRunReposByRun  mockCall[string, []store.RunRepo]
 	listRunReposWithURLByRun mockCall[string, []store.ListRunReposWithURLByRunRow]
 
 	countRunReposByStatus mockResult[[]store.CountRunReposByStatusRow]
@@ -132,7 +133,7 @@ type jobStore struct {
 	getLatestRunRepoByModAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
 
 	// Stale recovery
-	listStaleRunningJobs          mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
+	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
 	countStaleNodesWithRunningJobs mockResult[int64]
 
 	// Node (for claim)
@@ -152,14 +153,14 @@ type jobStore struct {
 	createSpecErr    error
 
 	// Mig creation (for migs_ticket flow)
-	createMigCalled    bool
-	createMigParams    store.CreateMigParams
+	createMigCalled     bool
+	createMigParams     store.CreateMigParams
 	createMigRepoCalled bool
 
 	// Run creation (for migs_ticket flow)
-	createRunCalled    bool
-	createRunParams    store.CreateRunParams
-	createRunResult    store.Run
+	createRunCalled bool
+	createRunParams store.CreateRunParams
+	createRunResult store.Run
 
 	listRunsResult []store.Run
 }
@@ -385,6 +386,11 @@ func (m *jobStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job
 		return store.Job{}, pgx.ErrNoRows
 	}
 	return m.claimJob.val, nil
+}
+
+func (m *jobStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {
+	_, err := m.unclaimJob.record(arg)
+	return err
 }
 
 func (m *jobStore) ClaimRun(ctx context.Context, nodeID *string) (store.Run, error) {
