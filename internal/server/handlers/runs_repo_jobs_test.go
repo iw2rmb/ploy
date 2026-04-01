@@ -339,6 +339,33 @@ func TestListRunRepoJobsHandler_ExposesGateStackDetection(t *testing.T) {
 	}
 }
 
+func TestListRunRepoJobsHandler_PrefersGateRuntimeImageAddress(t *testing.T) {
+	t.Parallel()
+
+	metaJSON := `{"kind":"gate","gate":{"stack_gate":{"enabled":true,"result":"pass","runtime_image":"ghcr.io/iw2rmb/ploy/gates/maven:3-eclipse-temurin-17"}}}`
+	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
+	st.listJobsByRunRepoAttempt.val[0].JobImage = "gate-image-placeholder"
+
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
+
+	assertStatus(t, rr, http.StatusOK)
+
+	var resp struct {
+		Jobs []struct {
+			JobImage string `json:"job_image"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
+	}
+	if got, want := resp.Jobs[0].JobImage, "ghcr.io/iw2rmb/ploy/gates/maven:3-eclipse-temurin-17"; got != want {
+		t.Fatalf("job_image = %q, want %q", got, want)
+	}
+}
+
 func TestListRunRepoJobsHandler_InvalidMeta_DoesNotFailResponse(t *testing.T) {
 	t.Parallel()
 

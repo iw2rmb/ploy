@@ -21,7 +21,7 @@ import (
 const (
 	installedStacksCatalogPath  = "/etc/ploy/gates/stacks.yaml"
 	contentTypeJSON             = "application/json"
-	defaultRegistryImagePrefix  = "127.0.0.1:5000/ploy"
+	defaultRegistryImagePrefix  = "ghcr.io/iw2rmb/ploy"
 	containerRegistryEnvVarName = "PLOY_CONTAINER_REGISTRY"
 )
 

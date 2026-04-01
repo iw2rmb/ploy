@@ -31,7 +31,7 @@ const DefaultStacksCatalogPath = "gates/stacks.yaml"
 
 const (
 	containerRegistryEnvKey    = "PLOY_CONTAINER_REGISTRY"
-	defaultRegistryImagePrefix = "127.0.0.1:5000/ploy"
+	defaultRegistryImagePrefix = "ghcr.io/iw2rmb/ploy"
 )
 
 var (

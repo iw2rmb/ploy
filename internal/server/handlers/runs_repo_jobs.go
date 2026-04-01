@@ -84,7 +84,7 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 				JobID:      job.ID,
 				Name:       job.Name,
 				JobType:    job.JobType,
-				JobImage:   job.JobImage,
+				JobImage:   strings.TrimSpace(job.JobImage),
 				RepoShaIn:  job.RepoShaIn,
 				RepoShaOut: job.RepoShaOut,
 				NextID:     job.NextID,
@@ -106,6 +106,12 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 					}
 					if meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
 						jr.BugSummary = strings.TrimSpace(meta.GateMetadata.BugSummary)
+					}
+					if meta.GateMetadata != nil && meta.GateMetadata.StackGate != nil {
+						if runtimeImage := strings.TrimSpace(meta.GateMetadata.StackGate.RuntimeImage); runtimeImage != "" {
+							// Prefer the runtime-resolved gate image when available.
+							jr.JobImage = runtimeImage
+						}
 					}
 					if meta.RecoveryMetadata != nil {
 						jr.Recovery = newRecoveryView(meta.RecoveryMetadata)
