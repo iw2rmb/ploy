@@ -1,6 +1,8 @@
 [.github/](.github) GitHub automation workflows and CI configuration for building, testing, and publishing.
 [.gitignore](.gitignore) Git ignore rules for build outputs, local state, and generated artifacts.
+[.golangci.yml](.golangci.yml) Repository golangci-lint policy defining enabled linters, exclusions, and import-boundary checks.
 [.goreleaser.yml](.goreleaser.yml) GoReleaser release configuration for multi-platform binaries, checksums, SBOMs, signing, and Homebrew tap publishing.
+[.pre-commit-config.yaml](.pre-commit-config.yaml) Pre-commit hook set for file hygiene, Go formatting, markdown linting, and manual static analysis.
 [Makefile](Makefile) Canonical project tasks for build, test, lint, and release-oriented workflows.
 [README.md](README.md) Primary project overview with architecture, setup, and usage guidance.
 [VERSION](VERSION) Current project version identifier used by build and release workflows.
