@@ -115,7 +115,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
-          version: "~> v2"
+          version: "v2.13.3"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -155,7 +155,7 @@ jobs:
           echo "### Installation" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "# Homebrew (macOS/Linux)" >> $GITHUB_STEP_SUMMARY
-          echo "brew install iw2rmb/ploy/ploy" >> $GITHUB_STEP_SUMMARY
+          echo "brew install --cask iw2rmb/ploy/ploy" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Release URL" >> $GITHUB_STEP_SUMMARY

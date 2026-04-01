@@ -169,7 +169,7 @@ Once the workflow completes:
    ```bash
    # Test Homebrew (if tap is configured)
    brew update
-   brew upgrade iw2rmb/ploy/ploy
+   brew upgrade --cask iw2rmb/ploy/ploy
    ploy version  # Should show vX.Y.Z
 
    # Test direct download
@@ -203,8 +203,8 @@ The Homebrew tap requires a separate repository and GitHub token.
    mkdir homebrew-ploy
    cd homebrew-ploy
 
-   # Create Formula directory
-   mkdir -p Formula
+   # Create Casks directory
+   mkdir -p Casks
 
    # Initialize git
    git init
@@ -228,8 +228,8 @@ The Homebrew tap requires a separate repository and GitHub token.
    - Click "Add secret"
 
 5. **Verify on next release**:
-   - After the next release, check that the Formula was updated:
-     https://github.com/iw2rmb/homebrew-ploy/blob/main/Formula/ploy.rb
+   - After the next release, check that the cask was updated:
+     https://github.com/iw2rmb/homebrew-ploy/blob/main/Casks/ploy.rb
 
 ## Troubleshooting
 
@@ -267,18 +267,18 @@ If a specific platform binary is missing:
    goreleaser release --snapshot --clean
    ```
 
-### Homebrew Formula Not Updated
+### Homebrew Cask Not Updated
 
 If the Homebrew tap wasn't updated:
 
 1. Verify `HOMEBREW_TAP_GITHUB_TOKEN` is set in repository secrets
 2. Check release workflow logs for Homebrew-related errors
-3. Manually update the formula if needed:
+3. Manually update the cask if needed:
    ```bash
    cd /tmp
    git clone https://github.com/iw2rmb/homebrew-ploy.git
    cd homebrew-ploy
-   # Edit Formula/ploy.rb
+   # Edit Casks/ploy.rb
    # Update version and sha256
    git commit -am "ploy vX.Y.Z"
    git push
