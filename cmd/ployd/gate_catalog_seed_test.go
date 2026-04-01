@@ -85,7 +85,7 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
 	root := t.TempDir()
 	catalogPath := filepath.Join(root, "gates", "stacks.yaml")
 	profileJava := filepath.Join(root, "gates", "profiles", "java-17-maven.yaml")
-	profileGo := filepath.Join(root, "gates", "profiles", "go-1.22.yaml")
+	profileGo := filepath.Join(root, "gates", "profiles", "go-1.25.8.yaml")
 	writeGateProfileYAML(t, profileJava, "default", "java", "maven", "17", "mvn -q test")
 	writeGateProfileYAML(t, profileGo, "default", "go", "go", "1.22", "go test ./...")
 
@@ -127,8 +127,8 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
 	}
 
 	wantKeys := map[string]bool{
-		"gate-profiles/defaults/java/17/maven/profile.json":   false,
-		"gate-profiles/defaults/go/1.22/default/profile.json": false,
+		"gate-profiles/defaults/java/17/maven/profile.json":     false,
+		"gate-profiles/defaults/go/1.25.8/default/profile.json": false,
 	}
 	for _, row := range fakeStore.defaultProfiles {
 		if _, ok := wantKeys[row.ObjectKey]; ok {
@@ -155,11 +155,11 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
 	if got, want := javaRow.Image, "registry.test.local/ploy/maven:3-eclipse-temurin-17"; got != want {
 		t.Fatalf("java image=%q, want %q", got, want)
 	}
-	goRow, ok := fakeStore.stacks["go|1.22|"]
+	goRow, ok := fakeStore.stacks["go|1.25.8|"]
 	if !ok {
 		t.Fatal("go stack row missing")
 	}
-	if got, want := goRow.Image, "registry.test.local/ploy/golang:1.22"; got != want {
+	if got, want := goRow.Image, "registry.test.local/ploy/golang:1.25.8"; got != want {
 		t.Fatalf("go image=%q, want %q", got, want)
 	}
 }

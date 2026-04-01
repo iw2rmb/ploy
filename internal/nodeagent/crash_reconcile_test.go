@@ -285,21 +285,30 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 
 	s := workflowkit.NewRunOrchestrationScenario()
 	containerID := "ctr-running-1"
-	var logsCalled bool
-	var completeCalled bool
-	var completePayload struct {
+	logsCh := make(chan struct{}, 1)
+	completeCh := make(chan struct {
 		Status   string `json:"status"`
 		ExitCode int32  `json:"exit_code"`
-	}
+	}, 1)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
-			logsCalled = true
+			select {
+			case logsCh <- struct{}{}:
+			default:
+			}
 			w.WriteHeader(http.StatusCreated)
 		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
-			completeCalled = true
+			var completePayload struct {
+				Status   string `json:"status"`
+				ExitCode int32  `json:"exit_code"`
+			}
 			_ = json.NewDecoder(r.Body).Decode(&completePayload)
+			select {
+			case completeCh <- completePayload:
+			default:
+			}
 			w.WriteHeader(http.StatusOK)
 		default:
 			http.NotFound(w, r)
@@ -336,14 +345,31 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
-	deadline := time.After(2 * time.Second)
+	var (
+		logsCalled      bool
+		completeCalled  bool
+		completePayload struct {
+			Status   string `json:"status"`
+			ExitCode int32  `json:"exit_code"`
+		}
+	)
+	timeout := time.After(2 * time.Second)
 	for {
-		if logsCalled && completeCalled {
+		if logsCalled && completeCalled && controller.ReleaseCalls() == 1 {
 			break
 		}
 		select {
-		case <-deadline:
-			t.Fatalf("timeout waiting for recovered monitor upload, logs_called=%v complete_called=%v", logsCalled, completeCalled)
+		case <-logsCh:
+			logsCalled = true
+		case completePayload = <-completeCh:
+			completeCalled = true
+		case <-timeout:
+			t.Fatalf(
+				"timeout waiting for recovered monitor upload, logs_called=%v complete_called=%v release_calls=%d",
+				logsCalled,
+				completeCalled,
+				controller.ReleaseCalls(),
+			)
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
@@ -355,11 +381,11 @@ func TestCrashReconcile_RecoveredRunningMonitor_UploadsLogsAndTerminalStatus(t *
 	if completePayload.ExitCode != 0 {
 		t.Fatalf("exit_code = %d, want 0", completePayload.ExitCode)
 	}
-	if controller.acquireCalls != 1 {
-		t.Fatalf("AcquireSlot calls = %d, want 1", controller.acquireCalls)
+	if controller.AcquireCalls() != 1 {
+		t.Fatalf("AcquireSlot calls = %d, want 1", controller.AcquireCalls())
 	}
-	if controller.releaseCalls != 1 {
-		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.releaseCalls)
+	if controller.ReleaseCalls() != 1 {
+		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.ReleaseCalls())
 	}
 }
 
@@ -368,16 +394,23 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 
 	s := workflowkit.NewRunOrchestrationScenario()
 	containerID := "ctr-running-conflict"
-	var logsCalled bool
-	completeCalls := 0
+	var (
+		mu            sync.Mutex
+		logsCalled    bool
+		completeCalls int
+	)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v1/nodes/"+testNodeID+"/logs":
+			mu.Lock()
 			logsCalled = true
+			mu.Unlock()
 			w.WriteHeader(http.StatusCreated)
 		case r.URL.Path == "/v1/jobs/"+s.JobID.String()+"/complete":
+			mu.Lock()
 			completeCalls++
+			mu.Unlock()
 			w.WriteHeader(http.StatusConflict)
 		default:
 			http.NotFound(w, r)
@@ -414,32 +447,40 @@ func TestCrashReconcile_RecoveredRunningMonitor_CompletionConflictIsNonFatal(t *
 		{ContainerID: containerID, RunID: s.RunID, JobID: s.JobID},
 	})
 
-	deadline := time.After(2 * time.Second)
+	timeout := time.After(2 * time.Second)
 	for {
-		if logsCalled && completeCalls > 0 && controller.releaseCalls == 1 {
+		mu.Lock()
+		localLogsCalled := logsCalled
+		localCompleteCalls := completeCalls
+		mu.Unlock()
+
+		if localLogsCalled && localCompleteCalls > 0 && controller.ReleaseCalls() == 1 {
 			break
 		}
 		select {
-		case <-deadline:
+		case <-timeout:
 			t.Fatalf(
 				"timeout waiting for recovered monitor completion, logs_called=%v complete_calls=%d release_calls=%d",
-				logsCalled,
-				completeCalls,
-				controller.releaseCalls,
+				localLogsCalled,
+				localCompleteCalls,
+				controller.ReleaseCalls(),
 			)
 		default:
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
 
-	if completeCalls != 1 {
-		t.Fatalf("completion calls = %d, want 1", completeCalls)
+	mu.Lock()
+	localCompleteCalls := completeCalls
+	mu.Unlock()
+	if localCompleteCalls != 1 {
+		t.Fatalf("completion calls = %d, want 1", localCompleteCalls)
 	}
-	if controller.acquireCalls != 1 {
-		t.Fatalf("AcquireSlot calls = %d, want 1", controller.acquireCalls)
+	if controller.AcquireCalls() != 1 {
+		t.Fatalf("AcquireSlot calls = %d, want 1", controller.AcquireCalls())
 	}
-	if controller.releaseCalls != 1 {
-		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.releaseCalls)
+	if controller.ReleaseCalls() != 1 {
+		t.Fatalf("ReleaseSlot calls = %d, want 1", controller.ReleaseCalls())
 	}
 }
 
@@ -527,10 +568,10 @@ func TestCrashReconcile_RecoveredRunningMonitor_IsolatedFailures(t *testing.T) {
 		}
 	}
 
-	if controller.acquireCalls != 2 {
-		t.Fatalf("AcquireSlot calls = %d, want 2", controller.acquireCalls)
+	if controller.AcquireCalls() != 2 {
+		t.Fatalf("AcquireSlot calls = %d, want 2", controller.AcquireCalls())
 	}
-	if controller.releaseCalls != 2 {
-		t.Fatalf("ReleaseSlot calls = %d, want 2", controller.releaseCalls)
+	if controller.ReleaseCalls() != 2 {
+		t.Fatalf("ReleaseSlot calls = %d, want 2", controller.ReleaseCalls())
 	}
 }

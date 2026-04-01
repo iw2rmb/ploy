@@ -304,6 +304,11 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if !have("git") {
 		t.Skip("git not found in PATH; skipping")
 	}
+	// Require real Codex auth from environment to run this test without stubbing.
+	auth := os.Getenv("CODEX_AUTH_JSON")
+	if strings.TrimSpace(auth) == "" {
+		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
+	}
 
 	repoURL := "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"
 	branch := "e2e/fail-missing-symbol"
@@ -323,7 +328,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	// Prefer a pre-captured Build Gate log placed alongside this test.
 	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
 	repoRoot = strings.TrimSpace(repoRoot)
-	testLog := filepath.Join(repoRoot, "tests", "integration", "migs", "codex", "build-gate.log")
+	testLog := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
 	logPath := filepath.Join(inDir, "build-gate.log")
 	if data, err := os.ReadFile(testLog); err == nil && len(data) > 0 {
 		if err := os.WriteFile(logPath, data, 0o644); err != nil {
@@ -368,11 +373,6 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Fatalf("write prompt: %v", err)
 	}
 
-	// Require real Codex auth from environment to run this test without stubbing.
-	auth := os.Getenv("CODEX_AUTH_JSON")
-	if strings.TrimSpace(auth) == "" {
-		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
-	}
 	// Run codex; map workspace to the same absolute path inside container.
 	// Inject repo metadata env vars for context; Build Gate is run externally (not by Codex).
 	run := exec.Command("docker", "run", "--rm",
