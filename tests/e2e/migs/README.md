@@ -272,7 +272,7 @@ This makes gate health visible without requiring raw artifact inspection.
 **Environment Considerations**
 
 - Cluster targeting:
-  - CLI reads the default descriptor at `~/.config/ploy/clusters/` (no env override).
+  - CLI reads the default descriptor at `~/.config/ploy` (no env override).
 - Build Gate image override:
   - To change the Build Gate executor container image, use `PLOY_BUILDGATE_IMAGE` on worker nodes.
 

@@ -83,11 +83,15 @@ func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
 		t.Fatalf("clustersDir=%s want %s", dir, want)
 	}
 
-	// Ensure SetDefault creates marker file under clusters dir.
+	// Ensure SetDefault creates marker file under config base dir.
 	if err := SetDefault(ClusterID("abc")); err != nil {
 		t.Fatalf("SetDefault error: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "default")); err != nil {
+	base, err := configBaseDir()
+	if err != nil {
+		t.Fatalf("configBaseDir error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(base, "default")); err != nil {
 		t.Fatalf("default marker not created: %v", err)
 	}
 }

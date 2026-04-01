@@ -2,8 +2,8 @@
 set -euo pipefail
 
 e2e_descriptor_path() {
-  local marker="${PLOY_CONFIG_HOME}/clusters/default"
-  local clusters_dir="${PLOY_CONFIG_HOME}/clusters"
+  local marker="${PLOY_CONFIG_HOME}/default"
+  local clusters_dir="${PLOY_CONFIG_HOME}"
 
   e2e_resolve_descriptor_path "$marker" "$clusters_dir"
 }

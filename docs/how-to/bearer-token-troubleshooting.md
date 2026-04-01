@@ -100,7 +100,7 @@ Check:
 
 1. Verify the token is complete (three parts separated by dots):
    ```bash
-   TOKEN=$(jq -r .token ~/.config/ploy/clusters/<cluster-id>.json)
+   TOKEN=$(jq -r .token ~/.config/ploy/<cluster-id>/auth.json)
    echo "$TOKEN" | tr '.' '\n' | wc -l
    # Should output: 3
    ```
@@ -125,7 +125,7 @@ Check:
 
 1. Check token expiration:
    ```bash
-   TOKEN=$(jq -r .token ~/.config/ploy/clusters/<cluster-id>.json)
+   TOKEN=$(jq -r .token ~/.config/ploy/<cluster-id>/auth.json)
    PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
    echo "$PAYLOAD" | base64 -d | jq -r .exp | xargs -I {} date -r {}
    ```

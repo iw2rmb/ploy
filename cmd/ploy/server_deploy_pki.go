@@ -29,7 +29,7 @@ func handleRefreshAdminCert(ctx context.Context, stderr io.Writer) error {
 	_, _ = fmt.Fprintln(stderr, "     ploy cluster token create --role cli-admin --description \"My token\"")
 	_, _ = fmt.Fprintln(stderr, "")
 	_, _ = fmt.Fprintln(stderr, "  2. Add the token to your cluster descriptor:")
-	_, _ = fmt.Fprintln(stderr, "     Edit ~/.config/ploy/clusters/<cluster-id>.json")
+	_, _ = fmt.Fprintln(stderr, "     Edit ~/.config/ploy/<cluster-id>/auth.json")
 	_, _ = fmt.Fprintln(stderr, `     Add: "token": "your-token-here"`)
 	_, _ = fmt.Fprintln(stderr, "")
 
