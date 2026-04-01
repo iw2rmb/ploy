@@ -74,10 +74,10 @@ func TestDetect_Success(t *testing.T) {
 			evidence: map[string]string{"sourceCompatibility": "11"},
 		},
 		{
-			name:      "go/go122",
-			workspace: filepath.Join("testdata", "go", "go122"),
-			wantLang:  "go", wantTool: "go", wantRel: "1.22",
-			evidence: map[string]string{"go": "1.22"},
+			name:      "go/go125",
+			workspace: filepath.Join("testdata", "go", "go125"),
+			wantLang:  "go", wantTool: "go", wantRel: "1.25",
+			evidence: map[string]string{"go": "1.25"},
 		},
 		{
 			name:      "rust/rust176-cargo",

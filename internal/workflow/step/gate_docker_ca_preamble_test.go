@@ -31,13 +31,13 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 		},
 		{
 			name:      "go",
-			workspace: func(t *testing.T) string { return createGoWorkspace(t, "1.22") },
+			workspace: func(t *testing.T) string { return createGoWorkspace(t, "1.25") },
 			spec: func() *contracts.StepGateSpec {
 				return &contracts.StepGateSpec{
 					Enabled: true,
 					ImageOverrides: []contracts.BuildGateImageRule{{
-						Stack: contracts.StackExpectation{Language: "go", Release: "1.22"},
-						Image: "golang:1.22",
+						Stack: contracts.StackExpectation{Language: "go", Release: "1.25"},
+						Image: "golang:1.25",
 					}},
 				}
 			},

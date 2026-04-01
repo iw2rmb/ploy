@@ -55,10 +55,10 @@ func TestStackFieldsMatch(t *testing.T) {
 			name:        "language wildcard",
 			lang:        "go",
 			tool:        "go",
-			release:     "1.22",
+			release:     "1.25",
 			wantLang:    "",
 			wantTool:    "go",
-			wantRelease: "1.22",
+			wantRelease: "1.25",
 			want:        true,
 		},
 		{
