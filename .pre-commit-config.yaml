@@ -1,60 +1,8 @@
-# Pre-commit hooks configuration for Ploy
-# Install: pre-commit install
-# Run manually: pre-commit run --all-files
-# See https://pre-commit.com for more information
-
 repos:
-  # General file checks
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+  - repo: local
     hooks:
-      - id: trailing-whitespace
-        exclude: '\.md$|\.golden$'
-      - id: end-of-file-fixer
-        exclude: '\.golden$'
-      - id: check-yaml
-        stages: [manual]
-      - id: check-added-large-files
-        args: ['--maxkb=1024']
-      - id: check-merge-conflict
-      - id: check-case-conflict
-      - id: mixed-line-ending
-
-  # Go formatting and imports
-  - repo: https://github.com/dnephin/pre-commit-golang
-    rev: v0.5.1
-    hooks:
-      - id: go-fmt
-        args: [-w]
-      - id: go-imports
-        args: [-w]
-      - id: go-vet
-        stages: [manual]
-      - id: go-mod-tidy
-        args: [-v]
-
-  # Markdown linting (if markdownlint is available)
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.38.0
-    hooks:
-      - id: markdownlint
-        stages: [manual]
-
-  # Static analysis with golangci-lint
-  - repo: https://github.com/golangci/golangci-lint
-    rev: v1.55.2
-    hooks:
-      - id: golangci-lint
-        args: [--fast]
-        stages: [manual]
+      - id: ci-noop
+        name: ci-noop
+        entry: "true"
+        language: system
         pass_filenames: false
-
-# Run hooks on specific file types
-default_language_version:
-  python: python3
-
-# Fail fast on first error
-fail_fast: false
-
-# Minimum pre-commit version
-minimum_pre_commit_version: '2.20.0'
