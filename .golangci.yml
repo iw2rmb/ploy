@@ -1,0 +1,176 @@
+# golangci-lint configuration for Ploy
+# See https://golangci-lint.run/usage/configuration/ for full options
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true  # Include test files in linting
+  modules-download-mode: readonly
+
+linters:
+  disable:
+    - gosec         # Use govulncheck for release; tune Gosec per-package later
+    - depguard      # Disabled temporarily; misconfigured and blocking valid imports
+  enable:
+    - errcheck      # Check for unchecked errors
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Go static analysis
+    - unused        # Check for unused constants, variables, functions and types
+    - misspell      # Spell checker
+    - unconvert     # Remove unnecessary type conversions
+    - gocritic      # Go source code linter providing checks currently missing from other linters
+    - bodyclose     # Check HTTP response body is closed
+    - sqlclosecheck # Check sql.Rows and sql.Stmt are closed
+  settings:
+    depguard:
+      # Depguard v2 requires explicit list-type configuration.
+      # By default, all imports are allowed unless explicitly denied.
+      rules:
+        Main:
+          # Main rule: allow all imports (no restrictions by default).
+          # This overrides any implicit default deny-all behavior.
+          # Specific architectural boundaries enforced via separate rules below.
+          list-mode: lax
+          allow:
+            - $gostd  # Allow all Go standard library packages
+          deny: []
+        no-server-from-cli-node:
+          # Apply to CLI and node code only; prevent server coupling.
+          files:
+            - "internal/cli/**"
+            - "internal/node/**"
+            - "internal/nodeagent/**"
+          deny:
+            - pkg: "^github.com/iw2rmb/ploy/internal/server($|/)"
+              desc: "CLI/Node must not import internal/server; depend on stable interfaces"
+    errcheck:
+      check-type-assertions: true
+      check-blank: false  # Disable blank identifier check to allow common defer patterns
+      exclude-functions:
+        # Allow common patterns that don't need error checking.
+        # Test cleanup (defer in tests) uses these patterns extensively.
+        - (*database/sql.Rows).Close
+        - (*database/sql.Stmt).Close
+        - (*os.File).Close
+        - (os).RemoveAll
+        - (os).Remove
+        - (os).Setenv
+        - (os).Unsetenv
+        - (io.ReadCloser).Close
+        - (net/http.ResponseBody).Close
+    gosec:
+      # Enable all security checks
+      excludes: []
+      severity: low
+      confidence: low
+    govet:
+      enable-all: true
+      disable:
+        - shadow        # Too noisy for now
+        - fieldalignment
+        - unusedwrite
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+    gocritic:
+      disabled-checks:
+        - builtinShadow
+        - emptyStringTest
+      enabled-checks:
+        - appendAssign
+        - assignOp
+        - boolExprSimplify
+        - captLocal
+        - caseOrder
+        - deprecatedComment
+        - dupImport
+        - elseif
+        - emptyFallthrough
+        - hexLiteral
+        - ifElseChain
+        - nilValReturn
+        - regexpMust
+        - singleCaseSwitch
+        - sloppyLen
+        - switchTrue
+        - typeSwitchVar
+        - underef
+        - unlambda
+        - unslice
+  exclusions:
+    # Skip generated or vendor/binary directories
+    paths:
+      - dist
+      - vendor
+    # Exclude specific patterns (migrated from issues.exclude-rules)
+    rules:
+      # Common accepted patterns: ignore errors from Close in defer statements.
+      # Rationale: cleanup code (especially in tests) uses defer with Close() where
+      # error handling is not critical or would complicate the code unnecessarily.
+      - linters:
+          - errcheck
+        text: 'Error return value of `?[^`]*\.Close`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?[^`]*RemoveAll`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?[^`]*Remove`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?[^`]*Setenv`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?[^`]*Unsetenv`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?fmt\.Fprint`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?fmt\.Fprintf`? is not checked'
+      - linters:
+          - errcheck
+        text: 'Error return value of `?fmt\.Sscanf`? is not checked'
+      # Exclude test files from some checks.
+      # Rationale: test code prioritizes clarity and conciseness over strict lint rules.
+      # Tests often use simplified error handling and resource cleanup patterns.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - gocritic
+          - unused
+          - bodyclose
+      # Allow init functions
+      - text: "should not use init functions"
+        linters:
+          - revive
+      # Security lints tuned for CLI context (allow file paths from flags/env)
+      - linters:
+          - gosec
+        text: 'G304: Potential file inclusion via variable'
+      - linters:
+          - gosec
+        text: 'G306: Expect WriteFile permissions to be 0600 or less'
+      - linters:
+          - gosec
+        text: 'G301: Expect directory permissions to be 0750 or less'
+      - linters:
+          - gosec
+        text: 'G112: Potential Slowloris Attack'
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: true
+
+output:
+  formats:
+    text:
+      path: stdout
+      colors: true
+      print-issued-lines: true
+      print-linter-name: true

@@ -79,12 +79,28 @@ sign-binaries: verify-version ## Sign dist binaries with cosign (keyless or key-
 		else \
 			shasum -a 256 "$$bin" > "$${prefix}.sha256"; \
 		fi; \
-		COSIGN_YES=true cosign sign-blob --yes \
-			--output-signature "$${prefix}.sig" \
-			--output-certificate "$${prefix}.pem" \
-			--annotation version="$(VERSION)" \
-			--annotation commit="$(GIT_COMMIT)" \
-			"$$bin"; \
+		if cosign sign-blob --help 2>&1 | grep -q -- '--annotations'; then \
+			COSIGN_YES=true cosign sign-blob --yes \
+				--output-signature "$${prefix}.sig" \
+				--output-certificate "$${prefix}.pem" \
+				--annotations "version=$(VERSION)" \
+				--annotations "commit=$(GIT_COMMIT)" \
+				"$$bin"; \
+		elif cosign sign-blob --help 2>&1 | grep -q -- '--annotation'; then \
+			COSIGN_YES=true cosign sign-blob --yes \
+				--output-signature "$${prefix}.sig" \
+				--output-certificate "$${prefix}.pem" \
+				--annotation "version=$(VERSION)" \
+				--annotation "commit=$(GIT_COMMIT)" \
+				"$$bin"; \
+		else \
+			COSIGN_YES=true cosign sign-blob --yes \
+				--output-signature "$${prefix}.sig" \
+				--output-certificate "$${prefix}.pem" \
+				-a "version=$(VERSION)" \
+				-a "commit=$(GIT_COMMIT)" \
+				"$$bin"; \
+		fi; \
 	done
 
 .PHONY: fmt

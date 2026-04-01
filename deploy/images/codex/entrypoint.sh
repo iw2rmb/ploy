@@ -69,6 +69,37 @@ config_file=""
 model="${CODEX_MODEL:-}"
 prompt_file=""
 
+# Backward-compat path for mig-codex integration tests and legacy callers:
+# allow `amata ...` passthrough while preserving codex artifact conventions.
+if [[ "${1:-}" == "amata" ]]; then
+  shift
+  if [[ $# -eq 0 && -s "/in/amata.yaml" ]]; then
+    set -- run /in/amata.yaml
+  fi
+
+  mkdir -p "$out_dir" "$codex_config_dir"
+  logfile="$out_dir/codex.log"
+  manifest="$out_dir/codex-run.json"
+
+  echo "[codex] amata compatibility mode" | tee "$logfile" >&2
+  set +e
+  amata "$@" 2>&1 | tee -a "$logfile" >&2
+  status=${PIPESTATUS[0]}
+  set -e
+
+  if [[ ! -s "$out_dir/codex-last.txt" ]]; then
+    if [[ -s "$logfile" ]]; then
+      grep -v '^\s*$' "$logfile" | tail -1 > "$out_dir/codex-last.txt" || true
+    fi
+    [[ -s "$out_dir/codex-last.txt" ]] || touch "$out_dir/codex-last.txt"
+  fi
+
+  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","session_id":"%s","resumed":%s}\n' \
+    "$ts" "${status:-0}" "$model" "$input_dir" "" "false" > "$manifest"
+  exit "${status:-0}"
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --input) input_dir="$2"; shift 2 ;;
