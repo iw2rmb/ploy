@@ -38,7 +38,7 @@ For end users, install the Ploy CLI using one of these methods:
 
 **Homebrew (macOS/Linux)**
 ```bash
-brew install iw2rmb/ploy/ploy
+brew install --cask iw2rmb/ploy/ploy
 ```
 
 **Direct Download**

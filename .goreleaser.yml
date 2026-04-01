@@ -1,0 +1,213 @@
+# GoReleaser configuration for Ploy
+# Documentation: https://goreleaser.com
+
+version: 2
+
+before:
+  hooks:
+    # Ensure dependencies are up to date
+    - go mod tidy
+    # Note: Tests are run by GitHub Actions pre-release-checks job
+
+builds:
+  # ploy CLI - main client tool
+  - id: ploy
+    binary: ploy
+    main: ./cmd/ploy
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/iw2rmb/ploy/internal/version.Version={{.Version}}
+      - -X github.com/iw2rmb/ploy/internal/version.Commit={{.Commit}}
+      - -X github.com/iw2rmb/ploy/internal/version.BuiltAt={{.Date}}
+    ignore:
+      # Windows doesn't support arm64 in our use case
+      - goos: windows
+        goarch: arm64
+
+  # ployd - server daemon
+  - id: ployd
+    binary: ployd
+    main: ./cmd/ployd
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/iw2rmb/ploy/internal/version.Version={{.Version}}
+      - -X github.com/iw2rmb/ploy/internal/version.Commit={{.Commit}}
+      - -X github.com/iw2rmb/ploy/internal/version.BuiltAt={{.Date}}
+
+  # ployd-node - worker node daemon
+  - id: ployd-node
+    binary: ployd-node
+    main: ./cmd/ployd-node
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/iw2rmb/ploy/internal/version.Version={{.Version}}
+      - -X github.com/iw2rmb/ploy/internal/version.Commit={{.Commit}}
+      - -X github.com/iw2rmb/ploy/internal/version.BuiltAt={{.Date}}
+
+archives:
+  # Separate archive for each binary to avoid platform inconsistency
+  - id: ploy
+    ids:
+      - ploy
+    formats: [tar.gz]
+    name_template: >-
+      ploy_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      - docs/**/*
+
+  - id: ployd
+    ids:
+      - ployd
+    formats: [tar.gz]
+    name_template: >-
+      ployd_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+  - id: ployd-node
+    ids:
+      - ployd-node
+    formats: [tar.gz]
+    name_template: >-
+      ployd-node_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'typo'
+      - 'README'
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Security Updates'
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Performance Improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: Others
+      order: 999
+
+homebrew_casks:
+  - name: ploy
+    repository:
+      owner: iw2rmb
+      name: homebrew-ploy
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/iw2rmb/ploy
+    description: "Ploy - Infrastructure orchestration and deployment platform"
+    license: "Apache-2.0"
+    directory: Casks
+    # Only include the CLI in Homebrew cask
+    ids:
+      - ploy
+    binaries:
+      - ploy
+
+release:
+  github:
+    owner: iw2rmb
+    name: ploy
+  draft: false
+  prerelease: auto
+  mode: append
+  header: |
+    ## Ploy {{ .Version }}
+
+    Welcome to this new release of Ploy!
+  footer: |
+    ## Installation
+
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install --cask iw2rmb/ploy/ploy
+    ```
+
+    ### Direct Download
+    Download the appropriate binary for your platform from the assets below.
+
+    **Full Changelog**: https://github.com/iw2rmb/ploy/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+sboms:
+  - artifacts: archive
+    documents:
+      - "{{ .ArtifactName }}.sbom.json"
+
+signs:
+  - cmd: cosign
+    env:
+      - COSIGN_EXPERIMENTAL=1
+    certificate: '${artifact}.pem'
+    args:
+      - sign-blob
+      - '--output-certificate=${certificate}'
+      - '--output-signature=${signature}'
+      - '${artifact}'
+      - "--yes"
+    artifacts: checksum
+    output: true

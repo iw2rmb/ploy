@@ -1,5 +1,6 @@
 [.github/](.github) GitHub automation workflows and CI configuration for building, testing, and publishing.
 [.gitignore](.gitignore) Git ignore rules for build outputs, local state, and generated artifacts.
+[.goreleaser.yml](.goreleaser.yml) GoReleaser release configuration for multi-platform binaries, checksums, SBOMs, signing, and Homebrew tap publishing.
 [Makefile](Makefile) Canonical project tasks for build, test, lint, and release-oriented workflows.
 [README.md](README.md) Primary project overview with architecture, setup, and usage guidance.
 [VERSION](VERSION) Current project version identifier used by build and release workflows.
