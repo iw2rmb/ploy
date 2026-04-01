@@ -26,7 +26,6 @@ For the detailed API surface and schemas, see `docs/api/OpenAPI.yaml`. This READ
 **Docs You'll Want**
 - Overview & quick start: this `README.md`.
 - Local Docker cluster: `docs/how-to/deploy-locally.md`.
-- Offline VPS bundle: `docs/how-to/deploy-vps-offline.md`.
 - TUI navigation: `docs/how-to/tui-navigation.md`.
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative schemas).
 - Environment variables: `docs/envs/README.md`.

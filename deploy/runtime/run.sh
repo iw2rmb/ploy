@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$SCRIPT_DIR/docker-compose.yml" ]]; then
+  ROOT_DIR="$SCRIPT_DIR"
+  RUNTIME_DIR="$SCRIPT_DIR"
+else
+  ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  RUNTIME_DIR="$ROOT_DIR/deploy/runtime"
+fi
 cd "$ROOT_DIR"
 
-COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f deploy/runtime/docker-compose.yml}"
+COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f ${RUNTIME_DIR}/docker-compose.yml}"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"

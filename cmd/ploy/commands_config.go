@@ -36,14 +36,14 @@ func newManifestCmd(stderr io.Writer) *cobra.Command {
 // newClusterCmd creates the cobra command for 'ploy cluster' and its subcommands.
 // This wires the cluster router into a proper cobra command hierarchy.
 // The cluster command provides a unified namespace for cluster management:
-//   - deploy:  Deploy and configure a control plane server
+//   - deploy:  Deploy runtime stack on the current host
 //   - node:    Manage worker nodes in a cluster
 //   - rollout: Perform rolling updates for servers and nodes
 //   - token:   Manage API tokens bound to a cluster
 func newClusterCmd(stderr io.Writer) *cobra.Command {
 	clusterCmd := &cobra.Command{
 		Use:                "cluster",
-		Short:              "Manage clusters (deploy, nodes, rollout, tokens)",
+		Short:              "Manage clusters (runtime deploy, nodes, rollout, tokens)",
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return handleCluster(args, stderr)

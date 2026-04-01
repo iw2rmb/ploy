@@ -11,7 +11,7 @@ import (
 // management operations under `ploy cluster`.
 //
 // The cluster command is the primary entry point for:
-//   - deploy: Deploy and configure a control plane server (delegates to handleServerDeploy)
+//   - deploy: Deploy runtime stack on the current host (delegates to handleClusterDeploy)
 //   - node:   Manage worker nodes in a cluster (delegates to handleNode)
 //   - rollout: Perform rolling updates for servers and nodes (delegates to handleRollout)
 //   - token:  Manage API tokens bound to a cluster (delegates to handleToken)
@@ -32,9 +32,8 @@ func handleCluster(args []string, stderr io.Writer) error {
 	// Route to the appropriate handler based on the subcommand.
 	switch args[0] {
 	case "deploy":
-		// Delegate to the existing server deploy handler.
-		// This reuses all existing validation, provisioning, and PKI logic.
-		return handleServerDeploy(args[1:], stderr)
+		// Delegate to embedded runtime deployment handler.
+		return handleClusterDeploy(args[1:], stderr)
 	case "node":
 		// Delegate to the existing node handler which supports `add` subcommand.
 		return handleNode(args[1:], stderr)
@@ -58,7 +57,7 @@ func printClusterUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy cluster <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  deploy   Deploy and configure a control plane server")
+	_, _ = fmt.Fprintln(w, "  deploy   Deploy runtime stack on the current host")
 	_, _ = fmt.Fprintln(w, "  node     Manage worker nodes in a cluster")
 	_, _ = fmt.Fprintln(w, "  rollout  Perform rolling updates for servers and nodes")
 	_, _ = fmt.Fprintln(w, "  token    Manage API tokens bound to a cluster")

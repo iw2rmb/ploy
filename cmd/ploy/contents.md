@@ -1,7 +1,11 @@
 [README.md](README.md) CLI package overview, usage notes, and development guidance for the ploy command.
 [autocomplete/](autocomplete) Shell completion scripts for bash, zsh, and fish integration.
+[assets/](assets) Embedded runtime deployment archive consumed by `ploy cluster deploy`.
 [autocomplete_test.go](autocomplete_test.go) Tests that validate autocomplete command wiring and generated completion output.
 [cli_test.go](cli_test.go) End-to-end CLI behavior tests covering root invocation and shared command setup.
+[cluster_deploy.go](cluster_deploy.go) Implements `ploy cluster deploy` via embedded runtime extract/execute/cleanup flow.
+[cluster_deploy_assets.go](cluster_deploy_assets.go) Embeds the runtime deployment archive used by cluster deploy.
+[cluster_deploy_test.go](cluster_deploy_test.go) Tests runtime deploy arg parsing, env defaults, execution, and cleanup.
 [cluster_command.go](cluster_command.go) Declares cluster-related CLI command tree and shared cluster command wiring.
 [cluster_command_test.go](cluster_command_test.go) Tests for cluster command registration, help, and argument handling.
 [commands_config.go](commands_config.go) Registers configuration command group and connects config subcommands.
@@ -97,17 +101,6 @@
 [run_submit.go](run_submit.go) Implements run submit command that validates specs and submits jobs to the control plane.
 [run_submit_load_spec_test.go](run_submit_load_spec_test.go) Tests run submit spec-loading behavior from files and inline inputs.
 [run_submit_test.go](run_submit_test.go) Tests run submit command orchestration, validation, and request payload generation.
-[server_cmd_usage_test.go](server_cmd_usage_test.go) Tests server command usage/help output and command discoverability.
-[server_deploy_cmd.go](server_deploy_cmd.go) Declares server deploy command and orchestrates deploy substeps.
-[server_deploy_dryrun_reuse_test.go](server_deploy_dryrun_reuse_test.go) Tests server deploy dry-run and resource reuse behavior.
-[server_deploy_pki.go](server_deploy_pki.go) PKI generation and certificate handling used by server deploy workflows.
-[server_deploy_provision_test.go](server_deploy_provision_test.go) Tests server deploy provisioning logic and provisioning failure cases.
-[server_deploy_remote.go](server_deploy_remote.go) Remote execution and transport helpers for server deployment operations.
-[server_deploy_run.go](server_deploy_run.go) Main server deploy execution flow coordinating validation and remote actions.
-[server_deploy_validation_test.go](server_deploy_validation_test.go) Tests deploy input validation rules and reject-path behavior.
-[server_flags_test.go](server_flags_test.go) Tests server command flag configuration, defaults, and validation constraints.
-[server_pki_generation_test.go](server_pki_generation_test.go) Tests deterministic PKI generation behavior and certificate field constraints.
-[server_testhelpers_test.go](server_testhelpers_test.go) Shared test helpers for server command tests and fixture setup.
 [testdata/](testdata) Golden fixtures and sample text outputs used by CLI command tests.
 [testmain_test.go](testmain_test.go) TestMain setup for package-wide test configuration and shared lifecycle hooks.
 [token_commands.go](token_commands.go) Token management command handlers for auth token creation and inspection.

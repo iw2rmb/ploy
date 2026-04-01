@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -80,16 +83,41 @@ func TestHandleClusterHelp(t *testing.T) {
 	}
 }
 
-// TestHandleClusterDelegatesDeployToServerDeploy verifies that "cluster deploy"
-// routes to handleServerDeploy. We test this by checking that missing --address
-// produces the server deploy usage error.
-func TestHandleClusterDelegatesDeployToServerDeploy(t *testing.T) {
+// TestHandleClusterDelegatesDeployToClusterDeploy verifies that "cluster deploy"
+// routes to handleClusterDeploy and invokes runtime deployment.
+func TestHandleClusterDelegatesDeployToClusterDeploy(t *testing.T) {
+	t.Setenv("PLOY_CONFIG_HOME", t.TempDir())
+	t.Setenv("PLOY_VERSION", "v0.1.0")
+	oldRunner := runClusterDeployScript
+	oldGen := generateClusterDeployID
+	defer func() { runClusterDeployScript = oldRunner }()
+	defer func() { generateClusterDeployID = oldGen }()
+	generateClusterDeployID = func() (string, error) { return "test-cluster-1234", nil }
+
+	var called bool
+	var gotScript string
+	var gotArgs []string
+	runClusterDeployScript = func(ctx context.Context, scriptPath string, args []string, env []string, stdout, stderr io.Writer) error {
+		called = true
+		gotScript = scriptPath
+		gotArgs = append([]string(nil), args...)
+		return nil
+	}
+
 	buf := &bytes.Buffer{}
 	err := handleCluster([]string{"deploy"}, buf)
 
-	// handleServerDeploy requires --address flag; without it, returns an error.
-	if err == nil || !strings.Contains(err.Error(), "address is required") {
-		t.Fatalf("expected 'address is required' error from handleServerDeploy, got %v", err)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !called {
+		t.Fatal("expected runtime deploy runner to be called")
+	}
+	if !strings.HasSuffix(gotScript, string(filepath.Separator)+"deploy"+string(filepath.Separator)+"run.sh") {
+		t.Fatalf("expected run script path to end with /deploy/run.sh, got %q", gotScript)
+	}
+	if len(gotArgs) != 2 || gotArgs[0] != "--cluster" || gotArgs[1] != "test-cluster-1234" {
+		t.Fatalf("expected generated cluster arg forwarding, got %v", gotArgs)
 	}
 }
 
@@ -200,7 +228,7 @@ func TestPrintClusterUsage(t *testing.T) {
 		"node",
 		"rollout",
 		"token",
-		"Deploy and configure a control plane server",
+		"Deploy runtime stack on the current host",
 		"Manage worker nodes in a cluster",
 		"Perform rolling updates for servers and nodes",
 		"Manage API tokens bound to a cluster",
