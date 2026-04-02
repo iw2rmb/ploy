@@ -33,6 +33,11 @@ func TestOpenAPICompleteness(t *testing.T) {
 		path   string
 		method string
 	}{
+		// Config — Global Env
+		{"/v1/config/env", "get"},
+		{"/v1/config/env/{key}", "get"},
+		{"/v1/config/env/{key}", "put"},
+		{"/v1/config/env/{key}", "delete"},
 		// PKI
 		{"/v1/pki/sign", "post"},
 		{"/v1/pki/sign/admin", "post"},
@@ -144,6 +149,10 @@ func TestOpenAPICompleteness(t *testing.T) {
 	}
 
 	requiredSchemas := []string{
+		"GlobalEnvTarget",
+		"GlobalEnvListItem",
+		"GlobalEnvVar",
+		"GlobalEnvPutRequest",
 		"PKISignRequest",
 		"PKISignResponse",
 		"PKIAdminSignRequest",
@@ -179,6 +188,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 func TestSchemaFilesValid(t *testing.T) {
 	schemaFiles := []string{
 		"components/schemas/common.yaml",
+		"components/schemas/config.yaml",
 		"components/schemas/controlplane.yaml",
 		"components/schemas/pki.yaml",
 	}

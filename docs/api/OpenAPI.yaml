@@ -226,8 +226,8 @@ components:
     PKIClientSignRequest:
       $ref: './components/schemas/pki.yaml#/PKIClientSignRequest'
     # Config schemas (global env, GitLab settings)
-    GlobalEnvScope:
-      $ref: './components/schemas/config.yaml#/GlobalEnvScope'
+    GlobalEnvTarget:
+      $ref: './components/schemas/config.yaml#/GlobalEnvTarget'
     GlobalEnvListItem:
       $ref: './components/schemas/config.yaml#/GlobalEnvListItem'
     GlobalEnvVar:

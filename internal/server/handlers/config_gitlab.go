@@ -22,20 +22,20 @@ type GlobalEnvVar struct {
 
 // ConfigHolder provides thread-safe access to runtime configuration, including
 // GitLab settings and global environment variables.
+// Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
 type ConfigHolder struct {
 	mu        sync.RWMutex
 	gitlab    config.GitLabConfig
-	globalEnv map[string]GlobalEnvVar
+	globalEnv map[string][]GlobalEnvVar
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
-// an optional map of global environment variables. The globalEnv map is copied
-// to ensure the caller cannot mutate internal state.
+// an optional map of global environment variables. Each input entry is stored
+// as a single-element slice keyed by the variable name.
 func NewConfigHolder(gitlab config.GitLabConfig, globalEnv map[string]GlobalEnvVar) *ConfigHolder {
-	// Copy the globalEnv map to avoid external mutation.
-	envCopy := make(map[string]GlobalEnvVar, len(globalEnv))
+	envCopy := make(map[string][]GlobalEnvVar, len(globalEnv))
 	for k, v := range globalEnv {
-		envCopy[k] = v
+		envCopy[k] = []GlobalEnvVar{v}
 	}
 	return &ConfigHolder{
 		gitlab:    gitlab,
@@ -57,45 +57,82 @@ func (h *ConfigHolder) SetGitLab(cfg config.GitLabConfig) {
 	h.gitlab = cfg
 }
 
-// GetGlobalEnv returns a copy of all global environment variables.
-// The returned map is safe to mutate without affecting the holder's state.
+// GetGlobalEnv returns a flat copy of all global environment variables.
+// For keys with multiple targets, the first entry is used.
+// Used by claim spec mutator pipeline; step 4 replaces with target-aware iteration.
 func (h *ConfigHolder) GetGlobalEnv() map[string]GlobalEnvVar {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	// Return a copy to prevent external mutation.
 	envCopy := make(map[string]GlobalEnvVar, len(h.globalEnv))
-	for k, v := range h.globalEnv {
-		envCopy[k] = v
+	for k, entries := range h.globalEnv {
+		if len(entries) > 0 {
+			envCopy[k] = entries[0]
+		}
 	}
 	return envCopy
 }
 
+// GetGlobalEnvEntries retrieves all entries for a key (one per target).
+// Returns nil if the key does not exist.
+func (h *ConfigHolder) GetGlobalEnvEntries(key string) []GlobalEnvVar {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	entries := h.globalEnv[key]
+	if len(entries) == 0 {
+		return nil
+	}
+	cp := make([]GlobalEnvVar, len(entries))
+	copy(cp, entries)
+	return cp
+}
+
 // GetGlobalEnvVar retrieves a single global env var by key.
-// Returns the variable and true if found, or a zero value and false if not.
+// Returns the first entry and true if found, or a zero value and false if not.
 func (h *ConfigHolder) GetGlobalEnvVar(key string) (GlobalEnvVar, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	v, ok := h.globalEnv[key]
-	return v, ok
+	entries := h.globalEnv[key]
+	if len(entries) == 0 {
+		return GlobalEnvVar{}, false
+	}
+	return entries[0], true
 }
 
-// SetGlobalEnvVar sets or updates a global environment variable in memory.
+// SetGlobalEnvVar sets or updates a global environment variable by key+target.
+// If an entry for this key+target already exists, it is replaced.
 // Persistence to the store is the caller's responsibility.
 func (h *ConfigHolder) SetGlobalEnvVar(key string, v GlobalEnvVar) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.globalEnv == nil {
-		h.globalEnv = make(map[string]GlobalEnvVar)
+		h.globalEnv = make(map[string][]GlobalEnvVar)
 	}
-	h.globalEnv[key] = v
+	entries := h.globalEnv[key]
+	for i, e := range entries {
+		if e.Target == v.Target {
+			entries[i] = v
+			h.globalEnv[key] = entries
+			return
+		}
+	}
+	h.globalEnv[key] = append(entries, v)
 }
 
-// DeleteGlobalEnvVar removes a global environment variable by key.
-// No-op if the key does not exist. Persistence is the caller's responsibility.
-func (h *ConfigHolder) DeleteGlobalEnvVar(key string) {
+// DeleteGlobalEnvVar removes a global environment variable by key and target.
+// No-op if the key+target does not exist. Persistence is the caller's responsibility.
+func (h *ConfigHolder) DeleteGlobalEnvVar(key string, target domaintypes.GlobalEnvTarget) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.globalEnv, key)
+	entries := h.globalEnv[key]
+	for i, e := range entries {
+		if e.Target == target {
+			h.globalEnv[key] = append(entries[:i], entries[i+1:]...)
+			if len(h.globalEnv[key]) == 0 {
+				delete(h.globalEnv, key)
+			}
+			return
+		}
+	}
 }
 
 // gitLabConfigResponse is the wire format for GET/PUT /v1/config/gitlab.

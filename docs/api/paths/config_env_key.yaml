@@ -9,14 +9,26 @@ get:
 
     Use this endpoint to retrieve the full value of a secret variable that is
     redacted in the list response.
+
+    **Ambiguity handling:** When the key exists for multiple targets, the
+    `target` query parameter is required. If omitted, the endpoint returns
+    409 Conflict with a list of available targets.
   parameters:
     - in: path
       name: key
       required: true
       schema:
         type: string
-      description: Environment variable key (e.g., CA_CERTS_PEM_BUNDLE, CODEX_AUTH_JSON, CCR_CONFIG_JSON, CRUSH_JSON).
-      example: CA_CERTS_PEM_BUNDLE
+      description: Environment variable key (e.g., PLOY_CA_CERTS, CODEX_AUTH_JSON, CCR_CONFIG_JSON, CRUSH_JSON).
+      example: PLOY_CA_CERTS
+    - in: query
+      name: target
+      required: false
+      schema:
+        $ref: "../components/schemas/config.yaml#/GlobalEnvTarget"
+      description: |
+        Target selector for disambiguation. Required when the key exists for
+        multiple targets; optional when only one target exists.
   responses:
     "200":
       description: OK
@@ -25,18 +37,22 @@ get:
           schema:
             $ref: "../components/schemas/config.yaml#/GlobalEnvVar"
           example:
-            key: "CA_CERTS_PEM_BUNDLE"
+            key: "PLOY_CA_CERTS"
             value: "-----BEGIN CERTIFICATE-----\nMIIC..."
-            scope: "all"
+            target: "gates"
             secret: true
     "400":
-      description: Bad request (key path parameter is required)
+      description: Bad request (key path parameter is required or invalid target)
     "401":
       description: Unauthorized
     "403":
       description: Forbidden (requires cli-admin role)
     "404":
       description: Global environment variable not found
+    "409":
+      description: |
+        Ambiguous key — exists for multiple targets. Specify `?target=` to
+        disambiguate.
     "500":
       description: Server error
 
@@ -47,18 +63,21 @@ put:
   description: |
     Creates or updates a global environment variable entry. The value is stored
     persistently in the config_env table and cached in memory via the config
-    holder. If the key already exists, the entry is updated.
+    holder. If the key+target pair already exists, the entry is updated.
+
+    The same key can be stored with different targets, creating separate entries
+    that are injected into different components.
 
     **Common use cases:**
-    - `CA_CERTS_PEM_BUNDLE` with scope `all` — PEM-encoded CA certificates
-      installed into container trust stores.
-    - `CODEX_AUTH_JSON` with scope `migs` — Codex credentials written to
-      `/out/codex/auth.json` by codex images (`CODEX_HOME=/out/codex` by default).
-    - `CCR_CONFIG_JSON` with scope `migs` — Claude Code Router config written to
+    - `PLOY_CA_CERTS` with target `gates` and `steps` — PEM-encoded CA
+      certificates installed into container trust stores.
+    - `CODEX_AUTH_JSON` with target `steps` — Codex credentials written to
+      `/out/codex/auth.json` by codex images.
+    - `CCR_CONFIG_JSON` with target `steps` — Claude Code Router config written to
       `/root/.claude-code-router/config.json` by codex images.
-    - `CRUSH_JSON` with scope `migs` — Crush JSON content or file path
+    - `CRUSH_JSON` with target `steps` — Crush JSON content or file path
       materialized to `/root/.config/crush/crush.json` by codex images.
-    - `OPENAI_API_KEY` with scope `all` — API key for LLM-integrated migs.
+    - `OPENAI_API_KEY` with target `steps` — API key for LLM-integrated migs.
 
     Requires `cli-admin` role.
   parameters:
@@ -80,19 +99,19 @@ put:
             summary: Set an API key
             value:
               value: "sk-..."
-              scope: "all"
+              target: "steps"
               secret: true
           ca_bundle:
-            summary: Set a CA certificate bundle
+            summary: Set a CA certificate bundle for gates
             value:
               value: "-----BEGIN CERTIFICATE-----\nMIIC..."
-              scope: "all"
+              target: "gates"
               secret: true
           non_secret:
             summary: Set a non-secret variable
             value:
               value: "myvalue"
-              scope: "migs"
+              target: "steps"
               secret: false
   responses:
     "200":
@@ -102,7 +121,7 @@ put:
           schema:
             $ref: "../components/schemas/config.yaml#/GlobalEnvVar"
     "400":
-      description: Bad request (invalid JSON or invalid scope)
+      description: Bad request (invalid JSON or invalid target)
     "401":
       description: Unauthorized
     "403":
@@ -119,6 +138,10 @@ delete:
     from the in-memory config holder. This is an idempotent operation; deleting
     a non-existent key does not return an error.
 
+    **Ambiguity handling:** When the key exists for multiple targets, the
+    `target` query parameter is required. If only one target exists, the target
+    is inferred automatically. If the key does not exist, returns 204 immediately.
+
     Requires `cli-admin` role.
   parameters:
     - in: path
@@ -128,14 +151,27 @@ delete:
         type: string
       description: Environment variable key.
       example: OLD_VAR
+    - in: query
+      name: target
+      required: false
+      schema:
+        $ref: "../components/schemas/config.yaml#/GlobalEnvTarget"
+      description: |
+        Target selector for disambiguation. Required when the key exists for
+        multiple targets; optional when only one target exists or the key does
+        not exist.
   responses:
     "204":
       description: Deleted (or already absent)
     "400":
-      description: Bad request (key path parameter is required)
+      description: Bad request (key path parameter is required or invalid target)
     "401":
       description: Unauthorized
     "403":
       description: Forbidden (requires cli-admin role)
+    "409":
+      description: |
+        Ambiguous key — exists for multiple targets. Specify `?target=` to
+        disambiguate.
     "500":
       description: Server error

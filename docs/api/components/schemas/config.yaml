@@ -3,39 +3,41 @@
 # These schemas define the types used by the /v1/config/* endpoints for
 # managing control-plane configuration (global env, GitLab settings, etc.).
 
-# GlobalEnvScope represents the allowed scope values that control which
-# job types receive a global environment variable.
-GlobalEnvScope:
+# GlobalEnvTarget represents the allowed target values that control which
+# components or job types receive a global environment variable.
+GlobalEnvTarget:
   type: string
   description: |
-    Scope that controls which job types receive this variable.
-    - `all` — Inject into every job type (mig, heal, pre_gate, re_gate, post_gate)
-    - `migs` — Inject into `mig` and `post_gate` jobs (code modification phases)
-    - `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
-    - `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate phases)
-  enum: [all, migs, heal, gate]
-  example: "all"
+    Target that controls which components or job types receive this variable.
+    - `server` — Inject into the server process
+    - `nodes` — Inject into node agent processes
+    - `gates` — Inject into gate jobs (pre_gate, re_gate, post_gate)
+    - `steps` — Inject into step jobs (mig, heal)
+  enum: [server, nodes, gates, steps]
+  example: "gates"
 
 # GlobalEnvListItem represents an entry in the GET /v1/config/env list response.
 # For entries marked as secret, the value is omitted to prevent accidental exposure.
+# A key may appear multiple times with different targets.
 GlobalEnvListItem:
   type: object
   description: |
     A global environment variable entry as returned in list responses.
     Secret values are omitted (redacted) in list views.
+    The same key may appear multiple times with different targets.
   properties:
     key:
       type: string
-      description: Environment variable key (e.g., CA_CERTS_PEM_BUNDLE).
-      example: "CA_CERTS_PEM_BUNDLE"
+      description: Environment variable key (e.g., PLOY_CA_CERTS).
+      example: "PLOY_CA_CERTS"
     value:
       type: string
       description: |
         Environment variable value. Present only for non-secret entries;
         omitted for secrets in list responses.
       example: "myvalue"
-    scope:
-      $ref: '#/GlobalEnvScope'
+    target:
+      $ref: '#/GlobalEnvTarget'
     secret:
       type: boolean
       description: |
@@ -44,7 +46,7 @@ GlobalEnvListItem:
       example: true
   required:
     - key
-    - scope
+    - target
     - secret
 
 # GlobalEnvVar represents a full global environment variable entry including
@@ -59,13 +61,13 @@ GlobalEnvVar:
     key:
       type: string
       description: Environment variable key.
-      example: "CA_CERTS_PEM_BUNDLE"
+      example: "PLOY_CA_CERTS"
     value:
       type: string
       description: Environment variable value (full, not redacted).
       example: "-----BEGIN CERTIFICATE-----\nMIIC..."
-    scope:
-      $ref: '#/GlobalEnvScope'
+    target:
+      $ref: '#/GlobalEnvTarget'
     secret:
       type: boolean
       description: Whether this variable should be treated as secret.
@@ -73,7 +75,7 @@ GlobalEnvVar:
   required:
     - key
     - value
-    - scope
+    - target
     - secret
 
 # GlobalEnvPutRequest represents the request body for PUT /v1/config/env/{key}.
@@ -81,8 +83,9 @@ GlobalEnvPutRequest:
   type: object
   description: |
     Request body for creating or updating a global environment variable.
-    The key is specified in the URL path; the body contains value, scope,
-    and secret flag.
+    The key is specified in the URL path; the body contains value, target,
+    and secret flag. Target is required and determines where the variable
+    is injected.
   properties:
     value:
       type: string
@@ -90,9 +93,8 @@ GlobalEnvPutRequest:
         Environment variable value. For file-based content (certificates, JSON
         credentials), the CLI reads the file and sends the content as this value.
       example: "sk-..."
-    scope:
-      $ref: '#/GlobalEnvScope'
-      default: "all"
+    target:
+      $ref: '#/GlobalEnvTarget'
     secret:
       type: boolean
       description: |
@@ -102,3 +104,4 @@ GlobalEnvPutRequest:
       example: true
   required:
     - value
+    - target
