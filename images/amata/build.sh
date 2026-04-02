@@ -7,9 +7,9 @@ cd "$ROOT_DIR"
 PLATFORM="${PLATFORM:-linux/amd64}"
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
 
-PLATFORM="$PLATFORM" deploy/images/amata/build-amata.sh
+PLATFORM="$PLATFORM" images/amata/build-amata.sh
 docker buildx build \
   --platform "$PLATFORM" \
-  -f deploy/images/amata/Dockerfile \
+  -f images/amata/Dockerfile \
   -t "${IMAGE_PREFIX}/amata:latest" \
   --push .

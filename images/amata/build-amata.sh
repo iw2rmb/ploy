@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # amata Docker build context so the Dockerfile can COPY it without any
 # in-image compilation.
 #
-# Output: deploy/images/amata/amata  (ELF binary for PLATFORM, default linux/amd64)
+# Output: images/amata/amata  (ELF binary for PLATFORM, default linux/amd64)
 #
 # Must be invoked from the ploy repository root, or run directly; the script
 # resolves paths from its own location.

@@ -13,11 +13,11 @@ import (
 // using key+target composite primary key semantics.
 // See docs/envs/README.md#Global Env Configuration for user-facing semantics.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestConfigEnv_CRUD(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()

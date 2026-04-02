@@ -10,122 +10,48 @@ Ploy is a workstation‑first orchestration stack for code‑mig (Migs) workflow
 
 Ploy uses a server/node split with PostgreSQL for state and mTLS for all control‑plane traffic. Nodes clone repositories shallow on-demand and upload diffs/logs/artifacts back to PostgreSQL.
 
-**High-Level Architecture**
-- Control plane:
-  - `ployd` exposes a `/v1/migs` facade for migs runs and a small set of cluster/control endpoints (PKI, nodes, repos).
-  - Runs are stored in PostgreSQL along with jobs, logs, diffs, and artifact bundles.
-- Workers:
-  - `ployd-node` claims jobs from the control plane, hydrates an ephemeral workspace, runs migs/build/tests, and streams logs/diffs/artifacts to the server.
-  - Workers derive MR branches and repo metadata (e.g., `ploy/{run_name|run_id}` when `--repo-target-ref` is omitted) from the run they execute.
-- Security:
-  - PKI-backed mTLS between CLI, server, and nodes; cluster CA and node/server certificates are managed by `ployd`.
-  - Certificates carry roles (CLI, control‑plane, worker) via subject fields; authorization is enforced by the server.
+## Install
 
-For the detailed API surface and schemas, see `docs/api/OpenAPI.yaml`. This README focuses on what Ploy is, how to deploy it, and how to use it from the CLI.
-
-**Docs You'll Want**
-- Overview & quick start: this `README.md`.
-- Local Docker cluster: `docs/how-to/deploy-locally.md`.
-- TUI navigation: `docs/how-to/tui-navigation.md`.
-- Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative schemas).
-- Environment variables: `docs/envs/README.md`.
-- Migs lifecycle and SSE events: `docs/migs-lifecycle.md`.
-- Contributor rules and testing workflow: `AGENTS.md`, `docs/testing-workflow.md`.
-
-**Installation**
-
-For end users, install the Ploy CLI using one of these methods:
-
-**Homebrew (macOS/Linux)**
+Homebrew (macOS/Linux):
 ```bash
 brew install --cask iw2rmb/ploy/ploy
 ```
 
-**Direct Download**
+Direct download: [latest release](https://github.com/iw2rmb/ploy/releases/latest)
 
-Download pre-built binaries from the [latest release](https://github.com/iw2rmb/ploy/releases/latest):
-- `ploy` — CLI for workstations (Linux, macOS, Windows)
-- `ployd` — Server daemon (Linux, macOS)
-- `ployd-node` — Worker node daemon (Linux, macOS)
+Build from source:
+```bash
+make build
+```
 
-Extract and move the binary to a directory in your `PATH` (e.g., `/usr/local/bin`).
+## Quick Start
 
-**Build**
-- Requirements: Go 1.25+. Docker is optional for local step execution; node container execution is scaffolded in this slice.
-- Build binaries from source into `dist/`:
+```bash
+export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
+export PLOY_OBJECTSTORE_ENDPOINT='http://localhost:3900'
+export PLOY_OBJECTSTORE_ACCESS_KEY='...'
+export PLOY_OBJECTSTORE_SECRET_KEY='...'
+export PLOY_VERSION='v0.1.0'                  # optional; defaults to ./VERSION
+export PLOY_CA_CERTS='/path/to/ca-bundle.pem' # optional
 
-  ```bash
-  make build
-  ```
+ploy cluster deploy
+```
 
-This produces `dist/ploy` and `dist/ployd`.
+Submit and follow a run:
 
-Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFIG_PATH` to change the default (`/etc/ploy/ployd.yaml`). The flag overrides the environment variable when both are provided.
+```bash
+ploy mig run \
+  --repo-url https://github.com/example/repo.git \
+  --repo-base-ref main \
+  --follow
+```
 
-**Listeners**
-- Local Docker control plane: `http://localhost:8080` (bearer token auth). Health at `/health`.
-- Metrics: `http://localhost:9100/metrics`.
+## Documentation
 
-**Scheduler & TTL**
-- Background tasks run under `internal/server/scheduler`.
-- TTL cleanup (`internal/store/ttlworker`) purges old rows and can drop monthly partitions.
-- YAML (`scheduler` section):
-  - `ttl`: retention for logs/events/diffs/artifact_bundles (default 30d if unset)
-  - `ttl_interval`: how often the cleanup runs (default 1h if unset)
-  - `drop_partitions`: when true, drop whole monthly partitions older than `ttl`
-  - `stale_job_recovery_interval`: stale-running-job recovery cycle interval (default 30s; set `0` to disable)
-  - `node_stale_after`: node heartbeat staleness threshold used by recovery (default 1m)
-
-**Quick Start (Runtime Images from GHCR)**
-- Deploy with pre-built GHCR images (pull-before-run enabled by default):
-
-  ```bash
-  export PLOY_DB_DSN='postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable'
-  export PLOY_VERSION='v0.1.0'                           # optional; defaults to ./VERSION
-  export PLOY_CA_CERTS='/path/to/ca-bundle.pem'          # optional
-  export PLOY_OBJECTSTORE_ENDPOINT='http://localhost:3900'
-  export PLOY_OBJECTSTORE_ACCESS_KEY='...'
-  export PLOY_OBJECTSTORE_SECRET_KEY='...'
-  ./deploy/runtime/run.sh
-  ```
-
-- Runtime auth state is stored at `~/.config/ploy/<cluster>/auth.json` (default cluster: `local`).
-
-- Submit a mig run and follow events:
-
-  ```bash
-  ./dist/ploy mig run --repo-url https://github.com/example/repo.git \
-    --repo-base-ref main \
-    --follow
-  ```
-
-  # Optional: include an explicit target ref to control the MR source branch
-  # (otherwise the node derives ploy/{run_name|run_id} when an MR is created).
-  ./dist/ploy mig run --repo-url https://github.com/example/repo.git \
-    --repo-base-ref main \
-    --repo-target-ref feature/upgrade \
-    --mr-success \
-    --follow
-
-- Stream run logs via SSE:
-
-  ```bash
-  ./dist/ploy run logs <run-id>
-  ```
-
-**Tests**
-- Run unit tests: `make test`
-- Run full local CI bundle (format, vet, staticcheck if installed, tests): `make ci-check`
-
-**Environment Variables**
-- Full reference: `docs/envs/README.md`
-- Key variables:
-  - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server.
-  - `PLOY_CONFIG_HOME` — Optional config root used by runtime deploy state (`<root>/<cluster>/auth.json`).
-  - `PLOY_BUILDGATE_IMAGE` — Optional Build Gate container image override.
-
-**Contributing**
-- Follow `AGENTS.md` and `docs/testing-workflow.md` (`make test` runs `go test ./internal/... ./cmd/...`).
-- Keep docs in sync; update `README.md` and `docs/` as needed.
+- Deploy cluster: `docs/how-to/deploy.md`
+- API schema: `docs/api/OpenAPI.yaml`
+- Environment variables: `docs/envs/README.md`
+- Migs lifecycle: `docs/migs-lifecycle.md`
+- TUI usage: `docs/how-to/tui-navigation.md`
 
 License: see `LICENSE` when present.

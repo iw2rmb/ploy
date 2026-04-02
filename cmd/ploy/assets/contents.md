@@ -1,1 +1,1 @@
-[runtime.tgz](runtime.tgz) Embedded compressed runtime deployment bundle extracted and executed by `ploy cluster deploy`.
+[runtime/](runtime) Source runtime deployment assets packaged into `runtime.tgz` for `ploy cluster deploy`.

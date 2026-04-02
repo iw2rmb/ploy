@@ -12,9 +12,9 @@ import (
 func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	skipDBIntegrationUnderCoverage(t)
 
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping smoke workflow test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping smoke workflow test")
 	}
 
 	ctx := context.Background()

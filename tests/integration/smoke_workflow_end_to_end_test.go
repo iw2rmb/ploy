@@ -15,9 +15,9 @@ import (
 func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	skipDBIntegrationUnderCoverage(t)
 
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping smoke workflow test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping smoke workflow test")
 	}
 
 	ctx := context.Background()
@@ -370,4 +370,4 @@ index abc1234..def5678 100644
 // C2: This test verifies the unified job+diff model where both mig and healing diffs
 // share the same next_id, enabling rehydration to include all diffs for a step.
 //
-// Requires: PLOY_TEST_PG_DSN environment variable.
+// Requires: PLOY_TEST_DB_DSN environment variable.

@@ -23,7 +23,7 @@ defaults change, or components adopt additional configuration.
   fails fast when an unknown adapter name is provided.
 - `PLOY_DB_DSN` — Required by local and offline-VPS deploy workflows.
   Used both for host-side setup SQL (DB create/drop, token insert, node seed)
-  and injected into the server container as `PLOY_POSTGRES_DSN`.
+  and injected into the server container as `PLOY_DB_DSN`.
   Host-side DSN may use `localhost`; local deploy rewrites loopback hosts
   (`localhost`, `127.0.0.1`, `::1`) to `host.docker.internal` for container use.
   For VPS deploy, the DSN must already be reachable from both the remote host
@@ -50,7 +50,7 @@ defaults change, or components adopt additional configuration.
   host port `8080` is already occupied (example: `PLOY_SERVER_PORT=18080`).
 - `PLOY_RUNTIME_PULL_IMAGES` — Runtime-local deploy toggle for pull-before-start behavior.
   Defaults to `1` (enabled). Set `0`/`false` to skip `docker compose pull`.
-- `PLOY_VERSION` — Runtime image semver tag used by `deploy/runtime/run.sh` when explicit image
+- `PLOY_VERSION` — Runtime image semver tag used by `ploy cluster deploy` when explicit image
   overrides are not set. Defaults to `./VERSION` in the repo root.
 - `PLOY_RUNTIME_SERVER_IMAGE` — Optional runtime-local server image override.
   Default: `ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}`.
@@ -456,15 +456,14 @@ See the **GitLab Merge Request Integration** section above for usage examples an
 The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 
 Precedence at server startup:
-- `PLOY_POSTGRES_DSN` (preferred)
+- `PLOY_DB_DSN` (preferred)
 - `postgres.dsn` in the config file
 
-- `PLOY_POSTGRES_DSN` — DSN the server reads at startup to open a PostgreSQL pool.
+- `PLOY_DB_DSN` — DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
-  The server no longer recognizes `PLOY_SERVER_PG_DSN`.
-- `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by integration and database-backed tests. When unset, such tests skip automatically.
+- `PLOY_TEST_DB_DSN` — Optional Postgres DSN used by integration and database-backed tests. When unset, such tests skip automatically.
 
-`ployd` reads `PLOY_POSTGRES_DSN` at startup; when unset, it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_POSTGRES_DSN}` in
+`ployd` reads `PLOY_DB_DSN` at startup; when unset, it falls back to `postgres.dsn` in the config file. Placeholders like `$PLOY_DB_DSN` in
 the config file are treated as unset unless the environment variable is actually present.
 
 - `PLOY_DOCKER_NETWORK` — Optional Docker network name to attach runtime containers (Build Gate
@@ -491,20 +490,6 @@ are stored in the object store.
 | `PLOY_OBJECTSTORE_SECURE` | Use TLS (true/false) | `false` |
 | `PLOY_OBJECTSTORE_REGION` | AWS region (optional; for local Garage use `garage`) | - |
 
-Deploy scripts consume the following S3 envs and map them to server object store settings:
-- `PLOY_S3_URL` -> `PLOY_OBJECTSTORE_ENDPOINT`
-- `PLOY_S3_ACCESS_KEY` -> `PLOY_OBJECTSTORE_ACCESS_KEY`
-- `PLOY_S3_SECRET_KEY` -> `PLOY_OBJECTSTORE_SECRET_KEY`
-
-For local development, these are configured in the local compose stack. The local stack includes:
-- Garage service for S3-compatible storage.
-- `garage-init` bootstrap that creates/authorizes:
-  - `${CLUSTER_ID:-local}` bucket (logs/diffs/artifacts blobs)
-  - `ploy-registry` bucket (OCI registry backing storage)
-- Local OCI registry (`registry`) backed by Garage S3 API.
-
-Alternatively, you can specify these in the server config file under `object_store.*`. Environment
-variables take precedence over the config file when both are present.
 
 ## Global Env Configuration
 
@@ -708,28 +693,6 @@ See `docs/api/OpenAPI.yaml` paths:
 - `PUT /v1/config/env/{key}` — Create or update an entry
 - `DELETE /v1/config/env/{key}` — Delete an entry
 
-## Legacy (Removed November 2025)
-
-The following variables are **no longer consumed** by the codebase after the Postgres/mTLS pivot:
-
-### GitLab Signer (Removed)
-- `PLOY_GITLAB_SIGNER_AES_KEY` — Removed (GitLab signer deleted).
-- `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Removed.
-- `PLOY_GITLAB_SIGNER_MAX_TTL` — Removed.
-- `PLOY_GITLAB_API_BASE_URL` — Removed.
-- `PLOY_GITLAB_ADMIN_TOKEN` — Removed.
-
-### etcd (Removed)
-- `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Replaced with PostgreSQL.
-- `PLOY_ETCD_TLS_CA` / `PLOY_ETCD_TLS_CERT` / `PLOY_ETCD_TLS_KEY` — Removed.
-- `PLOY_ETCD_TLS_SKIP_VERIFY` — Removed.
-
-### SSH Tunnels (Removed)
-- `PLOY_SSH_USER` — CLI uses direct HTTPS/mTLS.
-- `PLOY_SSH_IDENTITY` — Removed.
-- `PLOY_SSH_SOCKET_DIR` — Removed.
-- `PLOY_CACHE_HOME` — Removed.
-- `PLOY_TRANSFERS_BASE_DIR` — Removed (SSH-based artifact staging deleted).
 
 ### Other
 - `PLOY_ARTIFACT_ROOT` — Local artifact caching removed; nodes use ephemeral workspaces.
@@ -737,8 +700,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 ## Related Docs
 
 - [Migs lifecycle](../migs-lifecycle.md) — Server/node execution and orchestration flow
-- [Testing workflow](../testing-workflow.md) — Go testing workflow and local validation commands
-- [Local deployment](../how-to/deploy-locally.md) — Local Docker cluster
+- [Deployment](../how-to/deploy.md) — Local Docker cluster
 
 ## Build Gate Limits
 

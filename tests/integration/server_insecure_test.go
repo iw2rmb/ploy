@@ -19,13 +19,13 @@ import (
 // TestServerStartStop_InsecureMode verifies that the server can start and stop
 // with mTLS disabled using AllowInsecure authorizer (test-only configuration).
 //
-// This test requires a test database accessible via PLOY_TEST_PG_DSN.
+// This test requires a test database accessible via PLOY_TEST_DB_DSN.
 func TestServerStartStop_InsecureMode(t *testing.T) {
 	skipDBIntegrationUnderCoverage(t)
 
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -29,8 +29,8 @@ Current ORW runners execute through build tools:
 - Maven path: `orw-maven` invokes `mvn org.openrewrite.maven:rewrite-maven-plugin:run`
 
 Relevant scripts:
-- `deploy/images/migs/orw-gradle/orw-gradle.sh`
-- `deploy/images/migs/orw-maven/orw-maven.sh`
+- `images/migs/orw-gradle/orw-gradle.sh`
+- `images/migs/orw-maven/orw-maven.sh`
 
 Current model properties:
 - runs inside full project build lifecycle
@@ -157,10 +157,10 @@ Update runtime metadata:
 ## File-Level Change Plan
 
 Create:
-- `deploy/images/orw/orw-cli-gradle/Dockerfile`
-- `deploy/images/orw/orw-cli-gradle/orw-cli.sh`
-- `deploy/images/orw/orw-cli-maven/Dockerfile`
-- `deploy/images/orw/orw-cli-maven/orw-cli.sh`
+- `images/orw/orw-cli-gradle/Dockerfile`
+- `images/orw/orw-cli-gradle/orw-cli.sh`
+- `images/orw/orw-cli-maven/Dockerfile`
+- `images/orw/orw-cli-maven/orw-cli.sh`
 - tests for CLI runtime behavior under `tests/integration/migs/` (renamed path in same slice if required)
 
 Update:
@@ -169,8 +169,8 @@ Update:
 - docs that reference `migs-orw-gradle` and `migs-orw-maven`
 
 Remove:
-- `deploy/images/migs/orw-gradle/`
-- `deploy/images/migs/orw-maven/`
+- `images/migs/orw-gradle/`
+- `images/migs/orw-maven/`
 - docs and tests that assert plugin-based ORW behavior
 
 ## Testing Plan
@@ -217,7 +217,7 @@ No compatibility mode and no fallback path.
 
 ## References
 
-- `deploy/images/migs/orw-gradle/orw-gradle.sh`
-- `deploy/images/migs/orw-maven/orw-maven.sh`
+- `images/migs/orw-gradle/orw-gradle.sh`
+- `images/migs/orw-maven/orw-maven.sh`
 - `docs/migs-lifecycle.md`
 - `docs/envs/README.md`

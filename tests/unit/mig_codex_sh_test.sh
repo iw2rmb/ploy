@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for deploy/images/codex/entrypoint.sh (container command: codex)
+# Unit tests for images/codex/entrypoint.sh (container command: codex)
 # Tests CLI flag detection, JSONL event capture, session ID extraction,
 # and run manifest/session metadata.
 #
@@ -12,7 +12,7 @@
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-SCRIPT="$ROOT_DIR/deploy/images/codex/entrypoint.sh"
+SCRIPT="$ROOT_DIR/images/codex/entrypoint.sh"
 
 # Create a temporary copy of the codex entrypoint for test execution.
 create_test_script() {

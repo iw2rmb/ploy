@@ -42,7 +42,7 @@ set -euo pipefail
 # CONFIGURATION
 ################################################################################
 
-# Default to the local Docker cluster descriptor written by deploy/runtime/run.sh.
+# Default to the local Docker cluster descriptor written by ploy cluster deploy.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy/local}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"

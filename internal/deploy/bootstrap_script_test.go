@@ -116,7 +116,7 @@ func TestPrefixedScript_PostgreSQLInstallation(t *testing.T) {
 	if !strings.Contains(script, "CREATE DATABASE ploy OWNER ploy") {
 		t.Fatalf("script should create ploy database")
 	}
-	if !strings.Contains(script, "export PLOY_POSTGRES_DSN=") {
+	if !strings.Contains(script, "export PLOY_DB_DSN=") {
 		t.Fatalf("script should export derived DSN")
 	}
 }

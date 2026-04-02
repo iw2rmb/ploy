@@ -6,25 +6,25 @@
 
 **Prereqs**
 
-- Local Docker cluster deployed via `deploy/runtime/run.sh`.
+- Local Docker cluster deployed via `ploy cluster deploy`.
 - CLI configured for the local cluster:
   - `export PLOY_CONFIG_HOME="$HOME/.config/ploy/local"`
   - Scenario scripts auto-rebuild/repair `default` and validate the bearer token before run submission.
-  - Repair first tries `deploy/runtime/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
-  - If both descriptor and token seed are missing, rerun `deploy/runtime/run.sh`.
+  - Repair first tries `cmd/ploy/assets/runtime/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
+  - If both descriptor and token seed are missing, rerun `ploy cluster deploy`.
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
 **Build + Publish Mods Images (Local Registry)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f deploy/images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
-  - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f deploy/images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
-  - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f deploy/images/codex/Dockerfile -t codex:e2e .`
-  - Amata runner: from repo root run `bash deploy/images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f deploy/images/amata/Dockerfile -t amata:e2e .`
+  - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
+  - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
+  - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f images/codex/Dockerfile -t codex:e2e .`
+  - Amata runner: from repo root run `bash images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f images/amata/Dockerfile -t amata:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local registry using the helper script:
-  - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 deploy/images/build-and-push.sh`
+  - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 images/build-and-push.sh`
   - The script pushes `amata`, `codex`, `shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
   - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 

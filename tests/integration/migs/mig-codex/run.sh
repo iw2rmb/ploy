@@ -23,7 +23,7 @@ if [[ -z "${CODEX_AUTH_JSON:-}" ]]; then
 fi
 
 echo "[run] Building codex image (repo root)…" >&2
-docker build -t codex:latest -f deploy/images/codex/Dockerfile . >/dev/null
+docker build -t codex:latest -f images/codex/Dockerfile . >/dev/null
 
 echo "[run] Executing integration test…" >&2
 GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/migs/codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1

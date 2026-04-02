@@ -7,7 +7,7 @@ import (
 
 func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	script := renderBootstrapScript(map[string]string{
-		"PLOY_POSTGRES_DSN":       "postgres://user:pass@localhost:5432/ploy?sslmode=disable",
+		"PLOY_DB_DSN":             "postgres://user:pass@localhost:5432/ploy?sslmode=disable",
 		"PLOY_INSTALL_POSTGRESQL": "true",
 		"PLOY_CA_CERT_PEM":        "-----BEGIN CERTIFICATE-----\nABC\n-----END CERTIFICATE-----\n",
 		"BOOTSTRAP_PRIMARY":       "true",
@@ -21,7 +21,7 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 		}
 	}
 
-	assertContains("export PLOY_POSTGRES_DSN='postgres://user:pass@localhost:5432/ploy?sslmode=disable'")
+	assertContains("export PLOY_DB_DSN='postgres://user:pass@localhost:5432/ploy?sslmode=disable'")
 	assertContains("export PLOY_INSTALL_POSTGRESQL='true'")
 	assertContains("export PLOY_CA_CERT_PEM='-----BEGIN CERTIFICATE-----")
 
@@ -37,7 +37,7 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	assertContains("metrics:")
 	assertContains("listen: :9100")
 	assertContains("postgres:")
-	assertContains("dsn: ${PLOY_POSTGRES_DSN:-}")
+	assertContains("dsn: ${PLOY_DB_DSN:-}")
 
 	// Assert server systemd unit fragments exist
 	assertContains("cat > /etc/systemd/system/ployd.service <<EOF")
@@ -73,7 +73,7 @@ func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
 	// Should contain the install flag
 	assertContains("export PLOY_INSTALL_POSTGRESQL='true'")
 
-	// Should NOT contain PLOY_POSTGRES_DSN in the initial environment exports
+	// Should NOT contain PLOY_DB_DSN in the initial environment exports
 	// (it will be set later during the PostgreSQL install section)
 	lines := strings.Split(script, "\n")
 	foundInEnvExports := false
@@ -81,9 +81,9 @@ func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
 	for i, line := range lines {
 		// The environment exports section ends at the first non-export line after exports start
 		if inEnvSection && strings.HasPrefix(strings.TrimSpace(line), "export ") {
-			if strings.Contains(line, "PLOY_POSTGRES_DSN") {
+			if strings.Contains(line, "PLOY_DB_DSN") {
 				foundInEnvExports = true
-				t.Logf("Found PLOY_POSTGRES_DSN in env exports at line %d: %q", i, line)
+				t.Logf("Found PLOY_DB_DSN in env exports at line %d: %q", i, line)
 			}
 		} else if inEnvSection && strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "export ") {
 			// End of environment exports section
@@ -92,7 +92,7 @@ func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
 	}
 
 	if foundInEnvExports {
-		t.Fatalf("PLOY_POSTGRES_DSN should not be in initial environment exports when installing PostgreSQL")
+		t.Fatalf("PLOY_DB_DSN should not be in initial environment exports when installing PostgreSQL")
 	}
 
 	// Verify functional body fragments exist

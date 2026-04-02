@@ -19,11 +19,11 @@ import (
 // The fix uses FOR UPDATE SKIP LOCKED in the subquery and a status predicate
 // in the update to ensure concurrent schedulers cannot race.
 //
-// Requires PLOY_TEST_PG_DSN to be set with a test database.
+// Requires PLOY_TEST_DB_DSN to be set with a test database.
 func TestScheduleNextJobNoRace(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx := context.Background()
@@ -160,9 +160,9 @@ func TestScheduleNextJobNoRace(t *testing.T) {
 // TestScheduleNextJobSequential verifies that sequential calls to ScheduleNextJob
 // correctly schedule jobs in next_id order.
 func TestScheduleNextJobSequential(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx := context.Background()

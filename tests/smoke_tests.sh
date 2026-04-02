@@ -14,7 +14,7 @@
 #   --full:  Run all tests including e2e scenarios (requires cluster)
 #
 # Environment:
-#   PLOY_TEST_PG_DSN: PostgreSQL connection string for integration tests
+#   PLOY_TEST_DB_DSN: PostgreSQL connection string for integration tests
 #                     Example: postgresql://user:pass@localhost:5432/ploy_test
 #   SKIP_E2E:         Set to "1" to skip e2e tests even in --full mode
 #
@@ -124,10 +124,10 @@ check_prerequisites() {
     log_success "Found go: $(go version)"
 
     # For integration tests, check database connectivity
-    if [[ -n "${PLOY_TEST_PG_DSN:-}" ]]; then
-        log_success "PLOY_TEST_PG_DSN is set for integration tests"
+    if [[ -n "${PLOY_TEST_DB_DSN:-}" ]]; then
+        log_success "PLOY_TEST_DB_DSN is set for integration tests"
     else
-        log_warn "PLOY_TEST_PG_DSN not set; database integration tests will be skipped"
+        log_warn "PLOY_TEST_DB_DSN not set; database integration tests will be skipped"
     fi
 }
 
@@ -135,8 +135,8 @@ check_prerequisites() {
 run_integration_tests() {
     log_section "Integration Tests"
 
-    if [[ -z "${PLOY_TEST_PG_DSN:-}" ]]; then
-        log_warn "Skipping integration tests (PLOY_TEST_PG_DSN not set)"
+    if [[ -z "${PLOY_TEST_DB_DSN:-}" ]]; then
+        log_warn "Skipping integration tests (PLOY_TEST_DB_DSN not set)"
         return 0
     fi
 

@@ -8,7 +8,7 @@ This directory contains integration tests, end-to-end tests, and smoke test orch
 tests/
 ├── README.md                 # This file
 ├── smoke_tests.sh           # Orchestrates smoke tests across integration and e2e
-├── integration/             # Integration tests (require PLOY_TEST_PG_DSN)
+├── integration/             # Integration tests (require PLOY_TEST_DB_DSN)
 │   ├── build_test.go
 │   ├── happy_path_test.go
 │   ├── lab_smoke_test.go
@@ -42,7 +42,7 @@ tests/
 
 2. **For integration tests, set up a test database:**
    ```bash
-   export PLOY_TEST_PG_DSN="postgresql://user:pass@localhost:5432/ploy_test"
+   export PLOY_TEST_DB_DSN="postgresql://user:pass@localhost:5432/ploy_test"
    ```
    The database must exist and have migrations applied. See `internal/store/migrations/` for schema.
 
@@ -60,7 +60,7 @@ bash tests/smoke_tests.sh --quick
 ```
 - Runs unit tests for critical packages (backoff, SSE, GitLab client)
 - Runs CLI smoke tests (version, help)
-- Runs integration tests if `PLOY_TEST_PG_DSN` is set
+- Runs integration tests if `PLOY_TEST_DB_DSN` is set
 - **Duration:** ~1-2 minutes
 - **Use case:** Local development validation, pre-commit checks
 
@@ -92,7 +92,7 @@ go test -v ./internal/cli/stream/...
 go test -v ./internal/nodeagent/gitlab/...
 ```
 
-**Integration tests (require PLOY_TEST_PG_DSN):**
+**Integration tests (require PLOY_TEST_DB_DSN):**
 ```bash
 # All integration tests
 go test -v ./tests/integration/...
@@ -222,9 +222,9 @@ import (
 )
 
 func TestYourFeature(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx := context.Background()
@@ -281,20 +281,20 @@ The smoke test suite is designed for CI environments:
 - name: Run smoke tests (quick)
   run: bash tests/smoke_tests.sh --quick
   env:
-    PLOY_TEST_PG_DSN: ${{ secrets.TEST_PG_DSN }}
+    PLOY_TEST_DB_DSN: ${{ secrets.TEST_PG_DSN }}
 
 - name: Run smoke tests (full)
   if: github.ref == 'refs/heads/main'
   run: bash tests/smoke_tests.sh --full
   env:
-    PLOY_TEST_PG_DSN: ${{ secrets.TEST_PG_DSN }}
+    PLOY_TEST_DB_DSN: ${{ secrets.TEST_PG_DSN }}
     SKIP_E2E: "1"  # Skip e2e if cluster not available in CI
 ```
 
 ## Troubleshooting
 
 ### Integration tests fail: "connection refused"
-- Ensure PostgreSQL is running and `PLOY_TEST_PG_DSN` is correct.
+- Ensure PostgreSQL is running and `PLOY_TEST_DB_DSN` is correct.
 - Verify database exists and migrations are applied.
 
 ### E2E tests fail: "cluster not configured"

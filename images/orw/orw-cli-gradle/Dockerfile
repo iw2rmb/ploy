@@ -5,8 +5,8 @@
 FROM --platform=$BUILDPLATFORM maven:3.9.11-eclipse-temurin-17 AS rewrite-runner-build
 
 WORKDIR /build
-COPY deploy/images/orw/orw-cli-gradle/rewrite-runner/pom.xml rewrite-runner/pom.xml
-COPY deploy/images/orw/shared/orw-cli-runner/src rewrite-runner/src
+COPY images/orw/orw-cli-gradle/rewrite-runner/pom.xml rewrite-runner/pom.xml
+COPY images/orw/shared/orw-cli-runner/src rewrite-runner/src
 RUN --mount=type=cache,target=/root/.m2 \
     bash -euxo pipefail -c 'cd rewrite-runner && mvn -q -DskipTests package'
 
@@ -32,7 +32,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
     'exec java -jar /opt/orw-cli-runner/orw-cli-runner.jar "$@"' \
     > /usr/local/bin/rewrite && chmod +x /usr/local/bin/rewrite
 
-COPY --chmod=755 deploy/images/orw/orw-cli-gradle/orw-cli.sh /usr/local/bin/orw-cli
+COPY --chmod=755 images/orw/orw-cli-gradle/orw-cli.sh /usr/local/bin/orw-cli
 RUN ln -s /usr/local/bin/orw-cli /usr/local/bin/migs-orw-cli
 
 ENTRYPOINT ["migs-orw-cli"]
