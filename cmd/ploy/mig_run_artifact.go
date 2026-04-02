@@ -1,4 +1,4 @@
-// mod_run_artifact.go isolates artifact download and fetching logic.
+// mig_run_artifact.go isolates artifact download and fetching logic.
 //
 // This file contains downloadRunArtifacts which fetches run status
 // and downloads referenced artifacts to disk. It generates deterministic
@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // downloadRunArtifacts fetches run status and downloads referenced artifacts into dir.
@@ -49,17 +49,17 @@ func downloadRunArtifacts(ctx context.Context, base *url.URL, httpClient *http.C
 		return controlPlaneHTTPError(resp)
 	}
 	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
-	var summary modsapi.RunSummary
+	var summary migsapi.RunSummary
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		if errors.Is(err, io.EOF) {
 			// Treat empty body as an empty status (no artifacts).
-			summary = modsapi.RunSummary{}
+			summary = migsapi.RunSummary{}
 		} else {
 			return fmt.Errorf("decode run status: %w", err)
 		}
 	}
 	// Collect artifacts via control-plane HTTP endpoint lookups.
-	// Note: keep in sync with mod_run_artifact_test.go manifest shape.
+	// Note: keep in sync with mig_run_artifact_test.go manifest shape.
 	type manifestItem struct {
 		Stage  string `json:"stage"`
 		Name   string `json:"name"`
@@ -226,7 +226,7 @@ func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, run
 		return "", controlPlaneHTTPError(resp)
 	}
 	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
-	var summary modsapi.RunSummary
+	var summary migsapi.RunSummary
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		return "", err
 	}

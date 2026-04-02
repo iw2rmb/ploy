@@ -74,8 +74,8 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		{
 			name: "derives inbound from previous outbound",
 			steps: []StepMig{
-				stepMig("mod1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
-				stepMig("mod2:latest", nil),
+				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
+				stepMig("mig2:latest", nil),
 			},
 			check: func(t *testing.T, steps []StepMig) {
 				assertStackInbound(t, steps[1], 1, "java", "17")
@@ -84,8 +84,8 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		{
 			name: "derives inbound when Stack exists but Inbound is nil",
 			steps: []StepMig{
-				stepMig("mod1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "11")}),
-				stepMig("mod2:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
+				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "11")}),
+				stepMig("mig2:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
 			},
 			check: func(t *testing.T, steps []StepMig) {
 				assertStackInbound(t, steps[1], 1, "java", "11")
@@ -94,23 +94,23 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		{
 			name: "rejects mismatched explicit inbound",
 			steps: []StepMig{
-				stepMig("mod1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
-				stepMig("mod2:latest", &contracts.StackGateSpec{Inbound: inbound("java", "11")}),
+				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
+				stepMig("mig2:latest", &contracts.StackGateSpec{Inbound: inbound("java", "11")}),
 			},
 			wantErr: "mismatch",
 		},
 		{
 			name: "matching explicit inbound passes",
 			steps: []StepMig{
-				stepMig("mod1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
-				stepMig("mod2:latest", &contracts.StackGateSpec{Inbound: inbound("java", "17")}),
+				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: outbound("java", "17")}),
+				stepMig("mig2:latest", &contracts.StackGateSpec{Inbound: inbound("java", "17")}),
 			},
 		},
 		{
 			name: "skips chaining when previous outbound disabled",
 			steps: []StepMig{
-				stepMig("mod1:latest", &contracts.StackGateSpec{Outbound: disabledOutbound("java")}),
-				stepMig("mod2:latest", nil),
+				stepMig("mig1:latest", &contracts.StackGateSpec{Outbound: disabledOutbound("java")}),
+				stepMig("mig2:latest", nil),
 			},
 			check: func(t *testing.T, steps []StepMig) {
 				if steps[1].Stack != nil {
@@ -121,8 +121,8 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		{
 			name: "skips chaining when previous has no Stack",
 			steps: []StepMig{
-				stepMig("mod1:latest", nil),
-				stepMig("mod2:latest", nil),
+				stepMig("mig1:latest", nil),
+				stepMig("mig2:latest", nil),
 			},
 			check: func(t *testing.T, steps []StepMig) {
 				if steps[1].Stack != nil {
@@ -133,14 +133,14 @@ func TestValidateAndDeriveStackGateChaining(t *testing.T) {
 		{
 			name: "three step chain",
 			steps: []StepMig{
-				stepMig("mod1:latest", &contracts.StackGateSpec{
+				stepMig("mig1:latest", &contracts.StackGateSpec{
 					Inbound:  inbound("java", "8"),
 					Outbound: outbound("java", "11"),
 				}),
-				stepMig("mod2:latest", &contracts.StackGateSpec{
+				stepMig("mig2:latest", &contracts.StackGateSpec{
 					Outbound: outbound("java", "17"),
 				}),
-				stepMig("mod3:latest", nil),
+				stepMig("mig3:latest", nil),
 			},
 			check: func(t *testing.T, steps []StepMig) {
 				assertStackInbound(t, steps[1], 1, "java", "11")

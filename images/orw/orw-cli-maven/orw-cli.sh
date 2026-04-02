@@ -156,7 +156,7 @@ import_ca_bundle() {
   fi
 }
 
-if [[ "${MODS_SELF_TEST:-}" == "1" ]]; then
+if [[ "${MIGS_SELF_TEST:-}" == "1" ]]; then
   write_success_report "orw-cli self-test passed"
   exit 0
 fi

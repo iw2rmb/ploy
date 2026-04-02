@@ -19,7 +19,7 @@ func maybeCloneSkippedStepDiffBeforeCompletion(
 	if bp == nil {
 		return nil
 	}
-	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeMod {
+	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeMig {
 		return nil
 	}
 

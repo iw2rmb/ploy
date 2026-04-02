@@ -8,7 +8,7 @@ import (
 func TestParseMigSpecJSON_BuildGateStackConfig(t *testing.T) {
 	input := `{
 		"steps": [{
-			"image": "docker.io/user/mig:latest"
+			"image": "ghcr.io/iw2rmb/ploy/mig:latest"
 		}],
 		"build_gate": {
 			"enabled": true,
@@ -95,7 +95,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "invalid gate target",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {"pre": {"target": "unsupported"}}
 			}`,
 			wantErr: "build_gate.pre.target: invalid value",
@@ -103,7 +103,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "enabled without language",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {"pre": {"stack": {"enabled": true, "release": "11"}}}
 			}`,
 			wantErr: "build_gate.pre.stack.language: required",
@@ -111,7 +111,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "enabled without release",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {"post": {"stack": {"enabled": true, "language": "java"}}}
 			}`,
 			wantErr: "build_gate.post.stack.release: required",
@@ -119,7 +119,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 		{
 			name: "disabled with fields is ambiguous",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {"pre": {"stack": {"enabled": false, "language": "java", "release": "11"}}}
 			}`,
 			wantErr: "build_gate.pre.stack: enabled=false with stack fields is ambiguous",
@@ -142,7 +142,7 @@ func TestParseMigSpecJSON_BuildGateStackConfig_Invalid(t *testing.T) {
 func TestParseMigSpecJSON_BuildGateProfileOverride(t *testing.T) {
 	input := `{
 		"steps": [{
-			"image": "docker.io/user/mig:latest"
+			"image": "ghcr.io/iw2rmb/ploy/mig:latest"
 		}],
 		"build_gate": {
 			"pre": {
@@ -204,7 +204,7 @@ func TestParseMigSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 		{
 			name: "pre gate_profile missing command",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {"pre": {"gate_profile": {"env": {"A": "B"}}}}
 			}`,
 			wantErr: "build_gate.pre.gate_profile.command: required",
@@ -212,7 +212,7 @@ func TestParseMigSpecJSON_BuildGateProfileOverride_Invalid(t *testing.T) {
 		{
 			name: "post gate_profile command wrong type",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {"post": {"gate_profile": {"command": {"bad": true}}}}
 			}`,
 			wantErr: "command: expected string or array",

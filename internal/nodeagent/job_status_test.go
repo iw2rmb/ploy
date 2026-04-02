@@ -37,7 +37,7 @@ func TestDiffJobTypeConstants(t *testing.T) {
 		jobType  types.DiffJobType
 		expected string
 	}{
-		{"Mod", types.DiffJobTypeMod, "mig"},
+		{"Mig", types.DiffJobTypeMig, "mig"},
 		{"Healing", types.DiffJobTypeHealing, "healing"},
 	}
 

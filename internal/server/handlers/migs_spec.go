@@ -31,7 +31,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			Spec      json.RawMessage `json:"spec"`
 			CreatedBy *string         `json:"created_by,omitempty"`
 		}
-		if err := decodeRequestJSON(w, r, &req, maxModSpecSize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxMigSpecSize); err != nil {
 			return
 		}
 
@@ -52,7 +52,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 
 		// Check if mig is archived — cannot update spec on archived migs.
 		if mig.ArchivedAt.Valid {
@@ -70,14 +70,14 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-			slog.Error("set mig spec: create spec failed", "mig_id", modID, "err", err)
+			slog.Error("set mig spec: create spec failed", "mig_id", migID, "err", err)
 			return
 		}
 
 		// Update migs.spec_id to point at the new spec.
-		if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
+		if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: migID, SpecID: &createdSpec.ID}); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
-			slog.Error("set mig spec: update mig failed", "mig_id", modID, "spec_id", createdSpec.ID, "err", err)
+			slog.Error("set mig spec: update mig failed", "mig_id", migID, "spec_id", createdSpec.ID, "err", err)
 			return
 		}
 
@@ -96,7 +96,7 @@ func setMigSpecHandler(st store.Store) http.HandlerFunc {
 			slog.Error("set mig spec: encode response failed", "err", err)
 		}
 
-		slog.Info("mig spec set", "mig_id", modID, "spec_id", createdSpec.ID.String())
+		slog.Info("mig spec set", "mig_id", migID, "spec_id", createdSpec.ID.String())
 	}
 }
 

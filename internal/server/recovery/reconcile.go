@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -95,13 +95,13 @@ func MaybeCompleteRunIfAllReposTerminal(ctx context.Context, st store.Store, eve
 			repoURL = repos[0].RepoUrl
 		}
 
-		summary := modsapi.RunSummary{
+		summary := migsapi.RunSummary{
 			RunID:      runID,
 			State:      eval.RunState,
 			Repository: repoURL,
 			CreatedAt:  timeOrZero(run.CreatedAt),
 			UpdatedAt:  time.Now().UTC(),
-			Stages:     make(map[domaintypes.JobID]modsapi.StageStatus),
+			Stages:     make(map[domaintypes.JobID]migsapi.StageStatus),
 		}
 		if err := eventsService.PublishRun(ctx, runID, summary); err != nil {
 			slog.Error("complete run: publish run event failed", "run_id", runID, "err", err)

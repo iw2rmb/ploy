@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestModRunPull_IsRejected(t *testing.T) {
+func TestMigRunPull_IsRejected(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer

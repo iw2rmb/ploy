@@ -14,8 +14,8 @@ import (
 // Routing and Flag Parsing Tests
 // =============================================================================
 
-// TestModPullRouting validates that `ploy mig pull` routes to handleMigPull.
-func TestModPullRouting(t *testing.T) {
+// TestMigPullRouting validates that `ploy mig pull` routes to handleMigPull.
+func TestMigPullRouting(t *testing.T) {
 	// Skip if git is not available.
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git command not found, skipping test")
@@ -69,8 +69,8 @@ func TestModPullRouting(t *testing.T) {
 	}
 }
 
-// TestModPullUsageErrors validates that invalid flag combinations return appropriate errors.
-func TestModPullUsageErrors(t *testing.T) {
+// TestMigPullUsageErrors validates that invalid flag combinations return appropriate errors.
+func TestMigPullUsageErrors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -128,8 +128,8 @@ func TestModPullUsageErrors(t *testing.T) {
 	}
 }
 
-// TestModPullUsageHelp validates that the usage text contains expected content.
-func TestModPullUsageHelp(t *testing.T) {
+// TestMigPullUsageHelp validates that the usage text contains expected content.
+func TestMigPullUsageHelp(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
@@ -176,9 +176,9 @@ func TestModPullUsageHelp(t *testing.T) {
 // Git Worktree Precondition Tests
 // =============================================================================
 
-// TestHandleModPull_OutsideGitRepo verifies that handleMigPull fails
+// TestHandleMigPull_OutsideGitRepo verifies that handleMigPull fails
 // when called outside a git repository.
-func TestHandleModPull_OutsideGitRepo(t *testing.T) {
+func TestHandleMigPull_OutsideGitRepo(t *testing.T) {
 	// Skip if git is not available.
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git command not found, skipping test")
@@ -210,9 +210,9 @@ func TestHandleModPull_OutsideGitRepo(t *testing.T) {
 	}
 }
 
-// TestHandleModPull_DirtyWorkingTree verifies that handleMigPull fails
+// TestHandleMigPull_DirtyWorkingTree verifies that handleMigPull fails
 // when the working tree has uncommitted changes.
-func TestHandleModPull_DirtyWorkingTree(t *testing.T) {
+func TestHandleMigPull_DirtyWorkingTree(t *testing.T) {
 	// Skip if git is not available.
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git command not found, skipping test")
@@ -250,9 +250,9 @@ func TestHandleModPull_DirtyWorkingTree(t *testing.T) {
 	}
 }
 
-// TestHandleModPull_MissingRemote verifies that handleMigPull fails
+// TestHandleMigPull_MissingRemote verifies that handleMigPull fails
 // when the specified remote does not exist.
-func TestHandleModPull_MissingRemote(t *testing.T) {
+func TestHandleMigPull_MissingRemote(t *testing.T) {
 	// Skip if git is not available.
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git command not found, skipping test")
@@ -286,18 +286,18 @@ func TestHandleModPull_MissingRemote(t *testing.T) {
 }
 
 // =============================================================================
-// inferModFromRepo Unit Tests
+// inferMigFromRepo Unit Tests
 // =============================================================================
 
-// TestInferModFromRepo_NoMigs verifies error handling when no migs include the repo.
-func TestInferModFromRepo_NoMigs(t *testing.T) {
+// TestInferMigFromRepo_NoMigs verifies error handling when no migs include the repo.
+func TestInferMigFromRepo_NoMigs(t *testing.T) {
 	// Skip: This test requires a mock HTTP server which would require additional setup.
 	// The error path is covered by integration tests.
 	t.Skip("requires mock HTTP server; covered by integration tests")
 }
 
-// TestInferModFromRepo_MultipleMigs verifies error handling when multiple migs include the repo.
-func TestInferModFromRepo_MultipleMigs(t *testing.T) {
+// TestInferMigFromRepo_MultipleMigs verifies error handling when multiple migs include the repo.
+func TestInferMigFromRepo_MultipleMigs(t *testing.T) {
 	// Skip: This test requires a mock HTTP server which would require additional setup.
 	// The error path is covered by integration tests.
 	t.Skip("requires mock HTTP server; covered by integration tests")

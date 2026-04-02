@@ -67,7 +67,7 @@ func TestClaimService_Claim_SuccessBuildsPayloadAndTransitionsRepo(t *testing.T)
 		NodeID:      &nodeID,
 		Name:        "mig-0",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 		Meta:        []byte(`{}`),
 	}
 

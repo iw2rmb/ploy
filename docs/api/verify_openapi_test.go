@@ -48,10 +48,10 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// Migs (mig project CRUD)
 		{"/v1/migs", "get"},
 		{"/v1/migs", "post"},
-		{"/v1/migs/{mod_id}", "delete"},
-		{"/v1/migs/{mod_id}/archive", "patch"},
-		{"/v1/migs/{mod_id}/unarchive", "patch"},
-		{"/v1/migs/{mod_id}/runs", "post"},
+		{"/v1/migs/{mig_id}", "delete"},
+		{"/v1/migs/{mig_id}/archive", "patch"},
+		{"/v1/migs/{mig_id}/unarchive", "patch"},
+		{"/v1/migs/{mig_id}/runs", "post"},
 		// Batch runs lifecycle
 		{"/v1/runs", "get"},
 		{"/v1/runs/{id}", "get"},

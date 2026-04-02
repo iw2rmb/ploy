@@ -13,7 +13,7 @@
 //
 //	steps:
 //	  - name: java11-to-17
-//	    image: docker.io/user/migs-orw:latest
+//	    image: ghcr.io/iw2rmb/ploy/migs-orw:latest
 //	    stack:
 //	      inbound:
 //	        enabled: true

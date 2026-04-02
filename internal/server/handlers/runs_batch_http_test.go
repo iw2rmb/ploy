@@ -29,7 +29,7 @@ func TestCancelRunHandlerV1_CancelsRunAndWork(t *testing.T) {
 		SpecID:    domaintypes.NewSpecID(),
 		Status:    domaintypes.RunStatusStarted,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/cancel", nil)
 	req.SetPathValue("id", runID.String())
@@ -57,7 +57,7 @@ func TestCancelRunHandlerV1_CancelRunV1Error(t *testing.T) {
 		SpecID:    domaintypes.NewSpecID(),
 		Status:    domaintypes.RunStatusStarted,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 	st.cancelRunV1.err = errors.New("db exploded")
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/cancel", nil)
@@ -83,7 +83,7 @@ func TestCancelRunHandlerV1_TerminalRunIsIdempotent(t *testing.T) {
 		SpecID:    domaintypes.NewSpecID(),
 		Status:    domaintypes.RunStatusCancelled,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/cancel", nil)
 	req.SetPathValue("id", runID.String())
@@ -102,12 +102,12 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	modRepoID := domaintypes.NewMigRepoID()
+	migRepoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	st := &runStore{
 		createMigRepoResult: store.MigRepo{
-			ID:        modRepoID,
+			ID:        migRepoID,
 			RepoID:    repoID,
 			BaseRef:   "main",
 			TargetRef: "feature",
@@ -122,7 +122,7 @@ func TestAddRunRepoHandler_CreatesRepoWithoutImmediateJobs(t *testing.T) {
 		SpecID:    specID,
 		Status:    domaintypes.RunStatusStarted,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 
 	reqBody := map[string]any{
@@ -164,7 +164,7 @@ func TestListRunReposHandler_Success(t *testing.T) {
 			CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			RepoUrl:       "https://github.com/org/repo.git",
 		},
-		}
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos", nil)
 	req.SetPathValue("id", runID.String())
@@ -231,7 +231,7 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
-	modRepoID := domaintypes.NewMigRepoID()
+	migRepoID := domaintypes.NewMigRepoID()
 	specID := domaintypes.NewSpecID()
 
 	st := &runStore{
@@ -257,8 +257,8 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 				CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 			},
 		},
-		listMigReposByModResult: []store.MigRepo{
-			{ID: modRepoID, RepoID: repoID},
+		listMigReposByMigResult: []store.MigRepo{
+			{ID: migRepoID, RepoID: repoID},
 		},
 		repoByID: map[domaintypes.RepoID]store.Repo{
 			repoID: {ID: repoID, Url: "https://github.com/org/repo.git"},
@@ -270,12 +270,12 @@ func TestRestartRunRepoHandler_ReopensTerminalRunAndCreatesJobs(t *testing.T) {
 		SpecID:    specID,
 		Status:    domaintypes.RunStatusFinished,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
-	st.getModRepo.val = store.MigRepo{
-		ID:     modRepoID,
+	st.getMigRepo.val = store.MigRepo{
+		ID:     migRepoID,
 		RepoID: repoID,
-		}
+	}
 
 	reqBody := map[string]any{
 		"base_ref":   "develop",
@@ -329,7 +329,7 @@ func TestStartRunHandler_StartsQueuedRepos(t *testing.T) {
 		SpecID:    specID,
 		Status:    domaintypes.RunStatusStarted,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 	st.getSpec.val = store.Spec{ID: specID, Spec: []byte(`{"steps":[{"image":"a"}]}`)}
 	st.listRunReposByRun.val = []store.RunRepo{queuedRepo}
 	st.listQueuedRunReposByRun.val = []store.RunRepo{queuedRepo}
@@ -365,7 +365,7 @@ func TestStartRunHandler_TerminalRunConflict(t *testing.T) {
 		SpecID:    domaintypes.NewSpecID(),
 		Status:    domaintypes.RunStatusCancelled,
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-		}
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/start", nil)
 	req.SetPathValue("id", runID.String())

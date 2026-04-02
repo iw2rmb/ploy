@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS gate_profiles (
 CREATE INDEX IF NOT EXISTS gate_profiles_stack_updated_idx ON gate_profiles(stack_id, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS gate_profiles_repo_stack_updated_idx ON gate_profiles(repo_id, stack_id, updated_at DESC, id DESC);
 
--- ModRepos (managed repo set for a mig project)
+-- MigRepos (managed repo set for a mig project)
 -- Each row represents a repo participating in a mig, with mutable refs.
 -- Note: id is TEXT (NanoID-backed, 8 chars) for compact, human-friendly repo identifiers.
 -- Application code generates IDs via types.NewMigRepoID() before insertion.

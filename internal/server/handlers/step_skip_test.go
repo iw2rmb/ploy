@@ -29,7 +29,7 @@ func TestCanonicalizeAndHashJSON_Deterministic(t *testing.T) {
 	}
 }
 
-func TestModStepIndexFromJobNameForClaim(t *testing.T) {
+func TestMigStepIndexFromJobNameForClaim(t *testing.T) {
 	tests := []struct {
 		name      string
 		jobName   string
@@ -44,7 +44,7 @@ func TestModStepIndexFromJobNameForClaim(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := modStepIndexFromJobNameForClaim(tc.jobName, tc.stepsLen)
+			got, err := migStepIndexFromJobNameForClaim(tc.jobName, tc.stepsLen)
 			if tc.shouldErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -52,7 +52,7 @@ func TestModStepIndexFromJobNameForClaim(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("modStepIndexFromJobNameForClaim() error = %v", err)
+				t.Fatalf("migStepIndexFromJobNameForClaim() error = %v", err)
 			}
 			if got != tc.want {
 				t.Fatalf("index = %d, want %d", got, tc.want)

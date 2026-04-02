@@ -1,4 +1,4 @@
-// mod_list.go implements the 'ploy mig list' command handler.
+// mig_list.go implements the 'ploy mig list' command handler.
 //
 // This command lists mig projects:
 // - ploy mig list

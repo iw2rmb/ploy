@@ -63,7 +63,7 @@ func TestListReposHandler_Success_WithData(t *testing.T) {
 			LastRunAt:  pgtype.Timestamptz{Valid: false},
 			LastStatus: "",
 		},
-		}
+	}
 	handler := listReposHandler(st)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/repos", nil)
@@ -138,12 +138,12 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	st := &repoListStore{}
 	st.listRunsForRepo.val = []store.ListRunsForRepoRow{
 		{
 			RunID:         runID,
-			MigID:         modID,
+			MigID:         migID,
 			RunStatus:     domaintypes.RunStatusFinished,
 			RepoStatus:    domaintypes.RunRepoStatusSuccess,
 			RepoBaseRef:   "main",
@@ -152,7 +152,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 			StartedAt:     pgtype.Timestamptz{Time: now, Valid: true},
 			FinishedAt:    pgtype.Timestamptz{Time: now.Add(time.Minute), Valid: true},
 		},
-		}
+	}
 	handler := listRunsForRepoHandler(st)
 
 	repoID := "repo_123"
@@ -174,7 +174,7 @@ func TestListRunsForRepoHandler_Success(t *testing.T) {
 	if run.RunID.String() != runID.String() {
 		t.Fatalf("unexpected run_id: %s", run.RunID.String())
 	}
-	if run.MigID != modID {
+	if run.MigID != migID {
 		t.Fatalf("unexpected mig_id: %s", run.MigID.String())
 	}
 	if run.RunStatus != "Finished" {
@@ -240,7 +240,11 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			st := func() *repoListStore { st := &repoListStore{}; st.listRunsForRepo.err = errors.New("should not be called"); return st }()
+			st := func() *repoListStore {
+				st := &repoListStore{}
+				st.listRunsForRepo.err = errors.New("should not be called")
+				return st
+			}()
 			handler := listRunsForRepoHandler(st)
 
 			rr := doRequest(t, handler, http.MethodGet, tc.url, nil, "repo_id", "repo_123")
@@ -253,7 +257,11 @@ func TestListRunsForRepoHandler_InvalidPagination(t *testing.T) {
 func TestListRunsForRepoHandler_MissingRepoID(t *testing.T) {
 	t.Parallel()
 
-	st := func() *repoListStore { st := &repoListStore{}; st.listRunsForRepo.err = errors.New("should not be called"); return st }()
+	st := func() *repoListStore {
+		st := &repoListStore{}
+		st.listRunsForRepo.err = errors.New("should not be called")
+		return st
+	}()
 	handler := listRunsForRepoHandler(st)
 
 	rr := doRequest(t, handler, http.MethodGet, "/v1/repos//runs", nil, "repo_id", "")

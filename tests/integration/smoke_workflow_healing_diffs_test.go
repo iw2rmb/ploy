@@ -25,8 +25,8 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	defer db.Close()
 
 	// Create a run for the healing diff test.
-	modSpec := []byte(`{"type": "healing-test"}`)
-	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/healing-test", "main", "feature/healing-test", modSpec)
+	migSpec := []byte(`{"type": "healing-test"}`)
+	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/healing-test", "main", "feature/healing-test", migSpec)
 	run := fixture.Run
 	runRepo := fixture.RunRepo
 	t.Logf("✓ Created run: id=%v", run.ID)
@@ -40,7 +40,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main-0",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"mig"}`),
@@ -58,7 +58,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main-1",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"mig"}`),
@@ -70,25 +70,25 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// C2: Create diffs with next_id and job_type in summary.
 	// Step 0: mig diff + healing diff
-	step0ModSummary := []byte(`{"next_id":0,"job_type":"mig"}`)
+	step0MigSummary := []byte(`{"next_id":0,"job_type":"mig"}`)
 	step0HealSummary := []byte(`{"next_id":0,"job_type":"healing","healing_attempt":1}`)
 	// Step 1: mig diff + 2 healing diffs
-	step1ModSummary := []byte(`{"next_id":1,"job_type":"mig"}`)
+	step1MigSummary := []byte(`{"next_id":1,"job_type":"mig"}`)
 	step1Heal1Summary := []byte(`{"next_id":1,"job_type":"healing","healing_attempt":1}`)
 	step1Heal2Summary := []byte(`{"next_id":1,"job_type":"healing","healing_attempt":2}`)
 
 	// Create step 0 mig diff.
-	step0ModPatch := []byte{0x1f, 0x8b, 0x01} // Placeholder gzip bytes.
-	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+	step0MigPatch := []byte{0x1f, 0x8b, 0x01} // Placeholder gzip bytes.
+	step0MigDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:     run.ID,
 		JobID:     &jobStep0.ID,
-		PatchSize: int64(len(step0ModPatch)),
-		Summary:   step0ModSummary,
+		PatchSize: int64(len(step0MigPatch)),
+		Summary:   step0MigSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step0-mig) failed: %v", err)
 	}
-	t.Logf("✓ Created step 0 mig diff: id=%v", step0ModDiff.ID)
+	t.Logf("✓ Created step 0 mig diff: id=%v", step0MigDiff.ID)
 
 	// Create step 0 healing diff with same next_id.
 	step0HealPatch := []byte{0x1f, 0x8b, 0x02}
@@ -104,17 +104,17 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 0 healing diff: id=%v", step0HealDiff.ID)
 
 	// Create step 1 mig diff.
-	step1ModPatch := []byte{0x1f, 0x8b, 0x03}
-	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+	step1MigPatch := []byte{0x1f, 0x8b, 0x03}
+	step1MigDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:     run.ID,
 		JobID:     &jobStep1.ID,
-		PatchSize: int64(len(step1ModPatch)),
-		Summary:   step1ModSummary,
+		PatchSize: int64(len(step1MigPatch)),
+		Summary:   step1MigSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-mig) failed: %v", err)
 	}
-	t.Logf("✓ Created step 1 mig diff: id=%v", step1ModDiff.ID)
+	t.Logf("✓ Created step 1 mig diff: id=%v", step1MigDiff.ID)
 
 	// Create step 1 healing diffs (2 attempts).
 	step1Heal1Patch := []byte{0x1f, 0x8b, 0x04}
@@ -158,9 +158,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Verified diff ordering (by created_at)")
 
 	// Silence unused variable warnings for diff IDs (used implicitly via DB state).
-	_ = step0ModDiff
+	_ = step0MigDiff
 	_ = step0HealDiff
-	_ = step1ModDiff
+	_ = step1MigDiff
 	_ = step1Heal1Diff
 	_ = step1Heal2Diff
 

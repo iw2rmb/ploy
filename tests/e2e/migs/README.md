@@ -165,7 +165,7 @@ The node agent materializes the spec as `/in/amata.yaml` and runs
 The container uses the direct `codex exec` path.
 
 The `scenario-orw-fail` fixture exercises amata mode for the router and
-direct-Codex mode for healing. The `scenario-post-mod-heal` fixture reverses
+direct-Codex mode for healing. The `scenario-post-mig-heal` fixture reverses
 this — direct-Codex for the router and amata mode for healing.
 
 Example healing spec block (router in amata mode + healing in direct-Codex mode):
@@ -348,9 +348,8 @@ Example stack-aware spec:
 ```yaml
 mig:
   image:
-    default: docker.io/user/orw-cli-maven:latest
-    java-maven: docker.io/user/orw-cli-maven:latest
-    java-gradle: docker.io/user/orw-cli-gradle:latest
+    java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
+    java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
   env:
     RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```

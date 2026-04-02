@@ -17,10 +17,10 @@ import (
 // specPayloadOpts holds optional buildSpecPayload parameters.
 // Zero values correspond to the default (nil/empty/false) arguments.
 type specPayloadOpts struct {
-	modEnvs      []string
-	modImage     string
+	migEnvs      []string
+	migImage     string
 	retain       bool
-	modCommand   string
+	migCommand   string
 	gitlabPAT    string
 	gitlabDomain string
 	mrSuccess    bool
@@ -38,7 +38,7 @@ func callBuildSpecPayload(t *testing.T, specFile string, opts specPayloadOpts) (
 	t.Helper()
 	return buildSpecPayload(
 		context.Background(), nil, nil, specFile,
-		opts.modEnvs, opts.modImage, opts.retain, opts.modCommand,
+		opts.migEnvs, opts.migImage, opts.retain, opts.migCommand,
 		opts.gitlabPAT, opts.gitlabDomain, opts.mrSuccess, opts.mrFail,
 	)
 }
@@ -288,17 +288,17 @@ steps:
   - image: docker.io/test/mig:latest
     command: ["echo", "spec"]
 `,
-			opts:       specPayloadOpts{modCommand: `["echo","cli"]`},
+			opts:       specPayloadOpts{migCommand: `["echo","cli"]`},
 			wantCmdArr: []string{"echo", "cli"},
 		},
 		{
 			name:       "CLI JSON array command without spec file",
-			opts:       specPayloadOpts{modImage: "docker.io/test/mig:latest", modCommand: `["/bin/sh", "-c", "echo test"]`},
+			opts:       specPayloadOpts{migImage: "docker.io/test/mig:latest", migCommand: `["/bin/sh", "-c", "echo test"]`},
 			wantCmdArr: []string{"/bin/sh", "-c", "echo test"},
 		},
 		{
 			name:       "CLI plain string command without spec file",
-			opts:       specPayloadOpts{modImage: "docker.io/test/mig:latest", modCommand: "echo test"},
+			opts:       specPayloadOpts{migImage: "docker.io/test/mig:latest", migCommand: "echo test"},
 			wantCmdStr: "echo test",
 		},
 	}
@@ -754,10 +754,10 @@ func TestBuildSpecPayload_MultiStepMigsWithEnvFromFile(t *testing.T) {
 
 	result := buildAndParseSpec(t, tmpDir, fmt.Sprintf(`
 steps:
-  - image: docker.io/test/mod1:latest
+  - image: docker.io/test/mig1:latest
     env_from_file:
       TOKEN: %s
-  - image: docker.io/test/mod2:latest
+  - image: docker.io/test/mig2:latest
     env_from_file:
       TOKEN: %s
 `, envFile1, envFile2), ".yaml", specPayloadOpts{})
@@ -819,8 +819,8 @@ steps:
 env:
   BASE_KEY: base_value
 `, ".yaml", specPayloadOpts{
-		modEnvs:  []string{"CLI_KEY=cli_value"},
-		modImage: "docker.io/test/override:v2",
+		migEnvs:  []string{"CLI_KEY=cli_value"},
+		migImage: "docker.io/test/override:v2",
 		retain:   true,
 	})
 
@@ -845,8 +845,8 @@ steps:
     env:
       STEP: "2"
 `, ".yaml", specPayloadOpts{
-		modEnvs:  []string{"CLI_KEY=cli_value"},
-		modImage: "docker.io/test/override:v2",
+		migEnvs:  []string{"CLI_KEY=cli_value"},
+		migImage: "docker.io/test/override:v2",
 		retain:   true,
 	})
 

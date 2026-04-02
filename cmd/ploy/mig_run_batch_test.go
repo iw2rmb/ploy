@@ -20,8 +20,8 @@ func TestRunListCallsControlPlane(t *testing.T) {
 
 	runID1 := domaintypes.NewRunID().String()
 	runID2 := domaintypes.NewRunID().String()
-	modID1 := domaintypes.NewMigID().String()
-	modID2 := domaintypes.NewMigID().String()
+	migID1 := domaintypes.NewMigID().String()
+	migID2 := domaintypes.NewMigID().String()
 	specID1 := domaintypes.NewSpecID().String()
 	specID2 := domaintypes.NewSpecID().String()
 
@@ -69,7 +69,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 					{
 						ID:        runID1,
 						Status:    "Started",
-						MigID:     modID1,
+						MigID:     migID1,
 						SpecID:    specID1,
 						CreatedAt: now,
 						Counts: &struct {
@@ -81,7 +81,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 					{
 						ID:        runID2,
 						Status:    "Finished",
-						MigID:     modID2,
+						MigID:     migID2,
 						SpecID:    specID2,
 						CreatedAt: now,
 					},
@@ -119,9 +119,9 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestModRunBatchStatusCallsControlPlane validates status command calls the API.
+// TestMigRunBatchStatusCallsControlPlane validates status command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunBatchStatusRemoved(t *testing.T) {}
+func TestMigRunBatchStatusRemoved(t *testing.T) {}
 
 // TestRunListEmptyResult validates list command handles empty results.
 // Not parallel because useServerDescriptor uses t.Setenv.
@@ -197,9 +197,9 @@ func TestRunListInvalidLimit(t *testing.T) {
 	}
 }
 
-// TestModRunBatchStatusNotFound validates run status command handles 404.
+// TestMigRunBatchStatusNotFound validates run status command handles 404.
 // Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunBatchStatusNotFound(t *testing.T) {
+func TestMigRunBatchStatusNotFound(t *testing.T) {
 	runID := domaintypes.NewRunID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/runs/"+runID {

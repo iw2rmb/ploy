@@ -16,11 +16,11 @@ import (
 func TestCreateMigRunCommand_Run(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewMigID().String()
+	migID := domaintypes.NewMigID().String()
 
 	tests := []struct {
 		name        string
-		modID       string
+		migID       string
 		repoURLs    []string
 		failed      bool
 		statusCode  int
@@ -29,28 +29,28 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 	}{
 		{
 			name:       "run all repos",
-			modID:      modID,
+			migID:      migID,
 			repoURLs:   nil,
 			failed:     false,
 			statusCode: http.StatusCreated,
 		},
 		{
 			name:       "run failed repos",
-			modID:      modID,
+			migID:      migID,
 			repoURLs:   nil,
 			failed:     true,
 			statusCode: http.StatusCreated,
 		},
 		{
 			name:       "run explicit repos",
-			modID:      modID,
+			migID:      migID,
 			repoURLs:   []string{"https://github.com/a/b.git", "https://github.com/c/d.git"},
 			failed:     false,
 			statusCode: http.StatusCreated,
 		},
 		{
 			name:        "mutually exclusive flags",
-			modID:       modID,
+			migID:       migID,
 			repoURLs:    []string{"https://github.com/a/b.git"},
 			failed:      true,
 			wantErr:     true,
@@ -58,7 +58,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 		},
 		{
 			name:        "missing mig id",
-			modID:       "",
+			migID:       "",
 			wantErr:     true,
 			wantErrText: "mig id is required",
 		},
@@ -113,7 +113,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 			cmd := CreateMigRunCommand{
 				Client:   srv.Client(),
 				BaseURL:  baseURL,
-				MigRef:   domaintypes.MigRef(tc.modID),
+				MigRef:   domaintypes.MigRef(tc.migID),
 				RepoURLs: tc.repoURLs,
 				Failed:   tc.failed,
 			}
@@ -142,7 +142,7 @@ func TestCreateMigRunCommand_Run(t *testing.T) {
 func TestCreateMigRunCommand_SelectorMutualExclusion(t *testing.T) {
 	t.Parallel()
 
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatalf("unexpected HTTP request: %s %s", r.Method, r.URL.String())
@@ -154,7 +154,7 @@ func TestCreateMigRunCommand_SelectorMutualExclusion(t *testing.T) {
 	cmd := CreateMigRunCommand{
 		Client:   srv.Client(),
 		BaseURL:  baseURL,
-		MigRef:   domaintypes.MigRef(modID.String()),
+		MigRef:   domaintypes.MigRef(migID.String()),
 		RepoURLs: []string{"https://github.com/org/repo.git"},
 		Failed:   true,
 	}

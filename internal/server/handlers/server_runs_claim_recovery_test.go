@@ -18,7 +18,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 		jobType: domaintypes.JobTypeHeal,
 		jobName: "heal-1-0",
 		specJSON: []byte(`{
-			"steps":[{"image":"docker.io/acme/mod:latest"}],
+			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{
 				"healing":{
 					"by_error_kind":{
@@ -97,7 +97,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 		jobType: domaintypes.JobTypeHeal,
 		jobName: "heal-1-0",
 		specJSON: []byte(`{
-			"steps":[{"image":"docker.io/acme/mod:latest"}],
+			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{
 				"healing":{
 					"by_error_kind":{
@@ -146,7 +146,7 @@ func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T
 		jobName:  "heal-1-0",
 		jobImage: "docker.io/acme/heal:latest",
 		specJSON: []byte(`{
-			"steps":[{"image":"docker.io/acme/mod:latest"}],
+			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{
 				"healing":{
 					"by_error_kind":{

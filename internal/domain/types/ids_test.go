@@ -81,9 +81,9 @@ func TestStringIDs(t *testing.T) {
 	t.Run("JobID", func(t *testing.T) { testStringID[jobIDTag](t, "JobID", NewJobID().String()) })
 	t.Run("ClusterID", func(t *testing.T) { testStringID[clusterIDTag](t, "ClusterID", "c-1") })
 	t.Run("NodeID", func(t *testing.T) { testStringID[nodeIDTag](t, "NodeID", NewNodeKey()) })
-	t.Run("MigID", func(t *testing.T) { testStringID[modIDTag](t, "MigID", NewMigID().String()) })
+	t.Run("MigID", func(t *testing.T) { testStringID[migIDTag](t, "MigID", NewMigID().String()) })
 	t.Run("SpecID", func(t *testing.T) { testStringID[specIDTag](t, "SpecID", NewSpecID().String()) })
-	t.Run("MigRepoID", func(t *testing.T) { testStringID[modRepoIDTag](t, "MigRepoID", NewMigRepoID().String()) })
+	t.Run("MigRepoID", func(t *testing.T) { testStringID[migRepoIDTag](t, "MigRepoID", NewMigRepoID().String()) })
 }
 
 func TestIDs_RejectInvalidFormats(t *testing.T) {

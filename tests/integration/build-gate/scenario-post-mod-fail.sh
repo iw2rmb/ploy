@@ -27,7 +27,7 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 0
 fi
 
-WORKDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-postmod)
+WORKDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-postmig)
 INDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-postmig-in)
 cleanup() { rm -rf "$WORKDIR" "$INDIR" || true; }
 trap cleanup EXIT
@@ -89,13 +89,13 @@ echo "[scenario] Pre-mig gate passed (as expected)"
 # ─────────────────────────────────────────────────────────────────────────────
 echo "[scenario] Simulating mig that introduces compile error..."
 
-cat >"$WORKDIR/src/main/java/e2e/BrokenByMod.java" <<'JAVA'
+cat >"$WORKDIR/src/main/java/e2e/BrokenByMig.java" <<'JAVA'
 package e2e;
 
 // This class was "introduced by a mig" and references an undefined symbol.
 // Post-mig gate should fail due to this compile error.
-public class BrokenByMod {
-    public String broken() { return new UndefinedModSymbol().toString(); }
+public class BrokenByMig {
+    public String broken() { return new UndefinedMigSymbol().toString(); }
 }
 JAVA
 
@@ -117,7 +117,7 @@ if [[ $POST_STATUS -eq 0 ]]; then
 fi
 
 # Verify the failure is a compile error referencing the missing symbol.
-if ! grep -E -q 'COMPILATION ERROR|cannot find symbol|UndefinedModSymbol' <<<"$POST_LOGS"; then
+if ! grep -E -q 'COMPILATION ERROR|cannot find symbol|UndefinedMigSymbol' <<<"$POST_LOGS"; then
   echo "FAIL: post-mig Build Gate failed but not with expected compile error"
   echo "$POST_LOGS"
   exit 1
@@ -135,20 +135,20 @@ echo "$POST_LOGS" >"$INDIR/build-gate.log"
 # the node agent would then detect workspace diffs and re-run the gate.
 # Here we directly create the fix to test the gate-heal-regate flow.
 # ─────────────────────────────────────────────────────────────────────────────
-echo "[scenario] Running healing (creating UndefinedModSymbol.java)..."
+echo "[scenario] Running healing (creating UndefinedMigSymbol.java)..."
 
-cat >"$WORKDIR/src/main/java/e2e/UndefinedModSymbol.java" <<'JAVA'
+cat >"$WORKDIR/src/main/java/e2e/UndefinedMigSymbol.java" <<'JAVA'
 package e2e;
 
 // Healing stub created this class to fix the post-mig compile error.
 // After this fix, post-gate re-run should pass.
-public class UndefinedModSymbol {
+public class UndefinedMigSymbol {
     @Override
     public String toString() { return "healed"; }
 }
 JAVA
 
-echo "[scenario] Healing completed (UndefinedModSymbol.java created)"
+echo "[scenario] Healing completed (UndefinedMigSymbol.java created)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 6: Re-gate after healing should PASS.
@@ -178,7 +178,7 @@ echo "[scenario] Re-gate passed after healing"
 echo "[scenario] Testing scenario where healing fails (incomplete fix)..."
 
 # Restore workspace to broken state and apply incomplete healing.
-rm -f "$WORKDIR/src/main/java/e2e/UndefinedModSymbol.java"
+rm -f "$WORKDIR/src/main/java/e2e/UndefinedMigSymbol.java"
 
 # Incomplete healing: creates a class but with wrong name (healing failure).
 cat >"$WORKDIR/src/main/java/e2e/WrongClassName.java" <<'JAVA'

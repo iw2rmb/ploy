@@ -23,7 +23,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // runSubmitFlags encapsulates CLI flags for `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`.
@@ -44,9 +44,9 @@ type runSubmitFlags struct {
 	MaxRetries  *int
 
 	// Job container configuration
-	ModEnvs    *stringSlice
+	MigEnvs    *stringSlice
 	JobImage   *string
-	ModCommand *string
+	MigCommand *string
 
 	// GitLab integration
 	GitLabPAT    *string
@@ -81,10 +81,10 @@ func parseRunSubmitFlags(args []string) (*runSubmitFlags, error) {
 	flags.MaxRetries = fs.Int("max-retries", 5, "Max report fetch retries (-1 for unlimited)")
 
 	// Job container configuration
-	flags.ModEnvs = new(stringSlice)
-	fs.Var(flags.ModEnvs, "job-env", "Job environment KEY=VALUE (repeatable)")
+	flags.MigEnvs = new(stringSlice)
+	fs.Var(flags.MigEnvs, "job-env", "Job environment KEY=VALUE (repeatable)")
 	flags.JobImage = fs.String("job-image", "", "Container image for the mig step (optional)")
-	flags.ModCommand = fs.String("job-command", "", "Container command override")
+	flags.MigCommand = fs.String("job-command", "", "Container command override")
 
 	// GitLab integration
 	flags.GitLabPAT = fs.String("gitlab-pat", "", "GitLab Personal Access Token for this run (overrides server default)")
@@ -121,13 +121,13 @@ func validateRunSubmitFlags(flags *runSubmitFlags) error {
 }
 
 // handleRunSubmit implements the `ploy run --repo ... --base-ref ... --target-ref ... --spec ...` command.
-// It submits a single-repo run via POST /v1/runs and prints the resulting run_id and mod_id.
+// It submits a single-repo run via POST /v1/runs and prints the resulting run_id and mig_id.
 //
 // The command:
 // 1. Parses CLI flags
 // 2. Loads and validates the spec from file or stdin
 // 3. Submits the run request to POST /v1/runs
-// 4. Prints run_id and mod_id to stderr
+// 4. Prints run_id and mig_id to stderr
 func handleRunSubmit(args []string, stderr io.Writer) error {
 	// Parse CLI flags using extracted flag handling.
 	flags, err := parseRunSubmitFlags(args)
@@ -168,16 +168,16 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		CreatedBy: strings.TrimSpace(os.Getenv("USER")),
 	}
 
-	runID, modID, err := submitSingleRepoRun(ctx, base, httpClient, request)
+	runID, migID, err := submitSingleRepoRun(ctx, base, httpClient, request)
 	if err != nil {
 		return err
 	}
 
 	followEnabled := flags.Follow != nil && *flags.Follow
-	// Print run_id and mod_id only in non-follow mode; follow output already includes Run/Mig headers.
+	// Print run_id and mig_id only in non-follow mode; follow output already includes Run/Mig headers.
 	if !followEnabled {
 		_, _ = fmt.Fprintf(stderr, "run_id: %s\n", runID.String())
-		_, _ = fmt.Fprintf(stderr, "mod_id: %s\n", modID.String())
+		_, _ = fmt.Fprintf(stderr, "mig_id: %s\n", migID.String())
 	}
 
 	initialState := "pending"
@@ -192,7 +192,7 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 		finalState = strings.ToLower(string(final))
 
 		// Download artifacts after successful completion.
-		if final == modsapi.RunStateSucceeded {
+		if final == migsapi.RunStateSucceeded {
 			if artifactDir := strings.TrimSpace(*flags.ArtifactDir); artifactDir != "" {
 				if err := downloadRunArtifacts(ctx, base, httpClient, runID.String(), artifactDir, stderr); err != nil {
 					return err
@@ -242,17 +242,17 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 		specPath = tempPath
 	}
 
-	modEnvs := []string{}
-	if flags.ModEnvs != nil {
-		modEnvs = append(modEnvs, (*flags.ModEnvs)...)
+	migEnvs := []string{}
+	if flags.MigEnvs != nil {
+		migEnvs = append(migEnvs, (*flags.MigEnvs)...)
 	}
-	modImage := ""
+	migImage := ""
 	if flags.JobImage != nil {
-		modImage = strings.TrimSpace(*flags.JobImage)
+		migImage = strings.TrimSpace(*flags.JobImage)
 	}
-	modCommand := ""
-	if flags.ModCommand != nil {
-		modCommand = strings.TrimSpace(*flags.ModCommand)
+	migCommand := ""
+	if flags.MigCommand != nil {
+		migCommand = strings.TrimSpace(*flags.MigCommand)
 	}
 	gitlabPAT := ""
 	if flags.GitLabPAT != nil {
@@ -276,10 +276,10 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 		base,
 		client,
 		specPath,
-		modEnvs,
-		modImage,
+		migEnvs,
+		migImage,
 		false,
-		modCommand,
+		migCommand,
 		gitlabPAT,
 		gitlabDomain,
 		mrSuccess,
@@ -295,7 +295,7 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 }
 
 // followRunSubmit displays run status frames until run completion.
-func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, flags *runSubmitFlags, stderr io.Writer) (modsapi.RunState, error) {
+func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, flags *runSubmitFlags, stderr io.Writer) (migsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
 	capDuration := time.Duration(0)
@@ -374,7 +374,7 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 	}
 
 	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
-	if final != modsapi.RunStateSucceeded {
+	if final != migsapi.RunStateSucceeded {
 		return final, fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
 	}
 	return final, nil
@@ -434,7 +434,7 @@ func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Cl
 		return "", "", fmt.Errorf("run submit: empty run_id in response")
 	}
 	if created.MigID.IsZero() {
-		return "", "", fmt.Errorf("run submit: empty mod_id in response")
+		return "", "", fmt.Errorf("run submit: empty mig_id in response")
 	}
 	return created.RunID, created.MigID, nil
 }

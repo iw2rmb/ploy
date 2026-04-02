@@ -45,7 +45,7 @@ func TestRunController_watchRemoteCancellation_CancelsContext(t *testing.T) {
 		rc.watchRemoteCancellation(runCtx, StartRunRequest{
 			RunID:   runID,
 			JobID:   jobID,
-			JobType: types.JobTypeMod,
+			JobType: types.JobTypeMig,
 		}, cancel)
 		close(done)
 	}()

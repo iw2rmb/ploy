@@ -83,8 +83,8 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		h.ServeHTTP(rr, req)
 
 		assertStatus(t, rr, http.StatusBadRequest)
-		if st.getModCalled || st.createRunCalled {
-			t.Fatalf("expected no store calls, but got GetMig=%v CreateRun=%v", st.getModCalled, st.createRunCalled)
+		if st.getMigCalled || st.createRunCalled {
+			t.Fatalf("expected no store calls, but got GetMig=%v CreateRun=%v", st.getMigCalled, st.createRunCalled)
 		}
 	})
 

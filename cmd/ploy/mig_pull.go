@@ -1,4 +1,4 @@
-// mod_pull.go implements the `ploy mig pull` subcommand for pulling Migs diffs
+// mig_pull.go implements the `ploy mig pull` subcommand for pulling Migs diffs
 // into the current git worktree based on mig project context.
 //
 // Command structure:
@@ -11,7 +11,7 @@
 //     Call GET /v1/migs?repo_url=<current_repo_url>&archived=false
 //     If exactly one mig matches: use it.
 //     If multiple migs match: error with list of matching migs.
-//   - Uses POST /v1/migs/{mod_id}/pull to resolve the run and repo.
+//   - Uses POST /v1/migs/{mig_id}/pull to resolve the run and repo.
 //   - Pulls diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs.
 package main
 
@@ -38,7 +38,7 @@ import (
 //   - Must be executed from inside a git repository
 //   - Derives repo identity from git remote URL (origin by default)
 //   - Optionally accepts a mig ID/name; if omitted, infers from current repo
-//   - Uses POST /v1/migs/{mod_id}/pull to resolve run execution identifiers
+//   - Uses POST /v1/migs/{mig_id}/pull to resolve run execution identifiers
 //   - Pulls diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs
 //
 // Arguments:
@@ -86,9 +86,9 @@ func handleMigPull(args []string, stderr io.Writer) error {
 
 	// After flag parsing, remaining args may contain the optional mig identifier.
 	rest := fs.Args()
-	var modIDOrName string
+	var migIDOrName string
 	if len(rest) > 0 && strings.TrimSpace(rest[0]) != "" {
-		modIDOrName = strings.TrimSpace(rest[0])
+		migIDOrName = strings.TrimSpace(rest[0])
 	}
 
 	// Validate that no extra positional arguments were provided.
@@ -126,24 +126,24 @@ func handleMigPull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 5: Resolve the mig ID.
-	// If modIDOrName is provided, use it directly.
+	// If migIDOrName is provided, use it directly.
 	// Otherwise, infer from the current repo by querying migs that include this repo.
-	modID := modIDOrName
-	if modID == "" {
-		inferredModID, err := inferModFromRepo(ctx, httpClient, base, rawOriginURL, stderr)
+	migID := migIDOrName
+	if migID == "" {
+		inferredMigID, err := inferMigFromRepo(ctx, httpClient, base, rawOriginURL, stderr)
 		if err != nil {
 			return fmt.Errorf("mig pull: %w", err)
 		}
-		modID = inferredModID
+		migID = inferredMigID
 	}
 
-	_, _ = fmt.Fprintf(stderr, "mig pull: using mig %q\n", modID)
+	_, _ = fmt.Fprintf(stderr, "mig pull: using mig %q\n", migID)
 
-	// Step 6: Resolve repo execution via POST /v1/migs/{mod_id}/pull.
+	// Step 6: Resolve repo execution via POST /v1/migs/{mig_id}/pull.
 	pullCmd := migs.MigPullCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modID),
+		MigRef:  domaintypes.MigRef(migID),
 		RepoURL: rawOriginURL,
 		Mode:    pullMode,
 	}
@@ -225,19 +225,19 @@ func handleMigPull(args []string, stderr io.Writer) error {
 	// Success message.
 	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
 		appliedCount, resolution.RunID, targetRef, *origin)
-	_, _ = fmt.Fprintf(stderr, "  mig: %s\n", modID)
+	_, _ = fmt.Fprintf(stderr, "  mig: %s\n", migID)
 
 	return nil
 }
 
-// inferModFromRepo attempts to infer the mig ID from the current repo.
+// inferMigFromRepo attempts to infer the mig ID from the current repo.
 // It queries GET /v1/migs?repo_url=<url>&archived=false to find migs that include this repo.
 //
 // Returns:
 //   - If exactly one non-archived mig matches: return that mig's ID.
 //   - If multiple migs match: return error with list of matching migs.
 //   - If no migs match: return error.
-func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url.URL, repoURL string, stderr io.Writer) (string, error) {
+func inferMigFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url.URL, repoURL string, stderr io.Writer) (string, error) {
 	if baseURL == nil {
 		return "", errors.New("base url required")
 	}

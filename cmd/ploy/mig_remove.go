@@ -1,4 +1,4 @@
-// mod_remove.go implements the 'ploy mig remove' command handler.
+// mig_remove.go implements the 'ploy mig remove' command handler.
 //
 // This command deletes a mig project:
 // - ploy mig remove <mig-id|name>
@@ -27,7 +27,7 @@ func handleMigRemove(args []string, stderr io.Writer) error {
 		printMigRemoveUsage(stderr)
 		return fmt.Errorf("mig id or name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	// Resolve control plane connection.
 	ctx := context.Background()
@@ -40,14 +40,14 @@ func handleMigRemove(args []string, stderr io.Writer) error {
 	cmd := migs.RemoveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
 
 	if err := cmd.Run(ctx); err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Mod deleted: %s\n", modRef)
+	_, _ = fmt.Fprintf(stderr, "Mig deleted: %s\n", migRef)
 	return nil
 }
 

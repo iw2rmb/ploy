@@ -257,7 +257,7 @@ func TestBuildGateImageMapping_Validate(t *testing.T) {
 func TestBuildGateImageRule_ParseRoundTrip(t *testing.T) {
 	original := &MigSpec{
 		Steps: []MigStep{{
-			Image: JobImage{Universal: "docker.io/user/mig:latest"},
+			Image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 		}},
 		BuildGate: &BuildGateConfig{
 			Enabled: true,

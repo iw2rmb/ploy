@@ -15,8 +15,8 @@ func TestNoLegacyJobFieldTokens(t *testing.T) {
 		"step" + "_index",
 		"mig" + "_type",
 		"mig" + "_image",
-		"Mod" + "Type",
-		"Mod" + "Image",
+		"Mig" + "Type",
+		"Mig" + "Image",
 	}
 
 	roots := []string{"internal", "cmd", "docs", "tests"}

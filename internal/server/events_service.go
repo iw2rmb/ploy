@@ -14,7 +14,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -215,12 +215,12 @@ func (s *EventsService) CreateAndPublishLog(ctx context.Context, log store.Log, 
 // PublishRun publishes a run lifecycle event (queued/running/succeeded/failed/cancelled)
 // to the SSE hub. The runID (KSUID-backed RunID) is used as the streamID for SSE fanout.
 //
-// The payload is intentionally typed as modsapi.RunSummary to enforce a
+// The payload is intentionally typed as migsapi.RunSummary to enforce a
 // JSON‑serializable contract at the service boundary and prevent accidental
 // non‑JSON payloads from being published. Callers should also emit a terminal
 // "done" status via Hub().PublishStatus when the run reaches a terminal state
 // so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
-func (s *EventsService) PublishRun(ctx context.Context, runID domaintypes.RunID, payload modsapi.RunSummary) error {
+func (s *EventsService) PublishRun(ctx context.Context, runID domaintypes.RunID, payload migsapi.RunSummary) error {
 	if runID.IsZero() {
 		return logstream.ErrInvalidRunID
 	}

@@ -4,7 +4,7 @@ set -euo pipefail
 # Run the real codex integration test with build‑gate verification.
 # - Builds the codex image from repo root (includes ploy-buildgate CLI)
 # - Exports CODEX_AUTH_JSON (reads ~/.codex/auth.json if unset)
-# - Executes the Go test: TestModCodex_HealsUsingBuildGateLog_FromFailingBranch
+# - Executes the Go test: TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 cd "$ROOT"
@@ -26,4 +26,4 @@ echo "[run] Building codex image (repo root)…" >&2
 docker build -t codex:latest -f images/codex/Dockerfile . >/dev/null
 
 echo "[run] Executing integration test…" >&2
-GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/migs/codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1
+GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/migs/codex -run TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1

@@ -101,9 +101,9 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		modRepoID := domaintypes.NewMigRepoID()
-		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
-			ID:        modRepoID,
+		migRepoID := domaintypes.NewMigRepoID()
+		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
+			ID:        migRepoID,
 			MigID:     run.MigID,
 			Url:       req.RepoURL.String(),
 			BaseRef:   req.BaseRef.String(),
@@ -120,19 +120,19 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		repoURL, err := repoURLForID(r.Context(), st, modRepo.RepoID)
+		repoURL, err := repoURLForID(r.Context(), st, migRepo.RepoID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to get repo url: %v", err)
 			return
 		}
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, modRepo.BaseRef)
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef)
 		if seedErr != nil {
-			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
+			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
 			slog.Error("add run repo: resolve source commit failed",
 				"run_id", runID.String(),
-				"repo_id", modRepo.RepoID,
+				"repo_id", migRepo.RepoID,
 				"repo_url", repoURL,
-				"base_ref", modRepo.BaseRef,
+				"base_ref", migRepo.BaseRef,
 				"err", seedErr,
 			)
 			return
@@ -141,15 +141,15 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
 			MigID:           run.MigID,
 			RunID:           runID,
-			RepoID:          modRepo.RepoID,
-			RepoBaseRef:     modRepo.BaseRef,
-			RepoTargetRef:   modRepo.TargetRef,
+			RepoID:          migRepo.RepoID,
+			RepoBaseRef:     migRepo.BaseRef,
+			RepoTargetRef:   migRepo.TargetRef,
 			SourceCommitSha: sourceCommitSHA,
 			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", modRepo.RepoID, "err", err)
+			slog.Error("add run repo: create run repo failed", "run_id", runID.String(), "repo_id", migRepo.RepoID, "err", err)
 			return
 		}
 
@@ -349,10 +349,10 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 				newTarget = req.TargetRef.String()
 			}
 			_ = st.UpdateRunRepoRefs(r.Context(), store.UpdateRunRepoRefsParams{RunID: runID, RepoID: repoID, RepoBaseRef: newBase, RepoTargetRef: newTarget})
-			if modRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID); listErr == nil {
-				for _, modRepo := range modRepos {
-					if modRepo.RepoID == repoID {
-						_ = st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: modRepo.ID, BaseRef: newBase, TargetRef: newTarget})
+			if migRepos, listErr := st.ListMigReposByMig(r.Context(), run.MigID); listErr == nil {
+				for _, migRepo := range migRepos {
+					if migRepo.RepoID == repoID {
+						_ = st.UpdateMigRepoRefs(r.Context(), store.UpdateMigRepoRefsParams{ID: migRepo.ID, BaseRef: newBase, TargetRef: newTarget})
 						break
 					}
 				}

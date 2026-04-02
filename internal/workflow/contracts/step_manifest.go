@@ -18,7 +18,7 @@ var (
 	stepInputNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9\-]{2,63}$`)
 )
 
-// StepManifest defines the execution contract for a single Mod step.
+// StepManifest defines the execution contract for a single Mig step.
 type StepManifest struct {
 	ID         types.StepID
 	Name       string

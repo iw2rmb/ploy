@@ -90,10 +90,10 @@ index 2a02d41..0527e6b 100644
 +++ b/README.md
 @@ -1 +1 @@
 -# Test
-+# Test Modified
++# Test Migified
 `,
 			validateAfter: func(t *testing.T, dir string) {
-				assertFileContent(t, filepath.Join(dir, "README.md"), "# Test Modified\n")
+				assertFileContent(t, filepath.Join(dir, "README.md"), "# Test Migified\n")
 			},
 		},
 	}

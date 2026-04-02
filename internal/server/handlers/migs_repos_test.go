@@ -17,13 +17,13 @@ import (
 // POST /v1/migs/{mig_id}/repos — Add Mig Repo
 // =============================================================================
 
-func TestAddModRepoHandler(t *testing.T) {
-	activeMig := store.Mig{ID: "mod123", Name: "test-mig"}
+func TestAddMigRepoHandler(t *testing.T) {
+	activeMig := store.Mig{ID: "mig123", Name: "test-mig"}
 
 	tests := []struct {
 		name           string
 		store          *migStore
-		modID          string
+		migID          string
 		body           map[string]interface{}
 		wantStatus     int
 		wantBodySubstr string
@@ -31,15 +31,15 @@ func TestAddModRepoHandler(t *testing.T) {
 	}{
 		{
 			name:       "success - adds repo to mig",
-			store:      &migStore{getModResult: activeMig},
-			modID:      "mod123",
+			store:      &migStore{getMigResult: activeMig},
+			migID:      "mig123",
 			body:       map[string]interface{}{"repo_url": "https://github.com/org/repo", "base_ref": "main", "target_ref": "feature-branch"},
 			wantStatus: http.StatusCreated,
 		},
 		{
 			name:       "success - normalizes repo URL",
-			store:      &migStore{getModResult: activeMig},
-			modID:      "mod123",
+			store:      &migStore{getMigResult: activeMig},
+			migID:      "mig123",
 			body:       map[string]interface{}{"repo_url": "https://github.com/org/repo.git/", "base_ref": "main", "target_ref": "feature"},
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, m *migStore) {
@@ -52,40 +52,40 @@ func TestAddModRepoHandler(t *testing.T) {
 		},
 		{
 			name:           "error - mig not found",
-			store:          &migStore{getModErr: pgx.ErrNoRows},
-			modID:          "mod404",
+			store:          &migStore{getMigErr: pgx.ErrNoRows},
+			migID:          "mig404",
 			body:           map[string]interface{}{"repo_url": "https://github.com/org/repo", "base_ref": "main", "target_ref": "feature"},
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "mig not found",
 		},
 		{
 			name:           "error - archived mig",
-			store:          &migStore{getModResult: store.Mig{ID: "modarc", Name: "archived-mig", ArchivedAt: pgtype.Timestamptz{Valid: true}}},
-			modID:          "modarc",
+			store:          &migStore{getMigResult: store.Mig{ID: "modarc", Name: "archived-mig", ArchivedAt: pgtype.Timestamptz{Valid: true}}},
+			migID:          "modarc",
 			body:           map[string]interface{}{"repo_url": "https://github.com/org/repo", "base_ref": "main", "target_ref": "feature"},
 			wantStatus:     http.StatusConflict,
 			wantBodySubstr: "cannot add repo to archived mig",
 		},
 		{
 			name:           "error - missing repo_url",
-			store:          &migStore{getModResult: activeMig},
-			modID:          "mod123",
+			store:          &migStore{getMigResult: activeMig},
+			migID:          "mig123",
 			body:           map[string]interface{}{"base_ref": "main", "target_ref": "feature"},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "repo_url: empty",
 		},
 		{
 			name:           "error - missing base_ref",
-			store:          &migStore{getModResult: activeMig},
-			modID:          "mod123",
+			store:          &migStore{getMigResult: activeMig},
+			migID:          "mig123",
 			body:           map[string]interface{}{"repo_url": "https://github.com/org/repo", "target_ref": "feature"},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "base_ref: empty",
 		},
 		{
 			name:           "error - invalid repo_url scheme",
-			store:          &migStore{getModResult: activeMig},
-			modID:          "mod123",
+			store:          &migStore{getMigResult: activeMig},
+			migID:          "mig123",
 			body:           map[string]interface{}{"repo_url": "ftp://invalid.com/repo", "base_ref": "main", "target_ref": "feature"},
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "invalid repo url",
@@ -95,7 +95,7 @@ func TestAddModRepoHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := addMigRepoHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+tt.modID+"/repos", tt.body, "mig_id", tt.modID)
+			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/"+tt.migID+"/repos", tt.body, "mig_id", tt.migID)
 			assertStatus(t, rr, tt.wantStatus)
 			assertBodyContains(t, rr, tt.wantBodySubstr)
 			if tt.verify != nil {
@@ -109,23 +109,23 @@ func TestAddModRepoHandler(t *testing.T) {
 // GET /v1/migs/{mig_id}/repos — List Mig Repos
 // =============================================================================
 
-func TestListModReposHandler(t *testing.T) {
+func TestListMigReposHandler(t *testing.T) {
 	tests := []struct {
 		name           string
 		store          *migStore
-		modID          string
+		migID          string
 		wantStatus     int
 		wantBodySubstr string
 		verify         func(t *testing.T, rr *httptest.ResponseRecorder)
 	}{
 		{
 			name:  "success - lists repos",
-			modID: "mod123",
+			migID: "mig123",
 			store: &migStore{
-				getModResult: store.Mig{ID: "mod123", Name: "test-mig"},
-				listMigReposByModResult: []store.MigRepo{
-					{ID: "repo0001", MigID: "mod123", RepoID: "repo0001", BaseRef: "main", TargetRef: "feature1"},
-					{ID: "repo0002", MigID: "mod123", RepoID: "repo0002", BaseRef: "develop", TargetRef: "feature2"},
+				getMigResult: store.Mig{ID: "mig123", Name: "test-mig"},
+				listMigReposByMigResult: []store.MigRepo{
+					{ID: "repo0001", MigID: "mig123", RepoID: "repo0001", BaseRef: "main", TargetRef: "feature1"},
+					{ID: "repo0002", MigID: "mig123", RepoID: "repo0002", BaseRef: "develop", TargetRef: "feature2"},
 				},
 				repoByID: map[types.RepoID]store.Repo{
 					"repo0001": {ID: "repo0001", Url: "https://github.com/org/repo1"},
@@ -145,10 +145,10 @@ func TestListModReposHandler(t *testing.T) {
 		},
 		{
 			name:  "success - empty list",
-			modID: "mod123",
+			migID: "mig123",
 			store: &migStore{
-				getModResult:            store.Mig{ID: "mod123", Name: "test-mig"},
-				listMigReposByModResult: []store.MigRepo{},
+				getMigResult:            store.Mig{ID: "mig123", Name: "test-mig"},
+				listMigReposByMigResult: []store.MigRepo{},
 			},
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, rr *httptest.ResponseRecorder) {
@@ -163,8 +163,8 @@ func TestListModReposHandler(t *testing.T) {
 		},
 		{
 			name:           "error - mig not found",
-			modID:          "mod404",
-			store:          &migStore{getModErr: pgx.ErrNoRows},
+			migID:          "mig404",
+			store:          &migStore{getMigErr: pgx.ErrNoRows},
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "mig not found",
 		},
@@ -173,7 +173,7 @@ func TestListModReposHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := listMigReposHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodGet, "/v1/migs/"+tt.modID+"/repos", nil, "mig_id", tt.modID)
+			rr := doRequest(t, handler, http.MethodGet, "/v1/migs/"+tt.migID+"/repos", nil, "mig_id", tt.migID)
 			assertStatus(t, rr, tt.wantStatus)
 			assertBodyContains(t, rr, tt.wantBodySubstr)
 			if tt.verify != nil {
@@ -188,51 +188,69 @@ func TestListModReposHandler(t *testing.T) {
 // =============================================================================
 
 func TestDeleteMigRepoHandler(t *testing.T) {
-	activeMig := store.Mig{ID: "mod123", Name: "test-mig"}
+	activeMig := store.Mig{ID: "mig123", Name: "test-mig"}
 
 	tests := []struct {
 		name           string
 		store          *migStore
-		modID          string
+		migID          string
 		repoID         string
 		wantStatus     int
 		wantBodySubstr string
 	}{
 		{
-			name:       "success - deletes repo",
-			store:      func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepo.val = store.MigRepo{ID: "repoX789", MigID: "mod123"}; st.hasModRepoHistory.val = false; return st }(),
-			modID:      "mod123",
+			name: "success - deletes repo",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepo.val = store.MigRepo{ID: "repoX789", MigID: "mig123"}
+				st.hasMigRepoHistory.val = false
+				return st
+			}(),
+			migID:      "mig123",
 			repoID:     "repoX789",
 			wantStatus: http.StatusNoContent,
 		},
 		{
 			name:           "error - mig not found",
-			store:          &migStore{getModErr: pgx.ErrNoRows},
-			modID:          "mod404",
+			store:          &migStore{getMigErr: pgx.ErrNoRows},
+			migID:          "mig404",
 			repoID:         "repoX789",
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "mig not found",
 		},
 		{
-			name:           "error - repo not found",
-			store:          func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepo.err = pgx.ErrNoRows; return st }(),
-			modID:          "mod123",
+			name: "error - repo not found",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepo.err = pgx.ErrNoRows
+				return st
+			}(),
+			migID:          "mig123",
 			repoID:         "repo4040",
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "repo not found",
 		},
 		{
-			name:           "error - repo belongs to different mig",
-			store:          func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepo.val = store.MigRepo{ID: "repo0003", MigID: "moddif"}; return st }(),
-			modID:          "mod123",
+			name: "error - repo belongs to different mig",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepo.val = store.MigRepo{ID: "repo0003", MigID: "migdif"}
+				return st
+			}(),
+			migID:          "mig123",
 			repoID:         "repo0003",
 			wantStatus:     http.StatusNotFound,
 			wantBodySubstr: "repo does not belong to this mig",
 		},
 		{
-			name:           "error - repo has historical executions",
-			store:          func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepo.val = store.MigRepo{ID: "repohist", MigID: "mod123"}; st.hasModRepoHistory.val = true; return st }(),
-			modID:          "mod123",
+			name: "error - repo has historical executions",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepo.val = store.MigRepo{ID: "repohist", MigID: "mig123"}
+				st.hasMigRepoHistory.val = true
+				return st
+			}(),
+			migID:          "mig123",
 			repoID:         "repohist",
 			wantStatus:     http.StatusConflict,
 			wantBodySubstr: "cannot delete repo with historical executions",
@@ -242,7 +260,7 @@ func TestDeleteMigRepoHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := deleteMigRepoHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/"+tt.modID+"/repos/"+tt.repoID, nil, "mig_id", tt.modID, "repo_id", tt.repoID)
+			rr := doRequest(t, handler, http.MethodDelete, "/v1/migs/"+tt.migID+"/repos/"+tt.repoID, nil, "mig_id", tt.migID, "repo_id", tt.repoID)
 			assertStatus(t, rr, tt.wantStatus)
 			assertBodyContains(t, rr, tt.wantBodySubstr)
 		})
@@ -264,13 +282,13 @@ func TestBulkUpsertMigReposHandler(t *testing.T) {
 		} `json:"errors"`
 	}
 
-	activeMig := store.Mig{ID: "mod123", Name: "test-mig"}
+	activeMig := store.Mig{ID: "mig123", Name: "test-mig"}
 	archivedMig := store.Mig{ID: "modarc", Name: "archived-mig", ArchivedAt: pgtype.Timestamptz{Valid: true}}
 
 	tests := []struct {
 		name           string
 		store          *migStore
-		modID          string
+		migID          string
 		contentType    string
 		body           string
 		wantStatus     int
@@ -281,9 +299,13 @@ func TestBulkUpsertMigReposHandler(t *testing.T) {
 		verify         func(t *testing.T, m *migStore)
 	}{
 		{
-			name:        "success - creates new repos",
-			store:       func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepoByURL.err = pgx.ErrNoRows; return st }(),
-			modID:       "mod123",
+			name: "success - creates new repos",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepoByURL.err = pgx.ErrNoRows
+				return st
+			}(),
+			migID:       "mig123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/repo1,main,feature1
@@ -294,11 +316,11 @@ https://github.com/org/repo2,develop,feature2`,
 		{
 			name: "success - updates existing repos",
 			store: func() *migStore {
-				st := &migStore{getModResult: activeMig}
-				st.getModRepoByURL.val = store.MigRepo{ID: "repoexst", MigID: "mod123"}
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepoByURL.val = store.MigRepo{ID: "repoexst", MigID: "mig123"}
 				return st
 			}(),
-			modID:       "mod123",
+			migID:       "mig123",
 			contentType: "text/csv",
 			body: `repo_url,base_ref,target_ref
 https://github.com/org/existing,main,new-feature`,
@@ -306,38 +328,46 @@ https://github.com/org/existing,main,new-feature`,
 			wantUpdated: 1,
 		},
 		{
-			name:        "success - parses quoted fields and unicode",
-			store:       func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepoByURL.err = pgx.ErrNoRows; return st }(),
-			modID:       "mod123",
+			name: "success - parses quoted fields and unicode",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepoByURL.err = pgx.ErrNoRows
+				return st
+			}(),
+			migID:       "mig123",
 			contentType: "text/csv",
 			body:        "repo_url,base_ref,target_ref\n\"https://github.com/org/привет\",\"main\",\"feature\"\"one\"",
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
 		},
 		{
-			name:        "success - normalizes repo URL before upsert",
-			store:       func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepoByURL.err = pgx.ErrNoRows; return st }(),
-			modID:       "mod123",
+			name: "success - normalizes repo URL before upsert",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepoByURL.err = pgx.ErrNoRows
+				return st
+			}(),
+			migID:       "mig123",
 			contentType: "text/csv",
 			body:        "repo_url,base_ref,target_ref\nhttps://github.com/org/repo.git/,main,feature",
 			wantStatus:  http.StatusOK,
 			wantCreated: 1,
 			verify: func(t *testing.T, m *migStore) {
 				t.Helper()
-				assertCalled(t, "GetMigRepoByURL", m.getModRepoByURL.called)
-				if m.getModRepoByURL.params.Url != "https://github.com/org/repo" {
-					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getModRepoByURL.params.Url, "https://github.com/org/repo")
+				assertCalled(t, "GetMigRepoByURL", m.getMigRepoByURL.called)
+				if m.getMigRepoByURL.params.Url != "https://github.com/org/repo" {
+					t.Fatalf("GetMigRepoByURL repo_url mismatch: got=%q want=%q", m.getMigRepoByURL.params.Url, "https://github.com/org/repo")
 				}
-				assertCalled(t, "UpsertMigRepo", m.upsertModRepoCalled)
-				if m.upsertModRepoParams.Url != "https://github.com/org/repo" {
-					t.Fatalf("UpsertMigRepo repo_url mismatch: got=%q want=%q", m.upsertModRepoParams.Url, "https://github.com/org/repo")
+				assertCalled(t, "UpsertMigRepo", m.upsertMigRepoCalled)
+				if m.upsertMigRepoParams.Url != "https://github.com/org/repo" {
+					t.Fatalf("UpsertMigRepo repo_url mismatch: got=%q want=%q", m.upsertMigRepoParams.Url, "https://github.com/org/repo")
 				}
 			},
 		},
 		{
 			name:           "error - wrong content type",
-			store:          &migStore{getModResult: activeMig},
-			modID:          "mod123",
+			store:          &migStore{getMigResult: activeMig},
+			migID:          "mig123",
 			contentType:    "application/json",
 			body:           `{}`,
 			wantStatus:     http.StatusBadRequest,
@@ -345,8 +375,8 @@ https://github.com/org/existing,main,new-feature`,
 		},
 		{
 			name:           "error - mig not found",
-			store:          &migStore{getModErr: pgx.ErrNoRows},
-			modID:          "mod404",
+			store:          &migStore{getMigErr: pgx.ErrNoRows},
+			migID:          "mig404",
 			contentType:    "text/csv",
 			body:           "repo_url,base_ref,target_ref\nhttps://github.com/org/repo,main,feature",
 			wantStatus:     http.StatusNotFound,
@@ -354,8 +384,8 @@ https://github.com/org/existing,main,new-feature`,
 		},
 		{
 			name:           "error - archived mig",
-			store:          &migStore{getModResult: archivedMig},
-			modID:          "modarc",
+			store:          &migStore{getMigResult: archivedMig},
+			migID:          "modarc",
 			contentType:    "text/csv",
 			body:           "repo_url,base_ref,target_ref\nhttps://github.com/org/repo,main,feature",
 			wantStatus:     http.StatusConflict,
@@ -363,17 +393,21 @@ https://github.com/org/existing,main,new-feature`,
 		},
 		{
 			name:           "error - invalid header",
-			store:          &migStore{getModResult: activeMig},
-			modID:          "mod123",
+			store:          &migStore{getMigResult: activeMig},
+			migID:          "mig123",
 			contentType:    "text/csv",
 			body:           "wrong,headers,here\nhttps://github.com/org/repo,main,feature",
 			wantStatus:     http.StatusBadRequest,
 			wantBodySubstr: "CSV header must be",
 		},
 		{
-			name:        "partial success - invalid repo_url on one line",
-			store:       func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepoByURL.err = pgx.ErrNoRows; return st }(),
-			modID:       "mod123",
+			name: "partial success - invalid repo_url on one line",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepoByURL.err = pgx.ErrNoRows
+				return st
+			}(),
+			migID:       "mig123",
 			contentType: "text/csv",
 			body:        "repo_url,base_ref,target_ref\nhttps://github.com/org/good-repo,main,feature1\nftp://invalid.com/bad-repo,main,feature2",
 			wantStatus:  http.StatusOK,
@@ -382,8 +416,8 @@ https://github.com/org/existing,main,new-feature`,
 		},
 		{
 			name:           "partial success - missing fields",
-			store:          &migStore{getModResult: activeMig},
-			modID:          "mod123",
+			store:          &migStore{getMigResult: activeMig},
+			migID:          "mig123",
 			contentType:    "text/csv",
 			body:           "repo_url,base_ref,target_ref\nhttps://github.com/org/repo,,feature",
 			wantStatus:     http.StatusOK,
@@ -392,24 +426,28 @@ https://github.com/org/existing,main,new-feature`,
 		},
 		{
 			name:        "partial success - strict CSV parse error",
-			store:       &migStore{getModResult: activeMig},
-			modID:       "mod123",
+			store:       &migStore{getMigResult: activeMig},
+			migID:       "mig123",
 			contentType: "text/csv",
 			body:        "repo_url,base_ref,target_ref\nhttps://github.com/org/repo,main,\"unterminated",
 			wantStatus:  http.StatusOK,
 			wantFailed:  1,
 		},
 		{
-			name:        "partial success - store lookup error is a per-line failure",
-			store:       func() *migStore { st := &migStore{getModResult: activeMig}; st.getModRepoByURL.err = errors.New("db down"); return st }(),
-			modID:       "mod123",
+			name: "partial success - store lookup error is a per-line failure",
+			store: func() *migStore {
+				st := &migStore{getMigResult: activeMig}
+				st.getMigRepoByURL.err = errors.New("db down")
+				return st
+			}(),
+			migID:       "mig123",
 			contentType: "text/csv",
 			body:        "repo_url,base_ref,target_ref\nhttps://github.com/org/repo,main,feature",
 			wantStatus:  http.StatusOK,
 			wantFailed:  1,
 			verify: func(t *testing.T, m *migStore) {
 				t.Helper()
-				assertNotCalled(t, "UpsertMigRepo", m.upsertModRepoCalled)
+				assertNotCalled(t, "UpsertMigRepo", m.upsertMigRepoCalled)
 			},
 		},
 	}
@@ -417,7 +455,7 @@ https://github.com/org/existing,main,new-feature`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := bulkUpsertMigReposHandler(tt.store)
-			rr := doRequestWithContentType(t, handler, http.MethodPost, "/v1/migs/"+tt.modID+"/repos/bulk", tt.contentType, tt.body, "mig_id", tt.modID)
+			rr := doRequestWithContentType(t, handler, http.MethodPost, "/v1/migs/"+tt.migID+"/repos/bulk", tt.contentType, tt.body, "mig_id", tt.migID)
 			assertStatus(t, rr, tt.wantStatus)
 			assertBodyContains(t, rr, tt.wantBodySubstr)
 			if tt.verify != nil {

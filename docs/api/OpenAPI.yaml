@@ -9,10 +9,10 @@ info:
 
     v1 API surfaces:
     - `/v1/migs` — mig project CRUD (create/list/delete/archive).
-    - `/v1/migs/{mod_id}/specs` and `/v1/migs/{mod_id}/specs/latest` — spec management for mig projects.
-    - `/v1/migs/{mod_id}/repos` — repo set management (add/list/delete repos).
-    - `/v1/migs/{mod_id}/runs` — create multi-repo batch runs for a mig.
-    - `/v1/migs/{mod_id}/pull` — resolve repo execution for `ploy mig pull`.
+    - `/v1/migs/{mig_id}/specs` and `/v1/migs/{mig_id}/specs/latest` — spec management for mig projects.
+    - `/v1/migs/{mig_id}/repos` — repo set management (add/list/delete repos).
+    - `/v1/migs/{mig_id}/runs` — create multi-repo batch runs for a mig.
+    - `/v1/migs/{mig_id}/pull` — resolve repo execution for `ploy mig pull`.
     - `/v1/runs` — single-repo run submission and run listing.
     - `/v1/runs/{id}/*` — run lifecycle (inspect/cancel/start/timing).
     - `/v1/runs/{run_id}/repos/{repo_id}/*` — repo-scoped execution surfaces:
@@ -51,151 +51,151 @@ security:
 paths:
   # Config endpoints
   /v1/config/gitlab:
-    $ref: './paths/config_gitlab.yaml'
+    $ref: "./paths/config_gitlab.yaml"
   /v1/config/env:
-    $ref: './paths/config_env.yaml'
+    $ref: "./paths/config_env.yaml"
   /v1/config/env/{key}:
-    $ref: './paths/config_env_key.yaml'
+    $ref: "./paths/config_env_key.yaml"
   # Token management (JWT bearer tokens)
   /v1/tokens:
-    $ref: './paths/tokens.yaml'
+    $ref: "./paths/tokens.yaml"
   /v1/tokens/{id}:
-    $ref: './paths/tokens_id.yaml'
+    $ref: "./paths/tokens_id.yaml"
   # Bootstrap tokens and node enrollment
   /v1/bootstrap/tokens:
-    $ref: './paths/bootstrap_tokens.yaml'
+    $ref: "./paths/bootstrap_tokens.yaml"
   /v1/pki/bootstrap:
-    $ref: './paths/pki_bootstrap.yaml'
+    $ref: "./paths/pki_bootstrap.yaml"
   # PKI endpoints
   /v1/pki/sign:
-    $ref: './paths/pki_sign.yaml'
+    $ref: "./paths/pki_sign.yaml"
   /v1/pki/sign/admin:
-    $ref: './paths/pki_sign_admin.yaml'
+    $ref: "./paths/pki_sign_admin.yaml"
   /v1/pki/sign/client:
-    $ref: './paths/pki_sign_client.yaml'
+    $ref: "./paths/pki_sign_client.yaml"
   # Control-plane surfaces
   # Run lifecycle and streaming are exposed under /v1/runs/*.
   # Nodes upload logs/diffs/artifacts under /v1/runs/* and complete jobs under /v1/jobs/*.
   /v1/migs:
-    $ref: './paths/migs.yaml'
-  /v1/migs/{mod_id}:
-    $ref: './paths/migs_mig_id.yaml'
-  /v1/migs/{mod_id}/archive:
-    $ref: './paths/migs_mig_id_archive.yaml'
-  /v1/migs/{mod_id}/unarchive:
-    $ref: './paths/migs_mig_id_unarchive.yaml'
-  /v1/migs/{mod_id}/specs:
-    $ref: './paths/migs_mig_id_specs.yaml'
-  /v1/migs/{mod_id}/specs/latest:
-    $ref: './paths/migs_mig_id_specs_latest.yaml'
-  /v1/migs/{mod_id}/repos:
-    $ref: './paths/migs_mig_id_repos.yaml'
-  /v1/migs/{mod_id}/repos/{repo_id}:
-    $ref: './paths/migs_mig_id_repos_repo_id.yaml'
-  /v1/migs/{mod_id}/repos/bulk:
-    $ref: './paths/migs_mig_id_repos_bulk.yaml'
-  /v1/migs/{mod_id}/runs:
-    $ref: './paths/migs_mig_id_runs.yaml'
-  /v1/migs/{mod_id}/pull:
-    $ref: './paths/migs_mig_id_pull.yaml'
+    $ref: "./paths/migs.yaml"
+  /v1/migs/{mig_id}:
+    $ref: "./paths/migs_mig_id.yaml"
+  /v1/migs/{mig_id}/archive:
+    $ref: "./paths/migs_mig_id_archive.yaml"
+  /v1/migs/{mig_id}/unarchive:
+    $ref: "./paths/migs_mig_id_unarchive.yaml"
+  /v1/migs/{mig_id}/specs:
+    $ref: "./paths/migs_mig_id_specs.yaml"
+  /v1/migs/{mig_id}/specs/latest:
+    $ref: "./paths/migs_mig_id_specs_latest.yaml"
+  /v1/migs/{mig_id}/repos:
+    $ref: "./paths/migs_mig_id_repos.yaml"
+  /v1/migs/{mig_id}/repos/{repo_id}:
+    $ref: "./paths/migs_mig_id_repos_repo_id.yaml"
+  /v1/migs/{mig_id}/repos/bulk:
+    $ref: "./paths/migs_mig_id_repos_bulk.yaml"
+  /v1/migs/{mig_id}/runs:
+    $ref: "./paths/migs_mig_id_runs.yaml"
+  /v1/migs/{mig_id}/pull:
+    $ref: "./paths/migs_mig_id_pull.yaml"
   /v1/runs/{id}/logs:
-    $ref: './paths/runs_id_logs.yaml'
+    $ref: "./paths/runs_id_logs.yaml"
   /v1/artifacts:
-    $ref: './paths/artifacts.yaml'
+    $ref: "./paths/artifacts.yaml"
   /v1/artifacts/{id}:
-    $ref: './paths/artifacts_id.yaml'
+    $ref: "./paths/artifacts_id.yaml"
   # Node heartbeat endpoint
   /v1/nodes/{id}/heartbeat:
-    $ref: './paths/nodes_id_heartbeat.yaml'
+    $ref: "./paths/nodes_id_heartbeat.yaml"
   # Node drain/undrain and list endpoints
   /v1/nodes:
-    $ref: './paths/nodes.yaml'
+    $ref: "./paths/nodes.yaml"
   /v1/nodes/{id}/drain:
-    $ref: './paths/nodes_id_drain.yaml'
+    $ref: "./paths/nodes_id_drain.yaml"
   /v1/nodes/{id}/undrain:
-    $ref: './paths/nodes_id_undrain.yaml'
+    $ref: "./paths/nodes_id_undrain.yaml"
   # Node claim endpoint (pull-based work assignment)
   # Note: The ack endpoint (/v1/nodes/{id}/ack) has been removed. Claim is the
   # canonical endpoint for pulling work from the unified jobs queue.
   /v1/nodes/{id}/claim:
-    $ref: './paths/nodes_id_claim.yaml'
+    $ref: "./paths/nodes_id_claim.yaml"
   # NOTE: Node-based completion endpoint (/v1/nodes/{id}/complete) has been removed.
   # Use the job-level endpoint POST /v1/jobs/{job_id}/complete instead.
 
   # Jobs — global jobs listing for TUI (list across all runs with mig context)
   /v1/jobs:
-    $ref: './paths/jobs.yaml'
+    $ref: "./paths/jobs.yaml"
   # Job-level completion endpoint (job-scoped, no node ID) — canonical endpoint for job completion
   /v1/jobs/{job_id}/complete:
-    $ref: './paths/jobs_job_id_complete.yaml'
+    $ref: "./paths/jobs_job_id_complete.yaml"
   # Job-level status polling endpoint — workers use this to detect remote cancellation.
   /v1/jobs/{job_id}/status:
-    $ref: './paths/jobs_job_id_status.yaml'
+    $ref: "./paths/jobs_job_id_status.yaml"
   # Job-level runtime image persistence — nodes persist the resolved container image name (jobs.job_image)
   /v1/jobs/{job_id}/image:
-    $ref: './paths/jobs_job_id_image.yaml'
+    $ref: "./paths/jobs_job_id_image.yaml"
   # Node events endpoint
   /v1/nodes/{id}/events:
-    $ref: './paths/nodes_id_events.yaml'
+    $ref: "./paths/nodes_id_events.yaml"
   # Node logs endpoint (gzipped chunks)
   /v1/nodes/{id}/logs:
-    $ref: './paths/nodes_id_logs.yaml'
+    $ref: "./paths/nodes_id_logs.yaml"
   # Batch runs endpoints (list/inspect/cancel)
   /v1/runs:
-    $ref: './paths/runs.yaml'
+    $ref: "./paths/runs.yaml"
   /v1/runs/{id}:
-    $ref: './paths/runs_id.yaml'
+    $ref: "./paths/runs_id.yaml"
   /v1/runs/{id}/status:
-    $ref: './paths/migs_id.yaml'
+    $ref: "./paths/migs_id.yaml"
   /v1/runs/{id}/start:
-    $ref: './paths/runs_id_start.yaml'
+    $ref: "./paths/runs_id_start.yaml"
   /v1/runs/{id}/cancel:
-    $ref: './paths/runs_id_cancel.yaml'
+    $ref: "./paths/runs_id_cancel.yaml"
   /v1/runs/{id}/timing:
-    $ref: './paths/runs_id_timing.yaml'
+    $ref: "./paths/runs_id_timing.yaml"
   /v1/runs/{id}/repos:
-    $ref: './paths/runs_id_repos.yaml'
+    $ref: "./paths/runs_id_repos.yaml"
   /v1/runs/{id}/repos/{repo_id}/restart:
-    $ref: './paths/runs_id_repos_repo_id_restart.yaml'
+    $ref: "./paths/runs_id_repos_repo_id_restart.yaml"
   # Repo-scoped diffs listing — see docs/migs-lifecycle.md § "Pulling Diffs Locally"
   /v1/runs/{run_id}/repos/{repo_id}/diffs:
-    $ref: './paths/runs_run_id_repos_repo_id_diffs.yaml'
+    $ref: "./paths/runs_run_id_repos_repo_id_diffs.yaml"
   # Repo-scoped logs SSE stream — filters run logs to jobs in this repo
   /v1/runs/{run_id}/repos/{repo_id}/logs:
-    $ref: './paths/runs_run_id_repos_repo_id_logs.yaml'
+    $ref: "./paths/runs_run_id_repos_repo_id_logs.yaml"
   # Repo-scoped artifact listing — filters artifacts to jobs in this repo
   /v1/runs/{run_id}/repos/{repo_id}/artifacts:
-    $ref: './paths/runs_run_id_repos_repo_id_artifacts.yaml'
+    $ref: "./paths/runs_run_id_repos_repo_id_artifacts.yaml"
   # Repo-scoped jobs listing — lists jobs for a repo execution
   /v1/runs/{run_id}/repos/{repo_id}/jobs:
-    $ref: './paths/runs_run_id_repos_repo_id_jobs.yaml'
+    $ref: "./paths/runs_run_id_repos_repo_id_jobs.yaml"
   # Repo-scoped cancel — cancels a single repo execution within a run
   /v1/runs/{run_id}/repos/{repo_id}/cancel:
-    $ref: './paths/runs_run_id_repos_repo_id_cancel.yaml'
+    $ref: "./paths/runs_run_id_repos_repo_id_cancel.yaml"
   /v1/runs/{run_id}/pull:
-    $ref: './paths/runs_run_id_pull.yaml'
+    $ref: "./paths/runs_run_id_pull.yaml"
   # Repo-centric endpoints — list repos and show runs for a given repo
   /v1/repos:
-    $ref: './paths/repos.yaml'
+    $ref: "./paths/repos.yaml"
   /v1/repos/{repo_id}/runs:
-    $ref: './paths/repos_repo_id_runs.yaml'
+    $ref: "./paths/repos_repo_id_runs.yaml"
   # SBOM compatibility hints (stack-scoped evidence for deps healing)
   /v1/sboms/compat:
-    $ref: './paths/sboms_compat.yaml'
+    $ref: "./paths/sboms_compat.yaml"
   # Spec bundle upload (CLI → server) and download (worker ← server)
   /v1/spec-bundles:
-    $ref: './paths/spec_bundles.yaml'
+    $ref: "./paths/spec_bundles.yaml"
   /v1/spec-bundles/{id}:
-    $ref: './paths/spec_bundles_id.yaml'
+    $ref: "./paths/spec_bundles_id.yaml"
   # Job diff upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/diff:
-    $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'
+    $ref: "./paths/runs_run_id_jobs_job_id_diff.yaml"
   # Job artifact bundle upload endpoint (run-scoped, no node ID)
   /v1/runs/{run_id}/jobs/{job_id}/artifact:
-    $ref: './paths/runs_run_id_jobs_job_id_artifact.yaml'
+    $ref: "./paths/runs_run_id_jobs_job_id_artifact.yaml"
   # Control-plane diff ingestion endpoint
   /v1/runs/{id}/diffs:
-    $ref: './paths/runs_id_diffs.yaml'
+    $ref: "./paths/runs_id_diffs.yaml"
   # Build Gate HTTP service removed: gate runs as jobs in the Migs pipeline.
   # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint.
   # Legacy removed:
@@ -218,129 +218,129 @@ components:
   schemas:
     # PKI schemas
     PKISignRequest:
-      $ref: './components/schemas/pki.yaml#/PKISignRequest'
+      $ref: "./components/schemas/pki.yaml#/PKISignRequest"
     PKISignResponse:
-      $ref: './components/schemas/pki.yaml#/PKISignResponse'
+      $ref: "./components/schemas/pki.yaml#/PKISignResponse"
     PKIAdminSignRequest:
-      $ref: './components/schemas/pki.yaml#/PKIAdminSignRequest'
+      $ref: "./components/schemas/pki.yaml#/PKIAdminSignRequest"
     PKIClientSignRequest:
-      $ref: './components/schemas/pki.yaml#/PKIClientSignRequest'
+      $ref: "./components/schemas/pki.yaml#/PKIClientSignRequest"
     # Config schemas (global env, GitLab settings)
     GlobalEnvTarget:
-      $ref: './components/schemas/config.yaml#/GlobalEnvTarget'
+      $ref: "./components/schemas/config.yaml#/GlobalEnvTarget"
     GlobalEnvListItem:
-      $ref: './components/schemas/config.yaml#/GlobalEnvListItem'
+      $ref: "./components/schemas/config.yaml#/GlobalEnvListItem"
     GlobalEnvVar:
-      $ref: './components/schemas/config.yaml#/GlobalEnvVar'
+      $ref: "./components/schemas/config.yaml#/GlobalEnvVar"
     GlobalEnvPutRequest:
-      $ref: './components/schemas/config.yaml#/GlobalEnvPutRequest'
+      $ref: "./components/schemas/config.yaml#/GlobalEnvPutRequest"
     # Control-plane schemas
     Error:
-      $ref: './components/schemas/common.yaml#/Error'
+      $ref: "./components/schemas/common.yaml#/Error"
     Run:
-      $ref: './components/schemas/controlplane.yaml#/Run'
+      $ref: "./components/schemas/controlplane.yaml#/Run"
     RunSummary:
-      $ref: './components/schemas/controlplane.yaml#/RunSummary'
+      $ref: "./components/schemas/controlplane.yaml#/RunSummary"
     RunRepo:
-      $ref: './components/schemas/controlplane.yaml#/RunRepo'
+      $ref: "./components/schemas/controlplane.yaml#/RunRepo"
     RunRepoCounts:
-      $ref: './components/schemas/controlplane.yaml#/RunRepoCounts'
+      $ref: "./components/schemas/controlplane.yaml#/RunRepoCounts"
     RunRepoStatus:
-      $ref: './components/schemas/controlplane.yaml#/RunRepoStatus'
+      $ref: "./components/schemas/controlplane.yaml#/RunRepoStatus"
     RunBatchDerivedStatus:
-      $ref: './components/schemas/controlplane.yaml#/RunBatchDerivedStatus'
+      $ref: "./components/schemas/controlplane.yaml#/RunBatchDerivedStatus"
     CreateRunRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
+      $ref: "./components/schemas/controlplane.yaml#/CreateRunRequest"
     CreateRunResponse:
-      $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
+      $ref: "./components/schemas/controlplane.yaml#/CreateRunResponse"
     RunSubmitRequest:
-      $ref: './components/schemas/controlplane.yaml#/RunSubmitRequest'
+      $ref: "./components/schemas/controlplane.yaml#/RunSubmitRequest"
     MigsRunSummary:
-      $ref: './components/schemas/controlplane.yaml#/MigsRunSummary'
+      $ref: "./components/schemas/controlplane.yaml#/MigsRunSummary"
     StageStatus:
-      $ref: './components/schemas/controlplane.yaml#/StageStatus'
+      $ref: "./components/schemas/controlplane.yaml#/StageStatus"
     NodeClaimResponse:
-      $ref: './components/schemas/controlplane.yaml#/NodeClaimResponse'
+      $ref: "./components/schemas/controlplane.yaml#/NodeClaimResponse"
     Event:
-      $ref: './components/schemas/controlplane.yaml#/Event'
+      $ref: "./components/schemas/controlplane.yaml#/Event"
     Stage:
-      $ref: './components/schemas/controlplane.yaml#/Stage'
+      $ref: "./components/schemas/controlplane.yaml#/Stage"
     WorkflowGraphNode:
-      $ref: './components/schemas/controlplane.yaml#/WorkflowGraphNode'
+      $ref: "./components/schemas/controlplane.yaml#/WorkflowGraphNode"
     WorkflowGraph:
-      $ref: './components/schemas/controlplane.yaml#/WorkflowGraph'
+      $ref: "./components/schemas/controlplane.yaml#/WorkflowGraph"
     Node:
-      $ref: './components/schemas/controlplane.yaml#/Node'
+      $ref: "./components/schemas/controlplane.yaml#/Node"
     NodeCreateLogResponse:
-      $ref: './components/schemas/controlplane.yaml#/NodeCreateLogResponse'
+      $ref: "./components/schemas/controlplane.yaml#/NodeCreateLogResponse"
     # Build Gate HTTP schemas removed: gate runs as jobs in the Migs pipeline.
     # Nodes claim gate work via the unified /v1/nodes/{id}/claim endpoint using NodeClaimResponse.
     # Repo-centric API types
     RepoSummary:
-      $ref: './components/schemas/controlplane.yaml#/RepoSummary'
+      $ref: "./components/schemas/controlplane.yaml#/RepoSummary"
     RepoRunSummary:
-      $ref: './components/schemas/controlplane.yaml#/RepoRunSummary'
-    # Mig project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mod_id}
+      $ref: "./components/schemas/controlplane.yaml#/RepoRunSummary"
+    # Mig project CRUD types — POST /v1/migs, GET /v1/migs, DELETE /v1/migs/{mig_id}
     CreateMigRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateMigRequest'
+      $ref: "./components/schemas/controlplane.yaml#/CreateMigRequest"
     CreateMigResponse:
-      $ref: './components/schemas/controlplane.yaml#/CreateMigResponse'
+      $ref: "./components/schemas/controlplane.yaml#/CreateMigResponse"
     MigListItem:
-      $ref: './components/schemas/controlplane.yaml#/MigListItem'
+      $ref: "./components/schemas/controlplane.yaml#/MigListItem"
     ListMigsResponse:
-      $ref: './components/schemas/controlplane.yaml#/ListMigsResponse'
+      $ref: "./components/schemas/controlplane.yaml#/ListMigsResponse"
     MigArchiveResponse:
-      $ref: './components/schemas/controlplane.yaml#/MigArchiveResponse'
-    # Spec management types — POST /v1/migs/{mod_id}/specs
+      $ref: "./components/schemas/controlplane.yaml#/MigArchiveResponse"
+    # Spec management types — POST /v1/migs/{mig_id}/specs
     SetMigSpecRequest:
-      $ref: './components/schemas/controlplane.yaml#/SetMigSpecRequest'
+      $ref: "./components/schemas/controlplane.yaml#/SetMigSpecRequest"
     SetMigSpecResponse:
-      $ref: './components/schemas/controlplane.yaml#/SetMigSpecResponse'
-    # Mig repo types — POST/GET /v1/migs/{mod_id}/repos, DELETE /v1/migs/{mod_id}/repos/{repo_id}
+      $ref: "./components/schemas/controlplane.yaml#/SetMigSpecResponse"
+    # Mig repo types — POST/GET /v1/migs/{mig_id}/repos, DELETE /v1/migs/{mig_id}/repos/{repo_id}
     MigRepo:
-      $ref: './components/schemas/controlplane.yaml#/MigRepo'
+      $ref: "./components/schemas/controlplane.yaml#/MigRepo"
     AddMigRepoRequest:
-      $ref: './components/schemas/controlplane.yaml#/AddMigRepoRequest'
+      $ref: "./components/schemas/controlplane.yaml#/AddMigRepoRequest"
     ListMigReposResponse:
-      $ref: './components/schemas/controlplane.yaml#/ListMigReposResponse'
+      $ref: "./components/schemas/controlplane.yaml#/ListMigReposResponse"
     BulkUpsertMigReposResponse:
-      $ref: './components/schemas/controlplane.yaml#/BulkUpsertMigReposResponse'
+      $ref: "./components/schemas/controlplane.yaml#/BulkUpsertMigReposResponse"
     BulkUpsertError:
-      $ref: './components/schemas/controlplane.yaml#/BulkUpsertError'
-    # Mig run types — POST /v1/migs/{mod_id}/runs
+      $ref: "./components/schemas/controlplane.yaml#/BulkUpsertError"
+    # Mig run types — POST /v1/migs/{mig_id}/runs
     RepoSelectorMode:
-      $ref: './components/schemas/controlplane.yaml#/RepoSelectorMode'
+      $ref: "./components/schemas/controlplane.yaml#/RepoSelectorMode"
     MigRepoSelector:
-      $ref: './components/schemas/controlplane.yaml#/MigRepoSelector'
+      $ref: "./components/schemas/controlplane.yaml#/MigRepoSelector"
     CreateMigRunRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateMigRunRequest'
+      $ref: "./components/schemas/controlplane.yaml#/CreateMigRunRequest"
     CreateMigRunResponse:
-      $ref: './components/schemas/controlplane.yaml#/CreateMigRunResponse'
-    # Pull resolution types — POST /v1/migs/{mod_id}/pull, POST /v1/runs/{run_id}/pull
+      $ref: "./components/schemas/controlplane.yaml#/CreateMigRunResponse"
+    # Pull resolution types — POST /v1/migs/{mig_id}/pull, POST /v1/runs/{run_id}/pull
     PullResolutionMode:
-      $ref: './components/schemas/controlplane.yaml#/PullResolutionMode'
+      $ref: "./components/schemas/controlplane.yaml#/PullResolutionMode"
     MigPullRequest:
-      $ref: './components/schemas/controlplane.yaml#/MigPullRequest'
+      $ref: "./components/schemas/controlplane.yaml#/MigPullRequest"
     RunPullRequest:
-      $ref: './components/schemas/controlplane.yaml#/RunPullRequest'
+      $ref: "./components/schemas/controlplane.yaml#/RunPullRequest"
     PullResolutionResponse:
-      $ref: './components/schemas/controlplane.yaml#/PullResolutionResponse'
+      $ref: "./components/schemas/controlplane.yaml#/PullResolutionResponse"
     # Single-repo run submission — POST /v1/runs
     CreateSingleRepoRunResponse:
-      $ref: './components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse'
+      $ref: "./components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse"
     # Repo-scoped diff listing — GET /v1/runs/{run_id}/repos/{repo_id}/diffs
     DiffItem:
-      $ref: './components/schemas/controlplane.yaml#/DiffItem'
+      $ref: "./components/schemas/controlplane.yaml#/DiffItem"
     DiffListResponse:
-      $ref: './components/schemas/controlplane.yaml#/DiffListResponse'
+      $ref: "./components/schemas/controlplane.yaml#/DiffListResponse"
     # Repo-scoped jobs listing — GET /v1/runs/{run_id}/repos/{repo_id}/jobs
     RepoJobItem:
-      $ref: './components/schemas/controlplane.yaml#/RepoJobItem'
+      $ref: "./components/schemas/controlplane.yaml#/RepoJobItem"
     ListRepoJobsResponse:
-      $ref: './components/schemas/controlplane.yaml#/ListRepoJobsResponse'
+      $ref: "./components/schemas/controlplane.yaml#/ListRepoJobsResponse"
     # Spec bundle upload/download schemas
     SpecBundleUploadResponse:
-      $ref: './paths/spec_bundles.yaml#/components/schemas/SpecBundleUploadResponse'
+      $ref: "./paths/spec_bundles.yaml#/components/schemas/SpecBundleUploadResponse"
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed

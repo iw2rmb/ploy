@@ -14,33 +14,33 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/RunSubmitRequest'
+          $ref: "../components/schemas/controlplane.yaml#/RunSubmitRequest"
   responses:
-    '201':
+    "201":
       description: Created — run accepted and started.
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse'
-    '400':
+            $ref: "../components/schemas/controlplane.yaml#/CreateSingleRepoRunResponse"
+    "400":
       description: Bad request — missing or invalid fields in the request body.
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '500':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
       description: Internal server error.
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
+            $ref: "../components/schemas/common.yaml#/Error"
 
 get:
   tags: [Control]
   summary: List batch runs
   description: |
     Return a paginated list of batch runs backed by the `runs` table. Each
-    entry exposes basic run metadata (id, mod_id, spec_id, status, timestamps)
+    entry exposes basic run metadata (id, mig_id, spec_id, status, timestamps)
     and optional per-repo status counts aggregated from `run_repos`.
   parameters:
     - in: query
@@ -61,7 +61,7 @@ get:
         minimum: 0
       description: Number of runs to skip from the start of the result set.
   responses:
-    '200':
+    "200":
       description: OK
       content:
         application/json:
@@ -71,17 +71,17 @@ get:
               runs:
                 type: array
                 items:
-                  $ref: '../components/schemas/controlplane.yaml#/RunSummary'
+                  $ref: "../components/schemas/controlplane.yaml#/RunSummary"
             required: [runs]
-    '400':
+    "400":
       description: Bad request (invalid pagination parameters)
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '500':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
       description: Internal server error
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
+            $ref: "../components/schemas/common.yaml#/Error"

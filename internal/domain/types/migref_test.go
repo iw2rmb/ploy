@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// TestModRef tests the MigRef type for mig reference validation and serialization.
-func TestModRef(t *testing.T) {
+// TestMigRef tests the MigRef type for mig reference validation and serialization.
+func TestMigRef(t *testing.T) {
 	t.Parallel()
 
 	t.Run("String", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestModRef(t *testing.T) {
 		if !empty.IsZero() {
 			t.Error("zero MigRef.IsZero() = false, want true")
 		}
-		nonEmpty := MigRef("mod123")
+		nonEmpty := MigRef("mig123")
 		if nonEmpty.IsZero() {
 			t.Error("non-zero MigRef.IsZero() = true, want false")
 		}
@@ -41,8 +41,8 @@ func TestModRef(t *testing.T) {
 			// Valid cases: mig IDs and mig names.
 			{"valid_nanoid", "abc123", nil},
 			{"valid_name", "my-mig", nil},
-			{"valid_name_underscore", "my_mod_name", nil},
-			{"valid_alphanumeric", "ModName123", nil},
+			{"valid_name_underscore", "my_mig_name", nil},
+			{"valid_alphanumeric", "MigName123", nil},
 			{"valid_uuid_like", "12345678-1234-1234-1234-123456789012", nil}, // No special treatment
 
 			// Invalid: empty.
@@ -72,7 +72,7 @@ func TestModRef(t *testing.T) {
 	t.Run("TextRoundTrip", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []string{"mod123", "my-mig", "ModName_v2"}
+		tests := []string{"mig123", "my-mig", "MigName_v2"}
 		for _, v := range tests {
 			ref := MigRef(v)
 			b, err := ref.MarshalText()
@@ -152,7 +152,7 @@ func TestModRef(t *testing.T) {
 	t.Run("JSONRoundTrip", func(t *testing.T) {
 		t.Parallel()
 
-		tests := []string{"mod123", "my-mig", "ModName_v2"}
+		tests := []string{"mig123", "my-mig", "MigName_v2"}
 		for _, v := range tests {
 			ref := MigRef(v)
 			b, err := json.Marshal(ref)

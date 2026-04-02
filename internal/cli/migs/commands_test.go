@@ -17,7 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // newTestLogPrinter creates a LogPrinter for testing that writes to the provided writer.
@@ -31,12 +31,12 @@ func TestArtifactsCommand(t *testing.T) {
 	buildJobID := domaintypes.NewJobID()
 	testJobID := domaintypes.NewJobID()
 
-	run := modsapi.RunSummary{
+	run := migsapi.RunSummary{
 		RunID: runID,
-		State: modsapi.RunStateSucceeded,
-		Stages: map[domaintypes.JobID]modsapi.StageStatus{
-			buildJobID: {State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
-			testJobID:  {State: modsapi.StageStateSucceeded},
+		State: migsapi.RunStateSucceeded,
+		Stages: map[domaintypes.JobID]migsapi.StageStatus{
+			buildJobID: {State: migsapi.StageStateSucceeded, Artifacts: map[string]string{"bin": "cid1"}},
+			testJobID:  {State: migsapi.StageStateSucceeded},
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -57,11 +57,11 @@ func TestArtifactsCommand(t *testing.T) {
 
 func TestCancelResumeSubmitCommands(t *testing.T) {
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 
 	runIDStr := runID.String()
-	modIDStr := modID.String()
+	migIDStr := migID.String()
 	specIDStr := specID.String()
 
 	mux := http.NewServeMux()
@@ -70,7 +70,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		// Server returns 201 Created with {run_id, mod_id, spec_id}.
+		// Server returns 201 Created with {run_id, mig_id, spec_id}.
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(struct {
 			RunID  string `json:"run_id"`
@@ -78,22 +78,22 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			SpecID string `json:"spec_id"`
 		}{
 			RunID:  runIDStr,
-			MigID:  modIDStr,
+			MigID:  migIDStr,
 			SpecID: specIDStr,
 		})
 	})
 	mux.HandleFunc("/v1/runs/"+runIDStr+"/status", func(w http.ResponseWriter, r *http.Request) {
 		// Canonical RunSummary response shape for status.
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+		_ = json.NewEncoder(w).Encode(migsapi.RunSummary{
 			RunID:      runID,
-			State:      modsapi.RunStatePending,
+			State:      migsapi.RunStatePending,
 			Repository: "https://example.com/repo.git",
 			Metadata: map[string]string{
 				"repo_base_ref":   "main",
 				"repo_target_ref": "feature",
 			},
-			Stages: make(map[domaintypes.JobID]modsapi.StageStatus),
+			Stages: make(map[domaintypes.JobID]migsapi.StageStatus),
 		})
 	})
 	mux.HandleFunc("/v1/runs/"+runIDStr+"/cancel", func(w http.ResponseWriter, r *http.Request) {
@@ -152,11 +152,11 @@ func TestSubmitCommand_InvalidRepoURLScheme(t *testing.T) {
 func TestEventsCommandStreamsToTerminal(t *testing.T) {
 	tests := []struct {
 		name          string
-		terminalState modsapi.RunState
+		terminalState migsapi.RunState
 	}{
-		{"succeeded", modsapi.RunStateSucceeded},
-		{"cancelled", modsapi.RunStateCancelled},
-		{"failed", modsapi.RunStateFailed},
+		{"succeeded", migsapi.RunStateSucceeded},
+		{"cancelled", migsapi.RunStateCancelled},
+		{"failed", migsapi.RunStateFailed},
 	}
 
 	for _, tt := range tests {
@@ -169,7 +169,7 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 				if f, ok := w.(http.Flusher); ok {
 					f.Flush()
 				}
-				runSummary := modsapi.RunSummary{RunID: runID, State: tt.terminalState}
+				runSummary := migsapi.RunSummary{RunID: runID, State: tt.terminalState}
 				b, _ := json.Marshal(runSummary)
 				_, _ = w.Write([]byte("event: run\n"))
 				_, _ = w.Write([]byte("data: "))
@@ -235,8 +235,8 @@ func TestSimplePrinterFormats(t *testing.T) {
 
 	var b bytes.Buffer
 	p := SimplePrinter{out: &b}
-	p.Run(modsapi.RunSummary{RunID: runID, State: modsapi.RunStateRunning})
-	p.Stage(modsapi.StageStatus{State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: jobID, LastError: "boom"})
+	p.Run(migsapi.RunSummary{RunID: runID, State: migsapi.RunStateRunning})
+	p.Stage(migsapi.StageStatus{State: migsapi.StageStateFailed, Attempts: 2, CurrentJobID: jobID, LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")
 	}
@@ -251,7 +251,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 		name        string
 		buildEvents func(runID, nodeID, jobID string) []string
 		wantLog     string // expected substring in log output
-		wantFinal   modsapi.RunState
+		wantFinal   migsapi.RunState
 		wantNodeID  bool // whether node= context should appear
 	}{
 		{
@@ -264,7 +264,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 				}
 			},
 			wantLog:    "Build started",
-			wantFinal:  modsapi.RunStateSucceeded,
+			wantFinal:  migsapi.RunStateSucceeded,
 			wantNodeID: true,
 		},
 		{
@@ -277,7 +277,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 				}
 			},
 			wantLog:    "Warning",
-			wantFinal:  modsapi.RunStateSucceeded,
+			wantFinal:  migsapi.RunStateSucceeded,
 			wantNodeID: false,
 		},
 		{
@@ -290,7 +290,7 @@ func TestEventsCommandWithLogPrinter(t *testing.T) {
 				}
 			},
 			wantLog:    "retained", // retention summary is printed
-			wantFinal:  modsapi.RunStateSucceeded,
+			wantFinal:  migsapi.RunStateSucceeded,
 			wantNodeID: false,
 		},
 	}
@@ -396,7 +396,7 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("events run: %v", err)
 	}
-	if state != modsapi.RunStateSucceeded {
+	if state != migsapi.RunStateSucceeded {
 		t.Errorf("state=%s, want succeeded", state)
 	}
 

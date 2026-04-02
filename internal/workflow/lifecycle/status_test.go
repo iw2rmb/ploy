@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
@@ -88,7 +88,7 @@ func TestEvaluateRunCompletionFromRepoCounts(t *testing.T) {
 		name       string
 		counts     []store.CountRunReposByStatusRow
 		wantFinish bool
-		wantState  modsapi.RunState
+		wantState  migsapi.RunState
 	}{
 		{
 			name: "all success",
@@ -96,7 +96,7 @@ func TestEvaluateRunCompletionFromRepoCounts(t *testing.T) {
 				{Status: domaintypes.RunRepoStatusSuccess, Count: 2},
 			},
 			wantFinish: true,
-			wantState:  modsapi.RunStateSucceeded,
+			wantState:  migsapi.RunStateSucceeded,
 		},
 		{
 			name: "fail dominates",
@@ -105,7 +105,7 @@ func TestEvaluateRunCompletionFromRepoCounts(t *testing.T) {
 				{Status: domaintypes.RunRepoStatusFail, Count: 1},
 			},
 			wantFinish: true,
-			wantState:  modsapi.RunStateFailed,
+			wantState:  migsapi.RunStateFailed,
 		},
 		{
 			name: "cancelled when no fail",
@@ -113,7 +113,7 @@ func TestEvaluateRunCompletionFromRepoCounts(t *testing.T) {
 				{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
 			},
 			wantFinish: true,
-			wantState:  modsapi.RunStateCancelled,
+			wantState:  migsapi.RunStateCancelled,
 		},
 		{
 			name: "running blocks completion",

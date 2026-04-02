@@ -291,7 +291,7 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 	})
 }
 
-func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
+func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode")
 	}

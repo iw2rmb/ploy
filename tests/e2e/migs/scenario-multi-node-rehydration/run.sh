@@ -186,12 +186,12 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
     echo "Extracting Codex mig-out artifact bundles (if present)..."
     shopt -s nullglob
-    mod_out_bundles=("${ARTIFACT_DIR}"/*_mig-out.bin)
+    mig_out_bundles=("${ARTIFACT_DIR}"/*_mig-out.bin)
     shopt -u nullglob
-    if ((${#mod_out_bundles[@]} == 0)); then
+    if ((${#mig_out_bundles[@]} == 0)); then
       echo "   - no mig-out bundles found in ${ARTIFACT_DIR} (Codex artifacts may be missing)"
     else
-      for bundle in "${mod_out_bundles[@]}"; do
+      for bundle in "${mig_out_bundles[@]}"; do
         echo "   extracting $(basename "$bundle")"
         if ! tar -xzf "$bundle" -C "${ARTIFACT_DIR}"; then
           echo "   ⚠ failed to extract ${bundle}"

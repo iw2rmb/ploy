@@ -1,4 +1,4 @@
-// mod_archive.go implements the 'ploy mig archive' command handler.
+// mig_archive.go implements the 'ploy mig archive' command handler.
 //
 // This command archives a mig project:
 // - ploy mig archive <mig-id|name>
@@ -27,7 +27,7 @@ func handleMigArchive(args []string, stderr io.Writer) error {
 		printMigArchiveUsage(stderr)
 		return fmt.Errorf("mig id or name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	// Resolve control plane connection.
 	ctx := context.Background()
@@ -40,7 +40,7 @@ func handleMigArchive(args []string, stderr io.Writer) error {
 	cmd := migs.ArchiveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
 
 	result, err := cmd.Run(ctx)
@@ -48,7 +48,7 @@ func handleMigArchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Mod archived: %s (name: %s)\n", result.ID.String(), result.Name)
+	_, _ = fmt.Fprintf(stderr, "Mig archived: %s (name: %s)\n", result.ID.String(), result.Name)
 	return nil
 }
 

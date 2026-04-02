@@ -11,9 +11,9 @@ import (
 
 func TestWithTempDir(t *testing.T) {
 	tests := []struct {
-		name      string
-		fnErr     error
-		wantErr   error
+		name    string
+		fnErr   error
+		wantErr error
 	}{
 		{name: "creates_and_cleans_up", fnErr: nil, wantErr: nil},
 		{name: "cleans_up_on_error", fnErr: os.ErrInvalid, wantErr: os.ErrInvalid},
@@ -74,7 +74,7 @@ func TestSnapshotWorkspaceForNoIndexDiff(t *testing.T) {
 				}
 			}
 
-			result := snapshotWorkspaceForNoIndexDiff(runID, jobID, types.DiffJobTypeMod, workspace)
+			result := snapshotWorkspaceForNoIndexDiff(runID, jobID, types.DiffJobTypeMig, workspace)
 			defer result.cleanup()
 
 			if tt.wantEmpty {

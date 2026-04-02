@@ -8,7 +8,7 @@ import (
 func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 	input := `{
 		"steps": [{
-			"image": "docker.io/user/mig:latest",
+			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello",
 			"env": {"FOO": "bar", "BAZ": "qux"}
 		}],
@@ -40,8 +40,8 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 	}
 
 	// Verify image (universal form).
-	if step.Image.Universal != "docker.io/user/mig:latest" {
-		t.Errorf("image = %q, want %q", step.Image.Universal, "docker.io/user/mig:latest")
+	if step.Image.Universal != "ghcr.io/iw2rmb/ploy/mig:latest" {
+		t.Errorf("image = %q, want %q", step.Image.Universal, "ghcr.io/iw2rmb/ploy/mig:latest")
 	}
 
 	// Verify env.
@@ -79,8 +79,8 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	input := `{
 		"steps": [
-			{"name": "step-1", "image": "docker.io/user/mod1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}, "always": true},
-			{"name": "step-2", "image": "docker.io/user/mod2:latest", "env": {"STEP": "2"}, "always": false}
+			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}, "always": true},
+			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "env": {"STEP": "2"}, "always": false}
 		],
 		"build_gate": {
 			"enabled": true,
@@ -88,14 +88,14 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 				"by_error_kind": {
 					"infra": {
 						"retries": 3,
-						"image": "docker.io/user/codex:latest",
+						"image": "ghcr.io/iw2rmb/ploy/codex:latest",
 						"command": "fix-it",
 						"env": {"PROMPT": "fix the build"}
 					}
 				}
 			},
 			"router": {
-				"image": "docker.io/user/router:latest"
+				"image": "ghcr.io/iw2rmb/ploy/router:latest"
 			}
 		}
 	}`
@@ -111,30 +111,30 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	}
 
 	// Verify first step.
-	mod1 := spec.Steps[0]
-	if mod1.Name != "step-1" {
-		t.Errorf("steps[0].name = %q, want %q", mod1.Name, "step-1")
+	mig1 := spec.Steps[0]
+	if mig1.Name != "step-1" {
+		t.Errorf("steps[0].name = %q, want %q", mig1.Name, "step-1")
 	}
-	if mod1.Image.Universal != "docker.io/user/mod1:latest" {
-		t.Errorf("steps[0].image = %q, want %q", mod1.Image.Universal, "docker.io/user/mod1:latest")
+	if mig1.Image.Universal != "ghcr.io/iw2rmb/ploy/mig1:latest" {
+		t.Errorf("steps[0].image = %q, want %q", mig1.Image.Universal, "ghcr.io/iw2rmb/ploy/mig1:latest")
 	}
 	// Command is exec array form.
-	if len(mod1.Command.Exec) != 2 || mod1.Command.Exec[0] != "echo" || mod1.Command.Exec[1] != "step1" {
-		t.Errorf("steps[0].command.Exec = %v, want [echo, step1]", mod1.Command.Exec)
+	if len(mig1.Command.Exec) != 2 || mig1.Command.Exec[0] != "echo" || mig1.Command.Exec[1] != "step1" {
+		t.Errorf("steps[0].command.Exec = %v, want [echo, step1]", mig1.Command.Exec)
 	}
-	if mod1.Env["STEP"] != "1" {
-		t.Errorf("steps[0].env[STEP] = %q, want %q", mod1.Env["STEP"], "1")
+	if mig1.Env["STEP"] != "1" {
+		t.Errorf("steps[0].env[STEP] = %q, want %q", mig1.Env["STEP"], "1")
 	}
-	if !mod1.Always {
+	if !mig1.Always {
 		t.Errorf("steps[0].always = false, want true")
 	}
 
 	// Verify second step.
-	mod2 := spec.Steps[1]
-	if mod2.Name != "step-2" {
-		t.Errorf("steps[1].name = %q, want %q", mod2.Name, "step-2")
+	mig2 := spec.Steps[1]
+	if mig2.Name != "step-2" {
+		t.Errorf("steps[1].name = %q, want %q", mig2.Name, "step-2")
 	}
-	if mod2.Always {
+	if mig2.Always {
 		t.Errorf("steps[1].always = true, want false")
 	}
 
@@ -149,9 +149,9 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	if infra.Retries != 3 {
 		t.Errorf("build_gate.healing.by_error_kind.infra.retries = %d, want 3", infra.Retries)
 	}
-	if infra.Image.Universal != "docker.io/user/codex:latest" {
+	if infra.Image.Universal != "ghcr.io/iw2rmb/ploy/codex:latest" {
 		t.Errorf("build_gate.healing.by_error_kind.infra.image = %q, want %q",
-			infra.Image.Universal, "docker.io/user/codex:latest")
+			infra.Image.Universal, "ghcr.io/iw2rmb/ploy/codex:latest")
 	}
 	if infra.Command.Shell != "fix-it" {
 		t.Errorf("build_gate.healing.by_error_kind.infra.command = %q, want %q",
@@ -160,9 +160,9 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	if spec.BuildGate.Router == nil {
 		t.Fatal("build_gate.router is nil")
 	}
-	if spec.BuildGate.Router.Image.Universal != "docker.io/user/router:latest" {
+	if spec.BuildGate.Router.Image.Universal != "ghcr.io/iw2rmb/ploy/router:latest" {
 		t.Errorf("build_gate.router.image = %q, want %q",
-			spec.BuildGate.Router.Image.Universal, "docker.io/user/router:latest")
+			spec.BuildGate.Router.Image.Universal, "ghcr.io/iw2rmb/ploy/router:latest")
 	}
 }
 
@@ -175,17 +175,17 @@ func TestParseMigSpecJSON_RetainContainerForbidden(t *testing.T) {
 		{
 			name: "step retain forbidden",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest", "retain_container": true}]
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest", "retain_container": true}]
 			}`,
 			wantErr: "steps[0].retain_container: forbidden",
 		},
 		{
 			name: "healing retain forbidden",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {
-					"healing": {"by_error_kind": {"infra": {"image": "docker.io/user/heal:latest", "retain_container": true}}},
-					"router": {"image": "docker.io/user/router:latest"}
+					"healing": {"by_error_kind": {"infra": {"image": "ghcr.io/iw2rmb/ploy/heal:latest", "retain_container": true}}},
+					"router": {"image": "ghcr.io/iw2rmb/ploy/router:latest"}
 				}
 			}`,
 			wantErr: "build_gate.healing.by_error_kind.infra.retain_container: forbidden",
@@ -193,9 +193,9 @@ func TestParseMigSpecJSON_RetainContainerForbidden(t *testing.T) {
 		{
 			name: "router retain forbidden",
 			input: `{
-				"steps": [{"image": "docker.io/user/mig:latest"}],
+				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {
-					"router": {"image": "docker.io/user/router:latest", "retain_container": true}
+					"router": {"image": "ghcr.io/iw2rmb/ploy/router:latest", "retain_container": true}
 				}
 			}`,
 			wantErr: "build_gate.router.retain_container: forbidden",
@@ -219,9 +219,9 @@ func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 	input := `{
 		"steps": [{
 			"image": {
-				"default": "docker.io/user/mig:default",
-				"java-maven": "docker.io/user/mig:maven",
-				"java-gradle": "docker.io/user/mig:gradle"
+				"default": "ghcr.io/iw2rmb/ploy/mig:default",
+				"java-maven": "ghcr.io/iw2rmb/ploy/mig:maven",
+				"java-gradle": "ghcr.io/iw2rmb/ploy/mig:gradle"
 			}
 		}]
 	}`
@@ -243,8 +243,8 @@ func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveImage(java-maven) failed: %v", err)
 	}
-	if img != "docker.io/user/mig:maven" {
-		t.Errorf("ResolveImage(java-maven) = %q, want %q", img, "docker.io/user/mig:maven")
+	if img != "ghcr.io/iw2rmb/ploy/mig:maven" {
+		t.Errorf("ResolveImage(java-maven) = %q, want %q", img, "ghcr.io/iw2rmb/ploy/mig:maven")
 	}
 
 	// Verify default fallback.
@@ -252,8 +252,8 @@ func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveImage(unknown) failed: %v", err)
 	}
-	if img != "docker.io/user/mig:default" {
-		t.Errorf("ResolveImage(unknown) = %q, want %q", img, "docker.io/user/mig:default")
+	if img != "ghcr.io/iw2rmb/ploy/mig:default" {
+		t.Errorf("ResolveImage(unknown) = %q, want %q", img, "ghcr.io/iw2rmb/ploy/mig:default")
 	}
 }
 
@@ -264,7 +264,7 @@ func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
 		"apiVersion": "ploy.mig/v1alpha1",
 		"kind": "MigRunSpec",
 		"steps": [{
-			"image": "docker.io/user/mig:latest",
+			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello",
 			"env": {"FOO": "bar"}
 		}],
@@ -282,8 +282,8 @@ func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
 	if spec.Kind != "MigRunSpec" {
 		t.Errorf("kind = %q, want %q", spec.Kind, "MigRunSpec")
 	}
-	if spec.Steps[0].Image.Universal != "docker.io/user/mig:latest" {
-		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "docker.io/user/mig:latest")
+	if spec.Steps[0].Image.Universal != "ghcr.io/iw2rmb/ploy/mig:latest" {
+		t.Errorf("image = %q, want %q", spec.Steps[0].Image.Universal, "ghcr.io/iw2rmb/ploy/mig:latest")
 	}
 	if spec.Steps[0].Command.Shell != "echo hello" {
 		t.Errorf("command = %q, want %q", spec.Steps[0].Command.Shell, "echo hello")
@@ -301,14 +301,14 @@ func TestParseMigSpecJSON_Empty(t *testing.T) {
 	}
 }
 
-func TestParseMigSpecJSON_ModIndexForbidden(t *testing.T) {
-	input := `{"mod_index":0,"steps":[{"image":"docker.io/user/mig:latest"}]}`
+func TestParseMigSpecJSON_MigIndexForbidden(t *testing.T) {
+	input := `{"mig_index":0,"steps":[{"image":"ghcr.io/iw2rmb/ploy/mig:latest"}]}`
 	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
-		t.Fatal("expected error for mod_index")
+		t.Fatal("expected error for mig_index")
 	}
-	if !strings.Contains(err.Error(), "mod_index: forbidden") {
-		t.Fatalf("expected mod_index forbidden error, got %q", err.Error())
+	if !strings.Contains(err.Error(), "mig_index: forbidden") {
+		t.Fatalf("expected mig_index forbidden error, got %q", err.Error())
 	}
 }
 
@@ -353,7 +353,7 @@ func TestMigSpec_ArtifactFields(t *testing.T) {
 func TestParseMigSpecJSON_RequiresStepsEvenWithExtraFields(t *testing.T) {
 	input := `{
 		"mig": {
-			"image": "docker.io/user/mig:latest",
+			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello"
 		}
 	}`

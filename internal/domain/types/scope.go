@@ -76,7 +76,7 @@ func (t GlobalEnvTarget) MatchesJobType(jobType JobType) bool {
 	case GlobalEnvTargetGates:
 		return jobType == JobTypePreGate || jobType == JobTypeReGate || jobType == JobTypePostGate
 	case GlobalEnvTargetSteps:
-		return jobType == JobTypeMod || jobType == JobTypeHeal
+		return jobType == JobTypeMig || jobType == JobTypeHeal
 	default:
 		return false
 	}

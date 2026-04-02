@@ -60,7 +60,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		{
 			name:      "injects pre_gate from active target",
 			jobType:   domaintypes.JobTypePreGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile:   profile,
 			wantPhase: "pre",
 			wantCmd:   "go test ./... -run TestUnit",
@@ -70,7 +70,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		{
 			name:      "injects post_gate from active target",
 			jobType:   domaintypes.JobTypePostGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile:   profile,
 			wantPhase: "post",
 			wantCmd:   "go test ./... -run TestUnit",
@@ -80,7 +80,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		{
 			name:      "injects re_gate from active target",
 			jobType:   domaintypes.JobTypeReGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile:   profile,
 			wantPhase: "post",
 			wantCmd:   "go test ./... -run TestUnit",
@@ -91,7 +91,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 			name:    "explicit spec gate_profile wins over profile mapping",
 			jobType: domaintypes.JobTypePreGate,
 			spec: []byte(`{
-				"steps":[{"image":"docker.io/acme/mod:latest"}],
+				"steps":[{"image":"docker.io/acme/mig:latest"}],
 				"build_gate":{"pre":{"gate_profile":{"command":"echo explicit","env":{"X":"1"}}}}
 			}`),
 			profile:   profile,
@@ -102,14 +102,14 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		},
 		{
 			name:    "non-gate job does not inject",
-			jobType: domaintypes.JobTypeMod,
-			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			jobType: domaintypes.JobTypeMig,
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile: profile,
 		},
 		{
 			name:      "maps even when target status is failed",
 			jobType:   domaintypes.JobTypePreGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantPhase: "pre",
 			wantCmd:   "go test ./...",
 			profile: []byte(`{
@@ -129,7 +129,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		{
 			name:    "unsupported active target is terminal and does not inject",
 			jobType: domaintypes.JobTypePostGate,
-			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile: []byte(`{
 				"schema_version": 1,
 				"repo_id": "repo_123",
@@ -147,7 +147,7 @@ func TestApplyRepoGateProfileMutator(t *testing.T) {
 		{
 			name:    "invalid profile returns error",
 			jobType: domaintypes.JobTypePreGate,
-			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			profile: []byte(`{"schema_version":1}`),
 			wantErr: "gate_profile",
 		},

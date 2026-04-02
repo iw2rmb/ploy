@@ -96,7 +96,7 @@ allprojects { project ->
 // - Always attempts to write SPDX JSON at /out/sbom.spdx.json from resolved
 //   Gradle dependency configurations, even when cyclonedxBom is not available.
 // - Never fails the build if dependency inspection or file write fails.
-def _ployCollectModuleCoords = { configuration, packageMap ->
+def _ployCollectMiguleCoords = { configuration, packageMap ->
   if (configuration == null || packageMap == null) return
   try {
     if (!configuration.canBeResolved) return
@@ -105,7 +105,7 @@ def _ployCollectModuleCoords = { configuration, packageMap ->
   }
 
   try {
-    def deps = configuration.resolvedConfiguration?.lenientConfiguration?.allModuleDependencies
+    def deps = configuration.resolvedConfiguration?.lenientConfiguration?.allMiguleDependencies
     deps?.each { dep ->
       def g = (dep.moduleGroup ?: "").toString().trim()
       def n = (dep.moduleName ?: "").toString().trim()
@@ -163,7 +163,7 @@ def _ployWriteFallbackSBOM = {
 
   projects.each { p ->
     preferred.each { cfgName ->
-      _ployCollectModuleCoords(p.configurations?.findByName(cfgName), packageMap)
+      _ployCollectMiguleCoords(p.configurations?.findByName(cfgName), packageMap)
     }
   }
 
@@ -184,7 +184,7 @@ def _ployWriteFallbackSBOM = {
   if (packageMap.isEmpty()) {
     projects.each { p ->
       p.configurations?.each { cfg ->
-        _ployCollectModuleCoords(cfg, packageMap)
+        _ployCollectMiguleCoords(cfg, packageMap)
       }
     }
   }

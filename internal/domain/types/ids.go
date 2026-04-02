@@ -64,9 +64,9 @@ type (
 	jobIDTag        struct{}
 	clusterIDTag    struct{}
 	nodeIDTag       struct{}
-	modIDTag        struct{}
+	migIDTag        struct{}
 	specIDTag       struct{}
-	modRepoIDTag    struct{}
+	migRepoIDTag    struct{}
 	repoIDTag       struct{}
 	specBundleIDTag struct{}
 )
@@ -74,9 +74,9 @@ type (
 func (runIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidRunID) }
 func (jobIDTag) ValidateID(s string) error     { return validateKSUID(s, ErrInvalidJobID) }
 func (nodeIDTag) ValidateID(s string) error    { return validateNanoID(s, 6, ErrInvalidNodeID) }
-func (modIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidMigID) }
+func (migIDTag) ValidateID(s string) error     { return validateNanoID(s, 6, ErrInvalidMigID) }
 func (specIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidSpecID) }
-func (modRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidMigRepoID) }
+func (migRepoIDTag) ValidateID(s string) error { return validateNanoID(s, 8, ErrInvalidMigRepoID) }
 func (repoIDTag) ValidateID(s string) error    { return validateNanoID(s, 8, ErrInvalidRepoID) }
 func (specBundleIDTag) ValidateID(s string) error {
 	return validateNanoID(s, 8, ErrInvalidSpecBundleID)
@@ -100,7 +100,7 @@ type NodeID = StringID[nodeIDTag]
 
 // MigID identifies a mig project.
 // Uses NanoID(6) for compact, URL-safe identifiers suitable for CLI usage and display.
-type MigID = StringID[modIDTag]
+type MigID = StringID[migIDTag]
 
 // SpecID identifies a spec instance in the specs table.
 // Uses NanoID(8) for spec identifiers in the append-only specs table.
@@ -108,7 +108,7 @@ type SpecID = StringID[specIDTag]
 
 // MigRepoID identifies a repo entry within a mig project.
 // Uses NanoID(8) for per-mig repository identifiers.
-type MigRepoID = StringID[modRepoIDTag]
+type MigRepoID = StringID[migRepoIDTag]
 
 // RepoID identifies a global repository record.
 // Uses NanoID(8) and maps to repos.id / run_repos.repo_id / jobs.repo_id.

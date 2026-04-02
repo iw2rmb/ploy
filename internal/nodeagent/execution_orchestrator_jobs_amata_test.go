@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestSelectedModAmata(t *testing.T) {
+func TestSelectedMigAmata(t *testing.T) {
 	t.Parallel()
 
 	amataExec := &contracts.AmataRunSpec{Spec: "exec-spec"}
@@ -53,18 +53,18 @@ func TestSelectedModAmata(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := selectedModAmata(tt.typed, tt.stepIdx)
+			got := selectedMigAmata(tt.typed, tt.stepIdx)
 			if tt.wantSpec == "" {
 				if got != nil {
-					t.Fatalf("selectedModAmata() = %+v, want nil", got)
+					t.Fatalf("selectedMigAmata() = %+v, want nil", got)
 				}
 				return
 			}
 			if got == nil {
-				t.Fatal("selectedModAmata() = nil, want non-nil")
+				t.Fatal("selectedMigAmata() = nil, want non-nil")
 			}
 			if got.Spec != tt.wantSpec {
-				t.Fatalf("selectedModAmata().Spec = %q, want %q", got.Spec, tt.wantSpec)
+				t.Fatalf("selectedMigAmata().Spec = %q, want %q", got.Spec, tt.wantSpec)
 			}
 		})
 	}
@@ -74,9 +74,9 @@ func TestWriteAmataSpecInDir(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		amata     *contracts.AmataRunSpec
-		wantFile  bool
+		name        string
+		amata       *contracts.AmataRunSpec
+		wantFile    bool
 		wantContent string
 	}{
 		{

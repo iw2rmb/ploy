@@ -27,7 +27,7 @@ func TestMaybePersistGateSuccessSBOMRows_PersistsRowsForSuccessfulGate(t *testin
 	st := &jobStore{}
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
 		{RunID: runID, JobID: &jobID, ObjectKey: &objKey},
-		}
+	}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
 		"out/sbom.spdx.json": []byte(`{
@@ -67,7 +67,7 @@ func TestMaybePersistGateSuccessSBOMRows_SkipsNonGateOrNonSuccess(t *testing.T) 
 		ID:      domaintypes.NewJobID(),
 		RunID:   domaintypes.NewRunID(),
 		RepoID:  domaintypes.NewRepoID(),
-		JobType: domaintypes.JobTypeMod,
+		JobType: domaintypes.JobTypeMig,
 	}
 	st := &jobStore{}
 

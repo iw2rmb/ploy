@@ -103,7 +103,7 @@ func TestFilesystemDiffGenerator_Generate(t *testing.T) {
 		t.Fatalf("failed to commit: %v", err)
 	}
 
-	// Modify the file to create a diff.
+	// Migify the file to create a diff.
 	if err := os.WriteFile(testFile, []byte("modified content\n"), 0644); err != nil {
 		t.Fatalf("failed to modify test file: %v", err)
 	}

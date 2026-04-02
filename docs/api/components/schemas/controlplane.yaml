@@ -34,7 +34,7 @@ Run:
     id:
       type: string
       description: Run ID (KSUID string)
-    mod_id:
+    mig_id:
       type: string
       minLength: 1
       description: Mig (project) ID (NanoID string). Must be non-empty.
@@ -71,7 +71,7 @@ Run:
       type: object
       additionalProperties: true
       nullable: true
-  required: [id, mod_id, spec_id, status, created_at]
+  required: [id, mig_id, spec_id, status, created_at]
 
 RunRepoCounts:
   type: object
@@ -106,7 +106,7 @@ RunRepoCounts:
       format: int32
       description: Repos stopped while running.
     derived_status:
-      $ref: '#/RunBatchDerivedStatus'
+      $ref: "#/RunBatchDerivedStatus"
       description: |
         Batch-level status computed from per-repo states. Precedence order:
         cancelled > running > failed > completed > pending.
@@ -136,7 +136,7 @@ RunRepo:
       type: string
       description: Git ref representing the target branch for the run.
     status:
-      $ref: '#/RunRepoStatus'
+      $ref: "#/RunRepoStatus"
       description: Current execution status for this repo.
     attempt:
       type: integer
@@ -184,7 +184,7 @@ RunSummary:
       type: string
       minLength: 1
       description: Unique run identifier (KSUID string). Must be non-empty.
-    mod_id:
+    mig_id:
       type: string
       minLength: 1
       description: Mig (project) identifier for the run. Must be non-empty.
@@ -215,12 +215,12 @@ RunSummary:
       nullable: true
       description: Timestamp when the run reached a terminal state.
     repo_counts:
-      $ref: '#/RunRepoCounts'
+      $ref: "#/RunRepoCounts"
       nullable: true
       description: Aggregated per-repo status counts (optional).
   required:
     - id
-    - mod_id
+    - mig_id
     - spec_id
     - status
     - created_at
@@ -266,9 +266,9 @@ CreateSingleRepoRunResponse:
   type: object
   properties:
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    mod_id: { type: string, description: "Mig ID (NanoID string)" }
+    mig_id: { type: string, description: "Mig ID (NanoID string)" }
     spec_id: { type: string, description: "Spec ID (NanoID string)" }
-  required: [run_id, mod_id, spec_id]
+  required: [run_id, mig_id, spec_id]
 
 CreateMigRequest:
   type: object
@@ -325,14 +325,14 @@ MigRepo:
   type: object
   properties:
     id: { type: string, description: "Repo ID (NanoID string)" }
-    mod_id: { type: string, description: "Mig ID (NanoID string)" }
+    mig_id: { type: string, description: "Mig ID (NanoID string)" }
     repo_url:
       type: string
       description: "Repository URL (normalized for matching)."
     base_ref: { type: string }
     target_ref: { type: string }
     created_at: { type: string, format: date-time }
-  required: [id, mod_id, repo_url, base_ref, target_ref, created_at]
+  required: [id, mig_id, repo_url, base_ref, target_ref, created_at]
 
 ListMigReposResponse:
   type: object
@@ -340,7 +340,7 @@ ListMigReposResponse:
     repos:
       type: array
       items:
-        $ref: '#/MigRepo'
+        $ref: "#/MigRepo"
   required: [repos]
 
 BulkUpsertError:
@@ -359,7 +359,7 @@ BulkUpsertMigReposResponse:
     errors:
       type: array
       items:
-        $ref: '#/BulkUpsertError'
+        $ref: "#/BulkUpsertError"
   required: [created, updated, failed, errors]
 
 RepoSelectorMode:
@@ -371,7 +371,7 @@ MigRepoSelector:
   type: object
   properties:
     mode:
-      $ref: '#/RepoSelectorMode'
+      $ref: "#/RepoSelectorMode"
     repos:
       type: array
       items:
@@ -383,7 +383,7 @@ CreateMigRunRequest:
   type: object
   properties:
     repo_selector:
-      $ref: '#/MigRepoSelector'
+      $ref: "#/MigRepoSelector"
     created_by: { type: string, nullable: true }
   required: [repo_selector]
 
@@ -416,7 +416,7 @@ MigPullRequest:
       type: string
       description: Repository URL (normalized for matching).
     mode:
-      $ref: '#/PullResolutionMode'
+      $ref: "#/PullResolutionMode"
   required: [repo_url]
 
 PullResolutionResponse:
@@ -450,7 +450,7 @@ ListMigsResponse:
     migs:
       type: array
       items:
-        $ref: '#/MigListItem'
+        $ref: "#/MigListItem"
   required: [migs]
 
 MigArchiveResponse:
@@ -536,7 +536,7 @@ MigsRunSummary:
         dynamically inserted `heal-*` and `re-gate` jobs for healing flows.
       type: object
       additionalProperties:
-        $ref: '#/StageStatus'
+        $ref: "#/StageStatus"
   required: [run_id, state, repository, created_at, updated_at, stages]
 
 # StageStatus — Job execution state within a RunSummary.stages map
@@ -627,7 +627,8 @@ NodeClaimResponse:
     status:
       type: string
       description: "Run status. Values: Started, Finished, Cancelled."
-    node_id: { type: string, description: "Node ID (NanoID 6-character string)" }
+    node_id:
+      { type: string, description: "Node ID (NanoID 6-character string)" }
     base_ref: { type: string }
     target_ref: { type: string }
     next_id:
@@ -692,7 +693,8 @@ Event:
   properties:
     id: { type: integer, format: int64 }
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     time: { type: string, format: date-time }
     level: { type: string }
     message: { type: string }
@@ -728,7 +730,7 @@ ListRunsTimingsResponse:
     timings:
       type: array
       items:
-        $ref: '#/RunTiming'
+        $ref: "#/RunTiming"
   required: [timings]
 
 Diff:
@@ -737,7 +739,8 @@ Diff:
   properties:
     id: { type: string, format: uuid, description: "Diff ID (still UUID)" }
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     patch:
       type: string
       description: Gzipped unified diff (≤10 MiB gzipped), base64-encoded.
@@ -750,7 +753,8 @@ CreateDiffRequest:
   type: object
   # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     patch:
       type: string
       description: Gzipped unified diff (≤10 MiB gzipped), base64-encoded.
@@ -766,7 +770,12 @@ DiffItem:
     id: { type: string, format: uuid, description: "Diff ID (UUID)" }
     job_id: { type: string, description: "Job ID (KSUID string)" }
     created_at: { type: string, format: date-time }
-    gzipped_size: { type: integer, format: int32, description: "Size of gzipped patch in bytes" }
+    gzipped_size:
+      {
+        type: integer,
+        format: int32,
+        description: "Size of gzipped patch in bytes",
+      }
     summary:
       type: object
       additionalProperties: true
@@ -788,7 +797,7 @@ DiffListResponse:
     diffs:
       type: array
       items:
-        $ref: '#/DiffItem'
+        $ref: "#/DiffItem"
   required: [diffs]
 
 Log:
@@ -797,7 +806,8 @@ Log:
   properties:
     id: { type: integer, format: int64 }
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -820,7 +830,8 @@ CreateLogRequest:
   type: object
   # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -834,7 +845,8 @@ NodeCreateLogRequest:
   # Note: run_id and job_id are now KSUID-backed strings (27 characters).
   properties:
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
@@ -846,9 +858,15 @@ ArtifactBundle:
   type: object
   # Note: artifact_bundles.id is still UUID, but run_id and job_id are KSUID strings.
   properties:
-    id: { type: string, format: uuid, description: "Artifact bundle ID (still UUID)" }
+    id:
+      {
+        type: string,
+        format: uuid,
+        description: "Artifact bundle ID (still UUID)",
+      }
     run_id: { type: string, description: "Run ID (KSUID string)" }
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     name: { type: string, nullable: true }
     bundle:
       type: string
@@ -861,7 +879,8 @@ CreateArtifactBundleRequest:
   type: object
   # Note: job_id is now a KSUID-backed string (27 characters).
   properties:
-    job_id: { type: string, nullable: true, description: "Job ID (KSUID string)" }
+    job_id:
+      { type: string, nullable: true, description: "Job ID (KSUID string)" }
     name: { type: string, nullable: true }
     bundle:
       type: string
@@ -978,7 +997,7 @@ WorkflowGraph:
       type: object
       description: Map of job IDs to graph nodes
       additionalProperties:
-        $ref: '#/WorkflowGraphNode'
+        $ref: "#/WorkflowGraphNode"
     root_ids:
       type: array
       description: IDs of entry-point nodes (jobs with no parents)
@@ -1035,7 +1054,7 @@ RepoRunSummary:
     run_id:
       type: string
       description: Unique run identifier (KSUID string)
-    mod_id:
+    mig_id:
       type: string
       description: Mig (project) identifier for the run
     run_status:
@@ -1066,7 +1085,7 @@ RepoRunSummary:
       description: Timestamp when execution completed
   required:
     - run_id
-    - mod_id
+    - mig_id
     - run_status
     - repo_status
     - base_ref
@@ -1224,7 +1243,7 @@ ListRepoJobsResponse:
     jobs:
       type: array
       items:
-        $ref: '#/RepoJobItem'
+        $ref: "#/RepoJobItem"
       description: Jobs for this repo execution (chain order represented by next_id links)
   required:
     - run_id

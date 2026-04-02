@@ -4,7 +4,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // RunReport is the canonical status report contract shared by all status renderers.
@@ -51,7 +51,7 @@ type RunJobEntry struct {
 }
 
 // RunJobRecovery projects recovery classifier fields surfaced by repo job APIs.
-type RunJobRecovery = modsapi.RunRepoJobRecovery
+type RunJobRecovery = migsapi.RunRepoJobRecovery
 
 // RunJobArtifact is the per-job artifact view emitted by run status JSON.
 // It includes the CID plus a lookup URL that resolves artifact bundle metadata.

@@ -29,41 +29,41 @@ func TestV1SQLCQueries_Migs(t *testing.T) {
 
 	createdBy := "test-user"
 
-	modID1 := types.NewMigID()
-	modName1 := "v1-sqlc-mig-alpha-" + modID1.String()
-	mod1, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        modID1,
-		Name:      modName1,
+	migID1 := types.NewMigID()
+	migName1 := "v1-sqlc-mig-alpha-" + migID1.String()
+	mig1, err := db.CreateMig(ctx, CreateMigParams{
+		ID:        migID1,
+		Name:      migName1,
 		SpecID:    nil,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateMig(mod1) failed: %v", err)
+		t.Fatalf("CreateMig(mig1) failed: %v", err)
 	}
-	defer func() { _ = db.DeleteMig(ctx, mod1.ID) }()
+	defer func() { _ = db.DeleteMig(ctx, mig1.ID) }()
 
-	modID2 := types.NewMigID()
-	modName2 := "v1-sqlc-mig-beta-" + modID2.String()
-	mod2, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        modID2,
-		Name:      modName2,
+	migID2 := types.NewMigID()
+	migName2 := "v1-sqlc-mig-beta-" + migID2.String()
+	mig2, err := db.CreateMig(ctx, CreateMigParams{
+		ID:        migID2,
+		Name:      migName2,
 		SpecID:    nil,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
-		t.Fatalf("CreateMig(mod2) failed: %v", err)
+		t.Fatalf("CreateMig(mig2) failed: %v", err)
 	}
-	defer func() { _ = db.DeleteMig(ctx, mod2.ID) }()
+	defer func() { _ = db.DeleteMig(ctx, mig2.ID) }()
 
-	gotByName, err := db.GetMigByName(ctx, modName1)
+	gotByName, err := db.GetMigByName(ctx, migName1)
 	if err != nil {
 		t.Fatalf("GetMigByName() failed: %v", err)
 	}
-	if gotByName.ID != mod1.ID {
-		t.Fatalf("GetMigByName() returned wrong mig id: got=%q want=%q", gotByName.ID, mod1.ID)
+	if gotByName.ID != mig1.ID {
+		t.Fatalf("GetMigByName() returned wrong mig id: got=%q want=%q", gotByName.ID, mig1.ID)
 	}
 
-	if err := db.ArchiveMig(ctx, mod2.ID); err != nil {
+	if err := db.ArchiveMig(ctx, mig2.ID); err != nil {
 		t.Fatalf("ArchiveMig() failed: %v", err)
 	}
 
@@ -94,7 +94,7 @@ func TestV1SQLCQueries_Migs(t *testing.T) {
 	}
 	foundArchived := false
 	for _, m := range archived {
-		if m.ID == mod2.ID {
+		if m.ID == mig2.ID {
 			foundArchived = true
 		}
 		if !m.ArchivedAt.Valid {
@@ -102,7 +102,7 @@ func TestV1SQLCQueries_Migs(t *testing.T) {
 		}
 	}
 	if !foundArchived {
-		t.Fatalf("ListMigs(archived) did not return expected archived mig: id=%q", mod2.ID)
+		t.Fatalf("ListMigs(archived) did not return expected archived mig: id=%q", mig2.ID)
 	}
 
 	// Active only.
@@ -135,26 +135,26 @@ func TestV1SQLCQueries_Migs(t *testing.T) {
 	}
 	foundAlpha := false
 	for _, m := range filtered {
-		if m.ID == mod1.ID {
+		if m.ID == mig1.ID {
 			foundAlpha = true
 		}
-		if m.ID == mod2.ID {
-			t.Fatalf("ListMigs(name_filter) unexpectedly included mod2: id=%q name=%q", m.ID, m.Name)
+		if m.ID == mig2.ID {
+			t.Fatalf("ListMigs(name_filter) unexpectedly included mig2: id=%q name=%q", m.ID, m.Name)
 		}
 	}
 	if !foundAlpha {
-		t.Fatalf("ListMigs(name_filter) did not return expected mod1: id=%q", mod1.ID)
+		t.Fatalf("ListMigs(name_filter) did not return expected mig1: id=%q", mig1.ID)
 	}
 
-	if err := db.UnarchiveMig(ctx, mod2.ID); err != nil {
+	if err := db.UnarchiveMig(ctx, mig2.ID); err != nil {
 		t.Fatalf("UnarchiveMig() failed: %v", err)
 	}
 }
 
-// TestV1SQLCQueries_ModRepos verifies v1 mig_repos lookup/upsert/delete behavior.
+// TestV1SQLCQueries_MigRepos verifies v1 mig_repos lookup/upsert/delete behavior.
 //
 // This test is skipped if PLOY_TEST_DB_DSN is not set.
-func TestV1SQLCQueries_ModRepos(t *testing.T) {
+func TestV1SQLCQueries_MigRepos(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
@@ -168,10 +168,10 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 	defer db.Close()
 
 	createdBy := "test-user"
-	modID := types.NewMigID()
+	migID := types.NewMigID()
 	mig, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        modID,
-		Name:      "v1-sqlc-mig-repos-" + modID.String(),
+		ID:        migID,
+		Name:      "v1-sqlc-mig-repos-" + migID.String(),
 		SpecID:    nil,
 		CreatedBy: &createdBy,
 	})

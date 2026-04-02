@@ -72,26 +72,26 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
 			return contracts.StepManifest{}, fmt.Errorf("step index %d out of range (0-%d)", stepIndex, len(typedOpts.Steps)-1)
 		}
-		stepMod := typedOpts.Steps[stepIndex]
+		stepMig := typedOpts.Steps[stepIndex]
 
-		if !stepMod.Image.IsEmpty() {
-			resolved, err := stepMod.Image.ResolveImage(stack)
+		if !stepMig.Image.IsEmpty() {
+			resolved, err := stepMig.Image.ResolveImage(stack)
 			if err != nil {
 				return contracts.StepManifest{}, fmt.Errorf("step[%d] image resolution: %w", stepIndex, err)
 			}
 			image = strings.TrimSpace(resolved)
 		}
-		if stepMod.Amata != nil && strings.TrimSpace(stepMod.Amata.Spec) != "" {
-			command = resolveAmataCommand(stepMod.Amata)
+		if stepMig.Amata != nil && strings.TrimSpace(stepMig.Amata.Spec) != "" {
+			command = resolveAmataCommand(stepMig.Amata)
 		} else {
-			command = stepMod.Command.ToSlice()
+			command = stepMig.Command.ToSlice()
 		}
-		tmpBundle = stepMod.TmpBundle
+		tmpBundle = stepMig.TmpBundle
 
 		for k, v := range req.Env {
 			env[k] = v
 		}
-		for k, v := range stepMod.Env {
+		for k, v := range stepMig.Env {
 			env[k] = v
 		}
 	} else {
@@ -359,7 +359,7 @@ func buildRouterManifest(req StartRunRequest, router MigContainerSpec, stack con
 
 // validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.
 // For steps after the first, it derives inbound expectations from the previous step's outbound
-// when omitted, and rejects mismatched explicit inbound. Modifies steps in place.
+// when omitted, and rejects mismatched explicit inbound. Migifies steps in place.
 func validateAndDeriveStackGateChaining(steps []StepMig) error {
 	if len(steps) <= 1 {
 		return nil

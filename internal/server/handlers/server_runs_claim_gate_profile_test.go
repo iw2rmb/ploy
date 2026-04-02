@@ -35,14 +35,14 @@ func TestClaimJob_ReGateCandidatePrepOverridePrecedence(t *testing.T) {
 	}{
 		{
 			name:    "candidate wins on re_gate",
-			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:    []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantCmd: "echo candidate-unit",
 			wantSrc: "candidate",
 		},
 		{
 			name: "explicit prep wins over candidate",
 			spec: []byte(`{
-					"steps":[{"image":"docker.io/acme/mod:latest"}],
+					"steps":[{"image":"docker.io/acme/mig:latest"}],
 					"build_gate":{"post":{"gate_profile":{"command":"echo explicit","env":{"SRC":"explicit"}}}}
 			}`),
 			wantCmd: "echo explicit",

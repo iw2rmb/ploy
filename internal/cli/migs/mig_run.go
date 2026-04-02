@@ -1,7 +1,7 @@
 // Package migs provides CLI client implementations for Migs operations.
 // This file implements the mig run command for creating runs from a mig project.
 //
-// This command calls POST /v1/migs/{mod_id}/runs with repo selection.
+// This command calls POST /v1/migs/{mig_id}/runs with repo selection.
 // Implements: ploy mig run <mig-id|name> [--repo <repo-url> ...] [--failed]
 package migs
 
@@ -19,7 +19,7 @@ import (
 )
 
 // CreateMigRunCommand creates a batch run from a mig project with repo selection.
-// Endpoint: POST /v1/migs/{mod_id}/runs
+// Endpoint: POST /v1/migs/{mig_id}/runs
 // Creates a run with repo selection based on mode: all, explicit, or failed.
 type CreateMigRunCommand struct {
 	Client    *http.Client
@@ -35,7 +35,7 @@ type CreateMigRunResult struct {
 	RunID domaintypes.RunID `json:"run_id"`
 }
 
-// Run executes POST /v1/migs/{mod_id}/runs to create a run with repo selection.
+// Run executes POST /v1/migs/{mig_id}/runs to create a run with repo selection.
 // Flag behavior:
 //   - --repo ... selects explicit repos (by repo_url identity within the mig)
 //   - --failed selects repos with last terminal state Fail
@@ -95,7 +95,7 @@ func (c CreateMigRunCommand) Run(ctx context.Context) (CreateMigRunResult, error
 		return CreateMigRunResult{}, fmt.Errorf("mig run: marshal request: %w", err)
 	}
 
-	// POST /v1/migs/{mod_id}/runs
+	// POST /v1/migs/{mig_id}/runs
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "runs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {

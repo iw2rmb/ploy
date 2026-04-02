@@ -13,7 +13,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // GetRunReportCommand builds the canonical RunReport payload for a run.
@@ -206,7 +206,7 @@ func listRunStageArtifacts(
 		return nil, httpx.WrapError("run report: fetch run stage artifacts", resp.Status, resp.Body)
 	}
 
-	var summary modsapi.RunSummary
+	var summary migsapi.RunSummary
 	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return nil, fmt.Errorf("run report: decode run stage artifacts: %w", err)
 	}

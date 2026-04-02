@@ -15,7 +15,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 const defaultFollowPollInterval = 1 * time.Second
@@ -26,7 +26,7 @@ type followReportMsg struct {
 
 type followTerminalMsg struct {
 	report RunReport
-	state  modsapi.RunState
+	state  migsapi.RunState
 }
 
 type followErrMsg struct {
@@ -38,7 +38,7 @@ type followModel struct {
 	spinner      spinner.Model
 	spinnerFrame int
 	report       *RunReport
-	finalState   modsapi.RunState
+	finalState   migsapi.RunState
 	renderErr    error
 }
 
@@ -111,7 +111,7 @@ type FollowRunCommand struct {
 }
 
 // Run executes follow-mode rendering until the run reaches a terminal state.
-func (c FollowRunCommand) Run(ctx context.Context) (modsapi.RunState, error) {
+func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	if c.Client == nil {
 		return "", fmt.Errorf("run follow: client required")
 	}
@@ -145,7 +145,7 @@ func (c FollowRunCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 		tea.WithoutSignalHandler(),
 	)
 
-	stateCh := make(chan modsapi.RunState, 1)
+	stateCh := make(chan migsapi.RunState, 1)
 	errCh := make(chan error, 1)
 	go c.coordinate(coordCtx, program, interval, stateCh, errCh)
 
@@ -202,7 +202,7 @@ func (c FollowRunCommand) coordinate(
 	ctx context.Context,
 	program *tea.Program,
 	pollInterval time.Duration,
-	stateCh chan<- modsapi.RunState,
+	stateCh chan<- migsapi.RunState,
 	errCh chan<- error,
 ) {
 	defer close(stateCh)
@@ -294,7 +294,7 @@ func (c FollowRunCommand) coordinate(
 }
 
 // DeriveRunStateFromReport computes terminal run state from repo statuses.
-func DeriveRunStateFromReport(report RunReport) modsapi.RunState {
+func DeriveRunStateFromReport(report RunReport) migsapi.RunState {
 	if len(report.Repos) == 0 {
 		return ""
 	}
@@ -319,13 +319,13 @@ func DeriveRunStateFromReport(report RunReport) modsapi.RunState {
 	}
 
 	if hasFailure {
-		return modsapi.RunStateFailed
+		return migsapi.RunStateFailed
 	}
 	if allSuccess {
-		return modsapi.RunStateSucceeded
+		return migsapi.RunStateSucceeded
 	}
 	if allCancelled {
-		return modsapi.RunStateCancelled
+		return migsapi.RunStateCancelled
 	}
 	return ""
 }

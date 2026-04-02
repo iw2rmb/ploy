@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // TestDownloadRunArtifactsCreatesManifest verifies that artifacts are downloaded
@@ -29,12 +29,12 @@ func TestDownloadRunArtifactsCreatesManifest(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status"):
 			// Run status endpoint — return RunSummary directly (canonical response shape).
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+			_ = json.NewEncoder(w).Encode(migsapi.RunSummary{
 				RunID: runID,
-				State: modsapi.RunStateSucceeded,
-				Stages: map[domaintypes.JobID]modsapi.StageStatus{
+				State: migsapi.RunStateSucceeded,
+				Stages: map[domaintypes.JobID]migsapi.StageStatus{
 					stageID: {
-						State: modsapi.StageStateSucceeded,
+						State: migsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
 							"artifact1": "cid-abc123",
 						},
@@ -145,18 +145,18 @@ func TestDownloadRunArtifactsMultipleStages(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status"):
 			// Run status with multiple stages — return RunSummary directly.
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+			_ = json.NewEncoder(w).Encode(migsapi.RunSummary{
 				RunID: runID,
-				State: modsapi.RunStateSucceeded,
-				Stages: map[domaintypes.JobID]modsapi.StageStatus{
+				State: migsapi.RunStateSucceeded,
+				Stages: map[domaintypes.JobID]migsapi.StageStatus{
 					planStageID: {
-						State: modsapi.StageStateSucceeded,
+						State: migsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
 							"plan.json": "cid-plan",
 						},
 					},
 					execStageID: {
-						State: modsapi.StageStateSucceeded,
+						State: migsapi.StageStateSucceeded,
 						Artifacts: map[string]string{
 							"output.log": "cid-exec",
 						},
@@ -267,9 +267,9 @@ func TestDownloadRunArtifactsErrorHandling(t *testing.T) {
 				if strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.HasSuffix(r.URL.Path, "/status") {
 					// Return RunSummary directly.
 					w.WriteHeader(http.StatusOK)
-					_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+					_ = json.NewEncoder(w).Encode(migsapi.RunSummary{
 						RunID: runID,
-						Stages: map[domaintypes.JobID]modsapi.StageStatus{
+						Stages: map[domaintypes.JobID]migsapi.StageStatus{
 							stageID: {Artifacts: map[string]string{"art": "missing-cid"}},
 						},
 					})
@@ -409,7 +409,7 @@ func TestFetchMRURL(t *testing.T) {
 				// Return RunSummary directly — the canonical response shape.
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
-				_ = json.NewEncoder(w).Encode(modsapi.RunSummary{
+				_ = json.NewEncoder(w).Encode(migsapi.RunSummary{
 					RunID:    runID,
 					Metadata: tt.metadata,
 				})
@@ -459,7 +459,7 @@ func TestDownloadRunArtifactsZeroArtifacts(t *testing.T) {
 			// Return RunSummary directly — the canonical response shape.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(modsapi.RunSummary{Stages: map[domaintypes.JobID]modsapi.StageStatus{
+			_ = json.NewEncoder(w).Encode(migsapi.RunSummary{Stages: map[domaintypes.JobID]migsapi.StageStatus{
 				stageID: {Artifacts: map[string]string{}},
 			}})
 			return

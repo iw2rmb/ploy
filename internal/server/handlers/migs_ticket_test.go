@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -73,16 +73,16 @@ func TestCreateJobsFromSpec(t *testing.T) {
 		wantErr     string
 	}{
 		{
-			name:        "SingleMod",
+			name:        "SingleMig",
 			runID:       domaintypes.RunID("run_test_12345678901234567"),
 			repoID:      domaintypes.RepoID("repo_abc"),
 			repoBaseRef: "main",
 			attempt:     1,
 			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"steps":[{"image":"mod1:v1"}]}`),
+			spec:        []byte(`{"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
@@ -93,12 +93,12 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoBaseRef: "develop",
 			attempt:     2,
 			repoSHA0:    testRepoSHA0,
-			spec:        []byte(`{"steps":[{"image":"mod1:v1"},{"image":"mod2:v2"},{"image":"mod3:v3"}]}`),
+			spec:        []byte(`{"steps":[{"image":"mig1:v1"},{"image":"mig2:v2"},{"image":"mig3:v3"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod1:v1", ""},
-				{"mig-1", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod2:v2", ""},
-				{"mig-2", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "mod3:v3", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
+				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig2:v2", ""},
+				{"mig-2", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig3:v3", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
@@ -112,7 +112,7 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			spec:        []byte(`{"steps":[{"image":"a"}]}`),
 			expected: []expectedJob{
 				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
-				{"mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated, "", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
 		},
@@ -162,8 +162,8 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		expectedJobs int
 	}{
 		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 3},
-		{"two_mods", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 4},
-		{"five_mods", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 7},
+		{"two_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 4},
+		{"five_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 7},
 	}
 
 	for _, tc := range testCases {
@@ -356,11 +356,11 @@ func TestGetRunStatusHandler(t *testing.T) {
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *jobStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				resp := decodeBody[modsapi.RunSummary](t, rr)
+				resp := decodeBody[migsapi.RunSummary](t, rr)
 				if resp.RunID.String() != runIDStr {
 					t.Fatalf("expected run_id %s, got %s", runIDStr, resp.RunID.String())
 				}
-				if resp.State != modsapi.RunStateRunning {
+				if resp.State != migsapi.RunStateRunning {
 					t.Fatalf("expected status running, got %s", resp.State)
 				}
 				if resp.Repository != "https://github.com/user/repo.git" {
@@ -375,7 +375,7 @@ func TestGetRunStatusHandler(t *testing.T) {
 				if len(resp.Stages) != 1 {
 					t.Fatalf("expected 1 stage, got %d", len(resp.Stages))
 				}
-				if got := resp.Stages[domaintypes.JobID(jobIDStr)].State; got != modsapi.StageStatePending {
+				if got := resp.Stages[domaintypes.JobID(jobIDStr)].State; got != migsapi.StageStatePending {
 					t.Fatalf("expected stage to be pending, got %s", got)
 				}
 				if got := resp.Stages[domaintypes.JobID(jobIDStr)].NextID; got == nil || *got != nextJobID {

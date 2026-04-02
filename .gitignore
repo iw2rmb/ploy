@@ -52,7 +52,7 @@ __pycache__/
 .gopath
 
 tests/tmp/
-/tests/e2e/mods/logs/
+/tests/e2e/migs/logs/
 tmp/
 e2e-logs/
 tests/e2e/deploy/e2e-logs/

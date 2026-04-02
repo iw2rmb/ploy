@@ -32,7 +32,7 @@ func TestCompleteJobDurationNeverNull(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create v1 fixture (mig, spec, mod_repo, run, run_repo).
+	// Create v1 fixture (mig, spec, mig_repo, run, run_repo).
 	fixture := newV1Fixture(t, ctx, db,
 		"https://github.com/iw2rmb/ploy-duration-test.git",
 		"main",

@@ -18,7 +18,7 @@ import (
 func TestRunLogsStructuredOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
-		modRunID: domaintypes.RunID("run-123"),
+		migRunID: domaintypes.RunID("run-123"),
 		logEvents: []sseTestEvent{
 			{
 				event: "log",
@@ -56,7 +56,7 @@ func TestRunLogsStructuredOutput(t *testing.T) {
 func TestRunLogsRawOutput(t *testing.T) {
 	t.Helper()
 	server := newStreamingServer(t, streamingServerConfig{
-		modRunID: domaintypes.RunID("run-raw"),
+		migRunID: domaintypes.RunID("run-raw"),
 		logEvents: []sseTestEvent{
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:00Z","stream":"stdout","line":"ready"}`},
 			{event: "log", data: `{"timestamp":"2025-10-22T10:05:01Z","stream":"stderr","line":"warn"}`},
@@ -142,7 +142,7 @@ func TestRunLogsReconnects(t *testing.T) {
 }
 
 type streamingServerConfig struct {
-	modRunID   domaintypes.RunID
+	migRunID   domaintypes.RunID
 	jobID      string
 	logEvents  []sseTestEvent
 	reconnects []streamReconnectPlan
@@ -165,8 +165,8 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 		connectionN int
 	)
 	streamPath := ""
-	if !cfg.modRunID.IsZero() {
-		streamPath = fmt.Sprintf("/v1/runs/%s/logs", cfg.modRunID.String())
+	if !cfg.migRunID.IsZero() {
+		streamPath = fmt.Sprintf("/v1/runs/%s/logs", cfg.migRunID.String())
 	}
 	if cfg.jobID != "" {
 		streamPath = fmt.Sprintf("/v1/runs/%s/logs", cfg.jobID)

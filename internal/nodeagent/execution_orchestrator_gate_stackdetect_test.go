@@ -350,7 +350,7 @@ func runRouterTestCase(t *testing.T, routerPayload string, jobType types.JobType
 		},
 		Healing: &HealingConfig{
 			Retries: 1,
-			Mod:     MigContainerSpec{Image: contracts.JobImage{Universal: "test/healer:latest"}},
+			Mig:     MigContainerSpec{Image: contracts.JobImage{Universal: "test/healer:latest"}},
 		},
 		Router: router,
 	}

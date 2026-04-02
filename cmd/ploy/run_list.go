@@ -1,7 +1,7 @@
 // run_list.go implements batch run list CLI commands.
 //
 // This file provides CLI handlers for managing batch runs as a whole, complementing
-// the repo-level operations in mod_run_repo.go. Batch commands delegate to the
+// the repo-level operations in mig_run_repo.go. Batch commands delegate to the
 // internal/cli/migs batch client for HTTP communication with the control plane.
 //
 // Command structure:

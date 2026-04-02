@@ -21,7 +21,7 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 	st.cancelActiveJobsByRunRepoAttempt.val = 2
 	st.listStaleRunningJobs.val = []store.ListStaleRunningJobsRow{
 		{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 2},
-		}
+	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
 			ID:          domaintypes.NewJobID(),
@@ -29,16 +29,16 @@ func TestStaleRecovery_RepoStatusCancelledAndRunCompletionFinished(t *testing.T)
 			RepoID:      repoID,
 			Attempt:     1,
 			Status:      domaintypes.JobStatusCancelled,
-			JobType:     domaintypes.JobTypeMod,
+			JobType:     domaintypes.JobTypeMig,
 			Meta:        []byte(`{"next_id":1000}`),
 			NextID:      nil,
 			Name:        "mig-0",
 			RepoBaseRef: "main",
 		},
-		}
+	}
 	st.countRunReposByStatus.val = []store.CountRunReposByStatusRow{
 		{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
-		}
+	}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 
 	task, err := recovery.NewStaleJobRecoveryTask(recovery.Options{
@@ -88,7 +88,7 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 	st.cancelActiveJobsByRunRepoAttempt.val = 1
 	st.listStaleRunningJobs.val = []store.ListStaleRunningJobsRow{
 		{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1},
-		}
+	}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
 		{
 			ID:          domaintypes.NewJobID(),
@@ -96,17 +96,17 @@ func TestStaleRecovery_RunCompletionNotTriggeredWhenOtherReposNonTerminal(t *tes
 			RepoID:      repoID,
 			Attempt:     1,
 			Status:      domaintypes.JobStatusCancelled,
-			JobType:     domaintypes.JobTypeMod,
+			JobType:     domaintypes.JobTypeMig,
 			Meta:        []byte(`{"next_id":1000}`),
 			NextID:      nil,
 			Name:        "mig-0",
 			RepoBaseRef: "main",
 		},
-		}
+	}
 	st.countRunReposByStatus.val = []store.CountRunReposByStatusRow{
 		{Status: domaintypes.RunRepoStatusCancelled, Count: 1},
 		{Status: domaintypes.RunRepoStatusRunning, Count: 1},
-		}
+	}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 
 	task, err := recovery.NewStaleJobRecoveryTask(recovery.Options{

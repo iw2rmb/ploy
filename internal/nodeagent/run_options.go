@@ -35,7 +35,7 @@ type BuildGateOptions struct {
 // HealingConfig describes the heal → re-gate loop configuration.
 type HealingConfig struct {
 	Retries int
-	Mod     MigContainerSpec
+	Mig     MigContainerSpec
 }
 
 func (o RunOptions) HasHealingSelector() bool {
@@ -90,8 +90,8 @@ type StepMig struct {
 	Always bool
 }
 
-// modsSpecToRunOptions converts contracts.MigSpec directly to RunOptions.
-func modsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
+// migsSpecToRunOptions converts contracts.MigSpec directly to RunOptions.
+func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 	if spec == nil {
 		return RunOptions{}
 	}
@@ -113,7 +113,7 @@ func modsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 					if healing.Retries <= 0 {
 						healing.Retries = 1
 					}
-					healing.Mod = MigContainerSpec{
+					healing.Mig = MigContainerSpec{
 						Image:     action.Image,
 						Command:   action.Command,
 						Env:       copyStringMap(action.Env),

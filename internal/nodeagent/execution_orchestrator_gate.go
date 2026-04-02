@@ -54,16 +54,16 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		step := typedOpts.Steps[stepIdx]
 		if step.Stack != nil {
 			// Get mig-level images from BuildGate config for image resolution.
-			modImages := typedOpts.BuildGate.Images
+			migImages := typedOpts.BuildGate.Images
 
 			switch req.JobType {
 			case types.JobTypePreGate:
 				if step.Stack.Inbound != nil && step.Stack.Inbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, modImages)
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Inbound, migImages)
 				}
 			case types.JobTypePostGate, types.JobTypeReGate:
 				if step.Stack.Outbound != nil && step.Stack.Outbound.Enabled {
-					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, modImages)
+					typedOpts.StackGate = stackGatePhaseSpecToStepGate(step.Stack.Outbound, migImages)
 				}
 			}
 		}

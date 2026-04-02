@@ -32,23 +32,23 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 
 	// Step 1: Create v1 mig+spec+repo, then create a run.
 	createdBy := "integration-test"
-	modSpec := []byte(`{"type":"integration-test","description":"Happy path test"}`)
+	migSpec := []byte(`{"type":"integration-test","description":"Happy path test"}`)
 
 	specID := domaintypes.NewSpecID()
 	spec, err := db.CreateSpec(ctx, store.CreateSpecParams{
 		ID:        specID,
 		Name:      "integration-spec",
-		Spec:      modSpec,
+		Spec:      migSpec,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	_, err = db.CreateMig(ctx, store.CreateMigParams{
-		ID:        modID,
-		Name:      "integration-mig-" + modID.String(),
+		ID:        migID,
+		Name:      "integration-mig-" + migID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -62,7 +62,7 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	migRepoID := domaintypes.NewMigRepoID()
 	repo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
 		ID:        migRepoID,
-		MigID:     modID,
+		MigID:     migID,
 		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
@@ -74,14 +74,14 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
-		MigID:     modID,
+		MigID:     migID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%s, mig_repo_id=%s, repo_id=%s, status=%s", run.ID, run.MigID.String(), repo.ID.String(), repo.RepoID.String(), run.Status)
+	t.Logf("Created run: id=%v, mig_id=%s, mig_repo_id=%s, repo_id=%s, status=%s", run.ID, run.MigID.String(), repo.ID.String(), repo.RepoID.String(), run.Status)
 
 	// Verify the run was created with expected values.
 	if repo.RepoID.IsZero() {

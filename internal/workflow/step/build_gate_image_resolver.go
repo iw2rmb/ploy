@@ -3,7 +3,7 @@
 // The resolver selects runtime images for Build Gate containers when Stack Gate
 // is enabled. It loads rules from multiple sources with precedence ordering:
 //  1. Default stacks catalog (gates/stacks.yaml) - lowest precedence
-//  2. Mod-level image overrides - highest precedence
+//  2. Mig-level image overrides - highest precedence
 //
 // Resolution uses "most specific match wins" semantics:
 //   - Tool-specific rules (specificity 3) beat tool-agnostic rules (specificity 2)
@@ -82,12 +82,12 @@ type BuildGateImageResolver struct {
 //
 // Parameters:
 //   - defaultPath: Path to the default stacks catalog (empty to skip file loading)
-//   - modOverride: Mod-level override rules (may be nil)
+//   - migOverride: Mig-level override rules (may be nil)
 //   - requireDefaultFile: Whether the default catalog file must exist
 //
 // Merge order (lowest to highest precedence):
 //   - Default catalog rules
-//   - Mod override rules
+//   - Mig override rules
 //
 // Returns an error if:
 //   - requireDefaultFile is true and defaultPath is set but file doesn't exist
@@ -95,7 +95,7 @@ type BuildGateImageResolver struct {
 //   - Any source has duplicate selectors
 func NewBuildGateImageResolver(
 	defaultPath string,
-	modOverride []contracts.BuildGateImageRule,
+	migOverride []contracts.BuildGateImageRule,
 	requireDefaultFile bool,
 ) (*BuildGateImageResolver, error) {
 	var allRules []contracts.BuildGateImageRule
@@ -118,10 +118,10 @@ func NewBuildGateImageResolver(
 	}
 
 	// Add mig override rules (highest precedence).
-	if len(modOverride) > 0 {
-		normalizedOverrides := normalizeBuildGateImageRules(modOverride)
+	if len(migOverride) > 0 {
+		normalizedOverrides := normalizeBuildGateImageRules(migOverride)
 		mapping := contracts.BuildGateImageMapping{Images: normalizedOverrides}
-		if err := mapping.Validate("mod_override"); err != nil {
+		if err := mapping.Validate("mig_override"); err != nil {
 			return nil, fmt.Errorf("mig override: %w", err)
 		}
 		allRules = append(allRules, normalizedOverrides...)

@@ -43,7 +43,7 @@ Example current target:
    - `images/orw/orw-cli-maven/rewrite-runner/pom.xml`
    - `images/orw/orw-cli-gradle/rewrite-runner/pom.xml`
 6. Build both images from repo-root context.
-7. Run image self-test (`MODS_SELF_TEST=1`).
+7. Run image self-test (`MIGS_SELF_TEST=1`).
 8. Run lane smoke tests against minimal fixtures:
    - Maven fixture with Java migration recipe.
    - Gradle fixture with Java migration recipe.

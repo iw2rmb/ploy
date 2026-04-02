@@ -14,7 +14,7 @@ tests/
 │   ├── lab_smoke_test.go
 │   ├── server_insecure_test.go
 │   ├── smoke_workflow_test.go  # Comprehensive workflow validation
-│   └── migs/                   # Mod-specific integration tests
+│   └── migs/                   # Mig-specific integration tests
 ├── e2e/                     # End-to-end scenarios (require cluster)
 │   └── migs/
 │       ├── README.md        # E2E documentation
@@ -199,7 +199,7 @@ The smoke test suite validates these critical paths:
    - Run inspection commands: `run status`, `run logs`, `mig run repo status`
 
 7. **Container execution (e2e):**
-   - Mod container lifecycle
+   - Mig container lifecycle
    - Log streaming from container
    - Artifact collection
    - Build Gate validation via HTTP API (repo+diff model)

@@ -12,17 +12,17 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // SimplePrinter prints a short human-readable summary of run and stage updates.
 type SimplePrinter struct{ out io.Writer }
 
-func (p *SimplePrinter) Run(t modsapi.RunSummary) {
+func (p *SimplePrinter) Run(t migsapi.RunSummary) {
 	_, _ = fmt.Fprintf(p.out, "Run %s: %s\n", strings.TrimSpace(string(t.RunID)), strings.ToLower(string(t.State)))
 }
-func (p *SimplePrinter) Stage(s modsapi.StageStatus) {
+func (p *SimplePrinter) Stage(s migsapi.StageStatus) {
 	label := strings.TrimSpace(string(s.CurrentJobID))
 	if label == "" {
 		label = "<stage>"
@@ -60,7 +60,7 @@ type EventsCommand struct {
 // Run consumes "run", "stage", and optionally "log" SSE events from /v1/runs/{id}/logs.
 // Unknown event types are ignored so the CLI remains forward compatible. Returns the final
 // run state. When LogPrinter is set, "log" events are rendered using the shared printer.
-func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
+func (c EventsCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	if c.Client.HTTPClient == nil {
 		return "", errors.New("migs events: http client required")
 	}
@@ -94,11 +94,11 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	if err != nil {
 		return "", err
 	}
-	var final modsapi.RunState
+	var final migsapi.RunState
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
 		case "run":
-			var t modsapi.RunSummary
+			var t migsapi.RunSummary
 			if err := json.Unmarshal(evt.Data, &t); err != nil {
 				return fmt.Errorf("migs events: decode run: %w", err)
 			}
@@ -110,7 +110,7 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 		case "stage":
 			var payload struct {
 				RunID domaintypes.RunID   `json:"run_id"` // Run ID for the stage event
-				Stage modsapi.StageStatus `json:"stage"`
+				Stage migsapi.StageStatus `json:"stage"`
 			}
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
 				return fmt.Errorf("migs events: decode stage: %w", err)
@@ -150,9 +150,9 @@ func (c EventsCommand) Run(ctx context.Context) (modsapi.RunState, error) {
 	return final, nil
 }
 
-func isTerminalRunState(s modsapi.RunState) bool {
+func isTerminalRunState(s migsapi.RunState) bool {
 	switch s {
-	case modsapi.RunStateSucceeded, modsapi.RunStateFailed, modsapi.RunStateCancelled:
+	case migsapi.RunStateSucceeded, migsapi.RunStateFailed, migsapi.RunStateCancelled:
 		return true
 	default:
 		return false

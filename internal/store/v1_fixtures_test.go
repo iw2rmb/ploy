@@ -123,10 +123,10 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := types.NewMigID()
+	migID := types.NewMigID()
 	mig, err := db.CreateMig(ctx, CreateMigParams{
-		ID:        modID,
-		Name:      "test-mig-" + modID.String(),
+		ID:        migID,
+		Name:      "test-mig-" + migID.String(),
 		SpecID:    &specID,
 		CreatedBy: &createdBy,
 	})
@@ -134,10 +134,10 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 		t.Fatalf("CreateMig() failed: %v", err)
 	}
 
-	modRepoID := types.NewMigRepoID()
-	modRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
-		ID:        modRepoID,
-		MigID:     modID,
+	migRepoID := types.NewMigRepoID()
+	migRepo, err := db.CreateMigRepo(ctx, CreateMigRepoParams{
+		ID:        migRepoID,
+		MigID:     migID,
 		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
@@ -149,7 +149,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	runID := types.NewRunID()
 	run, err := db.CreateRun(ctx, CreateRunParams{
 		ID:        runID,
-		MigID:     modID,
+		MigID:     migID,
 		SpecID:    specID,
 		CreatedBy: &createdBy,
 	})
@@ -158,9 +158,9 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	}
 
 	runRepo, err := db.CreateRunRepo(ctx, CreateRunRepoParams{
-		MigID:           modID,
+		MigID:           migID,
 		RunID:           runID,
-		RepoID:          modRepo.RepoID,
+		RepoID:          migRepo.RepoID,
 		RepoBaseRef:     baseRef,
 		RepoTargetRef:   targetRef,
 		SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
@@ -173,7 +173,7 @@ func newV1Fixture(t *testing.T, ctx context.Context, db Store, repoURL, baseRef,
 	return v1Fixture{
 		Mig:     mig,
 		Spec:    spec,
-		MigRepo: modRepo,
+		MigRepo: migRepo,
 		Run:     run,
 		RunRepo: runRepo,
 	}

@@ -84,9 +84,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
 		req.JobType = jobType
 		r.executeGateJob(ctx, req)
-	case types.JobTypeMod:
+	case types.JobTypeMig:
 		req.JobType = jobType
-		r.executeModJob(ctx, req)
+		r.executeMigJob(ctx, req)
 	case types.JobTypeHeal:
 		req.JobType = jobType
 		r.executeHealingJob(ctx, req)
@@ -100,9 +100,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	}
 }
 
-// modStepIndexFromJobName derives the mig step index from server-created job names.
+// migStepIndexFromJobName derives the mig step index from server-created job names.
 // Expected shape is "mig-N". For single-step runs without an indexed name, returns 0.
-func modStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
+func migStepIndexFromJobName(jobName string, stepsLen int) (int, error) {
 	name := strings.TrimSpace(jobName)
 	if stepsLen <= 1 {
 		return 0, nil

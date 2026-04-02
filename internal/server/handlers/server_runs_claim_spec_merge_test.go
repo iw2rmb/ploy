@@ -91,26 +91,26 @@ func TestClaimJob_DoesNotMergeRepoGateProfileIntoGateSpec(t *testing.T) {
 		{
 			name:      "pre_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypePreGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantPhase: "pre",
 		},
 		{
 			name:      "post_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypePostGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantPhase: "post",
 		},
 		{
 			name:      "re_gate keeps spec unchanged without explicit gate_profile",
 			jobType:   domaintypes.JobTypeReGate,
-			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mod:latest"}]}`),
+			spec:      []byte(`{"steps":[{"image":"docker.io/acme/mig:latest"}]}`),
 			wantPhase: "post",
 		},
 		{
 			name:    "explicit spec gate_profile is preserved",
 			jobType: domaintypes.JobTypePreGate,
 			spec: []byte(`{
-				"steps":[{"image":"docker.io/acme/mod:latest"}],
+				"steps":[{"image":"docker.io/acme/mig:latest"}],
 				"build_gate":{"pre":{"gate_profile":{"command":"echo explicit","env":{"X":"1"}}}}
 			}`),
 			wantPhase: "pre",

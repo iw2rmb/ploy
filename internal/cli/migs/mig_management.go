@@ -4,9 +4,9 @@
 // These commands call the server endpoints:
 // - POST /v1/migs (create mig)
 // - GET /v1/migs (list migs)
-// - DELETE /v1/migs/{mod_ref} (delete mig)
-// - PATCH /v1/migs/{mod_ref}/archive (archive mig)
-// - PATCH /v1/migs/{mod_ref}/unarchive (unarchive mig)
+// - DELETE /v1/migs/{mig_ref} (delete mig)
+// - PATCH /v1/migs/{mig_ref}/archive (archive mig)
+// - PATCH /v1/migs/{mig_ref}/unarchive (unarchive mig)
 //
 // These commands implement the mig management surfaces (create, list, delete, archive).
 package migs
@@ -160,7 +160,7 @@ func (c ListMigsCommand) Run(ctx context.Context) ([]domainapi.MigSummary, error
 }
 
 // RemoveMigCommand deletes a mig project.
-// Endpoint: DELETE /v1/migs/{mod_ref}
+// Endpoint: DELETE /v1/migs/{mig_ref}
 // Refuses deletion if the mig has any runs.
 type RemoveMigCommand struct {
 	Client  *http.Client
@@ -168,7 +168,7 @@ type RemoveMigCommand struct {
 	MigRef  types.MigRef // Required: mig ID or name to delete.
 }
 
-// Run executes DELETE /v1/migs/{mod_ref} to delete a mig.
+// Run executes DELETE /v1/migs/{mig_ref} to delete a mig.
 func (c RemoveMigCommand) Run(ctx context.Context) error {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return fmt.Errorf("mig remove: %w", err)
@@ -177,7 +177,7 @@ func (c RemoveMigCommand) Run(ctx context.Context) error {
 		return fmt.Errorf("mig remove: mig ref is required")
 	}
 
-	// DELETE /v1/migs/{mod_ref}
+	// DELETE /v1/migs/{mig_ref}
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String())
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
 	if err != nil {
@@ -199,7 +199,7 @@ func (c RemoveMigCommand) Run(ctx context.Context) error {
 }
 
 // ArchiveMigCommand archives a mig project.
-// Endpoint: PATCH /v1/migs/{mod_ref}/archive
+// Endpoint: PATCH /v1/migs/{mig_ref}/archive
 // Refuses archival if the mig has running jobs.
 type ArchiveMigCommand struct {
 	Client  *http.Client
@@ -214,7 +214,7 @@ type ArchiveMigResult struct {
 	Archived bool        `json:"archived"`
 }
 
-// Run executes PATCH /v1/migs/{mod_ref}/archive to archive a mig.
+// Run executes PATCH /v1/migs/{mig_ref}/archive to archive a mig.
 func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return ArchiveMigResult{}, fmt.Errorf("mig archive: %w", err)
@@ -223,7 +223,7 @@ func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
 		return ArchiveMigResult{}, fmt.Errorf("mig archive: mig ref is required")
 	}
 
-	// PATCH /v1/migs/{mod_ref}/archive
+	// PATCH /v1/migs/{mig_ref}/archive
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "archive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
@@ -248,7 +248,7 @@ func (c ArchiveMigCommand) Run(ctx context.Context) (ArchiveMigResult, error) {
 }
 
 // UnarchiveMigCommand unarchives a mig project.
-// Endpoint: PATCH /v1/migs/{mod_ref}/unarchive
+// Endpoint: PATCH /v1/migs/{mig_ref}/unarchive
 // Restores an archived mig to active status.
 type UnarchiveMigCommand struct {
 	Client  *http.Client
@@ -263,7 +263,7 @@ type UnarchiveMigResult struct {
 	Archived bool        `json:"archived"`
 }
 
-// Run executes PATCH /v1/migs/{mod_ref}/unarchive to unarchive a mig.
+// Run executes PATCH /v1/migs/{mig_ref}/unarchive to unarchive a mig.
 func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: %w", err)
@@ -272,7 +272,7 @@ func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error
 		return UnarchiveMigResult{}, fmt.Errorf("mig unarchive: mig ref is required")
 	}
 
-	// PATCH /v1/migs/{mod_ref}/unarchive
+	// PATCH /v1/migs/{mig_ref}/unarchive
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "unarchive")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, endpoint.String(), nil)
 	if err != nil {
@@ -297,7 +297,7 @@ func (c UnarchiveMigCommand) Run(ctx context.Context) (UnarchiveMigResult, error
 }
 
 // SetMigSpecCommand creates a new spec row and updates migs.spec_id.
-// Endpoint: POST /v1/migs/{mod_ref}/specs
+// Endpoint: POST /v1/migs/{mig_ref}/specs
 // Sets the mig's current spec by creating a new spec row.
 type SetMigSpecCommand struct {
 	Client    *http.Client
@@ -314,7 +314,7 @@ type SetMigSpecResult struct {
 	CreatedAt time.Time    `json:"created_at"`
 }
 
-// Run executes POST /v1/migs/{mod_ref}/specs to set the mig's spec.
+// Run executes POST /v1/migs/{mig_ref}/specs to set the mig's spec.
 func (c SetMigSpecCommand) Run(ctx context.Context) (SetMigSpecResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return SetMigSpecResult{}, fmt.Errorf("mig spec set: %w", err)
@@ -344,7 +344,7 @@ func (c SetMigSpecCommand) Run(ctx context.Context) (SetMigSpecResult, error) {
 		return SetMigSpecResult{}, fmt.Errorf("mig spec set: marshal request: %w", err)
 	}
 
-	// POST /v1/migs/{mod_ref}/specs
+	// POST /v1/migs/{mig_ref}/specs
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "specs")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
@@ -377,7 +377,7 @@ func (c SetMigSpecCommand) Run(ctx context.Context) (SetMigSpecResult, error) {
 type ResolveMigByNameCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
-	MigRef  types.MigRef // Mod reference (could be ID or name).
+	MigRef  types.MigRef // Mig reference (could be ID or name).
 }
 
 // Run attempts to resolve a mig ID from a name reference.

@@ -2,7 +2,7 @@
 //
 // These commands call the server endpoints:
 //   - POST /v1/runs/{run_id}/pull (resolve repo for a run)
-//   - POST /v1/migs/{mod_id}/pull (resolve repo for a mig)
+//   - POST /v1/migs/{mig_id}/pull (resolve repo for a mig)
 //
 // These endpoints help CLI clients resolve repo execution identifiers needed to
 // pull diffs from the server.
@@ -28,7 +28,7 @@ import (
 // PullResolution is the response from pull resolution endpoints.
 // It provides the identifiers needed to fetch diffs:
 //   - RunID: the run containing the execution
-//   - RepoID: the mod_repos.id for the matched repo
+//   - RepoID: the mig_repos.id for the matched repo
 //   - RepoTargetRef: the target ref snapshot from run_repos
 type PullResolution struct {
 	RunID         domaintypes.RunID     `json:"run_id"`
@@ -43,7 +43,7 @@ type PullResolution struct {
 // RunPullCommand resolves a repo_url to execution identifiers for a specific run.
 // Endpoint: POST /v1/runs/{run_id}/pull
 //
-// Server matches the repo by joining run_repos to mod_repos by repo_id,
+// Server matches the repo by joining run_repos to mig_repos by repo_id,
 // filtering by run_id, and comparing normalized repo_url.
 // Returns 404 if no repo matches, 409 if multiple repos match (ambiguous).
 type RunPullCommand struct {
@@ -109,7 +109,7 @@ func (c RunPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 }
 
 // =============================================================================
-// Mod Pull Resolution Command
+// Mig Pull Resolution Command
 // =============================================================================
 
 // PullMode specifies which run to select for mig pull resolution.
@@ -123,9 +123,9 @@ const (
 )
 
 // MigPullCommand resolves a repo_url to execution identifiers for a mig.
-// Endpoint: POST /v1/migs/{mod_id}/pull
+// Endpoint: POST /v1/migs/{mig_id}/pull
 //
-// Server performs the lookup using mod_id + repo_url to find mod_repos.id,
+// Server performs the lookup using mig_id + repo_url to find mig_repos.id,
 // then selects the appropriate run_repos by created_at DESC, filtering by
 // the requested terminal status (Success or Fail).
 // Mode values:
@@ -141,7 +141,7 @@ type MigPullCommand struct {
 	Mode    PullMode // Pull mode (last-succeeded or last-failed)
 }
 
-// Run executes POST /v1/migs/{mod_id}/pull with the provided repo_url and mode.
+// Run executes POST /v1/migs/{mig_id}/pull with the provided repo_url and mode.
 // Returns the PullResolution containing run_id, repo_id, and repo_target_ref.
 func (c MigPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
@@ -164,7 +164,7 @@ func (c MigPullCommand) Run(ctx context.Context) (*PullResolution, error) {
 		mode = PullModeLastSucceeded
 	}
 
-	// Build endpoint: POST /v1/migs/{mod_id}/pull
+	// Build endpoint: POST /v1/migs/{mig_id}/pull
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "pull")
 
 	// Build request body: {"repo_url": "...", "mode": "..."}

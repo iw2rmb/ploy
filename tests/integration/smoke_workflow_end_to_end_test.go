@@ -28,7 +28,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	defer db.Close()
 
 	// Step 1: Create a v1 run representing a mig execution workflow.
-	modSpec := []byte(`{
+	migSpec := []byte(`{
 		"type": "smoke-workflow",
 		"image": "docker.io/example/mig-test:latest",
 		"command": ["mig-test", "--input", "/workspace"],
@@ -36,7 +36,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 			"enabled": true
 		}
 	}`)
-	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", "feature/smoke-workflow", modSpec)
+	fixture := newV1RunFixture(t, ctx, db, "https://github.com/example/smoke-workflow", "main", "feature/smoke-workflow", migSpec)
 	run := fixture.Run
 	runRepo := fixture.RunRepo
 
@@ -71,7 +71,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "main",
 		Status:      domaintypes.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"mig","lane":"main"}`),
@@ -115,7 +115,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	t.Logf("✓ Created log chunk 0: %d bytes", log1.DataSize)
 
 	// Main job logs
-	mainLog := []byte("INFO: Executing mig\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
+	mainLog := []byte("INFO: Executing mig\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mig execution complete\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
 		RunID:    run.ID,
 		JobID:    &jobMain.ID,
@@ -210,7 +210,7 @@ index abc1234..def5678 100644
 			Valid: true,
 		},
 		Level:   "info",
-		Message: "Mod execution completed successfully",
+		Message: "Mig execution completed successfully",
 		Meta:    []byte(`{"source":"smoke-test","phase":"main","status":"completed"}`),
 	})
 	if err != nil {

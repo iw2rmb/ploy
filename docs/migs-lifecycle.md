@@ -50,7 +50,7 @@ pre-gate(+healing) → mig → post-gate(+healing)
    - On failure with healing migs configured: enter fail → heal → re-gate loop.
    - If healing is exhausted: run exits without executing the mig.
 
-2. **Mod execution** — The mig container runs against the validated workspace.
+2. **Mig execution** — The mig container runs against the validated workspace.
    - Exit code 0: proceed to post-mig gate.
    - Non-zero exit: run fails; no post-mig gate is run.
 
@@ -74,7 +74,7 @@ pre-gate(+healing) → mig[0] → post-gate[0](+healing) → mig[1] → post-gat
    - If healing exhausted: run exits without executing any migs.
 
 2. **For each step[k] in `steps[]` (k = 0, 1, ..., N-1)**:
-   - **Mod[k] execution** — Runs against the workspace with changes from all
+   - **Mig[k] execution** — Runs against the workspace with changes from all
      prior steps applied.
    - **Post-mig gate[k]** — Runs after step[k] exits with code 0.
      - On failure with healing: enter fail → heal → re-gate loop.
@@ -156,7 +156,7 @@ build_gate:
   # Router runs once after gate failure to produce bug_summary.
   router:
     spec_path: ./healing/router/spec.yaml
-    image: docker.io/user/codex:latest
+    image: ghcr.io/iw2rmb/ploy/codex:latest
     env:
       CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
     env_from_file:
@@ -168,7 +168,7 @@ build_gate:
       infra:
         spec_path: ./healing/infra/spec.yaml
         retries: 2
-        image: docker.io/user/codex:latest
+        image: ghcr.io/iw2rmb/ploy/codex:latest
         env:
           CODEX_PROMPT: "Fix infra/toolchain issue in /in/build-gate.log"
         expectations:
@@ -178,7 +178,7 @@ build_gate:
       code:
         spec_path: ./healing/code/spec.yaml
         retries: 2
-        image: docker.io/user/codex:latest
+        image: ghcr.io/iw2rmb/ploy/codex:latest
         env:
           CODEX_PROMPT: "Fix code issue in /in/build-gate.log"
 ```
@@ -223,7 +223,7 @@ router:
 
 ```yaml
 router:
-  image: docker.io/user/codex:latest
+  image: ghcr.io/iw2rmb/ploy/codex:latest
   env:
     CODEX_PROMPT: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
   env_from_file:
@@ -400,15 +400,14 @@ The `image` field (in `steps[]` and in `build_gate.healing.by_error_kind.<kind>`
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
-image: docker.io/user/migs-openrewrite:latest
+image: ghcr.io/iw2rmb/ploy/migs-openrewrite:latest
 ```
 
 **Stack-specific images (map)** — Different images per detected stack:
 ```yaml
 image:
-  default: docker.io/user/migs-openrewrite:latest
-  java-maven: docker.io/user/orw-cli-maven:latest
-  java-gradle: docker.io/user/orw-cli-gradle:latest
+  java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
+  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
 ```
 
 ### Stack detection via Build Gate
@@ -442,9 +441,9 @@ When resolving an image for a given stack:
 │                         Image Resolution Flow                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│   image: "docker.io/user/img:latest"                                        │
+│   image: "ghcr.io/iw2rmb/ploy/img:latest"                                        │
 │       │                                                                     │
-│       └──▶ Return "docker.io/user/img:latest" (universal, any stack)        │
+│       └──▶ Return "ghcr.io/iw2rmb/ploy/img:latest" (universal, any stack)        │
 │                                                                             │
 │   image:                                                                    │
 │     default: img:default                                                    │
@@ -485,9 +484,8 @@ A common use case is dedicated OpenRewrite images for Maven and Gradle:
 
 ```yaml
 image:
-  default: docker.io/user/migs-openrewrite:latest
-  java-maven: docker.io/user/orw-cli-maven:latest
-  java-gradle: docker.io/user/orw-cli-gradle:latest
+  java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
+  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
 env:
   RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 ```
@@ -512,9 +510,9 @@ config as a code change, then let the stack-aware ORW Migs apply it.
 ```yaml
 migs:
   - name: generate-rewrite-config
-    image: docker.io/user/shell:latest
+    image: ghcr.io/iw2rmb/ploy/shell:latest
     env:
-      MOD_SHELL_SCRIPT: ./generate-rewrite.sh
+      MIG_SHELL_SCRIPT: ./generate-rewrite.sh
 ```
 
 `./generate-rewrite.sh` runs inside `/workspace` and writes a complete
@@ -533,13 +531,13 @@ recipeList:
 ```yaml
 migs:
   - name: generate-rewrite-config
-    image: docker.io/user/shell:latest
+    image: ghcr.io/iw2rmb/ploy/shell:latest
     env:
-      MOD_SHELL_SCRIPT: ./generate-rewrite.sh
+      MIG_SHELL_SCRIPT: ./generate-rewrite.sh
   - name: apply-openrewrite
     image:
-      java-maven: docker.io/user/orw-cli-maven:latest
-      java-gradle: docker.io/user/orw-cli-gradle:latest
+      java-maven: ghcr.io/iw2rmb/ploy/orw-cli-maven:latest
+      java-gradle: ghcr.io/iw2rmb/ploy/orw-cli-gradle:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
@@ -580,7 +578,7 @@ transaction.
 | Type        | Description                                  | Example        |
 |-------------|----------------------------------------------|----------------|
 | `pre_gate`  | Pre-mig Build Gate validation                | `pre-gate`     |
-| `mig`       | Modification container execution             | `mig-0`        |
+| `mig`       | Migification container execution             | `mig-0`        |
 | `post_gate` | Post-mig Build Gate validation               | `post-gate`    |
 | `heal`      | Healing job after gate failure               | `heal-0`       |
 | `re_gate`   | Re-validation after healing                  | `re-gate`      |
@@ -697,7 +695,7 @@ artifacts) remain job-addressed via `job_id`.
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Run (`runs`)** — Stores a run referencing `mod_id` + `spec_id` and run-level
+- **Run (`runs`)** — Stores a run referencing `mig_id` + `spec_id` and run-level
   status (`Started`, `Finished`, `Cancelled`). Per-repo execution lives in `run_repos`.
 
 - **Specs (`specs`)** — Append-only spec JSON dictionary. Runs and migs reference
@@ -837,7 +835,7 @@ Gate env precedence:
 | Table       | Purpose                                    | Key relationships                         |
 |-------------|--------------------------------------------|-------------------------------------------|
 | `specs`     | Append-only spec dictionary                | referenced by `migs.spec_id`, `runs.spec_id` |
-| `migs`      | Mod projects                               | `migs` → `mig_repos` (1:N), `migs` → `runs` (1:N) |
+| `migs`      | Mig projects                               | `migs` → `mig_repos` (1:N), `migs` → `runs` (1:N) |
 | `repos`     | Global repository identity                 | `repos` → `mig_repos` (1:N), `repos` → `run_repos` (1:N), `repos` → `jobs` (1:N) |
 | `mig_repos` | Managed repo membership for a mig          | (`mig_id`, `repo_id`) membership + ref snapshot source |
 | `runs`      | Run record                                 | `runs` → `run_repos` (1:N), `runs` → `jobs` (1:N) |
@@ -865,7 +863,7 @@ workflows.
 │     ├─ Get origin URL from `git remote get-url <origin>`                    │
 │     ├─ (run pull) Call POST /v1/runs/{run_id}/pull with repo_url             │
 │     └─ (mig pull) Optionally infer mig via GET /v1/migs?repo_url=...         │
-│               then call POST /v1/migs/{mod_id}/pull with repo_url + mode     │
+│               then call POST /v1/migs/{mig_id}/pull with repo_url + mode     │
 │                                                                             │
 │  2. Fetch base snapshot                                                      │
 │     ├─ Call GET /v1/runs/{run_id}/repos and find repo_id                     │
@@ -911,7 +909,7 @@ workflows.
 **API endpoints consumed:**
 
 - `POST /v1/runs/{run_id}/pull` — Resolve `repo_id` + `repo_target_ref` for the current repo within the run.
-- `POST /v1/migs/{mod_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
+- `POST /v1/migs/{mig_id}/pull` — Resolve `run_id` + `repo_id` + `repo_target_ref` for the current repo within the selected run.
 - `GET /v1/runs/{run_id}/repos` — Fetch run repo snapshots (used to read `base_ref`).
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs` — List diffs for the repo execution within a run.
 - `GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>` — Download gzipped patch content.
@@ -945,7 +943,7 @@ cd /path/to/service-a
 # Run-based pull:
 ploy run pull <run-id>
 
-# Mod-based pull:
+# Mig-based pull:
 ploy mig pull <mig-id|name>
 
 # Preview without making changes:
@@ -1134,7 +1132,7 @@ value is a `StageStatus` object describing that job's execution state.
     - `jobs` rows (including `meta` JSONB with job metadata).
     - Artifact bundles per job.
     - Run stats (MR URL, gate summary).
-  - Returns `RunSummary` directly (Go type `modsapi.RunSummary`); the canonical JSON shape for run state.
+  - Returns `RunSummary` directly (Go type `migsapi.RunSummary`); the canonical JSON shape for run state.
 
 - `GET /v1/runs/{id}/logs` — SSE event stream for a run's logs and status.
   - Handler: `getRunLogsHandler`.
@@ -1239,7 +1237,7 @@ artifacts/diffs to the correct node.
 
 ### 3.3 Runs endpoints (runtime implementation)
 
-- `GET /v1/runs` — list batch runs with basic metadata (mod_id, spec_id, status, timestamps) and optional per-repo status counts.
+- `GET /v1/runs` — list batch runs with basic metadata (mig_id, spec_id, status, timestamps) and optional per-repo status counts.
 - `GET /v1/runs/{id}` — inspect a single batch run with aggregated repo counts from `run_repos`.
 - `POST /v1/runs/{id}/cancel` — cancel a batch run by transitioning the run to `Cancelled` and marking `Queued`/`Running` `run_repos` as `Cancelled`, and cancelling/removing waiting jobs from the queue (idempotent for terminal runs). The CLI maps this to `ploy run cancel <run-id>` and returns the canonical `RunSummary` payload.
 

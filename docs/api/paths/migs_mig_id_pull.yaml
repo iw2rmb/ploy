@@ -10,7 +10,7 @@ post:
     - Response returns run_id, repo_id, and repo_target_ref (from run_repos snapshot).
   parameters:
     - in: path
-      name: mod_id
+      name: mig_id
       required: true
       schema:
         type: string
@@ -20,29 +20,29 @@ post:
     content:
       application/json:
         schema:
-          $ref: '../components/schemas/controlplane.yaml#/MigPullRequest'
+          $ref: "../components/schemas/controlplane.yaml#/MigPullRequest"
   responses:
-    '200':
+    "200":
       description: OK
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/PullResolutionResponse'
-    '400':
+            $ref: "../components/schemas/controlplane.yaml#/PullResolutionResponse"
+    "400":
       description: Bad request — missing or invalid fields in the request body.
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '404':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "404":
       description: Not found — mig/repo or matching run not found.
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '500':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
       description: Internal server error.
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
+            $ref: "../components/schemas/common.yaml#/Error"

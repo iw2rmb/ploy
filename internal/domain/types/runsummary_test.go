@@ -62,7 +62,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects_empty_mod_id", func(t *testing.T) {
+	t.Run("rejects_empty_mig_id", func(t *testing.T) {
 		t.Parallel()
 
 		// JSON with empty mig_id should fail to unmarshal.
@@ -100,7 +100,7 @@ func TestRunSummaryJSON(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects_whitespace_mod_id", func(t *testing.T) {
+	t.Run("rejects_whitespace_mig_id", func(t *testing.T) {
 		t.Parallel()
 
 		// JSON with whitespace-only mig_id should fail to unmarshal.

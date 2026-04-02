@@ -103,27 +103,27 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "default:17"},
 	}
 
-	// Mod override rules (highest precedence).
-	modRules := []contracts.BuildGateImageRule{
+	// Mig override rules (highest precedence).
+	migRules := []contracts.BuildGateImageRule{
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
 	}
 
 	tests := []struct {
 		name         string
 		defaultRules []contracts.BuildGateImageRule
-		modRules     []contracts.BuildGateImageRule
+		migRules     []contracts.BuildGateImageRule
 		wantImage    string
 	}{
 		{
 			name:         "mig overrides all",
 			defaultRules: defaultRules,
-			modRules:     modRules,
+			migRules:     migRules,
 			wantImage:    "mig:17",
 		},
 		{
 			name:         "default when no overrides",
 			defaultRules: defaultRules,
-			modRules:     nil,
+			migRules:     nil,
 			wantImage:    "default:17",
 		},
 	}
@@ -133,7 +133,7 @@ func TestBuildGateImageResolver_Precedence(t *testing.T) {
 			// Build merged rules manually (simulating NewBuildGateImageResolver without file loading).
 			var rules []contracts.BuildGateImageRule
 			rules = append(rules, tt.defaultRules...)
-			rules = append(rules, tt.modRules...)
+			rules = append(rules, tt.migRules...)
 
 			resolver := &BuildGateImageResolver{rules: rules}
 			got, err := resolver.Resolve(contracts.StackExpectation{Language: "java", Release: "17"})
@@ -471,12 +471,12 @@ stacks:
 `), 0644); err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
 	}
-	modRules := []contracts.BuildGateImageRule{
+	migRules := []contracts.BuildGateImageRule{
 		{Stack: contracts.StackExpectation{Language: "java", Release: "17"}, Image: "mig:17"},
 	}
 
 	t.Run("mig overrides default", func(t *testing.T) {
-		resolver, err := NewBuildGateImageResolver(defaultFile, modRules, true)
+		resolver, err := NewBuildGateImageResolver(defaultFile, migRules, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
 		}
@@ -507,7 +507,7 @@ stacks:
 
 	t.Run("default used for non-overridden stack", func(t *testing.T) {
 		// mig only overrides java:17, not java:11.
-		resolver, err := NewBuildGateImageResolver(defaultFile, modRules, true)
+		resolver, err := NewBuildGateImageResolver(defaultFile, migRules, true)
 		if err != nil {
 			t.Fatalf("NewBuildGateImageResolver failed: %v", err)
 		}

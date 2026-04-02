@@ -18,7 +18,7 @@ WORKDIR /workspace
 
 ENV WORKSPACE=/workspace \
     OUTDIR=/out \
-    MOD_SHELL_SCRIPT=""
+    MIG_SHELL_SCRIPT=""
 
 RUN mkdir -p /workspace /out
 

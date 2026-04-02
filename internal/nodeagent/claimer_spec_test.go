@@ -38,8 +38,8 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
 	if typedOpts.Healing.Retries != 2 {
 		t.Fatalf("expected retries=2, got %d", typedOpts.Healing.Retries)
 	}
-	if typedOpts.Healing.Mod.Image.Universal != "docker.io/test/heal:latest" {
-		t.Fatalf("expected heal image docker.io/test/heal:latest, got %q", typedOpts.Healing.Mod.Image.Universal)
+	if typedOpts.Healing.Mig.Image.Universal != "docker.io/test/heal:latest" {
+		t.Fatalf("expected heal image docker.io/test/heal:latest, got %q", typedOpts.Healing.Mig.Image.Universal)
 	}
 }
 
@@ -83,7 +83,7 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	}
 }
 
-func TestParseSpec_IgnoresUnknownTopLevelModObject(t *testing.T) {
+func TestParseSpec_IgnoresUnknownTopLevelMigObject(t *testing.T) {
 	specJSON := `{
         "steps": [{
             "image": "docker.io/test/required:latest",
@@ -224,12 +224,12 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 	if typedOpts.Healing.Retries != 1 {
 		t.Errorf("expected Healing.Retries=1, got %d", typedOpts.Healing.Retries)
 	}
-	if typedOpts.Healing.Mod.Image.Universal != "docker.io/test/healer:latest" {
-		t.Errorf("expected Healing.Mod.Image=docker.io/test/healer:latest, got %q", typedOpts.Healing.Mod.Image.Universal)
+	if typedOpts.Healing.Mig.Image.Universal != "docker.io/test/healer:latest" {
+		t.Errorf("expected Healing.Mig.Image=docker.io/test/healer:latest, got %q", typedOpts.Healing.Mig.Image.Universal)
 	}
 }
 
-func TestParseSpec_HealingSingleMod(t *testing.T) {
+func TestParseSpec_HealingSingleMig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -239,7 +239,7 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 		wantImage   string
 	}{
 		{
-			name: "single_mod_healing",
+			name: "single_mig_healing",
 			specJSON: `{
 				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"build_gate": {
@@ -279,14 +279,14 @@ func TestParseSpec_HealingSingleMod(t *testing.T) {
 				t.Errorf("Retries: got %d, want %d", typedOpts.Healing.Retries, tc.wantRetries)
 			}
 
-			if typedOpts.Healing.Mod.Image.Universal != tc.wantImage {
-				t.Errorf("Healing mig image: got %q, want %q", typedOpts.Healing.Mod.Image.Universal, tc.wantImage)
+			if typedOpts.Healing.Mig.Image.Universal != tc.wantImage {
+				t.Errorf("Healing mig image: got %q, want %q", typedOpts.Healing.Mig.Image.Universal, tc.wantImage)
 			}
 		})
 	}
 }
 
-func TestParseHealingMod_ModFields(t *testing.T) {
+func TestParseHealingMig_MigFields(t *testing.T) {
 	t.Parallel()
 
 	specJSON := `{
@@ -319,24 +319,24 @@ func TestParseHealingMod_ModFields(t *testing.T) {
 		t.Fatal("expected healing config to be parsed")
 	}
 
-	mig := typedOpts.Healing.Mod
+	mig := typedOpts.Healing.Mig
 
 	// Verify image.
 	if mig.Image.Universal != "docker.io/test/healer:v1" {
-		t.Errorf("Mod image: got %q, want %q", mig.Image.Universal, "docker.io/test/healer:v1")
+		t.Errorf("Mig image: got %q, want %q", mig.Image.Universal, "docker.io/test/healer:v1")
 	}
 
 	// Verify command (shell form).
 	if mig.Command.Shell != "heal.sh --fix" {
-		t.Errorf("Mod command: got %q, want %q", mig.Command.Shell, "heal.sh --fix")
+		t.Errorf("Mig command: got %q, want %q", mig.Command.Shell, "heal.sh --fix")
 	}
 
 	// Verify env.
 	if mig.Env["MODE"] != "aggressive" {
-		t.Errorf("Mod env MODE: got %q, want %q", mig.Env["MODE"], "aggressive")
+		t.Errorf("Mig env MODE: got %q, want %q", mig.Env["MODE"], "aggressive")
 	}
 	if mig.Env["DEBUG"] != "true" {
-		t.Errorf("Mod env DEBUG: got %q, want %q", mig.Env["DEBUG"], "true")
+		t.Errorf("Mig env DEBUG: got %q, want %q", mig.Env["DEBUG"], "true")
 	}
 
 }

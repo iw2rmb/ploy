@@ -117,7 +117,7 @@ func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
 	}
 
 	// Parse using the canonical parser for structural validation.
-	modsSpec, err := contracts.ParseMigSpecJSON(spec)
+	migsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
 		return env, typedOpts, err
 	}
@@ -127,15 +127,15 @@ func parseSpec(spec json.RawMessage) (map[string]string, RunOptions, error) {
 	// - For single-step runs, step env is merged into env (step overrides).
 	// - For multi-step runs, env contains only the global env; step env is applied
 	//   at manifest build time via typedOpts.Steps[stepIndex].Env.
-	env = modsSpecToEnv(modsSpec)
+	env = migsSpecToEnv(migsSpec)
 
 	// Direct conversion from typed MigSpec to RunOptions.
-	typedOpts = modsSpecToRunOptions(modsSpec)
+	typedOpts = migsSpecToRunOptions(migsSpec)
 
 	return env, typedOpts, nil
 }
 
-func modsSpecToEnv(spec *contracts.MigSpec) map[string]string {
+func migsSpecToEnv(spec *contracts.MigSpec) map[string]string {
 	if spec == nil {
 		return map[string]string{}
 	}

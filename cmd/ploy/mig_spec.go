@@ -1,4 +1,4 @@
-// mod_spec.go implements the 'ploy mig spec' command handler.
+// mig_spec.go implements the 'ploy mig spec' command handler.
 //
 // This command sets a mig's spec:
 // - ploy mig spec set <mig-id|name> <path|->
@@ -51,7 +51,7 @@ func handleMigSpecSet(args []string, stderr io.Writer) error {
 		printMigSpecSetUsage(stderr)
 		return fmt.Errorf("mig id/name and spec path are required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 	specPath := args[1]
 
 	// Resolve control plane connection.
@@ -71,7 +71,7 @@ func handleMigSpecSet(args []string, stderr io.Writer) error {
 	cmd := migs.SetMigSpecCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 		Spec:    specData,
 	}
 

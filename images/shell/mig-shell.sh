@@ -6,7 +6,7 @@ usage() {
 mig-shell --script <path> [--dir <workspace>] [--out <dir>]
 
 Environment:
-  MOD_SHELL_SCRIPT   Relative or absolute script path to execute.
+  MIG_SHELL_SCRIPT   Relative or absolute script path to execute.
   WORKSPACE          Workspace directory (default: /workspace).
   OUTDIR             Output directory for reports/logs (default: /out).
 
@@ -42,11 +42,11 @@ done
 mkdir -p "$outdir"
 
 if [[ -z "$script_path" ]]; then
-  script_path="${MOD_SHELL_SCRIPT:-}"
+  script_path="${MIG_SHELL_SCRIPT:-}"
 fi
 
 if [[ -z "$script_path" ]]; then
-  echo "error: --script <path> or MOD_SHELL_SCRIPT is required" >&2
+  echo "error: --script <path> or MIG_SHELL_SCRIPT is required" >&2
   usage >&2
   exit 2
 fi
