@@ -408,6 +408,24 @@ func TestJobStatsPayload_HasJobMeta(t *testing.T) {
 	}
 }
 
+func TestJobStatsPayload_ErrorMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  JobStatsPayload
+		expected string
+	}{
+		{name: "empty", payload: JobStatsPayload{}, expected: ""},
+		{name: "trimmed", payload: JobStatsPayload{Error: "  gate execution failed: network missing  "}, expected: "gate execution failed: network missing"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.payload.ErrorMessage(); got != tc.expected {
+				t.Errorf("ErrorMessage() = %q, want %q", got, tc.expected)
+			}
+		})
+	}
+}
+
 func TestJobStatsPayload_ValidateJobMeta(t *testing.T) {
 	tests := []struct {
 		name    string
