@@ -639,7 +639,7 @@ seed_node_record() {
 set_global_env_via_server_api() {
   local key="$1"
   local value="$2"
-  local target="${3:-all}"
+  local target="${3:-server}"
   local payload
 
   payload="$(GLOBAL_ENV_VALUE="$value" GLOBAL_ENV_TARGET="$target" "$PYTHON_BIN" <<'PY'
@@ -678,13 +678,13 @@ configure_runtime_globals_and_persist_auth() {
   set_default_auth_symlink
 
   log "Configuring Gradle Build Cache globals..."
-  set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_URL "http://gradle-build-cache:5071/cache/" all
-  set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_PUSH "true" all
+  set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_URL "http://gradle-build-cache:5071/cache/" server
+  set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_PUSH "true" server
 
   runtime_ca_bundle="$(runtime_ca_bundle_value || true)"
   if [[ -n "$runtime_ca_bundle" ]]; then
     log "Configuring global PLOY_CA_CERTS..."
-    set_global_env_via_server_api PLOY_CA_CERTS "$runtime_ca_bundle" all
+    set_global_env_via_server_api PLOY_CA_CERTS "$runtime_ca_bundle" server
   fi
 }
 
