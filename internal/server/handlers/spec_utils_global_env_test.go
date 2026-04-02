@@ -13,7 +13,7 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 	tests := []struct {
 		name       string
 		spec       json.RawMessage
-		env        map[string]GlobalEnvVar
+		env        map[string][]GlobalEnvVar
 		jobType    domaintypes.JobType
 		wantErr    bool
 		expectKeys []string
@@ -29,20 +29,20 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 		{
 			name:    "empty env leaves spec unchanged",
 			spec:    json.RawMessage(`{"foo":"bar"}`),
-			env:     map[string]GlobalEnvVar{},
+			env:     map[string][]GlobalEnvVar{},
 			jobType: domaintypes.JobTypeMod,
 		},
 		{
 			name:    "nil spec returns error",
 			spec:    nil,
-			env:     map[string]GlobalEnvVar{"API_KEY": {Value: "secret123", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+			env:     map[string][]GlobalEnvVar{"API_KEY": {{Value: "secret123", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
 			jobType: domaintypes.JobTypeMod,
 			wantErr: true,
 		},
 		{
 			name:       "empty spec creates env map",
 			spec:       json.RawMessage(`{}`),
-			env:        map[string]GlobalEnvVar{"API_KEY": {Value: "secret123", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+			env:        map[string][]GlobalEnvVar{"API_KEY": {{Value: "secret123", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
 			jobType:    domaintypes.JobTypeMod,
 			expectKeys: []string{"API_KEY"},
 			checkEnv:   map[string]string{"API_KEY": "secret123"},
@@ -90,7 +90,7 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 		{
 			name:    "per-run env takes precedence over global",
 			spec:    json.RawMessage(`{"env":{"API_KEY":"per-run-value","OTHER":"existing"}}`),
-			env:     map[string]GlobalEnvVar{"API_KEY": {Value: "global-value", Target: domaintypes.GlobalEnvTargetSteps}, "NEW_KEY": {Value: "new-value", Target: domaintypes.GlobalEnvTargetSteps}},
+			env:     map[string][]GlobalEnvVar{"API_KEY": {{Value: "global-value", Target: domaintypes.GlobalEnvTargetSteps}}, "NEW_KEY": {{Value: "new-value", Target: domaintypes.GlobalEnvTargetSteps}}},
 			jobType: domaintypes.JobTypeMod,
 			checkEnv: map[string]string{
 				"API_KEY": "per-run-value",
@@ -101,7 +101,7 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 		{
 			name:    "preserves other spec fields",
 			spec:    json.RawMessage(`{"repo":"github.com/test","timeout":300,"env":{"EXISTING":"yes"}}`),
-			env:     map[string]GlobalEnvVar{"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+			env:     map[string][]GlobalEnvVar{"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
 			jobType: domaintypes.JobTypeMod,
 			checkEnv: map[string]string{
 				"EXISTING":           "yes",
@@ -111,32 +111,107 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 		{
 			name:    "invalid JSON returns error",
 			spec:    json.RawMessage(`{invalid`),
-			env:     map[string]GlobalEnvVar{"KEY": {Value: "value", Target: domaintypes.GlobalEnvTargetSteps}},
+			env:     map[string][]GlobalEnvVar{"KEY": {{Value: "value", Target: domaintypes.GlobalEnvTargetSteps}}},
 			jobType: domaintypes.JobTypeMod,
 			wantErr: true,
 		},
 		{
-			name:    "common global keys for mig",
-			spec:    json.RawMessage(`{}`),
-			env: map[string]GlobalEnvVar{
-				"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
-				"CODEX_AUTH_JSON":     {Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
-				"OPENAI_API_KEY":      {Value: "sk-...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
+			name: "common global keys for mig",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+				"CODEX_AUTH_JSON":     {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+				"OPENAI_API_KEY":      {{Value: "sk-...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 			},
 			jobType:    domaintypes.JobTypeMod,
 			expectKeys: []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "OPENAI_API_KEY"},
 		},
 		{
-			name:    "common global keys for pre_gate with gates target",
-			spec:    json.RawMessage(`{}`),
-			env: map[string]GlobalEnvVar{
-				"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetGates, Secret: true},
-				"CODEX_AUTH_JSON":     {Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
-				"OPENAI_API_KEY":      {Value: "sk-...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
+			name: "common global keys for pre_gate with gates target",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
+				"CODEX_AUTH_JSON":     {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+				"OPENAI_API_KEY":      {{Value: "sk-...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 			},
 			jobType:    domaintypes.JobTypePreGate,
 			expectKeys: []string{"CA_CERTS_PEM_BUNDLE"},
 			rejectKeys: []string{"CODEX_AUTH_JSON", "OPENAI_API_KEY"},
+		},
+		// --- Step 4: target-aware merge precedence tests ---
+		{
+			name: "nodes-target provides fallback for mig job",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"SHARED_KEY": {{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes}},
+			},
+			jobType:  domaintypes.JobTypeMod,
+			checkEnv: map[string]string{"SHARED_KEY": "nodes-val"},
+		},
+		{
+			name: "nodes-target provides fallback for gate job",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"SHARED_KEY": {{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes}},
+			},
+			jobType:  domaintypes.JobTypePreGate,
+			checkEnv: map[string]string{"SHARED_KEY": "nodes-val"},
+		},
+		{
+			name: "job-target overrides nodes-target on key collision",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"SHARED_KEY": {
+					{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes},
+					{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps},
+				},
+			},
+			jobType:  domaintypes.JobTypeMod,
+			checkEnv: map[string]string{"SHARED_KEY": "steps-val"},
+		},
+		{
+			name: "gates-target overrides nodes-target for gate job",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"SHARED_KEY": {
+					{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes},
+					{Value: "gates-val", Target: domaintypes.GlobalEnvTargetGates},
+				},
+			},
+			jobType:  domaintypes.JobTypePostGate,
+			checkEnv: map[string]string{"SHARED_KEY": "gates-val"},
+		},
+		{
+			name: "per-run env overrides both job-target and nodes-target",
+			spec: json.RawMessage(`{"env":{"SHARED_KEY":"per-run-val"}}`),
+			env: map[string][]GlobalEnvVar{
+				"SHARED_KEY": {
+					{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes},
+					{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps},
+				},
+			},
+			jobType:  domaintypes.JobTypeMod,
+			checkEnv: map[string]string{"SHARED_KEY": "per-run-val"},
+		},
+		{
+			name: "server-target not injected into jobs",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"SERVER_ONLY": {{Value: "server-val", Target: domaintypes.GlobalEnvTargetServer}},
+			},
+			jobType:    domaintypes.JobTypeMod,
+			rejectKeys: []string{"SERVER_ONLY"},
+		},
+		{
+			name: "nodes-target with no matching job-target",
+			spec: json.RawMessage(`{}`),
+			env: map[string][]GlobalEnvVar{
+				"STEPS_KEY": {{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps}},
+				"NODES_KEY": {{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes}},
+			},
+			jobType:    domaintypes.JobTypePreGate,
+			expectKeys: []string{"NODES_KEY"},
+			rejectKeys: []string{"STEPS_KEY"},
 		},
 	}
 
@@ -186,9 +261,9 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 	}
 }
 
-func targetTestEnv() map[string]GlobalEnvVar {
-	return map[string]GlobalEnvVar{
-		"GATES_KEY": {Value: "gates-value", Target: domaintypes.GlobalEnvTargetGates},
-		"STEPS_KEY": {Value: "steps-value", Target: domaintypes.GlobalEnvTargetSteps},
+func targetTestEnv() map[string][]GlobalEnvVar {
+	return map[string][]GlobalEnvVar{
+		"GATES_KEY": {{Value: "gates-value", Target: domaintypes.GlobalEnvTargetGates}},
+		"STEPS_KEY": {{Value: "steps-value", Target: domaintypes.GlobalEnvTargetSteps}},
 	}
 }

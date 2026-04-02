@@ -272,10 +272,10 @@ func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
 	entries := []store.ConfigEnv{
 		{Key: "A", Target: "server", Value: "1", Secret: true},
 		{Key: "B", Target: "gates", Value: "2", Secret: false},
-		{Key: "C", Target: "mig", Value: "3", Secret: false},   // invalid (old scope value, hard cut)
-		{Key: "D", Target: "steps", Value: "4", Secret: false},  // valid
-		{Key: "E", Target: "", Value: "5", Secret: false},       // empty target rejected
-		{Key: "F", Target: "all", Value: "6", Secret: false},    // old scope value, hard cut
+		{Key: "C", Target: "mig", Value: "3", Secret: false},  // invalid (old scope value, hard cut)
+		{Key: "D", Target: "steps", Value: "4", Secret: false}, // valid
+		{Key: "E", Target: "", Value: "5", Secret: false},      // empty target rejected
+		{Key: "F", Target: "all", Value: "6", Secret: false},   // old scope value, hard cut
 	}
 
 	got := globalEnvMapFromStoreEntries(entries)
@@ -291,14 +291,30 @@ func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
 	if _, ok := got["F"]; ok {
 		t.Fatalf("expected old-scope-value entry F to be dropped")
 	}
-	if got["A"].Target != domaintypes.GlobalEnvTargetServer {
-		t.Fatalf("A target=%q want %q", got["A"].Target, domaintypes.GlobalEnvTargetServer)
+	if got["A"][0].Target != domaintypes.GlobalEnvTargetServer {
+		t.Fatalf("A target=%q want %q", got["A"][0].Target, domaintypes.GlobalEnvTargetServer)
 	}
-	if got["B"].Target != domaintypes.GlobalEnvTargetGates {
-		t.Fatalf("B target=%q want %q", got["B"].Target, domaintypes.GlobalEnvTargetGates)
+	if got["B"][0].Target != domaintypes.GlobalEnvTargetGates {
+		t.Fatalf("B target=%q want %q", got["B"][0].Target, domaintypes.GlobalEnvTargetGates)
 	}
-	if got["D"].Target != domaintypes.GlobalEnvTargetSteps {
-		t.Fatalf("D target=%q want %q", got["D"].Target, domaintypes.GlobalEnvTargetSteps)
+	if got["D"][0].Target != domaintypes.GlobalEnvTargetSteps {
+		t.Fatalf("D target=%q want %q", got["D"][0].Target, domaintypes.GlobalEnvTargetSteps)
+	}
+}
+
+func TestGlobalEnvMapFromStoreEntries_MultiTargetSameKey(t *testing.T) {
+	entries := []store.ConfigEnv{
+		{Key: "SHARED", Target: "gates", Value: "gates-val", Secret: false},
+		{Key: "SHARED", Target: "steps", Value: "steps-val", Secret: true},
+		{Key: "SHARED", Target: "nodes", Value: "nodes-val", Secret: false},
+	}
+
+	got := globalEnvMapFromStoreEntries(entries)
+	if len(got) != 1 {
+		t.Fatalf("globalEnvMapFromStoreEntries() keys=%d want 1", len(got))
+	}
+	if len(got["SHARED"]) != 3 {
+		t.Fatalf("SHARED entries=%d want 3", len(got["SHARED"]))
 	}
 }
 

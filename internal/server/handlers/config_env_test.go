@@ -11,9 +11,9 @@ import (
 // TestConfigEnvListReturnsAllEntries verifies that GET /v1/config/env
 // returns all key+target pairs sorted by key then target, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true},
-		"API_KEY":             {Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
+		"API_KEY":             {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
 	})
 
 	handler := listGlobalEnvHandler(holder)
@@ -79,8 +79,8 @@ func TestConfigEnvListMultiTarget(t *testing.T) {
 // TestConfigEnvGetReturnsEntry verifies GET /v1/config/env/{key}
 // returns full value (including for secrets) for admin access.
 func TestConfigEnvGetReturnsEntry(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"CODEX_AUTH_JSON": {Value: `{"token":"secret"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"CODEX_AUTH_JSON": {{Value: `{"token":"secret"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 	})
 
 	handler := getGlobalEnvHandler(holder)
@@ -145,8 +145,8 @@ func TestConfigEnvGetAmbiguityError(t *testing.T) {
 // TestConfigEnvGetInvalidTarget verifies GET /v1/config/env/{key}?target=bad
 // returns 400 when the target value is not a valid GlobalEnvTarget.
 func TestConfigEnvGetInvalidTarget(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"MY_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
 	handler := getGlobalEnvHandler(holder)
@@ -159,8 +159,8 @@ func TestConfigEnvGetInvalidTarget(t *testing.T) {
 // TestConfigEnvGetTargetNotFound verifies GET /v1/config/env/{key}?target=steps
 // returns 404 when the target is valid but the key has no entry for that target.
 func TestConfigEnvGetTargetNotFound(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"MY_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
 	handler := getGlobalEnvHandler(holder)
@@ -309,8 +309,8 @@ func TestConfigEnvPutMultiTarget(t *testing.T) {
 // removes from store and holder.
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"OLD_KEY": {Value: "old-value", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"OLD_KEY": {{Value: "old-value", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)
@@ -340,8 +340,8 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 // ?target= succeeds when only one target exists for the key.
 func TestConfigEnvDeleteInfersTarget(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"SINGLE": {Value: "val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"SINGLE": {{Value: "val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false}},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)
@@ -382,8 +382,8 @@ func TestConfigEnvDeleteAmbiguityError(t *testing.T) {
 // returns 400 when the target value is not a valid GlobalEnvTarget.
 func TestConfigEnvDeleteInvalidTarget(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"MY_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)
@@ -517,8 +517,8 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 func TestConfigEnvDeleteStoreError(t *testing.T) {
 	st := &configStore{}
 	st.deleteGlobalEnv.err = errMockDatabase
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"OLD_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+		"OLD_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)

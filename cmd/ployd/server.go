@@ -134,12 +134,10 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 			globalEnvEntries = nil
 		}
 	}
-	// Convert store entries to ConfigHolder's in-memory map.
+	// Convert store entries to ConfigHolder's in-memory multi-target map.
 	// Parse target strings from database into typed GlobalEnvTarget values.
-	// Note: with composite key (key, target), multiple entries can share the same
-	// key with different targets. The flat map uses last-target-wins ordering
-	// (entries are sorted by key ASC, target ASC). Step 2/4 will rebuild
-	// ConfigHolder for multi-target support.
+	// With composite key (key, target), multiple entries can share the same
+	// key with different targets.
 	globalEnvMap := globalEnvMapFromStoreEntries(globalEnvEntries)
 	slog.Info("loaded global env entries from store", "count", len(globalEnvMap))
 
@@ -207,8 +205,8 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	return nil
 }
 
-func globalEnvMapFromStoreEntries(entries []store.ConfigEnv) map[string]handlers.GlobalEnvVar {
-	globalEnvMap := make(map[string]handlers.GlobalEnvVar, len(entries))
+func globalEnvMapFromStoreEntries(entries []store.ConfigEnv) map[string][]handlers.GlobalEnvVar {
+	globalEnvMap := make(map[string][]handlers.GlobalEnvVar)
 	for _, e := range entries {
 		// Parse target from database; empty or invalid targets are dropped.
 		target, err := domaintypes.ParseGlobalEnvTarget(e.Target)
@@ -220,11 +218,11 @@ func globalEnvMapFromStoreEntries(entries []store.ConfigEnv) map[string]handlers
 			)
 			continue
 		}
-		globalEnvMap[e.Key] = handlers.GlobalEnvVar{
+		globalEnvMap[e.Key] = append(globalEnvMap[e.Key], handlers.GlobalEnvVar{
 			Value:  e.Value,
 			Target: target,
 			Secret: e.Secret,
-		}
+		})
 	}
 	return globalEnvMap
 }
