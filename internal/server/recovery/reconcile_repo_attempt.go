@@ -32,7 +32,7 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 		}
 
 		switch job.Status {
-		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
+		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
 		default:
 			return RepoAttemptReconcileEval{ShouldUpdate: false}, nil
 		}
@@ -69,7 +69,7 @@ func EvaluateRepoAttemptTerminalStatus(jobs []store.Job) (RepoAttemptReconcileEv
 	switch lastJob.Status {
 	case domaintypes.JobStatusSuccess:
 		repoStatus = domaintypes.RunRepoStatusSuccess
-	case domaintypes.JobStatusFail:
+	case domaintypes.JobStatusFail, domaintypes.JobStatusError:
 		repoStatus = domaintypes.RunRepoStatusFail
 	case domaintypes.JobStatusCancelled:
 		repoStatus = domaintypes.RunRepoStatusCancelled

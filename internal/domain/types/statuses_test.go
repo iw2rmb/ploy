@@ -16,6 +16,7 @@ func TestParseJobStatus(t *testing.T) {
 		{name: "running", input: "Running", want: JobStatusRunning},
 		{name: "success", input: "Success", want: JobStatusSuccess},
 		{name: "fail", input: "Fail", want: JobStatusFail},
+		{name: "error", input: "Error", want: JobStatusError},
 		{name: "cancelled", input: "Cancelled", want: JobStatusCancelled},
 		{name: "invalid lowercase", input: "running", wantErr: true},
 		{name: "unknown", input: "unknown", wantErr: true},

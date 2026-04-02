@@ -14,21 +14,23 @@ import (
 )
 
 func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState) {
-	if state.input.Status != domaintypes.JobStatusFail {
+	if state.input.Status != domaintypes.JobStatusFail && state.input.Status != domaintypes.JobStatusError {
 		return
 	}
 
-	if errMsg := formatExit137Error(state.job.Name, state.input.ExitCode); errMsg != nil {
-		if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
-			RunID:     state.job.RunID,
-			RepoID:    state.job.RepoID,
-			LastError: errMsg,
-		}); updateErr != nil {
-			slog.Error("complete job: failed to set repo last_error for exit code 137",
-				"job_id", state.job.ID,
-				"repo_id", state.job.RepoID,
-				"err", updateErr,
-			)
+	if state.input.Status == domaintypes.JobStatusFail {
+		if errMsg := formatExit137Error(state.job.Name, state.input.ExitCode); errMsg != nil {
+			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
+				RunID:     state.job.RunID,
+				RepoID:    state.job.RepoID,
+				LastError: errMsg,
+			}); updateErr != nil {
+				slog.Error("complete job: failed to set repo last_error for exit code 137",
+					"job_id", state.job.ID,
+					"repo_id", state.job.RepoID,
+					"err", updateErr,
+				)
+			}
 		}
 	}
 

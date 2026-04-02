@@ -19,7 +19,7 @@ post:
   summary: Mark job as completed via job-level endpoint
   description: |
     Nodes call this endpoint when job execution finishes to transition a job from
-    `Running` to a terminal status (`Success`, `Fail`, or `Cancelled`). The server:
+    `Running` to a terminal status (`Success`, `Fail`, `Error`, or `Cancelled`). The server:
 
     1. Validates node identity from the client certificate and enforces job ownership.
     2. Transitions the job to terminal status with `finished_at`, `duration_ms`, `exit_code`,
@@ -42,7 +42,7 @@ post:
             status:
               type: string
               description: Terminal status derived from job execution
-              enum: [ Success, Fail, Cancelled ]
+              enum: [ Success, Fail, Error, Cancelled ]
             exit_code:
               type: integer
               format: int32
@@ -115,7 +115,7 @@ post:
       description: |
         Conflict — job not in `running` state. This occurs when:
         - The job is still in `Created` or `Queued` state (not yet started)
-        - The job has already been completed (`Success`, `Fail`, or `Cancelled`)
+        - The job has already been completed (`Success`, `Fail`, `Error`, or `Cancelled`)
         - A duplicate completion request was received after the job transitioned
     '500':
       description: Internal server error

@@ -16,6 +16,7 @@ func TestJobStatusConstants(t *testing.T) {
 	}{
 		{"Success", types.JobStatusSuccess, "Success"},
 		{"Fail", types.JobStatusFail, "Fail"},
+		{"Error", types.JobStatusError, "Error"},
 		{"Cancelled", types.JobStatusCancelled, "Cancelled"},
 	}
 

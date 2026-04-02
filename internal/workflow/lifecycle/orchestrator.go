@@ -17,13 +17,13 @@ import (
 
 // JobStatusFromRunError maps a job execution error to the appropriate terminal job status.
 // context.Canceled and context.DeadlineExceeded produce Cancelled; all other
-// errors produce Fail. This is the canonical status-from-error mapping consumed
+// errors produce Error. This is the canonical status-from-error mapping consumed
 // across all nodeagent execution paths.
 func JobStatusFromRunError(err error) domaintypes.JobStatus {
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return domaintypes.JobStatusCancelled
 	}
-	return domaintypes.JobStatusFail
+	return domaintypes.JobStatusError
 }
 
 var sha40Pattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -80,7 +80,7 @@ func EvaluateCompletionDecision(
 			return CompletionDecision{ChainAction: CompletionChainAdvanceNext}
 		}
 		return CompletionDecision{ChainAction: CompletionChainNoAction}
-	case domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
+	case domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
 		if jobType == domaintypes.JobTypeMR {
 			return CompletionDecision{ChainAction: CompletionChainNoAction}
 		}

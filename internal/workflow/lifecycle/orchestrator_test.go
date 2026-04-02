@@ -140,6 +140,20 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 			hasNext:    true,
 			wantAction: lifecycle.CompletionChainCancelRemainder,
 		},
+		{
+			name:       "errored gate job cancels remainder without gate failure evaluation",
+			jobType:    domaintypes.JobTypePreGate,
+			jobStatus:  domaintypes.JobStatusError,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainCancelRemainder,
+		},
+		{
+			name:       "errored MR job takes no chain action",
+			jobType:    domaintypes.JobTypeMR,
+			jobStatus:  domaintypes.JobStatusError,
+			hasNext:    true,
+			wantAction: lifecycle.CompletionChainNoAction,
+		},
 		// Cancelled paths
 		{
 			name:       "cancelled MR job takes no chain action",

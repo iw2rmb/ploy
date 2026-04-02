@@ -20,6 +20,7 @@ func TestStageStatusFromDomain(t *testing.T) {
 		{name: "running", input: domaintypes.JobStatusRunning, want: StageStateRunning},
 		{name: "success", input: domaintypes.JobStatusSuccess, want: StageStateSucceeded},
 		{name: "fail", input: domaintypes.JobStatusFail, want: StageStateFailed},
+		{name: "error", input: domaintypes.JobStatusError, want: StageStateFailed},
 		{name: "cancelled", input: domaintypes.JobStatusCancelled, want: StageStateCancelled},
 		{name: "unknown", input: domaintypes.JobStatus("unknown"), wantErr: true},
 	}

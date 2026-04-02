@@ -927,7 +927,7 @@ WorkflowGraphNode:
     status:
       type: string
       description: Job execution status (matches jobs.status)
-      enum: [Created, Queued, Running, Success, Fail, Cancelled]
+      enum: [Created, Queued, Running, Success, Fail, Error, Cancelled]
     attempt:
       type: integer
       format: int32
@@ -1111,7 +1111,7 @@ RepoJobItem:
       description: Node ID that claimed/executed this job (NanoID 6-character string)
     status:
       type: string
-      description: Job status (Created, Queued, Running, Success, Fail, Cancelled)
+      description: Job status (Created, Queued, Running, Success, Fail, Error, Cancelled)
     started_at:
       type: string
       format: date-time

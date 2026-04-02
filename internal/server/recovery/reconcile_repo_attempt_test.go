@@ -46,6 +46,14 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 			},
 			wantUpdate: false,
 		},
+		{
+			name: "error status maps repo to fail",
+			jobs: []store.Job{
+				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMod, Status: domaintypes.JobStatusError},
+			},
+			wantUpdate: true,
+			wantStatus: domaintypes.RunRepoStatusFail,
+		},
 	}
 
 	for _, tc := range cases {
