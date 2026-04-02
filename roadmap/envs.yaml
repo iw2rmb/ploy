@@ -120,6 +120,8 @@ items:
         commit: be508f20
       - gaps: ["\"Implement PLOY_CA_CERTS materializer to accept inline PEM content or a readable file path and produce uniform trust-store setup behavior.\" is not implemented consistently: `internal/workflow/step/gate_command_materializer.go:57` and ORW wrappers (`deploy/images/orw/orw-cli-gradle/orw-cli.sh:116`, `deploy/images/orw/orw-cli-maven/orw-cli.sh:116`) still detect file-path mode with `-f` (regular-file only), while readable non-regular paths are treated as inline PEM content instead of file-path input."]
         commit: 027e9a9b
+      - gaps: ["\"Implement PLOY_CA_CERTS materializer to accept inline PEM content or a readable file path and produce uniform trust-store setup behavior.\" is incomplete for gate profile command overrides: `resolveGateCommand` returns `prep.Command.ToSlice()` directly in `internal/workflow/step/gate_plan_command_selector.go:23`, so the materializer preamble from `envMaterializerPreamble()` is not applied on that execution path and `PLOY_CA_CERTS` special handling is skipped there.", "\"Update tests to assert certificate installation behavior through the new materializer path without legacy key dependencies.\" is incomplete for the gate profile override execution path: `internal/workflow/step/gate_docker_ca_preamble_test.go:14` validates only tool-derived commands, and there is no test asserting materializer behavior when `prep.Command` is selected by `resolveGateCommand` in `internal/workflow/step/gate_plan_command_selector.go:23`."]
+        commit: null
     label: "5"
     summary: Introduce shared env materializer mechanism and migrate certificate handling to PLOY_CA_CERTS.
     classification: determined
