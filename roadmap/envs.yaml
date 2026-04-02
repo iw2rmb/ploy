@@ -117,7 +117,7 @@ items:
       - gaps: ["\"Introduce shared materializer contract for special env keys while keeping default behavior as plain env passthrough.\" is only partially implemented in `internal/workflow/step/gate_command_materializer.go:10-23`: `EnvMaterializer`/`MaterializerForKey` are defined, but `envMaterializerPreamble` is hardcoded to `ployCAcertsPreamble()` and does not compose from the shared contract, so the materializer mechanism is not actually extensible through a single shared registration path."]
         commit: 0b83e1eb
       - gaps: ["\"Implement PLOY_CA_CERTS materializer to accept inline PEM content or a readable file path and produce uniform trust-store setup behavior.\" is not implemented correctly in runtime entrypoints: `deploy/images/server/entrypoint.sh:8`-`13` and `deploy/images/node/entrypoint.sh:8`-`13` classify only non-empty regular files as file-path mode and otherwise treat the value as inline PEM, so the `/dev/null` default set by `deploy/runtime/run.sh:423` (mounted to `/etc/ploy/certs/ca.crt`) is converted into a temp file containing a literal path string and then exported via `SSL_CERT_FILE`/`CURL_CA_BUNDLE`/`GIT_SSL_CAINFO`."]
-        commit: null
+        commit: be508f20
     label: "5"
     summary: Introduce shared env materializer mechanism and migrate certificate handling to PLOY_CA_CERTS.
     classification: determined
