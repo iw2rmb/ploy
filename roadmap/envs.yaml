@@ -119,7 +119,7 @@ items:
       - gaps: ["\"Implement PLOY_CA_CERTS materializer to accept inline PEM content or a readable file path and produce uniform trust-store setup behavior.\" is not implemented correctly in runtime entrypoints: `deploy/images/server/entrypoint.sh:8`-`13` and `deploy/images/node/entrypoint.sh:8`-`13` classify only non-empty regular files as file-path mode and otherwise treat the value as inline PEM, so the `/dev/null` default set by `deploy/runtime/run.sh:423` (mounted to `/etc/ploy/certs/ca.crt`) is converted into a temp file containing a literal path string and then exported via `SSL_CERT_FILE`/`CURL_CA_BUNDLE`/`GIT_SSL_CAINFO`."]
         commit: be508f20
       - gaps: ["\"Implement PLOY_CA_CERTS materializer to accept inline PEM content or a readable file path and produce uniform trust-store setup behavior.\" is not implemented consistently: `internal/workflow/step/gate_command_materializer.go:57` and ORW wrappers (`deploy/images/orw/orw-cli-gradle/orw-cli.sh:116`, `deploy/images/orw/orw-cli-maven/orw-cli.sh:116`) still detect file-path mode with `-f` (regular-file only), while readable non-regular paths are treated as inline PEM content instead of file-path input."]
-        commit: null
+        commit: 027e9a9b
     label: "5"
     summary: Introduce shared env materializer mechanism and migrate certificate handling to PLOY_CA_CERTS.
     classification: determined
