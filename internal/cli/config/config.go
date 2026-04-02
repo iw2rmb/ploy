@@ -193,14 +193,6 @@ func configBaseDir() (string, error) {
 	return base, nil
 }
 
-func clustersDir() (string, error) {
-	base, err := configBaseDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, "clusters"), nil
-}
-
 func descriptorPath(base string, clusterID ClusterID) string {
 	return filepath.Join(base, sanitizeFilename(string(clusterID)), "auth.json")
 }

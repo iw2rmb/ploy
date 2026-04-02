@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -11,7 +10,7 @@ func TestSaveListAndDefaultDescriptor(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmp)
 	t.Cleanup(func() {
-		if dir, err := clustersDir(); err == nil {
+		if dir, err := configBaseDir(); err == nil {
 			_ = os.RemoveAll(dir)
 		}
 	})
@@ -39,16 +38,16 @@ func TestSaveListAndDefaultDescriptor(t *testing.T) {
 	}
 }
 
-func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
+func TestConfigBaseDirEnvPrecedenceAndSanitize(t *testing.T) {
 	// PLOY_CONFIG_HOME wins over home default.
 	tmp := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmp)
-	dir, err := clustersDir()
+	dir, err := configBaseDir()
 	if err != nil {
-		t.Fatalf("clustersDir error: %v", err)
+		t.Fatalf("configBaseDir error: %v", err)
 	}
-	if !strings.HasPrefix(dir, filepath.Join(tmp, "clusters")) {
-		t.Fatalf("clustersDir should be under %s, got %s", filepath.Join(tmp, "clusters"), dir)
+	if dir != tmp {
+		t.Fatalf("configBaseDir=%s want %s", dir, tmp)
 	}
 
 	if got := sanitizeFilename("a/b\\c"); got != "a_b_c" {
@@ -60,12 +59,12 @@ func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
 	// Override HOME via os.UserHomeDir by setting HOME for most systems.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	dir, err = clustersDir()
+	dir, err = configBaseDir()
 	if err != nil {
-		t.Fatalf("clustersDir error: %v", err)
+		t.Fatalf("configBaseDir error: %v", err)
 	}
-	if want := filepath.Join(home, ".config", "ploy", "clusters"); dir != want {
-		t.Fatalf("clustersDir=%s want %s", dir, want)
+	if want := filepath.Join(home, ".config", "ploy"); dir != want {
+		t.Fatalf("configBaseDir=%s want %s", dir, want)
 	}
 
 	// Ensure SetDefault creates marker file under config base dir.
@@ -83,7 +82,7 @@ func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
 
 func TestListDescriptorsMissingDirOK(t *testing.T) {
 	t.Setenv("PLOY_CONFIG_HOME", t.TempDir())
-	// Deliberately do not create clusters dir; function should not error and return empty list.
+	// Deliberately do not create cluster descriptor directories; function should not error and return empty list.
 	list, err := ListDescriptors()
 	if err != nil {
 		t.Fatalf("ListDescriptors error: %v", err)
