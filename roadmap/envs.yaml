@@ -1,0 +1,144 @@
+policy: .codex/policies/composing-roadmaps.md
+schema: .codex/policies/roadmap.schema.json
+title: Target-Based Env Propagation and PLOY_CA_CERTS Unification
+scope: Replace scope-based global env routing with target-based propagation and standardize CA propagation on PLOY_CA_CERTS across CLI, server, node, gates, and steps.
+documentation:
+  - docs/envs/README.md
+  - docs/api/paths/config_env.yaml
+  - docs/api/paths/config_env_key.yaml
+  - docs/api/components/schemas/config.yaml
+  - cmd/ploy/README.md
+  - docs/migs-lifecycle.md
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: Replace scope model with target model in domain types and persistence layer.
+    classification: determined
+    components:
+      - internal/domain/types/scope.go
+      - internal/domain/types/scope_test.go
+      - internal/store/schema.sql
+      - internal/store/queries/config_env.sql
+      - internal/store/{models.go,querier.go,config_env.sql.go,config_env_test.go}
+      - cmd/ployd/server.go
+      - cmd/ployd/main_test.go
+    implementation:
+      - Replace GlobalEnvScope enum/parser/matcher with GlobalEnvTarget enum/parser and a selector expander for CLI aliases all and jobs.
+      - Update config_env schema and sqlc query contracts to persist one record per key-target pair with deterministic list/get ordering.
+      - Regenerate sqlc outputs and adapt store interfaces/tests to key-plus-target CRUD semantics.
+      - Update server bootstrap loading path to parse targets and drop invalid persisted entries.
+    verification:
+      - "go test ./internal/domain/types ./internal/store ./cmd/ployd"
+      - "Store integration test validates multi-target same-key upsert/list/get/delete behavior with no key-level overwrite."
+    reasoning: high
+    cfp: 10
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: Refactor config env HTTP handlers and API contracts from scope to target with multi-entry key operations.
+    classification: determined
+    components:
+      - internal/server/handlers/{config_env.go,config_gitlab.go,config_env_test.go,test_fixture_config_test.go}
+      - docs/api/components/schemas/config.yaml
+      - docs/api/paths/{config_env.yaml,config_env_key.yaml}
+    implementation:
+      - Replace wire fields scope with target in list/get/put payloads and validation.
+      - Update GET-by-key response semantics to return all entries for that key grouped by target.
+      - Add targeted delete behavior for a specific key-target pair and keep deterministic error mapping for invalid target values.
+      - Update handler tests and fixture mocks to cover multi-target key behavior and target validation.
+    verification:
+      - "go test ./internal/server/handlers"
+      - "OpenAPI docs and handler tests agree on request/response shapes and target enum values."
+    reasoning: medium
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "3"
+    summary: Redesign ploy config env CLI UX to --on/--from target selectors with strict conflict handling.
+    classification: determined
+    components:
+      - cmd/ploy/config_env_command.go
+      - cmd/ploy/{config_env_command_flags_test.go,config_env_command_files_test.go,help_regressions_test.go,README.md}
+    implementation:
+      - Replace set --scope with --on supporting comma-separated selectors all,jobs,server,nodes,gates,steps and default jobs.
+      - Implement selector expansion and validation where all is exclusive and jobs expands to gates plus steps.
+      - Add unset --from selector handling and enforce mandatory --from only when key exists in multiple targets.
+      - Update list/show rendering to present per-target entries for the same key.
+      - Update usage/help text and examples to PLOY_CA_CERTS naming and target-based commands.
+    verification:
+      - "go test ./cmd/ploy -run ConfigEnv"
+      - "CLI tests cover selector parsing, all exclusivity, default on=jobs, and unset ambiguity resolution."
+    reasoning: high
+    cfp: 9
+
+  - done: false
+    reviews: []
+    label: "4"
+    summary: Implement target-based propagation engine for jobs, nodes, and server runtime consumption.
+    classification: determined
+    components:
+      - internal/server/handlers/{claim_spec_mutator_base.go,claim_spec_mutator_pipeline.go,spec_utils_global_env_test.go,server_runs_claim_spec_merge_test.go,nodes_claim_response.go}
+      - internal/nodeagent/{claimer_loop.go,manifest.go,recovery_runtime.go,claimer_global_env_test.go}
+      - internal/server/handlers/config_env.go
+      - cmd/ployd/server.go
+    implementation:
+      - Replace scope-based job filtering with target-aware merge logic: gates for pre_gate/re_gate/post_gate and steps for mig/heal; exclude mr from jobs.
+      - Add deterministic precedence: per-run env wins over global; when both nodes and job-target apply, job-target value wins.
+      - Implement immediate nodes-target consumption for container env injection paths.
+      - Implement immediate server-target consumption via process env mutation on set/unset and startup preload.
+      - Remove healing-specific CA env override path so healing follows the same propagation mechanism as other job containers.
+    verification:
+      - "go test ./internal/server/handlers ./internal/nodeagent"
+      - "Claim merge tests assert correct target-to-job routing and precedence for collisions across nodes/gates/steps and per-run env."
+    reasoning: high
+    cfp: 12
+
+  - done: false
+    reviews: []
+    label: "5"
+    summary: Standardize CA env key to PLOY_CA_CERTS and introduce one shared container CA installer mechanism.
+    classification: determined
+    components:
+      - deploy/runtime/{run.sh,docker-compose.yml}
+      - deploy/images/{server/entrypoint.sh,node/entrypoint.sh,orw/orw-cli-gradle/orw-cli.sh,orw/orw-cli-maven/orw-cli.sh}
+      - internal/workflow/step/gate_command.go
+      - internal/workflow/step/{gate_docker_ca_preamble_test.go,gate_docker_runtime_test.go,container_docker_create_test.go}
+      - internal/nodeagent/claimer_global_env_test.go
+    implementation:
+      - Replace CA_CERTS_PEM_BUNDLE references with PLOY_CA_CERTS in control-plane global env seeding and runtime consumers.
+      - Implement shared installer behavior for container contexts that accepts either inline PEM content or a readable file path value.
+      - Apply shared installer usage across server/node entrypoints and gate/step/orw execution paths to keep certificate handling uniform.
+      - Update tests to assert PLOY_CA_CERTS presence and certificate installation behavior without legacy key dependencies.
+    verification:
+      - "go test ./internal/workflow/step ./internal/nodeagent"
+      - "Shell/image-level checks confirm PLOY_CA_CERTS configures TLS trust for server/node and gate/step/orw containers."
+    reasoning: high
+    cfp: 11
+
+  - done: false
+    reviews: []
+    label: "6"
+    summary: Update documentation corpus and examples to the new target model and CA naming.
+    classification: determined
+    components:
+      - docs/envs/README.md
+      - docs/migs-lifecycle.md
+      - docs/how-to/{deploy-locally.md,publish-migs.md}
+      - README.md
+      - cmd/ploy/README.md
+      - docs/api/{paths/config_env.yaml,paths/config_env_key.yaml,components/schemas/config.yaml}
+    implementation:
+      - Replace scope terminology and examples with target-based --on/--from CLI workflows.
+      - Replace CA_CERTS_PEM_BUNDLE examples/contracts with PLOY_CA_CERTS and describe universal container cert handling.
+      - Document target-to-job mapping, jobs alias expansion, unset ambiguity behavior, and precedence rules.
+      - Ensure API docs and operator docs stay consistent with implemented wire contracts and CLI help.
+    verification:
+      - "Manual doc consistency pass across env docs, API docs, and CLI README examples."
+      - "Command snippets in docs use --on and --from and no longer mention --scope or CA_CERTS_PEM_BUNDLE."
+    reasoning: medium
+    cfp: 6
