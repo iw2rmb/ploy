@@ -163,7 +163,7 @@ func buildClusterDeployEnv(deployDir string) ([]string, error) {
 
 	if strings.TrimSpace(os.Getenv("COMPOSE_CMD")) == "" {
 		composePath := filepath.Join(deployDir, "docker-compose.yml")
-		env = upsertEnv(env, "COMPOSE_CMD", "docker compose -f "+composePath)
+		env = upsertEnv(env, "COMPOSE_CMD", "docker compose -p ploy -f "+composePath)
 	}
 
 	if strings.TrimSpace(os.Getenv("PLOY_VERSION")) == "" {

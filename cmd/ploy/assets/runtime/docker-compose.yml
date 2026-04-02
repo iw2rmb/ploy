@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     environment:
       - PLOY_CONTAINER_REGISTRY=${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}
-      - PLOY_DOCKER_NETWORK=runtime_default
+      - PLOY_DOCKER_NETWORK=ploy_default
       - PLOY_DOCKER_AUTH_CONFIG=${PLOY_DOCKER_AUTH_CONFIG:-}
       - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}
       - PLOYD_CACHE_HOME=/private/tmp

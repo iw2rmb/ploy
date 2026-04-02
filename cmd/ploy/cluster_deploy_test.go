@@ -72,7 +72,7 @@ func TestBuildClusterDeployEnvSetsComposeAndVersion(t *testing.T) {
 		t.Fatalf("buildClusterDeployEnv returned error: %v", err)
 	}
 
-	expectCompose := "COMPOSE_CMD=docker compose -f " + filepath.Join(deployDir, "docker-compose.yml")
+	expectCompose := "COMPOSE_CMD=docker compose -p ploy -f " + filepath.Join(deployDir, "docker-compose.yml")
 	expectVersion := "PLOY_VERSION=v1.2.3"
 	if !containsExactEnvEntry(env, expectCompose) {
 		t.Fatalf("expected env to contain %q", expectCompose)
