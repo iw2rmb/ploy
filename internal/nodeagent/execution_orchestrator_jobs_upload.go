@@ -151,7 +151,7 @@ func (r *runController) reportTerminalStatus(
 
 	if runErr != nil {
 		status = lifecycle.JobStatusFromRunError(runErr)
-		if status == types.JobStatusFail {
+		if status == types.JobStatusError {
 			v := int32(-1)
 			exitCode = &v
 		}

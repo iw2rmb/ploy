@@ -54,7 +54,7 @@ get:
                       description: Job name
                     status:
                       type: string
-                      description: Job lifecycle status (`Created|Queued|Running|Success|Fail|Cancelled`).
+                      description: Job lifecycle status (`Created|Queued|Running|Success|Fail|Error|Cancelled`).
                     duration_ms:
                       type: integer
                       format: int64

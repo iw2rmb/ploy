@@ -101,7 +101,7 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
 
 	// Gate execution errors (e.g., Docker pull/create/start failures) are NOT build failures
-	// and must not trigger healing. Treat them as terminal cancellations for this repo
+	// and must not trigger healing. Treat them as terminal runtime errors for this repo
 	// attempt so the control plane cancels remaining jobs without scheduling heal/re-gate.
 	if gateErr != nil || gateResult == nil {
 		duration := time.Since(startTime)
@@ -117,14 +117,14 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 			Error(fmt.Sprintf("gate execution failed: %s", errMsg.Error())).
 			MustBuild()
 
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusCancelled.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
-			slog.Error("failed to upload gate cancellation status after gate execution error",
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), nil, stats, req.JobID, repoSHAOut); uploadErr != nil {
+			slog.Error("failed to upload gate error status after gate execution error",
 				"run_id", req.RunID,
 				"job_id", req.JobID,
 				"error", uploadErr,
 			)
 		}
-		slog.Error("gate execution failed; cancelling repo attempt (no healing)",
+		slog.Error("gate execution failed; marking repo attempt as error (no healing)",
 			"run_id", req.RunID,
 			"job_id", req.JobID,
 			"job_type", req.JobType,

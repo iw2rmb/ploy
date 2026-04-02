@@ -37,7 +37,7 @@ get:
               status:
                 type: string
                 description: Canonical job status enum value
-                enum: [ Created, Queued, Running, Success, Fail, Cancelled ]
+                enum: [ Created, Queued, Running, Success, Fail, Error, Cancelled ]
     '400':
       description: Bad request (missing/invalid `job_id` or node header)
       content:
@@ -62,4 +62,3 @@ get:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
-

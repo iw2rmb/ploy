@@ -38,10 +38,10 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 		{name: "ctx_deadline/heal/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
 		// MR jobs: Cancelled maps to NoAction — failures do not cascade.
 		{name: "ctx_canceled/mr/no-next", err: context.Canceled, jobType: domaintypes.JobTypeMR, hasNext: false, wantCancelSuccessor: false},
-		// Runtime errors: non-gate jobs → Fail → onFail → CancelRemainder.
+		// Runtime errors: non-gate jobs → Error → CancelRemainder.
 		{name: "runtime_error/mod/has-next", err: errors.New("container exited unexpectedly"), jobType: domaintypes.JobTypeMod, hasNext: true, wantCancelSuccessor: true},
 		{name: "runtime_error/heal/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
-		// MR runtime errors: Fail maps to NoAction.
+		// MR runtime errors: Error maps to NoAction.
 		{name: "runtime_error/mr/no-next", err: errors.New("git push: authentication failed"), jobType: domaintypes.JobTypeMR, hasNext: false, wantCancelSuccessor: false},
 	}
 
@@ -119,7 +119,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 // paths emit (execution_orchestrator_gate.go).
 //
 // Gate status assignment is deliberate and explicit — not via lifecycle.JobStatusFromRunError:
-//   - Infrastructure errors → Cancelled (prevents healing activation)
+//   - Infrastructure errors → Error     (prevents healing activation)
 //   - Test failures        → Fail      (triggers EvaluateGateFailure / healing evaluation)
 //   - Test successes       → Success   (advances the job chain)
 //
@@ -140,15 +140,15 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 		// wantAdvanceNext: PromoteJobByIDIfUnblocked was called.
 		wantAdvanceNext bool
 	}{
-		// Gate infra errors always produce Cancelled → CancelRemainder (no healing path entered).
+		// Gate infra errors always produce Error → CancelRemainder (no healing path entered).
 		{
-			name: "pre_gate/infra_cancelled/has-next",
-			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusCancelled, hasNext: true,
+			name: "pre_gate/infra_error/has-next",
+			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusError, hasNext: true,
 			wantCancelSuccessor: true,
 		},
 		{
-			name: "post_gate/infra_cancelled/has-next",
-			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusCancelled, hasNext: true,
+			name: "post_gate/infra_error/has-next",
+			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusError, hasNext: true,
 			wantCancelSuccessor: true,
 		},
 		// Gate test failures produce Fail → EvaluateGateFailure → healing path entered (GetRun called).

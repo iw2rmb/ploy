@@ -227,10 +227,10 @@ func (r *runController) executeMRJob(ctx context.Context, req StartRunRequest) {
 		}
 
 		var exitCode int32 = -1
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusFail.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
-			slog.Error("failed to upload MR job failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), types.JobStatusError.String(), &exitCode, stats, req.JobID, repoSHAOut); uploadErr != nil {
+			slog.Error("failed to upload MR job error status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Warn("MR job failed", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
+		slog.Warn("MR job errored", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr, "duration", duration)
 		return
 	}
 

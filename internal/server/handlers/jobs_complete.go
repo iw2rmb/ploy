@@ -18,7 +18,7 @@ import (
 // This is a simpler contract than the node-based endpoint since job_id
 // is in the URL path and node identity comes from mTLS.
 type completeJobRequest struct {
-	Status     string          `json:"status"`                 // Terminal status: Success, Fail, or Cancelled
+	Status     string          `json:"status"`                 // Terminal status: Success, Fail, Error, or Cancelled
 	ExitCode   *int32          `json:"exit_code,omitempty"`    // Exit code from job execution
 	Stats      json.RawMessage `json:"stats,omitempty"`        // Optional job statistics (must be JSON object)
 	RepoSHAOut string          `json:"repo_sha_out,omitempty"` // Optional lowercase 40-hex output SHA reported by node.
@@ -112,8 +112,9 @@ func validateCompleteJobRequest(r *http.Request, req completeJobRequest) (
 	}
 	if normalizedStatus != domaintypes.JobStatusSuccess &&
 		normalizedStatus != domaintypes.JobStatusFail &&
+		normalizedStatus != domaintypes.JobStatusError &&
 		normalizedStatus != domaintypes.JobStatusCancelled {
-		return "", JobStatsPayload{}, nil, "", "", completeBadRequest("status must be Success, Fail, or Cancelled, got %s", req.Status)
+		return "", JobStatsPayload{}, nil, "", "", completeBadRequest("status must be Success, Fail, Error, or Cancelled, got %s", req.Status)
 	}
 
 	statsBytes := []byte("{}")

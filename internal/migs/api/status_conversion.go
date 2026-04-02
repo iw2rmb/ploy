@@ -15,7 +15,7 @@ func StageStatusFromDomain(status domaintypes.JobStatus) (StageState, error) {
 		return StageStateRunning, nil
 	case domaintypes.JobStatusSuccess:
 		return StageStateSucceeded, nil
-	case domaintypes.JobStatusFail:
+	case domaintypes.JobStatusFail, domaintypes.JobStatusError:
 		return StageStateFailed, nil
 	case domaintypes.JobStatusCancelled:
 		return StageStateCancelled, nil

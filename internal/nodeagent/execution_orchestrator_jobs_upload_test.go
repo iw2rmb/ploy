@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -407,6 +408,11 @@ func TestRunController_reportTerminalStatus(t *testing.T) {
 			name:       "runtime error reports cancelled",
 			runErr:     context.Canceled,
 			wantStatus: types.JobStatusCancelled.String(),
+		},
+		{
+			name:       "runtime error reports error",
+			runErr:     errors.New("runtime failed"),
+			wantStatus: types.JobStatusError.String(),
 		},
 		{
 			name:       "nonzero exit code reports fail",

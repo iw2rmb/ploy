@@ -53,7 +53,7 @@ func cancelRemainingJobsAfterFailure(
 		nextID = job.NextID
 
 		switch job.Status {
-		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusCancelled:
+		case domaintypes.JobStatusSuccess, domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
 			continue
 		}
 

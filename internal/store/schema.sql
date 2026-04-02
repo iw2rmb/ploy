@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- Status model (see docs/migs-lifecycle.md § "State machines"):
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
--- - job_status: Created | Queued | Running | Success | Fail | Cancelled
+-- - job_status: Created | Queued | Running | Success | Fail | Error | Cancelled
 --
 -- Capitalized values are canonical; no aliases.
 DO $$
@@ -44,7 +44,7 @@ BEGIN
     JOIN pg_namespace n ON n.oid = t.typnamespace
     WHERE t.typname = 'job_status' AND n.nspname = 'ploy'
   ) THEN
-    CREATE TYPE job_status AS ENUM ('Created', 'Queued', 'Running', 'Success', 'Fail', 'Cancelled');
+    CREATE TYPE job_status AS ENUM ('Created', 'Queued', 'Running', 'Success', 'Fail', 'Error', 'Cancelled');
   END IF;
 END $$;
 

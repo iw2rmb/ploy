@@ -15,6 +15,7 @@ const (
 	JobStatusRunning   JobStatus = "Running"
 	JobStatusSuccess   JobStatus = "Success"
 	JobStatusFail      JobStatus = "Fail"
+	JobStatusError     JobStatus = "Error"
 	JobStatusCancelled JobStatus = "Cancelled"
 )
 
@@ -22,7 +23,7 @@ func (s JobStatus) String() string { return string(s) }
 
 func (s JobStatus) Validate() error {
 	switch s {
-	case JobStatusCreated, JobStatusQueued, JobStatusRunning, JobStatusSuccess, JobStatusFail, JobStatusCancelled:
+	case JobStatusCreated, JobStatusQueued, JobStatusRunning, JobStatusSuccess, JobStatusFail, JobStatusError, JobStatusCancelled:
 		return nil
 	default:
 		return fmt.Errorf("invalid job status %q", s)
