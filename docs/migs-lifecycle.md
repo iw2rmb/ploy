@@ -1337,17 +1337,17 @@ Migs container images are standard OCI images with the following expectations:
     - The node downloads and verifies the bundle, extracts it safely, and mounts
       each declared top-level entry read-only at `/tmp/<name>`.
   - **Global env injection**: The control plane injects server-configured global
-    environment variables at job claim time via `mergeGlobalEnvIntoSpec()`. Global
-    env vars are filtered by scope (`all`, `migs`, `heal`, `gate`) to match job types:
-    - `all` → injected into every job
-    - `migs` → `mig` and `post_gate` jobs
-    - `heal` → `heal` and `re_gate` jobs
-    - `gate` → `pre_gate`, `re_gate`, and `post_gate` jobs
+    environment variables at job claim time based on target-to-job-type mapping. Global
+    env vars use targets that map to job types:
+    - `gates` → `pre_gate`, `re_gate`, `post_gate` jobs
+    - `steps` → `mig`, `heal` jobs
+    - `nodes` → node agent processes (merged into manifest env)
+    - `server` → server process (consumed on set/startup)
     The job spec must be a JSON object; invalid/non-object specs are rejected at submission
     time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
   - **Precedence**: Per-run env (spec or CLI flags) wins over global env—existing
-    keys are never overwritten.
-  - **Common global vars**: `CA_CERTS_PEM_BUNDLE`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`, `OPENAI_API_KEY`.
+    keys are never overwritten. Job-target env overrides nodes-target env on key collisions.
+  - **Common global vars**: `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`, `OPENAI_API_KEY`.
     See [Environment Variables](./envs/README.md) § "Global Env Configuration" for full details.
 
 - **Execution**

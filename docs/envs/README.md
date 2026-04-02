@@ -38,7 +38,7 @@ defaults change, or components adopt additional configuration.
   Docker, so Docker Hub auth/token TLS uses the same root CAs.
   The same bundle is mounted into runtime containers (`server`/`node`) as a local file
   and exported through runtime TLS env vars; it is not baked into images.
-  Local/runtime deploy scripts also seed global `CA_CERTS_PEM_BUNDLE` from this file
+  Local/runtime deploy scripts also seed global `PLOY_CA_CERTS` from this file
   so mig/build-gate containers receive the same CA bundle at runtime.
   Current automation targets:
   - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
@@ -512,7 +512,7 @@ variables take precedence over the config file when both are present.
 ## Global Env Configuration
 
 The control plane supports centralized global environment variables that are automatically injected
-into job containers based on scope rules. This enables cluster-wide configuration of credentials,
+into cluster components based on target rules. This enables cluster-wide configuration of credentials,
 CA bundles, and API keys without embedding them in every spec file.
 
 ### Configuration via CLI
@@ -520,46 +520,67 @@ CA bundles, and API keys without embedding them in every spec file.
 Use the `ploy config env` subcommands to manage global environment variables:
 
 ```bash
-# Set a CA certificate bundle (injected into all job types)
-ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
+# Set a CA certificate bundle (injected into all targets)
+ploy config env set --key PLOY_CA_CERTS --file ca-bundle.pem --on all
 
-# Set Codex auth credentials (injected only into mig and post_gate jobs)
-ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope migs
+# Set Codex auth credentials (injected into gate and step jobs — default --on jobs)
+ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json
 
-# Set OpenAI API key (injected into all jobs)
-ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
+# Set OpenAI API key (injected into gate and step jobs — default --on jobs)
+ploy config env set --key OPENAI_API_KEY --value sk-...
 
 # List configured variables (secret values redacted)
 ploy config env list
 
 # Show a specific variable (use --raw to reveal secret values)
+# Use --from when the key exists for multiple targets
+ploy config env show --key PLOY_CA_CERTS --from gates
 ploy config env show --key OPENAI_API_KEY --raw
 
-# Delete a variable
+# Delete a variable (use --from when key exists for multiple targets)
 ploy config env unset --key OLD_VAR
+ploy config env unset --key PLOY_CA_CERTS --from gates
 ```
 
-### Scope Semantics
+### Target Semantics
 
-The `scope` parameter controls which job types receive each variable:
+**Targets** control which components receive each variable:
 
-| Scope | Job Types | Use Case |
-|-------|-----------|----------|
-| `all` | Every job type (mig, heal, pre_gate, re_gate, post_gate) | Credentials needed everywhere (CA certs, API keys) |
-| `migs` | `mig`, `post_gate` | Credentials for code modification phases |
-| `heal` | `heal`, `re_gate` | Credentials specific to healing/retry phases |
-| `gate` | `pre_gate`, `re_gate`, `post_gate` | Credentials for gate execution phases |
+| Target | Components | Use Case |
+|--------|------------|----------|
+| `server` | Server process | Server-side credentials and configuration |
+| `nodes` | Node agent processes | Node-level configuration |
+| `gates` | Gate jobs (`pre_gate`, `re_gate`, `post_gate`) | Build gate credentials |
+| `steps` | Step jobs (`mig`, `heal`) | Mig execution credentials |
+
+The `set` command uses **`--on` selectors** for convenience:
+
+| Selector | Expands To | Notes |
+|----------|------------|-------|
+| `all` | server, nodes, gates, steps | All targets |
+| `jobs` | gates, steps | Default when `--on` is omitted |
+| `server` | server | Single target |
+| `nodes` | nodes | Single target |
+| `gates` | gates | Single target |
+| `steps` | steps | Single target |
+
+The `show` and `unset` commands use **`--from`** to specify the target:
+- When omitted and the key exists for only one target, the target is inferred automatically.
+- When the key exists for multiple targets, `--from` is required or the command returns an
+  ambiguity error listing available targets.
 
 ### Injection Flow
 
-1. **Storage**: Variables are persisted in the `config_env` table and cached in the
-   control-plane's `ConfigHolder` at startup.
+1. **Storage**: Variables are persisted in the `config_env` table as one row per key-target
+   pair and cached in the control-plane's `ConfigHolder` at startup.
 2. **Claim-time merge**: When a node claims a job via `/v1/nodes/{id}/claim`, the server
-   calls `mergeGlobalEnvIntoSpec()` to inject matching global env vars into the job's spec.
+   merges matching global env vars into the job's spec based on target-to-job-type mapping
+   (gates → pre_gate/re_gate/post_gate; steps → mig/heal).
    The job spec must be a JSON object; invalid/non-object specs are rejected at submission
    time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
 3. **Precedence**: Per-run env vars (in spec or CLI flags) take precedence—existing keys
-   in the spec are never overwritten by global env.
+   in the spec are never overwritten by global env. Job-target env overrides nodes-target
+   env on key collisions.
 4. **Container injection**: The node agent propagates the merged `env` map to the
    container runtime, which sets them in the running container. For Build Gate jobs,
    the node agent mirrors job env into the gate spec env so gate build images
@@ -569,7 +590,7 @@ The `scope` parameter controls which job types receive each variable:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `CA_CERTS_PEM_BUNDLE` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates installed into the container's trust store |
+| `PLOY_CA_CERTS` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates or file path; materializer installs into container trust store |
 | `CODEX_AUTH_JSON` | `codex` | JSON content or file path materialized to `/out/codex/auth.json` at container startup |
 | `CCR_CONFIG_JSON` | `codex` | JSON content or file path materialized to `/root/.claude-code-router/config.json` at container startup |
 | `CRUSH_JSON` | `codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
@@ -652,17 +673,20 @@ If `/root/.claude-code-router/config.json` exists at startup, `codex` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 
-**Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble that:
-1. Writes `CA_CERTS_PEM_BUNDLE` to a temp file
-2. Splits the bundle into individual `.crt` files
-3. Copies them to `/usr/local/share/ca-certificates/ploy/`
-4. Runs `update-ca-certificates` (on Debian/Ubuntu images)
-5. Optionally imports into Java cacerts via `keytool` when available
+**Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble
+via the `PLOY_CA_CERTS` materializer that:
+1. Detects whether `PLOY_CA_CERTS` contains inline PEM content or a readable file path
+2. Writes the PEM content to a temp file (or uses the file path directly)
+3. Splits the bundle into individual `.crt` files
+4. Copies them to `/usr/local/share/ca-certificates/ploy/`
+5. Runs `update-ca-certificates` (on Debian/Ubuntu images)
+6. Optionally imports into Java cacerts via `keytool` when available
+7. Exports `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, and `GIT_SSL_CAINFO` to the resolved path
 
 **Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
-**ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Similar CA bundle handling as build-gate, ensuring
-OpenRewrite can fetch dependencies from internal artifact repositories while
+**ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same `PLOY_CA_CERTS` materializer behavior as
+build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.
 
 Both images ship a bundled `rewrite` executable (`/usr/local/bin/rewrite`) backed
