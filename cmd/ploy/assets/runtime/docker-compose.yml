@@ -29,7 +29,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "wget -qO- http://localhost:8080/health >/dev/null || exit 1",
+          "curl -fsS http://localhost:8080/health >/dev/null || exit 1",
         ]
       interval: 10s
       timeout: 5s
