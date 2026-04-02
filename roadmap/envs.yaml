@@ -67,7 +67,9 @@ items:
     cfp: 8
     commit: 701a5a3d
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"go test ./cmd/ploy -run HelpRegression\" is not currently exercising any tests (`[no tests to run]`). In `cmd/ploy/help_regressions_test.go:9` and `cmd/ploy/help_regressions_test.go:44`, test names do not match `HelpRegression`, so the Step 3 help-regression verification gate is effectively empty.", "\"Implement selector expansion and validation where all is exclusive and jobs expands to gates plus steps.\" is only partially enforced in `cmd/ploy/config_env_command.go:343-356,380`: `--on` is parsed as a single `StringVar` with no duplicate-flag validation, so `--on all --on gates` is accepted (last value wins) instead of enforcing explicit `all` exclusivity."]
+        commit: null
     label: "3"
     summary: Redesign ploy config env CLI UX to --on and --from selectors with endpoint-aligned ambiguity handling.
     classification: determined
