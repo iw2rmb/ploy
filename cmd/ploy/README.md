@@ -2,8 +2,9 @@
 
 `ploy` is a single-purpose CLI that claims workflow runs from the Ploy control plane,
 reconstructs the default migs→build→test DAG, and dispatches stages via the
-configured runtime adapter. Legacy subcommands (apps, env, migs, security, etc.) were
-removed during the workstation legacy teardown.
+configured runtime adapter. Legacy subcommands (apps, migs, security, etc.) were
+removed during the workstation legacy teardown. Global environment management
+is available under `ploy config env`.
 
 ## Usage
 
