@@ -247,3 +247,57 @@ env:
 		t.Fatalf("env.URL got %q, want %q", got, want)
 	}
 }
+
+func TestLoadSpec_ExpandsImagePlaceholders(t *testing.T) {
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	t.Setenv("PLOY_TEST_LOADSPEC_IMAGE", "docker.io/test/codex:latest")
+	t.Setenv("PLOY_TEST_LOADSPEC_STEP_DEFAULT", "docker.io/test/default-step:latest")
+
+	spec := []byte(`
+steps:
+  - image:
+      default: $PLOY_TEST_LOADSPEC_STEP_DEFAULT
+      java-gradle: ${PLOY_TEST_LOADSPEC_IMAGE}
+build_gate:
+  router:
+    image: $PLOY_TEST_LOADSPEC_IMAGE
+  healing:
+    by_error_kind:
+      infra:
+        retries: 1
+        image: ${PLOY_TEST_LOADSPEC_IMAGE}
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(context.Background(), nil, nil, specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	step := result["steps"].([]any)[0].(map[string]any)
+	image := step["image"].(map[string]any)
+	if got, want := image["default"].(string), "docker.io/test/default-step:latest"; got != want {
+		t.Fatalf("steps[0].image.default got %q, want %q", got, want)
+	}
+	if got, want := image["java-gradle"].(string), "docker.io/test/codex:latest"; got != want {
+		t.Fatalf("steps[0].image.java-gradle got %q, want %q", got, want)
+	}
+
+	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
+	if got, want := router["image"].(string), "docker.io/test/codex:latest"; got != want {
+		t.Fatalf("build_gate.router.image got %q, want %q", got, want)
+	}
+
+	infra := result["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
+	if got, want := infra["image"].(string), "docker.io/test/codex:latest"; got != want {
+		t.Fatalf("build_gate.healing.by_error_kind.infra.image got %q, want %q", got, want)
+	}
+}
