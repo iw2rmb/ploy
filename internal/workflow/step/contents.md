@@ -1,4 +1,3 @@
-[testdata/](testdata) Fixture YAML catalogs used by stack-image resolver tests to validate valid mappings and duplicate/missing-field errors.
 [build_gate_image_resolver.go](build_gate_image_resolver.go) Resolves build-gate runtime images from catalog and override rules with precedence, specificity, and conflict validation.
 [build_gate_image_resolver_test.go](build_gate_image_resolver_test.go) Tests resolver precedence, matching, and configuration-error paths for stack-image mapping resolution.
 [build_gate_log_trimmer.go](build_gate_log_trimmer.go) Trims Maven and Gradle gate logs down to actionable failure regions while leaving unknown-tool output unchanged.
@@ -20,6 +19,7 @@
 [diff_test.go](diff_test.go) Exercises patch-stat parsing and diff execution edge cases.
 [errors.go](errors.go) Defines shared step-level sentinel errors such as repository cancellation semantics.
 [gate_command.go](gate_command.go) Builds gate shell commands, including CA-certificate preamble injection and tool-target command selection.
+[gate_command_materializer.go](gate_command_materializer.go) Defines env-key materializer preambles, including  certificate installation for gate command execution.
 [gate_docker.go](gate_docker.go) Implements Docker-backed gate executor that resolves plans, runs gate containers, and records authoritative gate outcomes.
 [gate_docker_ca_preamble_test.go](gate_docker_ca_preamble_test.go) Verifies gate commands include CA preamble behavior for supported build tools.
 [gate_docker_gradle_cache_hits_test.go](gate_docker_gradle_cache_hits_test.go) Tests Gradle cache-hit extraction, normalization, and cleanup from gate workspace artifacts.
@@ -46,4 +46,5 @@
 [runner_hydration_test.go](runner_hydration_test.go) Ensures hydration failures short-circuit execution with correct error propagation.
 [runner_test.go](runner_test.go) Baseline runner tests for successful execution flow and result shape.
 [stack_match.go](stack_match.go) Matches detected stack observations against gate expectations with evidence and specificity rules.
+[testdata/](testdata) Fixture YAML catalogs used by stack-image resolver tests to validate valid mappings and duplicate/missing-field errors.
 [testhelpers_test.go](testhelpers_test.go) Shared test doubles and workspace helpers used across workflow step unit tests.
