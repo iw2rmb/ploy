@@ -191,7 +191,7 @@ func TestMutateClaimSpec_InvalidSpec(t *testing.T) {
 	_, err := mutateClaimSpec(claimSpecMutatorInput{
 		spec:    []byte(`[]`),
 		job:     job,
-		jobType: domaintypes.JobTypeMod,
+		jobType: domaintypes.JobTypeMig,
 	})
 	if err == nil {
 		t.Fatal("expected error")

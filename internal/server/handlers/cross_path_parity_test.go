@@ -34,12 +34,12 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 		wantCancelSuccessor bool
 	}{
 		// context.Canceled: non-gate jobs → Cancelled → onCancelled → CancelRemainder.
-		{name: "ctx_canceled/mod/has-next", err: context.Canceled, jobType: domaintypes.JobTypeMod, hasNext: true, wantCancelSuccessor: true},
+		{name: "ctx_canceled/mig/has-next", err: context.Canceled, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 		{name: "ctx_deadline/heal/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
 		// MR jobs: Cancelled maps to NoAction — failures do not cascade.
 		{name: "ctx_canceled/mr/no-next", err: context.Canceled, jobType: domaintypes.JobTypeMR, hasNext: false, wantCancelSuccessor: false},
 		// Runtime errors: non-gate jobs → Error → CancelRemainder.
-		{name: "runtime_error/mod/has-next", err: errors.New("container exited unexpectedly"), jobType: domaintypes.JobTypeMod, hasNext: true, wantCancelSuccessor: true},
+		{name: "runtime_error/mig/has-next", err: errors.New("container exited unexpectedly"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 		{name: "runtime_error/heal/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
 		// MR runtime errors: Error maps to NoAction.
 		{name: "runtime_error/mr/no-next", err: errors.New("git push: authentication failed"), jobType: domaintypes.JobTypeMR, hasNext: false, wantCancelSuccessor: false},
@@ -80,7 +80,7 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 			}
 
 			st := &jobStore{
-				getJobResult:                   job,
+				getJobResult: job,
 			}
 			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
 
@@ -142,12 +142,12 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 	}{
 		// Gate infra errors always produce Error → CancelRemainder (no healing path entered).
 		{
-			name: "pre_gate/infra_error/has-next",
+			name:    "pre_gate/infra_error/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusError, hasNext: true,
 			wantCancelSuccessor: true,
 		},
 		{
-			name: "post_gate/infra_error/has-next",
+			name:    "post_gate/infra_error/has-next",
 			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusError, hasNext: true,
 			wantCancelSuccessor: true,
 		},
@@ -155,26 +155,26 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 		// With no job meta the recovery kind defaults to Unknown (terminal), so healing resolves to
 		// CancelRemainder internally — both the healing entry point and the cancel side-effect are present.
 		{
-			name: "pre_gate/test_fail/has-next",
+			name:    "pre_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusFail, hasNext: true,
 			wantGetRunCalled:    true,
 			wantCancelSuccessor: true,
 		},
 		{
-			name: "re_gate/test_fail/has-next",
+			name:    "re_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypeReGate, status: domaintypes.JobStatusFail, hasNext: true,
 			wantGetRunCalled:    true,
 			wantCancelSuccessor: true,
 		},
 		// Gate successes → AdvanceNext when a successor exists.
 		{
-			name: "pre_gate/success/has-next",
+			name:    "pre_gate/success/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusSuccess, hasNext: true,
 			wantAdvanceNext: true,
 		},
 		// Gate success with no successor → NoAction.
 		{
-			name: "post_gate/success/no-next",
+			name:    "post_gate/success/no-next",
 			jobType: domaintypes.JobTypePostGate, status: domaintypes.JobStatusSuccess, hasNext: false,
 		},
 	}
@@ -215,7 +215,7 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			}
 
 			st := &jobStore{
-				getJobResult:                   job,
+				getJobResult: job,
 			}
 			st.listJobsByRunRepoAttempt.val = []store.Job{job, successor}
 

@@ -29,31 +29,31 @@ func TestV1Schema_MigsNameUniqueness(t *testing.T) {
 	defer db.Close()
 
 	// Clean up any existing test migs.
-	testModIDs := []string{}
+	testMigIDs := []string{}
 	defer func() {
-		for _, modID := range testModIDs {
-			_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID)
+		for _, migID := range testMigIDs {
+			_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", migID)
 		}
 	}()
 
 	// Insert first mig with name "test-mig-uniqueness".
-	modID1 := domaintypes.NewMigID()
-	testModIDs = append(testModIDs, modID1.String())
+	migID1 := domaintypes.NewMigID()
+	testMigIDs = append(testMigIDs, migID1.String())
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID1.String(), "test-mig-uniqueness", "test-user")
+		`, migID1.String(), "test-mig-uniqueness", "test-user")
 	if err != nil {
 		t.Fatalf("first mig insert failed: %v", err)
 	}
 
 	// Attempt to insert second mig with the same name.
-	modID2 := domaintypes.NewMigID()
-	testModIDs = append(testModIDs, modID2.String())
+	migID2 := domaintypes.NewMigID()
+	testMigIDs = append(testMigIDs, migID2.String())
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID2.String(), "test-mig-uniqueness", "test-user")
+		`, migID2.String(), "test-mig-uniqueness", "test-user")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
@@ -69,11 +69,11 @@ func TestV1Schema_MigsNameUniqueness(t *testing.T) {
 	}
 }
 
-// TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mig_id, repo_id).
+// TestV1Schema_MigReposUniqueness verifies the UNIQUE constraint on (mig_id, repo_id).
 // The mig_repos table has UNIQUE (mig_id, repo_id) to prevent duplicate repo memberships per mig.
 //
 // This test is skipped if PLOY_TEST_DB_DSN is not set.
-func TestV1Schema_ModReposUniqueness(t *testing.T) {
+func TestV1Schema_MigReposUniqueness(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
@@ -87,15 +87,15 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 	defer db.Close()
 
 	// Create a test mig.
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	defer func() {
-		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID.String())
+		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", migID.String())
 	}()
 
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID.String(), "test-mig-repos-uniq-"+modID.String(), "test-user")
+		`, migID.String(), "test-mig-repos-uniq-"+migID.String(), "test-user")
 	if err != nil {
 		t.Fatalf("mig insert failed: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID1.String(), modID.String(), resolvedRepoID1, "main", "feature")
+		`, repoID1.String(), migID.String(), resolvedRepoID1, "main", "feature")
 	if err != nil {
 		t.Fatalf("first mig_repos insert failed: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID2.String(), modID.String(), resolvedRepoID1, "main", "feature-2")
+		`, repoID2.String(), migID.String(), resolvedRepoID1, "main", "feature-2")
 
 	// Verify that the insert was rejected due to unique constraint violation.
 	if err == nil {
@@ -158,8 +158,8 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test mig, spec, mod_repo, and run.
-	modID := domaintypes.NewMigID()
+	// Create a test mig, spec, mig_repo, and run.
+	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
 	runID := domaintypes.NewRunID()
@@ -168,14 +168,14 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM runs WHERE id = $1", runID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM mig_repos WHERE id = $1", repoID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM specs WHERE id = $1", specID.String())
-		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID.String())
+		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", migID.String())
 	}()
 
 	// Insert mig.
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID.String(), "test-run-repos-pk-"+modID.String(), "test-user")
+		`, migID.String(), "test-run-repos-pk-"+migID.String(), "test-user")
 	if err != nil {
 		t.Fatalf("mig insert failed: %v", err)
 	}
@@ -201,11 +201,11 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 		t.Fatalf("repos upsert failed: %v", err)
 	}
 
-	// Insert mod_repo.
+	// Insert mig_repo.
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID.String(), modID.String(), resolvedRepoIDPK, "main", "feature")
+		`, repoID.String(), migID.String(), resolvedRepoIDPK, "main", "feature")
 	if err != nil {
 		t.Fatalf("mig_repos insert failed: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO runs (id, mig_id, spec_id, created_by, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, runID.String(), modID.String(), specID.String(), "test-user", "Started")
+		`, runID.String(), migID.String(), specID.String(), "test-user", "Started")
 	if err != nil {
 		t.Fatalf("run insert failed: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, modID.String(), runID.String(), resolvedRepoIDPK, "main", "feature", "Queued")
+		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "feature", "Queued")
 	if err != nil {
 		t.Fatalf("first run_repos insert failed: %v", err)
 	}
@@ -232,7 +232,7 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, modID.String(), runID.String(), resolvedRepoIDPK, "main", "feature-2", "Queued")
+		`, migID.String(), runID.String(), resolvedRepoIDPK, "main", "feature-2", "Queued")
 
 	// Verify that the insert was rejected due to PK violation.
 	if err == nil {
@@ -264,8 +264,8 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test mig, spec, mod_repo, run, and run_repo.
-	modID := domaintypes.NewMigID()
+	// Create a test mig, spec, mig_repo, run, and run_repo.
+	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 	repoID := domaintypes.NewMigRepoID()
 	runID := domaintypes.NewRunID()
@@ -279,14 +279,14 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM runs WHERE id = $1", runID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM mig_repos WHERE id = $1", repoID.String())
 		_, _ = db.Pool().Exec(ctx, "DELETE FROM specs WHERE id = $1", specID.String())
-		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", modID.String())
+		_, _ = db.Pool().Exec(ctx, "DELETE FROM migs WHERE id = $1", migID.String())
 	}()
 
 	// Insert mig.
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO migs (id, name, created_by, created_at)
 			VALUES ($1, $2, $3, now())
-		`, modID.String(), "test-jobs-uniq-"+modID.String(), "test-user")
+		`, migID.String(), "test-jobs-uniq-"+migID.String(), "test-user")
 	if err != nil {
 		t.Fatalf("mig insert failed: %v", err)
 	}
@@ -312,11 +312,11 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 		t.Fatalf("repos upsert failed: %v", err)
 	}
 
-	// Insert mod_repo.
+	// Insert mig_repo.
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO mig_repos (id, mig_id, repo_id, base_ref, target_ref, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, repoID.String(), modID.String(), resolvedRepoIDJobs, "main", "feature")
+		`, repoID.String(), migID.String(), resolvedRepoIDJobs, "main", "feature")
 	if err != nil {
 		t.Fatalf("mig_repos insert failed: %v", err)
 	}
@@ -325,7 +325,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO runs (id, mig_id, spec_id, created_by, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, now())
-		`, runID.String(), modID.String(), specID.String(), "test-user", "Started")
+		`, runID.String(), migID.String(), specID.String(), "test-user", "Started")
 	if err != nil {
 		t.Fatalf("run insert failed: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestV1Schema_JobsUniqueness(t *testing.T) {
 	_, err = db.Pool().Exec(ctx, `
 			INSERT INTO run_repos (mig_id, run_id, repo_id, repo_base_ref, repo_target_ref, status, created_at)
 			VALUES ($1, $2, $3, $4, $5, $6, now())
-		`, modID.String(), runID.String(), resolvedRepoIDJobs, "main", "feature", "Queued")
+		`, migID.String(), runID.String(), resolvedRepoIDJobs, "main", "feature", "Queued")
 	if err != nil {
 		t.Fatalf("run_repos insert failed: %v", err)
 	}

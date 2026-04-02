@@ -244,18 +244,18 @@ func getMigByRefOrFail(w http.ResponseWriter, r *http.Request, st store.Store, l
 // Returns (mig, true) on success, (zero, false) when the response has already
 // been written.
 func getMigByIDOrFail(w http.ResponseWriter, r *http.Request, st store.Store, logPrefix string) (store.Mig, bool) {
-	modID, err := parseRequiredPathID[domaintypes.MigID](r, "mig_id")
+	migID, err := parseRequiredPathID[domaintypes.MigID](r, "mig_id")
 	if err != nil {
 		writeHTTPError(w, http.StatusBadRequest, "%s", err)
 		return store.Mig{}, false
 	}
-	mig, err := st.GetMig(r.Context(), modID)
+	mig, err := st.GetMig(r.Context(), migID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			writeHTTPError(w, http.StatusNotFound, "mig not found")
 			return store.Mig{}, false
 		}
-		slog.Error(logPrefix+": get mig failed", "mig_id", modID, "err", err)
+		slog.Error(logPrefix+": get mig failed", "mig_id", migID, "err", err)
 		writeHTTPError(w, http.StatusInternalServerError, "failed to get mig: %v", err)
 		return store.Mig{}, false
 	}

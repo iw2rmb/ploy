@@ -15,7 +15,7 @@ import (
 )
 
 // TestRunSubmitCallsControlPlane validates `ploy run --repo ... --base-ref ... --target-ref ... --spec ...`
-// calls POST /v1/runs and prints run_id and mod_id.
+// calls POST /v1/runs and prints run_id and mig_id.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunSubmitCallsControlPlane(t *testing.T) {
 	t.Setenv("USER", "test-user")
@@ -35,7 +35,7 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 	var capturedRequest map[string]any
 
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewMigID().String()
+	migID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +53,7 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 			// Return 201 Created with run_id.
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + modID + `","spec_id":"` + specID + `"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + migID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 
@@ -111,13 +111,13 @@ func TestRunSubmitCallsControlPlane(t *testing.T) {
 		t.Errorf("expected spec.steps[0].command='echo hello', got %v", step0["command"])
 	}
 
-	// Validate output contains run_id and mod_id.
+	// Validate output contains run_id and mig_id.
 	output := buf.String()
 	if !strings.Contains(output, "run_id: "+runID) {
 		t.Errorf("expected output to contain run_id %q: %s", runID, output)
 	}
-	if !strings.Contains(output, "mod_id: "+modID) {
-		t.Errorf("expected output to contain mod_id %q: %s", modID, output)
+	if !strings.Contains(output, "mig_id: "+migID) {
+		t.Errorf("expected output to contain mig_id %q: %s", migID, output)
 	}
 }
 
@@ -178,7 +178,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 	var submitCalled bool
 	var capturedRequest map[string]any
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewMigID().String()
+	migID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs" {
@@ -190,7 +190,7 @@ func TestRunSubmitSpecFromStdin(t *testing.T) {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + modID + `","spec_id":"` + specID + `"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + migID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -256,7 +256,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 
 	var submitCalled bool
 	runID := domaintypes.NewRunID().String()
-	modID := domaintypes.NewMigID().String()
+	migID := domaintypes.NewMigID().String()
 	specID := domaintypes.NewSpecID().String()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +264,7 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 			submitCalled = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + modID + `","spec_id":"` + specID + `"}`))
+			_, _ = w.Write([]byte(`{"run_id":"` + runID + `","mig_id":"` + migID + `","spec_id":"` + specID + `"}`))
 			return
 		}
 		http.NotFound(w, r)
@@ -292,8 +292,8 @@ func TestRunSubmitJSONSpec(t *testing.T) {
 	if !strings.Contains(output, "run_id: "+runID) {
 		t.Errorf("expected output to contain run_id %q: %s", runID, output)
 	}
-	if !strings.Contains(output, "mod_id: "+modID) {
-		t.Errorf("expected output to contain mod_id %q: %s", modID, output)
+	if !strings.Contains(output, "mig_id: "+migID) {
+		t.Errorf("expected output to contain mig_id %q: %s", migID, output)
 	}
 }
 
@@ -582,7 +582,7 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if strings.Count(out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") != 1 {
 		t.Fatalf("expected repo header to render once in follow output, got: %q", out)
 	}
-	if strings.Contains(out, "run_id: ") || strings.Contains(out, "mod_id: ") {
+	if strings.Contains(out, "run_id: ") || strings.Contains(out, "mig_id: ") {
 		t.Fatalf("expected follow mode to omit preface id lines, got: %q", out)
 	}
 	if strings.Contains(out, "Repo 1/1:") {

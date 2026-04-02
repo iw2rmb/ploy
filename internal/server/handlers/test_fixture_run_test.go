@@ -32,7 +32,7 @@ type runStore struct {
 	listRunReposByRun        mockCall[string, []store.RunRepo]
 	listRunReposWithURLByRun mockCall[string, []store.ListRunReposWithURLByRunRow]
 
-	getLatestRunRepoByModAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
+	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
 
 	listQueuedRunReposByRun mockCall[string, []store.RunRepo]
 
@@ -43,8 +43,8 @@ type runStore struct {
 	getRunRepoCalls   int
 	getRunRepoErr     error
 
-	updateRunRepoRefs   mockCall[store.UpdateRunRepoRefsParams, struct{}]
-	updateMigRepoRefs   mockCall[store.UpdateMigRepoRefsParams, struct{}]
+	updateRunRepoRefs       mockCall[store.UpdateRunRepoRefsParams, struct{}]
+	updateMigRepoRefs       mockCall[store.UpdateMigRepoRefsParams, struct{}]
 	incrementRunRepoAttempt mockCall[store.IncrementRunRepoAttemptParams, struct{}]
 
 	updateRunRepoStatusCalled bool
@@ -63,13 +63,13 @@ type runStore struct {
 	createMigRepoParams store.CreateMigRepoParams
 	createMigRepoErr    error
 
-	getModResult store.Mig
-	getModErr    error
+	getMigResult store.Mig
+	getMigErr    error
 
-	getModRepo mockResult[store.MigRepo]
+	getMigRepo mockResult[store.MigRepo]
 
-	listMigReposByModResult []store.MigRepo
-	listMigReposByModErr    error
+	listMigReposByMigResult []store.MigRepo
+	listMigReposByMigErr    error
 
 	repoByID map[types.RepoID]store.Repo
 
@@ -162,7 +162,7 @@ func (m *runStore) ListRunReposWithURLByRun(ctx context.Context, runID types.Run
 }
 
 func (m *runStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
-	return m.getLatestRunRepoByModAndRepoStatus.record(arg)
+	return m.getLatestRunRepoByMigAndRepoStatus.record(arg)
 }
 
 func (m *runStore) ListQueuedRunReposByRun(ctx context.Context, runID types.RunID) ([]store.RunRepo, error) {
@@ -259,10 +259,10 @@ func (m *runStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepo
 }
 
 func (m *runStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error) {
-	if m.getModErr != nil {
-		return store.Mig{}, m.getModErr
+	if m.getMigErr != nil {
+		return store.Mig{}, m.getMigErr
 	}
-	result := m.getModResult
+	result := m.getMigResult
 	if result.ID.IsZero() {
 		result.ID = id
 	}
@@ -270,11 +270,11 @@ func (m *runStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error
 }
 
 func (m *runStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
-	return m.getModRepo.ret()
+	return m.getMigRepo.ret()
 }
 
-func (m *runStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([]store.MigRepo, error) {
-	return m.listMigReposByModResult, m.listMigReposByModErr
+func (m *runStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
+	return m.listMigReposByMigResult, m.listMigReposByMigErr
 }
 
 func (m *runStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {

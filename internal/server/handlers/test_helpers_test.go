@@ -120,7 +120,7 @@ func newRunRepoJobsFixture(t *testing.T, metaJSON string) (*runStore, http.Handl
 			Status:  domaintypes.JobStatusFail,
 			Meta:    []byte(metaJSON),
 		},
-		}
+	}
 	handler := listRunRepoJobsHandler(st)
 	return st, handler, runID, repoID
 }
@@ -135,17 +135,17 @@ func allReposSelector() map[string]any {
 }
 
 // activeMigWithSpec returns a migStore pre-configured with an active (non-archived)
-// mig (ID "mod123"), a spec row, and one MigRepo.
+// mig (ID "mig123"), a spec row, and one MigRepo.
 func activeMigWithSpec(specID domaintypes.SpecID) *migStore {
 	st := &migStore{
-		getModResult: store.Mig{
-			ID:         "mod123",
+		getMigResult: store.Mig{
+			ID:         "mig123",
 			Name:       "test-mig",
 			SpecID:     &specID,
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
-		listMigReposByModResult: []store.MigRepo{
-			{ID: "repo1", MigID: "mod123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
+		listMigReposByMigResult: []store.MigRepo{
+			{ID: "repo1", MigID: "mig123", RepoID: "repo1", BaseRef: "main", TargetRef: "feature1"},
 		},
 	}
 	st.getSpec.val = store.Spec{
@@ -167,14 +167,14 @@ type jobTestFixture struct {
 }
 
 // newJobFixture creates a running job fixture with default values.
-// jobType defaults to domaintypes.JobTypeMod.
+// jobType defaults to domaintypes.JobTypeMig.
 func newJobFixture(jobType domaintypes.JobType) jobTestFixture {
 	nodeIDStr := domaintypes.NewNodeKey()
 	nodeID := domaintypes.NodeID(nodeIDStr)
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	if jobType == "" {
-		jobType = domaintypes.JobTypeMod
+		jobType = domaintypes.JobTypeMig
 	}
 	return jobTestFixture{
 		NodeIDStr: nodeIDStr,
@@ -307,7 +307,7 @@ func withGetRunCreatedAt(t time.Time) func(*jobStore) {
 }
 
 // doRequestWithContentType sends a request with a custom Content-Type and string body.
-// pathParams are key-value pairs: "mig_id", "mod123", "repo_id", "repo1".
+// pathParams are key-value pairs: "mig_id", "mig123", "repo_id", "repo1".
 func doRequestWithContentType(t *testing.T, handler http.Handler, method, path, contentType, body string, pathParams ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, bytes.NewReader([]byte(body)))
@@ -322,7 +322,7 @@ func doRequestWithContentType(t *testing.T, handler http.Handler, method, path, 
 
 // doRequest sends a request to handler and returns the recorder.
 // body: nil → no body; string → raw body; otherwise → JSON-marshaled.
-// pathParams are key-value pairs: "mig_ref", "mod123", "run_id", "run1".
+// pathParams are key-value pairs: "mig_ref", "mig123", "run_id", "run1".
 func doRequest(t *testing.T, handler http.Handler, method, path string, body any, pathParams ...string) *httptest.ResponseRecorder {
 	t.Helper()
 	var r *http.Request

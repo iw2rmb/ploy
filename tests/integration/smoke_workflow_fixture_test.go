@@ -10,8 +10,8 @@ import (
 
 type v1RunFixture struct {
 	Spec    store.Spec
-	Mod     store.Mig
-	ModRepo store.MigRepo
+	Mig     store.Mig
+	MigRepo store.MigRepo
 	Run     store.Run
 	RunRepo store.RunRepo
 }
@@ -32,10 +32,10 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	mig, err := db.CreateMig(ctx, store.CreateMigParams{
-		ID:        modID,
-		Name:      "smoke-" + modID.String(),
+		ID:        migID,
+		Name:      "smoke-" + migID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -43,10 +43,10 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 		t.Fatalf("CreateMig() failed: %v", err)
 	}
 
-	modRepoID := domaintypes.NewMigRepoID()
-	modRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
-		ID:        modRepoID,
-		MigID:     modID,
+	migRepoID := domaintypes.NewMigRepoID()
+	migRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
+		ID:        migRepoID,
+		MigID:     migID,
 		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
@@ -58,7 +58,7 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
-		MigID:     modID,
+		MigID:     migID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -67,9 +67,9 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 	}
 
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
-		MigID:         modID,
+		MigID:         migID,
 		RunID:         run.ID,
-		RepoID:        modRepo.RepoID,
+		RepoID:        migRepo.RepoID,
 		RepoBaseRef:   baseRef,
 		RepoTargetRef: targetRef,
 	})
@@ -79,8 +79,8 @@ func newV1RunFixture(t *testing.T, ctx context.Context, db store.Store, repoURL,
 
 	return v1RunFixture{
 		Spec:    spec,
-		Mod:     mig,
-		ModRepo: modRepo,
+		Mig:     mig,
+		MigRepo: migRepo,
 		Run:     run,
 		RunRepo: runRepo,
 	}

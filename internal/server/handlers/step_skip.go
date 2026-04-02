@@ -16,7 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-type modStepOpsPayload struct {
+type migStepOpsPayload struct {
 	Step         contracts.MigStep          `json:"step"`
 	GlobalEnv    map[string]string          `json:"global_env,omitempty"`
 	EffectiveEnv map[string]string          `json:"effective_env,omitempty"`
@@ -24,13 +24,13 @@ type modStepOpsPayload struct {
 	BuildGate    *contracts.BuildGateConfig `json:"build_gate,omitempty"`
 }
 
-func resolveAndPersistModStepSkip(
+func resolveAndPersistMigStepSkip(
 	ctx context.Context,
 	st store.Store,
 	job store.Job,
 	mergedSpec []byte,
 ) (*contracts.MigStepSkipMetadata, error) {
-	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeMod {
+	if domaintypes.JobType(job.JobType) != domaintypes.JobTypeMig {
 		return nil, nil
 	}
 
@@ -44,7 +44,7 @@ func resolveAndPersistModStepSkip(
 		return nil, fmt.Errorf("parse merged spec for step cache: %w", err)
 	}
 
-	stepIndex, err := modStepIndexFromJobNameForClaim(job.Name, len(spec.Steps))
+	stepIndex, err := migStepIndexFromJobNameForClaim(job.Name, len(spec.Steps))
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func resolveAndPersistModStepSkip(
 		effectiveEnv[k] = v
 	}
 
-	opsPayload := modStepOpsPayload{
+	opsPayload := migStepOpsPayload{
 		Step:         stepCfg,
 		GlobalEnv:    spec.Env,
 		EffectiveEnv: effectiveEnv,
@@ -108,7 +108,7 @@ func resolveAndPersistModStepSkip(
 	return skip, nil
 }
 
-func modStepIndexFromJobNameForClaim(jobName string, stepsLen int) (int, error) {
+func migStepIndexFromJobNameForClaim(jobName string, stepsLen int) (int, error) {
 	name := strings.TrimSpace(jobName)
 	if stepsLen <= 1 {
 		return 0, nil

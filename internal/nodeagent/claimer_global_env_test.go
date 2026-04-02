@@ -51,9 +51,9 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 				}
 			}`),
 			wantEnv: map[string]string{
-				"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
-				"CODEX_AUTH_JSON":     `{"api_key":"sk-xxx","org_id":"org-yyy"}`,
-				"OPENAI_API_KEY":      "sk-openai-test-key-12345",
+				"PLOY_CA_CERTS":   "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
+				"CODEX_AUTH_JSON": `{"api_key":"sk-xxx","org_id":"org-yyy"}`,
+				"OPENAI_API_KEY":  "sk-openai-test-key-12345",
 			},
 		},
 		{
@@ -69,8 +69,8 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 					"ignored": {
 						"image": "test/mig:latest",
 						"env": {
-							"MOD_VAR": "mod_value",
-							"SHARED_VAR": "mod_ignored"
+							"MIG_VAR": "mig_value",
+							"SHARED_VAR": "mig_ignored"
 						}
 					}
 				}`),
@@ -78,7 +78,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 				// Only top-level env is extracted; mig.env is ignored.
 				"GLOBAL_VAR": "global_value",
 				"SHARED_VAR": "top_level_value",
-				// MOD_VAR is NOT present because mig.env is not processed.
+				// MIG_VAR is NOT present because mig.env is not processed.
 			},
 		},
 		{
@@ -179,10 +179,10 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Verify all global env vars are present in the manifest.
 	expectedEnv := map[string]string{
-		"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
-		"CODEX_AUTH_JSON":     `{"token":"test-codex-token"}`,
-		"OPENAI_API_KEY":      "sk-test-openai-key",
-		"CUSTOM_GLOBAL_VAR":   "custom_value",
+		"PLOY_CA_CERTS":     "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
+		"CODEX_AUTH_JSON":   `{"token":"test-codex-token"}`,
+		"OPENAI_API_KEY":    "sk-test-openai-key",
+		"CUSTOM_GLOBAL_VAR": "custom_value",
 	}
 
 	for key, wantVal := range expectedEnv {
@@ -245,9 +245,9 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 
 	// Verify global env vars are preserved in gate manifest.
 	expectedEnv := map[string]string{
-		"PLOY_CA_CERTS": "gate-test-cert-bundle",
-		"CODEX_AUTH_JSON":     "gate-codex-auth",
-		"GATE_SPECIFIC_VAR":   "gate_value",
+		"PLOY_CA_CERTS":     "gate-test-cert-bundle",
+		"CODEX_AUTH_JSON":   "gate-codex-auth",
+		"GATE_SPECIFIC_VAR": "gate_value",
 	}
 
 	for key, wantVal := range expectedEnv {
@@ -383,38 +383,38 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/healing"),
 		Env: map[string]string{
-			"GLOBAL_VAR":          "global_value",
+			"GLOBAL_VAR":    "global_value",
 			"PLOY_CA_CERTS": "global-cert-bundle",
-			"SHARED_VAR":          "from_req",
+			"SHARED_VAR":    "from_req",
 		},
 	}
 
 	// Healing mig with its own env that overrides req.Env on collision.
-	healingMod := MigContainerSpec{
+	healingMig := MigContainerSpec{
 		Image: testJobImage("codex:latest"),
 		Env: map[string]string{
-			"PLOY_CA_CERTS": "healing-cert-bundle",
-			"CODEX_AUTH_JSON":     `{"healing":"auth"}`,
-			"HEALING_SPECIFIC":    "healing_value",
+			"PLOY_CA_CERTS":    "healing-cert-bundle",
+			"CODEX_AUTH_JSON":  `{"healing":"auth"}`,
+			"HEALING_SPECIFIC": "healing_value",
 		},
 	}
 
 	// Pass MigStackUnknown explicitly to indicate tests operate without stack detection.
-	manifest, err := buildHealingManifest(req, healingMod, 0, "", contracts.MigStackUnknown)
+	manifest, err := buildHealingManifest(req, healingMig, 0, "", contracts.MigStackUnknown)
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error: %v", err)
 	}
 
 	// Verify env vars are preserved with correct precedence.
 	expectedEnv := map[string]string{
-		"GLOBAL_VAR":          "global_value",            // from req.Env (no override)
-		"PLOY_CA_CERTS": "healing-cert-bundle",     // mig.Env overrides req.Env
-		"CODEX_AUTH_JSON":     `{"healing":"auth"}`,      // from mig.Env only
-		"HEALING_SPECIFIC":    "healing_value",           // from mig.Env only
-		"SHARED_VAR":          "from_req",                // from req.Env (no mig override)
-		"PLOY_REPO_URL":       "https://gitlab.com/test/repo.git",
-		"PLOY_BASE_REF":       "main",
-		"PLOY_TARGET_REF":     "feature/healing",
+		"GLOBAL_VAR":       "global_value",        // from req.Env (no override)
+		"PLOY_CA_CERTS":    "healing-cert-bundle", // mig.Env overrides req.Env
+		"CODEX_AUTH_JSON":  `{"healing":"auth"}`,  // from mig.Env only
+		"HEALING_SPECIFIC": "healing_value",       // from mig.Env only
+		"SHARED_VAR":       "from_req",            // from req.Env (no mig override)
+		"PLOY_REPO_URL":    "https://gitlab.com/test/repo.git",
+		"PLOY_BASE_REF":    "main",
+		"PLOY_TARGET_REF":  "feature/healing",
 	}
 
 	for key, wantVal := range expectedEnv {

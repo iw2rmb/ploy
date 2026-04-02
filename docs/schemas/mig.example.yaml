@@ -104,7 +104,7 @@ steps:
 # - Optional `always: true` on a step disables step-cache reuse for that step.
 #
 # Each entry in steps[] supports the same `image` field as the single-step spec:
-# - String form: `image: docker.io/user/mig:latest` (universal, any stack)
+# - String form: `image: ghcr.io/iw2rmb/ploy/mig:latest` (universal, any stack)
 # - Map form: `image: {default: ..., java-maven: ..., java-gradle: ...}` (stack-aware)
 #
 # Example (disabled by default; remove comments to activate):
@@ -234,7 +234,7 @@ build_gate:
 # HEALING CONFIGURATION (build_gate.healing)
 ################################################################################
 # Healing runs after router (if configured) when the Build Gate fails.
-# Mod-like fields (image, command, env, env_from_file) are specified under
+# Mig-like fields (image, command, env, env_from_file) are specified under
 # healing.by_error_kind.<error_kind> (no nested "mig" key).
 #
 # Two execution modes per error kind:

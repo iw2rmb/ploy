@@ -97,8 +97,8 @@ func buildClaimResponsePayload(
 	}
 
 	var stepSkip *contracts.MigStepSkipMetadata
-	if jobType == domaintypes.JobTypeMod {
-		stepSkip, err = resolveAndPersistModStepSkip(ctx, st, job, mergedSpec)
+	if jobType == domaintypes.JobTypeMig {
+		stepSkip, err = resolveAndPersistMigStepSkip(ctx, st, job, mergedSpec)
 		if err != nil {
 			return claimResponsePayload{}, fmt.Errorf("resolve step skip metadata: %w", err)
 		}

@@ -59,7 +59,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 		if mig.ArchivedAt.Valid {
 			writeHTTPError(w, http.StatusConflict, "cannot create run for archived mig")
 			return
@@ -72,10 +72,10 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Select repos based on mode.
-		selectedRepos, err := selectReposForRun(r.Context(), st, modID, req.RepoSelector.Mode, req.RepoSelector.Repos)
+		selectedRepos, err := selectReposForRun(r.Context(), st, migID, req.RepoSelector.Mode, req.RepoSelector.Repos)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to select repos: %v", err)
-			slog.Error("create mig run: select repos failed", "mig_id", modID.String(), "mode", req.RepoSelector.Mode, "err", err)
+			slog.Error("create mig run: select repos failed", "mig_id", migID.String(), "mode", req.RepoSelector.Mode, "err", err)
 			return
 		}
 
@@ -89,44 +89,44 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 		runID := domaintypes.NewRunID()
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
 			ID:        runID,
-			MigID:     modID,
+			MigID:     migID,
 			SpecID:    *mig.SpecID,
 			CreatedBy: req.CreatedBy,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create run: %v", err)
-			slog.Error("create mig run: create run failed", "mig_id", modID.String(), "run_id", runID, "err", err)
+			slog.Error("create mig run: create run failed", "mig_id", migID.String(), "run_id", runID, "err", err)
 			return
 		}
 
 		// Create run_repos entries for each selected repo.
 		// v1: run_repos snapshots refs from mig_repos at run creation time.
-		for _, modRepo := range selectedRepos {
-			repoURL, urlErr := repoURLForID(r.Context(), st, modRepo.RepoID)
+		for _, migRepo := range selectedRepos {
+			repoURL, urlErr := repoURLForID(r.Context(), st, migRepo.RepoID)
 			if urlErr != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", urlErr)
-				slog.Error("create mig run: get repo failed", "repo_id", modRepo.RepoID, "err", urlErr)
+				slog.Error("create mig run: get repo failed", "repo_id", migRepo.RepoID, "err", urlErr)
 				return
 			}
-			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, modRepo.BaseRef)
+			sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), repoURL, migRepo.BaseRef)
 			if seedErr != nil {
-				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, modRepo.BaseRef, seedErr)
+				writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", repoURL, migRepo.BaseRef, seedErr)
 				slog.Error("create mig run: resolve source commit failed",
 					"run_id", run.ID,
-					"repo_id", modRepo.RepoID,
+					"repo_id", migRepo.RepoID,
 					"repo_url", repoURL,
-					"base_ref", modRepo.BaseRef,
+					"base_ref", migRepo.BaseRef,
 					"err", seedErr,
 				)
 				return
 			}
 			// Create run_repo entry snapshotting refs.
 			_, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-				MigID:           modID,
+				MigID:           migID,
 				RunID:           run.ID,
-				RepoID:          modRepo.RepoID,
-				RepoBaseRef:     modRepo.BaseRef,
-				RepoTargetRef:   modRepo.TargetRef,
+				RepoID:          migRepo.RepoID,
+				RepoBaseRef:     migRepo.BaseRef,
+				RepoTargetRef:   migRepo.TargetRef,
 				SourceCommitSha: sourceCommitSHA,
 				RepoSha0:        sourceCommitSHA,
 			})
@@ -134,7 +134,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
 				slog.Error("create mig run: create run repo failed",
 					"run_id", run.ID,
-					"repo_id", modRepo.RepoID,
+					"repo_id", migRepo.RepoID,
 					"repo_url", repoURL,
 					"err", err,
 				)
@@ -158,7 +158,7 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 
 		slog.Info("mig run created",
 			"run_id", run.ID,
-			"mig_id", modID.String(),
+			"mig_id", migID.String(),
 			"spec_id", *mig.SpecID,
 			"repo_count", len(selectedRepos),
 			"mode", req.RepoSelector.Mode,
@@ -173,9 +173,9 @@ func createMigRunHandler(st store.Store) http.HandlerFunc {
 // - "all": all repos in the mig's repo set
 // - "failed": repos whose last terminal run_repos status is 'Fail'
 // - "explicit": specific repos by URL (normalized for matching)
-func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.MigID, mode string, repoURLs []string) ([]store.MigRepo, error) {
+func selectReposForRun(ctx context.Context, st store.Store, migID domaintypes.MigID, mode string, repoURLs []string) ([]store.MigRepo, error) {
 	// Get all repos for the mig.
-	allRepos, err := st.ListMigReposByMig(ctx, modID)
+	allRepos, err := st.ListMigReposByMig(ctx, migID)
 	if err != nil {
 		return nil, fmt.Errorf("list mig repos: %w", err)
 	}
@@ -187,7 +187,7 @@ func selectReposForRun(ctx context.Context, st store.Store, modID domaintypes.Mi
 
 	case "failed":
 		// Get repo IDs whose last terminal status is 'Fail'.
-		failedRepoIDs, err := st.ListFailedRepoIDsByMig(ctx, modID)
+		failedRepoIDs, err := st.ListFailedRepoIDsByMig(ctx, migID)
 		if err != nil {
 			return nil, fmt.Errorf("list failed repos: %w", err)
 		}

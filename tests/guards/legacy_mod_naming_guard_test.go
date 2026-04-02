@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// TestNoLegacyModNamingInKeySurfaces enforces the phase-0 contract for the
+// TestNoLegacyMigNamingInKeySurfaces enforces the phase-0 contract for the
 // mig rename by blocking legacy naming in key repository surfaces.
-func TestNoLegacyModNamingInKeySurfaces(t *testing.T) {
+func TestNoLegacyMigNamingInKeySurfaces(t *testing.T) {
 	legacyUnit := "m" + "o" + "d"
 	legacyPlural := legacyUnit + "s"
 	tokens := []string{

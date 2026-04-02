@@ -8,7 +8,7 @@ import (
 
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -82,31 +82,31 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		}
 
 		// v1 side-effect: Create mig project with name == id
-		modID := domaintypes.NewMigID()
+		migID := domaintypes.NewMigID()
 		if _, err := st.CreateMig(r.Context(), store.CreateMigParams{
-			ID:        modID,
-			Name:      modID.String(),
+			ID:        migID,
+			Name:      migID.String(),
 			SpecID:    &createdSpec.ID,
 			CreatedBy: createdByPtr,
 		}); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig: %v", err)
-			slog.Error("create single-repo run: create mig failed", "mig_id", modID, "err", err)
+			slog.Error("create single-repo run: create mig failed", "mig_id", migID, "err", err)
 			return
 		}
 
 		// Create mig repo for the provided repo_url
 		normalizedRepoURL := domaintypes.NormalizeRepoURL(req.RepoURL.String())
-		modRepoID := domaintypes.NewMigRepoID()
-		modRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
-			ID:        modRepoID,
-			MigID:     modID,
+		migRepoID := domaintypes.NewMigRepoID()
+		migRepo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
+			ID:        migRepoID,
+			MigID:     migID,
 			Url:       normalizedRepoURL,
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
-			slog.Error("create single-repo run: create mig repo failed", "mig_id", modID, "repo_url", req.RepoURL, "err", err)
+			slog.Error("create single-repo run: create mig repo failed", "mig_id", migID, "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
@@ -114,7 +114,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		runID := domaintypes.NewRunID()
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
 			ID:        runID,
-			MigID:     modID,
+			MigID:     migID,
 			SpecID:    createdSpec.ID,
 			CreatedBy: createdByPtr,
 		})
@@ -125,30 +125,30 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 		}
 
 		// Create run_repo entry
-		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), normalizedRepoURL, modRepo.BaseRef)
+		sourceCommitSHA, seedErr := resolveSourceCommitSHAFromContext(r.Context(), normalizedRepoURL, migRepo.BaseRef)
 		if seedErr != nil {
-			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, modRepo.BaseRef, seedErr)
+			writeHTTPError(w, http.StatusBadRequest, "failed to resolve source commit for repo %s ref %s: %v", normalizedRepoURL, migRepo.BaseRef, seedErr)
 			slog.Error("create single-repo run: resolve source commit failed",
 				"run_id", run.ID,
-				"repo_id", modRepo.RepoID,
+				"repo_id", migRepo.RepoID,
 				"repo_url", normalizedRepoURL,
-				"base_ref", modRepo.BaseRef,
+				"base_ref", migRepo.BaseRef,
 				"err", seedErr,
 			)
 			return
 		}
 		runRepo, err := st.CreateRunRepo(r.Context(), store.CreateRunRepoParams{
-			MigID:           modID,
+			MigID:           migID,
 			RunID:           run.ID,
-			RepoID:          modRepo.RepoID,
-			RepoBaseRef:     modRepo.BaseRef,
-			RepoTargetRef:   modRepo.TargetRef,
+			RepoID:          migRepo.RepoID,
+			RepoBaseRef:     migRepo.BaseRef,
+			RepoTargetRef:   migRepo.TargetRef,
 			SourceCommitSha: sourceCommitSHA,
 			RepoSha0:        sourceCommitSHA,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create run repo: %v", err)
-			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", modRepo.RepoID, "err", err)
+			slog.Error("create single-repo run: create run_repo failed", "run_id", run.ID, "repo_id", migRepo.RepoID, "err", err)
 			return
 		}
 
@@ -159,31 +159,31 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 			SpecID domaintypes.SpecID `json:"spec_id"`
 		}{
 			RunID:  run.ID,
-			MigID:  modID,
+			MigID:  migID,
 			SpecID: createdSpec.ID,
 		}
 
 		// Publish queued event to SSE hub for the run
 		if eventsService != nil {
-			// Build a minimal run summary for the event using modsapi.RunSummary
+			// Build a minimal run summary for the event using migsapi.RunSummary
 			// (matching the event structure expected by eventsService.PublishRun)
-			runState, convErr := modsapi.RunStatusFromDomain(run.Status)
+			runState, convErr := migsapi.RunStatusFromDomain(run.Status)
 			if convErr != nil {
 				slog.Error("create single-repo run: invalid run status for publish payload", "run_id", run.ID, "status", run.Status, "err", convErr)
-				runState = modsapi.RunStateRunning
+				runState = migsapi.RunStateRunning
 			}
-			summary := modsapi.RunSummary{
+			summary := migsapi.RunSummary{
 				RunID:      run.ID,
 				State:      runState,
 				Submitter:  "",
 				Repository: normalizedRepoURL,
 				Metadata: map[string]string{
-					"repo_base_ref":   modRepo.BaseRef,
-					"repo_target_ref": modRepo.TargetRef,
+					"repo_base_ref":   migRepo.BaseRef,
+					"repo_target_ref": migRepo.TargetRef,
 				},
 				CreatedAt: timeOrZero(run.CreatedAt),
 				UpdatedAt: time.Now().UTC(),
-				Stages:    make(map[domaintypes.JobID]modsapi.StageStatus),
+				Stages:    make(map[domaintypes.JobID]migsapi.StageStatus),
 			}
 			if err := eventsService.PublishRun(r.Context(), run.ID, summary); err != nil {
 				slog.Error("create single-repo run: publish run event failed", "run_id", run.ID, "err", err)
@@ -198,7 +198,7 @@ func createSingleRepoRunHandler(st store.Store, eventsService *server.EventsServ
 
 		slog.Info("single-repo run created",
 			"run_id", run.ID,
-			"mig_id", modID.String(),
+			"mig_id", migID.String(),
 			"spec_id", createdSpec.ID,
 			"repo_id", runRepo.RepoID,
 			"repo_url", req.RepoURL,

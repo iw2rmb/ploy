@@ -36,7 +36,7 @@ func TestLabSmoke(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create v1 entities: spec → mig → mod_repo → run → run_repo.
+	// Step 1: Create v1 entities: spec → mig → mig_repo → run → run_repo.
 	createdBy := "smoke-test"
 	specJSON := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
 	specID := domaintypes.NewSpecID()
@@ -50,10 +50,10 @@ func TestLabSmoke(t *testing.T) {
 		t.Fatalf("CreateSpec() failed: %v", err)
 	}
 
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	_, err = db.CreateMig(ctx, store.CreateMigParams{
-		ID:        modID,
-		Name:      "smoke-test-" + modID.String(),
+		ID:        migID,
+		Name:      "smoke-test-" + migID.String(),
 		SpecID:    &spec.ID,
 		CreatedBy: &createdBy,
 	})
@@ -65,10 +65,10 @@ func TestLabSmoke(t *testing.T) {
 	baseRef := "main"
 	targetRef := "feature/smoke-test"
 
-	modRepoID := domaintypes.NewMigRepoID()
-	modRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
-		ID:        modRepoID,
-		MigID:     modID,
+	migRepoID := domaintypes.NewMigRepoID()
+	migRepo, err := db.CreateMigRepo(ctx, store.CreateMigRepoParams{
+		ID:        migRepoID,
+		MigID:     migID,
 		Url:       repoURL,
 		BaseRef:   baseRef,
 		TargetRef: targetRef,
@@ -80,21 +80,21 @@ func TestLabSmoke(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
 		ID:        runID,
-		MigID:     modID,
+		MigID:     migID,
 		SpecID:    spec.ID,
 		CreatedBy: &createdBy,
 	})
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%s, spec_id=%s, status=%s", run.ID, run.MigID, run.SpecID, run.Status)
+	t.Logf("Created run: id=%v, mig_id=%s, spec_id=%s, status=%s", run.ID, run.MigID, run.SpecID, run.Status)
 
 	runRepo, err := db.CreateRunRepo(ctx, store.CreateRunRepoParams{
-		MigID:         modID,
+		MigID:         migID,
 		RunID:         run.ID,
-		RepoID:        modRepo.RepoID,
-		RepoBaseRef:   modRepo.BaseRef,
-		RepoTargetRef: modRepo.TargetRef,
+		RepoID:        migRepo.RepoID,
+		RepoBaseRef:   migRepo.BaseRef,
+		RepoTargetRef: migRepo.TargetRef,
 	})
 	if err != nil {
 		t.Fatalf("CreateRunRepo() failed: %v", err)
@@ -109,7 +109,7 @@ func TestLabSmoke(t *testing.T) {
 		Attempt:     runRepo.Attempt,
 		Name:        "build",
 		Status:      domaintypes.JobStatusRunning,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 		JobImage:    "",
 		NextID:      nil,
 		Meta:        []byte(`{"type":"build","tool":"make"}`),

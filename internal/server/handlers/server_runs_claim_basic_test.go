@@ -64,8 +64,8 @@ func TestClaimJob_HappyPath(t *testing.T) {
 				if spec["job_id"] != f.jobID.String() {
 					t.Fatalf("expected spec.job_id %s, got %v", f.jobID.String(), spec["job_id"])
 				}
-				if _, ok := spec["mod_index"]; ok {
-					t.Fatalf("expected spec.mod_index to be absent, got %v", spec["mod_index"])
+				if _, ok := spec["mig_index"]; ok {
+					t.Fatalf("expected spec.mig_index to be absent, got %v", spec["mig_index"])
 				}
 			},
 		},

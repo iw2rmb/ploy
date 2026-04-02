@@ -50,7 +50,7 @@ ploy config gitlab show
 # Token:  glpat-xx...
 ```
 
-### Step 3: Run a Mod with MR creation
+### Step 3: Run a Mig with MR creation
 
 Source branch naming
 - Ploy uses the effective target ref as the MR source branch. When you pass `--target-ref`, that value is used directly. When you omit it, the node derives a default of `ploy/{run_name|run_id}` using the run name when set (e.g., batch name) or the run ID (KSUID string) otherwise. The base branch remains the one provided via `--base-ref` (commonly `main`).

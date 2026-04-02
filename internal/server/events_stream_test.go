@@ -10,7 +10,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
@@ -83,56 +83,56 @@ func TestStream_PublishRun(t *testing.T) {
 	tests := []struct {
 		name        string
 		runID       string
-		state       modsapi.RunState
+		state       migsapi.RunState
 		wantErr     bool
 		checkEvents bool
 	}{
 		{
 			name:        "publish queued run",
 			runID:       domaintypes.NewRunID().String(),
-			state:       modsapi.RunStatePending,
+			state:       migsapi.RunStatePending,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish running run",
 			runID:       domaintypes.NewRunID().String(),
-			state:       modsapi.RunStateRunning,
+			state:       migsapi.RunStateRunning,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish succeeded run",
 			runID:       domaintypes.NewRunID().String(),
-			state:       modsapi.RunStateSucceeded,
+			state:       migsapi.RunStateSucceeded,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish failed run",
 			runID:       domaintypes.NewRunID().String(),
-			state:       modsapi.RunStateFailed,
+			state:       migsapi.RunStateFailed,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "publish cancelled run",
 			runID:       domaintypes.NewRunID().String(),
-			state:       modsapi.RunStateCancelled,
+			state:       migsapi.RunStateCancelled,
 			wantErr:     false,
 			checkEvents: true,
 		},
 		{
 			name:        "empty runID returns error",
 			runID:       "",
-			state:       modsapi.RunStatePending,
+			state:       migsapi.RunStatePending,
 			wantErr:     true,
 			checkEvents: false,
 		},
 		{
 			name:        "whitespace runID returns error",
 			runID:       "  \t  ",
-			state:       modsapi.RunStatePending,
+			state:       migsapi.RunStatePending,
 			wantErr:     true,
 			checkEvents: false,
 		},
@@ -153,7 +153,7 @@ func TestStream_PublishRun(t *testing.T) {
 
 			payloadRunID := domaintypes.NewRunID()
 			stageJobID := domaintypes.NewJobID()
-			payload := modsapi.RunSummary{
+			payload := migsapi.RunSummary{
 				RunID:      payloadRunID,
 				State:      tt.state,
 				Submitter:  "test-user",
@@ -163,9 +163,9 @@ func TestStream_PublishRun(t *testing.T) {
 				},
 				CreatedAt: now,
 				UpdatedAt: now,
-				Stages: map[domaintypes.JobID]modsapi.StageStatus{
+				Stages: map[domaintypes.JobID]migsapi.StageStatus{
 					stageJobID: {
-						State:       modsapi.StageStateQueued,
+						State:       migsapi.StageStateQueued,
 						Attempts:    0,
 						MaxAttempts: 3,
 					},
@@ -196,7 +196,7 @@ func TestStream_PublishRun(t *testing.T) {
 				}
 
 				// Verify the payload is correctly marshaled.
-				var decodedPayload modsapi.RunSummary
+				var decodedPayload migsapi.RunSummary
 				if err := json.Unmarshal(snapshot[0].Data, &decodedPayload); err != nil {
 					t.Fatalf("failed to unmarshal run payload: %v", err)
 				}
@@ -229,12 +229,12 @@ func TestStream_PublishRunWithContext(t *testing.T) {
 	}
 
 	runID := domaintypes.NewRunID().String()
-	payload := modsapi.RunSummary{
+	payload := migsapi.RunSummary{
 		RunID:     domaintypes.RunID("test-run"),
-		State:     modsapi.RunStateRunning,
+		State:     migsapi.RunStateRunning,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		Stages:    map[domaintypes.JobID]modsapi.StageStatus{},
+		Stages:    map[domaintypes.JobID]migsapi.StageStatus{},
 	}
 
 	// Test with cancelled context.

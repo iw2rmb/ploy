@@ -1,4 +1,4 @@
-// mod_run_spec.go separates spec file handling from mig run execution.
+// mig_run_spec.go separates spec file handling from mig run execution.
 //
 // This file contains buildSpecPayload which parses YAML/JSON spec files
 // and resolves env_from_file references to inject file content as environment
@@ -563,10 +563,10 @@ func buildSpecPayload(
 	base *url.URL,
 	client *http.Client,
 	specFile string,
-	modEnvs []string,
-	modImage string,
+	migEnvs []string,
+	migImage string,
 	retain bool,
-	modCommand string,
+	migCommand string,
 	gitlabPAT string,
 	gitlabDomain string,
 	mrSuccess bool,
@@ -603,7 +603,7 @@ func buildSpecPayload(
 	}
 
 	// Merge CLI flag overrides (CLI flags take precedence)
-	hasOverrides := len(modEnvs) > 0 || modImage != "" || modCommand != "" ||
+	hasOverrides := len(migEnvs) > 0 || migImage != "" || migCommand != "" ||
 		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
 
 	// Only proceed if we have a spec file or CLI overrides
@@ -611,7 +611,7 @@ func buildSpecPayload(
 		return nil, nil
 	}
 
-	if len(modEnvs) > 0 {
+	if len(migEnvs) > 0 {
 		// Start from existing env.
 		current := make(map[string]any)
 		if existingEnv, ok := specMap["env"].(map[string]any); ok {
@@ -623,7 +623,7 @@ func buildSpecPayload(
 		}
 
 		// Apply CLI overrides (higher precedence than spec file)
-		for _, kv := range modEnvs {
+		for _, kv := range migEnvs {
 			kv = strings.TrimSpace(kv)
 			if kv == "" {
 				continue
@@ -651,7 +651,7 @@ func buildSpecPayload(
 	if steps, ok := specMap["steps"].([]any); ok {
 		stepsLen = len(steps)
 	}
-	if stepsLen <= 1 && (modImage != "" || modCommand != "") {
+	if stepsLen <= 1 && (migImage != "" || migCommand != "") {
 		// Ensure steps[0] exists and is a map.
 		var step0 map[string]any
 		if stepsLen == 1 {
@@ -664,21 +664,21 @@ func buildSpecPayload(
 			specMap["steps"] = []any{step0}
 		}
 
-		if modImage != "" {
-			step0["image"] = modImage
+		if migImage != "" {
+			step0["image"] = migImage
 		}
-		if modCommand != "" {
+		if migCommand != "" {
 			// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
 			// Fallback to plain string when not a JSON array.
 			var asArray []string
-			if strings.HasPrefix(modCommand, "[") && strings.HasSuffix(modCommand, "]") {
-				if err := json.Unmarshal([]byte(modCommand), &asArray); err == nil && len(asArray) > 0 {
+			if strings.HasPrefix(migCommand, "[") && strings.HasSuffix(migCommand, "]") {
+				if err := json.Unmarshal([]byte(migCommand), &asArray); err == nil && len(asArray) > 0 {
 					step0["command"] = asArray
 				} else {
-					step0["command"] = modCommand
+					step0["command"] = migCommand
 				}
 			} else {
-				step0["command"] = modCommand
+				step0["command"] = migCommand
 			}
 		}
 	}

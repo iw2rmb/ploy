@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
@@ -72,15 +72,15 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 			func(job store.Job) *domaintypes.JobID { return job.NextID },
 		)
 
-		resp := modsapi.ListRunRepoJobsResponse{
+		resp := migsapi.ListRunRepoJobsResponse{
 			RunID:   runID,
 			RepoID:  repoID,
 			Attempt: attempt,
-			Jobs:    make([]modsapi.RunRepoJob, 0, len(jobs)),
+			Jobs:    make([]migsapi.RunRepoJob, 0, len(jobs)),
 		}
 
 		for _, job := range jobs {
-			jr := modsapi.RunRepoJob{
+			jr := migsapi.RunRepoJob{
 				JobID:      job.ID,
 				Name:       job.Name,
 				JobType:    job.JobType,
@@ -149,11 +149,11 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *modsapi.RunRepoJobRecovery {
+func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *migsapi.RunRepoJobRecovery {
 	if meta == nil {
 		return nil
 	}
-	return &modsapi.RunRepoJobRecovery{
+	return &migsapi.RunRepoJobRecovery{
 		LoopKind:                  meta.LoopKind,
 		ErrorKind:                 meta.ErrorKind,
 		StrategyID:                meta.StrategyID,

@@ -3,7 +3,7 @@ get:
   summary: Inspect a batch run
   description: |
     Return a detailed summary for a single batch run identified by its run ID.
-    The response includes run metadata (mod_id, spec_id, status, timestamps) and
+    The response includes run metadata (mig_id, spec_id, status, timestamps) and
     optional aggregated repo status counts from `run_repos`.
   parameters:
     - in: path
@@ -14,30 +14,30 @@ get:
       # Run IDs are KSUID strings (27 characters, lexicographically sortable).
       description: Run ID (KSUID string)
   responses:
-    '200':
+    "200":
       description: OK
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/RunSummary'
-    '400':
+            $ref: "../components/schemas/controlplane.yaml#/RunSummary"
+    "400":
       description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '404':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "404":
       description: Run not found
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '500':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
       description: Internal server error
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
+            $ref: "../components/schemas/common.yaml#/Error"
 
 delete:
   tags: [Control]
@@ -52,23 +52,23 @@ delete:
         type: string
       description: Run ID (KSUID string)
   responses:
-    '204':
+    "204":
       description: No Content
-    '400':
+    "400":
       description: Bad request (missing or empty run id)
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '404':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "404":
       description: Run not found
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
-    '500':
+            $ref: "../components/schemas/common.yaml#/Error"
+    "500":
       description: Internal server error
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/common.yaml#/Error'
+            $ref: "../components/schemas/common.yaml#/Error"

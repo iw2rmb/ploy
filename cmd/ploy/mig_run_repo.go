@@ -1,4 +1,4 @@
-// mod_run_repo.go implements the `ploy mig run repo` subcommands for managing
+// mig_run_repo.go implements the `ploy mig run repo` subcommands for managing
 // repos within a batch run.
 //
 // This file provides CLI routing for repo add/remove/restart operations
@@ -137,7 +137,7 @@ func handleMigRunRepoAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mig.
+	// v1: RepoID refers to mig_repos.id, the canonical repository identifier within the mig.
 	_, _ = fmt.Fprintf(stderr, "Repo added: %s (repo_id: %s, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
 	return nil
 }
@@ -181,7 +181,7 @@ func handleMigRunRepoRemove(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mig.
+	// v1: RepoID refers to mig_repos.id, the canonical repository identifier within the mig.
 	_, _ = fmt.Fprintf(stderr, "Repo removed: %s (repo_id: %s, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Status)
 	return nil
 }
@@ -236,7 +236,7 @@ func handleMigRunRepoRestart(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	// v1: RepoID refers to mod_repos.id, the canonical repository identifier within the mig.
+	// v1: RepoID refers to mig_repos.id, the canonical repository identifier within the mig.
 	_, _ = fmt.Fprintf(stderr, "Repo restarted: %s (repo_id: %s, attempt: %d, status: %s)\n", domaintypes.NormalizeRepoURLSchemless(resp.RepoURL), resp.RepoID, resp.Attempt, resp.Status)
 	return nil
 }
@@ -261,10 +261,10 @@ type runRepoRestartRequest struct {
 // runRepoResponse mirrors the server's RunRepoResponse for CLI consumption.
 // runRepoResponse represents a single repo within a batch for CLI responses.
 // v1 model: run_repos uses composite PK (run_id, repo_id), not a standalone id field.
-// RepoID refers to mod_repos.id (the repository identifier within a mig project).
+// RepoID refers to mig_repos.id (the repository identifier within a mig project).
 type runRepoResponse struct {
 	RunID      domaintypes.RunID     `json:"run_id"`
-	RepoID     domaintypes.MigRepoID `json:"repo_id"` // mod_repos.id (NanoID, 8 chars)
+	RepoID     domaintypes.MigRepoID `json:"repo_id"` // mig_repos.id (NanoID, 8 chars)
 	RepoURL    string                `json:"repo_url"`
 	BaseRef    string                `json:"base_ref"`   // Snapshot from run_repos.repo_base_ref
 	TargetRef  string                `json:"target_ref"` // Snapshot from run_repos.repo_target_ref

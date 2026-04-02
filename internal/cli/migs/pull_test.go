@@ -181,8 +181,8 @@ func TestRunPullCommand_ValidationErrors(t *testing.T) {
 // MigPullCommand Tests
 // =============================================================================
 
-// TestModPullCommand_Success verifies successful pull resolution for a mig.
-func TestModPullCommand_Success(t *testing.T) {
+// TestMigPullCommand_Success verifies successful pull resolution for a mig.
+func TestMigPullCommand_Success(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
@@ -245,8 +245,8 @@ func TestModPullCommand_Success(t *testing.T) {
 	}
 }
 
-// TestModPullCommand_WithLastFailed verifies that last-failed mode is sent correctly.
-func TestModPullCommand_WithLastFailed(t *testing.T) {
+// TestMigPullCommand_WithLastFailed verifies that last-failed mode is sent correctly.
+func TestMigPullCommand_WithLastFailed(t *testing.T) {
 	t.Parallel()
 
 	const basePathPrefix = "/api"
@@ -300,8 +300,8 @@ func TestModPullCommand_WithLastFailed(t *testing.T) {
 	}
 }
 
-// TestModPullCommand_DefaultMode verifies that mode defaults to last-succeeded.
-func TestModPullCommand_DefaultMode(t *testing.T) {
+// TestMigPullCommand_DefaultMode verifies that mode defaults to last-succeeded.
+func TestMigPullCommand_DefaultMode(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -350,8 +350,8 @@ func TestModPullCommand_DefaultMode(t *testing.T) {
 	}
 }
 
-// TestModPullCommand_ValidationErrors verifies input validation.
-func TestModPullCommand_ValidationErrors(t *testing.T) {
+// TestMigPullCommand_ValidationErrors verifies input validation.
+func TestMigPullCommand_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -408,8 +408,8 @@ func TestModPullCommand_ValidationErrors(t *testing.T) {
 	}
 }
 
-// TestModPullCommand_NotFound verifies error handling for 404 responses.
-func TestModPullCommand_NotFound(t *testing.T) {
+// TestMigPullCommand_NotFound verifies error handling for 404 responses.
+func TestMigPullCommand_NotFound(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

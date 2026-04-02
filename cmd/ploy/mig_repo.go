@@ -1,4 +1,4 @@
-// mod_repo.go implements the 'ploy mig repo' command handler.
+// mig_repo.go implements the 'ploy mig repo' command handler.
 //
 // This command manages a mig's repo set:
 // - ploy mig repo add <mig-id|name> --repo <repo-url> --base-ref <ref> --target-ref <ref>
@@ -67,7 +67,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 		printMigRepoAddUsage(stderr)
 		return fmt.Errorf("mig id/name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	if err := fs.Parse(args[1:]); err != nil {
 		printMigRepoAddUsage(stderr)
@@ -99,9 +99,9 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
-	modID, err := resolveCmd.Run(ctx)
+	migID, err := resolveCmd.Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -110,7 +110,7 @@ func handleMigRepoAdd(args []string, stderr io.Writer) error {
 	cmd := migs.AddMigRepoCommand{
 		Client:    httpClient,
 		BaseURL:   base,
-		MigRef:    domaintypes.MigRef(modID),
+		MigRef:    domaintypes.MigRef(migID),
 		RepoURL:   *repoURL,
 		BaseRef:   *baseRef,
 		TargetRef: *targetRef,
@@ -138,7 +138,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 		printMigRepoListUsage(stderr)
 		return fmt.Errorf("mig id/name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	// Resolve control plane connection.
 	ctx := context.Background()
@@ -151,9 +151,9 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
-	modID, err := resolveCmd.Run(ctx)
+	migID, err := resolveCmd.Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func handleMigRepoList(args []string, stderr io.Writer) error {
 	cmd := migs.ListMigReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modID),
+		MigRef:  domaintypes.MigRef(migID),
 	}
 
 	results, err := cmd.Run(ctx)
@@ -211,7 +211,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 		printMigRepoRemoveUsage(stderr)
 		return fmt.Errorf("mig id/name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	if err := fs.Parse(args[1:]); err != nil {
 		printMigRepoRemoveUsage(stderr)
@@ -235,9 +235,9 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
-	modID, err := resolveCmd.Run(ctx)
+	migID, err := resolveCmd.Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,7 @@ func handleMigRepoRemove(args []string, stderr io.Writer) error {
 	cmd := migs.RemoveMigRepoCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modID),
+		MigRef:  domaintypes.MigRef(migID),
 		RepoID:  domaintypes.MigRepoID(*repoID),
 	}
 
@@ -277,7 +277,7 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 		printMigRepoImportUsage(stderr)
 		return fmt.Errorf("mig id/name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	if err := fs.Parse(args[1:]); err != nil {
 		printMigRepoImportUsage(stderr)
@@ -307,9 +307,9 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 	resolveCmd := migs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
-	modID, err := resolveCmd.Run(ctx)
+	migID, err := resolveCmd.Run(ctx)
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func handleMigRepoImport(args []string, stderr io.Writer) error {
 	cmd := migs.ImportMigReposCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modID),
+		MigRef:  domaintypes.MigRef(migID),
 		CSVData: csvData,
 	}
 

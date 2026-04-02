@@ -18,13 +18,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
-// executeModJob runs a mig container job.
+// executeMigJob runs a mig container job.
 // Executes the container, uploads diff, and reports status.
 //
 // Stack-aware image selection: The job loads the persisted stack from the
 // pre-gate phase and uses it for manifest building. This ensures mig steps
 // use stack-specific images (e.g., java-maven, java-gradle) when configured.
-func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) {
+func (r *runController) executeMigJob(ctx context.Context, req StartRunRequest) {
 	startTime := time.Now()
 
 	if req.StepSkip != nil {
@@ -63,7 +63,7 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	typedOpts := req.TypedOptions
 	stepIdx := 0
 	if len(typedOpts.Steps) > 0 {
-		idx, err := modStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
+		idx, err := migStepIndexFromJobName(req.JobName, len(typedOpts.Steps))
 		if err != nil {
 			err = fmt.Errorf("derive mig step index from job_name: %w", err)
 			slog.Error("failed to derive mig step index", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
@@ -95,16 +95,16 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 
 	cfg := standardJobConfig{
 		Manifest:                  manifest,
-		DiffType:                  types.DiffJobTypeMod,
+		DiffType:                  types.DiffJobTypeMig,
 		OutDirPattern:             "ploy-mig-out-*",
 		WorkspacePolicy:           workspaceChangePolicyIgnore,
 		UploadConfiguredArtifacts: true,
 		UploadDiff: func(ctx context.Context, runID types.RunID, jobID types.JobID, jobName string, diffGen step.DiffGenerator, baseDir, workspace string, result step.Result) {
-			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMod, true)
+			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeMig, true)
 		},
-		StartTime:                 startTime,
+		StartTime: startTime,
 	}
-	if err := configureModAmataInDir(&cfg, typedOpts, stepIdx); err != nil {
+	if err := configureMigAmataInDir(&cfg, typedOpts, stepIdx); err != nil {
 		slog.Error("failed to configure /in/amata.yaml for mig job", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
@@ -137,11 +137,11 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	var manifest contracts.StepManifest
 	var err error
 
-	if typedOpts.Healing == nil || typedOpts.Healing.Mod.Image.IsEmpty() {
+	if typedOpts.Healing == nil || typedOpts.Healing.Mig.Image.IsEmpty() {
 		err = fmt.Errorf("healing job missing selected strategy image")
 	} else {
-		healMod := typedOpts.Healing.Mod
-		manifest, err = buildHealingManifest(req, healMod, 0, "", stack)
+		healMig := typedOpts.Healing.Mig
+		manifest, err = buildHealingManifest(req, healMig, 0, "", stack)
 	}
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
@@ -171,7 +171,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			if err := r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, req.RecoveryContext, schemaJSON); err != nil {
 				return err
 			}
-			return writeAmataSpecInDir(inDir, typedOpts.Healing.Mod.Amata)
+			return writeAmataSpecInDir(inDir, typedOpts.Healing.Mig.Amata)
 		},
 		PrepareManifest: func(m *contracts.StepManifest, ws string) {
 			r.injectHealingEnvVars(m, ws)
@@ -203,8 +203,8 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	r.executeStandardJob(ctx, req, cfg)
 }
 
-func configureModAmataInDir(cfg *standardJobConfig, typedOpts RunOptions, stepIdx int) error {
-	amata := selectedModAmata(typedOpts, stepIdx)
+func configureMigAmataInDir(cfg *standardJobConfig, typedOpts RunOptions, stepIdx int) error {
+	amata := selectedMigAmata(typedOpts, stepIdx)
 	if amata == nil || strings.TrimSpace(amata.Spec) == "" {
 		return nil
 	}
@@ -215,7 +215,7 @@ func configureModAmataInDir(cfg *standardJobConfig, typedOpts RunOptions, stepId
 	return nil
 }
 
-func selectedModAmata(typedOpts RunOptions, stepIdx int) *contracts.AmataRunSpec {
+func selectedMigAmata(typedOpts RunOptions, stepIdx int) *contracts.AmataRunSpec {
 	if len(typedOpts.Steps) == 0 {
 		return typedOpts.Execution.Amata
 	}

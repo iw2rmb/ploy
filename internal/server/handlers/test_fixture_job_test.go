@@ -130,7 +130,7 @@ type jobStore struct {
 
 	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunRepoAttemptParams, int64]
 
-	getLatestRunRepoByModAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
+	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
 
 	// Stale recovery
 	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
@@ -141,8 +141,8 @@ type jobStore struct {
 	updateNodeHeartbeat mockCall[store.UpdateNodeHeartbeatParams, struct{}]
 
 	// Mig repo (for claim spec merge)
-	getModRepo              mockResult[store.MigRepo]
-	listMigReposByModResult []store.MigRepo
+	getMigRepo              mockResult[store.MigRepo]
+	listMigReposByMigResult []store.MigRepo
 
 	// Event
 	createEvent mockResult[store.Event]
@@ -602,7 +602,7 @@ func (m *jobStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params 
 }
 
 func (m *jobStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
-	return m.getLatestRunRepoByModAndRepoStatus.record(arg)
+	return m.getLatestRunRepoByMigAndRepoStatus.record(arg)
 }
 
 // Stale recovery methods
@@ -629,11 +629,11 @@ func (m *jobStore) UpdateNodeHeartbeat(ctx context.Context, params store.UpdateN
 // Mig repo methods (for claim spec merge)
 
 func (m *jobStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
-	return m.getModRepo.ret()
+	return m.getMigRepo.ret()
 }
 
-func (m *jobStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([]store.MigRepo, error) {
-	return m.listMigReposByModResult, nil
+func (m *jobStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
+	return m.listMigReposByMigResult, nil
 }
 
 // Event methods

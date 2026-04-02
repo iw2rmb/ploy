@@ -62,17 +62,17 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 		if mig.ArchivedAt.Valid {
 			writeHTTPError(w, http.StatusConflict, "cannot add repo to archived mig")
 			return
 		}
 
-		// Create the mod_repo row.
+		// Create the mig_repo row.
 		repoID := domaintypes.NewMigRepoID()
 		repo, err := st.CreateMigRepo(r.Context(), store.CreateMigRepoParams{
 			ID:        repoID,
-			MigID:     modID,
+			MigID:     migID,
 			Url:       normalizedURL,
 			BaseRef:   req.BaseRef.String(),
 			TargetRef: req.TargetRef.String(),
@@ -85,7 +85,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig repo: %v", err)
-			slog.Error("add mig repo: create failed", "mig_id", modID, "repo_url", normalizedURL, "err", err)
+			slog.Error("add mig repo: create failed", "mig_id", migID, "repo_url", normalizedURL, "err", err)
 			return
 		}
 
@@ -98,7 +98,7 @@ func addMigRepoHandler(st store.Store) http.HandlerFunc {
 			CreatedAt: repo.CreatedAt.Time,
 		})
 
-		slog.Info("mig repo added", "mig_id", modID, "repo_id", repo.ID, "repo_url", normalizedURL)
+		slog.Info("mig repo added", "mig_id", migID, "repo_id", repo.ID, "repo_url", normalizedURL)
 	}
 }
 
@@ -114,13 +114,13 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 
 		// List repos for this mig.
-		repos, err := st.ListMigReposByMig(r.Context(), modID)
+		repos, err := st.ListMigReposByMig(r.Context(), migID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list mig repos: %v", err)
-			slog.Error("list mig repos: list failed", "mig_id", modID, "err", err)
+			slog.Error("list mig repos: list failed", "mig_id", migID, "err", err)
 			return
 		}
 
@@ -129,7 +129,7 @@ func listMigReposHandler(st store.Store) http.HandlerFunc {
 			repoURL, err := repoURLForID(r.Context(), st, repo.RepoID)
 			if err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to get repo: %v", err)
-				slog.Error("list mig repos: get repo failed", "mig_id", modID, "repo_id", repo.RepoID, "err", err)
+				slog.Error("list mig repos: get repo failed", "mig_id", migID, "repo_id", repo.RepoID, "err", err)
 				return
 			}
 			items = append(items, domainapi.MigRepoSummary{
@@ -159,7 +159,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 
 		repoID, err := parseRequiredPathID[domaintypes.MigRepoID](r, "repo_id")
 		if err != nil {
@@ -178,7 +178,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 			slog.Error("delete mig repo: get repo failed", "repo_id", repoID, "err", err)
 			return
 		}
-		if repo.MigID != modID {
+		if repo.MigID != migID {
 			writeHTTPError(w, http.StatusNotFound, "repo does not belong to this mig")
 			return
 		}
@@ -203,7 +203,7 @@ func deleteMigRepoHandler(st store.Store) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("mig repo deleted", "mig_id", modID, "repo_id", repoID)
+		slog.Info("mig repo deleted", "mig_id", migID, "repo_id", repoID)
 	}
 }
 
@@ -227,7 +227,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 		if mig.ArchivedAt.Valid {
 			writeHTTPError(w, http.StatusConflict, "cannot modify repos on archived mig")
 			return
@@ -326,7 +326,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 
 			// Check if repo already exists to determine if this is create or update.
 			_, err = st.GetMigRepoByURL(r.Context(), store.GetMigRepoByURLParams{
-				MigID: modID,
+				MigID: migID,
 				Url:   normalizedURL,
 			})
 			isUpdate := err == nil
@@ -339,7 +339,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 			// Upsert the repo.
 			_, err = st.UpsertMigRepo(r.Context(), store.UpsertMigRepoParams{
 				ID:        domaintypes.NewMigRepoID(), // Only used for insert
-				MigID:     modID,
+				MigID:     migID,
 				Url:       normalizedURL,
 				BaseRef:   baseRef,
 				TargetRef: targetRef,
@@ -382,7 +382,7 @@ func bulkUpsertMigReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Info("bulk upsert mig repos completed",
-			"mig_id", modID,
+			"mig_id", migID,
 			"created", created,
 			"updated", updated,
 			"failed", failed,

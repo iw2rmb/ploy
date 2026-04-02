@@ -2,7 +2,7 @@ package lifecycle
 
 import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -65,7 +65,7 @@ func DeriveBatchStatus(counts *domaintypes.RunRepoCounts) string {
 // RunCompletionEval is the pure evaluation result for run completion.
 type RunCompletionEval struct {
 	ShouldFinish bool
-	RunState     modsapi.RunState
+	RunState     migsapi.RunState
 }
 
 // EvaluateRunCompletionFromRepoCounts determines whether a run can be marked Finished.
@@ -96,11 +96,11 @@ func EvaluateRunCompletionFromRepoCounts(counts []store.CountRunReposByStatusRow
 		return RunCompletionEval{ShouldFinish: false}
 	}
 
-	runState := modsapi.RunStateSucceeded
+	runState := migsapi.RunStateSucceeded
 	if anyFail {
-		runState = modsapi.RunStateFailed
+		runState = migsapi.RunStateFailed
 	} else if anyCancelled {
-		runState = modsapi.RunStateCancelled
+		runState = migsapi.RunStateCancelled
 	}
 
 	return RunCompletionEval{

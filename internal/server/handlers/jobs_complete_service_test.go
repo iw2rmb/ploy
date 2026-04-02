@@ -21,7 +21,7 @@ func TestCompleteJobService_Complete_ReturnsConflictForNonRunningJob(t *testing.
 			RepoID:    domaintypes.NewRepoID(),
 			NodeID:    &nodeID,
 			Status:    domaintypes.JobStatusQueued,
-			JobType:   domaintypes.JobTypeMod,
+			JobType:   domaintypes.JobTypeMig,
 			RepoShaIn: "0123456789abcdef0123456789abcdef01234567",
 		},
 	}
@@ -57,7 +57,7 @@ func TestCompleteJobService_Complete_SuccessPromotesNextJob(t *testing.T) {
 			Attempt:     1,
 			NodeID:      &nodeID,
 			Status:      domaintypes.JobStatusRunning,
-			JobType:     domaintypes.JobTypeMod,
+			JobType:     domaintypes.JobTypeMig,
 			RepoShaIn:   "0123456789abcdef0123456789abcdef01234567",
 			NextID:      &nextID,
 		},

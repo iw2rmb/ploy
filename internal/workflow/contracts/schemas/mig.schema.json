@@ -4,7 +4,7 @@
   "title": "MIG raw contract schema",
   "type": "object",
   "properties": {
-    "mod_index": false,
+    "mig_index": false,
     "amata": false,
     "steps": {
       "type": "array",

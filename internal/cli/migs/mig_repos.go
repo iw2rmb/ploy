@@ -2,10 +2,10 @@
 // This file implements mig repo set management commands (add, list, remove, import).
 //
 // These commands call the server endpoints:
-// - POST /v1/migs/{mod_id}/repos (add repo)
-// - GET /v1/migs/{mod_id}/repos (list repos)
-// - DELETE /v1/migs/{mod_id}/repos/{repo_id} (delete repo)
-// - POST /v1/migs/{mod_id}/repos/bulk (bulk import from CSV)
+// - POST /v1/migs/{mig_id}/repos (add repo)
+// - GET /v1/migs/{mig_id}/repos (list repos)
+// - DELETE /v1/migs/{mig_id}/repos/{repo_id} (delete repo)
+// - POST /v1/migs/{mig_id}/repos/bulk (bulk import from CSV)
 //
 // These commands implement mig repo set management (add, list, remove, import).
 package migs
@@ -25,7 +25,7 @@ import (
 )
 
 // AddMigRepoCommand adds a repo to a mig's repo set.
-// Endpoint: POST /v1/migs/{mod_id}/repos
+// Endpoint: POST /v1/migs/{mig_id}/repos
 // Adds a repo with URL, base ref, and target ref.
 type AddMigRepoCommand struct {
 	Client    *http.Client
@@ -36,7 +36,7 @@ type AddMigRepoCommand struct {
 	TargetRef string             // Required: target git ref.
 }
 
-// Run executes POST /v1/migs/{mod_id}/repos to add a repo.
+// Run executes POST /v1/migs/{mig_id}/repos to add a repo.
 func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: %w", err)
@@ -73,7 +73,7 @@ func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, e
 		return domainapi.MigRepoSummary{}, fmt.Errorf("mig repo add: marshal request: %w", err)
 	}
 
-	// POST /v1/migs/{mod_id}/repos
+	// POST /v1/migs/{mig_id}/repos
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload))
 	if err != nil {
@@ -100,7 +100,7 @@ func (c AddMigRepoCommand) Run(ctx context.Context) (domainapi.MigRepoSummary, e
 }
 
 // ListMigReposCommand lists repos in a mig's repo set.
-// Endpoint: GET /v1/migs/{mod_id}/repos
+// Endpoint: GET /v1/migs/{mig_id}/repos
 // Returns repos with ID, REPO_URL, BASE_REF, TARGET_REF, ADDED_AT.
 type ListMigReposCommand struct {
 	Client  *http.Client
@@ -108,7 +108,7 @@ type ListMigReposCommand struct {
 	MigRef  domaintypes.MigRef // Required: mig ID or name.
 }
 
-// Run executes GET /v1/migs/{mod_id}/repos to list repos.
+// Run executes GET /v1/migs/{mig_id}/repos to list repos.
 func (c ListMigReposCommand) Run(ctx context.Context) ([]domainapi.MigRepoSummary, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return nil, fmt.Errorf("mig repo list: %w", err)
@@ -117,7 +117,7 @@ func (c ListMigReposCommand) Run(ctx context.Context) ([]domainapi.MigRepoSummar
 		return nil, fmt.Errorf("mig repo list: mig id is required")
 	}
 
-	// GET /v1/migs/{mod_id}/repos
+	// GET /v1/migs/{mig_id}/repos
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -143,7 +143,7 @@ func (c ListMigReposCommand) Run(ctx context.Context) ([]domainapi.MigRepoSummar
 }
 
 // RemoveMigRepoCommand deletes a repo from a mig's repo set.
-// Endpoint: DELETE /v1/migs/{mod_id}/repos/{repo_id}
+// Endpoint: DELETE /v1/migs/{mig_id}/repos/{repo_id}
 // Refuses deletion if there are historical executions referencing this repo.
 type RemoveMigRepoCommand struct {
 	Client  *http.Client
@@ -152,7 +152,7 @@ type RemoveMigRepoCommand struct {
 	RepoID  domaintypes.MigRepoID
 }
 
-// Run executes DELETE /v1/migs/{mod_id}/repos/{repo_id} to delete a repo.
+// Run executes DELETE /v1/migs/{mig_id}/repos/{repo_id} to delete a repo.
 func (c RemoveMigRepoCommand) Run(ctx context.Context) error {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return fmt.Errorf("mig repo remove: %w", err)
@@ -164,7 +164,7 @@ func (c RemoveMigRepoCommand) Run(ctx context.Context) error {
 		return fmt.Errorf("mig repo remove: repo id is required")
 	}
 
-	// DELETE /v1/migs/{mod_id}/repos/{repo_id}
+	// DELETE /v1/migs/{mig_id}/repos/{repo_id}
 	endpoint := c.BaseURL.JoinPath(
 		"v1",
 		"migs",
@@ -192,7 +192,7 @@ func (c RemoveMigRepoCommand) Run(ctx context.Context) error {
 }
 
 // ImportMigReposCommand bulk imports repos for a mig from CSV.
-// Endpoint: POST /v1/migs/{mod_id}/repos/bulk
+// Endpoint: POST /v1/migs/{mig_id}/repos/bulk
 // Imports repos from CSV with header: repo_url,base_ref,target_ref.
 type ImportMigReposCommand struct {
 	Client  *http.Client
@@ -215,7 +215,7 @@ type ImportError struct {
 	Message string `json:"message"`
 }
 
-// Run executes POST /v1/migs/{mod_id}/repos/bulk to import repos from CSV.
+// Run executes POST /v1/migs/{mig_id}/repos/bulk to import repos from CSV.
 func (c ImportMigReposCommand) Run(ctx context.Context) (ImportMigReposResult, error) {
 	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
 		return ImportMigReposResult{}, fmt.Errorf("mig repo import: %w", err)
@@ -227,7 +227,7 @@ func (c ImportMigReposCommand) Run(ctx context.Context) (ImportMigReposResult, e
 		return ImportMigReposResult{}, fmt.Errorf("mig repo import: csv data is required")
 	}
 
-	// POST /v1/migs/{mod_id}/repos/bulk with Content-Type: text/csv
+	// POST /v1/migs/{mig_id}/repos/bulk with Content-Type: text/csv
 	endpoint := c.BaseURL.JoinPath("v1", "migs", c.MigRef.String(), "repos", "bulk")
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(c.CSVData))
 	if err != nil {

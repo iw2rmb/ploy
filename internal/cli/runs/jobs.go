@@ -8,14 +8,14 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/workflow/jobchain"
 )
 
-type RepoJobEntry = modsapi.RunRepoJob
+type RepoJobEntry = migsapi.RunRepoJob
 
 // ListRepoJobsResult contains the response from listing repo jobs.
-type ListRepoJobsResult = modsapi.ListRunRepoJobsResponse
+type ListRepoJobsResult = migsapi.ListRunRepoJobsResponse
 
 // ListRepoJobsCommand fetches jobs for a repo execution.
 type ListRepoJobsCommand struct {

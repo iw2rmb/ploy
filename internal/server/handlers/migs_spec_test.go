@@ -31,8 +31,8 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 			name: "success",
 			store: func() *migStore {
 				st := &migStore{
-					getModResult: store.Mig{
-						ID: "mod123", Name: "test-mig",
+					getMigResult: store.Mig{
+						ID: "mig123", Name: "test-mig",
 						SpecID:     &migSpecID,
 						ArchivedAt: pgtype.Timestamptz{Valid: false},
 					},
@@ -49,15 +49,15 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 				if rr.Body.String() != string(specRow.Spec) {
 					t.Fatalf("body = %q, want %q", rr.Body.String(), string(specRow.Spec))
 				}
-				assertCalled(t, "GetMig", st.getModCalled)
+				assertCalled(t, "GetMig", st.getMigCalled)
 				assertCalled(t, "GetSpec", st.getSpec.called)
 			},
 		},
 		{
 			name: "mig without spec",
 			store: &migStore{
-				getModResult: store.Mig{
-					ID: "mod123", Name: "test-mig",
+				getMigResult: store.Mig{
+					ID: "mig123", Name: "test-mig",
 					SpecID:     nil,
 					ArchivedAt: pgtype.Timestamptz{Valid: false},
 				},
@@ -70,7 +70,7 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 		},
 		{
 			name:       "mig not found",
-			store:      &migStore{getModErr: pgx.ErrNoRows},
+			store:      &migStore{getMigErr: pgx.ErrNoRows},
 			wantStatus: http.StatusNotFound,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
@@ -82,7 +82,7 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := getMigLatestSpecHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodGet, "/v1/migs/mod123/specs/latest", nil, "mig_ref", "mod123")
+			rr := doRequest(t, handler, http.MethodGet, "/v1/migs/mig123/specs/latest", nil, "mig_ref", "mig123")
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, tt.store, rr)
@@ -97,7 +97,7 @@ func TestMigs_GetLatestSpec(t *testing.T) {
 
 func TestMigs_SetSpec(t *testing.T) {
 	activeMig := store.Mig{
-		ID: "mod123", Name: "test-mig",
+		ID: "mig123", Name: "test-mig",
 		ArchivedAt: pgtype.Timestamptz{Valid: false},
 	}
 
@@ -115,9 +115,9 @@ func TestMigs_SetSpec(t *testing.T) {
 			wantStatus: http.StatusCreated,
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "GetMig", st.getModCalled)
+				assertCalled(t, "GetMig", st.getMigCalled)
 				assertCalled(t, "CreateSpec", st.createSpecCalled)
-				assertCalled(t, "UpdateMigSpec", st.updateModSpec.called)
+				assertCalled(t, "UpdateMigSpec", st.updateMigSpec.called)
 				resp := decodeBody[struct {
 					ID        string `json:"id"`
 					CreatedAt string `json:"created_at"`
@@ -145,11 +145,11 @@ func TestMigs_SetSpec(t *testing.T) {
 		{name: "missing spec", store: &migStore{}, body: map[string]any{"name": "no-spec"}, wantStatus: http.StatusBadRequest},
 		{name: "invalid spec", store: &migStore{}, body: map[string]any{"spec": map[string]any{"mig": map[string]any{"command": "echo hello"}}}, wantStatus: http.StatusBadRequest},
 		{name: "invalid JSON", store: &migStore{}, body: "not json", wantStatus: http.StatusBadRequest},
-		{name: "mig not found", store: &migStore{getModErr: pgx.ErrNoRows}, body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusNotFound},
+		{name: "mig not found", store: &migStore{getMigErr: pgx.ErrNoRows}, body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusNotFound},
 		{
 			name: "archived mig",
-			store: &migStore{getModResult: store.Mig{
-				ID: "mod123", Name: "test-mig",
+			store: &migStore{getMigResult: store.Mig{
+				ID: "mig123", Name: "test-mig",
 				ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			}},
 			body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusConflict,
@@ -157,7 +157,7 @@ func TestMigs_SetSpec(t *testing.T) {
 		{
 			name: "CreateSpec store error",
 			store: &migStore{
-				getModResult:  activeMig,
+				getMigResult:  activeMig,
 				createSpecErr: errors.New("database connection failed"),
 			},
 			body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusInternalServerError,
@@ -165,8 +165,8 @@ func TestMigs_SetSpec(t *testing.T) {
 		{
 			name: "UpdateMigSpec store error",
 			store: func() *migStore {
-				st := &migStore{getModResult: activeMig}
-				st.updateModSpec.err = errors.New("database connection failed")
+				st := &migStore{getMigResult: activeMig}
+				st.updateMigSpec.err = errors.New("database connection failed")
 				return st
 			}(),
 			body: map[string]any{"spec": validSpecBody()}, wantStatus: http.StatusInternalServerError,
@@ -177,10 +177,10 @@ func TestMigs_SetSpec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			st := tt.store
 			if st == nil {
-				st = &migStore{getModResult: activeMig}
+				st = &migStore{getMigResult: activeMig}
 			}
 			handler := setMigSpecHandler(st)
-			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", tt.body, "mig_ref", "mod123")
+			rr := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/specs", tt.body, "mig_ref", "mig123")
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, st, rr)
@@ -191,27 +191,27 @@ func TestMigs_SetSpec(t *testing.T) {
 
 func TestMigs_SetSpec_RepeatedCalls(t *testing.T) {
 	st := &migStore{
-		getModResult: store.Mig{
-			ID: "mod123", Name: "test-mig",
+		getMigResult: store.Mig{
+			ID: "mig123", Name: "test-mig",
 			ArchivedAt: pgtype.Timestamptz{Valid: false},
 		},
 	}
 	handler := setMigSpecHandler(st)
 
-	rr1 := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", map[string]any{"spec": validSpecBody()}, "mig_ref", "mod123")
+	rr1 := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/specs", map[string]any{"spec": validSpecBody()}, "mig_ref", "mig123")
 	assertStatus(t, rr1, http.StatusCreated)
 	firstSpecID := decodeBody[struct{ ID string }](t, rr1).ID
 
 	st.createSpecCalled = false
-	st.updateModSpec.called = false
+	st.updateMigSpec.called = false
 
 	spec2 := validSpecBody()
 	spec2["env"] = map[string]any{"FOO": "bar"}
-	rr2 := doRequest(t, handler, http.MethodPost, "/v1/migs/mod123/specs", map[string]any{"spec": spec2}, "mig_ref", "mod123")
+	rr2 := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/specs", map[string]any{"spec": spec2}, "mig_ref", "mig123")
 	assertStatus(t, rr2, http.StatusCreated)
 
 	assertCalled(t, "CreateSpec", st.createSpecCalled)
-	assertCalled(t, "UpdateMigSpec", st.updateModSpec.called)
+	assertCalled(t, "UpdateMigSpec", st.updateMigSpec.called)
 
 	secondSpecID := decodeBody[struct{ ID string }](t, rr2).ID
 	if firstSpecID == secondSpecID {

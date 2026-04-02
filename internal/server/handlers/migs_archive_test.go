@@ -20,11 +20,11 @@ import (
 
 func TestMigs_Archive(t *testing.T) {
 	activeMig := store.Mig{
-		ID: "mod123", Name: "test-mig",
+		ID: "mig123", Name: "test-mig",
 		ArchivedAt: pgtype.Timestamptz{Valid: false},
 	}
 	archivedMig := store.Mig{
-		ID: "mod123", Name: "test-mig",
+		ID: "mig123", Name: "test-mig",
 		ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
@@ -38,17 +38,17 @@ func TestMigs_Archive(t *testing.T) {
 		{
 			name: "success",
 			store: &migStore{
-				getModResult:   activeMig,
+				getMigResult:   activeMig,
 				listRunsResult: []store.Run{},
 			},
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "GetMig", st.getModCalled)
+				assertCalled(t, "GetMig", st.getMigCalled)
 				assertCalled(t, "ArchiveMig", st.archiveMig.called)
-				if st.archiveMig.params != "mod123" {
-					t.Errorf("ArchiveMig param = %q, want %q", st.archiveMig.params, "mod123")
+				if st.archiveMig.params != "mig123" {
+					t.Errorf("ArchiveMig param = %q, want %q", st.archiveMig.params, "mig123")
 				}
 				resp := decodeBody[struct {
 					ID       string `json:"id"`
@@ -62,8 +62,8 @@ func TestMigs_Archive(t *testing.T) {
 		},
 		{
 			name:       "already archived (idempotent)",
-			store:      &migStore{getModResult: archivedMig},
-			migRef:     "mod123",
+			store:      &migStore{getMigResult: archivedMig},
+			migRef:     "mig123",
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
@@ -72,20 +72,20 @@ func TestMigs_Archive(t *testing.T) {
 		},
 		{
 			name:       "not found",
-			store:      &migStore{getModErr: pgx.ErrNoRows},
+			store:      &migStore{getMigErr: pgx.ErrNoRows},
 			migRef:     "nonexistent",
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name: "refuses with active jobs",
 			store: &migStore{
-				getModResult:   activeMig,
-				listRunsResult: []store.Run{{ID: "run1", MigID: "mod123"}},
+				getMigResult:   activeMig,
+				listRunsResult: []store.Run{{ID: "run1", MigID: "mig123"}},
 				listJobsByRunResult: []store.Job{
 					{ID: "job1", RunID: "run1", Status: domaintypes.JobStatusRunning},
 				},
 			},
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusConflict,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
@@ -95,14 +95,14 @@ func TestMigs_Archive(t *testing.T) {
 		{
 			name: "allows with completed jobs",
 			store: &migStore{
-				getModResult:   activeMig,
-				listRunsResult: []store.Run{{ID: "run1", MigID: "mod123"}},
+				getMigResult:   activeMig,
+				listRunsResult: []store.Run{{ID: "run1", MigID: "mig123"}},
 				listJobsByRunResult: []store.Job{
 					{ID: "job1", RunID: "run1", Status: domaintypes.JobStatusSuccess},
 					{ID: "job2", RunID: "run1", Status: domaintypes.JobStatusFail},
 				},
 			},
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
@@ -112,17 +112,17 @@ func TestMigs_Archive(t *testing.T) {
 		{
 			name: "by name",
 			store: &migStore{
-				getModErr:          pgx.ErrNoRows,
-				getModByNameResult: store.Mig{ID: "mod123", Name: "my-mig", ArchivedAt: pgtype.Timestamptz{Valid: false}},
+				getMigErr:          pgx.ErrNoRows,
+				getMigByNameResult: store.Mig{ID: "mig123", Name: "my-mig", ArchivedAt: pgtype.Timestamptz{Valid: false}},
 				listRunsResult:     []store.Run{},
 			},
 			migRef:     "my-mig",
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, st *migStore, _ *httptest.ResponseRecorder) {
 				t.Helper()
-				assertCalled(t, "GetMigByName", st.getModByNameCalled)
-				if st.archiveMig.params != "mod123" {
-					t.Errorf("ArchiveMig param = %q, want %q", st.archiveMig.params, "mod123")
+				assertCalled(t, "GetMigByName", st.getMigByNameCalled)
+				if st.archiveMig.params != "mig123" {
+					t.Errorf("ArchiveMig param = %q, want %q", st.archiveMig.params, "mig123")
 				}
 			},
 		},
@@ -130,13 +130,13 @@ func TestMigs_Archive(t *testing.T) {
 			name: "store error",
 			store: func() *migStore {
 				st := &migStore{
-					getModResult:   activeMig,
+					getMigResult:   activeMig,
 					listRunsResult: []store.Run{},
 				}
 				st.archiveMig.err = errors.New("database connection failed")
 				return st
 			}(),
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusInternalServerError,
 		},
 	}
@@ -167,8 +167,8 @@ func TestMigs_Unarchive(t *testing.T) {
 		{
 			name: "success",
 			store: &migStore{
-				getModResult: store.Mig{
-					ID: "mod123", Name: "test-mig",
+				getMigResult: store.Mig{
+					ID: "mig123", Name: "test-mig",
 					ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				},
 			},
@@ -176,8 +176,8 @@ func TestMigs_Unarchive(t *testing.T) {
 			verify: func(t *testing.T, st *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
 				assertCalled(t, "UnarchiveMig", st.unarchiveMig.called)
-				if st.unarchiveMig.params != "mod123" {
-					t.Errorf("UnarchiveMig param = %q, want %q", st.unarchiveMig.params, "mod123")
+				if st.unarchiveMig.params != "mig123" {
+					t.Errorf("UnarchiveMig param = %q, want %q", st.unarchiveMig.params, "mig123")
 				}
 				resp := decodeBody[struct {
 					ID       string `json:"id"`
@@ -192,8 +192,8 @@ func TestMigs_Unarchive(t *testing.T) {
 		{
 			name: "already unarchived (idempotent)",
 			store: &migStore{
-				getModResult: store.Mig{
-					ID: "mod123", Name: "test-mig",
+				getMigResult: store.Mig{
+					ID: "mig123", Name: "test-mig",
 					ArchivedAt: pgtype.Timestamptz{Valid: false},
 				},
 			},
@@ -205,15 +205,15 @@ func TestMigs_Unarchive(t *testing.T) {
 		},
 		{
 			name:       "not found",
-			store:      &migStore{getModErr: pgx.ErrNoRows},
+			store:      &migStore{getMigErr: pgx.ErrNoRows},
 			wantStatus: http.StatusNotFound,
 		},
 		{
 			name: "store error",
 			store: func() *migStore {
 				st := &migStore{
-					getModResult: store.Mig{
-						ID: "mod123", Name: "test-mig",
+					getMigResult: store.Mig{
+						ID: "mig123", Name: "test-mig",
 						ArchivedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 					},
 				}
@@ -227,7 +227,7 @@ func TestMigs_Unarchive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handler := unarchiveMigHandler(tt.store)
-			rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mod123/unarchive", nil, "mig_ref", "mod123")
+			rr := doRequest(t, handler, http.MethodPatch, "/v1/migs/mig123/unarchive", nil, "mig_ref", "mig123")
 			assertStatus(t, rr, tt.wantStatus)
 			if tt.verify != nil {
 				tt.verify(t, tt.store, rr)

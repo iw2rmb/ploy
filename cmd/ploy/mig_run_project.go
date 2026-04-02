@@ -1,4 +1,4 @@
-// mod_run_project.go implements the 'ploy mig run <mig-id|name>' command handler for mig projects.
+// mig_run_project.go implements the 'ploy mig run <mig-id|name>' command handler for mig projects.
 //
 // This command creates a run from a mig project:
 // - ploy mig run <mig-id|name> [--repo <repo-url> ...] [--failed]
@@ -10,7 +10,7 @@
 //   - --failed → repos with last terminal state Fail
 //   - omitted → all repos in the mig repo set
 //
-// - Creates a mig-scoped run via POST /v1/migs/{mod_id}/runs and immediately starts execution.
+// - Creates a mig-scoped run via POST /v1/migs/{mig_id}/runs and immediately starts execution.
 // - Prints run_id.
 package main
 
@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
-	climods "github.com/iw2rmb/ploy/internal/cli/migs"
+	climigs "github.com/iw2rmb/ploy/internal/cli/migs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // handleMigRunProject implements 'ploy mig run <mig-id|name> [--repo <url>...] [--failed]'.
@@ -46,7 +46,7 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 		printMigRunProjectUsage(stderr)
 		return fmt.Errorf("mig id/name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	// Parse remaining flags.
 	fs := flag.NewFlagSet("mig run project", flag.ContinueOnError)
@@ -84,21 +84,21 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 	}
 
 	// Resolve mig reference to ID (supports both name and ID).
-	resolveCmd := climods.ResolveMigByNameCommand{
+	resolveCmd := climigs.ResolveMigByNameCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
-	modID, err := resolveCmd.Run(ctx)
+	migID, err := resolveCmd.Run(ctx)
 	if err != nil {
 		return err
 	}
 
 	// Execute mig run command with repo selection.
-	cmd := climods.CreateMigRunCommand{
+	cmd := climigs.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  base,
-		MigRef:   domaintypes.MigRef(modID),
+		MigRef:   domaintypes.MigRef(migID),
 		RepoURLs: repoURLs,
 		Failed:   *failed,
 	}
@@ -113,14 +113,14 @@ func handleMigRunProject(args []string, stderr io.Writer) error {
 
 	// Follow mode: display job graph until completion.
 	if *followFlag {
-		return followModRunProject(ctx, base, httpClient, result.RunID, *capDuration, *cancelOnCap, *maxRetries, stderr)
+		return followMigRunProject(ctx, base, httpClient, result.RunID, *capDuration, *cancelOnCap, *maxRetries, stderr)
 	}
 
 	return nil
 }
 
-// followModRunProject displays the job graph until run completion.
-func followModRunProject(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, capDuration time.Duration, cancelOnCap bool, maxRetries int, stderr io.Writer) error {
+// followMigRunProject displays the job graph until run completion.
+func followMigRunProject(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, capDuration time.Duration, cancelOnCap bool, maxRetries int, stderr io.Writer) error {
 
 	followCtx := ctx
 	var cancel context.CancelFunc
@@ -157,7 +157,7 @@ func followModRunProject(ctx context.Context, baseURL *url.URL, client *http.Cli
 	}
 
 	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
-	if final != modsapi.RunStateSucceeded {
+	if final != migsapi.RunStateSucceeded {
 		return fmt.Errorf("mig run ended in %s", strings.ToLower(string(final)))
 	}
 

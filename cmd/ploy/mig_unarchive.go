@@ -1,4 +1,4 @@
-// mod_unarchive.go implements the 'ploy mig unarchive' command handler.
+// mig_unarchive.go implements the 'ploy mig unarchive' command handler.
 //
 // This command unarchives a mig project:
 // - ploy mig unarchive <mig-id|name>
@@ -26,7 +26,7 @@ func handleMigUnarchive(args []string, stderr io.Writer) error {
 		printMigUnarchiveUsage(stderr)
 		return fmt.Errorf("mig id or name required")
 	}
-	modRef := args[0]
+	migRef := args[0]
 
 	// Resolve control plane connection.
 	ctx := context.Background()
@@ -39,7 +39,7 @@ func handleMigUnarchive(args []string, stderr io.Writer) error {
 	cmd := migs.UnarchiveMigCommand{
 		Client:  httpClient,
 		BaseURL: base,
-		MigRef:  domaintypes.MigRef(modRef),
+		MigRef:  domaintypes.MigRef(migRef),
 	}
 
 	result, err := cmd.Run(ctx)
@@ -47,7 +47,7 @@ func handleMigUnarchive(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Mod unarchived: %s (name: %s)\n", result.ID.String(), result.Name)
+	_, _ = fmt.Fprintf(stderr, "Mig unarchived: %s (name: %s)\n", result.ID.String(), result.Name)
 	return nil
 }
 

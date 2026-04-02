@@ -144,7 +144,7 @@ func TestParseMigSpecJSON_StackGate(t *testing.T) {
 	input := `{
 		"steps": [{
 			"name": "java11-to-17",
-			"image": "docker.io/user/migs-orw:latest",
+			"image": "ghcr.io/iw2rmb/ploy/orw-cli-maven:latest",
 			"stack": {
 				"inbound":  {"enabled": true, "expect": {"language": "java", "tool": "maven", "release": "11"}},
 				"outbound": {"enabled": true, "expect": {"language": "java", "tool": "maven", "release": "17"}}
@@ -261,7 +261,7 @@ func TestValidateStackGatePhaseSpec(t *testing.T) {
 func TestStackGateSpec_RoundTrip(t *testing.T) {
 	original := &MigSpec{
 		Steps: []MigStep{{
-			Image: JobImage{Universal: "docker.io/user/mig:latest"},
+			Image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 			Stack: &StackGateSpec{
 				Inbound:  &StackGatePhaseSpec{Enabled: true, Expect: copyStackExp(javaMaven11Exp)},
 				Outbound: &StackGatePhaseSpec{Enabled: true, Expect: copyStackExp(javaMaven17Exp)},

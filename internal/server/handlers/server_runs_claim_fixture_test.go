@@ -47,7 +47,7 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 	now := time.Now().UTC()
 
 	if opts.jobType == "" {
-		opts.jobType = domaintypes.JobTypeMod
+		opts.jobType = domaintypes.JobTypeMig
 	}
 	if opts.jobName == "" {
 		opts.jobName = "mig-0"
@@ -95,8 +95,8 @@ func newClaimJobFixture(t testing.TB, opts claimJobFixtureOptions) *claimJobFixt
 		Status:    opts.runStatus,
 		CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		}
-	st.getModRepo.val = store.MigRepo{ID: domaintypes.NewMigRepoID(), RepoID: repoID}
+	}
+	st.getMigRepo.val = store.MigRepo{ID: domaintypes.NewMigRepoID(), RepoID: repoID}
 	st.getSpec.val = store.Spec{ID: specID, Spec: opts.specJSON}
 
 	return &claimJobFixture{

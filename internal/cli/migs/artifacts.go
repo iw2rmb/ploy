@@ -12,7 +12,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/httpx"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // ArtifactsCommand lists artifacts attached to a Migs run by stage.
@@ -46,7 +46,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 		return httpx.WrapError("migs artifacts", resp.Status, resp.Body)
 	}
 	// Decode RunSummary directly — the server returns the canonical type (no wrapper).
-	var summary modsapi.RunSummary
+	var summary migsapi.RunSummary
 	if err := httpx.DecodeResponseJSON(resp.Body, &summary, httpx.MaxJSONBodyBytes); err != nil {
 		return err
 	}

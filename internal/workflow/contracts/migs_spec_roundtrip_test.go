@@ -9,7 +9,7 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 	mrOnSuccess := true
 	original := &MigSpec{
 		Steps: []MigStep{{
-			Image:   JobImage{Universal: "docker.io/user/mig:latest"},
+			Image:   JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 			Command: CommandSpec{Shell: "echo hello"},
 			Env:     map[string]string{"FOO": "bar"},
 		}},
@@ -46,11 +46,11 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 	original := &MigSpec{
 		Steps: []MigStep{
-			{Name: "step-1", Image: JobImage{Universal: "mod1:latest"}},
+			{Name: "step-1", Image: JobImage{Universal: "mig1:latest"}},
 			{Name: "step-2", Image: JobImage{ByStack: map[MigStack]string{
-				MigStackDefault:    "mod2:default",
-				MigStackJavaMaven:  "mod2:maven",
-				MigStackJavaGradle: "mod2:gradle",
+				MigStackDefault:    "mig2:default",
+				MigStackJavaMaven:  "mig2:maven",
+				MigStackJavaGradle: "mig2:gradle",
 			}}},
 		},
 		BuildGate: &BuildGateConfig{

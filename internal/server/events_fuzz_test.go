@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // FuzzPublishRunRoundTrip ensures arbitrary run payloads marshal/unmarshal without panicking
@@ -24,18 +24,18 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, streamRunID, payloadRunID string, stateByte uint8) {
 		// Map byte to a valid run state.
-		states := []modsapi.RunState{
-			modsapi.RunStatePending,
-			modsapi.RunStateRunning,
-			modsapi.RunStateSucceeded,
-			modsapi.RunStateFailed,
-			modsapi.RunStateCancelled,
+		states := []migsapi.RunState{
+			migsapi.RunStatePending,
+			migsapi.RunStateRunning,
+			migsapi.RunStateSucceeded,
+			migsapi.RunStateFailed,
+			migsapi.RunStateCancelled,
 		}
 		state := states[int(stateByte)%len(states)]
 
 		// Build payload using renamed RunID field.
 		payloadID := domaintypes.RunID(payloadRunID)
-		payload := modsapi.RunSummary{RunID: payloadID, State: state}
+		payload := migsapi.RunSummary{RunID: payloadID, State: state}
 		ctx := context.Background()
 
 		err := svc.PublishRun(ctx, domaintypes.RunID(streamRunID), payload)
@@ -62,7 +62,7 @@ func FuzzPublishRunRoundTrip(f *testing.F) {
 		if snap[0].Type != domaintypes.SSEEventRun {
 			t.Fatalf("unexpected event type: %s", snap[0].Type)
 		}
-		var out modsapi.RunSummary
+		var out migsapi.RunSummary
 		if err := json.Unmarshal(snap[0].Data, &out); err != nil {
 			t.Fatalf("unmarshal: %v", err)
 		}

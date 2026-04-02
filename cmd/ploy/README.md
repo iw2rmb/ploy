@@ -68,9 +68,9 @@ lists artifacts with `stage`, `name`, `cid`, `digest`, `size` (bytes written),
 and the local `path`. Filenames are sanitized and deterministic; when a content
 digest is available it prefixes the name, otherwise the artifact CID is used.
 
-## Mod Projects
+## Mig Projects
 
-Mod projects are long-lived containers with a unique name, a current spec, and a managed repo set.
+Mig projects are long-lived containers with a unique name, a current spec, and a managed repo set.
 
 ```bash
 # Create a mig project.
@@ -94,7 +94,7 @@ ploy mig run my-mig --repo https://github.com/org/repo-a.git --repo https://gith
 ploy mig run my-mig --failed
 ```
 
-## Batched Mod Runs
+## Batched Mig Runs
 
 `mig run` supports two usage patterns: **single-repo runs** and **batch runs** that
 operate over multiple repositories under a shared run spec. In a batch, `ploy mig run`
@@ -203,21 +203,21 @@ cd service-a
 # Run-based pull (you know the run_id):
 ploy run pull <run-id>
 
-# Mod-based pull (default: last succeeded):
+# Mig-based pull (default: last succeeded):
 ploy mig pull <mig-id|name>
 ```
 
 **How it works:**
 1. Derives the current repo identity from the git remote (default: `origin`).
 2. Verifies the working tree is clean (no uncommitted changes).
-3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mod_id}/pull` for mig-based pull).
+3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mig_id}/pull` for mig-based pull).
 4. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
 5. Creates a new branch at the fetched commit using the run's `target_ref`.
 6. Downloads and applies all stored Migs diffs via `git apply`.
 
 **Arguments:**
 - `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
-- `[<mig-id|name>]` — Mod ID or name (optional), for `ploy mig pull`.
+- `[<mig-id|name>]` — Mig ID or name (optional), for `ploy mig pull`.
 
 **Flags:**
 - `--origin <remote>` — Git remote to match (default: `origin`). Use this when your

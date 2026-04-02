@@ -16,7 +16,7 @@ func TestGetStatusCommandDelegates(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-	modID := domaintypes.NewMigID()
+	migID := domaintypes.NewMigID()
 	specID := domaintypes.NewSpecID()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,7 @@ func TestGetStatusCommandDelegates(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"` + runID.String() + `","status":"running","mig_id":"` + modID.String() + `","spec_id":"` + specID.String() + `","created_at":"2024-01-01T00:00:00Z"}`))
+		_, _ = w.Write([]byte(`{"id":"` + runID.String() + `","status":"running","mig_id":"` + migID.String() + `","spec_id":"` + specID.String() + `","created_at":"2024-01-01T00:00:00Z"}`))
 	}))
 	t.Cleanup(srv.Close)
 

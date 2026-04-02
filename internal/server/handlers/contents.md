@@ -88,7 +88,7 @@
 [nodes_test.go](nodes_test.go) Covers node lifecycle handlers and store interaction invariants.
 [path_params_test.go](path_params_test.go) Tests shared path-parameter parsing and validation helpers used by handlers.
 [pull.go](pull.go) Handlers that resolve and return pullable repository state for runs and migs.
-[pull_test.go](pull_test.go) Covers pull endpoints for run/mod repos, URL normalization, and selection/error semantics.
+[pull_test.go](pull_test.go) Covers pull endpoints for run/mig repos, URL normalization, and selection/error semantics.
 [register.go](register.go) Registers all HTTP routes and binds handlers to shared dependencies.
 [register_routes_coverage_test.go](register_routes_coverage_test.go) Guards route registration parity against the declared OpenAPI surface.
 [repo_lookup.go](repo_lookup.go) Utility helpers to resolve repository records for request handlers.

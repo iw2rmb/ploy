@@ -36,14 +36,14 @@
 [execution_healing_policy_test.go](execution_healing_policy_test.go) Unit tests covering execution healing policy behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_mr.go](execution_mr.go) Merge-request job flow that prepares branch state, pushes changes, and triggers provider MR creation.
 [execution_mr_test.go](execution_mr_test.go) Unit tests covering execution mr behavior, edge cases, and contract expectations for nodeagent flows.
-[execution_orchestrator.go](execution_orchestrator.go) High-level job dispatcher that routes claimed jobs to gate/mod/heal/MR executors and handles panic-safe teardown.
+[execution_orchestrator.go](execution_orchestrator.go) High-level job dispatcher that routes claimed jobs to gate/mig/heal/MR executors and handles panic-safe teardown.
 [execution_orchestrator_cancel_test.go](execution_orchestrator_cancel_test.go) Unit tests covering execution orchestrator cancel behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_orchestrator_gate.go](execution_orchestrator_gate.go) Gate-job execution logic, including gate profile wiring, failure handling, and stack-aware gate behaviors.
 [execution_orchestrator_gate_stackdetect_test.go](execution_orchestrator_gate_stackdetect_test.go) Verifies gate-job stack detection behavior and fallback decisions when stack metadata is partial or missing.
 [execution_orchestrator_gate_test.go](execution_orchestrator_gate_test.go) Unit tests covering execution orchestrator gate behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_orchestrator_healing_runtime.go](execution_orchestrator_healing_runtime.go) Healing runtime path that builds recovery execution context and applies recovery-specific runtime configuration.
 [execution_orchestrator_helpers_test.go](execution_orchestrator_helpers_test.go) Unit tests covering execution orchestrator helpers behavior, edge cases, and contract expectations for nodeagent flows.
-[execution_orchestrator_jobs.go](execution_orchestrator_jobs.go) Main mod/heal job execution routines and shared orchestration helpers for container runs and result handling.
+[execution_orchestrator_jobs.go](execution_orchestrator_jobs.go) Main mig/heal job execution routines and shared orchestration helpers for container runs and result handling.
 [execution_orchestrator_jobs_amata_test.go](execution_orchestrator_jobs_amata_test.go) Covers Amata-oriented job orchestration wiring, runtime inputs, and failure handling during execution dispatch.
 [execution_orchestrator_jobs_upload.go](execution_orchestrator_jobs_upload.go) Artifact, diff, and status upload orchestration for completed jobs and intermediate execution outputs.
 [execution_orchestrator_jobs_upload_test.go](execution_orchestrator_jobs_upload_test.go) Tests upload orchestration for job status, logs, artifacts, and diffs under success and error conditions.
@@ -73,7 +73,7 @@
 [loghook_test.go](loghook_test.go) Unit tests covering loghook behavior, edge cases, and contract expectations for nodeagent flows.
 [logstreamer.go](logstreamer.go) Streaming log uploader that batches, compresses, and sends execution logs with hooks and size controls.
 [logstreamer_test.go](logstreamer_test.go) Unit tests covering logstreamer behavior, edge cases, and contract expectations for nodeagent flows.
-[manifest.go](manifest.go) Manifest builders that translate claim/spec inputs into executable step manifests for gate, mod, and healing jobs.
+[manifest.go](manifest.go) Manifest builders that translate claim/spec inputs into executable step manifests for gate, mig, and healing jobs.
 [manifest_healing_test.go](manifest_healing_test.go) Unit tests covering manifest healing behavior, edge cases, and contract expectations for nodeagent flows.
 [manifest_jobid_test.go](manifest_jobid_test.go) Unit tests covering manifest jobid behavior, edge cases, and contract expectations for nodeagent flows.
 [manifest_router_test.go](manifest_router_test.go) Unit tests covering manifest router behavior, edge cases, and contract expectations for nodeagent flows.

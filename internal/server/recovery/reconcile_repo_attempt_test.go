@@ -26,7 +26,7 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 		{
 			name: "non terminal job blocks update",
 			jobs: []store.Job{
-				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMod, Status: domaintypes.JobStatusRunning},
+				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusRunning},
 			},
 			wantUpdate: false,
 		},
@@ -34,7 +34,7 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 			name: "uses highest next_id terminal job",
 			jobs: []store.Job{
 				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePreGate, Status: domaintypes.JobStatusFail, Meta: mkMeta(1000)},
-				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMod, Status: domaintypes.JobStatusSuccess, Meta: mkMeta(2000)},
+				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess, Meta: mkMeta(2000)},
 			},
 			wantUpdate: true,
 			wantStatus: domaintypes.RunRepoStatusSuccess,
@@ -49,7 +49,7 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 		{
 			name: "error status maps repo to fail",
 			jobs: []store.Job{
-				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMod, Status: domaintypes.JobStatusError},
+				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusError},
 			},
 			wantUpdate: true,
 			wantStatus: domaintypes.RunRepoStatusFail,

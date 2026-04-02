@@ -31,7 +31,7 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check for running jobs in this mig's runs.
-		hasRunningJobs, err := modHasAnyRunningJobs(r.Context(), st, mig.ID)
+		hasRunningJobs, err := migHasAnyRunningJobs(r.Context(), st, mig.ID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to check jobs: %v", err)
 			slog.Error("archive mig: check jobs failed", "mig_id", mig.ID, "err", err)
@@ -53,9 +53,9 @@ func archiveMigHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-func modHasAnyRunningJobs(ctx context.Context, st store.Store, modID domaintypes.MigID) (bool, error) {
+func migHasAnyRunningJobs(ctx context.Context, st store.Store, migID domaintypes.MigID) (bool, error) {
 	return scanRunPages(ctx, st, func(run store.Run) (bool, error) {
-		if run.MigID != modID {
+		if run.MigID != migID {
 			return false, nil
 		}
 		jobs, err := st.ListJobsByRun(ctx, run.ID)

@@ -184,7 +184,7 @@ When Stack Gate is enabled for a gate phase (a gate job carries `gate.stack_gate
 Build Gate resolves its runtime image from an explicit stack→image mapping.
 
 **Resolution sources and precedence (highest wins):**
-1. Mod spec: `build_gate.images[]` (per-stack overrides)
+1. Mig spec: `build_gate.images[]` (per-stack overrides)
 2. Default catalog: `gates/stacks.yaml` (installed at `/etc/ploy/gates/stacks.yaml` in Docker images)
 
 **Default catalog shipping:**

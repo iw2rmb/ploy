@@ -68,9 +68,9 @@ func TestSQLCOverridesCompile(t *testing.T) {
 	assertType[types.SpecID](spec.ID)
 
 	// Verify MigRepo struct field types.
-	var modRepo MigRepo
-	assertType[types.MigRepoID](modRepo.ID)
-	assertType[types.MigID](modRepo.MigID)
+	var migRepo MigRepo
+	assertType[types.MigRepoID](migRepo.ID)
+	assertType[types.MigID](migRepo.MigID)
 
 	// Verify RunRepo struct field types.
 	var runRepo RunRepo

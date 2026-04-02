@@ -20,7 +20,7 @@ type migStore struct {
 	createSpecErr    error
 
 	getSpec       mockCall[string, store.Spec]
-	updateModSpec mockCall[store.UpdateMigSpecParams, struct{}]
+	updateMigSpec mockCall[store.UpdateMigSpecParams, struct{}]
 
 	// Mig CRUD
 	createMigCalled bool
@@ -33,15 +33,15 @@ type migStore struct {
 	listMigsResult []store.Mig
 	listMigsErr    error
 
-	getModCalled bool
-	getModParam  string
-	getModResult store.Mig
-	getModErr    error
+	getMigCalled bool
+	getMigParam  string
+	getMigResult store.Mig
+	getMigErr    error
 
-	getModByNameCalled bool
-	getModByNameParam  string
-	getModByNameResult store.Mig
-	getModByNameErr    error
+	getMigByNameCalled bool
+	getMigByNameParam  string
+	getMigByNameResult store.Mig
+	getMigByNameErr    error
 
 	deleteMig    mockCall[string, struct{}]
 	archiveMig   mockCall[string, struct{}]
@@ -53,26 +53,26 @@ type migStore struct {
 	createMigRepoResult store.MigRepo
 	createMigRepoErr    error
 
-	getModRepo mockResult[store.MigRepo]
+	getMigRepo mockResult[store.MigRepo]
 
-	listMigReposByModCalled  bool
-	listMigReposByModParam   string
-	listMigReposByModResult  []store.MigRepo
-	listMigReposByModResults map[string][]store.MigRepo
-	listMigReposByModErr     error
+	listMigReposByMigCalled  bool
+	listMigReposByMigParam   string
+	listMigReposByMigResult  []store.MigRepo
+	listMigReposByMigResults map[string][]store.MigRepo
+	listMigReposByMigErr     error
 
-	getModRepoByURL mockCall[store.GetMigRepoByURLParams, store.MigRepo]
+	getMigRepoByURL mockCall[store.GetMigRepoByURLParams, store.MigRepo]
 
-	upsertModRepoCalled bool
-	upsertModRepoParams store.UpsertMigRepoParams
-	upsertModRepoResult store.MigRepo
-	upsertModRepoErr    error
+	upsertMigRepoCalled bool
+	upsertMigRepoParams store.UpsertMigRepoParams
+	upsertMigRepoResult store.MigRepo
+	upsertMigRepoErr    error
 
 	deleteMigRepo     mockResult[struct{}]
-	hasModRepoHistory mockResult[bool]
+	hasMigRepoHistory mockResult[bool]
 	updateMigRepoRefs mockCall[store.UpdateMigRepoRefsParams, struct{}]
 
-	listFailedRepoIDsByMod mockCall[string, []types.RepoID]
+	listFailedRepoIDsByMig mockCall[string, []types.RepoID]
 
 	repoByID map[types.RepoID]store.Repo
 
@@ -92,9 +92,9 @@ type migStore struct {
 	createRunRepoErr    error
 
 	// Run/Job queries (for archive validation and migs_ticket)
-	getRun             mockCall[string, store.Run]
-	listRunsResult     []store.Run
-	listRunsErr        error
+	getRun              mockCall[string, store.Run]
+	listRunsResult      []store.Run
+	listRunsErr         error
 	listJobsByRunResult []store.Job
 	listJobsByRunCalled bool
 
@@ -133,7 +133,7 @@ func (m *migStore) GetSpec(ctx context.Context, id types.SpecID) (store.Spec, er
 }
 
 func (m *migStore) UpdateMigSpec(ctx context.Context, params store.UpdateMigSpecParams) error {
-	_, err := m.updateModSpec.record(params)
+	_, err := m.updateMigSpec.record(params)
 	return err
 }
 
@@ -168,12 +168,12 @@ func (m *migStore) ListMigs(ctx context.Context, params store.ListMigsParams) ([
 }
 
 func (m *migStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error) {
-	m.getModCalled = true
-	m.getModParam = id.String()
-	if m.getModErr != nil {
-		return store.Mig{}, m.getModErr
+	m.getMigCalled = true
+	m.getMigParam = id.String()
+	if m.getMigErr != nil {
+		return store.Mig{}, m.getMigErr
 	}
-	result := m.getModResult
+	result := m.getMigResult
 	if result.ID.IsZero() {
 		result.ID = id
 	}
@@ -184,12 +184,12 @@ func (m *migStore) GetMig(ctx context.Context, id types.MigID) (store.Mig, error
 }
 
 func (m *migStore) GetMigByName(ctx context.Context, name string) (store.Mig, error) {
-	m.getModByNameCalled = true
-	m.getModByNameParam = name
-	if m.getModByNameErr != nil {
-		return store.Mig{}, m.getModByNameErr
+	m.getMigByNameCalled = true
+	m.getMigByNameParam = name
+	if m.getMigByNameErr != nil {
+		return store.Mig{}, m.getMigByNameErr
 	}
-	result := m.getModByNameResult
+	result := m.getMigByNameResult
 	if result.ID.IsZero() && result.Name == "" {
 		return store.Mig{}, pgx.ErrNoRows
 	}
@@ -243,29 +243,29 @@ func (m *migStore) CreateMigRepo(ctx context.Context, params store.CreateMigRepo
 }
 
 func (m *migStore) GetMigRepo(ctx context.Context, id types.MigRepoID) (store.MigRepo, error) {
-	return m.getModRepo.ret()
+	return m.getMigRepo.ret()
 }
 
-func (m *migStore) ListMigReposByMig(ctx context.Context, modID types.MigID) ([]store.MigRepo, error) {
-	m.listMigReposByModCalled = true
-	modIDStr := modID.String()
-	m.listMigReposByModParam = modIDStr
-	if m.listMigReposByModResults != nil {
-		if repos, ok := m.listMigReposByModResults[modIDStr]; ok {
-			return repos, m.listMigReposByModErr
+func (m *migStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]store.MigRepo, error) {
+	m.listMigReposByMigCalled = true
+	migIDStr := migID.String()
+	m.listMigReposByMigParam = migIDStr
+	if m.listMigReposByMigResults != nil {
+		if repos, ok := m.listMigReposByMigResults[migIDStr]; ok {
+			return repos, m.listMigReposByMigErr
 		}
 	}
-	return m.listMigReposByModResult, m.listMigReposByModErr
+	return m.listMigReposByMigResult, m.listMigReposByMigErr
 }
 
 func (m *migStore) GetMigRepoByURL(ctx context.Context, arg store.GetMigRepoByURLParams) (store.MigRepo, error) {
-	return m.getModRepoByURL.record(arg)
+	return m.getMigRepoByURL.record(arg)
 }
 
 func (m *migStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoParams) (store.MigRepo, error) {
-	m.upsertModRepoCalled = true
-	m.upsertModRepoParams = arg
-	result := m.upsertModRepoResult
+	m.upsertMigRepoCalled = true
+	m.upsertMigRepoParams = arg
+	result := m.upsertMigRepoResult
 	if result.ID.IsZero() {
 		result.ID = arg.ID
 	}
@@ -285,7 +285,7 @@ func (m *migStore) UpsertMigRepo(ctx context.Context, arg store.UpsertMigRepoPar
 		m.repoByID = map[types.RepoID]store.Repo{}
 	}
 	m.repoByID[result.RepoID] = store.Repo{ID: result.RepoID, Url: arg.Url}
-	return result, m.upsertModRepoErr
+	return result, m.upsertMigRepoErr
 }
 
 func (m *migStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error {
@@ -293,11 +293,11 @@ func (m *migStore) DeleteMigRepo(ctx context.Context, id types.MigRepoID) error 
 }
 
 func (m *migStore) HasMigRepoHistory(ctx context.Context, repoID types.RepoID) (bool, error) {
-	return m.hasModRepoHistory.ret()
+	return m.hasMigRepoHistory.ret()
 }
 
-func (m *migStore) ListFailedRepoIDsByMig(ctx context.Context, modID types.MigID) ([]types.RepoID, error) {
-	return m.listFailedRepoIDsByMod.record(modID.String())
+func (m *migStore) ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error) {
+	return m.listFailedRepoIDsByMig.record(migID.String())
 }
 
 func (m *migStore) UpdateMigRepoRefs(ctx context.Context, params store.UpdateMigRepoRefsParams) error {
@@ -434,4 +434,3 @@ func (m *migStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store
 func (m *migStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	return m.createEvent.ret()
 }
-

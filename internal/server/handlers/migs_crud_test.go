@@ -62,7 +62,7 @@ func TestMigs_Create(t *testing.T) {
 				t.Helper()
 				assertCalled(t, "CreateMig", st.createMigCalled)
 				assertCalled(t, "CreateSpec", st.createSpecCalled)
-				assertCalled(t, "UpdateMigSpec", st.updateModSpec.called)
+				assertCalled(t, "UpdateMigSpec", st.updateMigSpec.called)
 				resp := decodeBody[struct {
 					ID     string  `json:"id"`
 					Name   string  `json:"name"`
@@ -119,8 +119,8 @@ func TestMigs_List(t *testing.T) {
 			name: "returns migs",
 			store: &migStore{
 				listMigsResult: []store.Mig{
-					{ID: "mod001", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-					{ID: "mod002", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
+					{ID: "mig001", Name: "alpha-mig", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+					{ID: "mig002", Name: "beta-mig", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true}},
 				},
 			},
 			wantStatus: http.StatusOK,
@@ -189,12 +189,12 @@ func TestMigs_List(t *testing.T) {
 			name: "repo_url filter normalizes",
 			store: &migStore{
 				listMigsResult: []store.Mig{
-					{ID: "mod001", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-					{ID: "mod002", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
+					{ID: "mig001", Name: "alpha", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+					{ID: "mig002", Name: "beta", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
 				},
-				listMigReposByModResults: map[string][]store.MigRepo{
-					"mod001": {{ID: "repo1", MigID: "mod001", RepoID: "repo1"}},
-					"mod002": {{ID: "repo2", MigID: "mod002", RepoID: "repo2"}},
+				listMigReposByMigResults: map[string][]store.MigRepo{
+					"mig001": {{ID: "repo1", MigID: "mig001", RepoID: "repo1"}},
+					"mig002": {{ID: "repo2", MigID: "mig002", RepoID: "repo2"}},
 				},
 				repoByID: map[types.RepoID]store.Repo{
 					"repo1": {ID: "repo1", Url: "https://github.com/org/repo"},
@@ -213,8 +213,8 @@ func TestMigs_List(t *testing.T) {
 				if len(resp.Migs) != 1 {
 					t.Fatalf("got %d migs, want 1", len(resp.Migs))
 				}
-				if resp.Migs[0].ID != "mod001" {
-					t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mod001")
+				if resp.Migs[0].ID != "mig001" {
+					t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mig001")
 				}
 			},
 		},
@@ -222,14 +222,14 @@ func TestMigs_List(t *testing.T) {
 			name: "repo_url filter paginates",
 			store: &migStore{
 				listMigsResult: []store.Mig{
-					{ID: "mod00A", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
-					{ID: "mod00B", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
-					{ID: "mod00C", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
+					{ID: "mig00A", Name: "a", CreatedAt: pgtype.Timestamptz{Time: now, Valid: true}},
+					{ID: "mig00B", Name: "b", CreatedAt: pgtype.Timestamptz{Time: now.Add(-time.Minute), Valid: true}},
+					{ID: "mig00C", Name: "c", CreatedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Minute), Valid: true}},
 				},
-				listMigReposByModResults: map[string][]store.MigRepo{
-					"mod00A": {{ID: "repoA", MigID: "mod00A", RepoID: "repoA"}},
-					"mod00B": {{ID: "repoB", MigID: "mod00B", RepoID: "repoB"}},
-					"mod00C": {{ID: "repoC", MigID: "mod00C", RepoID: "repoC"}},
+				listMigReposByMigResults: map[string][]store.MigRepo{
+					"mig00A": {{ID: "repoA", MigID: "mig00A", RepoID: "repoA"}},
+					"mig00B": {{ID: "repoB", MigID: "mig00B", RepoID: "repoB"}},
+					"mig00C": {{ID: "repoC", MigID: "mig00C", RepoID: "repoC"}},
 				},
 				repoByID: map[types.RepoID]store.Repo{
 					"repoA": {ID: "repoA", Url: "https://github.com/org/repo"},
@@ -248,8 +248,8 @@ func TestMigs_List(t *testing.T) {
 				if len(resp.Migs) != 1 {
 					t.Fatalf("got %d migs, want 1", len(resp.Migs))
 				}
-				if resp.Migs[0].ID != "mod00B" {
-					t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mod00B")
+				if resp.Migs[0].ID != "mig00B" {
+					t.Errorf("id = %q, want %q", resp.Migs[0].ID, "mig00B")
 				}
 			},
 		},
@@ -310,20 +310,20 @@ func TestMigs_Delete(t *testing.T) {
 		{
 			name:       "success",
 			store:      &migStore{listRunsResult: []store.Run{}},
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusNoContent,
 			verify: func(t *testing.T, st *migStore) {
 				t.Helper()
-				assertCalled(t, "GetMig", st.getModCalled)
+				assertCalled(t, "GetMig", st.getMigCalled)
 				assertCalled(t, "DeleteMig", st.deleteMig.called)
-				if st.deleteMig.params != "mod123" {
-					t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mod123")
+				if st.deleteMig.params != "mig123" {
+					t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mig123")
 				}
 			},
 		},
 		{
 			name:       "not found",
-			store:      &migStore{getModErr: pgx.ErrNoRows},
+			store:      &migStore{getMigErr: pgx.ErrNoRows},
 			migRef:     "nonexistent",
 			wantStatus: http.StatusNotFound,
 			verify: func(t *testing.T, st *migStore) {
@@ -334,9 +334,9 @@ func TestMigs_Delete(t *testing.T) {
 		{
 			name: "refuses with runs",
 			store: &migStore{
-				listRunsResult: []store.Run{{ID: "run1", MigID: "mod123"}},
+				listRunsResult: []store.Run{{ID: "run1", MigID: "mig123"}},
 			},
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusConflict,
 			verify: func(t *testing.T, st *migStore) {
 				t.Helper()
@@ -346,17 +346,17 @@ func TestMigs_Delete(t *testing.T) {
 		{
 			name: "by name",
 			store: &migStore{
-				getModErr:          pgx.ErrNoRows,
-				getModByNameResult: store.Mig{ID: "mod123", Name: "my-mig"},
+				getMigErr:          pgx.ErrNoRows,
+				getMigByNameResult: store.Mig{ID: "mig123", Name: "my-mig"},
 				listRunsResult:     []store.Run{},
 			},
 			migRef:     "my-mig",
 			wantStatus: http.StatusNoContent,
 			verify: func(t *testing.T, st *migStore) {
 				t.Helper()
-				assertCalled(t, "GetMigByName", st.getModByNameCalled)
-				if st.deleteMig.params != "mod123" {
-					t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mod123")
+				assertCalled(t, "GetMigByName", st.getMigByNameCalled)
+				if st.deleteMig.params != "mig123" {
+					t.Errorf("DeleteMig param = %q, want %q", st.deleteMig.params, "mig123")
 				}
 			},
 		},
@@ -367,7 +367,7 @@ func TestMigs_Delete(t *testing.T) {
 				st.deleteMig.err = errors.New("database connection failed")
 				return st
 			}(),
-			migRef:     "mod123",
+			migRef:     "mig123",
 			wantStatus: http.StatusInternalServerError,
 		},
 	}

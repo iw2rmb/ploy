@@ -24,7 +24,7 @@ Contract
 
 Fixed Paths (summary)
 
-- `/workspace` — Git working tree (RW). Modify here to produce the diff (uncommitted changes).
+- `/workspace` — Git working tree (RW). Migify here to produce the diff (uncommitted changes).
 - `/in` — Optional inputs (RO).
 - `/out` — Collected outputs (RW). Ploy uploads its contents as a bundle.
 

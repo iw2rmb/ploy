@@ -18,27 +18,27 @@ func TestJobImage_ResolveImage_Universal(t *testing.T) {
 	}{
 		{
 			name:  "universal image with java-maven stack",
-			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
+			image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/migs-orw:latest"},
 			stack: MigStackJavaMaven,
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 		{
 			name:  "universal image with java-gradle stack",
-			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
+			image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/migs-orw:latest"},
 			stack: MigStackJavaGradle,
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 		{
 			name:  "universal image with unknown stack",
-			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
+			image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/migs-orw:latest"},
 			stack: MigStackUnknown,
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 		{
 			name:  "universal image with empty stack (defaults to unknown)",
-			image: JobImage{Universal: "docker.io/user/migs-orw:latest"},
+			image: JobImage{Universal: "ghcr.io/iw2rmb/ploy/migs-orw:latest"},
 			stack: "",
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 	}
 
@@ -64,9 +64,9 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 	// Stack map with exact keys and default.
 	stackMap := JobImage{
 		ByStack: map[MigStack]string{
-			MigStackDefault:    "docker.io/user/migs-orw:latest",
-			MigStackJavaMaven:  "docker.io/user/orw-cli:latest",
-			MigStackJavaGradle: "docker.io/user/orw-cli:latest",
+			MigStackDefault:    "ghcr.io/iw2rmb/ploy/migs-orw:latest",
+			MigStackJavaMaven:  "ghcr.io/iw2rmb/ploy/orw-cli:latest",
+			MigStackJavaGradle: "ghcr.io/iw2rmb/ploy/orw-cli:latest",
 		},
 	}
 
@@ -80,37 +80,37 @@ func TestJobImage_ResolveImage_StackSpecific(t *testing.T) {
 			name:  "exact match java-maven",
 			image: stackMap,
 			stack: MigStackJavaMaven,
-			want:  "docker.io/user/orw-cli:latest",
+			want:  "ghcr.io/iw2rmb/ploy/orw-cli:latest",
 		},
 		{
 			name:  "exact match java-gradle",
 			image: stackMap,
 			stack: MigStackJavaGradle,
-			want:  "docker.io/user/orw-cli:latest",
+			want:  "ghcr.io/iw2rmb/ploy/orw-cli:latest",
 		},
 		{
 			name:  "fallback to default for java stack",
 			image: stackMap,
 			stack: MigStackJava,
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for unknown stack",
 			image: stackMap,
 			stack: MigStackUnknown,
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for empty stack",
 			image: stackMap,
 			stack: "",
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 		{
 			name:  "fallback to default for custom stack",
 			image: stackMap,
 			stack: MigStack("python-pip"),
-			want:  "docker.io/user/migs-orw:latest",
+			want:  "ghcr.io/iw2rmb/ploy/migs-orw:latest",
 		},
 	}
 
@@ -136,7 +136,7 @@ func TestJobImage_ResolveImage_NoDefault(t *testing.T) {
 	// Stack map without default key.
 	stackMap := JobImage{
 		ByStack: map[MigStack]string{
-			MigStackJavaMaven: "docker.io/user/orw-cli:latest",
+			MigStackJavaMaven: "ghcr.io/iw2rmb/ploy/orw-cli:latest",
 		},
 	}
 
@@ -197,13 +197,13 @@ func TestParseJobImage_String(t *testing.T) {
 	}{
 		{
 			name:  "simple string",
-			input: "docker.io/user/mig:latest",
-			want:  "docker.io/user/mig:latest",
+			input: "ghcr.io/iw2rmb/ploy/mig:latest",
+			want:  "ghcr.io/iw2rmb/ploy/mig:latest",
 		},
 		{
 			name:  "string with whitespace",
-			input: "  docker.io/user/mig:v1  ",
-			want:  "docker.io/user/mig:v1",
+			input: "  ghcr.io/iw2rmb/ploy/mig:v1  ",
+			want:  "ghcr.io/iw2rmb/ploy/mig:v1",
 		},
 		{
 			name:  "empty string",
@@ -236,9 +236,9 @@ func TestParseJobImage_Map(t *testing.T) {
 	t.Run("map[string]any from JSON/YAML", func(t *testing.T) {
 		t.Parallel()
 		input := map[string]any{
-			"default":     "docker.io/user/migs-orw:latest",
-			"java-maven":  "docker.io/user/orw-cli:latest",
-			"java-gradle": "docker.io/user/orw-cli:latest",
+			"default":     "ghcr.io/iw2rmb/ploy/migs-orw:latest",
+			"java-maven":  "ghcr.io/iw2rmb/ploy/orw-cli:latest",
+			"java-gradle": "ghcr.io/iw2rmb/ploy/orw-cli:latest",
 		}
 
 		got, err := ParseJobImage(input)
@@ -251,13 +251,13 @@ func TestParseJobImage_Map(t *testing.T) {
 		if len(got.ByStack) != 3 {
 			t.Errorf("expected 3 stack entries, got %d", len(got.ByStack))
 		}
-		if got.ByStack[MigStackDefault] != "docker.io/user/migs-orw:latest" {
+		if got.ByStack[MigStackDefault] != "ghcr.io/iw2rmb/ploy/migs-orw:latest" {
 			t.Errorf("default image mismatch: %q", got.ByStack[MigStackDefault])
 		}
-		if got.ByStack[MigStackJavaMaven] != "docker.io/user/orw-cli:latest" {
+		if got.ByStack[MigStackJavaMaven] != "ghcr.io/iw2rmb/ploy/orw-cli:latest" {
 			t.Errorf("java-maven image mismatch: %q", got.ByStack[MigStackJavaMaven])
 		}
-		if got.ByStack[MigStackJavaGradle] != "docker.io/user/orw-cli:latest" {
+		if got.ByStack[MigStackJavaGradle] != "ghcr.io/iw2rmb/ploy/orw-cli:latest" {
 			t.Errorf("java-gradle image mismatch: %q", got.ByStack[MigStackJavaGradle])
 		}
 	})
@@ -437,9 +437,9 @@ func TestJobImage_String(t *testing.T) {
 
 	t.Run("universal", func(t *testing.T) {
 		t.Parallel()
-		img := JobImage{Universal: "docker.io/user/mig:latest"}
+		img := JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"}
 		got := img.String()
-		if got != "docker.io/user/mig:latest" {
+		if got != "ghcr.io/iw2rmb/ploy/mig:latest" {
 			t.Errorf("String() = %q, want universal image", got)
 		}
 	})

@@ -15,14 +15,14 @@ func TestEvaluateClaimDecision(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name    string
-		jobType domaintypes.JobType
-		rrStatus domaintypes.RunRepoStatus
+		name        string
+		jobType     domaintypes.JobType
+		rrStatus    domaintypes.RunRepoStatus
 		wantAdvance bool
 	}{
 		{
 			name:        "non-MR queued repo advances to running",
-			jobType:     domaintypes.JobTypeMod,
+			jobType:     domaintypes.JobTypeMig,
 			rrStatus:    domaintypes.RunRepoStatusQueued,
 			wantAdvance: true,
 		},
@@ -34,7 +34,7 @@ func TestEvaluateClaimDecision(t *testing.T) {
 		},
 		{
 			name:        "non-MR running repo is not re-advanced",
-			jobType:     domaintypes.JobTypeMod,
+			jobType:     domaintypes.JobTypeMig,
 			rrStatus:    domaintypes.RunRepoStatusRunning,
 			wantAdvance: false,
 		},
@@ -78,14 +78,14 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 		// Success paths
 		{
 			name:       "success with successor advances chain",
-			jobType:    domaintypes.JobTypeMod,
+			jobType:    domaintypes.JobTypeMig,
 			jobStatus:  domaintypes.JobStatusSuccess,
 			hasNext:    true,
 			wantAction: lifecycle.CompletionChainAdvanceNext,
 		},
 		{
 			name:       "success without successor takes no action",
-			jobType:    domaintypes.JobTypeMod,
+			jobType:    domaintypes.JobTypeMig,
 			jobStatus:  domaintypes.JobStatusSuccess,
 			hasNext:    false,
 			wantAction: lifecycle.CompletionChainNoAction,
@@ -120,8 +120,8 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 			wantAction: lifecycle.CompletionChainEvaluateGateFailure,
 		},
 		{
-			name:       "failed non-gate mod job cancels chain",
-			jobType:    domaintypes.JobTypeMod,
+			name:       "failed non-gate mig job cancels chain",
+			jobType:    domaintypes.JobTypeMig,
 			jobStatus:  domaintypes.JobStatusFail,
 			hasNext:    true,
 			wantAction: lifecycle.CompletionChainCancelRemainder,
@@ -164,7 +164,7 @@ func TestEvaluateCompletionDecision(t *testing.T) {
 		},
 		{
 			name:       "cancelled non-MR job cancels remainder",
-			jobType:    domaintypes.JobTypeMod,
+			jobType:    domaintypes.JobTypeMig,
 			jobStatus:  domaintypes.JobStatusCancelled,
 			hasNext:    true,
 			wantAction: lifecycle.CompletionChainCancelRemainder,
@@ -201,7 +201,7 @@ func TestIsGateJobType(t *testing.T) {
 		{domaintypes.JobTypePreGate, true},
 		{domaintypes.JobTypePostGate, true},
 		{domaintypes.JobTypeReGate, true},
-		{domaintypes.JobTypeMod, false},
+		{domaintypes.JobTypeMig, false},
 		{domaintypes.JobTypeHeal, false},
 		{domaintypes.JobTypeMR, false},
 	}
@@ -346,7 +346,7 @@ func secondAttemptCase() gateFailureCase {
 			baseGateID:  {ID: baseGateID, JobType: domaintypes.JobTypePreGate, NextID: &heal1ID},
 			heal1ID:     {ID: heal1ID, JobType: domaintypes.JobTypeHeal, NextID: &reGate1ID},
 			reGate1ID:   {ID: reGate1ID, JobType: domaintypes.JobTypeReGate, NextID: &successorID},
-			successorID: {ID: successorID, JobType: domaintypes.JobTypeMod},
+			successorID: {ID: successorID, JobType: domaintypes.JobTypeMig},
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 		recoveryKind: contracts.RecoveryErrorKindInfra,

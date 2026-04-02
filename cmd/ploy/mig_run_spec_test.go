@@ -28,13 +28,13 @@ gitlab_domain: gitlab.com
 	}
 
 	// CLI overrides should take precedence
-	modEnvs := []string{"KEY1=from_cli", "KEY3=new_value"}
+	migEnvs := []string{"KEY1=from_cli", "KEY3=new_value"}
 	payload, err := buildSpecPayload(
 		context.Background(),
 		nil,
 		nil,
 		specPath,
-		modEnvs,
+		migEnvs,
 		"docker.io/test/mig:v2", // override image
 		true,                    // retain
 		"",
@@ -240,9 +240,9 @@ func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
 				}
 			}
 
-			modImage := ""
+			migImage := ""
 			if tt.gitlabPAT != "" || strings.TrimSpace(tt.specContent) != "" || tt.gitlabDomain != "" {
-				modImage = "docker.io/test/mig:latest"
+				migImage = "docker.io/test/mig:latest"
 			}
 			payload, err := buildSpecPayload(
 				context.Background(),
@@ -250,7 +250,7 @@ func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
 				nil,
 				specFile,
 				nil,
-				modImage,
+				migImage,
 				false,
 				"",
 				tt.gitlabPAT,

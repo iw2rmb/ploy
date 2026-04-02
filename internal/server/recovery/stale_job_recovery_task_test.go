@@ -54,7 +54,7 @@ func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
 		StaleRows: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoID, Attempt: 2, RunningJobs: 3},
 		},
-		StaleNodesCount: 1,
+		StaleNodesCount:  1,
 		CancelRowsResult: 3,
 		JobsByAttempt: map[workflowkit.AttemptKey][]store.Job{
 			{RunID: runID, RepoID: repoID, Attempt: 2}: {
@@ -66,7 +66,7 @@ func TestStaleJobRecoveryTask_Run_CompletesRunWhenReposTerminal(t *testing.T) {
 					Attempt:     2,
 					Name:        "mig-0",
 					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMod,
+					JobType:     domaintypes.JobTypeMig,
 					Meta:        []byte(`{"next_id":2000}`),
 				},
 			},
@@ -138,7 +138,7 @@ func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t 
 		StaleRows: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 1},
 		},
-		StaleNodesCount: 1,
+		StaleNodesCount:  1,
 		CancelRowsResult: 1,
 		JobsByAttempt: map[workflowkit.AttemptKey][]store.Job{
 			{RunID: runID, RepoID: repoID, Attempt: 1}: {
@@ -150,7 +150,7 @@ func TestStaleJobRecoveryTask_Run_DoesNotCompleteRunWhenOtherReposNonTerminal(t 
 					Attempt:     1,
 					Name:        "mig-0",
 					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMod,
+					JobType:     domaintypes.JobTypeMig,
 					Meta:        []byte(`{"next_id":1000}`),
 				},
 			},
@@ -192,7 +192,7 @@ func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
 		StaleRows: []store.ListStaleRunningJobsRow{
 			{RunID: runID, RepoID: repoID, Attempt: 1, RunningJobs: 2},
 		},
-		StaleNodesCount: 2,
+		StaleNodesCount:  2,
 		CancelRowsResult: 2,
 		JobsByAttempt: map[workflowkit.AttemptKey][]store.Job{
 			{RunID: runID, RepoID: repoID, Attempt: 1}: {
@@ -204,7 +204,7 @@ func TestStaleJobRecoveryTask_Run_LogsCycleCounters(t *testing.T) {
 					Attempt:     1,
 					Name:        "mig-0",
 					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMod,
+					JobType:     domaintypes.JobTypeMig,
 					Meta:        []byte(`{"next_id":1000}`),
 				},
 			},
@@ -282,7 +282,7 @@ func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
 			{RunID: runID, RepoID: repoA, Attempt: 1, RunningJobs: 1},
 			{RunID: runID, RepoID: repoB, Attempt: 1, RunningJobs: 1},
 		},
-		StaleNodesCount: 1,
+		StaleNodesCount:  1,
 		CancelRowsResult: 1,
 		JobsByAttempt: map[workflowkit.AttemptKey][]store.Job{
 			{RunID: runID, RepoID: repoA, Attempt: 1}: {
@@ -294,7 +294,7 @@ func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
 					Attempt:     1,
 					Name:        "mig-a",
 					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMod,
+					JobType:     domaintypes.JobTypeMig,
 					Meta:        []byte(`{"next_id":1000}`),
 				},
 			},
@@ -307,7 +307,7 @@ func TestStaleJobRecoveryTask_Run_EmitsTerminalSSEOnlyOncePerRun(t *testing.T) {
 					Attempt:     1,
 					Name:        "mig-b",
 					Status:      domaintypes.JobStatusCancelled,
-					JobType:     domaintypes.JobTypeMod,
+					JobType:     domaintypes.JobTypeMig,
 					Meta:        []byte(`{"next_id":2000}`),
 				},
 			},

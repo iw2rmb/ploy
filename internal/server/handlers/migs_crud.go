@@ -18,9 +18,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// maxModSpecSize is the body size limit for mig spec creation endpoints.
+// maxMigSpecSize is the body size limit for mig spec creation endpoints.
 // Specs can be large (JSON blobs), so we allow up to 4 MiB.
-const maxModSpecSize = 4 << 20
+const maxMigSpecSize = 4 << 20
 
 // createMigHandler creates a new mig project.
 // Endpoint: POST /v1/migs
@@ -38,7 +38,7 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			CreatedBy *string          `json:"created_by,omitempty"`
 		}
 
-		if err := decodeRequestJSON(w, r, &req, maxModSpecSize); err != nil {
+		if err := decodeRequestJSON(w, r, &req, maxMigSpecSize); err != nil {
 			return
 		}
 
@@ -63,9 +63,9 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 
 		// Create mig (create spec only after the mig row exists to avoid creating
 		// orphaned specs on mig-name collisions).
-		modID := domaintypes.NewMigID()
+		migID := domaintypes.NewMigID()
 		mig, err := st.CreateMig(r.Context(), store.CreateMigParams{
-			ID:        modID,
+			ID:        migID,
 			Name:      name,
 			SpecID:    nil,
 			CreatedBy: req.CreatedBy,
@@ -78,7 +78,7 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 				return
 			}
 			writeHTTPError(w, http.StatusInternalServerError, "failed to create mig: %v", err)
-			slog.Error("create mig: create mig failed", "mig_id", modID.String(), "err", err)
+			slog.Error("create mig: create mig failed", "mig_id", migID.String(), "err", err)
 			return
 		}
 
@@ -94,12 +94,12 @@ func createMigHandler(st store.Store) http.HandlerFunc {
 			})
 			if err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to create spec: %v", err)
-				slog.Error("create mig: create spec failed", "mig_id", modID.String(), "err", err)
+				slog.Error("create mig: create spec failed", "mig_id", migID.String(), "err", err)
 				return
 			}
-			if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: modID, SpecID: &createdSpec.ID}); err != nil {
+			if err := st.UpdateMigSpec(r.Context(), store.UpdateMigSpecParams{ID: migID, SpecID: &createdSpec.ID}); err != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to update mig spec: %v", err)
-				slog.Error("create mig: update spec failed", "mig_id", modID.String(), "spec_id", createdSpec.ID.String(), "err", err)
+				slog.Error("create mig: update spec failed", "mig_id", migID.String(), "spec_id", createdSpec.ID.String(), "err", err)
 				return
 			}
 			createdID := createdSpec.ID
@@ -281,13 +281,13 @@ func deleteMigHandler(st store.Store) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		modID := mig.ID
+		migID := mig.ID
 
 		// Check if any runs exist for this mig
-		hasRuns, err := migHasAnyRuns(r.Context(), st, modID)
+		hasRuns, err := migHasAnyRuns(r.Context(), st, migID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to check runs: %v", err)
-			slog.Error("delete mig: check runs failed", "mig_id", modID, "err", err)
+			slog.Error("delete mig: check runs failed", "mig_id", migID, "err", err)
 			return
 		}
 		if hasRuns {
@@ -296,20 +296,20 @@ func deleteMigHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Delete the mig
-		if err := st.DeleteMig(r.Context(), modID); err != nil {
+		if err := st.DeleteMig(r.Context(), migID); err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to delete mig: %v", err)
-			slog.Error("delete mig: database error", "mig_id", modID, "err", err)
+			slog.Error("delete mig: database error", "mig_id", migID, "err", err)
 			return
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("mig deleted", "mig_id", modID)
+		slog.Info("mig deleted", "mig_id", migID)
 	}
 }
 
-func migHasAnyRuns(ctx context.Context, st store.Store, modID domaintypes.MigID) (bool, error) {
+func migHasAnyRuns(ctx context.Context, st store.Store, migID domaintypes.MigID) (bool, error) {
 	return scanRunPages(ctx, st, func(run store.Run) (bool, error) {
-		return run.MigID == modID, nil
+		return run.MigID == migID, nil
 	})
 }
 

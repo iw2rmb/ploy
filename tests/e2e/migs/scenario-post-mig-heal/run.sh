@@ -26,15 +26,15 @@
 #
 # Usage:
 #   # From repository root:
-#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mig-heal/run.sh
 #
 #   # With custom configuration:
 #   REPO_URL="https://gitlab.com/example/repo.git" \
 #   REPO_BASE_REF="fail-branch" \
-#   bash tests/e2e/migs/scenario-post-mod-heal/run.sh
+#   bash tests/e2e/migs/scenario-post-mig-heal/run.sh
 #
 #   # Skip artifact collection:
-#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mod-heal/run.sh
+#   SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-post-mig-heal/run.sh
 
 set -euo pipefail
 
@@ -76,7 +76,7 @@ SPEC_FILE="${SCRIPT_DIR}/mig.yaml"
 SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
 if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   TS=$(date +%y%m%d%H%M%S)
-  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mod-heal/${TS}}"
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/migs/scenario-post-mig-heal/${TS}}"
   mkdir -p "${ARTIFACT_DIR}"
 fi
 
@@ -85,7 +85,7 @@ fi
 ################################################################################
 
 echo "=========================================="
-echo "E2E: Post-Mod Gate Healing Scenario"
+echo "E2E: Post-Mig Gate Healing Scenario"
 echo "=========================================="
 echo "Ploy binary:     $PLOY_BIN"
 echo "PLOY_CONFIG_HOME: $PLOY_CONFIG_HOME"
@@ -177,12 +177,12 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   # ────────────────────────────────────────────────────────────────────────────
   echo "Extracting Codex mig-out artifact bundles (if present)..."
   shopt -s nullglob
-  mod_out_bundles=("${ARTIFACT_DIR}"/*_mig-out.bin)
+  mig_out_bundles=("${ARTIFACT_DIR}"/*_mig-out.bin)
   shopt -u nullglob
-  if ((${#mod_out_bundles[@]} == 0)); then
+  if ((${#mig_out_bundles[@]} == 0)); then
     echo "  - no mig-out bundles found in ${ARTIFACT_DIR} (Codex artifacts may be missing)"
   else
-    for bundle in "${mod_out_bundles[@]}"; do
+    for bundle in "${mig_out_bundles[@]}"; do
       echo "  extracting $(basename "$bundle")"
       if ! tar -xzf "$bundle" -C "${ARTIFACT_DIR}"; then
         echo "  ⚠ failed to extract ${bundle}"

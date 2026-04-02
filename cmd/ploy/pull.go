@@ -31,10 +31,10 @@ import (
 	"strings"
 	"time"
 
-	climods "github.com/iw2rmb/ploy/internal/cli/migs"
+	climigs "github.com/iw2rmb/ploy/internal/cli/migs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
 // pullState represents the persisted state for a pull operation.
@@ -224,7 +224,7 @@ func handlePull(args []string, stderr io.Writer) error {
 	}
 
 	// Step 10: Check final state.
-	if runState != modsapi.RunStateSucceeded {
+	if runState != migsapi.RunStateSucceeded {
 		return fmt.Errorf("run ended in %s; cannot pull diffs", strings.ToLower(string(runState)))
 	}
 
@@ -313,16 +313,16 @@ func savePullState(path string, state pullState) error {
 // Infers the mig from the repo URL and creates a run scoped to only this repo.
 func initiatePullRun(ctx context.Context, httpClient *http.Client, baseURL *url.URL, repoURL string, stderr io.Writer) (domaintypes.RunID, error) {
 	// Infer mig from repo.
-	modID, err := inferModFromRepo(ctx, httpClient, baseURL, repoURL, stderr)
+	migID, err := inferMigFromRepo(ctx, httpClient, baseURL, repoURL, stderr)
 	if err != nil {
 		return "", fmt.Errorf("pull: %w", err)
 	}
 
 	// Create mig-project run scoped to this repo.
-	cmd := climods.CreateMigRunCommand{
+	cmd := climigs.CreateMigRunCommand{
 		Client:   httpClient,
 		BaseURL:  baseURL,
-		MigRef:   domaintypes.MigRef(modID),
+		MigRef:   domaintypes.MigRef(migID),
 		RepoURLs: []string{repoURL},
 	}
 	result, err := cmd.Run(ctx)
@@ -334,7 +334,7 @@ func initiatePullRun(ctx context.Context, httpClient *http.Client, baseURL *url.
 }
 
 // followPullRun follows the run until terminal state.
-func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, capDuration time.Duration, cancelOnCap bool, maxRetries int, stderr io.Writer) (modsapi.RunState, error) {
+func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, runID domaintypes.RunID, capDuration time.Duration, cancelOnCap bool, maxRetries int, stderr io.Writer) (migsapi.RunState, error) {
 	followCtx := ctx
 	var cancel context.CancelFunc
 	if capDuration > 0 {
@@ -377,7 +377,7 @@ func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, r
 // Reuses the logic from run_pull.go.
 func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID, repoURL, origin string, dryRun bool, stderr io.Writer) error {
 	// Resolve repo execution via POST /v1/runs/{run_id}/pull.
-	pullCmd := climods.RunPullCommand{
+	pullCmd := climigs.RunPullCommand{
 		Client:  httpClient,
 		BaseURL: baseURL,
 		RunID:   runID,
@@ -465,34 +465,34 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 }
 
 // isTerminalRunState returns true if the run state is terminal.
-func isTerminalRunState(s modsapi.RunState) bool {
+func isTerminalRunState(s migsapi.RunState) bool {
 	switch s {
-	case modsapi.RunStateSucceeded, modsapi.RunStateFailed, modsapi.RunStateCancelled:
+	case migsapi.RunStateSucceeded, migsapi.RunStateFailed, migsapi.RunStateCancelled:
 		return true
 	}
 	return false
 }
 
-func mapRunSummaryToRunState(summary domaintypes.RunSummary) (modsapi.RunState, error) {
+func mapRunSummaryToRunState(summary domaintypes.RunSummary) (migsapi.RunState, error) {
 	switch summary.Status {
 	case domaintypes.RunStatusStarted:
-		return modsapi.RunStateRunning, nil
+		return migsapi.RunStateRunning, nil
 	case domaintypes.RunStatusCancelled:
-		return modsapi.RunStateCancelled, nil
+		return migsapi.RunStateCancelled, nil
 	case domaintypes.RunStatusFinished:
 		if summary.Counts != nil {
 			switch strings.ToLower(strings.TrimSpace(summary.Counts.DerivedStatus)) {
 			case "completed":
-				return modsapi.RunStateSucceeded, nil
+				return migsapi.RunStateSucceeded, nil
 			case "failed":
-				return modsapi.RunStateFailed, nil
+				return migsapi.RunStateFailed, nil
 			case "cancelled":
-				return modsapi.RunStateCancelled, nil
+				return migsapi.RunStateCancelled, nil
 			case "running", "pending":
-				return modsapi.RunStateRunning, nil
+				return migsapi.RunStateRunning, nil
 			}
 		}
-		return modsapi.RunStateSucceeded, nil
+		return migsapi.RunStateSucceeded, nil
 	default:
 		return "", fmt.Errorf("unknown run status %q", summary.Status)
 	}

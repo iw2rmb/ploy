@@ -62,13 +62,13 @@ const (
 // YAML/JSON Examples:
 //
 //	# Universal image (string form) — used for all stacks:
-//	image: docker.io/user/migs-openrewrite:latest
+//	image: ghcr.io/iw2rmb/ploy/migs-openrewrite:latest
 //
 //	# Stack-specific images (map form) — per-stack optimization:
 //	image:
-//	  default: docker.io/user/migs-openrewrite:latest
-//	  java-maven: docker.io/user/orw-cli:latest
-//	  java-gradle: docker.io/user/orw-cli:latest
+//	  default: ghcr.io/iw2rmb/ploy/migs-openrewrite:latest
+//	  java-maven: ghcr.io/iw2rmb/ploy/orw-cli:latest
+//	  java-gradle: ghcr.io/iw2rmb/ploy/orw-cli:latest
 type JobImage struct {
 	// Universal holds the image when specified as a single string.
 	// When non-empty, this image is used regardless of detected stack.

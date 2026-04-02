@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -62,7 +62,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build RunSummary response with Stages and Artifacts.
-		runState, convErr := modsapi.RunStatusFromDomain(run.Status)
+		runState, convErr := migsapi.RunStatusFromDomain(run.Status)
 		if convErr != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to convert run status: %v", convErr)
 			slog.Error("get run status: invalid run status", "run_id", run.ID, "status", run.Status, "err", convErr)
@@ -87,7 +87,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			repoURL = rr.RepoUrl
 		}
 
-		summary := modsapi.RunSummary{
+		summary := migsapi.RunSummary{
 			RunID:      run.ID,
 			State:      runState,
 			Submitter:  "",
@@ -95,7 +95,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 			Metadata:   map[string]string{"repo_base_ref": repoBase, "repo_target_ref": repoTarget},
 			CreatedAt:  timeOrZero(run.CreatedAt),
 			UpdatedAt:  time.Now().UTC(),
-			Stages:     make(map[domaintypes.JobID]modsapi.StageStatus),
+			Stages:     make(map[domaintypes.JobID]migsapi.StageStatus),
 		}
 
 		// Surface MR URL, gate summary, and resume metadata from runs.stats if present.
@@ -143,7 +143,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 		}
 		for _, job := range jobs {
 			jobIDStr := job.ID.String()
-			s, convErr := modsapi.StageStatusFromDomain(job.Status)
+			s, convErr := migsapi.StageStatusFromDomain(job.Status)
 			if convErr != nil {
 				writeHTTPError(w, http.StatusInternalServerError, "failed to convert stage status for job %s: %v", job.ID, convErr)
 				slog.Error("get run status: invalid stage status", "run_id", run.ID, "job_id", job.ID, "status", job.Status, "err", convErr)
@@ -171,7 +171,7 @@ func getRunStatusHandler(st store.Store) http.HandlerFunc {
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing chain semantics.
-			summary.Stages[job.ID] = modsapi.StageStatus{
+			summary.Stages[job.ID] = migsapi.StageStatus{
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
@@ -217,7 +217,7 @@ func createJobsFromSpec(
 	repoSHA0 string,
 	spec []byte,
 ) error {
-	modsSpec, err := contracts.ParseMigSpecJSON(spec)
+	migsSpec, err := contracts.ParseMigSpecJSON(spec)
 	if err != nil {
 		return fmt.Errorf("parse migs spec: %w", err)
 	}
@@ -225,7 +225,7 @@ func createJobsFromSpec(
 	if !sha40Pattern.MatchString(repoSHA0) {
 		return fmt.Errorf("repo_sha0 must match ^[0-9a-f]{40}$")
 	}
-	preGateBinding, err := resolvePreGateCreationBindingFromStore(ctx, st, repoID, repoSHA0, modsSpec)
+	preGateBinding, err := resolvePreGateCreationBindingFromStore(ctx, st, repoID, repoSHA0, migsSpec)
 	if err != nil {
 		return fmt.Errorf("resolve pre-gate binding: %w", err)
 	}
@@ -238,32 +238,32 @@ func createJobsFromSpec(
 	}
 	drafts := []draft{{name: "pre-gate", jobType: domaintypes.JobTypePreGate}}
 
-	if len(modsSpec.Steps) > 1 {
-		for i, mig := range modsSpec.Steps {
+	if len(migsSpec.Steps) > 1 {
+		for i, mig := range migsSpec.Steps {
 			jobImage := ""
 			if mig.Image.Universal != "" {
 				jobImage = strings.TrimSpace(mig.Image.Universal)
 			}
 			drafts = append(drafts, draft{
 				name:     fmt.Sprintf("mig-%d", i),
-				jobType:  domaintypes.JobTypeMod,
+				jobType:  domaintypes.JobTypeMig,
 				jobImage: jobImage,
 				stepName: mig.Name,
 			})
 		}
 	} else {
-		modImage := ""
+		migImage := ""
 		stepName := ""
-		if len(modsSpec.Steps) > 0 {
-			if modsSpec.Steps[0].Image.Universal != "" {
-				modImage = strings.TrimSpace(modsSpec.Steps[0].Image.Universal)
+		if len(migsSpec.Steps) > 0 {
+			if migsSpec.Steps[0].Image.Universal != "" {
+				migImage = strings.TrimSpace(migsSpec.Steps[0].Image.Universal)
 			}
-			stepName = modsSpec.Steps[0].Name
+			stepName = migsSpec.Steps[0].Name
 		}
 		drafts = append(drafts, draft{
 			name:     "mig-0",
-			jobType:  domaintypes.JobTypeMod,
-			jobImage: modImage,
+			jobType:  domaintypes.JobTypeMig,
+			jobImage: migImage,
 			stepName: stepName,
 		})
 	}

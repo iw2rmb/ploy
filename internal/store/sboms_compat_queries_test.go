@@ -19,7 +19,7 @@ func TestHasSBOMEvidenceForStack_FiltersByGateStatusTypeAndStack(t *testing.T) {
 	gradleProfileID := upsertGateProfileForSBOMCompatTest(t, ctx, db, fx.RunRepo.RepoID, gradleStackID, "2222222222222222222222222222222222222222")
 
 	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusFail, "alpha", "1.0.0")
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeMod, types.JobStatusSuccess, "alpha", "1.1.0")
+	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeMig, types.JobStatusSuccess, "alpha", "1.1.0")
 	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, gradleProfileID, types.JobTypePreGate, types.JobStatusSuccess, "alpha", "2.0.0")
 
 	has, err := db.HasSBOMEvidenceForStack(ctx, HasSBOMEvidenceForStackParams{
@@ -78,7 +78,7 @@ func TestListSBOMCompatRows_FiltersByGateStatusTypeStackAndRequestedLibs(t *test
 	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "beta", "2.0.0")
 	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusSuccess, "org:lib", "3.1.0")
 
-	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeMod, types.JobStatusSuccess, "alpha", "9.9.9")
+	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypeMig, types.JobStatusSuccess, "alpha", "9.9.9")
 	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, mavenProfileID, types.JobTypePreGate, types.JobStatusFail, "beta", "9.9.9")
 	createGateJobAndSBOMRowForSBOMCompatTest(t, ctx, db, fx, gradleProfileID, types.JobTypePreGate, types.JobStatusSuccess, "alpha", "8.0.0")
 

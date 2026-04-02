@@ -53,7 +53,7 @@ steps:
 
   # Step 1: Migrate to Java 17 (may trigger post-gate failure on fail-missing-symbol branch)
   # This transformation may expose or interact with the UndefinedClass reference.
-  # If post-gate fails, healing will create the missing UndefinedModSymbol class.
+  # If post-gate fails, healing will create the missing UndefinedMigSymbol class.
   - image: localhost:5000/ploy/orw-cli-maven:latest
     env:
       RECIPE_GROUP: org.openrewrite.recipe

@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// TestModShell_ExecutesScriptAndWritesReport verifies that mig-shell executes
+// TestMigShell_ExecutesScriptAndWritesReport verifies that mig-shell executes
 // the requested script in the workspace and writes a run report.
-func TestModShell_ExecutesScriptAndWritesReport(t *testing.T) {
+func TestMigShell_ExecutesScriptAndWritesReport(t *testing.T) {
 	workspace := t.TempDir()
 	outdir := t.TempDir()
 
@@ -24,10 +24,10 @@ echo "from-mig-shell" > rewrite.yml
 		t.Fatalf("write script: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "images", "shell", "mig-shell.sh")
-	cmd := exec.Command("bash", modScript, "--dir", workspace, "--out", outdir)
+	migScript := filepath.Join(repoRoot(t), "images", "shell", "mig-shell.sh")
+	cmd := exec.Command("bash", migScript, "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
-		"MOD_SHELL_SCRIPT="+scriptPath,
+		"MIG_SHELL_SCRIPT="+scriptPath,
 	)
 
 	out, err := cmd.CombinedOutput()

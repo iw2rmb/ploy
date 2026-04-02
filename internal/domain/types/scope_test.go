@@ -112,12 +112,12 @@ func TestGlobalEnvTarget_MatchesJobType(t *testing.T) {
 		{name: "gates matches pre_gate", target: GlobalEnvTargetGates, jobType: JobTypePreGate, want: true},
 		{name: "gates matches re_gate", target: GlobalEnvTargetGates, jobType: JobTypeReGate, want: true},
 		{name: "gates matches post_gate", target: GlobalEnvTargetGates, jobType: JobTypePostGate, want: true},
-		{name: "gates does not match mig", target: GlobalEnvTargetGates, jobType: JobTypeMod, want: false},
+		{name: "gates does not match mig", target: GlobalEnvTargetGates, jobType: JobTypeMig, want: false},
 		{name: "gates does not match heal", target: GlobalEnvTargetGates, jobType: JobTypeHeal, want: false},
 		{name: "gates does not match mr", target: GlobalEnvTargetGates, jobType: JobTypeMR, want: false},
 
 		// "steps" target matches step jobs.
-		{name: "steps matches mig", target: GlobalEnvTargetSteps, jobType: JobTypeMod, want: true},
+		{name: "steps matches mig", target: GlobalEnvTargetSteps, jobType: JobTypeMig, want: true},
 		{name: "steps matches heal", target: GlobalEnvTargetSteps, jobType: JobTypeHeal, want: true},
 		{name: "steps does not match pre_gate", target: GlobalEnvTargetSteps, jobType: JobTypePreGate, want: false},
 		{name: "steps does not match re_gate", target: GlobalEnvTargetSteps, jobType: JobTypeReGate, want: false},
@@ -125,18 +125,18 @@ func TestGlobalEnvTarget_MatchesJobType(t *testing.T) {
 		{name: "steps does not match mr", target: GlobalEnvTargetSteps, jobType: JobTypeMR, want: false},
 
 		// "server" target does not match any job type (not job-routed).
-		{name: "server does not match mig", target: GlobalEnvTargetServer, jobType: JobTypeMod, want: false},
+		{name: "server does not match mig", target: GlobalEnvTargetServer, jobType: JobTypeMig, want: false},
 		{name: "server does not match heal", target: GlobalEnvTargetServer, jobType: JobTypeHeal, want: false},
 		{name: "server does not match pre_gate", target: GlobalEnvTargetServer, jobType: JobTypePreGate, want: false},
 
 		// "nodes" target does not match any job type (not job-routed).
-		{name: "nodes does not match mig", target: GlobalEnvTargetNodes, jobType: JobTypeMod, want: false},
+		{name: "nodes does not match mig", target: GlobalEnvTargetNodes, jobType: JobTypeMig, want: false},
 		{name: "nodes does not match heal", target: GlobalEnvTargetNodes, jobType: JobTypeHeal, want: false},
 		{name: "nodes does not match pre_gate", target: GlobalEnvTargetNodes, jobType: JobTypePreGate, want: false},
 
 		// Unknown/empty targets should not match.
-		{name: "unknown target does not match", target: "unknown", jobType: JobTypeMod, want: false},
-		{name: "empty target does not match", target: "", jobType: JobTypeMod, want: false},
+		{name: "unknown target does not match", target: "unknown", jobType: JobTypeMig, want: false},
+		{name: "empty target does not match", target: "", jobType: JobTypeMig, want: false},
 	}
 
 	for _, tt := range tests {

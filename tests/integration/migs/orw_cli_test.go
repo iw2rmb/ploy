@@ -75,8 +75,8 @@ exit 67
 		t.Fatalf("write gradle stub: %v", err)
 	}
 
-	modScript := resolveORWCLIScript(t)
-	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
 		"RECIPE_ARTIFACT=rewrite-migrate-java",
@@ -143,8 +143,8 @@ exit 17
 		t.Fatalf("write rewrite stub: %v", err)
 	}
 
-	modScript := resolveORWCLIScript(t)
-	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP=org.openrewrite.recipe",
 		"RECIPE_ARTIFACT=rewrite-migrate-java",
@@ -182,9 +182,9 @@ func TestOrwCLI_SelfTestWritesSuccessReport(t *testing.T) {
 
 	workspace := t.TempDir()
 	outdir := t.TempDir()
-	modScript := resolveORWCLIScript(t)
-	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
-	cmd.Env = append(os.Environ(), "MODS_SELF_TEST=1")
+	migScript := resolveORWCLIScript(t)
+	cmd := exec.Command("bash", migScript, "--apply", "--dir", workspace, "--out", outdir)
+	cmd.Env = append(os.Environ(), "MIGS_SELF_TEST=1")
 
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("orw-cli self-test failed: %v\n%s", err, string(out))

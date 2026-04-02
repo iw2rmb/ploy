@@ -1,10 +1,10 @@
-// mod_add.go implements the 'ploy mig add' command handler.
+// mig_add.go implements the 'ploy mig add' command handler.
 //
 // This command creates a mig project:
 // - ploy mig add --name <name> [--spec <path|->]
 // - Creates a mig with unique name.
 // - If --spec is provided, creates initial spec row and sets migs.spec_id.
-// - Prints mod_id and name; if --spec is provided, also prints spec_id.
+// - Prints mig_id and name; if --spec is provided, also prints spec_id.
 package main
 
 import (
@@ -76,9 +76,9 @@ func handleMigAdd(args []string, stderr io.Writer) error {
 
 	// Print result.
 	if result.SpecID != nil {
-		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s, spec_id: %s)\n", result.ID.String(), result.Name, result.SpecID.String())
+		_, _ = fmt.Fprintf(stderr, "Mig created: %s (name: %s, spec_id: %s)\n", result.ID.String(), result.Name, result.SpecID.String())
 	} else {
-		_, _ = fmt.Fprintf(stderr, "Mod created: %s (name: %s)\n", result.ID.String(), result.Name)
+		_, _ = fmt.Fprintf(stderr, "Mig created: %s (name: %s)\n", result.ID.String(), result.Name)
 	}
 
 	return nil

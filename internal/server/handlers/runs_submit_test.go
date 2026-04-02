@@ -109,14 +109,14 @@ func TestRunsCreateSingleRepo_RepoURLNormalized(t *testing.T) {
 	}))
 	assertStatus(t, rr, http.StatusCreated)
 
-	// Verify mod_repo was created with normalized URL.
+	// Verify mig_repo was created with normalized URL.
 	if !st.createMigRepoCalled {
 		t.Fatal("store.CreateMigRepo was not called")
 	}
 	// types.NormalizeRepoURL trims trailing "/" and ".git".
 	expectedURL := "https://github.com/org/repo"
 	if st.createMigRepoParams.Url != expectedURL {
-		t.Errorf("mod_repo URL = %q, want %q (normalized)", st.createMigRepoParams.Url, expectedURL)
+		t.Errorf("mig_repo URL = %q, want %q (normalized)", st.createMigRepoParams.Url, expectedURL)
 	}
 }
 

@@ -123,9 +123,9 @@ func TestParseSpec(t *testing.T) {
 			},
 		},
 		{
-			name: "mod_index_rejected",
+			name: "mig_index_rejected",
 			json: `{
-				"mod_index": 1,
+				"mig_index": 1,
 				"steps": [
 					{"image":"docker.io/test/step-a:v1"},
 					{"image":"docker.io/test/step-b:v1"}
@@ -133,10 +133,10 @@ func TestParseSpec(t *testing.T) {
 			}`,
 			check: func(t *testing.T, _ map[string]string, opts RunOptions, _ error) {
 				if len(opts.Steps) != 0 {
-					t.Fatalf("expected mod_index to be rejected (zero typed options), got steps_len=%d", len(opts.Steps))
+					t.Fatalf("expected mig_index to be rejected (zero typed options), got steps_len=%d", len(opts.Steps))
 				}
 				if !opts.Execution.Image.IsEmpty() {
-					t.Fatalf("expected mod_index to be rejected (zero typed options), got execution.image=%v", opts.Execution.Image)
+					t.Fatalf("expected mig_index to be rejected (zero typed options), got execution.image=%v", opts.Execution.Image)
 				}
 			},
 		},
@@ -145,14 +145,13 @@ func TestParseSpec(t *testing.T) {
 			json: `{
 				"steps": [{
 					"image": {
-						"default": "docker.io/user/migs-orw:latest",
-						"java-maven": "docker.io/user/orw-cli:latest",
-						"java-gradle": "docker.io/user/orw-cli:latest"
+						"java-maven": "ghcr.io/iw2rmb/ploy/orw-cli:latest",
+						"java-gradle": "ghcr.io/iw2rmb/ploy/orw-cli:latest"
 					}
 				}]
 			}`,
 			check: func(t *testing.T, _ map[string]string, opts RunOptions, _ error) {
-				assertImage(t, "Execution.Image(maven)", opts.Execution.Image, contracts.MigStackJavaMaven, "docker.io/user/orw-cli:latest")
+				assertImage(t, "Execution.Image(maven)", opts.Execution.Image, contracts.MigStackJavaMaven, "ghcr.io/iw2rmb/ploy/orw-cli:latest")
 			},
 		},
 	}
@@ -167,7 +166,7 @@ func TestParseSpec(t *testing.T) {
 	}
 }
 
-// --- modsSpecToRunOptions direct conversion tests ---
+// --- migsSpecToRunOptions direct conversion tests ---
 
 func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Parallel()
@@ -225,7 +224,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 			ArtifactName:  "my-artifact",
 		}
 
-		runOpts := modsSpecToRunOptions(spec)
+		runOpts := migsSpecToRunOptions(spec)
 
 		if runOpts.ServerMetadata.JobID.String() != "job-direct-test-123" {
 			t.Errorf("JobID: got %q, want %q", runOpts.ServerMetadata.JobID.String(), "job-direct-test-123")
@@ -252,7 +251,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 		if runOpts.Healing.Retries != 3 {
 			t.Errorf("Healing.Retries: got %d, want 3", runOpts.Healing.Retries)
 		}
-		assertImage(t, "Healing.Mod.Image", runOpts.Healing.Mod.Image, contracts.MigStackUnknown, "docker.io/test/heal:v1")
+		assertImage(t, "Healing.Mig.Image", runOpts.Healing.Mig.Image, contracts.MigStackUnknown, "docker.io/test/heal:v1")
 
 		if runOpts.MRWiring.GitLabPAT != "glpat-secret" {
 			t.Errorf("MRWiring.GitLabPAT: got %q, want glpat-secret", runOpts.MRWiring.GitLabPAT)
@@ -293,7 +292,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 			},
 		}
 
-		runOpts := modsSpecToRunOptions(spec)
+		runOpts := migsSpecToRunOptions(spec)
 
 		if len(runOpts.Steps) != 2 {
 			t.Fatalf("Steps: expected 2, got %d", len(runOpts.Steps))
@@ -320,7 +319,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Run("nil_spec_returns_zero_value", func(t *testing.T) {
 		t.Parallel()
 
-		runOpts := modsSpecToRunOptions(nil)
+		runOpts := migsSpecToRunOptions(nil)
 		if !runOpts.Execution.Image.IsEmpty() {
 			t.Error("expected empty Execution.Image for nil spec")
 		}
@@ -339,7 +338,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 			})
 		})
 
-		runOpts := modsSpecToRunOptions(spec)
+		runOpts := migsSpecToRunOptions(spec)
 
 		if runOpts.Healing == nil {
 			t.Fatal("expected Healing config")
@@ -366,7 +365,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 			},
 		}
 
-		runOpts := modsSpecToRunOptions(spec)
+		runOpts := migsSpecToRunOptions(spec)
 		assertImage(t, "Maven image", runOpts.Execution.Image, contracts.MigStackJavaMaven, "docker.io/test/maven:v1")
 	})
 }
@@ -449,7 +448,7 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				t.Parallel()
 				step := makeStep("img")
 				probe.stepMutator(&step)
-				opts := modsSpecToRunOptions(&contracts.MigSpec{Steps: []contracts.MigStep{step}})
+				opts := migsSpecToRunOptions(&contracts.MigSpec{Steps: []contracts.MigStep{step}})
 				probe.checkPresent(t, opts.Execution)
 			})
 
@@ -457,7 +456,7 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				t.Parallel()
 				step0 := makeStep("img0")
 				probe.stepMutator(&step0)
-				opts := modsSpecToRunOptions(&contracts.MigSpec{Steps: []contracts.MigStep{step0, makeStep("img1")}})
+				opts := migsSpecToRunOptions(&contracts.MigSpec{Steps: []contracts.MigStep{step0, makeStep("img1")}})
 				if len(opts.Steps) != 2 {
 					t.Fatalf("Steps len: got %d, want 2", len(opts.Steps))
 				}
@@ -472,11 +471,11 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 					s.BuildGate = withHealing("code", action)
 				})
-				opts := modsSpecToRunOptions(spec)
+				opts := migsSpecToRunOptions(spec)
 				if opts.Healing == nil {
 					t.Fatal("expected Healing config")
 				}
-				probe.checkPresent(t, opts.Healing.Mod)
+				probe.checkPresent(t, opts.Healing.Mig)
 			})
 
 			t.Run("router", func(t *testing.T) {
@@ -486,7 +485,7 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 					s.BuildGate = withRouter(router)
 				})
-				opts := modsSpecToRunOptions(spec)
+				opts := migsSpecToRunOptions(spec)
 				if opts.Router == nil {
 					t.Fatal("expected Router config")
 				}
@@ -508,12 +507,12 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				},
 			}
 		})
-		opts := modsSpecToRunOptions(spec)
+		opts := migsSpecToRunOptions(spec)
 		if opts.Router != nil && opts.Router.Amata != nil {
 			t.Error("Router.Amata: expected nil when not configured")
 		}
-		if opts.Healing != nil && opts.Healing.Mod.Amata != nil {
-			t.Error("Healing.Mod.Amata: expected nil when not configured")
+		if opts.Healing != nil && opts.Healing.Mig.Amata != nil {
+			t.Error("Healing.Mig.Amata: expected nil when not configured")
 		}
 	})
 }

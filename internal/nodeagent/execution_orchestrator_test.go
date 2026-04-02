@@ -27,7 +27,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 		seedFiles    map[string]string // relative to runDir -> content
 		healingSpec  *contracts.HealingSpec
 		recovery     *contracts.RecoveryClaimContext
-		schemaJSON   string // "" = don't pass schema; "auto" = mustGateProfileSchemaJSON
+		schemaJSON   string            // "" = don't pass schema; "auto" = mustGateProfileSchemaJSON
 		wantFiles    map[string]string // relative to inDir -> expected content ("" = just check existence)
 		wantAbsent   []string          // files that must NOT exist in inDir
 		wantErr      bool
@@ -43,7 +43,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 		{
 			name: "CopiesGateProfileForInfra",
 			seedFiles: map[string]string{
-				"build-gate-first.log":   "failure\n",
+				"build-gate-first.log":    "failure\n",
 				"build-gate-profile.json": profile,
 			},
 			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
@@ -56,7 +56,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 		{
 			name: "SkipsGateProfileForNonInfra",
 			seedFiles: map[string]string{
-				"build-gate-first.log":   "failure\n",
+				"build-gate-first.log":    "failure\n",
 				"build-gate-profile.json": `{"schema_version":1}`,
 			},
 			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "code"},
@@ -235,7 +235,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 	}
 }
 
-func TestModStepIndexFromJobName_MultiStep(t *testing.T) {
+func TestMigStepIndexFromJobName_MultiStep(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -256,7 +256,7 @@ func TestModStepIndexFromJobName_MultiStep(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := modStepIndexFromJobName(tc.jobName, tc.steps)
+			got, err := migStepIndexFromJobName(tc.jobName, tc.steps)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error for job_name=%q", tc.jobName)
@@ -264,10 +264,10 @@ func TestModStepIndexFromJobName_MultiStep(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("modStepIndexFromJobName(%q,%d) returned error: %v", tc.jobName, tc.steps, err)
+				t.Fatalf("migStepIndexFromJobName(%q,%d) returned error: %v", tc.jobName, tc.steps, err)
 			}
 			if got != tc.want {
-				t.Fatalf("modStepIndexFromJobName(%q,%d)=%d want %d", tc.jobName, tc.steps, got, tc.want)
+				t.Fatalf("migStepIndexFromJobName(%q,%d)=%d want %d", tc.jobName, tc.steps, got, tc.want)
 			}
 		})
 	}

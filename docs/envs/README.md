@@ -103,7 +103,7 @@ Role model (bearer token claims):
   description. Default: `local1`.
 - `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
   as `PLOY_CONTAINER_REGISTRY`.
-- `MODS_IMAGE_PREFIX` — Optional absolute image prefix override used by the mig image build/push helper.
+- `MIGS_IMAGE_PREFIX` — Optional absolute image prefix override used by the mig image build/push helper.
   Default fallback is `${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}`.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Migs LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on

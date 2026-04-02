@@ -127,13 +127,13 @@ func TestParseParam(t *testing.T) {
 		t.Parallel()
 
 		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		req.SetPathValue("mig_id", "mod123")
+		req.SetPathValue("mig_id", "mig123")
 		id, err := parseRequiredPathID[domaintypes.MigID](req, "mig_id")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if id != domaintypes.MigID("mod123") {
-			t.Errorf("id = %q, want %q", id, "mod123")
+		if id != domaintypes.MigID("mig123") {
+			t.Errorf("id = %q, want %q", id, "mig123")
 		}
 	})
 

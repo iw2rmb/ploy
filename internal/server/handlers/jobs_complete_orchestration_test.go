@@ -169,13 +169,13 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_ModFailureCancelsRemainingJobs verifies that when a non-gate
+// TestCompleteJob_MigFailureCancelsRemainingJobs verifies that when a non-gate
 // mig job fails, remaining non-terminal jobs are canceled so the run can
 // transition to a terminal state instead of leaving jobs stranded.
-func TestCompleteJob_ModFailureCancelsRemainingJobs(t *testing.T) {
+func TestCompleteJob_MigFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeMod)
+	f := newRepoScopedFixture(domaintypes.JobTypeMig)
 	repoID := f.Job.RepoID
 	postJobID := domaintypes.NewJobID()
 	f.Job.Meta = []byte(`{"kind":"mig"}`)
@@ -281,7 +281,7 @@ func TestCompleteJob_Success_DoesNotUseStepIndexScheduler(t *testing.T) {
 		RepoBaseRef: "main",
 		Attempt:     1,
 		Status:      domaintypes.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 	}
 	f.Job.RepoID = nextJob.RepoID
 	f.Job.RepoBaseRef = "main"
@@ -359,7 +359,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 
 	gf := newGateFailureFixture(t, []byte(`{"kind":"gate","gate":{"static_checks":[{"tool":"maven","passed":false}],"recovery":{"loop_kind":"healing","error_kind":"infra","strategy_id":"infra-default"}}}`))
 	st := &transientGetRunStore{
-		jobStore: gf.Store,
+		jobStore:  gf.Store,
 		failCount: 1,
 		err:       errors.New("transient get run failure"),
 	}
@@ -407,4 +407,3 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 		t.Fatalf("unexpected cancellation call: %+v", st.updateJobStatus.calls[0])
 	}
 }
-

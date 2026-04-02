@@ -12,9 +12,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-// TestModRunRepoRouting verifies that `mig run repo` dispatches to the correct handler.
+// TestMigRunRepoRouting verifies that `mig run repo` dispatches to the correct handler.
 // Tests argument parsing without making HTTP calls (no t.Setenv, so t.Parallel is safe).
-func TestModRunRepoRouting(t *testing.T) {
+func TestMigRunRepoRouting(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -89,9 +89,9 @@ func TestModRunRepoRouting(t *testing.T) {
 	}
 }
 
-// TestModRunRepoAddCallsControlPlane verifies that `mig run repo add` calls the correct endpoint.
+// TestMigRunRepoAddCallsControlPlane verifies that `mig run repo add` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoAddCallsControlPlane(t *testing.T) {
+func TestMigRunRepoAddCallsControlPlane(t *testing.T) {
 	var called bool
 	var receivedBody map[string]string
 
@@ -102,10 +102,10 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
-			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
+			// v1: Use RepoID (mig_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
 				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
+				RepoID:    "a1b2c3d4", // mig_repos.id (NanoID, 8 chars)
 				RepoURL:   receivedBody["repo_url"],
 				BaseRef:   receivedBody["base_ref"],
 				TargetRef: receivedBody["target_ref"],
@@ -148,10 +148,10 @@ func TestModRunRepoAddCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestModRunRepoAddRejectsInvalidRepoURLScheme verifies that the CLI rejects invalid repo_url
+// TestMigRunRepoAddRejectsInvalidRepoURLScheme verifies that the CLI rejects invalid repo_url
 // schemes at the input boundary and does not call the control plane.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
+func TestMigRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 	var called bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -181,9 +181,9 @@ func TestModRunRepoAddRejectsInvalidRepoURLScheme(t *testing.T) {
 	}
 }
 
-// TestModRunRepoRemoveCallsControlPlane verifies that `mig run repo remove` calls the correct endpoint.
+// TestMigRunRepoRemoveCallsControlPlane verifies that `mig run repo remove` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
+func TestMigRunRepoRemoveCallsControlPlane(t *testing.T) {
 	var called bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -192,10 +192,10 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 			called = true
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
+			// v1: Use RepoID (mig_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
 				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
+				RepoID:    "a1b2c3d4", // mig_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
@@ -227,9 +227,9 @@ func TestModRunRepoRemoveCallsControlPlane(t *testing.T) {
 	}
 }
 
-// TestModRunRepoRestartCallsControlPlane verifies that `mig run repo restart` calls the correct endpoint.
+// TestMigRunRepoRestartCallsControlPlane verifies that `mig run repo restart` calls the correct endpoint.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
+func TestMigRunRepoRestartCallsControlPlane(t *testing.T) {
 	var called bool
 	var receivedBody map[string]*string
 
@@ -240,10 +240,10 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
+			// v1: Use RepoID (mig_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
 				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
+				RepoID:    "a1b2c3d4", // mig_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main",
 				TargetRef: "feature-branch-v2",
@@ -282,7 +282,7 @@ func TestModRunRepoRestartCallsControlPlane(t *testing.T) {
 
 // RED gate for roadmap/reporting.md Phase 0:
 // repo status must be removed in favor of `ploy run status`.
-func TestModRunRepoStatusRemoved(t *testing.T) {
+func TestMigRunRepoStatusRemoved(t *testing.T) {
 	t.Parallel()
 
 	buf := &bytes.Buffer{}
@@ -296,9 +296,9 @@ func TestModRunRepoStatusRemoved(t *testing.T) {
 	}
 }
 
-// TestModRunRepoAddServerError verifies error handling when the server returns an error.
+// TestMigRunRepoAddServerError verifies error handling when the server returns an error.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoAddServerError(t *testing.T) {
+func TestMigRunRepoAddServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos" {
 			http.Error(w, "run not found", http.StatusNotFound)
@@ -332,9 +332,9 @@ func TestModRunRepoAddServerError(t *testing.T) {
 // Verifies that CLI subcommands validate arguments and call correct endpoints.
 // =========================================================================
 
-// TestModRunRepoRemoveServerError verifies error handling when remove fails.
+// TestMigRunRepoRemoveServerError verifies error handling when remove fails.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoRemoveServerError(t *testing.T) {
+func TestMigRunRepoRemoveServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/cancel" {
 			http.Error(w, "repo not found", http.StatusNotFound)
@@ -360,9 +360,9 @@ func TestModRunRepoRemoveServerError(t *testing.T) {
 	}
 }
 
-// TestModRunRepoRestartServerError verifies error handling when restart fails.
+// TestMigRunRepoRestartServerError verifies error handling when restart fails.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoRestartServerError(t *testing.T) {
+func TestMigRunRepoRestartServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v1/runs/2HBZ1MRFOo8uvXVJhVqKlf8W8Ep/repos/a1b2c3d4/restart" {
 			// Conflict: cannot restart a non-terminal repo.
@@ -389,9 +389,9 @@ func TestModRunRepoRestartServerError(t *testing.T) {
 	}
 }
 
-// TestModRunRepoStatusServerError verifies the removed status command fails immediately.
+// TestMigRunRepoStatusServerError verifies the removed status command fails immediately.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoStatusServerError(t *testing.T) {
+func TestMigRunRepoStatusServerError(t *testing.T) {
 	var called bool
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -415,9 +415,9 @@ func TestModRunRepoStatusServerError(t *testing.T) {
 	}
 }
 
-// TestModRunRepoRestartWithBaseRef verifies restart sends optional base-ref.
+// TestMigRunRepoRestartWithBaseRef verifies restart sends optional base-ref.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoRestartWithBaseRef(t *testing.T) {
+func TestMigRunRepoRestartWithBaseRef(t *testing.T) {
 	var receivedBody map[string]*string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -425,10 +425,10 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
+			// v1: Use RepoID (mig_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
 				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
+				RepoID:    "a1b2c3d4", // mig_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-branch",
@@ -462,9 +462,9 @@ func TestModRunRepoRestartWithBaseRef(t *testing.T) {
 	}
 }
 
-// TestModRunRepoRestartWithBothRefs verifies restart sends both base and target refs.
+// TestMigRunRepoRestartWithBothRefs verifies restart sends both base and target refs.
 // Note: Not parallel because useServerDescriptor uses t.Setenv.
-func TestModRunRepoRestartWithBothRefs(t *testing.T) {
+func TestMigRunRepoRestartWithBothRefs(t *testing.T) {
 	var receivedBody map[string]*string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -472,10 +472,10 @@ func TestModRunRepoRestartWithBothRefs(t *testing.T) {
 			_ = json.NewDecoder(r.Body).Decode(&receivedBody)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			// v1: Use RepoID (mod_repos.id), not a non-existent run_repos.id.
+			// v1: Use RepoID (mig_repos.id), not a non-existent run_repos.id.
 			resp := runRepoResponse{
 				RunID:     "2HBZ1MRFOo8uvXVJhVqKlf8W8Ep",
-				RepoID:    "a1b2c3d4", // mod_repos.id (NanoID, 8 chars)
+				RepoID:    "a1b2c3d4", // mig_repos.id (NanoID, 8 chars)
 				RepoURL:   "https://github.com/org/repo.git",
 				BaseRef:   "main-v2",
 				TargetRef: "feature-v2",

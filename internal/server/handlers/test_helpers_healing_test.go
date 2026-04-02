@@ -39,7 +39,7 @@ func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture
 		Attempt:     1,
 		Name:        "mig-0",
 		Status:      domaintypes.JobStatusCreated,
-		JobType:     domaintypes.JobTypeMod,
+		JobType:     domaintypes.JobTypeMig,
 		Meta:        []byte(`{}`),
 	}
 	f.Job.NextID = &successor.ID
@@ -297,7 +297,7 @@ func newHealingChain(t *testing.T, opts ...func(*healingChainConfig)) healingCha
 		jobs = append(jobs, j)
 	}
 
-	mig0 := baseJob("mig-0", domaintypes.JobTypeMod, domaintypes.JobStatusCreated)
+	mig0 := baseJob("mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated)
 	mig0.Meta = []byte(`{}`)
 	jobs = append(jobs, mig0)
 
