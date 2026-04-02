@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
@@ -15,9 +16,8 @@ import (
 )
 
 // TestHandleConfigEnvListSuccess verifies that the 'list' subcommand retrieves
-// and displays global env variables from the server.
+// and displays global env variables from the server using target wire format.
 func TestHandleConfigEnvListSuccess(t *testing.T) {
-	// Arrange a fake server that returns env entries.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			t.Fatalf("expected GET, got %s", r.Method)
@@ -27,9 +27,10 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]map[string]any{
-			{"key": "CA_CERTS_PEM_BUNDLE", "scope": "all", "secret": true},
-			{"key": "OPENAI_API_KEY", "scope": "migs", "secret": true},
-			{"key": "DEBUG_MODE", "value": "true", "scope": "gate", "secret": false},
+			{"key": "PLOY_CA_CERTS", "target": "gates", "secret": true},
+			{"key": "PLOY_CA_CERTS", "target": "steps", "secret": true},
+			{"key": "OPENAI_API_KEY", "target": "steps", "secret": true},
+			{"key": "DEBUG_MODE", "value": "true", "target": "gates", "secret": false},
 		})
 	}))
 	defer srv.Close()
@@ -46,12 +47,12 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 		t.Fatalf("handleConfigEnvList error: %v", err)
 	}
 
-	// Verify header and entries are displayed.
-	if !strings.Contains(output, "KEY") {
-		t.Fatalf("expected header in output, got: %q", output)
+	// Verify header uses TARGET column.
+	if !strings.Contains(output, "TARGET") {
+		t.Fatalf("expected TARGET header in output, got: %q", output)
 	}
-	if !strings.Contains(output, "CA_CERTS_PEM_BUNDLE") {
-		t.Fatalf("expected CA_CERTS_PEM_BUNDLE in output, got: %q", output)
+	if !strings.Contains(output, "PLOY_CA_CERTS") {
+		t.Fatalf("expected PLOY_CA_CERTS in output, got: %q", output)
 	}
 	if !strings.Contains(output, "OPENAI_API_KEY") {
 		t.Fatalf("expected OPENAI_API_KEY in output, got: %q", output)
@@ -94,20 +95,21 @@ func TestHandleConfigEnvListEmpty(t *testing.T) {
 	}
 }
 
-// TestHandleConfigEnvShowSuccess verifies that 'show' retrieves a single env variable.
+// TestHandleConfigEnvShowSuccess verifies that 'show' retrieves a single env variable
+// using the target wire format.
 func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/config/env/CA_CERTS_PEM_BUNDLE" {
-			t.Fatalf("expected /v1/config/env/CA_CERTS_PEM_BUNDLE, got %s", r.URL.Path)
+		if r.URL.Path != "/v1/config/env/PLOY_CA_CERTS" {
+			t.Fatalf("expected /v1/config/env/PLOY_CA_CERTS, got %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"key":    "CA_CERTS_PEM_BUNDLE",
+			"key":    "PLOY_CA_CERTS",
 			"value":  "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----",
-			"scope":  "all",
+			"target": "gates",
 			"secret": true,
 		})
 	}))
@@ -118,18 +120,18 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
+		err = handleConfigEnvShow([]string{"--key", "PLOY_CA_CERTS"}, buf)
 	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvShow error: %v", err)
 	}
 
-	if !strings.Contains(output, "Key:    CA_CERTS_PEM_BUNDLE") {
+	if !strings.Contains(output, "Key:    PLOY_CA_CERTS") {
 		t.Fatalf("expected key in output, got: %q", output)
 	}
-	if !strings.Contains(output, "Scope:  all") {
-		t.Fatalf("expected scope in output, got: %q", output)
+	if !strings.Contains(output, "Target: gates") {
+		t.Fatalf("expected target in output, got: %q", output)
 	}
 	if !strings.Contains(output, "Secret: true") {
 		t.Fatalf("expected secret flag in output, got: %q", output)
@@ -137,6 +139,56 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	// Value should be redacted for secrets by default.
 	if strings.Contains(output, "-----BEGIN CERTIFICATE-----") {
 		t.Fatalf("secret value should be redacted without --raw, got: %q", output)
+	}
+}
+
+// TestHandleConfigEnvShowWithFrom verifies that --from sends the target query parameter.
+func TestHandleConfigEnvShowWithFrom(t *testing.T) {
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query().Get("target")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"key":    "PLOY_CA_CERTS",
+			"value":  "pem-content",
+			"target": "gates",
+			"secret": false,
+		})
+	}))
+	defer srv.Close()
+
+	clienv.UseServerDescriptor(t, srv.URL)
+
+	buf := &bytes.Buffer{}
+	var err error
+	stdcapture.CaptureStdout(t, func() {
+		err = handleConfigEnvShow([]string{"--key", "PLOY_CA_CERTS", "--from", "gates"}, buf)
+	})
+
+	if err != nil {
+		t.Fatalf("handleConfigEnvShow error: %v", err)
+	}
+	if gotQuery != "gates" {
+		t.Fatalf("expected target query param 'gates', got %q", gotQuery)
+	}
+}
+
+// TestHandleConfigEnvShowAmbiguity verifies that 409 responses produce a --from hint.
+func TestHandleConfigEnvShowAmbiguity(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "ambiguous key: exists for targets gates, steps", http.StatusConflict)
+	}))
+	defer srv.Close()
+
+	clienv.UseServerDescriptor(t, srv.URL)
+
+	buf := &bytes.Buffer{}
+	err := handleConfigEnvShow([]string{"--key", "PLOY_CA_CERTS"}, buf)
+	if err == nil {
+		t.Fatalf("expected error for ambiguous key")
+	}
+	if !strings.Contains(err.Error(), "use --from") {
+		t.Fatalf("expected --from hint in error, got: %v", err)
 	}
 }
 
@@ -150,7 +202,7 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"key":    "SECRET_KEY",
 			"value":  "super-secret-value-12345",
-			"scope":  "migs",
+			"target": "steps",
 			"secret": true,
 		})
 	}))
@@ -194,20 +246,32 @@ func TestHandleConfigEnvShowNotFound(t *testing.T) {
 }
 
 // TestHandleConfigEnvSetSuccessInline verifies setting a value with --value.
+// Default --on is jobs, which expands to gates+steps (two PUTs).
 func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
-	var gotPath, gotMethod, gotContentType string
-	var gotBody map[string]any
+	var mu sync.Mutex
+	var gotRequests []struct {
+		Method      string
+		Path        string
+		ContentType string
+		Body        map[string]any
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotMethod = r.Method
-		gotPath = r.URL.Path
-		gotContentType = r.Header.Get("Content-Type")
-		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		gotRequests = append(gotRequests, struct {
+			Method      string
+			Path        string
+			ContentType string
+			Body        map[string]any
+		}{r.Method, r.URL.Path, r.Header.Get("Content-Type"), body})
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"key":    "OPENAI_API_KEY",
 			"value":  "sk-test-12345",
-			"scope":  "all",
+			"target": body["target"],
 			"secret": true,
 		})
 	}))
@@ -225,28 +289,72 @@ func TestHandleConfigEnvSetSuccessInline(t *testing.T) {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
 	}
 
-	// Assert request details.
-	if gotMethod != "PUT" {
-		t.Fatalf("expected PUT, got %s", gotMethod)
-	}
-	if gotPath != "/v1/config/env/OPENAI_API_KEY" {
-		t.Fatalf("expected /v1/config/env/OPENAI_API_KEY, got %s", gotPath)
-	}
-	if gotContentType != "application/json" {
-		t.Fatalf("expected application/json, got %s", gotContentType)
-	}
-	if gotBody["value"] != "sk-test-12345" {
-		t.Fatalf("expected value 'sk-test-12345', got: %v", gotBody["value"])
-	}
-	if gotBody["scope"] != "all" {
-		t.Fatalf("expected scope 'all', got: %v", gotBody["scope"])
-	}
-	if gotBody["secret"] != true {
-		t.Fatalf("expected secret true (default), got: %v", gotBody["secret"])
+	// Default --on=jobs → gates, steps (2 PUTs).
+	if len(gotRequests) != 2 {
+		t.Fatalf("expected 2 PUT requests (jobs=gates+steps), got %d", len(gotRequests))
 	}
 
-	if !strings.Contains(output, "updated successfully") {
+	// Verify targets sent.
+	targets := map[string]bool{}
+	for _, req := range gotRequests {
+		if req.Method != "PUT" {
+			t.Fatalf("expected PUT, got %s", req.Method)
+		}
+		if req.Path != "/v1/config/env/OPENAI_API_KEY" {
+			t.Fatalf("expected /v1/config/env/OPENAI_API_KEY, got %s", req.Path)
+		}
+		if req.ContentType != "application/json" {
+			t.Fatalf("expected application/json, got %s", req.ContentType)
+		}
+		if req.Body["value"] != "sk-test-12345" {
+			t.Fatalf("expected value 'sk-test-12345', got: %v", req.Body["value"])
+		}
+		if req.Body["secret"] != true {
+			t.Fatalf("expected secret true (default), got: %v", req.Body["secret"])
+		}
+		targets[req.Body["target"].(string)] = true
+	}
+	if !targets["gates"] || !targets["steps"] {
+		t.Fatalf("expected targets gates and steps, got: %v", targets)
+	}
+
+	if !strings.Contains(output, "set for targets") {
 		t.Fatalf("expected success message, got: %q", output)
+	}
+}
+
+// TestHandleConfigEnvSetSingleTarget verifies setting with --on gates (single target, one PUT).
+func TestHandleConfigEnvSetSingleTarget(t *testing.T) {
+	var gotBody map[string]any
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"key":    "FOO",
+			"value":  "bar",
+			"target": "gates",
+			"secret": true,
+		})
+	}))
+	defer srv.Close()
+
+	clienv.UseServerDescriptor(t, srv.URL)
+
+	buf := &bytes.Buffer{}
+	var err error
+	output := stdcapture.CaptureStdout(t, func() {
+		err = handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
+	})
+
+	if err != nil {
+		t.Fatalf("handleConfigEnvSet error: %v", err)
+	}
+	if gotBody["target"] != "gates" {
+		t.Fatalf("expected target 'gates', got: %v", gotBody["target"])
+	}
+	if !strings.Contains(output, "set for target gates") {
+		t.Fatalf("expected single-target success message, got: %q", output)
 	}
 }
 
@@ -259,18 +367,23 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 		t.Fatalf("write test file: %v", err)
 	}
 
-	var gotBody map[string]any
+	var mu sync.Mutex
+	var gotBodies []map[string]any
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "PUT" {
 			t.Fatalf("expected PUT, got %s", r.Method)
 		}
-		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		gotBodies = append(gotBodies, body)
+		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"key":    "CA_CERTS_PEM_BUNDLE",
+			"key":    "PLOY_CA_CERTS",
 			"value":  fileContent,
-			"scope":  "all",
+			"target": body["target"],
 			"secret": true,
 		})
 	}))
@@ -281,53 +394,23 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{"--key", "CA_CERTS_PEM_BUNDLE", "--file", filePath, "--scope", "all"}, buf)
+		err = handleConfigEnvSet([]string{"--key", "PLOY_CA_CERTS", "--file", filePath, "--on", "all"}, buf)
 	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvSet error: %v", err)
 	}
 
-	// Verify the file content was sent.
-	if gotBody["value"] != fileContent {
-		t.Fatalf("expected file content, got: %v", gotBody["value"])
-	}
-}
-
-// TestHandleConfigEnvSetCustomScope verifies setting with a custom scope.
-func TestHandleConfigEnvSetCustomScope(t *testing.T) {
-	var gotBody map[string]any
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewDecoder(r.Body).Decode(&gotBody)
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"key":    "CODEX_AUTH_JSON",
-			"value":  "{}",
-			"scope":  "migs",
-			"secret": true,
-		})
-	}))
-	defer srv.Close()
-
-	clienv.UseServerDescriptor(t, srv.URL)
-
-	buf := &bytes.Buffer{}
-	var err error
-	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{
-			"--key", "CODEX_AUTH_JSON",
-			"--value", "{}",
-			"--scope", "migs",
-		}, buf)
-	})
-
-	if err != nil {
-		t.Fatalf("handleConfigEnvSet error: %v", err)
+	// --on all → 4 PUTs (gates, nodes, server, steps).
+	if len(gotBodies) != 4 {
+		t.Fatalf("expected 4 PUT requests (all targets), got %d", len(gotBodies))
 	}
 
-	if gotBody["scope"] != "migs" {
-		t.Fatalf("expected scope 'migs', got: %v", gotBody["scope"])
+	// Verify the file content was sent in each request.
+	for _, body := range gotBodies {
+		if body["value"] != fileContent {
+			t.Fatalf("expected file content, got: %v", body["value"])
+		}
 	}
 }
 
@@ -341,7 +424,7 @@ func TestHandleConfigEnvSetSecretFalse(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"key":    "DEBUG_MODE",
 			"value":  "true",
-			"scope":  "gate",
+			"target": "gates",
 			"secret": false,
 		})
 	}))
@@ -355,7 +438,7 @@ func TestHandleConfigEnvSetSecretFalse(t *testing.T) {
 		err = handleConfigEnvSet([]string{
 			"--key", "DEBUG_MODE",
 			"--value", "true",
-			"--scope", "gate",
+			"--on", "gates",
 			"--secret=false",
 		}, buf)
 	})
@@ -379,7 +462,7 @@ func TestHandleConfigEnvSetServerError(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar"}, buf)
+	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates"}, buf)
 	if err == nil {
 		t.Fatalf("expected error from server")
 	}
@@ -404,7 +487,7 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvUnset([]string{"--key", "CA_CERTS_PEM_BUNDLE"}, buf)
+		err = handleConfigEnvUnset([]string{"--key", "PLOY_CA_CERTS"}, buf)
 	})
 
 	if err != nil {
@@ -414,12 +497,57 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	if gotMethod != "DELETE" {
 		t.Fatalf("expected DELETE, got %s", gotMethod)
 	}
-	if gotPath != "/v1/config/env/CA_CERTS_PEM_BUNDLE" {
-		t.Fatalf("expected /v1/config/env/CA_CERTS_PEM_BUNDLE, got %s", gotPath)
+	if gotPath != "/v1/config/env/PLOY_CA_CERTS" {
+		t.Fatalf("expected /v1/config/env/PLOY_CA_CERTS, got %s", gotPath)
 	}
 
 	if !strings.Contains(output, "deleted successfully") {
 		t.Fatalf("expected success message, got: %q", output)
+	}
+}
+
+// TestHandleConfigEnvUnsetWithFrom verifies that --from sends the target query parameter.
+func TestHandleConfigEnvUnsetWithFrom(t *testing.T) {
+	var gotQuery string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query().Get("target")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	clienv.UseServerDescriptor(t, srv.URL)
+
+	buf := &bytes.Buffer{}
+	var err error
+	stdcapture.CaptureStdout(t, func() {
+		err = handleConfigEnvUnset([]string{"--key", "PLOY_CA_CERTS", "--from", "gates"}, buf)
+	})
+
+	if err != nil {
+		t.Fatalf("handleConfigEnvUnset error: %v", err)
+	}
+	if gotQuery != "gates" {
+		t.Fatalf("expected target query param 'gates', got %q", gotQuery)
+	}
+}
+
+// TestHandleConfigEnvUnsetAmbiguity verifies that 409 responses produce a --from hint.
+func TestHandleConfigEnvUnsetAmbiguity(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "ambiguous key: exists for targets gates, steps", http.StatusConflict)
+	}))
+	defer srv.Close()
+
+	clienv.UseServerDescriptor(t, srv.URL)
+
+	buf := &bytes.Buffer{}
+	err := handleConfigEnvUnset([]string{"--key", "PLOY_CA_CERTS"}, buf)
+	if err == nil {
+		t.Fatalf("expected error for ambiguous key")
+	}
+	if !strings.Contains(err.Error(), "use --from") {
+		t.Fatalf("expected --from hint in error, got: %v", err)
 	}
 }
 
@@ -512,7 +640,7 @@ func TestHandleConfigEnvShowRedactsShortSecrets(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"key":    "SHORT",
 			"value":  "abc",
-			"scope":  "all",
+			"target": "steps",
 			"secret": true,
 		})
 	}))

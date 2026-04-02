@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -45,32 +46,34 @@ func handleConfigEnv(args []string, stderr io.Writer) error {
 func printConfigEnvUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy config env <command>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Manage global environment variables (GitLab, CA bundles, Codex auth JSON, OpenAI keys).")
+	_, _ = fmt.Fprintln(w, "Manage global environment variables injected into cluster components.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  list                            List all global environment variables")
-	_, _ = fmt.Fprintln(w, "  show --key <NAME> [--raw]       Show a specific environment variable")
+	_, _ = fmt.Fprintln(w, "  show --key <NAME> [--from <TARGET>] [--raw]")
+	_, _ = fmt.Fprintln(w, "                                  Show a specific environment variable")
 	_, _ = fmt.Fprintln(w, "  set --key <NAME> (--value <STRING> | --file <PATH>)")
-	_, _ = fmt.Fprintln(w, "                                  [--scope migs|heal|gate|all] [--secret=true|false]")
+	_, _ = fmt.Fprintln(w, "                                  [--on <SELECTOR>] [--secret=true|false]")
 	_, _ = fmt.Fprintln(w, "                                  Set an environment variable")
-	_, _ = fmt.Fprintln(w, "  unset --key <NAME>              Delete an environment variable")
+	_, _ = fmt.Fprintln(w, "  unset --key <NAME> [--from <TARGET>]")
+	_, _ = fmt.Fprintln(w, "                                  Delete an environment variable")
 }
 
 // globalEnvListItem matches the server's list response structure.
 // For secrets, the value is omitted (empty) in the list view.
 type globalEnvListItem struct {
-	Key    string                     `json:"key"`
-	Value  string                     `json:"value,omitempty"`
-	Scope  domaintypes.GlobalEnvScope `json:"scope"`
-	Secret bool                       `json:"secret"`
+	Key    string `json:"key"`
+	Value  string `json:"value,omitempty"`
+	Target string `json:"target"`
+	Secret bool   `json:"secret"`
 }
 
 // globalEnvResponse matches the server's single-entry response structure.
 type globalEnvResponse struct {
-	Key    string                     `json:"key"`
-	Value  string                     `json:"value"`
-	Scope  domaintypes.GlobalEnvScope `json:"scope"`
-	Secret bool                       `json:"secret"`
+	Key    string `json:"key"`
+	Value  string `json:"value"`
+	Target string `json:"target"`
+	Secret bool   `json:"secret"`
 }
 
 // handleConfigEnvList retrieves and displays all global environment variables.
@@ -126,8 +129,8 @@ func handleConfigEnvList(args []string, stderr io.Writer) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	for _, item := range items {
-		if err := item.Scope.Validate(); err != nil {
-			return fmt.Errorf("invalid scope %q in response: %w", item.Scope, err)
+		if _, err := domaintypes.ParseGlobalEnvTarget(item.Target); err != nil {
+			return fmt.Errorf("invalid target %q in response: %w", item.Target, err)
 		}
 	}
 
@@ -138,7 +141,7 @@ func handleConfigEnvList(args []string, stderr io.Writer) error {
 	}
 
 	// Print header and each item.
-	fmt.Printf("%-30s %-10s %-8s %s\n", "KEY", "SCOPE", "SECRET", "VALUE")
+	fmt.Printf("%-30s %-10s %-8s %s\n", "KEY", "TARGET", "SECRET", "VALUE")
 	fmt.Println(strings.Repeat("-", 70))
 	for _, item := range items {
 		// Redact secret values in list view (server already omits them).
@@ -150,7 +153,7 @@ func handleConfigEnvList(args []string, stderr io.Writer) error {
 		if len(displayValue) > 20 {
 			displayValue = displayValue[:17] + "..."
 		}
-		fmt.Printf("%-30s %-10s %-8t %s\n", item.Key, item.Scope, item.Secret, displayValue)
+		fmt.Printf("%-30s %-10s %-8t %s\n", item.Key, item.Target, item.Secret, displayValue)
 	}
 	return nil
 }
@@ -163,6 +166,7 @@ func printConfigEnvListUsage(w io.Writer) {
 
 // handleConfigEnvShow displays a single global environment variable.
 // By default, secret values are redacted; use --raw to show the full value.
+// Use --from to specify the target when the key exists for multiple targets.
 func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
 		printConfigEnvShowUsage(stderr)
@@ -175,10 +179,12 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("config env show", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var (
-		key stringValue
-		raw bool
+		key  stringValue
+		from stringValue
+		raw  bool
 	)
 	fs.Var(&key, "key", "Environment variable name (required)")
+	fs.Var(&from, "from", "Target to read from (required when key exists for multiple targets)")
 	fs.BoolVar(&raw, "raw", false, "Show raw value without redaction")
 
 	if err := parseFlagSet(fs, args, func() { printConfigEnvShowUsage(stderr) }); err != nil {
@@ -193,6 +199,16 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 		return errors.New("--key is required")
 	}
 
+	// Validate --from if provided.
+	if from.set {
+		if strings.TrimSpace(from.value) == "" {
+			return errors.New("--from value cannot be empty")
+		}
+		if _, err := domaintypes.ParseGlobalEnvTarget(from.value); err != nil {
+			return fmt.Errorf("invalid --from target: %w", err)
+		}
+	}
+
 	// Resolve control plane URL and HTTP client.
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
@@ -201,6 +217,9 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/env/" + key.value
+	if from.set {
+		endpoint += "?target=" + from.value
+	}
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -217,6 +236,10 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	if resp.StatusCode == http.StatusNotFound {
 		return fmt.Errorf("environment variable %q not found", key.value)
 	}
+	if resp.StatusCode == http.StatusConflict {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("key %q exists for multiple targets; use --from to specify which target: %s", key.value, string(body))
+	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
@@ -226,8 +249,8 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	if err := json.NewDecoder(resp.Body).Decode(&entry); err != nil {
 		return fmt.Errorf("decode response: %w", err)
 	}
-	if err := entry.Scope.Validate(); err != nil {
-		return fmt.Errorf("invalid scope %q in response: %w", entry.Scope, err)
+	if _, err := domaintypes.ParseGlobalEnvTarget(entry.Target); err != nil {
+		return fmt.Errorf("invalid target %q in response: %w", entry.Target, err)
 	}
 
 	// Display the entry, redacting secret values unless --raw is specified.
@@ -243,28 +266,71 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 
 	fmt.Printf("Key:    %s\n", entry.Key)
 	fmt.Printf("Value:  %s\n", displayValue)
-	fmt.Printf("Scope:  %s\n", entry.Scope)
+	fmt.Printf("Target: %s\n", entry.Target)
 	fmt.Printf("Secret: %t\n", entry.Secret)
 	return nil
 }
 
 func printConfigEnvShowUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config env show --key <NAME> [--raw]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy config env show --key <NAME> [--from <TARGET>] [--raw]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --key    Environment variable name (required)")
+	_, _ = fmt.Fprintln(w, "  --from   Target to read from: server, nodes, gates, steps")
+	_, _ = fmt.Fprintln(w, "           (required when key exists for multiple targets)")
 	_, _ = fmt.Fprintln(w, "  --raw    Show raw value without redaction")
 }
 
 // globalEnvSetRequest is the request body for PUT /v1/config/env/{key}.
 type globalEnvSetRequest struct {
-	Value  string                     `json:"value"`
-	Scope  domaintypes.GlobalEnvScope `json:"scope"`
-	Secret *bool                      `json:"secret,omitempty"`
+	Value  string `json:"value"`
+	Target string `json:"target"`
+	Secret *bool  `json:"secret,omitempty"`
+}
+
+// validOnSelectors is the set of accepted values for the --on flag.
+var validOnSelectors = map[string]bool{
+	"all": true, "jobs": true, "server": true, "nodes": true, "gates": true, "steps": true,
+}
+
+// expandOnSelector expands a --on selector into a sorted slice of GlobalEnvTarget values.
+// "all" expands to [gates, nodes, server, steps] (all four targets).
+// "jobs" expands to [gates, steps].
+// Other selectors map directly to the corresponding single target.
+func expandOnSelector(selector string) ([]domaintypes.GlobalEnvTarget, error) {
+	if !validOnSelectors[selector] {
+		valid := make([]string, 0, len(validOnSelectors))
+		for k := range validOnSelectors {
+			valid = append(valid, k)
+		}
+		sort.Strings(valid)
+		return nil, fmt.Errorf("invalid --on selector %q (must be one of: %s)", selector, strings.Join(valid, ", "))
+	}
+	switch selector {
+	case "all":
+		return []domaintypes.GlobalEnvTarget{
+			domaintypes.GlobalEnvTargetGates,
+			domaintypes.GlobalEnvTargetNodes,
+			domaintypes.GlobalEnvTargetServer,
+			domaintypes.GlobalEnvTargetSteps,
+		}, nil
+	case "jobs":
+		return []domaintypes.GlobalEnvTarget{
+			domaintypes.GlobalEnvTargetGates,
+			domaintypes.GlobalEnvTargetSteps,
+		}, nil
+	default:
+		t, err := domaintypes.ParseGlobalEnvTarget(selector)
+		if err != nil {
+			return nil, err
+		}
+		return []domaintypes.GlobalEnvTarget{t}, nil
+	}
 }
 
 // handleConfigEnvSet creates or updates a global environment variable.
 // Value can be provided inline (--value) or from a file (--file).
+// The --on selector determines which targets receive the variable.
 func handleConfigEnvSet(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
 		printConfigEnvSetUsage(stderr)
@@ -280,13 +346,13 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 		key    stringValue
 		value  stringValue
 		file   stringValue
-		scope  string
+		on     string
 		secret boolValue
 	)
 	fs.Var(&key, "key", "Environment variable name (required)")
 	fs.Var(&value, "value", "Inline value (mutually exclusive with --file)")
 	fs.Var(&file, "file", "Path to file containing value (mutually exclusive with --value)")
-	fs.StringVar(&scope, "scope", "all", "Scope: migs, heal, gate, all")
+	fs.StringVar(&on, "on", "jobs", "Target selector: all, jobs, server, nodes, gates, steps")
 	fs.Var(&secret, "secret", "Mark value as secret (default: true)")
 
 	if err := parseFlagSet(fs, args, func() { printConfigEnvSetUsage(stderr) }); err != nil {
@@ -311,9 +377,9 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 		return errors.New("--value and --file are mutually exclusive")
 	}
 
-	parsedScope, err := domaintypes.ParseGlobalEnvScope(scope)
+	targets, err := expandOnSelector(on)
 	if err != nil {
-		return fmt.Errorf("invalid scope %q: %w", scope, err)
+		return err
 	}
 
 	// Read value from file if --file is specified.
@@ -329,16 +395,12 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 	}
 
 	// Build request body. Default secret to true if not explicitly set.
-	reqBody := globalEnvSetRequest{
-		Value: actualValue,
-		Scope: parsedScope,
-	}
+	var secretPtr *bool
 	if secret.set {
-		reqBody.Secret = &secret.value
+		secretPtr = &secret.value
 	} else {
-		// Default to true if not specified.
 		defaultSecret := true
-		reqBody.Secret = &defaultSecret
+		secretPtr = &defaultSecret
 	}
 
 	// Resolve control plane URL and HTTP client.
@@ -348,52 +410,76 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 		return fmt.Errorf("resolve control plane: %w", err)
 	}
 
-	bodyJSON, err := json.Marshal(reqBody)
-	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
-	}
+	// Send one PUT per expanded target.
+	for _, target := range targets {
+		reqBody := globalEnvSetRequest{
+			Value:  actualValue,
+			Target: target.String(),
+			Secret: secretPtr,
+		}
+		bodyJSON, err := json.Marshal(reqBody)
+		if err != nil {
+			return fmt.Errorf("marshal request: %w", err)
+		}
 
-	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/env/" + key.value
-	req, err := http.NewRequestWithContext(ctx, "PUT", endpoint, bytes.NewReader(bodyJSON))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+		endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/env/" + key.value
+		req, err := http.NewRequestWithContext(ctx, "PUT", endpoint, bytes.NewReader(bodyJSON))
+		if err != nil {
+			return fmt.Errorf("create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("PUT %s: %w", endpoint, err)
-	}
-	defer func() {
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("PUT %s: %w", endpoint, err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+			_ = resp.Body.Close()
+			return fmt.Errorf("server returned %d for target %s: %s", resp.StatusCode, target, string(body))
+		}
 		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	fmt.Printf("Environment variable %q updated successfully\n", key.value)
+	if len(targets) == 1 {
+		fmt.Printf("Environment variable %q set for target %s\n", key.value, targets[0])
+	} else {
+		names := make([]string, len(targets))
+		for i, t := range targets {
+			names[i] = t.String()
+		}
+		fmt.Printf("Environment variable %q set for targets %s\n", key.value, strings.Join(names, ", "))
+	}
 	return nil
 }
 
 func printConfigEnvSetUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config env set --key <NAME> (--value <STRING> | --file <PATH>) [--scope <SCOPE>] [--secret=true|false]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy config env set --key <NAME> (--value <STRING> | --file <PATH>) [--on <SELECTOR>] [--secret=true|false]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --key      Environment variable name (required)")
 	_, _ = fmt.Fprintln(w, "  --value    Inline value (mutually exclusive with --file)")
 	_, _ = fmt.Fprintln(w, "  --file     Path to file containing value (mutually exclusive with --value)")
-	_, _ = fmt.Fprintln(w, "  --scope    Scope: migs, heal, gate, all (default: all)")
+	_, _ = fmt.Fprintln(w, "  --on       Target selector: all, jobs, server, nodes, gates, steps (default: jobs)")
 	_, _ = fmt.Fprintln(w, "  --secret   Mark value as secret (default: true)")
 	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Selectors:")
+	_, _ = fmt.Fprintln(w, "  all      → server, nodes, gates, steps (all targets)")
+	_, _ = fmt.Fprintln(w, "  jobs     → gates, steps (default)")
+	_, _ = fmt.Fprintln(w, "  server   → server only")
+	_, _ = fmt.Fprintln(w, "  nodes    → nodes only")
+	_, _ = fmt.Fprintln(w, "  gates    → gates only")
+	_, _ = fmt.Fprintln(w, "  steps    → steps only")
+	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
-	_, _ = fmt.Fprintln(w, "  ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all")
-	_, _ = fmt.Fprintln(w, "  ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope migs")
-	_, _ = fmt.Fprintln(w, "  ploy config env set --key OPENAI_API_KEY --value sk-... --scope all")
+	_, _ = fmt.Fprintln(w, "  ploy config env set --key PLOY_CA_CERTS --file ca-bundle.pem --on all")
+	_, _ = fmt.Fprintln(w, "  ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --on steps")
+	_, _ = fmt.Fprintln(w, "  ploy config env set --key OPENAI_API_KEY --value sk-... --on jobs")
 }
 
 // handleConfigEnvUnset deletes a global environment variable.
+// Use --from to specify the target when the key exists for multiple targets.
 func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
 		printConfigEnvUnsetUsage(stderr)
@@ -405,8 +491,12 @@ func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 	}
 	fs := flag.NewFlagSet("config env unset", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	var key stringValue
+	var (
+		key  stringValue
+		from stringValue
+	)
 	fs.Var(&key, "key", "Environment variable name (required)")
+	fs.Var(&from, "from", "Target to delete from (required when key exists for multiple targets)")
 
 	if err := parseFlagSet(fs, args, func() { printConfigEnvUnsetUsage(stderr) }); err != nil {
 		return err
@@ -420,6 +510,16 @@ func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 		return errors.New("--key is required")
 	}
 
+	// Validate --from if provided.
+	if from.set {
+		if strings.TrimSpace(from.value) == "" {
+			return errors.New("--from value cannot be empty")
+		}
+		if _, err := domaintypes.ParseGlobalEnvTarget(from.value); err != nil {
+			return fmt.Errorf("invalid --from target: %w", err)
+		}
+	}
+
 	// Resolve control plane URL and HTTP client.
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
@@ -428,6 +528,9 @@ func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 	}
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/env/" + key.value
+	if from.set {
+		endpoint += "?target=" + from.value
+	}
 	req, err := http.NewRequestWithContext(ctx, "DELETE", endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -442,6 +545,10 @@ func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 	}()
 
 	// 204 No Content is success, 404 is also acceptable (already deleted).
+	if resp.StatusCode == http.StatusConflict {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("key %q exists for multiple targets; use --from to specify which target: %s", key.value, string(body))
+	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
 			fmt.Printf("Environment variable %q not found (may already be deleted)\n", key.value)
@@ -456,8 +563,10 @@ func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 }
 
 func printConfigEnvUnsetUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config env unset --key <NAME>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy config env unset --key <NAME> [--from <TARGET>]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --key    Environment variable name (required)")
+	_, _ = fmt.Fprintln(w, "  --from   Target to delete from: server, nodes, gates, steps")
+	_, _ = fmt.Fprintln(w, "           (required when key exists for multiple targets)")
 }

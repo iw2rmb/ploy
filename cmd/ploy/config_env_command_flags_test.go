@@ -110,6 +110,30 @@ func TestHandleConfigEnvShowEmptyKey(t *testing.T) {
 	}
 }
 
+// TestHandleConfigEnvShowInvalidFrom verifies that invalid --from values are rejected.
+func TestHandleConfigEnvShowInvalidFrom(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleConfigEnvShow([]string{"--key", "FOO", "--from", "bogus"}, buf)
+	if err == nil {
+		t.Fatalf("expected error for invalid --from")
+	}
+	if !strings.Contains(err.Error(), "invalid --from target") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestHandleConfigEnvShowEmptyFrom verifies that an empty --from value is rejected.
+func TestHandleConfigEnvShowEmptyFrom(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleConfigEnvShow([]string{"--key", "FOO", "--from", ""}, buf)
+	if err == nil {
+		t.Fatalf("expected error for empty --from")
+	}
+	if !strings.Contains(err.Error(), "--from value cannot be empty") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // TestHandleConfigEnvSetRequiresKey verifies that the 'set' subcommand
 // requires the --key flag to be specified.
 func TestHandleConfigEnvSetRequiresKey(t *testing.T) {
@@ -162,34 +186,32 @@ func TestHandleConfigEnvSetRejectsExtraArgs(t *testing.T) {
 	}
 }
 
-// TestHandleConfigEnvSetInvalidScope verifies that invalid scope values are rejected.
-func TestHandleConfigEnvSetInvalidScope(t *testing.T) {
-	// To test scope validation, we need to pass --value or --file.
-	// Since we're testing flag parsing (not network), use --value.
+// TestHandleConfigEnvSetInvalidOnSelector verifies that invalid --on values are rejected.
+func TestHandleConfigEnvSetInvalidOnSelector(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--scope", "invalid"}, buf)
+	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "invalid"}, buf)
 	if err == nil {
-		t.Fatalf("expected error for invalid scope")
+		t.Fatalf("expected error for invalid --on selector")
 	}
-	if !strings.Contains(err.Error(), "invalid scope") {
+	if !strings.Contains(err.Error(), "invalid --on selector") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// TestHandleConfigEnvSetValidScopes verifies that all valid scope values are accepted.
-func TestHandleConfigEnvSetValidScopes(t *testing.T) {
-	validScopes := []string{"all", "migs", "heal", "gate"}
-	for _, scope := range validScopes {
-		t.Run(scope, func(t *testing.T) {
+// TestHandleConfigEnvSetValidOnSelectors verifies that all valid --on values are accepted.
+func TestHandleConfigEnvSetValidOnSelectors(t *testing.T) {
+	validSelectors := []string{"all", "jobs", "server", "nodes", "gates", "steps"}
+	for _, sel := range validSelectors {
+		t.Run(sel, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			// This will fail at resolveControlPlaneHTTP, but scope validation should pass.
-			err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--scope", scope}, buf)
-			// We expect an error (no server descriptor), but NOT a scope error.
+			// This will fail at resolveControlPlaneHTTP, but selector validation should pass.
+			err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", sel}, buf)
+			// We expect an error (no server descriptor), but NOT a selector error.
 			if err == nil {
 				t.Fatalf("expected error (no server descriptor)")
 			}
-			if strings.Contains(err.Error(), "invalid scope") {
-				t.Fatalf("scope %q should be valid, got: %v", scope, err)
+			if strings.Contains(err.Error(), "invalid --on selector") {
+				t.Fatalf("selector %q should be valid, got: %v", sel, err)
 			}
 		})
 	}
@@ -233,6 +255,30 @@ func TestHandleConfigEnvUnsetEmptyKey(t *testing.T) {
 	}
 }
 
+// TestHandleConfigEnvUnsetInvalidFrom verifies that invalid --from values are rejected.
+func TestHandleConfigEnvUnsetInvalidFrom(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleConfigEnvUnset([]string{"--key", "FOO", "--from", "bogus"}, buf)
+	if err == nil {
+		t.Fatalf("expected error for invalid --from")
+	}
+	if !strings.Contains(err.Error(), "invalid --from target") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestHandleConfigEnvUnsetEmptyFrom verifies that an empty --from value is rejected.
+func TestHandleConfigEnvUnsetEmptyFrom(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleConfigEnvUnset([]string{"--key", "FOO", "--from", ""}, buf)
+	if err == nil {
+		t.Fatalf("expected error for empty --from")
+	}
+	if !strings.Contains(err.Error(), "--from value cannot be empty") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // TestHandleConfigEnvSetFileNotFound verifies that missing files are detected.
 func TestHandleConfigEnvSetFileNotFound(t *testing.T) {
 	buf := &bytes.Buffer{}
@@ -254,6 +300,54 @@ func TestHandleConfigEnvSetEmptyKey(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--key is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestExpandOnSelector verifies selector expansion and validation.
+func TestExpandOnSelector(t *testing.T) {
+	tests := []struct {
+		name      string
+		selector  string
+		wantNames []string
+		wantErr   string
+	}{
+		{name: "all expands to four targets", selector: "all", wantNames: []string{"gates", "nodes", "server", "steps"}},
+		{name: "jobs expands to gates+steps", selector: "jobs", wantNames: []string{"gates", "steps"}},
+		{name: "server single", selector: "server", wantNames: []string{"server"}},
+		{name: "nodes single", selector: "nodes", wantNames: []string{"nodes"}},
+		{name: "gates single", selector: "gates", wantNames: []string{"gates"}},
+		{name: "steps single", selector: "steps", wantNames: []string{"steps"}},
+		{name: "invalid selector", selector: "bogus", wantErr: "invalid --on selector"},
+		{name: "empty selector", selector: "", wantErr: "invalid --on selector"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targets, err := expandOnSelector(tt.selector)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got := make([]string, len(targets))
+			for i, tgt := range targets {
+				got[i] = tgt.String()
+			}
+			if len(got) != len(tt.wantNames) {
+				t.Fatalf("expected %v, got %v", tt.wantNames, got)
+			}
+			for i := range got {
+				if got[i] != tt.wantNames[i] {
+					t.Fatalf("expected %v, got %v", tt.wantNames, got)
+				}
+			}
+		})
 	}
 }
 
