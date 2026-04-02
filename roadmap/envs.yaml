@@ -61,6 +61,7 @@ items:
       - "go test ./docs/api -run OpenAPI"
     reasoning: medium
     cfp: 8
+    commit: 701a5a3d
   - done: false
     reviews: []
     label: "3"
