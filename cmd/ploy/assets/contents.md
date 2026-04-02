@@ -1,1 +1,1 @@
-[runtime/](runtime) Source runtime deployment assets packaged into `runtime.tgz` for `ploy cluster deploy`.
+[runtime/](runtime) Source runtime deployment assets embedded directly for `ploy cluster deploy`.

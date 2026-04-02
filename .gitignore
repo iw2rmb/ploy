@@ -64,7 +64,6 @@ tests/e2e/deploy/e2e-logs/
 .codex/
 .tmp/
 
-cmd/ploy/assets/runtime.tgz
 /ploy
 /ployd
 /ployd-node
