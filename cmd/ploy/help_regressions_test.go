@@ -17,8 +17,6 @@ func TestHelpRegressionLeafHelpReturnsNoError(t *testing.T) {
 		{args: []string{"run", "cancel", "--help"}, expectSnippet: "Usage: ploy run cancel"},
 		{args: []string{"run", "start", "--help"}, expectSnippet: "Usage: ploy run start"},
 		{args: []string{"cluster", "node", "add", "--help"}, expectSnippet: "Usage: ploy cluster node add"},
-		{args: []string{"cluster", "rollout", "server", "--help"}, expectSnippet: "Usage: ploy cluster rollout server"},
-		{args: []string{"cluster", "rollout", "nodes", "--help"}, expectSnippet: "Usage: ploy cluster rollout nodes"},
 		{args: []string{"cluster", "token", "list", "--help"}, expectSnippet: "Usage: ploy cluster token list"},
 		{args: []string{"config", "gitlab", "show", "--help"}, expectSnippet: "Usage: ploy config gitlab show"},
 		{args: []string{"config", "env", "set", "--help"}, expectSnippet: "Usage: ploy config env set"},

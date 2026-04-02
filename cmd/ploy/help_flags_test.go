@@ -17,8 +17,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		expectNoError  bool     // Whether the command should succeed (return nil)
 	}{
 		// Root level --help
-		// NOTE: `ploy rollout` and `ploy token` have been removed as top-level commands.
-		// Rollout is now accessible only via `ploy cluster rollout`.
+		// NOTE: `ploy token` has been removed as a top-level command.
 		// Token is now accessible only via `ploy cluster token`.
 		{
 			name:           "ploy --help",
@@ -79,10 +78,6 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			expectNoError:  true,
 		},
 
-		// NOTE: `ploy rollout` has been removed as a top-level command.
-		// Rollout operations are now accessible only via `ploy cluster rollout`.
-		// The rollout tests have been replaced with cluster rollout tests below.
-
 		// config command --help
 		{
 			name:           "ploy config --help",
@@ -134,7 +129,7 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 		{
 			name:           "ploy cluster --help",
 			args:           []string{"cluster", "--help"},
-			expectContains: []string{"Usage: ploy cluster", "deploy", "node", "rollout", "token"},
+			expectContains: []string{"Usage: ploy cluster", "deploy", "node", "token"},
 			expectNoError:  true,
 		},
 		{
@@ -155,21 +150,6 @@ func TestHelpFlagsAtAllLevels(t *testing.T) {
 			name:           "ploy cluster node -h",
 			args:           []string{"cluster", "node", "-h"},
 			expectContains: []string{"Usage: ploy cluster node"},
-			expectNoError:  true,
-		},
-
-		// cluster rollout --help (deeper level)
-		// NOTE: Rollout is now accessible only via `ploy cluster rollout`.
-		{
-			name:           "ploy cluster rollout --help",
-			args:           []string{"cluster", "rollout", "--help"},
-			expectContains: []string{"Usage: ploy cluster rollout", "server", "nodes"},
-			expectNoError:  true,
-		},
-		{
-			name:           "ploy cluster rollout -h",
-			args:           []string{"cluster", "rollout", "-h"},
-			expectContains: []string{"Usage: ploy cluster rollout"},
 			expectNoError:  true,
 		},
 
@@ -241,15 +221,13 @@ func TestWantsHelpFunction(t *testing.T) {
 
 // TestHelpFlagNoUnknownSubcommandError verifies that --help does not trigger
 // "unknown subcommand" errors that would be confusing to users.
-// NOTE: `ploy server`, `ploy rollout`, and `ploy token` have been removed as top-level commands.
+// NOTE: `ploy server` and `ploy token` have been removed as top-level commands.
 // Server deployment is now only accessible via `ploy cluster deploy`.
-// Rollout operations are now only accessible via `ploy cluster rollout`.
 // Token operations are now only accessible via `ploy cluster token`.
 func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 	commands := [][]string{
 		{"mig", "--help"},
 		// NOTE: {"server", "--help"} removed — server re-rooted under cluster deploy.
-		// NOTE: {"rollout", "--help"} removed — rollout re-rooted under cluster rollout.
 		// NOTE: {"token", "--help"} removed — token re-rooted under cluster token.
 		{"config", "--help"},
 		{"config", "gitlab", "--help"},
@@ -257,8 +235,7 @@ func TestHelpFlagNoUnknownSubcommandError(t *testing.T) {
 		{"cluster", "--help"},
 		{"cluster", "deploy", "--help"}, // Replaces ploy server --help
 		{"cluster", "node", "--help"},
-		{"cluster", "rollout", "--help"}, // Replaces ploy rollout --help
-		{"cluster", "token", "--help"},   // Replaces ploy token --help
+		{"cluster", "token", "--help"}, // Replaces ploy token --help
 	}
 
 	for _, args := range commands {

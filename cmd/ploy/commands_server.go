@@ -1,3 +1,3 @@
 package main
 
-// Legacy server/rollout command builders have been removed.
+// Legacy server command builders have been removed.

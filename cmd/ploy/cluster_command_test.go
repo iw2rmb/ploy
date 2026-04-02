@@ -73,7 +73,7 @@ func TestHandleClusterHelp(t *testing.T) {
 			}
 
 			// Should list all subcommands.
-			expectedSubcommands := []string{"deploy", "node", "rollout", "token"}
+			expectedSubcommands := []string{"deploy", "node", "token"}
 			for _, sub := range expectedSubcommands {
 				if !strings.Contains(output, sub) {
 					t.Errorf("expected usage to contain %q for %s, got %q", sub, tt.name, output)
@@ -134,19 +134,6 @@ func TestHandleClusterDelegatesNodeToHandleNode(t *testing.T) {
 	}
 }
 
-// TestHandleClusterDelegatesRolloutToHandleRollout verifies that "cluster rollout"
-// routes to handleRollout. We test this by checking that no subcommand produces
-// the rollout subcommand required error.
-func TestHandleClusterDelegatesRolloutToHandleRollout(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleCluster([]string{"rollout"}, buf)
-
-	// handleRollout with no args requires a subcommand.
-	if err == nil || !strings.Contains(err.Error(), "rollout subcommand required") {
-		t.Fatalf("expected 'rollout subcommand required' error from handleRollout, got %v", err)
-	}
-}
-
 // TestHandleClusterDelegatesTokenToHandleToken verifies that "cluster token"
 // routes to handleToken. We test this by checking that no subcommand produces
 // the token subcommand required error.
@@ -174,24 +161,6 @@ func TestClusterNodeHelp(t *testing.T) {
 	output := buf.String()
 	if !strings.Contains(output, "Usage: ploy cluster node") {
 		t.Fatalf("expected node usage, got %q", output)
-	}
-}
-
-// TestClusterRolloutHelp verifies that "cluster rollout --help" works correctly.
-// NOTE: Rollout is now accessible only via `ploy cluster rollout`.
-func TestClusterRolloutHelp(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleCluster([]string{"rollout", "--help"}, buf)
-
-	// Should not return an error.
-	if err != nil {
-		t.Fatalf("expected no error for cluster rollout --help, got %v", err)
-	}
-
-	// Should print cluster rollout usage.
-	output := buf.String()
-	if !strings.Contains(output, "Usage: ploy cluster rollout") {
-		t.Fatalf("expected cluster rollout usage, got %q", output)
 	}
 }
 
@@ -226,11 +195,9 @@ func TestPrintClusterUsage(t *testing.T) {
 		"Commands:",
 		"deploy",
 		"node",
-		"rollout",
 		"token",
 		"Deploy runtime stack on the current host",
 		"Manage worker nodes in a cluster",
-		"Perform rolling updates for servers and nodes",
 		"Manage API tokens bound to a cluster",
 	}
 
@@ -253,7 +220,7 @@ func TestClusterCommandIntegration(t *testing.T) {
 		{
 			name:           "ploy cluster --help",
 			args:           []string{"cluster", "--help"},
-			expectContains: []string{"Usage: ploy cluster", "deploy", "node", "rollout", "token"},
+			expectContains: []string{"Usage: ploy cluster", "deploy", "node", "token"},
 			expectNoError:  true,
 		},
 		{

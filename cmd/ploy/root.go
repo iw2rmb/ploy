@@ -66,18 +66,17 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
 	// Cluster and configuration commands
-	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (deploy, node, rollout, token)
+	root.AddCommand(newClusterCmd(stderr))  // ploy cluster (deploy, node, token)
 	root.AddCommand(newConfigCmd(stderr))   // ploy config (gitlab show/set/validate)
 	root.AddCommand(newManifestCmd(stderr)) // ploy manifest (schema, validate)
 
 	// Interactive TUI
 	root.AddCommand(newTUICmd(stderr)) // ploy tui (interactive terminal UI)
 
-	// Server, node, rollout, and token management commands
-	// NOTE: `ploy server`, `ploy node`, `ploy rollout`, and `ploy token` have been removed as top-level commands.
+	// Server, node, and token management commands
+	// NOTE: `ploy server`, `ploy node`, and `ploy token` have been removed as top-level commands.
 	// Runtime deployment is accessible via `ploy cluster deploy`.
 	// Node operations are now accessible only via `ploy cluster node`.
-	// Rollout operations are now accessible only via `ploy cluster rollout`.
 	// Token operations are now accessible only via `ploy cluster token`.
 	// This keeps deployment and node-management under `ploy cluster ...` and reduces top-level command surface.
 

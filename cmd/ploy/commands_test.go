@@ -26,7 +26,7 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"mig",      // newMigCmd
 		"run",      // newRunCmd
 		"pull",     // newPullCmd
-		"cluster",  // newClusterCmd (includes token, node, rollout, deploy)
+		"cluster",  // newClusterCmd (includes token, node, deploy)
 		"config",   // newConfigCmd
 		"manifest", // newManifestCmd
 		"tui",      // newTUICmd
