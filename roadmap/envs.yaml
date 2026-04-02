@@ -88,7 +88,7 @@ items:
     reasoning: high
     cfp: 9
     commit: 6b8ff872
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Implement immediate server-target consumption on set unset and startup preload paths.\" is not implemented: PUT/DELETE only persist and update holder in [config_env.go:175](/Users/vk/@iw2rmb/ploy/internal/server/handlers/config_env.go:175) and [config_env.go:256](/Users/vk/@iw2rmb/ploy/internal/server/handlers/config_env.go:256), and startup preload only builds `ConfigHolder` in [server.go:141](/Users/vk/@iw2rmb/ploy/cmd/ployd/server.go:141) and [server.go:145](/Users/vk/@iw2rmb/ploy/cmd/ployd/server.go:145).", "\"Implement immediate nodes-target consumption for manifest and container env injection paths.\" is incomplete for heal containers: healing path builds manifest from `typedOpts.Healing.Mod` at [execution_orchestrator_jobs.go:143](/Users/vk/@iw2rmb/ploy/internal/nodeagent/execution_orchestrator_jobs.go:143), and `buildHealingManifest` uses `mig.Env` only at [manifest.go:266](/Users/vk/@iw2rmb/ploy/internal/nodeagent/manifest.go:266), so top-level `req.Env` (where target-based global env is merged) is not consumed for heal job container env."]
         commit: 14fe15e4
