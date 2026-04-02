@@ -476,16 +476,25 @@ See `docs/migs-lifecycle.md` § 7.2 for the complete SSE payload specification.
 ## Global Environment Configuration
 
 The `ploy config env` commands manage global environment variables that are automatically
-injected into job containers across the cluster. This provides a centralized way to configure
+injected into cluster components. This provides a centralized way to configure
 credentials, CA bundles, and other shared settings without embedding them in every spec file.
 
 ### Key Concepts
 
-**Scopes** control which job types receive each variable:
-- `all` — Inject into every job type (migs, healing, gates)
-- `migs` — Inject into `mig` and `post_gate` jobs (code modification phases)
-- `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
-- `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate execution phases)
+**Targets** control which components receive each variable:
+- `server` — Inject into the server process
+- `nodes` — Inject into node agent processes
+- `gates` — Inject into gate jobs (`pre_gate`, `re_gate`, `post_gate`)
+- `steps` — Inject into step jobs (`mig`, `heal`)
+
+The `set` command uses **`--on` selectors** for convenience:
+- `all` → server, nodes, gates, steps (all targets)
+- `jobs` → gates, steps (default)
+- `server`, `nodes`, `gates`, `steps` → single target
+
+The `show` and `unset` commands use **`--from`** to specify the target when a key
+exists for multiple targets. When omitted and the key is unambiguous (single target),
+the target is inferred automatically.
 
 **Secrets** are redacted in list/show output by default. Use `--raw` with `show` to reveal the
 full value.
@@ -500,31 +509,32 @@ Existing keys in the spec are never overwritten by global config.
 ploy config env list
 
 # Show a specific variable (use --raw to reveal secret values)
-ploy config env show --key CA_CERTS_PEM_BUNDLE
+ploy config env show --key PLOY_CA_CERTS --from gates
 ploy config env show --key OPENAI_API_KEY --raw
 
 # Set a variable from a file (common for certs and JSON credentials)
-ploy config env set --key CA_CERTS_PEM_BUNDLE --file ca-bundle.pem --scope all
-ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --scope migs
+ploy config env set --key PLOY_CA_CERTS --file ca-bundle.pem --on all
+ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --on steps
 
-# Set a variable with an inline value
-ploy config env set --key OPENAI_API_KEY --value sk-... --scope all
+# Set a variable with an inline value (default --on jobs → gates, steps)
+ploy config env set --key OPENAI_API_KEY --value sk-...
 
 # Set a non-secret variable (visible in list output)
-ploy config env set --key CUSTOM_VAR --value myvalue --scope all --secret=false
+ploy config env set --key CUSTOM_VAR --value myvalue --on gates --secret=false
 
-# Delete a variable
+# Delete a variable (use --from when key exists for multiple targets)
 ploy config env unset --key OLD_VAR
+ploy config env unset --key PLOY_CA_CERTS --from gates
 ```
 
 ### Common Variables
 
-| Variable | Description | Recommended Scope |
+| Variable | Description | Recommended Target |
 |----------|-------------|-------------------|
-| `CA_CERTS_PEM_BUNDLE` | PEM-encoded CA certificates for TLS trust | `all` |
-| `CODEX_AUTH_JSON` | Codex authentication credentials | `migs` |
-| `CRUSH_JSON` | Crush config JSON content or file path (materialized at `/root/.config/crush/crush.json`) | `migs` |
-| `OPENAI_API_KEY` | OpenAI API key for LLM-integrated migs | `all` |
+| `PLOY_CA_CERTS` | PEM-encoded CA certificates for TLS trust | `all` |
+| `CODEX_AUTH_JSON` | Codex authentication credentials | `steps` |
+| `CRUSH_JSON` | Crush config JSON content or file path (materialized at `/root/.config/crush/crush.json`) | `steps` |
+| `OPENAI_API_KEY` | OpenAI API key for LLM-integrated migs | `jobs` |
 
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and
 `docs/migs-lifecycle.md` for how these variables flow into job containers.
