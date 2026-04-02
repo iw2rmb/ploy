@@ -151,16 +151,11 @@ func printClusterDeployUsage(w io.Writer) {
 func resolveClusterDeployConfigHome() (string, error) {
 	base := strings.TrimSpace(os.Getenv("PLOY_CONFIG_HOME"))
 	if base == "" {
-		xdg := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME"))
-		if xdg != "" {
-			base = filepath.Join(xdg, "ploy")
-		} else {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return "", fmt.Errorf("cluster deploy: resolve home dir: %w", err)
-			}
-			base = filepath.Join(home, ".config", "ploy")
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("cluster deploy: resolve home dir: %w", err)
 		}
+		base = filepath.Join(home, ".config", "ploy")
 	}
 	return base, nil
 }

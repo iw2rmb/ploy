@@ -312,7 +312,6 @@ func TestNodeAddDescriptorRefresh(t *testing.T) {
 	// Set up temporary config directory.
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", "")
 	// Ensure any test-created descriptors are removed.
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 

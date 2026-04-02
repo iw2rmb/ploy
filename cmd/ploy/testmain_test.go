@@ -16,7 +16,6 @@ func TestMain(m *testing.M) {
 		os.Exit(2)
 	}
 	_ = os.Setenv("PLOY_CONFIG_HOME", tmpHome)
-	_ = os.Setenv("XDG_CONFIG_HOME", "")
 	// Ensure an isolated default descriptor exists for all CLI tests.
 	_, _ = cliconfig.SaveDescriptor(cliconfig.Descriptor{
 		ClusterID:       cliconfig.ClusterID("test-cluster"),
