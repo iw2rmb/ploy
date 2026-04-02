@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-cd "$ROOT_DIR"
+cd $HOME/@iw2rmb/ploy
 
 PLATFORM="${PLATFORM:-linux/amd64}"
 IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
