@@ -27,6 +27,8 @@
 [flags_helpers.go](flags_helpers.go) Utility helpers for flag coercion, defaults, and cross-command validation.
 [flags_string_slice.go](flags_string_slice.go) Custom string-slice flag type and parsing helpers for repeated options.
 [help_flags_test.go](help_flags_test.go) Tests command help output to ensure shared flags are documented correctly.
+[help_parse.go](help_parse.go) Shared flag parsing helper that prints command usage and treats --help/-h as success.
+[help_regressions_test.go](help_regressions_test.go) Regression tests ensuring deep help paths and leaf --help invocations return usage without errors.
 [main.go](main.go) Program entrypoint that boots the Cobra root command and executes the CLI.
 [manifest_command.go](manifest_command.go) Implements manifest inspection and output commands for deployment descriptors.
 [manifest_command_test.go](manifest_command_test.go) Tests manifest command parsing, rendering, and validation flows.
