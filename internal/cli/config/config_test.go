@@ -10,7 +10,6 @@ import (
 func TestSaveListAndDefaultDescriptor(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmp)
-	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Cleanup(func() {
 		if dir, err := clustersDir(); err == nil {
 			_ = os.RemoveAll(dir)
@@ -41,10 +40,9 @@ func TestSaveListAndDefaultDescriptor(t *testing.T) {
 }
 
 func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
-	// PLOY_CONFIG_HOME wins over XDG and home.
+	// PLOY_CONFIG_HOME wins over home default.
 	tmp := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmp)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "xdg"))
 	dir, err := clustersDir()
 	if err != nil {
 		t.Fatalf("clustersDir error: %v", err)
@@ -57,21 +55,8 @@ func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
 		t.Fatalf("sanitizeFilename=%q want a_b_c", got)
 	}
 
-	// When PLOY_CONFIG_HOME empty, XDG_CONFIG_HOME should be used.
+	// With env empty, ensure it resolves under home.
 	t.Setenv("PLOY_CONFIG_HOME", "")
-	xdg := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", xdg)
-	dir, err = clustersDir()
-	if err != nil {
-		t.Fatalf("clustersDir error: %v", err)
-	}
-	if !strings.HasPrefix(dir, filepath.Join(xdg, "ploy", "clusters")) {
-		t.Fatalf("clustersDir should be under %s, got %s", filepath.Join(xdg, "ploy", "clusters"), dir)
-	}
-
-	// Finally, with both envs empty, ensure it resolves under home.
-	t.Setenv("PLOY_CONFIG_HOME", "")
-	t.Setenv("XDG_CONFIG_HOME", "")
 	// Override HOME via os.UserHomeDir by setting HOME for most systems.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -98,7 +83,6 @@ func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
 
 func TestListDescriptorsMissingDirOK(t *testing.T) {
 	t.Setenv("PLOY_CONFIG_HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", "")
 	// Deliberately do not create clusters dir; function should not error and return empty list.
 	list, err := ListDescriptors()
 	if err != nil {
@@ -112,7 +96,6 @@ func TestListDescriptorsMissingDirOK(t *testing.T) {
 func TestLoadDefault(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmp)
-	t.Setenv("XDG_CONFIG_HOME", "")
 
 	// LoadDefault should fail when no default is set.
 	if _, err := LoadDefault(); err == nil {

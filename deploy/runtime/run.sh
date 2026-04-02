@@ -16,7 +16,7 @@ CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/ploy}"
+PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
 AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
@@ -66,7 +66,7 @@ Environment:
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION})
   PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION})
   PLOY_RUNTIME_PULL_IMAGES Set to 0/false to skip pull before up (default: 1)
-  PLOY_CONFIG_HOME        Config root (default: ${XDG_CONFIG_HOME:-$HOME/.config}/ploy)
+  PLOY_CONFIG_HOME        Config root (default: $HOME/.config/ploy)
   AUTH_JSON_PATH          Optional explicit auth state path; default: <PLOY_CONFIG_HOME>/<cluster>/auth.json
 USAGE
 }

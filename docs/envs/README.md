@@ -64,16 +64,13 @@ defaults change, or components adopt additional configuration.
   `node` container at `/var/run/docker.sock`.
   Docker script default: `/var/run/docker.sock`.
 - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
-  default descriptor at `~/.config/ploy/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
+  default descriptor at `~/.config/ploy/default` (or `PLOY_CONFIG_HOME` path) and negotiates mTLS when the
   descriptor specifies HTTPS.
 - `PLOY_BUILDGATE_TIMEOUT` — Optional maximum duration for Build Gate HTTP polling (e.g., `5m`). When the request
   context has no deadline, HTTP-based gate executors use this value as the polling timeout; defaults to `10m` when unset or invalid.
 - `PLOY_CONFIG_HOME` — Optional override for the base directory where cluster descriptors
-  are stored. When unset, the CLI falls back to `XDG_CONFIG_HOME/ploy` or `~/.config/ploy`.
-  Priority: `PLOY_CONFIG_HOME` → `XDG_CONFIG_HOME/ploy` → `~/.config/ploy`.
-- `XDG_CONFIG_HOME` — Standard XDG Base Directory specification variable. When set
-  (and `PLOY_CONFIG_HOME` is not), the CLI uses `$XDG_CONFIG_HOME/ploy` for cluster
-  descriptor storage. Falls back to `~/.config/ploy` when both are unset.
+  are stored. When unset, the CLI falls back to `~/.config/ploy`.
+  Priority: `PLOY_CONFIG_HOME` → `~/.config/ploy`.
 
 Local cluster descriptors (written under `~/.config/ploy/{cluster}/`) now use bearer token authentication:
 - `token` — Bearer token for authenticating with the control plane. Generate using `ploy cluster token create`.
@@ -401,7 +398,7 @@ ploy run --mr-success \
 ## Control Plane
 
 - (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. Components derive the endpoint and token from
-  the default cluster descriptor under `PLOY_CONFIG_HOME` (or XDG/home default).
+  the default cluster descriptor under `PLOY_CONFIG_HOME` (or home default).
 
 ### Server (Control Plane)
 
