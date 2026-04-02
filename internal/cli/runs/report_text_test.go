@@ -165,9 +165,9 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	}
 
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
-	assertx.Contains(t, out, "\x1b[91m✗\x1b[0m")
+	assertx.Contains(t, out, ColoredStatusGlyph("failed", 0))
 	assertx.Contains(t, out, "pre_gate")
-	assertx.Contains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
+	assertx.Contains(t, out, "└  Exit 137: "+colorizeErrorText("infra compile failed at step 2"))
 	assertx.NotContains(t, out, "<infra>")
 	assertx.Contains(t, out, "✓")
 	assertx.Contains(t, out, "Heal")
@@ -183,9 +183,9 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 
 	prefix42 := "└  Exit 42: "
 	indent42 := strings.Repeat(" ", len(prefix42))
-	wrappedExpected := prefix42 + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
-		indent42 + "\x1b[91m" + strings.Repeat("x", 100) + "\x1b[0m\n" +
-		indent42 + "\x1b[91m" + strings.Repeat("x", 10) + "\x1b[0m"
+	wrappedExpected := prefix42 + colorizeErrorText(strings.Repeat("x", 100)) + "\n" +
+		indent42 + colorizeErrorText(strings.Repeat("x", 100)) + "\n" +
+		indent42 + colorizeErrorText(strings.Repeat("x", 10))
 
 	tests := []struct {
 		name       string
@@ -205,7 +205,7 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 				BugSummary: "missing ; in Foo.java",
 				Recovery:   &RunJobRecovery{ErrorKind: "code"},
 			},
-			contains:   []string{"└  Exit 1: \x1b[91mcode missing ; in Foo.java\x1b[0m", "0.8s"},
+			contains:   []string{"└  Exit 1: " + colorizeErrorText("code missing ; in Foo.java"), "0.8s"},
 			notContain: []string{"<code>"},
 		},
 		{
@@ -219,7 +219,7 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 				DurationMs: 1000,
 				BugSummary: "re-gate failed",
 			},
-			contains:   []string{"└  Exit 1: \x1b[91munknown re-gate failed\x1b[0m"},
+			contains:   []string{"└  Exit 1: " + colorizeErrorText("unknown re-gate failed")},
 			notContain: []string{"<unknown>"},
 		},
 		{
@@ -412,9 +412,9 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	now := time.Date(2026, time.February, 26, 10, 0, 5, 0, time.UTC)
 
 	tests := []struct {
-		name    string
-		frame   int
-		glyph   string
+		name  string
+		frame int
+		glyph string
 	}{
 		{"frame 0", 0, "⣾"},
 		{"frame 1", 1, "⣷"},

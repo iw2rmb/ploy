@@ -165,8 +165,8 @@ func renderFollowRepoTableLines(repo FollowRepoFrame) []string {
 
 	for _, row := range repo.Rows {
 		cells := normalizeFollowCells(row.Cells, columnCount)
-		if len(cells) > 0 {
-			cells[0] = followShieldANSIForTabwriter(cells[0])
+		for i := range cells {
+			cells[i] = shieldTerminalEscapesForTabwriter(cells[i])
 		}
 		if durationColumn >= 0 && durationColumn < len(cells) {
 			duration := strings.TrimSpace(cells[durationColumn])
@@ -226,18 +226,63 @@ func joinRenderedLineRange(lines []string, start int, count int) string {
 	return strings.Join(lines[start:end], "\n") + "\n"
 }
 
-func followShieldANSIForTabwriter(value string) string {
-	if !strings.Contains(value, "\x1b[") {
+func shieldTerminalEscapesForTabwriter(value string) string {
+	if !strings.Contains(value, "\x1b") {
 		return value
 	}
 	escape := string([]byte{tabwriter.Escape})
-	replacer := strings.NewReplacer(
-		ansiSuccessLightGreen, escape+ansiSuccessLightGreen+escape,
-		ansiDefaultForeground, escape+ansiDefaultForeground+escape,
-		ansiErrorLightRed, escape+ansiErrorLightRed+escape,
-		ansiColorReset, escape+ansiColorReset+escape,
-	)
-	return replacer.Replace(value)
+	var out strings.Builder
+	for i := 0; i < len(value); {
+		if value[i] != 0x1b {
+			out.WriteByte(value[i])
+			i++
+			continue
+		}
+		start := i
+		end := terminalEscapeSeqEnd(value, i)
+		if end <= start {
+			out.WriteByte(value[i])
+			i++
+			continue
+		}
+		out.WriteString(escape)
+		out.WriteString(value[start:end])
+		out.WriteString(escape)
+		i = end
+	}
+	return out.String()
+}
+
+func terminalEscapeSeqEnd(value string, escPos int) int {
+	if escPos+1 >= len(value) {
+		return 0
+	}
+	switch value[escPos+1] {
+	case '[':
+		// CSI: ESC [ ... final-byte(0x40-0x7E)
+		for i := escPos + 2; i < len(value); i++ {
+			b := value[i]
+			if b >= 0x40 && b <= 0x7e {
+				return i + 1
+			}
+		}
+		return 0
+	case ']':
+		// OSC: ESC ] ... BEL or ST (ESC \)
+		for i := escPos + 2; i < len(value); i++ {
+			switch value[i] {
+			case 0x07:
+				return i + 1
+			case 0x1b:
+				if i+1 < len(value) && value[i+1] == '\\' {
+					return i + 2
+				}
+			}
+		}
+		return 0
+	default:
+		return 0
+	}
 }
 
 func renderFollowColumns(columns []string) string {
@@ -245,7 +290,7 @@ func renderFollowColumns(columns []string) string {
 		headerCells := make([]string, len(columns))
 		copy(headerCells, columns)
 		// Keep an explicit first status column so table headers align with data rows.
-		headerCells[0] = followShieldANSIForTabwriter(ansiDefaultForeground + " " + ansiColorReset)
+		headerCells[0] = shieldTerminalEscapesForTabwriter(neutralGlyphStyle.Render(" "))
 		return strings.Join(headerCells, "\t")
 	}
 	return strings.Join(columns, "\t")

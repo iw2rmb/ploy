@@ -93,7 +93,7 @@ func TestSeedGateCatalogDefaults_IdempotentReseed(t *testing.T) {
   - lang: java
     release: "17"
     tool: maven
-    image: ${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17
+    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
     profile: gates/profiles/java-17-maven.yaml
   - lang: go
     release: "1.25.8"
@@ -171,7 +171,7 @@ func TestSeedGateCatalogDefaults_MissingProfileFileFails(t *testing.T) {
   - lang: java
     release: "17"
     tool: maven
-    image: ${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17
+    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
     profile: gates/profiles/missing.yaml
 `
 	if err := os.MkdirAll(filepath.Dir(catalogPath), 0o755); err != nil {

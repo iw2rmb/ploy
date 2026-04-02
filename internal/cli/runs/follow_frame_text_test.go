@@ -1,12 +1,19 @@
 package runs
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
+
+var ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
+
+func stripCSI(s string) string {
+	return ansiCSIRe.ReplaceAllString(s, "")
+}
 
 func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
 	t.Parallel()
@@ -126,10 +133,9 @@ func TestRenderFollowFrameText_DoesNotInflatePaddingForANSIStateGlyphs(t *testin
 	rowA := lines[len(lines)-2]
 	rowB := lines[len(lines)-1]
 	header := lines[len(lines)-3]
-	replacer := strings.NewReplacer("\x1b[92m", "", "\x1b[39m", "", "\x1b[0m", "")
-	rowA = replacer.Replace(rowA)
-	rowB = replacer.Replace(rowB)
-	header = replacer.Replace(header)
+	rowA = stripCSI(rowA)
+	rowB = stripCSI(rowB)
+	header = stripCSI(header)
 
 	idxHeader := strings.Index(header, "Step")
 	idxA := strings.Index(rowA, "pre_gate")
@@ -174,11 +180,10 @@ func TestRenderFollowFrameText_ExitRowsDoNotShiftColumns(t *testing.T) {
 		t.Fatalf("expected header + rows + exit line, got %q", out)
 	}
 
-	replacer := strings.NewReplacer("\x1b[92m", "", "\x1b[39m", "", "\x1b[91m", "", "\x1b[0m", "")
-	header := replacer.Replace(lines[0])
-	rowPreGate := replacer.Replace(lines[1])
-	rowHeal := replacer.Replace(lines[3])
-	rowMig := replacer.Replace(lines[4])
+	header := stripCSI(lines[0])
+	rowPreGate := stripCSI(lines[1])
+	rowHeal := stripCSI(lines[3])
+	rowMig := stripCSI(lines[4])
 
 	idxHeader := strings.Index(header, "Step")
 	idxPreGate := strings.Index(rowPreGate, "pre_gate")

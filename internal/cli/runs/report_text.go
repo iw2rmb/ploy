@@ -273,7 +273,7 @@ func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) s
 	lines := make([]string, 0, len(wrapped))
 	for i, line := range wrapped {
 		if colorizeContent {
-			line = ansiErrorLightRed + line + ansiColorReset
+			line = colorizeErrorText(line)
 		}
 		if i == 0 {
 			lines = append(lines, prefix+line)
