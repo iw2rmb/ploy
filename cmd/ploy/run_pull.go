@@ -54,6 +54,11 @@ import (
 // Returns an error if argument parsing fails, preconditions are not met, run resolution fails,
 // or git/API operations fail.
 func handleRunPull(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printRunPullUsage(stderr)
+		return nil
+	}
+
 	// Create a flag set for the pull subcommand.
 	// Use ContinueOnError to handle parse errors gracefully and show usage.
 	fs := flag.NewFlagSet("run pull", flag.ContinueOnError)
@@ -66,8 +71,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	dryRun := fs.Bool("dry-run", false, "validate and print actions without mutating the repo")
 
 	// Parse the flags from the provided arguments.
-	if err := fs.Parse(args); err != nil {
-		printRunPullUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printRunPullUsage(stderr) }); err != nil {
 		return err
 	}
 

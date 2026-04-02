@@ -15,6 +15,11 @@ var rolloutNodesHost = executeRolloutNode
 // Defined in rollout_nodes_api.go.
 
 func handleRolloutNodes(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printRolloutNodesUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -45,8 +50,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 	fs.Var(&dryRun, "dry-run", "Print planned rollout actions per node without making changes")
 	fs.Var(&maxAttempts, "max-attempts", "Maximum retry attempts for each node (default: 3)")
 
-	if err := fs.Parse(args); err != nil {
-		printRolloutNodesUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printRolloutNodesUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {

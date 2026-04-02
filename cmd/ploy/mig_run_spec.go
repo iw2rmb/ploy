@@ -63,6 +63,9 @@ func preprocessModsSpecInPlace(spec map[string]any, specBaseDir string) error {
 	if err := resolveAmataSpecPathInPlace(spec, specBaseDir); err != nil {
 		return fmt.Errorf("resolve amata.spec path: %w", err)
 	}
+	if err := resolveImageEnvInPlace(spec); err != nil {
+		return fmt.Errorf("resolve image env placeholders: %w", err)
+	}
 
 	// Resolve env_from_file references in the canonical top-level env block.
 	if err := resolveEnvFromFileInPlace(spec, specBaseDir); err != nil {
@@ -100,6 +103,86 @@ func preprocessModsSpecInPlace(spec map[string]any, specBaseDir string) error {
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+func resolveImageEnvInPlace(spec map[string]any) error {
+	if steps, ok := spec["steps"].([]any); ok {
+		for i, raw := range steps {
+			step, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			if err := resolveImageInSection(step, fmt.Sprintf("steps[%d]", i)); err != nil {
+				return err
+			}
+		}
+	}
+
+	bg, ok := spec["build_gate"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	if router, ok := bg["router"].(map[string]any); ok {
+		if err := resolveImageInSection(router, "build_gate.router"); err != nil {
+			return err
+		}
+	}
+
+	if healing, ok := bg["healing"].(map[string]any); ok {
+		if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+			for errorKind, raw := range byErrorKind {
+				action, ok := raw.(map[string]any)
+				if !ok {
+					continue
+				}
+				if err := resolveImageInSection(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s", errorKind)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func resolveImageInSection(section map[string]any, prefix string) error {
+	raw, exists := section["image"]
+	if !exists {
+		return nil
+	}
+
+	switch image := raw.(type) {
+	case string:
+		expanded, err := expandSpecEnvValue(image)
+		if err != nil {
+			return fmt.Errorf("%s.image: %w", prefix, err)
+		}
+		section["image"] = expanded
+	case map[string]any:
+		for stack, rawValue := range image {
+			value, ok := rawValue.(string)
+			if !ok {
+				continue
+			}
+			expanded, err := expandSpecEnvValue(value)
+			if err != nil {
+				return fmt.Errorf("%s.image[%q]: %w", prefix, stack, err)
+			}
+			image[stack] = expanded
+		}
+	case map[string]string:
+		for stack, value := range image {
+			expanded, err := expandSpecEnvValue(value)
+			if err != nil {
+				return fmt.Errorf("%s.image[%q]: %w", prefix, stack, err)
+			}
+			image[stack] = expanded
+		}
+		section["image"] = image
 	}
 
 	return nil

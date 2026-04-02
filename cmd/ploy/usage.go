@@ -45,20 +45,6 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "  fetch       Download run artifacts")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Use 'ploy mig <command> --help' for command details.")
-		case "server":
-			// Minimal server usage
-			_, _ = fmt.Fprintln(w, "")
-			_, _ = fmt.Fprintln(w, "Commands:")
-			_, _ = fmt.Fprintln(w, "  deploy      Deploy and configure a control plane server")
-		case "rollout":
-			_, _ = fmt.Fprintln(w, "")
-			_, _ = fmt.Fprintln(w, "Commands:")
-			_, _ = fmt.Fprintln(w, "  server      Roll out a new binary to a control plane server")
-			_, _ = fmt.Fprintln(w, "  nodes       Roll out a new binary to worker nodes (batched)")
-		case "environment":
-			_, _ = fmt.Fprintln(w, "")
-			_, _ = fmt.Fprintln(w, "Commands:")
-			_, _ = fmt.Fprintln(w, "  materialize Materialize integration environments from manifests")
 		case "manifest":
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")
@@ -68,6 +54,7 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")
 			_, _ = fmt.Fprintln(w, "  gitlab      Manage GitLab integration credentials")
+			_, _ = fmt.Fprintln(w, "  env         Manage global environment variables")
 		}
 	default:
 		// Print an exact usage line for deeper paths (e.g., server deploy).
@@ -99,7 +86,6 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  logs        Stream run logs (SSE)")
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
 	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
-	_, _ = fmt.Fprintln(w, "  diff        List diffs or download newest patch for a run")
 	_, _ = fmt.Fprintln(w, "  pull        Pull diffs into the current git worktree")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Run submission (direct flags without subcommand):")

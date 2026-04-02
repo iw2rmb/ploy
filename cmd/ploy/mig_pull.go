@@ -48,6 +48,11 @@ import (
 // Returns an error if argument parsing fails, preconditions are not met,
 // mig/run resolution fails, or git/API operations fail.
 func handleMigPull(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printMigPullUsage(stderr)
+		return nil
+	}
+
 	// Create a flag set for the pull subcommand.
 	fs := flag.NewFlagSet("mig pull", flag.ContinueOnError)
 	fs.SetOutput(io.Discard) // Suppress default flag error output; we print custom usage.
@@ -63,8 +68,7 @@ func handleMigPull(args []string, stderr io.Writer) error {
 	lastSucceeded := fs.Bool("last-succeeded", false, "select the latest succeeded run (default)")
 
 	// Parse the flags from the provided arguments.
-	if err := fs.Parse(args); err != nil {
-		printMigPullUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printMigPullUsage(stderr) }); err != nil {
 		return err
 	}
 

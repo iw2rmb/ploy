@@ -22,13 +22,17 @@ import (
 // handleRunList implements `ploy run list [--limit N] [--offset N]`.
 // Lists batch runs with pagination, showing ID, name, status, and repo counts.
 func handleRunList(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printRunListUsage(stderr)
+		return nil
+	}
+
 	fs := flag.NewFlagSet("run list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	limit := fs.Int("limit", 50, "Max number of runs to return (1-100)")
 	offset := fs.Int("offset", 0, "Number of runs to skip")
 
-	if err := fs.Parse(args); err != nil {
-		printRunListUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printRunListUsage(stderr) }); err != nil {
 		return err
 	}
 

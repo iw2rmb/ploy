@@ -52,6 +52,11 @@ func printTokenUsage(w io.Writer) {
 
 // handleTokenCreate creates a new API token.
 func handleTokenCreate(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printTokenCreateUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -67,8 +72,7 @@ func handleTokenCreate(args []string, stderr io.Writer) error {
 	fs.Var(&description, "description", "Human-readable description of the token")
 	fs.Var(&expiresInDays, "expires", "Expiration in days (default: 365)")
 
-	if err := fs.Parse(args); err != nil {
-		printTokenCreateUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printTokenCreateUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -165,6 +169,11 @@ func printTokenCreateUsage(w io.Writer) {
 
 // handleTokenList lists all API tokens.
 func handleTokenList(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printTokenListUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -172,8 +181,7 @@ func handleTokenList(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("token list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	if err := fs.Parse(args); err != nil {
-		printTokenListUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printTokenListUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -271,6 +279,11 @@ func printTokenListUsage(w io.Writer) {
 
 // handleTokenRevoke revokes an API token.
 func handleTokenRevoke(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printTokenRevokeUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -278,8 +291,7 @@ func handleTokenRevoke(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("token revoke", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	if err := fs.Parse(args); err != nil {
-		printTokenRevokeUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printTokenRevokeUsage(stderr) }); err != nil {
 		return err
 	}
 

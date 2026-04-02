@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -898,4 +899,52 @@ steps:
 	param := set[0].(map[string]any)
 	assertField(t, param, "param", "model")
 	assertField(t, param, "value", "gpt-5")
+}
+
+func TestBuildSpecPayload_ImageInterpolationAcrossSections(t *testing.T) {
+	t.Setenv("PLOY_TEST_IMG", "docker.io/test/codex:latest")
+	t.Setenv("PLOY_TEST_STEP_DEFAULT", "docker.io/test/default-step:latest")
+	t.Setenv("PLOY_TEST_STEP_MAVEN", "docker.io/test/maven-step:latest")
+
+	result := runBuildSpecPayload(t, `
+steps:
+  - image:
+      default: $PLOY_TEST_STEP_DEFAULT
+      java-maven: ${PLOY_TEST_STEP_MAVEN}
+build_gate:
+  router:
+    image: $PLOY_TEST_IMG
+  healing:
+    by_error_kind:
+      infra:
+        retries: 1
+        image: ${PLOY_TEST_IMG}
+`, ".yaml", specPayloadOpts{})
+
+	steps := mustSteps(t, result, 1)
+	stepImage := mustDig(t, steps[0], "image")
+	assertField(t, stepImage, "default", "docker.io/test/default-step:latest")
+	assertField(t, stepImage, "java-maven", "docker.io/test/maven-step:latest")
+
+	router := mustDig(t, result, "build_gate", "router")
+	assertField(t, router, "image", "docker.io/test/codex:latest")
+
+	infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
+	assertField(t, infra, "image", "docker.io/test/codex:latest")
+}
+
+func TestBuildSpecPayload_ImageInterpolation_UnresolvedReturnsError(t *testing.T) {
+	specFile := filepath.Join(t.TempDir(), "spec.yaml")
+	writeFile(t, specFile, `
+steps:
+  - image: $PLOY_TEST_MISSING_IMAGE
+`)
+
+	_, err := callBuildSpecPayload(t, specFile, specPayloadOpts{})
+	if err == nil {
+		t.Fatalf("expected unresolved image placeholder error")
+	}
+	if !strings.Contains(err.Error(), `steps[0].image: unresolved environment variables: PLOY_TEST_MISSING_IMAGE`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
