@@ -15,7 +15,9 @@ done: false
 reviews: []
 items:
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"Store tests assert multi-target same-key upsert/list/get/delete behavior without key-level overwrite.\" is not fully met in `internal/store/config_env_test.go`: same-key multi-target assertions cover upsert/get/delete in `multi_target_same_key` (`internal/store/config_env_test.go:116`), but list behavior is validated only with distinct keys in `list_global_env` (`internal/store/config_env_test.go:192`) and does not assert that `ListGlobalEnv` returns both targets for one key without collapse."]
+        commit: null
     label: "1"
     summary: Replace scope with target in domain/store model using hard-cut semantics for test installations.
     classification: determined
