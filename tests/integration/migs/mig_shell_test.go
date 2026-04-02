@@ -24,7 +24,7 @@ echo "from-mig-shell" > rewrite.yml
 		t.Fatalf("write script: %v", err)
 	}
 
-	modScript := filepath.Join(repoRoot(t), "deploy", "images", "shell", "mig-shell.sh")
+	modScript := filepath.Join(repoRoot(t), "images", "shell", "mig-shell.sh")
 	cmd := exec.Command("bash", modScript, "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"MOD_SHELL_SCRIPT="+scriptPath,

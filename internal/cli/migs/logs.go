@@ -18,7 +18,7 @@ import (
 // ErrInvalidFormat indicates an unsupported format value.
 var ErrInvalidFormat = errors.New("migs: invalid format")
 
-// LogsCommand streams logs for a single Mods run over SSE.
+// LogsCommand streams logs for a single Migs run over SSE.
 type LogsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL

@@ -10,11 +10,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// TestV1SQLCQueries_Mods verifies that the v1 migs queries are wired and match
+// TestV1SQLCQueries_Migs verifies that the v1 migs queries are wired and match
 // the expected filter semantics.
 //
 // This test is skipped if PLOY_TEST_DB_DSN is not set.
-func TestV1SQLCQueries_Mods(t *testing.T) {
+func TestV1SQLCQueries_Migs(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")

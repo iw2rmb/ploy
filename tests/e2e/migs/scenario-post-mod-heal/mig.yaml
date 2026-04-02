@@ -1,4 +1,4 @@
-# E2E scenario: Multi-step Mods run with post-mig gate healing.
+# E2E scenario: Multi-step Migs run with post-mig gate healing.
 #
 # This spec validates gate-heal-regate behavior for post-mig gate failures:
 # 1. Each migs[] entry is followed by a post-gate check

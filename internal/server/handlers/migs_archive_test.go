@@ -18,7 +18,7 @@ import (
 // PATCH /v1/migs/{mig_ref}/archive — Archive Mig
 // =============================================================================
 
-func TestMods_Archive(t *testing.T) {
+func TestMigs_Archive(t *testing.T) {
 	activeMig := store.Mig{
 		ID: "mod123", Name: "test-mig",
 		ArchivedAt: pgtype.Timestamptz{Valid: false},
@@ -157,7 +157,7 @@ func TestMods_Archive(t *testing.T) {
 // PATCH /v1/migs/{mig_ref}/unarchive — Unarchive Mig
 // =============================================================================
 
-func TestMods_Unarchive(t *testing.T) {
+func TestMigs_Unarchive(t *testing.T) {
 	tests := []struct {
 		name       string
 		store      *migStore

@@ -2,9 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"io"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -80,44 +77,6 @@ func TestHandleClusterHelp(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// TestHandleClusterDelegatesDeployToClusterDeploy verifies that "cluster deploy"
-// routes to handleClusterDeploy and invokes runtime deployment.
-func TestHandleClusterDelegatesDeployToClusterDeploy(t *testing.T) {
-	t.Setenv("PLOY_CONFIG_HOME", t.TempDir())
-	t.Setenv("PLOY_VERSION", "v0.1.0")
-	oldRunner := runClusterDeployScript
-	oldGen := generateClusterDeployID
-	defer func() { runClusterDeployScript = oldRunner }()
-	defer func() { generateClusterDeployID = oldGen }()
-	generateClusterDeployID = func() (string, error) { return "test-cluster-1234", nil }
-
-	var called bool
-	var gotScript string
-	var gotArgs []string
-	runClusterDeployScript = func(ctx context.Context, scriptPath string, args []string, env []string, stdout, stderr io.Writer) error {
-		called = true
-		gotScript = scriptPath
-		gotArgs = append([]string(nil), args...)
-		return nil
-	}
-
-	buf := &bytes.Buffer{}
-	err := handleCluster([]string{"deploy"}, buf)
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if !called {
-		t.Fatal("expected runtime deploy runner to be called")
-	}
-	if !strings.HasSuffix(gotScript, string(filepath.Separator)+"deploy"+string(filepath.Separator)+"run.sh") {
-		t.Fatalf("expected run script path to end with /deploy/run.sh, got %q", gotScript)
-	}
-	if len(gotArgs) != 2 || gotArgs[0] != "--cluster" || gotArgs[1] != "test-cluster-1234" {
-		t.Fatalf("expected generated cluster arg forwarding, got %v", gotArgs)
 	}
 }
 

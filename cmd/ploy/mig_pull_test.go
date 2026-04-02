@@ -167,7 +167,7 @@ func TestModPullUsageHelp(t *testing.T) {
 	}
 
 	// Verify description of functionality is mentioned.
-	if !strings.Contains(output, "Pulls Mods diffs from a mig") {
+	if !strings.Contains(output, "Pulls Migs diffs from a mig") {
 		t.Errorf("usage should describe pulling diffs from a mig, got %q", output)
 	}
 }
@@ -289,15 +289,15 @@ func TestHandleModPull_MissingRemote(t *testing.T) {
 // inferModFromRepo Unit Tests
 // =============================================================================
 
-// TestInferModFromRepo_NoMods verifies error handling when no migs include the repo.
-func TestInferModFromRepo_NoMods(t *testing.T) {
+// TestInferModFromRepo_NoMigs verifies error handling when no migs include the repo.
+func TestInferModFromRepo_NoMigs(t *testing.T) {
 	// Skip: This test requires a mock HTTP server which would require additional setup.
 	// The error path is covered by integration tests.
 	t.Skip("requires mock HTTP server; covered by integration tests")
 }
 
-// TestInferModFromRepo_MultipleMods verifies error handling when multiple migs include the repo.
-func TestInferModFromRepo_MultipleMods(t *testing.T) {
+// TestInferModFromRepo_MultipleMigs verifies error handling when multiple migs include the repo.
+func TestInferModFromRepo_MultipleMigs(t *testing.T) {
 	// Skip: This test requires a mock HTTP server which would require additional setup.
 	// The error path is covered by integration tests.
 	t.Skip("requires mock HTTP server; covered by integration tests")

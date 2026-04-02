@@ -432,7 +432,7 @@ func TestBuildSpecPayload_SpecPathMerge(t *testing.T) {
 		fragment         string
 		spec             string   // %s placeholder for fragment path
 		digPath          []string // path to the merged object in the result
-		useNormalize     bool     // call normalizeModsSpecToJSON instead
+		useNormalize     bool     // call normalizeMigsSpecToJSON instead
 		wantFields       map[string]any
 		wantEnv          map[string]any // nil value → just check key existence
 		wantAbsent       []string
@@ -496,7 +496,7 @@ build_gate:
 			wantAbsent: []string{"spec_path"},
 		},
 		{
-			name: "normalizeModsSpecToJSON healing fragment merge",
+			name: "normalizeMigsSpecToJSON healing fragment merge",
 			fragment: `
 retries: 2
 image: docker.io/test/healer:latest
@@ -533,9 +533,9 @@ build_gate:
 
 			var result map[string]any
 			if tt.useNormalize {
-				normalized, err := normalizeModsSpecToJSON(context.Background(), nil, nil, []byte(specContent))
+				normalized, err := normalizeMigsSpecToJSON(context.Background(), nil, nil, []byte(specContent))
 				if err != nil {
-					t.Fatalf("normalizeModsSpecToJSON: %v", err)
+					t.Fatalf("normalizeMigsSpecToJSON: %v", err)
 				}
 				result = unmarshalPayload(t, normalized)
 			} else {
@@ -705,7 +705,7 @@ build_gate:
 	assertField(t, env, "HEALING_MODE", "auto")
 }
 
-func TestBuildSpecPayload_MultiStepMods(t *testing.T) {
+func TestBuildSpecPayload_MultiStepMigs(t *testing.T) {
 	t.Parallel()
 	result := runBuildSpecPayload(t, `
 apiVersion: ploy.mig/v1alpha1
@@ -744,7 +744,7 @@ build_gate:
 	mustDig(t, result, "build_gate", "healing")
 }
 
-func TestBuildSpecPayload_MultiStepModsWithEnvFromFile(t *testing.T) {
+func TestBuildSpecPayload_MultiStepMigsWithEnvFromFile(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	envFile1 := filepath.Join(tmpDir, "env1.txt")

@@ -141,7 +141,7 @@ func TestRunPullUsageHelp(t *testing.T) {
 	}
 
 	// Verify description of functionality is mentioned.
-	if !strings.Contains(output, "Pulls Mods diffs from a run") {
+	if !strings.Contains(output, "Pulls Migs diffs from a run") {
 		t.Errorf("usage should describe pulling diffs from a run, got %q", output)
 	}
 }

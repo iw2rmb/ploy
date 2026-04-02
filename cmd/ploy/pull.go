@@ -1,7 +1,7 @@
 // pull.go implements the `ploy pull` command for the local repo pull workflow.
 //
 // This command:
-//   - Ensures a Mods run exists for the current local repo HEAD SHA
+//   - Ensures a Migs run exists for the current local repo HEAD SHA
 //   - Pulls the resulting diffs into the local git worktree
 //
 // Command structure:
@@ -437,7 +437,7 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 
 	// Handle --dry-run mode.
 	if dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Mods diff(s)\n",
+		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Migs diff(s)\n",
 			targetRef, baseRef, origin, len(diffs))
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
@@ -458,7 +458,7 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 
 	// Success message.
-	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
 		appliedCount, runID, targetRef, origin)
 
 	return nil
@@ -502,7 +502,7 @@ func mapRunSummaryToRunState(summary domaintypes.RunSummary) (modsapi.RunState, 
 func printPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy pull [--new-run] [--follow] [--origin <remote>] [--dry-run]")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Ensures a Mods run exists for the current local repo HEAD and pulls diffs.")
+	_, _ = fmt.Fprintln(w, "Ensures a Migs run exists for the current local repo HEAD and pulls diffs.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Maintains per-repo pull state that binds {repo_url, head_sha, run_id}.")
 	_, _ = fmt.Fprintln(w, "")

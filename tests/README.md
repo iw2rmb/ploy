@@ -204,7 +204,7 @@ The smoke test suite validates these critical paths:
    - Artifact collection
    - Build Gate validation via HTTP API (repo+diff model)
    - Healing workflow (Build Gate failure → healing migs → re-gate via remote workers)
-   - Decoupled execution: Mods and Build Gate can run on different nodes
+   - Decoupled execution: Migs and Build Gate can run on different nodes
 
 ## Writing New Tests
 

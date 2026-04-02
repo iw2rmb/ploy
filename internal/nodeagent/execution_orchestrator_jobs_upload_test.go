@@ -348,7 +348,7 @@ func TestRunController_uploadGateReportArtifacts(t *testing.T) {
 }
 
 // Note: uploadDiff and associated mig diff metadata tests were removed along
-// with legacy HEAD-based diff generation. Mods now use baseline-aware
+// with legacy HEAD-based diff generation. Migs now use baseline-aware
 // GenerateBetween semantics via dedicated helpers.
 
 // TestIsValidArtifactPath verifies path traversal prevention for artifact paths.

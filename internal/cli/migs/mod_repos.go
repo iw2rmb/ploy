@@ -1,4 +1,4 @@
-// Package migs provides CLI client implementations for Mods operations.
+// Package migs provides CLI client implementations for Migs operations.
 // This file implements mig repo set management commands (add, list, remove, import).
 //
 // These commands call the server endpoints:

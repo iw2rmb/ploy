@@ -14,7 +14,7 @@ import (
 
 func TestLogsCommandStreamsStructured(t *testing.T) {
 	t.Helper()
-	server := newModsStreamServer(t, []testEvent{
+	server := newMigsStreamServer(t, []testEvent{
 		{event: "log", data: `{"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"line-1"}`},
 		{event: "retention", data: `{"retained":true,"ttl":"72h","expires_at":"2025-10-25T10:00:00Z","bundle_cid":"bafy-test"}`},
 		{event: "done", data: `{"status":"completed"}`},
@@ -56,7 +56,7 @@ type testEvent struct {
 	data  string
 }
 
-func newModsStreamServer(t *testing.T, events []testEvent) *httptest.Server {
+func newMigsStreamServer(t *testing.T, events []testEvent) *httptest.Server {
 	t.Helper()
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/runs/test/logs" {

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// handleMigFetch downloads artifacts for an existing Mods run into a directory.
+// handleMigFetch downloads artifacts for an existing Migs run into a directory.
 func handleMigFetch(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
 		printMigFetchUsage(stderr)

@@ -1,4 +1,4 @@
-// Package migs provides CLI client implementations for Mods operations.
+// Package migs provides CLI client implementations for Migs operations.
 // This file implements the batch run lifecycle client for create/list/stop/status
 // operations against the control-plane /v1/runs endpoints.
 //
@@ -27,7 +27,7 @@ type CreateBatchCommand struct {
 	Client    *http.Client
 	BaseURL   *url.URL
 	Name      *string         // Optional batch name.
-	Spec      json.RawMessage // Mods spec (YAML/JSON parsed to JSON).
+	Spec      json.RawMessage // Migs spec (YAML/JSON parsed to JSON).
 	CreatedBy *string         // Optional creator identifier.
 	RepoURL   string          // Initial repo URL for batch (required by server).
 	BaseRef   string          // Initial base ref.

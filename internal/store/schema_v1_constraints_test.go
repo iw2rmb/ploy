@@ -11,11 +11,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// TestV1Schema_ModsNameUniqueness verifies the UNIQUE constraint on migs.name.
+// TestV1Schema_MigsNameUniqueness verifies the UNIQUE constraint on migs.name.
 // The migs table has a unique index on name to prevent duplicate mig names.
 //
 // This test is skipped if PLOY_TEST_DB_DSN is not set.
-func TestV1Schema_ModsNameUniqueness(t *testing.T) {
+func TestV1Schema_MigsNameUniqueness(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
 		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")

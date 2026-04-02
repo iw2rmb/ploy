@@ -10,8 +10,8 @@ import (
 func newPullCmd(stderr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull",
-		Short: "Pull Mods diffs for current repo HEAD",
-		Long: `Ensures a Mods run exists for the current local repo HEAD and pulls diffs.
+		Short: "Pull Migs diffs for current repo HEAD",
+		Long: `Ensures a Migs run exists for the current local repo HEAD and pulls diffs.
 
 Maintains per-repo pull state that binds {repo_url, head_sha, run_id}.
 

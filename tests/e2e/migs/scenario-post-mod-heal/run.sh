@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# E2E scenario: Multi-step Mods run with post-mig gate healing.
+# E2E scenario: Multi-step Migs run with post-mig gate healing.
 #
 # This script validates gate-heal-regate behavior when a mig transformation
 # introduces a compile error (post-mig gate fails), requiring healing to fix
@@ -44,7 +44,7 @@ set -euo pipefail
 
 # Default to the local Docker cluster descriptor written by ploy cluster deploy.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy/local}"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 

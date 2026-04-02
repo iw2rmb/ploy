@@ -229,7 +229,7 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 			}
 			migs := filtered[start:end]
 
-			writeModsListResponse(w, migs)
+			writeMigsListResponse(w, migs)
 			return
 		}
 
@@ -245,11 +245,11 @@ func listMigsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		writeModsListResponse(w, migs)
+		writeMigsListResponse(w, migs)
 	}
 }
 
-func writeModsListResponse(w http.ResponseWriter, migs []store.Mig) {
+func writeMigsListResponse(w http.ResponseWriter, migs []store.Mig) {
 	items := make([]domainapi.MigSummary, 0, len(migs))
 	for _, mig := range migs {
 		var specIDPtr *domaintypes.SpecID

@@ -169,7 +169,7 @@ func TestParseSpec(t *testing.T) {
 
 // --- modsSpecToRunOptions direct conversion tests ---
 
-func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
+func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 	t.Parallel()
 
 	t.Run("single_step_with_all_options", func(t *testing.T) {
@@ -373,7 +373,7 @@ func TestModsSpecToRunOptions_DirectConversion(t *testing.T) {
 
 // --- field propagation tests ---
 
-func TestModsSpecToRunOptions_FieldPropagation(t *testing.T) {
+func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 	t.Parallel()
 
 	bundle := &contracts.TmpBundleRef{

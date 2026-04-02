@@ -71,6 +71,6 @@ cmd/ploy/assets/runtime.tgz
 
 # amata
 .amata
-deploy/images/amata/amata
+images/amata/amata
 
 .crush

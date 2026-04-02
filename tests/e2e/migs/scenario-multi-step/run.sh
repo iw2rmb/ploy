@@ -16,7 +16,7 @@ REPO_TARGET_REF="${REPO_TARGET_REF:-java6-multy-mig}"
 SPEC_FILE="${SCRIPT_DIR}/mig.yaml"
 
 echo "=========================================="
-echo "Multi-step Mods E2E Scenario"
+echo "Multi-step Migs E2E Scenario"
 echo "=========================================="
 echo "Repo URL:         $REPO_URL"
 echo "Base ref:         $REPO_BASE_REF"

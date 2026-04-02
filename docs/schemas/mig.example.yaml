@@ -97,7 +97,7 @@ steps:
 # next step begins, enabling per-step rehydration and multi-node execution.
 #
 # Rules:
-# - Mods execute in array order (steps are sequential within one run).
+# - Migs execute in array order (steps are sequential within one run).
 # - All steps share the same repository, base_ref, target_ref, and global gate policy.
 # - Each step produces a diff artifact before the next step starts.
 # - If any step fails its gate check, the global healing policy applies.
@@ -161,7 +161,7 @@ build_gate:
 #   handles validation orchestration and build verification.
 #
 # Environment variables injected by the node agent for healing migs:
-# - PLOY_REPO_URL: Git repository URL (same as the Mods run)
+# - PLOY_REPO_URL: Git repository URL (same as the Migs run)
 # - PLOY_BUILDGATE_REF: Git ref for Build Gate baseline (base_ref or commit_sha)
 # - PLOY_HOST_WORKSPACE: Host path to workspace (for direct host verification)
 # - PLOY_SERVER_URL: ploy server URL for Build Gate HTTP API
@@ -349,7 +349,7 @@ mr_on_fail: true
 #   * See the CANONICAL MODS SHAPE section above for full image resolution rules.
 #
 # - Multi-step semantics:
-#   * Mods execute in array order (sequential steps within one run).
+#   * Migs execute in array order (sequential steps within one run).
 #   * All steps share the same repository and global gate/heal policy.
 #   * Each step produces a diff artifact captured before the next step.
 #   * Diffs enable rehydration: any step can be re-executed on any node by

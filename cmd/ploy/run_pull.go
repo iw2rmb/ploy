@@ -1,5 +1,5 @@
 // run_pull.go implements the `ploy run pull <run-id>` subcommand for
-// pulling Mods diffs into the current git worktree.
+// pulling Migs diffs into the current git worktree.
 //
 // This command pulls diffs from a specific run into the current git repository.
 // The command uses POST /v1/runs/{run_id}/pull to resolve the current repo.
@@ -189,7 +189,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 
 	// Step 9: Handle --dry-run mode.
 	if *dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Mods diff(s)\n",
+		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Migs diff(s)\n",
 			targetRef, baseRef, *origin, len(diffs))
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
@@ -212,7 +212,7 @@ func handleRunPull(args []string, stderr io.Writer) error {
 	}
 
 	// Success message.
-	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
 		appliedCount, runID, targetRef, *origin)
 
 	return nil
@@ -273,7 +273,7 @@ func fetchRunRepoDetails(ctx context.Context, httpClient *http.Client, baseURL *
 func printRunPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run pull [--origin <remote>] [--dry-run] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Pulls Mods diffs from a run into the current git repository.")
+	_, _ = fmt.Fprintln(w, "Pulls Migs diffs from a run into the current git repository.")
 	_, _ = fmt.Fprintln(w, "Creates a new branch at the run's base commit and applies stored diffs.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use this command when you have a specific run ID.")
