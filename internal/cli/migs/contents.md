@@ -5,12 +5,12 @@
 [events.go](events.go) Event-stream helpers for MIG operations, including formatting and stream consumption.
 [logs.go](logs.go) MIG logs command implementation for fetching and printing run logs.
 [logs_test.go](logs_test.go) Tests log retrieval filtering, output handling, and error propagation paths.
-[mod_management.go](mod_management.go) Management-mode MIG commands for lifecycle operations such as archive and remove.
-[mod_management_test.go](mod_management_test.go) Tests management-mode MIG command behavior and mutation guardrails.
-[mod_repos.go](mod_repos.go) Repository-scoped MIG command module for listing and selecting migration repositories.
-[mod_repos_test.go](mod_repos_test.go) Tests repository module command behavior and repository selector parsing.
-[mod_run.go](mod_run.go) Run-mode MIG command module that builds and submits run-related requests.
-[mod_run_test.go](mod_run_test.go) Tests run-module command validation, defaults, and request generation.
+[mig_management.go](mig_management.go) CLI client commands for MIG management operations (add/list/remove/archive/unarchive).
+[mig_management_test.go](mig_management_test.go) Tests MIG management command behavior across create/list/delete and archive flows.
+[mig_repos.go](mig_repos.go) CLI client commands for MIG repository set operations including add/list/remove and CSV bulk import.
+[mig_repos_test.go](mig_repos_test.go) Tests MIG repo command request shaping, validation, and API error handling.
+[mig_run.go](mig_run.go) CLI client command for creating MIG runs with all/explicit/failed repo selection modes.
+[mig_run_test.go](mig_run_test.go) Tests MIG run selector validation and run-creation request/response handling.
 [pull.go](pull.go) MIG pull command logic for syncing migration definitions to local workspace state.
 [pull_test.go](pull_test.go) Tests MIG pull filtering, destination handling, and remote error cases.
 [status.go](status.go) MIG status command implementation and status rendering utilities.
