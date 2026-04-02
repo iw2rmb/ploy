@@ -184,6 +184,51 @@ func TestOpenAPICompleteness(t *testing.T) {
 	}
 }
 
+// TestConfigEnvKeyResponseSemantics verifies that the OpenAPI contract for
+// /v1/config/env/{key} retains ambiguity (409) and target-validation (400)
+// response codes on GET and DELETE operations.
+func TestConfigEnvKeyResponseSemantics(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(".", "paths", "config_env_key.yaml"))
+	if err != nil {
+		t.Fatalf("read config_env_key.yaml: %v", err)
+	}
+
+	var spec map[string]interface{}
+	if err := yaml.Unmarshal(data, &spec); err != nil {
+		t.Fatalf("parse config_env_key.yaml: %v", err)
+	}
+
+	methods := []struct {
+		method string
+		codes  []string
+	}{
+		{"get", []string{"400", "409"}},
+		{"delete", []string{"400", "409"}},
+	}
+
+	for _, m := range methods {
+		t.Run(m.method, func(t *testing.T) {
+			op, ok := spec[m.method].(map[string]interface{})
+			if !ok {
+				t.Fatalf("method %s not found in config_env_key.yaml", m.method)
+			}
+
+			responses, ok := op["responses"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("responses not found for method %s", m.method)
+			}
+
+			for _, code := range m.codes {
+				t.Run("status_"+code, func(t *testing.T) {
+					if _, ok := responses[code]; !ok {
+						t.Errorf("%s /v1/config/env/{key} missing response %s", m.method, code)
+					}
+				})
+			}
+		})
+	}
+}
+
 // TestSchemaFilesValid verifies that all schema files are valid YAML.
 func TestSchemaFilesValid(t *testing.T) {
 	schemaFiles := []string{
