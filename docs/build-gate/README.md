@@ -197,7 +197,7 @@ stacks:
   - lang: java
     release: "17"
     tool: maven
-    image: ${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17
+    image: $PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17
     profile: gates/profiles/java-17-maven.yaml
 ```
 
