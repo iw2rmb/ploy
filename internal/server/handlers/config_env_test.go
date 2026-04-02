@@ -9,7 +9,7 @@ import (
 )
 
 // TestConfigEnvListReturnsAllEntries verifies that GET /v1/config/env
-// returns all entries sorted by key, with secret values redacted.
+// returns all key+target pairs sorted by key then target, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
 		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true},
@@ -27,19 +27,52 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 		t.Fatalf("got %d entries, want 2", len(resp))
 	}
 
-	// Verify sorted order.
+	// Verify sorted order by key.
 	if resp[0].Key != "API_KEY" || resp[1].Key != "CA_CERTS_PEM_BUNDLE" {
 		t.Errorf("entries not sorted: got %v, %v", resp[0].Key, resp[1].Key)
 	}
 
-	// Non-secret entry includes value.
+	// Non-secret entry includes value and target.
 	if resp[0].Value != "sk-abc123" {
 		t.Errorf("non-secret value = %q, want %q", resp[0].Value, "sk-abc123")
+	}
+	if resp[0].Target != "steps" {
+		t.Errorf("non-secret target = %q, want %q", resp[0].Target, "steps")
 	}
 
 	// Secret entry has redacted (empty) value.
 	if resp[1].Value != "" {
 		t.Errorf("secret value = %q, want empty", resp[1].Value)
+	}
+	if resp[1].Target != "gates" {
+		t.Errorf("secret target = %q, want %q", resp[1].Target, "gates")
+	}
+}
+
+// TestConfigEnvListMultiTarget verifies that list returns separate entries
+// for the same key with different targets.
+func TestConfigEnvListMultiTarget(t *testing.T) {
+	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "val-gates", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+	holder.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "val-steps", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+
+	handler := listGlobalEnvHandler(holder)
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env", nil)
+
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[[]globalEnvListItem](t, rr)
+
+	if len(resp) != 2 {
+		t.Fatalf("got %d entries, want 2", len(resp))
+	}
+
+	// Sorted by target within key.
+	if resp[0].Target != "gates" || resp[1].Target != "steps" {
+		t.Errorf("targets = [%q, %q], want [gates, steps]", resp[0].Target, resp[1].Target)
+	}
+	if resp[0].Value != "val-gates" || resp[1].Value != "val-steps" {
+		t.Errorf("values = [%q, %q], want [val-gates, val-steps]", resp[0].Value, resp[1].Value)
 	}
 }
 
@@ -52,26 +85,61 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 
 	handler := getGlobalEnvHandler(holder)
 
-	// Create a request with path value set.
 	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/CODEX_AUTH_JSON", nil, "key", "CODEX_AUTH_JSON")
 
 	assertStatus(t, rr, http.StatusOK)
 
 	resp := decodeBody[globalEnvResponse](t, rr)
 
-	// Value should be returned for admin access.
 	if resp.Key != "CODEX_AUTH_JSON" {
 		t.Errorf("Key = %q, want %q", resp.Key, "CODEX_AUTH_JSON")
 	}
 	if resp.Value != `{"token":"secret"}` {
 		t.Errorf("Value = %q, want %q", resp.Value, `{"token":"secret"}`)
 	}
-	if resp.Scope != "steps" {
-		t.Errorf("Scope = %q, want %q", resp.Scope, "steps")
+	if resp.Target != "steps" {
+		t.Errorf("Target = %q, want %q", resp.Target, "steps")
 	}
 	if !resp.Secret {
 		t.Errorf("Secret = %v, want true", resp.Secret)
 	}
+}
+
+// TestConfigEnvGetWithTargetSelector verifies GET /v1/config/env/{key}?target=
+// returns the correct entry when multiple targets exist.
+func TestConfigEnvGetWithTargetSelector(t *testing.T) {
+	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "gates-val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+
+	handler := getGlobalEnvHandler(holder)
+
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MULTI?target=steps", nil, "key", "MULTI")
+
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[globalEnvResponse](t, rr)
+
+	if resp.Value != "steps-val" {
+		t.Errorf("Value = %q, want %q", resp.Value, "steps-val")
+	}
+	if resp.Target != "steps" {
+		t.Errorf("Target = %q, want %q", resp.Target, "steps")
+	}
+}
+
+// TestConfigEnvGetAmbiguityError verifies GET /v1/config/env/{key} returns 409
+// when multiple targets exist and no target selector is provided.
+func TestConfigEnvGetAmbiguityError(t *testing.T) {
+	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "gates-val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+
+	handler := getGlobalEnvHandler(holder)
+
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MULTI", nil, "key", "MULTI")
+
+	assertStatus(t, rr, http.StatusConflict)
 }
 
 // TestConfigEnvGetNotFound verifies GET /v1/config/env/{key} returns 404
@@ -95,7 +163,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 
 	reqBody := map[string]any{
 		"value":  "-----BEGIN CERTIFICATE-----\n...",
-		"scope":  "gates",
+		"target": "gates",
 		"secret": true,
 	}
 
@@ -119,6 +187,12 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	if v.Value != "-----BEGIN CERTIFICATE-----\n..." {
 		t.Errorf("holder Value = %q", v.Value)
 	}
+
+	// Verify response uses target field.
+	resp := decodeBody[globalEnvResponse](t, rr)
+	if resp.Target != "gates" {
+		t.Errorf("response Target = %q, want %q", resp.Target, "gates")
+	}
 }
 
 // TestConfigEnvPutDefaultsSecretToTrue verifies that secret defaults to true
@@ -131,8 +205,8 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 
 	// Omit "secret" field — should default to true.
 	reqBody := map[string]any{
-		"value": "test-value",
-		"scope": "steps",
+		"value":  "test-value",
+		"target": "steps",
 	}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
@@ -158,8 +232,8 @@ func TestConfigEnvPutInvalidTarget(t *testing.T) {
 	handler := putGlobalEnvHandler(holder, st)
 
 	reqBody := map[string]any{
-		"value": "test",
-		"scope": "invalid-target",
+		"value":  "test",
+		"target": "invalid-target",
 	}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
@@ -172,7 +246,38 @@ func TestConfigEnvPutInvalidTarget(t *testing.T) {
 	}
 }
 
-// TestConfigEnvDeleteRemovesEntry verifies DELETE /v1/config/env/{key}
+// TestConfigEnvPutMultiTarget verifies that PUT with different targets for the same key
+// creates separate entries in the holder.
+func TestConfigEnvPutMultiTarget(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+
+	putHandler := putGlobalEnvHandler(holder, st)
+
+	// PUT with gates target.
+	rr := doRequest(t, putHandler, http.MethodPut, "/v1/config/env/SHARED", map[string]any{
+		"value":  "gates-val",
+		"target": "gates",
+		"secret": false,
+	}, "key", "SHARED")
+	assertStatus(t, rr, http.StatusOK)
+
+	// PUT same key with steps target.
+	rr = doRequest(t, putHandler, http.MethodPut, "/v1/config/env/SHARED", map[string]any{
+		"value":  "steps-val",
+		"target": "steps",
+		"secret": false,
+	}, "key", "SHARED")
+	assertStatus(t, rr, http.StatusOK)
+
+	// Verify both entries exist.
+	entries := holder.GetGlobalEnvEntries("SHARED")
+	if len(entries) != 2 {
+		t.Fatalf("got %d entries, want 2", len(entries))
+	}
+}
+
+// TestConfigEnvDeleteRemovesEntry verifies DELETE /v1/config/env/{key}?target=
 // removes from store and holder.
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	st := &configStore{}
@@ -203,34 +308,94 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	}
 }
 
-// TestConfigEnvRoundTrip verifies PUT followed by GET returns identical values.
+// TestConfigEnvDeleteInfersTarget verifies DELETE /v1/config/env/{key} without
+// ?target= succeeds when only one target exists for the key.
+func TestConfigEnvDeleteInfersTarget(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
+		"SINGLE": {Value: "val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false},
+	})
+
+	handler := deleteGlobalEnvHandler(holder, st)
+
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/SINGLE", nil, "key", "SINGLE")
+
+	assertStatus(t, rr, http.StatusNoContent)
+
+	if !st.deleteGlobalEnv.called {
+		t.Error("store.DeleteGlobalEnv was not called")
+	}
+	if st.deleteGlobalEnv.params.Target != "nodes" {
+		t.Errorf("inferred target = %q, want %q", st.deleteGlobalEnv.params.Target, "nodes")
+	}
+}
+
+// TestConfigEnvDeleteAmbiguityError verifies DELETE /v1/config/env/{key}
+// returns 409 when multiple targets exist and no target is specified.
+func TestConfigEnvDeleteAmbiguityError(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+
+	handler := deleteGlobalEnvHandler(holder, st)
+
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/MULTI", nil, "key", "MULTI")
+
+	assertStatus(t, rr, http.StatusConflict)
+
+	// Store should not be called.
+	if st.deleteGlobalEnv.called {
+		t.Error("store.DeleteGlobalEnv should not be called for ambiguous delete")
+	}
+}
+
+// TestConfigEnvDeleteNonexistentKey verifies DELETE for non-existent key returns 204.
+func TestConfigEnvDeleteNonexistentKey(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+
+	handler := deleteGlobalEnvHandler(holder, st)
+
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/GHOST", nil, "key", "GHOST")
+
+	assertStatus(t, rr, http.StatusNoContent)
+
+	// Store should not be called for non-existent key.
+	if st.deleteGlobalEnv.called {
+		t.Error("store.DeleteGlobalEnv should not be called for non-existent key")
+	}
+}
+
+// TestConfigEnvRoundTrip verifies PUT followed by GET returns identical values
+// using target-based wire format.
 func TestConfigEnvRoundTrip(t *testing.T) {
 	tests := []struct {
 		name   string
 		key    string
 		value  string
-		scope  string
+		target string
 		secret bool
 	}{
 		{
 			name:   "CA bundle",
 			key:    "CA_CERTS_PEM_BUNDLE",
 			value:  "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
-			scope:  "gates",
+			target: "gates",
 			secret: true,
 		},
 		{
 			name:   "non-secret API key",
 			key:    "PUBLIC_API_KEY",
 			value:  "pk_live_abc123",
-			scope:  "steps",
+			target: "steps",
 			secret: false,
 		},
 		{
 			name:   "codex auth JSON",
 			key:    "CODEX_AUTH_JSON",
 			value:  `{"api_key":"sk-...","org_id":"org-123"}`,
-			scope:  "server",
+			target: "server",
 			secret: true,
 		},
 	}
@@ -243,7 +408,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			// PUT the entry.
 			putRR := doRequest(t, putGlobalEnvHandler(holder, st), http.MethodPut, "/v1/config/env/"+tt.key, map[string]any{
 				"value":  tt.value,
-				"scope":  tt.scope,
+				"target": tt.target,
 				"secret": tt.secret,
 			}, "key", tt.key)
 			assertStatus(t, putRR, http.StatusOK)
@@ -260,8 +425,8 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			if resp.Value != tt.value {
 				t.Errorf("Value = %q, want %q", resp.Value, tt.value)
 			}
-			if resp.Scope != tt.scope {
-				t.Errorf("Scope = %q, want %q", resp.Scope, tt.scope)
+			if resp.Target != tt.target {
+				t.Errorf("Target = %q, want %q", resp.Target, tt.target)
 			}
 			if resp.Secret != tt.secret {
 				t.Errorf("Secret = %v, want %v", resp.Secret, tt.secret)
@@ -289,7 +454,7 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 
 	handler := putGlobalEnvHandler(holder, st)
 
-	reqBody := map[string]any{"value": "test", "scope": "gates"}
+	reqBody := map[string]any{"value": "test", "target": "gates"}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST", reqBody, "key", "TEST")
 

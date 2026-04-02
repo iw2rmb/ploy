@@ -4,19 +4,21 @@ get:
   operationId: listGlobalEnv
   description: |
     Returns all global environment variable entries known to the control plane.
-    Each item includes the key, scope, and secret flag. For entries marked as
+    Each item includes the key, target, and secret flag. For entries marked as
     secret, the value field is omitted from the response to avoid leaking
     sensitive data.
 
-    Global environment variables are automatically injected into job containers
-    based on their scope. This enables cluster-wide configuration of credentials,
-    CA bundles, and API keys without embedding them in every spec file.
+    A key may appear multiple times with different targets when the same
+    variable is configured for multiple injection points.
 
-    **Scope semantics:**
-    - `all` — Inject into every job type (mig, heal, pre_gate, re_gate, post_gate)
-    - `migs` — Inject into `mig` and `post_gate` jobs (code modification phases)
-    - `heal` — Inject into `heal` and `re_gate` jobs (healing/retry phases)
-    - `gate` — Inject into `pre_gate`, `re_gate`, and `post_gate` jobs (gate execution phases)
+    Global environment variables are automatically injected into job containers
+    or processes based on their target.
+
+    **Target semantics:**
+    - `server` — Inject into the server process
+    - `nodes` — Inject into node agent processes
+    - `gates` — Inject into gate jobs (pre_gate, re_gate, post_gate)
+    - `steps` — Inject into step jobs (mig, heal)
 
     **Precedence:** Per-run env vars (in spec or CLI flags) take precedence over
     global env. Existing keys in the spec are never overwritten.
@@ -32,12 +34,15 @@ get:
             items:
               $ref: '../components/schemas/config.yaml#/GlobalEnvListItem'
           example:
-            - key: "CA_CERTS_PEM_BUNDLE"
-              scope: "all"
+            - key: "PLOY_CA_CERTS"
+              target: "gates"
+              secret: true
+            - key: "PLOY_CA_CERTS"
+              target: "steps"
               secret: true
             - key: "CUSTOM_VAR"
               value: "myvalue"
-              scope: "all"
+              target: "steps"
               secret: false
     '401':
       description: Unauthorized

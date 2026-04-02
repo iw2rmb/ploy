@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -12,38 +13,37 @@ import (
 
 // globalEnvListItem represents an entry in the GET /v1/config/env list response.
 // For secrets, the value is redacted to prevent accidental exposure.
-// Scope is serialized as string for wire compatibility.
 type globalEnvListItem struct {
 	Key    string `json:"key"`
 	Value  string `json:"value,omitempty"` // Omitted (empty) for secrets in list view.
-	Scope  string `json:"scope"`
+	Target string `json:"target"`
 	Secret bool   `json:"secret"`
 }
 
 // globalEnvResponse represents the response for GET /v1/config/env/{key} and PUT /v1/config/env/{key}.
 // Full value is returned since these endpoints are admin-only and accessed via mTLS.
-// Scope is serialized as string for wire compatibility.
 type globalEnvResponse struct {
 	Key    string `json:"key"`
 	Value  string `json:"value"`
-	Scope  string `json:"scope"`
+	Target string `json:"target"`
 	Secret bool   `json:"secret"`
 }
 
 // globalEnvPutRequest represents the request body for PUT /v1/config/env/{key}.
-// Scope is parsed and validated at the API boundary using domaintypes.ParseGlobalEnvTarget().
+// Target is parsed and validated at the API boundary using domaintypes.ParseGlobalEnvTarget().
 type globalEnvPutRequest struct {
 	Value  string `json:"value"`
-	Scope  string `json:"scope"`  // Raw string from wire; parsed as target via ParseGlobalEnvTarget.
+	Target string `json:"target"` // Raw string from wire; parsed via ParseGlobalEnvTarget.
 	Secret *bool  `json:"secret"` // Pointer to distinguish explicit false from missing (defaults to true).
 }
 
 // listGlobalEnvHandler returns an HTTP handler that lists all global env entries.
+// Returns all key+target pairs as a flat list sorted by key then target.
 // For secret entries, the value is redacted (empty string) in the response.
 // Requires cli-admin role (enforced by middleware).
 func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		envMap := holder.GetGlobalEnv()
+		envMap := holder.GetGlobalEnvAll()
 
 		// Build sorted list for consistent output.
 		keys := make([]string, 0, len(envMap))
@@ -52,19 +52,24 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 		}
 		sort.Strings(keys)
 
-		items := make([]globalEnvListItem, 0, len(keys))
+		var items []globalEnvListItem
 		for _, k := range keys {
-			v := envMap[k]
-			item := globalEnvListItem{
-				Key:    k,
-				Scope:  v.Target.String(), // Convert typed scope to string for wire format.
-				Secret: v.Secret,
+			entries := envMap[k]
+			// Sort entries within key by target for deterministic order.
+			sort.Slice(entries, func(i, j int) bool {
+				return entries[i].Target.String() < entries[j].Target.String()
+			})
+			for _, v := range entries {
+				item := globalEnvListItem{
+					Key:    k,
+					Target: v.Target.String(),
+					Secret: v.Secret,
+				}
+				if !v.Secret {
+					item.Value = v.Value
+				}
+				items = append(items, item)
 			}
-			// Redact value for secrets in list view.
-			if !v.Secret {
-				item.Value = v.Value
-			}
-			items = append(items, item)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -79,6 +84,8 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 
 // getGlobalEnvHandler returns an HTTP handler that returns a single global env entry by key.
 // Full value is returned regardless of secret flag (admin-only, mTLS protected).
+// When multiple targets exist for a key, the ?target= query parameter is required;
+// otherwise the endpoint returns a 409 ambiguity error.
 // Requires cli-admin role (enforced by middleware).
 func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -88,16 +95,23 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 			return
 		}
 
-		v, ok := holder.GetGlobalEnvVar(key)
-		if !ok {
+		entries := holder.GetGlobalEnvEntries(key)
+		if len(entries) == 0 {
 			writeHTTPError(w, http.StatusNotFound, "global env key not found: %s", key)
+			return
+		}
+
+		targetStr := r.URL.Query().Get("target")
+		v, err := resolveAmbiguousEntry(entries, targetStr)
+		if err != nil {
+			writeHTTPError(w, http.StatusConflict, "%s", err)
 			return
 		}
 
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  v.Value,
-			Scope:  v.Target.String(), // Convert typed scope to string for wire format.
+			Target: v.Target.String(),
 			Secret: v.Secret,
 		}
 
@@ -109,7 +123,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 
 		slog.Info("config env get: returned entry",
 			"key", key,
-			"scope", v.Target.String(),
+			"target", v.Target.String(),
 			"secret", v.Secret,
 		)
 	}
@@ -132,9 +146,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		}
 
 		// Parse and validate target at API boundary using typed enum.
-		// ParseGlobalEnvTarget validates against known values (server, nodes, gates, steps).
-		// Empty values are rejected (no default target).
-		target, err := domaintypes.ParseGlobalEnvTarget(req.Scope)
+		target, err := domaintypes.ParseGlobalEnvTarget(req.Target)
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
@@ -168,7 +180,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  req.Value,
-			Scope:  target.String(),
+			Target: target.String(),
 			Secret: secret,
 		}
 
@@ -188,6 +200,9 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 
 // deleteGlobalEnvHandler returns an HTTP handler that deletes a global env entry.
 // Removes from both the in-memory ConfigHolder and the store.
+// When multiple targets exist for a key, the ?target= query parameter is required;
+// otherwise the endpoint returns a 409 ambiguity error.
+// If only one target exists for the key, target is inferred automatically.
 // Requires cli-admin role (enforced by middleware).
 func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -197,12 +212,31 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 			return
 		}
 
-		// Parse target from query parameter; required for composite key delete.
+		// Resolve target: explicit query param or inferred from single entry.
 		targetStr := r.URL.Query().Get("target")
-		target, err := domaintypes.ParseGlobalEnvTarget(targetStr)
-		if err != nil {
-			writeHTTPError(w, http.StatusBadRequest, "%s", err)
-			return
+		var target domaintypes.GlobalEnvTarget
+
+		entries := holder.GetGlobalEnvEntries(key)
+		if targetStr != "" {
+			target, err = domaintypes.ParseGlobalEnvTarget(targetStr)
+			if err != nil {
+				writeHTTPError(w, http.StatusBadRequest, "%s", err)
+				return
+			}
+		} else {
+			switch len(entries) {
+			case 0:
+				// Idempotent: key does not exist, nothing to delete.
+				w.WriteHeader(http.StatusNoContent)
+				return
+			case 1:
+				target = entries[0].Target
+			default:
+				writeHTTPError(w, http.StatusConflict,
+					"ambiguous key %q: exists for targets %s; specify ?target= to disambiguate",
+					key, targetList(entries))
+				return
+			}
 		}
 
 		// Delete from store first (idempotent operation).
@@ -213,10 +247,68 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 		}
 
 		// Remove from in-memory holder after successful deletion.
-		holder.DeleteGlobalEnvVar(key)
+		holder.DeleteGlobalEnvVar(key, target)
 
 		w.WriteHeader(http.StatusNoContent)
 
-		slog.Info("config env delete: removed entry", "key", key)
+		slog.Info("config env delete: removed entry", "key", key, "target", target.String())
 	}
+}
+
+// resolveAmbiguousEntry selects a single entry from a non-empty slice.
+// If targetStr is provided, the matching entry is returned.
+// If targetStr is empty and exactly one entry exists, that entry is returned.
+// If targetStr is empty and multiple entries exist, an ambiguity error is returned.
+func resolveAmbiguousEntry(entries []GlobalEnvVar, targetStr string) (GlobalEnvVar, error) {
+	if targetStr != "" {
+		target, err := domaintypes.ParseGlobalEnvTarget(targetStr)
+		if err != nil {
+			return GlobalEnvVar{}, err
+		}
+		for _, e := range entries {
+			if e.Target == target {
+				return e, nil
+			}
+		}
+		return GlobalEnvVar{}, fmt.Errorf("target %q not found for this key", targetStr)
+	}
+
+	if len(entries) == 1 {
+		return entries[0], nil
+	}
+
+	return GlobalEnvVar{}, fmt.Errorf(
+		"ambiguous: key exists for targets %s; specify ?target= to disambiguate",
+		targetList(entries))
+}
+
+// targetList formats entry targets as a comma-separated string for error messages.
+func targetList(entries []GlobalEnvVar) string {
+	targets := make([]string, len(entries))
+	for i, e := range entries {
+		targets[i] = e.Target.String()
+	}
+	sort.Strings(targets)
+	result := ""
+	for i, t := range targets {
+		if i > 0 {
+			result += ", "
+		}
+		result += t
+	}
+	return result
+}
+
+// GetGlobalEnvAll returns a copy of all global environment entries grouped by key.
+// Each key maps to a slice of entries (one per target).
+func (h *ConfigHolder) GetGlobalEnvAll() map[string][]GlobalEnvVar {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	envCopy := make(map[string][]GlobalEnvVar, len(h.globalEnv))
+	for k, entries := range h.globalEnv {
+		cp := make([]GlobalEnvVar, len(entries))
+		copy(cp, entries)
+		envCopy[k] = cp
+	}
+	return envCopy
 }
