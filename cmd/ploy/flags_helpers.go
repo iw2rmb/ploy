@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // stringValue implements flag.Value with a marker for whether it was set.
@@ -17,6 +18,14 @@ type stringValue struct {
 
 func (v *stringValue) String() string     { return v.value }
 func (v *stringValue) Set(s string) error { v.value = s; v.set = true; return nil }
+
+// stringsValue implements flag.Value for accumulating multiple string flag values.
+type stringsValue struct {
+	values []string
+}
+
+func (v *stringsValue) String() string     { return strings.Join(v.values, ",") }
+func (v *stringsValue) Set(s string) error { v.values = append(v.values, s); return nil }
 
 // intValue implements flag.Value for integers.
 type intValue struct {

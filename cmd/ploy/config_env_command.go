@@ -328,6 +328,28 @@ func expandOnSelector(selector string) ([]domaintypes.GlobalEnvTarget, error) {
 	}
 }
 
+// expandOnSelectors expands multiple --on selectors into a deduplicated, sorted slice of targets.
+func expandOnSelectors(selectors []string) ([]domaintypes.GlobalEnvTarget, error) {
+	seen := make(map[domaintypes.GlobalEnvTarget]bool)
+	var targets []domaintypes.GlobalEnvTarget
+	for _, s := range selectors {
+		expanded, err := expandOnSelector(s)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range expanded {
+			if !seen[t] {
+				seen[t] = true
+				targets = append(targets, t)
+			}
+		}
+	}
+	sort.Slice(targets, func(i, j int) bool {
+		return targets[i].String() < targets[j].String()
+	})
+	return targets, nil
+}
+
 // handleConfigEnvSet creates or updates a global environment variable.
 // Value can be provided inline (--value) or from a file (--file).
 // The --on selector determines which targets receive the variable.
@@ -346,13 +368,13 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 		key    stringValue
 		value  stringValue
 		file   stringValue
-		on     string
+		on     stringsValue
 		secret boolValue
 	)
 	fs.Var(&key, "key", "Environment variable name (required)")
 	fs.Var(&value, "value", "Inline value (mutually exclusive with --file)")
 	fs.Var(&file, "file", "Path to file containing value (mutually exclusive with --value)")
-	fs.StringVar(&on, "on", "jobs", "Target selector: all, jobs, server, nodes, gates, steps")
+	fs.Var(&on, "on", "Target selector: all, jobs, server, nodes, gates, steps (default: jobs)")
 	fs.Var(&secret, "secret", "Mark value as secret (default: true)")
 
 	if err := parseFlagSet(fs, args, func() { printConfigEnvSetUsage(stderr) }); err != nil {
@@ -377,7 +399,16 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 		return errors.New("--value and --file are mutually exclusive")
 	}
 
-	targets, err := expandOnSelector(on)
+	selectors := on.values
+	if len(selectors) == 0 {
+		selectors = []string{"jobs"}
+	}
+	for _, s := range selectors {
+		if s == "all" && len(selectors) > 1 {
+			return errors.New("--on all is exclusive and cannot be combined with other selectors")
+		}
+	}
+	targets, err := expandOnSelectors(selectors)
 	if err != nil {
 		return err
 	}
