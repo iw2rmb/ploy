@@ -148,6 +148,8 @@ items:
     reviews:
       - gaps: ["\"~/@iw2rmb/amata/scripts/check_docs_links.sh\" (Step 6 verification) is failing, so Step 6 is not complete against its own verification gate. Current missing links are in `design/k8s-jobs.md:193`, `design/k8s-jobs.md:194`, `design/orw-cli.md:224`, `docs/testing-workflow.md:216`, `docs/releasing.md:67`, and `docs/releasing.md:102`."]
         commit: b26da8fd
+      - gaps: ["\"Keep API docs, operator docs, and CLI docs synchronized with implemented wire contracts and help text.\" is violated in `cmd/ploy/README.md`: it states \"Legacy subcommands (apps, env, migs, security, etc.) were removed\" at `cmd/ploy/README.md:5-6`, but the same file later documents `ploy config env` commands (`cmd/ploy/README.md:476`) and the CLI/help code still exposes them (`cmd/ploy/config_env_command.go:47-59`)."]
+        commit: null
     label: "6"
     summary: Update operator and API documentation to target semantics, ambiguity rules, and materializer-based certificate handling.
     classification: determined
