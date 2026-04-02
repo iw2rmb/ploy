@@ -18,8 +18,8 @@
 [diff.go](diff.go) Computes patch statistics and runs git diff commands to produce workspace change metadata.
 [diff_test.go](diff_test.go) Exercises patch-stat parsing and diff execution edge cases.
 [errors.go](errors.go) Defines shared step-level sentinel errors such as repository cancellation semantics.
-[gate_command.go](gate_command.go) Builds gate shell commands, including CA-certificate preamble injection and tool-target command selection.
-[gate_command_materializer.go](gate_command_materializer.go) Defines env-key materializer preambles, including  certificate installation for gate command execution.
+[gate_command.go](gate_command.go) Builds deterministic gate shell commands per tool/target and prepends env-materializer preambles to gate execution scripts.
+[gate_command_materializer.go](gate_command_materializer.go) Registers special env-key materializers and provides the PLOY_CA_CERTS preamble that installs certs into system and Java trust stores.
 [gate_docker.go](gate_docker.go) Implements Docker-backed gate executor that resolves plans, runs gate containers, and records authoritative gate outcomes.
 [gate_docker_ca_preamble_test.go](gate_docker_ca_preamble_test.go) Verifies gate commands include CA preamble behavior for supported build tools.
 [gate_docker_gradle_cache_hits_test.go](gate_docker_gradle_cache_hits_test.go) Tests Gradle cache-hit extraction, normalization, and cleanup from gate workspace artifacts.
