@@ -142,6 +142,34 @@ func TestConfigEnvGetAmbiguityError(t *testing.T) {
 	assertStatus(t, rr, http.StatusConflict)
 }
 
+// TestConfigEnvGetInvalidTarget verifies GET /v1/config/env/{key}?target=bad
+// returns 400 when the target value is not a valid GlobalEnvTarget.
+func TestConfigEnvGetInvalidTarget(t *testing.T) {
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
+		"MY_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	})
+
+	handler := getGlobalEnvHandler(holder)
+
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MY_KEY?target=bogus", nil, "key", "MY_KEY")
+
+	assertStatus(t, rr, http.StatusBadRequest)
+}
+
+// TestConfigEnvGetTargetNotFound verifies GET /v1/config/env/{key}?target=steps
+// returns 404 when the target is valid but the key has no entry for that target.
+func TestConfigEnvGetTargetNotFound(t *testing.T) {
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
+		"MY_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	})
+
+	handler := getGlobalEnvHandler(holder)
+
+	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MY_KEY?target=steps", nil, "key", "MY_KEY")
+
+	assertStatus(t, rr, http.StatusNotFound)
+}
+
 // TestConfigEnvGetNotFound verifies GET /v1/config/env/{key} returns 404
 // when the key does not exist.
 func TestConfigEnvGetNotFound(t *testing.T) {
@@ -347,6 +375,25 @@ func TestConfigEnvDeleteAmbiguityError(t *testing.T) {
 	// Store should not be called.
 	if st.deleteGlobalEnv.called {
 		t.Error("store.DeleteGlobalEnv should not be called for ambiguous delete")
+	}
+}
+
+// TestConfigEnvDeleteInvalidTarget verifies DELETE /v1/config/env/{key}?target=bad
+// returns 400 when the target value is not a valid GlobalEnvTarget.
+func TestConfigEnvDeleteInvalidTarget(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
+		"MY_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+	})
+
+	handler := deleteGlobalEnvHandler(holder, st)
+
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/MY_KEY?target=bogus", nil, "key", "MY_KEY")
+
+	assertStatus(t, rr, http.StatusBadRequest)
+
+	if st.deleteGlobalEnv.called {
+		t.Error("store.DeleteGlobalEnv should not be called for invalid target")
 	}
 }
 

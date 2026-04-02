@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,11 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+)
+
+var (
+	errTargetNotFound = errors.New("target not found")
+	errAmbiguousKey   = errors.New("ambiguous key")
 )
 
 // globalEnvListItem represents an entry in the GET /v1/config/env list response.
@@ -104,7 +110,14 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 		targetStr := r.URL.Query().Get("target")
 		v, err := resolveAmbiguousEntry(entries, targetStr)
 		if err != nil {
-			writeHTTPError(w, http.StatusConflict, "%s", err)
+			switch {
+			case errors.Is(err, errAmbiguousKey):
+				writeHTTPError(w, http.StatusConflict, "%s", err)
+			case errors.Is(err, errTargetNotFound):
+				writeHTTPError(w, http.StatusNotFound, "%s", err)
+			default:
+				writeHTTPError(w, http.StatusBadRequest, "invalid target: %s", err)
+			}
 			return
 		}
 
@@ -259,6 +272,11 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 // If targetStr is provided, the matching entry is returned.
 // If targetStr is empty and exactly one entry exists, that entry is returned.
 // If targetStr is empty and multiple entries exist, an ambiguity error is returned.
+//
+// Errors returned wrap one of:
+//   - parse error from ParseGlobalEnvTarget (invalid target value)
+//   - errTargetNotFound (valid target but not present for this key)
+//   - errAmbiguousKey (multiple targets, no selector provided)
 func resolveAmbiguousEntry(entries []GlobalEnvVar, targetStr string) (GlobalEnvVar, error) {
 	if targetStr != "" {
 		target, err := domaintypes.ParseGlobalEnvTarget(targetStr)
@@ -270,7 +288,7 @@ func resolveAmbiguousEntry(entries []GlobalEnvVar, targetStr string) (GlobalEnvV
 				return e, nil
 			}
 		}
-		return GlobalEnvVar{}, fmt.Errorf("target %q not found for this key", targetStr)
+		return GlobalEnvVar{}, fmt.Errorf("%w: %q", errTargetNotFound, targetStr)
 	}
 
 	if len(entries) == 1 {
@@ -278,8 +296,8 @@ func resolveAmbiguousEntry(entries []GlobalEnvVar, targetStr string) (GlobalEnvV
 	}
 
 	return GlobalEnvVar{}, fmt.Errorf(
-		"ambiguous: key exists for targets %s; specify ?target= to disambiguate",
-		targetList(entries))
+		"%w: exists for targets %s; specify ?target= to disambiguate",
+		errAmbiguousKey, targetList(entries))
 }
 
 // targetList formats entry targets as a comma-separated string for error messages.
