@@ -30,6 +30,10 @@ import (
 // handleMigRunRepo routes `mig run repo <action>` subcommands.
 // Called when args[0] == "repo" in the mig run context.
 func handleMigRunRepo(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printMigRunRepoUsage(stderr)
+		return nil
+	}
 	if len(args) == 0 {
 		printMigRunRepoUsage(stderr)
 		return errors.New("mig run repo action required")

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/lipgloss/v2"
+
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -65,13 +67,8 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	}
 
 	if len(report.Repos) == 0 {
-		var out strings.Builder
-		for _, line := range headerLines {
-			out.WriteString(line)
-			out.WriteByte('\n')
-		}
-		out.WriteString("No repos found in this run.\n")
-		rendered := out.String()
+		block := strings.Join(append(headerLines, "No repos found in this run."), "\n")
+		rendered := lipgloss.NewStyle().Render(block) + "\n"
 		return RunReportTextLayout{
 			Text:            rendered,
 			LineCount:       strings.Count(rendered, "\n"),
@@ -144,7 +141,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 		out.WriteByte('\n')
 	}
 	out.WriteString(frameLayout.Text)
-	rendered := out.String()
+	rendered := lipgloss.NewStyle().Render(out.String())
 
 	dynamicSections := make([]RunReportDynamicSection, len(frameLayout.Sections))
 	headerLineCount := len(headerLines)

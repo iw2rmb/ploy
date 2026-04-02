@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -132,6 +133,9 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	flags, err := parseRunSubmitFlags(args)
 	if err != nil {
 		printRunSubmitUsage(stderr)
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
 
@@ -315,228 +319,65 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		LiveDurations: true,
 	}
 
-	refreshTicker := time.NewTicker(250 * time.Millisecond)
-	defer refreshTicker.Stop()
 	maxRetries := 5
 	if flags.MaxRetries != nil {
 		maxRetries = *flags.MaxRetries
 	}
-	retries := 0
-	spinnerFrame := 0
-
-	renderedLines := 0
-	var previousLayout runs.RunReportTextLayout
-	hasPreviousLayout := false
-	cursorHidden := false
-	defer func() {
-		if cursorHidden {
-			_, _ = fmt.Fprint(stderr, "\x1b[?25h")
+	final, err := runs.FollowRunCommand{
+		Client:       client,
+		BaseURL:      baseURL,
+		RunID:        runID,
+		Output:       stderr,
+		EnableOSC8:   renderOpts.EnableOSC8,
+		AuthToken:    renderOpts.AuthToken,
+		MaxRetries:   maxRetries,
+		PollInterval: time.Second,
+	}.Run(followCtx)
+	if err != nil {
+		cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
+		if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+			if cancelOnCap {
+				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
+				_ = runs.CancelCommand{
+					BaseURL: baseURL,
+					Client:  client,
+					RunID:   runID,
+					Reason:  "cap exceeded",
+					Output:  stderr,
+				}.Run(context.Background())
+			} else {
+				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
+			}
+			return "", nil
 		}
-	}()
+		return "", err
+	}
 
-	for {
-		report, err := runs.GetRunReportCommand{
-			Client:  client,
-			BaseURL: baseURL,
-			RunID:   runID,
-		}.Run(followCtx)
-		if err != nil {
-			// Handle timeout with optional cancellation.
+	if final == "" {
+		if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
 			cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
-			if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-				if cancelOnCap {
-					_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
-					_ = runs.CancelCommand{
-						BaseURL: baseURL,
-						Client:  client,
-						RunID:   runID,
-						Reason:  "cap exceeded",
-						Output:  stderr,
-					}.Run(context.Background())
-				} else {
-					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
-				}
-				return "", nil
+			if cancelOnCap {
+				_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
+				_ = runs.CancelCommand{
+					BaseURL: baseURL,
+					Client:  client,
+					RunID:   runID,
+					Reason:  "cap exceeded",
+					Output:  stderr,
+				}.Run(context.Background())
+			} else {
+				_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
 			}
-			if maxRetries >= 0 && retries >= maxRetries {
-				return "", err
-			}
-			retries++
-			select {
-			case <-followCtx.Done():
-				return "", followCtx.Err()
-			case <-refreshTicker.C:
-				continue
-			}
+			return "", nil
 		}
-		retries = 0
-
-		renderOpts.SpinnerFrame = spinnerFrame
-		renderOpts.Now = time.Now()
-		layout, err := runs.RenderRunReportTextLayout(report, renderOpts)
-		if err != nil {
-			return "", err
-		}
-
-		if !cursorHidden {
-			_, _ = fmt.Fprint(stderr, "\x1b[?25l")
-			cursorHidden = true
-		}
-
-		if !hasPreviousLayout {
-			_, _ = fmt.Fprint(stderr, layout.Text)
-		} else if renderedLines > 0 {
-			_, _ = fmt.Fprintf(stderr, "\x1b[%dA", renderedLines)
-			if !redrawRunReportRowsOnly(stderr, previousLayout, layout) {
-				_, _ = fmt.Fprint(stderr, "\x1b[J")
-				_, _ = fmt.Fprint(stderr, layout.Text)
-			}
-		} else {
-			_, _ = fmt.Fprint(stderr, layout.Text)
-		}
-		renderedLines = layout.LineCount
-		previousLayout = layout
-		hasPreviousLayout = true
-
-		final := deriveRunStateFromReport(report)
-		if final != "" {
-			_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
-			if final != modsapi.RunStateSucceeded {
-				return final, fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
-			}
-			return final, nil
-		}
-		spinnerFrame++
-
-		select {
-		case <-followCtx.Done():
-			cancelOnCap := flags.CancelOnCap != nil && *flags.CancelOnCap
-			if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-				if cancelOnCap {
-					_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting run cancellation...")
-					_ = runs.CancelCommand{
-						BaseURL: baseURL,
-						Client:  client,
-						RunID:   runID,
-						Reason:  "cap exceeded",
-						Output:  stderr,
-					}.Run(context.Background())
-				} else {
-					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; run %s continues running in the background.\n", capDuration.String(), runID)
-				}
-				return "", nil
-			}
-			return "", followCtx.Err()
-		case <-refreshTicker.C:
-		}
-	}
-}
-
-func redrawRunReportRowsOnly(w io.Writer, previous, next runs.RunReportTextLayout) bool {
-	if len(previous.DynamicSections) != len(next.DynamicSections) {
-		return false
-	}
-	nextLines := make([][]string, len(next.DynamicSections))
-	for i, section := range next.DynamicSections {
-		if section.LineCount == 0 {
-			continue
-		}
-		lines := splitFollowSectionLines(section.Text)
-		if len(lines) != section.LineCount {
-			return false
-		}
-		nextLines[i] = lines
+		return "", nil
 	}
 
-	cursorLine := 0
-	lineShift := 0
-	moveCursorTo := func(target int) {
-		if target > cursorLine {
-			_, _ = fmt.Fprintf(w, "\x1b[%dB", target-cursorLine)
-		} else if target < cursorLine {
-			_, _ = fmt.Fprintf(w, "\x1b[%dA", cursorLine-target)
-		}
-		cursorLine = target
+	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
+	if final != modsapi.RunStateSucceeded {
+		return final, fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
 	}
-
-	for i := range previous.DynamicSections {
-		prev := previous.DynamicSections[i]
-		nextSection := next.DynamicSections[i]
-		startLine := prev.StartLine + lineShift
-		moveCursorTo(startLine)
-
-		lineDelta := nextSection.LineCount - prev.LineCount
-		if lineDelta > 0 {
-			_, _ = fmt.Fprintf(w, "\x1b[%dL", lineDelta)
-		} else if lineDelta < 0 {
-			_, _ = fmt.Fprintf(w, "\x1b[%dM", -lineDelta)
-		}
-
-		if nextSection.LineCount > 0 {
-			lines := nextLines[i]
-			for lineIndex, line := range lines {
-				_, _ = fmt.Fprint(w, "\r\x1b[2K")
-				_, _ = fmt.Fprint(w, line)
-				if lineIndex < len(lines)-1 {
-					_, _ = fmt.Fprint(w, "\n")
-					cursorLine++
-				}
-			}
-			cursorLine = startLine + nextSection.LineCount - 1
-		}
-
-		lineShift += lineDelta
-	}
-
-	moveCursorTo(next.LineCount)
-	return true
-}
-
-func splitFollowSectionLines(section string) []string {
-	if section == "" {
-		return nil
-	}
-	lines := strings.Split(section, "\n")
-	if len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return lines
-}
-
-func deriveRunStateFromReport(report runs.RunReport) modsapi.RunState {
-	if len(report.Repos) == 0 {
-		return ""
-	}
-	allSuccess := true
-	allCancelled := true
-	hasFailure := false
-
-	for _, entry := range report.Repos {
-		status := strings.ToLower(strings.TrimSpace(string(entry.Status)))
-		switch status {
-		case "success", "succeeded", "finished":
-			allCancelled = false
-		case "cancelled", "canceled":
-			allSuccess = false
-		case "fail", "failed", "error":
-			hasFailure = true
-			allSuccess = false
-			allCancelled = false
-		default:
-			return ""
-		}
-	}
-
-	if hasFailure {
-		return modsapi.RunStateFailed
-	}
-	if allSuccess {
-		return modsapi.RunStateSucceeded
-	}
-	if allCancelled {
-		return modsapi.RunStateCancelled
-	}
-	return ""
+	return final, nil
 }
 
 func submitSingleRepoRun(ctx context.Context, base *url.URL, httpClient *http.Client, request domainapi.RunSubmitRequest) (domaintypes.RunID, domaintypes.MigID, error) {

@@ -63,6 +63,11 @@ func printNodeAddUsage(w io.Writer) {
 
 // handleNodeAdd validates required flags for adding a worker node.
 func handleNodeAdd(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printNodeAddUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -87,8 +92,7 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 	fs.Var(&sshPort, "ssh-port", "SSH port for node provisioning (default: 22)")
 	fs.BoolVar(&dryRun, "dry-run", false, "Validate inputs without performing provisioning")
 
-	if err := fs.Parse(args); err != nil {
-		printNodeAddUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printNodeAddUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
