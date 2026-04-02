@@ -250,15 +250,14 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 		if msg == "" {
 			msg = normalizeStatus(job.Status.String())
 		}
-		if isGateJobType(job.JobType.String()) {
-			errorKind := "unknown"
-			if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
-				errorKind = normalizeStatus(job.Recovery.ErrorKind)
+			if isGateJobType(job.JobType.String()) {
+				if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
+					errorKind := normalizeStatus(job.Recovery.ErrorKind)
+					msg = errorKind + " " + msg
+				}
 			}
-			msg = errorKind + " " + msg
+			colorizeContent = true
 		}
-		colorizeContent = true
-	}
 
 	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, colorizeContent)
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -162,7 +163,7 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	if model.renderErr != nil {
 		return "", model.renderErr
 	}
-	if model.report != nil {
+	if model.report != nil && !isTTYWriter(c.Output) {
 		opts := model.renderOpts
 		opts.SpinnerFrame = model.spinnerFrame
 		opts.LiveDurations = true
@@ -298,6 +299,28 @@ func DeriveRunStateFromReport(report RunReport) migsapi.RunState {
 	if len(report.Repos) == 0 {
 		return ""
 	}
+	anyJobError := false
+	anyJobFail := false
+	for _, entry := range report.Repos {
+		for _, job := range entry.Jobs {
+			status := strings.ToLower(strings.TrimSpace(string(job.Status)))
+			switch status {
+			case "created", "queued", "running":
+				return ""
+			case "error":
+				anyJobError = true
+			case "fail", "failed":
+				anyJobFail = true
+			}
+		}
+	}
+	if anyJobError {
+		return migsapi.RunStateError
+	}
+	if anyJobFail {
+		return migsapi.RunStateFailed
+	}
+
 	allSuccess := true
 	allCancelled := true
 	hasFailure := false
@@ -331,3 +354,15 @@ func DeriveRunStateFromReport(report RunReport) migsapi.RunState {
 }
 
 var _ tea.Model = followModel{}
+
+func isTTYWriter(w io.Writer) bool {
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (info.Mode() & os.ModeCharDevice) != 0
+}

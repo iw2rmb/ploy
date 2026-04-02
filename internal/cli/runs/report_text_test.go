@@ -209,7 +209,7 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 			notContain: []string{"<code>"},
 		},
 		{
-			name: "defaults unknown error kind for re_gate",
+			name: "omits unknown prefix when recovery kind is absent",
 			job: RunJobEntry{
 				JobID:      domaintypes.NewJobID(),
 				JobType:    "re_gate",
@@ -219,8 +219,8 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 				DurationMs: 1000,
 				BugSummary: "re-gate failed",
 			},
-			contains:   []string{"└  Exit 1: " + colorizeErrorText("unknown re-gate failed")},
-			notContain: []string{"<unknown>"},
+			contains:   []string{"└  Exit 1: " + colorizeErrorText("re-gate failed")},
+			notContain: []string{"<unknown>", "unknown re-gate failed"},
 		},
 		{
 			name: "wraps at 100 symbols",

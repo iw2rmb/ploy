@@ -467,7 +467,7 @@ func executePullDiffs(ctx context.Context, httpClient *http.Client, baseURL *url
 // isTerminalRunState returns true if the run state is terminal.
 func isTerminalRunState(s migsapi.RunState) bool {
 	switch s {
-	case migsapi.RunStateSucceeded, migsapi.RunStateFailed, migsapi.RunStateCancelled:
+	case migsapi.RunStateSucceeded, migsapi.RunStateFailed, migsapi.RunStateError, migsapi.RunStateCancelled:
 		return true
 	}
 	return false
@@ -484,6 +484,8 @@ func mapRunSummaryToRunState(summary domaintypes.RunSummary) (migsapi.RunState, 
 			switch strings.ToLower(strings.TrimSpace(summary.Counts.DerivedStatus)) {
 			case "completed":
 				return migsapi.RunStateSucceeded, nil
+			case "error":
+				return migsapi.RunStateError, nil
 			case "failed":
 				return migsapi.RunStateFailed, nil
 			case "cancelled":

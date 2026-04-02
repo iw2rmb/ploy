@@ -33,6 +33,22 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 			}
 		}
 	}
+	if state.input.Status == domaintypes.JobStatusError {
+		if errMsg := state.input.StatsPayload.ErrorMessage(); errMsg != "" {
+			errText := errMsg
+			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
+				RunID:     state.job.RunID,
+				RepoID:    state.job.RepoID,
+				LastError: &errText,
+			}); updateErr != nil {
+				slog.Error("complete job: failed to set repo last_error from stats.error",
+					"job_id", state.job.ID,
+					"repo_id", state.job.RepoID,
+					"err", updateErr,
+				)
+			}
+		}
+	}
 
 	jobType := domaintypes.JobType(state.job.JobType)
 	if err := jobType.Validate(); err != nil {

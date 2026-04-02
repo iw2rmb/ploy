@@ -37,9 +37,19 @@ type JobStatsPayload struct {
 	// DurationMs is the job execution duration in milliseconds (informational).
 	DurationMs int64 `json:"duration_ms,omitempty"`
 
+	// Error is an optional terminal error summary provided by node runtime.
+	// This is populated for infrastructure/runtime failures where no structured
+	// job_meta is available.
+	Error string `json:"error,omitempty"`
+
 	// JobResources carries per-job container resource consumption metrics.
 	// When present, the handler persists a row in ploy.job_metrics.
 	JobResources *JobResourcesPayload `json:"job_resources,omitempty"`
+}
+
+// ErrorMessage returns the terminal error text from stats.error when present.
+func (p JobStatsPayload) ErrorMessage() string {
+	return strings.TrimSpace(p.Error)
 }
 
 // JobResourcesPayload contains per-job container resource consumption metrics.

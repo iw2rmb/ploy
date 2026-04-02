@@ -30,6 +30,7 @@ const (
 	RunStateRunning    RunState = "running"
 	RunStateSucceeded  RunState = "succeeded"
 	RunStateFailed     RunState = "failed"
+	RunStateError      RunState = "error"
 	RunStateCancelling RunState = "cancelling"
 	RunStateCancelled  RunState = "cancelled"
 )
