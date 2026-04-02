@@ -270,10 +270,12 @@ func TestRun_StaleRecoverySchedulerEnabled(t *testing.T) {
 
 func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
 	entries := []store.ConfigEnv{
-		{Key: "A", Value: "1", Scope: "all", Secret: true},
-		{Key: "B", Value: "2", Scope: "", Secret: false},     // defaults to all
-		{Key: "C", Value: "3", Scope: "mig", Secret: false},  // invalid (typo)
-		{Key: "D", Value: "4", Scope: "migs", Secret: false}, // valid
+		{Key: "A", Target: "server", Value: "1", Secret: true},
+		{Key: "B", Target: "gates", Value: "2", Secret: false},
+		{Key: "C", Target: "mig", Value: "3", Secret: false},   // invalid (old scope value, hard cut)
+		{Key: "D", Target: "steps", Value: "4", Secret: false},  // valid
+		{Key: "E", Target: "", Value: "5", Secret: false},       // empty target rejected
+		{Key: "F", Target: "all", Value: "6", Secret: false},    // old scope value, hard cut
 	}
 
 	got := globalEnvMapFromStoreEntries(entries)
@@ -281,16 +283,22 @@ func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
 		t.Fatalf("globalEnvMapFromStoreEntries() len=%d want 3", len(got))
 	}
 	if _, ok := got["C"]; ok {
-		t.Fatalf("expected invalid-scope entry to be dropped")
+		t.Fatalf("expected invalid-target entry C to be dropped")
 	}
-	if got["A"].Scope != domaintypes.GlobalEnvScopeAll {
-		t.Fatalf("A scope=%q want %q", got["A"].Scope, domaintypes.GlobalEnvScopeAll)
+	if _, ok := got["E"]; ok {
+		t.Fatalf("expected empty-target entry E to be dropped")
 	}
-	if got["B"].Scope != domaintypes.GlobalEnvScopeAll {
-		t.Fatalf("B scope=%q want %q", got["B"].Scope, domaintypes.GlobalEnvScopeAll)
+	if _, ok := got["F"]; ok {
+		t.Fatalf("expected old-scope-value entry F to be dropped")
 	}
-	if got["D"].Scope != domaintypes.GlobalEnvScopeMods {
-		t.Fatalf("D scope=%q want %q", got["D"].Scope, domaintypes.GlobalEnvScopeMods)
+	if got["A"].Target != domaintypes.GlobalEnvTargetServer {
+		t.Fatalf("A target=%q want %q", got["A"].Target, domaintypes.GlobalEnvTargetServer)
+	}
+	if got["B"].Target != domaintypes.GlobalEnvTargetGates {
+		t.Fatalf("B target=%q want %q", got["B"].Target, domaintypes.GlobalEnvTargetGates)
+	}
+	if got["D"].Target != domaintypes.GlobalEnvTargetSteps {
+		t.Fatalf("D target=%q want %q", got["D"].Target, domaintypes.GlobalEnvTargetSteps)
 	}
 }
 

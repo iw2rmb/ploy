@@ -14,9 +14,9 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		specJSON: []byte(`{"env":{"CA_CERTS_PEM_BUNDLE":"per-run-cert","PER_RUN_ONLY":"value"}}`),
 	})
 
-	f.config.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{Value: "global-cert", Scope: domaintypes.GlobalEnvScopeAll, Secret: true})
-	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Scope: domaintypes.GlobalEnvScopeMods, Secret: true})
-	f.config.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Scope: domaintypes.GlobalEnvScopeHeal, Secret: false})
+	f.config.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
+	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
+	f.config.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
 
 	rr := f.serve()
 	assertStatus(t, rr, http.StatusOK)

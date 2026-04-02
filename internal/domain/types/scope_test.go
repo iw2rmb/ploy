@@ -2,87 +2,96 @@ package types
 
 import "testing"
 
-// TestGlobalEnvScope_Validate tests that Validate() correctly accepts known
-// scopes and rejects unknown/empty values.
-func TestGlobalEnvScope_Validate(t *testing.T) {
+// TestGlobalEnvTarget_Validate tests that Validate() correctly accepts known
+// targets and rejects unknown/empty values.
+func TestGlobalEnvTarget_Validate(t *testing.T) {
 	tests := []struct {
 		name    string
-		scope   GlobalEnvScope
+		target  GlobalEnvTarget
 		wantErr bool
 	}{
-		// Valid scopes.
-		{name: "all is valid", scope: GlobalEnvScopeAll, wantErr: false},
-		{name: "migs is valid", scope: GlobalEnvScopeMods, wantErr: false},
-		{name: "heal is valid", scope: GlobalEnvScopeHeal, wantErr: false},
-		{name: "gate is valid", scope: GlobalEnvScopeGate, wantErr: false},
+		// Valid targets.
+		{name: "server is valid", target: GlobalEnvTargetServer, wantErr: false},
+		{name: "nodes is valid", target: GlobalEnvTargetNodes, wantErr: false},
+		{name: "gates is valid", target: GlobalEnvTargetGates, wantErr: false},
+		{name: "steps is valid", target: GlobalEnvTargetSteps, wantErr: false},
 
-		// Valid scopes with surrounding whitespace (should be accepted after normalization).
-		{name: "all with spaces", scope: "  all  ", wantErr: false},
-		{name: "migs with tabs", scope: "\tmigs\t", wantErr: false},
+		// Valid targets with surrounding whitespace (should be accepted after normalization).
+		{name: "server with spaces", target: "  server  ", wantErr: false},
+		{name: "gates with tabs", target: "\tgates\t", wantErr: false},
 
-		// Invalid scopes.
-		{name: "empty string is invalid", scope: "", wantErr: true},
-		{name: "whitespace only is invalid", scope: "   ", wantErr: true},
-		{name: "unknown scope is invalid", scope: "unknown", wantErr: true},
-		{name: "typo mig (not migs) is invalid", scope: "mig", wantErr: true},
-		{name: "typo gates is invalid", scope: "gates", wantErr: true},
-		{name: "mixed case ALL is invalid", scope: "ALL", wantErr: true},
-		{name: "mixed case Migs is invalid", scope: "Migs", wantErr: true},
+		// Invalid targets.
+		{name: "empty string is invalid", target: "", wantErr: true},
+		{name: "whitespace only is invalid", target: "   ", wantErr: true},
+		{name: "unknown target is invalid", target: "unknown", wantErr: true},
+
+		// Old scope values are invalid (hard cut).
+		{name: "old scope all is invalid", target: "all", wantErr: true},
+		{name: "old scope migs is invalid", target: "migs", wantErr: true},
+		{name: "old scope heal is invalid", target: "heal", wantErr: true},
+		{name: "old scope gate is invalid", target: "gate", wantErr: true},
+
+		// Case sensitivity.
+		{name: "mixed case Server is invalid", target: "Server", wantErr: true},
+		{name: "mixed case GATES is invalid", target: "GATES", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.scope.Validate()
+			err := tt.target.Validate()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GlobalEnvScope(%q).Validate() error = %v, wantErr %v",
-					tt.scope, err, tt.wantErr)
+				t.Errorf("GlobalEnvTarget(%q).Validate() error = %v, wantErr %v",
+					tt.target, err, tt.wantErr)
 			}
 		})
 	}
 }
 
-// TestParseGlobalEnvScope tests that ParseGlobalEnvScope correctly parses valid
-// scopes and returns errors for invalid values.
-func TestParseGlobalEnvScope(t *testing.T) {
+// TestParseGlobalEnvTarget tests that ParseGlobalEnvTarget correctly parses valid
+// targets and returns errors for invalid values.
+func TestParseGlobalEnvTarget(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		want      GlobalEnvScope
+		want      GlobalEnvTarget
 		wantErr   bool
 		errSubstr string
 	}{
 		// Valid inputs.
-		{name: "all", input: "all", want: GlobalEnvScopeAll, wantErr: false},
-		{name: "migs", input: "migs", want: GlobalEnvScopeMods, wantErr: false},
-		{name: "heal", input: "heal", want: GlobalEnvScopeHeal, wantErr: false},
-		{name: "gate", input: "gate", want: GlobalEnvScopeGate, wantErr: false},
+		{name: "server", input: "server", want: GlobalEnvTargetServer, wantErr: false},
+		{name: "nodes", input: "nodes", want: GlobalEnvTargetNodes, wantErr: false},
+		{name: "gates", input: "gates", want: GlobalEnvTargetGates, wantErr: false},
+		{name: "steps", input: "steps", want: GlobalEnvTargetSteps, wantErr: false},
 
-		// Empty defaults to "all".
-		{name: "empty defaults to all", input: "", want: GlobalEnvScopeAll, wantErr: false},
-		{name: "whitespace defaults to all", input: "   ", want: GlobalEnvScopeAll, wantErr: false},
+		// Empty is rejected (no default).
+		{name: "empty rejected", input: "", wantErr: true, errSubstr: "target is required"},
+		{name: "whitespace rejected", input: "   ", wantErr: true, errSubstr: "target is required"},
 
 		// Valid with whitespace normalization.
-		{name: "all with spaces", input: "  all  ", want: GlobalEnvScopeAll, wantErr: false},
+		{name: "server with spaces", input: "  server  ", want: GlobalEnvTargetServer, wantErr: false},
+
+		// Old scope values are invalid.
+		{name: "old scope all", input: "all", want: "", wantErr: true, errSubstr: "invalid target"},
+		{name: "old scope migs", input: "migs", want: "", wantErr: true, errSubstr: "invalid target"},
 
 		// Invalid inputs.
-		{name: "unknown scope", input: "unknown", want: "", wantErr: true, errSubstr: "invalid scope"},
-		{name: "typo mig", input: "mig", want: "", wantErr: true, errSubstr: "invalid scope"},
+		{name: "unknown target", input: "unknown", want: "", wantErr: true, errSubstr: "invalid target"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseGlobalEnvScope(tt.input)
+			got, err := ParseGlobalEnvTarget(tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ParseGlobalEnvScope(%q) error = %v, wantErr %v",
+				t.Errorf("ParseGlobalEnvTarget(%q) error = %v, wantErr %v",
 					tt.input, err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr && got != tt.want {
-				t.Errorf("ParseGlobalEnvScope(%q) = %q, want %q", tt.input, got, tt.want)
+				t.Errorf("ParseGlobalEnvTarget(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 			if tt.wantErr && tt.errSubstr != "" && err != nil {
 				if !contains(err.Error(), tt.errSubstr) {
-					t.Errorf("ParseGlobalEnvScope(%q) error = %q, want error containing %q",
+					t.Errorf("ParseGlobalEnvTarget(%q) error = %q, want error containing %q",
 						tt.input, err.Error(), tt.errSubstr)
 				}
 			}
@@ -90,96 +99,90 @@ func TestParseGlobalEnvScope(t *testing.T) {
 	}
 }
 
-// TestGlobalEnvScope_MatchesJobType tests the scope matching logic that determines
-// whether a global env var should be injected based on job type and env var scope.
-func TestGlobalEnvScope_MatchesJobType(t *testing.T) {
+// TestGlobalEnvTarget_MatchesJobType tests the target matching logic that determines
+// whether a global env var should be injected based on job type and env var target.
+func TestGlobalEnvTarget_MatchesJobType(t *testing.T) {
 	tests := []struct {
 		name    string
-		scope   GlobalEnvScope
+		target  GlobalEnvTarget
 		jobType JobType
 		want    bool
 	}{
-		// "all" scope matches every job type.
-		{name: "all matches mig", scope: GlobalEnvScopeAll, jobType: JobTypeMod, want: true},
-		{name: "all matches heal", scope: GlobalEnvScopeAll, jobType: JobTypeHeal, want: true},
-		{name: "all matches pre_gate", scope: GlobalEnvScopeAll, jobType: JobTypePreGate, want: true},
-		{name: "all matches re_gate", scope: GlobalEnvScopeAll, jobType: JobTypeReGate, want: true},
-		{name: "all matches post_gate", scope: GlobalEnvScopeAll, jobType: JobTypePostGate, want: true},
-		{name: "all matches mr", scope: GlobalEnvScopeAll, jobType: JobTypeMR, want: true},
+		// "gates" target matches gate-related jobs.
+		{name: "gates matches pre_gate", target: GlobalEnvTargetGates, jobType: JobTypePreGate, want: true},
+		{name: "gates matches re_gate", target: GlobalEnvTargetGates, jobType: JobTypeReGate, want: true},
+		{name: "gates matches post_gate", target: GlobalEnvTargetGates, jobType: JobTypePostGate, want: true},
+		{name: "gates does not match mig", target: GlobalEnvTargetGates, jobType: JobTypeMod, want: false},
+		{name: "gates does not match heal", target: GlobalEnvTargetGates, jobType: JobTypeHeal, want: false},
+		{name: "gates does not match mr", target: GlobalEnvTargetGates, jobType: JobTypeMR, want: false},
 
-		// "migs" scope matches mig and post_gate jobs.
-		{name: "migs matches mig", scope: GlobalEnvScopeMods, jobType: JobTypeMod, want: true},
-		{name: "migs matches post_gate", scope: GlobalEnvScopeMods, jobType: JobTypePostGate, want: true},
-		{name: "migs does not match heal", scope: GlobalEnvScopeMods, jobType: JobTypeHeal, want: false},
-		{name: "migs does not match pre_gate", scope: GlobalEnvScopeMods, jobType: JobTypePreGate, want: false},
-		{name: "migs does not match re_gate", scope: GlobalEnvScopeMods, jobType: JobTypeReGate, want: false},
-		{name: "migs does not match mr", scope: GlobalEnvScopeMods, jobType: JobTypeMR, want: false},
+		// "steps" target matches step jobs.
+		{name: "steps matches mig", target: GlobalEnvTargetSteps, jobType: JobTypeMod, want: true},
+		{name: "steps matches heal", target: GlobalEnvTargetSteps, jobType: JobTypeHeal, want: true},
+		{name: "steps does not match pre_gate", target: GlobalEnvTargetSteps, jobType: JobTypePreGate, want: false},
+		{name: "steps does not match re_gate", target: GlobalEnvTargetSteps, jobType: JobTypeReGate, want: false},
+		{name: "steps does not match post_gate", target: GlobalEnvTargetSteps, jobType: JobTypePostGate, want: false},
+		{name: "steps does not match mr", target: GlobalEnvTargetSteps, jobType: JobTypeMR, want: false},
 
-		// "heal" scope matches heal and re_gate jobs.
-		{name: "heal matches heal", scope: GlobalEnvScopeHeal, jobType: JobTypeHeal, want: true},
-		{name: "heal matches re_gate", scope: GlobalEnvScopeHeal, jobType: JobTypeReGate, want: true},
-		{name: "heal does not match mig", scope: GlobalEnvScopeHeal, jobType: JobTypeMod, want: false},
-		{name: "heal does not match pre_gate", scope: GlobalEnvScopeHeal, jobType: JobTypePreGate, want: false},
-		{name: "heal does not match post_gate", scope: GlobalEnvScopeHeal, jobType: JobTypePostGate, want: false},
-		{name: "heal does not match mr", scope: GlobalEnvScopeHeal, jobType: JobTypeMR, want: false},
+		// "server" target does not match any job type (not job-routed).
+		{name: "server does not match mig", target: GlobalEnvTargetServer, jobType: JobTypeMod, want: false},
+		{name: "server does not match heal", target: GlobalEnvTargetServer, jobType: JobTypeHeal, want: false},
+		{name: "server does not match pre_gate", target: GlobalEnvTargetServer, jobType: JobTypePreGate, want: false},
 
-		// "gate" scope matches all gate-related jobs.
-		{name: "gate matches pre_gate", scope: GlobalEnvScopeGate, jobType: JobTypePreGate, want: true},
-		{name: "gate matches re_gate", scope: GlobalEnvScopeGate, jobType: JobTypeReGate, want: true},
-		{name: "gate matches post_gate", scope: GlobalEnvScopeGate, jobType: JobTypePostGate, want: true},
-		{name: "gate does not match mig", scope: GlobalEnvScopeGate, jobType: JobTypeMod, want: false},
-		{name: "gate does not match heal", scope: GlobalEnvScopeGate, jobType: JobTypeHeal, want: false},
-		{name: "gate does not match mr", scope: GlobalEnvScopeGate, jobType: JobTypeMR, want: false},
+		// "nodes" target does not match any job type (not job-routed).
+		{name: "nodes does not match mig", target: GlobalEnvTargetNodes, jobType: JobTypeMod, want: false},
+		{name: "nodes does not match heal", target: GlobalEnvTargetNodes, jobType: JobTypeHeal, want: false},
+		{name: "nodes does not match pre_gate", target: GlobalEnvTargetNodes, jobType: JobTypePreGate, want: false},
 
-		// Unknown/empty scopes should not match.
-		{name: "unknown scope does not match", scope: "unknown", jobType: JobTypeMod, want: false},
-		{name: "empty scope does not match", scope: "", jobType: JobTypeMod, want: false},
+		// Unknown/empty targets should not match.
+		{name: "unknown target does not match", target: "unknown", jobType: JobTypeMod, want: false},
+		{name: "empty target does not match", target: "", jobType: JobTypeMod, want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.scope.MatchesJobType(tt.jobType)
+			got := tt.target.MatchesJobType(tt.jobType)
 			if got != tt.want {
-				t.Errorf("GlobalEnvScope(%q).MatchesJobType(%q) = %v, want %v",
-					tt.scope, tt.jobType, got, tt.want)
+				t.Errorf("GlobalEnvTarget(%q).MatchesJobType(%q) = %v, want %v",
+					tt.target, tt.jobType, got, tt.want)
 			}
 		})
 	}
 }
 
-// TestGlobalEnvScope_String tests that String() returns the underlying value.
-func TestGlobalEnvScope_String(t *testing.T) {
+// TestGlobalEnvTarget_String tests that String() returns the underlying value.
+func TestGlobalEnvTarget_String(t *testing.T) {
 	tests := []struct {
-		scope GlobalEnvScope
-		want  string
+		target GlobalEnvTarget
+		want   string
 	}{
-		{GlobalEnvScopeAll, "all"},
-		{GlobalEnvScopeMods, "migs"},
-		{GlobalEnvScopeHeal, "heal"},
-		{GlobalEnvScopeGate, "gate"},
+		{GlobalEnvTargetServer, "server"},
+		{GlobalEnvTargetNodes, "nodes"},
+		{GlobalEnvTargetGates, "gates"},
+		{GlobalEnvTargetSteps, "steps"},
 	}
 	for _, tt := range tests {
-		if got := tt.scope.String(); got != tt.want {
-			t.Errorf("GlobalEnvScope(%q).String() = %q, want %q", tt.scope, got, tt.want)
+		if got := tt.target.String(); got != tt.want {
+			t.Errorf("GlobalEnvTarget(%q).String() = %q, want %q", tt.target, got, tt.want)
 		}
 	}
 }
 
-// TestGlobalEnvScope_IsZero tests that IsZero() correctly identifies empty values.
-func TestGlobalEnvScope_IsZero(t *testing.T) {
+// TestGlobalEnvTarget_IsZero tests that IsZero() correctly identifies empty values.
+func TestGlobalEnvTarget_IsZero(t *testing.T) {
 	tests := []struct {
-		scope GlobalEnvScope
-		want  bool
+		target GlobalEnvTarget
+		want   bool
 	}{
 		{"", true},
 		{"   ", true},
 		{"\t\n", true},
-		{"all", false},
-		{"migs", false},
+		{"server", false},
+		{"gates", false},
 	}
 	for _, tt := range tests {
-		if got := tt.scope.IsZero(); got != tt.want {
-			t.Errorf("GlobalEnvScope(%q).IsZero() = %v, want %v", tt.scope, got, tt.want)
+		if got := tt.target.IsZero(); got != tt.want {
+			t.Errorf("GlobalEnvTarget(%q).IsZero() = %v, want %v", tt.target, got, tt.want)
 		}
 	}
 }

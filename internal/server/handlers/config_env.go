@@ -31,10 +31,10 @@ type globalEnvResponse struct {
 }
 
 // globalEnvPutRequest represents the request body for PUT /v1/config/env/{key}.
-// Scope is parsed and validated at the API boundary using domaintypes.ParseGlobalEnvScope().
+// Scope is parsed and validated at the API boundary using domaintypes.ParseGlobalEnvTarget().
 type globalEnvPutRequest struct {
 	Value  string `json:"value"`
-	Scope  string `json:"scope"`  // Raw string from wire; validated via ParseGlobalEnvScope.
+	Scope  string `json:"scope"`  // Raw string from wire; parsed as target via ParseGlobalEnvTarget.
 	Secret *bool  `json:"secret"` // Pointer to distinguish explicit false from missing (defaults to true).
 }
 
@@ -57,7 +57,7 @@ func listGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 			v := envMap[k]
 			item := globalEnvListItem{
 				Key:    k,
-				Scope:  v.Scope.String(), // Convert typed scope to string for wire format.
+				Scope:  v.Target.String(), // Convert typed scope to string for wire format.
 				Secret: v.Secret,
 			}
 			// Redact value for secrets in list view.
@@ -97,7 +97,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  v.Value,
-			Scope:  v.Scope.String(), // Convert typed scope to string for wire format.
+			Scope:  v.Target.String(), // Convert typed scope to string for wire format.
 			Secret: v.Secret,
 		}
 
@@ -109,7 +109,7 @@ func getGlobalEnvHandler(holder *ConfigHolder) http.HandlerFunc {
 
 		slog.Info("config env get: returned entry",
 			"key", key,
-			"scope", v.Scope.String(),
+			"scope", v.Target.String(),
 			"secret", v.Secret,
 		)
 	}
@@ -131,10 +131,10 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			return
 		}
 
-		// Parse and validate scope at API boundary using typed enum.
-		// ParseGlobalEnvScope handles empty string (defaults to "all") and validates
-		// against known values (all, migs, heal, gate).
-		scope, err := domaintypes.ParseGlobalEnvScope(req.Scope)
+		// Parse and validate target at API boundary using typed enum.
+		// ParseGlobalEnvTarget validates against known values (server, nodes, gates, steps).
+		// Empty values are rejected (no default target).
+		target, err := domaintypes.ParseGlobalEnvTarget(req.Scope)
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
@@ -147,11 +147,10 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		}
 
 		// Persist to the store first (fail-fast if database is down).
-		// Store uses string scope for wire compatibility.
 		if err := st.UpsertGlobalEnv(r.Context(), store.UpsertGlobalEnvParams{
 			Key:    key,
+			Target: target.String(),
 			Value:  req.Value,
-			Scope:  scope.String(), // Convert typed scope to string for database storage.
 			Secret: secret,
 		}); err != nil {
 			slog.Error("config env put: store upsert failed", "err", err, "key", key)
@@ -160,17 +159,16 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 		}
 
 		// Update in-memory holder after successful persistence.
-		// In-memory representation uses typed scope.
 		holder.SetGlobalEnvVar(key, GlobalEnvVar{
 			Value:  req.Value,
-			Scope:  scope, // Use validated typed scope.
+			Target: target,
 			Secret: secret,
 		})
 
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  req.Value,
-			Scope:  scope.String(), // Convert typed scope to string for wire format.
+			Scope:  target.String(),
 			Secret: secret,
 		}
 
@@ -182,7 +180,7 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 
 		slog.Info("config env put: upserted entry",
 			"key", key,
-			"scope", scope.String(),
+			"target", target.String(),
 			"secret", secret,
 		)
 	}
@@ -199,8 +197,16 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 			return
 		}
 
+		// Parse target from query parameter; required for composite key delete.
+		targetStr := r.URL.Query().Get("target")
+		target, err := domaintypes.ParseGlobalEnvTarget(targetStr)
+		if err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			return
+		}
+
 		// Delete from store first (idempotent operation).
-		if err := st.DeleteGlobalEnv(r.Context(), key); err != nil {
+		if err := st.DeleteGlobalEnv(r.Context(), store.DeleteGlobalEnvParams{Key: key, Target: target.String()}); err != nil {
 			slog.Error("config env delete: store delete failed", "err", err, "key", key)
 			writeHTTPError(w, http.StatusInternalServerError, "failed to delete global env: %v", err)
 			return

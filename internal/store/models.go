@@ -54,8 +54,8 @@ type BootstrapToken struct {
 
 type ConfigEnv struct {
 	Key       string             `json:"key"`
+	Target    string             `json:"target"`
 	Value     string             `json:"value"`
-	Scope     string             `json:"scope"`
 	Secret    bool               `json:"secret"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }

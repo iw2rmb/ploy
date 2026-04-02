@@ -55,7 +55,7 @@ func applyGlobalEnvMutator(m map[string]any, env map[string]GlobalEnvVar, jobTyp
 	}
 
 	for k, v := range env {
-		if !v.Scope.MatchesJobType(jobType) {
+		if !v.Target.MatchesJobType(jobType) {
 			continue
 		}
 		if _, exists := em[k]; exists {

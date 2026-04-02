@@ -12,8 +12,8 @@ import (
 // returns all entries sorted by key, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\n...", Scope: domaintypes.GlobalEnvScopeAll, Secret: true},
-		"API_KEY":             {Value: "sk-abc123", Scope: domaintypes.GlobalEnvScopeMods, Secret: false},
+		"CA_CERTS_PEM_BUNDLE": {Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true},
+		"API_KEY":             {Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false},
 	})
 
 	handler := listGlobalEnvHandler(holder)
@@ -47,7 +47,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 // returns full value (including for secrets) for admin access.
 func TestConfigEnvGetReturnsEntry(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"CODEX_AUTH_JSON": {Value: `{"token":"secret"}`, Scope: domaintypes.GlobalEnvScopeMods, Secret: true},
+		"CODEX_AUTH_JSON": {Value: `{"token":"secret"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
 	})
 
 	handler := getGlobalEnvHandler(holder)
@@ -66,8 +66,8 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 	if resp.Value != `{"token":"secret"}` {
 		t.Errorf("Value = %q, want %q", resp.Value, `{"token":"secret"}`)
 	}
-	if resp.Scope != "migs" {
-		t.Errorf("Scope = %q, want %q", resp.Scope, "migs")
+	if resp.Scope != "steps" {
+		t.Errorf("Scope = %q, want %q", resp.Scope, "steps")
 	}
 	if !resp.Secret {
 		t.Errorf("Secret = %v, want true", resp.Secret)
@@ -95,7 +95,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 
 	reqBody := map[string]any{
 		"value":  "-----BEGIN CERTIFICATE-----\n...",
-		"scope":  "all",
+		"scope":  "gates",
 		"secret": true,
 	}
 
@@ -132,7 +132,7 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	// Omit "secret" field — should default to true.
 	reqBody := map[string]any{
 		"value": "test-value",
-		"scope": "migs",
+		"scope": "steps",
 	}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
@@ -150,8 +150,8 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	}
 }
 
-// TestConfigEnvPutInvalidScope verifies that invalid scope values return 400.
-func TestConfigEnvPutInvalidScope(t *testing.T) {
+// TestConfigEnvPutInvalidTarget verifies that invalid target values return 400.
+func TestConfigEnvPutInvalidTarget(t *testing.T) {
 	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), nil)
 
@@ -159,7 +159,7 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 
 	reqBody := map[string]any{
 		"value": "test",
-		"scope": "invalid-scope",
+		"scope": "invalid-target",
 	}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
@@ -168,7 +168,7 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 
 	// Store should not be called.
 	if st.upsertGlobalEnv.called {
-		t.Error("store.UpsertGlobalEnv should not be called for invalid scope")
+		t.Error("store.UpsertGlobalEnv should not be called for invalid target")
 	}
 }
 
@@ -177,12 +177,12 @@ func TestConfigEnvPutInvalidScope(t *testing.T) {
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	st := &configStore{}
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"OLD_KEY": {Value: "old-value", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
+		"OLD_KEY": {Value: "old-value", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)
 
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY", nil, "key", "OLD_KEY")
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY?target=gates", nil, "key", "OLD_KEY")
 
 	assertStatus(t, rr, http.StatusNoContent)
 
@@ -190,8 +190,11 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	if !st.deleteGlobalEnv.called {
 		t.Error("store.DeleteGlobalEnv was not called")
 	}
-	if st.deleteGlobalEnv.params != "OLD_KEY" {
-		t.Errorf("store Key = %q, want %q", st.deleteGlobalEnv.params, "OLD_KEY")
+	if st.deleteGlobalEnv.params.Key != "OLD_KEY" {
+		t.Errorf("store Key = %q, want %q", st.deleteGlobalEnv.params.Key, "OLD_KEY")
+	}
+	if st.deleteGlobalEnv.params.Target != "gates" {
+		t.Errorf("store Target = %q, want %q", st.deleteGlobalEnv.params.Target, "gates")
 	}
 
 	// Verify holder was updated.
@@ -213,21 +216,21 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			name:   "CA bundle",
 			key:    "CA_CERTS_PEM_BUNDLE",
 			value:  "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
-			scope:  "all",
+			scope:  "gates",
 			secret: true,
 		},
 		{
 			name:   "non-secret API key",
 			key:    "PUBLIC_API_KEY",
 			value:  "pk_live_abc123",
-			scope:  "gate",
+			scope:  "steps",
 			secret: false,
 		},
 		{
 			name:   "codex auth JSON",
 			key:    "CODEX_AUTH_JSON",
 			value:  `{"api_key":"sk-...","org_id":"org-123"}`,
-			scope:  "migs",
+			scope:  "server",
 			secret: true,
 		},
 	}
@@ -286,7 +289,7 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 
 	handler := putGlobalEnvHandler(holder, st)
 
-	reqBody := map[string]any{"value": "test", "scope": "all"}
+	reqBody := map[string]any{"value": "test", "scope": "gates"}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST", reqBody, "key", "TEST")
 
@@ -303,12 +306,12 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 	st := &configStore{}
 	st.deleteGlobalEnv.err = errMockDatabase
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string]GlobalEnvVar{
-		"OLD_KEY": {Value: "val", Scope: domaintypes.GlobalEnvScopeAll, Secret: false},
+		"OLD_KEY": {Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
 	})
 
 	handler := deleteGlobalEnvHandler(holder, st)
 
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY", nil, "key", "OLD_KEY")
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/OLD_KEY?target=gates", nil, "key", "OLD_KEY")
 
 	assertStatus(t, rr, http.StatusInternalServerError)
 

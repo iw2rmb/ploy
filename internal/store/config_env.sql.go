@@ -11,31 +11,41 @@ import (
 
 const deleteGlobalEnv = `-- name: DeleteGlobalEnv :exec
 DELETE FROM config_env
-WHERE key = $1
+WHERE key = $1 AND target = $2
 `
 
-// Removes an environment entry by key.
-// No-op if the key does not exist (exec returns no error).
-func (q *Queries) DeleteGlobalEnv(ctx context.Context, key string) error {
-	_, err := q.db.Exec(ctx, deleteGlobalEnv, key)
+type DeleteGlobalEnvParams struct {
+	Key    string `json:"key"`
+	Target string `json:"target"`
+}
+
+// Removes an environment entry by key and target.
+// No-op if the (key, target) pair does not exist (exec returns no error).
+func (q *Queries) DeleteGlobalEnv(ctx context.Context, arg DeleteGlobalEnvParams) error {
+	_, err := q.db.Exec(ctx, deleteGlobalEnv, arg.Key, arg.Target)
 	return err
 }
 
 const getGlobalEnv = `-- name: GetGlobalEnv :one
-SELECT key, value, scope, secret, updated_at
+SELECT key, target, value, secret, updated_at
 FROM config_env
-WHERE key = $1
+WHERE key = $1 AND target = $2
 `
 
-// Retrieves a single environment entry by key.
-// Returns pgx.ErrNoRows if the key does not exist.
-func (q *Queries) GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error) {
-	row := q.db.QueryRow(ctx, getGlobalEnv, key)
+type GetGlobalEnvParams struct {
+	Key    string `json:"key"`
+	Target string `json:"target"`
+}
+
+// Retrieves a single environment entry by key and target.
+// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
+func (q *Queries) GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error) {
+	row := q.db.QueryRow(ctx, getGlobalEnv, arg.Key, arg.Target)
 	var i ConfigEnv
 	err := row.Scan(
 		&i.Key,
+		&i.Target,
 		&i.Value,
-		&i.Scope,
 		&i.Secret,
 		&i.UpdatedAt,
 	)
@@ -44,14 +54,14 @@ func (q *Queries) GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, erro
 
 const listGlobalEnv = `-- name: ListGlobalEnv :many
 
-SELECT key, value, scope, secret, updated_at
+SELECT key, target, value, secret, updated_at
 FROM config_env
-ORDER BY key ASC
+ORDER BY key ASC, target ASC
 `
 
 // config_env.sql — CRUD queries for global environment variables (config_env table).
 // Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
-// Returns all global environment entries, ordered by key for consistent iteration.
+// Returns all global environment entries, ordered by key then target for consistent iteration.
 // Used by ConfigHolder initialization and HTTP list endpoint.
 func (q *Queries) ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error) {
 	rows, err := q.db.Query(ctx, listGlobalEnv)
@@ -64,8 +74,8 @@ func (q *Queries) ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error) {
 		var i ConfigEnv
 		if err := rows.Scan(
 			&i.Key,
+			&i.Target,
 			&i.Value,
-			&i.Scope,
 			&i.Secret,
 			&i.UpdatedAt,
 		); err != nil {
@@ -80,30 +90,29 @@ func (q *Queries) ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error) {
 }
 
 const upsertGlobalEnv = `-- name: UpsertGlobalEnv :exec
-INSERT INTO config_env (key, value, scope, secret, updated_at)
+INSERT INTO config_env (key, target, value, secret, updated_at)
 VALUES ($1, $2, $3, $4, now())
-ON CONFLICT (key) DO UPDATE SET
+ON CONFLICT (key, target) DO UPDATE SET
   value      = EXCLUDED.value,
-  scope      = EXCLUDED.scope,
   secret     = EXCLUDED.secret,
   updated_at = now()
 `
 
 type UpsertGlobalEnvParams struct {
 	Key    string `json:"key"`
+	Target string `json:"target"`
 	Value  string `json:"value"`
-	Scope  string `json:"scope"`
 	Secret bool   `json:"secret"`
 }
 
-// Inserts or updates an environment entry (upsert on primary key 'key').
-// Updates value, scope, secret, and refreshes updated_at on conflict.
+// Inserts or updates an environment entry (upsert on composite key (key, target)).
+// Updates value, secret, and refreshes updated_at on conflict.
 // This ensures idempotent set operations from the CLI or API.
 func (q *Queries) UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error {
 	_, err := q.db.Exec(ctx, upsertGlobalEnv,
 		arg.Key,
+		arg.Target,
 		arg.Value,
-		arg.Scope,
 		arg.Secret,
 	)
 	return err
