@@ -17,7 +17,7 @@ import (
 // GET /v1/migs/{mig_ref}/specs/latest — Get Mig Latest Spec
 // =============================================================================
 
-func TestMods_GetLatestSpec(t *testing.T) {
+func TestMigs_GetLatestSpec(t *testing.T) {
 	specRow := store.Spec{ID: "spec123", Spec: []byte(`{"version":"0.2.0","steps":[{"image":"alpine"}]}`)}
 	migSpecID := specRow.ID
 
@@ -95,7 +95,7 @@ func TestMods_GetLatestSpec(t *testing.T) {
 // POST /v1/migs/{mig_ref}/specs — Set Mig Spec
 // =============================================================================
 
-func TestMods_SetSpec(t *testing.T) {
+func TestMigs_SetSpec(t *testing.T) {
 	activeMig := store.Mig{
 		ID: "mod123", Name: "test-mig",
 		ArchivedAt: pgtype.Timestamptz{Valid: false},
@@ -189,7 +189,7 @@ func TestMods_SetSpec(t *testing.T) {
 	}
 }
 
-func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
+func TestMigs_SetSpec_RepeatedCalls(t *testing.T) {
 	st := &migStore{
 		getModResult: store.Mig{
 			ID: "mod123", Name: "test-mig",
@@ -218,4 +218,3 @@ func TestMods_SetSpec_RepeatedCalls(t *testing.T) {
 		t.Error("repeated calls should produce different spec IDs")
 	}
 }
-

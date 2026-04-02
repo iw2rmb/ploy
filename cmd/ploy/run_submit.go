@@ -465,7 +465,7 @@ func loadSpec(ctx context.Context, base *url.URL, client *http.Client, path stri
 
 	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/env_from_file/tmp_bundle),
 	// then validate with the canonical parser to catch structural issues early.
-	return normalizeModsSpecToJSON(ctx, base, client, data)
+	return normalizeMigsSpecToJSON(ctx, base, client, data)
 }
 
 func outputRunSubmitJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *runSubmitFlags) error {

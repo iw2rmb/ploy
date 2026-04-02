@@ -6,10 +6,10 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Package api defines the Mods run and stage types shared by the CLI,
+// Package api defines the Migs run and stage types shared by the CLI,
 // control plane (/v1/runs + /v1/migs/{id}*) and SSE hub. JSON tags mirror the wire shape.
 
-// StageState mirrors Mods stage lifecycle states exposed over the API.
+// StageState mirrors Migs stage lifecycle states exposed over the API.
 type StageState string
 
 const (
@@ -22,7 +22,7 @@ const (
 	StageStateCancelled  StageState = "cancelled"
 )
 
-// RunState mirrors Mods run lifecycle states exposed over the API.
+// RunState mirrors Migs run lifecycle states exposed over the API.
 type RunState string
 
 const (
@@ -69,7 +69,7 @@ type StageStatus struct {
 	NextID *domaintypes.JobID `json:"next_id,omitempty"`
 }
 
-// StageMetadata captures job-level metadata for Mods runs.
+// StageMetadata captures job-level metadata for Migs runs.
 // It mirrors information exposed via GET /v1/runs/{id}/status and is derived from
 // jobs and related artifacts rather than being tied to a specific storage
 // layout for jobs.meta JSONB.

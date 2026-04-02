@@ -197,7 +197,7 @@ from `amata.set`. `CODEX_PROMPT` is not required in this mode.
 
 ```yaml
 router:
-  image: docker.io/user/codex:latest
+  image: ghcr.io/iw2rmb/ploy/codex:latest
   amata:
     spec: |
       version: amata/v1

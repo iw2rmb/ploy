@@ -195,7 +195,7 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 	}
 }
 
-func TestModsCommandsErrorPaths(t *testing.T) {
+func TestMigsCommandsErrorPaths(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	runIDStr := runID.String()
 

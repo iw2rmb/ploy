@@ -8,7 +8,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestJSONRoundTrip ensures typed IDs in the Mods API marshal/unmarshal as JSON strings.
+// TestJSONRoundTrip ensures typed IDs in the Migs API marshal/unmarshal as JSON strings.
 // Verifies that RunSummary.RunID marshals as "run_id" in JSON for wire compatibility.
 func TestJSONRoundTrip(t *testing.T) {
 	runID := domaintypes.NewRunID()

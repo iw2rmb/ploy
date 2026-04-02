@@ -19,7 +19,7 @@ import (
 // POST /v1/migs — Create Mig
 // =============================================================================
 
-func TestMods_Create(t *testing.T) {
+func TestMigs_Create(t *testing.T) {
 	tests := []struct {
 		name        string
 		store       *migStore
@@ -104,7 +104,7 @@ func TestMods_Create(t *testing.T) {
 // GET /v1/migs — List Migs
 // =============================================================================
 
-func TestMods_List(t *testing.T) {
+func TestMigs_List(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
@@ -241,7 +241,9 @@ func TestMods_List(t *testing.T) {
 			wantStatus: http.StatusOK,
 			verify: func(t *testing.T, _ *migStore, rr *httptest.ResponseRecorder) {
 				t.Helper()
-				type migItem struct{ ID string `json:"id"` }
+				type migItem struct {
+					ID string `json:"id"`
+				}
 				resp := decodeBody[struct{ Migs []migItem }](t, rr)
 				if len(resp.Migs) != 1 {
 					t.Fatalf("got %d migs, want 1", len(resp.Migs))
@@ -297,7 +299,7 @@ func TestMods_List(t *testing.T) {
 // DELETE /v1/migs/{mig_ref} — Delete Mig
 // =============================================================================
 
-func TestMods_Delete(t *testing.T) {
+func TestMigs_Delete(t *testing.T) {
 	tests := []struct {
 		name       string
 		store      *migStore

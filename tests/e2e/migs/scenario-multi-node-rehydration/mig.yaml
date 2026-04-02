@@ -1,6 +1,6 @@
-# E2E scenario: Multi-step, multi-node Mods run with rehydration validation
+# E2E scenario: Multi-step, multi-node Migs run with rehydration validation
 #
-# This spec tests the complete multi-node execution flow for multi-step Mods runs,
+# This spec tests the complete multi-node execution flow for multi-step Migs runs,
 # validating that:
 # 1. Each step can execute on a different node (scheduler assigns steps independently)
 # 2. Rehydration works correctly (base clone + ordered diff chain)

@@ -60,7 +60,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	// that encapsulate command hierarchy and preserve existing business logic.
 	// Each builder function creates a cobra command tree with proper subcommand structure.
 
-	// Mods workflow commands
+	// Migs workflow commands
 	root.AddCommand(newMigCmd(stderr))  // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
 	root.AddCommand(newRunCmd(stderr))  // ploy run (events, inspect)
 	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)

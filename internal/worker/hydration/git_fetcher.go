@@ -29,7 +29,7 @@ type GitFetcherOptions struct {
 // The fetcher uses git shallow clones (--depth 1) to create the logical "base snapshot"
 // for each run on each node. This strategy minimizes network transfer and disk usage
 // while providing a consistent starting point for applying per-step diffs during
-// multi-step Mods runs.
+// multi-step Migs runs.
 //
 // The base snapshot is determined by:
 //  1. base_ref (if provided): Clones the specified branch/tag as the base.
@@ -65,7 +65,7 @@ func NewGitFetcher(opts GitFetcherOptions) (GitFetcher, error) {
 // copied to the destination workspace, avoiding repeated network fetches.
 //
 // The resulting clone serves as the logical "base snapshot" that nodes use
-// for applying ordered per-step diffs during multi-step Mods runs. Each node
+// for applying ordered per-step diffs during multi-step Migs runs. Each node
 // performs this clone independently, ensuring consistent base states across
 // distributed execution.
 //

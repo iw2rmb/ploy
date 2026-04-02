@@ -1,6 +1,6 @@
-**Mods E2E (Java 11→17) — Ploy Next**
+**Migs E2E (Java 11→17) — Ploy Next**
 
-- Goal: Recreate the historic Mods E2E using the current Ploy implementation (own job orchestration + integrated Build Gate) and the original sample repo ploy-orw-java11-maven. Two scenarios:
+- Goal: Recreate the historic Migs E2E using the current Ploy implementation (own job orchestration + integrated Build Gate) and the original sample repo ploy-orw-java11-maven. Two scenarios:
   - OpenRewrite apply upgrades Java 11→17 and Build Gate passes.
   - Same apply, but first Build Gate fails which triggers a healing loop (Codex-based healer) before Build Gate re-runs.
 
@@ -15,9 +15,9 @@
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
-**Build + Publish Mods Images (Local Registry)**
+**Build + Publish Migs Images (Local Registry)**
 
-- Build Mods images (requires Docker):
+- Build Migs images (requires Docker):
   - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
   - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
   - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f images/codex/Dockerfile -t codex:e2e .`
@@ -35,7 +35,7 @@ Notes:
 - ORW runtime isolation contract: OpenRewrite runs through `orw-cli` only; `transform.log` must not contain `rewriteRun` or `rewrite-maven-plugin:run`.
 
 See also:
-- `docs/how-to/publish-migs.md` for end-to-end Mods image publishing via CLI.
+- `docs/how-to/publish-migs.md` for end-to-end Migs image publishing via CLI.
 
 **Sample Repository**
 
@@ -109,7 +109,7 @@ Healing verification uses the same repo+diff semantics as the unified jobs-based
 - **Initial workspace**: The Build Gate validates code cloned from `repo_url+ref`.
 - **Healing modifications**: Healing migs modify the workspace in-place. Changes accumulate as diffs on top of the repo baseline.
 - **Re-gate verification**: After healing, the gate re-runs against `workspace = repo_url+ref + healing changes` using the local Docker gate executor (no HTTP Build Gate API call).
-- **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
+- **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Migs multi-step execution where each step's changes can be replayed for rehydration.
 
 **Codex Healing Handshake (workspace diff):**
 
@@ -150,7 +150,7 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
 
 **Environment variables injected by the node agent for healing migs:**
-- `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
+- `PLOY_REPO_URL` — Git repository URL (same as the Migs run)
 - `PLOY_BUILDGATE_REF` — Git ref for Build Gate baseline (base_ref or commit_sha)
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
 - `PLOY_SERVER_URL` — ploy control plane base URL
@@ -292,7 +292,7 @@ This makes gate health visible without requiring raw artifact inspection.
 
 **Multi-Step, Multi-Node Rehydration Scenario**
 
-E2E validation for multi-step Mods runs with multi-node execution and workspace rehydration:
+E2E validation for multi-step Migs runs with multi-node execution and workspace rehydration:
   - `bash tests/e2e/migs/scenario-multi-node-rehydration/run.sh`
 
 This scenario validates:
@@ -375,7 +375,7 @@ SKIP_ARTIFACTS=1 bash tests/e2e/migs/scenario-stack-aware-images/run.sh
 
 - Historic E2E assets from prior implementations are found in repo history under `tests/e2e/migs/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
   - `internal/workflow/contracts/` — Step manifest shapes and validation.
-  - `internal/workflow/runner/job_templates.go` — Mods image bindings for lanes.
+  - `internal/workflow/runner/job_templates.go` — Migs image bindings for lanes.
   - `internal/workflow/runner/healing.go` — Healing flow appended after Build Gate failures.
   - `internal/nodeagent/execution.go` — Workspace rehydration implementation (base clone + diff chain).
   - `internal/nodeagent/execution_rehydrate_test.go` — Unit tests for rehydration logic.

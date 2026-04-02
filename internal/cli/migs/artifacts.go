@@ -15,7 +15,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-// ArtifactsCommand lists artifacts attached to a Mods run by stage.
+// ArtifactsCommand lists artifacts attached to a Migs run by stage.
 type ArtifactsCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

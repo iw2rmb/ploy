@@ -1,4 +1,4 @@
-// mod_pull.go implements the `ploy mig pull` subcommand for pulling Mods diffs
+// mod_pull.go implements the `ploy mig pull` subcommand for pulling Migs diffs
 // into the current git worktree based on mig project context.
 //
 // Command structure:
@@ -202,7 +202,7 @@ func handleMigPull(args []string, stderr io.Writer) error {
 
 	// Step 11: Handle --dry-run mode.
 	if *dryRun {
-		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Mods diff(s)\n",
+		_, _ = fmt.Fprintf(stderr, "\nWould create branch %q at %q (origin %q) and apply %d Migs diff(s)\n",
 			targetRef, baseRef, *origin, len(diffs))
 		for i, diff := range diffs {
 			_, _ = fmt.Fprintf(stderr, "  diff %d: %s (%d bytes gzipped)\n",
@@ -223,7 +223,7 @@ func handleMigPull(args []string, stderr io.Writer) error {
 	}
 
 	// Success message.
-	_, _ = fmt.Fprintf(stderr, "\nApplied %d Mods diff(s) from run %s to branch %q (origin %q)\n",
+	_, _ = fmt.Fprintf(stderr, "\nApplied %d Migs diff(s) from run %s to branch %q (origin %q)\n",
 		appliedCount, resolution.RunID, targetRef, *origin)
 	_, _ = fmt.Fprintf(stderr, "  mig: %s\n", modID)
 
@@ -265,7 +265,7 @@ func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 
 	// Parse the response.
 	var result struct {
-		Mods []struct {
+		Migs []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"migs"`
@@ -276,17 +276,17 @@ func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 	}
 
 	// Handle results based on number of matches.
-	switch len(result.Mods) {
+	switch len(result.Migs) {
 	case 0:
 		return "", fmt.Errorf("no migs found that include repo %s", repoURL)
 	case 1:
-		mig := result.Mods[0]
+		mig := result.Migs[0]
 		_, _ = fmt.Fprintf(stderr, "mig pull: inferred mig %q (%s) from repo\n", mig.Name, mig.ID)
 		return mig.ID, nil
 	default:
 		// Multiple migs match — error with list.
 		_, _ = fmt.Fprintf(stderr, "mig pull: multiple migs include this repo:\n")
-		for _, mig := range result.Mods {
+		for _, mig := range result.Migs {
 			_, _ = fmt.Fprintf(stderr, "  - %s (%s)\n", mig.Name, mig.ID)
 		}
 		return "", errors.New("multiple migs match; specify a mig ID or name explicitly")
@@ -297,7 +297,7 @@ func inferModFromRepo(ctx context.Context, httpClient *http.Client, baseURL *url
 func printMigPullUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mig pull [--origin <remote>] [--dry-run] [--last-failed | --last-succeeded] [<mig-id|name>]")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Pulls Mods diffs from a mig's latest run into the current git repository.")
+	_, _ = fmt.Fprintln(w, "Pulls Migs diffs from a mig's latest run into the current git repository.")
 	_, _ = fmt.Fprintln(w, "Creates a new branch at the run's base commit and applies stored diffs.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use this command when you want to pull from a mig's latest run.")

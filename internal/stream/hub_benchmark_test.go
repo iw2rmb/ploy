@@ -13,7 +13,7 @@ import (
 // =============================================================================
 // These tests validate that enriched log payloads (with node_id, job_id,
 // job_type, next_id) do not regress performance or resilience for
-// long-running or chatty Mods runs.
+// long-running or chatty Migs runs.
 // Stress test: validate performance and resilience with enriched logs.
 
 // BenchmarkHubPublishEnrichedLog measures the throughput of publishing enriched
@@ -64,7 +64,7 @@ func BenchmarkHubPublishMinimalLog(b *testing.B) {
 }
 
 // BenchmarkHubConcurrentPublishEnrichedLog measures throughput under concurrent
-// publisher load. This simulates chatty Mods runs with multiple concurrent
+// publisher load. This simulates chatty Migs runs with multiple concurrent
 // log sources publishing enriched records.
 func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 	hub := NewHub(Options{BufferSize: 256, HistorySize: 1024})
@@ -93,7 +93,7 @@ func BenchmarkHubConcurrentPublishEnrichedLog(b *testing.B) {
 
 // TestHubHighVolumeEnrichedLogs verifies that the hub remains stable under
 // sustained high-volume publishing of enriched log records. This simulates
-// long-running Mods runs with chatty output. The test uses concurrent
+// long-running Migs runs with chatty output. The test uses concurrent
 // consumers to actively drain events while publishing continues.
 func TestHubHighVolumeEnrichedLogs(t *testing.T) {
 	t.Parallel()

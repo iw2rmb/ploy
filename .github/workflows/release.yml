@@ -106,7 +106,7 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
           PUSH_LATEST: "1"
-        run: ./deploy/images/build-and-push-core.sh
+        run: ./images/build-and-push-core.sh
 
       - name: Clean dist directory
         run: rm -rf dist

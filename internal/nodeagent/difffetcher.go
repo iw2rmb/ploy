@@ -15,7 +15,7 @@ import (
 
 // DiffFetcher fetches diffs from the control-plane server.
 // This is the symmetric counterpart to DiffUploader, enabling nodes to download
-// gzipped patches for workspace rehydration during multi-step Mods runs.
+// gzipped patches for workspace rehydration during multi-step Migs runs.
 //
 // The fetcher lists all diffs for a run/repo and lets callers apply deterministic
 // ordering rules for rehydration.

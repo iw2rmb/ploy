@@ -41,7 +41,7 @@ func mustRun(t *testing.T, name string, args ...string) (string, string) {
 
 func buildMigCodexImage(t *testing.T, repoRoot, imageTag string) {
 	t.Helper()
-	dockerfile := filepath.Join(repoRoot, "deploy", "images", "codex", "Dockerfile")
+	dockerfile := filepath.Join(repoRoot, "images", "codex", "Dockerfile")
 	_, _ = mustRun(t, "docker", "build", "-t", imageTag, "-f", dockerfile, repoRoot)
 }
 

@@ -1,4 +1,4 @@
-// Package migs provides CLI client implementations for Mods operations.
+// Package migs provides CLI client implementations for Migs operations.
 // This file implements mig project management commands (add, list, remove, archive, unarchive).
 //
 // These commands call the server endpoints:

@@ -49,7 +49,7 @@ materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest (when provided),
 publishes checkpoints for every stage transition (including lane cache keys),
 executes migs/build/test against a temporary workspace, and cleans up before
-exit. Mods planner hints (`--migs-plan-timeout`, `--migs-max-parallel`)
+exit. Migs planner hints (`--migs-plan-timeout`, `--migs-max-parallel`)
 flow into stage metadata so the control plane can respect concurrency/timebox controls.
 
 When `--follow` is set, the CLI displays a summarized per-repo job graph that
@@ -59,7 +59,7 @@ Note: `--follow` does not stream container logs. Use `ploy run logs <run-id>` fo
 
 `--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
 build-gate fails with a retryable outcome the runner collects the failure
-metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
+metadata, re-plans a healing branch using the Migs planner, and appends `#healN`
 stages before continuing to static checks and tests.
 
 When a followed run completes successfully, pass `--artifact-dir <dir>` to
@@ -189,15 +189,15 @@ ploy mig run repo remove \
 
 See `docs/migs-lifecycle.md` for the relationship between runs, `run_repos`, and jobs.
 
-### Pull Mods Changes Locally
+### Pull Migs Changes Locally
 
-After a run completes, you can pull the Mods-generated changes into your local
+After a run completes, you can pull the Migs-generated changes into your local
 repository using either `ploy run pull <run-id>` (run-based) or `ploy mig pull` (mig-based).
-These commands reconstruct the Mods branch locally by fetching stored diffs from the
+These commands reconstruct the Migs branch locally by fetching stored diffs from the
 control plane and applying them to a new branch.
 
 ```bash
-# From a repo that participated in a Mods run:
+# From a repo that participated in a Migs run:
 cd service-a
 
 # Run-based pull (you know the run_id):
@@ -213,7 +213,7 @@ ploy mig pull <mig-id|name>
 3. Resolves `(run_id, repo_id)` via `POST /v1/runs/{run_id}/pull` (or `POST /v1/migs/{mod_id}/pull` for mig-based pull).
 4. Fetches the run's `base_ref` from the origin remote (`git fetch <origin> <base_ref> --depth=1`).
 5. Creates a new branch at the fetched commit using the run's `target_ref`.
-6. Downloads and applies all stored Mods diffs via `git apply`.
+6. Downloads and applies all stored Migs diffs via `git apply`.
 
 **Arguments:**
 - `<run-id>` — Run ID (KSUID string), for `ploy run pull`.
@@ -402,10 +402,10 @@ ploy completion <shell> --help
   GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Mods stages execute.
-- `--migs-plan-timeout` — Duration string passed to the Mods planner to timebox
+  — Repository materialisation inputs consumed by `mig run`. Allowed `--repo-url` schemes: `https://`, `ssh://`, `file://`. When `--repo-url` is provided, `--repo-base-ref` selects the base branch (commonly `main`). `--repo-target-ref` is optional; when omitted, the node derives a default of `ploy/{run_name|run_id}` (using the run name when set or the run ID, a KSUID string, otherwise) for workspace context and MR source branch. The workspace hint creates an auxiliary directory (e.g. `migs/java`) before Migs stages execute.
+- `--migs-plan-timeout` — Duration string passed to the Migs planner to timebox
   plan evaluation (`mig run`).
-- `--migs-max-parallel` — Upper bound on concurrent Mods stages emitted by the
+- `--migs-max-parallel` — Upper bound on concurrent Migs stages emitted by the
   planner (`mig run`).
 - `--artifact-dir` — Download final artifacts to the given directory after a
   successful run (`mig run --follow`). A `manifest.json` file is created with
@@ -595,7 +595,7 @@ repair of build failures using tools like Codex or other LLM-based workflows.
    and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
 
 **Execution path:**
-Gate and healing steps are executed by the same nodeagent process that runs Mods jobs. Gate
+Gate and healing steps are executed by the same nodeagent process that runs Migs jobs. Gate
 jobs are regular jobs in the unified queue; there is no separate HTTP Build Gate worker
 mode and no `buildgate_worker_enabled` toggle.
 
@@ -665,7 +665,7 @@ for end-to-end usage with `codex`.
 
 ## Job Graph and DAG State
 
-Mods runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
+Migs runs execute as a directed acyclic graph (DAG) of jobs. The graph structure
 surfaces via `GET /v1/runs/{id}/status` in `RunSummary.stages` and through the
 Run status includes a `stages` map. Each job has a `next_id` for execution ordering
 and optional metadata identifying the job phase.

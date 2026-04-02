@@ -42,7 +42,7 @@ func (o *Options) normalize() {
 // LogRecord represents a structured log frame.
 // The enriched fields (NodeID, JobID, JobType) provide execution
 // context so clients can correlate log lines with specific nodes, jobs, and
-// Mods pipeline stages. These fields are optional — older or internal-only
+// Migs pipeline stages. These fields are optional — older or internal-only
 // log sources may omit them.
 // Uses domain types (NodeID, JobID, JobType) for type-safe identification.
 type LogRecord struct {

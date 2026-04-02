@@ -15,9 +15,9 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-// SubmitCommand submits a Mods run to the control plane.
+// SubmitCommand submits a Migs run to the control plane.
 // The command submits a single-repo run via POST /v1/runs, then fetches the
-// canonical Mods-style RunSummary via GET /v1/runs/{id}/status for display.
+// canonical Migs-style RunSummary via GET /v1/runs/{id}/status for display.
 type SubmitCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL

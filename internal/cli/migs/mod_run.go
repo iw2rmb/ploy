@@ -1,4 +1,4 @@
-// Package migs provides CLI client implementations for Mods operations.
+// Package migs provides CLI client implementations for Migs operations.
 // This file implements the mig run command for creating runs from a mig project.
 //
 // This command calls POST /v1/migs/{mod_id}/runs with repo selection.

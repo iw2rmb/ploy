@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# E2E scenario: Multi-step, multi-node Mods run with rehydration validation
+# E2E scenario: Multi-step, multi-node Migs run with rehydration validation
 #
-# This script validates the complete multi-node execution flow for multi-step Mods runs.
+# This script validates the complete multi-node execution flow for multi-step Migs runs.
 # It submits a three-step Java migration workflow and validates that:
 # - Steps can execute on different nodes (when multi-node cluster is available)
 # - Rehydration works correctly (base clone + ordered diff application)
@@ -32,7 +32,7 @@ set -euo pipefail
 
 # Default to the local Docker cluster descriptor written by ploy cluster deploy.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy/local}"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
