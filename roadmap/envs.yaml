@@ -112,7 +112,7 @@ items:
     reasoning: high
     cfp: 12
     commit: 06cea975
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Introduce shared materializer contract for special env keys while keeping default behavior as plain env passthrough.\" is only partially implemented in `internal/workflow/step/gate_command_materializer.go:10-23`: `EnvMaterializer`/`MaterializerForKey` are defined, but `envMaterializerPreamble` is hardcoded to `ployCAcertsPreamble()` and does not compose from the shared contract, so the materializer mechanism is not actually extensible through a single shared registration path."]
         commit: 0b83e1eb
