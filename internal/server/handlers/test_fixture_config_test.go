@@ -15,7 +15,7 @@ type configStore struct {
 	listGlobalEnv   mockResult[[]store.ConfigEnv]
 	getGlobalEnv    mockResult[store.ConfigEnv]
 	upsertGlobalEnv mockCall[store.UpsertGlobalEnvParams, struct{}]
-	deleteGlobalEnv mockCall[string, struct{}]
+	deleteGlobalEnv mockCall[store.DeleteGlobalEnvParams, struct{}]
 
 	// Spec Bundles
 	createSpecBundle mockCall[store.CreateSpecBundleParams, store.SpecBundle]
@@ -38,7 +38,7 @@ func (m *configStore) ListGlobalEnv(ctx context.Context) ([]store.ConfigEnv, err
 	return m.listGlobalEnv.ret()
 }
 
-func (m *configStore) GetGlobalEnv(ctx context.Context, key string) (store.ConfigEnv, error) {
+func (m *configStore) GetGlobalEnv(ctx context.Context, arg store.GetGlobalEnvParams) (store.ConfigEnv, error) {
 	return m.getGlobalEnv.ret()
 }
 
@@ -47,8 +47,8 @@ func (m *configStore) UpsertGlobalEnv(ctx context.Context, params store.UpsertGl
 	return err
 }
 
-func (m *configStore) DeleteGlobalEnv(ctx context.Context, key string) error {
-	_, err := m.deleteGlobalEnv.record(key)
+func (m *configStore) DeleteGlobalEnv(ctx context.Context, arg store.DeleteGlobalEnvParams) error {
+	_, err := m.deleteGlobalEnv.record(arg)
 	return err
 }
 

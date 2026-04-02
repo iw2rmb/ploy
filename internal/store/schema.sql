@@ -463,18 +463,21 @@ CREATE INDEX IF NOT EXISTS bootstrap_tokens_token_id_idx ON bootstrap_tokens(tok
 
 -- Global Environment Variables (config_env)
 -- Stores global environment entries (including secrets) for injection into jobs.
--- scope controls which job types receive the env var (migs, heal, gate, all).
+-- target controls which component or job types receive the env var (server, nodes, gates, steps).
 -- The secret flag indicates whether the value should be redacted at the CLI/HTTP layer.
--- Primary key on 'key' ensures uniqueness; upsert semantics for updates.
+-- Composite primary key on (key, target) allows one key to have multiple target rows.
+-- Hard-cut migration: drop old scope-based table to recreate with target column and composite PK.
+DROP TABLE IF EXISTS config_env;
 CREATE TABLE IF NOT EXISTS config_env (
-  key         TEXT PRIMARY KEY,                           -- Environment variable name (e.g., CA_CERTS_PEM_BUNDLE)
+  key         TEXT NOT NULL,                              -- Environment variable name (e.g., CA_CERTS_PEM_BUNDLE)
+  target      TEXT NOT NULL,                              -- Injection target: 'server', 'nodes', 'gates', 'steps'
   value       TEXT NOT NULL,                              -- Environment variable value (may be large, e.g., PEM bundles)
-  scope       TEXT NOT NULL,                              -- Selection scope: 'migs', 'heal', 'gate', 'all'
   secret      BOOLEAN NOT NULL DEFAULT TRUE,              -- If true, value is redacted in list views
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()          -- Last modification timestamp
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),         -- Last modification timestamp
+  PRIMARY KEY (key, target)
 );
--- Index for listing by scope (useful for job claim filtering).
-CREATE INDEX IF NOT EXISTS config_env_scope_idx ON config_env(scope);
+-- Index for listing by target (useful for job claim filtering).
+CREATE INDEX IF NOT EXISTS config_env_target_idx ON config_env(target);
 
 -- Spec bundles (pre-uploaded tar archives referenced by spec tmp_bundle fields)
 -- One row per uploaded bundle; id becomes the bundle_id in TmpBundleRef.

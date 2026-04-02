@@ -135,7 +135,11 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		}
 	}
 	// Convert store entries to ConfigHolder's in-memory map.
-	// Parse scope strings from database into typed GlobalEnvScope values.
+	// Parse target strings from database into typed GlobalEnvTarget values.
+	// Note: with composite key (key, target), multiple entries can share the same
+	// key with different targets. The flat map uses last-target-wins ordering
+	// (entries are sorted by key ASC, target ASC). Step 2/4 will rebuild
+	// ConfigHolder for multi-target support.
 	globalEnvMap := globalEnvMapFromStoreEntries(globalEnvEntries)
 	slog.Info("loaded global env entries from store", "count", len(globalEnvMap))
 
@@ -206,20 +210,19 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 func globalEnvMapFromStoreEntries(entries []store.ConfigEnv) map[string]handlers.GlobalEnvVar {
 	globalEnvMap := make(map[string]handlers.GlobalEnvVar, len(entries))
 	for _, e := range entries {
-		// Parse scope from database; empty defaults to "all".
-		// Invalid scopes are dropped to avoid injecting env vars under an unintended scope.
-		scope, err := domaintypes.ParseGlobalEnvScope(e.Scope)
+		// Parse target from database; empty or invalid targets are dropped.
+		target, err := domaintypes.ParseGlobalEnvTarget(e.Target)
 		if err != nil {
-			slog.Warn("invalid scope in stored global env, dropping entry",
+			slog.Warn("invalid target in stored global env, dropping entry",
 				"key", e.Key,
-				"scope", e.Scope,
+				"target", e.Target,
 				"err", err,
 			)
 			continue
 		}
 		globalEnvMap[e.Key] = handlers.GlobalEnvVar{
 			Value:  e.Value,
-			Scope:  scope,
+			Target: target,
 			Secret: e.Secret,
 		}
 	}

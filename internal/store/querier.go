@@ -88,9 +88,9 @@ type Querier interface {
 	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredLogs removes log rows older than the specified timestamp.
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
-	// Removes an environment entry by key.
-	// No-op if the key does not exist (exec returns no error).
-	DeleteGlobalEnv(ctx context.Context, key string) error
+	// Removes an environment entry by key and target.
+	// No-op if the (key, target) pair does not exist (exec returns no error).
+	DeleteGlobalEnv(ctx context.Context, arg DeleteGlobalEnvParams) error
 	DeleteJob(ctx context.Context, id types.JobID) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
@@ -113,9 +113,9 @@ type Querier interface {
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetExactGateProfile(ctx context.Context, arg GetExactGateProfileParams) (GetExactGateProfileRow, error)
-	// Retrieves a single environment entry by key.
-	// Returns pgx.ErrNoRows if the key does not exist.
-	GetGlobalEnv(ctx context.Context, key string) (ConfigEnv, error)
+	// Retrieves a single environment entry by key and target.
+	// Returns pgx.ErrNoRows if the (key, target) pair does not exist.
+	GetGlobalEnv(ctx context.Context, arg GetGlobalEnvParams) (ConfigEnv, error)
 	GetJob(ctx context.Context, id types.JobID) (Job, error)
 	GetLatestDiffByJob(ctx context.Context, jobID *types.JobID) (Diff, error)
 	GetLatestRepoGateProfile(ctx context.Context, arg GetLatestRepoGateProfileParams) (GetLatestRepoGateProfileRow, error)
@@ -290,8 +290,8 @@ type Querier interface {
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	UpsertExactGateProfile(ctx context.Context, arg UpsertExactGateProfileParams) (UpsertExactGateProfileRow, error)
 	UpsertGateJobProfileLink(ctx context.Context, arg UpsertGateJobProfileLinkParams) error
-	// Inserts or updates an environment entry (upsert on primary key 'key').
-	// Updates value, scope, secret, and refreshes updated_at on conflict.
+	// Inserts or updates an environment entry (upsert on composite key (key, target)).
+	// Updates value, secret, and refreshes updated_at on conflict.
 	// This ensures idempotent set operations from the CLI or API.
 	UpsertGlobalEnv(ctx context.Context, arg UpsertGlobalEnvParams) error
 	UpsertJobMetric(ctx context.Context, arg UpsertJobMetricParams) error

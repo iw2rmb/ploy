@@ -12,12 +12,12 @@ import (
 
 // GlobalEnvVar represents a single global environment variable with its metadata.
 // Used by ConfigHolder to track global env entries in memory.
-// The Scope field uses a typed enum (GlobalEnvScope) to prevent typo-class bugs
-// in scope routing logic.
+// The Target field uses a typed enum (GlobalEnvTarget) to prevent typo-class bugs
+// in target routing logic.
 type GlobalEnvVar struct {
-	Value  string                     `json:"value"`
-	Scope  domaintypes.GlobalEnvScope `json:"scope"`
-	Secret bool                       `json:"secret"`
+	Value  string                      `json:"value"`
+	Target domaintypes.GlobalEnvTarget `json:"target"`
+	Secret bool                        `json:"secret"`
 }
 
 // ConfigHolder provides thread-safe access to runtime configuration, including
