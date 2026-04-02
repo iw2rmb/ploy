@@ -193,7 +193,7 @@ func TestBuildGateImageResolver_ExpandsRegistryPrefixFromEnv(t *testing.T) {
 	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
 		{
 			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17",
+			Image: "$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17",
 		},
 	}, false)
 	if err != nil {
@@ -216,7 +216,7 @@ func TestBuildGateImageResolver_UsesDefaultPrefixWhenEnvUnset(t *testing.T) {
 	resolver, err := NewBuildGateImageResolver("", []contracts.BuildGateImageRule{
 		{
 			Stack: contracts.StackExpectation{Language: "java", Release: "17", Tool: "maven"},
-			Image: "${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17",
+			Image: "$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17",
 		},
 	}, false)
 	if err != nil {

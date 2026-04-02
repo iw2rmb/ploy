@@ -30,10 +30,10 @@ or targeted `docker buildx build ... --push` commands.
 Build Gate image mapping source of truth:
 - `gates/stacks.yaml`
 - Java defaults expect:
-  - `${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk11`
-  - `${PLOY_CONTAINER_REGISTRY}/gate-gradle:jdk17`
-  - `${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-11`
-  - `${PLOY_CONTAINER_REGISTRY}/maven:3-eclipse-temurin-17`
+  - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk11`
+  - `$PLOY_CONTAINER_REGISTRY/gate-gradle:jdk17`
+  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-11`
+  - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17`
 
 Custom CA support is runtime-only. Do not inject corporate certs during image build.
 Use `PLOY_CA_CERTS` at deployment/runtime so the same bundle is mounted into runtime
@@ -77,9 +77,9 @@ docker buildx build \
 Stack-aware image mapping example
 ```yaml
 image:
-  default: ${PLOY_CONTAINER_REGISTRY}/orw-cli-maven:latest
-  java-maven: ${PLOY_CONTAINER_REGISTRY}/orw-cli-maven:latest
-  java-gradle: ${PLOY_CONTAINER_REGISTRY}/orw-cli-gradle:latest
+  default: $PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest
+  java-maven: $PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest
+  java-gradle: $PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest
 ```
 
 Notes
@@ -96,7 +96,7 @@ PLATFORM=linux/amd64 deploy/images/build-and-push.sh
 
 Verification
 ```bash
-docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/orw-cli-maven:latest"
-docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/orw-cli-gradle:latest"
-docker buildx imagetools inspect "${PLOY_CONTAINER_REGISTRY}/codex:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/codex:latest"
 ```
