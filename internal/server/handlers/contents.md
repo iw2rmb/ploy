@@ -13,7 +13,7 @@
 [config_authz_test.go](config_authz_test.go) Checks admin authorization enforcement on configuration endpoints.
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers, defaults, round-trip behavior, and store error mapping.
-[config_gitlab.go](config_gitlab.go) GitLab/global-env config holder and accessors used by config endpoints.
+[config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab and global env endpoints.
 [config_gitlab_fuzz_test.go](config_gitlab_fuzz_test.go) Fuzzes GitLab config mutation paths to catch panics on malformed payload combinations.
 [config_gitlab_test.go](config_gitlab_test.go) Tests GitLab config holder and endpoint behavior for read/write and validation paths.
 [cross_path_parity_test.go](cross_path_parity_test.go) Ensures cross-path status/action parity between standard and gate-oriented completion paths.
