@@ -16,7 +16,8 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 
 	f.config.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
-	f.config.SetGlobalEnvVar("HEAL_ONLY", GlobalEnvVar{Value: "heal-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
+	f.config.SetGlobalEnvVar("NODES_FALLBACK", GlobalEnvVar{Value: "nodes-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
+	f.config.SetGlobalEnvVar("SERVER_ONLY", GlobalEnvVar{Value: "server-env", Target: domaintypes.GlobalEnvTargetServer, Secret: false})
 
 	rr := f.serve()
 	assertStatus(t, rr, http.StatusOK)
@@ -31,17 +32,47 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		t.Fatalf("expected spec.env to be an object, got %T", spec["env"])
 	}
 
+	// Per-run env overrides global env.
 	if env["CA_CERTS_PEM_BUNDLE"] != "per-run-cert" {
 		t.Fatalf("expected per-run CA_CERTS_PEM_BUNDLE to win, got %v", env["CA_CERTS_PEM_BUNDLE"])
 	}
+	// Steps-target injected for mig job.
 	if env["CODEX_AUTH_JSON"] != `{"token":"xxx"}` {
 		t.Fatalf("expected CODEX_AUTH_JSON to be injected, got %v", env["CODEX_AUTH_JSON"])
 	}
-	if _, ok := env["HEAL_ONLY"]; ok {
-		t.Fatalf("expected HEAL_ONLY not to be injected for mig job")
+	// Nodes-target provides fallback for all job types.
+	if env["NODES_FALLBACK"] != "nodes-env" {
+		t.Fatalf("expected NODES_FALLBACK to be injected as fallback, got %v", env["NODES_FALLBACK"])
+	}
+	// Server-target is not injected into job specs.
+	if _, ok := env["SERVER_ONLY"]; ok {
+		t.Fatalf("expected SERVER_ONLY not to be injected for mig job")
 	}
 	if env["PER_RUN_ONLY"] != "value" {
 		t.Fatalf("expected PER_RUN_ONLY preserved, got %v", env["PER_RUN_ONLY"])
+	}
+}
+
+func TestClaimJob_JobTargetOverridesNodesTarget(t *testing.T) {
+	t.Parallel()
+
+	f := newClaimJobFixture(t, claimJobFixtureOptions{
+		specJSON: []byte(`{}`),
+	})
+
+	// Same key with both nodes and steps targets — steps should win for mig job.
+	f.config.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes})
+	f.config.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps})
+
+	rr := f.serve()
+	assertStatus(t, rr, http.StatusOK)
+
+	resp := decodeBody[map[string]any](t, rr)
+	spec := resp["spec"].(map[string]any)
+	env := spec["env"].(map[string]any)
+
+	if env["SHARED_KEY"] != "steps-val" {
+		t.Fatalf("expected steps-target to override nodes-target, got %v", env["SHARED_KEY"])
 	}
 }
 

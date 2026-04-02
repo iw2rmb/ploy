@@ -56,10 +56,10 @@ func buildClaimResponsePayload(
 	}
 
 	gitlabCfg := config.GitLabConfig{}
-	globalEnv := map[string]GlobalEnvVar{}
+	globalEnv := map[string][]GlobalEnvVar{}
 	if configHolder != nil {
 		gitlabCfg = configHolder.GetGitLab()
-		globalEnv = configHolder.GetGlobalEnv()
+		globalEnv = configHolder.GetGlobalEnvAll()
 	}
 
 	var repoGateProfile []byte

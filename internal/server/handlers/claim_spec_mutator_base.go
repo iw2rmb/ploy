@@ -38,7 +38,14 @@ func applyJobIDMutator(m map[string]any, jobID domaintypes.JobID) error {
 	return nil
 }
 
-func applyGlobalEnvMutator(m map[string]any, env map[string]GlobalEnvVar, jobType domaintypes.JobType) error {
+// applyGlobalEnvMutator merges global env vars into the spec's env block using
+// target-aware precedence. For each key the merge order is:
+//  1. per-run env (already in spec) — highest priority, never overwritten
+//  2. job-target env (gates for gate jobs, steps for mig/heal) — overrides nodes
+//  3. nodes-target env — lowest priority fallback for all job types
+//
+// Routing is key-agnostic; all keys follow the same precedence rules.
+func applyGlobalEnvMutator(m map[string]any, env map[string][]GlobalEnvVar, jobType domaintypes.JobType) error {
 	if len(env) == 0 {
 		return nil
 	}
@@ -54,14 +61,33 @@ func applyGlobalEnvMutator(m map[string]any, env map[string]GlobalEnvVar, jobTyp
 		em = map[string]any{}
 	}
 
-	for k, v := range env {
-		if !v.Target.MatchesJobType(jobType) {
-			continue
+	// Two-pass merge into an intermediate map so job-target overrides nodes-target.
+	merged := make(map[string]string)
+
+	// Pass 1: nodes-target (lowest priority among global env).
+	for k, entries := range env {
+		for _, v := range entries {
+			if v.Target == domaintypes.GlobalEnvTargetNodes {
+				merged[k] = v.Value
+			}
 		}
+	}
+
+	// Pass 2: job-target (gates or steps) overrides nodes-target.
+	for k, entries := range env {
+		for _, v := range entries {
+			if v.Target.MatchesJobType(jobType) {
+				merged[k] = v.Value
+			}
+		}
+	}
+
+	// Apply merged global env; per-run env (already in em) wins.
+	for k, v := range merged {
 		if _, exists := em[k]; exists {
 			continue
 		}
-		em[k] = v.Value
+		em[k] = v
 	}
 	m["env"] = em
 	return nil

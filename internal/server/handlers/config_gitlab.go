@@ -30,12 +30,13 @@ type ConfigHolder struct {
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
-// an optional map of global environment variables. Each input entry is stored
-// as a single-element slice keyed by the variable name.
-func NewConfigHolder(gitlab config.GitLabConfig, globalEnv map[string]GlobalEnvVar) *ConfigHolder {
+// an optional multi-target map of global environment variables.
+func NewConfigHolder(gitlab config.GitLabConfig, globalEnv map[string][]GlobalEnvVar) *ConfigHolder {
 	envCopy := make(map[string][]GlobalEnvVar, len(globalEnv))
-	for k, v := range globalEnv {
-		envCopy[k] = []GlobalEnvVar{v}
+	for k, entries := range globalEnv {
+		cp := make([]GlobalEnvVar, len(entries))
+		copy(cp, entries)
+		envCopy[k] = cp
 	}
 	return &ConfigHolder{
 		gitlab:    gitlab,
@@ -55,21 +56,6 @@ func (h *ConfigHolder) SetGitLab(cfg config.GitLabConfig) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.gitlab = cfg
-}
-
-// GetGlobalEnv returns a flat copy of all global environment variables.
-// For keys with multiple targets, the first entry is used.
-// Used by claim spec mutator pipeline; step 4 replaces with target-aware iteration.
-func (h *ConfigHolder) GetGlobalEnv() map[string]GlobalEnvVar {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	envCopy := make(map[string]GlobalEnvVar, len(h.globalEnv))
-	for k, entries := range h.globalEnv {
-		if len(entries) > 0 {
-			envCopy[k] = entries[0]
-		}
-	}
-	return envCopy
 }
 
 // GetGlobalEnvEntries retrieves all entries for a key (one per target).

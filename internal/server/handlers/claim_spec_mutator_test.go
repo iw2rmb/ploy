@@ -28,7 +28,7 @@ func TestMutateClaimSpec_ReGateCandidateWinsOverRepoProfile(t *testing.T) {
 		job:             job,
 		jobType:         domaintypes.JobTypeReGate,
 		gitLab:          config.GitLabConfig{Token: "server-token", Domain: "https://gitlab.example.com"},
-		globalEnv:       map[string]GlobalEnvVar{"GLOBAL": {Value: "g", Target: domaintypes.GlobalEnvTargetGates}},
+		globalEnv:       map[string][]GlobalEnvVar{"GLOBAL": {{Value: "g", Target: domaintypes.GlobalEnvTargetGates}}},
 		repoGateProfile: repoProfile,
 	})
 	if err != nil {

@@ -14,7 +14,7 @@ type claimSpecMutatorInput struct {
 	job             store.Job
 	jobType         domaintypes.JobType
 	gitLab          config.GitLabConfig
-	globalEnv       map[string]GlobalEnvVar
+	globalEnv       map[string][]GlobalEnvVar
 	repoGateProfile []byte
 }
 
