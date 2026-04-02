@@ -1,5 +1,6 @@
+---
 policy: .codex/policies/composing-roadmaps.md
-schema: .codex/policies/roadmap.schema.json
+schema: ~/.codex/policies/roadmap.schema.json
 title: Target-Based Global Env Propagation with Extensible Materializers
 scope: Replace scope-based global env routing with target-based propagation, enforce strict ambiguity handling for key operations, and standardize certificate handling through a generic materializer model with PLOY_CA_CERTS as the first built-in key.
 documentation:
@@ -30,7 +31,7 @@ items:
       - Replace GlobalEnvScope enum and parser contracts with GlobalEnvTarget enum and parser contracts at domain boundaries.
       - Change config_env storage model to one row per key-target pair with deterministic ordering for list/get operations.
       - Regenerate sqlc outputs and adapt store interfaces/tests to key-plus-target CRUD semantics.
-      - Apply hard cut semantics for this change set: no legacy scope-to-target translation and no compatibility behavior for historical rows.
+      - "Apply hard cut semantics for this change set: no legacy scope-to-target translation and no compatibility behavior for historical rows."
     verification:
       - "go test ./internal/domain/types ./internal/store ./cmd/ployd"
       - "Store tests assert multi-target same-key upsert/list/get/delete behavior without key-level overwrite."
@@ -51,7 +52,7 @@ items:
     implementation:
       - Replace wire field scope with target in list/get/put payloads and validation logic.
       - Keep GET and DELETE by key path stable while adding optional target selector for disambiguation.
-      - Enforce strict ambiguity behavior shared with CLI semantics: when multiple targets exist for a key, target is required or the endpoint returns an ambiguity error.
+      - "Enforce strict ambiguity behavior shared with CLI semantics: when multiple targets exist for a key, target is required or the endpoint returns an ambiguity error."
       - Update handler tests, fixtures, and OpenAPI verification tests to cover target validation and ambiguity responses.
     verification:
       - "go test ./internal/server/handlers -run ConfigEnv"
@@ -91,7 +92,7 @@ items:
       - cmd/ployd/server.go
     implementation:
       - Replace scope-based claim filtering with target-aware merge logic where gates map to pre_gate re_gate post_gate and steps map to mig heal.
-      - Keep deterministic precedence: per-run env overrides global env and job-target env overrides nodes-target env on key collisions.
+      - "Keep deterministic precedence: per-run env overrides global env and job-target env overrides nodes-target env on key collisions."
       - Implement immediate nodes-target consumption for manifest and container env injection paths.
       - Implement immediate server-target consumption on set unset and startup preload paths.
       - Keep routing key-agnostic in this layer so special handling is provided only by materializers.
@@ -145,6 +146,6 @@ items:
     verification:
       - "go test ./docs/api"
       - "~/@iw2rmb/amata/scripts/check_docs_links.sh"
-      - "grep -R \"CA_CERTS_PEM_BUNDLE\" docs cmd/ploy/README.md README.md && exit 1 || true"
+      - 'grep -R "CA_CERTS_PEM_BUNDLE" docs cmd/ploy/README.md README.md && exit 1 || true'
     reasoning: medium
     cfp: 6
