@@ -1,6 +1,9 @@
 package main
 
-import _ "embed"
+import "embed"
 
-//go:embed assets/runtime.tgz
-var clusterDeployRuntimeArchive []byte
+// clusterDeployRuntimeFS contains runtime deploy assets copied to the deploy dir
+// at runtime by `ploy cluster deploy`.
+//
+//go:embed assets/runtime/**
+var clusterDeployRuntimeFS embed.FS

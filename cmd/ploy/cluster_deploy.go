@@ -1,13 +1,11 @@
 package main
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"io"
 	"os"
 	"os/exec"
@@ -60,7 +58,7 @@ func handleClusterDeploy(args []string, stderr io.Writer) (retErr error) {
 	if err := os.MkdirAll(deployDir, 0o755); err != nil {
 		return fmt.Errorf("cluster deploy: create %s: %w", deployDir, err)
 	}
-	if err := extractClusterDeployRuntimeArchive(deployDir); err != nil {
+	if err := extractClusterDeployRuntimeAssets(deployDir); err != nil {
 		return err
 	}
 
@@ -190,68 +188,72 @@ func upsertEnv(env []string, key, value string) []string {
 	return append(env, prefix+value)
 }
 
-func extractClusterDeployRuntimeArchive(dstDir string) error {
-	gr, err := gzip.NewReader(bytes.NewReader(clusterDeployRuntimeArchive))
-	if err != nil {
-		return fmt.Errorf("cluster deploy: open embedded runtime archive: %w", err)
-	}
-	defer func() { _ = gr.Close() }()
-
+func extractClusterDeployRuntimeAssets(dstDir string) error {
 	base := filepath.Clean(dstDir)
-	tr := tar.NewReader(gr)
-	for {
-		hdr, err := tr.Next()
-		if errors.Is(err, io.EOF) {
+	walkErr := fs.WalkDir(clusterDeployRuntimeFS, "assets/runtime", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("cluster deploy: walk embedded runtime assets: %w", err)
+		}
+
+		name, relErr := filepath.Rel("assets/runtime", path)
+		if relErr != nil {
+			return fmt.Errorf("cluster deploy: resolve embedded runtime path %q: %w", path, relErr)
+		}
+		name = filepath.Clean(name)
+		if name == "." || name == "" {
 			return nil
 		}
-		if err != nil {
-			return fmt.Errorf("cluster deploy: read embedded runtime archive: %w", err)
-		}
-
-		name := filepath.Clean(strings.TrimPrefix(hdr.Name, "./"))
-		if name == "." || name == "" {
-			continue
+		if filepath.Base(name) == "contents.md" || strings.HasPrefix(filepath.Base(name), ".") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
 		}
 		if filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(os.PathSeparator)) {
-			return fmt.Errorf("cluster deploy: invalid archive entry path %q", hdr.Name)
+			return fmt.Errorf("cluster deploy: invalid embedded runtime path %q", path)
 		}
 
 		targetPath := filepath.Join(base, name)
 		if !isClusterDeployPathWithinBase(base, targetPath) {
-			return fmt.Errorf("cluster deploy: archive entry escapes target dir: %q", hdr.Name)
+			return fmt.Errorf("cluster deploy: embedded runtime path escapes target dir: %q", path)
 		}
 
-		mode := os.FileMode(hdr.Mode) & 0o777
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if mode == 0 {
-				mode = 0o755
-			}
-			if err := os.MkdirAll(targetPath, mode); err != nil {
+		if d.IsDir() {
+			if err := os.MkdirAll(targetPath, 0o755); err != nil {
 				return fmt.Errorf("cluster deploy: create dir %s: %w", targetPath, err)
 			}
-		case tar.TypeReg, tar.TypeRegA:
-			if mode == 0 {
-				mode = 0o644
-			}
-			if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-				return fmt.Errorf("cluster deploy: create parent dir for %s: %w", targetPath, err)
-			}
-			file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
-			if err != nil {
-				return fmt.Errorf("cluster deploy: create file %s: %w", targetPath, err)
-			}
-			if _, err := io.Copy(file, tr); err != nil {
-				_ = file.Close()
-				return fmt.Errorf("cluster deploy: write file %s: %w", targetPath, err)
-			}
-			if err := file.Close(); err != nil {
-				return fmt.Errorf("cluster deploy: close file %s: %w", targetPath, err)
-			}
-		default:
-			return fmt.Errorf("cluster deploy: unsupported archive entry type %d for %q", hdr.Typeflag, hdr.Name)
+			return nil
 		}
+
+		info, err := d.Info()
+		if err != nil {
+			return fmt.Errorf("cluster deploy: stat embedded runtime path %q: %w", path, err)
+		}
+		mode := info.Mode().Perm()
+		if mode == 0 {
+			mode = 0o644
+		}
+		// Shell scripts in runtime assets must remain executable after extraction.
+		if strings.HasSuffix(name, ".sh") {
+			mode = 0o755
+		}
+
+		content, err := fs.ReadFile(clusterDeployRuntimeFS, path)
+		if err != nil {
+			return fmt.Errorf("cluster deploy: read embedded runtime file %q: %w", path, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return fmt.Errorf("cluster deploy: create parent dir for %s: %w", targetPath, err)
+		}
+		if err := os.WriteFile(targetPath, content, mode); err != nil {
+			return fmt.Errorf("cluster deploy: write file %s: %w", targetPath, err)
+		}
+		return nil
+	})
+	if walkErr != nil {
+		return walkErr
 	}
+	return nil
 }
 
 func isClusterDeployPathWithinBase(base, candidate string) bool {
