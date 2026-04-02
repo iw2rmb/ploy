@@ -41,6 +41,10 @@ func printManifestUsage(w io.Writer) {
 
 // handleManifestSchema writes the manifest schema file to the provided writer.
 func handleManifestSchema(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printManifestSchemaUsage(stderr)
+		return nil
+	}
 	if len(args) > 0 {
 		printManifestSchemaUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(args, " "))
@@ -68,6 +72,10 @@ func printManifestSchemaUsage(w io.Writer) {
 
 // handleManifestValidate validates manifests and optionally rewrites them in place.
 func handleManifestValidate(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printManifestValidateUsage(stderr)
+		return nil
+	}
 	rewrite, targets, err := manifestcli.ParseTargets(args)
 	if err != nil {
 		printManifestValidateUsage(stderr)

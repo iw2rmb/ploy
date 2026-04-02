@@ -17,10 +17,14 @@ import (
 )
 
 func handleMigStatus(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printMigStatusUsage(stderr)
+		return nil
+	}
+
 	fs := flag.NewFlagSet("mig status", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	if err := fs.Parse(args); err != nil {
-		printMigStatusUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printMigStatusUsage(stderr) }); err != nil {
 		return err
 	}
 

@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -132,6 +133,9 @@ func handleRunSubmit(args []string, stderr io.Writer) error {
 	flags, err := parseRunSubmitFlags(args)
 	if err != nil {
 		printRunSubmitUsage(stderr)
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
 		return err
 	}
 

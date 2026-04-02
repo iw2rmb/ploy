@@ -95,27 +95,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 		Use:   "help [command]",
 		Short: "Help about any command",
 		Run: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				printUsage(stderr)
-			} else {
-				// Dispatch to existing help handlers for subcommands.
-				switch args[0] {
-				case "mig":
-					printMigUsage(stderr)
-				case "run":
-					printRunUsage(stderr)
-				case "pull":
-					printPullUsage(stderr)
-				case "cluster":
-					printClusterUsage(stderr)
-				case "config":
-					printConfigUsage(stderr)
-				case "tui":
-					printTUIUsage(stderr)
-				default:
-					printUsage(stderr)
-				}
-			}
+			printRequestedHelp(stderr, args)
 		},
 	})
 
@@ -142,6 +122,47 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	})
 
 	return root
+}
+
+func printRequestedHelp(w io.Writer, args []string) {
+	if len(args) == 0 {
+		printUsage(w)
+		return
+	}
+
+	withHelp := ensureHelpArg(args[1:])
+	switch args[0] {
+	case "mig":
+		_ = handleMig(withHelp, w)
+	case "run":
+		_ = handleRun(withHelp, w)
+	case "pull":
+		_ = handlePull(withHelp, w)
+	case "cluster":
+		_ = handleCluster(withHelp, w)
+	case "config":
+		_ = handleConfig(withHelp, w)
+	case "manifest":
+		_ = handleManifest(withHelp, w)
+	case "tui":
+		printTUIUsage(w)
+	case "version":
+		_, _ = fmt.Fprintln(w, "Usage: ploy version")
+	default:
+		printUsage(w)
+	}
+}
+
+func ensureHelpArg(args []string) []string {
+	if len(args) == 0 {
+		return []string{"--help"}
+	}
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			return args
+		}
+	}
+	return append(args, "--help")
 }
 
 // printVersion outputs version information to the given writer.
