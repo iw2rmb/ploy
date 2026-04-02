@@ -11,7 +11,7 @@ set -Eeuo pipefail
 # resolves paths from its own location.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+REPO_ROOT=$HOME/@iw2rmb/amata
 
 # Derive GOOS/GOARCH from PLATFORM env var (e.g. linux/amd64, linux/arm64).
 # Caller scripts expose PLATFORM; default to linux/amd64.
@@ -28,7 +28,7 @@ case "$_GOARCH" in
   *) echo "error: unsupported GOARCH '${_GOARCH}' derived from PLATFORM='${_PLATFORM}'" >&2; exit 1 ;;
 esac
 
-AMATA_SRC_CANDIDATE="$(cd "$REPO_ROOT/amata" 2>/dev/null && pwd)" || true
+AMATA_SRC_CANDIDATE="$(cd "$REPO_ROOT" 2>/dev/null && pwd)" || true
 
 if [[ -z "$AMATA_SRC_CANDIDATE" || ! -d "$AMATA_SRC_CANDIDATE" ]]; then
   echo "error: amata source directory not found at ${REPO_ROOT}/amata" >&2
