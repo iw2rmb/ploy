@@ -109,6 +109,7 @@ items:
       - "go test ./cmd/ployd -run GlobalEnvMapFromStoreEntries"
     reasoning: high
     cfp: 12
+    commit: 06cea975
   - done: false
     reviews: []
     label: "5"
