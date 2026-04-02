@@ -279,6 +279,46 @@ func TestHandleConfigEnvUnsetEmptyFrom(t *testing.T) {
 	}
 }
 
+// TestHandleConfigEnvSetOnAllExclusive verifies that --on all cannot be combined with other selectors.
+func TestHandleConfigEnvSetOnAllExclusive(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "all then gates", args: []string{"--key", "FOO", "--value", "bar", "--on", "all", "--on", "gates"}},
+		{name: "gates then all", args: []string{"--key", "FOO", "--value", "bar", "--on", "gates", "--on", "all"}},
+		{name: "all then jobs", args: []string{"--key", "FOO", "--value", "bar", "--on", "all", "--on", "jobs"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigEnvSet(tt.args, buf)
+			if err == nil {
+				t.Fatalf("expected error for --on all combined with other selectors")
+			}
+			if !strings.Contains(err.Error(), "--on all is exclusive") {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestHandleConfigEnvSetMultipleOnSelectors verifies that multiple --on selectors are accepted and deduplicated.
+func TestHandleConfigEnvSetMultipleOnSelectors(t *testing.T) {
+	buf := &bytes.Buffer{}
+	// --on gates --on steps should pass selector validation (will fail at resolveControlPlaneHTTP).
+	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "gates", "--on", "steps"}, buf)
+	if err == nil {
+		t.Fatalf("expected error (no server descriptor)")
+	}
+	if strings.Contains(err.Error(), "invalid --on selector") {
+		t.Fatalf("selector should be valid, got: %v", err)
+	}
+	if strings.Contains(err.Error(), "--on all is exclusive") {
+		t.Fatalf("should not trigger all exclusivity, got: %v", err)
+	}
+}
+
 // TestHandleConfigEnvSetFileNotFound verifies that missing files are detected.
 func TestHandleConfigEnvSetFileNotFound(t *testing.T) {
 	buf := &bytes.Buffer{}

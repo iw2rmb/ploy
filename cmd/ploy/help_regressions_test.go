@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestLeafHelpReturnsNoError(t *testing.T) {
+func TestHelpRegressionLeafHelpReturnsNoError(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -41,7 +41,7 @@ func TestLeafHelpReturnsNoError(t *testing.T) {
 	}
 }
 
-func TestHelpCommandRoutesDeepPaths(t *testing.T) {
+func TestHelpRegressionCommandRoutesDeepPaths(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
