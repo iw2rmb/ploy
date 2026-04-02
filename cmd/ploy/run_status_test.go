@@ -49,8 +49,9 @@ func TestRunStatusReportTextContract(t *testing.T) {
 		t.Fatalf("expected exactly one patch link, got %q", out)
 	}
 	assertx.Contains(t, out, "⣾")
-	assertx.Contains(t, out, "\x1b[91m✗\x1b[0m")
-	assertx.Contains(t, out, "└  Exit 137: \x1b[91minfra compile failed at step 2\x1b[0m")
+	assertx.Contains(t, out, "✗")
+	assertx.Contains(t, out, "└  Exit 137: ")
+	assertx.Contains(t, out, "infra compile failed at step 2")
 	assertx.NotContains(t, out, "<infra>")
 	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
 }

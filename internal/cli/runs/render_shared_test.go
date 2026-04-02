@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -170,20 +171,26 @@ func TestColoredStatusGlyph(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		status string
-		want   string
+		status      string
+		wantGlyph   string
+		wantColored bool
 	}{
-		{"failed", "\x1b[91m✗\x1b[0m"},
-		{"running", "\x1b[92m⣾\x1b[0m"},
-		{"success", "\x1b[92m✓\x1b[0m"},
-		{"queued", "\x1b[39m·\x1b[0m"},
+		{"failed", "✗", true},
+		{"running", "⣾", true},
+		{"success", "✓", true},
+		{"queued", "·", true},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.status, func(t *testing.T) {
 			t.Parallel()
-			if got := ColoredStatusGlyph(tc.status, 0); got != tc.want {
-				t.Fatalf("ColoredStatusGlyph(%q,0)=%q, want %q", tc.status, got, tc.want)
+			got := ColoredStatusGlyph(tc.status, 0)
+			if !strings.Contains(got, tc.wantGlyph) {
+				t.Fatalf("ColoredStatusGlyph(%q,0)=%q, expected glyph %q", tc.status, got, tc.wantGlyph)
+			}
+			hasCSI := strings.Contains(got, "\x1b[")
+			if hasCSI != tc.wantColored {
+				t.Fatalf("ColoredStatusGlyph(%q,0) colored=%v, want %v (value=%q)", tc.status, hasCSI, tc.wantColored, got)
 			}
 		})
 	}

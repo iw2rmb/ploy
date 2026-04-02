@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/follow"
 	climods "github.com/iw2rmb/ploy/internal/cli/migs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -130,12 +129,13 @@ func followModRunProject(ctx context.Context, baseURL *url.URL, client *http.Cli
 		defer cancel()
 	}
 
-	engine := follow.NewEngine(cloneForStream(client), baseURL, runID, follow.Config{
-		MaxRetries: maxRetries,
+	final, err := runs.FollowRunCommand{
+		Client:     cloneForStream(client),
+		BaseURL:    baseURL,
+		RunID:      runID,
 		Output:     stderr,
-	})
-
-	final, err := engine.Run(followCtx)
+		MaxRetries: maxRetries,
+	}.Run(followCtx)
 	if err != nil {
 		// Handle timeout with optional cancellation.
 		if capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {

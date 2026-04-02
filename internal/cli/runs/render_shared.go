@@ -5,17 +5,18 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/lipgloss/v2"
+
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // SpinnerFrames defines deterministic spinner glyph order for running states.
 var SpinnerFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
 
-const (
-	ansiSuccessLightGreen = "\x1b[92m"
-	ansiDefaultForeground = "\x1b[39m"
-	ansiErrorLightRed     = "\x1b[91m"
-	ansiColorReset        = "\x1b[0m"
+var (
+	successGlyphStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+	errorGlyphStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+	neutralGlyphStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )
 
 func normalizeStatus(s string) string {
@@ -111,12 +112,16 @@ func StatusGlyph(status string, spinnerFrame int) string {
 func ColoredStatusGlyph(status string, spinnerFrame int) string {
 	glyph := StatusGlyph(status, spinnerFrame)
 	if isFailedOrCrashedStatus(status) {
-		return ansiErrorLightRed + glyph + ansiColorReset
+		return errorGlyphStyle.Render(glyph)
 	}
 	if isSuccessfulStatus(status) || isRunningStatus(status) {
-		return ansiSuccessLightGreen + glyph + ansiColorReset
+		return successGlyphStyle.Render(glyph)
 	}
-	return ansiDefaultForeground + glyph + ansiColorReset
+	return neutralGlyphStyle.Render(glyph)
+}
+
+func colorizeErrorText(value string) string {
+	return errorGlyphStyle.Render(value)
 }
 
 func isFailedOrCrashedStatus(status string) bool {
