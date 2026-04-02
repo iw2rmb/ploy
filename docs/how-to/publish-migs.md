@@ -37,7 +37,7 @@ Build Gate image mapping source of truth:
 
 Custom CA support is runtime-only. Do not inject corporate certs during image build.
 Use `PLOY_CA_CERTS` at deployment/runtime so the same bundle is mounted into runtime
-containers and propagated as `CA_CERTS_PEM_BUNDLE`.
+containers and propagated as `PLOY_CA_CERTS` via the materializer.
 
 Publish a single Migs image (example: orw-cli-maven)
 ```bash

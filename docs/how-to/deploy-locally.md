@@ -27,7 +27,7 @@ export PLOY_CONFIG_HOME="$HOME/.config/ploy"
   - `ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}`
   - `ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}`
 - Injects runtime CA bundle locally (when `PLOY_CA_CERTS` is set) without baking certs into images.
-- Seeds `CA_CERTS_PEM_BUNDLE` global env from `PLOY_CA_CERTS` so mig/build-gate containers also receive the same CA bundle at runtime.
+- Seeds `PLOY_CA_CERTS` global env from the host `PLOY_CA_CERTS` file so mig/build-gate containers also receive the same CA bundle at runtime via the materializer.
 
 ## Prerequisites
 
