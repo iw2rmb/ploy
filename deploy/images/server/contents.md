@@ -1,2 +1,2 @@
-[Dockerfile](Dockerfile) Builds the server runtime image with ployd, gate assets, schema bundle, and runtime dependencies.
-[entrypoint.sh](entrypoint.sh) Server container entrypoint that materializes PLOY_CA_CERTS into TLS trust env vars before launching ployd.
+[Dockerfile](Dockerfile) Builds the `ployd` Alpine server image with runtime dependencies, gate assets, schema file, and default command wiring.
+[entrypoint.sh](entrypoint.sh) Materializes CA certificates from `PLOY_CA_CERTS` and then execs the server daemon binary.
