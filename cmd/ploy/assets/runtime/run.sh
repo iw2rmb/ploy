@@ -636,109 +636,27 @@ seed_node_record() {
     ON CONFLICT (id) DO NOTHING;"
 }
 
-set_global_env_via_server_api() {
-  local key="$1"
-  local value="$2"
-  local target="${3:-gates}"
-  local payload=""
-  local response=""
-  local http_code=""
-  local response_body=""
-  local legacy_scope=""
-
-  global_env_payload() {
-    local field_name="$1"
-    local field_value="$2"
-    GLOBAL_ENV_VALUE="$value" GLOBAL_ENV_FIELD_NAME="$field_name" GLOBAL_ENV_FIELD_VALUE="$field_value" "$PYTHON_BIN" <<'PY'
-import json
-import os
-print(json.dumps({
-  "value": os.environ["GLOBAL_ENV_VALUE"],
-  os.environ["GLOBAL_ENV_FIELD_NAME"]: os.environ["GLOBAL_ENV_FIELD_VALUE"],
-  "secret": True,
-}))
-PY
-  }
-
-  legacy_scope_from_target() {
-    local target_name="$1"
-    case "$target_name" in
-      gates) echo "gate" ;;
-      all) echo "all" ;;
-      *)
-        echo ""
-        return 1
-        ;;
-    esac
-  }
-
-  put_global_env() {
-    local req_payload="$1"
-    $COMPOSE_CMD exec -T \
-      -e PLOY_ADMIN_TOKEN="$ADMIN_TOKEN" \
-      -e PLOY_ENV_KEY="$key" \
-      -e PLOY_ENV_PAYLOAD="$req_payload" \
-      server sh -lc '
-        code="$(curl -sS -o /tmp/ploy_env_response.txt -w "%{http_code}" -X PUT "http://localhost:8080/v1/config/env/${PLOY_ENV_KEY}" \
-          -H "Authorization: Bearer ${PLOY_ADMIN_TOKEN}" \
-          -H "Content-Type: application/json" \
-          --data "${PLOY_ENV_PAYLOAD}")"
-        printf "%s\n" "$code"
-        cat /tmp/ploy_env_response.txt
-      '
-  }
-
-  payload="$(global_env_payload "target" "$target")"
-  response="$(put_global_env "$payload")"
-  http_code="${response%%$'\n'*}"
-  response_body="${response#*$'\n'}"
-
-  if [[ "$http_code" == "200" ]]; then
-    return 0
-  fi
-
-  # Backward compatibility for older runtime server images that still use `scope`.
-  if [[ "$http_code" == "400" && "$response_body" == *'unknown field "target"'* ]]; then
-    legacy_scope="$(legacy_scope_from_target "$target" || true)"
-    if [[ -z "$legacy_scope" ]]; then
-      echo "error: failed to set ${key} through server API: target '${target}' is unsupported by legacy runtime API" >&2
-      exit 1
-    fi
-    payload="$(global_env_payload "scope" "$legacy_scope")"
-    response="$(put_global_env "$payload")"
-    http_code="${response%%$'\n'*}"
-    response_body="${response#*$'\n'}"
-    if [[ "$http_code" == "200" ]]; then
-      return 0
-    fi
-  fi
-
-  echo "error: failed to set ${key} through server API (status ${http_code}): ${response_body}" >&2
-  exit 1
-}
-
-runtime_ca_bundle_value() {
-  if [[ -z "$PLOY_CA_CERTS" || "$PLOY_CA_CERTS" == "/dev/null" ]]; then
-    return 0
-  fi
-  cat "$PLOY_CA_CERTS"
-}
-
 configure_runtime_globals_and_persist_auth() {
-  local runtime_ca_bundle=""
-
   log "Writing cluster auth state to ${AUTH_JSON_PATH}..."
   write_auth_json
   set_default_auth_symlink
 
   log "Configuring Gradle Build Cache globals..."
-  set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_URL "http://gradle-build-cache:5071/cache/" gates
-  set_global_env_via_server_api PLOY_GRADLE_BUILD_CACHE_PUSH "true" gates
+  if ! ploy config env set --key PLOY_GRADLE_BUILD_CACHE_URL --value "http://gradle-build-cache:5071/cache/" --on gates >/dev/null; then
+    echo "error: failed to set PLOY_GRADLE_BUILD_CACHE_URL via ploy config env set --on gates" >&2
+    exit 1
+  fi
+  if ! ploy config env set --key PLOY_GRADLE_BUILD_CACHE_PUSH --value "true" --on gates >/dev/null; then
+    echo "error: failed to set PLOY_GRADLE_BUILD_CACHE_PUSH via ploy config env set --on gates" >&2
+    exit 1
+  fi
 
-  runtime_ca_bundle="$(runtime_ca_bundle_value || true)"
-  if [[ -n "$runtime_ca_bundle" ]]; then
+  if [[ -n "$PLOY_CA_CERTS" && "$PLOY_CA_CERTS" != "/dev/null" ]]; then
     log "Configuring global PLOY_CA_CERTS..."
-    set_global_env_via_server_api PLOY_CA_CERTS "$runtime_ca_bundle" all
+    if ! ploy config env set --key PLOY_CA_CERTS --file "$PLOY_CA_CERTS" --on all >/dev/null; then
+      echo "error: failed to set PLOY_CA_CERTS via ploy config env set --on all" >&2
+      exit 1
+    fi
   fi
 }
 
@@ -761,6 +679,7 @@ main() {
   need openssl
   need psql
   need pg_isready
+  need ploy
 
   case "$PULL_IMAGES" in
     0|false|FALSE|False|no|NO|No|off|OFF|Off)
