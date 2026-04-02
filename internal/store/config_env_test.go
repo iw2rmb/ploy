@@ -191,7 +191,7 @@ func TestConfigEnv_CRUD(t *testing.T) {
 
 	// Subtest: ListGlobalEnv returns all entries ordered by key then target.
 	t.Run("list_global_env", func(t *testing.T) {
-		// Insert additional entries.
+		// Insert additional entries with distinct keys.
 		err := db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{
 			Key: "TEST_CODEX_AUTH_JSON", Target: "steps",
 			Value: `{"token": "secret-token"}`, Secret: true,
@@ -208,12 +208,36 @@ func TestConfigEnv_CRUD(t *testing.T) {
 			t.Fatalf("UpsertGlobalEnv() for OPENAI failed: %v", err)
 		}
 
+		// Insert same key with multiple targets to verify list returns
+		// both rows without collapse.
+		err = db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{
+			Key: "TEST_MULTI_TARGET", Target: "gates",
+			Value: "gates-list-value", Secret: false,
+		})
+		if err != nil {
+			t.Fatalf("UpsertGlobalEnv(TEST_MULTI_TARGET/gates) failed: %v", err)
+		}
+		err = db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{
+			Key: "TEST_MULTI_TARGET", Target: "server",
+			Value: "server-list-value", Secret: true,
+		})
+		if err != nil {
+			t.Fatalf("UpsertGlobalEnv(TEST_MULTI_TARGET/server) failed: %v", err)
+		}
+		err = db.UpsertGlobalEnv(ctx, UpsertGlobalEnvParams{
+			Key: "TEST_MULTI_TARGET", Target: "steps",
+			Value: "steps-list-value", Secret: false,
+		})
+		if err != nil {
+			t.Fatalf("UpsertGlobalEnv(TEST_MULTI_TARGET/steps) failed: %v", err)
+		}
+
 		envs, err := db.ListGlobalEnv(ctx)
 		if err != nil {
 			t.Fatalf("ListGlobalEnv() failed: %v", err)
 		}
 
-		// Find our test entries.
+		// Find our test entries (distinct keys).
 		testKeys := []string{"TEST_CA_CERTS", "TEST_CODEX_AUTH_JSON", "TEST_OPENAI_API_KEY"}
 		foundKeys := make(map[string]bool)
 		for _, e := range envs {
@@ -222,6 +246,23 @@ func TestConfigEnv_CRUD(t *testing.T) {
 		for _, key := range testKeys {
 			if !foundKeys[key] {
 				t.Errorf("expected to find key %q in ListGlobalEnv output", key)
+			}
+		}
+
+		// Assert same-key multi-target rows are returned without collapse.
+		type keyTarget struct{ key, target string }
+		wantPairs := []keyTarget{
+			{"TEST_MULTI_TARGET", "gates"},
+			{"TEST_MULTI_TARGET", "server"},
+			{"TEST_MULTI_TARGET", "steps"},
+		}
+		foundPairs := make(map[keyTarget]bool)
+		for _, e := range envs {
+			foundPairs[keyTarget{e.Key, e.Target}] = true
+		}
+		for _, p := range wantPairs {
+			if !foundPairs[p] {
+				t.Errorf("ListGlobalEnv missing row for key=%q target=%q; same-key rows may have been collapsed", p.key, p.target)
 			}
 		}
 
