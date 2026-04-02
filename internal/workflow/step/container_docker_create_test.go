@@ -303,7 +303,7 @@ func TestDockerContainerRuntimeCreate_DockerHubRegistryAuthAlias(t *testing.T) {
 // TestDockerContainerRuntimeEnvPassthrough verifies that ContainerSpec.Env is
 // correctly converted to Docker's Env []string format and passed to the container.
 // This test confirms the flattenEnv function works correctly and that env vars
-// injected by the control plane (e.g., CA_CERTS_PEM_BUNDLE) reach the moby API.
+// injected by the control plane (e.g., PLOY_CA_CERTS) reach the moby API.
 func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
 	t.Parallel()
 
@@ -315,11 +315,11 @@ func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
 		{
 			name: "global_env_vars",
 			env: map[string]string{
-				"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
-				"CODEX_AUTH_JSON":     `{"token":"secret123"}`,
-				"OPENAI_API_KEY":      "sk-test-key",
+				"PLOY_CA_CERTS":  "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+				"CODEX_AUTH_JSON": `{"token":"secret123"}`,
+				"OPENAI_API_KEY":  "sk-test-key",
 			},
-			wantEnvKeys: []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "OPENAI_API_KEY"},
+			wantEnvKeys: []string{"PLOY_CA_CERTS", "CODEX_AUTH_JSON", "OPENAI_API_KEY"},
 		},
 		{
 			name: "mixed_env_vars",

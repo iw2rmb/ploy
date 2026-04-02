@@ -271,7 +271,7 @@ func TestDockerGateExecutor_GradleCommandUsesWrapperWhenSpecified(t *testing.T) 
 	}
 }
 
-// TestDockerGateExecutor_CAPreambleIncluded verifies that the CA bundle preamble
-// is prepended to Maven, Gradle, and plain Java build commands. This ensures that
-// CA_CERTS_PEM_BUNDLE from global config is consumed by the gate container for
-// trusting corporate proxies and private registries.
+// TestDockerGateExecutor_CAPreambleIncluded verifies that the PLOY_CA_CERTS
+// materializer preamble is prepended to Maven, Gradle, and plain Java build
+// commands. This ensures that PLOY_CA_CERTS from global config is consumed by
+// the gate container for trusting corporate proxies and private registries.

@@ -9,46 +9,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// caPreambleScript returns a shell preamble that installs CA certificates from the
-// CA_CERTS_PEM_BUNDLE environment variable into the system trust store and Java
-// cacerts keystore. This enables build-gate containers to trust corporate proxies
-// and private registries when the global config provides a CA bundle.
-//
-// The preamble:
-// 1. Splits CA_CERTS_PEM_BUNDLE into individual PEM files
-// 2. Installs them into /usr/local/share/ca-certificates and runs update-ca-certificates
-// 3. Imports each cert into the Java cacerts keystore via keytool (if available)
-//
-// This preamble is prepended to Maven, Gradle, and plain Java build commands so that
-// custom CA certificates injected via `ploy config env set --key CA_CERTS_PEM_BUNDLE ...`
-// are honored inside gate containers.
+// caPreambleScript returns the PLOY_CA_CERTS materializer preamble for backward
+// compatibility with callers that reference the old function name. New code should
+// use envMaterializerPreamble() directly.
 func caPreambleScript() string {
-	return `# --- CA bundle injection preamble (ploy global config) ---
-if [ -n "${CA_CERTS_PEM_BUNDLE:-}" ]; then
-  pem_file="$(mktemp)"
-  printf '%s\n' "${CA_CERTS_PEM_BUNDLE}" > "${pem_file}"
-  pem_dir="$(mktemp -d)"
-  # Split bundle into individual cert files: cert1.crt, cert2.crt, ...
-  awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="${pem_dir}" "${pem_file}"
-  # Update system CA store if update-ca-certificates is available
-  if command -v update-ca-certificates >/dev/null 2>&1; then
-    sys_ca_dir="/usr/local/share/ca-certificates/ploy-gate"
-    mkdir -p "$sys_ca_dir"
-    cp "${pem_dir}"/*.crt "$sys_ca_dir"/ 2>/dev/null || true
-    update-ca-certificates >/dev/null 2>&1 || true
-  fi
-  # Import into Java cacerts keystore if keytool is available
-  if command -v keytool >/dev/null 2>&1; then
-    for cert_path in "${pem_dir}"/*.crt; do
-      [ -f "$cert_path" ] || continue
-      base="$(basename "${cert_path}" .crt)"
-      alias="ploy_gate_pem_${base}"
-      keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "${alias}" -file "${cert_path}" >/dev/null 2>&1 || true
-    done
-  fi
-fi
-# --- End CA bundle preamble ---
-`
+	return envMaterializerPreamble()
 }
 
 // buildCommandForTool returns the default all-tests command for the given tool.
@@ -57,8 +22,10 @@ func buildCommandForTool(workspace string, tool string) ([]string, error) {
 }
 
 // buildCommandForToolTarget returns a deterministic command for a tool/target pair.
+// The env materializer preamble (PLOY_CA_CERTS trust-store setup) is prepended to
+// every gate command so certificates injected via global config are honored.
 func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
-	preamble := caPreambleScript()
+	preamble := envMaterializerPreamble()
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
 		switch strings.TrimSpace(target) {

@@ -12,7 +12,7 @@ import (
 // returns all key+target pairs sorted by key then target, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
-		"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
+		"PLOY_CA_CERTS": {{Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
 		"API_KEY":             {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
 	})
 
@@ -28,7 +28,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 	}
 
 	// Verify sorted order by key.
-	if resp[0].Key != "API_KEY" || resp[1].Key != "CA_CERTS_PEM_BUNDLE" {
+	if resp[0].Key != "API_KEY" || resp[1].Key != "PLOY_CA_CERTS" {
 		t.Errorf("entries not sorted: got %v, %v", resp[0].Key, resp[1].Key)
 	}
 
@@ -195,7 +195,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 		"secret": true,
 	}
 
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/CA_CERTS_PEM_BUNDLE", reqBody, "key", "CA_CERTS_PEM_BUNDLE")
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/PLOY_CA_CERTS", reqBody, "key", "PLOY_CA_CERTS")
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -203,14 +203,14 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	if !st.upsertGlobalEnv.called {
 		t.Error("store.UpsertGlobalEnv was not called")
 	}
-	if st.upsertGlobalEnv.params.Key != "CA_CERTS_PEM_BUNDLE" {
-		t.Errorf("store Key = %q, want %q", st.upsertGlobalEnv.params.Key, "CA_CERTS_PEM_BUNDLE")
+	if st.upsertGlobalEnv.params.Key != "PLOY_CA_CERTS" {
+		t.Errorf("store Key = %q, want %q", st.upsertGlobalEnv.params.Key, "PLOY_CA_CERTS")
 	}
 
 	// Verify holder was updated.
-	v, ok := holder.GetGlobalEnvVar("CA_CERTS_PEM_BUNDLE")
+	v, ok := holder.GetGlobalEnvVar("PLOY_CA_CERTS")
 	if !ok {
-		t.Fatal("holder does not contain CA_CERTS_PEM_BUNDLE")
+		t.Fatal("holder does not contain PLOY_CA_CERTS")
 	}
 	if v.Value != "-----BEGIN CERTIFICATE-----\n..." {
 		t.Errorf("holder Value = %q", v.Value)
@@ -426,7 +426,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 	}{
 		{
 			name:   "CA bundle",
-			key:    "CA_CERTS_PEM_BUNDLE",
+			key:    "PLOY_CA_CERTS",
 			value:  "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
 			target: "gates",
 			secret: true,

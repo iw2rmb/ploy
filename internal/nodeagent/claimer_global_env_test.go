@@ -6,7 +6,7 @@
 //	spec JSON → parseSpec → StartRunRequest.Env → buildManifestFromRequest → manifest.Env
 //
 // The tests ensure that:
-//   - Global env vars (e.g., CODEX_AUTH_JSON, CA_CERTS_PEM_BUNDLE, OPENAI_API_KEY)
+//   - Global env vars (e.g., CODEX_AUTH_JSON, PLOY_CA_CERTS, OPENAI_API_KEY)
 //     pass through the full claim → manifest pipeline without filtering.
 //   - Per-run env values override global env when both are present.
 //   - Gate manifests (buildGateManifestFromRequest) preserve env vars.
@@ -45,13 +45,13 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 				"job_id": "` + testKSUID + `",
 				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"env": {
-					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
+					"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
 					"CODEX_AUTH_JSON": "{\"api_key\":\"sk-xxx\",\"org_id\":\"org-yyy\"}",
 					"OPENAI_API_KEY": "sk-openai-test-key-12345"
 				}
 			}`),
 			wantEnv: map[string]string{
-				"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
+				"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
 				"CODEX_AUTH_JSON":     `{"api_key":"sk-xxx","org_id":"org-yyy"}`,
 				"OPENAI_API_KEY":      "sk-openai-test-key-12345",
 			},
@@ -100,11 +100,11 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			spec: json.RawMessage(`{
 				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"env": {
-					"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----"
+					"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----"
 				}
 			}`),
 			wantEnv: map[string]string{
-				"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----",
+				"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----",
 			},
 		},
 	}
@@ -149,7 +149,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"gitlab_pat": "glpat-test-token",
 		"env": {
-			"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
+			"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 			"CODEX_AUTH_JSON": "{\"token\":\"test-codex-token\"}",
 			"OPENAI_API_KEY": "sk-test-openai-key",
 			"CUSTOM_GLOBAL_VAR": "custom_value"
@@ -179,7 +179,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Verify all global env vars are present in the manifest.
 	expectedEnv := map[string]string{
-		"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
+		"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 		"CODEX_AUTH_JSON":     `{"token":"test-codex-token"}`,
 		"OPENAI_API_KEY":      "sk-test-openai-key",
 		"CUSTOM_GLOBAL_VAR":   "custom_value",
@@ -220,7 +220,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 			"enabled": true
 		},
 		"env": {
-			"CA_CERTS_PEM_BUNDLE": "gate-test-cert-bundle",
+			"PLOY_CA_CERTS": "gate-test-cert-bundle",
 			"CODEX_AUTH_JSON": "gate-codex-auth",
 			"GATE_SPECIFIC_VAR": "gate_value"
 		}
@@ -245,7 +245,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 
 	// Verify global env vars are preserved in gate manifest.
 	expectedEnv := map[string]string{
-		"CA_CERTS_PEM_BUNDLE": "gate-test-cert-bundle",
+		"PLOY_CA_CERTS": "gate-test-cert-bundle",
 		"CODEX_AUTH_JSON":     "gate-codex-auth",
 		"GATE_SPECIFIC_VAR":   "gate_value",
 	}
@@ -297,7 +297,7 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 		"env": {
 			"GLOBAL_VAR": "global_value",
 			"SHARED_VAR": "global_default",
-			"CA_CERTS_PEM_BUNDLE": "global-cert-bundle"
+			"PLOY_CA_CERTS": "global-cert-bundle"
 		},
 		"steps": [
 			{
@@ -343,8 +343,8 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	if manifest0.Env["SHARED_VAR"] != "step0_override" {
 		t.Errorf("step0: SHARED_VAR=%q, want step0_override (step env wins)", manifest0.Env["SHARED_VAR"])
 	}
-	if manifest0.Env["CA_CERTS_PEM_BUNDLE"] != "global-cert-bundle" {
-		t.Errorf("step0: CA_CERTS_PEM_BUNDLE=%q, want global-cert-bundle", manifest0.Env["CA_CERTS_PEM_BUNDLE"])
+	if manifest0.Env["PLOY_CA_CERTS"] != "global-cert-bundle" {
+		t.Errorf("step0: PLOY_CA_CERTS=%q, want global-cert-bundle", manifest0.Env["PLOY_CA_CERTS"])
 	}
 
 	// Build manifest for step 1 (should not have step0 override).
@@ -384,7 +384,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		TargetRef: types.GitRef("feature/healing"),
 		Env: map[string]string{
 			"GLOBAL_VAR":          "global_value",
-			"CA_CERTS_PEM_BUNDLE": "global-cert-bundle",
+			"PLOY_CA_CERTS": "global-cert-bundle",
 			"SHARED_VAR":          "from_req",
 		},
 	}
@@ -393,7 +393,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	healingMod := MigContainerSpec{
 		Image: testJobImage("codex:latest"),
 		Env: map[string]string{
-			"CA_CERTS_PEM_BUNDLE": "healing-cert-bundle",
+			"PLOY_CA_CERTS": "healing-cert-bundle",
 			"CODEX_AUTH_JSON":     `{"healing":"auth"}`,
 			"HEALING_SPECIFIC":    "healing_value",
 		},
@@ -408,7 +408,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	// Verify env vars are preserved with correct precedence.
 	expectedEnv := map[string]string{
 		"GLOBAL_VAR":          "global_value",            // from req.Env (no override)
-		"CA_CERTS_PEM_BUNDLE": "healing-cert-bundle",     // mig.Env overrides req.Env
+		"PLOY_CA_CERTS": "healing-cert-bundle",     // mig.Env overrides req.Env
 		"CODEX_AUTH_JSON":     `{"healing":"auth"}`,      // from mig.Env only
 		"HEALING_SPECIFIC":    "healing_value",           // from mig.Env only
 		"SHARED_VAR":          "from_req",                // from req.Env (no mig override)

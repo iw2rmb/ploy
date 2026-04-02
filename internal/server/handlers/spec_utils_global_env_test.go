@@ -101,11 +101,11 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 		{
 			name:    "preserves other spec fields",
 			spec:    json.RawMessage(`{"repo":"github.com/test","timeout":300,"env":{"EXISTING":"yes"}}`),
-			env:     map[string][]GlobalEnvVar{"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
+			env:     map[string][]GlobalEnvVar{"PLOY_CA_CERTS": {{Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
 			jobType: domaintypes.JobTypeMod,
 			checkEnv: map[string]string{
 				"EXISTING":           "yes",
-				"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERT-----\n...",
+				"PLOY_CA_CERTS": "-----BEGIN CERT-----\n...",
 			},
 		},
 		{
@@ -119,23 +119,23 @@ func TestApplyGlobalEnvMutator(t *testing.T) {
 			name: "common global keys for mig",
 			spec: json.RawMessage(`{}`),
 			env: map[string][]GlobalEnvVar{
-				"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+				"PLOY_CA_CERTS": {{Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 				"CODEX_AUTH_JSON":     {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 				"OPENAI_API_KEY":      {{Value: "sk-...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 			},
 			jobType:    domaintypes.JobTypeMod,
-			expectKeys: []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "OPENAI_API_KEY"},
+			expectKeys: []string{"PLOY_CA_CERTS", "CODEX_AUTH_JSON", "OPENAI_API_KEY"},
 		},
 		{
 			name: "common global keys for pre_gate with gates target",
 			spec: json.RawMessage(`{}`),
 			env: map[string][]GlobalEnvVar{
-				"CA_CERTS_PEM_BUNDLE": {{Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
+				"PLOY_CA_CERTS": {{Value: "-----BEGIN CERTIFICATE-----\nMIID...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
 				"CODEX_AUTH_JSON":     {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 				"OPENAI_API_KEY":      {{Value: "sk-...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 			},
 			jobType:    domaintypes.JobTypePreGate,
-			expectKeys: []string{"CA_CERTS_PEM_BUNDLE"},
+			expectKeys: []string{"PLOY_CA_CERTS"},
 			rejectKeys: []string{"CODEX_AUTH_JSON", "OPENAI_API_KEY"},
 		},
 		// --- Step 4: target-aware merge precedence tests ---
