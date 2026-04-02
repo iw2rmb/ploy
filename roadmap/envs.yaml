@@ -12,7 +12,9 @@ documentation:
   - cmd/ploy/README.md
   - docs/migs-lifecycle.md
 done: false
-reviews: []
+reviews:
+  - gaps: ["\"Keep API docs, operator docs, and CLI docs synchronized with implemented wire contracts and help text.\" is violated in `cmd/ploy/README.md:5-7`: it states legacy `migs` subcommands were removed, while the same file still documents `ploy mig run` usage (`cmd/ploy/README.md:23`).", "\"Replace CA_CERTS_PEM_BUNDLE references with PLOY_CA_CERTS across runtime seeders, claim merges, gate step paths, and ORW wrappers.\" has a leftover reference in `internal/store/schema.sql:472` where the `config_env.key` comment example still uses `CA_CERTS_PEM_BUNDLE`.", "\"Replace wire field scope with target in list/get/put payloads and validation logic.\" has leftover scope-based payload usage in `internal/server/handlers/config_authz_test.go:23` (`{\"value\":\"test\",\"scope\":\"all\"}` for `PUT /v1/config/env/{key}`)."]
+    commit: null
 items:
   - done: true
     reviews:
