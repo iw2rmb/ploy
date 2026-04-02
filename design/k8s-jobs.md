@@ -190,5 +190,5 @@ Testable outcome:
 - [internal/workflow/step/container_docker.go](/Users/v.v.kovalev/@iw2rmb/ploy/internal/workflow/step/container_docker.go)
 - [internal/server/handlers/nodes_claim_service.go](/Users/v.v.kovalev/@iw2rmb/ploy/internal/server/handlers/nodes_claim_service.go)
 - [internal/store/queries/jobs.sql](/Users/v.v.kovalev/@iw2rmb/ploy/internal/store/queries/jobs.sql)
-- [docs/migs-lifecycle.md](/Users/v.v.kovalev/@iw2rmb/ploy/docs/migs-lifecycle.md)
-- [docs/build-gate/README.md](/Users/v.v.kovalev/@iw2rmb/ploy/docs/build-gate/README.md)
+- [docs/migs-lifecycle.md](../docs/migs-lifecycle.md)
+- [docs/build-gate/README.md](../docs/build-gate/README.md)

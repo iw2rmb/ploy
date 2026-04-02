@@ -64,7 +64,7 @@ Before creating a release, ensure you have:
 
 Before creating a release tag:
 
-- [ ] Update `CHANGELOG.md` with release notes for this version
+- [ ] Prepare release notes for this version
   - Document breaking changes (if any)
   - List new features
   - Document bug fixes
@@ -97,9 +97,9 @@ git log $(git describe --tags --abbrev=0)..HEAD --pretty=format:"%s" | grep -E "
 
 Then update `VERSION` to that value (example: `v0.1.0`).
 
-### Step 2: Update CHANGELOG.md
+### Step 2: Write Release Notes
 
-Add a new section at the top of `CHANGELOG.md`:
+Add a new section at the top of the changelog file:
 
 ```markdown
 ## [X.Y.Z] - YYYY-MM-DD

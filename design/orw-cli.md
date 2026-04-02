@@ -221,4 +221,3 @@ No compatibility mode and no fallback path.
 - `deploy/images/migs/orw-maven/orw-maven.sh`
 - `docs/migs-lifecycle.md`
 - `docs/envs/README.md`
-- `design/gate-stack.md`
