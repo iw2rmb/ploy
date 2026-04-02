@@ -113,7 +113,7 @@ import_ca_bundle() {
   fi
 
   local ploy_ca_pem=""
-  if [[ -f "${PLOY_CA_CERTS}" ]]; then
+  if [[ -r "${PLOY_CA_CERTS}" ]]; then
     ploy_ca_pem="$(cat "${PLOY_CA_CERTS}")"
   else
     ploy_ca_pem="${PLOY_CA_CERTS}"

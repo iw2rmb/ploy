@@ -146,8 +146,8 @@ func TestCAPreambleScript(t *testing.T) {
 	}
 
 	// Verify materializer supports both file path and inline PEM detection.
-	if !strings.Contains(preamble, `-f "${PLOY_CA_CERTS}"`) {
-		t.Errorf("expected file-path detection in preamble, got:\n%s", preamble)
+	if !strings.Contains(preamble, `-r "${PLOY_CA_CERTS}"`) {
+		t.Errorf("expected readable-path detection in preamble, got:\n%s", preamble)
 	}
 }
 
