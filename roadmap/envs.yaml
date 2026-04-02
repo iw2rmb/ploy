@@ -37,7 +37,7 @@ items:
       - "Store tests assert multi-target same-key upsert/list/get/delete behavior without key-level overwrite."
     reasoning: high
     cfp: 9
-
+    commit: edd28207
   - done: false
     reviews: []
     label: "2"
@@ -59,7 +59,6 @@ items:
       - "go test ./docs/api -run OpenAPI"
     reasoning: medium
     cfp: 8
-
   - done: false
     reviews: []
     label: "3"
@@ -79,7 +78,6 @@ items:
       - "go test ./cmd/ploy -run HelpRegression"
     reasoning: high
     cfp: 9
-
   - done: false
     reviews: []
     label: "4"
@@ -101,7 +99,6 @@ items:
       - "go test ./cmd/ployd -run GlobalEnvMapFromStoreEntries"
     reasoning: high
     cfp: 12
-
   - done: false
     reviews: []
     label: "5"
@@ -125,7 +122,6 @@ items:
       - "bash -n deploy/runtime/run.sh deploy/images/server/entrypoint.sh deploy/images/node/entrypoint.sh deploy/images/orw/orw-cli-gradle/orw-cli.sh deploy/images/orw/orw-cli-maven/orw-cli.sh"
     reasoning: high
     cfp: 11
-
   - done: false
     reviews: []
     label: "6"
