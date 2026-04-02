@@ -76,14 +76,18 @@ type globalEnvResponse struct {
 // handleConfigEnvList retrieves and displays all global environment variables.
 // Secret values are redacted in the list view unless --raw is passed.
 func handleConfigEnvList(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigEnvListUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
 	fs := flag.NewFlagSet("config env list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	if err := fs.Parse(args); err != nil {
-		printConfigEnvListUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigEnvListUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -160,6 +164,11 @@ func printConfigEnvListUsage(w io.Writer) {
 // handleConfigEnvShow displays a single global environment variable.
 // By default, secret values are redacted; use --raw to show the full value.
 func handleConfigEnvShow(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigEnvShowUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -172,8 +181,7 @@ func handleConfigEnvShow(args []string, stderr io.Writer) error {
 	fs.Var(&key, "key", "Environment variable name (required)")
 	fs.BoolVar(&raw, "raw", false, "Show raw value without redaction")
 
-	if err := fs.Parse(args); err != nil {
-		printConfigEnvShowUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigEnvShowUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -258,6 +266,11 @@ type globalEnvSetRequest struct {
 // handleConfigEnvSet creates or updates a global environment variable.
 // Value can be provided inline (--value) or from a file (--file).
 func handleConfigEnvSet(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigEnvSetUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -276,8 +289,7 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 	fs.StringVar(&scope, "scope", "all", "Scope: migs, heal, gate, all")
 	fs.Var(&secret, "secret", "Mark value as secret (default: true)")
 
-	if err := fs.Parse(args); err != nil {
-		printConfigEnvSetUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigEnvSetUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -383,6 +395,11 @@ func printConfigEnvSetUsage(w io.Writer) {
 
 // handleConfigEnvUnset deletes a global environment variable.
 func handleConfigEnvUnset(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigEnvUnsetUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -391,8 +408,7 @@ func handleConfigEnvUnset(args []string, stderr io.Writer) error {
 	var key stringValue
 	fs.Var(&key, "key", "Environment variable name (required)")
 
-	if err := fs.Parse(args); err != nil {
-		printConfigEnvUnsetUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigEnvUnsetUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {

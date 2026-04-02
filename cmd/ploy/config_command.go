@@ -86,14 +86,18 @@ type gitLabConfigPayload struct {
 
 // handleConfigGitLabShow displays the current GitLab configuration.
 func handleConfigGitLabShow(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigGitLabShowUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
 	fs := flag.NewFlagSet("config gitlab show", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	if err := fs.Parse(args); err != nil {
-		printConfigGitLabShowUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigGitLabShowUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -148,6 +152,11 @@ func printConfigGitLabShowUsage(w io.Writer) {
 
 // handleConfigGitLabSet applies a GitLab configuration from a JSON file.
 func handleConfigGitLabSet(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigGitLabSetUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -158,8 +167,7 @@ func handleConfigGitLabSet(args []string, stderr io.Writer) error {
 	)
 	fs.Var(&filePath, "file", "Path to JSON file containing GitLab configuration")
 
-	if err := fs.Parse(args); err != nil {
-		printConfigGitLabSetUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigGitLabSetUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
@@ -229,6 +237,11 @@ func printConfigGitLabSetUsage(w io.Writer) {
 
 // handleConfigGitLabValidate validates a GitLab configuration file without saving.
 func handleConfigGitLabValidate(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigGitLabValidateUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -237,8 +250,7 @@ func handleConfigGitLabValidate(args []string, stderr io.Writer) error {
 	var filePath stringValue
 	fs.Var(&filePath, "file", "Path to JSON file to validate")
 
-	if err := fs.Parse(args); err != nil {
-		printConfigGitLabValidateUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printConfigGitLabValidateUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {

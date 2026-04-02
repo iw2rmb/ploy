@@ -42,6 +42,11 @@ func handleRollout(args []string, stderr io.Writer) error {
 }
 
 func handleRolloutServer(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printRolloutServerUsage(stderr)
+		return nil
+	}
+
 	if stderr == nil {
 		stderr = io.Discard
 	}
@@ -66,8 +71,7 @@ func handleRolloutServer(args []string, stderr io.Writer) error {
 	fs.Var(&timeout, "timeout", "Timeout in seconds for the rollout operation (default: 60)")
 	fs.Var(&dryRun, "dry-run", "Print planned rollout actions without making changes")
 
-	if err := fs.Parse(args); err != nil {
-		printRolloutServerUsage(stderr)
+	if err := parseFlagSet(fs, args, func() { printRolloutServerUsage(stderr) }); err != nil {
 		return err
 	}
 	if fs.NArg() > 0 {
