@@ -25,14 +25,15 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	}
 
 	got := rt.captured.Command
-	want := []string{"/bin/sh", "-c", "echo prep-gate"}
-	if len(got) != len(want) {
-		t.Fatalf("captured command length = %d, want %d (%v)", len(got), len(want), got)
+	if len(got) != 3 || got[0] != "/bin/sh" || got[1] != "-c" {
+		t.Fatalf("expected 3-element shell command, got %v", got)
 	}
-	for i, v := range want {
-		if got[i] != v {
-			t.Fatalf("captured command[%d] = %q, want %q", i, got[i], v)
-		}
+	if !strings.Contains(got[2], "echo prep-gate") {
+		t.Fatalf("expected prep command in shell script, got %q", got[2])
+	}
+	// Materializer preamble must be applied to profile override commands.
+	if !strings.Contains(got[2], "PLOY_CA_CERTS") {
+		t.Fatalf("expected PLOY_CA_CERTS materializer preamble in prep override command, got %q", got[2])
 	}
 }
 

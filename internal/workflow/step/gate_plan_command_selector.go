@@ -35,7 +35,7 @@ func resolveGateCommand(
 					)
 				}
 			}
-			return prep.Command.ToSlice(), contracts.CopyEnv(prep.Env), nil
+			return wrapWithMaterializerPreamble(prep.Command.ToSlice()), contracts.CopyEnv(prep.Env), nil
 		}
 	}
 
@@ -52,6 +52,31 @@ func resolveGateCommand(
 		return nil, nil, err
 	}
 	return cmd, nil, nil
+}
+
+// wrapWithMaterializerPreamble prepends the env materializer preamble to a
+// container command so that special env keys (e.g. PLOY_CA_CERTS) are
+// materialized regardless of whether the command was tool-derived or
+// profile-override-derived.
+func wrapWithMaterializerPreamble(cmd []string) []string {
+	preamble := envMaterializerPreamble()
+	if preamble == "" {
+		return cmd
+	}
+	// Shell-wrapped command: ["/bin/sh", "-c", "actual command"]
+	if len(cmd) == 3 && cmd[0] == "/bin/sh" && cmd[1] == "-c" {
+		return []string{cmd[0], cmd[1], preamble + cmd[2]}
+	}
+	// Exec-form: wrap in shell to apply preamble before the command.
+	var script strings.Builder
+	script.WriteString(preamble)
+	script.WriteString("exec")
+	for _, a := range cmd {
+		script.WriteString(" '")
+		script.WriteString(strings.ReplaceAll(a, "'", "'\\''"))
+		script.WriteString("'")
+	}
+	return []string{"/bin/sh", "-c", script.String()}
 }
 
 func stackMatchesPrepOverride(stack *contracts.GateProfileStack, language, tool, release string) bool {

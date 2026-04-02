@@ -173,6 +173,71 @@ func TestEnvMaterializerPreamble(t *testing.T) {
 	}
 }
 
+// TestDockerGateExecutor_CAPreambleOnPrepOverride verifies that the PLOY_CA_CERTS
+// materializer preamble is applied when the gate command is resolved from a
+// profile override (prep.Command) rather than from tool-derived detection.
+func TestDockerGateExecutor_CAPreambleOnPrepOverride(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		command contracts.CommandSpec
+	}{
+		{
+			name:    "shell_form",
+			command: contracts.CommandSpec{Shell: "echo prep-gate-test"},
+		},
+		{
+			name:    "exec_form",
+			command: contracts.CommandSpec{Exec: []string{"/usr/bin/echo", "prep-gate-test"}},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := &testContainerRuntime{}
+			executor := NewDockerGateExecutor(rt)
+			workspace := createMavenWorkspace(t, "17")
+
+			spec := &contracts.StepGateSpec{
+				Enabled: true,
+				GateProfile: &contracts.BuildGateProfileOverride{
+					Command: tc.command,
+				},
+			}
+
+			_, err := executor.Execute(context.Background(), spec, workspace)
+			if err != nil {
+				t.Fatalf("Execute() unexpected error: %v", err)
+			}
+			if !rt.createCalled {
+				t.Fatal("expected Create to be called")
+			}
+			if len(rt.captured.Command) != 3 {
+				t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
+			}
+
+			cmd := rt.captured.Command[2]
+
+			if !strings.Contains(cmd, "PLOY_CA_CERTS") {
+				t.Errorf("expected PLOY_CA_CERTS materializer preamble in prep override command, got %q", cmd)
+			}
+			if !strings.Contains(cmd, "update-ca-certificates") {
+				t.Errorf("expected update-ca-certificates in prep override command, got %q", cmd)
+			}
+			if !strings.Contains(cmd, "keytool -importcert") {
+				t.Errorf("expected keytool -importcert in prep override command, got %q", cmd)
+			}
+			if !strings.Contains(cmd, "prep-gate-test") {
+				t.Errorf("expected original command content in prep override command, got %q", cmd)
+			}
+		})
+	}
+}
+
 // --- Stack Gate Pre-Check Tests ---
 
 // createMavenWorkspace creates a workspace with a valid Maven pom.xml that has Java version.
