@@ -213,6 +213,5 @@ exemption mechanism — the finding must be resolved in source code.
 
 ## References
 
-- `AGENTS.md` — Engineering policies and local validation requirements
 - `tests/e2e/migs/README.md` — Workflow-level E2E scenarios
 - `docs/migs-lifecycle.md` — Run lifecycle and status behavior
