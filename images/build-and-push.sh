@@ -20,8 +20,8 @@ set -Eeuo pipefail
 #   PUSH_LATEST - Optional alias toggle for :latest (default 1 for stable releases)
 #
 # Examples:
-#   deploy/images/build-and-push.sh
-#   VERSION=v0.1.0 PLATFORM=linux/amd64 deploy/images/build-and-push.sh
+#   images/build-and-push.sh
+#   VERSION=v0.1.0 PLATFORM=linux/amd64 images/build-and-push.sh
 
 PLATFORM=${PLATFORM:-linux/amd64}
 IMAGE_PREFIX="${IMAGE_PREFIX:-ghcr.io/iw2rmb/ploy}"
@@ -92,7 +92,7 @@ build_push_orw() {
   local dir="$1"
   local image_name
   image_name="$(basename "$dir")"
-  local dockerfile="deploy/images/orw/${image_name}/Dockerfile"
+  local dockerfile="images/orw/${image_name}/Dockerfile"
 
   # Current ORW images share repo-root context because Dockerfiles copy shared files.
   build_push "$image_name" "$dockerfile" "."
@@ -123,25 +123,27 @@ mirror_remote_image() {
   docker buildx imagetools create -t "${target_ref}" "${source_ref}" >/dev/null
 }
 
+make build
+
 # server
-build_push server deploy/images/server/Dockerfile .
+build_push server images/server/Dockerfile .
 
 # node
-build_push node deploy/images/node/Dockerfile .
+build_push node images/node/Dockerfile .
 
 # codex
-build_push codex deploy/images/codex/Dockerfile .
+build_push codex images/codex/Dockerfile .
 
 # amata
-bash deploy/images/amata/build-amata.sh
-build_push amata deploy/images/amata/Dockerfile .
+bash images/amata/build-amata.sh
+build_push amata images/amata/Dockerfile .
 
 # shell
-build_push shell deploy/images/shell/Dockerfile deploy/images/shell
+build_push shell images/shell/Dockerfile images/shell
 
 # build gate (gradle)
-build_push_fixed_tag gate-gradle deploy/images/gates/gradle/Dockerfile.jdk11 deploy/images/gates/gradle jdk11
-build_push_fixed_tag gate-gradle deploy/images/gates/gradle/Dockerfile.jdk17 deploy/images/gates/gradle jdk17
+build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk11 images/gates/gradle jdk11
+build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk17 images/gates/gradle jdk17
 
 # build gate (maven mirrors)
 mirror_remote_image docker.io/library/maven:3-eclipse-temurin-11 "${IMAGE_PREFIX}/maven:3-eclipse-temurin-11"
@@ -152,11 +154,11 @@ orw_dirs=()
 while IFS= read -r d; do
   orw_dirs+=("$d")
 done < <(
-  find deploy/images/orw -mindepth 1 -maxdepth 1 -type d \
+  find images/orw -mindepth 1 -maxdepth 1 -type d \
     -exec test -f "{}/Dockerfile" \; -print | sort
 )
 if [[ ${#orw_dirs[@]} -eq 0 ]]; then
-  echo "error: no ORW image directories with Dockerfile found under deploy/images/orw" >&2
+  echo "error: no ORW image directories with Dockerfile found under images/orw" >&2
   exit 1
 fi
 for d in "${orw_dirs[@]}"; do

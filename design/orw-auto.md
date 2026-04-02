@@ -14,7 +14,7 @@ Provide a deterministic way to select `orw-cli` runner dependency versions for a
 - Promote only validated images.
 
 Out of scope:
-- Backward compatibility with removed single image `deploy/images/orw/orw-cli`.
+- Backward compatibility with removed single image `images/orw/orw-cli`.
 - Per-repo custom recipes in this document (same algorithm applies, different input coord).
 
 ## Why No Manual Table
@@ -40,8 +40,8 @@ Example current target:
 3. Resolve dependency tree.
 4. Extract effective `org.openrewrite:*` versions from the resolved tree.
 5. Update runner POMs:
-   - `deploy/images/orw/orw-cli-maven/rewrite-runner/pom.xml`
-   - `deploy/images/orw/orw-cli-gradle/rewrite-runner/pom.xml`
+   - `images/orw/orw-cli-maven/rewrite-runner/pom.xml`
+   - `images/orw/orw-cli-gradle/rewrite-runner/pom.xml`
 6. Build both images from repo-root context.
 7. Run image self-test (`MODS_SELF_TEST=1`).
 8. Run lane smoke tests against minimal fixtures:
@@ -103,5 +103,5 @@ Single pipeline per recipe version bump:
 
 - `tmp/j11to17/mig.yaml`
 - `design/orw-cli.md`
-- `deploy/images/orw/orw-cli-maven/rewrite-runner/pom.xml`
-- `deploy/images/orw/orw-cli-gradle/rewrite-runner/pom.xml`
+- `images/orw/orw-cli-maven/rewrite-runner/pom.xml`
+- `images/orw/orw-cli-gradle/rewrite-runner/pom.xml`

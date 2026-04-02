@@ -5,6 +5,4 @@
 [how-to/](how-to) Operational how-to guides for common maintainer and operator tasks.
 [log-hooks.md](log-hooks.md) Log hook architecture and runtime behavior for node-side log processing before upload.
 [migs-lifecycle.md](migs-lifecycle.md) Canonical lifecycle and architecture reference for runs, jobs, gates, and healing flows.
-[releasing.md](releasing.md) End-to-end release procedure covering versioning, tagging, artifact publishing, and verification.
 [schemas/](schemas) Schemas and examples for integration manifests, gate profiles, and mig spec structures.
-[testing-workflow.md](testing-workflow.md) Local and CI-aligned testing workflow, coverage guidance, and redundancy guardrails.

@@ -57,9 +57,9 @@ build: verify-go-toolchain verify-version package-runtime-assets ## Build the CL
 .PHONY: package-runtime-assets
 package-runtime-assets: ## Pack embedded runtime deploy archive for ploy cluster deploy
 	@mkdir -p cmd/ploy/assets
-	@cd deploy/runtime && \
+	@cd cmd/ploy/assets/runtime && \
 		find . -type f ! -name 'contents.md' | LC_ALL=C sort | \
-		tar -czf ../../cmd/ploy/assets/runtime.tgz -T -
+		tar -czf ../runtime.tgz -T -
 
 .PHONY: sign-binaries
 sign-binaries: verify-version ## Sign dist binaries with cosign (keyless or key-based)

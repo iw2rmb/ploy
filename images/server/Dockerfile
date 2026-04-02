@@ -12,7 +12,7 @@ RUN set -eux; \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
 COPY dist/ployd-linux /usr/local/bin/ployd
 RUN chmod +x /usr/local/bin/ployd
-COPY deploy/images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
+COPY images/server/entrypoint.sh /usr/local/bin/ployd-entrypoint
 RUN chmod +x /usr/local/bin/ployd-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 COPY --chown=ploy:ploy docs/schemas/gate_profile.schema.json /etc/ploy/schemas/gate_profile.schema.json

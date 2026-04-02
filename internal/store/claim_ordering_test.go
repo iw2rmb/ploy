@@ -15,11 +15,11 @@ import (
 // tie-breaker (… ORDER BY run_id, repo_id, attempt, next_id, id) so claim
 // behavior cannot vary when next_id ties.
 //
-// Requires PLOY_TEST_PG_DSN to be set with a test database.
+// Requires PLOY_TEST_DB_DSN to be set with a test database.
 func TestClaimJobOrderingDeterministic(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx := context.Background()
@@ -131,9 +131,9 @@ func TestClaimJobOrderingDeterministic(t *testing.T) {
 }
 
 func TestClaimJobOrderingScopedByRunRepoAttempt(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx := context.Background()

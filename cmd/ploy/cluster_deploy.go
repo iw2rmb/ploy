@@ -144,7 +144,7 @@ func parseClusterDeployArgs(args []string, stderr io.Writer) ([]string, error) {
 func printClusterDeployUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy cluster deploy [--drop-db] [--ployd] [--nodes] [--no-pull] [--cluster <id>] [cluster]")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Deploy runtime stack on the current host using embedded deploy/runtime assets.")
+	_, _ = fmt.Fprintln(w, "Deploy runtime stack on the current host using embedded cmd/ploy/assets/runtime assets.")
 	_, _ = fmt.Fprintln(w, "If cluster id is omitted, a new id is generated automatically.")
 }
 

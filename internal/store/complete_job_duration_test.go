@@ -18,11 +18,11 @@ import (
 // The duration_ms must always be set to a valid non-negative value (0 when
 // started_at is NULL, actual duration otherwise).
 //
-// Requires PLOY_TEST_PG_DSN to be set with a test database.
+// Requires PLOY_TEST_DB_DSN to be set with a test database.
 func TestCompleteJobDurationNeverNull(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()

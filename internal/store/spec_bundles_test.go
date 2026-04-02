@@ -13,9 +13,9 @@ import (
 
 func openStoreForSpecBundleTests(t *testing.T) (context.Context, Store) {
 	t.Helper()
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 	ctx := context.Background()
 	db, err := NewStore(ctx, dsn)

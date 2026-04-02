@@ -100,4 +100,4 @@ go test -race -cover ./internal/nodeagent/...
 
 ## Next Steps
 
-See `docs/how-to/deploy-locally.md`.
+See `docs/how-to/deploy.md`.

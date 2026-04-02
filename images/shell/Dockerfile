@@ -4,7 +4,7 @@
 # Git workspace. It is intended for lightweight preprocessing steps
 # such as generating rewrite.yml or other derived configs.
 #
-# See deploy/images/migs/README.md for the Migs runtime contract.
+# See images/README.md for the Migs runtime contract.
 
 FROM --platform=$TARGETOS/$TARGETARCH bash:5.2
 

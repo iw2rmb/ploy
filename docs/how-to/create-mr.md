@@ -8,7 +8,7 @@ Overview
 Prerequisites
 - A GitLab instance (self-hosted or gitlab.com)
 - A Personal Access Token (PAT) with `api` scope
-- A local Ploy cluster running (see `deploy/runtime/run.sh`) and accessible via `ploy` CLI (`PLOY_CONFIG_HOME=$HOME/.config/ploy/local`)
+- A Ploy cluster running (see `ploy cluster deploy`) and accessible via `ploy` CLI (`PLOY_CONFIG_HOME=$HOME/.config/ploy`)
 
 ## Method 1: Configure Global GitLab Credentials (Recommended)
 

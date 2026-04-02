@@ -7,7 +7,7 @@ if [[ -f "$SCRIPT_DIR/docker-compose.yml" ]]; then
   RUNTIME_DIR="$SCRIPT_DIR"
 else
   ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-  RUNTIME_DIR="$ROOT_DIR/deploy/runtime"
+  RUNTIME_DIR="$ROOT_DIR/cmd/ploy/assets/runtime"
 fi
 cd "$ROOT_DIR"
 
@@ -45,7 +45,7 @@ need() {
 
 usage() {
   cat <<'USAGE'
-Usage: ./deploy/runtime/run.sh [--drop-db] [--ployd] [--nodes] [--no-pull] [--cluster <id>] [cluster]
+Usage: ploy cluster deploy [--drop-db] [--ployd] [--nodes] [--no-pull] [--cluster <id>] [cluster]
 
 Runtime deploy using pre-built GHCR images.
 
@@ -412,7 +412,7 @@ configure_docker_registry_ca_if_needed() {
   fi
 
   echo "error: PLOY_CA_CERTS auto-install is not supported for docker context '${context}' (engine='${engine_name}') on ${os_name}" >&2
-  echo "error: configure docker daemon trust manually, then rerun deploy/runtime/run.sh" >&2
+  echo "error: configure docker daemon trust manually, then rerun ploy cluster deploy" >&2
   exit 1
 }
 

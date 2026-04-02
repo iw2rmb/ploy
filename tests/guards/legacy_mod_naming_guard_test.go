@@ -17,11 +17,11 @@ func TestNoLegacyModNamingInKeySurfaces(t *testing.T) {
 		"/v1/" + legacyPlural,
 		"internal/" + legacyPlural,
 		"ploy " + legacyUnit,
-		"deploy/images/" + legacyPlural,
+		"images/" + legacyPlural,
 		legacyPlural + "-",
 	}
 
-	roots := []string{"cmd", "internal", "deploy", "docs", "tests"}
+	roots := []string{"cmd", "internal", "images", "docs", "tests"}
 
 	for _, root := range roots {
 		rootPath := resolveRepoPath(root)

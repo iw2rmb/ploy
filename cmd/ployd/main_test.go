@@ -25,7 +25,7 @@ import (
 )
 
 func TestResolvePgDSN_EnvBeatsConfig(t *testing.T) {
-	t.Setenv("PLOY_POSTGRES_DSN", "postgres://env")
+	t.Setenv("PLOY_DB_DSN", "postgres://env")
 	cfg := apiconfig.Config{}
 	cfg.Postgres.DSN = "postgres://from-config"
 
@@ -36,7 +36,7 @@ func TestResolvePgDSN_EnvBeatsConfig(t *testing.T) {
 }
 
 func TestResolvePgDSN_FromConfig(t *testing.T) {
-	t.Setenv("PLOY_POSTGRES_DSN", "")
+	t.Setenv("PLOY_DB_DSN", "")
 	cfg := apiconfig.Config{}
 	cfg.Postgres.DSN = "  postgres://from-config  "
 
@@ -47,7 +47,7 @@ func TestResolvePgDSN_FromConfig(t *testing.T) {
 }
 
 func TestResolvePgDSN_TrimEnv(t *testing.T) {
-	t.Setenv("PLOY_POSTGRES_DSN", "  postgres://trimmed  ")
+	t.Setenv("PLOY_DB_DSN", "  postgres://trimmed  ")
 	cfg := apiconfig.Config{}
 	cfg.Postgres.DSN = "postgres://from-config"
 
@@ -58,9 +58,9 @@ func TestResolvePgDSN_TrimEnv(t *testing.T) {
 }
 
 func TestResolvePgDSN_PlaceholderIgnored(t *testing.T) {
-	t.Setenv("PLOY_POSTGRES_DSN", "")
+	t.Setenv("PLOY_DB_DSN", "")
 	cfg := apiconfig.Config{}
-	cfg.Postgres.DSN = "${PLOY_POSTGRES_DSN}"
+	cfg.Postgres.DSN = "${PLOY_DB_DSN}"
 
 	got := resolvePgDSN(cfg)
 	if got != "" {
@@ -273,7 +273,7 @@ func TestGlobalEnvMapFromStoreEntries_ParsesAndDropsInvalid(t *testing.T) {
 	entries := []store.ConfigEnv{
 		{Key: "A", Target: "server", Value: "1", Secret: true},
 		{Key: "B", Target: "gates", Value: "2", Secret: false},
-		{Key: "C", Target: "mig", Value: "3", Secret: false},  // invalid (old scope value, hard cut)
+		{Key: "C", Target: "mig", Value: "3", Secret: false},   // invalid (old scope value, hard cut)
 		{Key: "D", Target: "steps", Value: "4", Secret: false}, // valid
 		{Key: "E", Target: "", Value: "5", Secret: false},      // empty target rejected
 		{Key: "F", Target: "all", Value: "6", Secret: false},   // old scope value, hard cut

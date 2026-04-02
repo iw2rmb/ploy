@@ -13,11 +13,11 @@ import (
 // TestV1SQLCQueries_Mods verifies that the v1 migs queries are wired and match
 // the expected filter semantics.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1SQLCQueries_Mods(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -153,11 +153,11 @@ func TestV1SQLCQueries_Mods(t *testing.T) {
 
 // TestV1SQLCQueries_ModRepos verifies v1 mig_repos lookup/upsert/delete behavior.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1SQLCQueries_ModRepos(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -252,11 +252,11 @@ func TestV1SQLCQueries_ModRepos(t *testing.T) {
 
 // TestV1SQLCQueries_Specs verifies ListSpecs ordering by created_at DESC.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1SQLCQueries_Specs(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()

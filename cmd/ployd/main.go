@@ -60,7 +60,7 @@ func runMain() int {
 	// Resolve PostgreSQL DSN from environment or config.
 	dsn := resolvePgDSN(cfg)
 	if dsn == "" {
-		slog.Error("postgresql dsn not configured", "hint", "set PLOY_POSTGRES_DSN or configure postgres.dsn in config file")
+		slog.Error("postgresql dsn not configured", "hint", "set PLOY_DB_DSN or configure postgres.dsn in config file")
 		return 1
 	}
 

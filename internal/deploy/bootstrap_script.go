@@ -88,7 +88,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE ploy TO ploy;\" || true\n\n")
 
 	// Derive DSN
-	b.WriteString("  export PLOY_POSTGRES_DSN=\"postgres://ploy:${PLOY_DB_PASSWORD}@localhost:5432/ploy?sslmode=disable\"\n")
+	b.WriteString("  export PLOY_DB_DSN=\"postgres://ploy:${PLOY_DB_PASSWORD}@localhost:5432/ploy?sslmode=disable\"\n")
 	b.WriteString("  echo 'PostgreSQL configured successfully.'\n")
 	b.WriteString("fi\n\n")
 
@@ -141,7 +141,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  bearer_tokens:\n")
 	b.WriteString("    enabled: true\n")
 	b.WriteString("postgres:\n")
-	b.WriteString("  dsn: ${PLOY_POSTGRES_DSN:-}\n")
+	b.WriteString("  dsn: ${PLOY_DB_DSN:-}\n")
 	b.WriteString("EOF\n\n")
 
 	// Install systemd unit for server

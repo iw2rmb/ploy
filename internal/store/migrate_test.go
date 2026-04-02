@@ -8,9 +8,9 @@ import (
 )
 
 func TestRunMigrations(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping migration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping migration test")
 	}
 	ctx := context.Background()
 
@@ -74,9 +74,9 @@ func TestRunMigrations(t *testing.T) {
 }
 
 func TestEnsureVersionTable(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping version table test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping version table test")
 	}
 	ctx := context.Background()
 
@@ -105,9 +105,9 @@ func TestEnsureVersionTable(t *testing.T) {
 }
 
 func TestGetCurrentVersion(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping version test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping version test")
 	}
 	ctx := context.Background()
 

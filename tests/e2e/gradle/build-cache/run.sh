@@ -3,8 +3,8 @@ set -euo pipefail
 
 # E2E: Verify Gradle Build Gate uses the remote Gradle Build Cache node.
 #
-# This scenario depends on the local Docker cluster from deploy/runtime/run.sh:
-# - docker compose -f deploy/runtime/docker-compose.yml up -d
+# This scenario depends on the local Docker cluster from ploy cluster deploy:
+# - docker compose -f cmd/ploy/assets/runtime/docker-compose.yml up -d
 # - gradle-build-cache service reachable as http://gradle-build-cache:5071/cache/ from gate containers
 #
 # It clears the cache node data, runs a no-op mig run that triggers:
@@ -47,7 +47,7 @@ mkdir -p "${OUT_DIR}"
 
 cache_container_id="$(docker ps --filter 'name=gradle-build-cache' --format '{{.ID}}' | head -n 1 || true)"
 if [[ -z "${cache_container_id:-}" ]]; then
-  echo "Error: gradle-build-cache container not found; deploy the local cluster first (deploy/runtime/run.sh)." >&2
+  echo "Error: gradle-build-cache container not found; deploy the local cluster first (ploy cluster deploy)." >&2
   exit 1
 fi
 

@@ -10,9 +10,9 @@ import (
 )
 
 func TestSchema_GateProfilesUniqueByRepoShaStack(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -74,9 +74,9 @@ func TestSchema_GateProfilesUniqueByRepoShaStack(t *testing.T) {
 }
 
 func TestSchema_GateProfilesForeignKeys(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -111,9 +111,9 @@ func TestSchema_GateProfilesForeignKeys(t *testing.T) {
 }
 
 func TestSchema_GatesUniqueJobAndProfileFK(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()

@@ -14,11 +14,11 @@ import (
 // TestV1Schema_ModsNameUniqueness verifies the UNIQUE constraint on migs.name.
 // The migs table has a unique index on name to prevent duplicate mig names.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1Schema_ModsNameUniqueness(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -72,11 +72,11 @@ func TestV1Schema_ModsNameUniqueness(t *testing.T) {
 // TestV1Schema_ModReposUniqueness verifies the UNIQUE constraint on (mig_id, repo_id).
 // The mig_repos table has UNIQUE (mig_id, repo_id) to prevent duplicate repo memberships per mig.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1Schema_ModReposUniqueness(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -144,11 +144,11 @@ func TestV1Schema_ModReposUniqueness(t *testing.T) {
 // TestV1Schema_RunReposCompositePK verifies the composite PRIMARY KEY (run_id, repo_id).
 // The run_repos table has PRIMARY KEY (run_id, repo_id) to ensure one entry per repo per run.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1Schema_RunReposCompositePK(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -250,11 +250,11 @@ func TestV1Schema_RunReposCompositePK(t *testing.T) {
 // TestV1Schema_JobsUniqueness verifies the UNIQUE constraint on (run_id, repo_id, attempt, name).
 // The jobs table has UNIQUE (run_id, repo_id, attempt, name) to prevent duplicate jobs per repo attempt.
 //
-// This test is skipped if PLOY_TEST_PG_DSN is not set.
+// This test is skipped if PLOY_TEST_DB_DSN is not set.
 func TestV1Schema_JobsUniqueness(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()

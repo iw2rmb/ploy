@@ -1,12 +1,12 @@
 services:
   server:
-    image: ${PLOY_RUNTIME_SERVER_IMAGE:?set PLOY_RUNTIME_SERVER_IMAGE or run deploy/runtime/run.sh}
+    image: ${PLOY_RUNTIME_SERVER_IMAGE:?set PLOY_RUNTIME_SERVER_IMAGE or run ploy cluster deploy}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     platform: linux/amd64
     restart: unless-stopped
     environment:
-      - PLOY_POSTGRES_DSN=${PLOY_DB_DSN:?set PLOY_DB_DSN to a container-reachable postgres DSN}
+      - PLOY_DB_DSN=${PLOY_DB_DSN:?set PLOY_DB_DSN to a container-reachable postgres DSN}
       - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
       - PLOY_CLUSTER_ID=${CLUSTER_ID:-local}
       - PLOY_OBJECTSTORE_ENDPOINT=${PLOY_OBJECTSTORE_ENDPOINT:?set PLOY_OBJECTSTORE_ENDPOINT}
@@ -36,7 +36,7 @@ services:
       retries: 20
 
   node:
-    image: ${PLOY_RUNTIME_NODE_IMAGE:?set PLOY_RUNTIME_NODE_IMAGE or run deploy/runtime/run.sh}
+    image: ${PLOY_RUNTIME_NODE_IMAGE:?set PLOY_RUNTIME_NODE_IMAGE or run ploy cluster deploy}
     platform: linux/amd64
     user: "0:0"
     security_opt:
@@ -55,7 +55,7 @@ services:
       - PLOY_CA_CERTS=/etc/ploy/certs/ca.crt
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
-      - ${WORKER_TOKEN_PATH:?set WORKER_TOKEN_PATH (deploy/runtime/run.sh sets ~/.config/ploy/<cluster>/bearer-token)}:/etc/ploy/bearer-token:ro
+      - ${WORKER_TOKEN_PATH:?set WORKER_TOKEN_PATH (ploy cluster deploy sets ~/.config/ploy/<cluster>/bearer-token)}:/etc/ploy/bearer-token:ro
       - ${PLOY_CA_CERTS:-/dev/null}:/etc/ploy/certs/ca.crt:ro
       - ${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}:/var/run/docker.sock
       - /var/lib/docker:/var/lib/docker:ro

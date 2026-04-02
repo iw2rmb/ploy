@@ -8,9 +8,9 @@ import (
 )
 
 // resolvePgDSN returns the PostgreSQL DSN from environment or config.
-// Precedence: PLOY_POSTGRES_DSN > config.postgres.dsn
+// Precedence: PLOY_DB_DSN > config.postgres.dsn
 func resolvePgDSN(cfg config.Config) string {
-	if dsn := strings.TrimSpace(os.Getenv("PLOY_POSTGRES_DSN")); dsn != "" {
+	if dsn := strings.TrimSpace(os.Getenv("PLOY_DB_DSN")); dsn != "" {
 		return dsn
 	}
 	// Treat ${...} placeholders (as written by bootstrap) as unset to avoid

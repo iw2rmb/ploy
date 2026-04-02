@@ -45,10 +45,6 @@ __pycache__/
 # Logs
 /*.log
 
-# Test artifacts
-apps/
-test-template/
-
 .gocache_go/
 .gocache/
 .gopath/.gocache/
@@ -68,28 +64,13 @@ tests/e2e/deploy/e2e-logs/
 .codex/
 .tmp/
 
-# Deployment artifacts
-deploy/*/cli/rollout
-
-# Local deployment
-local/**
-
-# VPS
-deploy/vps/docker-compose-linux-x86_64
-deploy/vps/auth-secret.txt
-
+cmd/ploy/assets/runtime.tgz
 /ploy
 /ployd
 /ployd-node
-/ROADMAP.md
 
 # amata
 .amata
 deploy/images/amata/amata
-lib/j11to17/codex*/
-
-lib/sb2to3/repos*
-lib/sb2to3/runs*
 
 .crush
-deploy/runtime/node/bearer-token

@@ -12,7 +12,7 @@ RUN set -eux; \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
 COPY dist/ployd-node-linux /usr/local/bin/ployd-node
 RUN chmod +x /usr/local/bin/ployd-node
-COPY deploy/images/node/entrypoint.sh /usr/local/bin/ployd-node-entrypoint
+COPY images/node/entrypoint.sh /usr/local/bin/ployd-node-entrypoint
 RUN chmod +x /usr/local/bin/ployd-node-entrypoint
 COPY --chown=ploy:ploy gates/ /etc/ploy/gates/
 USER root

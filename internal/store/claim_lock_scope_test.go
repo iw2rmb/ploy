@@ -14,9 +14,9 @@ import (
 // The ClaimJob query joins `runs` for eligibility checks, but it must lock only
 // the selected `jobs` row via `FOR UPDATE OF j SKIP LOCKED`.
 func TestClaimJobLocksJobOnly(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping integration test")
 	}
 
 	ctx := context.Background()

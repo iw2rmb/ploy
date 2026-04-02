@@ -20,13 +20,13 @@ import (
 // 2. Simulate node operations: append logs and diffs as if a node is executing the run.
 // 3. Assert that logs and diff rows are stored in the database.
 //
-// This test requires a test database accessible via PLOY_TEST_PG_DSN.
+// This test requires a test database accessible via PLOY_TEST_DB_DSN.
 func TestLabSmoke(t *testing.T) {
 	skipDBIntegrationUnderCoverage(t)
 
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping lab smoke test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping lab smoke test")
 	}
 
 	ctx := context.Background()

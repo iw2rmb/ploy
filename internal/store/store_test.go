@@ -12,12 +12,12 @@ import (
 )
 
 // TestNewStore verifies that Store creation works with a valid DSN.
-// This test is skipped if PLOY_TEST_PG_DSN is not set, following the pattern
+// This test is skipped if PLOY_TEST_DB_DSN is not set, following the pattern
 // of integration tests that require external dependencies.
 func TestNewStore(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store initialization test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store initialization test")
 	}
 
 	ctx := context.Background()
@@ -40,9 +40,9 @@ func TestNewStore_InvalidDSN(t *testing.T) {
 // TestConnectSearchPath verifies that NewStore sets search_path so unqualified
 // table names resolve to the ploy schema, regardless of DSN formatting.
 func TestConnectSearchPath(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping search_path test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping search_path test")
 	}
 
 	// Ensure the test does not rely on DSN formatting (e.g. `search_path=` in the DSN).
@@ -95,9 +95,9 @@ func TestConnectSearchPath(t *testing.T) {
 }
 
 func TestCreateRun_RoundTrip_V1(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -173,9 +173,9 @@ func TestCreateRun_RoundTrip_V1(t *testing.T) {
 }
 
 func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
@@ -303,9 +303,9 @@ func TestRunRepo_CRUDAndStateTransitions_V1(t *testing.T) {
 }
 
 func TestListRunReposWithURLByRun_ReturnsRepoURLAndOrdering_V1(t *testing.T) {
-	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	dsn := os.Getenv("PLOY_TEST_DB_DSN")
 	if dsn == "" {
-		t.Skip("PLOY_TEST_PG_DSN not set; skipping store integration test")
+		t.Skip("PLOY_TEST_DB_DSN not set; skipping store integration test")
 	}
 
 	ctx := context.Background()
