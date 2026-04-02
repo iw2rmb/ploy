@@ -97,9 +97,9 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 
 			cmd := rt.captured.Command[2]
 
-			// Verify CA preamble is present.
-			if !strings.Contains(cmd, "CA_CERTS_PEM_BUNDLE") {
-				t.Errorf("expected CA_CERTS_PEM_BUNDLE in command, got %q", cmd)
+			// Verify PLOY_CA_CERTS materializer preamble is present.
+			if !strings.Contains(cmd, "PLOY_CA_CERTS") {
+				t.Errorf("expected PLOY_CA_CERTS in command, got %q", cmd)
 			}
 			if !strings.Contains(cmd, "update-ca-certificates") {
 				t.Errorf("expected update-ca-certificates in command, got %q", cmd)
@@ -120,29 +120,56 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 }
 
 // TestCAPreambleScript verifies the caPreambleScript function returns a valid
-// shell script that handles CA bundle installation.
+// shell script that handles CA bundle installation through the PLOY_CA_CERTS materializer.
 func TestCAPreambleScript(t *testing.T) {
 	t.Parallel()
 
 	preamble := caPreambleScript()
 
-	// Verify key components are present.
+	// Verify key components of the materializer preamble are present.
 	expectedFragments := []string{
-		"CA_CERTS_PEM_BUNDLE",              // env var check
-		"mktemp",                           // temp file creation
-		"awk",                              // cert splitting
-		"update-ca-certificates",           // system CA update
-		"keytool -importcert",              // Java cacerts import
-		"ploy_gate_pem_",                   // alias prefix
-		"changeit",                         // default keystore password
-		"--- CA bundle injection preamble", // start marker
-		"--- End CA bundle preamble",       // end marker
+		"PLOY_CA_CERTS",                            // env var check
+		"mktemp",                                   // temp file creation
+		"awk",                                      // cert splitting
+		"update-ca-certificates",                   // system CA update
+		"keytool -importcert",                      // Java cacerts import
+		"ploy_gate_pem_",                           // alias prefix
+		"changeit",                                 // default keystore password
+		"--- PLOY_CA_CERTS materializer preamble",  // start marker
+		"--- End PLOY_CA_CERTS materializer preamble", // end marker
 	}
 
 	for _, fragment := range expectedFragments {
 		if !strings.Contains(preamble, fragment) {
 			t.Errorf("expected %q in CA preamble, got:\n%s", fragment, preamble)
 		}
+	}
+
+	// Verify materializer supports both file path and inline PEM detection.
+	if !strings.Contains(preamble, `-f "${PLOY_CA_CERTS}"`) {
+		t.Errorf("expected file-path detection in preamble, got:\n%s", preamble)
+	}
+}
+
+// TestEnvMaterializerPreamble verifies envMaterializerPreamble returns the
+// PLOY_CA_CERTS materializer preamble and that MaterializerForKey correctly
+// identifies special vs plain-passthrough keys.
+func TestEnvMaterializerPreamble(t *testing.T) {
+	t.Parallel()
+
+	preamble := envMaterializerPreamble()
+	if !strings.Contains(preamble, "PLOY_CA_CERTS") {
+		t.Errorf("expected PLOY_CA_CERTS in materializer preamble")
+	}
+
+	// PLOY_CA_CERTS has a materializer.
+	if m := MaterializerForKey("PLOY_CA_CERTS"); m == nil {
+		t.Error("expected materializer for PLOY_CA_CERTS, got nil")
+	}
+
+	// Unknown keys use plain passthrough (no materializer).
+	if m := MaterializerForKey("OPENAI_API_KEY"); m != nil {
+		t.Error("expected nil materializer for plain key OPENAI_API_KEY")
 	}
 }
 

@@ -11,10 +11,10 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()
 
 	f := newClaimJobFixture(t, claimJobFixtureOptions{
-		specJSON: []byte(`{"env":{"CA_CERTS_PEM_BUNDLE":"per-run-cert","PER_RUN_ONLY":"value"}}`),
+		specJSON: []byte(`{"env":{"PLOY_CA_CERTS":"per-run-cert","PER_RUN_ONLY":"value"}}`),
 	})
 
-	f.config.SetGlobalEnvVar("CA_CERTS_PEM_BUNDLE", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
+	f.config.SetGlobalEnvVar("PLOY_CA_CERTS", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("NODES_FALLBACK", GlobalEnvVar{Value: "nodes-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
 	f.config.SetGlobalEnvVar("SERVER_ONLY", GlobalEnvVar{Value: "server-env", Target: domaintypes.GlobalEnvTargetServer, Secret: false})
@@ -33,8 +33,8 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	}
 
 	// Per-run env overrides global env.
-	if env["CA_CERTS_PEM_BUNDLE"] != "per-run-cert" {
-		t.Fatalf("expected per-run CA_CERTS_PEM_BUNDLE to win, got %v", env["CA_CERTS_PEM_BUNDLE"])
+	if env["PLOY_CA_CERTS"] != "per-run-cert" {
+		t.Fatalf("expected per-run PLOY_CA_CERTS to win, got %v", env["PLOY_CA_CERTS"])
 	}
 	// Steps-target injected for mig job.
 	if env["CODEX_AUTH_JSON"] != `{"token":"xxx"}` {

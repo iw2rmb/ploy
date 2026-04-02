@@ -639,13 +639,13 @@ seed_node_record() {
 set_global_env_via_server_api() {
   local key="$1"
   local value="$2"
-  local scope="${3:-all}"
+  local target="${3:-all}"
   local payload
 
-  payload="$(GLOBAL_ENV_VALUE="$value" GLOBAL_ENV_SCOPE="$scope" "$PYTHON_BIN" <<'PY'
+  payload="$(GLOBAL_ENV_VALUE="$value" GLOBAL_ENV_TARGET="$target" "$PYTHON_BIN" <<'PY'
 import json
 import os
-print(json.dumps({"value": os.environ["GLOBAL_ENV_VALUE"], "scope": os.environ["GLOBAL_ENV_SCOPE"], "secret": True}))
+print(json.dumps({"value": os.environ["GLOBAL_ENV_VALUE"], "target": os.environ["GLOBAL_ENV_TARGET"], "secret": True}))
 PY
 )"
 
@@ -683,8 +683,8 @@ configure_runtime_globals_and_persist_auth() {
 
   runtime_ca_bundle="$(runtime_ca_bundle_value || true)"
   if [[ -n "$runtime_ca_bundle" ]]; then
-    log "Configuring global CA_CERTS_PEM_BUNDLE from PLOY_CA_CERTS..."
-    set_global_env_via_server_api CA_CERTS_PEM_BUNDLE "$runtime_ca_bundle" all
+    log "Configuring global PLOY_CA_CERTS..."
+    set_global_env_via_server_api PLOY_CA_CERTS "$runtime_ca_bundle" all
   fi
 }
 

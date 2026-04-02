@@ -85,7 +85,7 @@ func TestDockerGateExecutor_PassesContainerLabelsFromContext(t *testing.T) {
 
 // TestDockerGateExecutor_EnvPassthrough verifies that environment variables from
 // StepGateSpec.Env are passed through to the Docker container. This ensures that
-// global env vars injected by the control plane (e.g., CA_CERTS_PEM_BUNDLE,
+// global env vars injected by the control plane (e.g., PLOY_CA_CERTS,
 // CODEX_AUTH_JSON) are available to image-level startup hooks.
 func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	t.Parallel()
@@ -95,9 +95,9 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	spec := &contracts.StepGateSpec{
 		Enabled: true,
 		Env: map[string]string{
-			"CA_CERTS_PEM_BUNDLE": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
-			"CODEX_AUTH_JSON":     `{"token":"secret"}`,
-			"CUSTOM_VAR":          "custom-value",
+			"PLOY_CA_CERTS":   "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+			"CODEX_AUTH_JSON": `{"token":"secret"}`,
+			"CUSTOM_VAR":     "custom-value",
 		},
 	}
 
@@ -119,7 +119,7 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 
 	// Check each expected key.
-	expectedKeys := []string{"CA_CERTS_PEM_BUNDLE", "CODEX_AUTH_JSON", "CUSTOM_VAR"}
+	expectedKeys := []string{"PLOY_CA_CERTS", "CODEX_AUTH_JSON", "CUSTOM_VAR"}
 	for _, key := range expectedKeys {
 		if _, ok := rt.captured.Env[key]; !ok {
 			t.Errorf("expected env var %q to be present, but it's missing", key)
@@ -127,9 +127,9 @@ func TestDockerGateExecutor_EnvPassthrough(t *testing.T) {
 	}
 
 	// Verify values are correct.
-	if rt.captured.Env["CA_CERTS_PEM_BUNDLE"] != spec.Env["CA_CERTS_PEM_BUNDLE"] {
-		t.Errorf("CA_CERTS_PEM_BUNDLE mismatch: got %q, want %q",
-			rt.captured.Env["CA_CERTS_PEM_BUNDLE"], spec.Env["CA_CERTS_PEM_BUNDLE"])
+	if rt.captured.Env["PLOY_CA_CERTS"] != spec.Env["PLOY_CA_CERTS"] {
+		t.Errorf("PLOY_CA_CERTS mismatch: got %q, want %q",
+			rt.captured.Env["PLOY_CA_CERTS"], spec.Env["PLOY_CA_CERTS"])
 	}
 	if rt.captured.Env["CODEX_AUTH_JSON"] != spec.Env["CODEX_AUTH_JSON"] {
 		t.Errorf("CODEX_AUTH_JSON mismatch: got %q, want %q",
