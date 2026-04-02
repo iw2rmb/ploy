@@ -135,6 +135,7 @@ items:
       - "bash -n deploy/runtime/run.sh deploy/images/server/entrypoint.sh deploy/images/node/entrypoint.sh deploy/images/orw/orw-cli-gradle/orw-cli.sh deploy/images/orw/orw-cli-maven/orw-cli.sh"
     reasoning: high
     cfp: 11
+    commit: 817a41c0
   - done: false
     reviews: []
     label: "6"
