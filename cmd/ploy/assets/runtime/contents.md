@@ -1,5 +1,5 @@
-[docker-compose.yml](docker-compose.yml) Docker Compose stack defining runtime server, node, and shared cache services for local/runtime deploy.
-[gradle-build-cache/](gradle-build-cache) Gradle build-cache service seed config and entrypoint used by the runtime compose stack.
-[node/](node) Runtime node service configuration consumed by the node container startup.
-[run.sh](run.sh) Runtime deployment helper that validates env, prepares state, and orchestrates docker compose operations.
-[server/](server) Runtime server service configuration consumed by the server container startup.
+[docker-compose.yml](docker-compose.yml) Docker Compose stack that runs runtime server, node, and Gradle build-cache services with required mounts and env wiring.
+[gradle-build-cache/](gradle-build-cache) Seed config and bootstrap entrypoint for the local Gradle build-cache service used by runtime workloads.
+[node/](node) Node runtime configuration defining server endpoint, node identity, and heartbeat/listen settings.
+[run.sh](run.sh) Runtime deploy script that validates prerequisites, provisions auth/tokens, and orchestrates compose startup plus DB/bootstrap steps.
+[server/](server) Server runtime configuration for HTTP and metrics listeners, admin socket path, auth mode, and Postgres DSN placeholder.
