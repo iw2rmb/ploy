@@ -66,27 +66,6 @@
 [node_command_test.go](node_command_test.go) Tests node command registration and node command behavior boundaries.
 [pull.go](pull.go) Implements top-level pull command behavior and repository synchronization workflow.
 [pull_helpers.go](pull_helpers.go) Shared helper utilities for pull command planning, filtering, and output rendering.
-[rollout_backoff.go](rollout_backoff.go) Backoff and retry policy helpers for rollout execution workflows.
-[rollout_backoff_test.go](rollout_backoff_test.go) Tests rollout backoff timing logic and retry-limit semantics.
-[rollout_logging.go](rollout_logging.go) Rollout-specific log formatting and structured event emission helpers.
-[rollout_logging_test.go](rollout_logging_test.go) Tests rollout log formatting, message routing, and structured output behavior.
-[rollout_metrics.go](rollout_metrics.go) Collects and reports rollout progress metrics for command output and monitoring.
-[rollout_nodes_api.go](rollout_nodes_api.go) API request helpers for node rollout operations and status polling.
-[rollout_nodes_args_validation_test.go](rollout_nodes_args_validation_test.go) Tests rollout node argument validation and invalid input rejection paths.
-[rollout_nodes_cmd.go](rollout_nodes_cmd.go) Declares rollout nodes command and wires rollout execution subflows.
-[rollout_nodes_command_sequence_test.go](rollout_nodes_command_sequence_test.go) Tests rollout node command sequencing and stage transition correctness.
-[rollout_nodes_dryrun_test.go](rollout_nodes_dryrun_test.go) Tests dry-run rollout behavior and no-side-effect guarantees.
-[rollout_nodes_exec.go](rollout_nodes_exec.go) Executes rollout node actions and coordinates step execution lifecycle.
-[rollout_nodes_execution_test.go](rollout_nodes_execution_test.go) Tests rollout node execution flow, retries, and failure handling.
-[rollout_nodes_match.go](rollout_nodes_match.go) Node matching and target selection logic for rollout operations.
-[rollout_nodes_resume_flow_test.go](rollout_nodes_resume_flow_test.go) Tests resumed rollout flow state handling across interrupted executions.
-[rollout_nodes_resume_retry_test.go](rollout_nodes_resume_retry_test.go) Tests retry behavior when resuming rollout node operations.
-[rollout_nodes_run.go](rollout_nodes_run.go) Orchestrates rollout run lifecycle over selected nodes and step plans.
-[rollout_nodes_selection_test.go](rollout_nodes_selection_test.go) Tests node selection filters and target resolution semantics.
-[rollout_nodes_state.go](rollout_nodes_state.go) State tracking for rollout node progress, checkpoints, and resume metadata.
-[rollout_nodes_state_test.go](rollout_nodes_state_test.go) Tests rollout node state transitions, persistence semantics, and recovery behavior.
-[rollout_server.go](rollout_server.go) Implements server rollout command flow and orchestration integration.
-[rollout_server_test.go](rollout_server_test.go) Tests server rollout command behavior including request composition and errors.
 [root.go](root.go) Constructs the CLI root command and binds global flags and command groups.
 [run_cancel.go](run_cancel.go) Implements run cancel command for terminating active runs via API calls.
 [run_cancel_test.go](run_cancel_test.go) Tests run cancellation command behavior and cancellation error handling.

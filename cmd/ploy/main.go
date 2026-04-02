@@ -34,8 +34,6 @@ func reportError(err error, stderr io.Writer) {
 
 // printUsage lists the available top-level commands.
 // Preserves the existing usage format exactly.
-// NOTE: `ploy rollout` has been removed as a top-level command.
-// Rollout operations are now accessible only via `ploy cluster rollout`.
 func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Ploy CLI v2")
 	_, _ = fmt.Fprintln(w, "")
@@ -46,7 +44,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  mig              Plan and run Migs workflows")
 	_, _ = fmt.Fprintln(w, "  run              Inspect runs and stream events")
 	_, _ = fmt.Fprintln(w, "  pull             Pull Mods diffs for current repo HEAD")
-	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, rollout, tokens)")
+	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, tokens)")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
 	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
 	_, _ = fmt.Fprintln(w, "  tui              Interactive TUI for migrations, runs, and jobs")

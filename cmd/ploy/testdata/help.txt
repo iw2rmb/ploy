@@ -7,7 +7,7 @@ Core Commands:
   mig              Plan and run Migs workflows
   run              Inspect runs and stream events
   pull             Pull Mods diffs for current repo HEAD
-  cluster          Manage clusters (deploy, nodes, rollout, tokens)
+  cluster          Manage clusters (deploy, nodes, tokens)
   config           Inspect or update cluster configuration
   manifest         Inspect and validate integration manifests
   tui              Interactive TUI for migrations, runs, and jobs
