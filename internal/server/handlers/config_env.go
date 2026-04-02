@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"sort"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -190,6 +191,13 @@ func putGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc 
 			Secret: secret,
 		})
 
+		// Server-target consumption: apply to process environment immediately.
+		if target == domaintypes.GlobalEnvTargetServer {
+			if err := os.Setenv(key, req.Value); err != nil {
+				slog.Error("config env put: os.Setenv failed", "err", err, "key", key)
+			}
+		}
+
 		resp := globalEnvResponse{
 			Key:    key,
 			Value:  req.Value,
@@ -261,6 +269,13 @@ func deleteGlobalEnvHandler(holder *ConfigHolder, st store.Store) http.HandlerFu
 
 		// Remove from in-memory holder after successful deletion.
 		holder.DeleteGlobalEnvVar(key, target)
+
+		// Server-target consumption: remove from process environment immediately.
+		if target == domaintypes.GlobalEnvTargetServer {
+			if err := os.Unsetenv(key); err != nil {
+				slog.Error("config env delete: os.Unsetenv failed", "err", err, "key", key)
+			}
+		}
 
 		w.WriteHeader(http.StatusNoContent)
 

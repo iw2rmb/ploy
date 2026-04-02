@@ -17,6 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	apiconfig "github.com/iw2rmb/ploy/internal/server/config"
+	"github.com/iw2rmb/ploy/internal/server/handlers"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -315,6 +316,30 @@ func TestGlobalEnvMapFromStoreEntries_MultiTargetSameKey(t *testing.T) {
 	}
 	if len(got["SHARED"]) != 3 {
 		t.Fatalf("SHARED entries=%d want 3", len(got["SHARED"]))
+	}
+}
+
+func TestApplyServerTargetEnv_SetsProcessEnv(t *testing.T) {
+	const key = "PLOY_TEST_SERVER_TARGET_ENV"
+	t.Cleanup(func() { os.Unsetenv(key) })
+
+	envMap := map[string][]handlers.GlobalEnvVar{
+		key: {
+			{Value: "server-val", Target: domaintypes.GlobalEnvTargetServer, Secret: false},
+		},
+		"PLOY_TEST_NODES_ONLY": {
+			{Value: "nodes-val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false},
+		},
+	}
+
+	applyServerTargetEnv(envMap)
+
+	if got := os.Getenv(key); got != "server-val" {
+		t.Fatalf("os.Getenv(%q) = %q, want %q", key, got, "server-val")
+	}
+	// nodes-target should not be set in process env.
+	if got := os.Getenv("PLOY_TEST_NODES_ONLY"); got != "" {
+		t.Fatalf("os.Getenv(PLOY_TEST_NODES_ONLY) = %q, want empty", got)
 	}
 }
 
