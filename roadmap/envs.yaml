@@ -147,7 +147,7 @@ items:
   - done: false
     reviews:
       - gaps: ["\"~/@iw2rmb/amata/scripts/check_docs_links.sh\" (Step 6 verification) is failing, so Step 6 is not complete against its own verification gate. Current missing links are in `design/k8s-jobs.md:193`, `design/k8s-jobs.md:194`, `design/orw-cli.md:224`, `docs/testing-workflow.md:216`, `docs/releasing.md:67`, and `docs/releasing.md:102`."]
-        commit: null
+        commit: b26da8fd
     label: "6"
     summary: Update operator and API documentation to target semantics, ambiguity rules, and materializer-based certificate handling.
     classification: determined
