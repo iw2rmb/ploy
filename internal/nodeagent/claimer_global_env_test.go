@@ -366,13 +366,13 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 }
 
-// TestGlobalEnvPropagation_HealingManifest verifies that global env vars are
-// available in healing manifests. While healing migs have their own env config,
-// global env vars from the spec should still be accessible via the request.
+// TestGlobalEnvPropagation_HealingManifest verifies that global env vars from
+// req.Env are merged into healing manifests as a base layer, with mig.Env
+// overriding on collision.
 //
-// Note: Healing manifests are built from HealingMod.Env, not from req.Env directly.
-// The caller can merge global env into HealingMod.Env if needed. This test verifies
-// the healing manifest builder does not filter env vars.
+// The merge order is: req.Env (base) → mig.Env (override) → repo metadata.
+// This ensures target-based global env propagated via the claim spec reaches
+// heal job containers.
 func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	t.Parallel()
 
@@ -382,9 +382,14 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/healing"),
+		Env: map[string]string{
+			"GLOBAL_VAR":          "global_value",
+			"CA_CERTS_PEM_BUNDLE": "global-cert-bundle",
+			"SHARED_VAR":          "from_req",
+		},
 	}
 
-	// Healing mig with global env vars pre-merged.
+	// Healing mig with its own env that overrides req.Env on collision.
 	healingMod := MigContainerSpec{
 		Image: testJobImage("codex:latest"),
 		Env: map[string]string{
@@ -400,15 +405,16 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		t.Fatalf("buildHealingManifest() error: %v", err)
 	}
 
-	// Verify env vars are preserved.
+	// Verify env vars are preserved with correct precedence.
 	expectedEnv := map[string]string{
-		"CA_CERTS_PEM_BUNDLE": "healing-cert-bundle",
-		"CODEX_AUTH_JSON":     `{"healing":"auth"}`,
-		"HEALING_SPECIFIC":    "healing_value",
-		// Repo metadata is also injected.
-		"PLOY_REPO_URL":   "https://gitlab.com/test/repo.git",
-		"PLOY_BASE_REF":   "main",
-		"PLOY_TARGET_REF": "feature/healing",
+		"GLOBAL_VAR":          "global_value",            // from req.Env (no override)
+		"CA_CERTS_PEM_BUNDLE": "healing-cert-bundle",     // mig.Env overrides req.Env
+		"CODEX_AUTH_JSON":     `{"healing":"auth"}`,      // from mig.Env only
+		"HEALING_SPECIFIC":    "healing_value",           // from mig.Env only
+		"SHARED_VAR":          "from_req",                // from req.Env (no mig override)
+		"PLOY_REPO_URL":       "https://gitlab.com/test/repo.git",
+		"PLOY_BASE_REF":       "main",
+		"PLOY_TARGET_REF":     "feature/healing",
 	}
 
 	for key, wantVal := range expectedEnv {

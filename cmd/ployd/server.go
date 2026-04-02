@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
@@ -141,6 +142,9 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	globalEnvMap := globalEnvMapFromStoreEntries(globalEnvEntries)
 	slog.Info("loaded global env entries from store", "count", len(globalEnvMap))
 
+	// Server-target consumption: apply server-target entries to process environment on startup.
+	applyServerTargetEnv(globalEnvMap)
+
 	// Initialize config holder for runtime configuration access.
 	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
 
@@ -203,6 +207,20 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	}
 
 	return nil
+}
+
+// applyServerTargetEnv sets process environment variables for all server-target entries.
+// Called once at startup to ensure server-target global env is available to the process.
+func applyServerTargetEnv(envMap map[string][]handlers.GlobalEnvVar) {
+	for key, entries := range envMap {
+		for _, e := range entries {
+			if e.Target == domaintypes.GlobalEnvTargetServer {
+				if err := os.Setenv(key, e.Value); err != nil {
+					slog.Warn("failed to set server-target env var", "key", key, "err", err)
+				}
+			}
+		}
+	}
 }
 
 func globalEnvMapFromStoreEntries(entries []store.ConfigEnv) map[string][]handlers.GlobalEnvVar {

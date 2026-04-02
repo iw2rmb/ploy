@@ -263,7 +263,10 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 		command = mig.Command.ToSlice()
 	}
 
-	env := make(map[string]string, len(mig.Env)+4)
+	env := make(map[string]string, len(req.Env)+len(mig.Env)+4)
+	for k, v := range req.Env {
+		env[k] = v
+	}
 	for k, v := range mig.Env {
 		env[k] = v
 	}
