@@ -85,6 +85,7 @@ items:
       - "go test ./cmd/ploy -run HelpRegression"
     reasoning: high
     cfp: 9
+    commit: 6b8ff872
   - done: false
     reviews: []
     label: "4"
