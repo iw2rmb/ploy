@@ -144,7 +144,7 @@ items:
     reasoning: high
     cfp: 11
     commit: 817a41c0
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"~/@iw2rmb/amata/scripts/check_docs_links.sh\" (Step 6 verification) is failing, so Step 6 is not complete against its own verification gate. Current missing links are in `design/k8s-jobs.md:193`, `design/k8s-jobs.md:194`, `design/orw-cli.md:224`, `docs/testing-workflow.md:216`, `docs/releasing.md:67`, and `docs/releasing.md:102`."]
         commit: b26da8fd
