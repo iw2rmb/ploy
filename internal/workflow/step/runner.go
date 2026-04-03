@@ -122,6 +122,13 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		return result, err
 	}
 
+	// Seed outDir with materialized Hydra out entries so the single /out mount
+	// covers both pre-seeded content and container writes, ensuring uploads
+	// capture all out artifacts.
+	if err := SeedOutDirFromStaging(req.Manifest, req.StagingDir, req.OutDir); err != nil {
+		return Result{}, fmt.Errorf("seed out dir from staging: %w", err)
+	}
+
 	// Stage 3: Execute container via configured runtime.
 	executionStart := time.Now()
 	if r.Containers == nil {

@@ -2,6 +2,7 @@ package step
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,13 +92,15 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.
 	if strings.TrimSpace(stagingDir) != "" {
 		// CA entries: mount at deterministic CA cert path (read-only).
+		// Archives are rooted under "content" (see buildSourceArchive), so
+		// the mount source must include the content subdirectory.
 		for _, entry := range manifest.CA {
 			hash, err := contracts.ParseStoredCAEntry(entry)
 			if err != nil {
 				return ContainerSpec{}, fmt.Errorf("ca entry %q: %w", entry, err)
 			}
 			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, hash),
+				Source:   filepath.Join(stagingDir, hash, "content"),
 				Target:   "/etc/ploy/ca/" + hash,
 				ReadOnly: true,
 			})
@@ -109,21 +112,9 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 				return ContainerSpec{}, fmt.Errorf("in entry %q: %w", entry, err)
 			}
 			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, parsed.Hash),
+				Source:   filepath.Join(stagingDir, parsed.Hash, "content"),
 				Target:   parsed.Dst,
 				ReadOnly: true,
-			})
-		}
-		// Out entries: mount read-write at the declared destination.
-		for _, entry := range manifest.Out {
-			parsed, err := contracts.ParseStoredOutEntry(entry)
-			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("out entry %q: %w", entry, err)
-			}
-			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, parsed.Hash),
-				Target:   parsed.Dst,
-				ReadOnly: false,
 			})
 		}
 		// Home entries: mount at $HOME/<dst> with mode from entry.
@@ -133,7 +124,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 				return ContainerSpec{}, fmt.Errorf("home entry %q: %w", entry, err)
 			}
 			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(stagingDir, parsed.Hash),
+				Source:   filepath.Join(stagingDir, parsed.Hash, "content"),
 				Target:   "/home/user/" + parsed.Dst,
 				ReadOnly: parsed.ReadOnly,
 			})
@@ -194,4 +185,88 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		LimitDiskBytes:   diskBytes,
 		StorageSizeOpt:   storageSizeOpt,
 	}, nil
+}
+
+// SeedOutDirFromStaging copies materialized Hydra out entry content from the
+// staging directory into outDir so that the single /out mount covers both
+// pre-seeded content and container writes. This ensures uploadOutDirBundle
+// archives all out content including Hydra-originated entries.
+func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir string) error {
+	if stagingDir == "" || outDir == "" {
+		return nil
+	}
+	for _, entry := range manifest.Out {
+		parsed, err := contracts.ParseStoredOutEntry(entry)
+		if err != nil {
+			return fmt.Errorf("out entry %q: %w", entry, err)
+		}
+		rel := strings.TrimPrefix(parsed.Dst, "/out/")
+		src := filepath.Join(stagingDir, parsed.Hash, "content")
+		dst := filepath.Join(outDir, rel)
+		if err := copyPath(src, dst); err != nil {
+			return fmt.Errorf("seed out %s: %w", parsed.Dst, err)
+		}
+	}
+	return nil
+}
+
+// copyPath copies src to dst. If src is a directory, it copies recursively.
+// If src is a file, it copies the file preserving permissions.
+func copyPath(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return copyDir(src, dst)
+	}
+	return copyFile(src, dst, info.Mode().Perm())
+}
+
+func copyDir(src, dst string) error {
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, de := range entries {
+		s := filepath.Join(src, de.Name())
+		d := filepath.Join(dst, de.Name())
+		if de.IsDir() {
+			if err := copyDir(s, d); err != nil {
+				return err
+			}
+		} else {
+			info, err := de.Info()
+			if err != nil {
+				return err
+			}
+			if err := copyFile(s, d, info.Mode().Perm()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func copyFile(src, dst string, perm os.FileMode) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	sf, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sf.Close()
+	df, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(df, sf); err != nil {
+		df.Close()
+		return err
+	}
+	return df.Close()
 }

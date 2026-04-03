@@ -31,9 +31,9 @@ func TestDockerGateExecutor_PrepOverrideCommandPrecedence(t *testing.T) {
 	if !strings.Contains(got[2], "echo prep-gate") {
 		t.Fatalf("expected prep command in shell script, got %q", got[2])
 	}
-	// Materializer preamble must be applied to profile override commands.
-	if !strings.Contains(got[2], "PLOY_CA_CERTS") {
-		t.Fatalf("expected PLOY_CA_CERTS materializer preamble in prep override command, got %q", got[2])
+	// CA delivery is now via Hydra CA mounts; no env preamble should be injected.
+	if strings.Contains(got[2], "PLOY_CA_CERTS") {
+		t.Fatalf("unexpected PLOY_CA_CERTS preamble in prep override command: %q", got[2])
 	}
 }
 

@@ -338,3 +338,132 @@ func TestHydraResources_Materialization(t *testing.T) {
 		})
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Mixed in/out/home/ca materialization and mount planning integration
+// ---------------------------------------------------------------------------
+
+func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
+	t.Parallel()
+
+	// Build distinct archives for each entry type, using the "content" root
+	// that buildSourceArchive produces.
+	caArchive := buildTestTarGz(t, map[string][]byte{
+		"content": []byte("-----BEGIN CERTIFICATE-----\nFAKE\n-----END CERTIFICATE-----"),
+	}, nil)
+	caHash := digestOf(caArchive)[:12]
+
+	inArchive := buildTestTarGz(t, map[string][]byte{
+		"content": []byte(`{"config":"value"}`),
+	}, nil)
+	inHash := digestOf(inArchive)[:12]
+
+	outArchive := buildTestTarGz(t, map[string][]byte{
+		"content/":        nil,
+		"content/seed.md": []byte("seed content"),
+	}, nil)
+	outHash := digestOf(outArchive)[:12]
+
+	homeArchive := buildTestTarGz(t, map[string][]byte{
+		"content": []byte(`{"auth":"token"}`),
+	}, nil)
+	homeHash := digestOf(homeArchive)[:12]
+
+	archives := map[string][]byte{
+		caHash:   caArchive,
+		inHash:   inArchive,
+		outHash:  outArchive,
+		homeHash: homeArchive,
+	}
+
+	bundleMap := map[string]string{
+		caHash:   "bun-ca",
+		inHash:   "bun-in",
+		outHash:  "bun-out",
+		homeHash: "bun-home",
+	}
+
+	// Serve bundles by bundleID.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := filepath.Base(r.URL.Path)
+		for hash, bid := range bundleMap {
+			if parts == bid {
+				w.Header().Set("Content-Type", "application/gzip")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write(archives[hash])
+				return
+			}
+		}
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	manifest := contracts.StepManifest{
+		CA:        []string{caHash},
+		In:        []string{inHash + ":/in/config.json"},
+		Out:       []string{outHash + ":/out/results"},
+		Home:      []string{homeHash + ":.auth.json:ro"},
+		BundleMap: bundleMap,
+	}
+
+	rc := newTestController(t, newAgentConfig(srv.URL))
+	stagingDir := t.TempDir()
+
+	// 1. Materialize all 4 entry types in a single call.
+	if err := rc.materializeHydraResources(t.Context(), manifest, bundleMap, stagingDir); err != nil {
+		t.Fatalf("materializeHydraResources: %v", err)
+	}
+
+	// 2. Verify all unique hashes were staged.
+	for _, hash := range []string{caHash, inHash, outHash, homeHash} {
+		if _, err := os.Stat(filepath.Join(stagingDir, hash)); err != nil {
+			t.Errorf("staging dir for hash %s missing: %v", hash, err)
+		}
+	}
+
+	// 3. Verify staged content at the content subdirectory level.
+	gotCA, err := os.ReadFile(filepath.Join(stagingDir, caHash, "content"))
+	if err != nil {
+		t.Fatalf("read CA content: %v", err)
+	}
+	if !bytes.Contains(gotCA, []byte("CERTIFICATE")) {
+		t.Errorf("CA content missing CERTIFICATE marker: %q", gotCA)
+	}
+
+	gotIn, err := os.ReadFile(filepath.Join(stagingDir, inHash, "content"))
+	if err != nil {
+		t.Fatalf("read In content: %v", err)
+	}
+	if string(gotIn) != `{"config":"value"}` {
+		t.Errorf("In content = %q", gotIn)
+	}
+
+	gotOutSeed, err := os.ReadFile(filepath.Join(stagingDir, outHash, "content", "seed.md"))
+	if err != nil {
+		t.Fatalf("read Out seed content: %v", err)
+	}
+	if string(gotOutSeed) != "seed content" {
+		t.Errorf("Out seed = %q", gotOutSeed)
+	}
+
+	gotHome, err := os.ReadFile(filepath.Join(stagingDir, homeHash, "content"))
+	if err != nil {
+		t.Fatalf("read Home content: %v", err)
+	}
+	if string(gotHome) != `{"auth":"token"}` {
+		t.Errorf("Home content = %q", gotHome)
+	}
+
+	// 4. Verify hash deduplication: same hash should not be materialized twice.
+	hashes := collectUniqueHashes(manifest)
+	seen := make(map[string]bool)
+	for _, h := range hashes {
+		if seen[h] {
+			t.Errorf("duplicate hash %s in collectUniqueHashes result", h)
+		}
+		seen[h] = true
+	}
+	if len(hashes) != 4 {
+		t.Errorf("expected 4 unique hashes, got %d: %v", len(hashes), hashes)
+	}
+}

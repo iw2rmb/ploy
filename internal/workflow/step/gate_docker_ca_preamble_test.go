@@ -8,7 +8,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
+func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -43,34 +43,6 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 			},
 			expectInCmd: "go test ./...",
 		},
-		{
-			name:      "cargo",
-			workspace: func(t *testing.T) string { return createCargoWorkspace(t, "1.76") },
-			spec: func() *contracts.StepGateSpec {
-				return &contracts.StepGateSpec{
-					Enabled: true,
-					ImageOverrides: []contracts.BuildGateImageRule{{
-						Stack: contracts.StackExpectation{Language: "rust", Release: "1.76"},
-						Image: "rust:1.76",
-					}},
-				}
-			},
-			expectInCmd: "cargo test",
-		},
-		{
-			name:      "pip",
-			workspace: func(t *testing.T) string { return createPythonWorkspace(t, "3.11") },
-			spec: func() *contracts.StepGateSpec {
-				return &contracts.StepGateSpec{
-					Enabled: true,
-					ImageOverrides: []contracts.BuildGateImageRule{{
-						Stack: contracts.StackExpectation{Language: "python", Release: "3.11"},
-						Image: "python:3.11",
-					}},
-				}
-			},
-			expectInCmd: "python -m compileall",
-		},
 	}
 
 	for _, tc := range testCases {
@@ -97,86 +69,56 @@ func TestDockerGateExecutor_CAPreambleIncluded(t *testing.T) {
 
 			cmd := rt.captured.Command[2]
 
-			// Verify PLOY_CA_CERTS materializer preamble is present.
-			if !strings.Contains(cmd, "PLOY_CA_CERTS") {
-				t.Errorf("expected PLOY_CA_CERTS in command, got %q", cmd)
-			}
-			if !strings.Contains(cmd, "update-ca-certificates") {
-				t.Errorf("expected update-ca-certificates in command, got %q", cmd)
-			}
-			if !strings.Contains(cmd, "keytool -importcert") {
-				t.Errorf("expected keytool -importcert in command, got %q", cmd)
-			}
-			if !strings.Contains(cmd, "ploy-gate") {
-				t.Errorf("expected ploy-gate CA directory name in command, got %q", cmd)
+			// CA delivery is now via Hydra CA mounts; no env preamble should
+			// be injected into gate commands.
+			if strings.Contains(cmd, "PLOY_CA_CERTS") {
+				t.Errorf("unexpected PLOY_CA_CERTS preamble in command: %q", cmd)
 			}
 
-			// Verify the build command is still present after the preamble.
+			// The build command must still be present.
 			if !strings.Contains(cmd, tc.expectInCmd) {
-				t.Errorf("expected %q in command after preamble, got %q", tc.expectInCmd, cmd)
+				t.Errorf("expected %q in command, got %q", tc.expectInCmd, cmd)
 			}
 		})
 	}
 }
 
-// TestCAPreambleScript verifies the caPreambleScript function returns a valid
-// shell script that handles CA bundle installation through the PLOY_CA_CERTS materializer.
-func TestCAPreambleScript(t *testing.T) {
+// TestCAPreambleScript_ReturnsEmpty verifies that caPreambleScript returns an
+// empty string after the PLOY_CA_CERTS materializer was removed in favor of
+// Hydra CA mount delivery.
+func TestCAPreambleScript_ReturnsEmpty(t *testing.T) {
 	t.Parallel()
 
 	preamble := caPreambleScript()
-
-	// Verify key components of the materializer preamble are present.
-	expectedFragments := []string{
-		"PLOY_CA_CERTS",                            // env var check
-		"mktemp",                                   // temp file creation
-		"awk",                                      // cert splitting
-		"update-ca-certificates",                   // system CA update
-		"keytool -importcert",                      // Java cacerts import
-		"ploy_gate_pem_",                           // alias prefix
-		"changeit",                                 // default keystore password
-		"--- PLOY_CA_CERTS materializer preamble",  // start marker
-		"--- End PLOY_CA_CERTS materializer preamble", // end marker
-	}
-
-	for _, fragment := range expectedFragments {
-		if !strings.Contains(preamble, fragment) {
-			t.Errorf("expected %q in CA preamble, got:\n%s", fragment, preamble)
-		}
-	}
-
-	// Verify materializer supports both file path and inline PEM detection.
-	if !strings.Contains(preamble, `-r "${PLOY_CA_CERTS}"`) {
-		t.Errorf("expected readable-path detection in preamble, got:\n%s", preamble)
+	if preamble != "" {
+		t.Errorf("expected empty preamble after PLOY_CA_CERTS materializer removal, got:\n%s", preamble)
 	}
 }
 
-// TestEnvMaterializerPreamble verifies envMaterializerPreamble returns the
-// PLOY_CA_CERTS materializer preamble and that MaterializerForKey correctly
-// identifies special vs plain-passthrough keys.
-func TestEnvMaterializerPreamble(t *testing.T) {
+// TestEnvMaterializerPreamble_Empty verifies that envMaterializerPreamble
+// returns an empty string and MaterializerForKey returns nil for all keys
+// after the PLOY_CA_CERTS materializer was removed.
+func TestEnvMaterializerPreamble_Empty(t *testing.T) {
 	t.Parallel()
 
 	preamble := envMaterializerPreamble()
-	if !strings.Contains(preamble, "PLOY_CA_CERTS") {
-		t.Errorf("expected PLOY_CA_CERTS in materializer preamble")
+	if preamble != "" {
+		t.Errorf("expected empty preamble, got: %q", preamble)
 	}
 
-	// PLOY_CA_CERTS has a materializer.
-	if m := MaterializerForKey("PLOY_CA_CERTS"); m == nil {
-		t.Error("expected materializer for PLOY_CA_CERTS, got nil")
+	// No materializer should be registered.
+	if m := MaterializerForKey("PLOY_CA_CERTS"); m != nil {
+		t.Error("expected nil materializer for PLOY_CA_CERTS after removal")
 	}
-
-	// Unknown keys use plain passthrough (no materializer).
 	if m := MaterializerForKey("OPENAI_API_KEY"); m != nil {
 		t.Error("expected nil materializer for plain key OPENAI_API_KEY")
 	}
 }
 
-// TestDockerGateExecutor_CAPreambleOnPrepOverride verifies that the PLOY_CA_CERTS
-// materializer preamble is applied when the gate command is resolved from a
-// profile override (prep.Command) rather than from tool-derived detection.
-func TestDockerGateExecutor_CAPreambleOnPrepOverride(t *testing.T) {
+// TestDockerGateExecutor_NoPreambleOnPrepOverride verifies that prep override
+// commands no longer contain the PLOY_CA_CERTS materializer preamble after
+// CA delivery was switched to Hydra mount entries.
+func TestDockerGateExecutor_NoPreambleOnPrepOverride(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -216,20 +158,11 @@ func TestDockerGateExecutor_CAPreambleOnPrepOverride(t *testing.T) {
 			if !rt.createCalled {
 				t.Fatal("expected Create to be called")
 			}
-			if len(rt.captured.Command) != 3 {
-				t.Fatalf("expected 3-element command, got %v", rt.captured.Command)
-			}
 
-			cmd := rt.captured.Command[2]
+			cmd := rt.captured.Command[len(rt.captured.Command)-1]
 
-			if !strings.Contains(cmd, "PLOY_CA_CERTS") {
-				t.Errorf("expected PLOY_CA_CERTS materializer preamble in prep override command, got %q", cmd)
-			}
-			if !strings.Contains(cmd, "update-ca-certificates") {
-				t.Errorf("expected update-ca-certificates in prep override command, got %q", cmd)
-			}
-			if !strings.Contains(cmd, "keytool -importcert") {
-				t.Errorf("expected keytool -importcert in prep override command, got %q", cmd)
+			if strings.Contains(cmd, "PLOY_CA_CERTS") {
+				t.Errorf("unexpected PLOY_CA_CERTS preamble in prep override command: %q", cmd)
 			}
 			if !strings.Contains(cmd, "prep-gate-test") {
 				t.Errorf("expected original command content in prep override command, got %q", cmd)
