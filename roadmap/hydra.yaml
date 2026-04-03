@@ -11,7 +11,7 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Remove acceptance paths for deprecated contract keys with stable error messages.\" is not fully implemented for `env` under `build_gate.router` and `build_gate.healing.by_error_kind.<kind>`: `internal/workflow/contracts/schemas/mig.schema.json` does not forbid `env` in `routerObject`/`healingActionObject`, so legacy records are still accepted (silently dropped) instead of rejected."]
         commit: "84903228"
