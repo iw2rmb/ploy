@@ -2,7 +2,7 @@
 [artifacts_id.yaml](artifacts_id.yaml) Retrieves artifact metadata or downloads artifact bundle bytes by artifact ID.
 [bootstrap_tokens.yaml](bootstrap_tokens.yaml) Creates bootstrap tokens used for node enrollment and certificate bootstrap.
 [config_env.yaml](config_env.yaml) Lists global environment variables configured in control-plane settings.
-[config_env_key.yaml](config_env_key.yaml) Gets, upserts, and deletes a specific global environment variable entry.
+[config_env_key.yaml](config_env_key.yaml) Gets, upserts, and deletes a global environment variable by key with target disambiguation.
 [config_gitlab.yaml](config_gitlab.yaml) Reads and updates GitLab configuration stored by the control plane.
 [jobs.yaml](jobs.yaml) Lists jobs for TUI and operational monitoring with filters and pagination.
 [jobs_job_id_complete.yaml](jobs_job_id_complete.yaml) Marks a job as completed through the job-level completion endpoint.
