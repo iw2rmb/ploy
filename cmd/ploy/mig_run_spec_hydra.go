@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -172,7 +173,12 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 	// In-process cache: CID → bundleID for content already uploaded/probed this pass.
 	seen := make(map[string]string)
 	// Accumulates shortHash → bundleID for runtime materialization.
+	// Seed from any existing bundle_map so that already-canonical entries
+	// retain their mappings when the spec mixes canonical and authoring forms.
 	bundleMap := make(map[string]string)
+	if existing, ok := spec["bundle_map"].(map[string]string); ok {
+		maps.Copy(bundleMap, existing)
+	}
 	for _, ref := range blocks {
 		if err := compileHydraBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir, seen, bundleMap); err != nil {
 			return err

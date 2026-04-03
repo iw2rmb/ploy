@@ -824,3 +824,68 @@ func TestCompileHydraRecordsInPlace_EmitsBundleMap(t *testing.T) {
 		}
 	}
 }
+
+func TestCompileHydraRecordsInPlace_MixedCanonicalAndAuthoring_PreservesBundleMap(t *testing.T) {
+	_, base, client, uploadCount := newMockBundleServer(t)
+
+	tmpDir := t.TempDir()
+	newFile := filepath.Join(tmpDir, "new.json")
+	if err := os.WriteFile(newFile, []byte(`{"new":"data"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pre-existing canonical entries with their bundle_map mappings,
+	// as would appear after a prior compile or server overlay merge.
+	existingCAHash := "aabbcc112233"
+	existingInHash := "ddeeff445566"
+	existingBundleMap := map[string]string{
+		existingCAHash: "bundle-existing-ca",
+		existingInHash: "bundle-existing-in",
+	}
+
+	spec := map[string]any{
+		"steps": []any{
+			map[string]any{
+				"image": "alpine:3",
+				// Mix: one canonical CA + one authoring in entry.
+				"ca": []any{existingCAHash},
+				"in": []any{
+					existingInHash + ":/in/old.json",
+					newFile + ":/in/new.json",
+				},
+			},
+		},
+		"bundle_map": existingBundleMap,
+	}
+
+	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
+		t.Fatalf("compileHydraRecordsInPlace: %v", err)
+	}
+
+	bm, ok := spec["bundle_map"].(map[string]string)
+	if !ok {
+		t.Fatalf("bundle_map type = %T, want map[string]string", spec["bundle_map"])
+	}
+
+	// Existing canonical entries must retain their mappings.
+	if got := bm[existingCAHash]; got != "bundle-existing-ca" {
+		t.Errorf("bundle_map[%q] = %q, want %q", existingCAHash, got, "bundle-existing-ca")
+	}
+	if got := bm[existingInHash]; got != "bundle-existing-in" {
+		t.Errorf("bundle_map[%q] = %q, want %q", existingInHash, got, "bundle-existing-in")
+	}
+
+	// The newly compiled entry must also be present.
+	step0 := spec["steps"].([]any)[0].(map[string]any)
+	inEntries := step0["in"].([]any)
+	newEntry := inEntries[1].(string)
+	newHash := strings.SplitN(newEntry, ":", 2)[0]
+	if _, exists := bm[newHash]; !exists {
+		t.Errorf("bundle_map missing entry for newly compiled hash %q", newHash)
+	}
+
+	// Only the new authoring entry should trigger an upload.
+	if *uploadCount != 1 {
+		t.Errorf("upload count = %d, want 1", *uploadCount)
+	}
+}
