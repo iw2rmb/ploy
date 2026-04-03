@@ -55,9 +55,9 @@ func resolveGateCommand(
 }
 
 // wrapWithMaterializerPreamble prepends the env materializer preamble to a
-// container command so that special env keys (e.g. PLOY_CA_CERTS) are
-// materialized regardless of whether the command was tool-derived or
-// profile-override-derived.
+// container command regardless of whether the command was tool-derived or
+// profile-override-derived. Under the Hydra-only contract the materializer
+// registry is empty, so this is a no-op pass-through.
 func wrapWithMaterializerPreamble(cmd []string) []string {
 	preamble := envMaterializerPreamble()
 	if preamble == "" {

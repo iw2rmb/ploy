@@ -357,11 +357,15 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if !have("git") {
 		t.Skip("git not found in PATH; skipping")
 	}
-	// Require real Codex auth file from environment to run this test without stubbing.
+	// Require real Codex auth file from environment to run the live healing flow.
 	// CODEX_AUTH_FILE points to a local auth.json file delivered via Hydra home mount.
+	// When unset, fall back to offline Hydra contract validation so that
+	// `go test ./tests/integration/...` always exercises this integration path.
 	authFile := os.Getenv("CODEX_AUTH_FILE")
 	if strings.TrimSpace(authFile) == "" {
-		t.Skip("CODEX_AUTH_FILE not set; skipping real Codex execution test")
+		t.Log("CODEX_AUTH_FILE not set; running offline Hydra contract validation")
+		validateCodexHydraContractOffline(t)
+		return
 	}
 	if _, err := os.Stat(authFile); err != nil {
 		t.Skipf("CODEX_AUTH_FILE %q not accessible: %v", authFile, err)
@@ -488,5 +492,50 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Logf(".buildgate-ready sentinel not found (optional): %v", err)
 	} else {
 		t.Logf(".buildgate-ready sentinel present; Codex signaled ready for Build Gate")
+	}
+}
+
+// validateCodexHydraContractOffline validates the Codex integration Hydra
+// contract without requiring a live Codex auth file. It verifies the
+// entrypoint script uses Hydra mount paths, the build-gate.log fixture
+// exists, and the Dockerfile is syntactically present.
+func validateCodexHydraContractOffline(t *testing.T) {
+	t.Helper()
+
+	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
+	repoRoot = strings.TrimSpace(repoRoot)
+
+	// 1. Entrypoint script exists and uses Hydra mount paths.
+	entrypoint := filepath.Join(repoRoot, "images", "codex", "entrypoint.sh")
+	data, err := os.ReadFile(entrypoint)
+	if err != nil {
+		t.Fatalf("entrypoint.sh missing: %v", err)
+	}
+	content := string(data)
+	for _, path := range []string{"/in/codex-prompt.txt", "OUTDIR:-/out", "Hydra"} {
+		if !strings.Contains(content, path) {
+			t.Errorf("entrypoint.sh missing expected Hydra reference %q", path)
+		}
+	}
+	if strings.Contains(content, "CODEX_PROMPT") {
+		t.Errorf("entrypoint.sh still references legacy CODEX_PROMPT env injection")
+	}
+
+	// 2. Build-gate.log test fixture exists.
+	fixture := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
+	if _, err := os.Stat(fixture); err != nil {
+		t.Errorf("build-gate.log fixture missing: %v", err)
+	}
+
+	// 3. Dockerfile exists.
+	dockerfile := filepath.Join(repoRoot, "images", "codex", "Dockerfile")
+	if _, err := os.Stat(dockerfile); err != nil {
+		t.Errorf("codex Dockerfile missing: %v", err)
+	}
+
+	// 4. Entrypoint bash syntax check.
+	cmd := exec.Command("bash", "-n", entrypoint)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("entrypoint.sh syntax error:\n%s", out)
 	}
 }
