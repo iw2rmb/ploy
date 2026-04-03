@@ -98,7 +98,8 @@ elif [[ "$RO_STATUS" == "Success" ]]; then
   echo "  ! /in write attempt: run succeeded unexpectedly" >&2
   FAILED=1
 else
-  echo "  + /in write attempt: run exited with status='${RO_STATUS}' exit=${RO_EXIT}"
+  echo "  ! /in write attempt: expected Fail status, got '${RO_STATUS}' exit=${RO_EXIT}" >&2
+  FAILED=1
 fi
 
 # --- Part 2: /out write success ---

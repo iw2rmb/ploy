@@ -357,10 +357,14 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if !have("git") {
 		t.Skip("git not found in PATH; skipping")
 	}
-	// Require real Codex auth from environment to run this test without stubbing.
-	auth := os.Getenv("CODEX_AUTH_JSON")
-	if strings.TrimSpace(auth) == "" {
-		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
+	// Require real Codex auth file from environment to run this test without stubbing.
+	// CODEX_AUTH_FILE points to a local auth.json file delivered via Hydra home mount.
+	authFile := os.Getenv("CODEX_AUTH_FILE")
+	if strings.TrimSpace(authFile) == "" {
+		t.Skip("CODEX_AUTH_FILE not set; skipping real Codex execution test")
+	}
+	if _, err := os.Stat(authFile); err != nil {
+		t.Skipf("CODEX_AUTH_FILE %q not accessible: %v", authFile, err)
 	}
 
 	repoURL := "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git"
@@ -427,9 +431,10 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	}
 
 	// Run codex; map workspace to the same absolute path inside container.
+	// Auth is delivered via Hydra home mount (volume-mounted auth.json file).
 	// Inject repo metadata env vars for context; Build Gate is run externally (not by Codex).
 	run := exec.Command("docker", "run", "--rm",
-		"-e", "CODEX_AUTH_JSON="+auth,
+		"-v", authFile+":/root/.codex/auth.json:ro",
 		"-e", "PLOY_HOST_WORKSPACE="+ws,
 		"-e", "PLOY_REPO_URL="+repoURL,
 		"-e", "PLOY_BUILDGATE_REF="+branch,
