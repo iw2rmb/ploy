@@ -235,6 +235,36 @@ func TestConfigHomeDeleteInvalidDst(t *testing.T) {
 	}
 }
 
+// TestConfigHomeDeleteHydraNormalizesNonCanonicalDst verifies that deleting
+// with a non-canonical destination (e.g. extra slashes) normalizes the dst
+// to match the canonical form persisted by the put handler.
+func TestConfigHomeDeleteHydraNormalizesNonCanonicalDst(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	holder.AddConfigHome("mig", ConfigHomeEntry{Entry: "abcdef1:.config/app", Dst: ".config/app", Section: "mig"})
+
+	handler := deleteConfigHomeHandler(holder, st)
+
+	// Use non-canonical dst ".config//app" which cleans to ".config/app".
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/home?dst=.config//app&section=mig", nil)
+
+	assertStatus(t, rr, http.StatusNoContent)
+
+	if !st.deleteConfigHome.called {
+		t.Error("store.DeleteConfigHome was not called")
+	}
+	// Store must receive the normalized dst, not the raw query value.
+	if st.deleteConfigHome.params.Dst != ".config/app" {
+		t.Errorf("store Dst = %q, want .config/app (normalized)", st.deleteConfigHome.params.Dst)
+	}
+
+	// Verify holder was updated using the normalized dst.
+	entries := holder.GetConfigHome("mig")
+	if len(entries) != 0 {
+		t.Errorf("holder Home = %v, want empty", entries)
+	}
+}
+
 // TestConfigHomePutDeduplicates verifies that upserting the same dst twice
 // in the same section does not produce duplicates.
 func TestConfigHomePutDeduplicates(t *testing.T) {
