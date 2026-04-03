@@ -81,6 +81,7 @@ items:
       - Validate merge order server then local then spec with deterministic canonical output snapshots.
     reasoning: medium
     cfp: 8
+    commit: f7562547
   - done: false
     reviews: []
     label: "1.4"
