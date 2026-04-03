@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -361,18 +362,20 @@ func mergeRecordsByDstBlock(block map[string]any, field string, overlay []string
 	}
 }
 
-// hydraExtractDst extracts the destination from a Hydra entry.
+// hydraExtractDst extracts the normalized destination from a Hydra entry.
 // For in/out: dst is everything after the last colon.
-// For home: dst is the middle segment (body after trimming :ro suffix).
+// For home: dst is the middle segment (body after trimming :ro suffix),
+// normalized with path.Clean so equivalent paths like ".config//app" and
+// ".config/app" dedup correctly.
 func hydraExtractDst(field, entry string) string {
 	switch field {
 	case "home":
 		body := strings.TrimSuffix(entry, ":ro")
 		idx := strings.LastIndex(body, ":")
 		if idx >= 0 {
-			return body[idx+1:]
+			return path.Clean(body[idx+1:])
 		}
-		return body
+		return path.Clean(body)
 	default: // in, out
 		idx := strings.LastIndex(entry, ":")
 		if idx >= 0 {
