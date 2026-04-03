@@ -15,8 +15,8 @@
 [commands_test.go](commands_test.go) Tests global command registration and top-level command hierarchy behavior.
 [common_http.go](common_http.go) Shared HTTP client and request helpers used across CLI command implementations.
 [common_http_test.go](common_http_test.go) Tests shared HTTP helper behavior including error mapping and request setup.
-[config_ca_command.go](config_ca_command.go) Implements ploy config ca set/unset/list CLI commands for global CA entries.
-[config_ca_command_flags_test.go](config_ca_command_flags_test.go) Tests config ca/home subcommand routing, required flags, and local Hydra CA hash validation.
+[config_ca_command.go](config_ca_command.go) Implements ploy config ca set/unset/list commands with local Hydra section and CA hash validation before API calls.
+[config_ca_command_flags_test.go](config_ca_command_flags_test.go) Tests config ca set/unset required flags plus local Hydra section and hash validation behavior.
 [config_command.go](config_command.go) Implements config command logic for reading, writing, and validating CLI config.
 [config_command_files_test.go](config_command_files_test.go) Tests config file I/O paths, precedence, and persistence behavior.
 [config_command_flags_test.go](config_command_flags_test.go) Tests config command flag parsing and validation paths.
@@ -25,8 +25,8 @@
 [config_env_command.go](config_env_command.go) Implements environment-focused config commands and env var projections.
 [config_env_command_files_test.go](config_env_command_files_test.go) Tests config env command behavior with file-backed configuration sources.
 [config_env_command_flags_test.go](config_env_command_flags_test.go) Tests config env command flags, defaults, and validation handling.
-[config_home_command.go](config_home_command.go) Implements ploy config home set/unset/list CLI commands for global home mount entries.
-[config_home_command_flags_test.go](config_home_command_flags_test.go) Tests config home command routing, required flags, and local Hydra home entry/destination validation.
+[config_home_command.go](config_home_command.go) Implements ploy config home set/unset/list commands with local Hydra section and home entry/destination validation.
+[config_home_command_flags_test.go](config_home_command_flags_test.go) Tests config home set/unset required flags plus local Hydra section and home entry/destination validation.
 [descriptor_control_plane_url_test.go](descriptor_control_plane_url_test.go) Tests control-plane URL derivation from descriptors and related edge cases.
 [flags.go](flags.go) Defines reusable CLI flags and shared flag registration helpers.
 [flags_helpers.go](flags_helpers.go) Utility helpers for flag coercion, defaults, and cross-command validation.
