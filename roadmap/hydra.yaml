@@ -225,7 +225,9 @@ items:
     cfp: 9
     commit: 8ce5bfb6
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["`go test ./tests/integration/... ./tests/e2e/migs/...` still fails in [tests/integration/migs/mig-codex/mig_codex_test.go](/Users/vk/@iw2rmb/ploy/tests/integration/migs/mig-codex/mig_codex_test.go:178) and [images/codex/entrypoint.sh](/Users/vk/@iw2rmb/ploy/images/codex/entrypoint.sh:28). The test still depends on legacy `CODEX_AUTH_JSON`/`CODEX_CONFIG_TOML`/`CCR_CONFIG_JSON` env materialization, and the image entrypoint still keeps the legacy warning/`amata` compatibility branch instead of Hydra-only behavior.", "[tests/e2e/migs/scenario-hydra-mount-enforcement/run.sh](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/scenario-hydra-mount-enforcement/run.sh:57) does not make the `/in` write path fail on the expected read-only case. If the write is rejected, execution falls through to the final `echo \"OK: write to /in correctly rejected\"`, so the container can exit 0 and the scenario cannot prove `/in` is read-only.", "[tests/e2e/migs/scenario-hydra-out-upload/run.sh](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/scenario-hydra-out-upload/run.sh:45) does not actually validate the uploaded `/out/report.json` content. The command writes escaped JSON text, and the assertions only check for `manifest.json` plus any `*report*` file, so the scenario can pass without proving `/out` upload continuity."]
+        commit: null
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
