@@ -425,8 +425,8 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 		secret bool
 	}{
 		{
-			name:   "CA bundle (server target)",
-			key:    "PLOY_CA_CERTS",
+			name:   "custom CA bundle (server target)",
+			key:    "CUSTOM_CA_CERTS",
 			value:  "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
 			target: "server",
 			secret: true,
@@ -439,8 +439,8 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 			secret: false,
 		},
 		{
-			name:   "codex auth JSON",
-			key:    "CODEX_AUTH_JSON",
+			name:   "custom auth JSON",
+			key:    "CUSTOM_AUTH_JSON",
 			value:  `{"api_key":"sk-...","org_id":"org-123"}`,
 			target: "server",
 			secret: true,
@@ -576,9 +576,9 @@ func TestConfigEnvPutSpecialKeyHardCutGuard(t *testing.T) {
 	}
 }
 
-// TestConfigEnvPutSpecialKeyServerTargetAllowed verifies that special env keys
-// with server or nodes targets remain writable (not migrated to typed fields).
-func TestConfigEnvPutSpecialKeyServerTargetAllowed(t *testing.T) {
+// TestConfigEnvPutSpecialKeyAllTargetsBlocked verifies that special env keys
+// are rejected for all targets (full hard-cut to typed config APIs).
+func TestConfigEnvPutSpecialKeyAllTargetsBlocked(t *testing.T) {
 	tests := []struct {
 		name   string
 		target string
@@ -598,10 +598,10 @@ func TestConfigEnvPutSpecialKeyServerTargetAllowed(t *testing.T) {
 			}
 			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/PLOY_CA_CERTS", reqBody, "key", "PLOY_CA_CERTS")
 
-			assertStatus(t, rr, http.StatusOK)
+			assertStatus(t, rr, http.StatusBadRequest)
 
-			if !st.upsertGlobalEnv.called {
-				t.Error("store.UpsertGlobalEnv should be called for non-migrated target")
+			if st.upsertGlobalEnv.called {
+				t.Error("store.UpsertGlobalEnv should NOT be called for migrated special env key")
 			}
 		})
 	}
