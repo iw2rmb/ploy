@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>] [--model <name>] [--prompt-file <file>]
+codex [--input <dir>] [--out <dir>] [--model <name>] [--prompt-file <file>]
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
@@ -38,8 +38,6 @@ activate_ccr_if_configured
 
 input_dir="${WORKSPACE:-/workspace}"
 out_dir="${OUTDIR:-/out}"
-auth_file=""
-config_file=""
 model="${CODEX_MODEL:-}"
 prompt_file=""
 
@@ -47,8 +45,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --input) input_dir="$2"; shift 2 ;;
     --out) out_dir="$2"; shift 2 ;;
-    --auth) auth_file="$2"; shift 2 ;;
-    --config) config_file="$2"; shift 2 ;;
     --model) model="$2"; shift 2 ;;
     --prompt-file) prompt_file="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -58,12 +54,6 @@ done
 
 mkdir -p "$out_dir" "$codex_config_dir"
 
-if [[ -n "$auth_file" ]]; then
-  install -m 600 "$auth_file" "$codex_config_dir/auth.json"
-fi
-if [[ -n "$config_file" ]]; then
-  install -m 600 "$config_file" "$codex_config_dir/config.toml"
-fi
 prompt=""
 if [[ -n "$prompt_file" ]]; then
   prompt="$(cat "$prompt_file")"
