@@ -281,7 +281,7 @@ items:
       - gaps: ["`[tests/e2e/migs/migs_e2e_test.go](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23)` still gates the live Hydra mount/upload tests behind `clusterReady`, and the skip path is still active at [L124-L125](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L124) and [L152-L153](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L152). In this workspace `go test -v ./tests/e2e/migs/...` passed with both `TestHydraMountEnforcement` and `TestHydraOutUpload` skipped, so the requested verification command does not guarantee the end-to-end scenarios actually run."]
         commit: 1f800526
       - gaps: ["[`tests/e2e/migs/migs_e2e_test.go`](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23) still hard-requires a built `dist/ploy` binary and a reachable local cluster before `TestHydraMountEnforcement` / `TestHydraOutUpload` run. In this workspace the requested `go test ./tests/integration/... ./tests/e2e/migs/...` failed on the `/healthz` check, so the Hydra e2e coverage is not actually exercised by the verification command in a clean setup.", "[`tests/integration/migs/mig-codex/mig_codex_test.go`](/Users/vk/@iw2rmb/ploy/tests/integration/migs/mig-codex/mig_codex_test.go#L360) still falls back to offline Hydra contract validation when `CODEX_AUTH_FILE` is unset. That means the same `go test` command can complete without running the live Codex healing path, so the integration half of the requested end-to-end coverage is not guaranteed."]
-        commit: null
+        commit: 5589cebc
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
