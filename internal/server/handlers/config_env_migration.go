@@ -9,8 +9,27 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+)
+
+var (
+	migrationRecordsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "ployd",
+		Subsystem: "env_migration",
+		Name:      "records_total",
+		Help:      "Total special env migration records by disposition.",
+	}, []string{"action"})
+
+	migrationErrorsTotal = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: "ployd",
+		Subsystem: "env_migration",
+		Name:      "errors_total",
+		Help:      "Total errors encountered during special env migration execution.",
+	})
 )
 
 // SpecialEnvMapping defines how a legacy env key maps to a typed Hydra field.
@@ -237,7 +256,8 @@ func RewriteSpecialEnvEntry(mapping *SpecialEnvMapping, hash string) (field, ent
 	}
 }
 
-// LogMigrationReport logs the migration report at appropriate severity levels.
+// LogMigrationReport logs the migration report at appropriate severity levels
+// and emits Prometheus metrics for scan outcomes.
 // Rewrite-needed entries are logged at Warn (action required), rejected entries
 // at Error (conflict), and skipped entries at Info.
 func LogMigrationReport(report *MigrationReport) {
@@ -278,6 +298,11 @@ func LogMigrationReport(report *MigrationReport) {
 			)
 		}
 	}
+
+	// Emit Prometheus metrics for scan-phase outcomes.
+	migrationRecordsTotal.WithLabelValues("rewrite_pending").Add(float64(report.Rewritten))
+	migrationRecordsTotal.WithLabelValues("rejected").Add(float64(report.Rejected))
+	migrationRecordsTotal.WithLabelValues("skipped").Add(float64(report.Skipped))
 }
 
 // MigrationExecResult summarizes the outcome of executing a migration.
@@ -356,18 +381,30 @@ func ExecuteMigration(
 		hash := contentHash(envValue)
 		field, record := RewriteSpecialEnvEntry(mapping, hash)
 
-		// Persist typed record to each target section.
+		// Persist typed record to each target section. Track failures so we
+		// only delete the legacy env row when ALL sections succeeded.
+		allSectionsOK := true
 		for _, section := range entry.Sections {
 			if persistErr := persistTypedRecord(ctx, st, holder, field, record, section, mapping); persistErr != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf(
 					"persist %s record for key %q section %q: %v",
 					field, entry.EnvKey, section, persistErr))
+				allSectionsOK = false
 				continue
 			}
 			result.Persisted++
 		}
 
-		// Delete legacy env record from store and holder.
+		// Only delete the legacy env record when every section was written
+		// successfully. Partial writes leave the source intact so the next
+		// startup can retry without data loss.
+		if !allSectionsOK {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"skipping legacy delete for key %q target %q: not all sections persisted",
+				entry.EnvKey, entry.Target))
+			continue
+		}
+
 		if deleteErr := st.DeleteGlobalEnv(ctx, store.DeleteGlobalEnvParams{
 			Key:    entry.EnvKey,
 			Target: target.String(),
@@ -439,7 +476,7 @@ func persistTypedRecord(
 	return nil
 }
 
-// LogMigrationExecResult logs the execution result of a migration.
+// LogMigrationExecResult logs the execution result and emits Prometheus metrics.
 func LogMigrationExecResult(result *MigrationExecResult) {
 	if result.Persisted == 0 && result.Deleted == 0 && result.Rejected == 0 && result.Skipped == 0 {
 		slog.Info("special env migration: no special env keys found")
@@ -457,4 +494,11 @@ func LogMigrationExecResult(result *MigrationExecResult) {
 	for _, e := range result.Errors {
 		slog.Error("special env migration: error", "detail", e)
 	}
+
+	// Emit Prometheus metrics for migration outcomes.
+	migrationRecordsTotal.WithLabelValues("persisted").Add(float64(result.Persisted))
+	migrationRecordsTotal.WithLabelValues("deleted").Add(float64(result.Deleted))
+	migrationRecordsTotal.WithLabelValues("rejected").Add(float64(result.Rejected))
+	migrationRecordsTotal.WithLabelValues("skipped").Add(float64(result.Skipped))
+	migrationErrorsTotal.Add(float64(len(result.Errors)))
 }

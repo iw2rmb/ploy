@@ -124,9 +124,9 @@ func TestConfigCommand_HydraCASetValidation(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "missing hash",
+			name:    "missing hash and file",
 			args:    []string{"--section", "mig"},
-			wantErr: "--hash is required",
+			wantErr: "either --hash or --file is required",
 		},
 		{
 			name:    "missing section",
