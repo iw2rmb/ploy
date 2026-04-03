@@ -322,20 +322,35 @@ func TestComputeArchiveShortHash(t *testing.T) {
 func newMockBundleServer(t *testing.T) (*httptest.Server, *url.URL, *http.Client, *int) {
 	t.Helper()
 	var uploadCount int
+	seenCIDs := make(map[string]struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/spec-bundles" {
-			uploadCount++
-			data, _ := io.ReadAll(r.Body)
-			h := sha256.Sum256(data)
-			digest := "sha256:" + hex.EncodeToString(h[:])
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"bundle_id": "bundle-" + hex.EncodeToString(h[:8]),
-				"cid":       "bafytest" + hex.EncodeToString(h[:4]),
-				"digest":    digest,
-			})
-			return
+		if r.URL.Path == "/v1/spec-bundles" {
+			if r.Method == http.MethodHead {
+				cid := r.URL.Query().Get("cid")
+				if _, ok := seenCIDs[cid]; ok {
+					w.WriteHeader(http.StatusOK)
+				} else {
+					w.WriteHeader(http.StatusNotFound)
+				}
+				return
+			}
+			if r.Method == http.MethodPost {
+				uploadCount++
+				data, _ := io.ReadAll(r.Body)
+				h := sha256.Sum256(data)
+				hexHash := hex.EncodeToString(h[:])
+				cid := "bafy" + hexHash[:32]
+				digest := "sha256:" + hexHash
+				seenCIDs[cid] = struct{}{}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"bundle_id": "bundle-" + hex.EncodeToString(h[:8]),
+					"cid":       cid,
+					"digest":    digest,
+				})
+				return
+			}
 		}
 		http.Error(w, "unexpected request", http.StatusInternalServerError)
 	}))
@@ -684,8 +699,53 @@ func TestCompileHydraRecordsInPlace_UploadDedup(t *testing.T) {
 		t.Errorf("identical content produced different hashes: %s vs %s", hash1, hash2)
 	}
 
-	// Server receives 2 uploads (client always uploads; server deduplicates).
-	if *uploadCount != 2 {
-		t.Errorf("upload count = %d, want 2", *uploadCount)
+	// In-process cache: identical content within one compile pass triggers only 1 upload.
+	if *uploadCount != 1 {
+		t.Errorf("upload count = %d, want 1 (identical content deduped in-process)", *uploadCount)
+	}
+}
+
+func TestCompileHydraRecordsInPlace_RepeatedRunSkipsUpload(t *testing.T) {
+	_, base, client, uploadCount := newMockBundleServer(t)
+
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "cert.pem")
+	if err := os.WriteFile(certFile, []byte("repeated-run-cert"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	makeSpec := func() map[string]any {
+		return map[string]any{
+			"steps": []any{
+				map[string]any{
+					"image": "docker.io/test/mig:latest",
+					"ca":    []any{certFile},
+				},
+			},
+		}
+	}
+
+	// First compile: probe misses, uploads.
+	spec1 := makeSpec()
+	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec1, tmpDir); err != nil {
+		t.Fatalf("first compile: %v", err)
+	}
+	if *uploadCount != 1 {
+		t.Fatalf("after first compile: upload count = %d, want 1", *uploadCount)
+	}
+	hash1 := spec1["steps"].([]any)[0].(map[string]any)["ca"].([]any)[0].(string)
+
+	// Second compile (simulates repeated run): probe hits, no new upload.
+	spec2 := makeSpec()
+	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec2, tmpDir); err != nil {
+		t.Fatalf("second compile: %v", err)
+	}
+	if *uploadCount != 1 {
+		t.Errorf("after second compile: upload count = %d, want 1 (repeated run should skip upload)", *uploadCount)
+	}
+	hash2 := spec2["steps"].([]any)[0].(map[string]any)["ca"].([]any)[0].(string)
+
+	if hash1 != hash2 {
+		t.Errorf("repeated run produced different hashes: %s vs %s", hash1, hash2)
 	}
 }

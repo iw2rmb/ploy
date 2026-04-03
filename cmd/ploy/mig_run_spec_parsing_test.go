@@ -533,7 +533,7 @@ build_gate:
 
 			var result map[string]any
 			if tt.useNormalize {
-				normalized, err := normalizeMigsSpecToJSON(context.Background(), nil, nil, []byte(specContent))
+				normalized, err := normalizeMigsSpecToJSON(context.Background(), nil, nil, []byte(specContent), "")
 				if err != nil {
 					t.Fatalf("normalizeMigsSpecToJSON: %v", err)
 				}

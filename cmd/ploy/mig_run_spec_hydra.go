@@ -169,8 +169,10 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 		return fmt.Errorf("file-backed records found but no HTTP client available for upload")
 	}
 
+	// In-process cache: CID → true for content already uploaded/probed this pass.
+	seen := make(map[string]bool)
 	for _, ref := range blocks {
-		if err := compileHydraBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir); err != nil {
+		if err := compileHydraBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir, seen); err != nil {
 			return err
 		}
 	}
@@ -212,20 +214,20 @@ func isAlreadyCanonical(field, s string) bool {
 }
 
 // compileHydraBlock compiles authoring entries in a single container block.
-func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string) error {
-	if err := compileCAEntries(ctx, base, client, block, prefix, specBaseDir); err != nil {
+func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
+	if err := compileCAEntries(ctx, base, client, block, prefix, specBaseDir, seen); err != nil {
 		return err
 	}
-	if err := compileInEntries(ctx, base, client, block, prefix, specBaseDir); err != nil {
+	if err := compileInEntries(ctx, base, client, block, prefix, specBaseDir, seen); err != nil {
 		return err
 	}
-	if err := compileOutEntries(ctx, base, client, block, prefix, specBaseDir); err != nil {
+	if err := compileOutEntries(ctx, base, client, block, prefix, specBaseDir, seen); err != nil {
 		return err
 	}
-	return compileHomeEntries(ctx, base, client, block, prefix, specBaseDir)
+	return compileHomeEntries(ctx, base, client, block, prefix, specBaseDir, seen)
 }
 
-func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string) error {
+func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
 	entries, ok := block["ca"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -241,7 +243,7 @@ func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, b
 			compiled[i] = s
 			continue
 		}
-		hash, err := compileFileRecord(ctx, base, client, s, specBaseDir)
+		hash, err := compileFileRecord(ctx, base, client, s, specBaseDir, seen)
 		if err != nil {
 			return fmt.Errorf("%s.ca[%d]: %w", prefix, i, err)
 		}
@@ -251,7 +253,7 @@ func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, b
 	return nil
 }
 
-func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string) error {
+func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
 	entries, ok := block["in"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -271,7 +273,7 @@ func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, b
 		if err != nil {
 			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
-		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir)
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen)
 		if err != nil {
 			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
@@ -281,7 +283,7 @@ func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, b
 	return nil
 }
 
-func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string) error {
+func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
 	entries, ok := block["out"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -301,7 +303,7 @@ func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, 
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
-		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir)
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen)
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
@@ -311,7 +313,7 @@ func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, 
 	return nil
 }
 
-func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string) error {
+func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
 	entries, ok := block["home"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -336,7 +338,7 @@ func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client,
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
-		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir)
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen)
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
@@ -351,8 +353,10 @@ func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client,
 }
 
 // compileFileRecord resolves a source path, builds a deterministic archive,
-// uploads it (server deduplicates by CID), and returns the short hash.
-func compileFileRecord(ctx context.Context, base *url.URL, client *http.Client, srcPath, specBaseDir string) (string, error) {
+// probes the server for an existing bundle with the same CID, uploads only
+// if missing, and returns the short hash. The seen map caches CIDs that have
+// already been verified or uploaded during this compilation pass.
+func compileFileRecord(ctx context.Context, base *url.URL, client *http.Client, srcPath, specBaseDir string, seen map[string]bool) (string, error) {
 	resolved, err := resolvePath(srcPath, specBaseDir)
 	if err != nil {
 		return "", fmt.Errorf("resolve source: %w", err)
@@ -364,12 +368,26 @@ func compileFileRecord(ctx context.Context, base *url.URL, client *http.Client, 
 	}
 
 	hash := computeArchiveShortHash(archiveBytes)
+	cid := computeSpecBundleCID(archiveBytes)
 
-	// Upload (server deduplicates by CID — returns 200 for existing, 201 for new).
-	if _, _, _, err := uploadSpecBundle(ctx, base, client, archiveBytes); err != nil {
-		return "", fmt.Errorf("upload: %w", err)
+	// In-process dedup: skip probe+upload if same content already handled this pass.
+	if seen[cid] {
+		return hash, nil
 	}
 
+	// Probe server for existing content by CID before uploading.
+	exists, err := probeSpecBundleByCID(ctx, base, client, cid)
+	if err != nil {
+		return "", fmt.Errorf("probe: %w", err)
+	}
+
+	if !exists {
+		if _, _, _, err := uploadSpecBundle(ctx, base, client, archiveBytes); err != nil {
+			return "", fmt.Errorf("upload: %w", err)
+		}
+	}
+
+	seen[cid] = true
 	return hash, nil
 }
 

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -463,9 +464,15 @@ func loadSpec(ctx context.Context, base *url.URL, client *http.Client, path stri
 		return nil, fmt.Errorf("spec is empty")
 	}
 
+	// Resolve base directory for relative path resolution within the spec.
+	specBaseDir := ""
+	if path != "-" {
+		specBaseDir = filepath.Dir(path)
+	}
+
 	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/env_from_file/tmp_bundle),
 	// then validate with the canonical parser to catch structural issues early.
-	return normalizeMigsSpecToJSON(ctx, base, client, data)
+	return normalizeMigsSpecToJSON(ctx, base, client, data, specBaseDir)
 }
 
 func outputRunSubmitJSONSummary(ctx context.Context, base *url.URL, httpClient *http.Client, runID domaintypes.RunID, initialState, finalState string, flags *runSubmitFlags) error {

@@ -29,18 +29,18 @@ import (
 
 var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
 
-func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Client, data []byte) (json.RawMessage, error) {
+func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Client, data []byte, specBaseDir string) (json.RawMessage, error) {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		if err := yaml.Unmarshal(data, &raw); err != nil {
 			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 		}
 	}
-	if err := preprocessMigsSpecInPlace(raw, ""); err != nil {
+	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
 		return nil, err
 	}
 
-	if err := compileHydraRecordsInPlace(ctx, base, client, raw, ""); err != nil {
+	if err := compileHydraRecordsInPlace(ctx, base, client, raw, specBaseDir); err != nil {
 		return nil, err
 	}
 

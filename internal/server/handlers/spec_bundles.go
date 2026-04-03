@@ -145,6 +145,33 @@ func writeSpecBundleUploadResponse(w http.ResponseWriter, bundle store.SpecBundl
 	}
 }
 
+// probeSpecBundleHandler checks whether a spec bundle with the given CID already exists.
+// CLI callers use this to skip uploading content that the server already has.
+//
+// Route: HEAD /v1/spec-bundles?cid={cid}
+// Auth:  RoleControlPlane
+// Returns 200 if a bundle with the CID exists, 404 otherwise.
+func probeSpecBundleHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cid := strings.TrimSpace(r.URL.Query().Get("cid"))
+		if cid == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		_, err := st.GetSpecBundleByCID(r.Context(), cid)
+		if err == nil {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		slog.Error("spec bundle probe: cid lookup failed", "cid", cid, "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
 // downloadSpecBundleHandler retrieves a spec bundle blob from object storage by bundle_id
 // and streams the raw bytes to the caller. Workers use this to fetch bundles before execution.
 //
