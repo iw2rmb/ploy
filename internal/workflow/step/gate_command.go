@@ -15,8 +15,8 @@ func buildCommandForTool(workspace string, tool string) ([]string, error) {
 }
 
 // buildCommandForToolTarget returns a deterministic command for a tool/target pair.
-// The env materializer preamble (PLOY_CA_CERTS trust-store setup) is prepended to
-// every gate command so certificates injected via global config are honored.
+// The env materializer preamble is prepended to every gate command; the materializer
+// registry is empty under the Hydra-only contract (CA certs are delivered via mounts).
 func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
 	preamble := envMaterializerPreamble()
 	switch strings.ToLower(strings.TrimSpace(tool)) {
