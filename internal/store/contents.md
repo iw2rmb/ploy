@@ -13,6 +13,7 @@
 [config_env.sql.go](config_env.sql.go) sqlc-generated CRUD queries for global configuration environment variables.
 [config_env_test.go](config_env_test.go) Integration tests for config env CRUD behavior and semantics.
 [config_home.sql.go](config_home.sql.go) sqlc-generated CRUD queries for global home mount entries per Hydra section.
+[config_home_hydra_test.go](config_home_hydra_test.go) Integration and contract tests for Hydra config_home CRUD dedup, ordering, and typed-query semantics.
 [db.go](db.go) sqlc-generated DBTX interfaces and query wrapper plumbing for store queries.
 [diffs.sql.go](diffs.sql.go) sqlc-generated diff-listing and diff-read queries used by CLI/API surfaces.
 [events.sql.go](events.sql.go) sqlc-generated event append/list queries for workflow event history.
