@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# E2E: tmp_dir mixed inputs (plain file + directory).
+# E2E: Hydra in-record mixed inputs (plain file + directory).
 #
-# Validates that a spec with two tmp_dir entries — one plain file and one
-# directory — results in both being visible under /tmp inside the container.
+# Validates that a spec with two `in` entries — one plain file and one
+# directory — results in both being visible under /in inside the container.
 #
 # Assertions:
 #   1. Run completes with status "Success".
-#   2. /tmp/config.json is present in the container (file entry).
-#   3. /tmp/scripts/build.sh is present in the container (directory entry).
+#   2. /in/config.json is present in the container (file entry).
+#   3. /in/scripts/build.sh is present in the container (directory entry).
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tests/e2e/lib/harness.sh
 source "${SCRIPT_DIR}/../../lib/harness.sh"
 
 e2e_init "${BASH_SOURCE[0]}"
-e2e_artifacts_init "$REPO_ROOT/tmp/migs/scenario-tmpdir-mixed"
+e2e_artifacts_init "$REPO_ROOT/tmp/migs/scenario-in-mixed"
 
 REPO="${PLOY_E2E_REPO_OVERRIDE:-https://github.com/octocat/Hello-World.git}"
 BASE_REF="${PLOY_E2E_BASE_REF:-master}"
-TARGET_REF="${PLOY_E2E_TARGET_REF:-e2e/tmpdir-mixed}"
+TARGET_REF="${PLOY_E2E_TARGET_REF:-e2e/in-mixed}"
 
 FIXTURES_DIR="${SCRIPT_DIR}/fixtures"
 CONFIG_PATH="${FIXTURES_DIR}/config.json"
 SCRIPTS_PATH="${FIXTURES_DIR}/scripts"
 
 echo "=========================================="
-echo "TmpDir Mixed Inputs E2E Scenario"
+echo "Hydra In-Record Mixed Inputs E2E Scenario"
 echo "=========================================="
 echo "Repo:        $REPO"
 echo "Base ref:    $BASE_REF"
@@ -36,8 +36,8 @@ echo "Fixtures:    $FIXTURES_DIR"
 echo "Artifacts:   $E2E_ARTIFACT_DIR"
 echo "=========================================="
 
-# Generate a spec with tmp_dir entries using absolute fixture paths.
-SPEC_FILE="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-tmpdir-mixed.XXXXXX.yaml")"
+# Generate a spec with Hydra in-record entries using absolute fixture paths.
+SPEC_FILE="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-in-mixed.XXXXXX.yaml")"
 trap 'rm -f "$SPEC_FILE"' EXIT
 
 cat >"$SPEC_FILE" <<YAML
@@ -48,18 +48,15 @@ steps:
     command: >-
       sh -c '
         set -e;
-        test -f /tmp/config.json || { echo "FAIL: /tmp/config.json missing"; exit 1; };
-        test -d /tmp/scripts    || { echo "FAIL: /tmp/scripts dir missing"; exit 1; };
-        test -f /tmp/scripts/build.sh || { echo "FAIL: /tmp/scripts/build.sh missing"; exit 1; };
-        echo "OK: /tmp/config.json present";
-        echo "OK: /tmp/scripts/build.sh present";
-        cat /tmp/config.json
+        test -f /in/config.json || { echo "FAIL: /in/config.json missing"; exit 1; };
+        test -f /in/build.sh    || { echo "FAIL: /in/build.sh missing"; exit 1; };
+        echo "OK: /in/config.json present";
+        echo "OK: /in/build.sh present";
+        cat /in/config.json
       '
-    tmp_dir:
-      - name: config.json
-        path: ${CONFIG_PATH}
-      - name: scripts
-        path: ${SCRIPTS_PATH}
+    in:
+      - ${CONFIG_PATH}:/in/config.json
+      - ${SCRIPTS_PATH}/build.sh:/in/build.sh
 YAML
 
 RUN_JSON="$(e2e_mig_run_json \
@@ -89,11 +86,11 @@ else
 fi
 
 if ((FAILED > 0)); then
-  echo "FAIL: scenario-tmpdir-mixed — assertions failed."
+  echo "FAIL: scenario-in-mixed — assertions failed."
   echo "Artifacts saved to: ${E2E_ARTIFACT_DIR}"
   exit 1
 fi
 
 echo ""
-echo "OK: scenario-tmpdir-mixed (file + directory tmp entries visible under /tmp)."
+echo "OK: scenario-in-mixed (file + directory in-record entries visible under /in)."
 echo "Artifacts saved to: ${E2E_ARTIFACT_DIR}"

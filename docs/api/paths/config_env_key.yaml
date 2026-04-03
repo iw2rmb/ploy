@@ -19,8 +19,8 @@ get:
       required: true
       schema:
         type: string
-      description: Environment variable key (e.g., PLOY_CA_CERTS, CODEX_AUTH_JSON, CCR_CONFIG_JSON, CRUSH_JSON).
-      example: PLOY_CA_CERTS
+      description: Environment variable key (e.g., OPENAI_API_KEY, CUSTOM_VAR). Special keys (PLOY_CA_CERTS, CODEX_AUTH_JSON, etc.) are migrated to typed config fields (ca, home, in) and rejected by this endpoint.
+      example: OPENAI_API_KEY
     - in: query
       name: target
       required: false
@@ -37,9 +37,9 @@ get:
           schema:
             $ref: "../components/schemas/config.yaml#/GlobalEnvVar"
           example:
-            key: "PLOY_CA_CERTS"
-            value: "-----BEGIN CERTIFICATE-----\nMIIC..."
-            target: "gates"
+            key: "OPENAI_API_KEY"
+            value: "sk-..."
+            target: "steps"
             secret: true
     "400":
       description: Bad request (key path parameter is required or invalid target)
@@ -69,15 +69,13 @@ put:
     that are injected into different components.
 
     **Common use cases:**
-    - `PLOY_CA_CERTS` with target `gates` and `steps` — PEM-encoded CA
-      certificates installed into container trust stores.
-    - `CODEX_AUTH_JSON` with target `steps` — Codex credentials written to
-      `/out/codex/auth.json` by codex images.
-    - `CCR_CONFIG_JSON` with target `steps` — Claude Code Router config written to
-      `/root/.claude-code-router/config.json` by codex images.
-    - `CRUSH_JSON` with target `steps` — Crush JSON content or file path
-      materialized to `/root/.config/crush/crush.json` by codex images.
     - `OPENAI_API_KEY` with target `steps` — API key for LLM-integrated migs.
+    - Custom variables for user-defined mig parameters.
+
+    **Migrated special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`,
+    `CRUSH_JSON`, and `CODEX_PROMPT` are migrated to typed config fields (`ca`, `home`,
+    `in`) and rejected by this endpoint on job targets. Use the typed config commands
+    (`ploy config ca`, `ploy config home`, `ploy config in`) instead.
 
     Requires `cli-admin` role.
   parameters:

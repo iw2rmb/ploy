@@ -28,8 +28,8 @@ GlobalEnvListItem:
   properties:
     key:
       type: string
-      description: Environment variable key (e.g., PLOY_CA_CERTS).
-      example: "PLOY_CA_CERTS"
+      description: Environment variable key (e.g., OPENAI_API_KEY).
+      example: "OPENAI_API_KEY"
     value:
       type: string
       description: |
@@ -61,11 +61,11 @@ GlobalEnvVar:
     key:
       type: string
       description: Environment variable key.
-      example: "PLOY_CA_CERTS"
+      example: "OPENAI_API_KEY"
     value:
       type: string
       description: Environment variable value (full, not redacted).
-      example: "-----BEGIN CERTIFICATE-----\nMIIC..."
+      example: "sk-..."
     target:
       $ref: '#/GlobalEnvTarget'
     secret:

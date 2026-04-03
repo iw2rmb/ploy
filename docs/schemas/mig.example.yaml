@@ -44,10 +44,8 @@ steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
     # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
     # command: ["/bin/sh", "-lc", "orw-cli --apply --dir /workspace --out /out"]
-    # Environment variables passed into the mig container
-    #   - use `env` for literal values
-    #   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
-    env:
+    # Environment variables passed into the mig container (key-value map).
+    envs:
       RECIPE_GROUP: org.openrewrite.recipe
       RECIPE_ARTIFACT: rewrite-migrate-java
       RECIPE_VERSION: "3.20.0"
@@ -56,37 +54,39 @@ steps:
       # ORW_REPOS: "https://repo1.maven.org/maven2,https://repo.internal/maven"
       # ORW_FAIL_ON_UNSUPPORTED: "true"
       # ORW_EXCLUDE_PATHS: "**/*.proto,build/generated/**"
-    env_from_file:
-      # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
-      # CODEX_AUTH_JSON: ~/.codex/auth.json
 
 ################################################################################
-# TMP_BUNDLE — per-block bundle injection
+# HYDRA FILE RECORDS — ca / in / out / home
 ################################################################################
-# Optional bundle reference that injects files/directories at /tmp/<name>
-# (read-only) inside the container. Supported under steps[], build_gate.router,
-# and build_gate.healing.by_error_kind.<kind>.
+# Hydra replaces legacy env_from_file, tmp_dir, and tmp_bundle with four
+# typed file-record fields. Each field accepts local source paths in the
+# spec; the CLI compiles them to canonical shortHash:dst form before submit.
 #
-# The CLI archives user-specified sources, uploads the bundle via the
-# control-plane API, and embeds the returned bundle reference in the spec.
-# The node agent downloads, verifies (digest), and extracts the bundle at
-# execution time, mounting each top-level entry read-only at /tmp/<name>.
+# Field semantics:
+#   ca   — CA certificate entries (local PEM paths or shortHash values).
+#          Mounted read-only under /etc/ploy/ca/.
+#   in   — Read-only input files: "src:/in/dst" → "shortHash:/in/dst".
+#          Mounted at /in/<name> inside the container.
+#   out  — Read-write output files: "src:/out/dst" → "shortHash:/out/dst".
+#          Mounted at /out/<name>; uploaded after step completion.
+#   home — Home-relative files: "src:dst{:ro}" → "shortHash:dst{:ro}".
+#          Mounted relative to $HOME inside the container.
 #
-# Bundle reference fields (all required when tmp_bundle is present):
-#  - bundle_id: opaque server-assigned identifier from the upload API
-#  - cid:       content-addressed identifier of the bundle archive
-#  - digest:    hex-encoded SHA-256 digest of the bundle bytes
-#  - entries:   list of top-level names; each must be a plain filename
-#               (no path separators, not "." or "..", no duplicates after trim)
+# Canonical stored-entry format after CLI compile:
+#   in:   ["shortHash:/in/config.json"]
+#   out:  ["shortHash:/out/result.txt"]
+#   home: ["shortHash:.config/app.toml:ro"]
+#   ca:   ["shortHash"]
 #
-# Example (disabled by default; remove comments to activate):
-# steps:
-#   - image: docker.io/your-dh-user/migs-openrewrite:latest
-#     tmp_bundle:
-#       bundle_id: bun-a1b2c3
-#       cid: bafyrei...
-#       digest: sha256:deadbeef...
-#       entries: [recipe.yaml, orw-settings.xml]
+# Example (before CLI compile — local paths):
+#   ca:
+#     - ./ca-bundle.pem
+#   in:
+#     - ./codex-auth.json:/in/codex-auth.json
+#   out:
+#     - ./seed.txt:/out/seed.txt
+#   home:
+#     - ./app.toml:.config/app.toml:ro
 
 ################################################################################
 # MULTI-STEP MODS (optional, for sequential transformations)
@@ -110,18 +110,15 @@ steps:
 # Example (disabled by default; remove comments to activate):
 # steps:
 #   - image: docker.io/your-dh-user/migs-migrate-java8:latest
-#     env:
+#     envs:
 #       MIGRATION_TARGET: java8
-#     tmp_bundle:
-#       bundle_id: bun-a1b2c3   # returned by CLI after upload
-#       cid: bafyrei...
-#       digest: sha256:deadbeef...
-#       entries: [settings.xml]
+#     in:
+#       - ./settings.xml:/in/settings.xml
 #   - image: docker.io/your-dh-user/migs-migrate-java11:latest
-#     env:
+#     envs:
 #       MIGRATION_TARGET: java11
 #   - image: docker.io/your-dh-user/migs-migrate-java17:latest
-#     env:
+#     envs:
 #       MIGRATION_TARGET: java17
 #       RECIPE_VERSION: "3.20.0"
 #     always: true
@@ -132,7 +129,7 @@ steps:
 #       default: docker.io/your-dh-user/migs-openrewrite:latest
 #       java-maven: docker.io/your-dh-user/orw-cli-maven:latest
 #       java-gradle: docker.io/your-dh-user/orw-cli-gradle:latest
-#     env:
+#     envs:
 #       RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
 
 ################################################################################
@@ -205,13 +202,8 @@ build_gate:
 #       # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
 #       #   - param: model
 #       #     value: gpt-4o
-#     env_from_file:
-#       CODEX_AUTH_JSON: ~/.codex/auth.json
-#     # tmp_bundle:   # optional; bundle reference for files at /tmp/<name>
-#     #   bundle_id: bun-...
-#     #   cid: bafyrei...
-#     #   digest: sha256:...
-#     #   entries: [router-instructions.txt]
+#     in:
+#       - ~/.codex/auth.json:/in/codex-auth.json
 #
 # 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
 #
@@ -219,7 +211,7 @@ build_gate:
 #   router:
 #     spec_path: ./healing/router/spec.yaml
 #     image: docker.io/your-dh-user/codex:latest
-#     env:
+#     envs:
 #       CODEX_PROMPT: |-
 #         Rules:
 #         - Read /in/build-gate.log.
@@ -227,14 +219,14 @@ build_gate:
 #         - Your final message MUST be one line of JSON: {"bug_summary":"..."}
 #         Task:
 #         Summarize the build failure as a single bug_summary one-liner.
-#     env_from_file:
-#       CODEX_AUTH_JSON: ~/.codex/auth.json
+#     in:
+#       - ~/.codex/auth.json:/in/codex-auth.json
 
 ################################################################################
 # HEALING CONFIGURATION (build_gate.healing)
 ################################################################################
 # Healing runs after router (if configured) when the Build Gate fails.
-# Mig-like fields (image, command, env, env_from_file) are specified under
+# Mig-like fields (image, command, envs, in, out, home, ca) are specified under
 # healing.by_error_kind.<error_kind> (no nested "mig" key).
 #
 # Two execution modes per error kind:
@@ -269,13 +261,8 @@ build_gate:
 #           # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
 #           #   - param: model
 #           #     value: gpt-4o
-#         env_from_file:
-#           CODEX_AUTH_JSON: ~/.codex/auth.json
-#         # tmp_bundle:   # optional; bundle reference for files at /tmp/<name>
-#         #   bundle_id: bun-...
-#         #   cid: bafyrei...
-#         #   digest: sha256:...
-#         #   entries: [prompt-extra.txt]
+#         in:
+#           - ~/.codex/auth.json:/in/codex-auth.json
 #
 # 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
 #
@@ -286,12 +273,12 @@ build_gate:
 #         spec_path: ./healing/infra/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
-#         env:
+#         envs:
 #           CODEX_PROMPT: |-
 #             Fix infra/toolchain issue in /in/build-gate.log.
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
-#         env_from_file:
-#           CODEX_AUTH_JSON: ~/.codex/auth.json
+#         in:
+#           - ~/.codex/auth.json:/in/codex-auth.json
 #         expectations:
 #           artifacts:
 #             - path: /out/gate-profile-candidate.json
@@ -300,12 +287,12 @@ build_gate:
 #         spec_path: ./healing/code/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
-#         env:
+#         envs:
 #           CODEX_PROMPT: |-
 #             Fix code-level issue in /in/build-gate.log.
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
-#         env_from_file:
-#           CODEX_AUTH_JSON: ~/.codex/auth.json
+#         in:
+#           - ~/.codex/auth.json:/in/codex-auth.json
 #
 # `spec_path` is optional preprocessing handled by CLI:
 # - CLI reads YAML/JSON object from `spec_path`
@@ -322,7 +309,7 @@ build_gate:
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
 gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided
-# gitlab_pat: "<TOKEN>"           # optional; can be provided via env_from_file in CLI; avoid committing to VCS
+# gitlab_pat: "<TOKEN>"           # optional; can be set via ploy config gitlab; avoid committing to VCS
 mr_on_success: true
 mr_on_fail: true
 ################################################################################
@@ -331,9 +318,13 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy run --spec mig.yaml` along with
 #   repository flags (e.g., --repo, --base-ref, --target-ref).
 #
-# - The agent honors: image, command, env, env_from_file, tmp_bundle,
+# - The agent honors: image, command, envs, ca, in, out, home,
 #   steps[] (for single-step and multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
+#
+# - Legacy fields (env, env_from_file, tmp_dir, tmp_bundle) are rejected by the
+#   server-side schema. Use envs for environment variables and ca/in/out/home
+#   for file injection.
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use `steps[]` with exactly one entry.

@@ -7,4 +7,5 @@
 [server_insecure_test.go](server_insecure_test.go) Validates HTTP server startup and protected endpoint access when insecure auth is enabled for tests.
 [smoke_workflow_end_to_end_test.go](smoke_workflow_end_to_end_test.go) Multi-stage workflow smoke test that exercises jobs, logs, diffs, events, and run completion state.
 [smoke_workflow_fixture_test.go](smoke_workflow_fixture_test.go) Shared fixture builder for creating v1 spec/mig/repo/run entities in smoke workflow tests.
+[hydra_contract_test.go](hydra_contract_test.go) Integration tests for Hydra contract precedence, parser edge cases, and legacy field rejection.
 [smoke_workflow_healing_diffs_test.go](smoke_workflow_healing_diffs_test.go) Verifies healing diff creation and ordered repo-scoped diff retrieval across workflow steps.

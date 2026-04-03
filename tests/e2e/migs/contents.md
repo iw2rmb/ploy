@@ -10,6 +10,8 @@
 [scenario-prep-ready.sh](scenario-prep-ready.sh) Setup scenario that prepares a repository branch for subsequent MIG e2e runs.
 [scenario-selftest.sh](scenario-selftest.sh) Self-check scenario ensuring local e2e harness prerequisites are wired correctly.
 [scenario-stack-aware-images/](scenario-stack-aware-images) Scenario suite validating stack-aware image selection and missing-default error behavior.
-[scenario-tmpdir-blocked/](scenario-tmpdir-blocked) Scenario proving unsafe tmp bundle entries are rejected during hydration.
-[scenario-tmpdir-mixed/](scenario-tmpdir-mixed) Scenario validating mixed tmp inputs (file and directory) are mounted under `/tmp`.
+[scenario-hydra-mount-enforcement/](scenario-hydra-mount-enforcement) Scenario validating Hydra /in read-only and /out writable mount semantics.
+[scenario-hydra-out-upload/](scenario-hydra-out-upload) Scenario validating /out write and artifact upload continuity end-to-end.
+[scenario-tmpdir-blocked/](scenario-tmpdir-blocked) Scenario proving unsafe bundle entries (traversal, symlink) are rejected during Hydra materialization.
+[scenario-tmpdir-mixed/](scenario-tmpdir-mixed) Scenario validating mixed Hydra in-record inputs (file and directory) are mounted under `/in`.
 [validate-hygiene.sh](validate-hygiene.sh) Script that validates scenario scripts/specs for required hygiene and consistency rules.

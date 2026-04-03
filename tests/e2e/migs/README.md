@@ -81,7 +81,7 @@ Example spec:
 **Using `--spec`:**
 
 The `--spec` flag accepts a YAML or JSON file defining:
-- **Main mig configuration** (`image`, `command`, `env`, `env_from_file`)
+- **Main mig configuration** (`image`, `command`, `envs`, `ca`, `in`, `out`, `home`)
 - **Build Gate settings** (`build_gate.enabled`, `build_gate.images`)
 - **Healing configuration** (`build_gate.router`, `build_gate.healing.by_error_kind`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
@@ -188,8 +188,8 @@ build_gate:
               - codex: |
                   Output exactly one JSON line:
                   {"bug_summary":"<<=200 chars>","error_kind":"code"}
-    env_from_file:
-      CODEX_AUTH_JSON: ~/.codex/auth.json
+    in:
+      - ~/.codex/auth.json:/in/codex-auth.json
   # direct-Codex mode: CODEX_PROMPT required
   healing:
     by_error_kind:
@@ -205,8 +205,8 @@ build_gate:
 
             Task:
             Fix the compilation error described in /in/build-gate.log.
-        env_from_file:
-          CODEX_AUTH_JSON: ~/.codex/auth.json
+        in:
+          - ~/.codex/auth.json:/in/codex-auth.json
 ```
 
 See `docs/schemas/mig.example.yaml` for the full spec schema.

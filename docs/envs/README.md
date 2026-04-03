@@ -38,8 +38,9 @@ defaults change, or components adopt additional configuration.
   Docker, so Docker Hub auth/token TLS uses the same root CAs.
   The same bundle is mounted into runtime containers (`server`/`node`) as a local file
   and exported through runtime TLS env vars; it is not baked into images.
-  Local/runtime deploy scripts also seed global `PLOY_CA_CERTS` from this file
-  so mig/build-gate containers receive the same CA bundle at runtime.
+  Deploy scripts seed the typed `ca` config field via `ploy config ca set` so
+  mig/build-gate containers receive the same CA bundle at runtime through
+  the Hydra `ca` materialization path (not as a raw env var).
   Current automation targets:
   - Docker context `colima` (installs CA inside the Colima VM and restarts Docker)
   - Linux hosts (installs CA under `/etc/docker/certs.d/...` and restarts Docker)
@@ -115,57 +116,70 @@ Role model (bearer token claims):
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
 - `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
-  - `env` — Inline environment variables for single-step runs (and base env for multi-step runs)
-  - `env_from_file` — File-based secrets (CLI reads and inlines content before submit)
-  - `steps[]` — Multi-step spec steps (each with its own image/command/env/env_from_file/tmp_bundle)
-  - `tmp_bundle` — Per-block bundle reference for file injection: CLI archives and uploads user-specified files/directories, then records the bundle reference (`bundle_id`, `cid`, `digest`, `entries`) in the spec. Supported in `steps[]`, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>`. See [tmp_bundle file injection](#tmp_bundle-file-injection) below.
+  - `envs` — Environment variables (key-value map, merged by key across precedence layers)
+  - `ca` — CA certificate entries (local paths or canonical `shortHash` values)
+  - `in` — Read-only input files (`src:/in/dst`; CLI compiles local paths to `shortHash:/in/dst`)
+  - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
+  - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
+  - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`ca`/`in`/`out`/`home`)
   - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
-### tmp_bundle file injection
 
-`tmp_bundle` is an optional bundle reference that injects files/directories into a container under `/tmp/<name>` (read-only mounts). It is supported on `steps[]` entries, `build_gate.router`, and `build_gate.healing.by_error_kind.<kind>` action blocks.
+### Hydra file-record compilation
 
-**CLI upload boundary** — before spec submission, the CLI:
-1. Archives each user-specified source (file or directory) into a deterministic bundle.
-2. Uploads the bundle via the control-plane API and captures the returned metadata.
-3. Replaces the user-facing source spec with the bundle reference in the submitted payload.
+The CLI compiles local file paths in `ca`, `in`, `out`, and `home` fields into
+canonical `shortHash:dst` records before spec submission:
 
-**Bundle reference fields** (all required when `tmp_bundle` is present):
-- `bundle_id` — opaque server-assigned identifier returned by the upload API.
-- `cid` — content-addressed identifier of the bundle archive.
-- `digest` — hex-encoded SHA-256 digest of the bundle archive bytes.
-- `entries` — ordered list of top-level names in the bundle. Each entry must be a plain filename (no path separators, not `.` or `..`, non-empty, no duplicates after whitespace trim).
+1. Resolves each source path relative to the spec file directory.
+2. Computes a content hash, uploads the archive when missing, and rewrites
+   the entry to `shortHash:dst` form.
+3. The node agent downloads bundles by hash and mounts them at the declared
+   destination (read-only for `ca`/`in`, read-write for `out`, configurable
+   for `home`).
 
-**Runtime behavior** — the node agent downloads the bundle, verifies the digest, and extracts each top-level entry into a per-job staging directory. Each entry is then mounted read-only into the container at `/tmp/<name>`. The staging directory is removed on both success and failure paths.
-
-**Example spec fragment (as submitted — after CLI upload):**
+**Example spec fragment (before CLI compile):**
 ```yaml
 steps:
   - image: docker.io/your-dh-user/migs-openrewrite:latest
-    tmp_bundle:
-      bundle_id: bun-a1b2c3
-      cid: bafyrei...
-      digest: sha256:deadbeef...
-      entries: [recipe.yaml]
+    in:
+      - ./recipe.yaml:/in/recipe.yaml
+    ca:
+      - ./ca-bundle.pem
 
 build_gate:
   router:
     image: docker.io/your-dh-user/codex:latest
-    tmp_bundle:
-      bundle_id: bun-d4e5f6
-      cid: bafyrei...
-      digest: sha256:cafebabe...
-      entries: [router-instructions.txt]
+    in:
+      - ./router-instructions.txt:/in/router-instructions.txt
   healing:
     by_error_kind:
       code:
         image: docker.io/your-dh-user/codex:latest
-        tmp_bundle:
-          bundle_id: bun-g7h8i9
-          cid: bafyrei...
-          digest: sha256:12345678...
-          entries: [prompt-extra.txt]
+        in:
+          - ./prompt-extra.txt:/in/prompt-extra.txt
+```
+
+**After CLI compile (canonical form submitted to server):**
+```yaml
+steps:
+  - image: docker.io/your-dh-user/migs-openrewrite:latest
+    in:
+      - "a1b2c3d4e5f6g7:/in/recipe.yaml"
+    ca:
+      - "f8e9d0c1b2a3"
+
+build_gate:
+  router:
+    image: docker.io/your-dh-user/codex:latest
+    in:
+      - "d4e5f6a7b8c9:/in/router-instructions.txt"
+  healing:
+    by_error_kind:
+      code:
+        image: docker.io/your-dh-user/codex:latest
+        in:
+          - "g7h8i9j0k1l2:/in/prompt-extra.txt"
 ```
 
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
@@ -176,7 +190,7 @@ build_gate:
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
 - `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
-  - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `env`, `env_from_file`
+  - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/prompt.txt`) are available to healing migs
@@ -207,7 +221,7 @@ Repo metadata (injected from StartRunRequest):
 Server connection details:
 - `PLOY_SERVER_URL` — Control plane base URL (e.g., `https://<server>:8443`)
 - `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
-- `PLOY_CA_CERTS` — Path to CA certificate inside healing container (`/etc/ploy/certs/ca.crt`)
+- CA certificates are delivered via Hydra `ca` mount entries (mounted under `/etc/ploy/ca/`), not as an environment variable.
 - `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
 - `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
@@ -502,11 +516,8 @@ CA bundles, and API keys without embedding them in every spec file.
 Use the `ploy config env` subcommands to manage global environment variables:
 
 ```bash
-# Set a CA certificate bundle (injected into all targets)
-ploy config env set --key PLOY_CA_CERTS --file ca-bundle.pem --on all
-
-# Set Codex auth credentials (injected into gate and step jobs — default --on jobs)
-ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json
+# Set CA certificates via typed config (replaces legacy PLOY_CA_CERTS env key)
+ploy config ca set --file ca-bundle.pem --on all
 
 # Set OpenAI API key (injected into gate and step jobs — default --on jobs)
 ploy config env set --key OPENAI_API_KEY --value sk-...
@@ -515,14 +526,18 @@ ploy config env set --key OPENAI_API_KEY --value sk-...
 ploy config env list
 
 # Show a specific variable (use --raw to reveal secret values)
-# Use --from when the key exists for multiple targets
-ploy config env show --key PLOY_CA_CERTS --from gates
 ploy config env show --key OPENAI_API_KEY --raw
 
 # Delete a variable (use --from when key exists for multiple targets)
 ploy config env unset --key OLD_VAR
-ploy config env unset --key PLOY_CA_CERTS --from gates
 ```
+
+**Migrated special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`,
+`CRUSH_JSON`, and `CODEX_PROMPT` have been migrated from raw env keys to typed config
+fields (`ca`, `home`, `in`). Use the dedicated typed config commands instead:
+- `ploy config ca set/unset/ls` — CA certificates
+- `ploy config home set/unset/ls` — Home-relative file mounts
+- `ploy config in set/unset/ls` — Read-only input file mounts
 
 ### Target Semantics
 
@@ -572,10 +587,9 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `PLOY_CA_CERTS` | ORW migs, build-gate, custom migs | PEM-encoded CA certificates or file path; materializer installs into container trust store |
-| `CODEX_AUTH_JSON` | `codex` | JSON content or file path materialized to `/out/codex/auth.json` at container startup |
-| `CCR_CONFIG_JSON` | `codex` | JSON content or file path materialized to `/root/.claude-code-router/config.json` at container startup |
-| `CRUSH_JSON` | `codex` | JSON content or file path materialized to `/root/.config/crush/crush.json` at container startup |
+| `ca` (typed) | ORW migs, build-gate, custom migs | PEM-encoded CA certificates; mounted via Hydra `ca` materialization (replaces `PLOY_CA_CERTS`) |
+| `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
+| `in` (typed) | `codex`, healing | Read-only input file mounts (replaces `CODEX_PROMPT` file injection) |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
@@ -655,19 +669,18 @@ If `/root/.claude-code-router/config.json` exists at startup, `codex` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 
-**Build Gate images (Maven/Gradle)**: The gate executor prepends a CA-install preamble
-via the `PLOY_CA_CERTS` materializer that:
-1. Detects whether `PLOY_CA_CERTS` contains inline PEM content or a readable file path
-2. Writes the PEM content to a temp file (or uses the file path directly)
-3. Splits the bundle into individual `.crt` files
-4. Copies them to `/usr/local/share/ca-certificates/ploy/`
-5. Runs `update-ca-certificates` (on Debian/Ubuntu images)
-6. Optionally imports into Java cacerts via `keytool` when available
-7. Exports `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, and `GIT_SSL_CAINFO` to the resolved path
+**Build Gate images (Maven/Gradle)**: The gate executor uses the Hydra `ca` mount
+entries to install CA certificates into the container trust store:
+1. CA bundles are delivered as files under `/etc/ploy/ca/<hash>`.
+2. The gate preamble splits the PEM bundle into individual `.crt` files.
+3. Copies them to `/usr/local/share/ca-certificates/ploy/`.
+4. Runs `update-ca-certificates` (on Debian/Ubuntu images).
+5. Optionally imports into Java cacerts via `keytool` when available.
+6. Exports `SSL_CERT_FILE`, `CURL_CA_BUNDLE`, and `GIT_SSL_CAINFO` to the resolved path.
 
 **Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
-**ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same `PLOY_CA_CERTS` materializer behavior as
+**ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same Hydra `ca` materialization behavior as
 build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.
 
