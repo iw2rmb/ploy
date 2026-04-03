@@ -2,6 +2,7 @@
 [config_ca.sql](config_ca.sql) SQL definitions for global CA certificate entry CRUD and listing queries per Hydra section.
 [config_env.sql](config_env.sql) SQL definitions for global config environment variable CRUD and listing queries.
 [config_home.sql](config_home.sql) SQL definitions for global home mount entry CRUD and listing queries per Hydra section.
+[config_in.sql](config_in.sql) SQL definitions for global in mount entry CRUD and section-scoped listing queries.
 [diffs.sql](diffs.sql) SQL definitions for diff creation, retrieval, cleanup, and run/repo listing queries.
 [events.sql](events.sql) SQL definitions for appending and listing run event records.
 [gate_profiles.sql](gate_profiles.sql) SQL definitions for gate profile upserts, lookups, and stack-constrained selection.
