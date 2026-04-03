@@ -592,4 +592,21 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 			t.Errorf("mount %s (%s) not found in spec mounts: %+v", w.target, w.field, spy.capturedSpec.Mounts)
 		}
 	}
+
+	// Assert /out mount target and mode from outDir (not staging-based).
+	var foundOut bool
+	for _, m := range spy.capturedSpec.Mounts {
+		if m.Target == "/out" {
+			foundOut = true
+			if m.Source != outDir2 {
+				t.Errorf("mount /out (out): source = %q, want %q", m.Source, outDir2)
+			}
+			if m.ReadOnly {
+				t.Errorf("mount /out (out): readOnly = true, want false")
+			}
+		}
+	}
+	if !foundOut {
+		t.Errorf("mount /out (out) not found in spec mounts: %+v", spy.capturedSpec.Mounts)
+	}
 }
