@@ -16,6 +16,7 @@ type claimSpecMutatorInput struct {
 	gitLab          config.GitLabConfig
 	globalEnv       map[string][]GlobalEnvVar
 	repoGateProfile []byte
+	hydraOverlays   map[string]*HydraJobConfig
 }
 
 type claimSpecMutator struct {
@@ -45,10 +46,8 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 			},
 		},
 		{
-			errContext: "merge global env into spec",
-			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyGlobalEnvMutator(m, in.globalEnv, in.jobType)
-			},
+			errContext: "merge hydra overlay into spec",
+			apply:     applyHydraOverlayMutator,
 		},
 		{
 			errContext: "merge recovery candidate prep into spec",

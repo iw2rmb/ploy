@@ -56,7 +56,7 @@ func (f *flushRecorder) Flush() {}
 func validSpecBody() map[string]any {
 	return map[string]any{
 		"version": "0.2.0",
-		"env":     map[string]any{},
+		"envs":    map[string]any{},
 		"steps":   []any{map[string]any{"image": "docker.io/test/mig:latest"}},
 	}
 }

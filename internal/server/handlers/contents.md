@@ -7,6 +7,8 @@
 [bootstrap.go](bootstrap.go) Constructs handler dependencies and bootstraps the HTTP handler layer wiring.
 [claim_spec_mutator_base.go](claim_spec_mutator_base.go) Core claim-spec mutation primitives applied before claim response emission.
 [claim_spec_mutator_gate.go](claim_spec_mutator_gate.go) Applies build-gate specific mutations when constructing claim specs.
+[claim_spec_mutator_hydra.go](claim_spec_mutator_hydra.go) Typed Hydra overlay merge for envs/ca/in/out/home with section routing and collision detection.
+[claim_spec_mutator_hydra_test.go](claim_spec_mutator_hydra_test.go) Tests Hydra overlay merge: global env routing, typed merge, section routing, router phase inheritance, collision detection, and three-layer precedence.
 [claim_spec_mutator_healing.go](claim_spec_mutator_healing.go) Injects healing/recovery-specific claim-spec adjustments and metadata.
 [claim_spec_mutator_pipeline.go](claim_spec_mutator_pipeline.go) Composes mutator stages into a deterministic claim-spec mutation pipeline.
 [claim_spec_mutator_test.go](claim_spec_mutator_test.go) Validates claim spec mutation precedence and recovery metadata shaping for gate/healing flows.
@@ -123,7 +125,6 @@
 [spec_bundles_test.go](spec_bundles_test.go) Covers spec-bundle upload/download handlers, ref counting, and cancellation safety.
 [spec_utils_fuzz_test.go](spec_utils_fuzz_test.go) Fuzzes spec mutator application to verify config mutation safety on arbitrary inputs.
 [spec_utils_gate_profile_test.go](spec_utils_gate_profile_test.go) Tests gate-profile extraction/mutation helpers for spec handling.
-[spec_utils_global_env_test.go](spec_utils_global_env_test.go) Validates global-env spec mutation helper behavior and edge cases.
 [spec_utils_test.go](spec_utils_test.go) General unit coverage for spec utility helpers used across handler flows.
 [stale_recovery_phase0_test.go](stale_recovery_phase0_test.go) Tests stale recovery phase-0 handler behavior and reconciliation decisions.
 [step_skip.go](step_skip.go) Step-skip policy evaluation helpers used in orchestration/claim paths.

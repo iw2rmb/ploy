@@ -206,7 +206,7 @@ func TestRunsCreateSingleRepo_MultiStepSpec(t *testing.T) {
 	// Multi-step spec with steps[] array.
 	multiStepSpec := map[string]any{
 		"version": "0.2.0",
-		"env":     map[string]any{},
+		"envs":    map[string]any{},
 		"steps": []any{
 			map[string]any{"image": "mig-image-1"},
 			map[string]any{"image": "mig-image-2"},
