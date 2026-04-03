@@ -12,7 +12,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 // buildTestTarGz creates a minimal tar.gz archive with the given entries for testing.
@@ -465,5 +467,83 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if len(hashes) != 4 {
 		t.Errorf("expected 4 unique hashes, got %d: %v", len(hashes), hashes)
+	}
+
+	// 5. Execute out mount planning via SeedOutDirFromStaging and verify
+	//    seeded content at the correct destination-relative path.
+	outDir := t.TempDir()
+	if err := step.SeedOutDirFromStaging(manifest, stagingDir, outDir); err != nil {
+		t.Fatalf("SeedOutDirFromStaging: %v", err)
+	}
+	seededOut, err := os.ReadFile(filepath.Join(outDir, "results", "seed.md"))
+	if err != nil {
+		t.Fatalf("seeded out content missing: %v", err)
+	}
+	if string(seededOut) != "seed content" {
+		t.Errorf("seeded out = %q, want %q", seededOut, "seed content")
+	}
+
+	// 6. Assert mount source layout for in/ca/home matches buildContainerSpec
+	//    expectations: each mount source is stagingDir/<hash>/content.
+	type wantMount struct {
+		hash     string
+		field    string
+		target   string
+		readOnly bool
+	}
+	wantMounts := []wantMount{
+		{hash: caHash, field: "ca", target: "/etc/ploy/ca/" + caHash, readOnly: true},
+		{hash: inHash, field: "in", target: "/in/config.json", readOnly: true},
+		{hash: homeHash, field: "home", target: "/home/user/.auth.json", readOnly: true},
+	}
+	for _, w := range wantMounts {
+		contentPath := filepath.Join(stagingDir, w.hash, "content")
+		if _, statErr := os.Stat(contentPath); statErr != nil {
+			t.Errorf("%s mount source %s missing: %v", w.field, contentPath, statErr)
+		}
+	}
+
+	// 7. Build a full manifest with inputs and envs for Runner integration
+	//    and verify container spec construction validates correctly.
+	fullManifest := contracts.StepManifest{
+		ID:    types.StepID("step-integration"),
+		Name:  "Mixed Hydra Integration",
+		Image: "alpine:3",
+		Inputs: []contracts.StepInput{{
+			Name:        "src",
+			MountPath:   "/workspace",
+			Mode:        contracts.StepInputModeReadWrite,
+			SnapshotCID: types.CID("bafy-test"),
+		}},
+		CA:        manifest.CA,
+		In:        manifest.In,
+		Out:       manifest.Out,
+		Home:      manifest.Home,
+		BundleMap: bundleMap,
+	}
+
+	// Use Runner with nil Containers to exercise SeedOutDirFromStaging
+	// through the standard execution flow (without container execution).
+	runner := &step.Runner{}
+	outDir2 := t.TempDir()
+	_, runErr := runner.Run(t.Context(), step.Request{
+		RunID:      types.RunID("run-integration"),
+		JobID:      types.JobID("job-integration"),
+		Manifest:   fullManifest,
+		Workspace:  t.TempDir(),
+		OutDir:     outDir2,
+		StagingDir: stagingDir,
+	})
+	if runErr != nil {
+		t.Fatalf("Runner.Run: %v", runErr)
+	}
+
+	// Verify that SeedOutDirFromStaging was executed during Run.
+	seeded2, err := os.ReadFile(filepath.Join(outDir2, "results", "seed.md"))
+	if err != nil {
+		t.Fatalf("Runner seeded out content missing: %v", err)
+	}
+	if string(seeded2) != "seed content" {
+		t.Errorf("Runner seeded out = %q, want %q", seeded2, "seed content")
 	}
 }
