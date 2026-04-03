@@ -16,6 +16,8 @@
 [config_ca.go](config_ca.go) CRUD handlers for global CA certificate entries per Hydra section.
 [config_ca_test.go](config_ca_test.go) Exercises global CA CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
+[config_env_migration.go](config_env_migration.go) Deterministic key-based rewrite mapping from special legacy env keys to typed Hydra ca/home/in fields with migration scan and report metrics.
+[config_env_migration_test.go](config_env_migration_test.go) Tests special env migration mapping table design alignment, rewrite entry generation, scan actions, conflict rejection, and report metrics.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers, defaults, round-trip behavior, and store error mapping.
 [config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab, global env, CA, and home endpoints.
 [config_gitlab_fuzz_test.go](config_gitlab_fuzz_test.go) Fuzzes GitLab config mutation paths to catch panics on malformed payload combinations.
