@@ -7,3 +7,9 @@ import "embed"
 //
 //go:embed assets/runtime/**
 var clusterDeployRuntimeFS embed.FS
+
+// clusterDeployConfigSchema contains the JSON schema copied to
+// $PLOY_CONFIG_HOME/config.schema.json during cluster deploy.
+//
+//go:embed assets/config.schema.json
+var clusterDeployConfigSchema []byte
