@@ -1,4 +1,5 @@
 [README.md](README.md) Runbook for MIG e2e prerequisites, image publishing, scenario execution, and validation contracts.
+[hydra_contract_offline_test.go](hydra_contract_offline_test.go) Offline contract test validating Hydra special-env mappings, docs coverage, and hydra scenario mount usage without a running cluster.
 [migs_e2e_test.go](migs_e2e_test.go) Go e2e suite that runs MIG scenarios and performs offline contract checks when cluster prerequisites are unavailable.
 [scenario-batch-run.sh](scenario-batch-run.sh) End-to-end batch-run scenario that validates repo fan-out, job progression, and stop behavior.
 [scenario-hydra-mount-enforcement/](scenario-hydra-mount-enforcement) Scenario proving Hydra mount contract by rejecting writes to `/in` and allowing writes to `/out`.
