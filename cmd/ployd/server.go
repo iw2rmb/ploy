@@ -239,9 +239,11 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	if st != nil {
 		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder, bp)
 		if execErr != nil {
-			slog.Error("special env migration: execution failed", "err", execErr)
-		} else {
-			handlers.LogMigrationExecResult(execResult)
+			return fmt.Errorf("special env migration: execution failed: %w", execErr)
+		}
+		handlers.LogMigrationExecResult(execResult)
+		if len(execResult.Errors) > 0 {
+			return fmt.Errorf("special env migration: %d error(s) during migration — unmigrated special keys would be dropped from env injection", len(execResult.Errors))
 		}
 	} else {
 		handlers.LogMigrationReport(migrationReport)
