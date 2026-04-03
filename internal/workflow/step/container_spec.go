@@ -212,6 +212,7 @@ func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir s
 	if stagingDir == "" || outDir == "" {
 		return nil
 	}
+	cleanOutDir := filepath.Clean(outDir)
 	for _, entry := range manifest.Out {
 		parsed, err := contracts.ParseStoredOutEntry(entry)
 		if err != nil {
@@ -219,7 +220,10 @@ func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir s
 		}
 		rel := strings.TrimPrefix(parsed.Dst, "/out/")
 		src := filepath.Join(stagingDir, parsed.Hash, "content")
-		dst := filepath.Join(outDir, rel)
+		dst := filepath.Clean(filepath.Join(outDir, rel))
+		if dst != cleanOutDir && !strings.HasPrefix(dst, cleanOutDir+string(filepath.Separator)) {
+			return fmt.Errorf("out entry %q: resolved path %s escapes outDir", entry, dst)
+		}
 		if err := copyPath(src, dst); err != nil {
 			return fmt.Errorf("seed out %s: %w", parsed.Dst, err)
 		}

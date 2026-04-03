@@ -26,6 +26,12 @@ func TestParseStoredInEntry(t *testing.T) {
 			wantDst:  "/in/subdir/file.txt",
 		},
 		{
+			name:     "double slash cleaned",
+			input:    "abcdef0:/in//tmp/pwn",
+			wantHash: "abcdef0",
+			wantDst:  "/in/tmp/pwn",
+		},
+		{
 			name:    "wrong domain",
 			input:   "abcdef0:/out/file",
 			wantErr: "destination must start with /in/",
@@ -38,7 +44,7 @@ func TestParseStoredInEntry(t *testing.T) {
 		{
 			name:    "path traversal",
 			input:   "abcdef0:/in/../etc/passwd",
-			wantErr: "path traversal not allowed",
+			wantErr: "destination must start with /in/",
 		},
 		{
 			name:    "no colon",
@@ -94,6 +100,17 @@ func TestParseStoredOutEntry(t *testing.T) {
 			wantDst:  "/out/results",
 		},
 		{
+			name:     "double slash cleaned",
+			input:    "abcdef0:/out//tmp/pwn",
+			wantHash: "abcdef0",
+			wantDst:  "/out/tmp/pwn",
+		},
+		{
+			name:    "double slash escapes domain",
+			input:   "abcdef0:/out/../../etc/shadow",
+			wantErr: "destination must start with /out/",
+		},
+		{
 			name:    "wrong domain",
 			input:   "abcdef0:/in/file",
 			wantErr: "destination must start with /out/",
@@ -101,7 +118,7 @@ func TestParseStoredOutEntry(t *testing.T) {
 		{
 			name:    "path traversal",
 			input:   "abcdef0:/out/../../etc/passwd",
-			wantErr: "path traversal not allowed",
+			wantErr: "destination must start with /out/",
 		},
 	}
 	for _, tc := range tests {

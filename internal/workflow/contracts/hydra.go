@@ -12,6 +12,7 @@ package contracts
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -33,6 +34,7 @@ func ParseStoredInEntry(s string) (ParsedStoredEntry, error) {
 	if err != nil {
 		return ParsedStoredEntry{}, fmt.Errorf("in entry %q: %w", s, err)
 	}
+	dst = path.Clean(dst)
 	if !strings.HasPrefix(dst, "/in/") {
 		return ParsedStoredEntry{}, fmt.Errorf("in entry %q: destination must start with /in/", s)
 	}
@@ -49,6 +51,7 @@ func ParseStoredOutEntry(s string) (ParsedStoredEntry, error) {
 	if err != nil {
 		return ParsedStoredEntry{}, fmt.Errorf("out entry %q: %w", s, err)
 	}
+	dst = path.Clean(dst)
 	if !strings.HasPrefix(dst, "/out/") {
 		return ParsedStoredEntry{}, fmt.Errorf("out entry %q: destination must start with /out/", s)
 	}
