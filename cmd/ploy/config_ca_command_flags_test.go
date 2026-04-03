@@ -46,15 +46,15 @@ func TestHandleConfigCALsAliasRoutes(t *testing.T) {
 	}
 }
 
-// TestHandleConfigCASetRequiresHash verifies that the 'set' subcommand
-// requires the --hash flag.
-func TestHandleConfigCASetRequiresHash(t *testing.T) {
+// TestHandleConfigCASetRequiresHashOrFile verifies that the 'set' subcommand
+// requires either --hash or --file flag.
+func TestHandleConfigCASetRequiresHashOrFile(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := handleConfigCASet([]string{"--section", "mig"}, buf)
 	if err == nil {
-		t.Fatalf("expected error when --hash is missing")
+		t.Fatalf("expected error when --hash/--file is missing")
 	}
-	if !strings.Contains(err.Error(), "--hash is required") {
+	if !strings.Contains(err.Error(), "either --hash or --file is required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

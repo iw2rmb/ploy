@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -134,6 +135,9 @@ func printConfigCAListUsage(w io.Writer) {
 }
 
 // handleConfigCASet adds a CA entry.
+// Supports two modes:
+//   - --hash <HASH> --section <SECTION>: register an existing hash
+//   - --file <PATH> --section <SECTION> [--section ...]: upload file, compute hash, register
 func handleConfigCASet(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
 		printConfigCASetUsage(stderr)
@@ -146,11 +150,13 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("config ca set", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var (
-		hash    stringValue
-		section stringValue
+		hash     stringValue
+		file     stringValue
+		sections stringsValue
 	)
-	fs.Var(&hash, "hash", "CA hash (required)")
-	fs.Var(&section, "section", "Target section (required)")
+	fs.Var(&hash, "hash", "CA hash (required unless --file is provided)")
+	fs.Var(&file, "file", "Path to CA bundle file (mutually exclusive with --hash)")
+	fs.Var(&sections, "section", "Target section (repeatable; required)")
 
 	if err := parseFlagSet(fs, args, func() { printConfigCASetUsage(stderr) }); err != nil {
 		return err
@@ -159,24 +165,23 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 		printConfigCASetUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
-	if !hash.set || strings.TrimSpace(hash.value) == "" {
+	if !hash.set && !file.set {
 		printConfigCASetUsage(stderr)
-		return errors.New("--hash is required")
+		return errors.New("either --hash or --file is required")
 	}
-	if !section.set || strings.TrimSpace(section.value) == "" {
+	if hash.set && file.set {
+		printConfigCASetUsage(stderr)
+		return errors.New("--hash and --file are mutually exclusive")
+	}
+	if len(sections.values) == 0 {
 		printConfigCASetUsage(stderr)
 		return errors.New("--section is required")
 	}
-	if err := contracts.ValidateHydraSection(section.value); err != nil {
-		return err
+	for _, s := range sections.values {
+		if err := contracts.ValidateHydraSection(s); err != nil {
+			return err
+		}
 	}
-
-	// Validate and normalize hash using Hydra parser rules.
-	normalizedHash, err := contracts.ParseStoredCAEntry(hash.value)
-	if err != nil {
-		return err
-	}
-	hash.value = normalizedHash
 
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
@@ -184,16 +189,61 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 		return fmt.Errorf("resolve control plane: %w", err)
 	}
 
+	var resolvedHash string
+	if file.set {
+		// Upload the CA bundle file as a spec bundle and derive the hash.
+		archiveBytes, buildErr := buildSourceArchive(expandPath(file.value))
+		if buildErr != nil {
+			return fmt.Errorf("build archive from %s: %w", file.value, buildErr)
+		}
+		resolvedHash = computeArchiveShortHash(archiveBytes)
+		cid := computeSpecBundleCID(archiveBytes)
+
+		// Probe before uploading to avoid redundant transfers.
+		_, exists, probeErr := probeSpecBundleByCID(ctx, baseURL, client, cid)
+		if probeErr != nil {
+			return fmt.Errorf("probe spec bundle: %w", probeErr)
+		}
+		if !exists {
+			if _, _, _, uploadErr := uploadSpecBundle(ctx, baseURL, client, archiveBytes); uploadErr != nil {
+				return fmt.Errorf("upload CA bundle: %w", uploadErr)
+			}
+		}
+	} else {
+		normalizedHash, parseErr := contracts.ParseStoredCAEntry(hash.value)
+		if parseErr != nil {
+			return parseErr
+		}
+		resolvedHash = normalizedHash
+	}
+
+	// Register the hash for each requested section.
+	for _, section := range sections.values {
+		if regErr := putConfigCAEntry(ctx, baseURL, client, resolvedHash, section); regErr != nil {
+			return regErr
+		}
+	}
+
+	if len(sections.values) == 1 {
+		fmt.Printf("CA entry %q added to section %s\n", resolvedHash, sections.values[0])
+	} else {
+		fmt.Printf("CA entry %q added to sections %s\n", resolvedHash, strings.Join(sections.values, ", "))
+	}
+	return nil
+}
+
+// putConfigCAEntry registers a CA hash for a single section via PUT /v1/config/ca/{hash}.
+func putConfigCAEntry(ctx context.Context, baseURL *url.URL, client *http.Client, hash, section string) error {
 	reqBody := struct {
 		Section string `json:"section"`
-	}{Section: section.value}
+	}{Section: section}
 	bodyJSON, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/ca/" + hash.value
-	req, err := http.NewRequestWithContext(ctx, "PUT", endpoint, bytes.NewReader(bodyJSON))
+	endpoint := baseURL.JoinPath("v1", "config", "ca", hash)
+	req, err := http.NewRequestWithContext(ctx, "PUT", endpoint.String(), bytes.NewReader(bodyJSON))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -207,19 +257,18 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("server returned %d for section %s: %s", resp.StatusCode, section, string(body))
 	}
-
-	fmt.Printf("CA entry %q added to section %s\n", hash.value, section.value)
 	return nil
 }
 
 func printConfigCASetUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config ca set --hash <HASH> --section <SECTION>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy config ca set (--hash <HASH> | --file <PATH>) --section <SECTION> [--section ...]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
-	_, _ = fmt.Fprintln(w, "  --hash     CA content hash (7-64 hex chars, required)")
-	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal (required)")
+	_, _ = fmt.Fprintln(w, "  --hash     CA content hash (7-64 hex chars; mutually exclusive with --file)")
+	_, _ = fmt.Fprintln(w, "  --file     Path to CA bundle file (uploads content, derives hash; mutually exclusive with --hash)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal (repeatable, required)")
 }
 
 // handleConfigCAUnset removes a CA entry.

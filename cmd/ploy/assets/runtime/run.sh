@@ -652,9 +652,11 @@ configure_runtime_globals_and_persist_auth() {
   fi
 
   if [[ -n "$PLOY_CA_CERTS" && "$PLOY_CA_CERTS" != "/dev/null" ]]; then
-    log "Configuring global PLOY_CA_CERTS..."
-    if ! ploy config env set --key PLOY_CA_CERTS --file "$PLOY_CA_CERTS" --on all >/dev/null; then
-      echo "error: failed to set PLOY_CA_CERTS via ploy config env set --on all" >&2
+    log "Configuring global CA bundle via typed config ca API..."
+    if ! ploy config ca set --file "$PLOY_CA_CERTS" \
+        --section pre_gate --section re_gate --section post_gate \
+        --section mig --section heal >/dev/null; then
+      echo "error: failed to set CA bundle via ploy config ca set" >&2
       exit 1
     fi
   fi
