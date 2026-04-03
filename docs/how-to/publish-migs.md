@@ -36,8 +36,8 @@ Build Gate image mapping source of truth:
   - `$PLOY_CONTAINER_REGISTRY/maven:3-eclipse-temurin-17`
 
 Custom CA support is runtime-only. Do not inject corporate certs during image build.
-Use `PLOY_CA_CERTS` at deployment/runtime so the same bundle is mounted into runtime
-containers and propagated as `PLOY_CA_CERTS` via the materializer.
+Set `PLOY_CA_CERTS` at deployment time so the cluster can mount the bundle into
+runtime containers via Hydra `ca` records (mounted read-only under `/etc/ploy/ca/`).
 
 Publish a single Migs image (example: orw-cli-maven)
 ```bash

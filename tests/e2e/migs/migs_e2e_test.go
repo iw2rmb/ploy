@@ -1,11 +1,14 @@
 package migs_e2e_test
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func repoRoot(t *testing.T) string {
@@ -15,6 +18,36 @@ func repoRoot(t *testing.T) string {
 		t.Fatalf("git rev-parse --show-toplevel: %v", err)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// skipUnlessClusterReady skips the test when the local cluster prerequisites
+// are not met (missing ploy binary or unreachable server). This allows
+// `go test ./tests/e2e/migs/...` to pass on a clean workspace without a
+// running local cluster.
+func skipUnlessClusterReady(t *testing.T, root string) {
+	t.Helper()
+
+	// 1. Built binary must exist.
+	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
+		t.Skipf("ploy binary not built (dist/ploy missing); skipping cluster e2e scenario")
+	}
+
+	// 2. Server must be reachable.
+	serverURL := os.Getenv("PLOY_SERVER_URL")
+	if serverURL == "" {
+		port := os.Getenv("PLOY_SERVER_PORT")
+		if port == "" {
+			port = "8080"
+		}
+		serverURL = fmt.Sprintf("http://localhost:%s", port)
+	}
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(serverURL + "/healthz")
+	if err != nil {
+		t.Skipf("local cluster not reachable at %s: %v; skipping cluster e2e scenario", serverURL, err)
+	}
+	resp.Body.Close()
 }
 
 // TestCodexEntrypointUnit runs the shell-based unit test suite for the codex
@@ -72,6 +105,7 @@ func TestHydraMountEnforcement(t *testing.T) {
 		t.Skip("short mode; skipping e2e scenario")
 	}
 	root := repoRoot(t)
+	skipUnlessClusterReady(t, root)
 	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-mount-enforcement", "run.sh")
 	if _, err := os.Stat(script); err != nil {
 		t.Skipf("scenario script not found: %v", err)
@@ -94,6 +128,7 @@ func TestHydraOutUpload(t *testing.T) {
 		t.Skip("short mode; skipping e2e scenario")
 	}
 	root := repoRoot(t)
+	skipUnlessClusterReady(t, root)
 	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-out-upload", "run.sh")
 	if _, err := os.Stat(script); err != nil {
 		t.Skipf("scenario script not found: %v", err)
