@@ -322,12 +322,14 @@ func TestComputeArchiveShortHash(t *testing.T) {
 func newMockBundleServer(t *testing.T) (*httptest.Server, *url.URL, *http.Client, *int) {
 	t.Helper()
 	var uploadCount int
-	seenCIDs := make(map[string]struct{})
+	// seenCIDs maps CID → bundleID for probe dedup and X-Bundle-ID header.
+	seenCIDs := make(map[string]string)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/spec-bundles" {
 			if r.Method == http.MethodHead {
 				cid := r.URL.Query().Get("cid")
-				if _, ok := seenCIDs[cid]; ok {
+				if bundleID, ok := seenCIDs[cid]; ok {
+					w.Header().Set("X-Bundle-ID", bundleID)
 					w.WriteHeader(http.StatusOK)
 				} else {
 					w.WriteHeader(http.StatusNotFound)
@@ -341,11 +343,12 @@ func newMockBundleServer(t *testing.T) (*httptest.Server, *url.URL, *http.Client
 				hexHash := hex.EncodeToString(h[:])
 				cid := "bafy" + hexHash[:32]
 				digest := "sha256:" + hexHash
-				seenCIDs[cid] = struct{}{}
+				bundleID := "bundle-" + hex.EncodeToString(h[:8])
+				seenCIDs[cid] = bundleID
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusCreated)
 				_ = json.NewEncoder(w).Encode(map[string]any{
-					"bundle_id": "bundle-" + hex.EncodeToString(h[:8]),
+					"bundle_id": bundleID,
 					"cid":       cid,
 					"digest":    digest,
 				})
@@ -747,5 +750,77 @@ func TestCompileHydraRecordsInPlace_RepeatedRunSkipsUpload(t *testing.T) {
 
 	if hash1 != hash2 {
 		t.Errorf("repeated run produced different hashes: %s vs %s", hash1, hash2)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// bundle_map emission
+// ---------------------------------------------------------------------------
+
+func TestCompileHydraRecordsInPlace_EmitsBundleMap(t *testing.T) {
+	_, base, client, _ := newMockBundleServer(t)
+
+	tmpDir := t.TempDir()
+	certFile := filepath.Join(tmpDir, "ca.pem")
+	inFile := filepath.Join(tmpDir, "config.json")
+	outFile := filepath.Join(tmpDir, "seed.txt")
+	homeFile := filepath.Join(tmpDir, "auth.json")
+
+	if err := os.WriteFile(certFile, []byte("ca-cert"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(inFile, []byte("in-data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(outFile, []byte("out-data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(homeFile, []byte("home-data"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	spec := map[string]any{
+		"steps": []any{
+			map[string]any{
+				"image": "alpine:3",
+				"ca":    []any{certFile},
+				"in":    []any{inFile + ":/in/config.json"},
+				"out":   []any{outFile + ":/out/seed.txt"},
+				"home":  []any{homeFile + ":.auth.json"},
+			},
+		},
+	}
+
+	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
+		t.Fatalf("compileHydraRecordsInPlace: %v", err)
+	}
+
+	bm, ok := spec["bundle_map"]
+	if !ok {
+		t.Fatal("bundle_map not emitted into spec")
+	}
+	bundleMap, ok := bm.(map[string]string)
+	if !ok {
+		t.Fatalf("bundle_map type = %T, want map[string]string", bm)
+	}
+
+	step0 := spec["steps"].([]any)[0].(map[string]any)
+	// Collect all shortHashes used in canonical entries.
+	caHash := step0["ca"].([]any)[0].(string)
+	inHash := strings.SplitN(step0["in"].([]any)[0].(string), ":", 2)[0]
+	outHash := strings.SplitN(step0["out"].([]any)[0].(string), ":", 2)[0]
+	homeHash := strings.SplitN(step0["home"].([]any)[0].(string), ":", 2)[0]
+
+	for _, h := range []string{caHash, inHash, outHash, homeHash} {
+		if _, exists := bundleMap[h]; !exists {
+			t.Errorf("bundle_map missing entry for hash %q", h)
+		}
+	}
+
+	// Every bundleID should be non-empty.
+	for hash, bundleID := range bundleMap {
+		if bundleID == "" {
+			t.Errorf("bundle_map[%q] is empty", hash)
+		}
 	}
 }

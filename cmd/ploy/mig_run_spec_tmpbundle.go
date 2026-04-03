@@ -151,9 +151,11 @@ func computeSpecBundleCID(data []byte) string {
 }
 
 // probeSpecBundleByCID checks whether a spec bundle with the given CID already
-// exists on the server via HEAD /v1/spec-bundles?cid={cid}. Returns true if
-// the server responds with 200, false for 404, and an error for other statuses.
-func probeSpecBundleByCID(ctx context.Context, base *url.URL, client *http.Client, cid string) (bool, error) {
+// exists on the server via HEAD /v1/spec-bundles?cid={cid}. Returns the
+// bundle ID from the X-Bundle-ID response header (empty when not provided),
+// true if a bundle with the CID exists, false for 404, and an error for other
+// statuses.
+func probeSpecBundleByCID(ctx context.Context, base *url.URL, client *http.Client, cid string) (bundleID string, exists bool, err error) {
 	endpoint := base.JoinPath("v1", "spec-bundles")
 	q := endpoint.Query()
 	q.Set("cid", cid)
@@ -161,22 +163,22 @@ func probeSpecBundleByCID(ctx context.Context, base *url.URL, client *http.Clien
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, endpoint.String(), nil)
 	if err != nil {
-		return false, fmt.Errorf("spec-bundle probe: build request: %w", err)
+		return "", false, fmt.Errorf("spec-bundle probe: build request: %w", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("spec-bundle probe: http request: %w", err)
+		return "", false, fmt.Errorf("spec-bundle probe: http request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return true, nil
+		return resp.Header.Get("X-Bundle-ID"), true, nil
 	case http.StatusNotFound:
-		return false, nil
+		return "", false, nil
 	default:
-		return false, fmt.Errorf("spec-bundle probe: unexpected status %s", resp.Status)
+		return "", false, fmt.Errorf("spec-bundle probe: unexpected status %s", resp.Status)
 	}
 }
 

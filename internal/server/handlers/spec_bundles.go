@@ -158,8 +158,9 @@ func probeSpecBundleHandler(st store.Store) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		_, err := st.GetSpecBundleByCID(r.Context(), cid)
+		bundle, err := st.GetSpecBundleByCID(r.Context(), cid)
 		if err == nil {
+			w.Header().Set("X-Bundle-ID", bundle.ID.String())
 			w.WriteHeader(http.StatusOK)
 			return
 		}

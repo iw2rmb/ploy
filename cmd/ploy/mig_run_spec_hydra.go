@@ -169,12 +169,17 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 		return fmt.Errorf("file-backed records found but no HTTP client available for upload")
 	}
 
-	// In-process cache: CID → true for content already uploaded/probed this pass.
-	seen := make(map[string]bool)
+	// In-process cache: CID → bundleID for content already uploaded/probed this pass.
+	seen := make(map[string]string)
+	// Accumulates shortHash → bundleID for runtime materialization.
+	bundleMap := make(map[string]string)
 	for _, ref := range blocks {
-		if err := compileHydraBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir, seen); err != nil {
+		if err := compileHydraBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir, seen, bundleMap); err != nil {
 			return err
 		}
+	}
+	if len(bundleMap) > 0 {
+		spec["bundle_map"] = bundleMap
 	}
 	return nil
 }
@@ -214,20 +219,20 @@ func isAlreadyCanonical(field, s string) bool {
 }
 
 // compileHydraBlock compiles authoring entries in a single container block.
-func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
-	if err := compileCAEntries(ctx, base, client, block, prefix, specBaseDir, seen); err != nil {
+func compileHydraBlock(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
+	if err := compileCAEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
 		return err
 	}
-	if err := compileInEntries(ctx, base, client, block, prefix, specBaseDir, seen); err != nil {
+	if err := compileInEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
 		return err
 	}
-	if err := compileOutEntries(ctx, base, client, block, prefix, specBaseDir, seen); err != nil {
+	if err := compileOutEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap); err != nil {
 		return err
 	}
-	return compileHomeEntries(ctx, base, client, block, prefix, specBaseDir, seen)
+	return compileHomeEntries(ctx, base, client, block, prefix, specBaseDir, seen, bundleMap)
 }
 
-func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
+func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
 	entries, ok := block["ca"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -245,7 +250,7 @@ func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, b
 			hash = s
 		} else {
 			var err error
-			hash, err = compileFileRecord(ctx, base, client, s, specBaseDir, seen)
+			hash, err = compileFileRecord(ctx, base, client, s, specBaseDir, seen, bundleMap)
 			if err != nil {
 				return fmt.Errorf("%s.ca[%d]: %w", prefix, i, err)
 			}
@@ -259,7 +264,7 @@ func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, b
 	return nil
 }
 
-func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
+func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
 	entries, ok := block["in"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -279,7 +284,7 @@ func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, b
 		if err != nil {
 			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
-		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen)
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen, bundleMap)
 		if err != nil {
 			return fmt.Errorf("%s.in[%d]: %w", prefix, i, err)
 		}
@@ -289,7 +294,7 @@ func compileInEntries(ctx context.Context, base *url.URL, client *http.Client, b
 	return nil
 }
 
-func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
+func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
 	entries, ok := block["out"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -309,7 +314,7 @@ func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, 
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
-		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen)
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen, bundleMap)
 		if err != nil {
 			return fmt.Errorf("%s.out[%d]: %w", prefix, i, err)
 		}
@@ -319,7 +324,7 @@ func compileOutEntries(ctx context.Context, base *url.URL, client *http.Client, 
 	return nil
 }
 
-func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]bool) error {
+func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client, block map[string]any, prefix, specBaseDir string, seen map[string]string, bundleMap map[string]string) error {
 	entries, ok := block["home"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil
@@ -344,7 +349,7 @@ func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client,
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
-		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen)
+		hash, err := compileFileRecord(ctx, base, client, src, specBaseDir, seen, bundleMap)
 		if err != nil {
 			return fmt.Errorf("%s.home[%d]: %w", prefix, i, err)
 		}
@@ -360,9 +365,11 @@ func compileHomeEntries(ctx context.Context, base *url.URL, client *http.Client,
 
 // compileFileRecord resolves a source path, builds a deterministic archive,
 // probes the server for an existing bundle with the same CID, uploads only
-// if missing, and returns the short hash. The seen map caches CIDs that have
-// already been verified or uploaded during this compilation pass.
-func compileFileRecord(ctx context.Context, base *url.URL, client *http.Client, srcPath, specBaseDir string, seen map[string]bool) (string, error) {
+// if missing, and returns the short hash. The seen map caches CIDs → bundleIDs
+// that have already been verified or uploaded during this compilation pass.
+// The bundleMap accumulates shortHash → bundleID mappings for runtime
+// materialization.
+func compileFileRecord(ctx context.Context, base *url.URL, client *http.Client, srcPath, specBaseDir string, seen map[string]string, bundleMap map[string]string) (string, error) {
 	resolved, err := resolvePath(srcPath, specBaseDir)
 	if err != nil {
 		return "", fmt.Errorf("resolve source: %w", err)
@@ -377,23 +384,30 @@ func compileFileRecord(ctx context.Context, base *url.URL, client *http.Client, 
 	cid := computeSpecBundleCID(archiveBytes)
 
 	// In-process dedup: skip probe+upload if same content already handled this pass.
-	if seen[cid] {
+	if bundleID, ok := seen[cid]; ok {
+		bundleMap[hash] = bundleID
 		return hash, nil
 	}
 
 	// Probe server for existing content by CID before uploading.
-	exists, err := probeSpecBundleByCID(ctx, base, client, cid)
+	probeBundleID, exists, err := probeSpecBundleByCID(ctx, base, client, cid)
 	if err != nil {
 		return "", fmt.Errorf("probe: %w", err)
 	}
 
-	if !exists {
-		if _, _, _, err := uploadSpecBundle(ctx, base, client, archiveBytes); err != nil {
-			return "", fmt.Errorf("upload: %w", err)
+	var bundleID string
+	if exists && probeBundleID != "" {
+		bundleID = probeBundleID
+	} else {
+		var uploadErr error
+		bundleID, _, _, uploadErr = uploadSpecBundle(ctx, base, client, archiveBytes)
+		if uploadErr != nil {
+			return "", fmt.Errorf("upload: %w", uploadErr)
 		}
 	}
 
-	seen[cid] = true
+	seen[cid] = bundleID
+	bundleMap[hash] = bundleID
 	return hash, nil
 }
 

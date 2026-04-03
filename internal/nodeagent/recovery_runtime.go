@@ -15,7 +15,9 @@ func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, w
 	}
 	manifest.Envs["PLOY_HOST_WORKSPACE"] = workspace
 	manifest.Envs["PLOY_SERVER_URL"] = r.cfg.ServerURL
-	manifest.Envs["PLOY_CA_CERTS"] = "/etc/ploy/certs/ca.crt"
+	// CA certs are delivered via Hydra CA mount entries (mounted at
+	// /etc/ploy/ca/<hash>) and TLS certs via certMountOptions; no longer
+	// injected as PLOY_CA_CERTS env.
 	manifest.Envs["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
 	manifest.Envs["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
 
