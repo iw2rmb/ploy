@@ -1320,20 +1320,14 @@ Migs container images are standard OCI images with the following expectations:
     - prompt files (`/in/prompt.txt`), etc.
 
 - **Environment**
-  - Spec `env` and `env_from_file` are resolved and merged by
-    `buildSpecPayload`.
-    - `env_from_file` paths are resolved on the CLI side and injected as string
-      values.
+  - Spec `env` maps are resolved and merged by `buildSpecPayload`.
     - Supported on:
       - each `steps[]` entry (single-step and multi-step runs),
       - `build_gate.healing.by_error_kind` and `build_gate.router`.
-  - Spec tmp injection is bundle-based (`tmp_bundle`) and supported on
-    `steps[]`, `build_gate.router`, and
-    `build_gate.healing.by_error_kind.<error_kind>`.
-    - Canonical fields: `bundle_id`, `cid`, `digest`, `entries`.
-    - Legacy inline `tmp_dir[].content` payloads are not supported.
-    - The node downloads and verifies the bundle, extracts it safely, and mounts
-      each declared top-level entry read-only at `/tmp/<name>`.
+  - **Typed file delivery (Hydra)**: Config files, CA bundles, and inputs are
+    delivered via typed mount records (`ca`, `in`, `out`, `home`) instead of env
+    vars. See [Environment Variables](./envs/README.md) § "Common Variables
+    Consumed by Official Images" for the mapping.
   - **Global env injection**: The control plane injects server-configured global
     environment variables at job claim time based on target-to-job-type mapping. Global
     env vars use targets that map to job types:
@@ -1345,7 +1339,7 @@ Migs container images are standard OCI images with the following expectations:
     time (400). If a persisted spec in the DB is invalid or non-object, claim fails with a 500.
   - **Precedence**: Per-run env (spec or CLI flags) wins over global env—existing
     keys are never overwritten. Job-target env overrides nodes-target env on key collisions.
-  - **Common global vars**: `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`, `OPENAI_API_KEY`.
+  - **Common global vars**: `OPENAI_API_KEY`, `PLOY_GRADLE_BUILD_CACHE_URL`.
     See [Environment Variables](./envs/README.md) § "Global Env Configuration" for full details.
 
 - **Execution**

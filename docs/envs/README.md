@@ -653,17 +653,15 @@ Run/API metadata propagation:
 - **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
   `CODEX_PROMPT` is required in this mode.
 
-In both modes, the entrypoint materializes config env vars before invoking the CLI:
-- `CODEX_AUTH_JSON` -> `/out/codex/auth.json`
-- `CODEX_CONFIG_TOML` -> `/out/codex/config.toml`
-- `CCR_CONFIG_JSON` -> `/root/.claude-code-router/config.json`
-- `CRUSH_JSON` -> `/root/.config/crush/crush.json`
+In both modes, config files are delivered via Hydra `home` mounts to their
+expected paths under `$HOME`. No env-based materialization is performed:
+- `auth.json` → `$HOME/.codex/auth.json` (via `home` mount)
+- `config.toml` → `$HOME/.codex/config.toml` (via `home` mount)
+- `config.json` → `$HOME/.claude-code-router/config.json` (via `home` mount)
+- `crush.json` → `$HOME/.config/crush/crush.json` (via `home` mount)
 
-`codex` sets `CODEX_HOME=/out/codex` by default, so Codex auth/config files
-are persisted under the mounted `/out` volume.
-
-For each key above, if the env value points to an existing file in the container,
-that file is copied; otherwise the env value is written as inline content.
+`codex` sets `CODEX_HOME=$HOME/.codex` by default. Configure delivery via
+`ploy config home set` or the spec `home` field.
 
 If `/root/.claude-code-router/config.json` exists at startup, `codex` runs:
 - `ccr start`
