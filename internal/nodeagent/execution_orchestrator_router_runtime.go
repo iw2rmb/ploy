@@ -99,16 +99,16 @@ func (r *runController) executeRouter(
 		gateResult.Recovery.RouterCmd = append([]string{}, routerManifest.Command...)
 	}
 
-	// Materialize the router tmp bundle into a staging directory.
-	return r.withMaterializedTmpBundle(ctx, routerManifest.TmpBundle, "ploy-router-tmpfiles-*", func(routerTmpStagingDir string) error {
+	// Materialize Hydra resources into a staging directory for router mount planning.
+	return r.withMaterializedResources(ctx, routerManifest, typedOpts.BundleMap, "ploy-router-staging-*", func(routerStagingDir string) error {
 		_, runErr := runner.Run(ctx, step.Request{
-			RunID:         req.RunID,
-			JobID:         req.JobID,
-			Manifest:      routerManifest,
-			Workspace:     workspace,
-			OutDir:        routerOutDir,
-			InDir:         routerInDir,
-			TmpStagingDir: routerTmpStagingDir,
+			RunID:      req.RunID,
+			JobID:      req.JobID,
+			Manifest:   routerManifest,
+			Workspace:  workspace,
+			OutDir:     routerOutDir,
+			InDir:      routerInDir,
+			StagingDir: routerStagingDir,
 		})
 		if runErr != nil {
 			slog.Warn("router execution failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr)

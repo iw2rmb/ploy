@@ -140,13 +140,13 @@ func migsSpecToEnv(spec *contracts.MigSpec) map[string]string {
 		return map[string]string{}
 	}
 
-	env := make(map[string]string, len(spec.Env))
-	for k, v := range spec.Env {
+	env := make(map[string]string, len(spec.Envs))
+	for k, v := range spec.Envs {
 		env[k] = v
 	}
 
 	if len(spec.Steps) == 1 {
-		for k, v := range spec.Steps[0].Env {
+		for k, v := range spec.Steps[0].Envs {
 			env[k] = v
 		}
 	}

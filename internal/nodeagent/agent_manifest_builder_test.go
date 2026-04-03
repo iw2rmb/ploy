@@ -67,11 +67,11 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
 		}
 
-		if len(manifest.Env) != 1 {
-			t.Errorf("expected 1 env var, got %d", len(manifest.Env))
+		if len(manifest.Envs) != 1 {
+			t.Errorf("expected 1 env var, got %d", len(manifest.Envs))
 		}
-		if manifest.Env["FOO"] != "bar" {
-			t.Errorf("expected env FOO=bar, got %q", manifest.Env["FOO"])
+		if manifest.Envs["FOO"] != "bar" {
+			t.Errorf("expected env FOO=bar, got %q", manifest.Envs["FOO"])
 		}
 	})
 
@@ -243,11 +243,11 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if want := []string{"--apply", "--dir", "/workspace"}; !slices.Equal(m0.Command, want) {
 			t.Fatalf("step 0: command = %v, want %v", m0.Command, want)
 		}
-		if m0.Env["BASE_VAR"] != "base_value" {
-			t.Errorf("step 0: BASE_VAR=%q, want base_value", m0.Env["BASE_VAR"])
+		if m0.Envs["BASE_VAR"] != "base_value" {
+			t.Errorf("step 0: BASE_VAR=%q, want base_value", m0.Envs["BASE_VAR"])
 		}
-		if m0.Env["STEP_VAR"] != "step0" {
-			t.Errorf("step 0: STEP_VAR=%q, want step0", m0.Env["STEP_VAR"])
+		if m0.Envs["STEP_VAR"] != "step0" {
+			t.Errorf("step 0: STEP_VAR=%q, want step0", m0.Envs["STEP_VAR"])
 		}
 
 		// Step 1.
@@ -261,11 +261,11 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if want := []string{"/bin/sh", "-c", "fmt --check"}; !slices.Equal(m1.Command, want) {
 			t.Fatalf("step 1: command = %v, want %v", m1.Command, want)
 		}
-		if m1.Env["BASE_VAR"] != "base_value" {
-			t.Errorf("step 1: BASE_VAR=%q, want base_value", m1.Env["BASE_VAR"])
+		if m1.Envs["BASE_VAR"] != "base_value" {
+			t.Errorf("step 1: BASE_VAR=%q, want base_value", m1.Envs["BASE_VAR"])
 		}
-		if m1.Env["STEP_VAR"] != "step1" {
-			t.Errorf("step 1: STEP_VAR=%q, want step1", m1.Env["STEP_VAR"])
+		if m1.Envs["STEP_VAR"] != "step1" {
+			t.Errorf("step 1: STEP_VAR=%q, want step1", m1.Envs["STEP_VAR"])
 		}
 	})
 
@@ -326,11 +326,11 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("buildManifestAtStep() error: %v", err)
 		}
-		if manifest.Env["SHARED_VAR"] != "step_override" {
-			t.Errorf("expected step env override: SHARED_VAR=step_override, got %q", manifest.Env["SHARED_VAR"])
+		if manifest.Envs["SHARED_VAR"] != "step_override" {
+			t.Errorf("expected step env override: SHARED_VAR=step_override, got %q", manifest.Envs["SHARED_VAR"])
 		}
-		if manifest.Env["UNIQUE_BASE"] != "base" {
-			t.Errorf("expected base env preserved: UNIQUE_BASE=base, got %q", manifest.Env["UNIQUE_BASE"])
+		if manifest.Envs["UNIQUE_BASE"] != "base" {
+			t.Errorf("expected base env preserved: UNIQUE_BASE=base, got %q", manifest.Envs["UNIQUE_BASE"])
 		}
 	})
 

@@ -103,6 +103,12 @@ type MigSpec struct {
 
 	// ArtifactName is an optional custom name for the uploaded artifact bundle.
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
+
+	// BundleMap maps content hashes used in CA/In/Out/Home entries to their
+	// spec bundle download identifiers (bundle IDs). Populated by the CLI
+	// compiler during spec submission. The nodeagent uses this to resolve
+	// shortHash → bundleID for resource download during materialization.
+	BundleMap map[string]string `json:"bundle_map,omitempty" yaml:"bundle_map,omitempty"`
 }
 
 // MigStep describes a single mig step in a run (steps[] array).

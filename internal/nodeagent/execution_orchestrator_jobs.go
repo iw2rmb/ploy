@@ -353,19 +353,19 @@ func (r *runController) runContainerJob(
 		preWorkspaceTree = tree
 	}
 
-	// Materialize the manifest tmp bundle into a staging directory.
+	// Materialize Hydra resources into a staging directory for mount planning.
 	var result step.Result
 	var runErr error
 	var duration time.Duration
-	if bundleErr := r.withMaterializedTmpBundle(ctx, manifest.TmpBundle, "ploy-tmpfiles-*", func(tmpStagingDir string) error {
+	if bundleErr := r.withMaterializedResources(ctx, manifest, req.TypedOptions.BundleMap, "ploy-staging-*", func(stagingDir string) error {
 		result, runErr = execCtx.runner.Run(ctx, step.Request{
-			RunID:         req.RunID,
-			JobID:         req.JobID,
-			Manifest:      manifest,
-			Workspace:     workspace,
-			OutDir:        outDir,
-			InDir:         inDir,
-			TmpStagingDir: tmpStagingDir,
+			RunID:      req.RunID,
+			JobID:      req.JobID,
+			Manifest:   manifest,
+			Workspace:  workspace,
+			OutDir:     outDir,
+			InDir:      inDir,
+			StagingDir: stagingDir,
 		})
 		duration = time.Since(startTime)
 		return nil
@@ -444,15 +444,17 @@ func withTempDir(prefix string, fn func(path string) error) error {
 	return fn(dir)
 }
 
-// withMaterializedTmpBundle materializes a TmpBundle into a staging directory
-// and passes the staging path to fn. When bundle is nil, fn receives "".
-func (r *runController) withMaterializedTmpBundle(ctx context.Context, bundle *contracts.TmpBundleRef, prefix string, fn func(stagingDir string) error) error {
-	if bundle == nil {
+// withMaterializedResources materializes Hydra resources (CA/In/Out/Home) from the
+// manifest into a staging directory and passes the staging path to fn. When the
+// manifest has no Hydra entries, fn receives "".
+func (r *runController) withMaterializedResources(ctx context.Context, manifest contracts.StepManifest, bundleMap map[string]string, prefix string, fn func(stagingDir string) error) error {
+	hashes := collectUniqueHashes(manifest)
+	if len(hashes) == 0 {
 		return fn("")
 	}
 	return withTempDir(prefix, func(dir string) error {
-		if err := r.materializeTmpBundle(ctx, bundle, dir); err != nil {
-			return fmt.Errorf("materialize tmp bundle: %w", err)
+		if err := r.materializeHydraResources(ctx, manifest, bundleMap, dir); err != nil {
+			return fmt.Errorf("materialize hydra resources: %w", err)
 		}
 		return fn(dir)
 	})

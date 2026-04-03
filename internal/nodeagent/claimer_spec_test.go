@@ -49,7 +49,7 @@ func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
             "image": "docker.io/test/mig:latest",
             "command": ["/bin/sh","-c","echo hi"]
         }],
-        "env": {"A":"1","B":"2"},
+        "envs": {"A":"1","B":"2"},
         "build_gate": {"enabled": false}
     }`
 	var raw json.RawMessage = []byte(specJSON)
@@ -88,7 +88,7 @@ func TestParseSpec_IgnoresUnknownTopLevelMigObject(t *testing.T) {
         "steps": [{
             "image": "docker.io/test/required:latest",
             "command": "echo from steps",
-            "env": {"A":"1","B":"2"}
+            "envs": {"A":"1","B":"2"}
         }],
         "mig": {
             "image": "docker.io/test/ignored:latest",
@@ -131,17 +131,17 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		"steps": [
 			{
 				"image": "docker.io/test/mig-step1:latest",
-				"env": {"STEP": "1", "TARGET": "java8"}
+				"envs": {"STEP": "1", "TARGET": "java8"}
 			},
 			{
 				"image": "docker.io/test/mig-step2:latest",
 				"command": ["migrate.sh", "--verbose"],
-				"env": {"STEP": "2", "TARGET": "java11"}
+				"envs": {"STEP": "2", "TARGET": "java11"}
 			},
 			{
 				"image": "docker.io/test/mig-step3:latest",
 				"command": "finalize.sh",
-				"env": {"STEP": "3"}
+				"envs": {"STEP": "3"}
 			}
 		],
 		"build_gate": {
@@ -299,7 +299,7 @@ func TestParseHealingMig_MigFields(t *testing.T) {
 						"retries": 1,
 						"image": "docker.io/test/healer:v1",
 						"command": "heal.sh --fix",
-						"env": {
+						"envs": {
 							"MODE": "aggressive",
 							"DEBUG": "true"
 						}
