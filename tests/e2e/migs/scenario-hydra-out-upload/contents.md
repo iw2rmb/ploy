@@ -1,1 +1,1 @@
-[run.sh](run.sh) E2E scenario runner that validates `/out` artifact upload and download continuity end to end.
+[run.sh](run.sh) Executes an E2E flow that writes to `/out`, downloads produced artifacts, and verifies payload integrity.

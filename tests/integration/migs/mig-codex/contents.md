@@ -1,3 +1,3 @@
-[build-gate.log](build-gate.log) Sample failing build-gate output used as integration-test input for healing flows.
-[mig_codex_test.go](mig_codex_test.go) Docker-based integration tests validating mig-codex container behavior and artifact contracts.
-[run.sh](run.sh) Local helper script that builds the codex image and executes the targeted mig-codex integration test.
+[build-gate.log](build-gate.log) Captures a representative Maven compilation failure used as fixture input for healing scenarios.
+[mig_codex_test.go](mig_codex_test.go) Contains Docker-backed integration tests for codex image behavior, Hydra mounts, and CCR activation flows.
+[run.sh](run.sh) Convenience runner that builds the codex image, exports auth, and runs the targeted mig-codex Go test.
