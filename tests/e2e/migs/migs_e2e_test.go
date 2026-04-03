@@ -21,20 +21,21 @@ func repoRoot(t *testing.T) string {
 }
 
 // clusterReady reports whether the local Hydra cluster is available for e2e
-// tests. When PLOY_E2E_CLUSTER=require it fails the test instead of returning
-// false, so CI pipelines that expect a running cluster get hard failures.
+// tests. By default it fails the test when the cluster is unavailable so that
+// verification commands do not silently pass with skipped scenarios. Set
+// PLOY_E2E_CLUSTER=skip to allow graceful skips in environments without a
+// running cluster.
 func clusterReady(t *testing.T, root string) bool {
 	t.Helper()
 
-	mode := os.Getenv("PLOY_E2E_CLUSTER")
-	mustFail := mode == "require"
+	allowSkip := os.Getenv("PLOY_E2E_CLUSTER") == "skip"
 
 	// 1. Built binary must exist.
 	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
-		if mustFail {
-			t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build`")
+		if allowSkip {
+			return false
 		}
-		return false
+		t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or set PLOY_E2E_CLUSTER=skip")
 	}
 
 	// 2. Server must be reachable.
@@ -50,10 +51,10 @@ func clusterReady(t *testing.T, root string) bool {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(serverURL + "/healthz")
 	if err != nil {
-		if mustFail {
-			t.Fatalf("local cluster not reachable at %s: %v; start the cluster", serverURL, err)
+		if allowSkip {
+			return false
 		}
-		return false
+		t.Fatalf("local cluster not reachable at %s: %v; start the cluster or set PLOY_E2E_CLUSTER=skip", serverURL, err)
 	}
 	resp.Body.Close()
 	return true
