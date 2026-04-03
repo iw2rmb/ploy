@@ -198,6 +198,8 @@ items:
         commit: 5e952150
       - gaps: ["`internal/server/handlers/config_env_migration.go#L206` never records a conflict for `ca` entries. The `ca` branch only skips equal hashes and otherwise leaves `conflicts` empty, so a different typed CA already present in a target section does not block migration.", "`internal/server/handlers/config_env_migration_fixture_test.go#L48` and `internal/server/handlers/testdata/migration_fixtures/` do not include any non-empty `existing_ca` conflict fixture, so the CA reject path is not covered by the dry-run fixture set."]
         commit: 46bf3c8a
+      - gaps: ["Startup only aborts when `ExecuteMigration` returns `Errors`; rejected special-env migrations are logged but do not stop boot, so conflicting legacy rows can still be dropped instead of blocking the daemon. See [cmd/ployd/server.go](/Users/vk/@iw2rmb/ploy/cmd/ployd/server.go#L245) and the reject flow in [internal/server/handlers/config_env_migration.go](/Users/vk/@iw2rmb/ploy/internal/server/handlers/config_env_migration.go#L150)."]
+        commit: null
     label: "1.7"
     summary: Execute hard-cut migration of special legacy env keys into typed ca home in fields and adjust runtime consumers.
     classification: assumption-bound
