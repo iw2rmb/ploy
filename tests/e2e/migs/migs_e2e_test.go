@@ -65,6 +65,50 @@ func TestMigSpecsNoLegacyCODEXPROMPT(t *testing.T) {
 	}
 }
 
+// TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
+// validating that /in is read-only and /out is writable.
+func TestHydraMountEnforcement(t *testing.T) {
+	if os.Getenv("PLOY_E2E") == "" {
+		t.Skip("PLOY_E2E not set; skipping e2e scenario")
+	}
+	root := repoRoot(t)
+	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-mount-enforcement", "run.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Skipf("scenario script not found: %v", err)
+	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scenario-hydra-mount-enforcement failed:\n%s", out)
+	}
+	t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
+}
+
+// TestHydraOutUpload runs the Hydra /out upload continuity e2e scenario,
+// validating that files written to /out are uploaded and retrievable as artifacts.
+func TestHydraOutUpload(t *testing.T) {
+	if os.Getenv("PLOY_E2E") == "" {
+		t.Skip("PLOY_E2E not set; skipping e2e scenario")
+	}
+	root := repoRoot(t)
+	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-out-upload", "run.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Skipf("scenario script not found: %v", err)
+	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scenario-hydra-out-upload failed:\n%s", out)
+	}
+	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
+}
+
 // TestMigSpecsPromptFilesExist verifies that all prompt files referenced via
 // Hydra in mounts in mig.yaml specs actually exist alongside the spec.
 func TestMigSpecsPromptFilesExist(t *testing.T) {
