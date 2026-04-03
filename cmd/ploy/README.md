@@ -620,9 +620,8 @@ build_gate:
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
         command: ["codex", "--input", "/workspace", "--out", "/out"]
-        envs:
-          CODEX_PROMPT: "Fix the infra build error in /in/build-gate.log"
         in:
+          codex-prompt.txt: "Fix the infra build error in /in/build-gate.log"
           - ~/.codex/auth.json:/in/codex-auth.json
         expectations:
           artifacts:
@@ -632,8 +631,8 @@ build_gate:
         spec_path: ./healing/code/spec.yaml
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
-        envs:
-          CODEX_PROMPT: "Fix the code build error in /in/build-gate.log"
+        in:
+          codex-prompt.txt: "Fix the code build error in /in/build-gate.log"
 ```
 
 `spec_path` is an optional CLI-side composition key for Build Gate router/healing

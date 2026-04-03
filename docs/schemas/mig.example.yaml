@@ -175,7 +175,7 @@ build_gate:
 #
 # Two execution modes:
 #
-# 1. amata mode (recommended): set `amata.spec` — CODEX_PROMPT is not required.
+# 1. amata mode (recommended): set `amata.spec` — no prompt file required.
 #    amata materializes the spec as /in/amata.yaml and runs `amata run /in/amata.yaml`.
 #    Use `amata.set` to pass ordered --set parameters to the amata run command.
 #
@@ -205,21 +205,20 @@ build_gate:
 #     in:
 #       - ~/.codex/auth.json:/in/codex-auth.json
 #
-# 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
+# 2. Direct-Codex mode (fallback): omit `amata` — prompt delivered via Hydra `in` mount.
 #
 # build_gate:
 #   router:
 #     spec_path: ./healing/router/spec.yaml
 #     image: docker.io/your-dh-user/codex:latest
-#     envs:
-#       CODEX_PROMPT: |-
+#     in:
+#       codex-prompt.txt: |-
 #         Rules:
 #         - Read /in/build-gate.log.
 #         - Do not edit /workspace.
 #         - Your final message MUST be one line of JSON: {"bug_summary":"..."}
 #         Task:
 #         Summarize the build failure as a single bug_summary one-liner.
-#     in:
 #       - ~/.codex/auth.json:/in/codex-auth.json
 
 ################################################################################
@@ -231,7 +230,7 @@ build_gate:
 #
 # Two execution modes per error kind:
 #
-# 1. amata mode (recommended): set `amata.spec` — CODEX_PROMPT is not required.
+# 1. amata mode (recommended): set `amata.spec` — no prompt file required.
 #
 # build_gate:
 #   healing:
@@ -264,7 +263,7 @@ build_gate:
 #         in:
 #           - ~/.codex/auth.json:/in/codex-auth.json
 #
-# 2. Direct-Codex mode (fallback): omit `amata` — CODEX_PROMPT is required.
+# 2. Direct-Codex mode (fallback): omit `amata` — prompt delivered via Hydra `in` mount.
 #
 # build_gate:
 #   healing:
@@ -273,11 +272,10 @@ build_gate:
 #         spec_path: ./healing/infra/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
-#         envs:
-#           CODEX_PROMPT: |-
+#         in:
+#           codex-prompt.txt: |-
 #             Fix infra/toolchain issue in /in/build-gate.log.
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
-#         in:
 #           - ~/.codex/auth.json:/in/codex-auth.json
 #         expectations:
 #           artifacts:
@@ -287,11 +285,10 @@ build_gate:
 #         spec_path: ./healing/code/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
-#         envs:
-#           CODEX_PROMPT: |-
+#         in:
+#           codex-prompt.txt: |-
 #             Fix code-level issue in /in/build-gate.log.
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
-#         in:
 #           - ~/.codex/auth.json:/in/codex-auth.json
 #
 # `spec_path` is optional preprocessing handled by CLI:
@@ -352,9 +349,9 @@ mr_on_fail: true
 # - Router and healing dual-mode execution:
 #   * When `amata` block is present (amata.spec non-empty): container runs
 #     `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags.
-#     CODEX_PROMPT is not required in this mode.
+#     No prompt file is required in this mode.
 #   * When `amata` block is absent: container uses direct `codex exec` path.
-#     CODEX_PROMPT is required in this mode.
+#     A prompt must be delivered via --prompt-file or Hydra in mount (/in/codex-prompt.txt).
 # - Container cleanup model:
 #   * Containers are retained after step/gate completion.
 #   * Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
