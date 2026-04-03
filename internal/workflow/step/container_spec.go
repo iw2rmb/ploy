@@ -117,6 +117,18 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 				ReadOnly: true,
 			})
 		}
+		// Out entries: validate destinations and enforce outDir presence.
+		// Out entries are seeded into outDir by SeedOutDirFromStaging and
+		// covered by the single /out mount — no separate mounts are created.
+		for _, entry := range manifest.Out {
+			parsed, err := contracts.ParseStoredOutEntry(entry)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("out entry %q: %w", entry, err)
+			}
+			if strings.TrimSpace(outDir) == "" {
+				return ContainerSpec{}, fmt.Errorf("out entry %q: outDir required for destination %s", entry, parsed.Dst)
+			}
+		}
 		// Home entries: mount at $HOME/<dst> with mode from entry.
 		// Resolve HOME from manifest envs; fall back to /home/user.
 		homeDir := "/home/user"

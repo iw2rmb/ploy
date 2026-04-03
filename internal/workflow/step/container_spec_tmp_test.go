@@ -3,6 +3,7 @@ package step
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -292,6 +293,45 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	// Total: workspace + /out + CA + In + Home = 5.
 	if len(spec.Mounts) != 5 {
 		t.Errorf("got %d mounts, want 5: %+v", len(spec.Mounts), spec.Mounts)
+	}
+}
+
+// TestBuildContainerSpec_HydraOutRequiresOutDir verifies that out entries in the
+// manifest are validated and that buildContainerSpec returns an error when outDir
+// is empty but out entries are present.
+func TestBuildContainerSpec_HydraOutRequiresOutDir(t *testing.T) {
+	stagingDir := t.TempDir()
+
+	manifest := baseManifestForHydra(t)
+	manifest.Out = []string{"fff0000:/out/results"}
+
+	_, err := buildContainerSpec(
+		types.RunID("run-out-nodir"), types.JobID("job-out-nodir"),
+		manifest, "/ws", "", "", stagingDir,
+	)
+	if err == nil {
+		t.Fatal("expected error when outDir is empty with out entries, got nil")
+	}
+	if !strings.Contains(err.Error(), "outDir required") {
+		t.Errorf("error = %q, want mention of outDir required", err)
+	}
+}
+
+// TestBuildContainerSpec_HydraOutInvalidEntry verifies that an invalid out entry
+// is rejected during mount planning.
+func TestBuildContainerSpec_HydraOutInvalidEntry(t *testing.T) {
+	stagingDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := baseManifestForHydra(t)
+	manifest.Out = []string{"not-a-valid-entry"}
+
+	_, err := buildContainerSpec(
+		types.RunID("run-out-bad"), types.JobID("job-out-bad"),
+		manifest, "/ws", outDir, "", stagingDir,
+	)
+	if err == nil {
+		t.Fatal("expected error for invalid out entry, got nil")
 	}
 }
 
