@@ -104,6 +104,7 @@ items:
       - Add table tests for precedence server local spec and destination conflict replacement behavior.
     reasoning: high
     cfp: 10
+    commit: dc51df4b
   - done: false
     reviews: []
     label: "1.5"
