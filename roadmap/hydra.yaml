@@ -196,6 +196,8 @@ items:
         commit: f2dc978a
       - gaps: ["Migration errors are non-fatal in `/Users/vk/@iw2rmb/ploy/cmd/ployd/server.go:239`, so the daemon still starts even when special keys fail to rewrite. Because `/Users/vk/@iw2rmb/ploy/internal/server/handlers/claim_spec_mutator_hydra.go:93` excludes migrated keys from raw env injection, any special key left unmigrated by a partial migration is effectively dropped instead of being preserved or blocking startup."]
         commit: 5e952150
+      - gaps: ["`internal/server/handlers/config_env_migration.go#L206` never records a conflict for `ca` entries. The `ca` branch only skips equal hashes and otherwise leaves `conflicts` empty, so a different typed CA already present in a target section does not block migration.", "`internal/server/handlers/config_env_migration_fixture_test.go#L48` and `internal/server/handlers/testdata/migration_fixtures/` do not include any non-empty `existing_ca` conflict fixture, so the CA reject path is not covered by the dry-run fixture set."]
+        commit: null
     label: "1.7"
     summary: Execute hard-cut migration of special legacy env keys into typed ca home in fields and adjust runtime consumers.
     classification: assumption-bound
