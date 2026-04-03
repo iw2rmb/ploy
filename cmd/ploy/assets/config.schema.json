@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/iw2rmb/ploy/schemas/config.schema.json",
+  "title": "Ploy local config.yaml schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "server": {
+      "$ref": "#/definitions/componentConfig"
+    },
+    "node": {
+      "$ref": "#/definitions/componentConfig"
+    },
+    "pre_gate": {
+      "$ref": "#/definitions/jobConfig"
+    },
+    "re_gate": {
+      "$ref": "#/definitions/jobConfig"
+    },
+    "post_gate": {
+      "$ref": "#/definitions/jobConfig"
+    },
+    "mig": {
+      "$ref": "#/definitions/jobConfig"
+    }
+  },
+  "definitions": {
+    "envMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "componentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "envs": {
+          "$ref": "#/definitions/envMap"
+        },
+        "ca": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "home": {
+          "$ref": "#/definitions/stringArray"
+        }
+      }
+    },
+    "jobConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "envs": {
+          "$ref": "#/definitions/envMap"
+        },
+        "ca": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "in": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "out": {
+          "$ref": "#/definitions/stringArray"
+        },
+        "home": {
+          "$ref": "#/definitions/stringArray"
+        }
+      }
+    }
+  }
+}

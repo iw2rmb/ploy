@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -111,6 +112,18 @@ func TestHandleClusterDeployExecutesAndAlwaysCleansUp(t *testing.T) {
 	}
 	if !called {
 		t.Fatal("expected runtime deploy runner to be called")
+	}
+
+	schemaPath := filepath.Join(configHome, "config.schema.json")
+	schemaBytes, readErr := os.ReadFile(schemaPath)
+	if readErr != nil {
+		t.Fatalf("expected config schema to be written at %s: %v", schemaPath, readErr)
+	}
+	if !bytes.Equal(schemaBytes, clusterDeployConfigSchema) {
+		t.Fatalf("written config schema does not match embedded asset")
+	}
+	if !json.Valid(schemaBytes) {
+		t.Fatalf("written config schema is not valid JSON")
 	}
 
 	deployPath := filepath.Join(configHome, "deploy")

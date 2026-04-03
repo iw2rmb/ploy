@@ -5,8 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/fs"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -38,6 +38,9 @@ func handleClusterDeploy(args []string, stderr io.Writer) (retErr error) {
 
 	configHome, err := resolveClusterDeployConfigHome()
 	if err != nil {
+		return err
+	}
+	if err := ensureClusterDeployConfigSchema(configHome); err != nil {
 		return err
 	}
 	deployDir := filepath.Join(configHome, "deploy")
@@ -73,6 +76,24 @@ func handleClusterDeploy(args []string, stderr io.Writer) (retErr error) {
 	}
 	if err := runClusterDeployScript(context.Background(), runScriptPath, forwardArgs, env, os.Stdout, stderr); err != nil {
 		return err
+	}
+	return nil
+}
+
+func ensureClusterDeployConfigSchema(configHome string) error {
+	configHome = strings.TrimSpace(configHome)
+	if configHome == "" {
+		return errors.New("cluster deploy: config home is required")
+	}
+	if len(clusterDeployConfigSchema) == 0 {
+		return errors.New("cluster deploy: embedded config schema is empty")
+	}
+	if err := os.MkdirAll(configHome, 0o755); err != nil {
+		return fmt.Errorf("cluster deploy: create config home %s: %w", configHome, err)
+	}
+	target := filepath.Join(configHome, "config.schema.json")
+	if err := os.WriteFile(target, clusterDeployConfigSchema, 0o644); err != nil {
+		return fmt.Errorf("cluster deploy: write config schema %s: %w", target, err)
 	}
 	return nil
 }
