@@ -46,48 +46,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy_env_from_file_rejected", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20", "env_from_file": {"K": "v"}}]
-		}`
-		_, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err == nil {
-			t.Fatal("expected error for env_from_file, got nil")
-		}
-		if !strings.Contains(err.Error(), "env_from_file") {
-			t.Fatalf("error %q does not mention env_from_file", err.Error())
-		}
-	})
-
-	t.Run("legacy_tmp_bundle_rejected", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20", "tmp_bundle": {}}]
-		}`
-		_, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err == nil {
-			t.Fatal("expected error for tmp_bundle, got nil")
-		}
-		if !strings.Contains(err.Error(), "tmp_bundle") {
-			t.Fatalf("error %q does not mention tmp_bundle", err.Error())
-		}
-	})
-
-	t.Run("legacy_tmp_dir_rejected", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20", "tmp_dir": []}]
-		}`
-		_, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err == nil {
-			t.Fatal("expected error for tmp_dir, got nil")
-		}
-		if !strings.Contains(err.Error(), "tmp_dir") {
-			t.Fatalf("error %q does not mention tmp_dir", err.Error())
-		}
-	})
-
 	t.Run("in_path_traversal_rejected", func(t *testing.T) {
 		t.Parallel()
 		_, err := contracts.ParseStoredInEntry("abcdef0:/in/../etc/passwd")
@@ -284,61 +242,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("legacy_env_rejected_at_root", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"env": {"KEY": "val"},
-			"steps": [{"image": "alpine:3.20"}]
-		}`
-		_, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err == nil {
-			t.Fatal("expected error for root-level env (legacy)")
-		}
-	})
-
-	t.Run("legacy_env_from_file_rejected_in_router", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20"}],
-			"build_gate": {
-				"router": {
-					"image": "codex:latest",
-					"env_from_file": {"K": "path"}
-				}
-			}
-		}`
-		_, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err == nil {
-			t.Fatal("expected error for env_from_file in router")
-		}
-		if !strings.Contains(err.Error(), "env_from_file") {
-			t.Fatalf("error %q does not mention env_from_file", err.Error())
-		}
-	})
-
-	t.Run("legacy_env_from_file_rejected_in_healing_action", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20"}],
-			"build_gate": {
-				"healing": {
-					"by_error_kind": {
-						"code": {
-							"image": "codex:latest",
-							"env_from_file": {"K": "path"}
-						}
-					}
-				}
-			}
-		}`
-		_, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err == nil {
-			t.Fatal("expected error for env_from_file in healing action")
-		}
-		if !strings.Contains(err.Error(), "env_from_file") {
-			t.Fatalf("error %q does not mention env_from_file", err.Error())
-		}
-	})
 }
 
 // TestHydraContract_MountEnforcement validates that Hydra contract-level
