@@ -210,6 +210,8 @@ func ScanSpecialEnvKeys(
 							// Same hash from a prior migration run — not a conflict.
 							continue
 						}
+						conflicts = append(conflicts, fmt.Sprintf(
+							"section %q already has ca entry with different hash", section))
 					}
 				}
 			}
