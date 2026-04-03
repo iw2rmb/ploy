@@ -15,7 +15,9 @@
 [commands_test.go](commands_test.go) Tests global command registration and top-level command hierarchy behavior.
 [common_http.go](common_http.go) Shared HTTP client and request helpers used across CLI command implementations.
 [common_http_test.go](common_http_test.go) Tests shared HTTP helper behavior including error mapping and request setup.
+[config_ca_command.go](config_ca_command.go) Implements ploy config ca set/unset/list CLI commands for global CA entries.
 [config_command.go](config_command.go) Implements config command logic for reading, writing, and validating CLI config.
+[config_home_command.go](config_home_command.go) Implements ploy config home set/unset/list CLI commands for global home mount entries.
 [config_command_files_test.go](config_command_files_test.go) Tests config file I/O paths, precedence, and persistence behavior.
 [config_command_flags_test.go](config_command_flags_test.go) Tests config command flag parsing and validation paths.
 [config_command_fuzz_test.go](config_command_fuzz_test.go) Fuzz tests for config command input parsing and robustness checks.

@@ -28,6 +28,18 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	s.RegisterRouteFunc("PUT /v1/config/env/{key}", putGlobalEnvHandler(configHolder, st), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("DELETE /v1/config/env/{key}", deleteGlobalEnvHandler(configHolder, st), auth.RoleCLIAdmin)
 
+	// Config — Global CA
+	s.RegisterRouteFunc("GET /v1/config/ca", listConfigCAHandler(configHolder), auth.RoleCLIAdmin)
+	s.RegisterRouteFunc("GET /v1/config/ca/{section}", listConfigCABySectionHandler(configHolder), auth.RoleCLIAdmin)
+	s.RegisterRouteFunc("PUT /v1/config/ca/{hash}", putConfigCAHandler(configHolder, st), auth.RoleCLIAdmin)
+	s.RegisterRouteFunc("DELETE /v1/config/ca/{hash}", deleteConfigCAHandler(configHolder, st), auth.RoleCLIAdmin)
+
+	// Config — Global Home
+	s.RegisterRouteFunc("GET /v1/config/home", listConfigHomeHandler(configHolder), auth.RoleCLIAdmin)
+	s.RegisterRouteFunc("GET /v1/config/home/{section}", listConfigHomeBySectionHandler(configHolder), auth.RoleCLIAdmin)
+	s.RegisterRouteFunc("PUT /v1/config/home", putConfigHomeHandler(configHolder, st), auth.RoleCLIAdmin)
+	s.RegisterRouteFunc("DELETE /v1/config/home", deleteConfigHomeHandler(configHolder, st), auth.RoleCLIAdmin)
+
 	// Token management
 	s.RegisterRouteFunc("POST /v1/tokens", createAPITokenHandler(st, tokenSecret), auth.RoleCLIAdmin)
 	s.RegisterRouteFunc("GET /v1/tokens", listAPITokensHandler(st), auth.RoleCLIAdmin)

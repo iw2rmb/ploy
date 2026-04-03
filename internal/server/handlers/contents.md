@@ -13,9 +13,13 @@
 [claim_spec_mutator_pipeline.go](claim_spec_mutator_pipeline.go) Composes mutator stages into a deterministic claim-spec mutation pipeline.
 [claim_spec_mutator_test.go](claim_spec_mutator_test.go) Validates claim spec mutation precedence and recovery metadata shaping for gate/healing flows.
 [config_authz_test.go](config_authz_test.go) Checks admin authorization enforcement on configuration endpoints.
+[config_ca.go](config_ca.go) CRUD handlers for global CA certificate entries per Hydra section.
+[config_ca_test.go](config_ca_test.go) Exercises global CA CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers, defaults, round-trip behavior, and store error mapping.
-[config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab and global env endpoints.
+[config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab, global env, CA, and home endpoints.
+[config_home.go](config_home.go) CRUD handlers for global home mount entries per Hydra section.
+[config_home_test.go](config_home_test.go) Exercises global home CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [config_gitlab_fuzz_test.go](config_gitlab_fuzz_test.go) Fuzzes GitLab config mutation paths to catch panics on malformed payload combinations.
 [config_gitlab_test.go](config_gitlab_test.go) Tests GitLab config holder and endpoint behavior for read/write and validation paths.
 [cross_path_parity_test.go](cross_path_parity_test.go) Ensures cross-path status/action parity between standard and gate-oriented completion paths.
