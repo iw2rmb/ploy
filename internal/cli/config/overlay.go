@@ -122,7 +122,8 @@ func (o *Overlay) JobSection(jobType string) *JobConfig {
 }
 
 // RouterSection returns the JobConfig for the active gate phase that a router
-// container inherits. Gate phase must be "pre_gate", "re_gate", or "post_gate".
+// container inherits. The caller derives the gate phase from the spec's
+// build_gate configuration. Valid values: "pre_gate", "re_gate", "post_gate".
 func (o *Overlay) RouterSection(gatePhase string) *JobConfig {
 	return o.JobSection(gatePhase)
 }

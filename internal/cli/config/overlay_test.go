@@ -279,3 +279,139 @@ func TestSortedEnvKeys(t *testing.T) {
 		t.Errorf("SortedEnvKeys = %v, want %v", got, want)
 	}
 }
+
+// TestMergeThreeLayerPrecedence verifies the full server → local → spec merge
+// order by applying each layer sequentially. Server defaults are lowest
+// precedence, local config overrides server, and spec overrides both.
+func TestMergeThreeLayerPrecedence(t *testing.T) {
+	// Simulate server defaults (lowest precedence).
+	serverCfg := &JobConfig{
+		Envs: map[string]string{
+			"SERVER_ONLY": "srv",
+			"SHARED_SL":   "from_server",
+			"SHARED_ALL":  "from_server",
+		},
+		CA:   []string{"aaaaaa1234ab"},
+		In:   []string{"/srv/data:/in/data.json"},
+		Home: []string{"/srv/auth:.auth/config.json"},
+	}
+
+	// Simulate local config overlay (middle precedence).
+	localCfg := &JobConfig{
+		Envs: map[string]string{
+			"LOCAL_ONLY": "local",
+			"SHARED_SL":  "from_local",
+			"SHARED_ALL": "from_local",
+		},
+		CA:   []string{"bbbbbb1234ab", "aaaaaa1234ab"},
+		In:   []string{"/local/extra:/in/extra.json"},
+		Home: []string{"/local/auth:.auth/config.json"},
+	}
+
+	// Spec values (highest precedence).
+	specBlock := map[string]any{
+		"envs": map[string]any{
+			"SPEC_ONLY":  "spec",
+			"SHARED_ALL": "from_spec",
+		},
+		"ca":   []any{"cccccc1234ab"},
+		"in":   []any{"/spec/data:/in/data.json"},
+		"home": []any{"/spec/auth:.auth/config.json:ro"},
+	}
+
+	// Apply layers in precedence order (lowest to highest): server < local < spec.
+	// MergeJobConfigIntoSpec treats the block as higher precedence than cfg.
+	// So: start with server as block, merge nothing (it's base).
+	// Then: local is the block, server is the overlay (lower precedence).
+	// Then: spec is the block, server+local is the overlay (lower precedence).
+
+	// Step 1: local block with server as overlay → local wins for shared keys.
+	localBlock := map[string]any{}
+	MergeJobConfigIntoSpec(localBlock, localCfg)   // local into empty block
+	MergeJobConfigIntoSpec(localBlock, serverCfg)   // server as lower-precedence overlay
+
+	// Step 2: spec block with server+local as overlay → spec wins for shared keys.
+	MergeJobConfigIntoSpec(specBlock, &JobConfig{
+		Envs: toStringMap(localBlock["envs"]),
+		CA:   toStringSlice(localBlock["ca"]),
+		In:   toStringSlice(localBlock["in"]),
+		Home: toStringSlice(localBlock["home"]),
+	})
+
+	envs := specBlock["envs"].(map[string]any)
+	// Spec wins for SHARED_ALL.
+	if envs["SHARED_ALL"] != "from_spec" {
+		t.Errorf("SHARED_ALL = %v, want from_spec (spec > local > server)", envs["SHARED_ALL"])
+	}
+	// Local wins over server for SHARED_SL (spec doesn't set it).
+	if envs["SHARED_SL"] != "from_local" {
+		t.Errorf("SHARED_SL = %v, want from_local (local > server)", envs["SHARED_SL"])
+	}
+	// Each layer's unique key preserved.
+	if envs["SERVER_ONLY"] != "srv" {
+		t.Errorf("SERVER_ONLY = %v, want srv", envs["SERVER_ONLY"])
+	}
+	if envs["LOCAL_ONLY"] != "local" {
+		t.Errorf("LOCAL_ONLY = %v, want local", envs["LOCAL_ONLY"])
+	}
+	if envs["SPEC_ONLY"] != "spec" {
+		t.Errorf("SPEC_ONLY = %v, want spec", envs["SPEC_ONLY"])
+	}
+
+	// CA: spec's cccccc + server's aaaaaa + local's bbbbbb (deduped, append order).
+	ca := toStringSlice(specBlock["ca"])
+	if len(ca) != 3 {
+		t.Fatalf("ca length = %d, want 3: %v", len(ca), ca)
+	}
+	if ca[0] != "cccccc1234ab" {
+		t.Errorf("ca[0] = %v, want cccccc1234ab (from spec)", ca[0])
+	}
+
+	// in: spec's /in/data.json wins over server's same dst; local's /in/extra.json appended.
+	in := toStringSlice(specBlock["in"])
+	if len(in) != 2 {
+		t.Fatalf("in length = %d, want 2: %v", len(in), in)
+	}
+	if in[0] != "/spec/data:/in/data.json" {
+		t.Errorf("in[0] = %v, want /spec/data:/in/data.json (spec wins)", in[0])
+	}
+
+	// home: spec's .auth/config.json:ro wins over server+local same dst.
+	home := toStringSlice(specBlock["home"])
+	if len(home) != 1 {
+		t.Fatalf("home length = %d, want 1: %v", len(home), home)
+	}
+	if home[0] != "/spec/auth:.auth/config.json:ro" {
+		t.Errorf("home[0] = %v, want spec entry with :ro preserved", home[0])
+	}
+}
+
+// toStringMap converts map[string]any to map[string]string for test helpers.
+func toStringMap(v any) map[string]string {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, val := range m {
+		if s, ok := val.(string); ok {
+			out[k] = s
+		}
+	}
+	return out
+}
+
+// toStringSlice converts []any to []string for test helpers.
+func toStringSlice(v any) []string {
+	a, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(a))
+	for _, e := range a {
+		if s, ok := e.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}

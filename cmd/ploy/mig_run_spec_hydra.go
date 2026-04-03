@@ -232,22 +232,28 @@ func compileCAEntries(ctx context.Context, base *url.URL, client *http.Client, b
 	if !ok || len(entries) == 0 {
 		return nil
 	}
-	compiled := make([]any, len(entries))
+	compiled := make([]any, 0, len(entries))
+	dedupSet := make(map[string]bool)
 	for i, e := range entries {
 		s, ok := e.(string)
 		if !ok {
 			return fmt.Errorf("%s.ca[%d]: expected string, got %T", prefix, i, e)
 		}
 		s = strings.TrimSpace(s)
+		var hash string
 		if shortHashPattern.MatchString(s) {
-			compiled[i] = s
-			continue
+			hash = s
+		} else {
+			var err error
+			hash, err = compileFileRecord(ctx, base, client, s, specBaseDir, seen)
+			if err != nil {
+				return fmt.Errorf("%s.ca[%d]: %w", prefix, i, err)
+			}
 		}
-		hash, err := compileFileRecord(ctx, base, client, s, specBaseDir, seen)
-		if err != nil {
-			return fmt.Errorf("%s.ca[%d]: %w", prefix, i, err)
+		if !dedupSet[hash] {
+			dedupSet[hash] = true
+			compiled = append(compiled, hash)
 		}
-		compiled[i] = hash
 	}
 	block["ca"] = compiled
 	return nil
