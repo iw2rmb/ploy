@@ -151,8 +151,9 @@ type MigStep struct {
 
 	// Amata configures amata-mode execution for this mig step container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
-	// --set flags; CODEX_PROMPT is not required in this mode.
-	// When nil, the container uses the direct codex exec path and CODEX_PROMPT is required.
+	// --set flags; no prompt file is required in this mode.
+	// When nil, the container uses the direct codex exec path and requires a
+	// prompt delivered via Hydra in mount (/in/codex-prompt.txt) or --prompt-file.
 	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
