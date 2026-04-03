@@ -68,8 +68,8 @@ func TestMigSpecsNoLegacyCODEXPROMPT(t *testing.T) {
 // TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
 // validating that /in is read-only and /out is writable.
 func TestHydraMountEnforcement(t *testing.T) {
-	if os.Getenv("PLOY_E2E") == "" {
-		t.Skip("PLOY_E2E not set; skipping e2e scenario")
+	if testing.Short() {
+		t.Skip("short mode; skipping e2e scenario")
 	}
 	root := repoRoot(t)
 	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-mount-enforcement", "run.sh")
@@ -90,8 +90,8 @@ func TestHydraMountEnforcement(t *testing.T) {
 // TestHydraOutUpload runs the Hydra /out upload continuity e2e scenario,
 // validating that files written to /out are uploaded and retrievable as artifacts.
 func TestHydraOutUpload(t *testing.T) {
-	if os.Getenv("PLOY_E2E") == "" {
-		t.Skip("PLOY_E2E not set; skipping e2e scenario")
+	if testing.Short() {
+		t.Skip("short mode; skipping e2e scenario")
 	}
 	root := repoRoot(t)
 	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-out-upload", "run.sh")

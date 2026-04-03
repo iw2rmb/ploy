@@ -47,7 +47,7 @@ func buildMigCodexImage(t *testing.T, repoRoot, imageTag string) {
 
 // TestMigCodexContainer tests codex.sh dual-mode routing inside the container image.
 // Amata mode: injects a mock amata binary via volume mount and verifies artifact outputs.
-// Direct codex mode: verifies CODEX_PROMPT is required when amata mode is not active.
+// Direct codex mode: verifies a prompt file (--prompt-file or /in/codex-prompt.txt) is required when amata mode is not active.
 func TestMigCodexContainer(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode")
@@ -215,7 +215,7 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 		}
 	})
 
-	t.Run("direct_codex_mode_requires_CODEX_PROMPT", func(t *testing.T) {
+	t.Run("direct_codex_mode_requires_prompt_file", func(t *testing.T) {
 		outDir, err := realTempDir("codex-test-out2-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
@@ -230,7 +230,7 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 		run := exec.Command("docker", "run", "--rm",
 			"-v", outDir+":/out",
 			"-v", wsDir+":/workspace",
-			// Deliberately omit CODEX_PROMPT to trigger the requirement check.
+			// Deliberately omit prompt file and /in mount to trigger the requirement check.
 			"codex:test-amata",
 			"--input", "/workspace", "--out", "/out",
 		)
@@ -239,7 +239,7 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 		run.Stderr = &outBuf
 		runErr := run.Run()
 		if runErr == nil {
-			t.Fatalf("expected container to fail without CODEX_PROMPT, but it succeeded")
+			t.Fatalf("expected container to fail without prompt file, but it succeeded")
 		}
 		if !strings.Contains(outBuf.String(), "prompt required") {
 			t.Errorf("expected 'prompt required' in output, got: %s", outBuf.String())
