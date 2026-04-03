@@ -33,7 +33,7 @@ func TestSpecBundle_CreateAndGet(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
 	createdBy := "test-user"
-	id := types.NewSpecBundleID()
+	id := string(string(types.NewSpecBundleID()))
 
 	bundle, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
 		ID:        id,
@@ -61,7 +61,7 @@ func TestSpecBundle_CreateAndGet(t *testing.T) {
 	if bundle.ObjectKey == nil || *bundle.ObjectKey == "" {
 		t.Fatal("bundle.ObjectKey should be set by generated column")
 	}
-	want := "spec_bundles/" + id.String() + "/bundle.tar"
+	want := "spec_bundles/" + id + "/bundle.tar"
 	if *bundle.ObjectKey != want {
 		t.Fatalf("bundle.ObjectKey=%q, want %q", *bundle.ObjectKey, want)
 	}
@@ -91,7 +91,7 @@ func TestSpecBundle_CreateAndGet(t *testing.T) {
 func TestSpecBundle_GetByID_NotFound(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
-	_, err := db.GetSpecBundle(ctx, types.NewSpecBundleID())
+	_, err := db.GetSpecBundle(ctx, string(types.NewSpecBundleID()))
 	if err != pgx.ErrNoRows {
 		t.Fatalf("GetSpecBundle() for missing id: got %v, want pgx.ErrNoRows", err)
 	}
@@ -100,9 +100,9 @@ func TestSpecBundle_GetByID_NotFound(t *testing.T) {
 func TestSpecBundle_GetByCID(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
-	cid := "bafybeid-test-cid-" + types.NewSpecBundleID().String()
+	cid := "bafybeid-test-cid-" + string(types.NewSpecBundleID())
 
-	id := types.NewSpecBundleID()
+	id := string(types.NewSpecBundleID())
 	_, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
 		ID:     id,
 		Cid:    cid,
@@ -125,7 +125,7 @@ func TestSpecBundle_GetByCID(t *testing.T) {
 func TestSpecBundle_GetByCID_NotFound(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
-	_, err := db.GetSpecBundleByCID(ctx, "nonexistent-cid-"+types.NewSpecBundleID().String())
+	_, err := db.GetSpecBundleByCID(ctx, "nonexistent-cid-"+string(types.NewSpecBundleID()))
 	if err != pgx.ErrNoRows {
 		t.Fatalf("GetSpecBundleByCID() for missing cid: got %v, want pgx.ErrNoRows", err)
 	}
@@ -134,9 +134,9 @@ func TestSpecBundle_GetByCID_NotFound(t *testing.T) {
 func TestSpecBundle_List(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
-	suffix := types.NewSpecBundleID().String()
+	suffix := string(types.NewSpecBundleID())
 	for i := range 3 {
-		id := types.NewSpecBundleID()
+		id := string(types.NewSpecBundleID())
 		_, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
 			ID:     id,
 			Cid:    "cid-list-" + suffix + "-" + string(rune('a'+i)),
@@ -169,10 +169,10 @@ func TestSpecBundle_List(t *testing.T) {
 func TestSpecBundle_UpdateLastRefAt(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
-	id := types.NewSpecBundleID()
+	id := string(types.NewSpecBundleID())
 	original, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
 		ID:     id,
-		Cid:    "cid-lastref-" + id.String(),
+		Cid:    "cid-lastref-" + id,
 		Digest: "sha256:lastref",
 		Size:   256,
 	})
@@ -200,10 +200,10 @@ func TestSpecBundle_UpdateLastRefAt(t *testing.T) {
 func TestSpecBundle_ListUnreferencedBefore(t *testing.T) {
 	ctx, db := openStoreForSpecBundleTests(t)
 
-	id := types.NewSpecBundleID()
+	id := string(types.NewSpecBundleID())
 	_, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
 		ID:     id,
-		Cid:    "cid-gc-" + id.String(),
+		Cid:    "cid-gc-" + id,
 		Digest: "sha256:gc",
 		Size:   128,
 	})
@@ -249,7 +249,7 @@ func TestSpecBundle_SizeConstraint(t *testing.T) {
 
 	// Zero size violates CHECK (size > 0).
 	_, err := db.CreateSpecBundle(ctx, CreateSpecBundleParams{
-		ID:     types.NewSpecBundleID(),
+		ID:     string(types.NewSpecBundleID()),
 		Cid:    "cid-zero-size",
 		Digest: "sha256:zero",
 		Size:   0,

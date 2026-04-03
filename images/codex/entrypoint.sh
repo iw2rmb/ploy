@@ -7,7 +7,7 @@ codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
-  CODEX_PROMPT      Inline prompt text fallback (prefer /in/codex-prompt.txt via Hydra in mount).
+  CODEX_PROMPT      Removed; use /in/codex-prompt.txt via Hydra in mount.
   CODEX_MODEL       Optional model override.
   CODEX_API_KEY     API key for Codex/OpenAI; passed through to codex exec.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior session.
@@ -122,10 +122,8 @@ if [[ -n "$prompt_file" ]]; then
 elif [[ -f "/in/codex-prompt.txt" ]]; then
   # Hydra in mount: prompt file materialized at /in/codex-prompt.txt.
   prompt="$(cat /in/codex-prompt.txt)"
-elif [[ -n "${CODEX_PROMPT:-}" ]]; then
-  prompt="$CODEX_PROMPT"
 else
-  echo "ERROR: prompt required (use --prompt-file, /in/codex-prompt.txt, or CODEX_PROMPT)" >&2
+  echo "ERROR: prompt required (use --prompt-file or /in/codex-prompt.txt via Hydra in mount)" >&2
   exit 2
 fi
 

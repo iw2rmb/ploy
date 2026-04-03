@@ -104,7 +104,7 @@ func TestScanSpecialEnvKeys_RewriteCandidates(t *testing.T) {
 		"OPENAI_API_KEY":  {{Value: "sk-xxx", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if report.Rewritten != 2 {
 		t.Errorf("Rewritten = %d, want 2", report.Rewritten)
@@ -133,7 +133,7 @@ func TestScanSpecialEnvKeys_ServerTargetSkipped(t *testing.T) {
 		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if report.Skipped != 1 {
 		t.Fatalf("Skipped = %d, want 1", report.Skipped)
@@ -148,7 +148,7 @@ func TestScanSpecialEnvKeys_NodesTargetSkipped(t *testing.T) {
 		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetNodes, Secret: true}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if report.Skipped != 1 {
 		t.Fatalf("Skipped = %d, want 1", report.Skipped)
@@ -164,7 +164,7 @@ func TestScanSpecialEnvKeys_ConflictRejected(t *testing.T) {
 		"mig": {{Entry: "existinghash:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome)
+	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
 
 	if report.Rejected != 1 {
 		t.Fatalf("Rejected = %d, want 1", report.Rejected)
@@ -182,7 +182,7 @@ func TestScanSpecialEnvKeys_GatesTarget(t *testing.T) {
 		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if report.Rewritten != 1 {
 		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
@@ -205,7 +205,7 @@ func TestScanSpecialEnvKeys_StepsTarget(t *testing.T) {
 		"CODEX_CONFIG_TOML": {{Value: "toml-data", Target: domaintypes.GlobalEnvTargetSteps}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if report.Rewritten != 1 {
 		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
@@ -232,7 +232,7 @@ func TestScanSpecialEnvKeys_MultipleTargets(t *testing.T) {
 		},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if report.Rewritten != 2 {
 		t.Errorf("Rewritten = %d, want 2 (gates + steps)", report.Rewritten)
@@ -243,7 +243,7 @@ func TestScanSpecialEnvKeys_MultipleTargets(t *testing.T) {
 }
 
 func TestScanSpecialEnvKeys_EmptyInput(t *testing.T) {
-	report := ScanSpecialEnvKeys(nil, nil, nil)
+	report := ScanSpecialEnvKeys(nil, nil, nil, nil)
 	if len(report.Entries) != 0 {
 		t.Errorf("Entries = %d, want 0", len(report.Entries))
 	}
@@ -255,7 +255,7 @@ func TestScanSpecialEnvKeys_NonSpecialKeysIgnored(t *testing.T) {
 		"PLOY_GRADLE_BUILD_CACHE_URL": {{Value: "https://cache.example.com", Target: domaintypes.GlobalEnvTargetGates}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil)
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
 	if len(report.Entries) != 0 {
 		t.Errorf("Entries = %d, want 0 (non-special keys should be ignored)", len(report.Entries))
@@ -273,10 +273,34 @@ func TestScanSpecialEnvKeys_HomeConflictPartialSections(t *testing.T) {
 		"mig": {{Entry: "abc1234:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome)
+	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
 
 	if report.Rejected != 1 {
 		t.Fatalf("Rejected = %d, want 1", report.Rejected)
+	}
+}
+
+func TestScanSpecialEnvKeys_InConflictRejected(t *testing.T) {
+	// CODEX_PROMPT maps to in:/in/codex-prompt.txt. Existing in entry for that
+	// destination in the mig section must cause rejection.
+	globalEnv := map[string][]GlobalEnvVar{
+		"CODEX_PROMPT": {{Value: "do the thing", Target: domaintypes.GlobalEnvTargetSteps}},
+	}
+
+	existingIn := map[string][]ConfigInEntry{
+		"mig": {{Entry: "abc123:/in/codex-prompt.txt", Dst: "/in/codex-prompt.txt", Section: "mig"}},
+	}
+
+	report := ScanSpecialEnvKeys(globalEnv, nil, nil, existingIn)
+
+	if report.Rejected != 1 {
+		t.Fatalf("Rejected = %d, want 1", report.Rejected)
+	}
+	if report.Entries[0].Action != MigrationActionReject {
+		t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionReject)
+	}
+	if report.Entries[0].Reason == "" {
+		t.Error("Reason should not be empty for rejected in entries")
 	}
 }
 
@@ -291,7 +315,7 @@ func TestMigrationReport_Metrics(t *testing.T) {
 		"mig": {{Dst: ".codex/auth.json"}},
 	}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome)
+	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
 
 	// CA gates → rewrite, AUTH steps → reject (conflict), CONFIG server → skip, CRUSH steps → rewrite
 	if report.Rewritten != 2 {
