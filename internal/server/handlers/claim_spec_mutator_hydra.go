@@ -72,7 +72,9 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 		return err
 	}
 
-	applyHealContainerOverlay(m, in)
+	if err := applyHealContainerOverlay(m, in); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -134,11 +136,20 @@ func assembleHydraOverlay(
 	return base
 }
 
-// deriveActiveGatePhaseFromSpec examines the spec's build_gate configuration
-// and returns the active gate phase for router overlay selection.
-// Returns "pre_gate" when build_gate.pre is configured or as fallback,
-// "post_gate" when only build_gate.post is configured.
-func deriveActiveGatePhaseFromSpec(m map[string]any) string {
+// deriveActiveGatePhase returns the gate phase for router overlay selection.
+// Gate job types (pre_gate, re_gate, post_gate) directly determine their
+// phase. Non-gate jobs fall back to spec-presence: pre_gate when build_gate.pre
+// is configured, post_gate when only build_gate.post is configured, pre_gate
+// as final fallback.
+func deriveActiveGatePhase(m map[string]any, jobType domaintypes.JobType) string {
+	switch jobType {
+	case domaintypes.JobTypePreGate:
+		return "pre_gate"
+	case domaintypes.JobTypeReGate:
+		return "re_gate"
+	case domaintypes.JobTypePostGate:
+		return "post_gate"
+	}
 	bg, ok := m["build_gate"].(map[string]any)
 	if !ok {
 		return "pre_gate"
@@ -166,7 +177,7 @@ func applyRouterPhaseOverlay(m map[string]any, in claimSpecMutatorInput) error {
 		return nil
 	}
 
-	gatePhase := deriveActiveGatePhaseFromSpec(m)
+	gatePhase := deriveActiveGatePhase(m, in.jobType)
 	overlay := assembleHydraOverlay(in.hydraOverlays, gatePhase, nil, in.jobType)
 
 	if err := validateOverlayCollisions(overlay, "build_gate.router"); err != nil {
@@ -178,24 +189,29 @@ func applyRouterPhaseOverlay(m map[string]any, in claimSpecMutatorInput) error {
 }
 
 // applyHealContainerOverlay applies the heal section overlay to each
-// build_gate.healing.by_error_kind.* action container.
-func applyHealContainerOverlay(m map[string]any, in claimSpecMutatorInput) {
+// build_gate.healing.by_error_kind.* action container. Returns a collision
+// error when the heal overlay contains duplicate destinations.
+func applyHealContainerOverlay(m map[string]any, in claimSpecMutatorInput) error {
 	bg, ok := m["build_gate"].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 	healing, ok := bg["healing"].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 	byErrorKind, ok := healing["by_error_kind"].(map[string]any)
 	if !ok {
-		return
+		return nil
 	}
 
 	overlay := assembleHydraOverlay(in.hydraOverlays, "heal", nil, domaintypes.JobTypeHeal)
 	if overlay.IsEmpty() {
-		return
+		return nil
+	}
+
+	if err := validateOverlayCollisions(overlay, "build_gate.healing"); err != nil {
+		return err
 	}
 
 	// Apply to error kind actions in sorted order for determinism.
@@ -212,6 +228,7 @@ func applyHealContainerOverlay(m map[string]any, in claimSpecMutatorInput) {
 		}
 		mergeHydraIntoBlock(action, overlay)
 	}
+	return nil
 }
 
 // mergeHydraIntoBlock applies all overlay fields into a spec block using
