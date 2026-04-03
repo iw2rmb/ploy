@@ -5,4 +5,4 @@
 [logging.go](logging.go) Initializes process-wide structured logging with level, format, and output-file options.
 [main.go](main.go) CLI entrypoint that loads config, initializes dependencies, seeds gate catalog, and runs ployd.
 [main_test.go](main_test.go) Covers main-package helpers and server startup wiring behavior under test scenarios.
-[server.go](server.go) Builds and runs ployd services, loads persisted config state, executes special-env migration, and starts HTTP/metrics servers.
+[server.go](server.go) Builds and runs ployd services, loads persisted runtime config overlays, executes special-env migration, and starts HTTP/metrics servers.

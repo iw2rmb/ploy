@@ -2,4 +2,4 @@
 [conflict_rejection.yaml](conflict_rejection.yaml) Fixture asserting migration rejects rewrite when destination already exists in section home entries.
 [gates_target_sections.yaml](gates_target_sections.yaml) Fixture verifying `gates` target rewrites map to `pre_gate`/`re_gate`/`post_gate` sections.
 [mixed_actions.yaml](mixed_actions.yaml) Fixture combining rewrite, reject, and skip outcomes across mixed targets and conflicts.
-[server_target_skipped.yaml](server_target_skipped.yaml) Fixture ensuring `server` and `nodes` targets are skipped as non job-scoped migration inputs.
+[server_target_skipped.yaml](server_target_skipped.yaml) Fixture verifying `server` and `nodes` targets are rewritten into typed records for all Hydra job sections.
