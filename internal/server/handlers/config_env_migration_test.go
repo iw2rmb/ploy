@@ -128,30 +128,38 @@ func TestScanSpecialEnvKeys_RewriteCandidates(t *testing.T) {
 	}
 }
 
-func TestScanSpecialEnvKeys_ServerTargetSkipped(t *testing.T) {
+func TestScanSpecialEnvKeys_ServerTargetMigrated(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
 		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
-	if report.Skipped != 1 {
-		t.Fatalf("Skipped = %d, want 1", report.Skipped)
+	if report.Rewritten != 1 {
+		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
 	}
-	if report.Entries[0].Action != MigrationActionSkip {
-		t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionSkip)
+	if report.Entries[0].Action != MigrationActionRewrite {
+		t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionRewrite)
+	}
+	// Server target maps to all job sections.
+	if len(report.Entries[0].Sections) != 5 {
+		t.Errorf("Sections = %v, want 5 sections (all)", report.Entries[0].Sections)
 	}
 }
 
-func TestScanSpecialEnvKeys_NodesTargetSkipped(t *testing.T) {
+func TestScanSpecialEnvKeys_NodesTargetMigrated(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
 		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetNodes, Secret: true}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
-	if report.Skipped != 1 {
-		t.Fatalf("Skipped = %d, want 1", report.Skipped)
+	if report.Rewritten != 1 {
+		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
+	}
+	// Nodes target maps to all job sections.
+	if len(report.Entries[0].Sections) != 5 {
+		t.Errorf("Sections = %v, want 5 sections (all)", report.Entries[0].Sections)
 	}
 }
 
@@ -234,11 +242,11 @@ func TestScanSpecialEnvKeys_MultipleTargets(t *testing.T) {
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
-	if report.Rewritten != 2 {
-		t.Errorf("Rewritten = %d, want 2 (gates + steps)", report.Rewritten)
+	if report.Rewritten != 3 {
+		t.Errorf("Rewritten = %d, want 3 (gates + steps + server)", report.Rewritten)
 	}
-	if report.Skipped != 1 {
-		t.Errorf("Skipped = %d, want 1 (server)", report.Skipped)
+	if report.Skipped != 0 {
+		t.Errorf("Skipped = %d, want 0", report.Skipped)
 	}
 }
 
@@ -312,20 +320,21 @@ func TestMigrationReport_Metrics(t *testing.T) {
 		"CRUSH_JSON":        {{Value: "crush", Target: domaintypes.GlobalEnvTargetSteps}},
 	}
 	existingHome := map[string][]ConfigHomeEntry{
-		"mig": {{Dst: ".codex/auth.json"}},
+		"mig": {{Entry: "existinghash:.codex/auth.json:ro", Dst: ".codex/auth.json"}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
 
-	// CA gates → rewrite, AUTH steps → reject (conflict), CONFIG server → skip, CRUSH steps → rewrite
-	if report.Rewritten != 2 {
-		t.Errorf("Rewritten = %d, want 2", report.Rewritten)
+	// CA gates → rewrite, AUTH steps → reject (conflict, hash mismatch),
+	// CONFIG server → rewrite (all sections), CRUSH steps → rewrite
+	if report.Rewritten != 3 {
+		t.Errorf("Rewritten = %d, want 3", report.Rewritten)
 	}
 	if report.Rejected != 1 {
 		t.Errorf("Rejected = %d, want 1", report.Rejected)
 	}
-	if report.Skipped != 1 {
-		t.Errorf("Skipped = %d, want 1", report.Skipped)
+	if report.Skipped != 0 {
+		t.Errorf("Skipped = %d, want 0", report.Skipped)
 	}
 	total := report.Rewritten + report.Rejected + report.Skipped
 	if total != len(report.Entries) {

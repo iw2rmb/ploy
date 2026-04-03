@@ -58,10 +58,12 @@ func buildClaimResponsePayload(
 	gitlabCfg := config.GitLabConfig{}
 	globalEnv := map[string][]GlobalEnvVar{}
 	var hydraOverlays map[string]*HydraJobConfig
+	var bundleMap map[string]string
 	if configHolder != nil {
 		gitlabCfg = configHolder.GetGitLab()
 		globalEnv = configHolder.GetGlobalEnvAll()
 		hydraOverlays = configHolder.GetHydraOverlays()
+		bundleMap = configHolder.GetBundleMap()
 	}
 
 	var repoGateProfile []byte
@@ -94,6 +96,7 @@ func buildClaimResponsePayload(
 		globalEnv:       globalEnv,
 		repoGateProfile: repoGateProfile,
 		hydraOverlays:   hydraOverlays,
+		bundleMap:       bundleMap,
 	})
 	if err != nil {
 		return claimResponsePayload{}, err

@@ -15,7 +15,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	})
 
 	f.config.SetGlobalEnvVar("PLOY_CA_CERTS", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
-	f.config.SetGlobalEnvVar("CODEX_AUTH_JSON", GlobalEnvVar{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
+	f.config.SetGlobalEnvVar("STEPS_SECRET", GlobalEnvVar{Value: "steps-secret-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
 	f.config.SetGlobalEnvVar("NODES_FALLBACK", GlobalEnvVar{Value: "nodes-env", Target: domaintypes.GlobalEnvTargetNodes, Secret: false})
 	f.config.SetGlobalEnvVar("SERVER_ONLY", GlobalEnvVar{Value: "server-env", Target: domaintypes.GlobalEnvTargetServer, Secret: false})
 
@@ -32,13 +32,20 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 		t.Fatalf("expected spec.envs to be an object, got %T", spec["envs"])
 	}
 
-	// Per-run envs overrides global env.
+	// Per-run envs for special key (PLOY_CA_CERTS) preserved in envs
+	// (per-run values always win; the special-key filter only affects
+	// global env overlay, not per-run spec values).
 	if envs["PLOY_CA_CERTS"] != "per-run-cert" {
 		t.Fatalf("expected per-run PLOY_CA_CERTS to win, got %v", envs["PLOY_CA_CERTS"])
 	}
-	// Steps-target injected for mig job.
-	if envs["CODEX_AUTH_JSON"] != `{"token":"xxx"}` {
-		t.Fatalf("expected CODEX_AUTH_JSON to be injected, got %v", envs["CODEX_AUTH_JSON"])
+	// Steps-target non-special key injected for mig job.
+	if envs["STEPS_SECRET"] != "steps-secret-val" {
+		t.Fatalf("expected STEPS_SECRET to be injected, got %v", envs["STEPS_SECRET"])
+	}
+	// Special env keys with global env target must NOT be injected as raw envs.
+	// They are file-backed and migrated to typed Hydra fields.
+	if _, ok := envs["CODEX_AUTH_JSON"]; ok {
+		t.Fatalf("expected special key CODEX_AUTH_JSON not to be injected as env var")
 	}
 	// Nodes-target provides fallback for all job types.
 	if envs["NODES_FALLBACK"] != "nodes-env" {

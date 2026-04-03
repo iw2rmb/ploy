@@ -104,11 +104,11 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 				"repo": "github.com/test", "timeout": float64(300),
 				"envs": map[string]any{"EXISTING": "yes"},
 			},
-			env:     map[string][]GlobalEnvVar{"PLOY_CA_CERTS": {{Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
+			env:     map[string][]GlobalEnvVar{"CUSTOM_CERT_DATA": {{Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}}},
 			jobType: domaintypes.JobTypeMig,
 			checkEnvs: map[string]string{
-				"EXISTING":      "yes",
-				"PLOY_CA_CERTS": "-----BEGIN CERT-----\n...",
+				"EXISTING":         "yes",
+				"CUSTOM_CERT_DATA": "-----BEGIN CERT-----\n...",
 			},
 		},
 		{

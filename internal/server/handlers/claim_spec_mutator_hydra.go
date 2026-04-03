@@ -91,10 +91,15 @@ func assembleHydraOverlay(
 	}
 
 	// Two-pass global env resolution (same logic as legacy applyGlobalEnvMutator).
+	// Special env keys (file-backed, migrated to typed Hydra fields) are
+	// excluded — they must not be folded as raw env vars into job envs.
 	globalMerged := make(map[string]string)
 
 	// Pass 1: nodes-target (lowest priority among global env).
 	for k, entries := range globalEnv {
+		if IsSpecialEnvKey(k) {
+			continue
+		}
 		for _, v := range entries {
 			if v.Target == domaintypes.GlobalEnvTargetNodes {
 				globalMerged[k] = v.Value
@@ -104,6 +109,9 @@ func assembleHydraOverlay(
 
 	// Pass 2: job-target (gates or steps) overrides nodes-target.
 	for k, entries := range globalEnv {
+		if IsSpecialEnvKey(k) {
+			continue
+		}
 		for _, v := range entries {
 			if v.Target.MatchesJobType(jobType) {
 				globalMerged[k] = v.Value
@@ -441,4 +449,37 @@ func copyStringSlice(s []string) []string {
 	cp := make([]string, len(s))
 	copy(cp, s)
 	return cp
+}
+
+// applyBundleMapMutator merges server-side bundle mappings (from migration and
+// config APIs) into spec["bundle_map"]. Existing spec entries take precedence.
+func applyBundleMapMutator(m map[string]any, in claimSpecMutatorInput) error {
+	if len(in.bundleMap) == 0 {
+		return nil
+	}
+
+	existing := make(map[string]string)
+	switch raw := m["bundle_map"].(type) {
+	case map[string]string:
+		for k, v := range raw {
+			existing[k] = v
+		}
+	case map[string]any:
+		for k, v := range raw {
+			if s, ok := v.(string); ok {
+				existing[k] = s
+			}
+		}
+	}
+
+	for hash, bundleID := range in.bundleMap {
+		if _, has := existing[hash]; !has {
+			existing[hash] = bundleID
+		}
+	}
+
+	if len(existing) > 0 {
+		m["bundle_map"] = existing
+	}
+	return nil
 }

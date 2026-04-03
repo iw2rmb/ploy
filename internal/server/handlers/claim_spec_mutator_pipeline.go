@@ -17,6 +17,7 @@ type claimSpecMutatorInput struct {
 	globalEnv       map[string][]GlobalEnvVar
 	repoGateProfile []byte
 	hydraOverlays   map[string]*HydraJobConfig
+	bundleMap       map[string]string // server-side shortHash → bundleID
 }
 
 type claimSpecMutator struct {
@@ -72,6 +73,10 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 			apply: func(m map[string]any, in claimSpecMutatorInput) error {
 				return applyHealingSchemaMutator(m, in.job, in.jobType)
 			},
+		},
+		{
+			errContext: "merge server bundle map into spec",
+			apply:     applyBundleMapMutator,
 		},
 	}
 

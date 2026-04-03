@@ -54,6 +54,7 @@ type ConfigHolder struct {
 	configCA   map[string][]string          // section → []hash
 	configHome map[string][]ConfigHomeEntry  // section → []entry
 	configIn   map[string][]ConfigInEntry    // section → []entry
+	bundleMap  map[string]string             // shortHash → bundleID (content-addressed, global)
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
@@ -565,4 +566,29 @@ func (h *ConfigHolder) syncHydraInLocked(section string) {
 		in[i] = e.Entry
 	}
 	cfg.In = in
+}
+
+// AddBundleMapping stores a shortHash → bundleID mapping so that the claim
+// mutator can thread server-side bundle references into spec bundle_map.
+func (h *ConfigHolder) AddBundleMapping(hash, bundleID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.bundleMap == nil {
+		h.bundleMap = make(map[string]string)
+	}
+	h.bundleMap[hash] = bundleID
+}
+
+// GetBundleMap returns a copy of all shortHash → bundleID mappings.
+func (h *ConfigHolder) GetBundleMap() map[string]string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if len(h.bundleMap) == 0 {
+		return nil
+	}
+	cp := make(map[string]string, len(h.bundleMap))
+	for k, v := range h.bundleMap {
+		cp[k] = v
+	}
+	return cp
 }
