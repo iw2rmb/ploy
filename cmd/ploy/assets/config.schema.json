@@ -5,23 +5,8 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "server": {
-      "$ref": "#/definitions/componentConfig"
-    },
-    "node": {
-      "$ref": "#/definitions/componentConfig"
-    },
-    "pre_gate": {
-      "$ref": "#/definitions/jobConfig"
-    },
-    "re_gate": {
-      "$ref": "#/definitions/jobConfig"
-    },
-    "post_gate": {
-      "$ref": "#/definitions/jobConfig"
-    },
-    "mig": {
-      "$ref": "#/definitions/jobConfig"
+    "defaults": {
+      "$ref": "#/definitions/defaultsConfig"
     }
   },
   "definitions": {
@@ -50,6 +35,42 @@
         },
         "home": {
           "$ref": "#/definitions/stringArray"
+        }
+      }
+    },
+    "jobTargetsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pre_gate": {
+          "$ref": "#/definitions/jobConfig"
+        },
+        "re_gate": {
+          "$ref": "#/definitions/jobConfig"
+        },
+        "post_gate": {
+          "$ref": "#/definitions/jobConfig"
+        },
+        "mig": {
+          "$ref": "#/definitions/jobConfig"
+        },
+        "heal": {
+          "$ref": "#/definitions/jobConfig"
+        }
+      }
+    },
+    "defaultsConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "server": {
+          "$ref": "#/definitions/componentConfig"
+        },
+        "node": {
+          "$ref": "#/definitions/componentConfig"
+        },
+        "job": {
+          "$ref": "#/definitions/jobTargetsConfig"
         }
       }
     },
