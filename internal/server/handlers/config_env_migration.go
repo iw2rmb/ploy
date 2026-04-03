@@ -467,8 +467,16 @@ func ExecuteMigration(
 			continue
 		}
 
-		// Store the hash → bundleID mapping so the claim mutator can thread
-		// it into spec bundle_map for node-side materialization.
+		// Persist the hash → bundleID mapping to the store so it survives
+		// server restarts, then update the in-memory ConfigHolder.
+		if upsertErr := st.UpsertConfigBundleMap(ctx, store.UpsertConfigBundleMapParams{
+			Hash:     hash,
+			BundleID: string(bundleID),
+		}); upsertErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"persist bundle mapping for hash %q: %v", hash, upsertErr))
+			continue
+		}
 		holder.AddBundleMapping(hash, string(bundleID))
 
 		field, record := RewriteSpecialEnvEntry(mapping, hash)

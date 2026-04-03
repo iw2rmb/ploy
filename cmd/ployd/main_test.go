@@ -187,6 +187,14 @@ func (s *schedulerProbeStore) ListConfigHome(ctx context.Context) ([]store.Confi
 	return nil, nil
 }
 
+func (s *schedulerProbeStore) ListConfigIn(ctx context.Context) ([]store.ConfigIn, error) {
+	return nil, nil
+}
+
+func (s *schedulerProbeStore) ListConfigBundleMap(ctx context.Context) ([]store.ConfigBundleMap, error) {
+	return nil, nil
+}
+
 func (s *schedulerProbeStore) DeleteExpiredLogs(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
 	return 0, nil
 }
