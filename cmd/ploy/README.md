@@ -522,9 +522,9 @@ ploy config env set --key CUSTOM_VAR --value myvalue --on gates --secret=false
 ploy config env unset --key OLD_VAR
 
 # CA certificates (typed Hydra field — replaces legacy PLOY_CA_CERTS env key)
-ploy config ca set --file ca-bundle.pem --on all
+ploy config ca set --file ca-bundle.pem --section pre_gate --section re_gate
 ploy config ca ls
-ploy config ca unset --from gates
+ploy config ca unset --hash <HASH> --section pre_gate
 ```
 
 ### Common Variables

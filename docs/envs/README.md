@@ -517,7 +517,7 @@ Use the `ploy config env` subcommands to manage global environment variables:
 
 ```bash
 # Set CA certificates via typed config (replaces legacy PLOY_CA_CERTS env key)
-ploy config ca set --file ca-bundle.pem --on all
+ploy config ca set --file ca-bundle.pem --section pre_gate --section re_gate
 
 # Set OpenAI API key (injected into gate and step jobs — default --on jobs)
 ploy config env set --key OPENAI_API_KEY --value sk-...
@@ -534,10 +534,9 @@ ploy config env unset --key OLD_VAR
 
 **Migrated special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`,
 `CRUSH_JSON`, and `CODEX_PROMPT` have been migrated from raw env keys to typed config
-fields (`ca`, `home`, `in`). Use the dedicated typed config commands instead:
+fields (`ca`, `home`) and Hydra in mounts. Use the dedicated typed config commands:
 - `ploy config ca set/unset/ls` — CA certificates
 - `ploy config home set/unset/ls` — Home-relative file mounts
-- `ploy config in set/unset/ls` — Read-only input file mounts
 
 ### Target Semantics
 
