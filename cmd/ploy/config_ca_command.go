@@ -1,0 +1,278 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+// handleConfigCA routes ca subcommands: list, set, unset.
+func handleConfigCA(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigCAUsage(stderr)
+		return nil
+	}
+	if len(args) == 0 {
+		printConfigCAUsage(stderr)
+		return errors.New("ca subcommand required")
+	}
+	switch args[0] {
+	case "list":
+		return handleConfigCAList(args[1:], stderr)
+	case "set":
+		return handleConfigCASet(args[1:], stderr)
+	case "unset":
+		return handleConfigCAUnset(args[1:], stderr)
+	default:
+		printConfigCAUsage(stderr)
+		return fmt.Errorf("unknown ca subcommand %q", args[0])
+	}
+}
+
+func printConfigCAUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy config ca <command>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Manage global CA certificate entries injected into job sections.")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Commands:")
+	_, _ = fmt.Fprintln(w, "  list [--section <SECTION>]       List all CA entries")
+	_, _ = fmt.Fprintln(w, "  set --hash <HASH> --section <SECTION>")
+	_, _ = fmt.Fprintln(w, "                                  Add a CA entry")
+	_, _ = fmt.Fprintln(w, "  unset --hash <HASH> --section <SECTION>")
+	_, _ = fmt.Fprintln(w, "                                  Remove a CA entry")
+}
+
+// configCAListItem matches the server's list response structure.
+type configCAItem struct {
+	Hash    string `json:"hash"`
+	Section string `json:"section"`
+}
+
+// handleConfigCAList retrieves and displays all CA entries.
+func handleConfigCAList(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigCAListUsage(stderr)
+		return nil
+	}
+
+	if stderr == nil {
+		stderr = io.Discard
+	}
+	fs := flag.NewFlagSet("config ca list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var section stringValue
+	fs.Var(&section, "section", "Filter by section: pre_gate, re_gate, post_gate, mig, heal")
+
+	if err := parseFlagSet(fs, args, func() { printConfigCAListUsage(stderr) }); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		printConfigCAListUsage(stderr)
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+
+	ctx := context.Background()
+	baseURL, client, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve control plane: %w", err)
+	}
+
+	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/ca"
+	if section.set {
+		endpoint += "/" + section.value
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("GET %s: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var items []configCAItem
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+
+	if len(items) == 0 {
+		fmt.Println("No CA entries configured.")
+		return nil
+	}
+
+	fmt.Printf("%-64s %s\n", "HASH", "SECTION")
+	fmt.Println(strings.Repeat("-", 80))
+	for _, item := range items {
+		fmt.Printf("%-64s %s\n", item.Hash, item.Section)
+	}
+	return nil
+}
+
+func printConfigCAListUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy config ca list [--section <SECTION>]")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --section  Filter by section: pre_gate, re_gate, post_gate, mig, heal")
+}
+
+// handleConfigCASet adds a CA entry.
+func handleConfigCASet(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigCASetUsage(stderr)
+		return nil
+	}
+
+	if stderr == nil {
+		stderr = io.Discard
+	}
+	fs := flag.NewFlagSet("config ca set", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var (
+		hash    stringValue
+		section stringValue
+	)
+	fs.Var(&hash, "hash", "CA hash (required)")
+	fs.Var(&section, "section", "Target section (required)")
+
+	if err := parseFlagSet(fs, args, func() { printConfigCASetUsage(stderr) }); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		printConfigCASetUsage(stderr)
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	if !hash.set || strings.TrimSpace(hash.value) == "" {
+		printConfigCASetUsage(stderr)
+		return errors.New("--hash is required")
+	}
+	if !section.set || strings.TrimSpace(section.value) == "" {
+		printConfigCASetUsage(stderr)
+		return errors.New("--section is required")
+	}
+
+	ctx := context.Background()
+	baseURL, client, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve control plane: %w", err)
+	}
+
+	reqBody := struct {
+		Section string `json:"section"`
+	}{Section: section.value}
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+
+	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/ca/" + hash.value
+	req, err := http.NewRequestWithContext(ctx, "PUT", endpoint, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("PUT %s: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Printf("CA entry %q added to section %s\n", hash.value, section.value)
+	return nil
+}
+
+func printConfigCASetUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy config ca set --hash <HASH> --section <SECTION>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --hash     CA content hash (7-64 hex chars, required)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal (required)")
+}
+
+// handleConfigCAUnset removes a CA entry.
+func handleConfigCAUnset(args []string, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printConfigCAUnsetUsage(stderr)
+		return nil
+	}
+
+	if stderr == nil {
+		stderr = io.Discard
+	}
+	fs := flag.NewFlagSet("config ca unset", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var (
+		hash    stringValue
+		section stringValue
+	)
+	fs.Var(&hash, "hash", "CA hash (required)")
+	fs.Var(&section, "section", "Target section (required)")
+
+	if err := parseFlagSet(fs, args, func() { printConfigCAUnsetUsage(stderr) }); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		printConfigCAUnsetUsage(stderr)
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+	if !hash.set || strings.TrimSpace(hash.value) == "" {
+		printConfigCAUnsetUsage(stderr)
+		return errors.New("--hash is required")
+	}
+	if !section.set || strings.TrimSpace(section.value) == "" {
+		printConfigCAUnsetUsage(stderr)
+		return errors.New("--section is required")
+	}
+
+	ctx := context.Background()
+	baseURL, client, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return fmt.Errorf("resolve control plane: %w", err)
+	}
+
+	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/ca/" + hash.value + "?section=" + section.value
+	req, err := http.NewRequestWithContext(ctx, "DELETE", endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("DELETE %s: %w", endpoint, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Printf("CA entry %q removed from section %s\n", hash.value, section.value)
+	return nil
+}
+
+func printConfigCAUnsetUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy config ca unset --hash <HASH> --section <SECTION>")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --hash     CA content hash (required)")
+	_, _ = fmt.Fprintln(w, "  --section  Target section: pre_gate, re_gate, post_gate, mig, heal (required)")
+}

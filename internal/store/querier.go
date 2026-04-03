@@ -88,6 +88,14 @@ type Querier interface {
 	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredLogs removes log rows older than the specified timestamp.
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
+	// Removes a CA entry by hash and section.
+	DeleteConfigCA(ctx context.Context, arg DeleteConfigCAParams) error
+	// Removes all CA entries for a section.
+	DeleteConfigCABySection(ctx context.Context, section string) error
+	// Removes a home entry by dst and section.
+	DeleteConfigHome(ctx context.Context, arg DeleteConfigHomeParams) error
+	// Removes all home entries for a section.
+	DeleteConfigHomeBySection(ctx context.Context, section string) error
 	// Removes an environment entry by key and target.
 	// No-op if the (key, target) pair does not exist (exec returns no error).
 	DeleteGlobalEnv(ctx context.Context, arg DeleteGlobalEnvParams) error
@@ -159,6 +167,14 @@ type Querier interface {
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
+	// Returns all CA entries ordered by section then hash for deterministic iteration.
+	ListConfigCA(ctx context.Context) ([]ConfigCa, error)
+	// Returns CA entries for a specific section ordered by hash.
+	ListConfigCABySection(ctx context.Context, section string) ([]ConfigCa, error)
+	// Returns all home entries ordered by section then dst for deterministic iteration.
+	ListConfigHome(ctx context.Context) ([]ConfigHome, error)
+	// Returns home entries for a specific section ordered by dst.
+	ListConfigHomeBySection(ctx context.Context, section string) ([]ConfigHome, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns diff metadata for a run.
 	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
@@ -289,6 +305,10 @@ type Querier interface {
 	UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	UpsertExactGateProfile(ctx context.Context, arg UpsertExactGateProfileParams) (UpsertExactGateProfileRow, error)
+	// Inserts or updates a CA entry (upsert on composite key (hash, section)).
+	UpsertConfigCA(ctx context.Context, arg UpsertConfigCAParams) error
+	// Inserts or updates a home entry (upsert on composite key (dst, section)).
+	UpsertConfigHome(ctx context.Context, arg UpsertConfigHomeParams) error
 	UpsertGateJobProfileLink(ctx context.Context, arg UpsertGateJobProfileLinkParams) error
 	// Inserts or updates an environment entry (upsert on composite key (key, target)).
 	// Updates value, secret, and refreshes updated_at on conflict.
