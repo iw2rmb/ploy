@@ -7,9 +7,9 @@
 [bootstrap.go](bootstrap.go) Constructs handler dependencies and bootstraps the HTTP handler layer wiring.
 [claim_spec_mutator_base.go](claim_spec_mutator_base.go) Core claim-spec mutation primitives applied before claim response emission.
 [claim_spec_mutator_gate.go](claim_spec_mutator_gate.go) Applies build-gate specific mutations when constructing claim specs.
+[claim_spec_mutator_healing.go](claim_spec_mutator_healing.go) Injects healing/recovery-specific claim-spec adjustments and metadata.
 [claim_spec_mutator_hydra.go](claim_spec_mutator_hydra.go) Typed Hydra overlay merge for envs/ca/in/out/home with section routing and collision detection.
 [claim_spec_mutator_hydra_test.go](claim_spec_mutator_hydra_test.go) Tests Hydra overlay merge: global env routing, typed merge, section routing, router phase inheritance, collision detection, and three-layer precedence.
-[claim_spec_mutator_healing.go](claim_spec_mutator_healing.go) Injects healing/recovery-specific claim-spec adjustments and metadata.
 [claim_spec_mutator_pipeline.go](claim_spec_mutator_pipeline.go) Composes mutator stages into a deterministic claim-spec mutation pipeline.
 [claim_spec_mutator_test.go](claim_spec_mutator_test.go) Validates claim spec mutation precedence and recovery metadata shaping for gate/healing flows.
 [config_authz_test.go](config_authz_test.go) Checks admin authorization enforcement on configuration endpoints.
