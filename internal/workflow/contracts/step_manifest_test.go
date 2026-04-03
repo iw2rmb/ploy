@@ -15,7 +15,7 @@ func TestStepManifestValidate(t *testing.T) {
 		Command:    []string{"/bin/run"},
 		Args:       []string{"--execute"},
 		WorkingDir: "/workspace",
-		Env: map[string]string{
+		Envs: map[string]string{
 			"JAVA_TOOL_OPTIONS": "-Xmx2g",
 		},
 		Inputs: []StepInput{
@@ -204,10 +204,10 @@ func cloneManifest(src StepManifest) StepManifest {
 			}
 		}
 	}
-	if len(src.Env) > 0 {
-		clone.Env = make(map[string]string, len(src.Env))
-		for k, v := range src.Env {
-			clone.Env[k] = v
+	if len(src.Envs) > 0 {
+		clone.Envs = make(map[string]string, len(src.Envs))
+		for k, v := range src.Envs {
+			clone.Envs[k] = v
 		}
 	}
 	if src.Gate != nil {

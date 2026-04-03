@@ -121,18 +121,24 @@ type HealingActionSpec struct {
 	// Command is the container command override (optional).
 	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
 
-	// Env holds environment variables to inject into the healing container.
-	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	// Envs holds environment variables to inject into the healing container.
+	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
+
+	// CA lists canonical CA certificate entries for the healing container.
+	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
+
+	// In lists canonical read-only input entries for the healing container.
+	In []string `json:"in,omitempty" yaml:"in,omitempty"`
+
+	// Out lists canonical read-write output entries for the healing container.
+	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
+
+	// Home lists canonical home-relative entries for the healing container.
+	Home []string `json:"home,omitempty" yaml:"home,omitempty"`
 
 	// Expectations defines typed strategy output contracts for downstream
 	// validation/promotion boundaries.
 	Expectations *RecoveryExpectationsSpec `json:"expectations,omitempty" yaml:"expectations,omitempty"`
-
-	// TmpBundle references a pre-uploaded bundle to extract under /tmp in the healing container.
-	TmpBundle *TmpBundleRef `json:"tmp_bundle,omitempty" yaml:"tmp_bundle,omitempty"`
-
-	// LegacyTmpDir captures any legacy tmp_dir JSON payload for explicit rejection.
-	LegacyTmpDir json.RawMessage `json:"tmp_dir,omitempty" yaml:"-"`
 
 	// Amata configures amata-mode execution for this healing action container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
@@ -153,7 +159,7 @@ type RecoveryExpectedArtifact struct {
 }
 
 // RouterSpec describes the router container that runs on gate failure to produce
-// a bug_summary before healing begins. Router is mig-like (Image, Command, Env)
+// a bug_summary before healing begins. Router is mig-like (Image, Command, Envs)
 // but has no Retries — it runs exactly once per gate failure.
 type RouterSpec struct {
 	// Image is the container image for the router (required).
@@ -162,14 +168,20 @@ type RouterSpec struct {
 	// Command is the container command override (optional).
 	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
 
-	// Env holds environment variables to inject into the router container.
-	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	// Envs holds environment variables to inject into the router container.
+	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
 
-	// TmpBundle references a pre-uploaded bundle to extract under /tmp in the router container.
-	TmpBundle *TmpBundleRef `json:"tmp_bundle,omitempty" yaml:"tmp_bundle,omitempty"`
+	// CA lists canonical CA certificate entries for the router container.
+	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
 
-	// LegacyTmpDir captures any legacy tmp_dir JSON payload for explicit rejection.
-	LegacyTmpDir json.RawMessage `json:"tmp_dir,omitempty" yaml:"-"`
+	// In lists canonical read-only input entries for the router container.
+	In []string `json:"in,omitempty" yaml:"in,omitempty"`
+
+	// Out lists canonical read-write output entries for the router container.
+	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
+
+	// Home lists canonical home-relative entries for the router container.
+	Home []string `json:"home,omitempty" yaml:"home,omitempty"`
 
 	// Amata configures amata-mode execution for this router container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional

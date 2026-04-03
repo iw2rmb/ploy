@@ -62,9 +62,9 @@ type ContainerResult struct {
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
 // The runID and jobID parameters thread workflow identifiers into container labels
 // for correlation with telemetry and log aggregation systems.
-// tmpStagingDir is an optional path to a staging directory for bundle entries;
-// each bundle entry in manifest.TmpBundle is mounted read-only at /tmp/<name>.
-func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, tmpStagingDir string) (ContainerSpec, error) {
+// stagingDir is an optional path to a staging directory for materialized Hydra
+// resources; each In/Out/Home/CA entry is mounted from stagingDir/<shortHash>.
+func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts.StepManifest, workspace string, outDir string, inDir string, stagingDir string) (ContainerSpec, error) {
 	// Mount the first input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared mount (first input), respecting mode.
@@ -87,24 +87,55 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
 	}
 
-	// Mount each bundle entry read-only at /tmp/<name> from the staging directory.
-	// Bundle entries are extracted from the downloaded archive before Run() is called.
-	// Runtime hardening: reject malformed names or canonical duplicates.
-	if strings.TrimSpace(tmpStagingDir) != "" && manifest.TmpBundle != nil {
-		seenBundleNames := make(map[string]struct{}, len(manifest.TmpBundle.Entries))
-		for _, entryName := range manifest.TmpBundle.Entries {
-			name, err := contracts.NormalizeTmpFileName(entryName)
+	// Mount Hydra materialized resources from the staging directory.
+	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.
+	if strings.TrimSpace(stagingDir) != "" {
+		// CA entries: mount at deterministic CA cert path (read-only).
+		for _, entry := range manifest.CA {
+			hash, err := contracts.ParseStoredCAEntry(entry)
 			if err != nil {
-				return ContainerSpec{}, fmt.Errorf("tmp bundle entry %q is not valid: %w", entryName, err)
+				return ContainerSpec{}, fmt.Errorf("ca entry %q: %w", entry, err)
 			}
-			if _, dup := seenBundleNames[name]; dup {
-				return ContainerSpec{}, fmt.Errorf("tmp bundle entry duplicate %q", name)
-			}
-			seenBundleNames[name] = struct{}{}
 			mounts = append(mounts, ContainerMount{
-				Source:   filepath.Join(tmpStagingDir, name),
-				Target:   "/tmp/" + name,
+				Source:   filepath.Join(stagingDir, hash),
+				Target:   "/etc/ploy/ca/" + hash,
 				ReadOnly: true,
+			})
+		}
+		// In entries: mount read-only at the declared destination.
+		for _, entry := range manifest.In {
+			parsed, err := contracts.ParseStoredInEntry(entry)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("in entry %q: %w", entry, err)
+			}
+			mounts = append(mounts, ContainerMount{
+				Source:   filepath.Join(stagingDir, parsed.Hash),
+				Target:   parsed.Dst,
+				ReadOnly: true,
+			})
+		}
+		// Out entries: mount read-write at the declared destination.
+		for _, entry := range manifest.Out {
+			parsed, err := contracts.ParseStoredOutEntry(entry)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("out entry %q: %w", entry, err)
+			}
+			mounts = append(mounts, ContainerMount{
+				Source:   filepath.Join(stagingDir, parsed.Hash),
+				Target:   parsed.Dst,
+				ReadOnly: false,
+			})
+		}
+		// Home entries: mount at $HOME/<dst> with mode from entry.
+		for _, entry := range manifest.Home {
+			parsed, err := contracts.ParseStoredHomeEntry(entry)
+			if err != nil {
+				return ContainerSpec{}, fmt.Errorf("home entry %q: %w", entry, err)
+			}
+			mounts = append(mounts, ContainerMount{
+				Source:   filepath.Join(stagingDir, parsed.Hash),
+				Target:   "/home/user/" + parsed.Dst,
+				ReadOnly: parsed.ReadOnly,
 			})
 		}
 	}
@@ -155,7 +186,7 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		Image:            manifest.Image,
 		Command:          append([]string{}, manifest.Command...),
 		WorkingDir:       wd,
-		Env:              manifest.Env,
+		Env:              manifest.Envs,
 		Mounts:           mounts,
 		Labels:           labels,
 		LimitNanoCPUs:    nanoCPUs,

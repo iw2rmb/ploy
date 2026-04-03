@@ -10,7 +10,7 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 		"steps": [{
 			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello",
-			"env": {"FOO": "bar", "BAZ": "qux"}
+			"envs": {"FOO": "bar", "BAZ": "qux"}
 		}],
 		"build_gate": {"enabled": true},
 		"gitlab_pat": "secret",
@@ -44,12 +44,12 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 		t.Errorf("image = %q, want %q", step.Image.Universal, "ghcr.io/iw2rmb/ploy/mig:latest")
 	}
 
-	// Verify env.
-	if step.Env["FOO"] != "bar" {
-		t.Errorf("env[FOO] = %q, want %q", step.Env["FOO"], "bar")
+	// Verify envs.
+	if step.Envs["FOO"] != "bar" {
+		t.Errorf("envs[FOO] = %q, want %q", step.Envs["FOO"], "bar")
 	}
-	if step.Env["BAZ"] != "qux" {
-		t.Errorf("env[BAZ] = %q, want %q", step.Env["BAZ"], "qux")
+	if step.Envs["BAZ"] != "qux" {
+		t.Errorf("envs[BAZ] = %q, want %q", step.Envs["BAZ"], "qux")
 	}
 
 	// Verify build_gate.
@@ -79,8 +79,8 @@ func TestParseMigSpecJSON_SingleStep(t *testing.T) {
 func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	input := `{
 		"steps": [
-			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "env": {"STEP": "1"}, "always": true},
-			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "env": {"STEP": "2"}, "always": false}
+			{"name": "step-1", "image": "ghcr.io/iw2rmb/ploy/mig1:latest", "command": ["echo", "step1"], "envs": {"STEP": "1"}, "always": true},
+			{"name": "step-2", "image": "ghcr.io/iw2rmb/ploy/mig2:latest", "envs": {"STEP": "2"}, "always": false}
 		],
 		"build_gate": {
 			"enabled": true,
@@ -90,7 +90,7 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 						"retries": 3,
 						"image": "ghcr.io/iw2rmb/ploy/codex:latest",
 						"command": "fix-it",
-						"env": {"PROMPT": "fix the build"}
+						"envs": {"PROMPT": "fix the build"}
 					}
 				}
 			},
@@ -122,8 +122,8 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	if len(mig1.Command.Exec) != 2 || mig1.Command.Exec[0] != "echo" || mig1.Command.Exec[1] != "step1" {
 		t.Errorf("steps[0].command.Exec = %v, want [echo, step1]", mig1.Command.Exec)
 	}
-	if mig1.Env["STEP"] != "1" {
-		t.Errorf("steps[0].env[STEP] = %q, want %q", mig1.Env["STEP"], "1")
+	if mig1.Envs["STEP"] != "1" {
+		t.Errorf("steps[0].envs[STEP] = %q, want %q", mig1.Envs["STEP"], "1")
 	}
 	if !mig1.Always {
 		t.Errorf("steps[0].always = false, want true")
@@ -266,7 +266,7 @@ func TestParseMigSpecJSON_APIVersionAndKind(t *testing.T) {
 		"steps": [{
 			"image": "ghcr.io/iw2rmb/ploy/mig:latest",
 			"command": "echo hello",
-			"env": {"FOO": "bar"}
+			"envs": {"FOO": "bar"}
 		}],
 		"build_gate": {"enabled": true}
 	}`

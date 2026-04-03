@@ -26,7 +26,7 @@ type StepManifest struct {
 	Command    []string
 	Args       []string
 	WorkingDir string
-	Env        map[string]string
+	Envs       map[string]string
 	Inputs     []StepInput
 	Outputs    []StepOutput
 	Artifacts  []StepArtifact
@@ -38,9 +38,17 @@ type StepManifest struct {
 	// logged.
 	Options map[string]any
 
-	// TmpBundle references the bundle to download and extract under /tmp.
-	// Set by the nodeagent from the incoming spec at execution time.
-	TmpBundle *TmpBundleRef
+	// CA lists canonical CA certificate entries (shortHash values).
+	CA []string
+
+	// In lists canonical read-only input entries ("shortHash:/in/dst").
+	In []string
+
+	// Out lists canonical read-write output entries ("shortHash:/out/dst").
+	Out []string
+
+	// Home lists canonical home-relative entries ("shortHash:dst{:ro}").
+	Home []string
 }
 
 // StepInputMode describes how the input is mounted into the container.
@@ -240,11 +248,11 @@ func (m StepManifest) validateIdentity() error {
 }
 
 func (m StepManifest) validateEnv() error {
-	if len(m.Env) == 0 {
+	if len(m.Envs) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(m.Env))
-	for key := range m.Env {
+	keys := make([]string, 0, len(m.Envs))
+	for key := range m.Envs {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
