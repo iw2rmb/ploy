@@ -109,10 +109,11 @@ func TestListJobsForTUI(t *testing.T) {
 
 	t.Run("RunIDFilteredResults", func(t *testing.T) {
 		runIDA := fxA.Run.ID
+		runIDAStr := string(runIDA)
 		rows, err := db.ListJobsForTUI(ctx, ListJobsForTUIParams{
 			Limit:  100,
 			Offset: 0,
-			RunID:  &runIDA,
+			RunID:  &runIDAStr,
 		})
 		if err != nil {
 			t.Fatalf("ListJobsForTUI(run_id=A) failed: %v", err)
@@ -171,9 +172,9 @@ func TestListJobsForTUI(t *testing.T) {
 	})
 
 	t.Run("CountJobsForTUI_FilteredByRun", func(t *testing.T) {
-		runIDA := fxA.Run.ID
+		runIDAStr := string(fxA.Run.ID)
 
-		countA, err := db.CountJobsForTUI(ctx, &runIDA)
+		countA, err := db.CountJobsForTUI(ctx, &runIDAStr)
 		if err != nil {
 			t.Fatalf("CountJobsForTUI(runA) failed: %v", err)
 		}
@@ -181,8 +182,8 @@ func TestListJobsForTUI(t *testing.T) {
 			t.Errorf("expected at least 2 jobs for run A, got %d", countA)
 		}
 
-		runIDB := fxB.Run.ID
-		countB, err := db.CountJobsForTUI(ctx, &runIDB)
+		runIDBStr := string(fxB.Run.ID)
+		countB, err := db.CountJobsForTUI(ctx, &runIDBStr)
 		if err != nil {
 			t.Fatalf("CountJobsForTUI(runB) failed: %v", err)
 		}

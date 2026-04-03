@@ -120,6 +120,7 @@ func ScanSpecialEnvKeys(
 	globalEnv map[string][]GlobalEnvVar,
 	existingCA map[string][]string,
 	existingHome map[string][]ConfigHomeEntry,
+	existingIn map[string][]ConfigInEntry,
 ) *MigrationReport {
 	report := &MigrationReport{}
 
@@ -151,12 +152,35 @@ func ScanSpecialEnvKeys(
 			}
 
 			var conflicts []string
-			if mapping.TargetField == "home" {
+			switch mapping.TargetField {
+			case "home":
 				for _, section := range sections {
 					for _, he := range existingHome[section] {
 						if he.Dst == mapping.Destination {
 							conflicts = append(conflicts, fmt.Sprintf(
 								"section %q already has home entry for %q", section, mapping.Destination))
+						}
+					}
+				}
+			case "in":
+				for _, section := range sections {
+					for _, ie := range existingIn[section] {
+						if ie.Dst == mapping.Destination {
+							conflicts = append(conflicts, fmt.Sprintf(
+								"section %q already has in entry for %q", section, mapping.Destination))
+						}
+					}
+				}
+			case "ca":
+				// CA entries are content-addressed by hash. A collision occurs
+				// when the same hash already exists in the target section. We
+				// compute the hash from the env value to check.
+				hash := contentHash(entry.Value)
+				for _, section := range sections {
+					for _, existing := range existingCA[section] {
+						if existing == hash {
+							conflicts = append(conflicts, fmt.Sprintf(
+								"section %q already has ca entry for hash %s", section, hash[:12]))
 						}
 					}
 				}

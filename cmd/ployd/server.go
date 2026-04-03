@@ -218,7 +218,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 
 	// Execute hard-cut migration: persist rewrite-eligible legacy special env keys
 	// as typed ca/home/in records and remove the legacy env records.
-	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, caBySection, homeBySection)
+	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, caBySection, homeBySection, inBySection)
 	if st != nil {
 		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder)
 		if execErr != nil {
