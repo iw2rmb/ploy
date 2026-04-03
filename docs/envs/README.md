@@ -532,9 +532,10 @@ ploy config env show --key OPENAI_API_KEY --raw
 ploy config env unset --key OLD_VAR
 ```
 
-**Migrated special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`,
-`CRUSH_JSON`, and `CODEX_PROMPT` have been migrated from raw env keys to typed config
-fields (`ca`, `home`) and Hydra in mounts. Use the dedicated typed config commands:
+**Migrated special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`,
+`CCR_CONFIG_JSON`, `CRUSH_JSON`, and `CODEX_PROMPT` have been migrated from raw env keys
+to typed config fields (`ca`, `home`) and Hydra in mounts. Use the dedicated typed config
+commands:
 - `ploy config ca set/unset/ls` — CA certificates
 - `ploy config home set/unset/ls` — Home-relative file mounts
 
@@ -587,7 +588,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 | Variable | Consumer | Description |
 |----------|----------|-------------|
 | `ca` (typed) | ORW migs, build-gate, custom migs | PEM-encoded CA certificates; mounted via Hydra `ca` materialization (replaces `PLOY_CA_CERTS`) |
-| `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
+| `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
 | `in` (typed) | `codex`, healing | Read-only input file mounts (replaces `CODEX_PROMPT` file injection) |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |

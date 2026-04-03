@@ -72,11 +72,11 @@ put:
     - `OPENAI_API_KEY` with target `steps` — API key for LLM-integrated migs.
     - Custom variables for user-defined mig parameters.
 
-    **Removed special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CCR_CONFIG_JSON`,
-    `CRUSH_JSON`, and `CODEX_PROMPT` are no longer supported as environment variables.
-    They have been replaced by typed Hydra config fields (`ca`, `home`) and are
-    rejected by this endpoint on all targets. Use the typed config commands
-    (`ploy config ca`, `ploy config home`) instead.
+    **Removed special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`,
+    `CCR_CONFIG_JSON`, `CRUSH_JSON`, and `CODEX_PROMPT` are no longer supported as
+    environment variables. They have been replaced by typed Hydra config fields (`ca`,
+    `home`) and are rejected by this endpoint on all targets. Use the typed config
+    commands (`ploy config ca`, `ploy config home`) instead.
 
     Requires `cli-admin` role.
   parameters:
