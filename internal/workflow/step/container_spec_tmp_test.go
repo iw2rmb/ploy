@@ -1,7 +1,6 @@
 package step
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -9,11 +8,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func baseManifestForTmp(t *testing.T) contracts.StepManifest {
+func baseManifestForHydra(t *testing.T) contracts.StepManifest {
 	t.Helper()
 	return contracts.StepManifest{
-		ID:    types.StepID("step-tmp"),
-		Name:  "With Tmp Files",
+		ID:    types.StepID("step-hydra"),
+		Name:  "With Hydra Mounts",
 		Image: "alpine:3",
 		Inputs: []contracts.StepInput{{
 			Name:        "src",
@@ -24,107 +23,164 @@ func baseManifestForTmp(t *testing.T) contracts.StepManifest {
 	}
 }
 
-func TestBuildContainerSpec_TmpBundleEntriesMountedReadOnly(t *testing.T) {
+func TestBuildContainerSpec_HydraInMountedReadOnly(t *testing.T) {
 	stagingDir := t.TempDir()
-	// Simulate extracted bundle contents in the staging dir.
-	if err := os.WriteFile(filepath.Join(stagingDir, "config.json"), []byte(`{}`), 0o644); err != nil {
-		t.Fatalf("write staging file: %v", err)
-	}
-	if err := os.Mkdir(filepath.Join(stagingDir, "scripts"), 0o755); err != nil {
-		t.Fatalf("mkdir scripts: %v", err)
-	}
 
-	manifest := baseManifestForTmp(t)
-	manifest.TmpBundle = &contracts.TmpBundleRef{
-		BundleID: "bun-123",
-		CID:      "bafy123",
-		Digest:   "abc",
-		Entries:  []string{"config.json", "scripts"},
-	}
+	manifest := baseManifestForHydra(t)
+	manifest.In = []string{"abcdef0:/in/config.json"}
 
-	spec, err := buildContainerSpec(types.RunID("run-bundle"), types.JobID("job-bundle"), manifest, "/ws", "", "", stagingDir)
+	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/ws", "", "", stagingDir)
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	// Expect workspace + 2 read-only bundle mounts.
-	if len(spec.Mounts) != 3 {
-		t.Fatalf("got %d mounts, want 3: %+v", len(spec.Mounts), spec.Mounts)
-	}
-
-	type want struct {
-		target   string
-		source   string
-		readOnly bool
-	}
-	cases := []want{
-		{target: "/tmp/config.json", source: filepath.Join(stagingDir, "config.json"), readOnly: true},
-		{target: "/tmp/scripts", source: filepath.Join(stagingDir, "scripts"), readOnly: true},
-	}
-	for _, w := range cases {
-		var found bool
-		for _, m := range spec.Mounts {
-			if m.Target == w.target {
-				found = true
-				if m.Source != w.source {
-					t.Errorf("mount %s: source got %q, want %q", w.target, m.Source, w.source)
-				}
-				if m.ReadOnly != w.readOnly {
-					t.Errorf("mount %s: ReadOnly got %v, want %v", w.target, m.ReadOnly, w.readOnly)
-				}
+	var found bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/in/config.json" {
+			found = true
+			if m.Source != filepath.Join(stagingDir, "abcdef0") {
+				t.Errorf("source = %q, want %q", m.Source, filepath.Join(stagingDir, "abcdef0"))
+			}
+			if !m.ReadOnly {
+				t.Errorf("/in mount must be read-only")
 			}
 		}
-		if !found {
-			t.Errorf("mount %s not found in %+v", w.target, spec.Mounts)
-		}
+	}
+	if !found {
+		t.Fatalf("/in/config.json mount not found in %+v", spec.Mounts)
 	}
 }
 
-func TestBuildContainerSpec_TmpBundleEntriesSkippedWithoutStagingDir(t *testing.T) {
-	manifest := baseManifestForTmp(t)
-	manifest.TmpBundle = &contracts.TmpBundleRef{
-		BundleID: "bun-123",
-		CID:      "bafy123",
-		Digest:   "abc",
-		Entries:  []string{"config.json"},
-	}
+func TestBuildContainerSpec_HydraOutMountedReadWrite(t *testing.T) {
+	stagingDir := t.TempDir()
 
-	spec, err := buildContainerSpec(types.RunID("run-bundle-nostaging"), types.JobID("job-bundle-nostaging"), manifest, "/ws", "", "", "")
+	manifest := baseManifestForHydra(t)
+	manifest.Out = []string{"bbbbbbb:/out/results"}
+
+	spec, err := buildContainerSpec(types.RunID("run-out"), types.JobID("job-out"), manifest, "/ws", "", "", stagingDir)
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
+	var found bool
 	for _, m := range spec.Mounts {
-		if m.Target == "/tmp/config.json" {
-			t.Fatalf("unexpected /tmp/config.json mount when tmpStagingDir is empty")
+		if m.Target == "/out/results" {
+			found = true
+			if m.Source != filepath.Join(stagingDir, "bbbbbbb") {
+				t.Errorf("source = %q, want %q", m.Source, filepath.Join(stagingDir, "bbbbbbb"))
+			}
+			if m.ReadOnly {
+				t.Errorf("/out mount must be read-write")
+			}
 		}
 	}
-}
-
-func TestBuildContainerSpec_TmpBundleEntriesDuplicateRejected(t *testing.T) {
-	stagingDir := t.TempDir()
-
-	manifest := baseManifestForTmp(t)
-	manifest.TmpBundle = &contracts.TmpBundleRef{
-		BundleID: "bun-dup",
-		CID:      "bafy123",
-		Digest:   "abc",
-		Entries:  []string{"config.json", "config.json"},
-	}
-
-	_, err := buildContainerSpec(types.RunID("run-bundle-dup"), types.JobID("job-bundle-dup"), manifest, "/ws", "", "", stagingDir)
-	if err == nil {
-		t.Fatal("expected error for duplicate bundle entry, got nil")
+	if !found {
+		t.Fatalf("/out/results mount not found in %+v", spec.Mounts)
 	}
 }
 
-func TestBuildContainerSpec_TmpFilesEmptyManifestTmpDir(t *testing.T) {
+func TestBuildContainerSpec_HydraHomeMountRW(t *testing.T) {
 	stagingDir := t.TempDir()
 
-	manifest := baseManifestForTmp(t)
-	// No bundle entries.
+	manifest := baseManifestForHydra(t)
+	manifest.Home = []string{"ccccccc:.codex/auth.json"}
 
-	spec, err := buildContainerSpec(types.RunID("run-tmp-empty"), types.JobID("job-tmp-empty"), manifest, "/ws", "", "", stagingDir)
+	spec, err := buildContainerSpec(types.RunID("run-home"), types.JobID("job-home"), manifest, "/ws", "", "", stagingDir)
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	var found bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/home/user/.codex/auth.json" {
+			found = true
+			if m.Source != filepath.Join(stagingDir, "ccccccc") {
+				t.Errorf("source = %q, want %q", m.Source, filepath.Join(stagingDir, "ccccccc"))
+			}
+			if m.ReadOnly {
+				t.Errorf("home mount (default) must be read-write")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("home mount not found in %+v", spec.Mounts)
+	}
+}
+
+func TestBuildContainerSpec_HydraHomeMountRO(t *testing.T) {
+	stagingDir := t.TempDir()
+
+	manifest := baseManifestForHydra(t)
+	manifest.Home = []string{"ddddddd:.config/app.toml:ro"}
+
+	spec, err := buildContainerSpec(types.RunID("run-home-ro"), types.JobID("job-home-ro"), manifest, "/ws", "", "", stagingDir)
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	var found bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/home/user/.config/app.toml" {
+			found = true
+			if !m.ReadOnly {
+				t.Errorf("home mount with :ro must be read-only")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("home mount not found in %+v", spec.Mounts)
+	}
+}
+
+func TestBuildContainerSpec_HydraCAMount(t *testing.T) {
+	stagingDir := t.TempDir()
+
+	manifest := baseManifestForHydra(t)
+	manifest.CA = []string{"eeeeeee"}
+
+	spec, err := buildContainerSpec(types.RunID("run-ca"), types.JobID("job-ca"), manifest, "/ws", "", "", stagingDir)
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	var found bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/etc/ploy/ca/eeeeeee" {
+			found = true
+			if m.Source != filepath.Join(stagingDir, "eeeeeee") {
+				t.Errorf("source = %q, want %q", m.Source, filepath.Join(stagingDir, "eeeeeee"))
+			}
+			if !m.ReadOnly {
+				t.Errorf("CA mount must be read-only")
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("CA mount not found in %+v", spec.Mounts)
+	}
+}
+
+func TestBuildContainerSpec_HydraSkippedWithoutStagingDir(t *testing.T) {
+	manifest := baseManifestForHydra(t)
+	manifest.In = []string{"abcdef0:/in/config.json"}
+	manifest.CA = []string{"bbbbbbb"}
+
+	spec, err := buildContainerSpec(types.RunID("run-nostaging"), types.JobID("job-nostaging"), manifest, "/ws", "", "", "")
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	// Only workspace mount should be present.
+	if len(spec.Mounts) != 1 {
+		t.Fatalf("got %d mounts, want 1: %+v", len(spec.Mounts), spec.Mounts)
+	}
+}
+
+func TestBuildContainerSpec_HydraNoFieldsValid(t *testing.T) {
+	stagingDir := t.TempDir()
+	manifest := baseManifestForHydra(t)
+
+	spec, err := buildContainerSpec(types.RunID("run-empty"), types.JobID("job-empty"), manifest, "/ws", "", "", stagingDir)
 	if err != nil {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}

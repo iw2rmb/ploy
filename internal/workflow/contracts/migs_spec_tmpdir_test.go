@@ -5,82 +5,121 @@ import (
 	"testing"
 )
 
-func TestMigSpecValidate_TmpBundleStep(t *testing.T) {
+func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
 		wantErr string
 	}{
 		{
-			name: "valid bundle reference",
+			name: "valid in entry",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["config.json"]}}]
+				"steps": [{"image": "img:latest", "in": ["abcdef0:/in/config.json"]}]
 			}`,
 		},
 		{
-			name: "valid bundle multiple entries",
+			name: "valid out entry",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["a.txt", "b.txt"]}}]
+				"steps": [{"image": "img:latest", "out": ["abcdef0:/out/results"]}]
 			}`,
 		},
 		{
-			name: "legacy tmp_dir rejected",
+			name: "valid home entry rw",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": [{"name": "config.json", "content": "e2Zve30="}]}]
+				"steps": [{"image": "img:latest", "home": ["abcdef0:.codex/auth.json"]}]
 			}`,
-			wantErr: "steps[0].tmp_dir: not supported; use tmp_bundle",
 		},
 		{
-			name: "bundle_id missing",
+			name: "valid home entry ro",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"cid": "cid1", "digest": "sha256:abc", "entries": ["f.txt"]}}]
+				"steps": [{"image": "img:latest", "home": ["abcdef0:.codex/auth.json:ro"]}]
 			}`,
-			wantErr: "steps[0].tmp_bundle.bundle_id: required",
 		},
 		{
-			name: "cid missing",
+			name: "valid ca entry",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "digest": "sha256:abc", "entries": ["f.txt"]}}]
+				"steps": [{"image": "img:latest", "ca": ["abcdef0123456"]}]
 			}`,
-			wantErr: "steps[0].tmp_bundle.cid: required",
 		},
 		{
-			name: "digest missing",
+			name: "in entry wrong domain",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "entries": ["f.txt"]}}]
+				"steps": [{"image": "img:latest", "in": ["abcdef0:/tmp/config.json"]}]
 			}`,
-			wantErr: "steps[0].tmp_bundle.digest: required",
+			wantErr: "steps[0].in[0]",
 		},
 		{
-			name: "entries empty",
+			name: "out entry wrong domain",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": []}}]
+				"steps": [{"image": "img:latest", "out": ["abcdef0:/in/results"]}]
 			}`,
-			wantErr: "steps[0].tmp_bundle.entries: required",
+			wantErr: "steps[0].out[0]",
 		},
 		{
-			name: "entry path separator rejected",
+			name: "home entry absolute path rejected",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["sub/file.txt"]}}]
+				"steps": [{"image": "img:latest", "home": ["abcdef0:/etc/config:ro"]}]
 			}`,
-			wantErr: "steps[0].tmp_bundle.entries[0]: must be a plain filename with no path separators",
+			wantErr: "steps[0].home[0]",
 		},
 		{
-			name: "entry dotdot rejected",
+			name: "home entry traversal rejected",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": [".."]}}]
+				"steps": [{"image": "img:latest", "home": ["abcdef0:../../etc/passwd"]}]
 			}`,
-			wantErr: "steps[0].tmp_bundle.entries[0]: must be a plain filename with no path separators",
+			wantErr: "steps[0].home[0]",
 		},
 		{
-			name: "duplicate entries rejected",
+			name: "in entry path traversal rejected",
 			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["x", "x"]}}]
+				"steps": [{"image": "img:latest", "in": ["abcdef0:/in/../etc/passwd"]}]
 			}`,
-			wantErr: `steps[0].tmp_bundle.entries[1]: duplicate "x"`,
+			wantErr: "steps[0].in[0]",
 		},
 		{
-			name: "no tmp_bundle is valid",
+			name: "ca entry invalid hash",
+			input: `{
+				"steps": [{"image": "img:latest", "ca": ["not-hex!"]}]
+			}`,
+			wantErr: "steps[0].ca[0]",
+		},
+		{
+			name: "duplicate in destinations rejected",
+			input: `{
+				"steps": [{"image": "img:latest", "in": ["abcdef0:/in/a", "bbbbbbb:/in/a"]}]
+			}`,
+			wantErr: "steps[0].in[1]",
+		},
+		{
+			name: "legacy env rejected by schema",
+			input: `{
+				"steps": [{"image": "img:latest", "env": {"FOO": "bar"}}]
+			}`,
+			wantErr: "steps[0].env: forbidden",
+		},
+		{
+			name: "legacy tmp_dir rejected by schema",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": []}]
+			}`,
+			wantErr: "steps[0].tmp_dir: forbidden",
+		},
+		{
+			name: "legacy tmp_bundle rejected by schema",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_bundle": {}}]
+			}`,
+			wantErr: "steps[0].tmp_bundle: forbidden",
+		},
+		{
+			name: "legacy env_from_file rejected by schema",
+			input: `{
+				"steps": [{"image": "img:latest", "env_from_file": {}}]
+			}`,
+			wantErr: "steps[0].env_from_file: forbidden",
+		},
+		{
+			name: "no hydra fields is valid",
 			input: `{
 				"steps": [{"image": "img:latest"}]
 			}`,
@@ -107,7 +146,7 @@ func TestMigSpecValidate_TmpBundleStep(t *testing.T) {
 	}
 }
 
-func TestMigSpecValidate_TmpBundleHealing(t *testing.T) {
+func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
 		"build_gate": {
@@ -122,18 +161,17 @@ func TestMigSpecValidate_TmpBundleHealing(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:  "valid bundle in healing action",
-			field: `"tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["patch.diff"]}`,
+			name:  "valid in entry in healing action",
+			field: `"in": ["abcdef0:/in/patch.diff"]`,
 		},
 		{
-			name:    "legacy tmp_dir in healing rejected",
-			field:   `"tmp_dir": [{"name": "patch.diff", "content": "aGVsbG8="}]`,
-			wantErr: "build_gate.healing.by_error_kind.infra.tmp_dir: not supported; use tmp_bundle",
+			name:  "valid home entry in healing action",
+			field: `"home": ["abcdef0:.config/app.json:ro"]`,
 		},
 		{
-			name:    "missing bundle_id in healing rejected",
-			field:   `"tmp_bundle": {"cid": "cid1", "digest": "sha256:abc", "entries": ["f.txt"]}`,
-			wantErr: "build_gate.healing.by_error_kind.infra.tmp_bundle.bundle_id: required",
+			name:    "invalid in entry in healing action",
+			field:   `"in": ["abcdef0:/tmp/bad"]`,
+			wantErr: "build_gate.healing.by_error_kind.infra.in[0]",
 		},
 	}
 
@@ -158,7 +196,7 @@ func TestMigSpecValidate_TmpBundleHealing(t *testing.T) {
 	}
 }
 
-func TestMigSpecValidate_TmpBundleRouter(t *testing.T) {
+func TestMigSpecValidate_HydraFieldsRouter(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
 		"build_gate": {"router": {"image": "router:latest", %s}}
@@ -170,18 +208,13 @@ func TestMigSpecValidate_TmpBundleRouter(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:  "valid bundle in router",
-			field: `"tmp_bundle": {"bundle_id": "b1", "cid": "cid1", "digest": "sha256:abc", "entries": ["rules.json"]}`,
+			name:  "valid ca entry in router",
+			field: `"ca": ["abcdef0123456"]`,
 		},
 		{
-			name:    "legacy tmp_dir in router rejected",
-			field:   `"tmp_dir": [{"name": "rules.json", "content": "e30="}]`,
-			wantErr: "build_gate.router.tmp_dir: not supported; use tmp_bundle",
-		},
-		{
-			name:    "missing cid in router rejected",
-			field:   `"tmp_bundle": {"bundle_id": "b1", "digest": "sha256:abc", "entries": ["f.txt"]}`,
-			wantErr: "build_gate.router.tmp_bundle.cid: required",
+			name:    "invalid ca in router",
+			field:   `"ca": ["NOT_HEX"]`,
+			wantErr: "build_gate.router.ca[0]",
 		},
 	}
 
@@ -206,15 +239,56 @@ func TestMigSpecValidate_TmpBundleRouter(t *testing.T) {
 	}
 }
 
-func TestParseMigSpecJSON_TmpBundleEntriesCanonicalized(t *testing.T) {
-	spec, err := ParseMigSpecJSON([]byte(`{
-		"steps": [{"image": "img:latest", "tmp_bundle": {"bundle_id": "b1", "cid": "c1", "digest": "d1", "entries": [" config.json "]}}]
-	}`))
-	if err != nil {
-		t.Fatalf("ParseMigSpecJSON() unexpected error: %v", err)
+func TestMigSpecValidate_LegacyRootFieldsRejected(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "root env rejected",
+			input: `{
+				"steps": [{"image": "img:latest"}],
+				"env": {"FOO": "bar"}
+			}`,
+			wantErr: "env: forbidden",
+		},
+		{
+			name: "root env_from_file rejected",
+			input: `{
+				"steps": [{"image": "img:latest"}],
+				"env_from_file": {}
+			}`,
+			wantErr: "env_from_file: forbidden",
+		},
+		{
+			name: "root tmp_dir rejected",
+			input: `{
+				"steps": [{"image": "img:latest"}],
+				"tmp_dir": []
+			}`,
+			wantErr: "tmp_dir: forbidden",
+		},
+		{
+			name: "root tmp_bundle rejected",
+			input: `{
+				"steps": [{"image": "img:latest"}],
+				"tmp_bundle": {}
+			}`,
+			wantErr: "tmp_bundle: forbidden",
+		},
 	}
-	if got, want := spec.Steps[0].TmpBundle.Entries[0], "config.json"; got != want {
-		t.Fatalf("tmp_bundle.entries[0] got %q, want %q", got, want)
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := ParseMigSpecJSON([]byte(tc.input))
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
+			}
+		})
 	}
 }
-

@@ -30,9 +30,7 @@
 package contracts
 
 import (
-	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -71,8 +69,8 @@ type MigSpec struct {
 	// A spec must contain at least one step.
 	Steps []MigStep `json:"steps,omitempty" yaml:"steps,omitempty"`
 
-	// Env holds environment variables applied to every step (step env overrides on conflicts).
-	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	// Envs holds environment variables applied to every step (step envs overrides on conflicts).
+	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
 
 	// --- Shared configuration (applies to both single-step and multi-step) ---
 
@@ -107,27 +105,6 @@ type MigSpec struct {
 	ArtifactName string `json:"artifact_name,omitempty" yaml:"artifact_name,omitempty"`
 }
 
-// TmpBundleRef references an uploaded bundle to be extracted under /tmp in the container.
-// The bundle is uploaded via the control-plane API before spec submission; the node agent
-// downloads, verifies, and unpacks it at execution time.
-//
-// All four fields are required when TmpBundleRef is present. Each entry in Entries must
-// be a plain filename (no path separators, not "." or "..") and names must be unique.
-type TmpBundleRef struct {
-	// BundleID is the opaque server-assigned identifier returned by the upload API.
-	BundleID string `json:"bundle_id" yaml:"bundle_id"`
-
-	// CID is the content-addressed identifier of the bundle archive.
-	CID string `json:"cid" yaml:"cid"`
-
-	// Digest is the hex-encoded SHA-256 digest of the bundle archive bytes.
-	Digest string `json:"digest" yaml:"digest"`
-
-	// Entries lists the top-level names present in the bundle archive.
-	// Each name is a plain filename mounted read-only at /tmp/<name> inside the container.
-	Entries []string `json:"entries" yaml:"entries"`
-}
-
 // MigStep describes a single mig step in a run (steps[] array).
 // Each step has its own image, command, and environment configuration.
 // Steps execute sequentially with shared workspace, each running gate+mig.
@@ -143,8 +120,20 @@ type MigStep struct {
 	// Can be a shell string or an exec array.
 	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
 
-	// Env holds environment variables specific to this step.
-	Env map[string]string `json:"env,omitempty" yaml:"env,omitempty"`
+	// Envs holds environment variables specific to this step.
+	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
+
+	// CA lists canonical CA certificate entries (shortHash values).
+	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
+
+	// In lists canonical read-only input entries ("shortHash:/in/dst").
+	In []string `json:"in,omitempty" yaml:"in,omitempty"`
+
+	// Out lists canonical read-write output entries ("shortHash:/out/dst").
+	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
+
+	// Home lists canonical home-relative entries ("shortHash:dst{:ro}").
+	Home []string `json:"home,omitempty" yaml:"home,omitempty"`
 
 	// Stack configures Stack Gate validation for this step.
 	// Inbound validates pre-mig expectations; Outbound validates post-mig expectations.
@@ -153,15 +142,6 @@ type MigStep struct {
 	// Always forces this step to run even when a cache hit exists for the same
 	// repo_sha_in and canonicalized step operations hash.
 	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
-
-	// TmpBundle references a pre-uploaded bundle to extract under /tmp in the container.
-	// The CLI archives and uploads user files before submission; the node agent downloads
-	// and unpacks the bundle at execution time.
-	TmpBundle *TmpBundleRef `json:"tmp_bundle,omitempty" yaml:"tmp_bundle,omitempty"`
-
-	// LegacyTmpDir captures any legacy tmp_dir JSON payload for explicit rejection.
-	// Submitting tmp_dir is no longer supported; use tmp_bundle instead.
-	LegacyTmpDir json.RawMessage `json:"tmp_dir,omitempty" yaml:"-"`
 
 	// Amata configures amata-mode execution for this mig step container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
@@ -194,10 +174,7 @@ func (s MigSpec) Validate() error {
 				return err
 			}
 		}
-		if mig.LegacyTmpDir != nil {
-			return fmt.Errorf("steps[%d].tmp_dir: not supported; use tmp_bundle", i)
-		}
-		if err := validateTmpBundle(mig.TmpBundle, fmt.Sprintf("steps[%d].tmp_bundle", i)); err != nil {
+		if err := validateHydraFields(mig.CA, mig.In, mig.Out, mig.Home, fmt.Sprintf("steps[%d]", i)); err != nil {
 			return err
 		}
 		if err := validateAmataRunSpec(mig.Amata, fmt.Sprintf("steps[%d].amata", i)); err != nil {
@@ -236,10 +213,7 @@ func (s MigSpec) Validate() error {
 					}
 				}
 			}
-			if action.LegacyTmpDir != nil {
-				return fmt.Errorf("%s.tmp_dir: not supported; use tmp_bundle", prefix)
-			}
-			if err := validateTmpBundle(action.TmpBundle, prefix+".tmp_bundle"); err != nil {
+			if err := validateHydraFields(action.CA, action.In, action.Out, action.Home, prefix); err != nil {
 				return err
 			}
 			if err := validateAmataRunSpec(action.Amata, prefix+".amata"); err != nil {
@@ -262,10 +236,7 @@ func (s MigSpec) Validate() error {
 		if s.BuildGate.Router.Image.IsEmpty() {
 			return fmt.Errorf("build_gate.router.image: required when router is specified")
 		}
-		if s.BuildGate.Router.LegacyTmpDir != nil {
-			return fmt.Errorf("build_gate.router.tmp_dir: not supported; use tmp_bundle")
-		}
-		if err := validateTmpBundle(s.BuildGate.Router.TmpBundle, "build_gate.router.tmp_bundle"); err != nil {
+		if err := validateHydraFields(s.BuildGate.Router.CA, s.BuildGate.Router.In, s.BuildGate.Router.Out, s.BuildGate.Router.Home, "build_gate.router"); err != nil {
 			return err
 		}
 		if err := validateAmataRunSpec(s.BuildGate.Router.Amata, "build_gate.router.amata"); err != nil {
@@ -378,54 +349,6 @@ func validateBuildGatePhaseTarget(target string, prefix string) error {
 	}
 }
 
-// validateTmpBundle validates a TmpBundleRef when present.
-// Returns nil if bundle is nil (field absent). When present, all four fields are
-// required and each entry must be a valid plain filename with no duplicates.
-func validateTmpBundle(bundle *TmpBundleRef, prefix string) error {
-	if bundle == nil {
-		return nil
-	}
-	if strings.TrimSpace(bundle.BundleID) == "" {
-		return fmt.Errorf("%s.bundle_id: required", prefix)
-	}
-	if strings.TrimSpace(bundle.CID) == "" {
-		return fmt.Errorf("%s.cid: required", prefix)
-	}
-	if strings.TrimSpace(bundle.Digest) == "" {
-		return fmt.Errorf("%s.digest: required", prefix)
-	}
-	if len(bundle.Entries) == 0 {
-		return fmt.Errorf("%s.entries: required", prefix)
-	}
-	seen := make(map[string]struct{}, len(bundle.Entries))
-	for i, entry := range bundle.Entries {
-		pos := fmt.Sprintf("%s.entries[%d]", prefix, i)
-		name, err := NormalizeTmpFileName(entry)
-		if err != nil {
-			return fmt.Errorf("%s: %w", pos, err)
-		}
-		if _, dup := seen[name]; dup {
-			return fmt.Errorf("%s: duplicate %q", pos, name)
-		}
-		bundle.Entries[i] = name
-		seen[name] = struct{}{}
-	}
-	return nil
-}
-
-// NormalizeTmpFileName canonicalizes and validates a tmp_dir destination name.
-// The canonical form trims surrounding whitespace and must remain a plain
-// filename (no path separators, not "." or "..").
-func NormalizeTmpFileName(name string) (string, error) {
-	normalized := strings.TrimSpace(name)
-	if normalized == "" {
-		return "", fmt.Errorf("required")
-	}
-	if normalized == "." || normalized == ".." || filepath.Base(normalized) != normalized {
-		return "", fmt.Errorf("must be a plain filename with no path separators")
-	}
-	return normalized, nil
-}
 
 func validateStackGateSpec(spec *StackGateSpec, prefix string) error {
 	if spec == nil {

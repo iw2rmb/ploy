@@ -11,7 +11,7 @@ func TestMigSpec_RoundTrip(t *testing.T) {
 		Steps: []MigStep{{
 			Image:   JobImage{Universal: "ghcr.io/iw2rmb/ploy/mig:latest"},
 			Command: CommandSpec{Shell: "echo hello"},
-			Env:     map[string]string{"FOO": "bar"},
+			Envs:    map[string]string{"FOO": "bar"},
 		}},
 		BuildGate:   &BuildGateConfig{Enabled: true},
 		GitLabPAT:   "secret",

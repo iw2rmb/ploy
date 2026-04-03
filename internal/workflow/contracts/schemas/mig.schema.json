@@ -6,6 +6,10 @@
   "properties": {
     "mig_index": false,
     "amata": false,
+    "env": false,
+    "env_from_file": false,
+    "tmp_dir": false,
+    "tmp_bundle": false,
     "steps": {
       "type": "array",
       "items": {
@@ -21,7 +25,11 @@
     "stepObject": {
       "type": "object",
       "properties": {
-        "retain_container": false
+        "retain_container": false,
+        "env": false,
+        "env_from_file": false,
+        "tmp_dir": false,
+        "tmp_bundle": false
       },
       "additionalProperties": true
     },
@@ -68,7 +76,10 @@
       "properties": {
         "retain_container": false,
         "spec": false,
-        "set": false
+        "set": false,
+        "env_from_file": false,
+        "tmp_dir": false,
+        "tmp_bundle": false
       },
       "additionalProperties": true
     },
@@ -77,7 +88,10 @@
       "properties": {
         "retain_container": false,
         "spec": false,
-        "set": false
+        "set": false,
+        "env_from_file": false,
+        "tmp_dir": false,
+        "tmp_bundle": false
       },
       "additionalProperties": true
     },
