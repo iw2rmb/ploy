@@ -351,7 +351,7 @@ func TestRunSubmitAcceptsMigratedSingleRepoFlags(t *testing.T) {
 	specContent := `steps:
   - image: alpine:3.20
     command: echo from-spec
-env:
+envs:
   KEY1: from-spec
 `
 	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
@@ -418,12 +418,12 @@ env:
 	if !ok || len(command) != 2 || command[0] != "echo" || command[1] != "from-cli" {
 		t.Fatalf("expected steps[0].command JSON array override, got %v", step0["command"])
 	}
-	env, ok := spec["env"].(map[string]any)
+	envs, ok := spec["envs"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected env in spec, got %T", spec["env"])
+		t.Fatalf("expected envs in spec, got %T", spec["envs"])
 	}
-	if env["KEY1"] != "from-cli" || env["KEY2"] != "extra" {
-		t.Fatalf("expected env overrides, got %v", env)
+	if envs["KEY1"] != "from-cli" || envs["KEY2"] != "extra" {
+		t.Fatalf("expected envs overrides, got %v", envs)
 	}
 	if spec["gitlab_pat"] != "glpat-test123" {
 		t.Fatalf("expected gitlab_pat in spec, got %v", spec["gitlab_pat"])

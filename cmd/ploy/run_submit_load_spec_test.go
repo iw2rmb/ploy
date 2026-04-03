@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -38,45 +39,35 @@ func newMockBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *htt
 	return srv, u, srv.Client()
 }
 
-func TestLoadSpec_ResolvesStepAndRouterPreprocessing(t *testing.T) {
+func TestLoadSpec_ResolvesStepAndRouterHydraRecords(t *testing.T) {
 	_, base, client := newMockBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
-	stepEnvPath := filepath.Join(tmpDir, "step.env")
-	stepTmpPath := filepath.Join(tmpDir, "step.txt")
-	routerEnvPath := filepath.Join(tmpDir, "router.env")
-	routerTmpPath := filepath.Join(tmpDir, "router.txt")
+	stepInFile := filepath.Join(tmpDir, "step-config.txt")
+	routerInFile := filepath.Join(tmpDir, "router-config.txt")
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 
-	if err := os.WriteFile(stepEnvPath, []byte("step-token"), 0o644); err != nil {
-		t.Fatalf("write step env file: %v", err)
+	if err := os.WriteFile(stepInFile, []byte("step-config-data"), 0o644); err != nil {
+		t.Fatalf("write step in file: %v", err)
 	}
-	if err := os.WriteFile(stepTmpPath, []byte("step-tmp"), 0o644); err != nil {
-		t.Fatalf("write step tmp file: %v", err)
-	}
-	if err := os.WriteFile(routerEnvPath, []byte("router-token"), 0o644); err != nil {
-		t.Fatalf("write router env file: %v", err)
-	}
-	if err := os.WriteFile(routerTmpPath, []byte("router-tmp"), 0o644); err != nil {
-		t.Fatalf("write router tmp file: %v", err)
+	if err := os.WriteFile(routerInFile, []byte("router-config-data"), 0o644); err != nil {
+		t.Fatalf("write router in file: %v", err)
 	}
 
 	spec := []byte(`
 steps:
   - image: docker.io/test/mig:latest
-    env_from_file:
-      STEP_TOKEN: ` + stepEnvPath + `
-    tmp_dir:
-      - name: step.txt
-        path: ` + stepTmpPath + `
+    envs:
+      STEP_TOKEN: step-token
+    in:
+      - ` + stepInFile + `:/in/config.txt
 build_gate:
   router:
     image: docker.io/test/router:latest
-    env_from_file:
-      ROUTER_TOKEN: ` + routerEnvPath + `
-    tmp_dir:
-      - name: router.txt
-        path: ` + routerTmpPath + `
+    envs:
+      ROUTER_TOKEN: router-token
+    in:
+      - ` + routerInFile + `:/in/router-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -93,67 +84,52 @@ build_gate:
 	}
 
 	step := result["steps"].([]any)[0].(map[string]any)
-	if _, ok := step["env_from_file"]; ok {
-		t.Fatalf("expected step env_from_file removed after preprocessing")
-	}
-	stepEnv := step["env"].(map[string]any)
-	if got, want := stepEnv["STEP_TOKEN"].(string), "step-token"; got != want {
-		t.Fatalf("steps[0].env.STEP_TOKEN got %q, want %q", got, want)
+	stepEnvs := step["envs"].(map[string]any)
+	if got, want := stepEnvs["STEP_TOKEN"].(string), "step-token"; got != want {
+		t.Fatalf("steps[0].envs.STEP_TOKEN got %q, want %q", got, want)
 	}
 
-	// tmp_dir should be replaced with tmp_bundle after upload.
-	if _, hasTmpDir := step["tmp_dir"]; hasTmpDir {
-		t.Fatalf("expected steps[0].tmp_dir removed after bundle upload")
+	// in entries should be compiled to canonical shortHash:/in/dst form.
+	stepIn, ok := step["in"].([]any)
+	if !ok || len(stepIn) != 1 {
+		t.Fatalf("expected steps[0].in with 1 entry, got %v", step["in"])
 	}
-	stepBundle, hasTmpBundle := step["tmp_bundle"].(map[string]any)
-	if !hasTmpBundle {
-		t.Fatalf("expected steps[0].tmp_bundle set after bundle upload")
+	stepInEntry, ok := stepIn[0].(string)
+	if !ok {
+		t.Fatalf("expected steps[0].in[0] to be string, got %T", stepIn[0])
 	}
-	if stepBundle["bundle_id"] != "test-bundle-id" {
-		t.Errorf("steps[0].tmp_bundle.bundle_id: got %q, want %q", stepBundle["bundle_id"], "test-bundle-id")
-	}
-	if entries, ok := stepBundle["entries"].([]any); !ok || len(entries) != 1 || entries[0] != "step.txt" {
-		t.Errorf("steps[0].tmp_bundle.entries: got %v, want [step.txt]", stepBundle["entries"])
+	if !strings.Contains(stepInEntry, ":/in/config.txt") {
+		t.Errorf("expected steps[0].in[0] to contain :/in/config.txt, got %q", stepInEntry)
 	}
 
 	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
-	if _, ok := router["env_from_file"]; ok {
-		t.Fatalf("expected router env_from_file removed after preprocessing")
-	}
-	routerEnv := router["env"].(map[string]any)
-	if got, want := routerEnv["ROUTER_TOKEN"].(string), "router-token"; got != want {
-		t.Fatalf("build_gate.router.env.ROUTER_TOKEN got %q, want %q", got, want)
+	routerEnvs := router["envs"].(map[string]any)
+	if got, want := routerEnvs["ROUTER_TOKEN"].(string), "router-token"; got != want {
+		t.Fatalf("build_gate.router.envs.ROUTER_TOKEN got %q, want %q", got, want)
 	}
 
-	// tmp_dir should be replaced with tmp_bundle.
-	if _, hasTmpDir := router["tmp_dir"]; hasTmpDir {
-		t.Fatalf("expected router.tmp_dir removed after bundle upload")
+	routerIn, ok := router["in"].([]any)
+	if !ok || len(routerIn) != 1 {
+		t.Fatalf("expected router.in with 1 entry, got %v", router["in"])
 	}
-	routerBundle, hasTmpBundle := router["tmp_bundle"].(map[string]any)
-	if !hasTmpBundle {
-		t.Fatalf("expected router.tmp_bundle set after bundle upload")
+	routerInEntry, ok := routerIn[0].(string)
+	if !ok {
+		t.Fatalf("expected router.in[0] to be string, got %T", routerIn[0])
 	}
-	if routerBundle["bundle_id"] != "test-bundle-id" {
-		t.Errorf("router.tmp_bundle.bundle_id: got %q, want %q", routerBundle["bundle_id"], "test-bundle-id")
-	}
-	if entries, ok := routerBundle["entries"].([]any); !ok || len(entries) != 1 || entries[0] != "router.txt" {
-		t.Errorf("router.tmp_bundle.entries: got %v, want [router.txt]", routerBundle["entries"])
+	if !strings.Contains(routerInEntry, ":/in/router-config.txt") {
+		t.Errorf("expected router.in[0] to contain :/in/router-config.txt, got %q", routerInEntry)
 	}
 }
 
-func TestLoadSpec_ResolvesHealingPreprocessing(t *testing.T) {
+func TestLoadSpec_ResolvesHealingHydraRecords(t *testing.T) {
 	_, base, client := newMockBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
-	healingEnvPath := filepath.Join(tmpDir, "healing.env")
-	healingTmpPath := filepath.Join(tmpDir, "healing.txt")
+	healingInFile := filepath.Join(tmpDir, "healing-config.txt")
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 
-	if err := os.WriteFile(healingEnvPath, []byte("healing-token"), 0o644); err != nil {
-		t.Fatalf("write healing env file: %v", err)
-	}
-	if err := os.WriteFile(healingTmpPath, []byte("healing-tmp"), 0o644); err != nil {
-		t.Fatalf("write healing tmp file: %v", err)
+	if err := os.WriteFile(healingInFile, []byte("healing-config-data"), 0o644); err != nil {
+		t.Fatalf("write healing in file: %v", err)
 	}
 
 	spec := []byte(`
@@ -167,11 +143,10 @@ build_gate:
       infra:
         retries: 1
         image: docker.io/test/healer:latest
-        env_from_file:
-          HEALING_TOKEN: ` + healingEnvPath + `
-        tmp_dir:
-          - name: healing.txt
-            path: ` + healingTmpPath + `
+        envs:
+          HEALING_TOKEN: healing-token
+        in:
+          - ` + healingInFile + `:/in/healing-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -188,27 +163,21 @@ build_gate:
 	}
 
 	infra := result["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
-	if _, ok := infra["env_from_file"]; ok {
-		t.Fatalf("expected healing env_from_file removed after preprocessing")
-	}
-	healingEnv := infra["env"].(map[string]any)
-	if got, want := healingEnv["HEALING_TOKEN"].(string), "healing-token"; got != want {
-		t.Fatalf("build_gate.healing.by_error_kind.infra.env.HEALING_TOKEN got %q, want %q", got, want)
+	healingEnvs := infra["envs"].(map[string]any)
+	if got, want := healingEnvs["HEALING_TOKEN"].(string), "healing-token"; got != want {
+		t.Fatalf("build_gate.healing.by_error_kind.infra.envs.HEALING_TOKEN got %q, want %q", got, want)
 	}
 
-	// tmp_dir should be replaced with tmp_bundle.
-	if _, hasTmpDir := infra["tmp_dir"]; hasTmpDir {
-		t.Fatalf("expected infra.tmp_dir removed after bundle upload")
+	healingIn, ok := infra["in"].([]any)
+	if !ok || len(healingIn) != 1 {
+		t.Fatalf("expected infra.in with 1 entry, got %v", infra["in"])
 	}
-	infraBundle, hasTmpBundle := infra["tmp_bundle"].(map[string]any)
-	if !hasTmpBundle {
-		t.Fatalf("expected infra.tmp_bundle set after bundle upload")
+	healingInEntry, ok := healingIn[0].(string)
+	if !ok {
+		t.Fatalf("expected infra.in[0] to be string, got %T", healingIn[0])
 	}
-	if infraBundle["bundle_id"] != "test-bundle-id" {
-		t.Errorf("infra.tmp_bundle.bundle_id: got %q, want %q", infraBundle["bundle_id"], "test-bundle-id")
-	}
-	if entries, ok := infraBundle["entries"].([]any); !ok || len(entries) != 1 || entries[0] != "healing.txt" {
-		t.Errorf("infra.tmp_bundle.entries: got %v, want [healing.txt]", infraBundle["entries"])
+	if !strings.Contains(healingInEntry, ":/in/healing-config.txt") {
+		t.Errorf("expected infra.in[0] to contain :/in/healing-config.txt, got %q", healingInEntry)
 	}
 }
 
@@ -220,7 +189,7 @@ func TestLoadSpec_ExpandsEnvPlaceholders(t *testing.T) {
 	spec := []byte(`
 steps:
   - image: docker.io/test/mig:latest
-env:
+envs:
   TOKEN: $PLOY_TEST_LOADSPEC_TOKEN
   URL: https://${PLOY_TEST_LOADSPEC_TOKEN}.example.test
 `)
@@ -228,7 +197,7 @@ env:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	// No tmp_dir sections, so nil base/client is fine.
+	// No Hydra file records, so nil base/client is fine.
 	payload, err := loadSpec(context.Background(), nil, nil, specPath)
 	if err != nil {
 		t.Fatalf("loadSpec() unexpected error: %v", err)
@@ -239,12 +208,12 @@ env:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	env := result["env"].(map[string]any)
-	if got, want := env["TOKEN"].(string), "loadspectoken"; got != want {
-		t.Fatalf("env.TOKEN got %q, want %q", got, want)
+	envs := result["envs"].(map[string]any)
+	if got, want := envs["TOKEN"].(string), "loadspectoken"; got != want {
+		t.Fatalf("envs.TOKEN got %q, want %q", got, want)
 	}
-	if got, want := env["URL"].(string), "https://loadspectoken.example.test"; got != want {
-		t.Fatalf("env.URL got %q, want %q", got, want)
+	if got, want := envs["URL"].(string), "https://loadspectoken.example.test"; got != want {
+		t.Fatalf("envs.URL got %q, want %q", got, want)
 	}
 }
 
