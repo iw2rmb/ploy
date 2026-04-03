@@ -157,8 +157,8 @@ build_gate:
   router:
     spec_path: ./healing/router/spec.yaml
     image: ghcr.io/iw2rmb/ploy/codex:latest
-    env:
-      CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
+    in:
+      codex-prompt.txt: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
     home:
       auth: ~/.codex/auth.json
 
@@ -169,8 +169,8 @@ build_gate:
         spec_path: ./healing/infra/spec.yaml
         retries: 2
         image: ghcr.io/iw2rmb/ploy/codex:latest
-        env:
-          CODEX_PROMPT: "Fix infra/toolchain issue in /in/build-gate.log"
+        in:
+          codex-prompt.txt: "Fix infra/toolchain issue in /in/build-gate.log"
         expectations:
           artifacts:
             - path: /out/gate-profile-candidate.json
@@ -179,8 +179,8 @@ build_gate:
         spec_path: ./healing/code/spec.yaml
         retries: 2
         image: ghcr.io/iw2rmb/ploy/codex:latest
-        env:
-          CODEX_PROMPT: "Fix code issue in /in/build-gate.log"
+        in:
+          codex-prompt.txt: "Fix code issue in /in/build-gate.log"
 ```
 
 Healing action fields (image, command, env, home) are specified under
@@ -193,7 +193,7 @@ Mig steps, router, and healing containers support two execution modes:
 **amata mode** (recommended): set `amata.spec` to a path of an amata workflow YAML file.
 The CLI loads file content into the canonical spec. The node agent materializes it as `/in/amata.yaml` and runs
 `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags
-from `amata.set`. `CODEX_PROMPT` is not required in this mode.
+from `amata.set`. No prompt file is required in this mode.
 
 ```yaml
 router:
@@ -219,13 +219,14 @@ router:
 ```
 
 **Direct-Codex mode** (fallback): omit `amata`. The container uses the direct
-`codex exec` path. `CODEX_PROMPT` is required in this mode.
+`codex exec` path. A prompt must be delivered via Hydra `in` mount as
+`/in/codex-prompt.txt`.
 
 ```yaml
 router:
   image: ghcr.io/iw2rmb/ploy/codex:latest
-  env:
-    CODEX_PROMPT: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
+  in:
+    codex-prompt.txt: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
   home:
     auth: ~/.codex/auth.json
 ```

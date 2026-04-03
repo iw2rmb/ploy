@@ -61,10 +61,10 @@ test_help_flag() {
     fail "help displays --out option" "expected --out in output"
     return
   fi
-  if echo "$output" | grep -q "CODEX_PROMPT"; then
-    pass "help mentions CODEX_PROMPT env"
+  if echo "$output" | grep -q -- "--prompt-file"; then
+    pass "help displays --prompt-file option"
   else
-    fail "help mentions CODEX_PROMPT env" "expected CODEX_PROMPT in output"
+    fail "help displays --prompt-file option" "expected --prompt-file in output"
     return
   fi
   if echo "$output" | grep -q "CODEX_RESUME"; then
@@ -73,10 +73,10 @@ test_help_flag() {
     fail "help mentions CODEX_RESUME env" "expected CODEX_RESUME in output"
     return
   fi
-  if echo "$output" | grep -q "CRUSH_JSON"; then
-    pass "help mentions CRUSH_JSON env"
+  if echo "$output" | grep -q "Hydra"; then
+    pass "help mentions Hydra file delivery"
   else
-    fail "help mentions CRUSH_JSON env" "expected CRUSH_JSON in output"
+    fail "help mentions Hydra file delivery" "expected Hydra in output"
     return
   fi
 }
@@ -967,138 +967,155 @@ assert_file_content_and_mode_600() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: Amata mode - CODEX_AUTH_JSON and CODEX_CONFIG_TOML are materialized
-#       to files with correct content and secure (600) permissions
+# Test: --auth and --config flags deliver credentials to CODEX_HOME with
+#       correct content and secure (600) permissions
 # ─────────────────────────────────────────────────────────────────────────────
-test_amata_mode_credentials_materialized() {
+test_credentials_via_flags() {
   run_test
 
-  local tmp_bin tmp_out
+  local tmp_bin tmp_out tmp_ws
   tmp_bin=$(mktemp -d)
   tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
 
-  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
 #!/bin/bash
-echo "amata ran"
+if [[ "$1" == "exec" && "$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo  Skip confirmations"
+  exit 0
+fi
 exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
 
-  local tmp_home tmp_script
+  local tmp_home tmp_script tmp_auth tmp_config tmp_prompt
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
+  tmp_auth=$(mktemp)
+  tmp_config=$(mktemp)
+  tmp_prompt=$(mktemp)
+  echo -n '{"token":"auth_secret"}' > "$tmp_auth"
+  printf '[model]\nname = "o4-mini"' > "$tmp_config"
+  echo "test prompt" > "$tmp_prompt"
 
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
     export OUTDIR="$tmp_out"
-    export CODEX_AUTH_JSON='{"token":"auth_secret"}'
-    export CODEX_CONFIG_TOML='[model]'$'\n''name = "o4-mini"'
-    unset CODEX_PROMPT
-    bash "$tmp_script" amata run /in/amata.yaml
+    bash "$tmp_script" --auth "$tmp_auth" --config "$tmp_config" --prompt-file "$tmp_prompt" --input "$tmp_ws" --out "$tmp_out"
   ) >/dev/null 2>&1
 
-  # Verify CODEX_AUTH_JSON was written with correct content
+  # Verify auth.json was installed with correct content
   if [[ -f "$tmp_home/.codex/auth.json" ]]; then
     local auth_content
     auth_content=$(cat "$tmp_home/.codex/auth.json")
     if [[ "$auth_content" == '{"token":"auth_secret"}' ]]; then
-      pass "amata mode: CODEX_AUTH_JSON written to auth.json with correct content"
+      pass "--auth flag installs auth.json with correct content"
     else
-      fail "amata mode: CODEX_AUTH_JSON content" "got: $auth_content"
+      fail "--auth flag auth.json content" "got: $auth_content"
     fi
     local perms
     perms=$(file_perms_octal "$tmp_home/.codex/auth.json")
     if [[ "$perms" == "600" ]]; then
-      pass "amata mode: auth.json has secure permissions (600)"
+      pass "auth.json has secure permissions (600)"
     else
-      fail "amata mode: auth.json permissions" "got: $perms, want: 600"
+      fail "auth.json permissions" "got: $perms, want: 600"
     fi
   else
-    fail "amata mode: CODEX_AUTH_JSON materialization" "auth.json not created"
+    fail "--auth flag auth.json delivery" "auth.json not created"
   fi
 
-  # Verify CODEX_CONFIG_TOML was written with correct content
+  # Verify config.toml was installed with correct content
   if [[ -f "$tmp_home/.codex/config.toml" ]]; then
     local cfg_content
     cfg_content=$(cat "$tmp_home/.codex/config.toml")
     if echo "$cfg_content" | grep -q 'o4-mini'; then
-      pass "amata mode: CODEX_CONFIG_TOML written to config.toml with correct content"
+      pass "--config flag installs config.toml with correct content"
     else
-      fail "amata mode: CODEX_CONFIG_TOML content" "got: $cfg_content"
+      fail "--config flag config.toml content" "got: $cfg_content"
     fi
     local perms
     perms=$(file_perms_octal "$tmp_home/.codex/config.toml")
     if [[ "$perms" == "600" ]]; then
-      pass "amata mode: config.toml has secure permissions (600)"
+      pass "config.toml has secure permissions (600)"
     else
-      fail "amata mode: config.toml permissions" "got: $perms, want: 600"
+      fail "config.toml permissions" "got: $perms, want: 600"
     fi
   else
-    fail "amata mode: CODEX_CONFIG_TOML materialization" "config.toml not created"
+    fail "--config flag config.toml delivery" "config.toml not created"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_auth" "$tmp_config" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: Amata mode - CODEX_HOME override controls auth/config destinations
+# Test: CODEX_HOME override controls --auth/--config destinations
 # ─────────────────────────────────────────────────────────────────────────────
-test_codex_home_override_materializes_auth_and_config() {
+test_codex_home_override_flag_delivery() {
   run_test
 
-  local tmp_bin tmp_out
+  local tmp_bin tmp_out tmp_ws
   tmp_bin=$(mktemp -d)
   tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
 
-  cat > "$tmp_bin/amata" <<'MOCKAMATA'
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
 #!/bin/bash
+if [[ "$1" == "exec" && "$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo  Skip confirmations"
+  exit 0
+fi
 exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
 
-  local tmp_home tmp_script codex_home
+  local tmp_home tmp_script codex_home tmp_auth tmp_config tmp_prompt
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
   codex_home="$tmp_out/codex-home"
+  tmp_auth=$(mktemp)
+  tmp_config=$(mktemp)
+  tmp_prompt=$(mktemp)
+  echo -n '{"token":"auth_override"}' > "$tmp_auth"
+  printf '[model]\nname = "o4-mini-override"' > "$tmp_config"
+  echo "test prompt" > "$tmp_prompt"
 
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
     export OUTDIR="$tmp_out"
     export CODEX_HOME="$codex_home"
-    export CODEX_AUTH_JSON='{"token":"auth_override"}'
-    export CODEX_CONFIG_TOML='[model]'$'\n''name = "o4-mini-override"'
-    unset CODEX_PROMPT
-    bash "$tmp_script" amata run /in/amata.yaml
+    bash "$tmp_script" --auth "$tmp_auth" --config "$tmp_config" --prompt-file "$tmp_prompt" --input "$tmp_ws" --out "$tmp_out"
   ) >/dev/null 2>&1
 
   assert_file_content_and_mode_600 \
     "$codex_home/auth.json" \
     '{"token":"auth_override"}' \
-    "amata mode: CODEX_HOME override auth.json"
+    "CODEX_HOME override auth.json"
 
   if [[ -f "$codex_home/config.toml" ]] && grep -q 'o4-mini-override' "$codex_home/config.toml"; then
-    pass "amata mode: CODEX_HOME override config.toml content"
+    pass "CODEX_HOME override config.toml content"
   else
-    fail "amata mode: CODEX_HOME override config.toml content" "config.toml missing or unexpected"
+    fail "CODEX_HOME override config.toml content" "config.toml missing or unexpected"
   fi
 
   local perms
   perms=$(file_perms_octal "$codex_home/config.toml")
   if [[ "$perms" == "600" ]]; then
-    pass "amata mode: CODEX_HOME override config.toml permissions"
+    pass "CODEX_HOME override config.toml permissions"
   else
-    fail "amata mode: CODEX_HOME override config.toml permissions" "got: $perms, want: 600"
+    fail "CODEX_HOME override config.toml permissions" "got: $perms, want: 600"
   fi
 
   if [[ ! -f "$tmp_home/.codex/auth.json" && ! -f "$tmp_home/.codex/config.toml" ]]; then
-    pass "amata mode: default ~/.codex not used when CODEX_HOME is set"
+    pass "default ~/.codex not used when CODEX_HOME is set"
   else
-    fail "amata mode: default ~/.codex not used when CODEX_HOME is set" "found files under $tmp_home/.codex"
+    fail "default ~/.codex not used when CODEX_HOME is set" "found files under $tmp_home/.codex"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_auth" "$tmp_config" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1285,9 +1302,9 @@ MOCKAMATA
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: Direct codex mode still requires CODEX_PROMPT
+# Test: Direct codex mode requires prompt file (--prompt-file or /in/codex-prompt.txt)
 # ─────────────────────────────────────────────────────────────────────────────
-test_direct_mode_requires_codex_prompt() {
+test_direct_mode_requires_prompt_file() {
   run_test
 
   local tmp_bin tmp_out tmp_ws
@@ -1316,15 +1333,14 @@ MOCKCODEX
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    unset CODEX_PROMPT
     bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
   ) >/dev/null 2>&1
   exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
-    pass "direct codex mode exits non-zero without CODEX_PROMPT"
+    pass "direct codex mode exits non-zero without prompt file"
   else
-    fail "direct mode prompt required" "expected non-zero exit without CODEX_PROMPT"
+    fail "direct mode prompt required" "expected non-zero exit without --prompt-file or /in/codex-prompt.txt"
   fi
 
   rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
@@ -1396,12 +1412,12 @@ echo "Test: Amata mode creates artifact files"
 test_amata_mode_creates_artifacts
 
 echo ""
-echo "Test: Amata mode credentials materialized with secure permissions"
-test_amata_mode_credentials_materialized
+echo "Test: --auth/--config flags deliver credentials with secure permissions"
+test_credentials_via_flags
 
 echo ""
-echo "Test: CODEX_HOME override materializes auth/config in custom directory"
-test_codex_home_override_materializes_auth_and_config
+echo "Test: CODEX_HOME override controls --auth/--config delivery destination"
+test_codex_home_override_flag_delivery
 
 echo ""
 echo "Test: CRUSH_JSON materialized in direct mode from inline content"
@@ -1420,8 +1436,8 @@ echo "Test: CODEX_API_KEY passthrough in amata mode"
 test_codex_api_key_passthrough_amata_mode
 
 echo ""
-echo "Test: Direct codex mode requires CODEX_PROMPT"
-test_direct_mode_requires_codex_prompt
+echo "Test: Direct codex mode requires prompt file"
+test_direct_mode_requires_prompt_file
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Summary

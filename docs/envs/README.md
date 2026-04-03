@@ -649,9 +649,9 @@ Run/API metadata propagation:
 
 **Codex images (`codex`)**: The entrypoint script supports two execution modes:
 - **amata mode**: when `amata.spec` is set on a mig step, router, or healing action, the container runs
-  `amata run /in/amata.yaml` (with optional `--set` flags). `CODEX_PROMPT` is not required.
+  `amata run /in/amata.yaml` (with optional `--set` flags). No prompt file is required.
 - **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
-  `CODEX_PROMPT` is required in this mode.
+  A prompt must be delivered via `--prompt-file` or Hydra `in` mount as `/in/codex-prompt.txt`.
 
 In both modes, config files are delivered via Hydra `home` mounts to their
 expected paths under `$HOME`. No env-based materialization is performed:
