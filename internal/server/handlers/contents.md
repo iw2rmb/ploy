@@ -16,11 +16,11 @@
 [config_ca.go](config_ca.go) CRUD handlers for global CA certificate entries per Hydra section.
 [config_ca_test.go](config_ca_test.go) Exercises global CA CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
-[config_env_migration.go](config_env_migration.go) Deterministic key-based rewrite mapping from special legacy env keys to typed Hydra ca/home/in fields with migration scan and report metrics.
+[config_env_migration.go](config_env_migration.go) Scans and migrates special legacy env keys into typed Hydra ca/home/in records (including server/nodes targets) with conflict handling and metrics.
 [config_env_migration_fixture_test.go](config_env_migration_fixture_test.go) Fixture-driven tests that load YAML migration scenarios and verify special-env scan reports.
 [config_env_migration_test.go](config_env_migration_test.go) Tests special env migration mapping table design alignment, rewrite entry generation, scan actions, conflict rejection, and report metrics.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers, defaults, round-trip behavior, and store error mapping.
-[config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab, global env, CA, and home endpoints.
+[config_gitlab.go](config_gitlab.go) Thread-safe runtime config holder and handlers for GitLab plus global env and typed Hydra CA/home/in overlays.
 [config_gitlab_fuzz_test.go](config_gitlab_fuzz_test.go) Fuzzes GitLab config mutation paths to catch panics on malformed payload combinations.
 [config_gitlab_test.go](config_gitlab_test.go) Tests GitLab config holder and endpoint behavior for read/write and validation paths.
 [config_home.go](config_home.go) CRUD handlers for global home mount entries per Hydra section.
@@ -82,7 +82,7 @@
 [nodes_claim.go](nodes_claim.go) HTTP claim handler that coordinates worker job acquisition.
 [nodes_claim_gate_skip_test.go](nodes_claim_gate_skip_test.go) Validates node claim behavior when gate-skip policy affects claimable work selection.
 [nodes_claim_recovery_context.go](nodes_claim_recovery_context.go) Builds recovery context payload attached to claim responses.
-[nodes_claim_response.go](nodes_claim_response.go) Claim response payload construction and write helpers for node API.
+[nodes_claim_response.go](nodes_claim_response.go) Builds node-claim API payloads by mutating spec with runtime overlays and attaching recovery, gate-skip, and step-skip metadata.
 [nodes_claim_service.go](nodes_claim_service.go) Claim service implementing queue selection, transitions, and error types.
 [nodes_claim_service_test.go](nodes_claim_service_test.go) Unit tests claim service no-work and success flows with payload shaping.
 [nodes_complete_healing.go](nodes_complete_healing.go) Handles healing-job completion and follow-up recovery orchestration.
@@ -125,7 +125,7 @@
 [server_runs_claim_fixture_test.go](server_runs_claim_fixture_test.go) Shared fixture/test harness for server run-claim endpoint tests.
 [server_runs_claim_gate_profile_test.go](server_runs_claim_gate_profile_test.go) Tests gate-profile data exposure in run-claim responses.
 [server_runs_claim_recovery_test.go](server_runs_claim_recovery_test.go) Validates run-claim recovery-context projection in API responses.
-[server_runs_claim_spec_merge_test.go](server_runs_claim_spec_merge_test.go) Tests spec-merge behavior when composing claim payloads for nodes.
+[server_runs_claim_spec_merge_test.go](server_runs_claim_spec_merge_test.go) Validates claim-time spec merge precedence for global env overlays and gate-profile behavior in node claim responses.
 [server_runs_delete_test.go](server_runs_delete_test.go) Covers server-side run delete endpoint behavior and status/error mapping.
 [server_runs_timing_test.go](server_runs_timing_test.go) Tests timing metadata/contract behavior in server run endpoints.
 [spec_bundles.go](spec_bundles.go) Spec bundle upload/download handlers with blob persistence integration.
