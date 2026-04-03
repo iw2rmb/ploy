@@ -85,7 +85,9 @@ items:
     cfp: 8
     commit: f7562547
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"Apply section routing for pre_gate re_gate post_gate mig heal and router phase inheritance inside claim assembly.\" is not fully implemented: router routing ignores current claim job type and derives phase only from `build_gate.pre/post` presence, so post/re-gate claims can inherit `pre_gate` when `pre` exists and `re_gate` is never selected for router inheritance (`internal/server/handlers/claim_spec_mutator_hydra.go:141`, `internal/server/handlers/claim_spec_mutator_hydra.go:169`).", "\"Emit deterministic conflict and validation errors for destination collisions and invalid routed sections.\" is not fully implemented for heal-routed overlays: `applyHealContainerOverlay` merges `heal` entries into `build_gate.healing.by_error_kind.*` without collision validation, so duplicate `in/out/home` destinations in heal overlays can pass without deterministic collision errors on non-heal claims (`internal/server/handlers/claim_spec_mutator_hydra.go:182`, `internal/server/handlers/claim_spec_mutator_hydra.go:213`).", "\"Add table tests for precedence server local spec and destination conflict replacement behavior.\" is not fully implemented: coverage has a single non-table precedence case and no table-driven replacement matrix for destination-conflict behavior across routed fields/contexts (`internal/server/handlers/claim_spec_mutator_hydra_test.go:675`, `internal/server/handlers/claim_spec_mutator_hydra_test.go:646`)."]
+        commit: null
     label: "1.4"
     summary: Extend claim-time mutator pipeline to typed Hydra overlays for job and router claims.
     classification: determined
