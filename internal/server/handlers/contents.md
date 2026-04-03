@@ -146,7 +146,7 @@
 [test_helpers_healing_test.go](test_helpers_healing_test.go) Shared healing-flow test helpers for recovery candidate construction and assertions.
 [test_helpers_test.go](test_helpers_test.go) Common HTTP/store/assertion helpers reused across the handler test suite.
 [test_mock_helpers_test.go](test_mock_helpers_test.go) Helper utilities for composing lightweight store mock behaviors in tests.
-[testdata/](testdata) Test fixtures for handler suites, including YAML scenarios for special-env migration dry-run coverage.
+[testdata](testdata) Test fixtures for handler suites, including YAML scenarios for special-env migration dry-run coverage.
 [tokens.go](tokens.go) Token/auth helpers used by protected handler endpoints.
 [worker_logs_fuzz_test.go](worker_logs_fuzz_test.go) Fuzzes worker log serialization/ingest contracts for robustness against malformed chunks.
 [worker_logs_test.go](worker_logs_test.go) Tests this handler component's behavior, edge cases, and store/error translation.

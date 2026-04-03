@@ -1,4 +1,5 @@
 [artifact_bundles.sql](artifact_bundles.sql) SQL definitions for artifact bundle create/read/delete queries used by sqlc.
+[config_bundle_map.sql](config_bundle_map.sql) SQL definitions for listing, upserting, and deleting config bundle hash-to-bundle mappings.
 [config_ca.sql](config_ca.sql) SQL definitions for global CA certificate entry CRUD and listing queries per Hydra section.
 [config_env.sql](config_env.sql) SQL definitions for global config environment variable CRUD and listing queries.
 [config_home.sql](config_home.sql) SQL definitions for global home mount entry CRUD and listing queries per Hydra section.
