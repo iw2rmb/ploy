@@ -684,10 +684,9 @@ assert_file_content_and_mode_600() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: --auth and --config flags deliver credentials to CODEX_HOME with
-#       correct content and secure (600) permissions
+# Test: --auth/--config flags are rejected (Hydra-only delivery)
 # ─────────────────────────────────────────────────────────────────────────────
-test_credentials_via_flags() {
+test_legacy_auth_config_flags_rejected() {
   run_test
 
   local tmp_bin tmp_out tmp_ws
@@ -706,133 +705,42 @@ exit 0
 MOCKCODEX
   chmod +x "$tmp_bin/codex"
 
-  local tmp_home tmp_script tmp_auth tmp_config tmp_prompt
+  local tmp_home tmp_script tmp_prompt
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
-  tmp_auth=$(mktemp)
-  tmp_config=$(mktemp)
   tmp_prompt=$(mktemp)
-  echo -n '{"token":"auth_secret"}' > "$tmp_auth"
-  printf '[model]\nname = "o4-mini"' > "$tmp_config"
   echo "test prompt" > "$tmp_prompt"
 
+  local exit_code
+  exit_code=0
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
     export OUTDIR="$tmp_out"
-    bash "$tmp_script" --auth "$tmp_auth" --config "$tmp_config" --prompt-file "$tmp_prompt" --input "$tmp_ws" --out "$tmp_out"
-  ) >/dev/null 2>&1
+    bash "$tmp_script" --auth /dev/null --prompt-file "$tmp_prompt" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1 || exit_code=$?
 
-  # Verify auth.json was installed with correct content
-  if [[ -f "$tmp_home/.codex/auth.json" ]]; then
-    local auth_content
-    auth_content=$(cat "$tmp_home/.codex/auth.json")
-    if [[ "$auth_content" == '{"token":"auth_secret"}' ]]; then
-      pass "--auth flag installs auth.json with correct content"
-    else
-      fail "--auth flag auth.json content" "got: $auth_content"
-    fi
-    local perms
-    perms=$(file_perms_octal "$tmp_home/.codex/auth.json")
-    if [[ "$perms" == "600" ]]; then
-      pass "auth.json has secure permissions (600)"
-    else
-      fail "auth.json permissions" "got: $perms, want: 600"
-    fi
+  if [[ $exit_code -ne 0 ]]; then
+    pass "--auth flag is rejected"
   else
-    fail "--auth flag auth.json delivery" "auth.json not created"
+    fail "--auth flag is rejected" "expected non-zero exit, got 0"
   fi
 
-  # Verify config.toml was installed with correct content
-  if [[ -f "$tmp_home/.codex/config.toml" ]]; then
-    local cfg_content
-    cfg_content=$(cat "$tmp_home/.codex/config.toml")
-    if echo "$cfg_content" | grep -q 'o4-mini'; then
-      pass "--config flag installs config.toml with correct content"
-    else
-      fail "--config flag config.toml content" "got: $cfg_content"
-    fi
-    local perms
-    perms=$(file_perms_octal "$tmp_home/.codex/config.toml")
-    if [[ "$perms" == "600" ]]; then
-      pass "config.toml has secure permissions (600)"
-    else
-      fail "config.toml permissions" "got: $perms, want: 600"
-    fi
-  else
-    fail "--config flag config.toml delivery" "config.toml not created"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_auth" "$tmp_config" "$tmp_prompt"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: CODEX_HOME override controls --auth/--config destinations
-# ─────────────────────────────────────────────────────────────────────────────
-test_codex_home_override_flag_delivery() {
-  run_test
-
-  local tmp_bin tmp_out tmp_ws
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  tmp_ws=$(mktemp -d)
-
-  cat > "$tmp_bin/codex" <<'MOCKCODEX'
-#!/bin/bash
-if [[ "$1" == "exec" && "$2" == "--help" ]]; then
-  echo "Usage: codex exec [OPTIONS]"
-  echo "  --yolo  Skip confirmations"
-  exit 0
-fi
-exit 0
-MOCKCODEX
-  chmod +x "$tmp_bin/codex"
-
-  local tmp_home tmp_script codex_home tmp_auth tmp_config tmp_prompt
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-  codex_home="$tmp_out/codex-home"
-  tmp_auth=$(mktemp)
-  tmp_config=$(mktemp)
-  tmp_prompt=$(mktemp)
-  echo -n '{"token":"auth_override"}' > "$tmp_auth"
-  printf '[model]\nname = "o4-mini-override"' > "$tmp_config"
-  echo "test prompt" > "$tmp_prompt"
-
+  exit_code=0
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
     export OUTDIR="$tmp_out"
-    export CODEX_HOME="$codex_home"
-    bash "$tmp_script" --auth "$tmp_auth" --config "$tmp_config" --prompt-file "$tmp_prompt" --input "$tmp_ws" --out "$tmp_out"
-  ) >/dev/null 2>&1
+    bash "$tmp_script" --config /dev/null --prompt-file "$tmp_prompt" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1 || exit_code=$?
 
-  assert_file_content_and_mode_600 \
-    "$codex_home/auth.json" \
-    '{"token":"auth_override"}' \
-    "CODEX_HOME override auth.json"
-
-  if [[ -f "$codex_home/config.toml" ]] && grep -q 'o4-mini-override' "$codex_home/config.toml"; then
-    pass "CODEX_HOME override config.toml content"
+  if [[ $exit_code -ne 0 ]]; then
+    pass "--config flag is rejected"
   else
-    fail "CODEX_HOME override config.toml content" "config.toml missing or unexpected"
+    fail "--config flag is rejected" "expected non-zero exit, got 0"
   fi
 
-  local perms
-  perms=$(file_perms_octal "$codex_home/config.toml")
-  if [[ "$perms" == "600" ]]; then
-    pass "CODEX_HOME override config.toml permissions"
-  else
-    fail "CODEX_HOME override config.toml permissions" "got: $perms, want: 600"
-  fi
-
-  if [[ ! -f "$tmp_home/.codex/auth.json" && ! -f "$tmp_home/.codex/config.toml" ]]; then
-    pass "default ~/.codex not used when CODEX_HOME is set"
-  else
-    fail "default ~/.codex not used when CODEX_HOME is set" "found files under $tmp_home/.codex"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_auth" "$tmp_config" "$tmp_prompt"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -980,12 +888,8 @@ echo "Test: --output-dir flag detection"
 test_output_dir_flag_detection
 
 echo ""
-echo "Test: --auth/--config flags deliver credentials with secure permissions"
-test_credentials_via_flags
-
-echo ""
-echo "Test: CODEX_HOME override controls --auth/--config delivery destination"
-test_codex_home_override_flag_delivery
+echo "Test: --auth/--config flags are rejected (Hydra-only)"
+test_legacy_auth_config_flags_rejected
 
 echo ""
 echo "Test: CODEX_API_KEY passthrough in direct codex mode"
