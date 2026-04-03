@@ -176,8 +176,15 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 	// Seed from any existing bundle_map so that already-canonical entries
 	// retain their mappings when the spec mixes canonical and authoring forms.
 	bundleMap := make(map[string]string)
-	if existing, ok := spec["bundle_map"].(map[string]string); ok {
+	switch existing := spec["bundle_map"].(type) {
+	case map[string]string:
 		maps.Copy(bundleMap, existing)
+	case map[string]any:
+		for k, v := range existing {
+			if s, ok := v.(string); ok {
+				bundleMap[k] = s
+			}
+		}
 	}
 	for _, ref := range blocks {
 		if err := compileHydraBlock(ctx, base, client, ref.block, ref.prefix, specBaseDir, seen, bundleMap); err != nil {
