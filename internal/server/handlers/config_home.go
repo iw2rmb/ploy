@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"path"
 	"sort"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -136,11 +137,13 @@ func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerF
 			return
 		}
 
-		// Validate destination using Hydra parser rules (aligned with put handler).
+		// Validate and normalize destination using Hydra parser rules (aligned
+		// with put handler's ParseStoredHomeEntry which cleans dst before persisting).
 		if err := contracts.ValidateHomeDestination(dst); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		dst = path.Clean(dst)
 
 		section := r.URL.Query().Get("section")
 		if section == "" {
