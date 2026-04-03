@@ -23,6 +23,7 @@ import (
 	"sort"
 	"strings"
 
+	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"gopkg.in/yaml.v3"
 )
@@ -37,6 +38,12 @@ func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 		}
 	}
 	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
+		return nil, err
+	}
+
+	// Apply local config.yaml overlay before Hydra compilation so that
+	// overlay file paths are also compiled to canonical form.
+	if err := applyConfigOverlayInPlace(raw); err != nil {
 		return nil, err
 	}
 
@@ -457,6 +464,67 @@ func expandSpecEnvValue(raw string) (string, error) {
 	return "", fmt.Errorf("unresolved environment variables: %s", strings.Join(names, ", "))
 }
 
+// applyConfigOverlayInPlace loads the local config.yaml overlay and merges it
+// into the spec using deterministic rules. This runs after preprocessing and
+// before Hydra compilation so overlay file paths also get compiled.
+//
+// Routing:
+//   - steps[] entries receive the "mig" job section overlay
+//   - build_gate.router receives the "pre_gate" section (router inherits active
+//     gate phase; pre_gate is the default at CLI compile time)
+//   - build_gate.healing.by_error_kind entries receive the "heal" section
+//   - top-level envs receive the "mig" section envs (primary job type)
+func applyConfigOverlayInPlace(spec map[string]any) error {
+	ov, err := cliconfig.LoadOverlay()
+	if err != nil {
+		return fmt.Errorf("config overlay: %w", err)
+	}
+	if ov.Defaults == nil || ov.Defaults.Job == nil {
+		return nil
+	}
+
+	migCfg := ov.JobSection("mig")
+	healCfg := ov.JobSection("heal")
+	// Router inherits from pre_gate at CLI compile time.
+	routerCfg := ov.RouterSection("pre_gate")
+
+	// Apply mig overlay to top-level envs.
+	if migCfg != nil && len(migCfg.Envs) > 0 {
+		cliconfig.MergeJobConfigIntoSpec(spec, &cliconfig.JobConfig{Envs: migCfg.Envs})
+	}
+
+	// Apply mig overlay to each step block.
+	if steps, ok := spec["steps"].([]any); ok {
+		for _, s := range steps {
+			step, ok := s.(map[string]any)
+			if !ok {
+				continue
+			}
+			cliconfig.MergeJobConfigIntoSpec(step, migCfg)
+		}
+	}
+
+	// Apply overlays to build_gate containers.
+	if bg, ok := spec["build_gate"].(map[string]any); ok {
+		if router, ok := bg["router"].(map[string]any); ok {
+			cliconfig.MergeJobConfigIntoSpec(router, routerCfg)
+		}
+		if healing, ok := bg["healing"].(map[string]any); ok {
+			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
+				for _, item := range byErrorKind {
+					action, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					cliconfig.MergeJobConfigIntoSpec(action, healCfg)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // buildSpecPayload loads a spec from file (YAML or JSON) and merges it with CLI flag overrides.
 // CLI flags take precedence over spec file values. Returns raw JSON bytes.
 //
@@ -511,6 +579,10 @@ func buildSpecPayload(
 	}
 
 	if err := preprocessMigsSpecInPlace(specMap, specBaseDir); err != nil {
+		return nil, err
+	}
+
+	if err := applyConfigOverlayInPlace(specMap); err != nil {
 		return nil, err
 	}
 
