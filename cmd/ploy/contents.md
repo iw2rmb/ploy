@@ -47,17 +47,17 @@
 [mig_run_artifact_fuzz_test.go](mig_run_artifact_fuzz_test.go) Fuzz tests for MIG artifact run input parsing and safety checks.
 [mig_run_artifact_test.go](mig_run_artifact_test.go) Tests MIG artifact run orchestration, validation, and API interactions.
 [mig_run_batch_test.go](mig_run_batch_test.go) Tests batch run behavior for MIG execution plans and batching rules.
-[mig_run_env_file_test.go](mig_run_env_file_test.go) Tests env-file ingestion and merging in MIG run command paths.
 [mig_run_fuzz_test.go](mig_run_fuzz_test.go) Fuzz coverage for MIG run argument/spec parsing and guardrails.
 [mig_run_project.go](mig_run_project.go) MIG run support for project-based execution context and project descriptor lookup.
 [mig_run_removed_test.go](mig_run_removed_test.go) Regression tests for run behavior when migrations were removed or missing.
 [mig_run_repo.go](mig_run_repo.go) MIG run orchestration for repository-targeted execution and repo job submission.
 [mig_run_repo_test.go](mig_run_repo_test.go) Tests repository-targeted MIG run request construction and error handling.
 [mig_run_spec.go](mig_run_spec.go) Parses and validates MIG run specs used by run submission commands.
+[mig_run_spec_hydra.go](mig_run_spec_hydra.go) Compiles authoring-form Hydra file records into canonical shortHash-backed spec entries.
+[mig_run_spec_hydra_test.go](mig_run_spec_hydra_test.go) Tests Hydra record parsing, canonicalization detection, and file-archive compilation flows.
 [mig_run_spec_parsing_test.go](mig_run_spec_parsing_test.go) Tests MIG run spec parser coverage for valid and invalid spec forms.
 [mig_run_spec_test.go](mig_run_spec_test.go) Unit tests for run spec normalization, defaults, and validation logic.
 [mig_run_spec_tmpbundle.go](mig_run_spec_tmpbundle.go) Temporary bundle assembly helpers for run spec execution inputs.
-[mig_run_spec_tmpdir_test.go](mig_run_spec_tmpdir_test.go) Tests temporary directory and cleanup behavior in run spec staging flows.
 [mig_spec.go](mig_spec.go) Shared MIG spec structures and helper logic used by command implementations.
 [mig_status.go](mig_status.go) Implements MIG status command fetching and presentation of migration state.
 [mig_status_test.go](mig_status_test.go) Tests MIG status request handling, output shaping, and edge conditions.
