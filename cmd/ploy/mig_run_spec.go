@@ -1,8 +1,8 @@
 // mig_run_spec.go separates spec file handling from mig run execution.
 //
 // This file contains buildSpecPayload which parses YAML/JSON spec files
-// and resolves env_from_file references to inject file content as environment
-// variables. Specs use a single canonical shape:
+// and compiles Hydra file-record entries (ca/in/out/home) into canonical
+// shortHash:dst form. Specs use a single canonical shape:
 //   - steps[] array with one entry per step (even single-step runs)
 //   - global build gate policy under build_gate (including build_gate.healing.by_error_kind)
 //
@@ -40,7 +40,7 @@ func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 		return nil, err
 	}
 
-	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, raw, ""); err != nil {
+	if err := compileHydraRecordsInPlace(ctx, base, client, raw, ""); err != nil {
 		return nil, err
 	}
 
@@ -67,12 +67,11 @@ func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
 		return fmt.Errorf("resolve image env placeholders: %w", err)
 	}
 
-	// Resolve env_from_file references in the canonical top-level env block.
-	if err := resolveEnvFromFileInPlace(spec, specBaseDir); err != nil {
-		return fmt.Errorf("resolve env from file (top-level): %w", err)
+	// Expand $VAR/${VAR} placeholders in envs values at all levels.
+	if err := resolveEnvsInPlace(spec); err != nil {
+		return fmt.Errorf("resolve envs (top-level): %w", err)
 	}
 
-	// Resolve env_from_file references in build_gate.healing.by_error_kind.* and build_gate.router.
 	if bg, ok := spec["build_gate"].(map[string]any); ok {
 		if healing, ok := bg["healing"].(map[string]any); ok {
 			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
@@ -81,30 +80,62 @@ func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
 					if !ok {
 						continue
 					}
-					if err := resolveEnvFromFileInPlace(action, specBaseDir); err != nil {
-						return fmt.Errorf("resolve env from file (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
+					if err := resolveEnvsInPlace(action); err != nil {
+						return fmt.Errorf("resolve envs (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
 					}
 				}
 			}
 		}
 		if router, ok := bg["router"].(map[string]any); ok {
-			if err := resolveEnvFromFileInPlace(router, specBaseDir); err != nil {
-				return fmt.Errorf("resolve env from file (build_gate.router): %w", err)
+			if err := resolveEnvsInPlace(router); err != nil {
+				return fmt.Errorf("resolve envs (build_gate.router): %w", err)
 			}
 		}
 	}
 
-	// Resolve env_from_file references in steps[] array entries.
 	if steps, ok := spec["steps"].([]any); ok {
 		for i, s := range steps {
 			if stepEntry, ok := s.(map[string]any); ok {
-				if err := resolveEnvFromFileInPlace(stepEntry, specBaseDir); err != nil {
-					return fmt.Errorf("resolve env from file (steps[%d]): %w", i, err)
+				if err := resolveEnvsInPlace(stepEntry); err != nil {
+					return fmt.Errorf("resolve envs (steps[%d]): %w", i, err)
 				}
 			}
 		}
 	}
 
+	return nil
+}
+
+// resolveEnvsInPlace expands $VAR and ${VAR} placeholders in envs string values.
+func resolveEnvsInPlace(spec map[string]any) error {
+	envsRaw, ok := spec["envs"]
+	if !ok {
+		return nil
+	}
+	switch envs := envsRaw.(type) {
+	case map[string]any:
+		for k, v := range envs {
+			s, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("envs[%s]: expected string, got %T", k, v)
+			}
+			expanded, err := expandSpecEnvValue(s)
+			if err != nil {
+				return fmt.Errorf("envs[%s]: %w", k, err)
+			}
+			envs[k] = expanded
+		}
+	case map[string]string:
+		expanded := make(map[string]any, len(envs))
+		for k, v := range envs {
+			exp, err := expandSpecEnvValue(v)
+			if err != nil {
+				return fmt.Errorf("envs[%s]: %w", k, err)
+			}
+			expanded[k] = exp
+		}
+		spec["envs"] = expanded
+	}
 	return nil
 }
 
@@ -392,116 +423,6 @@ func resolveAmataSpecInSection(section map[string]any, prefix, specBaseDir strin
 	return nil
 }
 
-// resolveEnvFromFile reads a file path (expanding ~) and returns its content as a string.
-// File content is treated as sensitive, so any errors redact the file path for security.
-func resolveEnvFromFile(path string, specBaseDir ...string) (string, error) {
-	path, err := resolvePath(path, specBaseDir...)
-	if err != nil {
-		return "", err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		// Redact file path to avoid leaking sensitive locations in error messages
-		return "", fmt.Errorf("read env file (path redacted): %w", err)
-	}
-	return string(data), nil
-}
-
-// resolveEnvFromFileInPlace processes env and env_from_file from a spec section,
-// resolving file references and merging them into the env map in-place.
-// Removes env_from_file after resolution.
-//
-// Supports two syntaxes:
-// 1. env_from_file as a sibling map: {"env_from_file": {"KEY": "/path/to/file"}}
-// 2. Inline syntax within env: {"env": {"KEY": {"from_file": "/path/to/file"}}}
-//
-// Values from env take precedence over env_from_file.
-func resolveEnvFromFileInPlace(spec map[string]any, specBaseDir ...string) error {
-	// Prepare the merged env map
-	mergedEnv := make(map[string]any)
-
-	// First, process env_from_file if present (sibling syntax)
-	switch envFromFile := spec["env_from_file"].(type) {
-	case map[string]any:
-		for k, v := range envFromFile {
-			path, ok := v.(string)
-			if !ok {
-				return fmt.Errorf("env_from_file[%s]: expected string path, got %T", k, v)
-			}
-			content, err := resolveEnvFromFile(path, specBaseDir...)
-			if err != nil {
-				return fmt.Errorf("env_from_file[%s]: %w", k, err)
-			}
-			mergedEnv[k] = content
-		}
-		// Remove env_from_file after processing to keep spec clean
-		delete(spec, "env_from_file")
-	case map[string]string:
-		for k, path := range envFromFile {
-			content, err := resolveEnvFromFile(path, specBaseDir...)
-			if err != nil {
-				return fmt.Errorf("env_from_file[%s]: %w", k, err)
-			}
-			mergedEnv[k] = content
-		}
-		delete(spec, "env_from_file")
-	}
-
-	// Then, process env (including inline {from_file: path} syntax)
-	switch env := spec["env"].(type) {
-	case map[string]any:
-		for k, v := range env {
-			switch val := v.(type) {
-			case string:
-				expanded, err := expandSpecEnvValue(val)
-				if err != nil {
-					return fmt.Errorf("env[%s]: %w", k, err)
-				}
-				// Direct string value (overwrites env_from_file if present)
-				mergedEnv[k] = expanded
-			case map[string]any:
-				// Check for {from_file: "path"} syntax
-				if fromFile, ok := val["from_file"].(string); ok {
-					content, err := resolveEnvFromFile(fromFile, specBaseDir...)
-					if err != nil {
-						return fmt.Errorf("env[%s].from_file: %w", k, err)
-					}
-					mergedEnv[k] = content
-				} else {
-					return fmt.Errorf("env[%s]: expected string or {from_file: path}, got unsupported map structure", k)
-				}
-			case map[string]string:
-				if fromFile, ok := val["from_file"]; ok {
-					content, err := resolveEnvFromFile(fromFile, specBaseDir...)
-					if err != nil {
-						return fmt.Errorf("env[%s].from_file: %w", k, err)
-					}
-					mergedEnv[k] = content
-				} else {
-					return fmt.Errorf("env[%s]: expected string or {from_file: path}, got unsupported map structure", k)
-				}
-			default:
-				return fmt.Errorf("env[%s]: expected string or {from_file: path}, got %T", k, v)
-			}
-		}
-	case map[string]string:
-		for k, v := range env {
-			expanded, err := expandSpecEnvValue(v)
-			if err != nil {
-				return fmt.Errorf("env[%s]: %w", k, err)
-			}
-			mergedEnv[k] = expanded
-		}
-	}
-
-	// Update spec with merged env (only if we have any env values)
-	if len(mergedEnv) > 0 {
-		spec["env"] = mergedEnv
-	}
-
-	return nil
-}
-
 func expandSpecEnvValue(raw string) (string, error) {
 	if !strings.Contains(raw, "$") {
 		return raw, nil
@@ -540,24 +461,19 @@ func expandSpecEnvValue(raw string) (string, error) {
 // CLI flags take precedence over spec file values. Returns raw JSON bytes.
 //
 // Processing order:
-// 1. Load spec file (YAML or JSON format) if provided
-// 2. Resolve env_from_file references in:
-//   - top-level env
-//   - steps[] entries
-//   - build_gate.healing.by_error_kind.* (healing actions)
-//   - build_gate.router (router)
-//
-// 3. Apply CLI flag overrides (higher precedence than spec file) to top-level fields.
-//
-// 4. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
+//  1. Load spec file (YAML or JSON format) if provided
+//  2. Preprocess: resolve spec_path, amata.spec, image env, envs expansion
+//  3. Compile Hydra records: ca/in/out/home authoring entries → canonical shortHash:dst form
+//  4. Apply CLI flag overrides (higher precedence than spec file) to top-level fields
+//  5. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
 //
 // Returns nil payload when neither spec file nor CLI overrides are provided.
 //
 // Multi-step semantics (steps[] array):
-// - Each entry in steps[] represents a sequential transformation step.
-// - All steps share the same repository and global build_gate policy (including healing).
-// - The CLI preserves steps[] without modification; image/command/retain overrides do not apply when len(steps) > 1.
-// - The server copies steps[] indexes into jobs.next_id and diffs.next_id.
+//   - Each entry in steps[] represents a sequential transformation step.
+//   - All steps share the same repository and global build_gate policy (including healing).
+//   - The CLI preserves steps[] without modification; image/command overrides do not apply when len(steps) > 1.
+//   - The server copies steps[] indexes into jobs.next_id and diffs.next_id.
 func buildSpecPayload(
 	ctx context.Context,
 	base *url.URL,
@@ -598,7 +514,7 @@ func buildSpecPayload(
 		return nil, err
 	}
 
-	if err := archiveAndUploadTmpDirsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
+	if err := compileHydraRecordsInPlace(ctx, base, client, specMap, specBaseDir); err != nil {
 		return nil, err
 	}
 
@@ -612,10 +528,10 @@ func buildSpecPayload(
 	}
 
 	if len(migEnvs) > 0 {
-		// Start from existing env.
+		// Start from existing envs.
 		current := make(map[string]any)
-		if existingEnv, ok := specMap["env"].(map[string]any); ok {
-			for k, v := range existingEnv {
+		if existingEnvs, ok := specMap["envs"].(map[string]any); ok {
+			for k, v := range existingEnvs {
 				if s, ok := v.(string); ok {
 					current[k] = s
 				}
@@ -641,7 +557,7 @@ func buildSpecPayload(
 			}
 		}
 		if len(current) > 0 {
-			specMap["env"] = current
+			specMap["envs"] = current
 		}
 	}
 

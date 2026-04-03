@@ -353,7 +353,7 @@ func TestBuildSpecPayload_BasicParsing(t *testing.T) {
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
-env:
+envs:
   KEY1: value1
   KEY2: value2
 build_gate:
@@ -377,7 +377,7 @@ mr_on_success: true
 			ext:  ".json",
 			spec: `{
   "steps": [{"image": "docker.io/test/mig:latest"}],
-  "env": {"KEY1": "value1"},
+  "envs": {"KEY1": "value1"},
   "build_gate": {
     "healing": {
       "by_error_kind": {
@@ -405,9 +405,9 @@ mr_on_success: true
 			mustDig(t, result, "build_gate", "healing")
 
 			if tt.wantEnv != nil {
-				env := mustDig(t, result, "env")
+				envs := mustDig(t, result, "envs")
 				for k, v := range tt.wantEnv {
-					assertField(t, env, k, v)
+					assertField(t, envs, k, v)
 				}
 			}
 			if tt.wantRetries != 0 {
@@ -443,7 +443,7 @@ func TestBuildSpecPayload_SpecPathMerge(t *testing.T) {
 			fragment: `
 retries: 2
 image: docker.io/test/healer:latest
-env:
+envs:
   A: from-fragment
   B: from-fragment
 expectations:
@@ -460,7 +460,7 @@ build_gate:
       infra:
         spec_path: %s
         retries: 1
-        env:
+        envs:
           B: inline-override
           C: inline-only
   router:
@@ -476,7 +476,7 @@ build_gate:
 			name: "router fragment merge with inline overrides",
 			fragment: `
 image: docker.io/test/router:latest
-env:
+envs:
   A: from-fragment
   B: from-fragment
 `,
@@ -486,7 +486,7 @@ steps:
 build_gate:
   router:
     spec_path: %s
-    env:
+    envs:
       B: inline-override
       C: inline-only
 `,
@@ -500,7 +500,7 @@ build_gate:
 			fragment: `
 retries: 2
 image: docker.io/test/healer:latest
-env:
+envs:
   FRAGMENT_ONLY: yes
 `,
 			spec: `
@@ -511,7 +511,7 @@ build_gate:
     by_error_kind:
       infra:
         spec_path: %s
-        env:
+        envs:
           INLINE_ONLY: "true"
   router:
     image: docker.io/test/router:latest
@@ -550,14 +550,14 @@ build_gate:
 				assertField(t, target, key, want)
 			}
 			if tt.wantEnv != nil {
-				env := mustDig(t, target, "env")
+				envs := mustDig(t, target, "envs")
 				for key, want := range tt.wantEnv {
 					if want == nil {
-						if _, ok := env[key]; !ok {
-							t.Errorf("expected env.%s to exist", key)
+						if _, ok := envs[key]; !ok {
+							t.Errorf("expected envs.%s to exist", key)
 						}
 					} else {
-						assertField(t, env, key, want)
+						assertField(t, envs, key, want)
 					}
 				}
 			}
@@ -604,14 +604,14 @@ build_gate:
 		{
 			name:         "router ${PLOY_PATH} expansion",
 			fragmentFile: "router-fragment.yaml",
-			fragment:     "image: docker.io/test/router:latest\nenv:\n  A: from-fragment\n",
+			fragment:     "image: docker.io/test/router:latest\nenvs:\n  A: from-fragment\n",
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
   router:
     spec_path: ${PLOY_PATH}/router-fragment.yaml
-    env:
+    envs:
       B: inline-only
 `,
 			digPath:    []string{"build_gate", "router"},
@@ -634,9 +634,9 @@ build_gate:
 				assertField(t, target, key, want)
 			}
 			if tt.wantEnv != nil {
-				env := mustDig(t, target, "env")
+				envs := mustDig(t, target, "envs")
 				for key, want := range tt.wantEnv {
-					assertField(t, env, key, want)
+					assertField(t, envs, key, want)
 				}
 			}
 		})
@@ -689,7 +689,7 @@ build_gate:
         retries: 2
         image: docker.io/test/healer:latest
         command: "heal.sh"
-        env:
+        envs:
           HEALING_MODE: auto
   router:
     image: docker.io/test/router:latest
@@ -701,8 +701,8 @@ build_gate:
 	assertField(t, infra, "command", "heal.sh")
 	assertAbsent(t, infra, "retain_container")
 
-	env := mustDig(t, infra, "env")
-	assertField(t, env, "HEALING_MODE", "auto")
+	envs := mustDig(t, infra, "envs")
+	assertField(t, envs, "HEALING_MODE", "auto")
 }
 
 func TestBuildSpecPayload_MultiStepMigs(t *testing.T) {
@@ -712,15 +712,15 @@ apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
 steps:
   - image: docker.io/test/mig-step1:latest
-    env:
+    envs:
       STEP: "1"
       TARGET: java8
   - image: docker.io/test/mig-step2:latest
-    env:
+    envs:
       STEP: "2"
       TARGET: java11
   - image: docker.io/test/mig-step3:latest
-    env:
+    envs:
       STEP: "3"
       TARGET: java17
 build_gate:
@@ -736,54 +736,26 @@ build_gate:
 
 	steps := mustSteps(t, result, 3)
 	assertField(t, steps[0], "image", "docker.io/test/mig-step1:latest")
-	env0 := mustDig(t, steps[0], "env")
-	assertField(t, env0, "STEP", "1")
+	envs0 := mustDig(t, steps[0], "envs")
+	assertField(t, envs0, "STEP", "1")
 
 	assertField(t, steps[1], "image", "docker.io/test/mig-step2:latest")
 	assertField(t, steps[2], "image", "docker.io/test/mig-step3:latest")
 	mustDig(t, result, "build_gate", "healing")
 }
 
-func TestBuildSpecPayload_MultiStepMigsWithEnvFromFile(t *testing.T) {
-	t.Parallel()
-	tmpDir := t.TempDir()
-	envFile1 := filepath.Join(tmpDir, "env1.txt")
-	envFile2 := filepath.Join(tmpDir, "env2.txt")
-	writeFile(t, envFile1, "secret-token-1")
-	writeFile(t, envFile2, "secret-token-2")
-
-	result := buildAndParseSpec(t, tmpDir, fmt.Sprintf(`
-steps:
-  - image: docker.io/test/mig1:latest
-    env_from_file:
-      TOKEN: %s
-  - image: docker.io/test/mig2:latest
-    env_from_file:
-      TOKEN: %s
-`, envFile1, envFile2), ".yaml", specPayloadOpts{})
-
-	steps := mustSteps(t, result, 2)
-	env0 := mustDig(t, steps[0], "env")
-	assertField(t, env0, "TOKEN", "secret-token-1")
-	env1 := mustDig(t, steps[1], "env")
-	assertField(t, env1, "TOKEN", "secret-token-2")
-	assertAbsent(t, steps[0], "env_from_file")
-	assertAbsent(t, steps[1], "env_from_file")
-}
-
 func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
 	specDir := t.TempDir()
 	t.Chdir(t.TempDir())
 
-	writeFile(t, filepath.Join(specDir, "secret.txt"), "secret-from-spec-dir")
 	writeFile(t, filepath.Join(specDir, "router-fragment.yaml"), "image: docker.io/test/router-fragment:latest\n")
 	writeFile(t, filepath.Join(specDir, "infra-fragment.yaml"), "image: docker.io/test/healer-fragment:latest\n")
 	amataContent := "version: amata/v1\nname: rel-path\n"
 	writeFile(t, filepath.Join(specDir, "amata.yaml"), amataContent)
 
 	result := buildAndParseSpec(t, specDir, `
-env_from_file:
-  TOKEN: secret.txt
+envs:
+  TOKEN: spec-dir-token
 steps:
   - image: docker.io/test/mig:latest
     amata:
@@ -797,8 +769,8 @@ build_gate:
     spec_path: router-fragment.yaml
 `, ".yaml", specPayloadOpts{})
 
-	env := mustDig(t, result, "env")
-	assertField(t, env, "TOKEN", "secret-from-spec-dir")
+	envs := mustDig(t, result, "envs")
+	assertField(t, envs, "TOKEN", "spec-dir-token")
 
 	steps := mustSteps(t, result, 1)
 	amata := mustDig(t, steps[0], "amata")
@@ -816,7 +788,7 @@ func TestBuildSpecPayload_CanonicalSingleStepWithOverrides(t *testing.T) {
 	result := runBuildSpecPayload(t, `
 steps:
   - image: docker.io/test/base:v1
-env:
+envs:
   BASE_KEY: base_value
 `, ".yaml", specPayloadOpts{
 		migEnvs:  []string{"CLI_KEY=cli_value"},
@@ -828,9 +800,9 @@ env:
 	assertField(t, steps[0], "image", "docker.io/test/override:v2")
 	assertAbsent(t, steps[0], "retain_container")
 
-	env := mustDig(t, result, "env")
-	assertField(t, env, "BASE_KEY", "base_value")
-	assertField(t, env, "CLI_KEY", "cli_value")
+	envs := mustDig(t, result, "envs")
+	assertField(t, envs, "BASE_KEY", "base_value")
+	assertField(t, envs, "CLI_KEY", "cli_value")
 	assertAbsent(t, result, "migs")
 }
 
@@ -839,10 +811,10 @@ func TestBuildSpecPayload_MultiStepIgnoresCLIOverrides(t *testing.T) {
 	result := runBuildSpecPayload(t, `
 steps:
   - image: docker.io/test/step1:v1
-    env:
+    envs:
       STEP: "1"
   - image: docker.io/test/step2:v1
-    env:
+    envs:
       STEP: "2"
 `, ".yaml", specPayloadOpts{
 		migEnvs:  []string{"CLI_KEY=cli_value"},
@@ -854,17 +826,17 @@ steps:
 
 	// First step unchanged (CLI overrides not applied to steps).
 	assertField(t, steps[0], "image", "docker.io/test/step1:v1")
-	env0 := mustDig(t, steps[0], "env")
-	if len(env0) != 1 {
-		t.Errorf("expected steps[0].env to have 1 key, got %d: %v", len(env0), env0)
+	envs0 := mustDig(t, steps[0], "envs")
+	if len(envs0) != 1 {
+		t.Errorf("expected steps[0].envs to have 1 key, got %d: %v", len(envs0), envs0)
 	}
-	assertField(t, env0, "STEP", "1")
+	assertField(t, envs0, "STEP", "1")
 
 	assertField(t, steps[1], "image", "docker.io/test/step2:v1")
 
-	// Top-level env override applied.
-	topEnv := mustDig(t, result, "env")
-	assertField(t, topEnv, "CLI_KEY", "cli_value")
+	// Top-level envs override applied.
+	topEnvs := mustDig(t, result, "envs")
+	assertField(t, topEnvs, "CLI_KEY", "cli_value")
 
 	// Image/retain overrides not applied at top level.
 	assertAbsent(t, result, "image")
