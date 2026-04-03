@@ -279,7 +279,7 @@ items:
       - gaps: ["`go test ./tests/integration/... ./tests/e2e/migs/...` still does not prove the new Hydra e2e flows on a clean workspace: `tests/e2e/migs/migs_e2e_test.go:23-25`, `124-125`, and `152-153` return `Skip` unless `dist/ploy` exists and `/healthz` is reachable. In this run both scenario tests skipped, so the command succeeded without executing `TestHydraMountEnforcement` or `TestHydraOutUpload`.", "`CODEX_CONFIG_TOML` is still missing from the docs/schema finalization layer even though migration code still handles it. `internal/server/handlers/config_env_migration.go:52-55` maps it to `.codex/config.toml`, but `docs/envs/README.md:535-591` and `docs/api/paths/config_env_key.yaml:75-79` do not include it in the migrated special-key inventory or typed-home replacement mapping."]
         commit: 5430d2c5
       - gaps: ["`[tests/e2e/migs/migs_e2e_test.go](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23)` still gates the live Hydra mount/upload tests behind `clusterReady`, and the skip path is still active at [L124-L125](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L124) and [L152-L153](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L152). In this workspace `go test -v ./tests/e2e/migs/...` passed with both `TestHydraMountEnforcement` and `TestHydraOutUpload` skipped, so the requested verification command does not guarantee the end-to-end scenarios actually run."]
-        commit: null
+        commit: 1f800526
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
