@@ -464,14 +464,34 @@ func expandSpecEnvValue(raw string) (string, error) {
 	return "", fmt.Errorf("unresolved environment variables: %s", strings.Join(names, ", "))
 }
 
+// deriveActiveGatePhase examines the spec's build_gate configuration and returns
+// the active gate phase string for router overlay selection. The router inherits
+// from the first enabled gate phase:
+//   - "pre_gate" when build_gate.pre is configured (default)
+//   - "post_gate" when only build_gate.post is configured
+//   - "pre_gate" as fallback
+func deriveActiveGatePhase(spec map[string]any) string {
+	bg, ok := spec["build_gate"].(map[string]any)
+	if !ok {
+		return "pre_gate"
+	}
+	if _, hasPre := bg["pre"].(map[string]any); hasPre {
+		return "pre_gate"
+	}
+	if _, hasPost := bg["post"].(map[string]any); hasPost {
+		return "post_gate"
+	}
+	return "pre_gate"
+}
+
 // applyConfigOverlayInPlace loads the local config.yaml overlay and merges it
 // into the spec using deterministic rules. This runs after preprocessing and
 // before Hydra compilation so overlay file paths also get compiled.
 //
 // Routing:
 //   - steps[] entries receive the "mig" job section overlay
-//   - build_gate.router receives the "pre_gate" section (router inherits active
-//     gate phase; pre_gate is the default at CLI compile time)
+//   - build_gate.router receives the active gate phase section (derived from
+//     spec build_gate.pre/post config; defaults to pre_gate)
 //   - build_gate.healing.by_error_kind entries receive the "heal" section
 //   - top-level envs receive the "mig" section envs (primary job type)
 func applyConfigOverlayInPlace(spec map[string]any) error {
@@ -485,8 +505,8 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 
 	migCfg := ov.JobSection("mig")
 	healCfg := ov.JobSection("heal")
-	// Router inherits from pre_gate at CLI compile time.
-	routerCfg := ov.RouterSection("pre_gate")
+	// Router inherits from the active gate phase derived from spec config.
+	routerCfg := ov.RouterSection(deriveActiveGatePhase(spec))
 
 	// Apply mig overlay to top-level envs.
 	if migCfg != nil && len(migCfg.Envs) > 0 {
