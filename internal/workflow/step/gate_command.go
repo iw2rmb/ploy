@@ -9,13 +9,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// caPreambleScript returns the PLOY_CA_CERTS materializer preamble for backward
-// compatibility with callers that reference the old function name. New code should
-// use envMaterializerPreamble() directly.
-func caPreambleScript() string {
-	return envMaterializerPreamble()
-}
-
 // buildCommandForTool returns the default all-tests command for the given tool.
 func buildCommandForTool(workspace string, tool string) ([]string, error) {
 	return buildCommandForToolTarget(workspace, tool, contracts.GateProfileTargetAllTests)

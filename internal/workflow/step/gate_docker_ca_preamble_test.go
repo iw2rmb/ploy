@@ -83,18 +83,6 @@ func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
 	}
 }
 
-// TestCAPreambleScript_ReturnsEmpty verifies that caPreambleScript returns an
-// empty string after the PLOY_CA_CERTS materializer was removed in favor of
-// Hydra CA mount delivery.
-func TestCAPreambleScript_ReturnsEmpty(t *testing.T) {
-	t.Parallel()
-
-	preamble := caPreambleScript()
-	if preamble != "" {
-		t.Errorf("expected empty preamble after PLOY_CA_CERTS materializer removal, got:\n%s", preamble)
-	}
-}
-
 // TestEnvMaterializerPreamble_Empty verifies that envMaterializerPreamble
 // returns an empty string and MaterializerForKey returns nil for all keys
 // after the PLOY_CA_CERTS materializer was removed.
