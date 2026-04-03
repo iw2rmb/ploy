@@ -161,6 +161,11 @@ func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name:    "legacy env rejected in healing action",
+			field:   `"env": {"FOO": "bar"}`,
+			wantErr: "build_gate.healing.by_error_kind.infra.env: forbidden",
+		},
+		{
 			name:  "valid in entry in healing action",
 			field: `"in": ["abcdef0:/in/patch.diff"]`,
 		},
@@ -207,6 +212,11 @@ func TestMigSpecValidate_HydraFieldsRouter(t *testing.T) {
 		field   string
 		wantErr string
 	}{
+		{
+			name:    "legacy env rejected in router",
+			field:   `"env": {"FOO": "bar"}`,
+			wantErr: "build_gate.router.env: forbidden",
+		},
 		{
 			name:  "valid ca entry in router",
 			field: `"ca": ["abcdef0123456"]`,

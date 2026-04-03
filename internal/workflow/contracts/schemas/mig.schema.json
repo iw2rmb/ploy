@@ -75,6 +75,7 @@
       "type": "object",
       "properties": {
         "retain_container": false,
+        "env": false,
         "spec": false,
         "set": false,
         "env_from_file": false,
@@ -87,6 +88,7 @@
       "type": "object",
       "properties": {
         "retain_container": false,
+        "env": false,
         "spec": false,
         "set": false,
         "env_from_file": false,
