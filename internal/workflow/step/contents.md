@@ -10,11 +10,11 @@
 [container_docker_logs_test.go](container_docker_logs_test.go) Validates log retrieval and stdout/stderr demultiplexing behavior for Docker runtime logs.
 [container_docker_stats.go](container_docker_stats.go) Collects and converts Docker stats into build-gate resource-usage metadata.
 [container_docker_v29_test.go](container_docker_v29_test.go) Re-validates create/start/wait/remove behavior and host-config propagation against Docker Engine v29 semantics.
-[container_spec.go](container_spec.go) Builds container execution specs with mounts, env, resource limits, and optional certificate wiring from step manifests.
+[container_spec.go](container_spec.go) Builds container specs from manifests, including Hydra CA/In/Out/Home mount planning, TLS mounts, labels, and runtime limits.
 [container_spec_certs_test.go](container_spec_certs_test.go) Ensures certificate-related mount options are applied correctly when cert paths are configured.
 [container_spec_in_mount_test.go](container_spec_in_mount_test.go) Verifies `/in` source mount behavior and read-only semantics when an input directory is provided.
 [container_spec_limits_test.go](container_spec_limits_test.go) Tests CPU, memory, and disk-limit translation from manifest resources into container spec limits.
-[container_spec_tmp_test.go](container_spec_tmp_test.go) Tests Hydra CA/in/out/home mount planning, read-only modes, and staging-dir behavior in container spec assembly.
+[container_spec_tmp_test.go](container_spec_tmp_test.go) Verifies Hydra CA/In/Out/Home mount semantics, staging-dir behavior, and read-only rules in container spec assembly.
 [diff.go](diff.go) Computes patch statistics and runs git diff commands to produce workspace change metadata.
 [diff_test.go](diff_test.go) Exercises patch-stat parsing and diff execution edge cases.
 [errors.go](errors.go) Defines shared step-level sentinel errors such as repository cancellation semantics.
