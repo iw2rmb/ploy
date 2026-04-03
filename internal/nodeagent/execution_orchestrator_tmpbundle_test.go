@@ -10,12 +10,39 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"context"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
+
+// spyContainerRuntime captures the ContainerSpec from Create for test assertions.
+type spyContainerRuntime struct {
+	capturedSpec step.ContainerSpec
+}
+
+func (s *spyContainerRuntime) Create(_ context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+	s.capturedSpec = spec
+	return "spy-handle", nil
+}
+
+func (s *spyContainerRuntime) Start(_ context.Context, _ step.ContainerHandle) error {
+	return nil
+}
+
+func (s *spyContainerRuntime) Wait(_ context.Context, _ step.ContainerHandle) (step.ContainerResult, error) {
+	return step.ContainerResult{ExitCode: 0}, nil
+}
+
+func (s *spyContainerRuntime) Logs(_ context.Context, _ step.ContainerHandle) ([]byte, error) {
+	return nil, nil
+}
+
+func (s *spyContainerRuntime) Remove(_ context.Context, _ step.ContainerHandle) error {
+	return nil
+}
 
 // buildTestTarGz creates a minimal tar.gz archive with the given entries for testing.
 // Each entry is map[archivePath]content; directories have nil content.
@@ -503,8 +530,9 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		}
 	}
 
-	// 7. Build a full manifest with inputs and envs for Runner integration
-	//    and verify container spec construction validates correctly.
+	// 7. Build a full manifest and run through Runner with spy runtime to
+	//    verify mount planning produces correct targets and modes.
+	spy := &spyContainerRuntime{}
 	fullManifest := contracts.StepManifest{
 		ID:    types.StepID("step-integration"),
 		Name:  "Mixed Hydra Integration",
@@ -522,9 +550,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 		BundleMap: bundleMap,
 	}
 
-	// Use Runner with nil Containers to exercise SeedOutDirFromStaging
-	// through the standard execution flow (without container execution).
-	runner := &step.Runner{}
+	runner := &step.Runner{Containers: spy}
 	outDir2 := t.TempDir()
 	_, runErr := runner.Run(t.Context(), step.Request{
 		RunID:      types.RunID("run-integration"),
@@ -545,5 +571,25 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	}
 	if string(seeded2) != "seed content" {
 		t.Errorf("Runner seeded out = %q, want %q", seeded2, "seed content")
+	}
+
+	// Assert mount targets and modes from captured container spec.
+	for _, w := range wantMounts {
+		var found bool
+		for _, m := range spy.capturedSpec.Mounts {
+			if m.Target == w.target {
+				found = true
+				wantSrc := filepath.Join(stagingDir, w.hash, "content")
+				if m.Source != wantSrc {
+					t.Errorf("mount %s (%s): source = %q, want %q", w.target, w.field, m.Source, wantSrc)
+				}
+				if m.ReadOnly != w.readOnly {
+					t.Errorf("mount %s (%s): readOnly = %v, want %v", w.target, w.field, m.ReadOnly, w.readOnly)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("mount %s (%s) not found in spec mounts: %+v", w.target, w.field, spy.capturedSpec.Mounts)
+		}
 	}
 }
