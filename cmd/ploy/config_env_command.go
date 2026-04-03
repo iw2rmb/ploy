@@ -527,7 +527,7 @@ func printConfigEnvSetUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  steps    → steps only")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Examples:")
-	_, _ = fmt.Fprintln(w, "  ploy config env set --key PLOY_CA_CERTS --file ca-bundle.pem --on all")
+	_, _ = fmt.Fprintln(w, "  ploy config env set --key GRADLE_OPTS --value '-Xmx512m' --on all")
 	_, _ = fmt.Fprintln(w, "  ploy config env set --key NPM_TOKEN --file ~/.npmrc-token --on steps")
 	_, _ = fmt.Fprintln(w, "  ploy config env set --key OPENAI_API_KEY --value sk-... --on jobs")
 }
