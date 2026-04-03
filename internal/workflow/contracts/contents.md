@@ -14,8 +14,8 @@
 [gate_profile.go](gate_profile.go) Defines build-gate profile contract types, enums, parsing, normalization, and validation rules.
 [gate_profile_schema.go](gate_profile_schema.go) Loads and applies JSON Schema validation for gate-profile payloads.
 [gate_profile_test.go](gate_profile_test.go) Tests gate-profile parsing and validation error paths for required and constrained fields.
-[hydra.go](hydra.go) Parses and validates canonical Hydra stored-entry formats for in/out/home/ca artifact references.
-[hydra_test.go](hydra_test.go) Tests Hydra entry parsing, domain checks, path safety guards, and hash validation.
+[hydra.go](hydra.go) Defines shared Hydra section validation plus canonical in/out/home/ca stored-entry parsers and validators.
+[hydra_test.go](hydra_test.go) Tests Hydra section validation, entry parsing, path safety checks, and canonical hash validation behavior.
 [job_meta.go](job_meta.go) Defines unified jobs.meta contracts for job kind, gate stage metadata, and associated validation rules.
 [job_meta_test.go](job_meta_test.go) Verifies jobs.meta contract validation for job kind and gate-stage metadata payloads.
 [json_compat_test.go](json_compat_test.go) Asserts JSON shape compatibility for legacy single-step and current steps-based mig contracts.
