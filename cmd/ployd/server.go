@@ -295,6 +295,11 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 // Called once at startup to ensure server-target global env is available to the process.
 func applyServerTargetEnv(envMap map[string][]handlers.GlobalEnvVar) {
 	for key, entries := range envMap {
+		// Special env keys are file-backed and migrated to typed Hydra
+		// fields; they must not be injected as raw process env vars.
+		if handlers.IsSpecialEnvKey(key) {
+			continue
+		}
 		for _, e := range entries {
 			if e.Target == domaintypes.GlobalEnvTargetServer {
 				if err := os.Setenv(key, e.Value); err != nil {

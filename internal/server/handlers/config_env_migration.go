@@ -116,15 +116,21 @@ type MigrationReport struct {
 	Skipped   int                    `json:"skipped"`
 }
 
+// allJobSections is the full set of Hydra sections across gates and steps.
+var allJobSections = []string{"heal", "mig", "post_gate", "pre_gate", "re_gate"}
+
 // sectionsForTarget returns the Hydra job sections that a GlobalEnvTarget
-// maps to. Server and nodes targets return nil because they affect the
-// process environment, not job containers.
+// maps to. Server and nodes targets map to all job sections because special
+// env keys with these targets should be migrated to typed fields available
+// to all job types (not applied as raw env vars).
 func sectionsForTarget(target domaintypes.GlobalEnvTarget) []string {
 	switch target {
 	case domaintypes.GlobalEnvTargetGates:
 		return []string{"pre_gate", "re_gate", "post_gate"}
 	case domaintypes.GlobalEnvTargetSteps:
 		return []string{"heal", "mig"}
+	case domaintypes.GlobalEnvTargetServer, domaintypes.GlobalEnvTargetNodes:
+		return allJobSections
 	default:
 		return nil
 	}
@@ -133,12 +139,10 @@ func sectionsForTarget(target domaintypes.GlobalEnvTarget) []string {
 // ScanSpecialEnvKeys examines global env entries and produces a migration
 // report identifying special keys that should be migrated to typed fields.
 //
-// Records with server or nodes targets are skipped (they affect the process
-// environment, not job containers). Records with gates or steps targets are
-// candidates for migration to the corresponding Hydra sections.
-//
-// When existingHome contains records that would conflict with the migration
-// target destination, the entry is rejected.
+// All targets (including server and nodes) are candidates for migration.
+// When existingHome/In/CA contains records that conflict with the migration
+// target, the entry is rejected — unless the existing record matches what
+// the migration would produce (idempotent retry after partial failure).
 func ScanSpecialEnvKeys(
 	globalEnv map[string][]GlobalEnvVar,
 	existingCA map[string][]string,
@@ -174,12 +178,17 @@ func ScanSpecialEnvKeys(
 				continue
 			}
 
+			// Compute the expected migration output so we can distinguish
+			// genuine conflicts from idempotent retries after partial failure.
+			expectedHash := migrationExpectedHash(mapping, entry.Value)
+			_, expectedRecord := RewriteSpecialEnvEntry(mapping, expectedHash)
+
 			var conflicts []string
 			switch mapping.TargetField {
 			case "home":
 				for _, section := range sections {
 					for _, he := range existingHome[section] {
-						if he.Dst == mapping.Destination {
+						if he.Dst == mapping.Destination && he.Entry != expectedRecord {
 							conflicts = append(conflicts, fmt.Sprintf(
 								"section %q already has home entry for %q", section, mapping.Destination))
 						}
@@ -188,22 +197,18 @@ func ScanSpecialEnvKeys(
 			case "in":
 				for _, section := range sections {
 					for _, ie := range existingIn[section] {
-						if ie.Dst == mapping.Destination {
+						if ie.Dst == mapping.Destination && ie.Entry != expectedRecord {
 							conflicts = append(conflicts, fmt.Sprintf(
 								"section %q already has in entry for %q", section, mapping.Destination))
 						}
 					}
 				}
 			case "ca":
-				// CA entries are content-addressed by hash. A collision occurs
-				// when the same hash already exists in the target section. We
-				// compute the hash from the env value to check.
-				hash := contentHash(entry.Value)
 				for _, section := range sections {
 					for _, existing := range existingCA[section] {
-						if existing == hash {
-							conflicts = append(conflicts, fmt.Sprintf(
-								"section %q already has ca entry for hash %s", section, hash[:12]))
+						if existing == expectedHash {
+							// Same hash from a prior migration run — not a conflict.
+							continue
 						}
 					}
 				}
@@ -360,10 +365,22 @@ func archiveShortHash(archiveBytes []byte) string {
 }
 
 // contentHash computes a deterministic SHA-256 hex hash of the given value.
-// Used only for CA conflict detection during scan (not for typed record keys).
 func contentHash(value string) string {
 	h := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(h[:])
+}
+
+// migrationExpectedHash computes the short hash that ExecuteMigration would
+// store for a given mapping and env value. This is the archive-based short
+// hash, matching the typed record key format used at execution time.
+// Falls back to contentHash prefix on archive build failure (should not happen
+// with valid values).
+func migrationExpectedHash(_ *SpecialEnvMapping, value string) string {
+	archiveBytes, err := buildValueArchive(value)
+	if err != nil {
+		return contentHash(value)[:migrationShortHashLen]
+	}
+	return archiveShortHash(archiveBytes)
 }
 
 // ExecuteMigration persists rewrite-eligible report entries as typed ca/home/in
@@ -449,6 +466,10 @@ func ExecuteMigration(
 				"upload spec bundle for key %q target %q: %v", entry.EnvKey, entry.Target, uploadErr))
 			continue
 		}
+
+		// Store the hash → bundleID mapping so the claim mutator can thread
+		// it into spec bundle_map for node-side materialization.
+		holder.AddBundleMapping(hash, string(bundleID))
 
 		field, record := RewriteSpecialEnvEntry(mapping, hash)
 
