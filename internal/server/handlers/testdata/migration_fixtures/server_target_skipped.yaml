@@ -1,0 +1,26 @@
+# Server and nodes targets are not job-scoped — they should be skipped.
+description: server/nodes targets skip migration
+env:
+  PLOY_CA_CERTS:
+    - value: "cert-data"
+      target: server
+      secret: true
+  CODEX_AUTH_JSON:
+    - value: '{"token":"t"}'
+      target: nodes
+      secret: true
+existing_ca: {}
+existing_home: {}
+expect:
+  rewritten: 0
+  rejected: 0
+  skipped: 2
+  entries:
+    - env_key: CODEX_AUTH_JSON
+      target: nodes
+      action: skip
+      target_field: home
+    - env_key: PLOY_CA_CERTS
+      target: server
+      action: skip
+      target_field: ca

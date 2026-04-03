@@ -59,7 +59,7 @@ type jobStore struct {
 
 	// Job listing (TUI)
 	listJobsForTUI  mockCall[store.ListJobsForTUIParams, []store.ListJobsForTUIRow]
-	countJobsForTUI mockCall[*types.RunID, int64]
+	countJobsForTUI mockCall[*string, int64]
 
 	// Claiming
 	claimJob   mockCall[types.NodeID, store.Job]
@@ -367,7 +367,7 @@ func (m *jobStore) ListJobsForTUI(ctx context.Context, arg store.ListJobsForTUIP
 	return m.listJobsForTUI.record(arg)
 }
 
-func (m *jobStore) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error) {
+func (m *jobStore) CountJobsForTUI(ctx context.Context, runID *string) (int64, error) {
 	return m.countJobsForTUI.record(runID)
 }
 

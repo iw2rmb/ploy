@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"sort"
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // SpecialEnvMapping defines how a legacy env key maps to a typed Hydra field.
@@ -249,5 +253,184 @@ func LogMigrationReport(report *MigrationReport) {
 				"reason", e.Reason,
 			)
 		}
+	}
+}
+
+// MigrationExecResult summarizes the outcome of executing a migration.
+type MigrationExecResult struct {
+	Persisted int // Number of typed records persisted.
+	Deleted   int // Number of legacy env records removed.
+	Rejected  int // Number of entries rejected (conflict).
+	Skipped   int // Number of entries skipped (non-job target).
+	Errors    []string
+}
+
+// contentHash computes a deterministic SHA-256 hex hash of the given value.
+// This is used to derive the content-addressable identifier for migrated
+// env values that become file-backed typed records.
+func contentHash(value string) string {
+	h := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(h[:])
+}
+
+// ExecuteMigration persists rewrite-eligible report entries as typed ca/home/in
+// records and removes the corresponding legacy env records from both the store
+// and the in-memory ConfigHolder.
+//
+// Content hashes are computed from GlobalEnvVar values via SHA-256. The caller
+// is responsible for ensuring that blob objects with matching hashes are
+// available in object storage before nodes attempt materialization.
+func ExecuteMigration(
+	ctx context.Context,
+	report *MigrationReport,
+	st store.Store,
+	holder *ConfigHolder,
+) (*MigrationExecResult, error) {
+	result := &MigrationExecResult{
+		Rejected: report.Rejected,
+		Skipped:  report.Skipped,
+	}
+
+	// Build a lookup from (envKey, target) → env value for hash computation.
+	allEnv := holder.GetGlobalEnvAll()
+
+	for _, entry := range report.Entries {
+		if entry.Action != MigrationActionRewrite {
+			continue
+		}
+
+		mapping := LookupSpecialEnvMapping(entry.EnvKey)
+		if mapping == nil {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"no mapping for key %q (internal error)", entry.EnvKey))
+			continue
+		}
+
+		// Find the env value for this specific (key, target) pair.
+		target, err := domaintypes.ParseGlobalEnvTarget(entry.Target)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"invalid target %q for key %q: %v", entry.Target, entry.EnvKey, err))
+			continue
+		}
+
+		var envValue string
+		var found bool
+		for _, ev := range allEnv[entry.EnvKey] {
+			if ev.Target == target {
+				envValue = ev.Value
+				found = true
+				break
+			}
+		}
+		if !found {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"env value not found for key %q target %q", entry.EnvKey, entry.Target))
+			continue
+		}
+
+		hash := contentHash(envValue)
+		field, record := RewriteSpecialEnvEntry(mapping, hash)
+
+		// Persist typed record to each target section.
+		for _, section := range entry.Sections {
+			if persistErr := persistTypedRecord(ctx, st, holder, field, record, section, mapping); persistErr != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf(
+					"persist %s record for key %q section %q: %v",
+					field, entry.EnvKey, section, persistErr))
+				continue
+			}
+			result.Persisted++
+		}
+
+		// Delete legacy env record from store and holder.
+		if deleteErr := st.DeleteGlobalEnv(ctx, store.DeleteGlobalEnvParams{
+			Key:    entry.EnvKey,
+			Target: target.String(),
+		}); deleteErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"delete legacy env key %q target %q: %v",
+				entry.EnvKey, entry.Target, deleteErr))
+			continue
+		}
+		holder.DeleteGlobalEnvVar(entry.EnvKey, target)
+		result.Deleted++
+	}
+
+	return result, nil
+}
+
+// persistTypedRecord persists a single typed record (ca, home, or in) to the
+// store and updates the in-memory ConfigHolder.
+func persistTypedRecord(
+	ctx context.Context,
+	st store.Store,
+	holder *ConfigHolder,
+	field, record, section string,
+	mapping *SpecialEnvMapping,
+) error {
+	switch field {
+	case "ca":
+		if err := st.UpsertConfigCA(ctx, store.UpsertConfigCAParams{
+			Hash:    record,
+			Section: section,
+		}); err != nil {
+			return err
+		}
+		holder.AddConfigCA(section, record)
+
+	case "home":
+		dst := mapping.Destination
+		if err := st.UpsertConfigHome(ctx, store.UpsertConfigHomeParams{
+			Entry:   record,
+			Dst:     dst,
+			Section: section,
+		}); err != nil {
+			return err
+		}
+		holder.AddConfigHome(section, ConfigHomeEntry{
+			Entry:   record,
+			Dst:     dst,
+			Section: section,
+		})
+
+	case "in":
+		dst := mapping.Destination
+		if err := st.UpsertConfigIn(ctx, store.UpsertConfigInParams{
+			Entry:   record,
+			Dst:     dst,
+			Section: section,
+		}); err != nil {
+			return err
+		}
+		holder.AddConfigIn(section, ConfigInEntry{
+			Entry:   record,
+			Dst:     dst,
+			Section: section,
+		})
+
+	default:
+		return fmt.Errorf("unknown field %q", field)
+	}
+	return nil
+}
+
+// LogMigrationExecResult logs the execution result of a migration.
+func LogMigrationExecResult(result *MigrationExecResult) {
+	if result.Persisted == 0 && result.Deleted == 0 && result.Rejected == 0 && result.Skipped == 0 {
+		slog.Info("special env migration: no special env keys found")
+		return
+	}
+
+	slog.Info("special env migration: execution complete",
+		"persisted", result.Persisted,
+		"deleted", result.Deleted,
+		"rejected", result.Rejected,
+		"skipped", result.Skipped,
+		"errors", len(result.Errors),
+	)
+
+	for _, e := range result.Errors {
+		slog.Error("special env migration: error", "detail", e)
 	}
 }

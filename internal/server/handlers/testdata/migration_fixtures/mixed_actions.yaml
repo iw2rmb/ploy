@@ -1,0 +1,40 @@
+# Mixed scenario: one rewrite, one reject, one skip.
+description: mixed rewrite/reject/skip across targets
+env:
+  PLOY_CA_CERTS:
+    - value: "cert"
+      target: gates
+      secret: true
+  CODEX_AUTH_JSON:
+    - value: '{"token":"t"}'
+      target: steps
+      secret: true
+  CODEX_CONFIG_TOML:
+    - value: "toml-data"
+      target: server
+      secret: true
+existing_ca: {}
+existing_home:
+  mig:
+    - entry: "abc:.codex/auth.json:ro"
+      dst: ".codex/auth.json"
+expect:
+  rewritten: 1
+  rejected: 1
+  skipped: 1
+  entries:
+    - env_key: CODEX_AUTH_JSON
+      target: steps
+      action: reject
+      target_field: home
+      destination: ".codex/auth.json"
+      sections: [heal, mig]
+    - env_key: CODEX_CONFIG_TOML
+      target: server
+      action: skip
+      target_field: home
+    - env_key: PLOY_CA_CERTS
+      target: gates
+      action: rewrite
+      target_field: ca
+      sections: [pre_gate, re_gate, post_gate]

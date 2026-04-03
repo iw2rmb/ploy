@@ -1,0 +1,69 @@
+# All six special env keys with steps target — all should rewrite to typed fields.
+description: full design mapping table rewrite for steps target
+env:
+  PLOY_CA_CERTS:
+    - value: "-----BEGIN CERT-----\nfake-cert\n-----END CERT-----"
+      target: steps
+      secret: true
+  CODEX_AUTH_JSON:
+    - value: '{"token":"test-auth"}'
+      target: steps
+      secret: true
+  CODEX_CONFIG_TOML:
+    - value: "[codex]\nkey = \"val\""
+      target: steps
+      secret: true
+  CRUSH_JSON:
+    - value: '{"endpoint":"https://crush.example.com"}'
+      target: steps
+      secret: true
+  CCR_CONFIG_JSON:
+    - value: '{"router":"v2"}'
+      target: steps
+      secret: true
+  CODEX_PROMPT:
+    - value: "You are a helpful assistant."
+      target: steps
+      secret: false
+existing_ca: {}
+existing_home: {}
+expect:
+  rewritten: 6
+  rejected: 0
+  skipped: 0
+  entries:
+    - env_key: CCR_CONFIG_JSON
+      target: steps
+      action: rewrite
+      target_field: home
+      destination: ".claude-code-router/config.json"
+      sections: [heal, mig]
+    - env_key: CODEX_AUTH_JSON
+      target: steps
+      action: rewrite
+      target_field: home
+      destination: ".codex/auth.json"
+      sections: [heal, mig]
+    - env_key: CODEX_CONFIG_TOML
+      target: steps
+      action: rewrite
+      target_field: home
+      destination: ".codex/config.toml"
+      sections: [heal, mig]
+    - env_key: CODEX_PROMPT
+      target: steps
+      action: rewrite
+      target_field: in
+      destination: "/in/codex-prompt.txt"
+      sections: [heal, mig]
+    - env_key: CRUSH_JSON
+      target: steps
+      action: rewrite
+      target_field: home
+      destination: ".config/crush/crush.json"
+      sections: [heal, mig]
+    - env_key: PLOY_CA_CERTS
+      target: steps
+      action: rewrite
+      target_field: ca
+      sections: [heal, mig]

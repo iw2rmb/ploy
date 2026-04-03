@@ -167,6 +167,17 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	}
 	slog.Info("loaded global home entries from store", "count", len(globalHomeEntries))
 
+	// Load global in entries from the store for ConfigHolder initialization.
+	var globalInEntries []store.ConfigIn
+	if st != nil {
+		globalInEntries, err = st.ListConfigIn(ctx)
+		if err != nil {
+			slog.Warn("failed to load global in entries from store, continuing with empty set", "err", err)
+			globalInEntries = nil
+		}
+	}
+	slog.Info("loaded global in entries from store", "count", len(globalInEntries))
+
 	// Initialize config holder for runtime configuration access.
 	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
 
@@ -192,10 +203,32 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		configHolder.SetConfigHome(section, entries)
 	}
 
-	// Scan for special legacy env keys that should be migrated to typed Hydra
-	// fields (ca, home, in). Log a migration report to support controlled rollout.
+	// Populate ConfigHolder with persisted in entries keyed by section.
+	inBySection := make(map[string][]handlers.ConfigInEntry)
+	for _, e := range globalInEntries {
+		inBySection[e.Section] = append(inBySection[e.Section], handlers.ConfigInEntry{
+			Entry:   e.Entry,
+			Dst:     e.Dst,
+			Section: e.Section,
+		})
+	}
+	for section, entries := range inBySection {
+		configHolder.SetConfigIn(section, entries)
+	}
+
+	// Execute hard-cut migration: persist rewrite-eligible legacy special env keys
+	// as typed ca/home/in records and remove the legacy env records.
 	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, caBySection, homeBySection)
-	handlers.LogMigrationReport(migrationReport)
+	if st != nil {
+		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder)
+		if execErr != nil {
+			slog.Error("special env migration: execution failed", "err", execErr)
+		} else {
+			handlers.LogMigrationExecResult(execResult)
+		}
+	} else {
+		handlers.LogMigrationReport(migrationReport)
+	}
 
 	// Register HTTP routes.
 	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)

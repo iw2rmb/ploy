@@ -34,18 +34,26 @@ type ConfigHomeEntry struct {
 	Section string `json:"section"`
 }
 
+// ConfigInEntry represents a single global in mount entry with its section.
+type ConfigInEntry struct {
+	Entry   string `json:"entry"`
+	Dst     string `json:"dst"`
+	Section string `json:"section"`
+}
+
 // ConfigHolder provides thread-safe access to runtime configuration, including
 // GitLab settings, global environment variables, and typed Hydra overlays.
 // Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
 // Hydra overlays are stored per section (pre_gate, re_gate, post_gate, mig, heal).
-// Config CA and Home entries are section-keyed and synced into hydra overlays.
+// Config CA, Home, and In entries are section-keyed and synced into hydra overlays.
 type ConfigHolder struct {
-	mu        sync.RWMutex
-	gitlab    config.GitLabConfig
-	globalEnv map[string][]GlobalEnvVar
-	hydra     map[string]*HydraJobConfig
-	configCA  map[string][]string // section → []hash
-	configHome map[string][]ConfigHomeEntry // section → []entry
+	mu         sync.RWMutex
+	gitlab     config.GitLabConfig
+	globalEnv  map[string][]GlobalEnvVar
+	hydra      map[string]*HydraJobConfig
+	configCA   map[string][]string          // section → []hash
+	configHome map[string][]ConfigHomeEntry  // section → []entry
+	configIn   map[string][]ConfigInEntry    // section → []entry
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
@@ -452,4 +460,109 @@ func (h *ConfigHolder) syncHydraHomeLocked(section string) {
 		home[i] = e.Entry
 	}
 	cfg.Home = home
+}
+
+// GetConfigIn returns all in entries for a section (sorted by dst).
+func (h *ConfigHolder) GetConfigIn(section string) []ConfigInEntry {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	entries := h.configIn[section]
+	if len(entries) == 0 {
+		return nil
+	}
+	cp := make([]ConfigInEntry, len(entries))
+	copy(cp, entries)
+	return cp
+}
+
+// GetConfigInAll returns a copy of all in entries keyed by section.
+func (h *ConfigHolder) GetConfigInAll() map[string][]ConfigInEntry {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if len(h.configIn) == 0 {
+		return nil
+	}
+	cp := make(map[string][]ConfigInEntry, len(h.configIn))
+	for k, v := range h.configIn {
+		s := make([]ConfigInEntry, len(v))
+		copy(s, v)
+		cp[k] = s
+	}
+	return cp
+}
+
+// SetConfigIn replaces the in entry set for a section and syncs into hydra overlays.
+func (h *ConfigHolder) SetConfigIn(section string, entries []ConfigInEntry) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.configIn == nil {
+		h.configIn = make(map[string][]ConfigInEntry)
+	}
+	if len(entries) == 0 {
+		delete(h.configIn, section)
+	} else {
+		cp := make([]ConfigInEntry, len(entries))
+		copy(cp, entries)
+		h.configIn[section] = cp
+	}
+	h.syncHydraInLocked(section)
+}
+
+// AddConfigIn adds or replaces an in entry by destination in a section (dedup by dst, sort by dst).
+func (h *ConfigHolder) AddConfigIn(section string, entry ConfigInEntry) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.configIn == nil {
+		h.configIn = make(map[string][]ConfigInEntry)
+	}
+	entries := h.configIn[section]
+	for i, e := range entries {
+		if e.Dst == entry.Dst {
+			entries[i] = entry
+			h.configIn[section] = entries
+			h.syncHydraInLocked(section)
+			return
+		}
+	}
+	h.configIn[section] = append(entries, entry)
+	sort.Slice(h.configIn[section], func(i, j int) bool {
+		return h.configIn[section][i].Dst < h.configIn[section][j].Dst
+	})
+	h.syncHydraInLocked(section)
+}
+
+// DeleteConfigIn removes an in entry by destination from a section.
+func (h *ConfigHolder) DeleteConfigIn(section, dst string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	entries := h.configIn[section]
+	for i, e := range entries {
+		if e.Dst == dst {
+			h.configIn[section] = append(entries[:i], entries[i+1:]...)
+			if len(h.configIn[section]) == 0 {
+				delete(h.configIn, section)
+			}
+			break
+		}
+	}
+	h.syncHydraInLocked(section)
+}
+
+// syncHydraInLocked updates the hydra overlay In field for a section.
+// Must be called with h.mu held.
+func (h *ConfigHolder) syncHydraInLocked(section string) {
+	if h.hydra == nil {
+		h.hydra = make(map[string]*HydraJobConfig)
+	}
+	cfg := h.hydra[section]
+	if cfg == nil {
+		cfg = &HydraJobConfig{}
+		h.hydra[section] = cfg
+	}
+	entries := h.configIn[section]
+	in := make([]string, len(entries))
+	for i, e := range entries {
+		in[i] = e.Entry
+	}
+	cfg.In = in
 }

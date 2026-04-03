@@ -510,6 +510,22 @@ CREATE TABLE IF NOT EXISTS config_home (
 );
 CREATE INDEX IF NOT EXISTS config_home_section_idx ON config_home(section);
 
+-- Global In Entries (config_in)
+-- Stores canonical in mount entries for injection into jobs.
+-- Each entry is "shortHash:dst" where dst starts with /in/.
+-- section controls which job phase receives the entry (pre_gate, re_gate, post_gate, mig, heal).
+-- Composite primary key on (dst, section) enforces one entry per destination per section
+-- (deterministic dedup by destination).
+DROP TABLE IF EXISTS config_in;
+CREATE TABLE IF NOT EXISTS config_in (
+  entry       TEXT NOT NULL,        -- Full canonical entry: "shortHash:dst"
+  dst         TEXT NOT NULL,        -- Extracted normalized destination for dedup
+  section     TEXT NOT NULL CHECK (section IN ('pre_gate', 're_gate', 'post_gate', 'mig', 'heal')),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (dst, section)
+);
+CREATE INDEX IF NOT EXISTS config_in_section_idx ON config_in(section);
+
 -- Spec bundles (pre-uploaded tar archives referenced by spec tmp_bundle fields)
 -- One row per uploaded bundle; id becomes the bundle_id in TmpBundleRef.
 -- last_ref_at is updated each time a spec or run references this bundle, enabling

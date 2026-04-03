@@ -130,10 +130,10 @@ func TestListJobsHandler_RunIDFilter(t *testing.T) {
 	if !st.listJobsForTUI.called {
 		t.Fatal("expected ListJobsForTUI to be called")
 	}
-	if st.listJobsForTUI.params.RunID == nil || *st.listJobsForTUI.params.RunID != runID {
+	if st.listJobsForTUI.params.RunID == nil || *st.listJobsForTUI.params.RunID != runID.String() {
 		t.Fatalf("expected run_id filter %q, got %v", runID, st.listJobsForTUI.params.RunID)
 	}
-	if st.countJobsForTUI.params == nil || *st.countJobsForTUI.params != runID {
+	if st.countJobsForTUI.params == nil || *st.countJobsForTUI.params != runID.String() {
 		t.Fatalf("expected count run_id filter %q, got %v", runID, st.countJobsForTUI.params)
 	}
 }

@@ -30,7 +30,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		st := &configStore{}
 		st.getSpecBundleByCID.err = pgx.ErrNoRows // no existing bundle
 		st.createSpecBundle.val = store.SpecBundle{
-			ID:        bundleID,
+			ID:        string(bundleID),
 			Cid:       cid,
 			Digest:    digest,
 			Size:      int64(len(bundleData)),
@@ -67,7 +67,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		existingID := domaintypes.NewSpecBundleID()
 		st := &configStore{}
 		st.getSpecBundleByCID.val = store.SpecBundle{
-			ID:     existingID,
+			ID:     string(existingID),
 			Cid:    cid,
 			Digest: digest,
 			Size:   int64(len(bundleData)),
@@ -134,7 +134,7 @@ func TestUploadSpecBundleHandler(t *testing.T) {
 		st := &configStore{}
 		st.getSpecBundleByCID.err = pgx.ErrNoRows
 		st.createSpecBundle.val = store.SpecBundle{
-			ID:        bundleID,
+			ID:        string(bundleID),
 			Cid:       cid,
 			Digest:    digest,
 			Size:      int64(len(bundleData)),
@@ -165,7 +165,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	t.Run("DownloadSuccess", func(t *testing.T) {
 		st := &configStore{}
 		st.getSpecBundle.val = store.SpecBundle{
-			ID:        bundleID,
+			ID:        string(bundleID),
 			ObjectKey: &objectKey,
 			}
 		bs := bsmock.New()
@@ -210,6 +210,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 
 	t.Run("InvalidID", func(t *testing.T) {
 		st := &configStore{}
+		st.getSpecBundle.err = pgx.ErrNoRows
 		bs := bsmock.New()
 
 		req := httptest.NewRequest(http.MethodGet, "/v1/spec-bundles/not-valid-id", nil)
@@ -217,8 +218,8 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		w := httptest.NewRecorder()
 		downloadSpecBundleHandler(st, bs)(w, req)
 
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400 for invalid ID, got %d", w.Code)
+		if w.Code != http.StatusNotFound {
+			t.Errorf("expected 404 for invalid ID, got %d", w.Code)
 		}
 	})
 
@@ -226,7 +227,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 		// Metadata row exists but blob is absent from object store: expect 404, not 503.
 		st := &configStore{}
 		st.getSpecBundle.val = store.SpecBundle{
-			ID:        bundleID,
+			ID:        string(bundleID),
 			ObjectKey: &objectKey,
 			}
 		bs := bsmock.New() // empty: key not seeded
@@ -244,7 +245,7 @@ func TestDownloadSpecBundleHandler(t *testing.T) {
 	t.Run("MissingObjectKey", func(t *testing.T) {
 		st := &configStore{}
 		st.getSpecBundle.val = store.SpecBundle{
-			ID:        bundleID,
+			ID:        string(bundleID),
 			ObjectKey: nil, // no object key
 			}
 		bs := bsmock.New()
@@ -272,7 +273,7 @@ func TestSpecBundleDownloadLastRefInvokedWhenRequestCanceledImmediatelyAfterResp
 		updateSpecBundleLastRefAtDone:    make(chan struct{}),
 	}
 	st.getSpecBundle.val = store.SpecBundle{
-		ID:        bundleID,
+		ID:        string(bundleID),
 		ObjectKey: &objectKey,
 		}
 	bs := bsmock.New()

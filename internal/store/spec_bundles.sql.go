@@ -8,7 +8,6 @@ package store
 import (
 	"context"
 
-	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -19,11 +18,11 @@ RETURNING id, cid, digest, size, object_key, created_by, created_at, last_ref_at
 `
 
 type CreateSpecBundleParams struct {
-	ID        types.SpecBundleID `json:"id"`
-	Cid       string             `json:"cid"`
-	Digest    string             `json:"digest"`
-	Size      int64              `json:"size"`
-	CreatedBy *string            `json:"created_by"`
+	ID        string  `json:"id"`
+	Cid       string  `json:"cid"`
+	Digest    string  `json:"digest"`
+	Size      int64   `json:"size"`
+	CreatedBy *string `json:"created_by"`
 }
 
 // Creates a new spec bundle metadata row. Blob data is stored in object storage.
@@ -50,6 +49,17 @@ func (q *Queries) CreateSpecBundle(ctx context.Context, arg CreateSpecBundlePara
 	return i, err
 }
 
+const deleteSpecBundle = `-- name: DeleteSpecBundle :exec
+DELETE FROM spec_bundles WHERE id = $1
+`
+
+// Deletes a spec bundle metadata row by ID.
+// Called by blobpersist as rollback when object storage upload fails.
+func (q *Queries) DeleteSpecBundle(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteSpecBundle, id)
+	return err
+}
+
 const getSpecBundle = `-- name: GetSpecBundle :one
 SELECT id, cid, digest, size, object_key, created_by, created_at, last_ref_at
 FROM spec_bundles
@@ -57,7 +67,7 @@ WHERE id = $1
 `
 
 // Returns spec bundle metadata including object_key for object-storage retrieval.
-func (q *Queries) GetSpecBundle(ctx context.Context, id types.SpecBundleID) (SpecBundle, error) {
+func (q *Queries) GetSpecBundle(ctx context.Context, id string) (SpecBundle, error) {
 	row := q.db.QueryRow(ctx, getSpecBundle, id)
 	var i SpecBundle
 	err := row.Scan(
@@ -141,30 +151,6 @@ func (q *Queries) ListSpecBundles(ctx context.Context, arg ListSpecBundlesParams
 	return items, nil
 }
 
-const updateSpecBundleLastRefAt = `-- name: UpdateSpecBundleLastRefAt :exec
-UPDATE spec_bundles
-SET last_ref_at = now()
-WHERE id = $1
-`
-
-// Updates last_ref_at to now() for the given spec bundle.
-// Call this whenever a spec or run references the bundle to keep GC metadata fresh.
-func (q *Queries) UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error {
-	_, err := q.db.Exec(ctx, updateSpecBundleLastRefAt, id)
-	return err
-}
-
-const deleteSpecBundle = `-- name: DeleteSpecBundle :exec
-DELETE FROM spec_bundles WHERE id = $1
-`
-
-// Deletes a spec bundle metadata row by ID.
-// Called by blobpersist as rollback when object storage upload fails.
-func (q *Queries) DeleteSpecBundle(ctx context.Context, id types.SpecBundleID) error {
-	_, err := q.db.Exec(ctx, deleteSpecBundle, id)
-	return err
-}
-
 const listSpecBundlesUnreferencedBefore = `-- name: ListSpecBundlesUnreferencedBefore :many
 SELECT id, cid, digest, size, object_key, created_by, created_at, last_ref_at
 FROM spec_bundles
@@ -201,4 +187,17 @@ func (q *Queries) ListSpecBundlesUnreferencedBefore(ctx context.Context, lastRef
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateSpecBundleLastRefAt = `-- name: UpdateSpecBundleLastRefAt :exec
+UPDATE spec_bundles
+SET last_ref_at = now()
+WHERE id = $1
+`
+
+// Updates last_ref_at to now() for the given spec bundle.
+// Call this whenever a spec or run references the bundle to keep GC metadata fresh.
+func (q *Queries) UpdateSpecBundleLastRefAt(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, updateSpecBundleLastRefAt, id)
+	return err
 }
