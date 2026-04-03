@@ -622,7 +622,8 @@ build_gate:
         command: ["codex", "--input", "/workspace", "--out", "/out"]
         in:
           - ./codex-prompt.txt:/in/codex-prompt.txt
-          - ~/.codex/auth.json:/in/codex-auth.json
+        home:
+          - ~/.codex/auth.json:.codex/auth.json:ro
         expectations:
           artifacts:
             - path: /out/gate-profile-candidate.json
