@@ -51,7 +51,7 @@
 [execution_orchestrator_router_runtime.go](execution_orchestrator_router_runtime.go) Router runtime integration for gate/heal decision handoff and recovery metadata propagation during execution.
 [execution_orchestrator_test.go](execution_orchestrator_test.go) Unit tests covering execution orchestrator behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_orchestrator_tmpbundle.go](execution_orchestrator_tmpbundle.go) Temporary bundle extraction and materialization helpers for safe staged inputs in job workspaces.
-[execution_orchestrator_tmpbundle_test.go](execution_orchestrator_tmpbundle_test.go) Validates temporary bundle extraction and workspace materialization safeguards for orchestrated job inputs.
+[execution_orchestrator_tmpbundle_test.go](execution_orchestrator_tmpbundle_test.go) Tests tmp-bundle digest verification plus safe extraction rules for archive paths, entry types, and duplicate entries.
 [execution_rehydrate_test.go](execution_rehydrate_test.go) Unit tests covering execution rehydrate behavior, edge cases, and contract expectations for nodeagent flows.
 [gate_context.go](gate_context.go) Gate execution context structures and helpers used to pass gate-profile and decision state across phases.
 [git/](git) Git helpers for workspace status, commit/push operations, SHA lookup, and secret redaction used by job execution.
