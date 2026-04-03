@@ -10,21 +10,21 @@ import (
 
 // injectHealingEnvVars adds recovery-job environment variables to the manifest.
 func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, workspace string) {
-	if manifest.Env == nil {
-		manifest.Env = map[string]string{}
+	if manifest.Envs == nil {
+		manifest.Envs = map[string]string{}
 	}
-	manifest.Env["PLOY_HOST_WORKSPACE"] = workspace
-	manifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
-	manifest.Env["PLOY_CA_CERTS"] = "/etc/ploy/certs/ca.crt"
-	manifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
-	manifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+	manifest.Envs["PLOY_HOST_WORKSPACE"] = workspace
+	manifest.Envs["PLOY_SERVER_URL"] = r.cfg.ServerURL
+	manifest.Envs["PLOY_CA_CERTS"] = "/etc/ploy/certs/ca.crt"
+	manifest.Envs["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
+	manifest.Envs["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
 
 	if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
-		manifest.Env["PLOY_API_TOKEN"] = token
+		manifest.Envs["PLOY_API_TOKEN"] = token
 	} else if !r.cfg.HTTP.TLS.Enabled {
 		if data, err := os.ReadFile(bearerTokenPath()); err == nil {
 			if token := strings.TrimSpace(string(data)); token != "" {
-				manifest.Env["PLOY_API_TOKEN"] = token
+				manifest.Envs["PLOY_API_TOKEN"] = token
 			}
 		} else {
 			slog.Warn("recovery: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)

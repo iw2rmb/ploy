@@ -49,6 +49,11 @@ type StepManifest struct {
 
 	// Home lists canonical home-relative entries ("shortHash:dst{:ro}").
 	Home []string
+
+	// BundleMap maps content hashes to spec bundle download identifiers.
+	// The nodeagent uses this to resolve Hydra entry hashes → bundleIDs
+	// for resource download during staged materialization.
+	BundleMap map[string]string
 }
 
 // StepInputMode describes how the input is mounted into the container.

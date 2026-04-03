@@ -92,8 +92,8 @@ func TestParseSpec(t *testing.T) {
 		{
 			name: "single_step_merges_step_env",
 			json: `{
-				"env": {"A":"1","B":"2"},
-				"steps": [{"image": "img", "env": {"B":"step","C":"3"}}]
+				"envs": {"A":"1","B":"2"},
+				"steps": [{"image": "img", "envs": {"B":"step","C":"3"}}]
 			}`,
 			check: func(t *testing.T, env map[string]string, _ RunOptions, _ error) {
 				if env["A"] != "1" || env["B"] != "step" || env["C"] != "3" {
@@ -104,10 +104,10 @@ func TestParseSpec(t *testing.T) {
 		{
 			name: "multi_step_returns_global_env_only",
 			json: `{
-				"env": {"A":"1"},
+				"envs": {"A":"1"},
 				"steps": [
-					{"image":"a","env":{"A":"step0","B":"0"}},
-					{"image":"b","env":{"A":"step1","B":"1"}}
+					{"image":"a","envs":{"A":"step0","B":"0"}},
+					{"image":"b","envs":{"A":"step1","B":"1"}}
 				]
 			}`,
 			check: func(t *testing.T, env map[string]string, opts RunOptions, _ error) {
@@ -183,7 +183,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 				{
 					Image:   testJobImage("docker.io/test/mig:v1"),
 					Command: contracts.CommandSpec{Exec: []string{"echo", "hello"}},
-					Env:     map[string]string{"KEY": "value"},
+					Envs:    map[string]string{"KEY": "value"},
 				},
 			},
 			BuildGate: &contracts.BuildGateConfig{
@@ -211,7 +211,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 							Retries: 3,
 							Image:   testJobImage("docker.io/test/heal:v1"),
 							Command: contracts.CommandSpec{Shell: "fix.sh"},
-							Env:     map[string]string{"MODE": "auto"},
+							Envs:    map[string]string{"MODE": "auto"},
 						},
 					},
 				},
@@ -282,12 +282,12 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 				{
 					Image:   testJobImage("docker.io/test/step1:v1"),
 					Command: contracts.CommandSpec{Shell: "step1.sh"},
-					Env:     map[string]string{"STEP": "1"},
+					Envs:    map[string]string{"STEP": "1"},
 				},
 				{
 					Image:   testJobImage("docker.io/test/step2:v1"),
 					Command: contracts.CommandSpec{Exec: []string{"step2", "--flag"}},
-					Env:     map[string]string{"STEP": "2"},
+					Envs:    map[string]string{"STEP": "2"},
 				},
 			},
 		}
@@ -375,12 +375,10 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 	t.Parallel()
 
-	bundle := &contracts.TmpBundleRef{
-		BundleID: "bun-123",
-		CID:      "cid-abc",
-		Digest:   "sha256:deadbeef",
-		Entries:  []string{"config.json", "secret.txt"},
-	}
+	hydraCA := []string{"abc1234"}
+	hydraIn := []string{"def5678:/in/config"}
+	hydraOut := []string{"aaa1111:/out/result"}
+	hydraHome := []string{"bbb2222:dotfile:ro"}
 	amataSpec := &contracts.AmataRunSpec{
 		Spec: "task: fix-it\nprompt: fix the bug",
 		Set: []contracts.AmataSetParam{
@@ -400,20 +398,47 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 
 	probes := []fieldProbe{
 		{
-			name:          "TmpBundle",
-			stepMutator:   func(s *contracts.MigStep) { s.TmpBundle = bundle },
-			healMutator:   func(a *contracts.HealingActionSpec) { a.TmpBundle = bundle },
-			routerMutator: func(r *contracts.RouterSpec) { r.TmpBundle = bundle },
+			name: "HydraFields",
+			stepMutator: func(s *contracts.MigStep) {
+				s.CA = hydraCA
+				s.In = hydraIn
+				s.Out = hydraOut
+				s.Home = hydraHome
+			},
+			healMutator: func(a *contracts.HealingActionSpec) {
+				a.CA = hydraCA
+				a.In = hydraIn
+				a.Out = hydraOut
+				a.Home = hydraHome
+			},
+			routerMutator: func(r *contracts.RouterSpec) {
+				r.CA = hydraCA
+				r.In = hydraIn
+				r.Out = hydraOut
+				r.Home = hydraHome
+			},
 			checkPresent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
-				if mc.TmpBundle == nil || mc.TmpBundle.BundleID != "bun-123" {
-					t.Fatalf("TmpBundle: got %v", mc.TmpBundle)
+				if len(mc.CA) != 1 || mc.CA[0] != "abc1234" {
+					t.Fatalf("CA: got %v", mc.CA)
+				}
+				if len(mc.In) != 1 || mc.In[0] != "def5678:/in/config" {
+					t.Fatalf("In: got %v", mc.In)
+				}
+				if len(mc.Out) != 1 || mc.Out[0] != "aaa1111:/out/result" {
+					t.Fatalf("Out: got %v", mc.Out)
+				}
+				if len(mc.Home) != 1 || mc.Home[0] != "bbb2222:dotfile:ro" {
+					t.Fatalf("Home: got %v", mc.Home)
 				}
 			},
 			checkAbsent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
-				if mc.TmpBundle != nil {
-					t.Errorf("TmpBundle: got non-nil, want nil")
+				if len(mc.CA) != 0 {
+					t.Errorf("CA: got %v, want empty", mc.CA)
+				}
+				if len(mc.In) != 0 {
+					t.Errorf("In: got %v, want empty", mc.In)
 				}
 			},
 		},

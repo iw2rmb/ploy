@@ -44,7 +44,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			spec: json.RawMessage(`{
 				"job_id": "` + testKSUID + `",
 				"steps": [{"image": "docker.io/test/mig:latest"}],
-				"env": {
+				"envs": {
 					"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
 					"CODEX_AUTH_JSON": "{\"api_key\":\"sk-xxx\",\"org_id\":\"org-yyy\"}",
 					"OPENAI_API_KEY": "sk-openai-test-key-12345"
@@ -62,7 +62,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			name: "nested_env_not_merged",
 			spec: json.RawMessage(`{
 					"steps": [{"image": "docker.io/test/mig:latest"}],
-					"env": {
+					"envs": {
 						"GLOBAL_VAR": "global_value",
 						"SHARED_VAR": "top_level_value"
 					},
@@ -85,7 +85,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			name: "empty_env_values_preserved",
 			spec: json.RawMessage(`{
 				"steps": [{"image": "docker.io/test/mig:latest"}],
-				"env": {
+				"envs": {
 					"EMPTY_VAR": "",
 					"WHITESPACE_VAR": "   "
 				}
@@ -99,7 +99,7 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			name: "multiline_cert_bundle_preserved",
 			spec: json.RawMessage(`{
 				"steps": [{"image": "docker.io/test/mig:latest"}],
-				"env": {
+				"envs": {
 					"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\nMIIBkT...\n-----END CERTIFICATE-----\n-----BEGIN CERTIFICATE-----\nMIICaT...\n-----END CERTIFICATE-----"
 				}
 			}`),
@@ -148,7 +148,7 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 		"job_id": "` + testKSUID + `",
 		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"gitlab_pat": "glpat-test-token",
-		"env": {
+		"envs": {
 			"PLOY_CA_CERTS": "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
 			"CODEX_AUTH_JSON": "{\"token\":\"test-codex-token\"}",
 			"OPENAI_API_KEY": "sk-test-openai-key",
@@ -186,13 +186,13 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 	}
 
 	for key, wantVal := range expectedEnv {
-		gotVal, ok := manifest.Env[key]
+		gotVal, ok := manifest.Envs[key]
 		if !ok {
 			t.Errorf("manifest.Env missing key %q", key)
 			continue
 		}
 		if gotVal != wantVal {
-			t.Errorf("manifest.Env[%q] = %q, want %q", key, gotVal, wantVal)
+			t.Errorf("manifest.Envs[%q] = %q, want %q", key, gotVal, wantVal)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 		"build_gate": {
 			"enabled": true
 		},
-		"env": {
+		"envs": {
 			"PLOY_CA_CERTS": "gate-test-cert-bundle",
 			"CODEX_AUTH_JSON": "gate-codex-auth",
 			"GATE_SPECIFIC_VAR": "gate_value"
@@ -251,13 +251,13 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 	}
 
 	for key, wantVal := range expectedEnv {
-		gotVal, ok := gateManifest.Env[key]
+		gotVal, ok := gateManifest.Envs[key]
 		if !ok {
 			t.Errorf("gateManifest.Env missing key %q", key)
 			continue
 		}
 		if gotVal != wantVal {
-			t.Errorf("gateManifest.Env[%q] = %q, want %q", key, gotVal, wantVal)
+			t.Errorf("gateManifest.Envs[%q] = %q, want %q", key, gotVal, wantVal)
 		}
 	}
 
@@ -294,7 +294,7 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	t.Parallel()
 
 	specJSON := json.RawMessage(`{
-		"env": {
+		"envs": {
 			"GLOBAL_VAR": "global_value",
 			"SHARED_VAR": "global_default",
 			"PLOY_CA_CERTS": "global-cert-bundle"
@@ -302,14 +302,14 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 		"steps": [
 			{
 				"image": "step0-mig:latest",
-				"env": {
+				"envs": {
 					"STEP_VAR": "step0_value",
 					"SHARED_VAR": "step0_override"
 				}
 			},
 			{
 				"image": "step1-mig:latest",
-				"env": {
+				"envs": {
 					"STEP_VAR": "step1_value"
 				}
 			}
@@ -334,17 +334,17 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 
 	// Verify step 0 env merge.
-	if manifest0.Env["GLOBAL_VAR"] != "global_value" {
-		t.Errorf("step0: GLOBAL_VAR=%q, want global_value", manifest0.Env["GLOBAL_VAR"])
+	if manifest0.Envs["GLOBAL_VAR"] != "global_value" {
+		t.Errorf("step0: GLOBAL_VAR=%q, want global_value", manifest0.Envs["GLOBAL_VAR"])
 	}
-	if manifest0.Env["STEP_VAR"] != "step0_value" {
-		t.Errorf("step0: STEP_VAR=%q, want step0_value", manifest0.Env["STEP_VAR"])
+	if manifest0.Envs["STEP_VAR"] != "step0_value" {
+		t.Errorf("step0: STEP_VAR=%q, want step0_value", manifest0.Envs["STEP_VAR"])
 	}
-	if manifest0.Env["SHARED_VAR"] != "step0_override" {
-		t.Errorf("step0: SHARED_VAR=%q, want step0_override (step env wins)", manifest0.Env["SHARED_VAR"])
+	if manifest0.Envs["SHARED_VAR"] != "step0_override" {
+		t.Errorf("step0: SHARED_VAR=%q, want step0_override (step env wins)", manifest0.Envs["SHARED_VAR"])
 	}
-	if manifest0.Env["PLOY_CA_CERTS"] != "global-cert-bundle" {
-		t.Errorf("step0: PLOY_CA_CERTS=%q, want global-cert-bundle", manifest0.Env["PLOY_CA_CERTS"])
+	if manifest0.Envs["PLOY_CA_CERTS"] != "global-cert-bundle" {
+		t.Errorf("step0: PLOY_CA_CERTS=%q, want global-cert-bundle", manifest0.Envs["PLOY_CA_CERTS"])
 	}
 
 	// Build manifest for step 1 (should not have step0 override).
@@ -355,14 +355,14 @@ func TestGlobalEnvPropagation_MultiStepRun(t *testing.T) {
 	}
 
 	// Verify step 1 env merge (SHARED_VAR should be global default).
-	if manifest1.Env["GLOBAL_VAR"] != "global_value" {
-		t.Errorf("step1: GLOBAL_VAR=%q, want global_value", manifest1.Env["GLOBAL_VAR"])
+	if manifest1.Envs["GLOBAL_VAR"] != "global_value" {
+		t.Errorf("step1: GLOBAL_VAR=%q, want global_value", manifest1.Envs["GLOBAL_VAR"])
 	}
-	if manifest1.Env["STEP_VAR"] != "step1_value" {
-		t.Errorf("step1: STEP_VAR=%q, want step1_value", manifest1.Env["STEP_VAR"])
+	if manifest1.Envs["STEP_VAR"] != "step1_value" {
+		t.Errorf("step1: STEP_VAR=%q, want step1_value", manifest1.Envs["STEP_VAR"])
 	}
-	if manifest1.Env["SHARED_VAR"] != "global_default" {
-		t.Errorf("step1: SHARED_VAR=%q, want global_default (no step override)", manifest1.Env["SHARED_VAR"])
+	if manifest1.Envs["SHARED_VAR"] != "global_default" {
+		t.Errorf("step1: SHARED_VAR=%q, want global_default (no step override)", manifest1.Envs["SHARED_VAR"])
 	}
 }
 
@@ -418,7 +418,7 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	}
 
 	for key, wantVal := range expectedEnv {
-		gotVal, ok := manifest.Env[key]
+		gotVal, ok := manifest.Envs[key]
 		if !ok {
 			t.Errorf("healingManifest.Env missing key %q", key)
 			continue
@@ -437,7 +437,7 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 	// Test various env key patterns that might be incorrectly filtered.
 	specJSON := json.RawMessage(`{
 		"steps": [{"image": "docker.io/test/mig:latest"}],
-		"env": {
+		"envs": {
 			"NORMAL_KEY": "value1",
 			"lowercase_key": "value2",
 			"MixedCase_Key": "value3",
@@ -480,13 +480,13 @@ func TestGlobalEnvPropagation_NoFiltering(t *testing.T) {
 	}
 
 	for _, key := range expectedKeys {
-		if _, ok := manifest.Env[key]; !ok {
+		if _, ok := manifest.Envs[key]; !ok {
 			t.Errorf("manifest.Env missing key %q (filtered incorrectly)", key)
 		}
 	}
 
 	// Verify total count matches.
-	if len(manifest.Env) != len(expectedKeys) {
-		t.Errorf("manifest.Env has %d keys, want %d", len(manifest.Env), len(expectedKeys))
+	if len(manifest.Envs) != len(expectedKeys) {
+		t.Errorf("manifest.Envs has %d keys, want %d", len(manifest.Envs), len(expectedKeys))
 	}
 }

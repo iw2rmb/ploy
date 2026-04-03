@@ -22,6 +22,10 @@ type RunOptions struct {
 	ServerMetadata  ServerMetadataOptions
 	Steps           []StepMig
 	StackGate       *contracts.StepGateStackSpec
+
+	// BundleMap maps content hashes to spec bundle download identifiers.
+	// Populated from MigSpec.BundleMap during spec-to-run-options conversion.
+	BundleMap map[string]string
 }
 
 // BuildGateOptions configures pre-mig build gate validation.
@@ -48,10 +52,13 @@ type MigContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
 	Env     map[string]string
-	// TmpBundle references a pre-uploaded bundle to extract under /tmp at execution time.
-	// Populated from the spec's tmp_bundle field during spec-to-run-options conversion.
-	// The nodeagent downloads and unpacks this bundle before container launch.
-	TmpBundle *contracts.TmpBundleRef
+
+	// Hydra resource entries for staged materialization and mount planning.
+	CA   []string // canonical CA cert entries (shortHash)
+	In   []string // canonical read-only input entries (shortHash:/in/dst)
+	Out  []string // canonical read-write output entries (shortHash:/out/dst)
+	Home []string // canonical home-relative entries (shortHash:dst{:ro})
+
 	// Amata configures amata-mode execution. When non-nil with a non-empty Spec,
 	// the container runs `amata run /in/amata.yaml` instead of the direct codex path.
 	Amata *contracts.AmataRunSpec
@@ -114,11 +121,14 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 						healing.Retries = 1
 					}
 					healing.Mig = MigContainerSpec{
-						Image:     action.Image,
-						Command:   action.Command,
-						Env:       copyStringMap(action.Env),
-						TmpBundle: action.TmpBundle,
-						Amata:     action.Amata,
+						Image:   action.Image,
+						Command: action.Command,
+						Env:     copyStringMap(action.Envs),
+						CA:      action.CA,
+						In:      action.In,
+						Out:     action.Out,
+						Home:    action.Home,
+						Amata:   action.Amata,
 					}
 					runOpts.Healing = healing
 				}
@@ -127,11 +137,14 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 
 		if spec.BuildGate.Router != nil {
 			runOpts.Router = &MigContainerSpec{
-				Image:     spec.BuildGate.Router.Image,
-				Command:   spec.BuildGate.Router.Command,
-				Env:       copyStringMap(spec.BuildGate.Router.Env),
-				TmpBundle: spec.BuildGate.Router.TmpBundle,
-				Amata:     spec.BuildGate.Router.Amata,
+				Image:   spec.BuildGate.Router.Image,
+				Command: spec.BuildGate.Router.Command,
+				Env:     copyStringMap(spec.BuildGate.Router.Envs),
+				CA:      spec.BuildGate.Router.CA,
+				In:      spec.BuildGate.Router.In,
+				Out:     spec.BuildGate.Router.Out,
+				Home:    spec.BuildGate.Router.Home,
+				Amata:   spec.BuildGate.Router.Amata,
 			}
 		}
 	}
@@ -152,7 +165,10 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		step := spec.Steps[0]
 		runOpts.Execution.Image = step.Image
 		runOpts.Execution.Command = step.Command
-		runOpts.Execution.TmpBundle = step.TmpBundle
+		runOpts.Execution.CA = step.CA
+		runOpts.Execution.In = step.In
+		runOpts.Execution.Out = step.Out
+		runOpts.Execution.Home = step.Home
 		runOpts.Execution.Amata = step.Amata
 	}
 
@@ -161,11 +177,14 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		for _, step := range spec.Steps {
 			runOpts.Steps = append(runOpts.Steps, StepMig{
 				MigContainerSpec: MigContainerSpec{
-					Image:     step.Image,
-					Command:   step.Command,
-					Env:       copyStringMap(step.Env),
-					TmpBundle: step.TmpBundle,
-					Amata:     step.Amata,
+					Image:   step.Image,
+					Command: step.Command,
+					Env:     copyStringMap(step.Envs),
+					CA:      step.CA,
+					In:      step.In,
+					Out:     step.Out,
+					Home:    step.Home,
+					Amata:   step.Amata,
 				},
 				Stack:  step.Stack,
 				Always: step.Always,
@@ -186,6 +205,8 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 	if !spec.JobID.IsZero() {
 		runOpts.ServerMetadata.JobID = spec.JobID
 	}
+
+	runOpts.BundleMap = spec.BundleMap
 
 	return runOpts
 }
@@ -214,7 +235,7 @@ func copyHealingSpec(in *contracts.HealingSpec) *contracts.HealingSpec {
 		out.ByErrorKind = make(map[string]contracts.HealingActionSpec, len(in.ByErrorKind))
 		for k, v := range in.ByErrorKind {
 			item := v
-			item.Env = copyStringMap(v.Env)
+			item.Envs = copyStringMap(v.Envs)
 			if v.Expectations != nil {
 				exp := *v.Expectations
 				if len(v.Expectations.Artifacts) > 0 {

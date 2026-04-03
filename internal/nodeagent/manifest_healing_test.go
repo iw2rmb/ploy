@@ -184,8 +184,8 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
 
-			assertEnvContains(t, manifest.Env, tc.wantEnv)
-			assertEnvAbsent(t, manifest.Env, tc.wantAbsnt)
+			assertEnvContains(t, manifest.Envs, tc.wantEnv)
+			assertEnvAbsent(t, manifest.Envs, tc.wantAbsnt)
 		})
 	}
 }
@@ -388,7 +388,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
 
-			gotResume, hasResume := manifest.Env["CODEX_RESUME"]
+			gotResume, hasResume := manifest.Envs["CODEX_RESUME"]
 			if tc.wantResume {
 				if !hasResume || gotResume != "1" {
 					t.Errorf("CODEX_RESUME = %q (present=%v), want '1'", gotResume, hasResume)
@@ -399,7 +399,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 				}
 			}
 
-			assertEnvContains(t, manifest.Env, tc.wantEnv)
+			assertEnvContains(t, manifest.Envs, tc.wantEnv)
 		})
 	}
 }

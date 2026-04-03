@@ -66,7 +66,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	command := []string(nil)
 	env := make(map[string]string, len(req.Env))
 
-	var tmpBundle *contracts.TmpBundleRef
+	var hydraCA, hydraIn, hydraOut, hydraHome []string
 	if len(typedOpts.Steps) > 0 {
 		// Multi-step run.
 		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
@@ -86,7 +86,10 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		} else {
 			command = stepMig.Command.ToSlice()
 		}
-		tmpBundle = stepMig.TmpBundle
+		hydraCA = stepMig.CA
+		hydraIn = stepMig.In
+		hydraOut = stepMig.Out
+		hydraHome = stepMig.Home
 
 		for k, v := range req.Env {
 			env[k] = v
@@ -108,7 +111,10 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		} else {
 			command = typedOpts.Execution.Command.ToSlice()
 		}
-		tmpBundle = typedOpts.Execution.TmpBundle
+		hydraCA = typedOpts.Execution.CA
+		hydraIn = typedOpts.Execution.In
+		hydraOut = typedOpts.Execution.Out
+		hydraHome = typedOpts.Execution.Home
 
 		for k, v := range req.Env {
 			env[k] = v
@@ -177,8 +183,12 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		Image:      image,
 		Command:    command,
 		WorkingDir: "/workspace",
-		Env:        env,
-		TmpBundle:  tmpBundle,
+		Envs:       env,
+		CA:         hydraCA,
+		In:         hydraIn,
+		Out:        hydraOut,
+		Home:       hydraHome,
+		BundleMap:  typedOpts.BundleMap,
 		Gate: &contracts.StepGateSpec{
 			Enabled:        true,
 			Env:            gateEnv,
@@ -284,8 +294,11 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 		Image:      image,
 		Command:    command,
 		WorkingDir: "/workspace",
-		Env:        env,
-		TmpBundle:  mig.TmpBundle,
+		Envs:       env,
+		CA:         mig.CA,
+		In:         mig.In,
+		Out:        mig.Out,
+		Home:       mig.Home,
 		Gate:       &contracts.StepGateSpec{Enabled: false},
 		Inputs: []contracts.StepInput{
 			{
@@ -337,8 +350,11 @@ func buildRouterManifest(req StartRunRequest, router MigContainerSpec, stack con
 		Image:      image,
 		Command:    command,
 		WorkingDir: "/workspace",
-		Env:        env,
-		TmpBundle:  router.TmpBundle,
+		Envs:       env,
+		CA:         router.CA,
+		In:         router.In,
+		Out:        router.Out,
+		Home:       router.Home,
 		Gate:       &contracts.StepGateSpec{Enabled: false},
 		Inputs: []contracts.StepInput{
 			{

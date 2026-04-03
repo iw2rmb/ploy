@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
@@ -17,24 +18,114 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// materializeTmpBundle downloads a spec bundle, verifies its SHA-256 digest, and
-// extracts the archive into stagingDir. Extraction applies traversal-safe rules.
-func (r *runController) materializeTmpBundle(ctx context.Context, bundle *contracts.TmpBundleRef, stagingDir string) error {
-	if bundle == nil {
+// materializeHydraResources collects unique content hashes from the manifest's
+// CA/In/Out/Home entries, downloads each referenced spec bundle by its bundleID
+// (resolved via bundleMap), verifies the SHA-256 digest, and extracts the
+// archive into stagingDir/<hash>. Returns nil when no entries require
+// materialization.
+func (r *runController) materializeHydraResources(ctx context.Context, manifest contracts.StepManifest, bundleMap map[string]string, stagingDir string) error {
+	hashes := collectUniqueHashes(manifest)
+	if len(hashes) == 0 {
 		return nil
 	}
 	if r.artifactUploader == nil {
 		return fmt.Errorf("uploader not initialized")
 	}
-	data, err := r.artifactUploader.DownloadSpecBundle(ctx, bundle.BundleID)
+	for _, hash := range hashes {
+		bundleID, ok := bundleMap[hash]
+		if !ok {
+			return fmt.Errorf("no bundle mapping for hash %s", hash)
+		}
+		if err := r.materializeResource(ctx, bundleID, hash, stagingDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// materializeResource downloads a spec bundle by bundleID, verifies that its
+// SHA-256 digest starts with the expected hash prefix, and extracts the
+// archive into stagingDir/<hash>.
+func (r *runController) materializeResource(ctx context.Context, bundleID, hash, stagingDir string) error {
+	data, err := r.artifactUploader.DownloadSpecBundle(ctx, bundleID)
 	if err != nil {
-		return fmt.Errorf("download bundle %s: %w", bundle.BundleID, err)
+		return fmt.Errorf("download resource %s (bundle %s): %w", hash, bundleID, err)
 	}
-	if err := verifyBundleDigest(data, bundle.Digest); err != nil {
-		return fmt.Errorf("bundle %s: %w", bundle.BundleID, err)
+	if err := verifyDigestPrefix(data, hash); err != nil {
+		return fmt.Errorf("resource %s: %w", hash, err)
 	}
-	if err := extractTmpBundle(data, stagingDir); err != nil {
-		return fmt.Errorf("extract bundle %s: %w", bundle.BundleID, err)
+	dst := filepath.Join(stagingDir, hash)
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return fmt.Errorf("create staging dir for %s: %w", hash, err)
+	}
+	if err := extractBundle(data, dst); err != nil {
+		return fmt.Errorf("extract resource %s: %w", hash, err)
+	}
+	return nil
+}
+
+// collectUniqueHashes extracts all unique content hashes referenced by the
+// manifest's CA, In, Out, and Home entries. Returns a deduplicated slice.
+func collectUniqueHashes(manifest contracts.StepManifest) []string {
+	seen := make(map[string]struct{})
+	var hashes []string
+
+	for _, entry := range manifest.CA {
+		hash, err := contracts.ParseStoredCAEntry(entry)
+		if err != nil {
+			slog.Warn("skip invalid CA entry during hash collection", "entry", entry, "error", err)
+			continue
+		}
+		if _, ok := seen[hash]; !ok {
+			seen[hash] = struct{}{}
+			hashes = append(hashes, hash)
+		}
+	}
+	for _, entry := range manifest.In {
+		parsed, err := contracts.ParseStoredInEntry(entry)
+		if err != nil {
+			slog.Warn("skip invalid In entry during hash collection", "entry", entry, "error", err)
+			continue
+		}
+		if _, ok := seen[parsed.Hash]; !ok {
+			seen[parsed.Hash] = struct{}{}
+			hashes = append(hashes, parsed.Hash)
+		}
+	}
+	for _, entry := range manifest.Out {
+		parsed, err := contracts.ParseStoredOutEntry(entry)
+		if err != nil {
+			slog.Warn("skip invalid Out entry during hash collection", "entry", entry, "error", err)
+			continue
+		}
+		if _, ok := seen[parsed.Hash]; !ok {
+			seen[parsed.Hash] = struct{}{}
+			hashes = append(hashes, parsed.Hash)
+		}
+	}
+	for _, entry := range manifest.Home {
+		parsed, err := contracts.ParseStoredHomeEntry(entry)
+		if err != nil {
+			slog.Warn("skip invalid Home entry during hash collection", "entry", entry, "error", err)
+			continue
+		}
+		if _, ok := seen[parsed.Hash]; !ok {
+			seen[parsed.Hash] = struct{}{}
+			hashes = append(hashes, parsed.Hash)
+		}
+	}
+	return hashes
+}
+
+// verifyDigestPrefix checks that the SHA-256 digest of data starts with the
+// given hex prefix. The prefix may be 7–64 hex characters (shortHash format).
+func verifyDigestPrefix(data []byte, prefix string) error {
+	hash := sha256.Sum256(data)
+	actual := hex.EncodeToString(hash[:])
+	expected := strings.TrimSpace(prefix)
+	expected = strings.TrimPrefix(expected, "sha256:")
+	if !strings.HasPrefix(strings.ToLower(actual), strings.ToLower(expected)) {
+		return fmt.Errorf("digest mismatch: expected prefix %s, got %s", expected, actual)
 	}
 	return nil
 }
@@ -53,7 +144,7 @@ func verifyBundleDigest(data []byte, expectedDigest string) error {
 	return nil
 }
 
-// extractTmpBundle decompresses and extracts a tar.gz bundle into stagingDir.
+// extractBundle decompresses and extracts a tar.gz bundle into stagingDir.
 // Security rules enforced per entry:
 //   - Symlink entries are rejected (TypeSymlink).
 //   - Hardlink entries are rejected (TypeLink).
@@ -61,7 +152,7 @@ func verifyBundleDigest(data []byte, expectedDigest string) error {
 //   - Any ".." path component is rejected.
 //   - Duplicate canonical paths are rejected.
 //   - Only regular files and directories are extracted; unknown types are skipped.
-func extractTmpBundle(data []byte, stagingDir string) error {
+func extractBundle(data []byte, stagingDir string) error {
 	gr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("open gzip: %w", err)
@@ -144,3 +235,7 @@ func extractTmpBundle(data []byte, stagingDir string) error {
 
 	return nil
 }
+
+// extractTmpBundle is an alias for extractBundle for backward compatibility
+// with existing test references.
+var extractTmpBundle = extractBundle

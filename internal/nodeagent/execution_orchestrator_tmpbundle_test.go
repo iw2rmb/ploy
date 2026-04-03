@@ -239,41 +239,41 @@ func upper(s string) string {
 	return string(b)
 }
 
-// --- materializeTmpBundle integration: download + verify + extract ---
+// --- materializeHydraResources integration: download + verify + extract ---
 
-func TestTmpBundle_Materialization(t *testing.T) {
+func TestHydraResources_Materialization(t *testing.T) {
 	t.Parallel()
 
 	validArchive := buildTestTarGz(t, map[string][]byte{
 		"config.json": []byte(`{"key":"value"}`),
 	}, nil)
-	validDigest := digestOf(validArchive)
+	validHash := digestOf(validArchive)[:12] // short hash prefix
 
 	badDigestArchive := buildTestTarGz(t, map[string][]byte{
 		"file.txt": []byte("data"),
 	}, nil)
+	badHash := "000000000000"
 
 	tests := []struct {
-		name     string
-		handler  http.HandlerFunc
-		bundle   *contracts.TmpBundleRef
-		wantErr  bool
-		assertFn func(t *testing.T, stagingDir string)
+		name      string
+		handler   http.HandlerFunc
+		manifest  contracts.StepManifest
+		bundleMap map[string]string
+		wantErr   bool
+		assertFn  func(t *testing.T, stagingDir string)
 	}{
 		{
-			name: "download verify extract",
+			name: "download verify extract via CA entry",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/gzip")
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(validArchive)
 			},
-			bundle: &contracts.TmpBundleRef{
-				BundleID: "bun-test-123", CID: "bafy123",
-				Digest: validDigest, Entries: []string{"config.json"},
-			},
+			manifest:  contracts.StepManifest{CA: []string{validHash}},
+			bundleMap: map[string]string{validHash: "bun-test-123"},
 			assertFn: func(t *testing.T, stagingDir string) {
 				t.Helper()
-				got, err := os.ReadFile(filepath.Join(stagingDir, "config.json"))
+				got, err := os.ReadFile(filepath.Join(stagingDir, validHash, "config.json"))
 				if err != nil {
 					t.Fatalf("read config.json: %v", err)
 				}
@@ -288,23 +288,27 @@ func TestTmpBundle_Materialization(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				_, _ = w.Write(badDigestArchive)
 			},
-			bundle: &contracts.TmpBundleRef{
-				BundleID: "bun-bad-digest", CID: "bafy123",
-				Digest:  "0000000000000000000000000000000000000000000000000000000000000000",
-				Entries: []string{"file.txt"},
-			},
-			wantErr: true,
+			manifest:  contracts.StepManifest{In: []string{badHash + ":/in/data"}},
+			bundleMap: map[string]string{badHash: "bun-bad-digest"},
+			wantErr:   true,
 		},
 		{
 			name: "server error rejected",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "not found", http.StatusNotFound)
 			},
-			bundle: &contracts.TmpBundleRef{
-				BundleID: "bun-missing", CID: "bafy123",
-				Digest: "abc", Entries: []string{"file.txt"},
+			manifest:  contracts.StepManifest{Out: []string{"abc1234567ab:/out/result"}},
+			bundleMap: map[string]string{"abc1234567ab": "bun-missing"},
+			wantErr:   true,
+		},
+		{
+			name: "missing bundle map entry rejected",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				t.Fatal("handler should not be called")
 			},
-			wantErr: true,
+			manifest:  contracts.StepManifest{CA: []string{"deadbeef1234"}},
+			bundleMap: map[string]string{}, // no mapping
+			wantErr:   true,
 		},
 	}
 
@@ -317,7 +321,7 @@ func TestTmpBundle_Materialization(t *testing.T) {
 
 			rc := newTestController(t, newAgentConfig(srv.URL))
 			stagingDir := t.TempDir()
-			err := rc.materializeTmpBundle(t.Context(), tt.bundle, stagingDir)
+			err := rc.materializeHydraResources(t.Context(), tt.manifest, tt.bundleMap, stagingDir)
 
 			if tt.wantErr {
 				if err == nil {
@@ -326,7 +330,7 @@ func TestTmpBundle_Materialization(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("materializeTmpBundle error: %v", err)
+				t.Fatalf("materializeHydraResources error: %v", err)
 			}
 			if tt.assertFn != nil {
 				tt.assertFn(t, stagingDir)

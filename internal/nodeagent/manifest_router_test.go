@@ -63,7 +63,7 @@ func TestBuildRouterManifest_PhaseAndLoopEnv(t *testing.T) {
 			if err != nil {
 				t.Fatalf("buildRouterManifest() error = %v", err)
 			}
-			assertEnvContains(t, manifest.Env, tc.wantEnv)
+			assertEnvContains(t, manifest.Envs, tc.wantEnv)
 		})
 	}
 }
