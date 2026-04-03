@@ -194,6 +194,8 @@ items:
         commit: c3db303b
       - gaps: ["\"Persist bundleMap for migrated file-backed records and reload it on startup.\" is not fully implemented: `ExecuteMigration` only adds shortHash→bundleID mappings to `ConfigHolder` in memory (`/Users/vk/@iw2rmb/ploy/internal/server/handlers/config_env_migration.go:470-472`), `ConfigHolder` has no persisted or rebuilt bundle-map source (`/Users/vk/@iw2rmb/ploy/internal/server/handlers/config_gitlab.go:49-73`), and `cmd/ployd/server.go` only reloads env/CA/home/in rows from the store before claim assembly (`/Users/vk/@iw2rmb/ploy/cmd/ployd/server.go:126-223`). After a clean restart, `nodes_claim_response.go` still passes `configHolder.GetBundleMap()` into claim mutation (`/Users/vk/@iw2rmb/ploy/internal/server/handlers/nodes_claim_response.go:61-66`), so migrated `home`/`in` records can reach `materializeHydraResources` without any `bundleMap[hash]` entry and fail with `no bundle mapping for hash` (`/Users/vk/@iw2rmb/ploy/internal/nodeagent/execution_orchestrator_tmpbundle.go:21-35`)."]
         commit: f2dc978a
+      - gaps: ["Migration errors are non-fatal in `/Users/vk/@iw2rmb/ploy/cmd/ployd/server.go:239`, so the daemon still starts even when special keys fail to rewrite. Because `/Users/vk/@iw2rmb/ploy/internal/server/handlers/claim_spec_mutator_hydra.go:93` excludes migrated keys from raw env injection, any special key left unmigrated by a partial migration is effectively dropped instead of being preserved or blocking startup."]
+        commit: null
     label: "1.7"
     summary: Execute hard-cut migration of special legacy env keys into typed ca home in fields and adjust runtime consumers.
     classification: assumption-bound
