@@ -359,13 +359,24 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	}
 	// Require real Codex auth file from environment to run the live healing flow.
 	// CODEX_AUTH_FILE points to a local auth.json file delivered via Hydra home mount.
-	// When unset, fall back to offline Hydra contract validation so that
-	// `go test ./tests/integration/...` always exercises this integration path.
+	//
+	// PLOY_INTEGRATION_CODEX controls behavior when CODEX_AUTH_FILE is unset:
+	//   "require" — t.Fatalf (CI with full infrastructure)
+	//   "skip"    — t.Skip (quiet local iteration)
+	//   unset     — run offline Hydra contract validation (default)
 	authFile := os.Getenv("CODEX_AUTH_FILE")
 	if strings.TrimSpace(authFile) == "" {
-		t.Log("CODEX_AUTH_FILE not set; running offline Hydra contract validation")
-		validateCodexHydraContractOffline(t)
-		return
+		mode := os.Getenv("PLOY_INTEGRATION_CODEX")
+		switch mode {
+		case "require":
+			t.Fatalf("CODEX_AUTH_FILE not set; live Codex integration required (PLOY_INTEGRATION_CODEX=require)")
+		case "skip":
+			t.Skip("CODEX_AUTH_FILE not set; skipping (PLOY_INTEGRATION_CODEX=skip)")
+		default:
+			t.Log("CODEX_AUTH_FILE not set; running offline Hydra contract validation (set PLOY_INTEGRATION_CODEX=require to enforce live coverage)")
+			validateCodexHydraContractOffline(t)
+			return
+		}
 	}
 	if _, err := os.Stat(authFile); err != nil {
 		t.Skipf("CODEX_AUTH_FILE %q not accessible: %v", authFile, err)
