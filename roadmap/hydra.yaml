@@ -248,6 +248,7 @@ items:
       - yamllint roadmap/hydra.yaml
     reasoning: medium
     cfp: 8
+    commit: db624431
   - done: false
     reviews: []
     label: "1.9"
