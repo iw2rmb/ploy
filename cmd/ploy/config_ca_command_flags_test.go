@@ -123,6 +123,41 @@ func TestHandleConfigCASetRejectsInvalidHash(t *testing.T) {
 	}
 }
 
+// TestHandleConfigCASetRejectsInvalidSection verifies that the 'set' subcommand
+// validates Hydra section names locally before making a network request.
+func TestHandleConfigCASetRejectsInvalidSection(t *testing.T) {
+	for _, s := range []string{"unknown", "server", ""} {
+		buf := &bytes.Buffer{}
+		args := []string{"--hash", "abcdef1234567", "--section", s}
+		if s == "" {
+			// Empty section is caught by the required-flag check.
+			continue
+		}
+		err := handleConfigCASet(args, buf)
+		if err == nil {
+			t.Fatalf("expected error for invalid section %q", s)
+		}
+		if !strings.Contains(err.Error(), "invalid hydra section") {
+			t.Fatalf("expected hydra section validation error, got: %v", err)
+		}
+	}
+}
+
+// TestHandleConfigCAUnsetRejectsInvalidSection verifies that the 'unset' subcommand
+// validates Hydra section names locally before making a network request.
+func TestHandleConfigCAUnsetRejectsInvalidSection(t *testing.T) {
+	for _, s := range []string{"unknown", "server"} {
+		buf := &bytes.Buffer{}
+		err := handleConfigCAUnset([]string{"--hash", "abcdef1234567", "--section", s}, buf)
+		if err == nil {
+			t.Fatalf("expected error for invalid section %q", s)
+		}
+		if !strings.Contains(err.Error(), "invalid hydra section") {
+			t.Fatalf("expected hydra section validation error, got: %v", err)
+		}
+	}
+}
+
 // TestHandleConfigCAUnsetRejectsInvalidHash verifies that the 'unset' subcommand
 // applies Hydra parser validation and rejects non-hex hashes locally.
 func TestHandleConfigCAUnsetRejectsInvalidHash(t *testing.T) {

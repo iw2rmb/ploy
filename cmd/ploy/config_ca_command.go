@@ -87,6 +87,9 @@ func handleConfigCAList(args []string, stderr io.Writer) error {
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/ca"
 	if section.set {
+		if err := contracts.ValidateHydraSection(section.value); err != nil {
+			return err
+		}
 		endpoint += "/" + section.value
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
@@ -163,6 +166,9 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 	if !section.set || strings.TrimSpace(section.value) == "" {
 		printConfigCASetUsage(stderr)
 		return errors.New("--section is required")
+	}
+	if err := contracts.ValidateHydraSection(section.value); err != nil {
+		return err
 	}
 
 	// Validate and normalize hash using Hydra parser rules.
@@ -249,6 +255,9 @@ func handleConfigCAUnset(args []string, stderr io.Writer) error {
 	if !section.set || strings.TrimSpace(section.value) == "" {
 		printConfigCAUnsetUsage(stderr)
 		return errors.New("--section is required")
+	}
+	if err := contracts.ValidateHydraSection(section.value); err != nil {
+		return err
 	}
 
 	// Validate and normalize hash using Hydra parser rules.

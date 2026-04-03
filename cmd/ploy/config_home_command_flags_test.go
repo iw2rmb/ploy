@@ -98,6 +98,36 @@ func TestHandleConfigHomeUnsetRequiresSection(t *testing.T) {
 	}
 }
 
+// TestHandleConfigHomeSetRejectsInvalidSection verifies that the 'set' subcommand
+// validates Hydra section names locally before making a network request.
+func TestHandleConfigHomeSetRejectsInvalidSection(t *testing.T) {
+	for _, s := range []string{"unknown", "server"} {
+		buf := &bytes.Buffer{}
+		err := handleConfigHomeSet([]string{"--entry", "abcdef1:.config/app", "--section", s}, buf)
+		if err == nil {
+			t.Fatalf("expected error for invalid section %q", s)
+		}
+		if !strings.Contains(err.Error(), "invalid hydra section") {
+			t.Fatalf("expected hydra section validation error, got: %v", err)
+		}
+	}
+}
+
+// TestHandleConfigHomeUnsetRejectsInvalidSection verifies that the 'unset' subcommand
+// validates Hydra section names locally before making a network request.
+func TestHandleConfigHomeUnsetRejectsInvalidSection(t *testing.T) {
+	for _, s := range []string{"unknown", "server"} {
+		buf := &bytes.Buffer{}
+		err := handleConfigHomeUnset([]string{"--dst", ".config/app", "--section", s}, buf)
+		if err == nil {
+			t.Fatalf("expected error for invalid section %q", s)
+		}
+		if !strings.Contains(err.Error(), "invalid hydra section") {
+			t.Fatalf("expected hydra section validation error, got: %v", err)
+		}
+	}
+}
+
 // TestHandleConfigHomeSetRejectsInvalidEntry verifies that the 'set' subcommand
 // applies Hydra home parser validation and rejects invalid entries locally.
 func TestHandleConfigHomeSetRejectsInvalidEntry(t *testing.T) {
