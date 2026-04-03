@@ -36,7 +36,9 @@ items:
     cfp: 8
     commit: db3891d6
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"Resolve source paths relative to originating spec file and build deterministic tar gz payloads for files and directories.\" is not fully implemented for `ploy mig add --spec <path>` and `ploy mig spec set <mig> <path>`: `loadSpec` reads the file path but calls `normalizeMigsSpecToJSON` without passing the spec directory, and `normalizeMigsSpecToJSON` runs preprocess/compile with empty `specBaseDir`, so relative Hydra sources/spec_path/amata paths resolve against process CWD instead of the originating spec file (`cmd/ploy/run_submit.go:444`, `cmd/ploy/mig_run_spec.go:39`, `cmd/ploy/mig_add.go:57`, `cmd/ploy/mig_spec.go:65`).", "\"Compute content hash, probe existing object metadata, upload only missing payloads, and rewrite records to shortHash destination canonical form.\" is not fully implemented: `compileFileRecord` always POSTs bundle bytes via `uploadSpecBundle` and does not perform a digest/CID metadata probe before upload, and the test codifies this behavior (`client always uploads`) instead of verifying skip-on-existing (`cmd/ploy/mig_run_spec_hydra.go:366`, `cmd/ploy/mig_run_spec_tmpbundle.go:147`, `cmd/ploy/mig_run_spec_hydra_test.go:687`).", "\"Verify identical bytes from repeated runs reuse existing object identity without extra blob uploads.\" is not covered by current CLI compiler tests: there is no repeated-run assertion, and the existing dedup test expects two upload requests for identical content within one compile pass (`cmd/ploy/mig_run_spec_hydra_test.go:645`)."]
+        commit: null
     label: "1.2"
     summary: Implement CLI file-record compiler to resolve local sources, upload bundles by digest, and emit canonical hash-first records.
     classification: determined
