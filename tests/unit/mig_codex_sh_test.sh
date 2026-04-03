@@ -23,6 +23,16 @@ create_test_script() {
   echo "$tmp_script"
 }
 
+# Create a temporary prompt file for direct codex mode tests.
+# Hydra contract: prompt is delivered via --prompt-file or /in/codex-prompt.txt.
+create_prompt_file() {
+  local content="${1:-test prompt}"
+  local tmp_prompt
+  tmp_prompt=$(mktemp)
+  printf '%s' "$content" > "$tmp_prompt"
+  echo "$tmp_prompt"
+}
+
 # Track test results
 TESTS_RUN=0
 TESTS_PASSED=0
@@ -120,12 +130,12 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
-  local output exit_code
+  local tmp_prompt output exit_code
+  tmp_prompt=$(create_prompt_file)
   output=$( (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) 2>&1 )
   exit_code=$?
 
@@ -136,7 +146,7 @@ MOCKCODEX
     fail "--json flag detection" "JSONL file missing or empty: $output"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -172,12 +182,12 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
-  local exit_code
+  local tmp_prompt exit_code
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
   exit_code=$?
 
@@ -194,7 +204,7 @@ MOCKCODEX
     fail "session ID extraction" "codex-session.txt not created"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -230,12 +240,12 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
-  local exit_code
+  local tmp_prompt exit_code
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
   exit_code=$?
 
@@ -259,7 +269,7 @@ MOCKCODEX
     fail "manifest new fields" "codex-run.json not created"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -293,12 +303,12 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
-  local exit_code
+  local tmp_prompt exit_code
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
   exit_code=$?
 
@@ -325,7 +335,7 @@ MOCKCODEX
     fi
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -373,13 +383,13 @@ MOCKCODEX
   # Patch the test script to use /in as $tmp_in
   sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
 
-  local exit_code
+  local tmp_prompt exit_code
+  tmp_prompt=$(create_prompt_file "ORIGINAL_PROMPT")
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="ORIGINAL_PROMPT"
     export CODEX_RESUME=1
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
   exit_code=$?
 
@@ -403,7 +413,7 @@ MOCKCODEX
     fail "resume mode logging" "expected 'resume mode enabled' in codex.log"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -442,13 +452,13 @@ MOCKCODEX
   tmp_script=$(create_test_script)
   sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
 
-  local exit_code
+  local tmp_prompt exit_code
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
     export CODEX_RESUME=1
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
   exit_code=$?
 
@@ -465,7 +475,7 @@ MOCKCODEX
     fail "fresh exec mode" "codex was not called"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -501,12 +511,13 @@ MOCKCODEX
   tmp_script=$(create_test_script)
   sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
 
+  local tmp_prompt
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
     export CODEX_RESUME=1
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
 
   # Check manifest contains resumed:true
@@ -522,7 +533,7 @@ MOCKCODEX
     fail "manifest resumed field" "codex-run.json not created"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -552,12 +563,13 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
+  local tmp_prompt
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
     # CODEX_RESUME not set
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
 
   # Check manifest contains resumed:false
@@ -573,7 +585,7 @@ MOCKCODEX
     fail "manifest resumed field" "codex-run.json not created"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -616,12 +628,12 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
-  local exit_code
+  local tmp_prompt exit_code
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
   exit_code=$?
 
@@ -631,304 +643,9 @@ MOCKCODEX
     fail "--output-dir flag detection" "flag was not passed to codex"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Amata mode - amata binary is called with forwarded args
-# ─────────────────────────────────────────────────────────────────────────────
-test_amata_mode_runs_amata() {
-  run_test
-
-  local tmp_bin tmp_out
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  local args_file="$tmp_out/.amata_args"
-
-  # Mock amata binary that records all arguments
-  cat > "$tmp_bin/amata" <<MOCKAMATA
-#!/bin/bash
-printf "%s\n" "\$@" > "$args_file"
-echo "amata ran"
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-
-  local exit_code
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    bash "$tmp_script" amata run /in/amata.yaml --set repo=myrepo --set env=prod
-  ) >/dev/null 2>&1
-  exit_code=$?
-
-  if [[ $exit_code -eq 0 ]]; then
-    pass "amata mode exits 0"
-  else
-    fail "amata mode exit code" "got $exit_code, want 0"
-  fi
-
-  if [[ -f "$args_file" ]]; then
-    local args
-    args=$(cat "$args_file")
-    if echo "$args" | grep -q "run" && echo "$args" | grep -q "/in/amata.yaml"; then
-      pass "amata binary called with run /in/amata.yaml"
-    else
-      fail "amata mode args" "expected 'run /in/amata.yaml' in: $args"
-    fi
-    if echo "$args" | grep -q "repo=myrepo" && echo "$args" | grep -q "env=prod"; then
-      pass "amata binary received --set flags"
-    else
-      fail "amata mode --set flags" "expected set flags in: $args"
-    fi
-  else
-    fail "amata mode invocation" "amata binary was not called"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Amata mode - CODEX_PROMPT is not required
-# ─────────────────────────────────────────────────────────────────────────────
-test_amata_mode_prompt_optional() {
-  run_test
-
-  local tmp_bin tmp_out
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-
-  # Mock amata binary that succeeds without any prompt input
-  cat > "$tmp_bin/amata" <<'MOCKAMATA'
-#!/bin/bash
-echo "amata ran"
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-
-  local exit_code
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    # Intentionally unset CODEX_PROMPT to verify it is not required in amata mode
-    unset CODEX_PROMPT
-    bash "$tmp_script" amata run /in/amata.yaml
-  ) >/dev/null 2>&1
-  exit_code=$?
-
-  if [[ $exit_code -eq 0 ]]; then
-    pass "amata mode succeeds without CODEX_PROMPT"
-  else
-    fail "amata mode prompt optional" "expected exit 0, got $exit_code"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Auto amata mode when /in/amata.yaml exists and no args are passed
-# ─────────────────────────────────────────────────────────────────────────────
-test_amata_mode_autodetect_from_in_dir() {
-  run_test
-
-  local tmp_bin tmp_out tmp_in
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  tmp_in=$(mktemp -d)
-  local args_file="$tmp_out/.amata_args"
-
-  # Materialize /in/amata.yaml and call script without argv to mimic legacy runners.
-  cat > "$tmp_in/amata.yaml" <<'AMATA'
-version: amata/v1
-name: autodetect-test
-entry: main
-AMATA
-
-  cat > "$tmp_bin/amata" <<MOCKAMATA
-#!/bin/bash
-printf "%s\n" "\$@" > "$args_file"
-echo "amata auto mode ran"
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
-
-  local exit_code
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    unset CODEX_PROMPT
-    bash "$tmp_script"
-  ) >/dev/null 2>&1
-  exit_code=$?
-
-  if [[ $exit_code -eq 0 ]]; then
-    pass "auto amata mode exits 0 when /in/amata.yaml exists"
-  else
-    fail "auto amata mode exit code" "got $exit_code, want 0"
-  fi
-
-  if [[ -f "$args_file" ]]; then
-    local args
-    args=$(cat "$args_file")
-    if echo "$args" | grep -q "run" && echo "$args" | grep -q "amata.yaml"; then
-      pass "auto amata mode invokes amata run with materialized amata.yaml"
-    else
-      fail "auto amata mode args" "expected run <...>/amata.yaml in: $args"
-    fi
-  else
-    fail "auto amata mode invocation" "amata binary was not called"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_in" "$tmp_home" "$tmp_script"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Auto amata mode when direct-style args are passed but no prompt source
-# ─────────────────────────────────────────────────────────────────────────────
-test_amata_mode_autodetect_with_direct_args_and_no_prompt() {
-  run_test
-
-  local tmp_bin tmp_out tmp_in tmp_ws
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  tmp_in=$(mktemp -d)
-  tmp_ws=$(mktemp -d)
-  local args_file="$tmp_out/.amata_args"
-
-  cat > "$tmp_in/amata.yaml" <<'AMATA'
-version: amata/v1
-name: autodetect-with-direct-args
-entry: main
-AMATA
-
-  cat > "$tmp_bin/amata" <<MOCKAMATA
-#!/bin/bash
-printf "%s\n" "\$@" > "$args_file"
-echo "amata auto mode ran"
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  # Mock codex should never be called in this scenario.
-  cat > "$tmp_bin/codex" <<'MOCKCODEX'
-#!/bin/bash
-echo "codex should not run here"
-exit 99
-MOCKCODEX
-  chmod +x "$tmp_bin/codex"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
-
-  local exit_code
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    unset CODEX_PROMPT
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
-  ) >/dev/null 2>&1
-  exit_code=$?
-
-  if [[ $exit_code -eq 0 ]]; then
-    pass "auto amata mode exits 0 with direct-style args and no prompt"
-  else
-    fail "auto amata mode with direct args exit code" "got $exit_code, want 0"
-  fi
-
-  if [[ -f "$args_file" ]]; then
-    local args
-    args=$(cat "$args_file")
-    if echo "$args" | grep -q "run" && echo "$args" | grep -q "amata.yaml"; then
-      pass "auto amata mode with direct args invokes amata run"
-    else
-      fail "auto amata mode with direct args" "expected run <...>/amata.yaml in: $args"
-    fi
-  else
-    fail "auto amata mode with direct args invocation" "amata binary was not called"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_in" "$tmp_ws" "$tmp_home" "$tmp_script"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Amata mode - artifact files are created
-# ─────────────────────────────────────────────────────────────────────────────
-test_amata_mode_creates_artifacts() {
-  run_test
-
-  local tmp_bin tmp_out
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-
-  cat > "$tmp_bin/amata" <<'MOCKAMATA'
-#!/bin/bash
-echo "amata task complete"
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    unset CODEX_PROMPT
-    bash "$tmp_script" amata run /in/amata.yaml
-  ) >/dev/null 2>&1
-
-  if [[ -f "$tmp_out/codex.log" && -s "$tmp_out/codex.log" ]]; then
-    pass "amata mode creates non-empty codex.log"
-  else
-    fail "amata mode codex.log" "codex.log missing or empty"
-  fi
-
-  if [[ -f "$tmp_out/codex-last.txt" ]]; then
-    pass "amata mode creates codex-last.txt"
-  else
-    fail "amata mode codex-last.txt" "codex-last.txt not created"
-  fi
-
-  if [[ -f "$tmp_out/codex-run.json" ]]; then
-    local manifest
-    manifest=$(cat "$tmp_out/codex-run.json")
-    if echo "$manifest" | grep -q '"exit_code":0'; then
-      pass "amata mode codex-run.json has exit_code:0"
-    else
-      fail "amata mode codex-run.json" "unexpected content: $manifest"
-    fi
-    if echo "$manifest" | grep -q '"resumed":false'; then
-      pass "amata mode codex-run.json has resumed:false"
-    else
-      fail "amata mode codex-run.json resumed" "expected resumed:false in: $manifest"
-    fi
-  else
-    fail "amata mode codex-run.json" "codex-run.json not created"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper: portable octal permission check
@@ -1119,91 +836,6 @@ MOCKCODEX
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: Direct mode - CRUSH_JSON inline content is materialized
-# ─────────────────────────────────────────────────────────────────────────────
-test_crush_json_materialized_direct_mode_content() {
-  run_test
-
-  local tmp_bin tmp_out tmp_ws
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  tmp_ws=$(mktemp -d)
-
-  cat > "$tmp_bin/codex" <<'MOCKCODEX'
-#!/bin/bash
-if [[ "$1" == "exec" && "$2" == "--help" ]]; then
-  echo "Usage: codex exec [OPTIONS]"
-  echo "  --yolo  Skip confirmations"
-  exit 0
-fi
-exit 0
-MOCKCODEX
-  chmod +x "$tmp_bin/codex"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-  local crush_content='{"providers":{"openai":{"api_key":"sk-test"}}}'
-
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
-    export CRUSH_JSON="$crush_content"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
-  ) >/dev/null 2>&1
-
-  assert_file_content_and_mode_600 \
-    "$tmp_home/.config/crush/crush.json" \
-    "$crush_content" \
-    "direct mode: CRUSH_JSON"
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: Amata mode - CRUSH_JSON file path is materialized
-# ─────────────────────────────────────────────────────────────────────────────
-test_crush_json_materialized_amata_mode_file_path() {
-  run_test
-
-  local tmp_bin tmp_out
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-
-  cat > "$tmp_bin/amata" <<'MOCKAMATA'
-#!/bin/bash
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-
-  local source_file source_content
-  source_file=$(mktemp)
-  source_content='{"default_provider":"openai","model":"gpt-5.4-mini"}'
-  printf "%s" "$source_content" > "$source_file"
-
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    export CRUSH_JSON="$source_file"
-    unset CODEX_PROMPT
-    bash "$tmp_script" amata run /in/amata.yaml
-  ) >/dev/null 2>&1
-
-  assert_file_content_and_mode_600 \
-    "$tmp_home/.config/crush/crush.json" \
-    "$source_content" \
-    "amata mode: CRUSH_JSON"
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script" "$source_file"
-}
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Test: CODEX_API_KEY is passed through to codex exec in direct mode
 # ─────────────────────────────────────────────────────────────────────────────
 test_codex_api_key_passthrough_direct_mode() {
@@ -1232,12 +864,13 @@ MOCKCODEX
   tmp_home=$(mktemp -d)
   tmp_script=$(create_test_script)
 
+  local tmp_prompt
+  tmp_prompt=$(create_prompt_file)
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="test prompt"
     export CODEX_API_KEY="test_direct_api_key_xyz"
-    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out" --prompt-file "$tmp_prompt"
   ) >/dev/null 2>&1
 
   if [[ -f "$env_file" ]]; then
@@ -1252,54 +885,9 @@ MOCKCODEX
     fail "CODEX_API_KEY direct mode passthrough" "codex env dump not created"
   fi
 
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script" "$tmp_prompt"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Test: CODEX_API_KEY is passed through to amata in amata mode
-# ─────────────────────────────────────────────────────────────────────────────
-test_codex_api_key_passthrough_amata_mode() {
-  run_test
-
-  local tmp_bin tmp_out
-  tmp_bin=$(mktemp -d)
-  tmp_out=$(mktemp -d)
-  local env_file="$tmp_out/.amata_env"
-
-  cat > "$tmp_bin/amata" <<MOCKAMATA
-#!/bin/bash
-echo "CODEX_API_KEY=\${CODEX_API_KEY:-}" > "$env_file"
-exit 0
-MOCKAMATA
-  chmod +x "$tmp_bin/amata"
-
-  local tmp_home tmp_script
-  tmp_home=$(mktemp -d)
-  tmp_script=$(create_test_script)
-
-  (
-    export HOME="$tmp_home"
-    export PATH="$tmp_bin:$PATH"
-    export OUTDIR="$tmp_out"
-    export CODEX_API_KEY="test_amata_api_key_abc"
-    unset CODEX_PROMPT
-    bash "$tmp_script" amata run /in/amata.yaml
-  ) >/dev/null 2>&1
-
-  if [[ -f "$env_file" ]]; then
-    local env_content
-    env_content=$(cat "$env_file")
-    if echo "$env_content" | grep -q "CODEX_API_KEY=test_amata_api_key_abc"; then
-      pass "CODEX_API_KEY passed through to amata in amata mode"
-    else
-      fail "CODEX_API_KEY amata mode passthrough" "got: $env_content"
-    fi
-  else
-    fail "CODEX_API_KEY amata mode passthrough" "amata env dump not created"
-  fi
-
-  rm -rf "$tmp_bin" "$tmp_out" "$tmp_home" "$tmp_script"
-}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Test: Direct codex mode requires prompt file (--prompt-file or /in/codex-prompt.txt)
@@ -1392,26 +980,6 @@ echo "Test: --output-dir flag detection"
 test_output_dir_flag_detection
 
 echo ""
-echo "Test: Amata mode runs amata with forwarded args"
-test_amata_mode_runs_amata
-
-echo ""
-echo "Test: Amata mode - CODEX_PROMPT not required"
-test_amata_mode_prompt_optional
-
-echo ""
-echo "Test: Amata mode auto-detect from /in/amata.yaml"
-test_amata_mode_autodetect_from_in_dir
-
-echo ""
-echo "Test: Amata mode auto-detect with direct args and no prompt"
-test_amata_mode_autodetect_with_direct_args_and_no_prompt
-
-echo ""
-echo "Test: Amata mode creates artifact files"
-test_amata_mode_creates_artifacts
-
-echo ""
 echo "Test: --auth/--config flags deliver credentials with secure permissions"
 test_credentials_via_flags
 
@@ -1420,20 +988,8 @@ echo "Test: CODEX_HOME override controls --auth/--config delivery destination"
 test_codex_home_override_flag_delivery
 
 echo ""
-echo "Test: CRUSH_JSON materialized in direct mode from inline content"
-test_crush_json_materialized_direct_mode_content
-
-echo ""
-echo "Test: CRUSH_JSON materialized in amata mode from file path"
-test_crush_json_materialized_amata_mode_file_path
-
-echo ""
 echo "Test: CODEX_API_KEY passthrough in direct codex mode"
 test_codex_api_key_passthrough_direct_mode
-
-echo ""
-echo "Test: CODEX_API_KEY passthrough in amata mode"
-test_codex_api_key_passthrough_amata_mode
 
 echo ""
 echo "Test: Direct codex mode requires prompt file"

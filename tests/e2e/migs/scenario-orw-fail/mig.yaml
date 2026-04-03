@@ -21,7 +21,7 @@ steps:
 build_gate:
   enabled: true
 
-  # Router: amata mode — CODEX_PROMPT not required; amata spec drives the workflow.
+  # Router: amata mode — no prompt file required; amata spec drives the workflow.
   # Exercises the amata execution path for router.
   router:
     image: localhost:5000/ploy/codex:latest
@@ -59,22 +59,11 @@ build_gate:
     by_error_kind:
       code:
         retries: 1
-        # Healing: direct-Codex fallback mode — CODEX_PROMPT required; no amata.spec.
+        # Healing: direct-Codex fallback mode — prompt via Hydra in mount; no amata.spec.
         # Exercises the direct codex exec path for healing.
         image: localhost:5000/ploy/codex:latest
-        env:
-          CODEX_PROMPT: |-
-            Rules:
-            - Use /workspace and /in/build-gate.log to understand the compile error.
-            - Edit files under /workspace as needed to fix the error.
-            - When you believe the code is ready for a full build validation, stop editing and end the session.
-            - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-              {"action_summary":"<<=200 chars, single line>"}
-            - Do not output any other text in the final message.
-
-            Task:
-            Fix the compilation error described in /in/build-gate.log.
         in:
+          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
           - ~/.codex/auth.json:/in/codex-auth.json
 
 mr_on_fail: false

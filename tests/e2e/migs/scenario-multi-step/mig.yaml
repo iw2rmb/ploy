@@ -60,16 +60,8 @@ build_gate:
   # Router emits bug_summary + error_kind before healing selection.
   router:
     image: localhost:5000/ploy/codex:latest
-    env:
-      CODEX_PROMPT: |-
-        Rules:
-        - Read /in/build-gate.log.
-        - Do not edit /workspace.
-        - Your final message MUST be EXACTLY one line of JSON:
-          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
-
-        Task:
-        Summarize the failure and classify it for healing selection.
+    in:
+      - ./codex-prompt-router.txt:/in/codex-prompt.txt
 
   # Healing policy applies to any step that fails its gate check. The healing
   # sequence runs once per retry count, then the gate is re-evaluated before
@@ -83,17 +75,9 @@ build_gate:
         # the workspace for diffs and re-runs the Build Gate externally when changes exist.
         # Codex never runs the gate itself.
         image: localhost:5000/ploy/codex:latest
-        env:
-          CODEX_PROMPT: |-
-            Rules:
-            - Use /workspace and /in/build-gate.log to understand the compile error.
-            - Edit files under /workspace as needed to fix the error.
-            - When you believe the code is ready for a full build validation, stop editing and end the session.
-
-            Task:
-            Fix the compilation error described in /in/build-gate.log.
+        in:
+          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
         # Uncomment to mount Codex auth JSON as a read-only input:
-        # in:
         #   - ~/.codex/auth.json:/in/codex-auth.json
 
 ################################################################################

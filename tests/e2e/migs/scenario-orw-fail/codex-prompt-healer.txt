@@ -1,0 +1,10 @@
+Rules:
+- Use /workspace and /in/build-gate.log to understand the compile error.
+- Edit files under /workspace as needed to fix the error.
+- When you believe the code is ready for a full build validation, stop editing and end the session.
+- Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+  {"action_summary":"<<=200 chars, single line>"}
+- Do not output any other text in the final message.
+
+Task:
+Fix the compilation error described in /in/build-gate.log.

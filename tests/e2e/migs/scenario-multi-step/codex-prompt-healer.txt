@@ -1,0 +1,7 @@
+Rules:
+- Use /workspace and /in/build-gate.log to understand the compile error.
+- Edit files under /workspace as needed to fix the error.
+- When you believe the code is ready for a full build validation, stop editing and end the session.
+
+Task:
+Fix the compilation error described in /in/build-gate.log.
