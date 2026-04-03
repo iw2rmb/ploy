@@ -180,7 +180,7 @@ items:
     reasoning: high
     cfp: 11
     commit: a71ece8f
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Add deterministic key-based rewrite path from special env keys to typed fields based on Hydra mapping table.\" is not fully implemented: startup only scans and logs (`cmd/ployd/server.go:195`, `cmd/ployd/server.go:197`, `cmd/ployd/server.go:198`), while migration code only produces report/rewrite strings and never persists typed `ca/home/in` records or removes legacy env records (`internal/server/handlers/config_env_migration.go:106`, `internal/server/handlers/config_env_migration.go:187`, `internal/server/handlers/config_env_migration.go:196`, `internal/server/handlers/config_env_migration.go:215`).", "\"Execute hard-cut migration of special legacy env keys into typed ca home in fields and adjust runtime consumers.\" is not fully implemented: legacy special keys remain fully writable via `config env` API (no hard-cut guard/rejection), so migrated state can be reintroduced as legacy env payloads (`internal/server/handlers/config_env.go:149`, `internal/server/handlers/config_env.go:176`, `internal/server/handlers/config_env.go:188`).", "\"Run migration dry-run fixture set and assert rewritten typed outputs match design mapping table.\" is not fully implemented: there is no dedicated migration dry-run fixture harness/set in-repo; coverage is table-driven unit tests only (`internal/server/handlers/config_env_migration_test.go:10`) and no fixture directory for this migration flow under `internal/server/handlers/`."]
         commit: 991b8159
