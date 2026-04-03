@@ -78,21 +78,12 @@ steps:
 build_gate:
   enabled: true
 
-  # Router: direct-Codex fallback mode — CODEX_PROMPT required; no amata.spec.
+  # Router: direct-Codex fallback mode — prompt via Hydra in mount; no amata.spec.
   # Exercises the direct codex exec path for router.
   router:
     image: localhost:5000/ploy/codex:latest
-    env:
-      CODEX_PROMPT: |-
-        Rules:
-        - Read /in/build-gate.log.
-        - Do not edit /workspace.
-        - Your final message MUST be EXACTLY one line of JSON:
-          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
-
-        Task:
-        Summarize the failure and classify it for healing selection.
     in:
+      - ./codex-prompt-router.txt:/in/codex-prompt.txt
       - ~/.codex/auth.json:/in/codex-auth.json
 
   ################################################################################
@@ -109,7 +100,7 @@ build_gate:
     by_error_kind:
       code:
         retries: 2 # Allow multiple healing attempts for complex errors
-        # Healing: amata mode — CODEX_PROMPT not required; amata spec drives the workflow.
+        # Healing: amata mode — no prompt file required; amata spec drives the workflow.
         # Exercises the amata execution path for healing.
         image: localhost:5000/ploy/codex:latest
         amata:

@@ -157,12 +157,12 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 
 Router and healing containers support two execution modes:
 
-**amata mode** (recommended): set `amata.spec` — `CODEX_PROMPT` is not required.
+**amata mode** (recommended): set `amata.spec` — no prompt file required.
 The node agent materializes the spec as `/in/amata.yaml` and runs
 `amata run /in/amata.yaml` with optional `--set` flags from `amata.set`.
 
-**Direct-Codex mode** (fallback): omit `amata` — `CODEX_PROMPT` is required.
-The container uses the direct `codex exec` path.
+**Direct-Codex mode** (fallback): omit `amata` — prompt delivered via Hydra `in`
+mount at `/in/codex-prompt.txt`. The container uses the direct `codex exec` path.
 
 The `scenario-orw-fail` fixture exercises amata mode for the router and
 direct-Codex mode for healing. The `scenario-post-mig-heal` fixture reverses
@@ -172,7 +172,7 @@ Example healing spec block (router in amata mode + healing in direct-Codex mode)
 ```yaml
 build_gate:
   enabled: true
-  # amata mode: CODEX_PROMPT not required
+  # amata mode: no prompt file required
   router:
     image: ghcr.io/iw2rmb/ploy/codex:latest
     amata:
@@ -190,22 +190,14 @@ build_gate:
                   {"bug_summary":"<<=200 chars>","error_kind":"code"}
     in:
       - ~/.codex/auth.json:/in/codex-auth.json
-  # direct-Codex mode: CODEX_PROMPT required
+  # direct-Codex mode: prompt via Hydra in mount
   healing:
     by_error_kind:
       code:
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
-        env:
-          CODEX_PROMPT: |-
-            Rules:
-            - Use /workspace and /in/build-gate.log to understand the compile error.
-            - Edit files under /workspace as needed to fix the error.
-            - When ready, stop editing and end the session.
-
-            Task:
-            Fix the compilation error described in /in/build-gate.log.
         in:
+          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
           - ~/.codex/auth.json:/in/codex-auth.json
 ```
 

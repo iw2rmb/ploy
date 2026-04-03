@@ -1,12 +1,12 @@
 # Failing Build Gate scenario — direct Codex mode for both router and healing.
-# Proves that when amata.spec is absent, CODEX_PROMPT is required and enforced
+# Proves that when amata.spec is absent, a prompt file is required and enforced
 # end-to-end through the healing loop (router summary → healing → re-gate).
 #
 # Parity contract with scenario-orw-fail:
 #   - Same repo/branch combination (pre-gate ORW failure).
 #   - Same loop shape: Build Gate fail → router summary → heal → re-gate.
 #   - Different execution mode: direct codex exec (no amata.spec) for both
-#     router and healing; CODEX_PROMPT required for both.
+#     router and healing; prompt delivered via Hydra in mount for both.
 #
 # Submit with:
 #   dist/ploy run \
@@ -30,43 +30,22 @@ steps:
 build_gate:
   enabled: true
 
-  # Router: direct Codex mode — no amata.spec; CODEX_PROMPT required and enforced.
+  # Router: direct Codex mode — no amata.spec; prompt via Hydra in mount.
   # Proves direct codex exec path for router in the failing-gate loop.
   router:
     image: localhost:5000/ploy/codex:latest
-    env:
-      CODEX_PROMPT: |-
-        Rules:
-        - Read /in/build-gate.log.
-        - Do not edit /workspace.
-        - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-          {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
-        - Do not output any other text in the final message.
-
-        Task:
-        Summarize the build failure in /in/build-gate.log.
     in:
+      - ./codex-prompt-router.txt:/in/codex-prompt.txt
       - ~/.codex/auth.json:/in/codex-auth.json
 
   healing:
     by_error_kind:
       code:
         retries: 1
-        # Healing: direct Codex mode — no amata.spec; CODEX_PROMPT required and enforced.
+        # Healing: direct Codex mode — no amata.spec; prompt via Hydra in mount.
         image: localhost:5000/ploy/codex:latest
-        env:
-          CODEX_PROMPT: |-
-            Rules:
-            - Use /workspace and /in/build-gate.log to understand the compile error.
-            - Edit files under /workspace as needed to fix the error.
-            - When you believe the code is ready for a full build validation, stop editing and end the session.
-            - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-              {"action_summary":"<<=200 chars, single line>"}
-            - Do not output any other text in the final message.
-
-            Task:
-            Fix the compilation error described in /in/build-gate.log.
         in:
+          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
           - ~/.codex/auth.json:/in/codex-auth.json
 
 mr_on_fail: false

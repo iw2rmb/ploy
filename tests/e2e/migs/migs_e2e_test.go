@@ -1,0 +1,108 @@
+package migs_e2e_test
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		t.Fatalf("git rev-parse --show-toplevel: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// TestCodexEntrypointUnit runs the shell-based unit test suite for the codex
+// entrypoint (images/codex/entrypoint.sh). This wraps the bash test runner so
+// that `go test ./tests/e2e/migs/...` covers the codex entrypoint contract.
+func TestCodexEntrypointUnit(t *testing.T) {
+	root := repoRoot(t)
+	script := filepath.Join(root, "tests", "unit", "mig_codex_sh_test.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Skipf("codex unit test script not found: %v", err)
+	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("codex entrypoint unit tests failed:\n%s", out)
+	}
+	t.Logf("codex entrypoint unit tests passed:\n%s", out)
+}
+
+// TestMigSpecsNoLegacyCODEXPROMPT verifies that no e2e mig.yaml spec uses the
+// legacy CODEX_PROMPT env injection pattern. All direct-Codex prompts must be
+// delivered via Hydra in mounts (/in/codex-prompt.txt).
+func TestMigSpecsNoLegacyCODEXPROMPT(t *testing.T) {
+	root := repoRoot(t)
+	scenarioDir := filepath.Join(root, "tests", "e2e", "migs")
+
+	entries, err := os.ReadDir(scenarioDir)
+	if err != nil {
+		t.Fatalf("read scenario dir: %v", err)
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		specPath := filepath.Join(scenarioDir, e.Name(), "mig.yaml")
+		data, err := os.ReadFile(specPath)
+		if err != nil {
+			continue // no mig.yaml in this scenario dir
+		}
+
+		if strings.Contains(string(data), "CODEX_PROMPT") {
+			t.Errorf("%s/mig.yaml: contains legacy CODEX_PROMPT env injection; use Hydra in mount (./prompt.txt:/in/codex-prompt.txt) instead", e.Name())
+		}
+	}
+}
+
+// TestMigSpecsPromptFilesExist verifies that all prompt files referenced via
+// Hydra in mounts in mig.yaml specs actually exist alongside the spec.
+func TestMigSpecsPromptFilesExist(t *testing.T) {
+	root := repoRoot(t)
+	scenarioDir := filepath.Join(root, "tests", "e2e", "migs")
+
+	entries, err := os.ReadDir(scenarioDir)
+	if err != nil {
+		t.Fatalf("read scenario dir: %v", err)
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		specPath := filepath.Join(scenarioDir, e.Name(), "mig.yaml")
+		data, err := os.ReadFile(specPath)
+		if err != nil {
+			continue
+		}
+
+		// Check for in-mount entries referencing codex-prompt files.
+		for _, line := range strings.Split(string(data), "\n") {
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, "- ./") || !strings.Contains(trimmed, ":/in/codex-prompt.txt") {
+				continue
+			}
+			// Extract the local source path from "- ./foo.txt:/in/codex-prompt.txt"
+			entry := strings.TrimPrefix(trimmed, "- ")
+			parts := strings.SplitN(entry, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			src := parts[0]
+			absPath := filepath.Join(scenarioDir, e.Name(), src)
+			if _, err := os.Stat(absPath); err != nil {
+				t.Errorf("%s/mig.yaml: references %s but file does not exist", e.Name(), src)
+			}
+		}
+	}
+}

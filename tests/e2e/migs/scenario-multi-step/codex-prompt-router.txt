@@ -1,0 +1,8 @@
+Rules:
+- Read /in/build-gate.log.
+- Do not edit /workspace.
+- Your final message MUST be EXACTLY one line of JSON:
+  {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
+
+Task:
+Summarize the failure and classify it for healing selection.

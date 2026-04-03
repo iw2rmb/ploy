@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # E2E: ORW apply on failing branch -> Build Gate fails -> healing -> re-gate.
-# Direct Codex mode: no amata.spec for router or healing; CODEX_PROMPT required.
+# Direct Codex mode: no amata.spec for router or healing; prompt via Hydra in mount.
 #
 # Validates (strict) — parity contract with scenario-orw-fail:
 #   1. Final repo status is "Success".
@@ -12,10 +12,10 @@ set -euo pipefail
 #   5. Codex handshake artifacts satisfy the metadata contract (strict mode).
 #   6. codex-last.txt satisfies the JSON schema contract: valid JSON, .error_kind == "code",
 #      .bug_summary present and non-empty, no unresolved template tokens.
-#   7. (Negative gate) Running with direct mode but without CODEX_PROMPT fails deterministically
+#   7. (Negative gate) Running with direct mode but without prompt file fails deterministically
 #      with "prompt required" — enforcement is proven end-to-end.
 #
-# Proves: direct codex exec enforces CODEX_PROMPT end-to-end in the healing loop.
+# Proves: direct codex exec enforces prompt file delivery end-to-end in the healing loop.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tests/e2e/lib/harness.sh
@@ -135,9 +135,9 @@ else
 fi
 
 echo ""
-echo "=== Negative gate: direct mode without CODEX_PROMPT must fail deterministically ==="
+echo "=== Negative gate: direct mode without prompt file must fail deterministically ==="
 
-# 7. A spec that uses direct codex mode but omits CODEX_PROMPT must be rejected
+# 7. A spec that uses direct codex mode but omits the prompt file must be rejected
 #    by codex with "prompt required" before any healing attempt.
 _NO_PROMPT_SPEC="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-no-prompt.XXXXXX.yaml")"
 cat >"$_NO_PROMPT_SPEC" <<'YAML'
@@ -154,7 +154,7 @@ steps:
 
 build_gate:
   enabled: true
-  # Router: direct Codex mode — CODEX_PROMPT intentionally omitted to prove enforcement.
+  # Router: direct Codex mode — prompt file intentionally omitted to prove enforcement.
   router:
     image: localhost:5000/ploy/codex:latest
     in:
@@ -173,7 +173,7 @@ _NO_PROMPT_OUT="$(e2e_mig_run_json \
 rm -f "$_NO_PROMPT_SPEC"
 
 if printf '%s' "$_NO_PROMPT_OUT" | grep -qF "prompt required"; then
-  echo "  + negative gate: run without CODEX_PROMPT rejected with 'prompt required' (enforcement confirmed)"
+  echo "  + negative gate: run without prompt file rejected with 'prompt required' (enforcement confirmed)"
 else
   echo "  ! negative gate: expected 'prompt required' error but got:" >&2
   printf '%s\n' "$_NO_PROMPT_OUT" >&2
