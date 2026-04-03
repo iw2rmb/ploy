@@ -11,6 +11,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -139,6 +141,43 @@ func addDirToTar(tw *tar.Writer, dirPath, namePrefix string) error {
 		}
 	}
 	return nil
+}
+
+// computeSpecBundleCID computes the content identifier for a spec bundle archive
+// using the same scheme as the server (bafy-prefixed SHA256 prefix).
+func computeSpecBundleCID(data []byte) string {
+	hash := sha256.Sum256(data)
+	return "bafy" + hex.EncodeToString(hash[:])[:32]
+}
+
+// probeSpecBundleByCID checks whether a spec bundle with the given CID already
+// exists on the server via HEAD /v1/spec-bundles?cid={cid}. Returns true if
+// the server responds with 200, false for 404, and an error for other statuses.
+func probeSpecBundleByCID(ctx context.Context, base *url.URL, client *http.Client, cid string) (bool, error) {
+	endpoint := base.JoinPath("v1", "spec-bundles")
+	q := endpoint.Query()
+	q.Set("cid", cid)
+	endpoint.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, endpoint.String(), nil)
+	if err != nil {
+		return false, fmt.Errorf("spec-bundle probe: build request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("spec-bundle probe: http request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("spec-bundle probe: unexpected status %s", resp.Status)
+	}
 }
 
 // uploadSpecBundle POSTs archiveBytes to POST base/v1/spec-bundles with Content-Type

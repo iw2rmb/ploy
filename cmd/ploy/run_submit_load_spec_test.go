@@ -17,17 +17,24 @@ import (
 func newMockBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *http.Client) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/v1/spec-bundles" {
-			data, _ := io.ReadAll(r.Body)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"bundle_id": "test-bundle-id",
-				"cid":       "bafytest",
-				"digest":    "sha256:deadbeef",
-				"size":      len(data),
-			})
-			return
+		if r.URL.Path == "/v1/spec-bundles" {
+			if r.Method == http.MethodHead {
+				// All probes miss in loadSpec tests (first-time upload).
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			if r.Method == http.MethodPost {
+				data, _ := io.ReadAll(r.Body)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"bundle_id": "test-bundle-id",
+					"cid":       "bafytest",
+					"digest":    "sha256:deadbeef",
+					"size":      len(data),
+				})
+				return
+			}
 		}
 		http.Error(w, "unexpected", http.StatusInternalServerError)
 	}))
