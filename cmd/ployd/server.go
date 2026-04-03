@@ -192,6 +192,11 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		configHolder.SetConfigHome(section, entries)
 	}
 
+	// Scan for special legacy env keys that should be migrated to typed Hydra
+	// fields (ca, home, in). Log a migration report to support controlled rollout.
+	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, caBySection, homeBySection)
+	handlers.LogMigrationReport(migrationReport)
+
 	// Register HTTP routes.
 	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)
 

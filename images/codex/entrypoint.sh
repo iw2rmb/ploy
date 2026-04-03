@@ -7,14 +7,15 @@ codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
-  CODEX_PROMPT      Inline prompt text (required in direct codex mode).
+  CODEX_PROMPT      Inline prompt text fallback (prefer /in/codex-prompt.txt via Hydra in mount).
   CODEX_MODEL       Optional model override.
   CODEX_API_KEY     API key for Codex/OpenAI; passed through to codex exec.
-  CODEX_AUTH_JSON   Inline JSON or file path for auth; if set, written to \$CODEX_HOME/auth.json.
-  CODEX_CONFIG_TOML Inline TOML for config; if set, written to \$CODEX_HOME/config.toml.
-  CRUSH_JSON        Inline JSON or file path for Crush config; if set, written to ~/.config/crush/crush.json.
-  CCR_CONFIG_JSON   Inline JSON or file path for Claude Code Router config; if set, written to ~/.claude-code-router/config.json.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior session.
+
+File delivery (Hydra):
+  Config files (auth.json, config.toml, crush.json, ccr config.json) are delivered
+  via Hydra home mounts to their expected paths under \$HOME. Prompt files are
+  delivered via Hydra in mounts to /in/codex-prompt.txt.
 USAGE
 }
 
@@ -24,32 +25,24 @@ export CODEX_HOME="$codex_config_dir"
 crush_config_file="$home_dir/.config/crush/crush.json"
 ccr_config_file="$home_dir/.claude-code-router/config.json"
 
-materialize_env_value_or_file() {
+# Hydra file delivery: config files are materialized by Hydra home mounts at
+# their expected paths. Legacy env-based inline materialization is removed.
+# If legacy env vars are still set, emit a warning to assist migration.
+warn_legacy_env() {
   local env_name="$1"
   local target_path="$2"
   local value="${!env_name:-}"
-  if [[ -z "$value" ]]; then
-    return 0
+  if [[ -n "$value" && ! -f "$target_path" ]]; then
+    echo "warning: $env_name is set but $target_path was not materialized by Hydra; migrate to typed home field" >&2
   fi
-
-  mkdir -p "$(dirname "$target_path")"
-  if [[ -f "$value" && -r "$value" ]]; then
-    install -m 600 "$value" "$target_path"
-    return 0
-  fi
-
-  (
-    umask 077
-    printf "%s" "$value" > "$target_path"
-  )
 }
 
-materialize_env_configs() {
+check_hydra_configs() {
   mkdir -p "$codex_config_dir"
-  materialize_env_value_or_file CODEX_AUTH_JSON "$codex_config_dir/auth.json"
-  materialize_env_value_or_file CODEX_CONFIG_TOML "$codex_config_dir/config.toml"
-  materialize_env_value_or_file CRUSH_JSON "$crush_config_file"
-  materialize_env_value_or_file CCR_CONFIG_JSON "$ccr_config_file"
+  warn_legacy_env CODEX_AUTH_JSON "$codex_config_dir/auth.json"
+  warn_legacy_env CODEX_CONFIG_TOML "$codex_config_dir/config.toml"
+  warn_legacy_env CRUSH_JSON "$crush_config_file"
+  warn_legacy_env CCR_CONFIG_JSON "$ccr_config_file"
 }
 
 activate_ccr_if_configured() {
@@ -59,7 +52,7 @@ activate_ccr_if_configured() {
   fi
 }
 
-materialize_env_configs
+check_hydra_configs
 activate_ccr_if_configured
 
 input_dir="${WORKSPACE:-/workspace}"
@@ -121,22 +114,24 @@ fi
 if [[ -n "$config_file" ]]; then
   install -m 600 "$config_file" "$codex_config_dir/config.toml"
 fi
-materialize_env_configs
+check_hydra_configs
 
 prompt=""
 if [[ -n "$prompt_file" ]]; then
   prompt="$(cat "$prompt_file")"
+elif [[ -f "/in/codex-prompt.txt" ]]; then
+  # Hydra in mount: prompt file materialized at /in/codex-prompt.txt.
+  prompt="$(cat /in/codex-prompt.txt)"
 elif [[ -n "${CODEX_PROMPT:-}" ]]; then
   prompt="$CODEX_PROMPT"
 else
-  echo "ERROR: prompt required (use --prompt-file or CODEX_PROMPT)" >&2
+  echo "ERROR: prompt required (use --prompt-file, /in/codex-prompt.txt, or CODEX_PROMPT)" >&2
   exit 2
 fi
 
-# Codex shell snapshot exports the process environment via /bin/sh; multiline
-# values in inline config env vars can break `export` parsing. After
-# materialization, keep values in local files/variables and remove these keys
-# from the process environment before invoking `codex exec`.
+# Remove legacy special env keys from the process environment. Config files
+# are delivered by Hydra home mounts; prompt is read above. Unsetting these
+# keys prevents multiline env values from breaking /bin/sh export handling.
 unset CODEX_PROMPT CODEX_AUTH_JSON CODEX_CONFIG_TOML CRUSH_JSON CCR_CONFIG_JSON
 
 resume_session=""
