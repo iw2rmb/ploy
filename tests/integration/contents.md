@@ -1,11 +1,11 @@
-[build-gate](build-gate) Shell-driven build-gate integration scenarios that simulate compile failures, healing, and re-gate validation.
-[build_test.go](build_test.go) Verifies `make build` produces an executable `dist/ploy` CLI binary.
-[coverage_guard_test.go](coverage_guard_test.go) Shared helper that skips DB-backed integration tests when coverage mode is enabled with non-isolated test DSN.
-[happy_path_test.go](happy_path_test.go) Integration flow that creates v1 entities, appends events/logs, and validates persisted happy-path data.
-[lab_smoke_test.go](lab_smoke_test.go) Minimal end-to-end store smoke test covering run/job creation plus log and diff ingestion.
-[migs](migs) Integration tests for migration executors (ORW, shell, codex) and related CLI/path behaviors.
-[server_insecure_test.go](server_insecure_test.go) Validates HTTP server startup and protected endpoint access when insecure auth is enabled for tests.
-[smoke_workflow_end_to_end_test.go](smoke_workflow_end_to_end_test.go) Multi-stage workflow smoke test that exercises jobs, logs, diffs, events, and run completion state.
-[smoke_workflow_fixture_test.go](smoke_workflow_fixture_test.go) Shared fixture builder for creating v1 spec/mig/repo/run entities in smoke workflow tests.
-[hydra_contract_test.go](hydra_contract_test.go) Integration tests for Hydra contract precedence, parser edge cases, mount enforcement, out upload continuity, and legacy field rejection.
-[smoke_workflow_healing_diffs_test.go](smoke_workflow_healing_diffs_test.go) Verifies healing diff creation and ordered repo-scoped diff retrieval across workflow steps.
+[build-gate/](build-gate) Shell integration scenarios that exercise build-gate failure artifacts and post-mig heal/re-gate behavior.
+[build_test.go](build_test.go) Integration test ensuring `make build` creates an executable `dist/ploy` binary.
+[coverage_guard_test.go](coverage_guard_test.go) Coverage-mode guard helper that skips DB-backed integration tests on shared DSNs.
+[happy_path_test.go](happy_path_test.go) End-to-end store integration flow for creating v1 entities, runs, logs, events, and persisted state.
+[hydra_contract_test.go](hydra_contract_test.go) Hydra contract integration tests for spec parsing precedence, mount validation, and legacy field rejection.
+[lab_smoke_test.go](lab_smoke_test.go) Minimal workflow smoke test that persists run/job lifecycle data, logs, and diffs through the store.
+[migs/](migs) Integration tests for migration executors and helpers across ORW CLI, shell runner, and codex paths.
+[server_insecure_test.go](server_insecure_test.go) Integration test for HTTP server startup and protected route access in insecure-auth test mode.
+[smoke_workflow_end_to_end_test.go](smoke_workflow_end_to_end_test.go) Multi-stage workflow smoke test covering job orchestration, logs, diffs, events, and completion status.
+[smoke_workflow_fixture_test.go](smoke_workflow_fixture_test.go) Shared fixture builder that creates v1 spec/mig/repo/run entities for smoke workflow tests.
+[smoke_workflow_healing_diffs_test.go](smoke_workflow_healing_diffs_test.go) Integration test validating ordered healing diff persistence and repo-scoped diff listing.
