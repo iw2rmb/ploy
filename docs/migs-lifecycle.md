@@ -1318,7 +1318,7 @@ Migs container images are standard OCI images with the following expectations:
     - per-iteration healing logs (`/in/healing-iteration-N.log`),
     - cumulative healing log (<code>/in/healing-log.md</code>),
     - Codex session state (`/in/codex-session.txt`),
-    - prompt files (`/in/prompt.txt`), etc.
+    - prompt files (`/in/codex-prompt.txt`), etc.
 
 - **Environment**
   - Spec `env` maps are resolved and merged by `buildSpecPayload`.

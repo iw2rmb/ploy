@@ -147,7 +147,7 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 
 **Cross-phase inputs available to healing migs:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
-- `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
+- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag)
 
 **Environment variables injected by the node agent for healing migs:**
 - `PLOY_REPO_URL` — Git repository URL (same as the Migs run)
@@ -221,7 +221,7 @@ When `codex` runs inside the repository directory (`/workspace`), it uses the mo
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing migs to reference
-- `/in/prompt.txt` — Default prompt location (when provided in spec; node mounts it R/O)
+- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag)
 
 What to expect with the provided E2E images:
 - Spec-driven healing runs with `codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.

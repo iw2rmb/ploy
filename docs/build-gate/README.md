@@ -299,7 +299,7 @@ remain an optional fallback optimization when claim context fields are absent.
 - For `selected_error_kind=deps`, claim `recovery_context` carries:
   - `deps_compat_endpoint`
   - `deps_bumps`
-- `/in/prompt.txt` — Optional prompt file when provided in spec.
+- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag).
 
 **Healing workspace policy:**
 - `build_gate.healing.selected_error_kind=infra`: healing is output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.

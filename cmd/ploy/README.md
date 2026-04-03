@@ -651,7 +651,7 @@ follow-up `re_gate` succeeds. Failed `re_gate` results never promote candidates.
 
 **Cross-phase inputs:**
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).
-- `/in/prompt.txt` — Optional prompt file (mounted when provided in spec).
+- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag).
 
 **Container cleanup model:**
 - Containers are retained after step/gate completion.
