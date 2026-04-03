@@ -157,6 +157,57 @@ func TestHydraOutUpload(t *testing.T) {
 	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
 }
 
+// TestHydraScenarioOfflineValidation validates the Hydra e2e scenario
+// infrastructure without requiring a running cluster or built binary.
+// This ensures `go test` in a clean workspace still exercises Hydra
+// contract coverage: scenario scripts exist, are syntactically valid bash,
+// and reference the correct Hydra mount paths.
+func TestHydraScenarioOfflineValidation(t *testing.T) {
+	root := repoRoot(t)
+	scenarios := []struct {
+		dir   string
+		paths []string // expected Hydra mount paths in the script
+	}{
+		{
+			dir:   "scenario-hydra-mount-enforcement",
+			paths: []string{"/in/", "/out/"},
+		},
+		{
+			dir:   "scenario-hydra-out-upload",
+			paths: []string{"/out/"},
+		},
+	}
+
+	for _, sc := range scenarios {
+		t.Run(sc.dir, func(t *testing.T) {
+			scriptPath := filepath.Join(root, "tests", "e2e", "migs", sc.dir, "run.sh")
+			data, err := os.ReadFile(scriptPath)
+			if err != nil {
+				t.Fatalf("scenario script missing: %v", err)
+			}
+			content := string(data)
+
+			// Syntax check.
+			cmd := exec.Command("bash", "-n", scriptPath)
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("bash syntax error in %s:\n%s", sc.dir, out)
+			}
+
+			// Verify the script references expected Hydra mount paths.
+			for _, p := range sc.paths {
+				if !strings.Contains(content, p) {
+					t.Errorf("%s/run.sh: missing expected Hydra mount path %q", sc.dir, p)
+				}
+			}
+
+			// Verify no legacy /in/prompt.txt reference.
+			if strings.Contains(content, "/in/prompt.txt") {
+				t.Errorf("%s/run.sh: contains legacy /in/prompt.txt; should use /in/codex-prompt.txt", sc.dir)
+			}
+		})
+	}
+}
+
 // TestMigSpecsPromptFilesExist verifies that all prompt files referenced via
 // Hydra in mounts in mig.yaml specs actually exist alongside the spec.
 func TestMigSpecsPromptFilesExist(t *testing.T) {
