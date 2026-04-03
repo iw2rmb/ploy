@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sort"
 	"sync"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
@@ -300,7 +301,7 @@ func (h *ConfigHolder) SetConfigCA(section string, hashes []string) {
 	h.syncHydraCALocked(section)
 }
 
-// AddConfigCA adds a single CA hash to a section (dedup, then sync).
+// AddConfigCA adds a single CA hash to a section (dedup, sort, then sync).
 func (h *ConfigHolder) AddConfigCA(section, hash string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -313,6 +314,7 @@ func (h *ConfigHolder) AddConfigCA(section, hash string) {
 		}
 	}
 	h.configCA[section] = append(h.configCA[section], hash)
+	sort.Strings(h.configCA[section])
 	h.syncHydraCALocked(section)
 }
 
@@ -393,7 +395,7 @@ func (h *ConfigHolder) SetConfigHome(section string, entries []ConfigHomeEntry) 
 	h.syncHydraHomeLocked(section)
 }
 
-// AddConfigHome adds or replaces a home entry by destination in a section (dedup by dst).
+// AddConfigHome adds or replaces a home entry by destination in a section (dedup by dst, sort by dst).
 func (h *ConfigHolder) AddConfigHome(section string, entry ConfigHomeEntry) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -410,6 +412,9 @@ func (h *ConfigHolder) AddConfigHome(section string, entry ConfigHomeEntry) {
 		}
 	}
 	h.configHome[section] = append(entries, entry)
+	sort.Slice(h.configHome[section], func(i, j int) bool {
+		return h.configHome[section][i].Dst < h.configHome[section][j].Dst
+	})
 	h.syncHydraHomeLocked(section)
 }
 

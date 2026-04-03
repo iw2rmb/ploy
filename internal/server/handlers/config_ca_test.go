@@ -8,7 +8,7 @@ import (
 )
 
 // TestConfigCAListReturnsAllEntries verifies that GET /v1/config/ca
-// returns all hash+section pairs sorted by section, insertion order within.
+// returns all hash+section pairs sorted by section then hash (canonical ordering).
 func TestConfigCAListReturnsAllEntries(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 	holder.AddConfigCA("mig", "abcdef1234567")
@@ -25,12 +25,12 @@ func TestConfigCAListReturnsAllEntries(t *testing.T) {
 		t.Fatalf("got %d entries, want 3", len(resp))
 	}
 
-	// Sorted by section; within section, insertion order.
-	if resp[0].Section != "mig" || resp[0].Hash != "abcdef1234567" {
-		t.Errorf("entry[0] = %+v, want mig/abcdef1234567", resp[0])
+	// Sorted by section, then by hash within section (deterministic canonical ordering).
+	if resp[0].Section != "mig" || resp[0].Hash != "1111111111111" {
+		t.Errorf("entry[0] = %+v, want mig/1111111111111", resp[0])
 	}
-	if resp[1].Section != "mig" || resp[1].Hash != "1111111111111" {
-		t.Errorf("entry[1] = %+v, want mig/1111111111111", resp[1])
+	if resp[1].Section != "mig" || resp[1].Hash != "abcdef1234567" {
+		t.Errorf("entry[1] = %+v, want mig/abcdef1234567", resp[1])
 	}
 	if resp[2].Section != "pre_gate" || resp[2].Hash != "1234567890abc" {
 		t.Errorf("entry[2] = %+v, want pre_gate/1234567890abc", resp[2])

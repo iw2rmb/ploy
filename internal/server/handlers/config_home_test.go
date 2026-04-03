@@ -25,7 +25,7 @@ func TestConfigHomeListReturnsAllEntries(t *testing.T) {
 		t.Fatalf("got %d entries, want 3", len(resp))
 	}
 
-	// Sorted by section then within-section order.
+	// Sorted by section, then by dst within section (deterministic canonical ordering).
 	if resp[0].Section != "mig" || resp[0].Dst != ".config/app" {
 		t.Errorf("entry[0] = %+v, want mig/.config/app", resp[0])
 	}
