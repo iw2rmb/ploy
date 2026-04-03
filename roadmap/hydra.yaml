@@ -1,0 +1,225 @@
+---
+policy: .codex/policies/composing-roadmaps.md
+schema: .codex/policies/roadmap.schema.json
+title: Hydra Unified Env and File Materialization
+scope: Replace legacy env and tmp-bundle paths with the Hydra envs ca in out home contract across CLI compile, server overlay, node runtime, and global config surfaces.
+documentation:
+  - design/hydra.md
+  - docs/envs/README.md
+  - docs/schemas/mig.example.yaml
+  - cmd/ploy/README.md
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1.1"
+    summary: Lock MIG and build-gate contracts to envs ca in out home and reject removed legacy fields.
+    classification: determined
+    components:
+      - internal/workflow/contracts/migs_spec.go
+      - internal/workflow/contracts/build_gate_config.go
+      - internal/workflow/contracts/step_manifest.go
+      - internal/workflow/step/container_spec.go
+      - internal/workflow/contracts/*_test.go
+    implementation:
+      - Replace contract fields env tmp_bundle env_from_file tmp_dir with envs ca in out home in step router and heal container specs.
+      - Add deterministic validators for destination domains, path traversal guards, and mode constraints per field.
+      - Define canonical stored-entry parsers shortHash dst and shortHash dst ro and wire them into contract validation.
+      - Remove acceptance paths for deprecated contract keys with stable error messages.
+    verification:
+      - go test ./internal/workflow/contracts ./internal/workflow/step -run 'Test.*Hydra|Test.*Spec|Test.*ContainerSpec'
+      - Validate fixtures with removed keys fail and new canonical records pass.
+    reasoning: medium
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "1.2"
+    summary: Implement CLI file-record compiler to resolve local sources, upload bundles by digest, and emit canonical hash-first records.
+    classification: determined
+    components:
+      - cmd/ploy/mig_run_spec.go
+      - cmd/ploy/mig_run_spec_tmpbundle.go
+      - cmd/ploy/mig_add.go
+      - cmd/ploy/mig_spec.go
+      - internal/cli/migs/**
+      - cmd/ploy/*hydra*_test.go
+    implementation:
+      - Replace legacy preprocess stages with one compiler pass for ca in out home records using right-biased src dst parsing rules.
+      - Resolve source paths relative to originating spec file and build deterministic tar gz payloads for files and directories.
+      - Compute content hash, probe existing object metadata, upload only missing payloads, and rewrite records to shortHash destination canonical form.
+      - Enforce strict in and out mode semantics and home optional ro suffix semantics before request submission.
+    verification:
+      - go test ./cmd/ploy ./internal/cli/migs -run 'Test.*Hydra|Test.*Compile|Test.*Upload|Test.*Canonical'
+      - Verify identical bytes from repeated runs reuse existing object identity without extra blob uploads.
+    reasoning: high
+    cfp: 12
+
+  - done: false
+    reviews: []
+    label: "1.3"
+    summary: Add local config.yaml overlay loading and deterministic merge precedence before CLI submits spec JSON.
+    classification: determined
+    components:
+      - internal/cli/config/config.go
+      - cmd/ploy/assets/config.schema.json
+      - cmd/ploy/assets/**
+      - cmd/ploy/cluster_deploy.go
+      - cmd/ploy/mig_run_spec.go
+    implementation:
+      - Introduce loader for PLOY_CONFIG_HOME config.yaml supporting defaults server node and job pre_gate re_gate post_gate mig heal sections.
+      - Apply deterministic merge rules envs by key, ca append with dedup by digest, and in out home override by destination.
+      - Route router containers to active gate section and keep compile output aligned with server local spec precedence contract.
+      - Embed config schema bytes in CLI assets and write config.schema.json during cluster deploy.
+    verification:
+      - go test ./internal/cli/config ./cmd/ploy -run 'Test.*Config.*Overlay|Test.*Routing|Test.*Schema'
+      - Validate merge order server then local then spec with deterministic canonical output snapshots.
+    reasoning: medium
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "1.4"
+    summary: Extend claim-time mutator pipeline to typed Hydra overlays for job and router claims.
+    classification: determined
+    components:
+      - internal/server/handlers/claim_spec_mutator_base.go
+      - internal/server/handlers/claim_spec_mutator_pipeline.go
+      - internal/server/handlers/nodes_claim_response.go
+      - internal/server/handlers/*claim*_test.go
+    implementation:
+      - Replace env-only merge in claim mutators with typed merge for envs ca in out home using deterministic ordering.
+      - Apply section routing for pre_gate re_gate post_gate mig heal and router phase inheritance inside claim assembly.
+      - Keep single parse single marshal flow while ensuring canonical shape is preserved after overlays.
+      - Emit deterministic conflict and validation errors for destination collisions and invalid routed sections.
+    verification:
+      - go test ./internal/server/handlers -run 'Test.*Claim.*Hydra|Test.*Mutator|Test.*Routing'
+      - Add table tests for precedence server local spec and destination conflict replacement behavior.
+    reasoning: high
+    cfp: 10
+
+  - done: false
+    reviews: []
+    label: "1.5"
+    summary: Replace tmp-bundle runtime path with generic materialization and mount planning for in out home and ca.
+    classification: determined
+    components:
+      - internal/nodeagent/execution_orchestrator_tmpbundle.go
+      - internal/nodeagent/execution_orchestrator_jobs.go
+      - internal/nodeagent/execution_orchestrator_jobs_upload.go
+      - internal/workflow/step/runner.go
+      - internal/workflow/step/container_spec.go
+      - internal/nodeagent/**/*_test.go
+    implementation:
+      - Promote tmpbundle materializer into generic staged-resource materialization with digest verification and safe extraction.
+      - Build mount plans from canonical records for read-only in mounts, read-write out mounts, home-relative mounts, and deterministic CA mount paths.
+      - Remove env preamble dependency for CA delivery and eliminate runtime reliance on multiline env injection.
+      - Preserve existing final out artifact upload behavior while switching underlying mount planning inputs to Hydra records.
+    verification:
+      - go test ./internal/nodeagent ./internal/workflow/step -run 'Test.*Materializ|Test.*Mount|Test.*Out.*Upload|Test.*CA'
+      - Execute node integration scenarios for mixed in out home ca records and assert mode and destination enforcement.
+    reasoning: high
+    cfp: 13
+
+  - done: false
+    reviews: []
+    label: "1.6"
+    summary: Replace env-only global config persistence and handlers with typed config sections and command surface.
+    classification: determined
+    components:
+      - internal/store/schema.sql
+      - internal/store/queries/**
+      - internal/server/handlers/config_env.go
+      - internal/server/handlers/config*.go
+      - cmd/ploy/config_command.go
+      - cmd/ploy/config_env_command.go
+      - cmd/ploy/config_*_command.go
+    implementation:
+      - Add typed storage model for target sections and fields envs ca home with deterministic ordering and dedup semantics.
+      - Replace env-only handler endpoints with typed read write APIs consumed by config command groups.
+      - Implement ploy config env set unset ls, ploy config ca set unset ls, and ploy config home set unset ls against the new store.
+      - Keep command and server validation aligned with Hydra parser and destination rules.
+    verification:
+      - go test ./internal/store ./internal/server/handlers ./cmd/ploy -run 'Test.*Config.*Hydra|Test.*Config.*Command'
+      - Verify section-scoped writes are visible in subsequent claim overlays without legacy env table usage.
+    reasoning: high
+    cfp: 11
+
+  - done: false
+    reviews: []
+    label: "1.7"
+    summary: Execute hard-cut migration of special legacy env keys into typed ca home in fields and adjust runtime consumers.
+    classification: assumption-bound
+    components:
+      - internal/server/handlers/config*.go
+      - internal/store/queries/**
+      - images/codex/entrypoint.sh
+      - images/amata/entrypoint.sh
+      - images/server/entrypoint.sh
+      - images/node/entrypoint.sh
+      - images/orw/orw-cli-gradle/orw-cli.sh
+      - images/orw/orw-cli-maven/orw-cli.sh
+    assumptions: Existing persisted env records containing PLOY_CA_CERTS CODEX_AUTH_JSON CODEX_CONFIG_TOML CRUSH_JSON CCR_CONFIG_JSON CODEX_PROMPT are recoverable as file-backed inputs with stable destination mapping and no conflicting typed records at migration time.
+    implementation:
+      - Add deterministic key-based rewrite path from special env keys to typed fields based on Hydra mapping table.
+      - Remove runtime behavior that expects these keys as multiline env payloads and switch consumers to materialized file paths.
+      - Update codex prompt execution flows to consume in mounted prompt files instead of inline env text when file-backed.
+      - Emit migration report metrics for rewritten records and rejected conflicts to support controlled rollout.
+    verification:
+      - go test ./internal/server/handlers ./internal/store ./internal/nodeagent -run 'Test.*Migration|Test.*Special.*Env|Test.*Prompt.*File'
+      - Run migration dry-run fixture set and assert rewritten typed outputs match design mapping table.
+    reasoning: high
+    cfp: 9
+
+  - done: false
+    reviews: []
+    label: "1.8"
+    summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
+    classification: determined
+    components:
+      - cmd/ploy/README.md
+      - docs/envs/README.md
+      - docs/schemas/mig.example.yaml
+      - docs/api/**
+      - tests/integration/**
+      - tests/e2e/migs/**
+      - roadmap/hydra.yaml
+    implementation:
+      - Delete residual references and tests for env_from_file tmp_dir tmp_bundle and PLOY_CA_CERTS env materialization behavior.
+      - Update docs and schemas to describe only envs ca in out home contract and canonical hash-first record formats.
+      - Add integration and e2e scenarios for precedence routing parser edge cases mount enforcement and out upload continuity.
+      - Run docs cross-link checks and keep roadmap acceptance aligned with implemented Hydra constraints.
+    verification:
+      - go test ./tests/integration/... ./tests/e2e/migs/...
+      - ~/@iw2rmb/amata/scripts/check_docs_links.sh
+      - yamllint roadmap/hydra.yaml
+    reasoning: medium
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "1.9"
+    summary: Collapse and refactor Hydra-related tests, refresh docs to final state, and remove leftover legacy artifacts.
+    classification: determined
+    components:
+      - internal/workflow/contracts/**/*_test.go
+      - internal/nodeagent/**/*_test.go
+      - internal/server/handlers/**/*_test.go
+      - cmd/ploy/**/*_test.go
+      - tests/{unit,integration,e2e}/**
+      - docs/**
+      - cmd/ploy/README.md
+      - roadmap/hydra.yaml
+    implementation:
+      - Consolidate duplicated legacy and Hydra transition tests into stable Hydra-first suites with clear ownership by contract compile overlay runtime domains.
+      - Refactor fixtures and helpers to remove tmp_bundle env_from_file tmp_dir assumptions and keep canonical hash-first inputs as defaults.
+      - Perform final docs sweep across CLI API and schema docs so no user-facing legacy behavior remains documented.
+      - Remove dead files comments and wiring that only existed for transition compatibility and are no longer referenced.
+    verification:
+      - go test ./...
+      - rg -n 'env_from_file|tmp_dir|tmp_bundle|PLOY_CA_CERTS' docs cmd internal tests || true
+      - ~/@iw2rmb/amata/scripts/check_docs_links.sh
+      - yamllint roadmap/hydra.yaml
+    reasoning: medium
+    cfp: 8

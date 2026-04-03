@@ -1,1 +1,1 @@
-No active roadmap documents.
+[hydra.yaml](hydra.yaml) Comprehensive Hydra implementation roadmap for unified envs/ca/in/out/home contract rollout across contracts, compiler, overlays, runtime materialization, config persistence, migration, and docs/tests.
