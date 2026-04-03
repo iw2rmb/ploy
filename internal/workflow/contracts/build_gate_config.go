@@ -186,8 +186,9 @@ type RouterSpec struct {
 
 	// Amata configures amata-mode execution for this router container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
-	// --set flags; CODEX_PROMPT is not required in this mode.
-	// When nil, the container uses the direct codex exec path and CODEX_PROMPT is required.
+	// --set flags; no prompt file is required in this mode.
+	// When nil, the container uses the direct codex exec path and requires
+	// /in/codex-prompt.txt to be materialized via a Hydra in mount.
 	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
@@ -196,9 +197,10 @@ type RouterSpec struct {
 // Command mapping rules (deterministic):
 //   - When Spec is non-empty: materialize Spec as /in/amata.yaml, then run
 //     `amata run /in/amata.yaml` followed by ordered `--set '<param>=<value>'` flags
-//     from Set. CODEX_PROMPT is not required in this mode.
+//     from Set. No prompt file is required in this mode.
 //   - When AmataRunSpec is absent (nil pointer on RouterSpec or HealingActionSpec):
-//     fall through to the existing direct `codex exec` path; CODEX_PROMPT is required.
+//     fall through to the existing direct `codex exec` path;
+//     /in/codex-prompt.txt must be materialized via a Hydra in mount.
 type AmataRunSpec struct {
 	// Spec is the amata spec content materialized as /in/amata.yaml before execution.
 	// Required when AmataRunSpec is present (non-empty).
