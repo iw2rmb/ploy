@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Run the real codex integration test with build‑gate verification.
 # - Builds the codex image from repo root (includes ploy-buildgate CLI)
-# - Exports CODEX_AUTH_JSON (reads ~/.codex/auth.json if unset)
+# - Exports CODEX_AUTH_FILE (path to auth.json delivered via Hydra home mount)
 # - Executes the Go test: TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -13,11 +13,11 @@ command -v go >/dev/null 2>&1 || { echo "go not found" >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "docker not found" >&2; exit 1; }
 command -v git >/dev/null 2>&1 || { echo "git not found" >&2; exit 1; }
 
-if [[ -z "${CODEX_AUTH_JSON:-}" ]]; then
+if [[ -z "${CODEX_AUTH_FILE:-}" ]]; then
   if [[ -f "$HOME/.codex/auth.json" ]]; then
-    export CODEX_AUTH_JSON="$(cat "$HOME/.codex/auth.json")"
+    export CODEX_AUTH_FILE="$HOME/.codex/auth.json"
   else
-    echo "CODEX_AUTH_JSON not set and ~/.codex/auth.json missing" >&2
+    echo "CODEX_AUTH_FILE not set and ~/.codex/auth.json missing" >&2
     exit 1
   fi
 fi

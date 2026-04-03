@@ -159,8 +159,8 @@ build_gate:
     image: ghcr.io/iw2rmb/ploy/codex:latest
     env:
       CODEX_PROMPT: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
-    env_from_file:
-      CODEX_AUTH_JSON: ~/.codex/auth.json
+    home:
+      auth: ~/.codex/auth.json
 
   # Healing runs after router, selected by router error_kind.
   healing:
@@ -183,7 +183,7 @@ build_gate:
           CODEX_PROMPT: "Fix code issue in /in/build-gate.log"
 ```
 
-Healing action fields (image, command, env, env_from_file) are specified under
+Healing action fields (image, command, env, home) are specified under
 `healing.by_error_kind.<error_kind>` — there is no nested `mig` key.
 
 #### Dual-mode execution (amata vs direct-Codex)
@@ -214,8 +214,8 @@ router:
     # set:   # optional; passed as ordered --set '<param>=<value>' flags
     #   - param: model
     #     value: gpt-4o
-  env_from_file:
-    CODEX_AUTH_JSON: ~/.codex/auth.json
+  home:
+    auth: ~/.codex/auth.json
 ```
 
 **Direct-Codex mode** (fallback): omit `amata`. The container uses the direct
@@ -226,8 +226,8 @@ router:
   image: ghcr.io/iw2rmb/ploy/codex:latest
   env:
     CODEX_PROMPT: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
-  env_from_file:
-    CODEX_AUTH_JSON: ~/.codex/auth.json
+  home:
+    auth: ~/.codex/auth.json
 ```
 
 The same dual-mode rules apply to `steps[]`, `router`, and `healing.by_error_kind.<error_kind>` entries.
@@ -1370,7 +1370,7 @@ The CLI entry points for Migs are implemented in CLI implementation:
 - `ploy mig run`:
   - Parses flags in CLI implementation.
   - Builds the spec payload in CLI implementation (handles `env` and
-    `env_from_file`).
+    `home`).
   - Constructs and submits `RunSubmitRequest` through runtime implementation.
   - Submits via runtime implementation.
   - Optional `--follow` displays a summarized per-repo job graph until completion,

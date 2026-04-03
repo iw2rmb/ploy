@@ -87,14 +87,21 @@ printf '%s\n' "$RO_JSON" >"${E2E_ARTIFACT_DIR}/run-mount-ro.json"
 FAILED=0
 
 # The container should fail because writing to /in/ is rejected (read-only mount).
+# We verify both the run status AND that the rejection message is present in output,
+# proving the failure was caused by the read-only mount (not an unrelated non-zero exit).
 RO_STATUS="$(printf '%s' "$RO_JSON" | jq -r '.repos[0].status // empty' 2>/dev/null || echo "")"
+RO_OUTPUT="$(printf '%s' "$RO_JSON" | jq -r '.repos[0].output // empty' 2>/dev/null || echo "")"
 if [[ "$RO_STATUS" == "Fail" ]]; then
   echo "  + /in write attempt: run failed as expected (read-only mount enforced)"
+  # Verify the failure was specifically due to read-only rejection, not a coincidental non-zero exit.
+  if printf '%s' "$RO_OUTPUT" | grep -q "read-only mount enforced\|Read-only file system\|Permission denied"; then
+    echo "  + /in write attempt: output confirms read-only rejection"
+  else
+    echo "  ! /in write attempt: run failed but output does not confirm read-only rejection" >&2
+    echo "    output: ${RO_OUTPUT:0:500}" >&2
+    FAILED=1
+  fi
 elif [[ "$RO_STATUS" == "Success" ]]; then
-  # If write succeeded, the container would have exited 1 on the FAIL echo above.
-  # This path means the write was rejected by the shell (permission denied), and
-  # the command exited non-zero, so the run should be Fail. If it's Success,
-  # something unexpected happened.
   echo "  ! /in write attempt: run succeeded unexpectedly" >&2
   FAILED=1
 else
