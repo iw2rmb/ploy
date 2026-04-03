@@ -1,5 +1,5 @@
 [README.md](README.md) Operator guide for running MIG end-to-end scenarios and interpreting expected outcomes.
-[migs_e2e_test.go](migs_e2e_test.go) E2E Go test driver that enforces local cluster readiness and runs Codex unit, Hydra scenario, and MIG spec hygiene checks.
+[migs_e2e_test.go](migs_e2e_test.go) E2E Go test driver that fails by default when cluster prerequisites are missing and runs Codex, Hydra, and spec hygiene checks.
 [scenario-batch-run.sh](scenario-batch-run.sh) E2E script validating batch MIG submission and multi-repo run behavior.
 [scenario-hydra-mount-enforcement/](scenario-hydra-mount-enforcement) Scenario validating Hydra /in read-only and /out writable mount semantics.
 [scenario-hydra-out-upload/](scenario-hydra-out-upload) Scenario validating /out write and artifact upload continuity end-to-end.
