@@ -172,10 +172,12 @@ func handleConfigHomeSet(args []string, stderr io.Writer) error {
 		return errors.New("--section is required")
 	}
 
-	// Validate entry format using Hydra home parser rules.
-	if _, err := contracts.ParseStoredHomeEntry(entry.value); err != nil {
+	// Validate and canonicalize entry using Hydra home parser rules.
+	parsed, err := contracts.ParseStoredHomeEntry(entry.value)
+	if err != nil {
 		return err
 	}
+	canonicalEntry := parsed.CanonicalHomeEntry()
 
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
@@ -186,7 +188,7 @@ func handleConfigHomeSet(args []string, stderr io.Writer) error {
 	reqBody := struct {
 		Entry   string `json:"entry"`
 		Section string `json:"section"`
-	}{Entry: entry.value, Section: section.value}
+	}{Entry: canonicalEntry, Section: section.value}
 	bodyJSON, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)
@@ -210,7 +212,7 @@ func handleConfigHomeSet(args []string, stderr io.Writer) error {
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	fmt.Printf("Home entry %q added to section %s\n", entry.value, section.value)
+	fmt.Printf("Home entry %q added to section %s\n", canonicalEntry, section.value)
 	return nil
 }
 

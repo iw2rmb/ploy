@@ -87,37 +87,38 @@ func putConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc
 			return
 		}
 
-		// Validate entry format using Hydra parser.
+		// Validate entry format using Hydra parser and canonicalize.
 		parsed, err := contracts.ParseStoredHomeEntry(req.Entry)
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		canonicalEntry := parsed.CanonicalHomeEntry()
 
 		if err := ValidateHydraSection(req.Section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
 
-		// Persist to store.
+		// Persist to store using canonicalized entry.
 		if err := st.UpsertConfigHome(r.Context(), store.UpsertConfigHomeParams{
-			Entry:   req.Entry,
+			Entry:   canonicalEntry,
 			Dst:     parsed.Dst,
 			Section: req.Section,
 		}); err != nil {
-			slog.Error("config home put: store upsert failed", "err", err, "entry", req.Entry)
+			slog.Error("config home put: store upsert failed", "err", err, "entry", canonicalEntry)
 			writeHTTPError(w, http.StatusInternalServerError, "failed to persist config home: %v", err)
 			return
 		}
 
 		// Update in-memory holder.
 		holder.AddConfigHome(req.Section, ConfigHomeEntry{
-			Entry:   req.Entry,
+			Entry:   canonicalEntry,
 			Dst:     parsed.Dst,
 			Section: req.Section,
 		})
 
-		resp := configHomeListItem{Entry: req.Entry, Dst: parsed.Dst, Section: req.Section}
+		resp := configHomeListItem{Entry: canonicalEntry, Dst: parsed.Dst, Section: req.Section}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {

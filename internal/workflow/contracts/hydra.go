@@ -89,6 +89,16 @@ func ParseStoredHomeEntry(s string) (ParsedStoredEntry, error) {
 	return ParsedStoredEntry{Hash: hash, Dst: dst, ReadOnly: readOnly}, nil
 }
 
+// CanonicalHomeEntry reconstructs the canonical stored home entry string
+// from parsed fields: "hash:dst" or "hash:dst:ro".
+func (p ParsedStoredEntry) CanonicalHomeEntry() string {
+	s := p.Hash + ":" + p.Dst
+	if p.ReadOnly {
+		s += ":ro"
+	}
+	return s
+}
+
 // ParseStoredCAEntry validates a canonical `ca` entry: a plain shortHash.
 func ParseStoredCAEntry(s string) (string, error) {
 	trimmed := strings.TrimSpace(s)
