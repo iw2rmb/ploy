@@ -165,6 +165,7 @@ items:
       - Verify section-scoped writes are visible in subsequent claim overlays without legacy env table usage.
     reasoning: high
     cfp: 11
+    commit: a71ece8f
   - done: false
     reviews: []
     label: "1.7"
