@@ -76,7 +76,8 @@ func ParseStoredHomeEntry(s string) (ParsedStoredEntry, error) {
 	if err != nil {
 		return ParsedStoredEntry{}, fmt.Errorf("home entry %q: %w", s, err)
 	}
-	if dst == "" {
+	dst = path.Clean(dst)
+	if dst == "" || dst == "." {
 		return ParsedStoredEntry{}, fmt.Errorf("home entry %q: destination required", s)
 	}
 	if strings.HasPrefix(dst, "/") {

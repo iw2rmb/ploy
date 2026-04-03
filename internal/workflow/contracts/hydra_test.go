@@ -173,6 +173,13 @@ func TestParseStoredHomeEntry(t *testing.T) {
 			wantRO:   true,
 		},
 		{
+			name:     "double slash cleaned",
+			input:    "abcdef0:.config//app",
+			wantHash: "abcdef0",
+			wantDst:  ".config/app",
+			wantRO:   false,
+		},
+		{
 			name:    "absolute path rejected",
 			input:   "abcdef0:/etc/config",
 			wantErr: "destination must be relative",
@@ -291,6 +298,19 @@ func TestValidateHydraHomeEntries_DuplicateDst(t *testing.T) {
 	}, "test")
 	if err == nil {
 		t.Fatal("expected duplicate destination error")
+	}
+	if !strings.Contains(err.Error(), "duplicate destination") {
+		t.Fatalf("error %q does not mention duplicate destination", err.Error())
+	}
+}
+
+func TestValidateHydraHomeEntries_DuplicateEquivalentPath(t *testing.T) {
+	err := ValidateHydraHomeEntries([]string{
+		"abcdef0:.config//app",
+		"bbbbbbb:.config/app",
+	}, "test")
+	if err == nil {
+		t.Fatal("expected duplicate destination error for equivalent paths")
 	}
 	if !strings.Contains(err.Error(), "duplicate destination") {
 		t.Fatalf("error %q does not mention duplicate destination", err.Error())
