@@ -210,6 +210,31 @@ func TestConfigHomeDeleteStoreError(t *testing.T) {
 	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
+// TestConfigHomeDeleteInvalidDst verifies 400 for invalid destination on delete.
+func TestConfigHomeDeleteInvalidDst(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+
+	handler := deleteConfigHomeHandler(holder, st)
+
+	tests := []struct {
+		name string
+		dst  string
+	}{
+		{name: "absolute path", dst: "/etc/passwd"},
+		{name: "path traversal", dst: "../escape"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rr := doRequest(t, handler, http.MethodDelete, "/v1/config/home?dst="+tt.dst+"&section=mig", nil)
+			assertStatus(t, rr, http.StatusBadRequest)
+			if st.deleteConfigHome.called {
+				t.Error("store should not be called for invalid destination")
+			}
+		})
+	}
+}
+
 // TestConfigHomePutDeduplicates verifies that upserting the same dst twice
 // in the same section does not produce duplicates.
 func TestConfigHomePutDeduplicates(t *testing.T) {

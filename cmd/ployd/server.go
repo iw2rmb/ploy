@@ -145,8 +145,52 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Server-target consumption: apply server-target entries to process environment on startup.
 	applyServerTargetEnv(globalEnvMap)
 
+	// Load global CA entries from the store for ConfigHolder initialization.
+	var globalCAEntries []store.ConfigCa
+	if st != nil {
+		globalCAEntries, err = st.ListConfigCA(ctx)
+		if err != nil {
+			slog.Warn("failed to load global CA entries from store, continuing with empty set", "err", err)
+			globalCAEntries = nil
+		}
+	}
+	slog.Info("loaded global CA entries from store", "count", len(globalCAEntries))
+
+	// Load global home entries from the store for ConfigHolder initialization.
+	var globalHomeEntries []store.ConfigHome
+	if st != nil {
+		globalHomeEntries, err = st.ListConfigHome(ctx)
+		if err != nil {
+			slog.Warn("failed to load global home entries from store, continuing with empty set", "err", err)
+			globalHomeEntries = nil
+		}
+	}
+	slog.Info("loaded global home entries from store", "count", len(globalHomeEntries))
+
 	// Initialize config holder for runtime configuration access.
 	configHolder := handlers.NewConfigHolder(cfg.GitLab, globalEnvMap)
+
+	// Populate ConfigHolder with persisted CA entries keyed by section.
+	caBySection := make(map[string][]string)
+	for _, e := range globalCAEntries {
+		caBySection[e.Section] = append(caBySection[e.Section], e.Hash)
+	}
+	for section, hashes := range caBySection {
+		configHolder.SetConfigCA(section, hashes)
+	}
+
+	// Populate ConfigHolder with persisted home entries keyed by section.
+	homeBySection := make(map[string][]handlers.ConfigHomeEntry)
+	for _, e := range globalHomeEntries {
+		homeBySection[e.Section] = append(homeBySection[e.Section], handlers.ConfigHomeEntry{
+			Entry:   e.Entry,
+			Dst:     e.Dst,
+			Section: e.Section,
+		})
+	}
+	for section, entries := range homeBySection {
+		configHolder.SetConfigHome(section, entries)
+	}
 
 	// Register HTTP routes.
 	handlers.RegisterRoutes(httpSrv, st, bs, bp, eventsService, configHolder, tokenSecret)

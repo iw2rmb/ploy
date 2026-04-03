@@ -29,7 +29,7 @@ func handleConfigEnv(args []string, stderr io.Writer) error {
 		return errors.New("env subcommand required")
 	}
 	switch args[0] {
-	case "list":
+	case "list", "ls":
 		return handleConfigEnvList(args[1:], stderr)
 	case "show":
 		return handleConfigEnvShow(args[1:], stderr)

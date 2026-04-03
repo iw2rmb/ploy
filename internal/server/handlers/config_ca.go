@@ -133,6 +133,12 @@ func deleteConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFun
 			return
 		}
 
+		// Validate hash format using Hydra parser (aligned with put handler).
+		if _, err := contracts.ParseStoredCAEntry(hash); err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			return
+		}
+
 		section := r.URL.Query().Get("section")
 		if section == "" {
 			writeHTTPError(w, http.StatusBadRequest, "section query parameter is required")

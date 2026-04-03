@@ -23,7 +23,7 @@ func handleConfigCA(args []string, stderr io.Writer) error {
 		return errors.New("ca subcommand required")
 	}
 	switch args[0] {
-	case "list":
+	case "list", "ls":
 		return handleConfigCAList(args[1:], stderr)
 	case "set":
 		return handleConfigCASet(args[1:], stderr)
