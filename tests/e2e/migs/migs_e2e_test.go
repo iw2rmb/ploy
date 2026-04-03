@@ -20,20 +20,20 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(string(out))
 }
 
-// requireClusterReady gates Hydra cluster e2e tests behind the PLOY_E2E_CLUSTER
-// env var. When PLOY_E2E_CLUSTER=1, the test fails if prerequisites are missing
-// (no ploy binary or unreachable server). When unset, the test skips.
+// requireClusterReady ensures the local Hydra cluster is available for e2e
+// tests. In non-short mode (the default for CI), missing prerequisites are a
+// hard failure so that Hydra e2e coverage cannot silently pass on a clean
+// workspace. Use PLOY_E2E_CLUSTER=skip to opt out explicitly.
 func requireClusterReady(t *testing.T, root string) {
 	t.Helper()
 
-	explicit := os.Getenv("PLOY_E2E_CLUSTER") == "1"
+	if os.Getenv("PLOY_E2E_CLUSTER") == "skip" {
+		t.Skip("PLOY_E2E_CLUSTER=skip; skipping Hydra cluster e2e scenario")
+	}
 
 	// 1. Built binary must exist.
 	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
-		if explicit {
-			t.Fatalf("PLOY_E2E_CLUSTER=1 but ploy binary not built (dist/ploy missing)")
-		}
-		t.Skipf("ploy binary not built (dist/ploy missing); set PLOY_E2E_CLUSTER=1 to require cluster e2e scenarios")
+		t.Fatalf("ploy binary not built (dist/ploy missing); build first or set PLOY_E2E_CLUSTER=skip")
 	}
 
 	// 2. Server must be reachable.
@@ -49,10 +49,7 @@ func requireClusterReady(t *testing.T, root string) {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(serverURL + "/healthz")
 	if err != nil {
-		if explicit {
-			t.Fatalf("PLOY_E2E_CLUSTER=1 but local cluster not reachable at %s: %v", serverURL, err)
-		}
-		t.Skipf("local cluster not reachable at %s: %v; set PLOY_E2E_CLUSTER=1 to require cluster e2e scenarios", serverURL, err)
+		t.Fatalf("local cluster not reachable at %s: %v; start the server or set PLOY_E2E_CLUSTER=skip", serverURL, err)
 	}
 	resp.Body.Close()
 }
