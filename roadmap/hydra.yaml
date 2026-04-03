@@ -268,6 +268,8 @@ items:
         commit: 4464c11b
       - gaps: ["tests/e2e/migs/migs_e2e_test.go:23-57 and tests/e2e/migs/migs_e2e_test.go:110-153 still gate the Hydra mount/upload scenarios on a built `dist/ploy` binary and a live local cluster. In this workspace `go test ./tests/integration/... ./tests/e2e/migs/...` fails before `TestHydraMountEnforcement` and `TestHydraOutUpload` run, so the requested verification command does not actually exercise the new end-to-end coverage in a clean workspace.", "cmd/ploy/README.md:623-625 still mounts `~/.codex/auth.json` under `in` as `/in/codex-auth.json`. The codex runtime only consumes auth/config from `$HOME/.codex` via Hydra home mounts (images/codex/entrypoint.sh:14-17,21-27), so this example is still on the wrong contract surface."]
         commit: 43cf5d9a
+      - gaps: ["`tests/e2e/migs/migs_e2e_test.go:23-58` still skips `TestHydraMountEnforcement` and `TestHydraOutUpload` when `dist/ploy` is missing or `/healthz` is unreachable, so `go test ./tests/integration/... ./tests/e2e/migs/...` can complete without actually exercising the Hydra end-to-end scenarios in a clean workspace."]
+        commit: null
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
