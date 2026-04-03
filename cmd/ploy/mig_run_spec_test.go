@@ -336,3 +336,183 @@ envs:
 		t.Errorf("expected steps[0].image from spec to be preserved, got %v", step0["image"])
 	}
 }
+
+// TestBuildSpecPayloadConfigOverlayMergePrecedence verifies that local config.yaml
+// overlay is applied with correct precedence: overlay < spec < CLI.
+func TestBuildSpecPayloadConfigOverlayMergePrecedence(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", configHome)
+
+	cfgContent := `
+defaults:
+  job:
+    mig:
+      envs:
+        FROM_OVERLAY: overlay_val
+        SHARED: from_overlay
+`
+	if err := os.WriteFile(filepath.Join(configHome, "config.yaml"), []byte(cfgContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	specDir := t.TempDir()
+	specPath := filepath.Join(specDir, "test.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+envs:
+  FROM_SPEC: spec_val
+  SHARED: from_spec
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	payload, err := buildSpecPayload(
+		context.Background(), nil, nil,
+		specPath, nil, "", false, "", "", "", false, false,
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	envs, ok := result["envs"].(map[string]any)
+	if !ok {
+		t.Fatal("expected envs in payload")
+	}
+	// Spec wins over overlay for same key.
+	if envs["SHARED"] != "from_spec" {
+		t.Errorf("SHARED = %v, want from_spec (spec > overlay)", envs["SHARED"])
+	}
+	// Overlay key appears when not in spec.
+	if envs["FROM_OVERLAY"] != "overlay_val" {
+		t.Errorf("FROM_OVERLAY = %v, want overlay_val", envs["FROM_OVERLAY"])
+	}
+	// Spec key preserved.
+	if envs["FROM_SPEC"] != "spec_val" {
+		t.Errorf("FROM_SPEC = %v, want spec_val", envs["FROM_SPEC"])
+	}
+}
+
+// TestBuildSpecPayloadConfigOverlayNoFile verifies that missing config.yaml
+// does not cause errors (returns zero overlay).
+func TestBuildSpecPayloadConfigOverlayNoFile(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", configHome)
+
+	specDir := t.TempDir()
+	specPath := filepath.Join(specDir, "test.yaml")
+	specContent := `
+steps:
+  - image: docker.io/test/mig:latest
+envs:
+  KEY: value
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	payload, err := buildSpecPayload(
+		context.Background(), nil, nil,
+		specPath, nil, "", false, "", "", "", false, false,
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	envs := result["envs"].(map[string]any)
+	if envs["KEY"] != "value" {
+		t.Errorf("KEY = %v, want value", envs["KEY"])
+	}
+}
+
+// TestApplyConfigOverlayInPlace_RouterInheritsGatePhase verifies that router
+// containers receive the pre_gate config overlay section.
+func TestApplyConfigOverlayInPlace_RouterInheritsGatePhase(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", configHome)
+
+	cfgContent := `
+defaults:
+  job:
+    pre_gate:
+      envs:
+        GATE_KEY: gate_val
+`
+	if err := os.WriteFile(filepath.Join(configHome, "config.yaml"), []byte(cfgContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	spec := map[string]any{
+		"steps": []any{
+			map[string]any{"image": "docker.io/test/mig:latest"},
+		},
+		"build_gate": map[string]any{
+			"router": map[string]any{
+				"image": "docker.io/test/router:latest",
+			},
+		},
+	}
+
+	if err := applyConfigOverlayInPlace(spec); err != nil {
+		t.Fatalf("applyConfigOverlayInPlace: %v", err)
+	}
+
+	router := spec["build_gate"].(map[string]any)["router"].(map[string]any)
+	envs, ok := router["envs"].(map[string]any)
+	if !ok || envs["GATE_KEY"] != "gate_val" {
+		t.Errorf("router envs = %v, expected GATE_KEY=gate_val from pre_gate overlay", envs)
+	}
+}
+
+// TestApplyConfigOverlayInPlace_HealingGetsHealSection verifies that healing
+// containers receive the heal config overlay section.
+func TestApplyConfigOverlayInPlace_HealingGetsHealSection(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", configHome)
+
+	cfgContent := `
+defaults:
+  job:
+    heal:
+      envs:
+        HEAL_KEY: heal_val
+`
+	if err := os.WriteFile(filepath.Join(configHome, "config.yaml"), []byte(cfgContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	spec := map[string]any{
+		"steps": []any{
+			map[string]any{"image": "docker.io/test/mig:latest"},
+		},
+		"build_gate": map[string]any{
+			"healing": map[string]any{
+				"by_error_kind": map[string]any{
+					"infra": map[string]any{
+						"image": "docker.io/test/healer:latest",
+					},
+				},
+			},
+		},
+	}
+
+	if err := applyConfigOverlayInPlace(spec); err != nil {
+		t.Fatalf("applyConfigOverlayInPlace: %v", err)
+	}
+
+	infra := spec["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
+	envs, ok := infra["envs"].(map[string]any)
+	if !ok || envs["HEAL_KEY"] != "heal_val" {
+		t.Errorf("healing envs = %v, expected HEAL_KEY=heal_val from heal overlay", envs)
+	}
+}
