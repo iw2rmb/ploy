@@ -57,6 +57,7 @@ items:
       - Verify identical bytes from repeated runs reuse existing object identity without extra blob uploads.
     reasoning: high
     cfp: 12
+    commit: c2710967
   - done: false
     reviews: []
     label: "1.3"
