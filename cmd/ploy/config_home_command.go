@@ -90,6 +90,9 @@ func handleConfigHomeList(args []string, stderr io.Writer) error {
 
 	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/config/home"
 	if section.set {
+		if err := contracts.ValidateHydraSection(section.value); err != nil {
+			return err
+		}
 		endpoint += "/" + section.value
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
@@ -170,6 +173,9 @@ func handleConfigHomeSet(args []string, stderr io.Writer) error {
 	if !section.set || strings.TrimSpace(section.value) == "" {
 		printConfigHomeSetUsage(stderr)
 		return errors.New("--section is required")
+	}
+	if err := contracts.ValidateHydraSection(section.value); err != nil {
+		return err
 	}
 
 	// Validate and canonicalize entry using Hydra home parser rules.
@@ -261,6 +267,9 @@ func handleConfigHomeUnset(args []string, stderr io.Writer) error {
 	if !section.set || strings.TrimSpace(section.value) == "" {
 		printConfigHomeUnsetUsage(stderr)
 		return errors.New("--section is required")
+	}
+	if err := contracts.ValidateHydraSection(section.value); err != nil {
+		return err
 	}
 
 	// Validate and normalize destination using Hydra home-destination rules.

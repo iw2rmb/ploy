@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // HydraJobConfig holds the typed Hydra overlay fields for a single job section.
@@ -30,21 +31,10 @@ func (c *HydraJobConfig) IsEmpty() bool {
 	return len(c.Envs) == 0 && len(c.CA) == 0 && len(c.In) == 0 && len(c.Out) == 0 && len(c.Home) == 0
 }
 
-// validHydraSections lists the known section names for typed Hydra overlays.
-var validHydraSections = map[string]bool{
-	"pre_gate":  true,
-	"re_gate":   true,
-	"post_gate": true,
-	"mig":       true,
-	"heal":      true,
-}
-
-// ValidateHydraSection returns an error if section is not a known Hydra section.
+// ValidateHydraSection delegates to contracts.ValidateHydraSection for
+// backward compatibility within the handlers package.
 func ValidateHydraSection(section string) error {
-	if !validHydraSections[section] {
-		return fmt.Errorf("invalid hydra section %q (must be one of: heal, mig, post_gate, pre_gate, re_gate)", section)
-	}
-	return nil
+	return contracts.ValidateHydraSection(section)
 }
 
 // applyHydraOverlayMutator replaces the legacy env-only merge with a typed merge
@@ -362,22 +352,23 @@ func mergeRecordsByDstBlock(block map[string]any, field string, overlay []string
 	}
 }
 
-// hydraExtractDst extracts the normalized destination from a Hydra entry.
-// For in/out: dst is everything after the last colon.
-// For home: dst is the middle segment (body after trimming :ro suffix),
-// normalized with path.Clean so equivalent paths like ".config//app" and
-// ".config/app" dedup correctly.
+// hydraExtractDst extracts the normalized destination from a Hydra entry
+// using first-colon split semantics matching contracts.splitHashDst.
+// For in/out: dst is everything after the first colon (shortHash:dst).
+// For home: body after trimming :ro suffix is split at the first colon,
+// then normalized with path.Clean so equivalent paths like ".config//app"
+// and ".config/app" dedup correctly.
 func hydraExtractDst(field, entry string) string {
 	switch field {
 	case "home":
 		body := strings.TrimSuffix(entry, ":ro")
-		idx := strings.LastIndex(body, ":")
+		idx := strings.Index(body, ":")
 		if idx >= 0 {
 			return path.Clean(body[idx+1:])
 		}
 		return path.Clean(body)
 	default: // in, out
-		idx := strings.LastIndex(entry, ":")
+		idx := strings.Index(entry, ":")
 		if idx >= 0 {
 			return entry[idx+1:]
 		}

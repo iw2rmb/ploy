@@ -17,6 +17,23 @@ import (
 	"strings"
 )
 
+// ValidHydraSections lists the known section names for typed Hydra overlays.
+var ValidHydraSections = map[string]bool{
+	"pre_gate":  true,
+	"re_gate":   true,
+	"post_gate": true,
+	"mig":       true,
+	"heal":      true,
+}
+
+// ValidateHydraSection returns an error if section is not a known Hydra section.
+func ValidateHydraSection(section string) error {
+	if !ValidHydraSections[section] {
+		return fmt.Errorf("invalid hydra section %q (must be one of: heal, mig, post_gate, pre_gate, re_gate)", section)
+	}
+	return nil
+}
+
 // shortHashPattern matches a valid shortHash: 7–64 lowercase hex characters.
 var shortHashPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 

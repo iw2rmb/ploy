@@ -954,6 +954,85 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// hydraExtractDst — first-colon split aligned with Hydra parser semantics
+// ---------------------------------------------------------------------------
+
+func TestHydraExtractDst_FirstColonSplit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		field string
+		entry string
+		want  string
+	}{
+		{
+			name:  "in simple",
+			field: "in",
+			entry: "abcdef0:/in/data.json",
+			want:  "/in/data.json",
+		},
+		{
+			name:  "out simple",
+			field: "out",
+			entry: "abcdef0:/out/results",
+			want:  "/out/results",
+		},
+		{
+			name:  "in with colon in destination",
+			field: "in",
+			entry: "abcdef0:/in/some:path",
+			want:  "/in/some:path",
+		},
+		{
+			name:  "out with colon in destination",
+			field: "out",
+			entry: "abcdef0:/out/some:path",
+			want:  "/out/some:path",
+		},
+		{
+			name:  "home simple rw",
+			field: "home",
+			entry: "abcdef0:.config/app",
+			want:  ".config/app",
+		},
+		{
+			name:  "home simple ro",
+			field: "home",
+			entry: "abcdef0:.config/app:ro",
+			want:  ".config/app",
+		},
+		{
+			name:  "home with colon in destination",
+			field: "home",
+			entry: "abcdef0:.config/some:dir",
+			want:  ".config/some:dir",
+		},
+		{
+			name:  "home double slash cleaned",
+			field: "home",
+			entry: "abcdef0:.config//app",
+			want:  ".config/app",
+		},
+		{
+			name:  "no colon returns full entry for in",
+			field: "in",
+			entry: "nocolon",
+			want:  "nocolon",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := hydraExtractDst(tc.field, tc.entry)
+			if got != tc.want {
+				t.Errorf("hydraExtractDst(%q, %q) = %q, want %q", tc.field, tc.entry, got, tc.want)
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
 // ValidateHydraSection
 // ---------------------------------------------------------------------------
 
