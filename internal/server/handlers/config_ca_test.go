@@ -193,6 +193,20 @@ func TestConfigCADeleteStoreError(t *testing.T) {
 	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
+// TestConfigCADeleteInvalidHash verifies 400 for invalid hash format on delete.
+func TestConfigCADeleteInvalidHash(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+
+	handler := deleteConfigCAHandler(holder, st)
+	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/ca/INVALID?section=mig", nil, "hash", "INVALID")
+
+	assertStatus(t, rr, http.StatusBadRequest)
+	if st.deleteConfigCA.called {
+		t.Error("store should not be called for invalid hash")
+	}
+}
+
 // TestConfigCAPutDeduplicates verifies that adding the same hash twice
 // to the same section does not produce duplicates.
 func TestConfigCAPutDeduplicates(t *testing.T) {

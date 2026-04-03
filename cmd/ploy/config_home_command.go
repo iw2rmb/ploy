@@ -24,7 +24,7 @@ func handleConfigHome(args []string, stderr io.Writer) error {
 		return errors.New("home subcommand required")
 	}
 	switch args[0] {
-	case "list":
+	case "list", "ls":
 		return handleConfigHomeList(args[1:], stderr)
 	case "set":
 		return handleConfigHomeSet(args[1:], stderr)

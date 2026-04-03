@@ -98,6 +98,23 @@ func ParseStoredCAEntry(s string) (string, error) {
 	return trimmed, nil
 }
 
+// ValidateHomeDestination validates a home destination path without requiring
+// a full canonical entry. The destination must be relative, non-empty, cleaned,
+// and free of path traversal.
+func ValidateHomeDestination(dst string) error {
+	cleaned := path.Clean(dst)
+	if cleaned == "" || cleaned == "." {
+		return fmt.Errorf("home destination %q: destination required", dst)
+	}
+	if strings.HasPrefix(cleaned, "/") {
+		return fmt.Errorf("home destination %q: must be relative (no leading /)", dst)
+	}
+	if err := guardPathTraversal(cleaned); err != nil {
+		return fmt.Errorf("home destination %q: %w", dst, err)
+	}
+	return nil
+}
+
 // ValidateHydraInEntries validates a slice of canonical `in` entries.
 func ValidateHydraInEntries(entries []string, prefix string) error {
 	seen := make(map[string]struct{}, len(entries))

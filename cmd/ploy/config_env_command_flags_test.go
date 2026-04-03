@@ -405,6 +405,19 @@ func TestConfigUsageIncludesEnv(t *testing.T) {
 	}
 }
 
+// TestHandleConfigEnvLsAliasRoutes verifies that 'ls' routes to the list handler.
+func TestHandleConfigEnvLsAliasRoutes(t *testing.T) {
+	buf := &bytes.Buffer{}
+	// 'ls' with unexpected args triggers the same error as 'list' with unexpected args.
+	err := handleConfigEnv([]string{"ls", "extra"}, buf)
+	if err == nil {
+		t.Fatalf("expected error for unexpected args via ls alias")
+	}
+	if !strings.Contains(err.Error(), "unexpected arguments:") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // TestConfigEnvRouting verifies that 'config env' routes to handleConfigEnv.
 func TestConfigEnvRouting(t *testing.T) {
 	buf := &bytes.Buffer{}

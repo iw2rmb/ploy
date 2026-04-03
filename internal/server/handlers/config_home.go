@@ -136,6 +136,12 @@ func deleteConfigHomeHandler(holder *ConfigHolder, st store.Store) http.HandlerF
 			return
 		}
 
+		// Validate destination using Hydra parser rules (aligned with put handler).
+		if err := contracts.ValidateHomeDestination(dst); err != nil {
+			writeHTTPError(w, http.StatusBadRequest, "%s", err)
+			return
+		}
+
 		section := r.URL.Query().Get("section")
 		if section == "" {
 			writeHTTPError(w, http.StatusBadRequest, "section query parameter is required")
