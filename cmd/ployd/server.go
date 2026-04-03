@@ -220,7 +220,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// as typed ca/home/in records and remove the legacy env records.
 	migrationReport := handlers.ScanSpecialEnvKeys(globalEnvMap, caBySection, homeBySection, inBySection)
 	if st != nil {
-		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder)
+		execResult, execErr := handlers.ExecuteMigration(ctx, migrationReport, st, configHolder, bp)
 		if execErr != nil {
 			slog.Error("special env migration: execution failed", "err", execErr)
 		} else {

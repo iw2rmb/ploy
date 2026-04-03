@@ -381,7 +381,7 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"key":    "PLOY_CA_CERTS",
+			"key":    "MY_CUSTOM_CERT",
 			"value":  fileContent,
 			"target": body["target"],
 			"secret": true,
@@ -394,7 +394,7 @@ func TestHandleConfigEnvSetSuccessFromFile(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvSet([]string{"--key", "PLOY_CA_CERTS", "--file", filePath, "--on", "all"}, buf)
+		err = handleConfigEnvSet([]string{"--key", "MY_CUSTOM_CERT", "--file", filePath, "--on", "all"}, buf)
 	})
 
 	if err != nil {

@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -13,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -314,9 +318,49 @@ type MigrationExecResult struct {
 	Errors    []string
 }
 
+// migrationShortHashLen is the fixed prefix length for canonical short hashes
+// (12 hex chars), matching the compile-time convention.
+const migrationShortHashLen = 12
+
+// buildValueArchive wraps a raw env value in a deterministic tar.gz archive
+// (single file named "content") matching the format produced by the CLI
+// compile path. Returns the archive bytes.
+func buildValueArchive(value string) ([]byte, error) {
+	var buf bytes.Buffer
+	gzw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gzw)
+
+	data := []byte(value)
+	hdr := &tar.Header{
+		Name:     "content",
+		Typeflag: tar.TypeReg,
+		Mode:     0o644,
+		Size:     int64(len(data)),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		return nil, fmt.Errorf("write tar header: %w", err)
+	}
+	if _, err := tw.Write(data); err != nil {
+		return nil, fmt.Errorf("write tar data: %w", err)
+	}
+	if err := tw.Close(); err != nil {
+		return nil, fmt.Errorf("close tar: %w", err)
+	}
+	if err := gzw.Close(); err != nil {
+		return nil, fmt.Errorf("close gzip: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// archiveShortHash computes the SHA-256 of archive bytes and returns the
+// short hash prefix (first 12 hex chars), matching the compile-time convention.
+func archiveShortHash(archiveBytes []byte) string {
+	h := sha256.Sum256(archiveBytes)
+	return hex.EncodeToString(h[:])[:migrationShortHashLen]
+}
+
 // contentHash computes a deterministic SHA-256 hex hash of the given value.
-// This is used to derive the content-addressable identifier for migrated
-// env values that become file-backed typed records.
+// Used only for CA conflict detection during scan (not for typed record keys).
 func contentHash(value string) string {
 	h := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(h[:])
@@ -326,14 +370,16 @@ func contentHash(value string) string {
 // records and removes the corresponding legacy env records from both the store
 // and the in-memory ConfigHolder.
 //
-// Content hashes are computed from GlobalEnvVar values via SHA-256. The caller
-// is responsible for ensuring that blob objects with matching hashes are
-// available in object storage before nodes attempt materialization.
+// Each migrated env value is wrapped in a deterministic tar.gz archive and
+// uploaded as a spec bundle so that node-side materialization can resolve the
+// content hash via bundleMap. The short hash (first 12 hex chars of the
+// archive's SHA-256) is used as the typed record key.
 func ExecuteMigration(
 	ctx context.Context,
 	report *MigrationReport,
 	st store.Store,
 	holder *ConfigHolder,
+	bp *blobpersist.Service,
 ) (*MigrationExecResult, error) {
 	result := &MigrationExecResult{
 		Rejected: report.Rejected,
@@ -378,7 +424,32 @@ func ExecuteMigration(
 			continue
 		}
 
-		hash := contentHash(envValue)
+		// Build a deterministic archive and upload as a spec bundle so
+		// nodes can resolve the hash via bundleMap during materialization.
+		archiveBytes, err := buildValueArchive(envValue)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"build archive for key %q target %q: %v", entry.EnvKey, entry.Target, err))
+			continue
+		}
+
+		hash := archiveShortHash(archiveBytes)
+
+		cid, digest := computeSpecBundleCIDAndDigest(archiveBytes)
+		bundleID := domaintypes.NewSpecBundleID()
+		createdBy := "env-migration"
+		if _, uploadErr := bp.CreateSpecBundle(ctx, store.CreateSpecBundleParams{
+			ID:        string(bundleID),
+			Cid:       cid,
+			Digest:    digest,
+			Size:      int64(len(archiveBytes)),
+			CreatedBy: &createdBy,
+		}, archiveBytes); uploadErr != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"upload spec bundle for key %q target %q: %v", entry.EnvKey, entry.Target, uploadErr))
+			continue
+		}
+
 		field, record := RewriteSpecialEnvEntry(mapping, hash)
 
 		// Persist typed record to each target section. Track failures so we
@@ -478,7 +549,7 @@ func persistTypedRecord(
 
 // LogMigrationExecResult logs the execution result and emits Prometheus metrics.
 func LogMigrationExecResult(result *MigrationExecResult) {
-	if result.Persisted == 0 && result.Deleted == 0 && result.Rejected == 0 && result.Skipped == 0 {
+	if result.Persisted == 0 && result.Deleted == 0 && result.Rejected == 0 && result.Skipped == 0 && len(result.Errors) == 0 {
 		slog.Info("special env migration: no special env keys found")
 		return
 	}
