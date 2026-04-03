@@ -21,21 +21,21 @@ func repoRoot(t *testing.T) string {
 }
 
 // requireClusterReady ensures the local Hydra cluster is available for e2e
-// tests. Tests are skipped when prerequisites are missing so that
-// `go test` in a clean workspace still succeeds. Set PLOY_E2E_CLUSTER=require
-// to hard-fail instead (e.g. in CI with a running cluster).
+// tests. Tests fail when prerequisites are missing so that verification
+// commands surface missing coverage. Set PLOY_E2E_CLUSTER=skip to allow
+// skipping in workspaces without a running cluster.
 func requireClusterReady(t *testing.T, root string) {
 	t.Helper()
 
 	mode := os.Getenv("PLOY_E2E_CLUSTER")
-	fail := mode == "require"
+	skip := mode == "skip"
 
 	// 1. Built binary must exist.
 	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
-		if fail {
-			t.Fatalf("ploy binary not built (dist/ploy missing)")
+		if skip {
+			t.Skipf("ploy binary not built (dist/ploy missing); skipping cluster e2e scenario (PLOY_E2E_CLUSTER=skip)")
 		}
-		t.Skipf("ploy binary not built (dist/ploy missing); skipping cluster e2e scenario")
+		t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or set PLOY_E2E_CLUSTER=skip")
 	}
 
 	// 2. Server must be reachable.
@@ -51,10 +51,10 @@ func requireClusterReady(t *testing.T, root string) {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(serverURL + "/healthz")
 	if err != nil {
-		if fail {
-			t.Fatalf("local cluster not reachable at %s: %v", serverURL, err)
+		if skip {
+			t.Skipf("local cluster not reachable at %s: %v; skipping cluster e2e scenario (PLOY_E2E_CLUSTER=skip)", serverURL, err)
 		}
-		t.Skipf("local cluster not reachable at %s: %v; skipping cluster e2e scenario", serverURL, err)
+		t.Fatalf("local cluster not reachable at %s: %v; start the cluster or set PLOY_E2E_CLUSTER=skip", serverURL, err)
 	}
 	resp.Body.Close()
 }
@@ -117,7 +117,7 @@ func TestHydraMountEnforcement(t *testing.T) {
 	requireClusterReady(t, root)
 	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-mount-enforcement", "run.sh")
 	if _, err := os.Stat(script); err != nil {
-		t.Skipf("scenario script not found: %v", err)
+		t.Fatalf("scenario script not found: %v", err)
 	}
 
 	cmd := exec.Command("bash", script)
@@ -140,7 +140,7 @@ func TestHydraOutUpload(t *testing.T) {
 	requireClusterReady(t, root)
 	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-out-upload", "run.sh")
 	if _, err := os.Stat(script); err != nil {
-		t.Skipf("scenario script not found: %v", err)
+		t.Fatalf("scenario script not found: %v", err)
 	}
 
 	cmd := exec.Command("bash", script)
