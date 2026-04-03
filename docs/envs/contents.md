@@ -1,1 +1,1 @@
-[README.md](README.md) Canonical reference of environment variables, runtime contracts, and spec-related configuration across CLI/server/node flows.
+[README.md](README.md) Canonical reference for CLI/server/node environment variables, runtime wiring, and healing container inputs.
