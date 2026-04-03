@@ -133,6 +133,12 @@ else
   exit 2
 fi
 
+# Codex shell snapshot exports the process environment via /bin/sh; multiline
+# values in inline config env vars can break `export` parsing. After
+# materialization, keep values in local files/variables and remove these keys
+# from the process environment before invoking `codex exec`.
+unset CODEX_PROMPT CODEX_AUTH_JSON CODEX_CONFIG_TOML CRUSH_JSON CCR_CONFIG_JSON
+
 resume_session=""
 if [[ "${CODEX_RESUME:-}" == "1" && -f "/in/codex-session.txt" ]]; then
   resume_session="$(tr -d '\r\n' < /in/codex-session.txt)"
