@@ -158,9 +158,9 @@ build_gate:
     spec_path: ./healing/router/spec.yaml
     image: ghcr.io/iw2rmb/ploy/codex:latest
     in:
-      codex-prompt.txt: "Summarize the build failure in /in/build-gate.log as JSON: {\"bug_summary\":\"...\"}"
+      - ./codex-prompt.txt:/in/codex-prompt.txt
     home:
-      auth: ~/.codex/auth.json
+      - ~/.codex/auth.json:.codex/auth.json:ro
 
   # Healing runs after router, selected by router error_kind.
   healing:
@@ -170,7 +170,7 @@ build_gate:
         retries: 2
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
-          codex-prompt.txt: "Fix infra/toolchain issue in /in/build-gate.log"
+          - ./codex-prompt.txt:/in/codex-prompt.txt
         expectations:
           artifacts:
             - path: /out/gate-profile-candidate.json
@@ -180,7 +180,7 @@ build_gate:
         retries: 2
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
-          codex-prompt.txt: "Fix code issue in /in/build-gate.log"
+          - ./codex-prompt.txt:/in/codex-prompt.txt
 ```
 
 Healing action fields (image, command, env, home) are specified under
@@ -215,7 +215,7 @@ router:
     #   - param: model
     #     value: gpt-4o
   home:
-    auth: ~/.codex/auth.json
+    - ~/.codex/auth.json:.codex/auth.json:ro
 ```
 
 **Direct-Codex mode** (fallback): omit `amata`. The container uses the direct
@@ -226,9 +226,9 @@ router:
 router:
   image: ghcr.io/iw2rmb/ploy/codex:latest
   in:
-    codex-prompt.txt: "Summarize the build failure as JSON: {\"bug_summary\":\"...\"}"
+    - ./codex-prompt.txt:/in/codex-prompt.txt
   home:
-    auth: ~/.codex/auth.json
+    - ~/.codex/auth.json:.codex/auth.json:ro
 ```
 
 The same dual-mode rules apply to `steps[]`, `router`, and `healing.by_error_kind.<error_kind>` entries.
