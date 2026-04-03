@@ -621,7 +621,7 @@ build_gate:
         image: ghcr.io/iw2rmb/ploy/codex:latest
         command: ["codex", "--input", "/workspace", "--out", "/out"]
         in:
-          codex-prompt.txt: "Fix the infra build error in /in/build-gate.log"
+          - ./codex-prompt.txt:/in/codex-prompt.txt
           - ~/.codex/auth.json:/in/codex-auth.json
         expectations:
           artifacts:
