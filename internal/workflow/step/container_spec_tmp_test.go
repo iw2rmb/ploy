@@ -143,6 +143,33 @@ func TestBuildContainerSpec_HydraHomeMountRO(t *testing.T) {
 	}
 }
 
+func TestBuildContainerSpec_HydraHomeUsesEnvHOME(t *testing.T) {
+	stagingDir := t.TempDir()
+
+	manifest := baseManifestForHydra(t)
+	manifest.Envs = map[string]string{"HOME": "/root"}
+	manifest.Home = []string{"ccccccc:.codex/auth.json"}
+
+	spec, err := buildContainerSpec(types.RunID("run-home-env"), types.JobID("job-home-env"), manifest, "/ws", "", "", stagingDir)
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	var found bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/root/.codex/auth.json" {
+			found = true
+			wantSrc := filepath.Join(stagingDir, "ccccccc", "content")
+			if m.Source != wantSrc {
+				t.Errorf("source = %q, want %q", m.Source, wantSrc)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("home mount with HOME=/root not found in %+v", spec.Mounts)
+	}
+}
+
 func TestBuildContainerSpec_HydraCAMount(t *testing.T) {
 	stagingDir := t.TempDir()
 

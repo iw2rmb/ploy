@@ -889,3 +889,59 @@ func TestCompileHydraRecordsInPlace_MixedCanonicalAndAuthoring_PreservesBundleMa
 		t.Errorf("upload count = %d, want 1", *uploadCount)
 	}
 }
+
+// TestCompileHydraRecordsInPlace_BundleMapFromJSONUnmarshal verifies that
+// bundle_map is correctly seeded when the spec was loaded from JSON/YAML,
+// which produces map[string]any instead of map[string]string.
+func TestCompileHydraRecordsInPlace_BundleMapFromJSONUnmarshal(t *testing.T) {
+	_, base, client, uploadCount := newMockBundleServer(t)
+
+	tmpDir := t.TempDir()
+	newFile := filepath.Join(tmpDir, "new.json")
+	if err := os.WriteFile(newFile, []byte(`{"new":"data"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	existingCAHash := "aabbcc112233"
+	existingInHash := "ddeeff445566"
+
+	// Simulate JSON-unmarshaled bundle_map: map[string]any with string values,
+	// as json.Unmarshal into map[string]any produces.
+	spec := map[string]any{
+		"steps": []any{
+			map[string]any{
+				"image": "alpine:3",
+				"ca":    []any{existingCAHash},
+				"in": []any{
+					existingInHash + ":/in/old.json",
+					newFile + ":/in/new.json",
+				},
+			},
+		},
+		"bundle_map": map[string]any{
+			existingCAHash: "bundle-existing-ca",
+			existingInHash: "bundle-existing-in",
+		},
+	}
+
+	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
+		t.Fatalf("compileHydraRecordsInPlace: %v", err)
+	}
+
+	bm, ok := spec["bundle_map"].(map[string]string)
+	if !ok {
+		t.Fatalf("bundle_map type = %T, want map[string]string", spec["bundle_map"])
+	}
+
+	if got := bm[existingCAHash]; got != "bundle-existing-ca" {
+		t.Errorf("bundle_map[%q] = %q, want %q", existingCAHash, got, "bundle-existing-ca")
+	}
+	if got := bm[existingInHash]; got != "bundle-existing-in" {
+		t.Errorf("bundle_map[%q] = %q, want %q", existingInHash, got, "bundle-existing-in")
+	}
+
+	// Only the new authoring entry should trigger an upload.
+	if *uploadCount != 1 {
+		t.Errorf("upload count = %d, want 1", *uploadCount)
+	}
+}
