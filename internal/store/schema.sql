@@ -526,6 +526,18 @@ CREATE TABLE IF NOT EXISTS config_in (
 );
 CREATE INDEX IF NOT EXISTS config_in_section_idx ON config_in(section);
 
+-- Global Bundle Map (config_bundle_map)
+-- Stores shortHash → bundleID mappings for content-addressed spec bundles
+-- referenced by config_home and config_in entries.
+-- Persisted so that after a server restart the claim mutator can resolve
+-- content hashes to spec bundle IDs for node-side materialization.
+DROP TABLE IF EXISTS config_bundle_map;
+CREATE TABLE IF NOT EXISTS config_bundle_map (
+  hash        TEXT NOT NULL PRIMARY KEY CHECK (hash ~ '^[0-9a-f]{7,64}$'),  -- Canonical shortHash
+  bundle_id   TEXT NOT NULL,                                                 -- spec_bundles.id
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Spec bundles (pre-uploaded tar archives referenced by spec tmp_bundle fields)
 -- One row per uploaded bundle; id becomes the bundle_id in TmpBundleRef.
 -- last_ref_at is updated each time a spec or run references this bundle, enabling

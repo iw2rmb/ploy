@@ -52,6 +52,12 @@ type BootstrapToken struct {
 	IssuedBy     *string            `json:"issued_by"`
 }
 
+type ConfigBundleMap struct {
+	Hash      string             `json:"hash"`
+	BundleID  string             `json:"bundle_id"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ConfigCa struct {
 	Hash      string             `json:"hash"`
 	Section   string             `json:"section"`

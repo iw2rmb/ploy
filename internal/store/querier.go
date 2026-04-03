@@ -76,6 +76,8 @@ type Querier interface {
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
+	// Removes a bundle map entry by hash.
+	DeleteConfigBundleMap(ctx context.Context, hash string) error
 	// Removes a CA entry by hash and section.
 	DeleteConfigCA(ctx context.Context, arg DeleteConfigCAParams) error
 	// Removes all CA entries for a section.
@@ -173,6 +175,10 @@ type Querier interface {
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
+	// config_bundle_map.sql — CRUD queries for global bundle map entries (config_bundle_map table).
+	// Provides ListConfigBundleMap, UpsertConfigBundleMap, DeleteConfigBundleMap.
+	// Returns all bundle map entries ordered by hash for deterministic iteration.
+	ListConfigBundleMap(ctx context.Context) ([]ConfigBundleMap, error)
 	// config_ca.sql — CRUD queries for global CA hash entries (config_ca table).
 	// Provides ListConfigCA, UpsertConfigCA, DeleteConfigCA, DeleteConfigCABySection.
 	// Returns all CA entries ordered by section then hash for deterministic iteration.
@@ -322,6 +328,9 @@ type Querier interface {
 	// Updates last_ref_at to now() for the given spec bundle.
 	// Call this whenever a spec or run references the bundle to keep GC metadata fresh.
 	UpdateSpecBundleLastRefAt(ctx context.Context, id string) error
+	// Inserts or updates a bundle map entry (upsert on primary key hash).
+	// Refreshes bundle_id and updated_at on conflict.
+	UpsertConfigBundleMap(ctx context.Context, arg UpsertConfigBundleMapParams) error
 	// Inserts or updates a CA entry (upsert on composite key (hash, section)).
 	// Refreshes updated_at on conflict.
 	UpsertConfigCA(ctx context.Context, arg UpsertConfigCAParams) error

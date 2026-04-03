@@ -28,6 +28,9 @@ type configStore struct {
 	upsertConfigIn mockCall[store.UpsertConfigInParams, struct{}]
 	deleteConfigIn mockCall[store.DeleteConfigInParams, struct{}]
 
+	// Bundle Map
+	upsertConfigBundleMap mockCall[store.UpsertConfigBundleMapParams, struct{}]
+
 	// Spec Bundles
 	createSpecBundle mockCall[store.CreateSpecBundleParams, store.SpecBundle]
 	getSpecBundle    mockResult[store.SpecBundle]
@@ -130,5 +133,12 @@ func (m *configStore) UpsertConfigIn(ctx context.Context, params store.UpsertCon
 
 func (m *configStore) DeleteConfigIn(ctx context.Context, arg store.DeleteConfigInParams) error {
 	_, err := m.deleteConfigIn.record(arg)
+	return err
+}
+
+// Bundle Map methods
+
+func (m *configStore) UpsertConfigBundleMap(ctx context.Context, params store.UpsertConfigBundleMapParams) error {
+	_, err := m.upsertConfigBundleMap.record(params)
 	return err
 }
