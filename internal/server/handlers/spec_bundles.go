@@ -82,7 +82,7 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 			// Update last_ref_at to keep GC metadata fresh.
 			if refErr := st.UpdateSpecBundleLastRefAt(r.Context(), existing.ID); refErr != nil {
 				slog.Warn("spec bundle upload: failed to update last_ref_at on deduplicated bundle",
-					"bundle_id", existing.ID.String(), "err", refErr)
+					"bundle_id", existing.ID, "err", refErr)
 			}
 			writeSpecBundleUploadResponse(w, existing, true)
 			return
@@ -99,7 +99,7 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 			createdByPtr = &createdBy
 		}
 		params := store.CreateSpecBundleParams{
-			ID:        bundleID,
+			ID:        string(bundleID),
 			Cid:       cid,
 			Digest:    digest,
 			Size:      int64(len(data)),
@@ -109,11 +109,11 @@ func uploadSpecBundleHandler(st store.Store, bp *blobpersist.Service) http.Handl
 		bundle, err := bp.CreateSpecBundle(r.Context(), params, data)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to persist spec bundle: %v", err)
-			slog.Error("spec bundle upload: persist failed", "bundle_id", bundleID.String(), "err", err)
+			slog.Error("spec bundle upload: persist failed", "bundle_id", bundleID, "err", err)
 			return
 		}
 
-		slog.Info("spec bundle uploaded", "bundle_id", bundle.ID.String(), "size", bundle.Size)
+		slog.Info("spec bundle uploaded", "bundle_id", bundle.ID, "size", bundle.Size)
 		writeSpecBundleUploadResponse(w, bundle, false)
 	}
 }
@@ -128,7 +128,7 @@ type specBundleUploadResponse struct {
 
 func writeSpecBundleUploadResponse(w http.ResponseWriter, bundle store.SpecBundle, deduplicated bool) {
 	resp := specBundleUploadResponse{
-		BundleID:     bundle.ID.String(),
+		BundleID:     bundle.ID,
 		CID:          bundle.Cid,
 		Digest:       bundle.Digest,
 		Size:         bundle.Size,
@@ -160,7 +160,7 @@ func probeSpecBundleHandler(st store.Store) http.HandlerFunc {
 		}
 		bundle, err := st.GetSpecBundleByCID(r.Context(), cid)
 		if err == nil {
-			w.Header().Set("X-Bundle-ID", bundle.ID.String())
+			w.Header().Set("X-Bundle-ID", bundle.ID)
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -180,7 +180,7 @@ func probeSpecBundleHandler(st store.Store) http.HandlerFunc {
 // Auth:  RoleWorker, RoleControlPlane
 func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		bundleID, err := parseRequiredPathID[domaintypes.SpecBundleID](r, "id")
+		bundleID, err := requiredPathParam(r, "id")
 		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
@@ -193,26 +193,26 @@ func downloadSpecBundleHandler(st store.Store, bs blobstore.Store) http.HandlerF
 				return
 			}
 			writeHTTPError(w, http.StatusInternalServerError, "failed to retrieve spec bundle: %v", err)
-			slog.Error("spec bundle download: metadata lookup failed", "bundle_id", bundleID.String(), "err", err)
+			slog.Error("spec bundle download: metadata lookup failed", "bundle_id", bundleID, "err", err)
 			return
 		}
 
-		rc, size, ok := openBlobForHTTP(w, r, bs, bundle.ObjectKey, "spec bundle", "bundle_id", bundleID.String())
+		rc, size, ok := openBlobForHTTP(w, r, bs, bundle.ObjectKey, "spec bundle", "bundle_id", bundleID)
 		if !ok {
 			return
 		}
 		defer rc.Close()
 
 		// Update last_ref_at asynchronously to track GC eligibility.
-		go func(bundleID domaintypes.SpecBundleID) {
+		go func(id string) {
 			ctx, cancel := context.WithTimeout(context.Background(), specBundleLastRefUpdateTimeout)
 			defer cancel()
-			if refErr := st.UpdateSpecBundleLastRefAt(ctx, bundleID); refErr != nil {
+			if refErr := st.UpdateSpecBundleLastRefAt(ctx, id); refErr != nil {
 				slog.Warn("spec bundle download: failed to update last_ref_at",
-					"bundle_id", bundleID.String(), "err", refErr)
+					"bundle_id", id, "err", refErr)
 			}
 		}(bundle.ID)
 
-		streamBlob(w, rc, size, fmt.Sprintf("%q", "bundle-"+bundleID.String()+".tar.gz"), "application/gzip")
+		streamBlob(w, rc, size, fmt.Sprintf("%q", "bundle-"+bundleID+".tar.gz"), "application/gzip")
 	}
 }

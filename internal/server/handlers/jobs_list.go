@@ -26,10 +26,17 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Convert typed RunID pointer to plain string pointer for store query.
+		var runIDStr *string
+		if runID != nil {
+			s := runID.String()
+			runIDStr = &s
+		}
+
 		jobs, err := st.ListJobsForTUI(r.Context(), store.ListJobsForTUIParams{
 			Limit:  limit,
 			Offset: offset,
-			RunID:  runID,
+			RunID:  runIDStr,
 		})
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list jobs: %v", err)
@@ -37,7 +44,7 @@ func listJobsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		total, err := st.CountJobsForTUI(r.Context(), runID)
+		total, err := st.CountJobsForTUI(r.Context(), runIDStr)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to count jobs: %v", err)
 			slog.Error("list jobs: count failed", "err", err)

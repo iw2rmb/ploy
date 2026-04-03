@@ -190,12 +190,12 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	handler := putGlobalEnvHandler(holder, st)
 
 	reqBody := map[string]any{
-		"value":  "-----BEGIN CERTIFICATE-----\n...",
+		"value":  "sk-abc123",
 		"target": "gates",
 		"secret": true,
 	}
 
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/PLOY_CA_CERTS", reqBody, "key", "PLOY_CA_CERTS")
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/OPENAI_API_KEY", reqBody, "key", "OPENAI_API_KEY")
 
 	assertStatus(t, rr, http.StatusOK)
 
@@ -203,16 +203,16 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	if !st.upsertGlobalEnv.called {
 		t.Error("store.UpsertGlobalEnv was not called")
 	}
-	if st.upsertGlobalEnv.params.Key != "PLOY_CA_CERTS" {
-		t.Errorf("store Key = %q, want %q", st.upsertGlobalEnv.params.Key, "PLOY_CA_CERTS")
+	if st.upsertGlobalEnv.params.Key != "OPENAI_API_KEY" {
+		t.Errorf("store Key = %q, want %q", st.upsertGlobalEnv.params.Key, "OPENAI_API_KEY")
 	}
 
 	// Verify holder was updated.
-	v, ok := holder.GetGlobalEnvVar("PLOY_CA_CERTS")
+	v, ok := holder.GetGlobalEnvVar("OPENAI_API_KEY")
 	if !ok {
-		t.Fatal("holder does not contain PLOY_CA_CERTS")
+		t.Fatal("holder does not contain OPENAI_API_KEY")
 	}
-	if v.Value != "-----BEGIN CERTIFICATE-----\n..." {
+	if v.Value != "sk-abc123" {
 		t.Errorf("holder Value = %q", v.Value)
 	}
 
@@ -425,10 +425,10 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 		secret bool
 	}{
 		{
-			name:   "CA bundle",
+			name:   "CA bundle (server target)",
 			key:    "PLOY_CA_CERTS",
 			value:  "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
-			target: "gates",
+			target: "server",
 			secret: true,
 		},
 		{
@@ -530,6 +530,80 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 	// Holder should not be updated on store failure.
 	if _, ok := holder.GetGlobalEnvVar("OLD_KEY"); !ok {
 		t.Error("holder should still contain OLD_KEY after store failure")
+	}
+}
+
+// TestConfigEnvPutSpecialKeyHardCutGuard verifies that PUT /v1/config/env/{key}
+// rejects special env keys with gates/steps targets (migrated to typed fields).
+func TestConfigEnvPutSpecialKeyHardCutGuard(t *testing.T) {
+	tests := []struct {
+		name   string
+		key    string
+		target string
+	}{
+		{"ca_gates", "PLOY_CA_CERTS", "gates"},
+		{"ca_steps", "PLOY_CA_CERTS", "steps"},
+		{"home_gates", "CODEX_AUTH_JSON", "gates"},
+		{"home_steps", "CODEX_CONFIG_TOML", "steps"},
+		{"in_steps", "CODEX_PROMPT", "steps"},
+		{"ccr_gates", "CCR_CONFIG_JSON", "gates"},
+		{"crush_steps", "CRUSH_JSON", "steps"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(emptyGitLabConfig(), nil)
+			handler := putGlobalEnvHandler(holder, st)
+
+			reqBody := map[string]any{
+				"value":  "some-value",
+				"target": tt.target,
+			}
+			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/"+tt.key, reqBody, "key", tt.key)
+
+			assertStatus(t, rr, http.StatusBadRequest)
+
+			// Store must not have been called.
+			if st.upsertGlobalEnv.called {
+				t.Error("store.UpsertGlobalEnv should not be called for migrated special key")
+			}
+
+			// Holder must not have been updated.
+			if _, ok := holder.GetGlobalEnvVar(tt.key); ok {
+				t.Error("holder should not contain the rejected key")
+			}
+		})
+	}
+}
+
+// TestConfigEnvPutSpecialKeyServerTargetAllowed verifies that special env keys
+// with server or nodes targets remain writable (not migrated to typed fields).
+func TestConfigEnvPutSpecialKeyServerTargetAllowed(t *testing.T) {
+	tests := []struct {
+		name   string
+		target string
+	}{
+		{"server", "server"},
+		{"nodes", "nodes"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(emptyGitLabConfig(), nil)
+			handler := putGlobalEnvHandler(holder, st)
+
+			reqBody := map[string]any{
+				"value":  "cert-data",
+				"target": tt.target,
+			}
+			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/PLOY_CA_CERTS", reqBody, "key", "PLOY_CA_CERTS")
+
+			assertStatus(t, rr, http.StatusOK)
+
+			if !st.upsertGlobalEnv.called {
+				t.Error("store.UpsertGlobalEnv should be called for non-migrated target")
+			}
+		})
 	}
 }
 

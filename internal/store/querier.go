@@ -41,8 +41,9 @@ type Querier interface {
 	// MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 	CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, arg CountJobsByRunRepoAttemptGroupByStatusParams) ([]CountJobsByRunRepoAttemptGroupByStatusRow, error)
 	// Counts jobs with optional run_id filter.
+	// run_id: if non-null, count jobs for that run; if null, count all jobs.
 	// Used with ListJobsForTUI to provide total for TUI pagination.
-	CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error)
+	CountJobsForTUI(ctx context.Context, runID *string) (int64, error)
 	CountRunReposByStatus(ctx context.Context, runID types.RunID) ([]CountRunReposByStatusRow, error)
 	// Counts distinct stale nodes that currently have at least one running job.
 	// Excludes NULL node_id rows (orphaned running jobs) from node count.
@@ -69,15 +70,24 @@ type Querier interface {
 	// v1: Creates a new run_repos row scoped to (run_id, repo_id).
 	// Note: attempt defaults to 1; status defaults to 'Queued'.
 	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
+	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
 	// The returned id becomes the bundle_id field in TmpBundleRef.
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
-	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
-	// Deletes a spec bundle metadata row by ID.
-	// Called by blobpersist as rollback when object storage upload fails.
-	DeleteSpecBundle(ctx context.Context, id types.SpecBundleID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
+	// Removes a CA entry by hash and section.
+	DeleteConfigCA(ctx context.Context, arg DeleteConfigCAParams) error
+	// Removes all CA entries for a section.
+	DeleteConfigCABySection(ctx context.Context, section string) error
+	// Removes a home entry by dst and section.
+	DeleteConfigHome(ctx context.Context, arg DeleteConfigHomeParams) error
+	// Removes all home entries for a section.
+	DeleteConfigHomeBySection(ctx context.Context, section string) error
+	// Removes an in entry by dst and section.
+	DeleteConfigIn(ctx context.Context, arg DeleteConfigInParams) error
+	// Removes all in entries for a section.
+	DeleteConfigInBySection(ctx context.Context, section string) error
 	DeleteDiff(ctx context.Context, id pgtype.UUID) error
 	DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	// DeleteExpiredArtifactBundles removes artifact bundle rows older than the specified timestamp.
@@ -88,14 +98,6 @@ type Querier interface {
 	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredLogs removes log rows older than the specified timestamp.
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
-	// Removes a CA entry by hash and section.
-	DeleteConfigCA(ctx context.Context, arg DeleteConfigCAParams) error
-	// Removes all CA entries for a section.
-	DeleteConfigCABySection(ctx context.Context, section string) error
-	// Removes a home entry by dst and section.
-	DeleteConfigHome(ctx context.Context, arg DeleteConfigHomeParams) error
-	// Removes all home entries for a section.
-	DeleteConfigHomeBySection(ctx context.Context, section string) error
 	// Removes an environment entry by key and target.
 	// No-op if the (key, target) pair does not exist (exec returns no error).
 	DeleteGlobalEnv(ctx context.Context, arg DeleteGlobalEnvParams) error
@@ -111,6 +113,9 @@ type Querier interface {
 	DeleteRun(ctx context.Context, id types.RunID) error
 	DeleteRunRepo(ctx context.Context, arg DeleteRunRepoParams) error
 	DeleteSBOMRowsByJob(ctx context.Context, jobID types.JobID) error
+	// Deletes a spec bundle metadata row by ID.
+	// Called by blobpersist as rollback when object storage upload fails.
+	DeleteSpecBundle(ctx context.Context, id string) error
 	// Transitional: returns current job id and linked successor id.
 	GetAdjacentJobIndices(ctx context.Context, id types.JobID) (GetAdjacentJobIndicesRow, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
@@ -144,11 +149,12 @@ type Querier interface {
 	GetRun(ctx context.Context, id types.RunID) (Run, error)
 	GetRunRepo(ctx context.Context, arg GetRunRepoParams) (RunRepo, error)
 	GetRunTiming(ctx context.Context, id types.RunID) (RunsTiming, error)
-	// Returns spec bundle metadata including object_key for object-storage retrieval.
-	GetSpecBundle(ctx context.Context, id types.SpecBundleID) (SpecBundle, error)
-	// Returns the most recently created spec bundle for a given cid.
-	GetSpecBundleByCID(ctx context.Context, cid string) (SpecBundle, error)
 	GetSpec(ctx context.Context, id types.SpecID) (Spec, error)
+	// Returns spec bundle metadata including object_key for object-storage retrieval.
+	GetSpecBundle(ctx context.Context, id string) (SpecBundle, error)
+	// Returns the most recently created spec bundle for a given cid.
+	// Used for deduplication: callers should check by CID before uploading.
+	GetSpecBundleByCID(ctx context.Context, cid string) (SpecBundle, error)
 	GetStepByJob(ctx context.Context, jobID string) (Step, error)
 	// Checks if a mig_repo has any historical executions (run_repos references).
 	// Returns true if the repo cannot be deleted due to history, false otherwise.
@@ -167,14 +173,24 @@ type Querier interface {
 	ListArtifactBundlesByRun(ctx context.Context, runID types.RunID) ([]ArtifactBundle, error)
 	// Returns artifact bundle metadata including object_key for object-storage retrieval.
 	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
+	// config_ca.sql — CRUD queries for global CA hash entries (config_ca table).
+	// Provides ListConfigCA, UpsertConfigCA, DeleteConfigCA, DeleteConfigCABySection.
 	// Returns all CA entries ordered by section then hash for deterministic iteration.
 	ListConfigCA(ctx context.Context) ([]ConfigCa, error)
 	// Returns CA entries for a specific section ordered by hash.
 	ListConfigCABySection(ctx context.Context, section string) ([]ConfigCa, error)
+	// config_home.sql — CRUD queries for global home mount entries (config_home table).
+	// Provides ListConfigHome, UpsertConfigHome, DeleteConfigHome, DeleteConfigHomeBySection.
 	// Returns all home entries ordered by section then dst for deterministic iteration.
 	ListConfigHome(ctx context.Context) ([]ConfigHome, error)
 	// Returns home entries for a specific section ordered by dst.
 	ListConfigHomeBySection(ctx context.Context, section string) ([]ConfigHome, error)
+	// config_in.sql — CRUD queries for global in mount entries (config_in table).
+	// Provides ListConfigIn, UpsertConfigIn, DeleteConfigIn, DeleteConfigInBySection.
+	// Returns all in entries ordered by section then dst for deterministic iteration.
+	ListConfigIn(ctx context.Context) ([]ConfigIn, error)
+	// Returns in entries for a specific section ordered by dst.
+	ListConfigInBySection(ctx context.Context, section string) ([]ConfigIn, error)
 	ListCreatedJobsByRunRepoAttempt(ctx context.Context, arg ListCreatedJobsByRunRepoAttemptParams) ([]Job, error)
 	// Returns diff metadata for a run.
 	ListDiffsByRun(ctx context.Context, runID types.RunID) ([]Diff, error)
@@ -196,12 +212,13 @@ type Querier interface {
 	ListFailedRepoIDsByMig(ctx context.Context, migID types.MigID) ([]types.RepoID, error)
 	// config_env.sql — CRUD queries for global environment variables (config_env table).
 	// Provides ListGlobalEnv, GetGlobalEnv, UpsertGlobalEnv, DeleteGlobalEnv.
-	// Returns all global environment entries, ordered by key for consistent iteration.
+	// Returns all global environment entries, ordered by key then target for consistent iteration.
 	// Used by ConfigHolder initialization and HTTP list endpoint.
 	ListGlobalEnv(ctx context.Context) ([]ConfigEnv, error)
 	ListJobsByRun(ctx context.Context, runID types.RunID) ([]Job, error)
 	ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRunRepoAttemptParams) ([]Job, error)
 	// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
+	// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
 	// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
 	ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
@@ -301,14 +318,20 @@ type Querier interface {
 	// Merge an MR URL into runs.stats.metadata.mr_url without altering other fields.
 	// Preserves existing stats and metadata keys via JSONB merge.
 	UpdateRunStatsMRURL(ctx context.Context, arg UpdateRunStatsMRURLParams) error
-	// Updates last_ref_at to now() for the given spec bundle.
-	UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
-	UpsertExactGateProfile(ctx context.Context, arg UpsertExactGateProfileParams) (UpsertExactGateProfileRow, error)
+	// Updates last_ref_at to now() for the given spec bundle.
+	// Call this whenever a spec or run references the bundle to keep GC metadata fresh.
+	UpdateSpecBundleLastRefAt(ctx context.Context, id string) error
 	// Inserts or updates a CA entry (upsert on composite key (hash, section)).
+	// Refreshes updated_at on conflict.
 	UpsertConfigCA(ctx context.Context, arg UpsertConfigCAParams) error
 	// Inserts or updates a home entry (upsert on composite key (dst, section)).
+	// Refreshes entry and updated_at on conflict (entry may change if hash or ro flag changes).
 	UpsertConfigHome(ctx context.Context, arg UpsertConfigHomeParams) error
+	// Inserts or updates an in entry (upsert on composite key (dst, section)).
+	// Refreshes entry and updated_at on conflict (entry may change if hash changes).
+	UpsertConfigIn(ctx context.Context, arg UpsertConfigInParams) error
+	UpsertExactGateProfile(ctx context.Context, arg UpsertExactGateProfileParams) (UpsertExactGateProfileRow, error)
 	UpsertGateJobProfileLink(ctx context.Context, arg UpsertGateJobProfileLinkParams) error
 	// Inserts or updates an environment entry (upsert on composite key (key, target)).
 	// Updates value, secret, and refreshes updated_at on conflict.

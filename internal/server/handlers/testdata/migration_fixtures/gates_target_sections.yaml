@@ -1,0 +1,19 @@
+# Gates target maps to pre_gate, re_gate, post_gate sections.
+description: gates target section mapping
+env:
+  PLOY_CA_CERTS:
+    - value: "cert-data"
+      target: gates
+      secret: true
+existing_ca: {}
+existing_home: {}
+expect:
+  rewritten: 1
+  rejected: 0
+  skipped: 0
+  entries:
+    - env_key: PLOY_CA_CERTS
+      target: gates
+      action: rewrite
+      target_field: ca
+      sections: [pre_gate, re_gate, post_gate]

@@ -197,6 +197,24 @@ func (q *Queries) CountJobsByRunRepoAttemptGroupByStatus(ctx context.Context, ar
 	return items, nil
 }
 
+const countJobsForTUI = `-- name: CountJobsForTUI :one
+SELECT COUNT(jobs.id)::BIGINT
+FROM jobs
+JOIN runs ON jobs.run_id = runs.id
+JOIN migs ON runs.mig_id = migs.id
+WHERE ($1::text IS NULL OR jobs.run_id = $1::text)
+`
+
+// Counts jobs with optional run_id filter.
+// run_id: if non-null, count jobs for that run; if null, count all jobs.
+// Used with ListJobsForTUI to provide total for TUI pagination.
+func (q *Queries) CountJobsForTUI(ctx context.Context, runID *string) (int64, error) {
+	row := q.db.QueryRow(ctx, countJobsForTUI, runID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countStaleNodesWithRunningJobs = `-- name: CountStaleNodesWithRunningJobs :one
 SELECT COUNT(DISTINCT jobs.node_id)::BIGINT
 FROM jobs
@@ -617,6 +635,76 @@ func (q *Queries) ListJobsByRunRepoAttempt(ctx context.Context, arg ListJobsByRu
 	return items, nil
 }
 
+const listJobsForTUI = `-- name: ListJobsForTUI :many
+SELECT
+  jobs.id AS job_id,
+  jobs.name,
+  jobs.status,
+  jobs.duration_ms,
+  jobs.job_image,
+  jobs.node_id,
+  migs.name AS mig_name,
+  jobs.run_id,
+  jobs.repo_id
+FROM jobs
+JOIN runs ON jobs.run_id = runs.id
+JOIN migs ON runs.mig_id = migs.id
+WHERE ($3::text IS NULL OR jobs.run_id = $3::text)
+ORDER BY jobs.id DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListJobsForTUIParams struct {
+	Limit  int32   `json:"limit"`
+	Offset int32   `json:"offset"`
+	RunID  *string `json:"run_id"`
+}
+
+type ListJobsForTUIRow struct {
+	JobID      types.JobID     `json:"job_id"`
+	Name       string          `json:"name"`
+	Status     types.JobStatus `json:"status"`
+	DurationMs int64           `json:"duration_ms"`
+	JobImage   string          `json:"job_image"`
+	NodeID     *types.NodeID   `json:"node_id"`
+	MigName    string          `json:"mig_name"`
+	RunID      types.RunID     `json:"run_id"`
+	RepoID     types.RepoID    `json:"repo_id"`
+}
+
+// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
+// run_id: if non-null, filter to jobs for that run; if null, return all jobs.
+// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
+func (q *Queries) ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error) {
+	rows, err := q.db.Query(ctx, listJobsForTUI, arg.Limit, arg.Offset, arg.RunID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListJobsForTUIRow{}
+	for rows.Next() {
+		var i ListJobsForTUIRow
+		if err := rows.Scan(
+			&i.JobID,
+			&i.Name,
+			&i.Status,
+			&i.DurationMs,
+			&i.JobImage,
+			&i.NodeID,
+			&i.MigName,
+			&i.RunID,
+			&i.RepoID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStaleRunningJobs = `-- name: ListStaleRunningJobs :many
 SELECT
   jobs.run_id,
@@ -1006,94 +1094,4 @@ func (q *Queries) UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams
 		arg.DurationMs,
 	)
 	return err
-}
-
-const listJobsForTUI = `-- name: ListJobsForTUI :many
-SELECT
-  jobs.id AS job_id,
-  jobs.name,
-  jobs.status,
-  jobs.duration_ms,
-  jobs.job_image,
-  jobs.node_id,
-  migs.name AS mig_name,
-  jobs.run_id,
-  jobs.repo_id
-FROM jobs
-JOIN runs ON jobs.run_id = runs.id
-JOIN migs ON runs.mig_id = migs.id
-WHERE ($3::text IS NULL OR jobs.run_id = $3::text)
-ORDER BY jobs.id DESC
-LIMIT $1 OFFSET $2
-`
-
-type ListJobsForTUIParams struct {
-	Limit  int32        `json:"limit"`
-	Offset int32        `json:"offset"`
-	RunID  *types.RunID `json:"run_id"`
-}
-
-type ListJobsForTUIRow struct {
-	JobID      types.JobID     `json:"job_id"`
-	Name       string          `json:"name"`
-	Status     types.JobStatus `json:"status"`
-	DurationMs int64           `json:"duration_ms"`
-	JobImage   string          `json:"job_image"`
-	NodeID     *types.NodeID   `json:"node_id"`
-	MigName    string          `json:"mig_name"`
-	RunID      types.RunID     `json:"run_id"`
-	RepoID     types.RepoID    `json:"repo_id"`
-}
-
-// Lists jobs with optional run_id filter, ordered newest-to-oldest by job id.
-// Joins runs and migs to surface mig_name per job for the TUI jobs-list screen.
-func (q *Queries) ListJobsForTUI(ctx context.Context, arg ListJobsForTUIParams) ([]ListJobsForTUIRow, error) {
-	rows, err := q.db.Query(ctx, listJobsForTUI,
-		arg.Limit,
-		arg.Offset,
-		arg.RunID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListJobsForTUIRow{}
-	for rows.Next() {
-		var i ListJobsForTUIRow
-		if err := rows.Scan(
-			&i.JobID,
-			&i.Name,
-			&i.Status,
-			&i.DurationMs,
-			&i.JobImage,
-			&i.NodeID,
-			&i.MigName,
-			&i.RunID,
-			&i.RepoID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const countJobsForTUI = `-- name: CountJobsForTUI :one
-SELECT COUNT(jobs.id)::BIGINT
-FROM jobs
-JOIN runs ON jobs.run_id = runs.id
-JOIN migs ON runs.mig_id = migs.id
-WHERE ($1::text IS NULL OR jobs.run_id = $1::text)
-`
-
-// Counts jobs with optional run_id filter.
-// Used with ListJobsForTUI to provide total for TUI pagination.
-func (q *Queries) CountJobsForTUI(ctx context.Context, runID *types.RunID) (int64, error) {
-	row := q.db.QueryRow(ctx, countJobsForTUI, runID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
 }

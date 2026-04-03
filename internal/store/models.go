@@ -73,6 +73,13 @@ type ConfigHome struct {
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ConfigIn struct {
+	Entry     string             `json:"entry"`
+	Dst       string             `json:"dst"`
+	Section   string             `json:"section"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     types.RunID        `json:"run_id"`
@@ -266,7 +273,7 @@ type Spec struct {
 }
 
 type SpecBundle struct {
-	ID        types.SpecBundleID `json:"id"`
+	ID        string             `json:"id"`
 	Cid       string             `json:"cid"`
 	Digest    string             `json:"digest"`
 	Size      int64              `json:"size"`

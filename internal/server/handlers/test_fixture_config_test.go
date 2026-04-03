@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 
-	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -24,6 +23,10 @@ type configStore struct {
 	// Config Home
 	upsertConfigHome mockCall[store.UpsertConfigHomeParams, struct{}]
 	deleteConfigHome mockCall[store.DeleteConfigHomeParams, struct{}]
+
+	// Config In
+	upsertConfigIn mockCall[store.UpsertConfigInParams, struct{}]
+	deleteConfigIn mockCall[store.DeleteConfigInParams, struct{}]
 
 	// Spec Bundles
 	createSpecBundle mockCall[store.CreateSpecBundleParams, store.SpecBundle]
@@ -90,7 +93,7 @@ func (m *configStore) CreateSpecBundle(ctx context.Context, params store.CreateS
 	return m.createSpecBundle.record(params)
 }
 
-func (m *configStore) GetSpecBundle(ctx context.Context, id types.SpecBundleID) (store.SpecBundle, error) {
+func (m *configStore) GetSpecBundle(ctx context.Context, id string) (store.SpecBundle, error) {
 	return m.getSpecBundle.ret()
 }
 
@@ -98,9 +101,9 @@ func (m *configStore) GetSpecBundleByCID(ctx context.Context, cid string) (store
 	return m.getSpecBundleByCID.ret()
 }
 
-func (m *configStore) UpdateSpecBundleLastRefAt(ctx context.Context, id types.SpecBundleID) error {
+func (m *configStore) UpdateSpecBundleLastRefAt(ctx context.Context, id string) error {
 	m.updateSpecBundleLastRefAtCalled = true
-	m.updateSpecBundleLastRefAtParam = id.String()
+	m.updateSpecBundleLastRefAtParam = id
 	if m.updateSpecBundleLastRefAtStarted != nil {
 		close(m.updateSpecBundleLastRefAtStarted)
 	}
@@ -114,6 +117,18 @@ func (m *configStore) UpdateSpecBundleLastRefAt(ctx context.Context, id types.Sp
 	return m.updateSpecBundleLastRefAtErr
 }
 
-func (m *configStore) DeleteSpecBundle(ctx context.Context, id types.SpecBundleID) error {
+func (m *configStore) DeleteSpecBundle(ctx context.Context, id string) error {
 	return m.deleteSpecBundle.err
+}
+
+// Config In methods
+
+func (m *configStore) UpsertConfigIn(ctx context.Context, params store.UpsertConfigInParams) error {
+	_, err := m.upsertConfigIn.record(params)
+	return err
+}
+
+func (m *configStore) DeleteConfigIn(ctx context.Context, arg store.DeleteConfigInParams) error {
+	_, err := m.deleteConfigIn.record(arg)
+	return err
 }
