@@ -59,33 +59,6 @@ func clusterReady(t *testing.T, root string) bool {
 	return true
 }
 
-// validateScenarioOffline performs offline validation of a scenario script:
-// bash syntax check, expected Hydra mount paths present, no legacy paths.
-func validateScenarioOffline(t *testing.T, scriptPath string, expectedPaths []string) {
-	t.Helper()
-
-	data, err := os.ReadFile(scriptPath)
-	if err != nil {
-		t.Fatalf("read scenario script: %v", err)
-	}
-	content := string(data)
-
-	cmd := exec.Command("bash", "-n", scriptPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("bash syntax error:\n%s", out)
-	}
-
-	for _, p := range expectedPaths {
-		if !strings.Contains(content, p) {
-			t.Errorf("scenario script missing expected Hydra mount path %q", p)
-		}
-	}
-
-	if strings.Contains(content, "/in/prompt.txt") {
-		t.Errorf("scenario script contains legacy /in/prompt.txt; should use /in/codex-prompt.txt")
-	}
-}
-
 // TestCodexEntrypointUnit runs the shell-based unit test suite for the codex
 // entrypoint (images/codex/entrypoint.sh). This wraps the bash test runner so
 // that `go test ./tests/e2e/migs/...` covers the codex entrypoint contract.
@@ -135,9 +108,9 @@ func TestMigSpecsNoLegacyCODEXPROMPT(t *testing.T) {
 }
 
 // TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
-// validating that /in is read-only and /out is writable. When the cluster is
-// unavailable the test falls back to offline script validation so that
-// `go test` always exercises Hydra mount coverage.
+// validating that /in is read-only and /out is writable. Requires a running
+// cluster; skips otherwise (offline validation is covered by
+// TestHydraScenarioOfflineValidation).
 func TestHydraMountEnforcement(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -148,25 +121,24 @@ func TestHydraMountEnforcement(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if clusterReady(t, root) {
-		cmd := exec.Command("bash", script)
-		cmd.Dir = root
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("scenario-hydra-mount-enforcement failed:\n%s", out)
-		}
-		t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
-	} else {
-		t.Logf("cluster unavailable; running offline validation")
-		validateScenarioOffline(t, script, []string{"/in/", "/out/"})
+	if !clusterReady(t, root) {
+		t.Skip("cluster unavailable; offline validation covered by TestHydraScenarioOfflineValidation")
 	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scenario-hydra-mount-enforcement failed:\n%s", out)
+	}
+	t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
 }
 
 // TestHydraOutUpload runs the Hydra /out upload continuity e2e scenario,
 // validating that files written to /out are uploaded and retrievable as artifacts.
-// When the cluster is unavailable the test falls back to offline script
-// validation so that `go test` always exercises Hydra out-upload coverage.
+// Requires a running cluster; skips otherwise (offline validation is covered by
+// TestHydraScenarioOfflineValidation).
 func TestHydraOutUpload(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -177,19 +149,18 @@ func TestHydraOutUpload(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if clusterReady(t, root) {
-		cmd := exec.Command("bash", script)
-		cmd.Dir = root
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("scenario-hydra-out-upload failed:\n%s", out)
-		}
-		t.Logf("scenario-hydra-out-upload passed:\n%s", out)
-	} else {
-		t.Logf("cluster unavailable; running offline validation")
-		validateScenarioOffline(t, script, []string{"/out/"})
+	if !clusterReady(t, root) {
+		t.Skip("cluster unavailable; offline validation covered by TestHydraScenarioOfflineValidation")
 	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scenario-hydra-out-upload failed:\n%s", out)
+	}
+	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
 }
 
 // TestHydraScenarioOfflineValidation validates the Hydra e2e scenario

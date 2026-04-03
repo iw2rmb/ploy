@@ -105,7 +105,8 @@ build_gate:
         in:
           - ./codex-prompt-healer.txt:/in/codex-prompt.txt
         # Uncomment if you have Codex auth configured:
-        #   - ~/.codex/auth.json:/in/codex-auth.json
+        # home:
+        #   - ~/.codex/auth.json:.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION
