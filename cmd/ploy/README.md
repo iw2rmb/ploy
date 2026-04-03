@@ -632,7 +632,7 @@ build_gate:
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
-          codex-prompt.txt: "Fix the code build error in /in/build-gate.log"
+          - ./codex-prompt.txt:/in/codex-prompt.txt
 ```
 
 `spec_path` is an optional CLI-side composition key for Build Gate router/healing
