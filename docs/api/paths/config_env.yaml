@@ -34,10 +34,7 @@ get:
             items:
               $ref: '../components/schemas/config.yaml#/GlobalEnvListItem'
           example:
-            - key: "PLOY_CA_CERTS"
-              target: "gates"
-              secret: true
-            - key: "PLOY_CA_CERTS"
+            - key: "OPENAI_API_KEY"
               target: "steps"
               secret: true
             - key: "CUSTOM_VAR"

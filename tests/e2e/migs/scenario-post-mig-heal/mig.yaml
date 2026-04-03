@@ -92,8 +92,8 @@ build_gate:
 
         Task:
         Summarize the failure and classify it for healing selection.
-    env_from_file:
-      CODEX_AUTH_JSON: ~/.codex/auth.json
+    in:
+      - ~/.codex/auth.json:/in/codex-auth.json
 
   ################################################################################
   # HEALING POLICY FOR POST-MOD FAILURES
@@ -137,8 +137,8 @@ build_gate:
                       Fix the compilation error described in /in/build-gate.log.
                       This is a post-mig gate failure (the mig transformation broke the build).
                       Create any missing classes or fix any syntax errors introduced by the transformation.
-        env_from_file:
-          CODEX_AUTH_JSON: ~/.codex/auth.json
+        in:
+          - ~/.codex/auth.json:/in/codex-auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION

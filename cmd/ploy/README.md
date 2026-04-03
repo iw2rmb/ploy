@@ -396,8 +396,9 @@ ploy completion <shell> --help
   and healing configuration for `mig run`. CLI flags (e.g., `--job-image`, `--gitlab-pat`)
   override corresponding spec values when both are present. Specs use canonical `steps[]`
   shape for both single-step and multi-step runs. Each step supports
-  `image`/`command`/`env`/`env_from_file` plus optional `tmp_bundle` file injection.
-  `tmp_bundle` is also supported in Build Gate router/healing action blocks
+  `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
+  for deterministic file injection via content-addressed bundles.
+  Hydra records are also supported in Build Gate router/healing action blocks
   (`build_gate.router`, `build_gate.healing.by_error_kind.<kind>`). The spec also supports
   GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
@@ -509,12 +510,7 @@ Existing keys in the spec are never overwritten by global config.
 ploy config env list
 
 # Show a specific variable (use --raw to reveal secret values)
-ploy config env show --key PLOY_CA_CERTS --from gates
 ploy config env show --key OPENAI_API_KEY --raw
-
-# Set a variable from a file (common for certs and JSON credentials)
-ploy config env set --key PLOY_CA_CERTS --file ca-bundle.pem --on all
-ploy config env set --key CODEX_AUTH_JSON --file ~/.codex/auth.json --on steps
 
 # Set a variable with an inline value (default --on jobs → gates, steps)
 ploy config env set --key OPENAI_API_KEY --value sk-...
@@ -524,16 +520,18 @@ ploy config env set --key CUSTOM_VAR --value myvalue --on gates --secret=false
 
 # Delete a variable (use --from when key exists for multiple targets)
 ploy config env unset --key OLD_VAR
-ploy config env unset --key PLOY_CA_CERTS --from gates
+
+# CA certificates (typed Hydra field — replaces legacy PLOY_CA_CERTS env key)
+ploy config ca set --file ca-bundle.pem --on all
+ploy config ca ls
+ploy config ca unset --from gates
 ```
 
 ### Common Variables
 
-| Variable | Description | Recommended Target |
-|----------|-------------|-------------------|
-| `PLOY_CA_CERTS` | PEM-encoded CA certificates for TLS trust | `all` |
-| `CODEX_AUTH_JSON` | Codex authentication credentials | `steps` |
-| `CRUSH_JSON` | Crush config JSON content or file path (materialized at `/root/.config/crush/crush.json`) | `steps` |
+| Variable / Field | Description | Recommended Target |
+|------------------|-------------|-------------------|
+| `ca` (typed) | PEM-encoded CA certificates for TLS trust | `all` |
 | `OPENAI_API_KEY` | OpenAI API key for LLM-integrated migs | `jobs` |
 
 See `docs/envs/README.md` § "Global Env Configuration" for detailed semantics and
@@ -622,10 +620,10 @@ build_gate:
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
         command: ["codex", "--input", "/workspace", "--out", "/out"]
-        env:
+        envs:
           CODEX_PROMPT: "Fix the infra build error in /in/build-gate.log"
-        env_from_file:
-          CODEX_AUTH_JSON: ~/.codex/auth.json
+        in:
+          - ~/.codex/auth.json:/in/codex-auth.json
         expectations:
           artifacts:
             - path: /out/gate-profile-candidate.json
@@ -634,7 +632,7 @@ build_gate:
         spec_path: ./healing/code/spec.yaml
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
-        env:
+        envs:
           CODEX_PROMPT: "Fix the code build error in /in/build-gate.log"
 ```
 

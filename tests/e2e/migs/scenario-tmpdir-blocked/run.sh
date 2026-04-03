@@ -5,12 +5,13 @@ set -euo pipefail
 #
 # Validates that spec bundles containing dangerous entries are rejected by the
 # node agent with deterministic error messages, and runs end with status "Fail"
-# rather than "Success".
+# rather than "Success". This tests the Hydra bundle safety layer which guards
+# all content-addressed file materialization (ca, in, out, home).
 #
 # Part 1 — traversal:
 #   1. Craft a tar.gz archive containing a traversal entry ("../evil.txt").
 #   2. Upload the archive directly to POST /v1/spec-bundles with bearer auth.
-#   3. Build a MigRunSpec that references the uploaded bundle via tmp_bundle:.
+#   3. Build a MigRunSpec that references the uploaded bundle via in record.
 #   4. Submit the run and follow to completion.
 #   5. Assert the final repo status is "Fail" and message contains "path traversal in entry".
 #
@@ -89,22 +90,23 @@ fi
 
 echo "Bundle uploaded: id=${BUNDLE_ID} cid=${CID}"
 
-# Step 3: build a spec referencing the uploaded bundle via tmp_bundle:.
+# Step 3: build a spec referencing the uploaded bundle via Hydra in record.
 SPEC_FILE="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-blocked-spec.XXXXXX.yaml")"
 trap 'rm -f "$ARCHIVE" "$SPEC_FILE"' EXIT
+
+# Extract short hash (first 12 hex chars) from the digest for the bundle_map key.
+SHORT_HASH="$(printf '%s' "$DIGEST" | sed 's/^sha256://' | cut -c1-12)"
 
 cat >"$SPEC_FILE" <<YAML
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
+bundle_map:
+  ${SHORT_HASH}: ${BUNDLE_ID}
 steps:
   - image: alpine:3.20
     command: echo "should not reach here"
-    tmp_bundle:
-      bundle_id: ${BUNDLE_ID}
-      cid: ${CID}
-      digest: ${DIGEST}
-      entries:
-        - evil.txt
+    in:
+      - "${SHORT_HASH}:/in/evil.txt"
 YAML
 
 # Step 4: submit the run; expect non-zero exit (run fails on the node).
@@ -216,22 +218,22 @@ fi
 
 echo "Symlink bundle uploaded: id=${BUNDLE_ID_SYM} cid=${CID_SYM}"
 
-# Step 8: build a spec referencing the symlink bundle.
+# Step 8: build a spec referencing the symlink bundle via Hydra in record.
 SPEC_FILE_SYM="$(mktemp "${TMPDIR:-/tmp}/ploy-e2e-blocked-sym-spec.XXXXXX.yaml")"
 trap 'rm -f "$ARCHIVE" "$SPEC_FILE" "$ARCHIVE_SYM" "$SPEC_FILE_SYM"' EXIT
+
+SHORT_HASH_SYM="$(printf '%s' "$DIGEST_SYM" | sed 's/^sha256://' | cut -c1-12)"
 
 cat >"$SPEC_FILE_SYM" <<YAML
 apiVersion: ploy.mig/v1alpha1
 kind: MigRunSpec
+bundle_map:
+  ${SHORT_HASH_SYM}: ${BUNDLE_ID_SYM}
 steps:
   - image: alpine:3.20
     command: echo "should not reach here"
-    tmp_bundle:
-      bundle_id: ${BUNDLE_ID_SYM}
-      cid: ${CID_SYM}
-      digest: ${DIGEST_SYM}
-      entries:
-        - evil.sh
+    in:
+      - "${SHORT_HASH_SYM}:/in/evil.sh"
 YAML
 
 # Step 9: submit the run; expect non-zero exit (run fails on the node).

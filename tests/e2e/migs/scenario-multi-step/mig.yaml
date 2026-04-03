@@ -92,10 +92,9 @@ build_gate:
 
             Task:
             Fix the compilation error described in /in/build-gate.log.
-        env_from_file:
-          # Inline Codex auth JSON from local file (resolved by CLI)
-          # Uncomment and set your auth file path:
-          # CODEX_AUTH_JSON: ~/.codex/auth.json
+        # Uncomment to mount Codex auth JSON as a read-only input:
+        # in:
+        #   - ~/.codex/auth.json:/in/codex-auth.json
 
 ################################################################################
 # GITLAB INTEGRATION (optional)
@@ -103,4 +102,4 @@ build_gate:
 mr_on_fail: false
 mr_on_success: true
 # gitlab_domain: gitlab.com  # optional; defaults to gitlab.com when gitlab_pat is set
-# gitlab_pat: ""  # optional; can be provided via CLI or env_from_file
+# gitlab_pat: ""  # optional; can be provided via CLI or ploy config gitlab

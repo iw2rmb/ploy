@@ -470,8 +470,8 @@ func loadSpec(ctx context.Context, base *url.URL, client *http.Client, path stri
 		specBaseDir = filepath.Dir(path)
 	}
 
-	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/env_from_file/tmp_bundle),
-	// then validate with the canonical parser to catch structural issues early.
+	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/envs expansion),
+	// compile Hydra file records, then validate with the canonical parser.
 	return normalizeMigsSpecToJSON(ctx, base, client, data, specBaseDir)
 }
 

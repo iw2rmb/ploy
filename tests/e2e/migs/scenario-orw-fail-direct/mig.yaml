@@ -45,8 +45,8 @@ build_gate:
 
         Task:
         Summarize the build failure in /in/build-gate.log.
-    env_from_file:
-      CODEX_AUTH_JSON: ~/.codex/auth.json
+    in:
+      - ~/.codex/auth.json:/in/codex-auth.json
 
   healing:
     by_error_kind:
@@ -66,8 +66,8 @@ build_gate:
 
             Task:
             Fix the compilation error described in /in/build-gate.log.
-        env_from_file:
-          CODEX_AUTH_JSON: ~/.codex/auth.json
+        in:
+          - ~/.codex/auth.json:/in/codex-auth.json
 
 mr_on_fail: false
 mr_on_success: true

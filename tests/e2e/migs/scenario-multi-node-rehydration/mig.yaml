@@ -119,8 +119,8 @@ build_gate:
             Fix the compilation error described in /in/build-gate.log.
           E2E_STEP_NAME: "healing-codex"
         # Uncomment if you have Codex auth configured:
-        # env_from_file:
-        #   CODEX_AUTH_JSON: ~/.codex/auth.json
+        # in:
+        #   - ~/.codex/auth.json:/in/codex-auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION
