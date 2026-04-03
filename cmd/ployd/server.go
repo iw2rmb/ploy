@@ -245,6 +245,9 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		if len(execResult.Errors) > 0 {
 			return fmt.Errorf("special env migration: %d error(s) during migration — unmigrated special keys would be dropped from env injection", len(execResult.Errors))
 		}
+		if execResult.Rejected > 0 {
+			return fmt.Errorf("special env migration: %d rejected conflict(s) — conflicting legacy env keys cannot be auto-migrated; resolve manually", execResult.Rejected)
+		}
 	} else {
 		handlers.LogMigrationReport(migrationReport)
 	}
