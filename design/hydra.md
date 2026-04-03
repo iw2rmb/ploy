@@ -198,7 +198,8 @@ Job section routing for `config.yaml` and server defaults:
 - `pre_gate` applies to pre-gate job containers.
 - `re_gate` applies to re-gate job containers.
 - `post_gate` applies to post-gate job containers.
-- `mig` applies to mig and heal job containers.
+- `mig` applies to mig job containers.
+- `heal` applies to heal job containers.
 - Router containers inherit the active gate phase section (`pre_gate`, `re_gate`, or `post_gate`).
 
 ### 6. Simplified `config.yaml` shape
@@ -218,33 +219,41 @@ defaults:
     ca: []
     home: []
   
-  pre_gate:
-    envs: {}
-    ca: []
-    in: []
-    out: []
-    home: []
-  
-  re_gate:
-    envs: {}
-    ca: []
-    in: []
-    out: []
-    home: []
-  
-  post_gate:
-    envs: {}
-    ca: []
-    in: []
-    out: []
-    home: []
-  
-  mig:
-    envs: {}
-    ca: []
-    in: []
-    out: []
-    home: []
+  job:
+    pre_gate:
+      envs: {}
+      ca: []
+      in: []
+      out: []
+      home: []
+    
+    re_gate:
+      envs: {}
+      ca: []
+      in: []
+      out: []
+      home: []
+    
+    post_gate:
+      envs: {}
+      ca: []
+      in: []
+      out: []
+      home: []
+    
+    mig:
+      envs: {}
+      ca: []
+      in: []
+      out: []
+      home: []
+      
+    heal:
+      envs: {}
+      ca: []
+      in: []
+      out: []
+      home: []
 ```
 
 `server` and `node` sections are component-scoped; job sections are claim/runtime-scoped.
