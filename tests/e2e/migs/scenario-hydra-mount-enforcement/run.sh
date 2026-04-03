@@ -56,10 +56,13 @@ steps:
   - image: alpine:3.20
     command: >-
       sh -c '
-        set -e;
         echo "attempting write to /in/config.json...";
-        echo "modified" > /in/config.json && { echo "FAIL: write to /in succeeded"; exit 1; };
-        echo "OK: write to /in correctly rejected"
+        if echo "modified" > /in/config.json 2>/dev/null; then
+          echo "FAIL: write to /in succeeded unexpectedly";
+          exit 1;
+        fi;
+        echo "OK: write to /in correctly rejected (read-only mount enforced)";
+        exit 2
       '
     in:
       - ${IN_FIXTURE}:/in/config.json
