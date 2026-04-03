@@ -10,7 +10,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // handleConfigHome routes home subcommands: list, set, unset.
@@ -169,6 +172,11 @@ func handleConfigHomeSet(args []string, stderr io.Writer) error {
 		return errors.New("--section is required")
 	}
 
+	// Validate entry format using Hydra home parser rules.
+	if _, err := contracts.ParseStoredHomeEntry(entry.value); err != nil {
+		return err
+	}
+
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
@@ -252,6 +260,12 @@ func handleConfigHomeUnset(args []string, stderr io.Writer) error {
 		printConfigHomeUnsetUsage(stderr)
 		return errors.New("--section is required")
 	}
+
+	// Validate and normalize destination using Hydra home-destination rules.
+	if err := contracts.ValidateHomeDestination(dst.value); err != nil {
+		return err
+	}
+	dst.value = path.Clean(dst.value)
 
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)

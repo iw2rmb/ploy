@@ -97,3 +97,53 @@ func TestHandleConfigHomeUnsetRequiresSection(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+// TestHandleConfigHomeSetRejectsInvalidEntry verifies that the 'set' subcommand
+// applies Hydra home parser validation and rejects invalid entries locally.
+func TestHandleConfigHomeSetRejectsInvalidEntry(t *testing.T) {
+	tests := []struct {
+		name  string
+		entry string
+	}{
+		{name: "missing dst", entry: "INVALID"},
+		{name: "absolute destination", entry: "abcdef1:/etc/passwd"},
+		{name: "path traversal", entry: "abcdef1:../escape"},
+		{name: "invalid hash", entry: "SHORT:.config/app"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigHomeSet([]string{"--entry", tt.entry, "--section", "mig"}, buf)
+			if err == nil {
+				t.Fatalf("expected error for invalid entry %q", tt.entry)
+			}
+			if !strings.Contains(err.Error(), "home entry") {
+				t.Fatalf("expected Hydra parser error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestHandleConfigHomeUnsetRejectsInvalidDst verifies that the 'unset' subcommand
+// applies Hydra home-destination validation and rejects invalid destinations locally.
+func TestHandleConfigHomeUnsetRejectsInvalidDst(t *testing.T) {
+	tests := []struct {
+		name string
+		dst  string
+	}{
+		{name: "absolute path", dst: "/etc/passwd"},
+		{name: "path traversal", dst: "../escape"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigHomeUnset([]string{"--dst", tt.dst, "--section", "mig"}, buf)
+			if err == nil {
+				t.Fatalf("expected error for invalid dst %q", tt.dst)
+			}
+			if !strings.Contains(err.Error(), "home destination") {
+				t.Fatalf("expected Hydra destination validation error, got: %v", err)
+			}
+		})
+	}
+}

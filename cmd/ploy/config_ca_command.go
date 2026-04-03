@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // handleConfigCA routes ca subcommands: list, set, unset.
@@ -163,6 +165,13 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 		return errors.New("--section is required")
 	}
 
+	// Validate and normalize hash using Hydra parser rules.
+	normalizedHash, err := contracts.ParseStoredCAEntry(hash.value)
+	if err != nil {
+		return err
+	}
+	hash.value = normalizedHash
+
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
@@ -241,6 +250,13 @@ func handleConfigCAUnset(args []string, stderr io.Writer) error {
 		printConfigCAUnsetUsage(stderr)
 		return errors.New("--section is required")
 	}
+
+	// Validate and normalize hash using Hydra parser rules.
+	normalizedHash, err := contracts.ParseStoredCAEntry(hash.value)
+	if err != nil {
+		return err
+	}
+	hash.value = normalizedHash
 
 	ctx := context.Background()
 	baseURL, client, err := resolveControlPlaneHTTP(ctx)
