@@ -17,6 +17,7 @@
 [config_ca_test.go](config_ca_test.go) Exercises global CA CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
 [config_env_migration.go](config_env_migration.go) Deterministic key-based rewrite mapping from special legacy env keys to typed Hydra ca/home/in fields with migration scan and report metrics.
+[config_env_migration_fixture_test.go](config_env_migration_fixture_test.go) Fixture-driven tests that load YAML migration scenarios and verify special-env scan reports.
 [config_env_migration_test.go](config_env_migration_test.go) Tests special env migration mapping table design alignment, rewrite entry generation, scan actions, conflict rejection, and report metrics.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers, defaults, round-trip behavior, and store error mapping.
 [config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab, global env, CA, and home endpoints.
@@ -145,6 +146,7 @@
 [test_helpers_healing_test.go](test_helpers_healing_test.go) Shared healing-flow test helpers for recovery candidate construction and assertions.
 [test_helpers_test.go](test_helpers_test.go) Common HTTP/store/assertion helpers reused across the handler test suite.
 [test_mock_helpers_test.go](test_mock_helpers_test.go) Helper utilities for composing lightweight store mock behaviors in tests.
+[testdata/](testdata) Test fixtures for handler suites, including YAML scenarios for special-env migration dry-run coverage.
 [tokens.go](tokens.go) Token/auth helpers used by protected handler endpoints.
 [worker_logs_fuzz_test.go](worker_logs_fuzz_test.go) Fuzzes worker log serialization/ingest contracts for robustness against malformed chunks.
 [worker_logs_test.go](worker_logs_test.go) Tests this handler component's behavior, edge cases, and store/error translation.
