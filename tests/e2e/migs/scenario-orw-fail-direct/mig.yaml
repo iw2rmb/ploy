@@ -36,7 +36,8 @@ build_gate:
     image: localhost:5000/ploy/codex:latest
     in:
       - ./codex-prompt-router.txt:/in/codex-prompt.txt
-      - ~/.codex/auth.json:/in/codex-auth.json
+    home:
+      - ~/.codex/auth.json:.codex/auth.json
 
   healing:
     by_error_kind:
@@ -46,7 +47,8 @@ build_gate:
         image: localhost:5000/ploy/codex:latest
         in:
           - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-          - ~/.codex/auth.json:/in/codex-auth.json
+        home:
+          - ~/.codex/auth.json:.codex/auth.json
 
 mr_on_fail: false
 mr_on_success: true

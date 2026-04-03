@@ -157,8 +157,8 @@ build_gate:
   # Router: direct Codex mode — prompt file intentionally omitted to prove enforcement.
   router:
     image: localhost:5000/ploy/codex:latest
-    in:
-      - ~/.codex/auth.json:/in/codex-auth.json
+    home:
+      - ~/.codex/auth.json:.codex/auth.json
 
 mr_on_fail: false
 mr_on_success: false

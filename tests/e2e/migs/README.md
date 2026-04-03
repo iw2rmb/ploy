@@ -188,8 +188,8 @@ build_gate:
               - codex: |
                   Output exactly one JSON line:
                   {"bug_summary":"<<=200 chars>","error_kind":"code"}
-    in:
-      - ~/.codex/auth.json:/in/codex-auth.json
+    home:
+      - ~/.codex/auth.json:.codex/auth.json
   # direct-Codex mode: prompt via Hydra in mount
   healing:
     by_error_kind:
@@ -198,7 +198,8 @@ build_gate:
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
           - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-          - ~/.codex/auth.json:/in/codex-auth.json
+        home:
+          - ~/.codex/auth.json:.codex/auth.json
 ```
 
 See `docs/schemas/mig.example.yaml` for the full spec schema.

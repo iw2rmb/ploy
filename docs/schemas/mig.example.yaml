@@ -81,8 +81,8 @@ steps:
 # Example (before CLI compile — local paths):
 #   ca:
 #     - ./ca-bundle.pem
-#   in:
-#     - ./codex-auth.json:/in/codex-auth.json
+#   home:
+#     - ./codex-auth.json:.codex/auth.json
 #   out:
 #     - ./seed.txt:/out/seed.txt
 #   home:
@@ -202,8 +202,8 @@ build_gate:
 #       # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
 #       #   - param: model
 #       #     value: gpt-4o
-#     in:
-#       - ~/.codex/auth.json:/in/codex-auth.json
+#     home:
+#       - ~/.codex/auth.json:.codex/auth.json
 #
 # 2. Direct-Codex mode (fallback): omit `amata` — prompt delivered via Hydra `in` mount.
 #
@@ -219,7 +219,8 @@ build_gate:
 #         - Your final message MUST be one line of JSON: {"bug_summary":"..."}
 #         Task:
 #         Summarize the build failure as a single bug_summary one-liner.
-#       - ~/.codex/auth.json:/in/codex-auth.json
+#     home:
+#       - ~/.codex/auth.json:.codex/auth.json
 
 ################################################################################
 # HEALING CONFIGURATION (build_gate.healing)
@@ -260,8 +261,8 @@ build_gate:
 #           # set:    # optional; passed as ordered --set '<param>=<value>' flags to amata run
 #           #   - param: model
 #           #     value: gpt-4o
-#         in:
-#           - ~/.codex/auth.json:/in/codex-auth.json
+#         home:
+#           - ~/.codex/auth.json:.codex/auth.json
 #
 # 2. Direct-Codex mode (fallback): omit `amata` — prompt delivered via Hydra `in` mount.
 #
@@ -276,7 +277,8 @@ build_gate:
 #           codex-prompt.txt: |-
 #             Fix infra/toolchain issue in /in/build-gate.log.
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
-#           - ~/.codex/auth.json:/in/codex-auth.json
+#         home:
+#           - ~/.codex/auth.json:.codex/auth.json
 #         expectations:
 #           artifacts:
 #             - path: /out/gate-profile-candidate.json
@@ -289,7 +291,8 @@ build_gate:
 #           codex-prompt.txt: |-
 #             Fix code-level issue in /in/build-gate.log.
 #             Your final message MUST be one line of JSON: {"action_summary":"..."}
-#           - ~/.codex/auth.json:/in/codex-auth.json
+#         home:
+#           - ~/.codex/auth.json:.codex/auth.json
 #
 # `spec_path` is optional preprocessing handled by CLI:
 # - CLI reads YAML/JSON object from `spec_path`
