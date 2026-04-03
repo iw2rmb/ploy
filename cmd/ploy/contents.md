@@ -53,7 +53,7 @@
 [mig_run_repo.go](mig_run_repo.go) MIG run orchestration for repository-targeted execution and repo job submission.
 [mig_run_repo_test.go](mig_run_repo_test.go) Tests repository-targeted MIG run request construction and error handling.
 [mig_run_spec.go](mig_run_spec.go) Parses and validates MIG run specs used by run submission commands.
-[mig_run_spec_hydra.go](mig_run_spec_hydra.go) Compiles Hydra authoring records into canonical shortHash entries while preserving existing bundle-map mappings.
+[mig_run_spec_hydra.go](mig_run_spec_hydra.go) Compiles Hydra authoring records into canonical shortHash entries and preserves prior bundle-map mappings for mixed specs.
 [mig_run_spec_hydra_test.go](mig_run_spec_hydra_test.go) Tests Hydra canonicalization, bundle-map preservation for mixed specs, and archive compilation flows.
 [mig_run_spec_parsing_test.go](mig_run_spec_parsing_test.go) Tests MIG run spec parser coverage for valid and invalid spec forms.
 [mig_run_spec_test.go](mig_run_spec_test.go) Unit tests for run spec normalization, defaults, and validation logic.
