@@ -129,6 +129,7 @@ items:
       - Execute node integration scenarios for mixed in out home ca records and assert mode and destination enforcement.
     reasoning: high
     cfp: 13
+    commit: 3bcf617e
   - done: false
     reviews: []
     label: "1.6"
