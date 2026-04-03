@@ -7,7 +7,6 @@ codex [--input <dir>] [--out <dir>] [--auth <auth.json>] [--config <config.toml>
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
-  CODEX_PROMPT      Removed; use /in/codex-prompt.txt via Hydra in mount.
   CODEX_MODEL       Optional model override.
   CODEX_API_KEY     API key for Codex/OpenAI; passed through to codex exec.
   CODEX_RESUME      If set to "1" and /in/codex-session.txt exists, resume the prior session.
@@ -22,28 +21,10 @@ USAGE
 home_dir="${HOME:-/root}"
 codex_config_dir="${CODEX_HOME:-$home_dir/.codex}"
 export CODEX_HOME="$codex_config_dir"
-crush_config_file="$home_dir/.config/crush/crush.json"
 ccr_config_file="$home_dir/.claude-code-router/config.json"
 
 # Hydra file delivery: config files are materialized by Hydra home mounts at
-# their expected paths. Legacy env-based inline materialization is removed.
-# If legacy env vars are still set, emit a warning to assist migration.
-warn_legacy_env() {
-  local env_name="$1"
-  local target_path="$2"
-  local value="${!env_name:-}"
-  if [[ -n "$value" && ! -f "$target_path" ]]; then
-    echo "warning: $env_name is set but $target_path was not materialized by Hydra; migrate to typed home field" >&2
-  fi
-}
-
-check_hydra_configs() {
-  mkdir -p "$codex_config_dir"
-  warn_legacy_env CODEX_AUTH_JSON "$codex_config_dir/auth.json"
-  warn_legacy_env CODEX_CONFIG_TOML "$codex_config_dir/config.toml"
-  warn_legacy_env CRUSH_JSON "$crush_config_file"
-  warn_legacy_env CCR_CONFIG_JSON "$ccr_config_file"
-}
+# their expected paths under $HOME. No env-based materialization.
 
 activate_ccr_if_configured() {
   if [[ -f "$ccr_config_file" ]]; then
@@ -52,7 +33,7 @@ activate_ccr_if_configured() {
   fi
 }
 
-check_hydra_configs
+mkdir -p "$codex_config_dir"
 activate_ccr_if_configured
 
 input_dir="${WORKSPACE:-/workspace}"
@@ -61,37 +42,6 @@ auth_file=""
 config_file=""
 model="${CODEX_MODEL:-}"
 prompt_file=""
-
-# Backward-compat path for mig-codex integration tests and legacy callers:
-# allow `amata ...` passthrough while preserving codex artifact conventions.
-if [[ "${1:-}" == "amata" ]]; then
-  shift
-  if [[ $# -eq 0 && -s "/in/amata.yaml" ]]; then
-    set -- run /in/amata.yaml
-  fi
-
-  mkdir -p "$out_dir" "$codex_config_dir"
-  logfile="$out_dir/codex.log"
-  manifest="$out_dir/codex-run.json"
-
-  echo "[codex] amata compatibility mode" | tee "$logfile" >&2
-  set +e
-  amata "$@" 2>&1 | tee -a "$logfile" >&2
-  status=${PIPESTATUS[0]}
-  set -e
-
-  if [[ ! -s "$out_dir/codex-last.txt" ]]; then
-    if [[ -s "$logfile" ]]; then
-      grep -v '^\s*$' "$logfile" | tail -1 > "$out_dir/codex-last.txt" || true
-    fi
-    [[ -s "$out_dir/codex-last.txt" ]] || touch "$out_dir/codex-last.txt"
-  fi
-
-  ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","session_id":"%s","resumed":%s}\n' \
-    "$ts" "${status:-0}" "$model" "$input_dir" "" "false" > "$manifest"
-  exit "${status:-0}"
-fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -114,8 +64,6 @@ fi
 if [[ -n "$config_file" ]]; then
   install -m 600 "$config_file" "$codex_config_dir/config.toml"
 fi
-check_hydra_configs
-
 prompt=""
 if [[ -n "$prompt_file" ]]; then
   prompt="$(cat "$prompt_file")"
@@ -126,11 +74,6 @@ else
   echo "ERROR: prompt required (use --prompt-file or /in/codex-prompt.txt via Hydra in mount)" >&2
   exit 2
 fi
-
-# Remove legacy special env keys from the process environment. Config files
-# are delivered by Hydra home mounts; prompt is read above. Unsetting these
-# keys prevents multiline env values from breaking /bin/sh export handling.
-unset CODEX_PROMPT CODEX_AUTH_JSON CODEX_CONFIG_TOML CRUSH_JSON CCR_CONFIG_JSON
 
 resume_session=""
 if [[ "${CODEX_RESUME:-}" == "1" && -f "/in/codex-session.txt" ]]; then

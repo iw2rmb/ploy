@@ -122,102 +122,95 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 	}
 	mustRun(t, "docker", "build", "-t", ccrTestImageTag, ccrMockDockerfileDir)
 
-	t.Run("amata_mode_routes_to_amata_and_writes_artifacts", func(t *testing.T) {
-		// Resolve symlinks so Docker Desktop on macOS gets the real path (e.g. /private/tmp vs /tmp).
-		outDir, err := realTempDir("codex-test-out-*")
-		if err != nil {
-			t.Fatalf("MkdirTemp: %v", err)
-		}
-		t.Cleanup(func() { os.RemoveAll(outDir) })
+	t.Run("amata_binary_runs_directly_in_image", func(t *testing.T) {
 		inDir, err := realTempDir("codex-test-in-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
 		t.Cleanup(func() { os.RemoveAll(inDir) })
 
-		// Write a minimal amata.yaml to /in so the path exists.
 		if err := os.WriteFile(inDir+"/amata.yaml", []byte("task: test\n"), 0o644); err != nil {
 			t.Fatalf("write amata.yaml: %v", err)
 		}
 
 		run := exec.Command("docker", "run", "--rm",
-			"-v", outDir+":/out",
 			"-v", inDir+":/in:ro",
+			"--entrypoint", "amata",
 			testImageTag,
-			"amata", "run", "/in/amata.yaml", "--set", "key=val",
+			"run", "/in/amata.yaml", "--set", "key=val",
 		)
-		if out, err := run.CombinedOutput(); err != nil {
-			t.Fatalf("amata mode container failed: %v\n%s", err, string(out))
-		}
-
-		// codex.log must exist and be non-empty.
-		lb, err := os.ReadFile(outDir + "/codex.log")
-		if err != nil || len(bytes.TrimSpace(lb)) == 0 {
-			t.Fatalf("codex.log missing or empty: %v", err)
-		}
-		// codex-last.txt must exist.
-		if _, err := os.Stat(outDir + "/codex-last.txt"); err != nil {
-			t.Fatalf("codex-last.txt missing: %v", err)
-		}
-		// codex-run.json must be valid JSON with exit_code:0.
-		rb, err := os.ReadFile(outDir + "/codex-run.json")
+		out, err := run.CombinedOutput()
 		if err != nil {
-			t.Fatalf("codex-run.json missing: %v", err)
+			t.Fatalf("amata direct invocation failed: %v\n%s", err, string(out))
 		}
-		var rj struct {
-			ExitCode int `json:"exit_code"`
-		}
-		if err := json.Unmarshal(rb, &rj); err != nil {
-			t.Fatalf("parse codex-run.json: %v", err)
-		}
-		if rj.ExitCode != 0 {
-			t.Errorf("codex-run.json exit_code = %d, want 0", rj.ExitCode)
+		if !strings.Contains(string(out), "amata mock ran") {
+			t.Errorf("expected 'amata mock ran' in output, got: %s", string(out))
 		}
 	})
 
-	t.Run("default_codex_home_materializes_auth_and_config_under_out_codex", func(t *testing.T) {
-		outDir, err := realTempDir("codex-test-out-codex-home-*")
+	t.Run("hydra_home_mount_delivers_auth_and_config", func(t *testing.T) {
+		outDir, err := realTempDir("codex-test-out-hydra-home-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
 		t.Cleanup(func() { os.RemoveAll(outDir) })
-		inDir, err := realTempDir("codex-test-in-codex-home-*")
+
+		// Create Hydra config files for volume mounting.
+		hydraDir, err := realTempDir("codex-test-hydra-cfg-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
 		}
-		t.Cleanup(func() { os.RemoveAll(inDir) })
-
-		if err := os.WriteFile(inDir+"/amata.yaml", []byte("task: codex-home\n"), 0o644); err != nil {
-			t.Fatalf("write amata.yaml: %v", err)
+		t.Cleanup(func() { os.RemoveAll(hydraDir) })
+		codexCfgDir := filepath.Join(hydraDir, ".codex")
+		if err := os.MkdirAll(codexCfgDir, 0o755); err != nil {
+			t.Fatalf("mkdir .codex: %v", err)
 		}
+
+		authJSON := `{"token":"from_hydra"}`
+		configTOML := "[model]\nname = \"from_hydra\""
+		if err := os.WriteFile(codexCfgDir+"/auth.json", []byte(authJSON), 0o644); err != nil {
+			t.Fatalf("write auth.json: %v", err)
+		}
+		if err := os.WriteFile(codexCfgDir+"/config.toml", []byte(configTOML), 0o644); err != nil {
+			t.Fatalf("write config.toml: %v", err)
+		}
+
+		// Build a verify image whose mock amata copies Hydra-delivered config to /out.
+		const verifyImageTag = "codex:test-hydra-verify"
+		verifyDockerfile := "FROM codex:test-amata\n" +
+			"RUN printf '#!/bin/sh\\nset -e\\ncp \"$HOME/.codex/auth.json\" /out/auth.json\\n" +
+			"cp \"$HOME/.codex/config.toml\" /out/config.toml\\necho hydra verify ok\\n' " +
+			"> /usr/local/bin/amata && chmod +x /usr/local/bin/amata\n"
+		verifyDir := t.TempDir()
+		if err := os.WriteFile(verifyDir+"/Dockerfile", []byte(verifyDockerfile), 0o644); err != nil {
+			t.Fatalf("write verify Dockerfile: %v", err)
+		}
+		mustRun(t, "docker", "build", "-t", verifyImageTag, verifyDir)
 
 		run := exec.Command("docker", "run", "--rm",
 			"-v", outDir+":/out",
-			"-v", inDir+":/in:ro",
-			"-e", `CODEX_AUTH_JSON={"token":"from_env"}`,
-			"-e", "CODEX_CONFIG_TOML=[model]\nname = \"from_env\"",
-			testImageTag,
-			"amata", "run", "/in/amata.yaml",
+			"-v", codexCfgDir+"/auth.json:/root/.codex/auth.json:ro",
+			"-v", codexCfgDir+"/config.toml:/root/.codex/config.toml:ro",
+			"--entrypoint", "amata",
+			verifyImageTag,
 		)
 		if out, err := run.CombinedOutput(); err != nil {
-			t.Fatalf("codex-home test container failed: %v\n%s", err, string(out))
+			t.Fatalf("hydra home mount test failed: %v\n%s", err, string(out))
 		}
 
-		authPath := filepath.Join(outDir, "codex", "auth.json")
-		authContent, err := os.ReadFile(authPath)
+		authContent, err := os.ReadFile(filepath.Join(outDir, "auth.json"))
 		if err != nil {
-			t.Fatalf("read auth.json: %v", err)
+			t.Fatalf("read auth.json from /out: %v", err)
 		}
-		if strings.TrimSpace(string(authContent)) != `{"token":"from_env"}` {
+		if strings.TrimSpace(string(authContent)) != authJSON {
 			t.Fatalf("unexpected auth.json content: %q", string(authContent))
 		}
 
-		configPath := filepath.Join(outDir, "codex", "config.toml")
-		configContent, err := os.ReadFile(configPath)
+		configContent, err := os.ReadFile(filepath.Join(outDir, "config.toml"))
 		if err != nil {
-			t.Fatalf("read config.toml: %v", err)
+			t.Fatalf("read config.toml from /out: %v", err)
 		}
-		if !strings.Contains(string(configContent), `name = "from_env"`) {
+		if !strings.Contains(string(configContent), `name = "from_hydra"`) {
 			t.Fatalf("unexpected config.toml content: %q", string(configContent))
 		}
 	})
@@ -253,7 +246,7 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 		}
 	})
 
-	t.Run("ccr_config_env_triggers_startup_activation", func(t *testing.T) {
+	t.Run("ccr_hydra_config_triggers_startup_activation", func(t *testing.T) {
 		outDir, err := realTempDir("codex-test-out3-*")
 		if err != nil {
 			t.Fatalf("MkdirTemp: %v", err)
@@ -265,16 +258,76 @@ RUN chmod +x /usr/local/bin/ccr /usr/local/bin/amata
 		}
 		t.Cleanup(func() { os.RemoveAll(inDir) })
 
-		if err := os.WriteFile(inDir+"/amata.yaml", []byte("task: ccr\n"), 0o644); err != nil {
-			t.Fatalf("write amata.yaml: %v", err)
+		// Hydra in mount: prompt for the entrypoint's direct codex mode.
+		if err := os.WriteFile(inDir+"/codex-prompt.txt", []byte("test prompt\n"), 0o644); err != nil {
+			t.Fatalf("write codex-prompt.txt: %v", err)
 		}
+
+		// Hydra home mount: CCR config.
+		ccrDir, err := realTempDir("codex-test-ccr-cfg-*")
+		if err != nil {
+			t.Fatalf("MkdirTemp: %v", err)
+		}
+		t.Cleanup(func() { os.RemoveAll(ccrDir) })
+		ccrCfgDir := filepath.Join(ccrDir, ".claude-code-router")
+		if err := os.MkdirAll(ccrCfgDir, 0o755); err != nil {
+			t.Fatalf("mkdir .claude-code-router: %v", err)
+		}
+		if err := os.WriteFile(ccrCfgDir+"/config.json", []byte(`{"router":"enabled"}`), 0o644); err != nil {
+			t.Fatalf("write ccr config.json: %v", err)
+		}
+
+		// Build a test image with mock ccr + mock codex (entrypoint runs ccr activation,
+		// then invokes codex exec — mock codex consumes stdin and exits).
+		const ccrHydraTag = "codex:test-ccr-hydra"
+		ccrHydraDockerfile := `FROM codex:test-amata
+RUN cat <<'CCREOF' > /usr/local/bin/ccr
+#!/bin/sh
+set -eu
+cmd="${1:-}"
+case "$cmd" in
+  start)
+    printf "start\n" >> /out/ccr-mock.log
+    exit 0
+    ;;
+  activate)
+    printf "activate\n" >> /out/ccr-mock.log
+    printf '%s\n' 'export CCR_ACTIVATED=1'
+    exit 0
+    ;;
+  *)
+    echo "unsupported ccr command: $*" >&2
+    exit 64
+    ;;
+esac
+CCREOF
+RUN cat <<'CODEXEOF' > /usr/local/bin/codex
+#!/bin/sh
+if [ "$1" = "exec" ]; then
+  for arg in "$@"; do
+    if [ "$arg" = "--help" ]; then
+      echo "--yolo --add-dir --json --output-last-message --output-dir"
+      exit 0
+    fi
+  done
+  cat > /dev/null
+  exit 0
+fi
+exit 0
+CODEXEOF
+RUN chmod +x /usr/local/bin/ccr /usr/local/bin/codex
+`
+		ccrHydraDir := t.TempDir()
+		if err := os.WriteFile(ccrHydraDir+"/Dockerfile", []byte(ccrHydraDockerfile), 0o644); err != nil {
+			t.Fatalf("write ccr hydra Dockerfile: %v", err)
+		}
+		mustRun(t, "docker", "build", "-t", ccrHydraTag, ccrHydraDir)
 
 		run := exec.Command("docker", "run", "--rm",
 			"-v", outDir+":/out",
 			"-v", inDir+":/in:ro",
-			"-e", `CCR_CONFIG_JSON={"router":"enabled"}`,
-			ccrTestImageTag,
-			"amata", "run", "/in/amata.yaml",
+			"-v", ccrCfgDir+"/config.json:/root/.claude-code-router/config.json:ro",
+			ccrHydraTag,
 		)
 		if out, err := run.CombinedOutput(); err != nil {
 			t.Fatalf("ccr startup container failed: %v\n%s", err, string(out))

@@ -89,14 +89,22 @@ else
   FAILED=1
 fi
 
-# Check artifact content if present.
-REPORT_FILES="$(find "$ARTIFACT_DL_DIR" -name '*report*' -type f 2>/dev/null || echo "")"
-if [[ -n "$REPORT_FILES" ]]; then
-  echo "  + report artifact files found:"
-  echo "$REPORT_FILES" | while read -r f; do echo "    - $f"; done
-else
+# Check artifact content — verify report.json has the expected payload.
+REPORT_FILE="$(find "$ARTIFACT_DL_DIR" -name '*report*' -type f 2>/dev/null | head -1 || echo "")"
+if [[ -z "$REPORT_FILE" ]]; then
   echo "  ! no report artifact found in downloaded artifacts" >&2
   FAILED=1
+else
+  echo "  + report artifact found: $REPORT_FILE"
+  REPORT_STATUS="$(jq -r '.status // empty' "$REPORT_FILE" 2>/dev/null || echo "")"
+  REPORT_ITEMS="$(jq -r '.items // empty' "$REPORT_FILE" 2>/dev/null || echo "")"
+  if [[ "$REPORT_STATUS" == "completed" && "$REPORT_ITEMS" == "42" ]]; then
+    echo "  + report.json content verified: status=completed, items=42"
+  else
+    echo "  ! report.json content mismatch: status='${REPORT_STATUS}' items='${REPORT_ITEMS}', expected status=completed items=42" >&2
+    echo "  ! raw content: $(cat "$REPORT_FILE")" >&2
+    FAILED=1
+  fi
 fi
 
 if ((FAILED > 0)); then

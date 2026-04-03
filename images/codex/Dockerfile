@@ -14,8 +14,7 @@ RUN apk add --no-cache bash git ca-certificates curl jq && \
     npm install -g @openai/codex && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/* && \
-    mkdir -p /workspace /out /out/codex /etc/ploy/certs && \
-    chmod 700 /out/codex && \
+    mkdir -p /workspace /out /etc/ploy/certs && \
     chmod 755 /etc/ploy/certs
 
 RUN apk update
@@ -27,11 +26,7 @@ RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \
-    CODEX_HOME=/out/codex \
-    CODEX_PROMPT="" \
     CODEX_MODEL="" \
-    CODEX_AUTH_JSON="" \
-    CODEX_CONFIG_TOML="" \
     PLOY_SERVER_URL="" \
     PLOY_API_TOKEN="" \
     PLOY_CA_CERTS="/etc/ploy/certs/ca.crt" \
