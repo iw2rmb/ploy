@@ -18,10 +18,10 @@
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers, defaults, round-trip behavior, and store error mapping.
 [config_gitlab.go](config_gitlab.go) Shared in-memory config holder and accessors for GitLab, global env, CA, and home endpoints.
-[config_home.go](config_home.go) CRUD handlers for global home mount entries per Hydra section.
-[config_home_test.go](config_home_test.go) Exercises global home CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [config_gitlab_fuzz_test.go](config_gitlab_fuzz_test.go) Fuzzes GitLab config mutation paths to catch panics on malformed payload combinations.
 [config_gitlab_test.go](config_gitlab_test.go) Tests GitLab config holder and endpoint behavior for read/write and validation paths.
+[config_home.go](config_home.go) CRUD handlers for global home mount entries per Hydra section.
+[config_home_test.go](config_home_test.go) Exercises global home CRUD handlers, section filtering, dedup, hydra overlay sync, and store error mapping.
 [cross_path_parity_test.go](cross_path_parity_test.go) Ensures cross-path status/action parity between standard and gate-oriented completion paths.
 [diffs.go](diffs.go) Handlers for diff metadata/list/download retrieval for runs and repos.
 [diffs_test.go](diffs_test.go) Tests run-repo diff retrieval/download handlers for ownership scoping and validation errors.
