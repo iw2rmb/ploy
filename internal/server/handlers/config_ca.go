@@ -84,11 +84,13 @@ func putConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate hash format using Hydra parser.
-		if _, err := contracts.ParseStoredCAEntry(hash); err != nil {
+		// Validate and normalize hash using Hydra parser.
+		normalized, err := contracts.ParseStoredCAEntry(hash)
+		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		hash = normalized
 
 		var req configCAPutRequest
 		if err := decodeRequestJSON(w, r, &req, DefaultMaxBodySize); err != nil {
@@ -133,11 +135,13 @@ func deleteConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFun
 			return
 		}
 
-		// Validate hash format using Hydra parser (aligned with put handler).
-		if _, err := contracts.ParseStoredCAEntry(hash); err != nil {
+		// Validate and normalize hash using Hydra parser (aligned with put handler).
+		normalized, err := contracts.ParseStoredCAEntry(hash)
+		if err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
 		}
+		hash = normalized
 
 		section := r.URL.Query().Get("section")
 		if section == "" {

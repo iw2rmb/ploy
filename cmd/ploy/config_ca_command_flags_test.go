@@ -97,3 +97,53 @@ func TestHandleConfigCAUnsetRequiresSection(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+// TestHandleConfigCASetRejectsInvalidHash verifies that the 'set' subcommand
+// applies Hydra parser validation and rejects non-hex hashes locally.
+func TestHandleConfigCASetRejectsInvalidHash(t *testing.T) {
+	tests := []struct {
+		name string
+		hash string
+	}{
+		{name: "uppercase hex", hash: "ABCDEF1234567"},
+		{name: "too short", hash: "abc12"},
+		{name: "non-hex chars", hash: "ghijklm1234567"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigCASet([]string{"--hash", tt.hash, "--section", "mig"}, buf)
+			if err == nil {
+				t.Fatalf("expected error for invalid hash %q", tt.hash)
+			}
+			if !strings.Contains(err.Error(), "ca entry") {
+				t.Fatalf("expected Hydra parser error, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestHandleConfigCAUnsetRejectsInvalidHash verifies that the 'unset' subcommand
+// applies Hydra parser validation and rejects non-hex hashes locally.
+func TestHandleConfigCAUnsetRejectsInvalidHash(t *testing.T) {
+	tests := []struct {
+		name string
+		hash string
+	}{
+		{name: "uppercase hex", hash: "ABCDEF1234567"},
+		{name: "too short", hash: "abc12"},
+		{name: "non-hex chars", hash: "ghijklm1234567"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigCAUnset([]string{"--hash", tt.hash, "--section", "mig"}, buf)
+			if err == nil {
+				t.Fatalf("expected error for invalid hash %q", tt.hash)
+			}
+			if !strings.Contains(err.Error(), "ca entry") {
+				t.Fatalf("expected Hydra parser error, got: %v", err)
+			}
+		})
+	}
+}
