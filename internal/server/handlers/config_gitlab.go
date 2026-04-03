@@ -21,12 +21,14 @@ type GlobalEnvVar struct {
 }
 
 // ConfigHolder provides thread-safe access to runtime configuration, including
-// GitLab settings and global environment variables.
+// GitLab settings, global environment variables, and typed Hydra overlays.
 // Global env is stored as key → []GlobalEnvVar to support multiple targets per key.
+// Hydra overlays are stored per section (pre_gate, re_gate, post_gate, mig, heal).
 type ConfigHolder struct {
 	mu        sync.RWMutex
 	gitlab    config.GitLabConfig
 	globalEnv map[string][]GlobalEnvVar
+	hydra     map[string]*HydraJobConfig
 }
 
 // NewConfigHolder creates a new config holder with initial GitLab config and
@@ -119,6 +121,51 @@ func (h *ConfigHolder) DeleteGlobalEnvVar(key string, target domaintypes.GlobalE
 			return
 		}
 	}
+}
+
+// GetHydraOverlays returns a deep copy of all Hydra overlays keyed by section.
+func (h *ConfigHolder) GetHydraOverlays() map[string]*HydraJobConfig {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if len(h.hydra) == 0 {
+		return nil
+	}
+	cp := make(map[string]*HydraJobConfig, len(h.hydra))
+	for k, v := range h.hydra {
+		cp[k] = &HydraJobConfig{
+			Envs: copyStringMap(v.Envs),
+			CA:   copyStringSlice(v.CA),
+			In:   copyStringSlice(v.In),
+			Out:  copyStringSlice(v.Out),
+			Home: copyStringSlice(v.Home),
+		}
+	}
+	return cp
+}
+
+// SetHydraJobConfig sets the Hydra overlay for a named section.
+// Section must be one of: pre_gate, re_gate, post_gate, mig, heal.
+func (h *ConfigHolder) SetHydraJobConfig(section string, cfg *HydraJobConfig) error {
+	if err := ValidateHydraSection(section); err != nil {
+		return err
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.hydra == nil {
+		h.hydra = make(map[string]*HydraJobConfig)
+	}
+	if cfg == nil {
+		delete(h.hydra, section)
+	} else {
+		h.hydra[section] = &HydraJobConfig{
+			Envs: copyStringMap(cfg.Envs),
+			CA:   copyStringSlice(cfg.CA),
+			In:   copyStringSlice(cfg.In),
+			Out:  copyStringSlice(cfg.Out),
+			Home: copyStringSlice(cfg.Home),
+		}
+	}
+	return nil
 }
 
 // gitLabConfigResponse is the wire format for GET/PUT /v1/config/gitlab.

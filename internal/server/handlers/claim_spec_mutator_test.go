@@ -24,7 +24,7 @@ func TestMutateClaimSpec_ReGateCandidateWinsOverRepoProfile(t *testing.T) {
 	repoProfile := []byte(`{"schema_version":1,"repo_id":"repo_1","runner_mode":"simple","stack":{"language":"go","tool":"go"},"targets":{"active":"unit","unit":{"status":"passed","command":"echo repo","env":{"SRC":"repo"}},"build":{"status":"passed","command":"echo repo build","env":{}},"all_tests":{"status":"not_attempted","env":{}}},"orchestration":{"pre":[],"post":[]}}`)
 
 	merged, err := mutateClaimSpec(claimSpecMutatorInput{
-		spec:            []byte(`{"env":{"EXISTING":"1"}}`),
+		spec:            []byte(`{"envs":{"EXISTING":"1"}}`),
 		job:             job,
 		jobType:         domaintypes.JobTypeReGate,
 		gitLab:          config.GitLabConfig{Token: "server-token", Domain: "https://gitlab.example.com"},
@@ -49,15 +49,15 @@ func TestMutateClaimSpec_ReGateCandidateWinsOverRepoProfile(t *testing.T) {
 	if got := out["gitlab_domain"]; got != "https://gitlab.example.com" {
 		t.Fatalf("gitlab_domain=%v, want https://gitlab.example.com", got)
 	}
-	env, ok := out["env"].(map[string]any)
+	envs, ok := out["envs"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected env object, got %T", out["env"])
+		t.Fatalf("expected envs object, got %T", out["envs"])
 	}
-	if got := env["EXISTING"]; got != "1" {
-		t.Fatalf("env.EXISTING=%v, want 1", got)
+	if got := envs["EXISTING"]; got != "1" {
+		t.Fatalf("envs.EXISTING=%v, want 1", got)
 	}
-	if got := env["GLOBAL"]; got != "g" {
-		t.Fatalf("env.GLOBAL=%v, want g", got)
+	if got := envs["GLOBAL"]; got != "g" {
+		t.Fatalf("envs.GLOBAL=%v, want g", got)
 	}
 	bg := out["build_gate"].(map[string]any)
 	post := bg["post"].(map[string]any)

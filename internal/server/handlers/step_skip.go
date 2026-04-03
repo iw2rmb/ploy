@@ -50,17 +50,17 @@ func resolveAndPersistMigStepSkip(
 	}
 	stepCfg := spec.Steps[stepIndex]
 
-	effectiveEnv := make(map[string]string, len(spec.Env)+len(stepCfg.Env))
-	for k, v := range spec.Env {
+	effectiveEnv := make(map[string]string, len(spec.Envs)+len(stepCfg.Envs))
+	for k, v := range spec.Envs {
 		effectiveEnv[k] = v
 	}
-	for k, v := range stepCfg.Env {
+	for k, v := range stepCfg.Envs {
 		effectiveEnv[k] = v
 	}
 
 	opsPayload := migStepOpsPayload{
 		Step:         stepCfg,
-		GlobalEnv:    spec.Env,
+		GlobalEnv:    spec.Envs,
 		EffectiveEnv: effectiveEnv,
 		Artifacts:    spec.ArtifactPaths,
 		BuildGate:    spec.BuildGate,

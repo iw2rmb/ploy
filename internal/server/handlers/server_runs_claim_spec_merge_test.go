@@ -11,7 +11,7 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	t.Parallel()
 
 	f := newClaimJobFixture(t, claimJobFixtureOptions{
-		specJSON: []byte(`{"env":{"PLOY_CA_CERTS":"per-run-cert","PER_RUN_ONLY":"value"}}`),
+		specJSON: []byte(`{"envs":{"PLOY_CA_CERTS":"per-run-cert","PER_RUN_ONLY":"value"}}`),
 	})
 
 	f.config.SetGlobalEnvVar("PLOY_CA_CERTS", GlobalEnvVar{Value: "global-cert", Target: domaintypes.GlobalEnvTargetSteps, Secret: true})
@@ -27,29 +27,29 @@ func TestClaimJob_MergesGlobalEnvIntoSpec(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected spec to be an object, got %T", resp["spec"])
 	}
-	env, ok := spec["env"].(map[string]any)
+	envs, ok := spec["envs"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected spec.env to be an object, got %T", spec["env"])
+		t.Fatalf("expected spec.envs to be an object, got %T", spec["envs"])
 	}
 
-	// Per-run env overrides global env.
-	if env["PLOY_CA_CERTS"] != "per-run-cert" {
-		t.Fatalf("expected per-run PLOY_CA_CERTS to win, got %v", env["PLOY_CA_CERTS"])
+	// Per-run envs overrides global env.
+	if envs["PLOY_CA_CERTS"] != "per-run-cert" {
+		t.Fatalf("expected per-run PLOY_CA_CERTS to win, got %v", envs["PLOY_CA_CERTS"])
 	}
 	// Steps-target injected for mig job.
-	if env["CODEX_AUTH_JSON"] != `{"token":"xxx"}` {
-		t.Fatalf("expected CODEX_AUTH_JSON to be injected, got %v", env["CODEX_AUTH_JSON"])
+	if envs["CODEX_AUTH_JSON"] != `{"token":"xxx"}` {
+		t.Fatalf("expected CODEX_AUTH_JSON to be injected, got %v", envs["CODEX_AUTH_JSON"])
 	}
 	// Nodes-target provides fallback for all job types.
-	if env["NODES_FALLBACK"] != "nodes-env" {
-		t.Fatalf("expected NODES_FALLBACK to be injected as fallback, got %v", env["NODES_FALLBACK"])
+	if envs["NODES_FALLBACK"] != "nodes-env" {
+		t.Fatalf("expected NODES_FALLBACK to be injected as fallback, got %v", envs["NODES_FALLBACK"])
 	}
 	// Server-target is not injected into job specs.
-	if _, ok := env["SERVER_ONLY"]; ok {
+	if _, ok := envs["SERVER_ONLY"]; ok {
 		t.Fatalf("expected SERVER_ONLY not to be injected for mig job")
 	}
-	if env["PER_RUN_ONLY"] != "value" {
-		t.Fatalf("expected PER_RUN_ONLY preserved, got %v", env["PER_RUN_ONLY"])
+	if envs["PER_RUN_ONLY"] != "value" {
+		t.Fatalf("expected PER_RUN_ONLY preserved, got %v", envs["PER_RUN_ONLY"])
 	}
 }
 
@@ -69,10 +69,10 @@ func TestClaimJob_JobTargetOverridesNodesTarget(t *testing.T) {
 
 	resp := decodeBody[map[string]any](t, rr)
 	spec := resp["spec"].(map[string]any)
-	env := spec["env"].(map[string]any)
+	envs := spec["envs"].(map[string]any)
 
-	if env["SHARED_KEY"] != "steps-val" {
-		t.Fatalf("expected steps-target to override nodes-target, got %v", env["SHARED_KEY"])
+	if envs["SHARED_KEY"] != "steps-val" {
+		t.Fatalf("expected steps-target to override nodes-target, got %v", envs["SHARED_KEY"])
 	}
 }
 

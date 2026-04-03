@@ -206,7 +206,7 @@ func TestMigs_SetSpec_RepeatedCalls(t *testing.T) {
 	st.updateMigSpec.called = false
 
 	spec2 := validSpecBody()
-	spec2["env"] = map[string]any{"FOO": "bar"}
+	spec2["envs"] = map[string]any{"FOO": "bar"}
 	rr2 := doRequest(t, handler, http.MethodPost, "/v1/migs/mig123/specs", map[string]any{"spec": spec2}, "mig_ref", "mig123")
 	assertStatus(t, rr2, http.StatusCreated)
 
