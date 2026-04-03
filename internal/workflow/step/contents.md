@@ -18,7 +18,7 @@
 [diff.go](diff.go) Computes patch statistics and runs git diff commands to produce workspace change metadata.
 [diff_test.go](diff_test.go) Exercises patch-stat parsing and diff execution edge cases.
 [errors.go](errors.go) Defines shared step-level sentinel errors such as repository cancellation semantics.
-[gate_command.go](gate_command.go) Builds deterministic gate shell commands per tool/target pair.
+[gate_command.go](gate_command.go) Builds deterministic gate shell commands per tool/target pair with Hydra-only no-op env materializer preamble.
 [gate_command_materializer.go](gate_command_materializer.go) Defines env-key materializer framework for gate-command preambles; registry is empty under Hydra-only contract (envs ca in out home).
 [gate_docker.go](gate_docker.go) Implements Docker-backed gate executor that resolves plans, runs gate containers, and records authoritative gate outcomes.
 [gate_docker_ca_preamble_test.go](gate_docker_ca_preamble_test.go) Tests that Docker gate commands contain no PLOY_CA_CERTS preamble after Hydra CA mount migration.
@@ -30,7 +30,7 @@
 [gate_docker_stack_gate_test.go](gate_docker_stack_gate_test.go) Tests stack-gate precheck/expectation flows and enforcement outcomes in Docker gate execution.
 [gate_factory_test.go](gate_factory_test.go) Verifies gate executor construction defaults and baseline execute behavior.
 [gate_only.go](gate_only.go) Runs hydration plus build-gate validation without executing a migration container.
-[gate_plan_command_selector.go](gate_plan_command_selector.go) Resolves gate command/env from stack details, requested target, and profile override constraints.
+[gate_plan_command_selector.go](gate_plan_command_selector.go) Resolves gate command/env from stack details, requested target, and profile overrides with Hydra-only no-op preamble wrapping.
 [gate_plan_resolver.go](gate_plan_resolver.go) Produces executable gate plans by combining stack detection, image resolution, and command selection.
 [gate_plan_resolver_test.go](gate_plan_resolver_test.go) Tests gate-plan policy branches, unsupported-target handling, and resolver decision outcomes.
 [gate_plan_stack_context.go](gate_plan_stack_context.go) Resolves stack context for gate planning across stack-gate mode, detection observations, and mapping fallbacks.

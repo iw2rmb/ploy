@@ -1,5 +1,5 @@
 [README.md](README.md) Runbook for MIG e2e prerequisites, image publishing, scenario execution, and validation contracts.
-[migs_e2e_test.go](migs_e2e_test.go) Go e2e suite that runs scenario scripts and validates spec and Hydra prompt/mount guardrails.
+[migs_e2e_test.go](migs_e2e_test.go) Go e2e suite that runs MIG scenarios and falls back to offline Hydra script/spec validation when cluster prerequisites are unavailable.
 [scenario-batch-run.sh](scenario-batch-run.sh) End-to-end batch-run scenario that validates repo fan-out, job progression, and stop behavior.
 [scenario-hydra-mount-enforcement/](scenario-hydra-mount-enforcement) Scenario proving Hydra mount contract by rejecting writes to `/in` and allowing writes to `/out`.
 [scenario-hydra-out-upload/](scenario-hydra-out-upload) Scenario verifying files written under `/out` are uploaded and downloadable as run artifacts.
