@@ -248,6 +248,8 @@ items:
         commit: 935ca7f5
       - gaps: ["[docs/api/paths/config_env_key.yaml:22](/Users/vk/@iw2rmb/ploy/docs/api/paths/config_env_key.yaml#L22) and [docs/api/paths/config_env_key.yaml:79](/Users/vk/@iw2rmb/ploy/docs/api/paths/config_env_key.yaml#L79) still advertise `ploy config in` and say migrated special keys are rejected only on job targets. `cmd/ploy/config_command.go` has no `in` subcommand, and `internal/server/handlers/config_env.go:169` rejects those keys on all targets.", "[tests/e2e/migs/migs_e2e_test.go:23](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23) and [tests/e2e/migs/migs_e2e_test.go:108](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L108) still skip the Hydra mount/upload scenarios unless `dist/ploy` exists and the local server answers `/healthz`, so `go test ./tests/integration/... ./tests/e2e/migs/...` can pass without actually exercising the new end-to-end coverage on a clean workspace."]
         commit: 6315ac8a
+      - gaps: ["`go test ./tests/integration/... ./tests/e2e/migs/...` still depends on a pre-existing local cluster and hard-fails when `/healthz` is unreachable. `requireClusterReady` in [tests/e2e/migs/migs_e2e_test.go](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23) aborts before the Hydra scenarios run, so the requested end-to-end coverage is not exercised by the verification command in a clean workspace."]
+        commit: null
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
