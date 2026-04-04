@@ -28,10 +28,10 @@
 [migs_spec_amata_test.go](migs_spec_amata_test.go) Parameterizes and tests valid Amata placement and forbidden flat-key variants across mig spec locations.
 [migs_spec_build_gate_test.go](migs_spec_build_gate_test.go) Tests build-gate stack configuration parsing and invalid target/field validation paths.
 [migs_spec_healing_test.go](migs_spec_healing_test.go) Tests healing contract requirements, retries coercion, and related parser validation behavior.
+[migs_spec_hydra_validation_test.go](migs_spec_hydra_validation_test.go) Tests Hydra field validation across step, healing, and router contracts, including domain/path safety and legacy field rejection.
 [migs_spec_parse.go](migs_spec_parse.go) Parses mig specs from JSON, enforces schema checks, normalizes defaults, and runs typed validation.
 [migs_spec_parse_test.go](migs_spec_parse_test.go) Tests single-step and multi-step mig spec parsing with build-gate and GitLab options.
 [migs_spec_roundtrip_test.go](migs_spec_roundtrip_test.go) Verifies JSON marshal/parse round-trip preserves canonical mig spec fields.
-[migs_spec_hydra_validation_test.go](migs_spec_hydra_validation_test.go) Tests Hydra field validation across step, healing, and router contracts, including domain/path safety and legacy field rejection.
 [mod_image.go](mod_image.go) Defines stack-aware job-image contract and resolution rules for universal and stack-specific image forms.
 [mod_image_test.go](mod_image_test.go) Tests job-image resolution precedence, fallbacks, and invalid map configurations.
 [orw_cli_contract.go](orw_cli_contract.go) Defines OpenRewrite CLI env contract and report/error parsing for deterministic runtime classification.
