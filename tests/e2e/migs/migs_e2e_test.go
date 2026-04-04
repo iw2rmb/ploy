@@ -167,6 +167,63 @@ func TestHydraOutUpload(t *testing.T) {
 	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
 }
 
+// TestHydraInMixed runs the Hydra in-record mixed inputs e2e scenario,
+// validating that a spec with both a plain file and a directory in-record
+// entry results in both being visible under /in inside the container.
+// Requires a live cluster; skips when unavailable. Offline contract
+// validation is covered by TestHydraScenarioOfflineValidation.
+func TestHydraInMixed(t *testing.T) {
+	if testing.Short() {
+		t.Skip("short mode; skipping e2e scenario")
+	}
+	root := repoRoot(t)
+	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-in-mixed", "run.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Fatalf("scenario script not found: %v", err)
+	}
+
+	if !clusterReady(t, root) {
+		t.Skip("cluster unavailable; offline contract coverage is in TestHydraScenarioOfflineValidation")
+	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scenario-in-mixed failed:\n%s", out)
+	}
+	t.Logf("scenario-in-mixed passed:\n%s", out)
+}
+
+// TestHydraBundleBlocked runs the Hydra bundle-blocked entries e2e scenario,
+// validating that spec bundles containing traversal paths or symlinks are
+// rejected by the node agent. Requires a live cluster; skips when unavailable.
+// Offline contract validation is covered by TestHydraScenarioOfflineValidation.
+func TestHydraBundleBlocked(t *testing.T) {
+	if testing.Short() {
+		t.Skip("short mode; skipping e2e scenario")
+	}
+	root := repoRoot(t)
+	script := filepath.Join(root, "tests", "e2e", "migs", "scenario-bundle-blocked", "run.sh")
+	if _, err := os.Stat(script); err != nil {
+		t.Fatalf("scenario script not found: %v", err)
+	}
+
+	if !clusterReady(t, root) {
+		t.Skip("cluster unavailable; offline contract coverage is in TestHydraScenarioOfflineValidation")
+	}
+
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("scenario-bundle-blocked failed:\n%s", out)
+	}
+	t.Logf("scenario-bundle-blocked passed:\n%s", out)
+}
+
 // TestHydraScenarioOfflineValidation validates the Hydra e2e scenario
 // infrastructure without requiring a running cluster or built binary.
 // This ensures `go test` in a clean workspace still exercises Hydra
@@ -185,6 +242,14 @@ func TestHydraScenarioOfflineValidation(t *testing.T) {
 		{
 			dir:   "scenario-hydra-out-upload",
 			paths: []string{"/out/"},
+		},
+		{
+			dir:   "scenario-in-mixed",
+			paths: []string{"/in/config.json", "/in/scripts"},
+		},
+		{
+			dir:   "scenario-bundle-blocked",
+			paths: []string{"/in/"},
 		},
 	}
 
@@ -349,6 +414,8 @@ func TestHydraMountEnforcementOffline(t *testing.T) {
 		}{
 			{"scenario-hydra-mount-enforcement", []string{"/in/", "/out/"}},
 			{"scenario-hydra-out-upload", []string{"/out/"}},
+			{"scenario-in-mixed", []string{"/in/config.json", "/in/scripts"}},
+			{"scenario-bundle-blocked", []string{"/in/"}},
 		} {
 			data, err := os.ReadFile(filepath.Join(root, "tests", "e2e", "migs", sc.dir, "run.sh"))
 			if err != nil {
@@ -547,6 +614,20 @@ func TestHydraE2EDefaultCoverageGate(t *testing.T) {
 			offlineTest: "TestHydraOutUploadContinuityOffline",
 			scriptDir:   "scenario-hydra-out-upload",
 			mountPaths:  []string{"/out/"},
+		},
+		{
+			name:        "in_mixed",
+			liveTest:    "TestHydraInMixed",
+			offlineTest: "TestHydraScenarioOfflineValidation/scenario-in-mixed",
+			scriptDir:   "scenario-in-mixed",
+			mountPaths:  []string{"/in/config.json", "/in/scripts"},
+		},
+		{
+			name:        "bundle_blocked",
+			liveTest:    "TestHydraBundleBlocked",
+			offlineTest: "TestHydraScenarioOfflineValidation/scenario-bundle-blocked",
+			scriptDir:   "scenario-bundle-blocked",
+			mountPaths:  []string{"/in/"},
 		},
 	}
 

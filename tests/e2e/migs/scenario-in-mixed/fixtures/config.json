@@ -1,4 +1,4 @@
 {
   "version": "1",
-  "mode": "e2e-tmpdir-test"
+  "mode": "e2e-hydra-in-mixed"
 }
