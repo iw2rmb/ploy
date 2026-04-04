@@ -102,7 +102,7 @@
 [register_routes_coverage_test.go](register_routes_coverage_test.go) Guards route registration parity against the declared OpenAPI surface.
 [repo_lookup.go](repo_lookup.go) Utility helpers to resolve repository records for request handlers.
 [repo_sha_seed.go](repo_sha_seed.go) Computes deterministic repo SHA seed values used by run planning flows.
-[repo_sha_seed_default_test.go](repo_sha_seed_default_test.go) Tests this handler component's behavior, edge cases, and store/error translation.
+[repo_sha_seed_default_test.go](repo_sha_seed_default_test.go) Test-only init hook that stubs source commit SHA resolution with deterministic validation errors.
 [repos.go](repos.go) Repository CRUD/list handlers and normalization helpers.
 [repos_test.go](repos_test.go) Tests repository management handlers and related normalization/error behaviors.
 [runs.go](runs.go) Core run handlers for lifecycle management and retrieval.
@@ -149,4 +149,4 @@
 [testdata](testdata) Test fixtures for handler suites, including YAML scenarios for special-env migration dry-run coverage.
 [tokens.go](tokens.go) Token/auth helpers used by protected handler endpoints.
 [worker_logs_fuzz_test.go](worker_logs_fuzz_test.go) Fuzzes worker log serialization/ingest contracts for robustness against malformed chunks.
-[worker_logs_test.go](worker_logs_test.go) Tests this handler component's behavior, edge cases, and store/error translation.
+[worker_logs_test.go](worker_logs_test.go) Covers node log ingestion handler for gzip payload handling, size limits, ID validation, and job-id propagation.
