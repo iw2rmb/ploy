@@ -14,9 +14,6 @@ type envMaterializerEntry struct {
 
 // materializers is the single registration point for all special env key
 // materializers. Add new entries here to extend the mechanism.
-// PLOY_CA_CERTS delivery is now handled via Hydra CA mount entries
-// (mounted at /etc/ploy/ca/<hash>) and no longer requires env preamble
-// injection.
 var materializers []envMaterializerEntry
 
 // MaterializerForKey returns the materializer for a special env key, or nil
