@@ -2,58 +2,163 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"testing"
 )
 
-// TestHandleConfigEnvRequiresSubcommand verifies that the 'config env' command
-// requires a subcommand and displays usage information when none is provided.
-func TestHandleConfigEnvRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnv(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing env subcommand")
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy config env") {
-		t.Fatalf("expected env usage output, got: %q", out)
-	}
-}
-
-// TestHandleConfigEnvUnknownSubcommand ensures that unknown env subcommands
-// are rejected with an appropriate error message.
-func TestHandleConfigEnvUnknownSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnv([]string{"unknown"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unknown env subcommand")
-	}
-	if !strings.Contains(err.Error(), "unknown env subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvHelpFlag verifies that --help flag displays usage
-// and exits without error.
-func TestHandleConfigEnvHelpFlag(t *testing.T) {
+// TestHandleConfigEnv_Routing verifies top-level routing: missing subcommand,
+// unknown subcommand, help flags, ls alias, and config→env dispatch.
+func TestHandleConfigEnv_Routing(t *testing.T) {
 	tests := []struct {
-		name string
-		args []string
+		name            string
+		fn              func([]string, io.Writer) error
+		args            []string
+		wantErr         bool
+		wantErrContains string
+		wantOutContains string
 	}{
-		{name: "help flag", args: []string{"--help"}},
-		{name: "h flag", args: []string{"-h"}},
+		{
+			name:            "missing subcommand",
+			fn:              handleConfigEnv,
+			args:            nil,
+			wantErr:         true,
+			wantOutContains: "Usage: ploy config env",
+		},
+		{
+			name:            "unknown subcommand",
+			fn:              handleConfigEnv,
+			args:            []string{"unknown"},
+			wantErr:         true,
+			wantErrContains: "unknown env subcommand",
+		},
+		{
+			name:            "help flag --help",
+			fn:              handleConfigEnv,
+			args:            []string{"--help"},
+			wantOutContains: "Usage: ploy config env",
+		},
+		{
+			name:            "help flag -h",
+			fn:              handleConfigEnv,
+			args:            []string{"-h"},
+			wantOutContains: "Usage: ploy config env",
+		},
+		{
+			name:            "ls alias routes to list",
+			fn:              handleConfigEnv,
+			args:            []string{"ls", "extra"},
+			wantErr:         true,
+			wantErrContains: "unexpected arguments:",
+		},
+		{
+			name:            "config env routing",
+			fn:              handleConfig,
+			args:            []string{"env"},
+			wantErr:         true,
+			wantErrContains: "env subcommand required",
+		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := handleConfigEnv(tt.args, buf)
-			if err != nil {
-				t.Fatalf("expected no error for help flag, got: %v", err)
+			err := tt.fn(tt.args, buf)
+
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
 			}
 			out := buf.String()
-			if !strings.Contains(out, "Usage: ploy config env") {
-				t.Fatalf("expected env usage output, got: %q", out)
+			if tt.wantOutContains != "" && !strings.Contains(out, tt.wantOutContains) {
+				t.Fatalf("expected output containing %q, got: %q", tt.wantOutContains, out)
+			}
+		})
+	}
+}
+
+// TestHandleConfigEnvShow_FlagValidation verifies flag parsing for the 'show' subcommand.
+func TestHandleConfigEnvShow_FlagValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		wantErrContains string
+	}{
+		{"missing key", nil, "--key is required"},
+		{"empty key", []string{"--key", ""}, "--key is required"},
+		{"extra args", []string{"--key", "FOO", "extra"}, "unexpected arguments:"},
+		{"invalid from", []string{"--key", "FOO", "--from", "bogus"}, "invalid --from target"},
+		{"empty from", []string{"--key", "FOO", "--from", ""}, "--from value cannot be empty"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigEnvShow(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
+			}
+		})
+	}
+}
+
+// TestHandleConfigEnvSet_FlagValidation verifies flag parsing for the 'set' subcommand.
+func TestHandleConfigEnvSet_FlagValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		wantErrContains string
+	}{
+		{"missing key", []string{"--value", "test"}, "--key is required"},
+		{"empty key", []string{"--key", "", "--value", "test"}, "--key is required"},
+		{"missing value and file", []string{"--key", "FOO"}, "either --value or --file is required"},
+		{"value and file exclusive", []string{"--key", "FOO", "--value", "bar", "--file", "test.txt"}, "--value and --file are mutually exclusive"},
+		{"extra args", []string{"--key", "FOO", "--value", "bar", "extra"}, "unexpected arguments:"},
+		{"invalid on selector", []string{"--key", "FOO", "--value", "bar", "--on", "invalid"}, "invalid --on selector"},
+		{"file not found", []string{"--key", "FOO", "--file", "/nonexistent/path/file.txt"}, "read file"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigEnvSet(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
+			}
+		})
+	}
+}
+
+// TestHandleConfigEnvUnset_FlagValidation verifies flag parsing for the 'unset' subcommand.
+func TestHandleConfigEnvUnset_FlagValidation(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		wantErrContains string
+	}{
+		{"missing key", nil, "--key is required"},
+		{"empty key", []string{"--key", ""}, "--key is required"},
+		{"extra args", []string{"--key", "FOO", "extra"}, "unexpected arguments:"},
+		{"invalid from", []string{"--key", "FOO", "--from", "bogus"}, "invalid --from target"},
+		{"empty from", []string{"--key", "FOO", "--from", ""}, "--from value cannot be empty"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigEnvUnset(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
 			}
 		})
 	}
@@ -68,132 +173,6 @@ func TestHandleConfigEnvListRejectsExtraArgs(t *testing.T) {
 		t.Fatalf("expected error for unexpected args")
 	}
 	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvShowRequiresKey verifies that the 'show' subcommand
-// requires the --key flag to be specified.
-func TestHandleConfigEnvShowRequiresKey(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --key is missing")
-	}
-	if !strings.Contains(err.Error(), "--key is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvShowRejectsExtraArgs ensures that the 'show' subcommand
-// rejects unexpected positional arguments.
-func TestHandleConfigEnvShowRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "FOO", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvShowEmptyKey ensures that an empty --key value is rejected.
-func TestHandleConfigEnvShowEmptyKey(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", ""}, buf)
-	if err == nil {
-		t.Fatalf("expected error for empty key")
-	}
-	if !strings.Contains(err.Error(), "--key is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvShowInvalidFrom verifies that invalid --from values are rejected.
-func TestHandleConfigEnvShowInvalidFrom(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "FOO", "--from", "bogus"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for invalid --from")
-	}
-	if !strings.Contains(err.Error(), "invalid --from target") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvShowEmptyFrom verifies that an empty --from value is rejected.
-func TestHandleConfigEnvShowEmptyFrom(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "FOO", "--from", ""}, buf)
-	if err == nil {
-		t.Fatalf("expected error for empty --from")
-	}
-	if !strings.Contains(err.Error(), "--from value cannot be empty") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetRequiresKey verifies that the 'set' subcommand
-// requires the --key flag to be specified.
-func TestHandleConfigEnvSetRequiresKey(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--value", "test"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when --key is missing")
-	}
-	if !strings.Contains(err.Error(), "--key is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetRequiresValueOrFile verifies that the 'set' subcommand
-// requires either --value or --file to be specified.
-func TestHandleConfigEnvSetRequiresValueOrFile(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when neither --value nor --file is provided")
-	}
-	if !strings.Contains(err.Error(), "either --value or --file is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetValueFileExclusive verifies that --value and --file
-// are mutually exclusive.
-func TestHandleConfigEnvSetValueFileExclusive(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--file", "test.txt"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when both --value and --file are provided")
-	}
-	if !strings.Contains(err.Error(), "--value and --file are mutually exclusive") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetRejectsExtraArgs ensures that the 'set' subcommand
-// rejects unexpected positional arguments.
-func TestHandleConfigEnvSetRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetInvalidOnSelector verifies that invalid --on values are rejected.
-func TestHandleConfigEnvSetInvalidOnSelector(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--value", "bar", "--on", "invalid"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for invalid --on selector")
-	}
-	if !strings.Contains(err.Error(), "invalid --on selector") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -214,68 +193,6 @@ func TestHandleConfigEnvSetValidOnSelectors(t *testing.T) {
 				t.Fatalf("selector %q should be valid, got: %v", sel, err)
 			}
 		})
-	}
-}
-
-// TestHandleConfigEnvUnsetRequiresKey verifies that the 'unset' subcommand
-// requires the --key flag to be specified.
-func TestHandleConfigEnvUnsetRequiresKey(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --key is missing")
-	}
-	if !strings.Contains(err.Error(), "--key is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvUnsetRejectsExtraArgs ensures that the 'unset' subcommand
-// rejects unexpected positional arguments.
-func TestHandleConfigEnvUnsetRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", "FOO", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvUnsetEmptyKey ensures that an empty --key value is rejected.
-func TestHandleConfigEnvUnsetEmptyKey(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", ""}, buf)
-	if err == nil {
-		t.Fatalf("expected error for empty key")
-	}
-	if !strings.Contains(err.Error(), "--key is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvUnsetInvalidFrom verifies that invalid --from values are rejected.
-func TestHandleConfigEnvUnsetInvalidFrom(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", "FOO", "--from", "bogus"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for invalid --from")
-	}
-	if !strings.Contains(err.Error(), "invalid --from target") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvUnsetEmptyFrom verifies that an empty --from value is rejected.
-func TestHandleConfigEnvUnsetEmptyFrom(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", "FOO", "--from", ""}, buf)
-	if err == nil {
-		t.Fatalf("expected error for empty --from")
-	}
-	if !strings.Contains(err.Error(), "--from value cannot be empty") {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -316,30 +233,6 @@ func TestHandleConfigEnvSetMultipleOnSelectors(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "--on all is exclusive") {
 		t.Fatalf("should not trigger all exclusivity, got: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetFileNotFound verifies that missing files are detected.
-func TestHandleConfigEnvSetFileNotFound(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "FOO", "--file", "/nonexistent/path/file.txt"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing file")
-	}
-	if !strings.Contains(err.Error(), "read file") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvSetEmptyKey ensures that an empty --key value is rejected.
-func TestHandleConfigEnvSetEmptyKey(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvSet([]string{"--key", "", "--value", "test"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for empty key")
-	}
-	if !strings.Contains(err.Error(), "--key is required") {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -391,8 +284,7 @@ func TestExpandOnSelector(t *testing.T) {
 	}
 }
 
-// TestConfigUsageIncludesEnv verifies that the config command usage now
-// includes the env subcommand.
+// TestConfigUsageIncludesEnv verifies that the config command usage includes the env subcommand.
 func TestConfigUsageIncludesEnv(t *testing.T) {
 	buf := &bytes.Buffer{}
 	printConfigUsage(buf)
@@ -402,31 +294,5 @@ func TestConfigUsageIncludesEnv(t *testing.T) {
 	}
 	if !strings.Contains(out, "Manage global environment variables") {
 		t.Fatalf("expected env description in config usage, got: %q", out)
-	}
-}
-
-// TestHandleConfigEnvLsAliasRoutes verifies that 'ls' routes to the list handler.
-func TestHandleConfigEnvLsAliasRoutes(t *testing.T) {
-	buf := &bytes.Buffer{}
-	// 'ls' with unexpected args triggers the same error as 'list' with unexpected args.
-	err := handleConfigEnv([]string{"ls", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args via ls alias")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestConfigEnvRouting verifies that 'config env' routes to handleConfigEnv.
-func TestConfigEnvRouting(t *testing.T) {
-	buf := &bytes.Buffer{}
-	// Without arguments, handleConfigEnv returns an error asking for subcommand.
-	err := handleConfig([]string{"env"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing env subcommand")
-	}
-	if !strings.Contains(err.Error(), "env subcommand required") {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
