@@ -18,7 +18,7 @@
 [config_env.go](config_env.go) CRUD handlers for global environment variables used by runs and node execution.
 [config_env_migration.go](config_env_migration.go) Scans and migrates env keys into typed Hydra ca/home/in records (including server/nodes targets) with conflict handling and metrics.
 [config_env_migration_fixture_test.go](config_env_migration_fixture_test.go) Fixture-driven tests that load YAML migration scenarios and verify env-to-Hydra scan reports.
-[config_env_migration_test.go](config_env_migration_test.go) Tests env migration mapping table design alignment, rewrite entry generation, scan actions, conflict rejection, and report metrics.
+[config_env_migration_test.go](config_env_migration_test.go) Table-driven tests for env migration target-to-section mapping, conflict rejection paths, rewrite entries, and report metrics.
 [config_env_test.go](config_env_test.go) Exercises global env CRUD handlers plus special-key target guards, defaults, round-trip behavior, and store error mapping.
 [config_gitlab.go](config_gitlab.go) Thread-safe runtime config holder and handlers for GitLab plus global env and typed Hydra CA/home/in overlays.
 [config_gitlab_fuzz_test.go](config_gitlab_fuzz_test.go) Fuzzes GitLab config mutation paths to catch panics on malformed payload combinations.
