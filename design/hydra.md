@@ -307,21 +307,18 @@ The following fields and patterns are not part of the Hydra contract and are rej
   - `internal/store/schema.sql`
   - `internal/store/queries/*`
 
-Typed field mappings for previously env-transported values:
+Hydra field mapping (final state):
 
-| Former env key | Former behavior | Typed field | Mapping |
-|---|---|---|---|
-| `PLOY_CA_CERTS` | Materialized by shell/env logic in server/node/gate/ORW runtimes | `ca` | `ca: [<local-ca-path>]` |
-| `CODEX_AUTH_JSON` | Materialized by codex/amata entrypoints into Codex auth file | `home` | `home: ["<src>:.codex/auth.json:ro"]` |
-| `CODEX_CONFIG_TOML` | Materialized by codex/amata entrypoints into Codex config file | `home` | `home: ["<src>:.codex/config.toml:ro"]` |
-| `CRUSH_JSON` | Materialized by codex/amata entrypoints into Crush config file | `home` | `home: ["<src>:.config/crush/crush.json:ro"]` |
-| `CCR_CONFIG_JSON` | Materialized by codex/amata entrypoints into Claude Code Router config file | `home` | `home: ["<src>:.claude-code-router/config.json:ro"]` |
-| `CODEX_PROMPT` (when file-backed) | Inline multiline prompt in env; shell/export-sensitive | `in` | `in: ["<src>:/in/codex-prompt.txt"]` + command uses `--prompt-file /in/codex-prompt.txt` |
+| Hydra field | Materialization target | Example |
+|---|---|---|
+| `envs` | Key/value environment variables (scalar only) | `envs: {"OPENAI_API_KEY": "sk-..."}` |
+| `ca` | CA certificate materialization via file delivery | `ca: ["<hash>"]` |
+| `in` | Read-only inputs under `/in` | `in: ["<hash>:/in/codex-prompt.txt"]` |
+| `out` | Read-write outputs under `/out` | `out: ["<hash>:/out/result.json"]` |
+| `home` | Files under `$HOME` (default rw, optional `:ro`) | `home: ["<hash>:.codex/auth.json:ro"]` |
 
-Notes:
-
-- No former special env keys map to `out`.
-- Non-special operational keys (e.g. `OPENAI_API_KEY`, `PLOY_GRADLE_BUILD_CACHE_URL`) remain in `envs`.
+All file-backed values use content-addressed upload. No env key carries file content.
+Legacy fields (`env_from_file`, `tmp_dir`, `tmp_bundle`, `env`) are forbidden at validation.
 
 ## Milestones
 
@@ -389,9 +386,9 @@ Testable outcome:
 
 ## Acceptance Criteria
 
-- Specs containing `env_from_file`, `tmp_dir`, `tmp_bundle`, or `PLOY_CA_CERTS` are rejected at validation.
-- New fields validate with deterministic error messages for invalid destination/mode/domain.
-- Stored spec entries validate canonical hash-first format (`shortHash:dst{:ro}` per field rules).
+- Only Hydra fields (`envs`, `ca`, `in`, `out`, `home`) are accepted; legacy fields are forbidden at validation.
+- Hydra fields validate with deterministic error messages for invalid destination/mode/domain.
+- Stored spec entries use canonical hash-first format (`shortHash:dst{:ro}` per field rules).
 - Effective configuration precedence is exactly: server defaults < local config.yaml < spec.
 - `in` mounts are read-only under `/in`; `out` mounts are read-write under `/out`; `home` mounts are under `$HOME`.
 - `home` mode semantics are deterministic: default `rw`, optional `:ro`.

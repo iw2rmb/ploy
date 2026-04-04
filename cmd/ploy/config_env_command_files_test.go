@@ -27,8 +27,8 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode([]map[string]any{
-			{"key": "PLOY_CA_CERTS", "target": "gates", "secret": true},
-			{"key": "PLOY_CA_CERTS", "target": "steps", "secret": true},
+			{"key": "DEPLOY_TOKEN", "target": "gates", "secret": true},
+			{"key": "DEPLOY_TOKEN", "target": "steps", "secret": true},
 			{"key": "OPENAI_API_KEY", "target": "steps", "secret": true},
 			{"key": "DEBUG_MODE", "value": "true", "target": "gates", "secret": false},
 		})
@@ -51,8 +51,8 @@ func TestHandleConfigEnvListSuccess(t *testing.T) {
 	if !strings.Contains(output, "TARGET") {
 		t.Fatalf("expected TARGET header in output, got: %q", output)
 	}
-	if !strings.Contains(output, "PLOY_CA_CERTS") {
-		t.Fatalf("expected PLOY_CA_CERTS in output, got: %q", output)
+	if !strings.Contains(output, "DEPLOY_TOKEN") {
+		t.Fatalf("expected DEPLOY_TOKEN in output, got: %q", output)
 	}
 	if !strings.Contains(output, "OPENAI_API_KEY") {
 		t.Fatalf("expected OPENAI_API_KEY in output, got: %q", output)
@@ -102,12 +102,12 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 		if r.Method != "GET" {
 			t.Fatalf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/config/env/PLOY_CA_CERTS" {
-			t.Fatalf("expected /v1/config/env/PLOY_CA_CERTS, got %s", r.URL.Path)
+		if r.URL.Path != "/v1/config/env/DEPLOY_TOKEN" {
+			t.Fatalf("expected /v1/config/env/DEPLOY_TOKEN, got %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"key":    "PLOY_CA_CERTS",
+			"key":    "DEPLOY_TOKEN",
 			"value":  "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----",
 			"target": "gates",
 			"secret": true,
@@ -120,14 +120,14 @@ func TestHandleConfigEnvShowSuccess(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "PLOY_CA_CERTS"}, buf)
+		err = handleConfigEnvShow([]string{"--key", "DEPLOY_TOKEN"}, buf)
 	})
 
 	if err != nil {
 		t.Fatalf("handleConfigEnvShow error: %v", err)
 	}
 
-	if !strings.Contains(output, "Key:    PLOY_CA_CERTS") {
+	if !strings.Contains(output, "Key:    DEPLOY_TOKEN") {
 		t.Fatalf("expected key in output, got: %q", output)
 	}
 	if !strings.Contains(output, "Target: gates") {
@@ -149,7 +149,7 @@ func TestHandleConfigEnvShowWithFrom(t *testing.T) {
 		gotQuery = r.URL.Query().Get("target")
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"key":    "PLOY_CA_CERTS",
+			"key":    "DEPLOY_TOKEN",
 			"value":  "pem-content",
 			"target": "gates",
 			"secret": false,
@@ -162,7 +162,7 @@ func TestHandleConfigEnvShowWithFrom(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvShow([]string{"--key", "PLOY_CA_CERTS", "--from", "gates"}, buf)
+		err = handleConfigEnvShow([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
 	})
 
 	if err != nil {
@@ -183,7 +183,7 @@ func TestHandleConfigEnvShowAmbiguity(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "PLOY_CA_CERTS"}, buf)
+	err := handleConfigEnvShow([]string{"--key", "DEPLOY_TOKEN"}, buf)
 	if err == nil {
 		t.Fatalf("expected error for ambiguous key")
 	}
@@ -487,7 +487,7 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	output := stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvUnset([]string{"--key", "PLOY_CA_CERTS"}, buf)
+		err = handleConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN"}, buf)
 	})
 
 	if err != nil {
@@ -497,8 +497,8 @@ func TestHandleConfigEnvUnsetSuccess(t *testing.T) {
 	if gotMethod != "DELETE" {
 		t.Fatalf("expected DELETE, got %s", gotMethod)
 	}
-	if gotPath != "/v1/config/env/PLOY_CA_CERTS" {
-		t.Fatalf("expected /v1/config/env/PLOY_CA_CERTS, got %s", gotPath)
+	if gotPath != "/v1/config/env/DEPLOY_TOKEN" {
+		t.Fatalf("expected /v1/config/env/DEPLOY_TOKEN, got %s", gotPath)
 	}
 
 	if !strings.Contains(output, "deleted successfully") {
@@ -521,7 +521,7 @@ func TestHandleConfigEnvUnsetWithFrom(t *testing.T) {
 	buf := &bytes.Buffer{}
 	var err error
 	stdcapture.CaptureStdout(t, func() {
-		err = handleConfigEnvUnset([]string{"--key", "PLOY_CA_CERTS", "--from", "gates"}, buf)
+		err = handleConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN", "--from", "gates"}, buf)
 	})
 
 	if err != nil {
@@ -542,7 +542,7 @@ func TestHandleConfigEnvUnsetAmbiguity(t *testing.T) {
 	clienv.UseServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", "PLOY_CA_CERTS"}, buf)
+	err := handleConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN"}, buf)
 	if err == nil {
 		t.Fatalf("expected error for ambiguous key")
 	}
