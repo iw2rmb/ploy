@@ -1,2 +1,2 @@
-[fixtures/](fixtures) Fixture inputs used by the mixed Hydra `in`-record scenario (config data and helper script).
-[run.sh](run.sh) E2E scenario runner that verifies mixed file inputs are mounted under `/in` and the run completes successfully.
+[fixtures/](fixtures) Fixture inputs for the mixed Hydra `in` scenario, including one JSON file and one mounted scripts directory.
+[run.sh](run.sh) E2E scenario runner that asserts `/in/config.json` and `/in/scripts/build.sh` are present and the run succeeds.
