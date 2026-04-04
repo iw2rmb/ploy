@@ -155,7 +155,7 @@ build_gate:
 
   # Router runs once after gate failure to produce bug_summary.
   router:
-    spec_path: ./healing/router/spec.yaml
+    <<: !include ./healing/router/spec.yaml
     image: ghcr.io/iw2rmb/ploy/codex:latest
     in:
       - ./codex-prompt.txt:/in/codex-prompt.txt
@@ -166,7 +166,7 @@ build_gate:
   healing:
     by_error_kind:
       infra:
-        spec_path: ./healing/infra/spec.yaml
+        <<: !include ./healing/infra/spec.yaml
         retries: 2
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
@@ -176,7 +176,7 @@ build_gate:
             - path: /out/gate-profile-candidate.json
               schema: gate_profile_v1
       code:
-        spec_path: ./healing/code/spec.yaml
+        <<: !include ./healing/code/spec.yaml
         retries: 2
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
@@ -232,10 +232,14 @@ router:
 ```
 
 The same dual-mode rules apply to `steps[]`, `router`, and `healing.by_error_kind.<error_kind>` entries.
-`spec_path` is supported in `build_gate.router` and
-`build_gate.healing.by_error_kind.<error_kind>`; CLI deep-merges the referenced
-object and inline fields override loaded values. `spec_path` supports env
-expansion (`$VAR`, `${VAR}`) and `~/` home expansion.
+Use YAML `!include` for spec composition: full replacement
+(`router: !include ./router.yaml#/router`) or deep merge
+(`router: {<<: !include ./router.yaml#/router, ...inline-overrides}`).
+Include references support `path[#/pointer]`, nested includes, and cycle
+detection. Relative include paths resolve from each including file directory.
+Relative local-source paths inside included fragments (`amata.spec`, `ca`, and
+the source side of `in`/`out`/`home`) are resolved from that included file
+directory.
 For `infra` recovery with `schema=gate_profile_v1`, healing is expected to emit
 `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` happens only
 when the immediate follow-up `re_gate` succeeds.
