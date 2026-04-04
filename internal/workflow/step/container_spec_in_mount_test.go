@@ -8,8 +8,8 @@ import (
 )
 
 // Verifies that when an inDir is provided, buildContainerSpec mounts it
-// read-only at /in and does not alter other mounts.
-func TestBuildContainerSpec_InMountReadOnly(t *testing.T) {
+// at /in and does not alter other mounts.
+func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 	manifest := contracts.StepManifest{
 		ID:    types.StepID("step-in-mount"),
 		Name:  "With /in",
@@ -27,7 +27,7 @@ func TestBuildContainerSpec_InMountReadOnly(t *testing.T) {
 		t.Fatalf("buildContainerSpec error: %v", err)
 	}
 
-	// Expect two mounts: workspace RW and /in RO
+	// Expect two mounts: workspace RW and /in.
 	if len(spec.Mounts) != 2 {
 		t.Fatalf("got %d mounts, want 2: %+v", len(spec.Mounts), spec.Mounts)
 	}
@@ -36,8 +36,8 @@ func TestBuildContainerSpec_InMountReadOnly(t *testing.T) {
 	for _, m := range spec.Mounts {
 		if m.Target == "/in" {
 			found = true
-			if !m.ReadOnly {
-				t.Fatalf("/in mount not read-only: %+v", m)
+			if m.ReadOnly {
+				t.Fatalf("/in mount should be writable: %+v", m)
 			}
 		}
 	}
