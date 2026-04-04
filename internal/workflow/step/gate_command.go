@@ -16,16 +16,13 @@ func buildCommandForTool(workspace string, tool string) ([]string, error) {
 
 // buildCommandForToolTarget returns a deterministic command for a tool/target pair.
 func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
-	preamble := envMaterializerPreamble()
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			script := preamble + "mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install"
-			return []string{"/bin/sh", "-lc", script}, nil
+			return []string{"/bin/sh", "-lc", "mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install"}, nil
 		case contracts.GateProfileTargetAllTests:
-			script := preamble + "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"
-			return []string{"/bin/sh", "-lc", script}, nil
+			return []string{"/bin/sh", "-lc", "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"}, nil
 		default:
 			return nil, fmt.Errorf("unsupported maven target: %q", target)
 		}
@@ -36,23 +33,18 @@ func buildCommandForToolTarget(workspace string, tool string, target string) ([]
 		}
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			script := preamble + gradleExec + " -q --stacktrace --build-cache build -x test -p /workspace"
-			return []string{"/bin/sh", "-lc", script}, nil
+			return []string{"/bin/sh", "-lc", gradleExec + " -q --stacktrace --build-cache build -x test -p /workspace"}, nil
 		case contracts.GateProfileTargetAllTests:
-			script := preamble + gradleExec + " -q --stacktrace --build-cache test -p /workspace"
-			return []string{"/bin/sh", "-lc", script}, nil
+			return []string{"/bin/sh", "-lc", gradleExec + " -q --stacktrace --build-cache test -p /workspace"}, nil
 		default:
 			return nil, fmt.Errorf("unsupported gradle target: %q", target)
 		}
 	case "go":
-		script := preamble + "go test ./..."
-		return []string{"/bin/sh", "-lc", script}, nil
+		return []string{"/bin/sh", "-lc", "go test ./..."}, nil
 	case "cargo":
-		script := preamble + "cargo test"
-		return []string{"/bin/sh", "-lc", script}, nil
+		return []string{"/bin/sh", "-lc", "cargo test"}, nil
 	case "pip", "poetry":
-		script := preamble + "python -m compileall -q /workspace"
-		return []string{"/bin/sh", "-lc", script}, nil
+		return []string{"/bin/sh", "-lc", "python -m compileall -q /workspace"}, nil
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}

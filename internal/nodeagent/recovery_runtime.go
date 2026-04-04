@@ -15,7 +15,7 @@ func (r *runController) injectHealingEnvVars(manifest *contracts.StepManifest, w
 	}
 	manifest.Envs["PLOY_HOST_WORKSPACE"] = workspace
 	manifest.Envs["PLOY_SERVER_URL"] = r.cfg.ServerURL
-	// TLS certs are delivered via certMountOptions.
+	// TLS cert files are bind-mounted into the container.
 	manifest.Envs["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
 	manifest.Envs["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
 
