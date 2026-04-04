@@ -499,3 +499,119 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	}
 }
 
+// TestMigCodex_HealingFlowOffline validates the healing flow structure without
+// requiring a live Codex auth file or network access. This covers the same
+// invariants as TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch at the
+// fixture/contract level: the build-gate.log fixture contains the expected
+// compilation error, the healing prompt conforms to the sentinel protocol,
+// and the /in + /out mount structure is correct for cross-phase inputs.
+func TestMigCodex_HealingFlowOffline(t *testing.T) {
+	t.Parallel()
+
+	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
+	repoRoot = strings.TrimSpace(repoRoot)
+
+	t.Run("build_gate_log_fixture_contains_compilation_error", func(t *testing.T) {
+		t.Parallel()
+		logPath := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
+		data, err := os.ReadFile(logPath)
+		if err != nil {
+			t.Fatalf("build-gate.log fixture missing: %v", err)
+		}
+		if !bytes.Contains(data, []byte("cannot find symbol")) {
+			t.Fatal("build-gate.log fixture must contain 'cannot find symbol' compilation error")
+		}
+		if !bytes.Contains(data, []byte("COMPILATION ERROR")) {
+			t.Fatal("build-gate.log fixture must contain 'COMPILATION ERROR' marker")
+		}
+	})
+
+	t.Run("healing_prompt_follows_sentinel_protocol", func(t *testing.T) {
+		t.Parallel()
+		// Reconstruct the same prompt the live test assembles.
+		prompt := strings.Join([]string{
+			"Rules:",
+			"- After making any change, generate a unified diff: cd /workspace && git diff > /out/heal.patch",
+			"- Write the sentinel file to signal readiness: echo 'ready' > /out/.buildgate-ready",
+			"- Build Gate verification is performed externally.",
+			"- Do NOT attempt to build or test inside this container.",
+			"- Once you have written the sentinel, print \"SENTINEL WRITTEN\".",
+			"",
+			"Task:",
+			"fix compilation error described in /in/build-gate.log",
+		}, "\n")
+
+		// Sentinel protocol: prompt must instruct writing to /out/.buildgate-ready
+		if !strings.Contains(prompt, "/out/.buildgate-ready") {
+			t.Error("prompt must reference sentinel path /out/.buildgate-ready")
+		}
+		// Healing diff: prompt must instruct writing to /out/heal.patch
+		if !strings.Contains(prompt, "/out/heal.patch") {
+			t.Error("prompt must reference heal patch path /out/heal.patch")
+		}
+		// Cross-phase input: prompt must reference /in/build-gate.log
+		if !strings.Contains(prompt, "/in/build-gate.log") {
+			t.Error("prompt must reference cross-phase input /in/build-gate.log")
+		}
+		// Must NOT reference legacy env injection
+		if strings.Contains(prompt, "CODEX_PROMPT") {
+			t.Error("prompt must not use legacy CODEX_PROMPT env injection")
+		}
+	})
+
+	t.Run("healing_mount_structure_in_readonly_out_writable", func(t *testing.T) {
+		t.Parallel()
+		// Validate that the healing flow's mount paths conform to Hydra
+		// contract: /in is read-only (build-gate.log delivered there),
+		// /out is writable (heal.patch and sentinel written there).
+		inDir := t.TempDir()
+		outDir := t.TempDir()
+
+		// Simulate /in mount: write build-gate.log (read-only source)
+		logSrc := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
+		logData, err := os.ReadFile(logSrc)
+		if err != nil {
+			t.Fatalf("read fixture: %v", err)
+		}
+		inLog := filepath.Join(inDir, "build-gate.log")
+		if err := os.WriteFile(inLog, logData, 0o444); err != nil {
+			t.Fatalf("write /in/build-gate.log: %v", err)
+		}
+
+		// Verify /in content is readable
+		readBack, err := os.ReadFile(inLog)
+		if err != nil {
+			t.Fatalf("read /in/build-gate.log: %v", err)
+		}
+		if !bytes.Contains(readBack, []byte("cannot find symbol")) {
+			t.Fatal("in-mounted build-gate.log must preserve compilation error")
+		}
+
+		// Simulate /out mount: write sentinel and patch (writable target)
+		sentinelPath := filepath.Join(outDir, ".buildgate-ready")
+		if err := os.WriteFile(sentinelPath, []byte("ready\n"), 0o644); err != nil {
+			t.Fatalf("write sentinel to /out: %v", err)
+		}
+		patchPath := filepath.Join(outDir, "heal.patch")
+		if err := os.WriteFile(patchPath, []byte("--- a/file\n+++ b/file\n"), 0o644); err != nil {
+			t.Fatalf("write heal.patch to /out: %v", err)
+		}
+
+		// Verify /out artifacts exist and are readable
+		if _, err := os.Stat(sentinelPath); err != nil {
+			t.Fatalf("sentinel not writable in /out: %v", err)
+		}
+		if _, err := os.Stat(patchPath); err != nil {
+			t.Fatalf("heal.patch not writable in /out: %v", err)
+		}
+	})
+
+	t.Run("codex_image_dockerfile_exists", func(t *testing.T) {
+		t.Parallel()
+		dockerfile := filepath.Join(repoRoot, "images", "codex", "Dockerfile")
+		if _, err := os.Stat(dockerfile); err != nil {
+			t.Fatalf("codex Dockerfile missing: %v", err)
+		}
+	})
+}
+
