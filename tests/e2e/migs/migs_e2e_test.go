@@ -118,9 +118,9 @@ func TestMigSpecsNoLegacyCODEXPROMPT(t *testing.T) {
 }
 
 // TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
-// validating that /in is read-only and /out is writable. When the cluster is
-// available, the full live scenario runs. Otherwise, offline contract
-// validation proves the scenario spec is correctly wired.
+// validating that /in is read-only and /out is writable. Requires a live
+// cluster; skips when unavailable. Offline contract validation is covered
+// by TestHydraScenarioOfflineValidation.
 func TestHydraMountEnforcement(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -131,74 +131,24 @@ func TestHydraMountEnforcement(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if clusterReady(t, root) {
-		cmd := exec.Command("bash", script)
-		cmd.Dir = root
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("scenario-hydra-mount-enforcement failed:\n%s", out)
-		}
-		t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
-		return
+	if !clusterReady(t, root) {
+		t.Skip("cluster unavailable; skipping live mount-enforcement scenario (offline contract covered by TestHydraScenarioOfflineValidation)")
 	}
 
-	// Offline contract validation — proves the scenario spec is correctly
-	// structured even when the cluster is not available.
-	t.Log("cluster unavailable; running offline contract validation for mount-enforcement scenario")
-	data, err := os.ReadFile(script)
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("read scenario script: %v", err)
+		t.Fatalf("scenario-hydra-mount-enforcement failed:\n%s", out)
 	}
-	content := string(data)
-
-	// Syntax check.
-	syntaxCmd := exec.Command("bash", "-n", script)
-	if out, err := syntaxCmd.CombinedOutput(); err != nil {
-		t.Fatalf("bash syntax error in scenario script:\n%s", out)
-	}
-
-	// The spec must declare in: records mapped to /in/ paths.
-	if !strings.Contains(content, "in:") || !strings.Contains(content, "/in/") {
-		t.Error("scenario spec missing in: record or /in/ mount path")
-	}
-
-	// The spec must declare out: records mapped to /out/ paths.
-	if !strings.Contains(content, "out:") || !strings.Contains(content, "/out/") {
-		t.Error("scenario spec missing out: record or /out/ mount path")
-	}
-
-	// The command must attempt a write to /in/ to prove read-only enforcement.
-	if !strings.Contains(content, "> /in/") {
-		t.Error("scenario command does not attempt write to /in/ (read-only enforcement untested)")
-	}
-
-	// The command must write to /out/ to prove writable mount.
-	if !strings.Contains(content, "> /out/") {
-		t.Error("scenario command does not write to /out/ (writable mount untested)")
-	}
-
-	// Must not use legacy env injection.
-	if strings.Contains(content, "CODEX_PROMPT") {
-		t.Error("scenario uses legacy CODEX_PROMPT env injection")
-	}
-
-	// Verify spec uses MigRunSpec API version.
-	if !strings.Contains(content, "apiVersion: ploy.mig/v1alpha1") {
-		t.Error("scenario spec missing apiVersion: ploy.mig/v1alpha1")
-	}
-	if !strings.Contains(content, "kind: MigRunSpec") {
-		t.Error("scenario spec missing kind: MigRunSpec")
-	}
-
-	t.Log("offline contract validation passed for mount-enforcement scenario")
+	t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
 }
 
 // TestHydraOutUpload runs the Hydra /out upload continuity e2e scenario,
 // validating that files written to /out are uploaded and retrievable as
-// artifacts. When the cluster is available, the full live scenario runs.
-// Otherwise, offline contract validation proves the scenario spec is correctly
-// wired.
+// artifacts. Requires a live cluster; skips when unavailable. Offline
+// contract validation is covered by TestHydraScenarioOfflineValidation.
 func TestHydraOutUpload(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode; skipping e2e scenario")
@@ -209,67 +159,18 @@ func TestHydraOutUpload(t *testing.T) {
 		t.Fatalf("scenario script not found: %v", err)
 	}
 
-	if clusterReady(t, root) {
-		cmd := exec.Command("bash", script)
-		cmd.Dir = root
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("scenario-hydra-out-upload failed:\n%s", out)
-		}
-		t.Logf("scenario-hydra-out-upload passed:\n%s", out)
-		return
+	if !clusterReady(t, root) {
+		t.Skip("cluster unavailable; skipping live out-upload scenario (offline contract covered by TestHydraScenarioOfflineValidation)")
 	}
 
-	// Offline contract validation — proves the scenario spec is correctly
-	// structured even when the cluster is not available.
-	t.Log("cluster unavailable; running offline contract validation for out-upload scenario")
-	data, err := os.ReadFile(script)
+	cmd := exec.Command("bash", script)
+	cmd.Dir = root
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("read scenario script: %v", err)
+		t.Fatalf("scenario-hydra-out-upload failed:\n%s", out)
 	}
-	content := string(data)
-
-	// Syntax check.
-	syntaxCmd := exec.Command("bash", "-n", script)
-	if out, err := syntaxCmd.CombinedOutput(); err != nil {
-		t.Fatalf("bash syntax error in scenario script:\n%s", out)
-	}
-
-	// The spec must declare out: records mapped to /out/ paths.
-	if !strings.Contains(content, "out:") || !strings.Contains(content, "/out/") {
-		t.Error("scenario spec missing out: record or /out/ mount path")
-	}
-
-	// The command must write to /out/ to produce an artifact.
-	if !strings.Contains(content, "> /out/") {
-		t.Error("scenario command does not write to /out/ (artifact production untested)")
-	}
-
-	// The script must verify downloaded artifacts after the run.
-	if !strings.Contains(content, "--artifact-dir") {
-		t.Error("scenario does not use --artifact-dir for artifact download verification")
-	}
-
-	// Must verify artifact content, not just existence.
-	if !strings.Contains(content, "report") {
-		t.Error("scenario does not verify report artifact content")
-	}
-
-	// Must not use legacy env injection.
-	if strings.Contains(content, "CODEX_PROMPT") {
-		t.Error("scenario uses legacy CODEX_PROMPT env injection")
-	}
-
-	// Verify spec uses MigRunSpec API version.
-	if !strings.Contains(content, "apiVersion: ploy.mig/v1alpha1") {
-		t.Error("scenario spec missing apiVersion: ploy.mig/v1alpha1")
-	}
-	if !strings.Contains(content, "kind: MigRunSpec") {
-		t.Error("scenario spec missing kind: MigRunSpec")
-	}
-
-	t.Log("offline contract validation passed for out-upload scenario")
+	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
 }
 
 // TestHydraScenarioOfflineValidation validates the Hydra e2e scenario

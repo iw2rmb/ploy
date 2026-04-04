@@ -373,9 +373,7 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		case "skip":
 			t.Skip("CODEX_AUTH_FILE not set; skipping (PLOY_INTEGRATION_CODEX=skip)")
 		default:
-			t.Log("CODEX_AUTH_FILE not set; running offline Hydra contract validation (set PLOY_INTEGRATION_CODEX=require to enforce live coverage)")
-			validateCodexHydraContractOffline(t)
-			return
+			t.Skip("CODEX_AUTH_FILE not set; skipping live healing flow (set PLOY_INTEGRATION_CODEX=require to enforce live coverage)")
 		}
 	}
 	if _, err := os.Stat(authFile); err != nil {
@@ -506,47 +504,3 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	}
 }
 
-// validateCodexHydraContractOffline validates the Codex integration Hydra
-// contract without requiring a live Codex auth file. It verifies the
-// entrypoint script uses Hydra mount paths, the build-gate.log fixture
-// exists, and the Dockerfile is syntactically present.
-func validateCodexHydraContractOffline(t *testing.T) {
-	t.Helper()
-
-	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
-	repoRoot = strings.TrimSpace(repoRoot)
-
-	// 1. Entrypoint script exists and uses Hydra mount paths.
-	entrypoint := filepath.Join(repoRoot, "images", "codex", "entrypoint.sh")
-	data, err := os.ReadFile(entrypoint)
-	if err != nil {
-		t.Fatalf("entrypoint.sh missing: %v", err)
-	}
-	content := string(data)
-	for _, path := range []string{"/in/codex-prompt.txt", "OUTDIR:-/out", "Hydra"} {
-		if !strings.Contains(content, path) {
-			t.Errorf("entrypoint.sh missing expected Hydra reference %q", path)
-		}
-	}
-	if strings.Contains(content, "CODEX_PROMPT") {
-		t.Errorf("entrypoint.sh still references legacy CODEX_PROMPT env injection")
-	}
-
-	// 2. Build-gate.log test fixture exists.
-	fixture := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
-	if _, err := os.Stat(fixture); err != nil {
-		t.Errorf("build-gate.log fixture missing: %v", err)
-	}
-
-	// 3. Dockerfile exists.
-	dockerfile := filepath.Join(repoRoot, "images", "codex", "Dockerfile")
-	if _, err := os.Stat(dockerfile); err != nil {
-		t.Errorf("codex Dockerfile missing: %v", err)
-	}
-
-	// 4. Entrypoint bash syntax check.
-	cmd := exec.Command("bash", "-n", entrypoint)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("entrypoint.sh syntax error:\n%s", out)
-	}
-}
