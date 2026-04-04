@@ -54,7 +54,6 @@ var specialEnvMappings = []SpecialEnvMapping{
 	{EnvKey: "CODEX_CONFIG_TOML", TargetField: "home", Destination: ".codex/config.toml", Mode: "ro"},
 	{EnvKey: "CODEX_PROMPT", TargetField: "in", Destination: "/in/codex-prompt.txt"},
 	{EnvKey: "CRUSH_JSON", TargetField: "home", Destination: ".config/crush/crush.json", Mode: "ro"},
-	{EnvKey: "PLOY_CA_CERTS", TargetField: "ca"},
 }
 
 // SpecialEnvMappingTable returns a copy of the canonical mapping table.

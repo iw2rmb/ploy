@@ -1,8 +1,8 @@
 # Gates target maps to pre_gate, re_gate, post_gate sections.
 description: gates target section mapping
 env:
-  PLOY_CA_CERTS:
-    - value: "cert-data"
+  CRUSH_JSON:
+    - value: "crush-data"
       target: gates
       secret: true
 existing_ca: {}
@@ -12,8 +12,9 @@ expect:
   rejected: 0
   skipped: 0
   entries:
-    - env_key: PLOY_CA_CERTS
+    - env_key: CRUSH_JSON
       target: gates
       action: rewrite
-      target_field: ca
+      target_field: home
+      destination: ".config/crush/crush.json"
       sections: [pre_gate, re_gate, post_gate]
