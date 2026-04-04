@@ -96,34 +96,6 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 				"steps": [{"image": "img:latest"}]
 			}`,
 		},
-		{
-			name: "env forbidden in step",
-			input: `{
-				"steps": [{"image": "img:latest", "env": {"FOO": "bar"}}]
-			}`,
-			wantErr: "forbidden",
-		},
-		{
-			name: "tmp_dir forbidden in step",
-			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": []}]
-			}`,
-			wantErr: "forbidden",
-		},
-		{
-			name: "tmp_bundle forbidden in step",
-			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {}}]
-			}`,
-			wantErr: "forbidden",
-		},
-		{
-			name: "env_from_file forbidden in step",
-			input: `{
-				"steps": [{"image": "img:latest", "env_from_file": {}}]
-			}`,
-			wantErr: "forbidden",
-		},
 	}
 
 	for _, tc := range tests {
@@ -244,55 +216,39 @@ func TestMigSpecValidate_HydraFieldsRouter(t *testing.T) {
 	}
 }
 
-func TestMigSpecValidate_ForbiddenRootFields(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr string
+func TestMigSpecValidate_HydraRemovedFields(t *testing.T) {
+	// Fields superseded by the Hydra contract (in, out, home, ca) are rejected
+	// by the schema at every spec location.
+	removedFields := []struct {
+		field string
+		value string
 	}{
-		{
-			name: "root env forbidden",
-			input: `{
-				"steps": [{"image": "img:latest"}],
-				"env": {"FOO": "bar"}
-			}`,
-			wantErr: "env: forbidden",
-		},
-		{
-			name: "root env_from_file forbidden",
-			input: `{
-				"steps": [{"image": "img:latest"}],
-				"env_from_file": {}
-			}`,
-			wantErr: "env_from_file: forbidden",
-		},
-		{
-			name: "root tmp_dir forbidden",
-			input: `{
-				"steps": [{"image": "img:latest"}],
-				"tmp_dir": []
-			}`,
-			wantErr: "tmp_dir: forbidden",
-		},
-		{
-			name: "root tmp_bundle forbidden",
-			input: `{
-				"steps": [{"image": "img:latest"}],
-				"tmp_bundle": {}
-			}`,
-			wantErr: "tmp_bundle: forbidden",
-		},
+		{"env", `{"FOO": "bar"}`},
+		{"env_from_file", `{}`},
+		{"tmp_dir", `[]`},
+		{"tmp_bundle", `{}`},
 	}
 
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			_, err := ParseMigSpecJSON([]byte(tc.input))
+	for _, rf := range removedFields {
+		t.Run("step/"+rf.field, func(t *testing.T) {
+			input := `{"steps": [{"image": "img:latest", "` + rf.field + `": ` + rf.value + `}]}`
+			_, err := ParseMigSpecJSON([]byte(input))
 			if err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+				t.Fatalf("expected forbidden error for step field %q, got nil", rf.field)
 			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
+			if !strings.Contains(err.Error(), "forbidden") {
+				t.Fatalf("error %q does not contain %q", err.Error(), "forbidden")
+			}
+		})
+
+		t.Run("root/"+rf.field, func(t *testing.T) {
+			input := `{"steps": [{"image": "img:latest"}], "` + rf.field + `": ` + rf.value + `}`
+			_, err := ParseMigSpecJSON([]byte(input))
+			if err == nil {
+				t.Fatalf("expected forbidden error for root field %q, got nil", rf.field)
+			}
+			if !strings.Contains(err.Error(), rf.field+": forbidden") {
+				t.Fatalf("error %q does not contain %q", err.Error(), rf.field+": forbidden")
 			}
 		})
 	}
