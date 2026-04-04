@@ -19,7 +19,7 @@ get:
       required: true
       schema:
         type: string
-      description: Environment variable key (e.g., OPENAI_API_KEY, CUSTOM_VAR). Legacy special keys (PLOY_CA_CERTS, CODEX_AUTH_JSON, etc.) have been removed; use typed config fields (ca, home) instead. This endpoint rejects those keys on all targets.
+      description: Environment variable key (e.g., OPENAI_API_KEY, CUSTOM_VAR). Reserved keys managed by typed config fields (ca, home) are rejected on all targets.
       example: OPENAI_API_KEY
     - in: query
       name: target
@@ -72,11 +72,9 @@ put:
     - `OPENAI_API_KEY` with target `steps` — API key for LLM-integrated migs.
     - Custom variables for user-defined mig parameters.
 
-    **Removed special keys:** `PLOY_CA_CERTS`, `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`,
-    `CCR_CONFIG_JSON`, `CRUSH_JSON`, and `CODEX_PROMPT` are no longer supported as
-    environment variables. They have been replaced by typed Hydra config fields (`ca`,
-    `home`) and are rejected by this endpoint on all targets. Use the typed config
-    commands (`ploy config ca`, `ploy config home`) instead.
+    **Reserved keys:** Keys managed by typed config fields (`ca`, `home`) are
+    rejected by this endpoint on all targets. Use the typed config commands
+    (`ploy config ca`, `ploy config home`) instead.
 
     Requires `cli-admin` role.
   parameters:

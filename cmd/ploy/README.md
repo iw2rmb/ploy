@@ -521,7 +521,7 @@ ploy config env set --key CUSTOM_VAR --value myvalue --on gates --secret=false
 # Delete a variable (use --from when key exists for multiple targets)
 ploy config env unset --key OLD_VAR
 
-# CA certificates (typed Hydra field — replaces legacy PLOY_CA_CERTS env key)
+# CA certificates (typed Hydra field)
 ploy config ca set --file ca-bundle.pem --section pre_gate --section re_gate
 ploy config ca ls
 ploy config ca unset --hash <HASH> --section pre_gate
