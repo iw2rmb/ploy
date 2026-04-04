@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -135,6 +134,23 @@ func assertAbsent(t *testing.T, m map[string]any, key string) {
 	}
 }
 
+func assertCommandArr(t *testing.T, step map[string]any, want []string) {
+	t.Helper()
+	cmd := step["command"]
+	arr, ok := cmd.([]any)
+	if !ok {
+		t.Fatalf("expected command as []any, got %T", cmd)
+	}
+	if len(arr) != len(want) {
+		t.Fatalf("command len = %d, want %d: %v", len(arr), len(want), arr)
+	}
+	for i, w := range want {
+		if got, _ := arr[i].(string); got != w {
+			t.Errorf("command[%d] = %q, want %q", i, got, w)
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Table-driven tests
 // ---------------------------------------------------------------------------
@@ -190,6 +206,14 @@ steps:
       spec: $PLOY_PATH/missing-amata.yaml
 `,
 			setenv: map[string]string{"PLOY_PATH": ""},
+		},
+		{
+			name: "unresolved image env placeholder",
+			spec: `
+steps:
+  - image: $PLOY_TEST_MISSING_IMAGE
+`,
+			wantErr: "resolve image env placeholders: steps[0].image: unresolved environment variables: PLOY_TEST_MISSING_IMAGE",
 		},
 		{
 			name: "step retain_container forbidden",
@@ -308,30 +332,25 @@ steps:
 			t.Parallel()
 			result := runBuildSpecPayload(t, tt.spec, ".yaml", tt.opts)
 			steps := mustSteps(t, result, 1)
-			cmd := steps[0]["command"]
-
 			if tt.wantCmdArr != nil {
-				arr, ok := cmd.([]any)
-				if !ok {
-					t.Fatalf("expected command as []any, got %T", cmd)
-				}
-				if len(arr) != len(tt.wantCmdArr) {
-					t.Fatalf("command len = %d, want %d: %v", len(arr), len(tt.wantCmdArr), arr)
-				}
-				for i, want := range tt.wantCmdArr {
-					if got, _ := arr[i].(string); got != want {
-						t.Errorf("command[%d] = %q, want %q", i, got, want)
-					}
-				}
+				assertCommandArr(t, steps[0], tt.wantCmdArr)
 			}
 			if tt.wantCmdStr != "" {
-				got, ok := cmd.(string)
+				got, ok := steps[0]["command"].(string)
 				if !ok || got != tt.wantCmdStr {
-					t.Errorf("command = %v, want %q", cmd, tt.wantCmdStr)
+					t.Errorf("command = %v, want %q", steps[0]["command"], tt.wantCmdStr)
 				}
 			}
 		})
 	}
+}
+
+// digCheck describes a nested assertion: dig into the result at digPath,
+// then verify wantFields and wantAbsent keys.
+type digCheck struct {
+	digPath    []string
+	wantFields map[string]any
+	wantAbsent []string
 }
 
 func TestBuildSpecPayload_BasicParsing(t *testing.T) {
@@ -346,6 +365,7 @@ func TestBuildSpecPayload_BasicParsing(t *testing.T) {
 		wantRetries   float64
 		wantDomain    string
 		wantMRSuccess bool
+		digChecks     []digCheck // optional nested field assertions
 	}{
 		{
 			name: "YAML spec",
@@ -393,6 +413,70 @@ mr_on_success: true
 			wantStepImage: "docker.io/test/mig:latest",
 			wantRetries:   2,
 		},
+		{
+			name: "healing fields and envs",
+			ext:  ".yaml",
+			spec: `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  healing:
+    by_error_kind:
+      infra:
+        retries: 2
+        image: docker.io/test/healer:latest
+        command: "heal.sh"
+        envs:
+          HEALING_MODE: auto
+  router:
+    image: docker.io/test/router:latest
+`,
+			wantStepImage: "docker.io/test/mig:latest",
+			digChecks: []digCheck{
+				{
+					digPath:    []string{"build_gate", "healing", "by_error_kind", "infra"},
+					wantFields: map[string]any{"retries": 2.0, "image": "docker.io/test/healer:latest", "command": "heal.sh"},
+					wantAbsent: []string{"retain_container"},
+				},
+				{
+					digPath:    []string{"build_gate", "healing", "by_error_kind", "infra", "envs"},
+					wantFields: map[string]any{"HEALING_MODE": "auto"},
+				},
+			},
+		},
+		{
+			name: "build_gate stack pre and post",
+			ext:  ".yaml",
+			spec: `
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  enabled: true
+  pre:
+    stack:
+      enabled: true
+      language: java
+      release: 11
+      default: true
+  post:
+    stack:
+      enabled: true
+      language: java
+      release: "17"
+      default: true
+`,
+			wantStepImage: "docker.io/test/mig:latest",
+			digChecks: []digCheck{
+				{
+					digPath:    []string{"build_gate", "pre", "stack"},
+					wantFields: map[string]any{"language": "java", "default": true, "release": 11.0},
+				},
+				{
+					digPath:    []string{"build_gate", "post", "stack"},
+					wantFields: map[string]any{"release": "17"},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -402,7 +486,6 @@ mr_on_success: true
 			steps := mustSteps(t, result, 1)
 			assertField(t, steps[0], "image", tt.wantStepImage)
 			assertAbsent(t, steps[0], "retain_container")
-			mustDig(t, result, "build_gate", "healing")
 
 			if tt.wantEnv != nil {
 				envs := mustDig(t, result, "envs")
@@ -419,6 +502,15 @@ mr_on_success: true
 			}
 			if tt.wantMRSuccess {
 				assertField(t, result, "mr_on_success", true)
+			}
+			for _, dc := range tt.digChecks {
+				target := mustDig(t, result, dc.digPath...)
+				for k, v := range dc.wantFields {
+					assertField(t, target, k, v)
+				}
+				for _, k := range dc.wantAbsent {
+					assertAbsent(t, target, k)
+				}
 			}
 		})
 	}
@@ -647,64 +739,6 @@ build_gate:
 // Individual tests (unique assertion patterns, cleaned up with helpers)
 // ---------------------------------------------------------------------------
 
-func TestBuildSpecPayload_BuildGateStackPrePost(t *testing.T) {
-	t.Parallel()
-	result := runBuildSpecPayload(t, `
-steps:
-  - image: docker.io/test/mig:latest
-build_gate:
-  enabled: true
-  pre:
-    stack:
-      enabled: true
-      language: java
-      release: 11
-      default: true
-  post:
-    stack:
-      enabled: true
-      language: java
-      release: "17"
-      default: true
-`, ".yaml", specPayloadOpts{})
-
-	preStack := mustDig(t, result, "build_gate", "pre", "stack")
-	assertField(t, preStack, "language", "java")
-	assertField(t, preStack, "default", true)
-	assertField(t, preStack, "release", 11.0)
-
-	postStack := mustDig(t, result, "build_gate", "post", "stack")
-	assertField(t, postStack, "release", "17")
-}
-
-func TestBuildSpecPayload_ContainsBuildGateHealing(t *testing.T) {
-	t.Parallel()
-	result := runBuildSpecPayload(t, `
-steps:
-  - image: docker.io/test/mig:latest
-build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        retries: 2
-        image: docker.io/test/healer:latest
-        command: "heal.sh"
-        envs:
-          HEALING_MODE: auto
-  router:
-    image: docker.io/test/router:latest
-`, ".yaml", specPayloadOpts{})
-
-	infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
-	assertField(t, infra, "retries", 2.0)
-	assertField(t, infra, "image", "docker.io/test/healer:latest")
-	assertField(t, infra, "command", "heal.sh")
-	assertAbsent(t, infra, "retain_container")
-
-	envs := mustDig(t, infra, "envs")
-	assertField(t, envs, "HEALING_MODE", "auto")
-}
-
 func TestBuildSpecPayload_MultiStepMigs(t *testing.T) {
 	t.Parallel()
 	result := runBuildSpecPayload(t, `
@@ -783,32 +817,63 @@ build_gate:
 	assertField(t, router, "image", "docker.io/test/router-fragment:latest")
 }
 
-func TestBuildSpecPayload_CanonicalSingleStepWithOverrides(t *testing.T) {
+func TestBuildSpecPayload_CLIOverrides(t *testing.T) {
 	t.Parallel()
-	result := runBuildSpecPayload(t, `
+
+	tests := []struct {
+		name           string
+		spec           string
+		opts           specPayloadOpts
+		wantStepCount  int
+		wantStepImages []string
+		wantStepEnvs   []map[string]any // per-step envs; nil entry = skip
+		wantTopEnv     map[string]any
+		wantTopFields  map[string]any
+		wantTopAbsent  []string
+		wantStepAbsent []string // checked on all steps
+	}{
+		{
+			name: "full CLI overrides on spec with envs and gitlab",
+			spec: `
+steps:
+  - image: docker.io/test/mig:v1
+envs:
+  KEY1: from_spec
+  KEY2: value2
+gitlab_domain: gitlab.com
+`,
+			opts: specPayloadOpts{
+				migEnvs:      []string{"KEY1=from_cli", "KEY3=new_value"},
+				migImage:     "docker.io/test/mig:v2",
+				retain:       true,
+				gitlabPAT:    "glpat-test",
+				gitlabDomain: "gitlab.example.com",
+				mrSuccess:    true,
+			},
+			wantStepCount:  1,
+			wantStepImages: []string{"docker.io/test/mig:v2"},
+			wantStepAbsent: []string{"retain_container"},
+			wantTopEnv:     map[string]any{"KEY1": "from_cli", "KEY2": "value2", "KEY3": "new_value"},
+			wantTopFields:  map[string]any{"gitlab_domain": "gitlab.example.com", "gitlab_pat": "glpat-test", "mr_on_success": true},
+		},
+		{
+			name: "single-step image and env overrides",
+			spec: `
 steps:
   - image: docker.io/test/base:v1
 envs:
   BASE_KEY: base_value
-`, ".yaml", specPayloadOpts{
-		migEnvs:  []string{"CLI_KEY=cli_value"},
-		migImage: "docker.io/test/override:v2",
-		retain:   true,
-	})
-
-	steps := mustSteps(t, result, 1)
-	assertField(t, steps[0], "image", "docker.io/test/override:v2")
-	assertAbsent(t, steps[0], "retain_container")
-
-	envs := mustDig(t, result, "envs")
-	assertField(t, envs, "BASE_KEY", "base_value")
-	assertField(t, envs, "CLI_KEY", "cli_value")
-	assertAbsent(t, result, "migs")
-}
-
-func TestBuildSpecPayload_MultiStepIgnoresCLIOverrides(t *testing.T) {
-	t.Parallel()
-	result := runBuildSpecPayload(t, `
+`,
+			opts:           specPayloadOpts{migEnvs: []string{"CLI_KEY=cli_value"}, migImage: "docker.io/test/override:v2", retain: true},
+			wantStepCount:  1,
+			wantStepImages: []string{"docker.io/test/override:v2"},
+			wantStepAbsent: []string{"retain_container"},
+			wantTopEnv:     map[string]any{"BASE_KEY": "base_value", "CLI_KEY": "cli_value"},
+			wantTopAbsent:  []string{"migs"},
+		},
+		{
+			name: "multi-step ignores image/command CLI overrides",
+			spec: `
 steps:
   - image: docker.io/test/step1:v1
     envs:
@@ -816,31 +881,53 @@ steps:
   - image: docker.io/test/step2:v1
     envs:
       STEP: "2"
-`, ".yaml", specPayloadOpts{
-		migEnvs:  []string{"CLI_KEY=cli_value"},
-		migImage: "docker.io/test/override:v2",
-		retain:   true,
-	})
-
-	steps := mustSteps(t, result, 2)
-
-	// First step unchanged (CLI overrides not applied to steps).
-	assertField(t, steps[0], "image", "docker.io/test/step1:v1")
-	envs0 := mustDig(t, steps[0], "envs")
-	if len(envs0) != 1 {
-		t.Errorf("expected steps[0].envs to have 1 key, got %d: %v", len(envs0), envs0)
+`,
+			opts:           specPayloadOpts{migEnvs: []string{"CLI_KEY=cli_value"}, migImage: "docker.io/test/override:v2", retain: true},
+			wantStepCount:  2,
+			wantStepImages: []string{"docker.io/test/step1:v1", "docker.io/test/step2:v1"},
+			wantStepEnvs:   []map[string]any{{"STEP": "1"}, {"STEP": "2"}},
+			wantTopEnv:     map[string]any{"CLI_KEY": "cli_value"},
+			wantTopAbsent:  []string{"image", "retain_container"},
+		},
 	}
-	assertField(t, envs0, "STEP", "1")
 
-	assertField(t, steps[1], "image", "docker.io/test/step2:v1")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := runBuildSpecPayload(t, tt.spec, ".yaml", tt.opts)
+			steps := mustSteps(t, result, tt.wantStepCount)
 
-	// Top-level envs override applied.
-	topEnvs := mustDig(t, result, "envs")
-	assertField(t, topEnvs, "CLI_KEY", "cli_value")
-
-	// Image/retain overrides not applied at top level.
-	assertAbsent(t, result, "image")
-	assertAbsent(t, result, "retain_container")
+			for i, wantImg := range tt.wantStepImages {
+				assertField(t, steps[i], "image", wantImg)
+				for _, key := range tt.wantStepAbsent {
+					assertAbsent(t, steps[i], key)
+				}
+			}
+			if tt.wantStepEnvs != nil {
+				for i, wantEnv := range tt.wantStepEnvs {
+					if wantEnv == nil {
+						continue
+					}
+					envs := mustDig(t, steps[i], "envs")
+					for k, v := range wantEnv {
+						assertField(t, envs, k, v)
+					}
+				}
+			}
+			if tt.wantTopEnv != nil {
+				envs := mustDig(t, result, "envs")
+				for k, v := range tt.wantTopEnv {
+					assertField(t, envs, k, v)
+				}
+			}
+			for k, v := range tt.wantTopFields {
+				assertField(t, result, k, v)
+			}
+			for _, key := range tt.wantTopAbsent {
+				assertAbsent(t, result, key)
+			}
+		})
+	}
 }
 
 func TestBuildSpecPayload_StepAmataSpecPathResolved(t *testing.T) {
@@ -903,20 +990,4 @@ build_gate:
 
 	infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
 	assertField(t, infra, "image", "docker.io/test/codex:latest")
-}
-
-func TestBuildSpecPayload_ImageInterpolation_UnresolvedReturnsError(t *testing.T) {
-	specFile := filepath.Join(t.TempDir(), "spec.yaml")
-	writeFile(t, specFile, `
-steps:
-  - image: $PLOY_TEST_MISSING_IMAGE
-`)
-
-	_, err := callBuildSpecPayload(t, specFile, specPayloadOpts{})
-	if err == nil {
-		t.Fatalf("expected unresolved image placeholder error")
-	}
-	if !strings.Contains(err.Error(), `steps[0].image: unresolved environment variables: PLOY_TEST_MISSING_IMAGE`) {
-		t.Fatalf("unexpected error: %v", err)
-	}
 }

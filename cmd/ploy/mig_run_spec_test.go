@@ -7,42 +7,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// buildSpecPayload: CLI overrides
-// ---------------------------------------------------------------------------
-
-func TestBuildSpecPayload_CLIOverrides(t *testing.T) {
-	t.Parallel()
-	result := runBuildSpecPayload(t, `
-steps:
-  - image: docker.io/test/mig:v1
-envs:
-  KEY1: from_spec
-  KEY2: value2
-gitlab_domain: gitlab.com
-`, ".yaml", specPayloadOpts{
-		migEnvs:      []string{"KEY1=from_cli", "KEY3=new_value"},
-		migImage:     "docker.io/test/mig:v2",
-		retain:       true,
-		gitlabPAT:    "glpat-test",
-		gitlabDomain: "gitlab.example.com",
-		mrSuccess:    true,
-	})
-
-	steps := mustSteps(t, result, 1)
-	assertField(t, steps[0], "image", "docker.io/test/mig:v2")
-	assertAbsent(t, steps[0], "retain_container")
-
-	envs := mustDig(t, result, "envs")
-	assertField(t, envs, "KEY1", "from_cli")
-	assertField(t, envs, "KEY2", "value2")
-	assertField(t, envs, "KEY3", "new_value")
-
-	assertField(t, result, "gitlab_domain", "gitlab.example.com")
-	assertField(t, result, "gitlab_pat", "glpat-test")
-	assertField(t, result, "mr_on_success", true)
-}
-
-// ---------------------------------------------------------------------------
 // buildSpecPayload: no spec / empty
 // ---------------------------------------------------------------------------
 
