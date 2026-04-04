@@ -349,3 +349,4 @@ items:
       - yamllint roadmap/hydra.yaml
     reasoning: medium
     cfp: 8
+    commit: fcf578d9
