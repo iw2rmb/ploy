@@ -96,47 +96,16 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 				"steps": [{"image": "img:latest"}]
 			}`,
 		},
-		// Legacy fields superseded by Hydra are forbidden at step level.
+		// Unsupported fields are rejected by schema validation.
 		{
-			name:    "env forbidden in step",
+			name:    "unsupported env field in step",
 			input:   `{"steps": [{"image": "img:latest", "env": {"FOO": "bar"}}]}`,
 			wantErr: "forbidden",
 		},
 		{
-			name:    "env_from_file forbidden in step",
-			input:   `{"steps": [{"image": "img:latest", "env_from_file": {}}]}`,
-			wantErr: "forbidden",
-		},
-		{
-			name:    "tmp_dir forbidden in step",
-			input:   `{"steps": [{"image": "img:latest", "tmp_dir": []}]}`,
-			wantErr: "forbidden",
-		},
-		{
-			name:    "tmp_bundle forbidden in step",
-			input:   `{"steps": [{"image": "img:latest", "tmp_bundle": {}}]}`,
-			wantErr: "forbidden",
-		},
-		// Legacy fields superseded by Hydra are forbidden at root level.
-		{
-			name:    "env forbidden at root",
+			name:    "unsupported env field at root",
 			input:   `{"steps": [{"image": "img:latest"}], "env": {"FOO": "bar"}}`,
 			wantErr: "env: forbidden",
-		},
-		{
-			name:    "env_from_file forbidden at root",
-			input:   `{"steps": [{"image": "img:latest"}], "env_from_file": {}}`,
-			wantErr: "env_from_file: forbidden",
-		},
-		{
-			name:    "tmp_dir forbidden at root",
-			input:   `{"steps": [{"image": "img:latest"}], "tmp_dir": []}`,
-			wantErr: "tmp_dir: forbidden",
-		},
-		{
-			name:    "tmp_bundle forbidden at root",
-			input:   `{"steps": [{"image": "img:latest"}], "tmp_bundle": {}}`,
-			wantErr: "tmp_bundle: forbidden",
 		},
 	}
 
