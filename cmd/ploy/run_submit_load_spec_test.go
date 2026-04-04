@@ -67,14 +67,14 @@ steps:
     envs:
       STEP_TOKEN: step-token
     in:
-      - ` + stepInFile + `:/in/config.txt
+      - ` + stepInFile + `:config.txt
 build_gate:
   router:
     image: docker.io/test/router:latest
     envs:
       ROUTER_TOKEN: router-token
     in:
-      - ` + routerInFile + `:/in/router-config.txt
+      - ` + routerInFile + `:router-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -153,7 +153,7 @@ build_gate:
         envs:
           HEALING_TOKEN: healing-token
         in:
-          - ` + healingInFile + `:/in/healing-config.txt
+          - ` + healingInFile + `:healing-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
