@@ -469,7 +469,7 @@ CREATE INDEX IF NOT EXISTS bootstrap_tokens_token_id_idx ON bootstrap_tokens(tok
 -- Hard-cut migration: drop old scope-based table to recreate with target column and composite PK.
 DROP TABLE IF EXISTS config_env;
 CREATE TABLE IF NOT EXISTS config_env (
-  key         TEXT NOT NULL,                              -- Environment variable name (e.g., PLOY_CA_CERTS)
+  key         TEXT NOT NULL,                              -- Environment variable name (e.g., OPENAI_API_KEY)
   target      TEXT NOT NULL,                              -- Injection target: 'server', 'nodes', 'gates', 'steps'
   value       TEXT NOT NULL,                              -- Environment variable value (may be large, e.g., PEM bundles)
   secret      BOOLEAN NOT NULL DEFAULT TRUE,              -- If true, value is redacted in list views

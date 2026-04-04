@@ -86,6 +86,7 @@ func TestBuildClusterDeployEnvSetsComposeAndVersion(t *testing.T) {
 func TestHandleClusterDeployExecutesAndAlwaysCleansUp(t *testing.T) {
 	configHome := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", configHome)
+	t.Setenv("PLOY_VERSION", "v0.0.0-test")
 
 	oldRunner := runClusterDeployScript
 	defer func() { runClusterDeployScript = oldRunner }()
