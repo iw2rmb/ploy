@@ -1,1 +1,1 @@
-[README.md](README.md) Current-state reference for CLI/server/node environment variables, typed config mapping, and runtime injection behavior.
+[README.md](README.md) Reference of active and removed Ploy environment variables, runtime contracts, and component configuration behavior.
