@@ -62,7 +62,7 @@ The same codebase already has strong primitives for content-addressed upload and
 
 - CLI preprocesses `env_from_file` and rewrites `tmp_dir` into uploaded `tmp_bundle`:
   - `cmd/ploy/mig_run_spec.go`
-  - `cmd/ploy/mig_run_spec_tmpbundle.go`
+  - `cmd/ploy/mig_run_spec_bundle.go`
 - Contracts still expose `env` and `tmp_bundle` and explicitly reject legacy `tmp_dir`:
   - `internal/workflow/contracts/migs_spec.go`
   - `internal/workflow/contracts/build_gate_config.go`
@@ -70,7 +70,7 @@ The same codebase already has strong primitives for content-addressed upload and
   - `internal/server/handlers/claim_spec_mutator_base.go`
   - `internal/server/handlers/claim_spec_mutator_pipeline.go`
 - Node runtime materializes tmp bundles and mounts `/tmp/<entry>`:
-  - `internal/nodeagent/execution_orchestrator_tmpbundle.go`
+  - `internal/nodeagent/execution_orchestrator_bundle.go`
   - `internal/nodeagent/execution_orchestrator_jobs.go`
   - `internal/workflow/step/container_spec.go`
 - `/out` is already a dedicated writable mount uploaded as artifact bundle:
@@ -298,7 +298,7 @@ Remove support for:
   - emits canonical spec JSON.
 - Files:
   - `cmd/ploy/mig_run_spec.go`
-  - `cmd/ploy/mig_run_spec_tmpbundle.go` (rename/repurpose to generic bundle compiler).
+  - `cmd/ploy/mig_run_spec_bundle.go` (rename/repurpose to generic bundle compiler).
 
 ### Server overlay
 
@@ -315,7 +315,7 @@ Remove support for:
 - Build mount plan from canonical records across `/in`, `/out`, `$HOME`, and CA locations.
 - Continue using existing digest verification and traversal-safe extraction logic.
 - Files:
-  - `internal/nodeagent/execution_orchestrator_tmpbundle.go` (promote to generic materializer module)
+  - `internal/nodeagent/execution_orchestrator_bundle.go` (promote to generic materializer module)
   - `internal/nodeagent/execution_orchestrator_jobs.go`
   - `internal/workflow/step/runner.go`
   - `internal/workflow/step/container_spec.go`
@@ -443,7 +443,7 @@ Testable outcome:
 ## References
 
 - `cmd/ploy/mig_run_spec.go`
-- `cmd/ploy/mig_run_spec_tmpbundle.go`
+- `cmd/ploy/mig_run_spec_bundle.go`
 - `internal/workflow/contracts/migs_spec.go`
 - `internal/workflow/contracts/build_gate_config.go`
 - `internal/workflow/contracts/step_manifest.go`
@@ -459,5 +459,5 @@ Testable outcome:
 - `images/orw/orw-cli-gradle/orw-cli.sh`
 - `images/orw/orw-cli-maven/orw-cli.sh`
 - `internal/nodeagent/execution_orchestrator_jobs.go`
-- `internal/nodeagent/execution_orchestrator_tmpbundle.go`
+- `internal/nodeagent/execution_orchestrator_bundle.go`
 - `internal/store/schema.sql`
