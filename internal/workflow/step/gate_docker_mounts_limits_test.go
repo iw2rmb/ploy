@@ -270,8 +270,3 @@ func TestDockerGateExecutor_GradleCommandUsesWrapperWhenSpecified(t *testing.T) 
 		t.Fatalf("expected gradle command to run tests in /workspace, got %q", cmd)
 	}
 }
-
-// TestDockerGateExecutor_CAPreambleIncluded verifies that the PLOY_CA_CERTS
-// materializer preamble is prepended to Maven, Gradle, and plain Java build
-// commands. This ensures that PLOY_CA_CERTS from global config is consumed by
-// the gate container for trusting corporate proxies and private registries.
