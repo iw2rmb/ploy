@@ -109,17 +109,27 @@ func TestHydraContractOffline(t *testing.T) {
 		}
 	})
 
-	t.Run("docs_api_config_env_lists_all_keys", func(t *testing.T) {
+	t.Run("docs_api_config_env_documents_reserved_key_rejection", func(t *testing.T) {
 		root := repoRoot(t)
 		data, err := os.ReadFile(filepath.Join(root, "docs", "api", "paths", "config_env_key.yaml"))
 		if err != nil {
 			t.Fatalf("read docs/api/paths/config_env_key.yaml: %v", err)
 		}
 		content := string(data)
+
+		// The API doc must describe reserved-key rejection for each Hydra
+		// typed field that has special env mappings.
+		fields := map[string]bool{}
 		for _, m := range table {
-			if !strings.Contains(content, m.EnvKey) {
-				t.Errorf("docs/api/paths/config_env_key.yaml does not mention migrated key %q", m.EnvKey)
+			fields[m.TargetField] = true
+		}
+		for field := range fields {
+			if !strings.Contains(content, field) {
+				t.Errorf("docs/api/paths/config_env_key.yaml does not mention typed field %q in reserved-key description", field)
 			}
+		}
+		if !strings.Contains(content, "eserved") {
+			t.Error("docs/api/paths/config_env_key.yaml does not document reserved-key rejection")
 		}
 	})
 
