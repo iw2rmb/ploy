@@ -203,14 +203,23 @@ func mergeCAIntoBlock(block map[string]any, overlay []string) {
 	}
 }
 
-// caDedup returns a dedup key for a CA entry. For short-hash entries use as-is;
-// for file paths, hash the value to avoid path-vs-digest comparison issues.
+// caDedup returns a dedup key for a CA entry. For hex-hash entries use as-is;
+// for file paths, read the file and compute SHA-256 of the content so that a
+// canonical hash entry and a file-path entry pointing to identical bytes are
+// deduped by content. Falls back to hashing the path string if the file is
+// unreadable.
 func caDedup(s string) string {
 	s = strings.TrimSpace(s)
 	// If it looks like a hex hash (7-64 chars), use it directly.
 	if len(s) >= 7 && len(s) <= 64 && isHex(s) {
 		return s
 	}
+	// File path: read content and hash the bytes.
+	if data, err := os.ReadFile(s); err == nil {
+		h := sha256.Sum256(data)
+		return hex.EncodeToString(h[:])
+	}
+	// Fallback: hash the path string when the file is unreadable.
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:])
 }

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -188,6 +190,36 @@ func TestMergeJobConfigIntoSpec_CAAppendDedup(t *testing.T) {
 	// The duplicate abcdef1234ab from overlay is deduped.
 	if len(ca) != 3 {
 		t.Fatalf("ca length = %d, want 3: %v", len(ca), ca)
+	}
+}
+
+func TestMergeJobConfigIntoSpec_CADedupByContentDigest(t *testing.T) {
+	// Create a temp CA file with known content.
+	dir := t.TempDir()
+	caFile := filepath.Join(dir, "ca.pem")
+	caContent := []byte("-----BEGIN CERTIFICATE-----\nMIIBxTCCAW...\n-----END CERTIFICATE-----\n")
+	if err := os.WriteFile(caFile, caContent, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Compute the content digest (same algorithm as caDedup).
+	h := sha256.Sum256(caContent)
+	contentHash := hex.EncodeToString(h[:])
+
+	// Spec has the canonical hash; overlay has the file path pointing to same bytes.
+	block := map[string]any{
+		"ca": []any{contentHash},
+	}
+	cfg := &JobConfig{CA: []string{caFile}}
+	MergeJobConfigIntoSpec(block, cfg)
+
+	ca := block["ca"].([]any)
+	// The file-path entry should be deduped against the hash entry because
+	// reading the file produces the same SHA-256 digest.
+	if len(ca) != 1 {
+		t.Fatalf("ca length = %d, want 1 (file-path entry should dedup against content hash): %v", len(ca), ca)
+	}
+	if ca[0] != contentHash {
+		t.Errorf("ca[0] = %v, want canonical hash %s", ca[0], contentHash)
 	}
 }
 
