@@ -2,7 +2,7 @@
 [build_test.go](build_test.go) Integration test ensuring `make build` produces an executable `dist/ploy` binary from a clean state.
 [coverage_guard_test.go](coverage_guard_test.go) Coverage-mode guard helper that skips DB-backed integration tests on shared DSNs.
 [happy_path_test.go](happy_path_test.go) End-to-end store integration flow for creating v1 entities, runs, logs, events, and persisted state.
-[hydra_contract_test.go](hydra_contract_test.go) Hydra contract integration tests for parsing precedence, hash/path edge cases, and mount enforcement rules.
+[hydra_contract_test.go](hydra_contract_test.go) Hydra contract integration tests for parsing precedence, hash/path edge cases, and canonical mount-based materialization behavior.
 [lab_smoke_test.go](lab_smoke_test.go) Minimal workflow smoke test that persists run/job lifecycle data, logs, diffs, and events through the store.
 [migs/](migs) Integration tests for migration executors and helpers across ORW CLI, shell runner, and codex paths.
 [server_insecure_test.go](server_insecure_test.go) Integration test for HTTP server startup, protected route access, and graceful shutdown in insecure-auth test mode.
