@@ -37,6 +37,8 @@
 [execution_mr.go](execution_mr.go) Merge-request job flow that prepares branch state, pushes changes, and triggers provider MR creation.
 [execution_mr_test.go](execution_mr_test.go) Unit tests covering execution mr behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_orchestrator.go](execution_orchestrator.go) High-level job dispatcher that routes claimed jobs to gate/mig/heal/MR executors and handles panic-safe teardown.
+[execution_orchestrator_bundle.go](execution_orchestrator_bundle.go) Bundle extraction and materialization helpers for safe staged inputs in job workspaces.
+[execution_orchestrator_bundle_test.go](execution_orchestrator_bundle_test.go) Tests bundle digest verification plus safe extraction rules for archive paths, entry types, and duplicate entries.
 [execution_orchestrator_cancel_test.go](execution_orchestrator_cancel_test.go) Unit tests covering execution orchestrator cancel behavior, edge cases, and contract expectations for nodeagent flows.
 [execution_orchestrator_gate.go](execution_orchestrator_gate.go) Gate-job execution logic, including gate profile wiring, failure handling, and stack-aware gate behaviors.
 [execution_orchestrator_gate_stackdetect_test.go](execution_orchestrator_gate_stackdetect_test.go) Verifies gate-job stack detection behavior and fallback decisions when stack metadata is partial or missing.
@@ -50,8 +52,6 @@
 [execution_orchestrator_rehydrate.go](execution_orchestrator_rehydrate.go) Workspace rehydration pipeline that rebuilds repository state from base snapshots and ordered diff artifacts.
 [execution_orchestrator_router_runtime.go](execution_orchestrator_router_runtime.go) Router runtime integration for gate/heal decision handoff and recovery metadata propagation during execution.
 [execution_orchestrator_test.go](execution_orchestrator_test.go) Unit tests covering execution orchestrator behavior, edge cases, and contract expectations for nodeagent flows.
-[execution_orchestrator_bundle.go](execution_orchestrator_bundle.go) Bundle extraction and materialization helpers for safe staged inputs in job workspaces.
-[execution_orchestrator_bundle_test.go](execution_orchestrator_bundle_test.go) Tests bundle digest verification plus safe extraction rules for archive paths, entry types, and duplicate entries.
 [execution_rehydrate_test.go](execution_rehydrate_test.go) Unit tests covering execution rehydrate behavior, edge cases, and contract expectations for nodeagent flows.
 [gate_context.go](gate_context.go) Gate execution context structures and helpers used to pass gate-profile and decision state across phases.
 [git/](git) Git helpers for workspace status, commit/push operations, SHA lookup, and secret redaction used by job execution.
