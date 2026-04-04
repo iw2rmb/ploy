@@ -1,22 +1,22 @@
-[.github/](.github) GitHub automation workflows and CI configuration for build, test, coverage, and releases.
-[.gitignore](.gitignore) Git ignore patterns for build outputs, caches, local tooling state, and generated artifacts.
-[.golangci.yml](.golangci.yml) golangci-lint configuration defining enabled linters and issue handling policy.
-[.goreleaser.yml](.goreleaser.yml) GoReleaser pipeline config for multi-platform binaries, packaging, checksums, signing, and distribution.
-[.pre-commit-config.yaml](.pre-commit-config.yaml) Pre-commit hook configuration for repository hygiene checks.
-[Makefile](Makefile) Canonical make targets for toolchain checks, build, test, lint, and release-oriented tasks.
-[README.md](README.md) Project overview and operator/developer usage guidance for the Ploy stack.
-[VERSION](VERSION) Single source of truth for the current release version.
-[badges/](badges) Generated coverage badge assets consumed by repository documentation.
-[cmd/](cmd) Entrypoints and command implementations for `ploy` CLI and `ployd`/`ployd-node` binaries.
-[design/](design) Design documents describing proposed implementation approaches for planned work.
-[docs/](docs) Current-state documentation for APIs, behavior, operations, schemas, and maintainer workflows.
-[gates/](gates) Gate profile and stack definitions used by build/validation workflows.
-[go.mod](go.mod) Go module manifest with required dependencies and toolchain version.
-[go.sum](go.sum) Dependency checksum lockfile for reproducible Go module resolution.
-[images/](images) Docker image build contexts and helper scripts for runtime, mig, ORW, and gate images.
-[internal/](internal) Internal application packages implementing domain logic, APIs, storage, runtime, and orchestration flows.
-[roadmap/](roadmap) Execution plans and implementation sequencing notes for upcoming tasks.
-[sqlc.yaml](sqlc.yaml) sqlc generation config mapping PostgreSQL schema/queries to typed Go store code.
-[staticcheck.conf](staticcheck.conf) Staticcheck ruleset configuration used by linting workflows.
-[tests/](tests) Guard, integration, and end-to-end test suites with shared test harness scripts.
-[tools/](tools) Small maintainer utilities and helper binaries used by development workflows.
+[.github/](.github) GitHub repository settings and Actions workflows for CI, coverage, release, and smoke checks.
+[.gitignore](.gitignore) Ignore rules for build outputs, caches, local tool state, logs, and generated artifacts.
+[.golangci.yml](.golangci.yml) Minimal golangci-lint configuration that runs `govet` with strict issue reporting.
+[.goreleaser.yml](.goreleaser.yml) GoReleaser configuration for building, packaging, signing, and publishing ploy binaries.
+[.pre-commit-config.yaml](.pre-commit-config.yaml) Local pre-commit hook configuration with the repository noop gate.
+[Makefile](Makefile) Primary build/test/lint/release task runner with toolchain and version validation targets.
+[README.md](README.md) Project overview, installation steps, and CLI-oriented quick-start documentation for Ploy.
+[VERSION](VERSION) Canonical semantic version value used for build stamping and releases.
+[badges/](badges) Generated SVG coverage badges used in repository documentation surfaces.
+[cmd/](cmd) Go command entrypoints and assets for `ploy`, `ployd`, and `ployd-node` binaries.
+[design/](design) Design specifications describing intended implementations for planned platform features.
+[docs/](docs) Current-state documentation for APIs, lifecycle behavior, schemas, and operational procedures.
+[gates/](gates) Gate stack and language/toolchain profile definitions for build-gate execution.
+[go.mod](go.mod) Go module manifest declaring the pinned toolchain and direct project dependencies.
+[go.sum](go.sum) Checksum lockfile for reproducible Go module dependency resolution.
+[images/](images) Container image build contexts and scripts for server, node, mig, and gate runtimes.
+[internal/](internal) Internal packages implementing CLI, control plane, node runtime, storage, workflow, and TUI logic.
+[roadmap/](roadmap) Implementation roadmaps that sequence planned work items and rollout steps.
+[sqlc.yaml](sqlc.yaml) sqlc generation mapping from PostgreSQL schema/queries to strongly typed Go store code.
+[staticcheck.conf](staticcheck.conf) Staticcheck ruleset enabling all checks with selected style/noise exceptions.
+[tests/](tests) Guard, integration, e2e, and unit test suites plus smoke-test helpers.
+[tools/](tools) Maintainer helper programs for completion generation and API token utility tasks.
