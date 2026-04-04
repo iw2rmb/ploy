@@ -330,7 +330,7 @@ items:
       - gaps: ["`design/hydra.md` still reads as a transition document, not final-state docs. It keeps `env_from_file`, `tmp_dir`, `tmp_bundle`, and `PLOY_CA_CERTS` in the current-baseline/non-goals narrative instead of fully rewriting the doc to the Hydra-only contract ([design/hydra.md](/Users/vk/@iw2rmb/ploy/design/hydra.md#L13), [design/hydra.md](/Users/vk/@iw2rmb/ploy/design/hydra.md#L61)).", "`internal/store/schema.sql` still has a stale `tmp_bundle` comment on `spec_bundles`, which is a leftover legacy artifact in the schema file ([internal/store/schema.sql](/Users/vk/@iw2rmb/ploy/internal/store/schema.sql#L541))."]
         commit: 1bf5da83
       - gaps: ["[internal/store/spec_bundles.sql.go](/Users/vk/@iw2rmb/ploy/internal/store/spec_bundles.sql.go:28), [internal/domain/types/ids.go](/Users/vk/@iw2rmb/ploy/internal/domain/types/ids.go:117), and [internal/domain/types/idgen.go](/Users/vk/@iw2rmb/ploy/internal/domain/types/idgen.go:101) still mention `TmpBundleRef`. The tmp-bundle naming is not fully removed from the tree.", "[cmd/ploy/assets/runtime/docker-compose.yml](/Users/vk/@iw2rmb/ploy/cmd/ploy/assets/runtime/docker-compose.yml:18) and [cmd/ploy/assets/runtime/docker-compose.yml](/Users/vk/@iw2rmb/ploy/cmd/ploy/assets/runtime/docker-compose.yml:55) still inject `PLOY_CA_CERTS` into the runtime compose surface. That keeps the legacy CA handoff variable visible in a final-state deployment artifact."]
-        commit: null
+        commit: 78597d9f
     label: "1.9"
     summary: Collapse and refactor Hydra-related tests, refresh docs to final state, and remove leftover legacy artifacts.
     classification: determined
