@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -103,11 +102,11 @@ func TestParseAuthoringOutEntry(t *testing.T) {
 func TestParseAuthoringHomeEntry(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		input      string
-		wantSrc    string
-		wantDst    string
-		wantRO     bool
-		wantErr    string
+		input   string
+		wantSrc string
+		wantDst string
+		wantRO  bool
+		wantErr string
 	}{
 		{input: "/tmp/cfg:.config/app.toml", wantSrc: "/tmp/cfg", wantDst: ".config/app.toml"},
 		{input: "/tmp/cfg:.config/app.toml:ro", wantSrc: "/tmp/cfg", wantDst: ".config/app.toml", wantRO: true},
@@ -155,23 +154,15 @@ func TestIsAlreadyCanonical(t *testing.T) {
 		entry string
 		want  bool
 	}{
-		// ca: bare short hash → canonical
 		{field: "ca", entry: "abcdef1234ab", want: true},
 		{field: "ca", entry: "abcdef1234abcdef1234abcdef1234abcdef1234abcdef1234abcdef1234abcd", want: true},
-		// ca: file path → not canonical
 		{field: "ca", entry: "/tmp/cert.pem", want: false},
 		{field: "ca", entry: "relative/cert.pem", want: false},
-		// in: shortHash:/in/dst → canonical
 		{field: "in", entry: "abcdef1234ab:/in/config.txt", want: true},
-		// in: file path → not canonical
 		{field: "in", entry: "/tmp/data.txt:/in/data.txt", want: false},
-		// out: shortHash:/out/dst → canonical
 		{field: "out", entry: "abcdef1234ab:/out/result.txt", want: true},
-		// home: shortHash:dst → canonical
 		{field: "home", entry: "abcdef1234ab:.config/app.toml", want: true},
-		// home: shortHash:dst:ro → canonical (first segment before : is hash)
 		{field: "home", entry: "abcdef1234ab:.config/app.toml:ro", want: true},
-		// Empty or no colon
 		{field: "in", entry: "no-colon", want: false},
 	}
 	for _, tt := range tests {
@@ -192,36 +183,12 @@ func TestHasAuthoringEntries(t *testing.T) {
 		block map[string]any
 		want  bool
 	}{
-		{
-			name:  "no hydra fields",
-			block: map[string]any{"image": "test:latest"},
-			want:  false,
-		},
-		{
-			name:  "ca with file path",
-			block: map[string]any{"ca": []any{"/tmp/cert.pem"}},
-			want:  true,
-		},
-		{
-			name:  "ca already canonical",
-			block: map[string]any{"ca": []any{"abcdef1234ab"}},
-			want:  false,
-		},
-		{
-			name:  "in with authoring entry",
-			block: map[string]any{"in": []any{"/tmp/data.txt:/in/data.txt"}},
-			want:  true,
-		},
-		{
-			name:  "in already canonical",
-			block: map[string]any{"in": []any{"abcdef1234ab:/in/data.txt"}},
-			want:  false,
-		},
-		{
-			name:  "mixed canonical and authoring",
-			block: map[string]any{"in": []any{"abcdef1234ab:/in/a.txt", "/tmp/b.txt:/in/b.txt"}},
-			want:  true,
-		},
+		{name: "no hydra fields", block: map[string]any{"image": "test:latest"}, want: false},
+		{name: "ca with file path", block: map[string]any{"ca": []any{"/tmp/cert.pem"}}, want: true},
+		{name: "ca already canonical", block: map[string]any{"ca": []any{"abcdef1234ab"}}, want: false},
+		{name: "in with authoring entry", block: map[string]any{"in": []any{"/tmp/data.txt:/in/data.txt"}}, want: true},
+		{name: "in already canonical", block: map[string]any{"in": []any{"abcdef1234ab:/in/data.txt"}}, want: false},
+		{name: "mixed canonical and authoring", block: map[string]any{"in": []any{"abcdef1234ab:/in/a.txt", "/tmp/b.txt:/in/b.txt"}}, want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -243,12 +210,8 @@ func TestBuildSourceArchive_FileProducesDeterministicHash(t *testing.T) {
 	tmpDir := t.TempDir()
 	f1 := filepath.Join(tmpDir, "a.txt")
 	f2 := filepath.Join(tmpDir, "b.txt")
-	if err := os.WriteFile(f1, []byte("hello"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(f2, []byte("hello"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, f1, "hello")
+	writeFile(t, f2, "hello")
 
 	arch1, err := buildSourceArchive(f1)
 	if err != nil {
@@ -275,12 +238,8 @@ func TestBuildSourceArchive_DirProducesDeterministicHash(t *testing.T) {
 	dir2 := t.TempDir()
 
 	for _, d := range []string{dir1, dir2} {
-		if err := os.WriteFile(filepath.Join(d, "a.txt"), []byte("alpha"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(d, "b.txt"), []byte("beta"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		writeFile(t, filepath.Join(d, "a.txt"), "alpha")
+		writeFile(t, filepath.Join(d, "b.txt"), "beta")
 	}
 
 	arch1, err := buildSourceArchive(dir1)
@@ -307,7 +266,6 @@ func TestComputeArchiveShortHash(t *testing.T) {
 		t.Errorf("short hash length = %d, want %d", len(hash), shortHashLen)
 	}
 
-	// Verify it matches expected SHA256 prefix.
 	full := sha256.Sum256(data)
 	want := hex.EncodeToString(full[:])[:shortHashLen]
 	if hash != want {
@@ -322,7 +280,6 @@ func TestComputeArchiveShortHash(t *testing.T) {
 func newMockBundleServer(t *testing.T) (*httptest.Server, *url.URL, *http.Client, *int) {
 	t.Helper()
 	var uploadCount int
-	// seenCIDs maps CID → bundleID for probe dedup and X-Bundle-ID header.
 	seenCIDs := make(map[string]string)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v1/spec-bundles" {
@@ -365,155 +322,191 @@ func newMockBundleServer(t *testing.T) (*httptest.Server, *url.URL, *http.Client
 	return srv, u, srv.Client(), &uploadCount
 }
 
-// ---------------------------------------------------------------------------
-// Compile Hydra records integration
-// ---------------------------------------------------------------------------
-
-func TestCompileHydraRecordsInPlace_CAEntries(t *testing.T) {
-	_, base, client, uploadCount := newMockBundleServer(t)
-
-	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	if err := os.WriteFile(certFile, []byte("-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{
-				"image": "docker.io/test/mig:latest",
-				"ca":    []any{certFile},
-			},
-		},
-	}
-
+// compileHydraSpec is a test helper that calls compileHydraRecordsInPlace and
+// fails the test on error.
+func compileHydraSpec(t *testing.T, base *url.URL, client *http.Client, spec map[string]any, tmpDir string) {
+	t.Helper()
 	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
 		t.Fatalf("compileHydraRecordsInPlace: %v", err)
 	}
+}
 
-	steps := spec["steps"].([]any)
-	step0 := steps[0].(map[string]any)
-	ca := step0["ca"].([]any)
-	if len(ca) != 1 {
-		t.Fatalf("expected 1 ca entry, got %d", len(ca))
-	}
-	hash, ok := ca[0].(string)
-	if !ok {
-		t.Fatalf("expected ca[0] to be string, got %T", ca[0])
-	}
+// assertCanonicalHash checks that s is a valid short hash (or starts with one
+// before the first colon for in/out/home entries).
+func assertCanonicalHash(t *testing.T, s string) string {
+	t.Helper()
+	hash := strings.SplitN(s, ":", 2)[0]
 	if !shortHashPattern.MatchString(hash) {
-		t.Errorf("ca[0] = %q, expected short hash pattern", hash)
+		t.Errorf("%q: hash segment %q does not match short hash pattern", s, hash)
 	}
-	if len(hash) != shortHashLen {
-		t.Errorf("ca[0] hash length = %d, want %d", len(hash), shortHashLen)
-	}
-	if *uploadCount != 1 {
-		t.Errorf("upload count = %d, want 1", *uploadCount)
-	}
+	return hash
 }
 
-func TestCompileHydraRecordsInPlace_InEntries(t *testing.T) {
-	_, base, client, _ := newMockBundleServer(t)
+// ---------------------------------------------------------------------------
+// Compile Hydra records: single-field (ca/in/out/home)
+// ---------------------------------------------------------------------------
 
-	tmpDir := t.TempDir()
-	dataFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(dataFile, []byte(`{"key": "value"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{
-				"image": "docker.io/test/mig:latest",
-				"in":    []any{dataFile + ":/in/config.json"},
-			},
+func TestCompileHydraRecordsInPlace_SingleField(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		content    string
+		field      string           // "ca", "in", "out", "home"
+		entrySuffix string          // appended to file path for in/out/home
+		wantSuffix string           // expected suffix on compiled entry
+	}{
+		{
+			name:     "ca entries",
+			fileName: "cert.pem",
+			content:  "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n",
+			field:    "ca",
+		},
+		{
+			name:        "in entries",
+			fileName:    "config.json",
+			content:     `{"key": "value"}`,
+			field:       "in",
+			entrySuffix: ":/in/config.json",
+			wantSuffix:  ":/in/config.json",
+		},
+		{
+			name:        "out entries",
+			fileName:    "template.txt",
+			content:     "output template",
+			field:       "out",
+			entrySuffix: ":/out/result.txt",
+			wantSuffix:  ":/out/result.txt",
+		},
+		{
+			name:        "home entries",
+			fileName:    "config.toml",
+			content:     "[app]\nkey = true\n",
+			field:       "home",
+			entrySuffix: ":.config/app.toml:ro",
+			wantSuffix:  ":.config/app.toml:ro",
 		},
 	}
 
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, base, client, _ := newMockBundleServer(t)
+			tmpDir := t.TempDir()
+			filePath := filepath.Join(tmpDir, tt.fileName)
+			writeFile(t, filePath, tt.content)
 
-	step0 := spec["steps"].([]any)[0].(map[string]any)
-	in := step0["in"].([]any)
-	if len(in) != 1 {
-		t.Fatalf("expected 1 in entry, got %d", len(in))
-	}
-	entry := in[0].(string)
-	if !strings.HasSuffix(entry, ":/in/config.json") {
-		t.Errorf("in[0] = %q, expected suffix :/in/config.json", entry)
-	}
-	// Verify the hash prefix.
-	parts := strings.SplitN(entry, ":", 2)
-	if !shortHashPattern.MatchString(parts[0]) {
-		t.Errorf("in[0] hash segment = %q, expected short hash", parts[0])
+			authEntry := filePath + tt.entrySuffix
+			spec := map[string]any{
+				"steps": []any{
+					map[string]any{
+						"image":  "docker.io/test/mig:latest",
+						tt.field: []any{authEntry},
+					},
+				},
+			}
+
+			compileHydraSpec(t, base, client, spec, tmpDir)
+
+			step0 := spec["steps"].([]any)[0].(map[string]any)
+			entries := step0[tt.field].([]any)
+			if len(entries) != 1 {
+				t.Fatalf("expected 1 %s entry, got %d", tt.field, len(entries))
+			}
+			entry := entries[0].(string)
+			assertCanonicalHash(t, entry)
+			if tt.wantSuffix != "" && !strings.HasSuffix(entry, tt.wantSuffix) {
+				t.Errorf("%s[0] = %q, expected suffix %q", tt.field, entry, tt.wantSuffix)
+			}
+		})
 	}
 }
 
-func TestCompileHydraRecordsInPlace_OutEntries(t *testing.T) {
-	_, base, client, _ := newMockBundleServer(t)
+// ---------------------------------------------------------------------------
+// Compile Hydra records: build_gate router & healing
+// ---------------------------------------------------------------------------
 
-	tmpDir := t.TempDir()
-	outFile := filepath.Join(tmpDir, "template.txt")
-	if err := os.WriteFile(outFile, []byte("output template"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{
-				"image": "docker.io/test/mig:latest",
-				"out":   []any{outFile + ":/out/result.txt"},
+func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
+	tests := []struct {
+		name       string
+		fileName   string
+		content    string
+		field      string
+		entrySuffix string
+		spec       func(filePath string) map[string]any
+		digPath    []string
+		wantSuffix string
+	}{
+		{
+			name:     "router ca compiled",
+			fileName: "router-ca.pem",
+			content:  "router-cert",
+			field:    "ca",
+			spec: func(filePath string) map[string]any {
+				return map[string]any{
+					"steps": []any{
+						map[string]any{"image": "docker.io/test/mig:latest"},
+					},
+					"build_gate": map[string]any{
+						"router": map[string]any{
+							"image": "docker.io/test/router:latest",
+							"ca":    []any{filePath},
+						},
+					},
+				}
 			},
+			digPath: []string{"build_gate", "router"},
+		},
+		{
+			name:        "healing in compiled",
+			fileName:    "healing-config.json",
+			content:     `{"mode":"auto"}`,
+			field:       "in",
+			entrySuffix: ":/in/healing-config.json",
+			spec: func(filePath string) map[string]any {
+				return map[string]any{
+					"steps": []any{
+						map[string]any{"image": "docker.io/test/mig:latest"},
+					},
+					"build_gate": map[string]any{
+						"healing": map[string]any{
+							"by_error_kind": map[string]any{
+								"infra": map[string]any{
+									"image": "docker.io/test/healer:latest",
+									"in":    []any{filePath + ":/in/healing-config.json"},
+								},
+							},
+						},
+					},
+				}
+			},
+			digPath:    []string{"build_gate", "healing", "by_error_kind", "infra"},
+			wantSuffix: ":/in/healing-config.json",
 		},
 	}
 
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, base, client, _ := newMockBundleServer(t)
+			tmpDir := t.TempDir()
+			filePath := filepath.Join(tmpDir, tt.fileName)
+			writeFile(t, filePath, tt.content)
 
-	step0 := spec["steps"].([]any)[0].(map[string]any)
-	out := step0["out"].([]any)
-	entry := out[0].(string)
-	if !strings.HasSuffix(entry, ":/out/result.txt") {
-		t.Errorf("out[0] = %q, expected suffix :/out/result.txt", entry)
+			spec := tt.spec(filePath)
+			compileHydraSpec(t, base, client, spec, tmpDir)
+
+			target := mustDig(t, spec, tt.digPath...)
+			entries := target[tt.field].([]any)
+			entry := entries[0].(string)
+			assertCanonicalHash(t, entry)
+			if tt.wantSuffix != "" && !strings.HasSuffix(entry, tt.wantSuffix) {
+				t.Errorf("%s[0] = %q, expected suffix %q", tt.field, entry, tt.wantSuffix)
+			}
+		})
 	}
 }
 
-func TestCompileHydraRecordsInPlace_HomeEntries(t *testing.T) {
-	_, base, client, _ := newMockBundleServer(t)
-
-	tmpDir := t.TempDir()
-	homeFile := filepath.Join(tmpDir, "config.toml")
-	if err := os.WriteFile(homeFile, []byte("[app]\nkey = true\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{
-				"image": "docker.io/test/mig:latest",
-				"home":  []any{homeFile + ":.config/app.toml:ro"},
-			},
-		},
-	}
-
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
-
-	step0 := spec["steps"].([]any)[0].(map[string]any)
-	home := step0["home"].([]any)
-	entry := home[0].(string)
-	if !strings.HasSuffix(entry, ":.config/app.toml:ro") {
-		t.Errorf("home[0] = %q, expected suffix :.config/app.toml:ro", entry)
-	}
-	// Verify hash prefix.
-	parts := strings.SplitN(entry, ":", 2)
-	if !shortHashPattern.MatchString(parts[0]) {
-		t.Errorf("home[0] hash segment = %q, expected short hash", parts[0])
-	}
-}
+// ---------------------------------------------------------------------------
+// Edge cases: skip canonical, nil entries, missing server
+// ---------------------------------------------------------------------------
 
 func TestCompileHydraRecordsInPlace_SkipsCanonicalEntries(t *testing.T) {
 	_, base, client, uploadCount := newMockBundleServer(t)
@@ -528,19 +521,14 @@ func TestCompileHydraRecordsInPlace_SkipsCanonicalEntries(t *testing.T) {
 		},
 	}
 
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, ""); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
+	compileHydraSpec(t, base, client, spec, "")
 
-	// No uploads should happen for already-canonical entries.
 	if *uploadCount != 0 {
 		t.Errorf("upload count = %d, want 0 (all entries canonical)", *uploadCount)
 	}
-
 	step0 := spec["steps"].([]any)[0].(map[string]any)
-	ca := step0["ca"].([]any)
-	if ca[0] != "abcdef1234ab" {
-		t.Errorf("ca[0] changed from canonical: %v", ca[0])
+	if step0["ca"].([]any)[0] != "abcdef1234ab" {
+		t.Errorf("ca[0] changed from canonical: %v", step0["ca"].([]any)[0])
 	}
 }
 
@@ -548,13 +536,9 @@ func TestCompileHydraRecordsInPlace_NilWhenNoEntries(t *testing.T) {
 	t.Parallel()
 	spec := map[string]any{
 		"steps": []any{
-			map[string]any{
-				"image": "docker.io/test/mig:latest",
-			},
+			map[string]any{"image": "docker.io/test/mig:latest"},
 		},
 	}
-
-	// Should return nil without needing base/client.
 	if err := compileHydraRecordsInPlace(context.Background(), nil, nil, spec, ""); err != nil {
 		t.Fatalf("compileHydraRecordsInPlace: %v", err)
 	}
@@ -563,16 +547,13 @@ func TestCompileHydraRecordsInPlace_NilWhenNoEntries(t *testing.T) {
 func TestCompileHydraRecordsInPlace_ErrorsWithoutServer(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	if err := os.WriteFile(certFile, []byte("cert"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, filepath.Join(tmpDir, "cert.pem"), "cert")
 
 	spec := map[string]any{
 		"steps": []any{
 			map[string]any{
 				"image": "docker.io/test/mig:latest",
-				"ca":    []any{certFile},
+				"ca":    []any{filepath.Join(tmpDir, "cert.pem")},
 			},
 		},
 	}
@@ -586,123 +567,38 @@ func TestCompileHydraRecordsInPlace_ErrorsWithoutServer(t *testing.T) {
 	}
 }
 
-func TestCompileHydraRecordsInPlace_BuildGateRouter(t *testing.T) {
-	_, base, client, _ := newMockBundleServer(t)
-
-	tmpDir := t.TempDir()
-	routerCA := filepath.Join(tmpDir, "router-ca.pem")
-	if err := os.WriteFile(routerCA, []byte("router-cert"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{"image": "docker.io/test/mig:latest"},
-		},
-		"build_gate": map[string]any{
-			"router": map[string]any{
-				"image": "docker.io/test/router:latest",
-				"ca":    []any{routerCA},
-			},
-		},
-	}
-
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
-
-	router := spec["build_gate"].(map[string]any)["router"].(map[string]any)
-	ca := router["ca"].([]any)
-	hash := ca[0].(string)
-	if !shortHashPattern.MatchString(hash) {
-		t.Errorf("router ca[0] = %q, expected short hash", hash)
-	}
-}
-
-func TestCompileHydraRecordsInPlace_BuildGateHealing(t *testing.T) {
-	_, base, client, _ := newMockBundleServer(t)
-
-	tmpDir := t.TempDir()
-	healingIn := filepath.Join(tmpDir, "healing-config.json")
-	if err := os.WriteFile(healingIn, []byte(`{"mode":"auto"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{"image": "docker.io/test/mig:latest"},
-		},
-		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"image": "docker.io/test/healer:latest",
-						"in":    []any{healingIn + ":/in/healing-config.json"},
-					},
-				},
-			},
-		},
-	}
-
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
-
-	infra := spec["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
-	in := infra["in"].([]any)
-	entry := in[0].(string)
-	if !strings.Contains(entry, ":/in/healing-config.json") {
-		t.Errorf("healing in[0] = %q, expected to contain :/in/healing-config.json", entry)
-	}
-}
-
 // ---------------------------------------------------------------------------
-// Upload deduplication: identical content should produce same hash
+// Upload deduplication
 // ---------------------------------------------------------------------------
 
 func TestCompileHydraRecordsInPlace_UploadDedup(t *testing.T) {
 	_, base, client, uploadCount := newMockBundleServer(t)
 
 	tmpDir := t.TempDir()
-	file1 := filepath.Join(tmpDir, "a.txt")
-	file2 := filepath.Join(tmpDir, "b.txt")
-	// Identical content in both files.
-	if err := os.WriteFile(file1, []byte("same-content"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(file2, []byte("same-content"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, filepath.Join(tmpDir, "a.txt"), "same-content")
+	writeFile(t, filepath.Join(tmpDir, "b.txt"), "same-content")
 
 	spec := map[string]any{
 		"steps": []any{
 			map[string]any{
 				"image": "docker.io/test/mig:latest",
 				"in": []any{
-					file1 + ":/in/a.txt",
-					file2 + ":/in/b.txt",
+					filepath.Join(tmpDir, "a.txt") + ":/in/a.txt",
+					filepath.Join(tmpDir, "b.txt") + ":/in/b.txt",
 				},
 			},
 		},
 	}
 
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
+	compileHydraSpec(t, base, client, spec, tmpDir)
 
 	step0 := spec["steps"].([]any)[0].(map[string]any)
 	in := step0["in"].([]any)
-	entry1 := in[0].(string)
-	entry2 := in[1].(string)
-
-	// Both should have the same hash prefix (identical content).
-	hash1 := strings.SplitN(entry1, ":", 2)[0]
-	hash2 := strings.SplitN(entry2, ":", 2)[0]
+	hash1 := assertCanonicalHash(t, in[0].(string))
+	hash2 := assertCanonicalHash(t, in[1].(string))
 	if hash1 != hash2 {
 		t.Errorf("identical content produced different hashes: %s vs %s", hash1, hash2)
 	}
-
-	// In-process cache: identical content within one compile pass triggers only 1 upload.
 	if *uploadCount != 1 {
 		t.Errorf("upload count = %d, want 1 (identical content deduped in-process)", *uploadCount)
 	}
@@ -712,17 +608,14 @@ func TestCompileHydraRecordsInPlace_RepeatedRunSkipsUpload(t *testing.T) {
 	_, base, client, uploadCount := newMockBundleServer(t)
 
 	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "cert.pem")
-	if err := os.WriteFile(certFile, []byte("repeated-run-cert"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, filepath.Join(tmpDir, "cert.pem"), "repeated-run-cert")
 
 	makeSpec := func() map[string]any {
 		return map[string]any{
 			"steps": []any{
 				map[string]any{
 					"image": "docker.io/test/mig:latest",
-					"ca":    []any{certFile},
+					"ca":    []any{filepath.Join(tmpDir, "cert.pem")},
 				},
 			},
 		}
@@ -730,21 +623,17 @@ func TestCompileHydraRecordsInPlace_RepeatedRunSkipsUpload(t *testing.T) {
 
 	// First compile: probe misses, uploads.
 	spec1 := makeSpec()
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec1, tmpDir); err != nil {
-		t.Fatalf("first compile: %v", err)
-	}
+	compileHydraSpec(t, base, client, spec1, tmpDir)
 	if *uploadCount != 1 {
 		t.Fatalf("after first compile: upload count = %d, want 1", *uploadCount)
 	}
 	hash1 := spec1["steps"].([]any)[0].(map[string]any)["ca"].([]any)[0].(string)
 
-	// Second compile (simulates repeated run): probe hits, no new upload.
+	// Second compile: probe hits, no new upload.
 	spec2 := makeSpec()
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec2, tmpDir); err != nil {
-		t.Fatalf("second compile: %v", err)
-	}
+	compileHydraSpec(t, base, client, spec2, tmpDir)
 	if *uploadCount != 1 {
-		t.Errorf("after second compile: upload count = %d, want 1 (repeated run should skip upload)", *uploadCount)
+		t.Errorf("after second compile: upload count = %d, want 1", *uploadCount)
 	}
 	hash2 := spec2["steps"].([]any)[0].(map[string]any)["ca"].([]any)[0].(string)
 
@@ -761,39 +650,24 @@ func TestCompileHydraRecordsInPlace_EmitsBundleMap(t *testing.T) {
 	_, base, client, _ := newMockBundleServer(t)
 
 	tmpDir := t.TempDir()
-	certFile := filepath.Join(tmpDir, "ca.pem")
-	inFile := filepath.Join(tmpDir, "config.json")
-	outFile := filepath.Join(tmpDir, "seed.txt")
-	homeFile := filepath.Join(tmpDir, "auth.json")
-
-	if err := os.WriteFile(certFile, []byte("ca-cert"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(inFile, []byte("in-data"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(outFile, []byte("out-data"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(homeFile, []byte("home-data"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeFile(t, filepath.Join(tmpDir, "ca.pem"), "ca-cert")
+	writeFile(t, filepath.Join(tmpDir, "config.json"), "in-data")
+	writeFile(t, filepath.Join(tmpDir, "seed.txt"), "out-data")
+	writeFile(t, filepath.Join(tmpDir, "auth.json"), "home-data")
 
 	spec := map[string]any{
 		"steps": []any{
 			map[string]any{
 				"image": "alpine:3",
-				"ca":    []any{certFile},
-				"in":    []any{inFile + ":/in/config.json"},
-				"out":   []any{outFile + ":/out/seed.txt"},
-				"home":  []any{homeFile + ":.auth.json"},
+				"ca":    []any{filepath.Join(tmpDir, "ca.pem")},
+				"in":    []any{filepath.Join(tmpDir, "config.json") + ":/in/config.json"},
+				"out":   []any{filepath.Join(tmpDir, "seed.txt") + ":/out/seed.txt"},
+				"home":  []any{filepath.Join(tmpDir, "auth.json") + ":.auth.json"},
 			},
 		},
 	}
 
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
+	compileHydraSpec(t, base, client, spec, tmpDir)
 
 	bm, ok := spec["bundle_map"]
 	if !ok {
@@ -805,19 +679,18 @@ func TestCompileHydraRecordsInPlace_EmitsBundleMap(t *testing.T) {
 	}
 
 	step0 := spec["steps"].([]any)[0].(map[string]any)
-	// Collect all shortHashes used in canonical entries.
-	caHash := step0["ca"].([]any)[0].(string)
-	inHash := strings.SplitN(step0["in"].([]any)[0].(string), ":", 2)[0]
-	outHash := strings.SplitN(step0["out"].([]any)[0].(string), ":", 2)[0]
-	homeHash := strings.SplitN(step0["home"].([]any)[0].(string), ":", 2)[0]
+	hashes := []string{
+		step0["ca"].([]any)[0].(string),
+		strings.SplitN(step0["in"].([]any)[0].(string), ":", 2)[0],
+		strings.SplitN(step0["out"].([]any)[0].(string), ":", 2)[0],
+		strings.SplitN(step0["home"].([]any)[0].(string), ":", 2)[0],
+	}
 
-	for _, h := range []string{caHash, inHash, outHash, homeHash} {
+	for _, h := range hashes {
 		if _, exists := bundleMap[h]; !exists {
 			t.Errorf("bundle_map missing entry for hash %q", h)
 		}
 	}
-
-	// Every bundleID should be non-empty.
 	for hash, bundleID := range bundleMap {
 		if bundleID == "" {
 			t.Errorf("bundle_map[%q] is empty", hash)
@@ -825,123 +698,78 @@ func TestCompileHydraRecordsInPlace_EmitsBundleMap(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// bundle_map: mixed canonical/authoring preservation
+// ---------------------------------------------------------------------------
+
 func TestCompileHydraRecordsInPlace_MixedCanonicalAndAuthoring_PreservesBundleMap(t *testing.T) {
-	_, base, client, uploadCount := newMockBundleServer(t)
-
-	tmpDir := t.TempDir()
-	newFile := filepath.Join(tmpDir, "new.json")
-	if err := os.WriteFile(newFile, []byte(`{"new":"data"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Pre-existing canonical entries with their bundle_map mappings,
-	// as would appear after a prior compile or server overlay merge.
-	existingCAHash := "aabbcc112233"
-	existingInHash := "ddeeff445566"
-	existingBundleMap := map[string]string{
-		existingCAHash: "bundle-existing-ca",
-		existingInHash: "bundle-existing-in",
-	}
-
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{
-				"image": "alpine:3",
-				// Mix: one canonical CA + one authoring in entry.
-				"ca": []any{existingCAHash},
-				"in": []any{
-					existingInHash + ":/in/old.json",
-					newFile + ":/in/new.json",
-				},
+	tests := []struct {
+		name      string
+		bundleMap any // map[string]string or map[string]any (JSON-unmarshaled)
+	}{
+		{
+			name: "typed map[string]string",
+			bundleMap: map[string]string{
+				"aabbcc112233": "bundle-existing-ca",
+				"ddeeff445566": "bundle-existing-in",
 			},
 		},
-		"bundle_map": existingBundleMap,
-	}
-
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
-
-	bm, ok := spec["bundle_map"].(map[string]string)
-	if !ok {
-		t.Fatalf("bundle_map type = %T, want map[string]string", spec["bundle_map"])
-	}
-
-	// Existing canonical entries must retain their mappings.
-	if got := bm[existingCAHash]; got != "bundle-existing-ca" {
-		t.Errorf("bundle_map[%q] = %q, want %q", existingCAHash, got, "bundle-existing-ca")
-	}
-	if got := bm[existingInHash]; got != "bundle-existing-in" {
-		t.Errorf("bundle_map[%q] = %q, want %q", existingInHash, got, "bundle-existing-in")
-	}
-
-	// The newly compiled entry must also be present.
-	step0 := spec["steps"].([]any)[0].(map[string]any)
-	inEntries := step0["in"].([]any)
-	newEntry := inEntries[1].(string)
-	newHash := strings.SplitN(newEntry, ":", 2)[0]
-	if _, exists := bm[newHash]; !exists {
-		t.Errorf("bundle_map missing entry for newly compiled hash %q", newHash)
-	}
-
-	// Only the new authoring entry should trigger an upload.
-	if *uploadCount != 1 {
-		t.Errorf("upload count = %d, want 1", *uploadCount)
-	}
-}
-
-// TestCompileHydraRecordsInPlace_BundleMapFromJSONUnmarshal verifies that
-// bundle_map is correctly seeded when the spec was loaded from JSON/YAML,
-// which produces map[string]any instead of map[string]string.
-func TestCompileHydraRecordsInPlace_BundleMapFromJSONUnmarshal(t *testing.T) {
-	_, base, client, uploadCount := newMockBundleServer(t)
-
-	tmpDir := t.TempDir()
-	newFile := filepath.Join(tmpDir, "new.json")
-	if err := os.WriteFile(newFile, []byte(`{"new":"data"}`), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	existingCAHash := "aabbcc112233"
-	existingInHash := "ddeeff445566"
-
-	// Simulate JSON-unmarshaled bundle_map: map[string]any with string values,
-	// as json.Unmarshal into map[string]any produces.
-	spec := map[string]any{
-		"steps": []any{
-			map[string]any{
-				"image": "alpine:3",
-				"ca":    []any{existingCAHash},
-				"in": []any{
-					existingInHash + ":/in/old.json",
-					newFile + ":/in/new.json",
-				},
+		{
+			name: "JSON-unmarshaled map[string]any",
+			bundleMap: map[string]any{
+				"aabbcc112233": "bundle-existing-ca",
+				"ddeeff445566": "bundle-existing-in",
 			},
 		},
-		"bundle_map": map[string]any{
-			existingCAHash: "bundle-existing-ca",
-			existingInHash: "bundle-existing-in",
-		},
 	}
 
-	if err := compileHydraRecordsInPlace(context.Background(), base, client, spec, tmpDir); err != nil {
-		t.Fatalf("compileHydraRecordsInPlace: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, base, client, uploadCount := newMockBundleServer(t)
 
-	bm, ok := spec["bundle_map"].(map[string]string)
-	if !ok {
-		t.Fatalf("bundle_map type = %T, want map[string]string", spec["bundle_map"])
-	}
+			tmpDir := t.TempDir()
+			writeFile(t, filepath.Join(tmpDir, "new.json"), `{"new":"data"}`)
 
-	if got := bm[existingCAHash]; got != "bundle-existing-ca" {
-		t.Errorf("bundle_map[%q] = %q, want %q", existingCAHash, got, "bundle-existing-ca")
-	}
-	if got := bm[existingInHash]; got != "bundle-existing-in" {
-		t.Errorf("bundle_map[%q] = %q, want %q", existingInHash, got, "bundle-existing-in")
-	}
+			spec := map[string]any{
+				"steps": []any{
+					map[string]any{
+						"image": "alpine:3",
+						"ca":    []any{"aabbcc112233"},
+						"in": []any{
+							"ddeeff445566:/in/old.json",
+							filepath.Join(tmpDir, "new.json") + ":/in/new.json",
+						},
+					},
+				},
+				"bundle_map": tt.bundleMap,
+			}
 
-	// Only the new authoring entry should trigger an upload.
-	if *uploadCount != 1 {
-		t.Errorf("upload count = %d, want 1", *uploadCount)
+			compileHydraSpec(t, base, client, spec, tmpDir)
+
+			bm, ok := spec["bundle_map"].(map[string]string)
+			if !ok {
+				t.Fatalf("bundle_map type = %T, want map[string]string", spec["bundle_map"])
+			}
+
+			// Existing canonical entries must retain their mappings.
+			if got := bm["aabbcc112233"]; got != "bundle-existing-ca" {
+				t.Errorf("bundle_map[aabbcc112233] = %q, want %q", got, "bundle-existing-ca")
+			}
+			if got := bm["ddeeff445566"]; got != "bundle-existing-in" {
+				t.Errorf("bundle_map[ddeeff445566] = %q, want %q", got, "bundle-existing-in")
+			}
+
+			// Newly compiled entry must also be present.
+			step0 := spec["steps"].([]any)[0].(map[string]any)
+			newEntry := step0["in"].([]any)[1].(string)
+			newHash := strings.SplitN(newEntry, ":", 2)[0]
+			if _, exists := bm[newHash]; !exists {
+				t.Errorf("bundle_map missing entry for newly compiled hash %q", newHash)
+			}
+
+			if *uploadCount != 1 {
+				t.Errorf("upload count = %d, want 1", *uploadCount)
+			}
+		})
 	}
 }
