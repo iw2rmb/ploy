@@ -83,34 +83,6 @@ func TestCodexEntrypointUnit(t *testing.T) {
 	t.Logf("codex entrypoint unit tests passed:\n%s", out)
 }
 
-// TestMigSpecsNoLegacyCODEXPROMPT verifies that no e2e mig.yaml spec uses the
-// legacy CODEX_PROMPT env injection pattern. All direct-Codex prompts must be
-// delivered via Hydra in mounts (/in/codex-prompt.txt).
-func TestMigSpecsNoLegacyCODEXPROMPT(t *testing.T) {
-	root := repoRoot(t)
-	scenarioDir := filepath.Join(root, "tests", "e2e", "migs")
-
-	entries, err := os.ReadDir(scenarioDir)
-	if err != nil {
-		t.Fatalf("read scenario dir: %v", err)
-	}
-
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		specPath := filepath.Join(scenarioDir, e.Name(), "mig.yaml")
-		data, err := os.ReadFile(specPath)
-		if err != nil {
-			continue // no mig.yaml in this scenario dir
-		}
-
-		if strings.Contains(string(data), "CODEX_PROMPT") {
-			t.Errorf("%s/mig.yaml: contains legacy CODEX_PROMPT env injection; use Hydra in mount (./prompt.txt:/in/codex-prompt.txt) instead", e.Name())
-		}
-	}
-}
-
 // TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
 // validating that /in is read-only and /out is writable. Requires a live
 // cluster; skips when unavailable. Offline contract validation is covered

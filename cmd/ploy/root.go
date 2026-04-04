@@ -13,6 +13,11 @@ import (
 // newRootCmd constructs the cobra root command with all subcommands.
 // It preserves the existing CLI surface and error reporting behavior.
 func newRootCmd(stderr io.Writer) *cobra.Command {
+	return newRootCmdWithIO(stderr, stderr)
+}
+
+// newRootCmdWithIO constructs the cobra root command with explicit stdout/stderr.
+func newRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	// Root command — top-level ploy entry point.
 	// SilenceUsage prevents cobra from printing usage on every error.
 	// SilenceErrors allows us to control error formatting via reportError.
@@ -37,7 +42,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 		Use:   "version",
 		Short: "Print version information",
 		Run: func(cmd *cobra.Command, args []string) {
-			printVersion(stderr)
+			printVersion(stdout)
 		},
 	}
 	root.AddCommand(versionCmd)
@@ -48,7 +53,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 		// Handle --version or -v flag at root level.
 		versionFlag, _ := cmd.Flags().GetBool("version")
 		if versionFlag {
-			printVersion(stderr)
+			printVersion(stdout)
 			// Return a sentinel error to skip execution (cobra will not print it).
 			return fmt.Errorf("version displayed")
 		}
@@ -99,7 +104,7 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	})
 
 	// Set output to stderr for all cobra messages.
-	root.SetOut(stderr)
+	root.SetOut(stdout)
 	root.SetErr(stderr)
 
 	// Configure unknown command handling to match old behavior.
@@ -171,7 +176,7 @@ func printVersion(w io.Writer) {
 	if strings.TrimSpace(v) == "" {
 		v = "dev"
 	}
-	_, _ = fmt.Fprintf(w, "ploy version %s\n", v)
+	_, _ = fmt.Fprintf(w, "%s\n", v)
 	if iversion.Commit != "" || iversion.BuiltAt != "" {
 		_, _ = fmt.Fprintf(w, "commit %s\n", iversion.Commit)
 		if iversion.BuiltAt != "" {

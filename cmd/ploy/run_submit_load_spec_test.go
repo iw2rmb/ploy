@@ -67,14 +67,14 @@ steps:
     envs:
       STEP_TOKEN: step-token
     in:
-      - ` + stepInFile + `:/in/config.txt
+      - ` + stepInFile + `:config.txt
 build_gate:
   router:
     image: docker.io/test/router:latest
     envs:
       ROUTER_TOKEN: router-token
     in:
-      - ` + routerInFile + `:/in/router-config.txt
+      - ` + routerInFile + `:router-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -153,7 +153,7 @@ build_gate:
         envs:
           HEALING_TOKEN: healing-token
         in:
-          - ` + healingInFile + `:/in/healing-config.txt
+          - ` + healingInFile + `:healing-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -275,5 +275,60 @@ build_gate:
 	infra := result["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
 	if got, want := infra["image"].(string), "docker.io/test/codex:latest"; got != want {
 		t.Fatalf("build_gate.healing.by_error_kind.infra.image got %q, want %q", got, want)
+	}
+}
+
+func TestLoadSpec_IncludeFragmentNormalizesRelativeHydraSources(t *testing.T) {
+	_, base, client := newMockBundleSrvForLoadSpec(t)
+
+	tmpDir := t.TempDir()
+	fragmentsDir := filepath.Join(tmpDir, "fragments")
+	if err := os.MkdirAll(fragmentsDir, 0o755); err != nil {
+		t.Fatalf("mkdir fragments: %v", err)
+	}
+
+	// Source file path is intentionally relative in the included fragment.
+	if err := os.WriteFile(filepath.Join(fragmentsDir, "router-config.txt"), []byte("router-config-data"), 0o644); err != nil {
+		t.Fatalf("write router config: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fragmentsDir, "router.fragment.yaml"), []byte(`
+router:
+  image: docker.io/test/router:latest
+  in:
+    - ./router-config.txt:router-config.txt
+`), 0o644); err != nil {
+		t.Fatalf("write router fragment: %v", err)
+	}
+
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := []byte(`
+steps:
+  - image: docker.io/test/mig:latest
+build_gate:
+  router:
+    <<: !include ./fragments/router.fragment.yaml#/router
+`)
+	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := loadSpec(context.Background(), base, client, specPath)
+	if err != nil {
+		t.Fatalf("loadSpec() unexpected error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
+	routerIn := router["in"].([]any)
+	entry, ok := routerIn[0].(string)
+	if !ok {
+		t.Fatalf("expected router.in[0] string, got %T", routerIn[0])
+	}
+	if !strings.Contains(entry, ":/in/router-config.txt") {
+		t.Fatalf("router.in[0] = %q, want canonical /in destination", entry)
 	}
 }

@@ -114,8 +114,9 @@ func TestCommandBuildersFunctional(t *testing.T) {
 // preserves backward-compatible behavior for common use cases.
 func TestRootCmdPreservesExistingBehavior(t *testing.T) {
 	t.Run("version flag", func(t *testing.T) {
+		stdout := &bytes.Buffer{}
 		stderr := &bytes.Buffer{}
-		rootCmd := newRootCmd(stderr)
+		rootCmd := newRootCmdWithIO(stdout, stderr)
 		rootCmd.SetArgs([]string{"--version"})
 
 		// Execute should handle --version and return the sentinel error.
@@ -124,10 +125,13 @@ func TestRootCmdPreservesExistingBehavior(t *testing.T) {
 			t.Errorf("expected sentinel error 'version displayed', got: %v", err)
 		}
 
-		// Verify version output was written to stderr.
-		output := stderr.String()
-		if !strings.Contains(output, "ploy version") {
-			t.Errorf("expected version output in stderr, got: %q", output)
+		// Verify version output was written to stdout.
+		output := stdout.String()
+		if !strings.Contains(output, "dev") {
+			t.Errorf("expected version output in stdout, got: %q", output)
+		}
+		if stderr.Len() != 0 {
+			t.Errorf("expected empty stderr for version output, got: %q", stderr.String())
 		}
 	})
 

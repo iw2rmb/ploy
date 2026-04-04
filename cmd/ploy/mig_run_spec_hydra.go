@@ -5,8 +5,8 @@
 //
 // Authoring input formats:
 //   - ca:   source-path
-//   - in:   src:dst          (right-biased split, dst must start with /in/)
-//   - out:  src:dst          (right-biased split, dst must start with /out/)
+//   - in:   src:dst          (right-biased split, dst treated as /in-relative)
+//   - out:  src:dst          (right-biased split, dst treated as /out-relative)
 //   - home: src:dst{:ro}     (right-biased split, dst is $HOME-relative)
 //
 // After compilation, entries are rewritten to:
@@ -24,6 +24,7 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -36,14 +37,15 @@ var shortHashPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 const shortHashLen = 12
 
 // parseAuthoringInEntry parses an authoring `in` entry: "src:dst".
-// Uses right-biased splitting (last colon). dst must start with "/in/".
+// Uses right-biased splitting (last colon). dst is normalized under /in.
 func parseAuthoringInEntry(s string) (src, dst string, err error) {
 	src, dst, err = splitRightBiasedColon(s)
 	if err != nil {
 		return "", "", fmt.Errorf("in entry %q: %w", s, err)
 	}
-	if !strings.HasPrefix(dst, "/in/") {
-		return "", "", fmt.Errorf("in entry %q: destination must start with /in/", s)
+	dst, err = normalizeAuthoringDestination(dst, "/in/")
+	if err != nil {
+		return "", "", fmt.Errorf("in entry %q: %w", s, err)
 	}
 	if err := guardAuthoringTraversal(dst); err != nil {
 		return "", "", fmt.Errorf("in entry %q: %w", s, err)
@@ -52,14 +54,15 @@ func parseAuthoringInEntry(s string) (src, dst string, err error) {
 }
 
 // parseAuthoringOutEntry parses an authoring `out` entry: "src:dst".
-// Uses right-biased splitting (last colon). dst must start with "/out/".
+// Uses right-biased splitting (last colon). dst is normalized under /out.
 func parseAuthoringOutEntry(s string) (src, dst string, err error) {
 	src, dst, err = splitRightBiasedColon(s)
 	if err != nil {
 		return "", "", fmt.Errorf("out entry %q: %w", s, err)
 	}
-	if !strings.HasPrefix(dst, "/out/") {
-		return "", "", fmt.Errorf("out entry %q: destination must start with /out/", s)
+	dst, err = normalizeAuthoringDestination(dst, "/out/")
+	if err != nil {
+		return "", "", fmt.Errorf("out entry %q: %w", s, err)
 	}
 	if err := guardAuthoringTraversal(dst); err != nil {
 		return "", "", fmt.Errorf("out entry %q: %w", s, err)
@@ -79,16 +82,35 @@ func parseAuthoringHomeEntry(s string) (src, dst string, readOnly bool, err erro
 	if err != nil {
 		return "", "", false, fmt.Errorf("home entry %q: %w", s, err)
 	}
+	dst = strings.TrimSpace(dst)
 	if dst == "" {
 		return "", "", false, fmt.Errorf("home entry %q: destination required", s)
 	}
-	if strings.HasPrefix(dst, "/") {
-		return "", "", false, fmt.Errorf("home entry %q: destination must be relative (no leading /)", s)
+	dst = strings.TrimPrefix(dst, "/")
+	dst = path.Clean(dst)
+	if dst == "" || dst == "." {
+		return "", "", false, fmt.Errorf("home entry %q: destination required", s)
 	}
 	if err := guardAuthoringTraversal(dst); err != nil {
 		return "", "", false, fmt.Errorf("home entry %q: %w", s, err)
 	}
 	return src, dst, readOnly, nil
+}
+
+func normalizeAuthoringDestination(dst, root string) (string, error) {
+	trimmed := strings.TrimSpace(dst)
+	if trimmed == "" {
+		return "", fmt.Errorf("destination required")
+	}
+
+	relative := trimmed
+	relative = strings.TrimPrefix(relative, "/")
+	relative = path.Clean(relative)
+	if relative == "" || relative == "." {
+		return "", fmt.Errorf("destination required")
+	}
+
+	return root + relative, nil
 }
 
 // splitRightBiasedColon splits at the last colon, returning (left, right).

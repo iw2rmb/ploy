@@ -64,7 +64,7 @@ type Request struct {
 	Manifest  contracts.StepManifest
 	Workspace string
 	OutDir    string
-	// InDir is an optional read-only directory mounted at /in for cross-phase inputs.
+	// InDir is an optional directory mounted at /in for cross-phase inputs.
 	InDir string
 	// StagingDir is an optional path to a directory containing pre-materialized
 	// Hydra resources. Each CA/In/Out/Home entry is mounted from StagingDir/<shortHash>.
