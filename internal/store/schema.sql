@@ -538,8 +538,8 @@ CREATE TABLE IF NOT EXISTS config_bundle_map (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Spec bundles (pre-uploaded tar archives referenced by spec tmp_bundle fields)
--- One row per uploaded bundle; id becomes the bundle_id in TmpBundleRef.
+-- Spec bundles (pre-uploaded tar archives referenced by content-addressed materialization fields)
+-- One row per uploaded bundle; id becomes the bundle_id in canonical spec references.
 -- last_ref_at is updated each time a spec or run references this bundle, enabling
 -- GC of unreferenced bundles via last_ref_at scans.
 -- Note: id is TEXT (NanoID-backed, 8 chars); application code generates IDs via NewSpecBundleID().
