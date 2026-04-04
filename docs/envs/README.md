@@ -104,8 +104,6 @@ Role model (bearer token claims):
   description. Default: `local1`.
 - `DOCKERHUB_PAT` — Optional Docker Hub Personal Access Token for authenticated pulls when you use Docker Hub
   as `PLOY_CONTAINER_REGISTRY`.
-- `MIGS_IMAGE_PREFIX` — Optional absolute image prefix override used by the mig image build/push helper.
-  Default fallback is `${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}`.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Migs LLM lanes. When set on the control
   plane, the runner injects it into the `migs-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
@@ -122,7 +120,7 @@ Role model (bearer token claims):
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`ca`/`in`/`out`/`home`)
-  - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional `spec_path` composition keys for router/infra/code actions
+  - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional YAML `!include` composition for router/infra/code actions
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
@@ -190,7 +188,7 @@ build_gate:
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
 - `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
-  - `infra`/`code` action entries configure `spec_path`, `retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`
+  - `infra`/`code` action entries configure include-composed action fields (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/codex-prompt.txt`) are available to healing migs

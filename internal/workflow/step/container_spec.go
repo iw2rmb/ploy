@@ -83,9 +83,12 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	if strings.TrimSpace(outDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: outDir, Target: "/out", ReadOnly: false})
 	}
-	// Optional /in mount for cross-phase inputs (read-only)
+	// Optional /in mount for cross-phase inputs.
+	// Keep the top-level mount writable so nested Hydra file mounts under /in/*
+	// can be created by the container runtime. Individual Hydra /in entries remain
+	// read-only mounts.
 	if strings.TrimSpace(inDir) != "" {
-		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
+		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: false})
 	}
 
 	// Mount Hydra materialized resources from the staging directory.

@@ -209,7 +209,7 @@ build_gate:
 #
 # build_gate:
 #   router:
-#     spec_path: ./healing/router/spec.yaml
+#     <<: !include ./healing/router/spec.yaml
 #     image: docker.io/your-dh-user/codex:latest
 #     in:
 #       codex-prompt.txt: |-
@@ -237,7 +237,7 @@ build_gate:
 #   healing:
 #     by_error_kind:
 #       code:
-#         spec_path: ./healing/code/spec.yaml
+#         <<: !include ./healing/code/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
 #         amata:
@@ -270,7 +270,7 @@ build_gate:
 #   healing:
 #     by_error_kind:
 #       infra:
-#         spec_path: ./healing/infra/spec.yaml
+#         <<: !include ./healing/infra/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
 #         in:
@@ -284,7 +284,7 @@ build_gate:
 #             - path: /out/gate-profile-candidate.json
 #               schema: gate_profile_v1
 #       code:
-#         spec_path: ./healing/code/spec.yaml
+#         <<: !include ./healing/code/spec.yaml
 #         retries: 2
 #         image: docker.io/your-dh-user/codex:latest
 #         in:
@@ -294,15 +294,13 @@ build_gate:
 #         home:
 #           - ~/.codex/auth.json:.codex/auth.json
 #
-# `spec_path` is optional preprocessing handled by CLI:
-# - CLI reads YAML/JSON object from `spec_path`
-# - deep-merges loaded object with inline action object
-# - inline fields override loaded fields
-# - path supports env expansion (`$VAR`, `${VAR}`) and `~/` home expansion
-# - `spec_path` is removed before spec submission/validation
-# Supported under:
-# - `build_gate.router.spec_path`
-# - `build_gate.healing.by_error_kind.<error_kind>.spec_path`
+# `!include` is optional preprocessing handled by CLI:
+# - scalar replacement: `field: !include ./file.yaml#/pointer`
+# - deep merge with overrides: `field: {<<: !include ./file.yaml#/pointer, ...}`
+# - include references support `path[#/pointer]`, nested includes, and cycle detection
+# - relative include paths resolve from each including file directory
+# - relative local-source paths inside included fragments (`amata.spec`, `ca`, and
+#   source side of `in`/`out`/`home`) resolve from that included file directory
 # For `infra` expectations with `schema: gate_profile_v1`, the healing job should
 # write `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` occurs
 # only when the immediate follow-up `re_gate` succeeds.

@@ -2,30 +2,24 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "$SCRIPT_DIR/docker-compose.yml" ]]; then
-  ROOT_DIR="$SCRIPT_DIR"
-  RUNTIME_DIR="$SCRIPT_DIR"
-else
-  ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-  RUNTIME_DIR="$ROOT_DIR/cmd/ploy/assets/runtime"
-fi
-cd "$ROOT_DIR"
+RUNTIME_DIR="$SCRIPT_DIR"
+cd "$RUNTIME_DIR"
 
 COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f ${RUNTIME_DIR}/docker-compose.yml}"
+PLOY_CONTAINER_REGISTRY="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-docker}"
 CLUSTER_ID="${CLUSTER_ID:-local}"
 NODE_ID="${NODE_ID:-local1}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
 PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
-AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
+AUTH_JSON_PATH=""
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
 PLOY_DEPLOY_CA_BUNDLE="${PLOY_DEPLOY_CA_BUNDLE:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
-PLOY_VERSION="${PLOY_VERSION:-}"
-WORKER_TOKEN_PATH="${WORKER_TOKEN_PATH:-}"
+PLOY_VERSION="${PLOY_VERSION:-$(ploy --version | head -n 1)}"
+WORKER_TOKEN_PATH=""
 PULL_IMAGES="${PLOY_RUNTIME_PULL_IMAGES:-1}"
 
 DROP_DB=0
@@ -62,12 +56,11 @@ Environment:
   PLOY_OBJECTSTORE_ACCESS_KEY S3 access key used by server object store config
   PLOY_OBJECTSTORE_SECRET_KEY S3 secret key used by server object store config
   PLOY_DEPLOY_CA_BUNDLE           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
-  PLOY_VERSION            Runtime version tag (default from ./VERSION, example v0.1.0)
+  PLOY_VERSION            Runtime version tag (default from `ploy --version`, example v0.1.0)
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION})
   PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION})
   PLOY_RUNTIME_PULL_IMAGES Set to 0/false to skip pull before up (default: 1)
   PLOY_CONFIG_HOME        Config root (default: $HOME/.config/ploy)
-  AUTH_JSON_PATH          Optional explicit auth state path; default: <PLOY_CONFIG_HOME>/<cluster>/auth.json
 USAGE
 }
 
@@ -111,42 +104,6 @@ parse_args() {
   done
 }
 
-init_cluster_paths() {
-  local cfg_root
-  cfg_root="${PLOY_CONFIG_HOME}"
-  if [[ "$cfg_root" != /* ]]; then
-    cfg_root="$ROOT_DIR/$cfg_root"
-  fi
-
-  if [[ -z "$AUTH_JSON_PATH" ]]; then
-    AUTH_JSON_PATH="$cfg_root/$CLUSTER_ID/auth.json"
-  elif [[ "$AUTH_JSON_PATH" != /* ]]; then
-    AUTH_JSON_PATH="$ROOT_DIR/$AUTH_JSON_PATH"
-  fi
-
-  if [[ -z "$WORKER_TOKEN_PATH" ]]; then
-    WORKER_TOKEN_PATH="$cfg_root/$CLUSTER_ID/bearer-token"
-  elif [[ "$WORKER_TOKEN_PATH" != /* ]]; then
-    WORKER_TOKEN_PATH="$ROOT_DIR/$WORKER_TOKEN_PATH"
-  fi
-
-  PLOY_CONFIG_HOME="$cfg_root"
-}
-
-resolve_ploy_version() {
-  if [[ -z "$PLOY_VERSION" && -f "$ROOT_DIR/VERSION" ]]; then
-    PLOY_VERSION="$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")"
-  fi
-  if [[ -z "$PLOY_VERSION" ]]; then
-    echo "error: PLOY_VERSION is required (set env or create $ROOT_DIR/VERSION)" >&2
-    exit 1
-  fi
-  if [[ ! "$PLOY_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-    echo "error: PLOY_VERSION must be semver (vX.Y.Z or vX.Y.Z-prerelease), got '$PLOY_VERSION'" >&2
-    exit 1
-  fi
-}
-
 init_runtime_image_defaults() {
   : "${PLOY_RUNTIME_SERVER_IMAGE:=ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION}}"
   : "${PLOY_RUNTIME_NODE_IMAGE:=ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION}}"
@@ -156,92 +113,24 @@ init_runtime_image_defaults() {
 }
 
 derive_admin_pg_dsn() {
-  "$PYTHON_BIN" <<'PY'
-import os
-from urllib.parse import urlsplit, urlunsplit
-
-dsn = os.environ["PLOY_DB_DSN"].strip()
-if not dsn:
-    raise SystemExit("error: PLOY_DB_DSN is required")
-if "://" not in dsn:
-    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN")
-u = urlsplit(dsn)
-if u.scheme not in ("postgres", "postgresql"):
-    raise SystemExit("error: PLOY_DB_DSN must use postgres:// or postgresql://")
-if u.path.strip("/") != "ploy":
-    raise SystemExit("error: PLOY_DB_DSN must target database ploy")
-print(urlunsplit((u.scheme, u.netloc, "/postgres", u.query, u.fragment)))
-PY
+  local dsn="$1"
+  printf '%s\n' "$dsn" | sed -E 's#(/)ploy([/?#]|$)#\1postgres\2#'
 }
 
 normalize_container_pg_dsn() {
-  PLOY_DB_DSN="$PLOY_DB_DSN" USER="${USER:-}" "$PYTHON_BIN" <<'PY'
-import os
-from urllib.parse import quote, urlsplit, urlunsplit
-
-dsn = os.environ["PLOY_DB_DSN"].strip()
-if not dsn or "://" not in dsn:
-    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN")
-u = urlsplit(dsn)
-if u.scheme not in ("postgres", "postgresql"):
-    raise SystemExit("error: PLOY_DB_DSN must use postgres:// or postgresql://")
-if u.path.strip("/") != "ploy":
-    raise SystemExit("error: PLOY_DB_DSN must target database ploy")
-
-username = u.username or os.environ.get("USER", "").strip()
-if not username:
-    raise SystemExit("error: unable to infer postgres username; include username in PLOY_DB_DSN or set USER")
-
-password = u.password
-host = (u.hostname or "").lower()
-if host in ("localhost", "127.0.0.1", "::1"):
-    host = "host.docker.internal"
-if ":" in host and not host.startswith("["):
-    host = f"[{host}]"
-
-userinfo = quote(username, safe="")
-if password is not None:
-    userinfo += ":" + quote(password, safe="")
-
-port = f":{u.port}" if u.port else ""
-netloc = f"{userinfo}@{host}{port}"
-print(urlunsplit((u.scheme, netloc, u.path, u.query, u.fragment)))
-PY
+  local dsn="$1"
+  printf '%s\n' "$dsn" | sed -E \
+    -e 's#(://|@)localhost([:/?#]|$)#\1host.docker.internal\2#g' \
+    -e 's#(://|@)127\.0\.0\.1([:/?#]|$)#\1host.docker.internal\2#g' \
+    -e 's#(://|@)\[::1\]([:/?#]|$)#\1host.docker.internal\2#g'
 }
 
 normalize_host_pg_dsn() {
-  PLOY_DB_DSN="$PLOY_DB_DSN" USER="${USER:-}" "$PYTHON_BIN" <<'PY'
-import os
-from urllib.parse import quote, urlsplit, urlunsplit
-
-dsn = os.environ["PLOY_DB_DSN"].strip()
-if not dsn or "://" not in dsn:
-    raise SystemExit("error: PLOY_DB_DSN must be a URL DSN")
-u = urlsplit(dsn)
-if u.scheme not in ("postgres", "postgresql"):
-    raise SystemExit("error: PLOY_DB_DSN must use postgres:// or postgresql://")
-if u.path.strip("/") != "ploy":
-    raise SystemExit("error: PLOY_DB_DSN must target database ploy")
-
-username = u.username or os.environ.get("USER", "").strip()
-if not username:
-    raise SystemExit("error: unable to infer postgres username; include username in PLOY_DB_DSN or set USER")
-
-password = u.password
-host = u.hostname or ""
-if host.lower() in ("host.docker.internal", "docker.for.mac.host.internal", "gateway.docker.internal"):
-    host = "localhost"
-if ":" in host and not host.startswith("["):
-    host = f"[{host}]"
-
-userinfo = quote(username, safe="")
-if password is not None:
-    userinfo += ":" + quote(password, safe="")
-
-port = f":{u.port}" if u.port else ""
-netloc = f"{userinfo}@{host}{port}"
-print(urlunsplit((u.scheme, netloc, u.path, u.query, u.fragment)))
-PY
+  local dsn="$1"
+  printf '%s\n' "$dsn" | sed -E \
+    -e 's#(://|@)host\.docker\.internal([:/?#]|$)#\1localhost\2#g' \
+    -e 's#(://|@)docker\.for\.mac\.host\.internal([:/?#]|$)#\1localhost\2#g' \
+    -e 's#(://|@)gateway\.docker\.internal([:/?#]|$)#\1localhost\2#g'
 }
 
 wait_for_postgres() {
@@ -382,19 +271,7 @@ configure_docker_registry_ca_if_needed() {
     return 0
   fi
 
-  ca_path="$PLOY_DEPLOY_CA_BUNDLE"
-  if [[ "$ca_path" != /* ]]; then
-    ca_path="$ROOT_DIR/$ca_path"
-  fi
-  if [[ ! -f "$ca_path" ]]; then
-    echo "error: PLOY_DEPLOY_CA_BUNDLE file not found: $ca_path" >&2
-    exit 1
-  fi
-  if [[ ! -s "$ca_path" ]]; then
-    echo "error: PLOY_DEPLOY_CA_BUNDLE file is empty: $ca_path" >&2
-    exit 1
-  fi
-
+  ca_path="$(resolve_ca_bundle_path "$PLOY_DEPLOY_CA_BUNDLE")"
   PLOY_DEPLOY_CA_BUNDLE="$ca_path"
   context="$(docker context show 2>/dev/null || true)"
   os_name="$(uname -s)"
@@ -417,15 +294,19 @@ configure_docker_registry_ca_if_needed() {
 }
 
 resolve_runtime_ca_bundle() {
-  local ca_path="${PLOY_DEPLOY_CA_BUNDLE:-}"
-
-  if [[ -z "$ca_path" ]]; then
+  if [[ -z "${PLOY_DEPLOY_CA_BUNDLE:-}" ]]; then
     PLOY_DEPLOY_CA_BUNDLE="/dev/null"
     return 0
   fi
 
+  PLOY_DEPLOY_CA_BUNDLE="$(resolve_ca_bundle_path "$PLOY_DEPLOY_CA_BUNDLE")"
+}
+
+resolve_ca_bundle_path() {
+  local ca_path="$1"
+
   if [[ "$ca_path" != /* ]]; then
-    ca_path="$ROOT_DIR/$ca_path"
+    ca_path="$RUNTIME_DIR/$ca_path"
   fi
   if [[ ! -f "$ca_path" ]]; then
     echo "error: PLOY_DEPLOY_CA_BUNDLE file not found: $ca_path" >&2
@@ -436,113 +317,90 @@ resolve_runtime_ca_bundle() {
     exit 1
   fi
 
-  PLOY_DEPLOY_CA_BUNDLE="$ca_path"
+  printf '%s\n' "$ca_path"
 }
 
 generate_tokens() {
-  "$PYTHON_BIN" <<'PY'
-import os, base64, json, hmac, hashlib, secrets, time
+  local secret
+  local admin_token admin_id admin_hash
+  local worker_token worker_id worker_hash
 
-secret = os.environ["PLOY_AUTH_SECRET"]
-cluster_id = os.environ.get("CLUSTER_ID", "local")
+  b64url() {
+    openssl base64 -A | tr '+/' '-_' | tr -d '='
+  }
 
-def b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+  sha256_hex() {
+    openssl dgst -sha256 | awk '{print $NF}'
+  }
 
-def gen_token(role: str):
-    now = int(time.time())
-    exp = now + 365*24*60*60
-    header = {"alg": "HS256", "typ": "JWT"}
-    jti = secrets.token_urlsafe(16)
-    payload = {
-        "cluster_id": cluster_id,
-        "role": role,
-        "token_type": "api",
-        "iat": now,
-        "exp": exp,
-        "jti": jti,
-    }
-    header_b64 = b64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
-    payload_b64 = b64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    unsigned = f"{header_b64}.{payload_b64}"
-    sig = hmac.new(secret.encode("utf-8"), unsigned.encode("utf-8"), hashlib.sha256).digest()
-    token = unsigned + "." + b64url(sig)
-    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
-    return token, jti, token_hash
+  gen_token() {
+    local role="$1"
+    local now exp jti header payload header_b64 payload_b64 unsigned signature token token_hash
 
-admin_token, admin_id, admin_hash = gen_token("cli-admin")
-worker_token, worker_id, worker_hash = gen_token("worker")
+    now="$(date +%s)"
+    exp="$((now + 365 * 24 * 60 * 60))"
+    jti="$(openssl rand 16 | b64url)"
+    header='{"alg":"HS256","typ":"JWT"}'
+    payload="$(jq -cn \
+      --arg cluster_id "$CLUSTER_ID" \
+      --arg role "$role" \
+      --arg jti "$jti" \
+      --argjson iat "$now" \
+      --argjson exp "$exp" \
+      '{cluster_id:$cluster_id,role:$role,token_type:"api",iat:$iat,exp:$exp,jti:$jti}')"
 
-print(f"ADMIN_TOKEN={admin_token}")
-print(f"ADMIN_TOKEN_ID={admin_id}")
-print(f"ADMIN_TOKEN_HASH={admin_hash}")
-print(f"WORKER_TOKEN={worker_token}")
-print(f"WORKER_TOKEN_ID={worker_id}")
-print(f"WORKER_TOKEN_HASH={worker_hash}")
-PY
+    header_b64="$(printf '%s' "$header" | b64url)"
+    payload_b64="$(printf '%s' "$payload" | b64url)"
+    unsigned="${header_b64}.${payload_b64}"
+    signature="$(printf '%s' "$unsigned" | openssl dgst -sha256 -hmac "$PLOY_AUTH_SECRET" -binary | b64url)"
+    token="${unsigned}.${signature}"
+    token_hash="$(printf '%s' "$token" | sha256_hex)"
+
+    printf '%s|%s|%s\n' "$token" "$jti" "$token_hash"
+  }
+
+  IFS='|' read -r admin_token admin_id admin_hash < <(gen_token "cli-admin")
+  IFS='|' read -r worker_token worker_id worker_hash < <(gen_token "worker")
+
+  printf 'ADMIN_TOKEN=%s\n' "$admin_token"
+  printf 'ADMIN_TOKEN_ID=%s\n' "$admin_id"
+  printf 'ADMIN_TOKEN_HASH=%s\n' "$admin_hash"
+  printf 'WORKER_TOKEN=%s\n' "$worker_token"
+  printf 'WORKER_TOKEN_ID=%s\n' "$worker_id"
+  printf 'WORKER_TOKEN_HASH=%s\n' "$worker_hash"
 }
 
 read_auth_json_field() {
   local field="$1"
   [[ -f "$AUTH_JSON_PATH" ]] || return 1
-  AUTH_JSON_PATH="$AUTH_JSON_PATH" AUTH_FIELD="$field" "$PYTHON_BIN" <<'PY'
-import json
-import os
-
-path = os.environ["AUTH_JSON_PATH"]
-field = os.environ["AUTH_FIELD"]
-try:
-    with open(path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
-except Exception:
-    raise SystemExit(1)
-value = data.get(field, "")
-if value is None:
-    value = ""
-print(str(value))
-PY
+  jq -er --arg field "$field" '.[$field] // "" | tostring' "$AUTH_JSON_PATH"
 }
 
 write_auth_json() {
-  local auth_dir server_url tmp_file
+  local auth_dir server_url generated_at
   auth_dir="$(dirname "$AUTH_JSON_PATH")"
   server_url="http://127.0.0.1:${PLOY_SERVER_PORT}"
+  generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   mkdir -p "$auth_dir"
-  tmp_file="$(mktemp)"
-  AUTH_JSON_PATH="$AUTH_JSON_PATH" \
-  CLUSTER_ID="$CLUSTER_ID" \
-  NODE_ID="$NODE_ID" \
-  SERVER_URL="$server_url" \
-  PLOY_AUTH_SECRET="$PLOY_AUTH_SECRET" \
-  ADMIN_TOKEN="$ADMIN_TOKEN" \
-  ADMIN_TOKEN_ID="$ADMIN_TOKEN_ID" \
-  ADMIN_TOKEN_HASH="$ADMIN_TOKEN_HASH" \
-  WORKER_TOKEN="$WORKER_TOKEN" \
-  WORKER_TOKEN_ID="$WORKER_TOKEN_ID" \
-  WORKER_TOKEN_HASH="$WORKER_TOKEN_HASH" \
-  "$PYTHON_BIN" <<'PY' > "$tmp_file"
-import json
-import os
-from datetime import datetime, timezone
 
-payload = {
-    "cluster_id": os.environ["CLUSTER_ID"],
-    "node_id": os.environ["NODE_ID"],
-    "address": os.environ["SERVER_URL"],
-    "token": os.environ["ADMIN_TOKEN"],
-    "auth_secret": os.environ["PLOY_AUTH_SECRET"],
-    "admin_token": os.environ["ADMIN_TOKEN"],
-    "admin_token_id": os.environ["ADMIN_TOKEN_ID"],
-    "admin_token_hash": os.environ["ADMIN_TOKEN_HASH"],
-    "worker_token": os.environ["WORKER_TOKEN"],
-    "worker_token_id": os.environ["WORKER_TOKEN_ID"],
-    "worker_token_hash": os.environ["WORKER_TOKEN_HASH"],
-    "generated_at": datetime.now(timezone.utc).isoformat(),
+  cat <<EOF > $AUTH_JSON_PATH
+{
+    "cluster_id": "$CLUSTER_ID",
+    "node_id": "$NODE_ID",
+    "address": "$server_url",
+    "token": "$ADMIN_TOKEN",
+    "auth_secret": "$PLOY_AUTH_SECRET",
+    "admin_token": "$ADMIN_TOKEN",
+    "admin_token_id": "$ADMIN_TOKEN_ID",
+    "admin_token_hash": "$ADMIN_TOKEN_HASH",
+    "worker_token": "$WORKER_TOKEN",
+    "worker_token_id": "$WORKER_TOKEN_ID",
+    "worker_token_hash": "$WORKER_TOKEN_HASH",
+    "generated_at": "$generated_at"
 }
-print(json.dumps(payload, indent=2, sort_keys=True))
-PY
-  chmod 600 "$tmp_file"
-  mv "$tmp_file" "$AUTH_JSON_PATH"
+EOF
+
+  chmod 600 "$AUTH_JSON_PATH"
 }
 
 set_default_auth_symlink() {
@@ -662,13 +520,11 @@ main() {
   local -a compose_services=(gradle-build-cache)
 
   parse_args "$@"
-  init_cluster_paths
-  resolve_ploy_version
   init_runtime_image_defaults
 
   log "Checking prerequisites..."
   need docker
-  need "$PYTHON_BIN"
+  need jq
   need openssl
   need psql
   need pg_isready
@@ -692,18 +548,20 @@ main() {
     exit 1
   fi
 
-  PLOY_DB_DSN_HOST="$(normalize_host_pg_dsn)"
-  PLOY_DB_DSN="$PLOY_DB_DSN_HOST"
-  PLOY_DB_DSN_CONTAINER="$(normalize_container_pg_dsn)"
+  PLOY_DB_DSN_HOST="$(normalize_host_pg_dsn "$PLOY_DB_DSN")"
+  PLOY_DB_DSN_CONTAINER="$(normalize_container_pg_dsn "$PLOY_DB_DSN_HOST")"
   PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
 
-  admin_pg_dsn="$(PLOY_DB_DSN="$PLOY_DB_DSN_HOST" derive_admin_pg_dsn)"
+  admin_pg_dsn="$(derive_admin_pg_dsn "$PLOY_DB_DSN_HOST")"
   wait_for_postgres "$admin_pg_dsn"
   if [[ $DROP_DB -eq 1 ]]; then
     drop_and_recreate_ploy_db "$admin_pg_dsn"
   else
     ensure_ploy_db_exists "$admin_pg_dsn"
   fi
+
+  AUTH_JSON_PATH="$PLOY_CONFIG_HOME/$CLUSTER_ID/auth.json"
+  WORKER_TOKEN_PATH="$PLOY_CONFIG_HOME/$CLUSTER_ID/bearer-token"
 
   if existing_auth_secret="$(read_auth_json_field auth_secret 2>/dev/null)"; then
     PLOY_AUTH_SECRET="$existing_auth_secret"
@@ -716,16 +574,11 @@ main() {
   export PLOY_AUTH_SECRET
   export CLUSTER_ID
   export PLOY_DB_DSN
-  PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
   export PLOY_DEPLOY_CA_BUNDLE
   export WORKER_TOKEN_PATH
   export PLOY_CONTAINER_REGISTRY
-  if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then
-    echo "error: PLOY_CONTAINER_REGISTRY is required (example: ghcr.io/iw2rmb/ploy)" >&2
-    exit 1
-  fi
 
   if [[ $REFRESH_PLOYD -eq 0 && $REFRESH_NODES -eq 0 ]]; then
     target_server=1

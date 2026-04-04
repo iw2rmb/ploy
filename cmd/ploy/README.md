@@ -612,11 +612,11 @@ reporting.
 ```yaml
 build_gate:
   router:
-    spec_path: ./healing/router/spec.yaml
+    <<: !include ./healing/router/spec.yaml
   healing:
     by_error_kind:
       infra:
-        spec_path: ./healing/infra/spec.yaml
+        <<: !include ./healing/infra/spec.yaml
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
         command: ["codex", "--input", "/workspace", "--out", "/out"]
@@ -629,21 +629,21 @@ build_gate:
             - path: /out/gate-profile-candidate.json
               schema: gate_profile_v1
       code:
-        spec_path: ./healing/code/spec.yaml
+        <<: !include ./healing/code/spec.yaml
         retries: 1
         image: ghcr.io/iw2rmb/ploy/codex:latest
         in:
           - ./codex-prompt.txt:/in/codex-prompt.txt
 ```
 
-`spec_path` is an optional CLI-side composition key for Build Gate router/healing
-objects. Supported locations:
-- `build_gate.router.spec_path`
-- `build_gate.healing.by_error_kind.<error_kind>.spec_path`
-CLI reads the referenced YAML/JSON object and deep-merges it into the target
-object. Inline fields next to `spec_path` override loaded fields. `spec_path`
-supports env expansion (`$VAR`, `${VAR}`) and `~/` home expansion. The key is
-removed before submit.
+`!include` is a CLI-side YAML composition macro. Use it either as full
+replacement (`router: !include ./router.yaml#/router`) or deep merge
+(`router: {<<: !include ./router.yaml#/router, ...overrides}`).
+Include references support `path[#/pointer]`, recurse through nested includes,
+and fail on include cycles. Relative include paths resolve from the including
+file directory. Relative local-source paths inside included fragments
+(`amata.spec`, `ca`, and source side of `in`/`out`/`home`) are rebased from
+that included file directory.
 
 For `infra` healing with `expectations.artifacts` schema `gate_profile_v1`, the
 healing container is expected to write `/out/gate-profile-candidate.json`. The

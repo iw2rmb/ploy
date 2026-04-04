@@ -31,11 +31,9 @@ import (
 var specEnvPlaceholderRE = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
 
 func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Client, data []byte, specBaseDir string) (json.RawMessage, error) {
-	var raw map[string]any
-	if err := json.Unmarshal(data, &raw); err != nil {
-		if err := yaml.Unmarshal(data, &raw); err != nil {
-			return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
-		}
+	raw, err := parseSpecInputToMap(data, specBaseDir)
+	if err != nil {
+		return nil, fmt.Errorf("parse spec (not valid JSON or YAML): %w", err)
 	}
 	if err := preprocessMigsSpecInPlace(raw, specBaseDir); err != nil {
 		return nil, err
@@ -64,9 +62,6 @@ func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 }
 
 func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
-	if err := resolveBuildGateSpecPathInPlace(spec, specBaseDir); err != nil {
-		return fmt.Errorf("resolve spec_path (build_gate): %w", err)
-	}
 	if err := resolveAmataSpecPathInPlace(spec, specBaseDir); err != nil {
 		return fmt.Errorf("resolve amata.spec path: %w", err)
 	}
@@ -252,10 +247,18 @@ func resolvePath(path string, baseDir ...string) (string, error) {
 	return expanded, nil
 }
 
-func parseSpecObject(data []byte) (map[string]any, error) {
+func parseSpecInputToMap(data []byte, specBaseDir string) (map[string]any, error) {
 	var obj map[string]any
 	if err := json.Unmarshal(data, &obj); err != nil {
-		if err := yaml.Unmarshal(data, &obj); err != nil {
+		specRootPath, rootErr := composeSpecRootPath(specBaseDir)
+		if rootErr != nil {
+			return nil, rootErr
+		}
+		composed, composeErr := composeSpecYAML(data, specRootPath)
+		if composeErr != nil {
+			return nil, composeErr
+		}
+		if err := yaml.Unmarshal(composed, &obj); err != nil {
 			return nil, fmt.Errorf("parse (not valid JSON or YAML): %w", err)
 		}
 	}
@@ -265,96 +268,20 @@ func parseSpecObject(data []byte) (map[string]any, error) {
 	return obj, nil
 }
 
-func readSpecObjectFromPath(path string, specBaseDir string) (map[string]any, error) {
-	resolved, err := resolvePath(path, specBaseDir)
-	if err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(resolved)
-	if err != nil {
-		return nil, fmt.Errorf("read file %s: %w", resolved, err)
-	}
-	obj, err := parseSpecObject(data)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", resolved, err)
-	}
-	return obj, nil
-}
-
-func deepMergeObjects(base, overlay map[string]any) map[string]any {
-	if base == nil {
-		base = map[string]any{}
-	}
-	out := make(map[string]any, len(base))
-	for k, v := range base {
-		out[k] = v
-	}
-	for k, v := range overlay {
-		if existing, ok := out[k]; ok {
-			existingMap, existingOK := existing.(map[string]any)
-			overlayMap, overlayOK := v.(map[string]any)
-			if existingOK && overlayOK {
-				out[k] = deepMergeObjects(existingMap, overlayMap)
-				continue
-			}
+func composeSpecRootPath(specBaseDir string) (string, error) {
+	base := strings.TrimSpace(specBaseDir)
+	if base == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("resolve working directory for spec: %w", err)
 		}
-		out[k] = v
+		base = wd
 	}
-	return out
-}
-
-func resolveBuildGateSpecPathInPlace(spec map[string]any, specBaseDir string) error {
-	bg, ok := spec["build_gate"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	if healing, ok := bg["healing"].(map[string]any); ok {
-		if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-			for errorKind, item := range byErrorKind {
-				action, ok := item.(map[string]any)
-				if !ok {
-					continue
-				}
-				specPathValue, hasSpecPath := action["spec_path"]
-				if !hasSpecPath {
-					continue
-				}
-				specPath, ok := specPathValue.(string)
-				if !ok {
-					return fmt.Errorf("%s.spec_path: expected string path, got %T", errorKind, specPathValue)
-				}
-				fragment, err := readSpecObjectFromPath(specPath, specBaseDir)
-				if err != nil {
-					return fmt.Errorf("%s.spec_path: %w", errorKind, err)
-				}
-
-				// spec_path is a preprocessing-only key; it must not reach canonical validation.
-				delete(action, "spec_path")
-				byErrorKind[errorKind] = deepMergeObjects(fragment, action)
-			}
-		}
-	}
-
-	router, ok := bg["router"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	specPathValue, hasSpecPath := router["spec_path"]
-	if !hasSpecPath {
-		return nil
-	}
-	specPath, ok := specPathValue.(string)
-	if !ok {
-		return fmt.Errorf("router.spec_path: expected string path, got %T", specPathValue)
-	}
-	fragment, err := readSpecObjectFromPath(specPath, specBaseDir)
+	resolved, err := filepath.Abs(base)
 	if err != nil {
-		return fmt.Errorf("router.spec_path: %w", err)
+		return "", fmt.Errorf("resolve absolute spec directory %s: %w", base, err)
 	}
-	delete(router, "spec_path")
-	bg["router"] = deepMergeObjects(fragment, router)
-	return nil
+	return filepath.Join(resolved, ".root-spec.yaml"), nil
 }
 
 // resolveAmataSpecPathInPlace loads amata.spec from file paths and replaces each
@@ -554,7 +481,7 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 //
 // Processing order:
 //  1. Load spec file (YAML or JSON format) if provided
-//  2. Preprocess: resolve spec_path, amata.spec, image env, envs expansion
+//  2. Preprocess: resolve !include composition, amata.spec, image env, envs expansion
 //  3. Compile Hydra records: ca/in/out/home authoring entries → canonical shortHash:dst form
 //  4. Apply CLI flag overrides (higher precedence than spec file) to top-level fields
 //  5. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
@@ -591,12 +518,9 @@ func buildSpecPayload(
 		if err != nil {
 			return nil, fmt.Errorf("read spec file %s: %w", specFile, err)
 		}
-		// Try JSON first, fallback to YAML
-		if err := json.Unmarshal(data, &specMap); err != nil {
-			// Not JSON; try YAML
-			if err := yaml.Unmarshal(data, &specMap); err != nil {
-				return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", specFile, err)
-			}
+		specMap, err = parseSpecInputToMap(data, specBaseDir)
+		if err != nil {
+			return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", specFile, err)
 		}
 	} else {
 		specMap = make(map[string]any)
