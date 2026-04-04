@@ -11,7 +11,7 @@ import (
 // TestConfigEnvListReturnsAllEntries verifies that GET /v1/config/env
 // returns all key+target pairs sorted by key then target, with secret values redacted.
 func TestConfigEnvListReturnsAllEntries(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
 		"PLOY_CA_CERTS": {{Value: "-----BEGIN CERTIFICATE-----\n...", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
 		"API_KEY":             {{Value: "sk-abc123", Target: domaintypes.GlobalEnvTargetSteps, Secret: false}},
 	})
@@ -52,7 +52,7 @@ func TestConfigEnvListReturnsAllEntries(t *testing.T) {
 // TestConfigEnvListMultiTarget verifies that list returns separate entries
 // for the same key with different targets.
 func TestConfigEnvListMultiTarget(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 	holder.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "val-gates", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 	holder.SetGlobalEnvVar("SHARED_KEY", GlobalEnvVar{Value: "val-steps", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
 
@@ -79,7 +79,7 @@ func TestConfigEnvListMultiTarget(t *testing.T) {
 // TestConfigEnvGetReturnsEntry verifies GET /v1/config/env/{key}
 // returns full value (including for secrets) for admin access.
 func TestConfigEnvGetReturnsEntry(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
 		"CODEX_AUTH_JSON": {{Value: `{"token":"secret"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 	})
 
@@ -108,7 +108,7 @@ func TestConfigEnvGetReturnsEntry(t *testing.T) {
 // TestConfigEnvGetWithTargetSelector verifies GET /v1/config/env/{key}?target=
 // returns the correct entry when multiple targets exist.
 func TestConfigEnvGetWithTargetSelector(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "gates-val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
 	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
 
@@ -128,64 +128,77 @@ func TestConfigEnvGetWithTargetSelector(t *testing.T) {
 	}
 }
 
-// TestConfigEnvGetAmbiguityError verifies GET /v1/config/env/{key} returns 409
-// when multiple targets exist and no target selector is provided.
-func TestConfigEnvGetAmbiguityError(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
-	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "gates-val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
-	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "steps-val", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+// TestConfigEnvGet_Errors verifies GET /v1/config/env/{key} error responses.
+func TestConfigEnvGet_Errors(t *testing.T) {
+	tests := []struct {
+		name       string
+		setupEnv   map[string][]GlobalEnvVar
+		key        string
+		query      string
+		wantStatus int
+	}{
+		{
+			name:       "not found",
+			key:        "NONEXISTENT",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name: "ambiguity without target selector",
+			setupEnv: map[string][]GlobalEnvVar{
+				"MULTI": {
+					{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false},
+					{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false},
+				},
+			},
+			key:        "MULTI",
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name: "invalid target",
+			setupEnv: map[string][]GlobalEnvVar{
+				"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
+			},
+			key:        "MY_KEY",
+			query:      "?target=bogus",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "target not found",
+			setupEnv: map[string][]GlobalEnvVar{
+				"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
+			},
+			key:        "MY_KEY",
+			query:      "?target=steps",
+			wantStatus: http.StatusNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			holder := NewConfigHolder(config.GitLabConfig{}, tt.setupEnv)
+			if tt.setupEnv == nil {
+				// Ensure non-ambiguous env entries are set via SetGlobalEnvVar if needed.
+			}
 
-	handler := getGlobalEnvHandler(holder)
+			// For the ambiguity test, set up via SetGlobalEnvVar.
+			if tt.name == "ambiguity without target selector" {
+				holder = NewConfigHolder(config.GitLabConfig{}, nil)
+				holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+				holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+			}
 
-	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MULTI", nil, "key", "MULTI")
+			handler := getGlobalEnvHandler(holder)
+			rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/"+tt.key+tt.query, nil, "key", tt.key)
 
-	assertStatus(t, rr, http.StatusConflict)
-}
-
-// TestConfigEnvGetInvalidTarget verifies GET /v1/config/env/{key}?target=bad
-// returns 400 when the target value is not a valid GlobalEnvTarget.
-func TestConfigEnvGetInvalidTarget(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
-		"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
-	})
-
-	handler := getGlobalEnvHandler(holder)
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MY_KEY?target=bogus", nil, "key", "MY_KEY")
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-// TestConfigEnvGetTargetNotFound verifies GET /v1/config/env/{key}?target=steps
-// returns 404 when the target is valid but the key has no entry for that target.
-func TestConfigEnvGetTargetNotFound(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
-		"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
-	})
-
-	handler := getGlobalEnvHandler(holder)
-
-	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/MY_KEY?target=steps", nil, "key", "MY_KEY")
-
-	assertStatus(t, rr, http.StatusNotFound)
-}
-
-// TestConfigEnvGetNotFound verifies GET /v1/config/env/{key} returns 404
-// when the key does not exist.
-func TestConfigEnvGetNotFound(t *testing.T) {
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
-
-	handler := getGlobalEnvHandler(holder)
-	rr := doRequest(t, handler, http.MethodGet, "/v1/config/env/NONEXISTENT", nil, "key", "NONEXISTENT")
-
-	assertStatus(t, rr, http.StatusNotFound)
+			assertStatus(t, rr, tt.wantStatus)
+		})
+	}
 }
 
 // TestConfigEnvPutUpsertsEntry verifies PUT /v1/config/env/{key}
 // persists to store and updates the holder.
 func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putGlobalEnvHandler(holder, st)
 
@@ -227,7 +240,7 @@ func TestConfigEnvPutUpsertsEntry(t *testing.T) {
 // when not explicitly set in the request.
 func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putGlobalEnvHandler(holder, st)
 
@@ -252,25 +265,30 @@ func TestConfigEnvPutDefaultsSecretToTrue(t *testing.T) {
 	}
 }
 
-// TestConfigEnvPutInvalidTarget verifies that invalid target values return 400.
-func TestConfigEnvPutInvalidTarget(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
-
-	handler := putGlobalEnvHandler(holder, st)
-
-	reqBody := map[string]any{
-		"value":  "test",
-		"target": "invalid-target",
+// TestConfigEnvPut_ValidationErrors verifies that PUT /v1/config/env/{key}
+// returns 400 for invalid inputs and does not call the store.
+func TestConfigEnvPut_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		key  string
+		body any
+	}{
+		{name: "invalid JSON", key: "TEST", body: "not json"},
+		{name: "invalid target", key: "TEST_KEY", body: map[string]any{"value": "test", "target": "invalid-target"}},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST_KEY", reqBody, "key", "TEST_KEY")
+			handler := putGlobalEnvHandler(holder, st)
+			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/"+tt.key, tt.body, "key", tt.key)
 
-	assertStatus(t, rr, http.StatusBadRequest)
-
-	// Store should not be called.
-	if st.upsertGlobalEnv.called {
-		t.Error("store.UpsertGlobalEnv should not be called for invalid target")
+			assertStatus(t, rr, http.StatusBadRequest)
+			if st.upsertGlobalEnv.called {
+				t.Error("store.UpsertGlobalEnv should not be called for invalid input")
+			}
+		})
 	}
 }
 
@@ -278,7 +296,7 @@ func TestConfigEnvPutInvalidTarget(t *testing.T) {
 // creates separate entries in the holder.
 func TestConfigEnvPutMultiTarget(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	putHandler := putGlobalEnvHandler(holder, st)
 
@@ -309,7 +327,7 @@ func TestConfigEnvPutMultiTarget(t *testing.T) {
 // removes from store and holder.
 func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
 		"OLD_KEY": {{Value: "old-value", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
@@ -340,7 +358,7 @@ func TestConfigEnvDeleteRemovesEntry(t *testing.T) {
 // ?target= succeeds when only one target exists for the key.
 func TestConfigEnvDeleteInfersTarget(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
 		"SINGLE": {{Value: "val", Target: domaintypes.GlobalEnvTargetNodes, Secret: false}},
 	})
 
@@ -358,49 +376,55 @@ func TestConfigEnvDeleteInfersTarget(t *testing.T) {
 	}
 }
 
-// TestConfigEnvDeleteAmbiguityError verifies DELETE /v1/config/env/{key}
-// returns 409 when multiple targets exist and no target is specified.
-func TestConfigEnvDeleteAmbiguityError(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
-	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
-	holder.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
-
-	handler := deleteGlobalEnvHandler(holder, st)
-
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/MULTI", nil, "key", "MULTI")
-
-	assertStatus(t, rr, http.StatusConflict)
-
-	// Store should not be called.
-	if st.deleteGlobalEnv.called {
-		t.Error("store.DeleteGlobalEnv should not be called for ambiguous delete")
+// TestConfigEnvDelete_Errors verifies DELETE /v1/config/env/{key} error responses.
+func TestConfigEnvDelete_Errors(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(*ConfigHolder)
+		key        string
+		query      string
+		wantStatus int
+	}{
+		{
+			name: "ambiguity without target",
+			setup: func(h *ConfigHolder) {
+				h.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "a", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+				h.SetGlobalEnvVar("MULTI", GlobalEnvVar{Value: "b", Target: domaintypes.GlobalEnvTargetSteps, Secret: false})
+			},
+			key:        "MULTI",
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name: "invalid target",
+			setup: func(h *ConfigHolder) {
+				h.SetGlobalEnvVar("MY_KEY", GlobalEnvVar{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false})
+			},
+			key:        "MY_KEY",
+			query:      "?target=bogus",
+			wantStatus: http.StatusBadRequest,
+		},
 	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			tt.setup(holder)
 
-// TestConfigEnvDeleteInvalidTarget verifies DELETE /v1/config/env/{key}?target=bad
-// returns 400 when the target value is not a valid GlobalEnvTarget.
-func TestConfigEnvDeleteInvalidTarget(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
-		"MY_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
-	})
+			handler := deleteGlobalEnvHandler(holder, st)
+			rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/"+tt.key+tt.query, nil, "key", tt.key)
 
-	handler := deleteGlobalEnvHandler(holder, st)
-
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/env/MY_KEY?target=bogus", nil, "key", "MY_KEY")
-
-	assertStatus(t, rr, http.StatusBadRequest)
-
-	if st.deleteGlobalEnv.called {
-		t.Error("store.DeleteGlobalEnv should not be called for invalid target")
+			assertStatus(t, rr, tt.wantStatus)
+			if st.deleteGlobalEnv.called {
+				t.Error("store.DeleteGlobalEnv should not be called")
+			}
+		})
 	}
 }
 
 // TestConfigEnvDeleteNonexistentKey verifies DELETE for non-existent key returns 204.
 func TestConfigEnvDeleteNonexistentKey(t *testing.T) {
 	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := deleteGlobalEnvHandler(holder, st)
 
@@ -450,7 +474,7 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &configStore{}
-			holder := NewConfigHolder(emptyGitLabConfig(), nil)
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 			// PUT the entry.
 			putRR := doRequest(t, putGlobalEnvHandler(holder, st), http.MethodPut, "/v1/config/env/"+tt.key, map[string]any{
@@ -482,22 +506,11 @@ func TestConfigEnvRoundTrip(t *testing.T) {
 	}
 }
 
-// TestConfigEnvPutInvalidJSON verifies that malformed JSON returns 400.
-func TestConfigEnvPutInvalidJSON(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
-
-	handler := putGlobalEnvHandler(holder, st)
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/TEST", "not json", "key", "TEST")
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
 // TestConfigEnvPutStoreError verifies that store errors return 500.
 func TestConfigEnvPutStoreError(t *testing.T) {
 	st := &configStore{}
 	st.upsertGlobalEnv.err = errMockDatabase
-	holder := NewConfigHolder(emptyGitLabConfig(), nil)
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putGlobalEnvHandler(holder, st)
 
@@ -517,7 +530,7 @@ func TestConfigEnvPutStoreError(t *testing.T) {
 func TestConfigEnvDeleteStoreError(t *testing.T) {
 	st := &configStore{}
 	st.deleteGlobalEnv.err = errMockDatabase
-	holder := NewConfigHolder(emptyGitLabConfig(), map[string][]GlobalEnvVar{
+	holder := NewConfigHolder(config.GitLabConfig{}, map[string][]GlobalEnvVar{
 		"OLD_KEY": {{Value: "val", Target: domaintypes.GlobalEnvTargetGates, Secret: false}},
 	})
 
@@ -533,24 +546,26 @@ func TestConfigEnvDeleteStoreError(t *testing.T) {
 	}
 }
 
-// TestConfigEnvPutSpecialKeyHardCutGuard verifies that PUT /v1/config/env/{key}
-// rejects special env keys with gates/steps targets (migrated to typed fields).
-func TestConfigEnvPutSpecialKeyHardCutGuard(t *testing.T) {
+// TestConfigEnvPut_SpecialKeyBlocked verifies that PUT /v1/config/env/{key}
+// rejects special env keys for all targets (migrated to typed config APIs).
+func TestConfigEnvPut_SpecialKeyBlocked(t *testing.T) {
 	tests := []struct {
 		name   string
 		key    string
 		target string
 	}{
-		{"home_gates", "CODEX_AUTH_JSON", "gates"},
-		{"home_steps", "CODEX_CONFIG_TOML", "steps"},
-		{"in_steps", "CODEX_PROMPT", "steps"},
-		{"ccr_gates", "CCR_CONFIG_JSON", "gates"},
-		{"crush_steps", "CRUSH_JSON", "steps"},
+		{"CODEX_AUTH_JSON/gates", "CODEX_AUTH_JSON", "gates"},
+		{"CODEX_CONFIG_TOML/steps", "CODEX_CONFIG_TOML", "steps"},
+		{"CODEX_PROMPT/steps", "CODEX_PROMPT", "steps"},
+		{"CCR_CONFIG_JSON/gates", "CCR_CONFIG_JSON", "gates"},
+		{"CRUSH_JSON/steps", "CRUSH_JSON", "steps"},
+		{"CODEX_AUTH_JSON/server", "CODEX_AUTH_JSON", "server"},
+		{"CODEX_AUTH_JSON/nodes", "CODEX_AUTH_JSON", "nodes"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &configStore{}
-			holder := NewConfigHolder(emptyGitLabConfig(), nil)
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 			handler := putGlobalEnvHandler(holder, st)
 
 			reqBody := map[string]any{
@@ -561,51 +576,12 @@ func TestConfigEnvPutSpecialKeyHardCutGuard(t *testing.T) {
 
 			assertStatus(t, rr, http.StatusBadRequest)
 
-			// Store must not have been called.
 			if st.upsertGlobalEnv.called {
 				t.Error("store.UpsertGlobalEnv should not be called for migrated special key")
 			}
-
-			// Holder must not have been updated.
 			if _, ok := holder.GetGlobalEnvVar(tt.key); ok {
 				t.Error("holder should not contain the rejected key")
 			}
 		})
 	}
-}
-
-// TestConfigEnvPutSpecialKeyAllTargetsBlocked verifies that special env keys
-// are rejected for all targets (full hard-cut to typed config APIs).
-func TestConfigEnvPutSpecialKeyAllTargetsBlocked(t *testing.T) {
-	tests := []struct {
-		name   string
-		target string
-	}{
-		{"server", "server"},
-		{"nodes", "nodes"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			st := &configStore{}
-			holder := NewConfigHolder(emptyGitLabConfig(), nil)
-			handler := putGlobalEnvHandler(holder, st)
-
-			reqBody := map[string]any{
-				"value":  "auth-data",
-				"target": tt.target,
-			}
-			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/CODEX_AUTH_JSON", reqBody, "key", "CODEX_AUTH_JSON")
-
-			assertStatus(t, rr, http.StatusBadRequest)
-
-			if st.upsertGlobalEnv.called {
-				t.Error("store.UpsertGlobalEnv should NOT be called for migrated special env key")
-			}
-		})
-	}
-}
-
-// Helper to create empty GitLab config for tests.
-func emptyGitLabConfig() config.GitLabConfig {
-	return config.GitLabConfig{}
 }
