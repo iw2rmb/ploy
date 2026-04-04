@@ -96,6 +96,34 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 				"steps": [{"image": "img:latest"}]
 			}`,
 		},
+		{
+			name: "env forbidden in step",
+			input: `{
+				"steps": [{"image": "img:latest", "env": {"FOO": "bar"}}]
+			}`,
+			wantErr: "forbidden",
+		},
+		{
+			name: "tmp_dir forbidden in step",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_dir": []}]
+			}`,
+			wantErr: "forbidden",
+		},
+		{
+			name: "tmp_bundle forbidden in step",
+			input: `{
+				"steps": [{"image": "img:latest", "tmp_bundle": {}}]
+			}`,
+			wantErr: "forbidden",
+		},
+		{
+			name: "env_from_file forbidden in step",
+			input: `{
+				"steps": [{"image": "img:latest", "env_from_file": {}}]
+			}`,
+			wantErr: "forbidden",
+		},
 	}
 
 	for _, tc := range tests {
@@ -113,31 +141,6 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tc.wantErr) {
 				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-			}
-		})
-	}
-}
-
-func TestMigSpecValidate_LegacyFieldsForbidden(t *testing.T) {
-	legacyFields := []struct {
-		name  string
-		field string
-	}{
-		{"env", `"env": {"FOO": "bar"}`},
-		{"tmp_dir", `"tmp_dir": []`},
-		{"tmp_bundle", `"tmp_bundle": {}`},
-		{"env_from_file", `"env_from_file": {}`},
-	}
-
-	for _, lf := range legacyFields {
-		t.Run(lf.name+"_rejected_in_step", func(t *testing.T) {
-			input := `{"steps": [{"image": "img:latest", ` + lf.field + `}]}`
-			_, err := ParseMigSpecJSON([]byte(input))
-			if err == nil {
-				t.Fatalf("expected legacy field %q to be rejected", lf.name)
-			}
-			if !strings.Contains(err.Error(), "forbidden") {
-				t.Fatalf("error %q does not contain 'forbidden'", err.Error())
 			}
 		})
 	}
@@ -205,7 +208,7 @@ func TestMigSpecValidate_HydraFieldsRouter(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:    "legacy env rejected in router",
+			name:    "env forbidden in router",
 			field:   `"env": {"FOO": "bar"}`,
 			wantErr: "build_gate.router.env: forbidden",
 		},
@@ -241,14 +244,14 @@ func TestMigSpecValidate_HydraFieldsRouter(t *testing.T) {
 	}
 }
 
-func TestMigSpecValidate_LegacyRootFieldsRejected(t *testing.T) {
+func TestMigSpecValidate_ForbiddenRootFields(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
 		wantErr string
 	}{
 		{
-			name: "root env rejected",
+			name: "root env forbidden",
 			input: `{
 				"steps": [{"image": "img:latest"}],
 				"env": {"FOO": "bar"}
@@ -256,7 +259,7 @@ func TestMigSpecValidate_LegacyRootFieldsRejected(t *testing.T) {
 			wantErr: "env: forbidden",
 		},
 		{
-			name: "root env_from_file rejected",
+			name: "root env_from_file forbidden",
 			input: `{
 				"steps": [{"image": "img:latest"}],
 				"env_from_file": {}
@@ -264,7 +267,7 @@ func TestMigSpecValidate_LegacyRootFieldsRejected(t *testing.T) {
 			wantErr: "env_from_file: forbidden",
 		},
 		{
-			name: "root tmp_dir rejected",
+			name: "root tmp_dir forbidden",
 			input: `{
 				"steps": [{"image": "img:latest"}],
 				"tmp_dir": []
@@ -272,7 +275,7 @@ func TestMigSpecValidate_LegacyRootFieldsRejected(t *testing.T) {
 			wantErr: "tmp_dir: forbidden",
 		},
 		{
-			name: "root tmp_bundle rejected",
+			name: "root tmp_bundle forbidden",
 			input: `{
 				"steps": [{"image": "img:latest"}],
 				"tmp_bundle": {}
