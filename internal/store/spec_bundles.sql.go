@@ -26,7 +26,6 @@ type CreateSpecBundleParams struct {
 }
 
 // Creates a new spec bundle metadata row. Blob data is stored in object storage.
-// The returned id becomes the bundle_id field in TmpBundleRef.
 func (q *Queries) CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error) {
 	row := q.db.QueryRow(ctx, createSpecBundle,
 		arg.ID,

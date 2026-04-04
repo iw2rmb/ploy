@@ -100,7 +100,7 @@ func NewRepoID() RepoID {
 
 // NewSpecBundleID generates a new unique SpecBundleID using NanoID.
 // Uses an 8-character NanoID with the URL-safe alphabet.
-// The returned value becomes the bundle_id in TmpBundleRef once stored.
+// Uses an 8-character NanoID with the URL-safe alphabet.
 func NewSpecBundleID() SpecBundleID {
 	id, err := gonanoid.Generate(alphabet, 8)
 	if err != nil {

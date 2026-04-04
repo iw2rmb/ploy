@@ -1,6 +1,5 @@
 -- name: CreateSpecBundle :one
 -- Creates a new spec bundle metadata row. Blob data is stored in object storage.
--- The returned id becomes the bundle_id field in TmpBundleRef.
 INSERT INTO spec_bundles (id, cid, digest, size, created_by)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING id, cid, digest, size, object_key, created_by, created_at, last_ref_at;

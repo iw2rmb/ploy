@@ -15,7 +15,6 @@ services:
       - PLOY_OBJECTSTORE_SECRET_KEY=${PLOY_OBJECTSTORE_SECRET_KEY:?set PLOY_OBJECTSTORE_SECRET_KEY}
       - PLOY_OBJECTSTORE_SECURE=${PLOY_OBJECTSTORE_SECURE:-false}
       - PLOY_OBJECTSTORE_REGION=${PLOY_OBJECTSTORE_REGION:-ploy}
-      - PLOY_CA_CERTS=/etc/ploy/certs/ca.crt
       - AWS_REQUEST_CHECKSUM_CALCULATION=when_required
       - AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
     volumes:
@@ -52,7 +51,6 @@ services:
       - DOCKER_AUTH_CONFIG=${DOCKER_AUTH_CONFIG:-}
       - PLOYD_CACHE_HOME=/private/tmp
       - TMPDIR=/private/tmp
-      - PLOY_CA_CERTS=/etc/ploy/certs/ca.crt
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - ${WORKER_TOKEN_PATH:?set WORKER_TOKEN_PATH (ploy cluster deploy sets ~/.config/ploy/<cluster>/bearer-token)}:/etc/ploy/bearer-token:ro
