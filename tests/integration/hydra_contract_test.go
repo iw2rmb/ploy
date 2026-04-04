@@ -309,7 +309,7 @@ func TestHydraContract_MountEnforcement(t *testing.T) {
 		spec := `{
 			"steps": [{
 				"image": "alpine:3.20",
-				"in":  ["abcdef0123456:/in/prompt.txt"],
+				"in":  ["abcdef0123456:/in/config.json"],
 				"out": ["bbbbbbb012345:/out/result.json"]
 			}],
 			"bundle_map": {"abcdef0123456": "bun-1", "bbbbbbb012345": "bun-2"}
