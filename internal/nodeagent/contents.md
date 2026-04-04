@@ -83,7 +83,7 @@
 [node_events_test.go](node_events_test.go) Unit tests covering node events behavior, edge cases, and contract expectations for nodeagent flows.
 [recovery_io.go](recovery_io.go) Parsers for recovery action/router outputs that normalize structured recovery decisions and summaries.
 [recovery_io_test.go](recovery_io_test.go) Unit tests covering recovery io behavior, edge cases, and contract expectations for nodeagent flows.
-[recovery_runtime.go](recovery_runtime.go) Recovery runtime env/TLS injection helpers used by healing jobs to access control-plane APIs securely.
+[recovery_runtime.go](recovery_runtime.go) Recovery runtime helpers that inject healing-job workspace, server URL, and TLS certificate paths for secure control-plane API access.
 [run_options.go](run_options.go) Typed run-option parsing and conversion utilities derived from claim/spec payloads for execution decisions.
 [run_options_test.go](run_options_test.go) Unit tests covering run options behavior, edge cases, and contract expectations for nodeagent flows.
 [server.go](server.go) Embedded node HTTP server setup, routing, and lifecycle management for control-plane callbacks.
