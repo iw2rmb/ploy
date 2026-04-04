@@ -139,11 +139,16 @@ func TestOverlay_JobSection(t *testing.T) {
 func TestOverlay_RouterSection(t *testing.T) {
 	ov := Overlay{Defaults: &Defaults{Job: &JobTargets{
 		PreGate:  &JobConfig{Envs: map[string]string{"PHASE": "pre"}},
+		ReGate:   &JobConfig{Envs: map[string]string{"PHASE": "re"}},
 		PostGate: &JobConfig{Envs: map[string]string{"PHASE": "post"}},
 	}}}
 	sec := ov.RouterSection("pre_gate")
 	if sec == nil || sec.Envs["PHASE"] != "pre" {
 		t.Fatalf("RouterSection(pre_gate) mismatch: %+v", sec)
+	}
+	sec = ov.RouterSection("re_gate")
+	if sec == nil || sec.Envs["PHASE"] != "re" {
+		t.Fatalf("RouterSection(re_gate) mismatch: %+v", sec)
 	}
 	sec = ov.RouterSection("post_gate")
 	if sec == nil || sec.Envs["PHASE"] != "post" {

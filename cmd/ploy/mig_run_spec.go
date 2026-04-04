@@ -468,6 +468,7 @@ func expandSpecEnvValue(raw string) (string, error) {
 // the active gate phase string for router overlay selection. The router inherits
 // from the first enabled gate phase:
 //   - "pre_gate" when build_gate.pre is configured (default)
+//   - "re_gate" when only build_gate.re is configured
 //   - "post_gate" when only build_gate.post is configured
 //   - "pre_gate" as fallback
 func deriveActiveGatePhase(spec map[string]any) string {
@@ -477,6 +478,9 @@ func deriveActiveGatePhase(spec map[string]any) string {
 	}
 	if _, hasPre := bg["pre"].(map[string]any); hasPre {
 		return "pre_gate"
+	}
+	if _, hasRe := bg["re"].(map[string]any); hasRe {
+		return "re_gate"
 	}
 	if _, hasPost := bg["post"].(map[string]any); hasPost {
 		return "post_gate"

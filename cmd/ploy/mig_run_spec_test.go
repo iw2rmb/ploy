@@ -540,6 +540,15 @@ func TestDeriveActiveGatePhase(t *testing.T) {
 			want: "pre_gate",
 		},
 		{
+			name: "build_gate with only re configured returns re_gate",
+			spec: map[string]any{
+				"build_gate": map[string]any{
+					"re": map[string]any{"target": "build"},
+				},
+			},
+			want: "re_gate",
+		},
+		{
 			name: "build_gate with only post configured returns post_gate",
 			spec: map[string]any{
 				"build_gate": map[string]any{
@@ -547,6 +556,26 @@ func TestDeriveActiveGatePhase(t *testing.T) {
 				},
 			},
 			want: "post_gate",
+		},
+		{
+			name: "build_gate with pre and re returns pre_gate",
+			spec: map[string]any{
+				"build_gate": map[string]any{
+					"pre": map[string]any{"target": "build"},
+					"re":  map[string]any{"target": "build"},
+				},
+			},
+			want: "pre_gate",
+		},
+		{
+			name: "build_gate with re and post returns re_gate",
+			spec: map[string]any{
+				"build_gate": map[string]any{
+					"re":   map[string]any{"target": "build"},
+					"post": map[string]any{"target": "unit"},
+				},
+			},
+			want: "re_gate",
 		},
 		{
 			name: "build_gate with both pre and post returns pre_gate",
@@ -559,7 +588,7 @@ func TestDeriveActiveGatePhase(t *testing.T) {
 			want: "pre_gate",
 		},
 		{
-			name: "build_gate with no pre or post defaults to pre_gate",
+			name: "build_gate with no pre re or post defaults to pre_gate",
 			spec: map[string]any{
 				"build_gate": map[string]any{
 					"enabled": true,
