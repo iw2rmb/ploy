@@ -94,7 +94,9 @@ func TestHydraContractOffline(t *testing.T) {
 		}
 	})
 
-	// Cross-check: docs inventories must list every special env key.
+	// Cross-check: docs inventories must list every special env key or its
+	// typed target field (legacy keys migrated to typed fields like "ca" are
+	// documented under the target field name, not the original env key).
 	t.Run("docs_env_readme_lists_all_keys", func(t *testing.T) {
 		root := repoRoot(t)
 		data, err := os.ReadFile(filepath.Join(root, "docs", "envs", "README.md"))
@@ -103,8 +105,8 @@ func TestHydraContractOffline(t *testing.T) {
 		}
 		content := string(data)
 		for _, m := range table {
-			if !strings.Contains(content, m.EnvKey) {
-				t.Errorf("docs/envs/README.md does not mention migrated key %q", m.EnvKey)
+			if !strings.Contains(content, m.EnvKey) && !strings.Contains(content, m.TargetField) {
+				t.Errorf("docs/envs/README.md does not mention migrated key %q or its target field %q", m.EnvKey, m.TargetField)
 			}
 		}
 	})

@@ -288,22 +288,6 @@ type globalEnvSetRequest struct {
 	Secret *bool  `json:"secret,omitempty"`
 }
 
-// migratedSpecialEnvKeys is the set of legacy env keys that have been migrated
-// to typed Hydra fields (ca/home/in) and must no longer be set via config env.
-var migratedSpecialEnvKeys = map[string]bool{
-	"CCR_CONFIG_JSON":  true,
-	"CODEX_AUTH_JSON":  true,
-	"CODEX_CONFIG_TOML": true,
-	"CODEX_PROMPT":     true,
-	"CRUSH_JSON":       true,
-	"PLOY_CA_CERTS":   true,
-}
-
-// isMigratedSpecialEnvKey reports whether key is a legacy special env key that
-// has been migrated to a typed Hydra field.
-func isMigratedSpecialEnvKey(key string) bool {
-	return migratedSpecialEnvKeys[key]
-}
 
 // validOnSelectors is the set of accepted values for the --on flag.
 var validOnSelectors = map[string]bool{
@@ -414,12 +398,6 @@ func handleConfigEnvSet(args []string, stderr io.Writer) error {
 	if value.set && file.set {
 		printConfigEnvSetUsage(stderr)
 		return errors.New("--value and --file are mutually exclusive")
-	}
-
-	// Hard-cut guard: reject migrated special env keys at the CLI before
-	// contacting the server. These keys must use the typed config APIs.
-	if isMigratedSpecialEnvKey(key.value) {
-		return fmt.Errorf("key %q is a migrated special env key and cannot be set via config env; use the typed config API instead", key.value)
 	}
 
 	selectors := on.values

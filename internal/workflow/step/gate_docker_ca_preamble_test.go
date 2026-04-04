@@ -83,29 +83,8 @@ func TestDockerGateExecutor_NoPreambleInCommand(t *testing.T) {
 	}
 }
 
-// TestEnvMaterializerPreamble_Empty verifies that envMaterializerPreamble
-// returns an empty string and MaterializerForKey returns nil for all keys
-// after the PLOY_CA_CERTS materializer was removed.
-func TestEnvMaterializerPreamble_Empty(t *testing.T) {
-	t.Parallel()
-
-	preamble := envMaterializerPreamble()
-	if preamble != "" {
-		t.Errorf("expected empty preamble, got: %q", preamble)
-	}
-
-	// No materializer should be registered.
-	if m := MaterializerForKey("PLOY_CA_CERTS"); m != nil {
-		t.Error("expected nil materializer for PLOY_CA_CERTS after removal")
-	}
-	if m := MaterializerForKey("OPENAI_API_KEY"); m != nil {
-		t.Error("expected nil materializer for plain key OPENAI_API_KEY")
-	}
-}
-
 // TestDockerGateExecutor_NoPreambleOnPrepOverride verifies that prep override
-// commands no longer contain the PLOY_CA_CERTS materializer preamble after
-// CA delivery was switched to Hydra mount entries.
+// commands contain no env preamble (CA delivery uses Hydra mount entries).
 func TestDockerGateExecutor_NoPreambleOnPrepOverride(t *testing.T) {
 	t.Parallel()
 

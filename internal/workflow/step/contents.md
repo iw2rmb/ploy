@@ -19,7 +19,6 @@
 [diff_test.go](diff_test.go) Exercises patch-stat parsing and diff execution edge cases.
 [errors.go](errors.go) Defines shared step-level sentinel errors such as repository cancellation semantics.
 [gate_command.go](gate_command.go) Builds deterministic gate shell commands per tool/target pair.
-[gate_command_materializer.go](gate_command_materializer.go) Defines env-key materializer framework for gate-command preambles.
 [gate_docker.go](gate_docker.go) Implements Docker-backed gate executor that resolves plans, runs gate containers, and records authoritative gate outcomes.
 [gate_docker_ca_preamble_test.go](gate_docker_ca_preamble_test.go) Tests that Docker gate commands contain no env preamble and materializer registry is empty.
 [gate_docker_gradle_cache_hits_test.go](gate_docker_gradle_cache_hits_test.go) Tests Gradle cache-hit extraction, normalization, and cleanup from gate workspace artifacts.
