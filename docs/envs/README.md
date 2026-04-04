@@ -585,7 +585,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 
 | Variable | Consumer | Description |
 |----------|----------|-------------|
-| `ca` (typed) | ORW migs, build-gate, custom migs | PEM-encoded CA certificates; mounted via Hydra `ca` materialization (replaces `PLOY_CA_CERTS`) |
+| `ca` (typed) | ORW migs, build-gate, custom migs | PEM-encoded CA certificates; mounted via Hydra `ca` materialization at `/etc/ploy/ca/<hash>` |
 | `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
 | `in` (typed) | `codex`, healing | Read-only input file mounts (replaces `CODEX_PROMPT` file injection) |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |

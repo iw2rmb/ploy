@@ -56,7 +56,7 @@ Optional:
 
 ## How ORW Images Behave
 
-- Both ORW images use the same `PLOY_CA_CERTS` materializer pattern as Build Gate.
+- Both ORW images use the Hydra `ca` materialization contract to receive CA certificates.
 - Both ship bundled `rewrite` at `/usr/local/bin/rewrite` backed by an embedded standalone runner JAR.
 - `ORW_CLI_BIN` defaults to the bundled binary and is intended to be overridden only for controlled debugging.
 - Recipes are resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION`; per-recipe image rebuild is not required.

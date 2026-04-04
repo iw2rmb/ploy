@@ -19,7 +19,7 @@ Optional env:
   ORW_FAIL_ON_UNSUPPORTED    true|false (default: true)
   ORW_EXCLUDE_PATHS          Comma-separated glob patterns excluded from parsing (e.g. **/*.proto)
   ORW_CLI_BIN                Executable name/path for OpenRewrite CLI (default: rewrite)
-  PLOY_CA_CERTS              PEM CA bundle file path imported into trust stores (inline PEM no longer supported)
+  PLOY_CA_CERT_PATH          PEM CA bundle file path imported into trust stores (Hydra mount: /etc/ploy/certs/ca.crt)
 USAGE
 }
 
@@ -108,19 +108,13 @@ parse_bool_default_true() {
 }
 
 import_ca_bundle() {
-  if [[ -z "${PLOY_CA_CERTS:-}" ]]; then
-    return 0
-  fi
-
-  # Hydra CA delivery: PLOY_CA_CERTS must be a readable file path.
-  # Inline PEM content is no longer supported.
-  if [[ ! -r "${PLOY_CA_CERTS}" ]]; then
-    echo "warning: PLOY_CA_CERTS is set but is not a readable file; migrate to Hydra CA mount or provide a file path" >>"$transform_log"
+  local ca_path="${PLOY_CA_CERT_PATH:-/etc/ploy/certs/ca.crt}"
+  if [[ ! -r "$ca_path" ]] || [[ ! -s "$ca_path" ]]; then
     return 0
   fi
 
   local pem_file pem_dir sys_ca_dir
-  pem_file="${PLOY_CA_CERTS}"
+  pem_file="$ca_path"
   pem_dir="$(mktemp -d)"
 
   awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$pem_dir" "$pem_file"
