@@ -28,7 +28,7 @@
 [migs_spec_amata_test.go](migs_spec_amata_test.go) Parameterizes and tests valid Amata placement and forbidden flat-key variants across mig spec locations.
 [migs_spec_build_gate_test.go](migs_spec_build_gate_test.go) Tests build-gate stack configuration parsing and invalid target/field validation paths.
 [migs_spec_healing_test.go](migs_spec_healing_test.go) Tests healing contract requirements, retries coercion, and related parser validation behavior.
-[migs_spec_hydra_validation_test.go](migs_spec_hydra_validation_test.go) Tests Hydra field validation across step, healing, and router contracts, including domain/path safety and removed-field schema enforcement.
+[migs_spec_hydra_validation_test.go](migs_spec_hydra_validation_test.go) Tests Hydra field validation across step, healing, and router contracts, including domain/path safety and schema rejection of unsupported materialization fields.
 [migs_spec_parse.go](migs_spec_parse.go) Parses mig specs from JSON, enforces schema checks, normalizes defaults, and runs typed validation.
 [migs_spec_parse_test.go](migs_spec_parse_test.go) Tests single-step and multi-step mig spec parsing with build-gate and GitLab options.
 [migs_spec_roundtrip_test.go](migs_spec_roundtrip_test.go) Verifies JSON marshal/parse round-trip preserves canonical mig spec fields.
