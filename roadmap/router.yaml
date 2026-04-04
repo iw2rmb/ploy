@@ -1,0 +1,138 @@
+---
+policy: .codex/policies/composing-roadmaps.md
+schema: .codex/policies/roadmap.schema.json
+title: Router As First-Class Job
+scope: Treat router as a normal queued job by extending existing healing-chain queue, completion, and rewiring flows; no parallel orchestration path.
+documentation:
+  - design/router.md
+  - docs/migs-lifecycle.md
+  - docs/api/components/schemas/controlplane.yaml
+  - internal/store/schema.sql
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: Extend existing job contracts to include canonical `router` job type across domain validation, DB constraints, and API schema.
+    classification: determined
+    components:
+      - internal/domain/types/migs.go
+      - internal/store/schema.sql
+      - docs/api/components/schemas/controlplane.yaml
+      - internal/domain/types/**/*test.go
+      - internal/store/**/*test.go
+      - docs/api/**/*test*.go
+    implementation:
+      - Extend job type constants and validation so `router` is accepted as a first-class job type alongside existing queued job types.
+      - Update jobs table `job_type` constraint to include `router` while preserving existing status and chain semantics.
+      - Update control-plane API schema enum so `router` is emitted by existing run/job surfaces.
+      - Add or adjust contract tests for domain validation, schema checks, and API enum exposure.
+    verification:
+      - Job type validation accepts `router` and rejects unsupported values.
+      - Store-level checks allow inserting and reading `router` jobs.
+      - API schema and generated docs expose `router` in job-type enums.
+      - Existing non-router job types continue to pass contract tests unchanged.
+    reasoning: high
+    cfp: 10
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: Extend existing failed-gate completion rewiring so it inserts queued `router` as successor before any healing-chain insertion.
+    classification: determined
+    components:
+      - internal/server/handlers/jobs_complete_service_post_actions.go
+      - internal/server/handlers/nodes_complete_healing.go
+      - internal/server/handlers/**/*complete*_test.go
+      - internal/store/**/*job*_test.go
+    implementation:
+      - Refactor existing failed-gate completion branch to create queued `router` successor instead of directly inserting `heal -> re_gate`.
+      - Reuse current chain rewiring invariants and persistence ordering, but target `failed_gate.next_id -> router`.
+      - Keep eligibility checks in the existing healing-orchestration path (gate type, healing/router configured), avoiding a second orchestration entrypoint.
+      - Add completion-service tests for `failed_gate -> router` chain creation and link integrity.
+    verification:
+      - Failing gate with healing enabled produces a persisted router successor job.
+      - Failed gate completion no longer inserts `heal` directly.
+      - Chain links remain single-successor and deterministic after rewiring.
+      - Ineligible failures do not create router jobs.
+    reasoning: high
+    cfp: 11
+
+  - done: false
+    reviews: []
+    label: "3"
+    summary: Extend existing completion decision flow so router completion becomes the only trigger for cancel vs `heal -> re_gate` transitions.
+    classification: determined
+    components:
+      - internal/server/handlers/jobs_complete_service_post_actions.go
+      - internal/server/handlers/nodes_complete_healing.go
+      - internal/workflow/lifecycle/orchestrator.go
+      - internal/server/handlers/**/*router*_test.go
+      - internal/workflow/lifecycle/**/*test.go
+    implementation:
+      - Add router completion handling to existing completion post-actions, consuming router classification metadata as transition input.
+      - Reuse existing `EvaluateGateFailureTransition` logic for terminal vs recoverable decisions and map outcomes to cancel or `heal -> re_gate` insertion.
+      - Ensure router terminal states `Fail`, `Error`, and `Cancelled` follow existing cancel-remainder behavior from router node in chain.
+      - Keep gate metadata ownership for gate findings and use router output metadata as authoritative recovery classification input.
+      - Add branch tests for terminal classification, missing action mapping, and recoverable path insertion.
+    verification:
+      - Healing insertion occurs only when router completes successfully with non-terminal classification and matching action.
+      - Terminal router classifications and non-success statuses cancel downstream jobs from router.
+      - Recovery decisions do not depend on former gate-inline router behavior.
+      - Existing non-recovery chain transitions remain unchanged.
+    reasoning: high
+    cfp: 12
+
+  - done: false
+    reviews: []
+    label: "4"
+    summary: Extend existing node queued-job dispatcher with `router` execution and reuse standard runtime error-to-`Error` status propagation.
+    classification: determined
+    components:
+      - internal/nodeagent/execution_orchestrator.go
+      - internal/nodeagent/execution_orchestrator_gate.go
+      - internal/nodeagent/execution_orchestrator_router_runtime.go
+      - internal/nodeagent/manifest.go
+      - internal/server/handlers/nodes_claim_recovery_context.go
+      - internal/nodeagent/**/*router*_test.go
+      - internal/server/handlers/**/*claim*_test.go
+    implementation:
+      - Remove inline router execution from gate executor path.
+      - Add `router` case to existing node job-type dispatch so router runs as a normal claimed queued job.
+      - Reuse existing router manifest/runtime code as primary router job execution path, returning runtime/infrastructure failures to standard status mapping.
+      - Extend recovery claim context for router jobs and ensure `/in/build-gate.log` is sourced from server-provided failed-gate metadata.
+      - Add node and handler tests for runtime error propagation, diagnostics persistence, and router input materialization.
+    verification:
+      - Gate executor no longer invokes inline router runtime.
+      - Router runtime failure results in router job status `Error` with persisted error details.
+      - Router job reads `build_gate_log` via recovery claim context without node-local fallback assumptions.
+      - Router success/failure uploads remain isolated to router job identity.
+    reasoning: high
+    cfp: 13
+
+  - done: false
+    reviews: []
+    label: "5"
+    summary: Align lifecycle documentation and end-to-end coverage for `failed_gate -> router -> {cancel|heal->re_gate}` without changing non-router flow contracts.
+    classification: determined
+    components:
+      - docs/migs-lifecycle.md
+      - tests/e2e/migs/**
+      - internal/server/handlers/**/*_test.go
+      - internal/nodeagent/**/*_test.go
+      - internal/workflow/lifecycle/**/*_test.go
+      - cmd/ploy/**/*_test.go
+    implementation:
+      - Update lifecycle docs to describe router as first-class queued job and router-owned healing trigger semantics.
+      - Add or update E2E scenarios for router success recoverable path, router terminal classification cancellation path, and router runtime infrastructure error path.
+      - Ensure API and CLI ordering/phase surfaces include router jobs in chain progression views.
+      - Verify deterministic run completion behavior remains intact for non-router flows.
+      - Remove obsolete assumptions that gate completion directly inserts healing jobs.
+    verification:
+      - Docs reflect router-driven recovery chain and no longer describe inline gate router execution.
+      - E2E tests pass for recoverable, terminal, and runtime-error router paths.
+      - Run/job APIs and CLI show router jobs with expected ordering and terminal outcomes.
+      - Regression suite confirms existing pre_gate/mig/post_gate and MR paths are unaffected.
+    reasoning: high
+    cfp: 9
