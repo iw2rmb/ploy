@@ -173,22 +173,56 @@ func TestHandleConfigEnvShowWithFrom(t *testing.T) {
 	}
 }
 
-// TestHandleConfigEnvShowAmbiguity verifies that 409 responses produce a --from hint.
-func TestHandleConfigEnvShowAmbiguity(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "ambiguous key: exists for targets gates, steps", http.StatusConflict)
-	}))
-	defer srv.Close()
-
-	clienv.UseServerDescriptor(t, srv.URL)
-
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "DEPLOY_TOKEN"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for ambiguous key")
+// TestHandleConfigEnvShow_ErrorResponses verifies error handling for various
+// server responses (ambiguity, not found, server error).
+func TestHandleConfigEnvShow_ErrorResponses(t *testing.T) {
+	tests := []struct {
+		name            string
+		status          int
+		body            string
+		args            []string
+		wantErrContains string
+	}{
+		{
+			name:            "ambiguity returns from hint",
+			status:          http.StatusConflict,
+			body:            "ambiguous key: exists for targets gates, steps",
+			args:            []string{"--key", "DEPLOY_TOKEN"},
+			wantErrContains: "use --from",
+		},
+		{
+			name:            "not found",
+			status:          http.StatusNotFound,
+			body:            "global env key not found: MISSING_KEY",
+			args:            []string{"--key", "MISSING_KEY"},
+			wantErrContains: "not found",
+		},
+		{
+			name:            "server error",
+			status:          http.StatusForbidden,
+			body:            "forbidden",
+			args:            []string{"--key", "FOO"},
+			wantErrContains: "server returned 403",
+		},
 	}
-	if !strings.Contains(err.Error(), "use --from") {
-		t.Fatalf("expected --from hint in error, got: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, tt.body, tt.status)
+			}))
+			defer srv.Close()
+
+			clienv.UseServerDescriptor(t, srv.URL)
+
+			buf := &bytes.Buffer{}
+			err := handleConfigEnvShow(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
+			}
+		})
 	}
 }
 
@@ -223,25 +257,6 @@ func TestHandleConfigEnvShowRaw(t *testing.T) {
 	// With --raw, the full value should be shown.
 	if !strings.Contains(output, "super-secret-value-12345") {
 		t.Fatalf("expected full value with --raw, got: %q", output)
-	}
-}
-
-// TestHandleConfigEnvShowNotFound verifies that missing keys return a clear error.
-func TestHandleConfigEnvShowNotFound(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "global env key not found: MISSING_KEY", http.StatusNotFound)
-	}))
-	defer srv.Close()
-
-	clienv.UseServerDescriptor(t, srv.URL)
-
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "MISSING_KEY"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing key")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -532,22 +547,49 @@ func TestHandleConfigEnvUnsetWithFrom(t *testing.T) {
 	}
 }
 
-// TestHandleConfigEnvUnsetAmbiguity verifies that 409 responses produce a --from hint.
-func TestHandleConfigEnvUnsetAmbiguity(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "ambiguous key: exists for targets gates, steps", http.StatusConflict)
-	}))
-	defer srv.Close()
-
-	clienv.UseServerDescriptor(t, srv.URL)
-
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", "DEPLOY_TOKEN"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for ambiguous key")
+// TestHandleConfigEnvUnset_ErrorResponses verifies error handling for various
+// server responses (ambiguity, server error).
+func TestHandleConfigEnvUnset_ErrorResponses(t *testing.T) {
+	tests := []struct {
+		name            string
+		status          int
+		body            string
+		args            []string
+		wantErrContains string
+	}{
+		{
+			name:            "ambiguity returns from hint",
+			status:          http.StatusConflict,
+			body:            "ambiguous key: exists for targets gates, steps",
+			args:            []string{"--key", "DEPLOY_TOKEN"},
+			wantErrContains: "use --from",
+		},
+		{
+			name:            "server error",
+			status:          http.StatusInternalServerError,
+			body:            "internal error",
+			args:            []string{"--key", "FOO"},
+			wantErrContains: "server returned 500",
+		},
 	}
-	if !strings.Contains(err.Error(), "use --from") {
-		t.Fatalf("expected --from hint in error, got: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, tt.body, tt.status)
+			}))
+			defer srv.Close()
+
+			clienv.UseServerDescriptor(t, srv.URL)
+
+			buf := &bytes.Buffer{}
+			err := handleConfigEnvUnset(tt.args, buf)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrContains) {
+				t.Fatalf("expected error containing %q, got: %v", tt.wantErrContains, err)
+			}
+		})
 	}
 }
 
@@ -576,25 +618,6 @@ func TestHandleConfigEnvUnsetNotFound(t *testing.T) {
 	}
 }
 
-// TestHandleConfigEnvUnsetServerError verifies that server errors are propagated.
-func TestHandleConfigEnvUnsetServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	clienv.UseServerDescriptor(t, srv.URL)
-
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvUnset([]string{"--key", "FOO"}, buf)
-	if err == nil {
-		t.Fatalf("expected error from server")
-	}
-	if !strings.Contains(err.Error(), "server returned 500") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 // TestHandleConfigEnvListServerError verifies that server errors in list are propagated.
 func TestHandleConfigEnvListServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -610,25 +633,6 @@ func TestHandleConfigEnvListServerError(t *testing.T) {
 		t.Fatalf("expected error from server")
 	}
 	if !strings.Contains(err.Error(), "server returned 401") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigEnvShowServerError verifies that server errors in show are propagated.
-func TestHandleConfigEnvShowServerError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-	}))
-	defer srv.Close()
-
-	clienv.UseServerDescriptor(t, srv.URL)
-
-	buf := &bytes.Buffer{}
-	err := handleConfigEnvShow([]string{"--key", "FOO"}, buf)
-	if err == nil {
-		t.Fatalf("expected error from server")
-	}
-	if !strings.Contains(err.Error(), "server returned 403") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

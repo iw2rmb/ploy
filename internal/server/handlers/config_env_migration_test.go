@@ -126,106 +126,105 @@ func TestScanSpecialEnvKeys_RewriteCandidates(t *testing.T) {
 	}
 }
 
-func TestScanSpecialEnvKeys_ServerTargetMigrated(t *testing.T) {
-	globalEnv := map[string][]GlobalEnvVar{
-		"CRUSH_JSON": {{Value: "crush-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true}},
+// TestScanSpecialEnvKeys_TargetMapping verifies that each GlobalEnvTarget maps
+// to the correct set of job sections.
+func TestScanSpecialEnvKeys_TargetMapping(t *testing.T) {
+	tests := []struct {
+		name         string
+		key          string
+		target       domaintypes.GlobalEnvTarget
+		wantSections []string
+	}{
+		{"gates", "CRUSH_JSON", domaintypes.GlobalEnvTargetGates, []string{"pre_gate", "re_gate", "post_gate"}},
+		{"steps", "CODEX_CONFIG_TOML", domaintypes.GlobalEnvTargetSteps, []string{"heal", "mig"}},
+		{"server expands to all", "CRUSH_JSON", domaintypes.GlobalEnvTargetServer, nil},  // 5 sections
+		{"nodes expands to all", "CRUSH_JSON", domaintypes.GlobalEnvTargetNodes, nil},    // 5 sections
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			globalEnv := map[string][]GlobalEnvVar{
+				tt.key: {{Value: "data", Target: tt.target, Secret: true}},
+			}
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
+			report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
 
-	if report.Rewritten != 1 {
-		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
-	}
-	if report.Entries[0].Action != MigrationActionRewrite {
-		t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionRewrite)
-	}
-	// Server target maps to all job sections.
-	if len(report.Entries[0].Sections) != 5 {
-		t.Errorf("Sections = %v, want 5 sections (all)", report.Entries[0].Sections)
+			if report.Rewritten != 1 {
+				t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
+			}
+			if report.Entries[0].Action != MigrationActionRewrite {
+				t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionRewrite)
+			}
+
+			if tt.wantSections != nil {
+				if len(report.Entries[0].Sections) != len(tt.wantSections) {
+					t.Fatalf("Sections = %v, want %v", report.Entries[0].Sections, tt.wantSections)
+				}
+				for i, s := range tt.wantSections {
+					if report.Entries[0].Sections[i] != s {
+						t.Errorf("Sections[%d] = %q, want %q", i, report.Entries[0].Sections[i], s)
+					}
+				}
+			} else {
+				// Server/nodes target maps to all 5 job sections.
+				if len(report.Entries[0].Sections) != 5 {
+					t.Errorf("Sections = %v, want 5 sections (all)", report.Entries[0].Sections)
+				}
+			}
+		})
 	}
 }
 
-func TestScanSpecialEnvKeys_NodesTargetMigrated(t *testing.T) {
-	globalEnv := map[string][]GlobalEnvVar{
-		"CRUSH_JSON": {{Value: "crush-data", Target: domaintypes.GlobalEnvTargetNodes, Secret: true}},
+// TestScanSpecialEnvKeys_ConflictCases verifies that existing home/in entries
+// cause rejection when they conflict with a special env migration.
+func TestScanSpecialEnvKeys_ConflictCases(t *testing.T) {
+	tests := []struct {
+		name         string
+		globalEnv    map[string][]GlobalEnvVar
+		existingHome map[string][]ConfigHomeEntry
+		existingIn   map[string][]ConfigInEntry
+	}{
+		{
+			name: "home conflict full",
+			globalEnv: map[string][]GlobalEnvVar{
+				"CODEX_AUTH_JSON": {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+			},
+			existingHome: map[string][]ConfigHomeEntry{
+				"mig": {{Entry: "existinghash:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
+			},
+		},
+		{
+			name: "home conflict partial sections",
+			globalEnv: map[string][]GlobalEnvVar{
+				"CODEX_AUTH_JSON": {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps}},
+			},
+			existingHome: map[string][]ConfigHomeEntry{
+				"mig": {{Entry: "abc1234:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
+			},
+		},
+		{
+			name: "in conflict",
+			globalEnv: map[string][]GlobalEnvVar{
+				"CODEX_PROMPT": {{Value: "do the thing", Target: domaintypes.GlobalEnvTargetSteps}},
+			},
+			existingIn: map[string][]ConfigInEntry{
+				"mig": {{Entry: "abc123:/in/codex-prompt.txt", Dst: "/in/codex-prompt.txt", Section: "mig"}},
+			},
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			report := ScanSpecialEnvKeys(tt.globalEnv, nil, tt.existingHome, tt.existingIn)
 
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
-
-	if report.Rewritten != 1 {
-		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
-	}
-	// Nodes target maps to all job sections.
-	if len(report.Entries[0].Sections) != 5 {
-		t.Errorf("Sections = %v, want 5 sections (all)", report.Entries[0].Sections)
-	}
-}
-
-func TestScanSpecialEnvKeys_ConflictRejected(t *testing.T) {
-	globalEnv := map[string][]GlobalEnvVar{
-		"CODEX_AUTH_JSON": {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
-	}
-
-	existingHome := map[string][]ConfigHomeEntry{
-		"mig": {{Entry: "existinghash:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
-	}
-
-	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
-
-	if report.Rejected != 1 {
-		t.Fatalf("Rejected = %d, want 1", report.Rejected)
-	}
-	if report.Entries[0].Action != MigrationActionReject {
-		t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionReject)
-	}
-	if report.Entries[0].Reason == "" {
-		t.Error("Reason should not be empty for rejected entries")
-	}
-}
-
-func TestScanSpecialEnvKeys_GatesTarget(t *testing.T) {
-	globalEnv := map[string][]GlobalEnvVar{
-		"CRUSH_JSON": {{Value: "crush-data", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
-	}
-
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
-
-	if report.Rewritten != 1 {
-		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
-	}
-
-	entry := report.Entries[0]
-	wantSections := []string{"pre_gate", "re_gate", "post_gate"}
-	if len(entry.Sections) != len(wantSections) {
-		t.Fatalf("Sections = %v, want %v", entry.Sections, wantSections)
-	}
-	for i, s := range wantSections {
-		if entry.Sections[i] != s {
-			t.Errorf("Sections[%d] = %q, want %q", i, entry.Sections[i], s)
-		}
-	}
-}
-
-func TestScanSpecialEnvKeys_StepsTarget(t *testing.T) {
-	globalEnv := map[string][]GlobalEnvVar{
-		"CODEX_CONFIG_TOML": {{Value: "toml-data", Target: domaintypes.GlobalEnvTargetSteps}},
-	}
-
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
-
-	if report.Rewritten != 1 {
-		t.Fatalf("Rewritten = %d, want 1", report.Rewritten)
-	}
-
-	entry := report.Entries[0]
-	wantSections := []string{"heal", "mig"}
-	if len(entry.Sections) != len(wantSections) {
-		t.Fatalf("Sections = %v, want %v", entry.Sections, wantSections)
-	}
-	for i, s := range wantSections {
-		if entry.Sections[i] != s {
-			t.Errorf("Sections[%d] = %q, want %q", i, entry.Sections[i], s)
-		}
+			if report.Rejected != 1 {
+				t.Fatalf("Rejected = %d, want 1", report.Rejected)
+			}
+			if report.Entries[0].Action != MigrationActionReject {
+				t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionReject)
+			}
+			if report.Entries[0].Reason == "" {
+				t.Error("Reason should not be empty for rejected entries")
+			}
+		})
 	}
 }
 
@@ -265,48 +264,6 @@ func TestScanSpecialEnvKeys_NonSpecialKeysIgnored(t *testing.T) {
 
 	if len(report.Entries) != 0 {
 		t.Errorf("Entries = %d, want 0 (non-special keys should be ignored)", len(report.Entries))
-	}
-}
-
-func TestScanSpecialEnvKeys_HomeConflictPartialSections(t *testing.T) {
-	// CODEX_AUTH_JSON with steps target maps to [heal, mig].
-	// Conflict only in mig → reject (conflict in any section rejects the entry).
-	globalEnv := map[string][]GlobalEnvVar{
-		"CODEX_AUTH_JSON": {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps}},
-	}
-
-	existingHome := map[string][]ConfigHomeEntry{
-		"mig": {{Entry: "abc1234:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
-	}
-
-	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
-
-	if report.Rejected != 1 {
-		t.Fatalf("Rejected = %d, want 1", report.Rejected)
-	}
-}
-
-func TestScanSpecialEnvKeys_InConflictRejected(t *testing.T) {
-	// CODEX_PROMPT maps to in:/in/codex-prompt.txt. Existing in entry for that
-	// destination in the mig section must cause rejection.
-	globalEnv := map[string][]GlobalEnvVar{
-		"CODEX_PROMPT": {{Value: "do the thing", Target: domaintypes.GlobalEnvTargetSteps}},
-	}
-
-	existingIn := map[string][]ConfigInEntry{
-		"mig": {{Entry: "abc123:/in/codex-prompt.txt", Dst: "/in/codex-prompt.txt", Section: "mig"}},
-	}
-
-	report := ScanSpecialEnvKeys(globalEnv, nil, nil, existingIn)
-
-	if report.Rejected != 1 {
-		t.Fatalf("Rejected = %d, want 1", report.Rejected)
-	}
-	if report.Entries[0].Action != MigrationActionReject {
-		t.Errorf("Action = %q, want %q", report.Entries[0].Action, MigrationActionReject)
-	}
-	if report.Entries[0].Reason == "" {
-		t.Error("Reason should not be empty for rejected in entries")
 	}
 }
 
