@@ -24,8 +24,8 @@ func repoRoot(t *testing.T) string {
 // tests. Callers that get false should t.Skip.
 //
 // PLOY_E2E_CLUSTER controls behavior when the cluster is unreachable:
-//   - "skip"    — return false (quiet local iteration)
-//   - unset     — t.Fatalf (default; ensures live Hydra coverage is proven)
+//   - "require" — t.Fatalf (CI; ensures live Hydra coverage is proven)
+//   - unset     — return false and let callers t.Skip (default)
 func clusterReady(t *testing.T, root string) bool {
 	t.Helper()
 
@@ -33,10 +33,9 @@ func clusterReady(t *testing.T, root string) bool {
 
 	// 1. Built binary must exist.
 	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
-		if mode == "skip" {
-			return false
+		if mode == "require" {
+			t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or unset PLOY_E2E_CLUSTER")
 		}
-		t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or set PLOY_E2E_CLUSTER=skip")
 		return false
 	}
 
@@ -53,10 +52,9 @@ func clusterReady(t *testing.T, root string) bool {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(serverURL + "/healthz")
 	if err != nil {
-		if mode == "skip" {
-			return false
+		if mode == "require" {
+			t.Fatalf("local cluster not reachable at %s: %v; start the cluster or unset PLOY_E2E_CLUSTER", serverURL, err)
 		}
-		t.Fatalf("local cluster not reachable at %s: %v; start the cluster or set PLOY_E2E_CLUSTER=skip", serverURL, err)
 		return false
 	}
 	resp.Body.Close()
@@ -126,7 +124,7 @@ func TestHydraMountEnforcement(t *testing.T) {
 	}
 
 	if !clusterReady(t, root) {
-		t.Skip("cluster unavailable (PLOY_E2E_CLUSTER=skip)")
+		t.Skip("cluster unavailable; set PLOY_E2E_CLUSTER=require to enforce")
 	}
 
 	cmd := exec.Command("bash", script)
@@ -154,7 +152,7 @@ func TestHydraOutUpload(t *testing.T) {
 	}
 
 	if !clusterReady(t, root) {
-		t.Skip("cluster unavailable (PLOY_E2E_CLUSTER=skip)")
+		t.Skip("cluster unavailable; set PLOY_E2E_CLUSTER=require to enforce")
 	}
 
 	cmd := exec.Command("bash", script)
