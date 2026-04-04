@@ -286,6 +286,8 @@ items:
         commit: 4782bbdb
       - gaps: ["`go test ./tests/integration/... ./tests/e2e/migs/...` does not guarantee execution of the new live Hydra scenarios yet: `tests/e2e/migs/migs_e2e_test.go` still gates `TestHydraMountEnforcement` and `TestHydraOutUpload` behind `clusterReady`, and in this workspace both skipped because `http://localhost:18080/healthz` was unreachable. That leaves the requested end-to-end coverage unproven by the verification command here (`tests/e2e/migs/migs_e2e_test.go:23-66`, `tests/e2e/migs/migs_e2e_test.go:120-171`)."]
         commit: 559658fe
+      - gaps: ["`Add integration and e2e scenarios for precedence routing parser edge cases mount enforcement and out upload continuity.` is still not guaranteed by `go test ./tests/integration/... ./tests/e2e/migs/...`: [tests/e2e/migs/migs_e2e_test.go](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23) falls back to offline validation when the local cluster is unreachable, so `TestHydraMountEnforcement` and `TestHydraOutUpload` can pass without running the live scenario scripts.", "`Add integration and e2e scenarios for precedence routing parser edge cases mount enforcement and out upload continuity.` is still not guaranteed for the Codex integration path: [tests/integration/migs/mig-codex/mig_codex_test.go](/Users/vk/@iw2rmb/ploy/tests/integration/migs/mig-codex/mig_codex_test.go#L361) defaults to offline Hydra contract validation when `CODEX_AUTH_FILE` is unset, so the live healing flow is optional in the same verification command."]
+        commit: null
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
