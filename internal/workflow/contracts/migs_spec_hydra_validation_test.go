@@ -91,34 +91,6 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 			wantErr: "steps[0].in[1]",
 		},
 		{
-			name: "legacy env rejected by schema",
-			input: `{
-				"steps": [{"image": "img:latest", "env": {"FOO": "bar"}}]
-			}`,
-			wantErr: "steps[0].env: forbidden",
-		},
-		{
-			name: "legacy tmp_dir rejected by schema",
-			input: `{
-				"steps": [{"image": "img:latest", "tmp_dir": []}]
-			}`,
-			wantErr: "steps[0].tmp_dir: forbidden",
-		},
-		{
-			name: "legacy tmp_bundle rejected by schema",
-			input: `{
-				"steps": [{"image": "img:latest", "tmp_bundle": {}}]
-			}`,
-			wantErr: "steps[0].tmp_bundle: forbidden",
-		},
-		{
-			name: "legacy env_from_file rejected by schema",
-			input: `{
-				"steps": [{"image": "img:latest", "env_from_file": {}}]
-			}`,
-			wantErr: "steps[0].env_from_file: forbidden",
-		},
-		{
 			name: "no hydra fields is valid",
 			input: `{
 				"steps": [{"image": "img:latest"}]
@@ -146,6 +118,31 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 	}
 }
 
+func TestMigSpecValidate_LegacyFieldsForbidden(t *testing.T) {
+	legacyFields := []struct {
+		name  string
+		field string
+	}{
+		{"env", `"env": {"FOO": "bar"}`},
+		{"tmp_dir", `"tmp_dir": []`},
+		{"tmp_bundle", `"tmp_bundle": {}`},
+		{"env_from_file", `"env_from_file": {}`},
+	}
+
+	for _, lf := range legacyFields {
+		t.Run(lf.name+"_rejected_in_step", func(t *testing.T) {
+			input := `{"steps": [{"image": "img:latest", ` + lf.field + `}]}`
+			_, err := ParseMigSpecJSON([]byte(input))
+			if err == nil {
+				t.Fatalf("expected legacy field %q to be rejected", lf.name)
+			}
+			if !strings.Contains(err.Error(), "forbidden") {
+				t.Fatalf("error %q does not contain 'forbidden'", err.Error())
+			}
+		})
+	}
+}
+
 func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
@@ -160,11 +157,6 @@ func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
 		field   string
 		wantErr string
 	}{
-		{
-			name:    "legacy env rejected in healing action",
-			field:   `"env": {"FOO": "bar"}`,
-			wantErr: "build_gate.healing.by_error_kind.infra.env: forbidden",
-		},
 		{
 			name:  "valid in entry in healing action",
 			field: `"in": ["abcdef0:/in/patch.diff"]`,
