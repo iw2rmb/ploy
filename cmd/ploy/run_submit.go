@@ -225,7 +225,11 @@ func buildRunSubmitSpecPayload(ctx context.Context, base *url.URL, client *http.
 		if len(data) == 0 {
 			return nil, fmt.Errorf("load spec: spec is empty")
 		}
-		f, err := os.CreateTemp("", "ploy-run-spec-*.yaml")
+		tempDir, wdErr := os.Getwd()
+		if wdErr != nil {
+			tempDir = ""
+		}
+		f, err := os.CreateTemp(tempDir, "ploy-run-spec-*.yaml")
 		if err != nil {
 			return nil, fmt.Errorf("load spec: create temp file: %w", err)
 		}
@@ -468,9 +472,15 @@ func loadSpec(ctx context.Context, base *url.URL, client *http.Client, path stri
 	specBaseDir := ""
 	if path != "-" {
 		specBaseDir = filepath.Dir(path)
+	} else {
+		wd, wdErr := os.Getwd()
+		if wdErr != nil {
+			return nil, fmt.Errorf("resolve working directory for stdin spec: %w", wdErr)
+		}
+		specBaseDir = wd
 	}
 
-	// Parse YAML/JSON, run shared CLI preprocessing (spec_path/envs expansion),
+	// Parse YAML/JSON, run shared CLI preprocessing (!include/envs expansion),
 	// compile Hydra file records, then validate with the canonical parser.
 	return normalizeMigsSpecToJSON(ctx, base, client, data, specBaseDir)
 }
