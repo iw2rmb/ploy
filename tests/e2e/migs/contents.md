@@ -1,6 +1,6 @@
-[README.md](README.md) MIGS E2E runbook covering prerequisites, image publishing, spec-driven runs, and build-gate healing contracts.
-[hydra_contract_offline_test.go](hydra_contract_offline_test.go) Offline Hydra contract tests validating env-key rewrite mappings, docs coverage, and Hydra scenario script constraints.
-[migs_e2e_test.go](migs_e2e_test.go) MIGS E2E harness that gates live-cluster scenarios and enforces offline contracts for Codex prompt and Hydra mount semantics.
+[README.md](README.md) MIGS e2e runbook covering prerequisites, image publishing, scenario execution, and build-gate healing contracts.
+[hydra_contract_offline_test.go](hydra_contract_offline_test.go) Offline Hydra contract tests validating env-key rewrites, docs coverage, and scenario script constraints.
+[migs_e2e_test.go](migs_e2e_test.go) MIGS e2e harness that runs live cluster scenarios when available and otherwise executes inline offline contract checks.
 [scenario-batch-run.sh](scenario-batch-run.sh) Batch-run workflow scenario that creates a run, adds repos, inspects status, and exercises restart or stop operations.
 [scenario-bundle-blocked/](scenario-bundle-blocked) Scenario that submits unsafe bundles and asserts traversal or symlink inputs are rejected.
 [scenario-hydra-mount-enforcement/](scenario-hydra-mount-enforcement) Scenario validating Hydra mount rules by verifying `/in` is read-only and `/out` is writable.
