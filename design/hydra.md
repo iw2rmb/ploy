@@ -244,11 +244,7 @@ Schema distribution contract:
 
 ### 7. Unsupported fields
 
-The following fields and patterns are not part of the Hydra contract and are rejected at validation:
-
-- `env` — replaced by `envs`.
-- Temporary directory fields — replaced by `in`/`out`/`home`.
-- Env-based CA materialization — replaced by `ca`.
+Only the canonical Hydra fields (`envs`, `ca`, `in`, `out`, `home`) are accepted for environment and file materialization. Any other materialization fields are rejected at schema validation.
 
 ## Implementation Notes
 
@@ -318,7 +314,7 @@ Hydra field mapping (final state):
 | `home` | Files under `$HOME` (default rw, optional `:ro`) | `home: ["<hash>:.codex/auth.json:ro"]` |
 
 All file-backed values use content-addressed upload. No env key carries file content.
-Legacy fields (`env_from_file`, `tmp_dir`, `tmp_bundle`, `env`) are forbidden at validation.
+Only the canonical Hydra fields above are accepted; any other materialization fields are rejected at validation.
 
 ## Milestones
 

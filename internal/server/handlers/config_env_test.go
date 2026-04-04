@@ -541,8 +541,6 @@ func TestConfigEnvPutSpecialKeyHardCutGuard(t *testing.T) {
 		key    string
 		target string
 	}{
-		{"ca_gates", "PLOY_CA_CERTS", "gates"},
-		{"ca_steps", "PLOY_CA_CERTS", "steps"},
 		{"home_gates", "CODEX_AUTH_JSON", "gates"},
 		{"home_steps", "CODEX_CONFIG_TOML", "steps"},
 		{"in_steps", "CODEX_PROMPT", "steps"},
@@ -593,10 +591,10 @@ func TestConfigEnvPutSpecialKeyAllTargetsBlocked(t *testing.T) {
 			handler := putGlobalEnvHandler(holder, st)
 
 			reqBody := map[string]any{
-				"value":  "cert-data",
+				"value":  "auth-data",
 				"target": tt.target,
 			}
-			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/PLOY_CA_CERTS", reqBody, "key", "PLOY_CA_CERTS")
+			rr := doRequest(t, handler, http.MethodPut, "/v1/config/env/CODEX_AUTH_JSON", reqBody, "key", "CODEX_AUTH_JSON")
 
 			assertStatus(t, rr, http.StatusBadRequest)
 

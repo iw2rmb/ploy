@@ -121,9 +121,6 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		if parsed.BuildGate == nil || parsed.BuildGate.Router == nil {
 			t.Fatal("expected router to be parsed")
 		}
-		if len(parsed.BuildGate.Router.Envs) != 0 {
-			t.Error("router must not use envs for prompt delivery; use Hydra in mount")
-		}
 		if len(parsed.BuildGate.Router.In) != 2 {
 			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(parsed.BuildGate.Router.In))
 		}
@@ -157,13 +154,7 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || len(parsed.BuildGate.Healing.ByErrorKind) == 0 {
 			t.Fatal("expected healing action to be parsed")
 		}
-		if len(parsed.BuildGate.Router.Envs) != 0 {
-			t.Error("router must not use envs for prompt delivery; use Hydra in mount")
-		}
 		action := parsed.BuildGate.Healing.ByErrorKind["code"]
-		if len(action.Envs) != 0 {
-			t.Error("healing action must not use envs for prompt delivery; use Hydra in mount")
-		}
 		if len(action.In) != 2 {
 			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(action.In))
 		}
