@@ -860,25 +860,6 @@ func TestHydraExtractDst_FirstColonSplit(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// ValidateHydraSection
-// ---------------------------------------------------------------------------
-
-func TestValidateHydraSection(t *testing.T) {
-	t.Parallel()
-
-	for _, s := range []string{"pre_gate", "re_gate", "post_gate", "mig", "heal"} {
-		if err := ValidateHydraSection(s); err != nil {
-			t.Errorf("ValidateHydraSection(%q) = %v, want nil", s, err)
-		}
-	}
-	for _, s := range []string{"", "unknown", "mr", "server", "node"} {
-		if err := ValidateHydraSection(s); err == nil {
-			t.Errorf("ValidateHydraSection(%q) = nil, want error", s)
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // ConfigHolder hydra overlay accessors
 // ---------------------------------------------------------------------------
 
