@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,11 +27,12 @@ func TestParseAuthoringInEntry(t *testing.T) {
 		wantDst string
 		wantErr string
 	}{
-		{input: "/tmp/data.txt:/in/data.txt", wantSrc: "/tmp/data.txt", wantDst: "/in/data.txt"},
-		{input: "relative/path:/in/nested/file.json", wantSrc: "relative/path", wantDst: "/in/nested/file.json"},
-		{input: "/tmp/data.txt:/out/data.txt", wantErr: "destination must start with /in/"},
-		{input: "/tmp/data.txt:data.txt", wantErr: "destination must start with /in/"},
-		{input: "/tmp/data.txt:/in/../etc/passwd", wantErr: "path traversal not allowed"},
+		{input: "/tmp/data.txt:/in/data.txt", wantSrc: "/tmp/data.txt", wantDst: "/in/in/data.txt"},
+		{input: "relative/path:/in/nested/file.json", wantSrc: "relative/path", wantDst: "/in/in/nested/file.json"},
+		{input: "/tmp/data.txt:data.txt", wantSrc: "/tmp/data.txt", wantDst: "/in/data.txt"},
+		{input: "/tmp/data.txt:./nested/data.txt", wantSrc: "/tmp/data.txt", wantDst: "/in/nested/data.txt"},
+		{input: "/tmp/data.txt:/out/data.txt", wantSrc: "/tmp/data.txt", wantDst: "/in/out/data.txt"},
+		{input: "/tmp/data.txt:/in/../etc/passwd", wantSrc: "/tmp/data.txt", wantDst: "/in/etc/passwd"},
 		{input: "no-colon-at-all", wantErr: "expected src:dst format"},
 		{input: ":/in/dst", wantErr: "source is empty"},
 		{input: "/src:", wantErr: "destination is empty"},
@@ -69,9 +71,10 @@ func TestParseAuthoringOutEntry(t *testing.T) {
 		wantDst string
 		wantErr string
 	}{
-		{input: "/tmp/out.txt:/out/result.txt", wantSrc: "/tmp/out.txt", wantDst: "/out/result.txt"},
-		{input: "/tmp/out.txt:/in/result.txt", wantErr: "destination must start with /out/"},
-		{input: "/tmp/out.txt:/out/../etc/shadow", wantErr: "path traversal not allowed"},
+		{input: "/tmp/out.txt:/out/result.txt", wantSrc: "/tmp/out.txt", wantDst: "/out/out/result.txt"},
+		{input: "/tmp/out.txt:result.txt", wantSrc: "/tmp/out.txt", wantDst: "/out/result.txt"},
+		{input: "/tmp/out.txt:/in/result.txt", wantSrc: "/tmp/out.txt", wantDst: "/out/in/result.txt"},
+		{input: "/tmp/out.txt:/out/../etc/shadow", wantSrc: "/tmp/out.txt", wantDst: "/out/etc/shadow"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -110,7 +113,7 @@ func TestParseAuthoringHomeEntry(t *testing.T) {
 	}{
 		{input: "/tmp/cfg:.config/app.toml", wantSrc: "/tmp/cfg", wantDst: ".config/app.toml"},
 		{input: "/tmp/cfg:.config/app.toml:ro", wantSrc: "/tmp/cfg", wantDst: ".config/app.toml", wantRO: true},
-		{input: "/tmp/cfg:/absolute/path", wantErr: "destination must be relative"},
+		{input: "/tmp/cfg:/absolute/path", wantSrc: "/tmp/cfg", wantDst: "absolute/path"},
 		{input: "/tmp/cfg:../escape", wantErr: "path traversal not allowed"},
 		{input: "just-a-string", wantErr: "expected src:dst format"},
 	}
@@ -366,7 +369,7 @@ func TestCompileHydraRecordsInPlace_SingleField(t *testing.T) {
 			fileName:    "config.json",
 			content:     `{"key": "value"}`,
 			field:       "in",
-			entrySuffix: ":/in/config.json",
+			entrySuffix: ":config.json",
 			wantSuffix:  ":/in/config.json",
 		},
 		{
@@ -374,7 +377,7 @@ func TestCompileHydraRecordsInPlace_SingleField(t *testing.T) {
 			fileName:    "template.txt",
 			content:     "output template",
 			field:       "out",
-			entrySuffix: ":/out/result.txt",
+			entrySuffix: ":result.txt",
 			wantSuffix:  ":/out/result.txt",
 		},
 		{
@@ -382,7 +385,7 @@ func TestCompileHydraRecordsInPlace_SingleField(t *testing.T) {
 			fileName:    "config.toml",
 			content:     "[app]\nkey = true\n",
 			field:       "home",
-			entrySuffix: ":.config/app.toml:ro",
+			entrySuffix: ":/.config/app.toml:ro",
 			wantSuffix:  ":.config/app.toml:ro",
 		},
 	}
@@ -417,6 +420,37 @@ func TestCompileHydraRecordsInPlace_SingleField(t *testing.T) {
 				t.Errorf("%s[0] = %q, expected suffix %q", tt.field, entry, tt.wantSuffix)
 			}
 		})
+	}
+}
+
+func TestCompileHydraRecordsInPlace_InDirectoryRelativeDestination(t *testing.T) {
+	_, base, client, _ := newMockBundleServer(t)
+	tmpDir := t.TempDir()
+
+	amataDir := filepath.Join(tmpDir, "amata")
+	if err := os.MkdirAll(amataDir, 0o755); err != nil {
+		t.Fatalf("mkdir amata dir: %v", err)
+	}
+	writeFile(t, filepath.Join(amataDir, "workflow.yaml"), "version: amata/v1\n")
+	writeFile(t, filepath.Join(amataDir, "schema.json"), `{"type":"object"}`)
+
+	spec := map[string]any{
+		"steps": []any{
+			map[string]any{
+				"image": "docker.io/test/mig:latest",
+				"in": []any{
+					"./amata:amata",
+				},
+			},
+		},
+	}
+
+	compileHydraSpec(t, base, client, spec, tmpDir)
+	step0 := spec["steps"].([]any)[0].(map[string]any)
+	entry := step0["in"].([]any)[0].(string)
+	assertCanonicalHash(t, entry)
+	if !strings.HasSuffix(entry, ":/in/amata") {
+		t.Fatalf("in[0] = %q, want suffix %q", entry, ":/in/amata")
 	}
 }
 
@@ -460,7 +494,7 @@ func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
 			fileName:    "healing-config.json",
 			content:     `{"mode":"auto"}`,
 			field:       "in",
-			entrySuffix: ":/in/healing-config.json",
+			entrySuffix: ":healing-config.json",
 			spec: func(filePath string) map[string]any {
 				return map[string]any{
 					"steps": []any{
@@ -471,7 +505,7 @@ func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
 							"by_error_kind": map[string]any{
 								"infra": map[string]any{
 									"image": "docker.io/test/healer:latest",
-									"in":    []any{filePath + ":/in/healing-config.json"},
+									"in":    []any{filePath + ":healing-config.json"},
 								},
 							},
 						},
