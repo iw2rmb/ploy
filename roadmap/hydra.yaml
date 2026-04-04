@@ -9,7 +9,9 @@ documentation:
   - docs/schemas/mig.example.yaml
   - cmd/ploy/README.md
 done: false
-reviews: []
+reviews:
+  - gaps: ["Router overlay selection ignores `re_gate` (only pre/post); routers can inherit wrong section – see cmd/ploy/mig_run_spec.go:467-509.", "Hydra e2e scenarios still auto-skip when dist/ploy binary or local cluster is missing unless PLOY_E2E_CLUSTER=require, so `go test ./tests/integration/... ./tests/e2e/migs/...` does not prove the roadmap coverage – see tests/e2e/migs/migs_e2e_test.go:25-63.", "Codex integration healing test still skips by default when CODEX_AUTH_FILE is unset (unless PLOY_INTEGRATION_CODEX=require), so the Hydra file-delivery path remains optional instead of enforced – see tests/integration/migs/mig-codex/mig_codex_test.go:347-373."]
+    commit: null
 items:
   - done: true
     reviews:
