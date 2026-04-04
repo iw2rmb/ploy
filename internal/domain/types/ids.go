@@ -115,7 +115,7 @@ type MigRepoID = StringID[migRepoIDTag]
 type RepoID = StringID[repoIDTag]
 
 // SpecBundleID identifies a spec bundle upload record in the spec_bundles table.
-// Uses NanoID(8) for stable, URL-safe identifiers; becomes the bundle_id in TmpBundleRef.
+// Uses NanoID(8) for stable, URL-safe identifiers.
 type SpecBundleID = StringID[specBundleIDTag]
 
 // MigRef is a reference that can be either a mig ID or a mig name.

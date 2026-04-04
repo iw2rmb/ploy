@@ -72,7 +72,6 @@ type Querier interface {
 	CreateRunRepo(ctx context.Context, arg CreateRunRepoParams) (RunRepo, error)
 	CreateSpec(ctx context.Context, arg CreateSpecParams) (Spec, error)
 	// Creates a new spec bundle metadata row. Blob data is stored in object storage.
-	// The returned id becomes the bundle_id field in TmpBundleRef.
 	CreateSpecBundle(ctx context.Context, arg CreateSpecBundleParams) (SpecBundle, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
