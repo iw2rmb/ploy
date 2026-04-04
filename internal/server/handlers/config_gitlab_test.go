@@ -7,79 +7,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
-// TestConfigGitLabGetReturnsCurrentConfig verifies that GET /v1/config/gitlab
-// returns the current GitLab configuration stored in the holder.
-func TestConfigGitLabGetReturnsCurrentConfig(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-		Token:  "test-token-123",
-	}, nil)
-
-	handler := getGitLabConfigHandler(holder)
-	rr := doRequest(t, handler, http.MethodGet, "/v1/config/gitlab", nil)
-
-	assertStatus(t, rr, http.StatusOK)
-
-	resp := decodeBody[gitLabConfigResponse](t, rr)
-
-	if resp.Domain != "https://gitlab.example.com" {
-		t.Errorf("Domain = %q, want %q", resp.Domain, "https://gitlab.example.com")
-	}
-	if resp.Token != "test-token-123" {
-		t.Errorf("Token = %q, want %q", resp.Token, "test-token-123")
-	}
-}
-
-// TestConfigGitLabPutUpdatesConfig verifies that PUT /v1/config/gitlab
-// updates the GitLab configuration and returns the new values.
-func TestConfigGitLabPutUpdatesConfig(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{
-		Domain: "https://gitlab.example.com",
-		Token:  "old-token",
-	}, nil)
-
-	handler := putGitLabConfigHandler(holder)
-
-	reqBody := map[string]string{
-		"domain": "https://gitlab.new.com",
-		"token":  "new-token-456",
-	}
-
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/gitlab", reqBody)
-
-	assertStatus(t, rr, http.StatusOK)
-
-	resp := decodeBody[gitLabConfigResponse](t, rr)
-
-	if resp.Domain != "https://gitlab.new.com" {
-		t.Errorf("response Domain = %q, want %q", resp.Domain, "https://gitlab.new.com")
-	}
-	if resp.Token != "new-token-456" {
-		t.Errorf("response Token = %q, want %q", resp.Token, "new-token-456")
-	}
-
-	// Verify the holder was updated.
-	cfg := holder.GetGitLab()
-	if cfg.Domain != "https://gitlab.new.com" {
-		t.Errorf("holder Domain = %q, want %q", cfg.Domain, "https://gitlab.new.com")
-	}
-	if cfg.Token != "new-token-456" {
-		t.Errorf("holder Token = %q, want %q", cfg.Token, "new-token-456")
-	}
-}
-
-// TestConfigGitLabPutInvalidJSON verifies that PUT /v1/config/gitlab
-// returns 400 Bad Request when the request body is not valid JSON.
-func TestConfigGitLabPutInvalidJSON(t *testing.T) {
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := putGitLabConfigHandler(holder)
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/gitlab", "not json")
-
-	assertStatus(t, rr, http.StatusBadRequest)
-}
-
-// TestConfigGitLabRoundTrip verifies that PUT followed by GET returns the same values.
+// TestConfigGitLabRoundTrip verifies that PUT followed by GET returns the same values,
+// and that the holder is updated after PUT.
 func TestConfigGitLabRoundTrip(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -102,18 +31,46 @@ func TestConfigGitLabRoundTrip(t *testing.T) {
 			})
 			assertStatus(t, putRR, http.StatusOK)
 
+			// Verify PUT response.
+			putResp := decodeBody[gitLabConfigResponse](t, putRR)
+			if putResp.Domain != tt.domain {
+				t.Errorf("PUT response Domain = %q, want %q", putResp.Domain, tt.domain)
+			}
+			if putResp.Token != tt.token {
+				t.Errorf("PUT response Token = %q, want %q", putResp.Token, tt.token)
+			}
+
+			// Verify holder was updated.
+			cfg := holder.GetGitLab()
+			if cfg.Domain != tt.domain {
+				t.Errorf("holder Domain = %q, want %q", cfg.Domain, tt.domain)
+			}
+			if cfg.Token != tt.token {
+				t.Errorf("holder Token = %q, want %q", cfg.Token, tt.token)
+			}
+
 			// GET the configuration.
 			getRR := doRequest(t, getGitLabConfigHandler(holder), http.MethodGet, "/v1/config/gitlab", nil)
 			assertStatus(t, getRR, http.StatusOK)
 
 			resp := decodeBody[gitLabConfigResponse](t, getRR)
-
 			if resp.Domain != tt.domain {
-				t.Errorf("Domain = %q, want %q", resp.Domain, tt.domain)
+				t.Errorf("GET Domain = %q, want %q", resp.Domain, tt.domain)
 			}
 			if resp.Token != tt.token {
-				t.Errorf("Token = %q, want %q", resp.Token, tt.token)
+				t.Errorf("GET Token = %q, want %q", resp.Token, tt.token)
 			}
 		})
 	}
+}
+
+// TestConfigGitLabPutInvalidJSON verifies that PUT /v1/config/gitlab
+// returns 400 Bad Request when the request body is not valid JSON.
+func TestConfigGitLabPutInvalidJSON(t *testing.T) {
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+
+	handler := putGitLabConfigHandler(holder)
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/gitlab", "not json")
+
+	assertStatus(t, rr, http.StatusBadRequest)
 }

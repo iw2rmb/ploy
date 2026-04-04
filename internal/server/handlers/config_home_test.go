@@ -97,47 +97,32 @@ func TestConfigHomePutUpsertsEntry(t *testing.T) {
 	}
 }
 
-// TestConfigHomePutInvalidEntry verifies 400 for invalid entry format.
-func TestConfigHomePutInvalidEntry(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := putConfigHomeHandler(holder, st)
-	reqBody := map[string]any{"entry": "INVALID", "section": "mig"}
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/home", reqBody)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if st.upsertConfigHome.called {
-		t.Error("store should not be called for invalid entry")
+// TestConfigHomePut_ValidationErrors verifies that PUT /v1/config/home
+// returns 400 for invalid inputs and does not call the store.
+func TestConfigHomePut_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		entry   string
+		section string
+	}{
+		{name: "invalid entry", entry: "INVALID", section: "mig"},
+		{name: "invalid section", entry: "abcdef1:.config/app", section: "bogus"},
 	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
-// TestConfigHomePutInvalidSection verifies 400 for invalid section.
-func TestConfigHomePutInvalidSection(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+			handler := putConfigHomeHandler(holder, st)
+			reqBody := map[string]any{"entry": tt.entry, "section": tt.section}
+			rr := doRequest(t, handler, http.MethodPut, "/v1/config/home", reqBody)
 
-	handler := putConfigHomeHandler(holder, st)
-	reqBody := map[string]any{"entry": "abcdef1:.config/app", "section": "bogus"}
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/home", reqBody)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if st.upsertConfigHome.called {
-		t.Error("store should not be called for invalid section")
+			assertStatus(t, rr, http.StatusBadRequest)
+			if st.upsertConfigHome.called {
+				t.Error("store should not be called for invalid input")
+			}
+		})
 	}
-}
-
-// TestConfigHomePutStoreError verifies 500 on store failure.
-func TestConfigHomePutStoreError(t *testing.T) {
-	st := &configStore{}
-	st.upsertConfigHome.err = errMockDatabase
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := putConfigHomeHandler(holder, st)
-	reqBody := map[string]any{"entry": "abcdef1:.config/app", "section": "mig"}
-	rr := doRequest(t, handler, http.MethodPut, "/v1/config/home", reqBody)
-
-	assertStatus(t, rr, http.StatusInternalServerError)
 }
 
 // TestConfigHomeDeleteRemovesEntry verifies DELETE /v1/config/home?dst=&section=
@@ -169,76 +154,79 @@ func TestConfigHomeDeleteRemovesEntry(t *testing.T) {
 	}
 }
 
-// TestConfigHomeDeleteMissingDst verifies 400 when dst is missing.
-func TestConfigHomeDeleteMissingDst(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := deleteConfigHomeHandler(holder, st)
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/home?section=mig", nil)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if st.deleteConfigHome.called {
-		t.Error("store should not be called when dst is missing")
-	}
-}
-
-// TestConfigHomeDeleteMissingSection verifies 400 when section is missing.
-func TestConfigHomeDeleteMissingSection(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := deleteConfigHomeHandler(holder, st)
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/home?dst=.config/app", nil)
-
-	assertStatus(t, rr, http.StatusBadRequest)
-	if st.deleteConfigHome.called {
-		t.Error("store should not be called when section is missing")
-	}
-}
-
-// TestConfigHomeDeleteStoreError verifies 500 on store failure.
-func TestConfigHomeDeleteStoreError(t *testing.T) {
-	st := &configStore{}
-	st.deleteConfigHome.err = errMockDatabase
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-	holder.AddConfigHome("mig", ConfigHomeEntry{Entry: "abcdef1:.config/app", Dst: ".config/app", Section: "mig"})
-
-	handler := deleteConfigHomeHandler(holder, st)
-	rr := doRequest(t, handler, http.MethodDelete, "/v1/config/home?dst=.config/app&section=mig", nil)
-
-	assertStatus(t, rr, http.StatusInternalServerError)
-}
-
-// TestConfigHomeDeleteInvalidDst verifies 400 for invalid destination on delete.
-func TestConfigHomeDeleteInvalidDst(t *testing.T) {
-	st := &configStore{}
-	holder := NewConfigHolder(config.GitLabConfig{}, nil)
-
-	handler := deleteConfigHomeHandler(holder, st)
-
+// TestConfigHomeDelete_ValidationErrors verifies that DELETE /v1/config/home
+// returns 400 for invalid or missing inputs and does not call the store.
+func TestConfigHomeDelete_ValidationErrors(t *testing.T) {
 	tests := []struct {
 		name string
-		dst  string
+		url  string
 	}{
-		{name: "absolute path", dst: "/etc/passwd"},
-		{name: "path traversal", dst: "../escape"},
+		{name: "missing dst", url: "/v1/config/home?section=mig"},
+		{name: "missing section", url: "/v1/config/home?dst=.config/app"},
+		{name: "absolute path dst", url: "/v1/config/home?dst=/etc/passwd&section=mig"},
+		{name: "path traversal dst", url: "/v1/config/home?dst=../escape&section=mig"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rr := doRequest(t, handler, http.MethodDelete, "/v1/config/home?dst="+tt.dst+"&section=mig", nil)
+			st := &configStore{}
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+
+			handler := deleteConfigHomeHandler(holder, st)
+			rr := doRequest(t, handler, http.MethodDelete, tt.url, nil)
+
 			assertStatus(t, rr, http.StatusBadRequest)
 			if st.deleteConfigHome.called {
-				t.Error("store should not be called for invalid destination")
+				t.Error("store should not be called for invalid input")
 			}
 		})
 	}
 }
 
-// TestConfigHomeDeleteHydraNormalizesNonCanonicalDst verifies that deleting
+// TestConfigHome_StoreErrors verifies that store failures return 500.
+func TestConfigHome_StoreErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		setup  func(*configStore)
+		invoke func(*ConfigHolder, *configStore) (http.Handler, string, any)
+	}{
+		{
+			name:   "put store error",
+			method: http.MethodPut,
+			setup:  func(st *configStore) { st.upsertConfigHome.err = errMockDatabase },
+			invoke: func(h *ConfigHolder, st *configStore) (http.Handler, string, any) {
+				return putConfigHomeHandler(h, st), "/v1/config/home",
+					map[string]any{"entry": "abcdef1:.config/app", "section": "mig"}
+			},
+		},
+		{
+			name:   "delete store error",
+			method: http.MethodDelete,
+			setup:  func(st *configStore) { st.deleteConfigHome.err = errMockDatabase },
+			invoke: func(h *ConfigHolder, st *configStore) (http.Handler, string, any) {
+				h.AddConfigHome("mig", ConfigHomeEntry{Entry: "abcdef1:.config/app", Dst: ".config/app", Section: "mig"})
+				return deleteConfigHomeHandler(h, st), "/v1/config/home?dst=.config/app&section=mig", nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			st := &configStore{}
+			tt.setup(st)
+			holder := NewConfigHolder(config.GitLabConfig{}, nil)
+
+			handler, path, body := tt.invoke(holder, st)
+			rr := doRequest(t, handler, tt.method, path, body)
+
+			assertStatus(t, rr, http.StatusInternalServerError)
+		})
+	}
+}
+
+// TestConfigHomeDeleteNormalizesNonCanonicalDst verifies that deleting
 // with a non-canonical destination (e.g. extra slashes) normalizes the dst
 // to match the canonical form persisted by the put handler.
-func TestConfigHomeDeleteHydraNormalizesNonCanonicalDst(t *testing.T) {
+func TestConfigHomeDeleteNormalizesNonCanonicalDst(t *testing.T) {
 	st := &configStore{}
 	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 	holder.AddConfigHome("mig", ConfigHomeEntry{Entry: "abcdef1:.config/app", Dst: ".config/app", Section: "mig"})
