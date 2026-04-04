@@ -49,14 +49,16 @@ steps:
       sh -c '
         set -e;
         test -f /in/config.json || { echo "FAIL: /in/config.json missing"; exit 1; };
-        test -f /in/build.sh    || { echo "FAIL: /in/build.sh missing"; exit 1; };
-        echo "OK: /in/config.json present";
-        echo "OK: /in/build.sh present";
+        test -d /in/scripts     || { echo "FAIL: /in/scripts not a directory"; exit 1; };
+        test -f /in/scripts/build.sh || { echo "FAIL: /in/scripts/build.sh missing"; exit 1; };
+        echo "OK: /in/config.json present (file entry)";
+        echo "OK: /in/scripts/ present (directory entry)";
+        echo "OK: /in/scripts/build.sh present";
         cat /in/config.json
       '
     in:
       - ${CONFIG_PATH}:/in/config.json
-      - ${SCRIPTS_PATH}/build.sh:/in/build.sh
+      - ${SCRIPTS_PATH}:/in/scripts
 YAML
 
 RUN_JSON="$(e2e_mig_run_json \
