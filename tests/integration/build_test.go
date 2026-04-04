@@ -37,8 +37,10 @@ func TestBuildCLI(t *testing.T) {
 	// Run `make build` to compile the CLI binary.
 	// We set the working directory to the repo root to ensure
 	// the Makefile is found correctly.
+	// Use a private GOCACHE to avoid failures from stale host cache entries.
 	buildCmd := exec.Command("make", "build")
 	buildCmd.Dir = repoRoot
+	buildCmd.Env = append(os.Environ(), "GOCACHE="+t.TempDir())
 	output, err := buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("make build failed: %v\nOutput: %s", err, output)

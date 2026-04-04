@@ -589,7 +589,6 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 | `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
 | `in` (typed) | `codex`, healing | Read-only input file mounts (replaces `CODEX_PROMPT` file injection) |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
-| `PLOY_CA_CERTS` | ORW migs, build-gate, custom migs | **Migrated → `ca` typed field.** PEM-encoded CA certificates; now materialized via Hydra `ca` at `/etc/ploy/ca/<hash>`. Legacy env key is rejected by the server on write. |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |
 

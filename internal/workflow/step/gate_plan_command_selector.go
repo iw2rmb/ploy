@@ -56,8 +56,7 @@ func resolveGateCommand(
 
 // wrapWithMaterializerPreamble prepends the env materializer preamble to a
 // container command regardless of whether the command was tool-derived or
-// profile-override-derived. Under the Hydra-only contract the materializer
-// registry is empty, so this is a no-op pass-through.
+// profile-override-derived.
 func wrapWithMaterializerPreamble(cmd []string) []string {
 	preamble := envMaterializerPreamble()
 	if preamble == "" {
