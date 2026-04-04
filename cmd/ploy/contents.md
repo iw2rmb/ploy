@@ -21,7 +21,7 @@
 [config_command_files_test.go](config_command_files_test.go) Tests config file I/O paths, precedence, and persistence behavior.
 [config_command_flags_test.go](config_command_flags_test.go) Tests config command flag parsing and validation paths.
 [config_command_fuzz_test.go](config_command_fuzz_test.go) Fuzz tests for config command input parsing and robustness checks.
-[config_command_hydra_test.go](config_command_hydra_test.go) Tests config routing plus Hydra home/CA set-unset required-flag validation before server requests.
+[config_command_hydra_test.go](config_command_hydra_test.go) Tests top-level `config` routing for typed Hydra subcommands (`ca` and `home`).
 [config_env_command.go](config_env_command.go) Implements `config env` list/show/set/unset CLI flows, including scoped usage examples and control-plane env API calls.
 [config_env_command_files_test.go](config_env_command_files_test.go) End-to-end tests for `config env` HTTP behavior, including target-scoped lookups, ambiguity hints, redaction, and file-based value input paths.
 [config_env_command_flags_test.go](config_env_command_flags_test.go) Tests config env command flags, defaults, and validation handling.

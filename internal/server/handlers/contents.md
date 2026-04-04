@@ -9,7 +9,7 @@
 [claim_spec_mutator_gate.go](claim_spec_mutator_gate.go) Applies build-gate specific mutations when constructing claim specs.
 [claim_spec_mutator_healing.go](claim_spec_mutator_healing.go) Injects healing/recovery-specific claim-spec adjustments and metadata.
 [claim_spec_mutator_hydra.go](claim_spec_mutator_hydra.go) Typed Hydra overlay merge with shared section validation and first-colon destination extraction for in/out/home records.
-[claim_spec_mutator_hydra_test.go](claim_spec_mutator_hydra_test.go) Tests Hydra overlay merge, section validation, first-colon destination parsing, collision checks, router inheritance, and precedence rules.
+[claim_spec_mutator_hydra_test.go](claim_spec_mutator_hydra_test.go) Tests Hydra overlay merge, first-colon destination parsing, collision checks, routing by job type, and precedence rules.
 [claim_spec_mutator_pipeline.go](claim_spec_mutator_pipeline.go) Composes mutator stages into a deterministic claim-spec mutation pipeline.
 [claim_spec_mutator_test.go](claim_spec_mutator_test.go) Validates claim spec mutation precedence and recovery metadata shaping for gate/healing flows.
 [config_authz_test.go](config_authz_test.go) Checks admin authorization enforcement on configuration endpoints.
@@ -146,7 +146,7 @@
 [test_helpers_healing_test.go](test_helpers_healing_test.go) Shared healing-flow test helpers for recovery candidate construction and assertions.
 [test_helpers_test.go](test_helpers_test.go) Common HTTP/store/assertion helpers reused across the handler test suite.
 [test_mock_helpers_test.go](test_mock_helpers_test.go) Helper utilities for composing lightweight store mock behaviors in tests.
-[testdata](testdata) Test fixtures for handler suites, including YAML scenarios for special-env migration dry-run coverage.
+[testdata/](testdata) Test fixtures for handler suites, including YAML scenarios for special-env migration dry-run coverage.
 [tokens.go](tokens.go) Token/auth helpers used by protected handler endpoints.
 [worker_logs_fuzz_test.go](worker_logs_fuzz_test.go) Fuzzes worker log serialization/ingest contracts for robustness against malformed chunks.
 [worker_logs_test.go](worker_logs_test.go) Covers node log ingestion handler for gzip payload handling, size limits, ID validation, and job-id propagation.
