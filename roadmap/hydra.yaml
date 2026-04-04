@@ -13,7 +13,7 @@ reviews:
   - gaps: ["Router overlay selection ignores `re_gate` (only pre/post); routers can inherit wrong section – see cmd/ploy/mig_run_spec.go:467-509.", "Hydra e2e scenarios still auto-skip when dist/ploy binary or local cluster is missing unless PLOY_E2E_CLUSTER=require, so `go test ./tests/integration/... ./tests/e2e/migs/...` does not prove the roadmap coverage – see tests/e2e/migs/migs_e2e_test.go:25-63.", "Codex integration healing test still skips by default when CODEX_AUTH_FILE is unset (unless PLOY_INTEGRATION_CODEX=require), so the Hydra file-delivery path remains optional instead of enforced – see tests/integration/migs/mig-codex/mig_codex_test.go:347-373."]
     commit: 001fb226
   - gaps: ["`go test ./tests/integration/... ./tests/e2e/migs/...` is not green on a clean workspace: `clusterReady` in tests/e2e/migs/migs_e2e_test.go:32-47 hard-fails when dist/ploy is missing, so the roadmap’s verification command cannot run without a prebuilt binary or opt-out env var.", "Hydra e2e scenarios in tests/e2e/migs/migs_e2e_test.go:117-215 still depend on a live cluster plus dist/ploy; they fail with “ploy binary not built” instead of exercising the mount/upload flows, leaving the roadmap’s end-to-end coverage unwired by default.", "Codex integration path in tests/integration/migs/mig-codex/mig_codex_test.go:357-379 aborts unless CODEX_AUTH_FILE is provided; go test ./... fails out-of-the-box, so the roadmap’s required verification set is not self-contained."]
-    commit: null
+    commit: b36f0682
 items:
   - done: true
     reviews:
