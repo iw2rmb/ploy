@@ -1,0 +1,91 @@
+---
+policy: .codex/policies/composing-roadmaps.md
+schema: .codex/policies/roadmap.schema.json
+title: Remove Run-Stream Log Merge via Job-Scoped Streams
+scope: Reduce log-stream complexity by stopping run-wide log merging and making logs stored and streamed per job.
+documentation:
+  - design/logs.md
+  - docs/api/OpenAPI.yaml
+  - docs/api/paths/runs_id_logs.yaml
+  - docs/api/paths/runs_run_id_repos_repo_id_logs.yaml
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: Remove run-stream merge points by making job-scoped ingest and stream contracts canonical from the start.
+    classification: determined
+    components:
+      - internal/nodeagent/logstreamer.go
+      - internal/nodeagent/logstreamer_test.go
+      - internal/server/handlers/register.go
+      - internal/server/handlers/events.go
+      - internal/server/handlers/nodes_logs.go
+      - internal/server/handlers/jobs_logs.go
+      - internal/server/handlers/**
+      - docs/api/OpenAPI.yaml
+      - docs/api/paths/{runs_id_logs,jobs_job_id_logs}.yaml
+      - docs/api/paths/runs_run_id_repos_repo_id_logs.yaml
+    implementation:
+      - Register GET /v1/jobs/{job_id}/logs and POST /v1/jobs/{job_id}/logs as canonical job-log endpoints with existing auth guarantees.
+      - Switch nodeagent log upload to POST /v1/jobs/{job_id}/logs and preserve chunk_no and payload size validation rules.
+      - Restrict GET /v1/runs/{run_id}/logs to run-state events only and remove log and retention event emission from its contract.
+      - "Update OpenAPI docs so stream ownership is explicit: run endpoint for lifecycle, job endpoint for container logs."
+      - Add endpoint and authorization tests for canonical job endpoints and updated run endpoint behavior.
+    verification:
+      - GET /v1/jobs/{job_id}/logs emits only log, retention, and done events for the addressed job.
+      - GET /v1/runs/{run_id}/logs emits only run-state events and done sentinel.
+      - POST /v1/jobs/{job_id}/logs is the active ingest path and rejects invalid chunk size or malformed payload.
+      - Route tests confirm unauthorized callers cannot access job logs stream or ingest endpoints.
+    reasoning: high
+    cfp: 12
+  - done: false
+    reviews: []
+    label: "2"
+    summary: Enforce server-side domain isolation so run lifecycle fanout never carries per-job container log frames.
+    classification: determined
+    components:
+      - internal/server/events_service.go
+      - internal/stream/hub.go
+      - internal/server/handlers/{events,nodes_logs,jobs_complete}.go
+      - internal/server/**/events*_test.go
+      - internal/server/handlers/*logs*_test.go
+    implementation:
+      - Split EventsService publish and subscribe paths into distinct run-state keys and job-log keys.
+      - Publish uploaded job logs exclusively in the job domain and keep run lifecycle publication in run domain.
+      - Emit terminal done by job_id for job streams and by run_id for run streams.
+      - Preserve ordered backfill and Last-Event-ID resume semantics in both domains using existing store reads.
+      - Add stream tests that assert domain isolation, ordering, and terminal signaling.
+    verification:
+      - Run stream subscribers never observe log or retention events during parallel job uploads.
+      - Job stream subscribers never observe run lifecycle events and receive done at job terminal state.
+      - Last-Event-ID resume returns ordered backfill then live updates within the same domain.
+      - Parallel jobs in one run do not cross-deliver log frames between job subscribers.
+    reasoning: high
+    cfp: 10
+  - done: false
+    reviews: []
+    label: "3"
+    summary: Align CLI UX to separated ownership so run commands show lifecycle and job commands show container output.
+    classification: determined
+    components:
+      - cmd/ploy/{run_logs,job_command,run_commands,mig_list}.go
+      - internal/cli/{runs,migs}/**
+      - internal/cli/migs/logs.go
+      - internal/cli/**/report*_builder*.go
+      - cmd/ploy/*logs*_test.go
+      - internal/cli/**/*logs*_test.go
+    implementation:
+      - Keep ploy run --follow and ploy run logs bound to run-state stream semantics with no container line assumptions.
+      - Add ploy job --follow <job-id> command path that tails /v1/jobs/{job_id}/logs and renders only that job output.
+      - Update run report rendering to remove Logs from Artefacts and make Job column IDs link to /v1/jobs/{job_id}/logs.
+      - Preserve tokenized links by appending auth_token when link tokenization is enabled.
+      - Add CLI tests for run-event-only output, job-follow output isolation, and updated report link formatting.
+    verification:
+      - ploy run logs <run-id> reflects run lifecycle events and excludes container log lines.
+      - ploy job --follow <job-id> prints only target job log lines and terminates on done event.
+      - Run report no longer includes Logs in Artefacts and job IDs link to /v1/jobs/{job_id}/logs.
+      - Token-enabled rendering includes auth_token in generated job-log links.
+    reasoning: high
+    cfp: 9
