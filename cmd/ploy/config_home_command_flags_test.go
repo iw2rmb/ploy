@@ -6,173 +6,154 @@ import (
 	"testing"
 )
 
-// TestHandleConfigHomeRequiresSubcommand verifies that the 'config home' command
-// requires a subcommand and displays usage information when none is provided.
-func TestHandleConfigHomeRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigHome(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing home subcommand")
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy config home") {
-		t.Fatalf("expected home usage output, got: %q", out)
-	}
-}
-
-// TestHandleConfigHomeUnknownSubcommand ensures that unknown home subcommands
-// are rejected with an appropriate error message.
-func TestHandleConfigHomeUnknownSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigHome([]string{"unknown"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unknown home subcommand")
-	}
-	if !strings.Contains(err.Error(), "unknown home subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigHomeLsAliasRoutes verifies that 'ls' routes to the list handler.
-func TestHandleConfigHomeLsAliasRoutes(t *testing.T) {
-	buf := &bytes.Buffer{}
-	// 'ls' with unexpected args triggers the same error as 'list' with unexpected args.
-	err := handleConfigHome([]string{"ls", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args via ls alias")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigHomeSetRequiresEntry verifies that the 'set' subcommand
-// requires the --entry flag.
-func TestHandleConfigHomeSetRequiresEntry(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigHomeSet([]string{"--section", "mig"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when --entry is missing")
-	}
-	if !strings.Contains(err.Error(), "--entry is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigHomeSetRequiresSection verifies that the 'set' subcommand
-// requires the --section flag.
-func TestHandleConfigHomeSetRequiresSection(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigHomeSet([]string{"--entry", "abcdef1:.config/app"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when --section is missing")
-	}
-	if !strings.Contains(err.Error(), "--section is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigHomeUnsetRequiresDst verifies that the 'unset' subcommand
-// requires the --dst flag.
-func TestHandleConfigHomeUnsetRequiresDst(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigHomeUnset([]string{"--section", "mig"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when --dst is missing")
-	}
-	if !strings.Contains(err.Error(), "--dst is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigHomeUnsetRequiresSection verifies that the 'unset' subcommand
-// requires the --section flag.
-func TestHandleConfigHomeUnsetRequiresSection(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigHomeUnset([]string{"--dst", ".config/app"}, buf)
-	if err == nil {
-		t.Fatalf("expected error when --section is missing")
-	}
-	if !strings.Contains(err.Error(), "--section is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// TestHandleConfigHomeSetRejectsInvalidSection verifies that the 'set' subcommand
-// validates Hydra section names locally before making a network request.
-func TestHandleConfigHomeSetRejectsInvalidSection(t *testing.T) {
-	for _, s := range []string{"unknown", "server"} {
-		buf := &bytes.Buffer{}
-		err := handleConfigHomeSet([]string{"--entry", "abcdef1:.config/app", "--section", s}, buf)
-		if err == nil {
-			t.Fatalf("expected error for invalid section %q", s)
-		}
-		if !strings.Contains(err.Error(), "invalid hydra section") {
-			t.Fatalf("expected hydra section validation error, got: %v", err)
-		}
-	}
-}
-
-// TestHandleConfigHomeUnsetRejectsInvalidSection verifies that the 'unset' subcommand
-// validates Hydra section names locally before making a network request.
-func TestHandleConfigHomeUnsetRejectsInvalidSection(t *testing.T) {
-	for _, s := range []string{"unknown", "server"} {
-		buf := &bytes.Buffer{}
-		err := handleConfigHomeUnset([]string{"--dst", ".config/app", "--section", s}, buf)
-		if err == nil {
-			t.Fatalf("expected error for invalid section %q", s)
-		}
-		if !strings.Contains(err.Error(), "invalid hydra section") {
-			t.Fatalf("expected hydra section validation error, got: %v", err)
-		}
-	}
-}
-
-// TestHandleConfigHomeSetRejectsInvalidEntry verifies that the 'set' subcommand
-// applies Hydra home parser validation and rejects invalid entries locally.
-func TestHandleConfigHomeSetRejectsInvalidEntry(t *testing.T) {
+func TestHandleConfigHome_SubcommandRouting(t *testing.T) {
 	tests := []struct {
-		name  string
-		entry string
+		name    string
+		args    []string
+		wantErr string
+		wantOut string
 	}{
-		{name: "missing dst", entry: "INVALID"},
-		{name: "absolute destination", entry: "abcdef1:/etc/passwd"},
-		{name: "path traversal", entry: "abcdef1:../escape"},
-		{name: "invalid hash", entry: "SHORT:.config/app"},
+		{
+			name:    "requires subcommand",
+			args:    nil,
+			wantErr: "home subcommand required",
+			wantOut: "Usage: ploy config home",
+		},
+		{
+			name:    "unknown subcommand rejected",
+			args:    []string{"unknown"},
+			wantErr: "unknown home subcommand",
+		},
+		{
+			name:    "ls alias routes to list",
+			args:    []string{"ls", "extra"},
+			wantErr: "unexpected arguments:",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := handleConfigHomeSet([]string{"--entry", tt.entry, "--section", "mig"}, buf)
+			err := handleConfigHome(tt.args, buf)
 			if err == nil {
-				t.Fatalf("expected error for invalid entry %q", tt.entry)
+				t.Fatalf("expected error, got nil")
 			}
-			if !strings.Contains(err.Error(), "home entry") {
-				t.Fatalf("expected Hydra parser error, got: %v", err)
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
+			}
+			if tt.wantOut != "" && !strings.Contains(buf.String(), tt.wantOut) {
+				t.Fatalf("stdout = %q, want containing %q", buf.String(), tt.wantOut)
 			}
 		})
 	}
 }
 
-// TestHandleConfigHomeUnsetRejectsInvalidDst verifies that the 'unset' subcommand
-// applies Hydra home-destination validation and rejects invalid destinations locally.
-func TestHandleConfigHomeUnsetRejectsInvalidDst(t *testing.T) {
+func TestHandleConfigHomeSet_Validation(t *testing.T) {
 	tests := []struct {
-		name string
-		dst  string
+		name    string
+		args    []string
+		wantErr string
 	}{
-		{name: "absolute path", dst: "/etc/passwd"},
-		{name: "path traversal", dst: "../escape"},
+		{
+			name:    "missing entry",
+			args:    []string{"--section", "mig"},
+			wantErr: "--entry is required",
+		},
+		{
+			name:    "missing section",
+			args:    []string{"--entry", "abcdef1:.config/app"},
+			wantErr: "--section is required",
+		},
+		{
+			name:    "invalid entry missing dst",
+			args:    []string{"--entry", "INVALID", "--section", "mig"},
+			wantErr: "home entry",
+		},
+		{
+			name:    "invalid entry absolute destination",
+			args:    []string{"--entry", "abcdef1:/etc/passwd", "--section", "mig"},
+			wantErr: "home entry",
+		},
+		{
+			name:    "invalid entry path traversal",
+			args:    []string{"--entry", "abcdef1:../escape", "--section", "mig"},
+			wantErr: "home entry",
+		},
+		{
+			name:    "invalid entry short hash",
+			args:    []string{"--entry", "SHORT:.config/app", "--section", "mig"},
+			wantErr: "home entry",
+		},
+		{
+			name:    "invalid section unknown",
+			args:    []string{"--entry", "abcdef1:.config/app", "--section", "unknown"},
+			wantErr: "invalid hydra section",
+		},
+		{
+			name:    "invalid section server",
+			args:    []string{"--entry", "abcdef1:.config/app", "--section", "server"},
+			wantErr: "invalid hydra section",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			err := handleConfigHomeUnset([]string{"--dst", tt.dst, "--section", "mig"}, buf)
+			err := handleConfigHomeSet(tt.args, buf)
 			if err == nil {
-				t.Fatalf("expected error for invalid dst %q", tt.dst)
+				t.Fatalf("expected error, got nil")
 			}
-			if !strings.Contains(err.Error(), "home destination") {
-				t.Fatalf("expected Hydra destination validation error, got: %v", err)
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestHandleConfigHomeUnset_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name:    "missing dst",
+			args:    []string{"--section", "mig"},
+			wantErr: "--dst is required",
+		},
+		{
+			name:    "missing section",
+			args:    []string{"--dst", ".config/app"},
+			wantErr: "--section is required",
+		},
+		{
+			name:    "invalid dst absolute path",
+			args:    []string{"--dst", "/etc/passwd", "--section", "mig"},
+			wantErr: "home destination",
+		},
+		{
+			name:    "invalid dst path traversal",
+			args:    []string{"--dst", "../escape", "--section", "mig"},
+			wantErr: "home destination",
+		},
+		{
+			name:    "invalid section unknown",
+			args:    []string{"--dst", ".config/app", "--section", "unknown"},
+			wantErr: "invalid hydra section",
+		},
+		{
+			name:    "invalid section server",
+			args:    []string{"--dst", ".config/app", "--section", "server"},
+			wantErr: "invalid hydra section",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			err := handleConfigHomeUnset(tt.args, buf)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
 			}
 		})
 	}

@@ -25,215 +25,205 @@ func baseManifestForHydra(t *testing.T) contracts.StepManifest {
 	}
 }
 
-func TestBuildContainerSpec_HydraInMountedReadOnly(t *testing.T) {
-	stagingDir := t.TempDir()
+// ---------------------------------------------------------------------------
+// Single-type Hydra mount tests (table-driven)
+// ---------------------------------------------------------------------------
 
-	manifest := baseManifestForHydra(t)
-	manifest.In = []string{"abcdef0:/in/config.json"}
-
-	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/ws", "", "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
+func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(m *contracts.StepManifest) string // returns outDir if needed
+		wantTarget string
+		wantSrcSfx string // expected suffix of mount source path
+		wantRO     bool
+		negTarget  string // mount target that must NOT exist
+	}{
+		{
+			name: "in mounted read-only",
+			setup: func(m *contracts.StepManifest) string {
+				m.In = []string{"abcdef0:/in/config.json"}
+				return ""
+			},
+			wantTarget: "/in/config.json",
+			wantSrcSfx: filepath.Join("abcdef0", "content"),
+			wantRO:     true,
+		},
+		{
+			name: "out seeded into outDir not separate mount",
+			setup: func(m *contracts.StepManifest) string {
+				m.Out = []string{"bbbbbbb:/out/results"}
+				return t.TempDir()
+			},
+			wantTarget: "/out",
+			negTarget:  "/out/results",
+		},
+		{
+			name: "home mount default rw",
+			setup: func(m *contracts.StepManifest) string {
+				m.Home = []string{"ccccccc:.codex/auth.json"}
+				return ""
+			},
+			wantTarget: "/home/user/.codex/auth.json",
+			wantSrcSfx: filepath.Join("ccccccc", "content"),
+			wantRO:     false,
+		},
+		{
+			name: "home mount with :ro",
+			setup: func(m *contracts.StepManifest) string {
+				m.Home = []string{"ddddddd:.config/app.toml:ro"}
+				return ""
+			},
+			wantTarget: "/home/user/.config/app.toml",
+			wantSrcSfx: filepath.Join("ddddddd", "content"),
+			wantRO:     true,
+		},
+		{
+			name: "home uses HOME env override",
+			setup: func(m *contracts.StepManifest) string {
+				m.Envs = map[string]string{"HOME": "/root"}
+				m.Home = []string{"ccccccc:.codex/auth.json"}
+				return ""
+			},
+			wantTarget: "/root/.codex/auth.json",
+			wantSrcSfx: filepath.Join("ccccccc", "content"),
+		},
+		{
+			name: "ca mount read-only",
+			setup: func(m *contracts.StepManifest) string {
+				m.CA = []string{"eeeeeee"}
+				return ""
+			},
+			wantTarget: "/etc/ploy/ca/eeeeeee",
+			wantSrcSfx: filepath.Join("eeeeeee", "content"),
+			wantRO:     true,
+		},
 	}
 
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/in/config.json" {
-			found = true
-			wantSrc := filepath.Join(stagingDir, "abcdef0", "content")
-			if m.Source != wantSrc {
-				t.Errorf("source = %q, want %q", m.Source, wantSrc)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stagingDir := t.TempDir()
+			manifest := baseManifestForHydra(t)
+			outDir := tt.setup(&manifest)
+
+			spec, err := buildContainerSpec(
+				types.RunID("run-"+tt.name), types.JobID("job-"+tt.name),
+				manifest, "/ws", outDir, "", stagingDir,
+			)
+			if err != nil {
+				t.Fatalf("buildContainerSpec error: %v", err)
 			}
-			if !m.ReadOnly {
-				t.Errorf("/in mount must be read-only")
+
+			var found bool
+			for _, m := range spec.Mounts {
+				if m.Target == tt.wantTarget {
+					found = true
+					if tt.wantSrcSfx != "" && !strings.HasSuffix(m.Source, tt.wantSrcSfx) {
+						t.Errorf("mount %s: source = %q, want suffix %q", tt.wantTarget, m.Source, tt.wantSrcSfx)
+					}
+					if tt.wantSrcSfx != "" && m.ReadOnly != tt.wantRO {
+						t.Errorf("mount %s: readOnly = %v, want %v", tt.wantTarget, m.ReadOnly, tt.wantRO)
+					}
+				}
 			}
-		}
-	}
-	if !found {
-		t.Fatalf("/in/config.json mount not found in %+v", spec.Mounts)
+			if !found {
+				t.Fatalf("mount %s not found in %+v", tt.wantTarget, spec.Mounts)
+			}
+
+			if tt.negTarget != "" {
+				for _, m := range spec.Mounts {
+					if m.Target == tt.negTarget {
+						t.Fatalf("unexpected separate mount for %s", tt.negTarget)
+					}
+				}
+			}
+		})
 	}
 }
 
-func TestBuildContainerSpec_HydraOutSeededInOutDir(t *testing.T) {
-	stagingDir := t.TempDir()
-	outDir := t.TempDir()
+// ---------------------------------------------------------------------------
+// Edge cases (table-driven)
+// ---------------------------------------------------------------------------
 
-	manifest := baseManifestForHydra(t)
-	manifest.Out = []string{"bbbbbbb:/out/results"}
-
-	spec, err := buildContainerSpec(types.RunID("run-out"), types.JobID("job-out"), manifest, "/ws", outDir, "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
+func TestBuildContainerSpec_HydraEdgeCases(t *testing.T) {
+	tests := []struct {
+		name       string
+		setup      func(m *contracts.StepManifest) (outDir, stagingDir string)
+		wantErr    string
+		wantMounts int // expected mount count when no error
+	}{
+		{
+			name: "skipped without staging dir",
+			setup: func(m *contracts.StepManifest) (string, string) {
+				m.In = []string{"abcdef0:/in/config.json"}
+				m.CA = []string{"bbbbbbb"}
+				return "", ""
+			},
+			wantMounts: 1,
+		},
+		{
+			name: "no hydra fields valid",
+			setup: func(m *contracts.StepManifest) (string, string) {
+				return "", t.TempDir()
+			},
+			wantMounts: 1,
+		},
+		{
+			name: "out requires outDir",
+			setup: func(m *contracts.StepManifest) (string, string) {
+				m.Out = []string{"fff0000:/out/results"}
+				return "", t.TempDir()
+			},
+			wantErr: "outDir required",
+		},
+		{
+			name: "out invalid entry rejected",
+			setup: func(m *contracts.StepManifest) (string, string) {
+				m.Out = []string{"not-a-valid-entry"}
+				return t.TempDir(), t.TempDir()
+			},
+			wantErr: "", // any non-nil error
+		},
 	}
 
-	// Out entries should NOT produce separate mounts; they are seeded into
-	// outDir and covered by the existing /out mount.
-	for _, m := range spec.Mounts {
-		if m.Target == "/out/results" {
-			t.Fatalf("unexpected separate mount for /out/results; out entries should be seeded into outDir")
-		}
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manifest := baseManifestForHydra(t)
+			outDir, stagingDir := tt.setup(&manifest)
 
-	// The /out mount from outDir should be present.
-	var outMountFound bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/out" && m.Source == outDir {
-			outMountFound = true
-		}
-	}
-	if !outMountFound {
-		t.Fatalf("/out mount from outDir not found in %+v", spec.Mounts)
+			spec, err := buildContainerSpec(
+				types.RunID("run-edge"), types.JobID("job-edge"),
+				manifest, "/ws", outDir, "", stagingDir,
+			)
+
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error = %q, want containing %q", err, tt.wantErr)
+				}
+				return
+			}
+			if tt.name == "out invalid entry rejected" {
+				if err == nil {
+					t.Fatal("expected error for invalid out entry, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(spec.Mounts) != tt.wantMounts {
+				t.Fatalf("got %d mounts, want %d: %+v", len(spec.Mounts), tt.wantMounts, spec.Mounts)
+			}
+		})
 	}
 }
 
-func TestBuildContainerSpec_HydraHomeMountRW(t *testing.T) {
-	stagingDir := t.TempDir()
+// ---------------------------------------------------------------------------
+// Mixed mount plan (all four Hydra entry types together)
+// ---------------------------------------------------------------------------
 
-	manifest := baseManifestForHydra(t)
-	manifest.Home = []string{"ccccccc:.codex/auth.json"}
-
-	spec, err := buildContainerSpec(types.RunID("run-home"), types.JobID("job-home"), manifest, "/ws", "", "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
-	}
-
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/home/user/.codex/auth.json" {
-			found = true
-			wantSrc := filepath.Join(stagingDir, "ccccccc", "content")
-			if m.Source != wantSrc {
-				t.Errorf("source = %q, want %q", m.Source, wantSrc)
-			}
-			if m.ReadOnly {
-				t.Errorf("home mount (default) must be read-write")
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("home mount not found in %+v", spec.Mounts)
-	}
-}
-
-func TestBuildContainerSpec_HydraHomeMountRO(t *testing.T) {
-	stagingDir := t.TempDir()
-
-	manifest := baseManifestForHydra(t)
-	manifest.Home = []string{"ddddddd:.config/app.toml:ro"}
-
-	spec, err := buildContainerSpec(types.RunID("run-home-ro"), types.JobID("job-home-ro"), manifest, "/ws", "", "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
-	}
-
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/home/user/.config/app.toml" {
-			found = true
-			wantSrc := filepath.Join(stagingDir, "ddddddd", "content")
-			if m.Source != wantSrc {
-				t.Errorf("source = %q, want %q", m.Source, wantSrc)
-			}
-			if !m.ReadOnly {
-				t.Errorf("home mount with :ro must be read-only")
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("home mount not found in %+v", spec.Mounts)
-	}
-}
-
-func TestBuildContainerSpec_HydraHomeUsesEnvHOME(t *testing.T) {
-	stagingDir := t.TempDir()
-
-	manifest := baseManifestForHydra(t)
-	manifest.Envs = map[string]string{"HOME": "/root"}
-	manifest.Home = []string{"ccccccc:.codex/auth.json"}
-
-	spec, err := buildContainerSpec(types.RunID("run-home-env"), types.JobID("job-home-env"), manifest, "/ws", "", "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
-	}
-
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/root/.codex/auth.json" {
-			found = true
-			wantSrc := filepath.Join(stagingDir, "ccccccc", "content")
-			if m.Source != wantSrc {
-				t.Errorf("source = %q, want %q", m.Source, wantSrc)
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("home mount with HOME=/root not found in %+v", spec.Mounts)
-	}
-}
-
-func TestBuildContainerSpec_HydraCAMount(t *testing.T) {
-	stagingDir := t.TempDir()
-
-	manifest := baseManifestForHydra(t)
-	manifest.CA = []string{"eeeeeee"}
-
-	spec, err := buildContainerSpec(types.RunID("run-ca"), types.JobID("job-ca"), manifest, "/ws", "", "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
-	}
-
-	var found bool
-	for _, m := range spec.Mounts {
-		if m.Target == "/etc/ploy/ca/eeeeeee" {
-			found = true
-			wantSrc := filepath.Join(stagingDir, "eeeeeee", "content")
-			if m.Source != wantSrc {
-				t.Errorf("source = %q, want %q", m.Source, wantSrc)
-			}
-			if !m.ReadOnly {
-				t.Errorf("CA mount must be read-only")
-			}
-		}
-	}
-	if !found {
-		t.Fatalf("CA mount not found in %+v", spec.Mounts)
-	}
-}
-
-func TestBuildContainerSpec_HydraSkippedWithoutStagingDir(t *testing.T) {
-	manifest := baseManifestForHydra(t)
-	manifest.In = []string{"abcdef0:/in/config.json"}
-	manifest.CA = []string{"bbbbbbb"}
-
-	spec, err := buildContainerSpec(types.RunID("run-nostaging"), types.JobID("job-nostaging"), manifest, "/ws", "", "", "")
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
-	}
-
-	// Only workspace mount should be present.
-	if len(spec.Mounts) != 1 {
-		t.Fatalf("got %d mounts, want 1: %+v", len(spec.Mounts), spec.Mounts)
-	}
-}
-
-func TestBuildContainerSpec_HydraNoFieldsValid(t *testing.T) {
-	stagingDir := t.TempDir()
-	manifest := baseManifestForHydra(t)
-
-	spec, err := buildContainerSpec(types.RunID("run-empty"), types.JobID("job-empty"), manifest, "/ws", "", "", stagingDir)
-	if err != nil {
-		t.Fatalf("buildContainerSpec error: %v", err)
-	}
-
-	// Only workspace mount.
-	if len(spec.Mounts) != 1 {
-		t.Fatalf("got %d mounts, want 1: %+v", len(spec.Mounts), spec.Mounts)
-	}
-}
-
-// TestBuildContainerSpec_HydraMixedMountPlan verifies that a manifest with all
-// four Hydra entry types (CA, In, Out, Home) produces the correct mount plan
-// with proper source paths, targets, and read-only modes.
 func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 	stagingDir := t.TempDir()
 	outDir := t.TempDir()
@@ -283,68 +273,25 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 		}
 	}
 
-	// Out entries must NOT produce separate mounts (covered by /out → outDir).
 	for _, m := range spec.Mounts {
 		if m.Target == "/out/results" {
 			t.Errorf("unexpected separate mount for /out/results; should be covered by /out")
 		}
 	}
 
-	// Total: workspace + /out + CA + In + Home = 5.
 	if len(spec.Mounts) != 5 {
 		t.Errorf("got %d mounts, want 5: %+v", len(spec.Mounts), spec.Mounts)
 	}
 }
 
-// TestBuildContainerSpec_HydraOutRequiresOutDir verifies that out entries in the
-// manifest are validated and that buildContainerSpec returns an error when outDir
-// is empty but out entries are present.
-func TestBuildContainerSpec_HydraOutRequiresOutDir(t *testing.T) {
-	stagingDir := t.TempDir()
+// ---------------------------------------------------------------------------
+// SeedOutDirFromStaging
+// ---------------------------------------------------------------------------
 
-	manifest := baseManifestForHydra(t)
-	manifest.Out = []string{"fff0000:/out/results"}
-
-	_, err := buildContainerSpec(
-		types.RunID("run-out-nodir"), types.JobID("job-out-nodir"),
-		manifest, "/ws", "", "", stagingDir,
-	)
-	if err == nil {
-		t.Fatal("expected error when outDir is empty with out entries, got nil")
-	}
-	if !strings.Contains(err.Error(), "outDir required") {
-		t.Errorf("error = %q, want mention of outDir required", err)
-	}
-}
-
-// TestBuildContainerSpec_HydraOutInvalidEntry verifies that an invalid out entry
-// is rejected during mount planning.
-func TestBuildContainerSpec_HydraOutInvalidEntry(t *testing.T) {
-	stagingDir := t.TempDir()
-	outDir := t.TempDir()
-
-	manifest := baseManifestForHydra(t)
-	manifest.Out = []string{"not-a-valid-entry"}
-
-	_, err := buildContainerSpec(
-		types.RunID("run-out-bad"), types.JobID("job-out-bad"),
-		manifest, "/ws", outDir, "", stagingDir,
-	)
-	if err == nil {
-		t.Fatal("expected error for invalid out entry, got nil")
-	}
-}
-
-// TestSeedOutDirFromStaging_ContainmentCheck verifies that SeedOutDirFromStaging
-// rejects out entries whose resolved destination escapes outDir.
 func TestSeedOutDirFromStaging_ContainmentCheck(t *testing.T) {
 	stagingDir := t.TempDir()
 	outDir := t.TempDir()
 
-	// Even though ParseStoredOutEntry cleans paths, verify the containment
-	// check in SeedOutDirFromStaging as defense-in-depth by testing with a
-	// destination that after cleaning still tries to escape via the rel path.
-	// A cleaned /out/results is safe; we verify it works.
 	hash := "abc0000"
 	contentDir := filepath.Join(stagingDir, hash, "content")
 	if err := os.MkdirAll(contentDir, 0o755); err != nil {
@@ -371,13 +318,10 @@ func TestSeedOutDirFromStaging_ContainmentCheck(t *testing.T) {
 	}
 }
 
-// TestSeedOutDirFromStaging verifies that out entry content is copied from
-// staging into outDir at the correct relative paths.
 func TestSeedOutDirFromStaging(t *testing.T) {
 	stagingDir := t.TempDir()
 	outDir := t.TempDir()
 
-	// Simulate materialized out content at stagingDir/<hash>/content.
 	hash := "abc0000"
 	contentDir := filepath.Join(stagingDir, hash, "content")
 	if err := os.MkdirAll(contentDir, 0o755); err != nil {
