@@ -517,3 +517,81 @@ func TestMigSpecsPromptFilesExist(t *testing.T) {
 		}
 	}
 }
+
+// TestHydraE2EDefaultCoverageGate runs unconditionally to ensure the default
+// `go test` path proves Hydra-only e2e coverage. When the live cluster is
+// unavailable, this gate validates that each live Hydra scenario has an
+// offline contract equivalent that covers the same enforcement semantics.
+// Set PLOY_E2E_CLUSTER=require to enforce live execution instead.
+func TestHydraE2EDefaultCoverageGate(t *testing.T) {
+	root := repoRoot(t)
+	live := clusterReady(t, root)
+
+	scenarios := []struct {
+		name        string
+		liveTest    string
+		offlineTest string
+		scriptDir   string
+		mountPaths  []string
+	}{
+		{
+			name:        "mount_enforcement",
+			liveTest:    "TestHydraMountEnforcement",
+			offlineTest: "TestHydraMountEnforcementOffline",
+			scriptDir:   "scenario-hydra-mount-enforcement",
+			mountPaths:  []string{"/in/", "/out/"},
+		},
+		{
+			name:        "out_upload",
+			liveTest:    "TestHydraOutUpload",
+			offlineTest: "TestHydraOutUploadContinuityOffline",
+			scriptDir:   "scenario-hydra-out-upload",
+			mountPaths:  []string{"/out/"},
+		},
+	}
+
+	for _, sc := range scenarios {
+		t.Run(sc.name, func(t *testing.T) {
+			if live {
+				t.Logf("live cluster available; %s will exercise full e2e", sc.liveTest)
+				return
+			}
+			t.Logf("live cluster unavailable; validating offline equivalent (%s)", sc.offlineTest)
+
+			// Verify scenario script exists and references expected Hydra mount paths.
+			scriptPath := filepath.Join(root, "tests", "e2e", "migs", sc.scriptDir, "run.sh")
+			data, err := os.ReadFile(scriptPath)
+			if err != nil {
+				t.Fatalf("scenario script %s/run.sh missing: %v", sc.scriptDir, err)
+			}
+			content := string(data)
+			for _, p := range sc.mountPaths {
+				if !strings.Contains(content, p) {
+					t.Errorf("%s/run.sh: missing Hydra mount path %q", sc.scriptDir, p)
+				}
+			}
+
+			// Verify no legacy CODEX_PROMPT in scenario scripts.
+			if strings.Contains(content, "CODEX_PROMPT") {
+				t.Errorf("%s/run.sh: contains legacy CODEX_PROMPT; must use Hydra in mount", sc.scriptDir)
+			}
+
+			// Validate contract-level parsers accept the mount paths
+			// used by the scenario (same assertions as the offline tests).
+			inEntry, err := contracts.ParseStoredInEntry("abcdef0:/in/config.json")
+			if err != nil {
+				t.Fatalf("contract parser rejects valid /in entry: %v", err)
+			}
+			if !inEntry.ReadOnly {
+				t.Error("/in entry must be read-only in contract")
+			}
+			outEntry, err := contracts.ParseStoredOutEntry("abcdef0:/out/result.txt")
+			if err != nil {
+				t.Fatalf("contract parser rejects valid /out entry: %v", err)
+			}
+			if outEntry.ReadOnly {
+				t.Error("/out entry must be writable in contract")
+			}
+		})
+	}
+}

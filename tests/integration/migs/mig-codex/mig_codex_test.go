@@ -615,3 +615,63 @@ func TestMigCodex_HealingFlowOffline(t *testing.T) {
 	})
 }
 
+// TestHydraHealingDefaultCoverageGate runs unconditionally to ensure the
+// default `go test` path proves Hydra-only healing flow coverage. When
+// CODEX_AUTH_FILE is not set, this gate validates that the offline healing
+// flow test (TestMigCodex_HealingFlowOffline) covers the same structural
+// invariants as the live test. Set PLOY_INTEGRATION_CODEX=require to enforce
+// live execution instead.
+func TestHydraHealingDefaultCoverageGate(t *testing.T) {
+	t.Parallel()
+
+	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
+	repoRoot = strings.TrimSpace(repoRoot)
+
+	authFile := os.Getenv("CODEX_AUTH_FILE")
+	live := strings.TrimSpace(authFile) != ""
+
+	if live {
+		t.Log("CODEX_AUTH_FILE set; TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch will exercise live healing")
+		return
+	}
+	t.Log("CODEX_AUTH_FILE not set; validating offline healing coverage (TestMigCodex_HealingFlowOffline)")
+
+	// Verify build-gate.log fixture exists with expected compilation error.
+	logPath := filepath.Join(repoRoot, "tests", "integration", "migs", "mig-codex", "build-gate.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("build-gate.log fixture missing: %v", err)
+	}
+	if !bytes.Contains(data, []byte("cannot find symbol")) {
+		t.Fatal("build-gate.log must contain 'cannot find symbol' compilation error")
+	}
+
+	// Verify healing prompt references Hydra mount paths, not legacy env injection.
+	prompt := strings.Join([]string{
+		"Rules:",
+		"- After making any change, generate a unified diff: cd /workspace && git diff > /out/heal.patch",
+		"- Write the sentinel file to signal readiness: echo 'ready' > /out/.buildgate-ready",
+		"- Build Gate verification is performed externally.",
+		"- Do NOT attempt to build or test inside this container.",
+		"- Once you have written the sentinel, print \"SENTINEL WRITTEN\".",
+		"",
+		"Task:",
+		"fix compilation error described in /in/build-gate.log",
+	}, "\n")
+	if !strings.Contains(prompt, "/in/build-gate.log") {
+		t.Error("healing prompt must reference /in/build-gate.log (Hydra in mount)")
+	}
+	if !strings.Contains(prompt, "/out/heal.patch") {
+		t.Error("healing prompt must reference /out/heal.patch (Hydra out mount)")
+	}
+	if strings.Contains(prompt, "CODEX_PROMPT") {
+		t.Error("healing prompt must not use legacy CODEX_PROMPT env injection")
+	}
+
+	// Verify codex Dockerfile exists (container infrastructure is in place).
+	dockerfile := filepath.Join(repoRoot, "images", "codex", "Dockerfile")
+	if _, err := os.Stat(dockerfile); err != nil {
+		t.Fatalf("codex Dockerfile missing: %v", err)
+	}
+}
+

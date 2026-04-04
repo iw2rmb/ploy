@@ -108,12 +108,11 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 				"enabled": true,
 				"router": {
 					"image": "codex:latest",
-					"envs": {"CODEX_PROMPT": "hello"},
-					"in": ["abcdef0:/in/auth.json"],
+					"in": ["abcdef0:/in/codex-prompt.txt", "ccccccc:/in/auth.json"],
 					"ca": ["bbbbbbb0123456"]
 				}
 			},
-			"bundle_map": {"abcdef0": "bun-1", "bbbbbbb0123456": "bun-2"}
+			"bundle_map": {"abcdef0": "bun-1", "bbbbbbb0123456": "bun-2", "ccccccc": "bun-3"}
 		}`
 		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
 		if err != nil {
@@ -121,6 +120,12 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 		if parsed.BuildGate == nil || parsed.BuildGate.Router == nil {
 			t.Fatal("expected router to be parsed")
+		}
+		if len(parsed.BuildGate.Router.Envs) != 0 {
+			t.Error("router must not use envs for prompt delivery; use Hydra in mount")
+		}
+		if len(parsed.BuildGate.Router.In) != 2 {
+			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(parsed.BuildGate.Router.In))
 		}
 	})
 
@@ -131,20 +136,19 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 			"build_gate": {
 				"router": {
 					"image": "codex:latest",
-					"envs": {"CODEX_PROMPT": "route it"}
+					"in": ["ddddddd:/in/codex-prompt.txt"]
 				},
 				"healing": {
 					"by_error_kind": {
 						"code": {
 							"retries": 1,
 							"image": "codex:latest",
-							"envs": {"CODEX_PROMPT": "fix it"},
-							"in": ["abcdef0:/in/auth.json"]
+							"in": ["abcdef0:/in/codex-prompt.txt", "eeeeeee:/in/auth.json"]
 						}
 					}
 				}
 			},
-			"bundle_map": {"abcdef0": "bun-1"}
+			"bundle_map": {"abcdef0": "bun-1", "ddddddd": "bun-2", "eeeeeee": "bun-3"}
 		}`
 		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
 		if err != nil {
@@ -152,6 +156,16 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 		if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || len(parsed.BuildGate.Healing.ByErrorKind) == 0 {
 			t.Fatal("expected healing action to be parsed")
+		}
+		if len(parsed.BuildGate.Router.Envs) != 0 {
+			t.Error("router must not use envs for prompt delivery; use Hydra in mount")
+		}
+		action := parsed.BuildGate.Healing.ByErrorKind["code"]
+		if len(action.Envs) != 0 {
+			t.Error("healing action must not use envs for prompt delivery; use Hydra in mount")
+		}
+		if len(action.In) != 2 {
+			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(action.In))
 		}
 	})
 
