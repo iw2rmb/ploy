@@ -1,3 +1,3 @@
-[Dockerfile](Dockerfile) Builds the Codex container image with required CLI dependencies, shell tooling, and the project entrypoint.
-[build.sh](build.sh) Runs `docker buildx` to build and push the `codex:latest` image for a configurable platform and registry.
-[entrypoint.sh](entrypoint.sh) Container command wrapper that prepares prompt/context, detects supported `codex exec` flags, runs Codex, and writes logs plus run metadata.
+[Dockerfile](Dockerfile) Builds the direct Codex runtime image with CLI tooling and the wrapper entrypoint script.
+[build.sh](build.sh) Builds and pushes the `codex:latest` container image for the configured registry.
+[entrypoint.sh](entrypoint.sh) Wraps `codex exec` for mig jobs, loading prompt/config inputs and persisting run/session artifacts.

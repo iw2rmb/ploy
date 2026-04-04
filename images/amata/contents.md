@@ -1,4 +1,4 @@
-[Dockerfile](Dockerfile) Builds the amata runner image with codex/crush/cc tools and ploy runtime defaults.
-[build-amata.sh](build-amata.sh) Builds the amata binary from sibling source and stages it into this image context.
-[build.sh](build.sh) Wrapper script that builds/stages amata and runs `docker buildx` to publish the image.
-[entrypoint.sh](entrypoint.sh) Container entrypoint that activates CCR when configured, runs amata, and emits codex artifacts to `/out`.
+[Dockerfile](Dockerfile) Builds the Amata runner image with codex/claude/crush tooling and the Amata binary entrypoint.
+[build-amata.sh](build-amata.sh) Compiles the sibling `amata` Go CLI and stages the binary into this image build context.
+[build.sh](build.sh) Builds and pushes the `amata:latest` container image after staging the Amata binary.
+[entrypoint.sh](entrypoint.sh) Runs Amata in mig containers, captures execution logs, and writes codex-compatible output artifacts.
