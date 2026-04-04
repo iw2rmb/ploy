@@ -361,20 +361,15 @@ func TestMigCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	// CODEX_AUTH_FILE points to a local auth.json file delivered via Hydra home mount.
 	//
 	// PLOY_INTEGRATION_CODEX controls behavior when CODEX_AUTH_FILE is unset:
-	//   "require" — t.Fatalf (CI with full infrastructure)
 	//   "skip"    — t.Skip (quiet local iteration)
-	//   unset     — run offline Hydra contract validation (default)
+	//   unset     — t.Fatalf (default; ensures live Codex coverage is proven)
 	authFile := os.Getenv("CODEX_AUTH_FILE")
 	if strings.TrimSpace(authFile) == "" {
 		mode := os.Getenv("PLOY_INTEGRATION_CODEX")
-		switch mode {
-		case "require":
-			t.Fatalf("CODEX_AUTH_FILE not set; live Codex integration required (PLOY_INTEGRATION_CODEX=require)")
-		case "skip":
+		if mode == "skip" {
 			t.Skip("CODEX_AUTH_FILE not set; skipping (PLOY_INTEGRATION_CODEX=skip)")
-		default:
-			t.Skip("CODEX_AUTH_FILE not set; skipping live healing flow (set PLOY_INTEGRATION_CODEX=require to enforce live coverage)")
 		}
+		t.Fatalf("CODEX_AUTH_FILE not set; live Codex integration required (set PLOY_INTEGRATION_CODEX=skip to opt out)")
 	}
 	if _, err := os.Stat(authFile); err != nil {
 		t.Skipf("CODEX_AUTH_FILE %q not accessible: %v", authFile, err)

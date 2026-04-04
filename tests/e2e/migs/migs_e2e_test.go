@@ -21,13 +21,11 @@ func repoRoot(t *testing.T) string {
 }
 
 // clusterReady reports whether the local Hydra cluster is available for e2e
-// tests. Callers that get false should t.Skip; offline contract validation is
-// covered by TestHydraScenarioOfflineValidation.
+// tests. Callers that get false should t.Skip.
 //
 // PLOY_E2E_CLUSTER controls behavior when the cluster is unreachable:
-//   - "require" — t.Fatalf (CI with full infrastructure)
-//   - "skip"    — return false, no log (quiet local iteration)
-//   - unset     — return false with t.Log (default)
+//   - "skip"    — return false (quiet local iteration)
+//   - unset     — t.Fatalf (default; ensures live Hydra coverage is proven)
 func clusterReady(t *testing.T, root string) bool {
 	t.Helper()
 
@@ -35,12 +33,10 @@ func clusterReady(t *testing.T, root string) bool {
 
 	// 1. Built binary must exist.
 	if _, err := os.Stat(filepath.Join(root, "dist", "ploy")); err != nil {
-		if mode == "require" {
-			t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or set PLOY_E2E_CLUSTER=skip")
+		if mode == "skip" {
+			return false
 		}
-		if mode != "skip" {
-			t.Log("ploy binary not built; falling back to offline Hydra validation")
-		}
+		t.Fatalf("ploy binary not built (dist/ploy missing); build with `make build` or set PLOY_E2E_CLUSTER=skip")
 		return false
 	}
 
@@ -57,12 +53,10 @@ func clusterReady(t *testing.T, root string) bool {
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(serverURL + "/healthz")
 	if err != nil {
-		if mode == "require" {
-			t.Fatalf("local cluster not reachable at %s: %v; start the cluster or set PLOY_E2E_CLUSTER=skip", serverURL, err)
+		if mode == "skip" {
+			return false
 		}
-		if mode != "skip" {
-			t.Logf("local cluster not reachable at %s; falling back to offline Hydra validation", serverURL)
-		}
+		t.Fatalf("local cluster not reachable at %s: %v; start the cluster or set PLOY_E2E_CLUSTER=skip", serverURL, err)
 		return false
 	}
 	resp.Body.Close()
@@ -132,7 +126,7 @@ func TestHydraMountEnforcement(t *testing.T) {
 	}
 
 	if !clusterReady(t, root) {
-		t.Skip("cluster unavailable; skipping live mount-enforcement scenario (offline contract covered by TestHydraScenarioOfflineValidation)")
+		t.Skip("cluster unavailable (PLOY_E2E_CLUSTER=skip)")
 	}
 
 	cmd := exec.Command("bash", script)
@@ -160,7 +154,7 @@ func TestHydraOutUpload(t *testing.T) {
 	}
 
 	if !clusterReady(t, root) {
-		t.Skip("cluster unavailable; skipping live out-upload scenario (offline contract covered by TestHydraScenarioOfflineValidation)")
+		t.Skip("cluster unavailable (PLOY_E2E_CLUSTER=skip)")
 	}
 
 	cmd := exec.Command("bash", script)
