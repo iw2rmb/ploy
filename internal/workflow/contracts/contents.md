@@ -31,7 +31,7 @@
 [migs_spec_parse.go](migs_spec_parse.go) Parses mig specs from JSON, enforces schema checks, normalizes defaults, and runs typed validation.
 [migs_spec_parse_test.go](migs_spec_parse_test.go) Tests single-step and multi-step mig spec parsing with build-gate and GitLab options.
 [migs_spec_roundtrip_test.go](migs_spec_roundtrip_test.go) Verifies JSON marshal/parse round-trip preserves canonical mig spec fields.
-[migs_spec_tmpdir_test.go](migs_spec_tmpdir_test.go) Tests mig-spec validation for Hydra-related in/out/home/ca step fields.
+[migs_spec_hydra_validation_test.go](migs_spec_hydra_validation_test.go) Tests mig-spec schema validation for Hydra ca/in/out/home fields and legacy field rejection.
 [mod_image.go](mod_image.go) Defines stack-aware job-image contract and resolution rules for universal and stack-specific image forms.
 [mod_image_test.go](mod_image_test.go) Tests job-image resolution precedence, fallbacks, and invalid map configurations.
 [orw_cli_contract.go](orw_cli_contract.go) Defines OpenRewrite CLI env contract and report/error parsing for deterministic runtime classification.

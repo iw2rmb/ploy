@@ -14,6 +14,6 @@
 [scenario-prep-ready.sh](scenario-prep-ready.sh) Prep lifecycle happy-path scenario checking PrepReady transition before repo jobs are enqueued.
 [scenario-selftest.sh](scenario-selftest.sh) Minimal self-test scenario that validates run/follow execution and artifact plumbing on a simple container step.
 [scenario-stack-aware-images/](scenario-stack-aware-images) Scenario for stack-aware image resolution across exact-match, default-fallback, and missing-default error paths.
-[scenario-tmpdir-blocked/](scenario-tmpdir-blocked) Scenario that uploads unsafe spec bundles and asserts deterministic rejection of traversal and symlink entries.
-[scenario-tmpdir-mixed/](scenario-tmpdir-mixed) Scenario validating Hydra in mounts with mixed fixture inputs consumed from /in inside the container.
+[scenario-bundle-blocked/](scenario-bundle-blocked) Scenario that uploads unsafe spec bundles and asserts deterministic rejection of traversal and symlink entries.
+[scenario-in-mixed/](scenario-in-mixed) Scenario validating Hydra in mounts with mixed fixture inputs consumed from /in inside the container.
 [validate-hygiene.sh](validate-hygiene.sh) Script that runs repository hygiene checks through test, vet, and staticcheck targets.

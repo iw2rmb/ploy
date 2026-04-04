@@ -58,9 +58,9 @@ steps:
 ################################################################################
 # HYDRA FILE RECORDS — ca / in / out / home
 ################################################################################
-# Hydra replaces legacy env_from_file, tmp_dir, and tmp_bundle with four
-# typed file-record fields. Each field accepts local source paths in the
-# spec; the CLI compiles them to canonical shortHash:dst form before submit.
+# Hydra provides four typed file-record fields. Each field accepts local
+# source paths in the spec; the CLI compiles them to canonical
+# shortHash:dst form before submit.
 #
 # Field semantics:
 #   ca   — CA certificate entries (local PEM paths or shortHash values).
@@ -322,9 +322,7 @@ mr_on_fail: true
 #   steps[] (for single-step and multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
 #   mr_on_fail, build_gate.* (enabled, images, router, healing).
 #
-# - Legacy fields (env, env_from_file, tmp_dir, tmp_bundle) are rejected by the
-#   server-side schema. Use envs for environment variables and ca/in/out/home
-#   for file injection.
+# - Use envs for environment variables and ca/in/out/home for file injection.
 #
 # - Single-step vs multi-step:
 #   * Single-step: Use `steps[]` with exactly one entry.
