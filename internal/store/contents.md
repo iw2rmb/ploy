@@ -49,7 +49,7 @@
 [sboms_compat_queries_test.go](sboms_compat_queries_test.go) Tests SBOM compatibility filtering by gate status, stack, and requested libraries.
 [sboms_sql_test.go](sboms_sql_test.go) Query and schema constraint tests for SBOM conflict and ordering behavior.
 [schedule_norace_test.go](schedule_norace_test.go) Concurrency test ensuring schedule-next-job path avoids double scheduling races.
-[schema.sql](schema.sql) Canonical PostgreSQL schema for the store, embedded and applied via migrations.
+[schema.sql](schema.sql) Canonical PostgreSQL schema defining store tables, enums, constraints, indexes, and Hydra-era global config structures.
 [schema_gate_stack_constraints_test.go](schema_gate_stack_constraints_test.go) Verifies gate/profile uniqueness and foreign-key constraints in schema DDL.
 [schema_v1_constraints_test.go](schema_v1_constraints_test.go) Regression tests for legacy v1 schema constraints and uniqueness rules.
 [spec_bundles.sql.go](spec_bundles.sql.go) sqlc-generated queries for content-addressed spec bundle persistence and lookup.
