@@ -45,46 +45,45 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 			expectKeys: []string{"API_KEY"},
 			checkEnvs:  map[string]string{"API_KEY": "secret123"},
 		},
-		{
-			name:       "mig job gets steps target",
+	}
+	// Job-type → target routing: steps-target jobs get STEPS_KEY, gates-target jobs get GATES_KEY.
+	for _, jt := range []struct {
+		jobType    domaintypes.JobType
+		expectKeys []string
+		rejectKeys []string
+	}{
+		{domaintypes.JobTypeMig, []string{"STEPS_KEY"}, []string{"GATES_KEY"}},
+		{domaintypes.JobTypeHeal, []string{"STEPS_KEY"}, []string{"GATES_KEY"}},
+		{domaintypes.JobTypePreGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
+		{domaintypes.JobTypeReGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
+		{domaintypes.JobTypePostGate, []string{"GATES_KEY"}, []string{"STEPS_KEY"}},
+	} {
+		tests = append(tests, struct {
+			name       string
+			spec       map[string]any
+			env        map[string][]GlobalEnvVar
+			jobType    domaintypes.JobType
+			expectKeys []string
+			rejectKeys []string
+			checkEnvs  map[string]string
+		}{
+			name:       string(jt.jobType) + " job gets correct target",
 			spec:       map[string]any{},
 			env:        targetTestEnv(),
-			jobType:    domaintypes.JobTypeMig,
-			expectKeys: []string{"STEPS_KEY"},
-			rejectKeys: []string{"GATES_KEY"},
-		},
-		{
-			name:       "heal job gets steps target",
-			spec:       map[string]any{},
-			env:        targetTestEnv(),
-			jobType:    domaintypes.JobTypeHeal,
-			expectKeys: []string{"STEPS_KEY"},
-			rejectKeys: []string{"GATES_KEY"},
-		},
-		{
-			name:       "pre_gate job gets gates target",
-			spec:       map[string]any{},
-			env:        targetTestEnv(),
-			jobType:    domaintypes.JobTypePreGate,
-			expectKeys: []string{"GATES_KEY"},
-			rejectKeys: []string{"STEPS_KEY"},
-		},
-		{
-			name:       "re_gate job gets gates target",
-			spec:       map[string]any{},
-			env:        targetTestEnv(),
-			jobType:    domaintypes.JobTypeReGate,
-			expectKeys: []string{"GATES_KEY"},
-			rejectKeys: []string{"STEPS_KEY"},
-		},
-		{
-			name:       "post_gate job gets gates target",
-			spec:       map[string]any{},
-			env:        targetTestEnv(),
-			jobType:    domaintypes.JobTypePostGate,
-			expectKeys: []string{"GATES_KEY"},
-			rejectKeys: []string{"STEPS_KEY"},
-		},
+			jobType:    jt.jobType,
+			expectKeys: jt.expectKeys,
+			rejectKeys: jt.rejectKeys,
+		})
+	}
+	tests = append(tests, []struct {
+		name       string
+		spec       map[string]any
+		env        map[string][]GlobalEnvVar
+		jobType    domaintypes.JobType
+		expectKeys []string
+		rejectKeys []string
+		checkEnvs  map[string]string
+	}{
 		{
 			name: "per-run envs takes precedence over global",
 			spec: map[string]any{
@@ -167,7 +166,7 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 			jobType:    domaintypes.JobTypeMig,
 			rejectKeys: []string{"SERVER_ONLY"},
 		},
-	}
+	}...)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -192,12 +191,6 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 
 func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 	t.Parallel()
-
-	type sliceCheck struct {
-		field     string
-		wantLen   int
-		wantFirst string
-	}
 
 	tests := []struct {
 		name      string
@@ -274,21 +267,8 @@ func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			for k, want := range tt.checkEnvs {
-				envs := m["envs"].(map[string]any)
-				if got := envs[k]; got != want {
-					t.Errorf("envs[%q] = %v, want %q", k, got, want)
-				}
-			}
-			for _, sc := range tt.slices {
-				raw := m[sc.field].([]any)
-				if len(raw) != sc.wantLen {
-					t.Fatalf("%s length = %d, want %d: %v", sc.field, len(raw), sc.wantLen, raw)
-				}
-				if sc.wantFirst != "" && raw[0] != sc.wantFirst {
-					t.Errorf("%s[0] = %v, want %s", sc.field, raw[0], sc.wantFirst)
-				}
-			}
+			assertEnvs(t, m, tt.checkEnvs, nil, nil)
+			assertSlices(t, m, tt.slices)
 		})
 	}
 }
@@ -357,10 +337,9 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 		spec          map[string]any
 		jobType       domaintypes.JobType
 		overlays      map[string]*HydraJobConfig
-		wantPhase     string // expected router envs["PHASE"]
-		wantCA        string // expected first router CA entry
-		noRouter      bool   // expect no router block created
-		checkRouterKV map[string]string // additional router envs key→value checks
+		noRouter      bool              // expect no router block created
+		checkRouterKV map[string]string  // expected router envs key→value
+		routerSlices  []sliceCheck       // slice checks on router sub-block
 	}{
 		{
 			name: "pre_gate claim inherits from pre_gate",
@@ -370,10 +349,10 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 					"router": map[string]any{"image": "router:latest"},
 				},
 			},
-			jobType:   domaintypes.JobTypePreGate,
-			overlays:  allOverlays,
-			wantPhase: "pre",
-			wantCA:    "aaa1234567ab",
+			jobType:       domaintypes.JobTypePreGate,
+			overlays:      allOverlays,
+			checkRouterKV: map[string]string{"PHASE": "pre"},
+			routerSlices:  []sliceCheck{{"ca", 1, "aaa1234567ab"}},
 		},
 		{
 			name: "re_gate claim inherits from re_gate not pre_gate",
@@ -383,10 +362,10 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 					"router": map[string]any{"image": "router:latest"},
 				},
 			},
-			jobType:   domaintypes.JobTypeReGate,
-			overlays:  allOverlays,
-			wantPhase: "re",
-			wantCA:    "bbb1234567ab",
+			jobType:       domaintypes.JobTypeReGate,
+			overlays:      allOverlays,
+			checkRouterKV: map[string]string{"PHASE": "re"},
+			routerSlices:  []sliceCheck{{"ca", 1, "bbb1234567ab"}},
 		},
 		{
 			name: "post_gate claim inherits from post_gate even when pre exists",
@@ -397,10 +376,10 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 					"router": map[string]any{"image": "router:latest"},
 				},
 			},
-			jobType:   domaintypes.JobTypePostGate,
-			overlays:  allOverlays,
-			wantPhase: "post",
-			wantCA:    "ccc1234567ab",
+			jobType:       domaintypes.JobTypePostGate,
+			overlays:      allOverlays,
+			checkRouterKV: map[string]string{"PHASE": "post"},
+			routerSlices:  []sliceCheck{{"ca", 1, "ccc1234567ab"}},
 		},
 		{
 			name: "mig claim falls back to spec presence pre_gate",
@@ -410,10 +389,10 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 					"router": map[string]any{"image": "router:latest"},
 				},
 			},
-			jobType:   domaintypes.JobTypeMig,
-			overlays:  allOverlays,
-			wantPhase: "pre",
-			wantCA:    "aaa1234567ab",
+			jobType:       domaintypes.JobTypeMig,
+			overlays:      allOverlays,
+			checkRouterKV: map[string]string{"PHASE": "pre"},
+			routerSlices:  []sliceCheck{{"ca", 1, "aaa1234567ab"}},
 		},
 		{
 			name: "mig claim falls back to post_gate when only post configured",
@@ -423,10 +402,10 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 					"router": map[string]any{"image": "router:latest"},
 				},
 			},
-			jobType:   domaintypes.JobTypeMig,
-			overlays:  allOverlays,
-			wantPhase: "post",
-			wantCA:    "ccc1234567ab",
+			jobType:       domaintypes.JobTypeMig,
+			overlays:      allOverlays,
+			checkRouterKV: map[string]string{"PHASE": "post"},
+			routerSlices:  []sliceCheck{{"ca", 1, "ccc1234567ab"}},
 		},
 		{
 			name: "no router section does nothing",
@@ -475,23 +454,8 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 				return
 			}
 			router := bg["router"].(map[string]any)
-			envs := router["envs"].(map[string]any)
-			if tt.wantPhase != "" {
-				if envs["PHASE"] != tt.wantPhase {
-					t.Errorf("router envs[PHASE] = %v, want %q", envs["PHASE"], tt.wantPhase)
-				}
-			}
-			if tt.wantCA != "" {
-				ca := router["ca"].([]any)
-				if len(ca) != 1 || ca[0] != tt.wantCA {
-					t.Errorf("router ca = %v, want [%s]", ca, tt.wantCA)
-				}
-			}
-			for k, want := range tt.checkRouterKV {
-				if got := envs[k]; got != want {
-					t.Errorf("router envs[%q] = %v, want %q", k, got, want)
-				}
-			}
+			assertEnvs(t, router, tt.checkRouterKV, nil, nil)
+			assertSlices(t, router, tt.routerSlices)
 		})
 	}
 }
@@ -532,28 +496,14 @@ func TestApplyHydraOverlay_HealContainerOverlay(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	bg := m["build_gate"].(map[string]any)
-	healing := bg["healing"].(map[string]any)
-	byKind := healing["by_error_kind"].(map[string]any)
+	byKind := m["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)
 
 	infra := byKind["infra"].(map[string]any)
-	infraEnvs := infra["envs"].(map[string]any)
-	if infraEnvs["EXISTING"] != "spec_val" {
-		t.Errorf("infra envs[EXISTING] = %v, want spec_val (spec wins)", infraEnvs["EXISTING"])
-	}
-	if infraEnvs["HEAL_KEY"] != "heal_val" {
-		t.Errorf("infra envs[HEAL_KEY] = %v, want heal_val", infraEnvs["HEAL_KEY"])
-	}
-	infraCA := infra["ca"].([]any)
-	if len(infraCA) != 1 || infraCA[0] != "heal1234567ab" {
-		t.Errorf("infra ca = %v, want [heal1234567ab]", infraCA)
-	}
+	assertEnvs(t, infra, map[string]string{"EXISTING": "spec_val", "HEAL_KEY": "heal_val"}, nil, nil)
+	assertSlice(t, infra, "ca", 1, "heal1234567ab")
 
 	logic := byKind["logic"].(map[string]any)
-	logicEnvs := logic["envs"].(map[string]any)
-	if logicEnvs["HEAL_KEY"] != "heal_val" {
-		t.Errorf("logic envs[HEAL_KEY] = %v, want heal_val", logicEnvs["HEAL_KEY"])
-	}
+	assertEnvs(t, logic, map[string]string{"HEAL_KEY": "heal_val"}, nil, nil)
 }
 
 // ---------------------------------------------------------------------------
@@ -570,10 +520,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 		overlays  map[string]*HydraJobConfig
 		wantErr   bool
 		errSubstr string // required substring in error message
-		// For non-error cases: verify replacement behavior.
-		checkField string // "in", "out", or "home"
-		wantLen    int
-		wantFirst  string
+		slices    []sliceCheck // non-error: verify replacement behavior
 	}{
 		{
 			name:    "duplicate in destinations in overlay",
@@ -649,9 +596,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			overlays: map[string]*HydraJobConfig{
 				"mig": {In: []string{"/overlay:/in/config.json"}},
 			},
-			checkField: "in",
-			wantLen:    1,
-			wantFirst:  "/spec:/in/config.json",
+			slices: []sliceCheck{{"in", 1, "/spec:/in/config.json"}},
 		},
 		{
 			name: "spec and overlay share out dst replaces with spec entry",
@@ -662,9 +607,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			overlays: map[string]*HydraJobConfig{
 				"mig": {Out: []string{"/overlay:/out/result.txt"}},
 			},
-			checkField: "out",
-			wantLen:    1,
-			wantFirst:  "/spec:/out/result.txt",
+			slices: []sliceCheck{{"out", 1, "/spec:/out/result.txt"}},
 		},
 		{
 			name: "spec and overlay share home dst replaces with spec entry",
@@ -675,9 +618,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			overlays: map[string]*HydraJobConfig{
 				"mig": {Home: []string{"/overlay:.config/app.toml"}},
 			},
-			checkField: "home",
-			wantLen:    1,
-			wantFirst:  "/spec:.config/app.toml:ro",
+			slices: []sliceCheck{{"home", 1, "/spec:.config/app.toml:ro"}},
 		},
 		{
 			name: "overlay appends non-colliding dst to spec",
@@ -688,9 +629,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			overlays: map[string]*HydraJobConfig{
 				"mig": {In: []string{"/overlay:/in/b.json"}},
 			},
-			checkField: "in",
-			wantLen:    2,
-			wantFirst:  "/spec:/in/a.json",
+			slices: []sliceCheck{{"in", 2, "/spec:/in/a.json"}},
 		},
 	}
 
@@ -718,15 +657,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if tt.checkField != "" {
-				raw := m[tt.checkField].([]any)
-				if len(raw) != tt.wantLen {
-					t.Fatalf("%s length = %d, want %d: %v", tt.checkField, len(raw), tt.wantLen, raw)
-				}
-				if tt.wantFirst != "" && raw[0] != tt.wantFirst {
-					t.Errorf("%s[0] = %v, want %s", tt.checkField, raw[0], tt.wantFirst)
-				}
-			}
+			assertSlices(t, m, tt.slices)
 		})
 	}
 }
@@ -746,12 +677,7 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 		jobType   domaintypes.JobType
 		// assertions
 		checkEnvs map[string]string // key → expected value
-		caLen     int               // expected ca slice length
-		caFirst   string            // expected first ca entry
-		inLen     int               // expected in slice length
-		inFirst   string            // expected first in entry
-		homeLen   int               // expected home slice length
-		homeFirst string            // expected first home entry
+		slices    []sliceCheck
 	}{
 		{
 			name: "spec wins over overlay and global for shared env key",
@@ -775,12 +701,11 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			},
 			jobType:   domaintypes.JobTypeMig,
 			checkEnvs: map[string]string{"SHARED_ALL": "from_spec", "SPEC_ONLY": "spec", "OVERLAY_ONLY": "overlay", "GLOBAL_ONLY": "overlay_override"},
-			caLen:     2,
-			caFirst:   "cccccc1234ab",
-			inLen:     2,
-			inFirst:   "/spec/data:/in/data.json",
-			homeLen:   1,
-			homeFirst: "/spec/auth:.auth/config.json:ro",
+			slices: []sliceCheck{
+				{"ca", 2, "cccccc1234ab"},
+				{"in", 2, "/spec/data:/in/data.json"},
+				{"home", 1, "/spec/auth:.auth/config.json:ro"},
+			},
 		},
 		{
 			name: "overlay wins over global for same env key",
@@ -805,8 +730,7 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			},
 			jobType:   domaintypes.JobTypeMig,
 			checkEnvs: map[string]string{"ONLY_GLOBAL": "g"},
-			inLen:     1,
-			inFirst:   "/f:/in/f.txt",
+			slices:    []sliceCheck{{"in", 1, "/f:/in/f.txt"}},
 		},
 		{
 			name: "spec envs win when no overlay or global conflict",
@@ -851,33 +775,7 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			assertEnvs(t, m, tt.checkEnvs, nil, nil)
-			if tt.caLen > 0 {
-				ca := m["ca"].([]any)
-				if len(ca) != tt.caLen {
-					t.Fatalf("ca length = %d, want %d: %v", len(ca), tt.caLen, ca)
-				}
-				if tt.caFirst != "" && ca[0] != tt.caFirst {
-					t.Errorf("ca[0] = %v, want %s", ca[0], tt.caFirst)
-				}
-			}
-			if tt.inLen > 0 {
-				in := m["in"].([]any)
-				if len(in) != tt.inLen {
-					t.Fatalf("in length = %d, want %d: %v", len(in), tt.inLen, in)
-				}
-				if tt.inFirst != "" && in[0] != tt.inFirst {
-					t.Errorf("in[0] = %v, want %s", in[0], tt.inFirst)
-				}
-			}
-			if tt.homeLen > 0 {
-				home := m["home"].([]any)
-				if len(home) != tt.homeLen {
-					t.Fatalf("home length = %d, want %d: %v", len(home), tt.homeLen, home)
-				}
-				if tt.homeFirst != "" && home[0] != tt.homeFirst {
-					t.Errorf("home[0] = %v, want %s", home[0], tt.homeFirst)
-				}
-			}
+			assertSlices(t, m, tt.slices)
 		})
 	}
 }
@@ -1029,7 +927,7 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 	t.Parallel()
 
 	jobID := domaintypes.NewJobID()
-	merged, err := mutateClaimSpec(claimSpecMutatorInput{
+	out := mustMutateAndUnmarshal(t, claimSpecMutatorInput{
 		spec:    []byte(`{"envs":{"EXISTING":"1"}}`),
 		job:     store.Job{ID: jobID, Meta: []byte(`{}`)},
 		jobType: domaintypes.JobTypeMig,
@@ -1043,41 +941,44 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 			},
 		},
 	})
-	if err != nil {
-		t.Fatalf("mutateClaimSpec: %v", err)
-	}
-
-	var out map[string]any
-	if err := json.Unmarshal(merged, &out); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
 
 	if got := out["job_id"]; got != jobID.String() {
 		t.Errorf("job_id = %v, want %s", got, jobID.String())
 	}
-
-	envs := out["envs"].(map[string]any)
-	if envs["EXISTING"] != "1" {
-		t.Errorf("envs[EXISTING] = %v, want 1", envs["EXISTING"])
-	}
-	if envs["GLOBAL"] != "g" {
-		t.Errorf("envs[GLOBAL] = %v, want g", envs["GLOBAL"])
-	}
-
-	ca := out["ca"].([]any)
-	if len(ca) != 1 || ca[0] != "abc1234567ab" {
-		t.Errorf("ca = %v, want [abc1234567ab]", ca)
-	}
-
-	in := out["in"].([]any)
-	if len(in) != 1 || in[0] != "/data:/in/data.json" {
-		t.Errorf("in = %v, want [/data:/in/data.json]", in)
-	}
+	assertEnvs(t, out, map[string]string{"EXISTING": "1", "GLOBAL": "g"}, nil, nil)
+	assertSlices(t, out, []sliceCheck{
+		{"ca", 1, "abc1234567ab"},
+		{"in", 1, "/data:/in/data.json"},
+	})
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+type sliceCheck struct {
+	field     string
+	wantLen   int
+	wantFirst string
+}
+
+func assertSlice(t *testing.T, m map[string]any, field string, wantLen int, wantFirst string) {
+	t.Helper()
+	raw := m[field].([]any)
+	if len(raw) != wantLen {
+		t.Fatalf("%s length = %d, want %d: %v", field, len(raw), wantLen, raw)
+	}
+	if wantFirst != "" && raw[0] != wantFirst {
+		t.Errorf("%s[0] = %v, want %s", field, raw[0], wantFirst)
+	}
+}
+
+func assertSlices(t *testing.T, m map[string]any, checks []sliceCheck) {
+	t.Helper()
+	for _, sc := range checks {
+		assertSlice(t, m, sc.field, sc.wantLen, sc.wantFirst)
+	}
+}
 
 func assertEnvs(t *testing.T, m map[string]any, checkEnvs map[string]string, expectKeys, rejectKeys []string) {
 	t.Helper()
