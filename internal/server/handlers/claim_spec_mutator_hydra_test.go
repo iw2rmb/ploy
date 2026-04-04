@@ -181,29 +181,7 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 			if err != nil {
 				t.Fatalf("applyHydraOverlayMutator: %v", err)
 			}
-
-			em, _ := m["envs"].(map[string]any)
-
-			for _, key := range tt.expectKeys {
-				if _, ok := em[key]; !ok {
-					t.Errorf("expected key %q to be present in envs", key)
-				}
-			}
-			for _, key := range tt.rejectKeys {
-				if em != nil {
-					if _, ok := em[key]; ok {
-						t.Errorf("expected key %q to be absent from envs", key)
-					}
-				}
-			}
-			for key, want := range tt.checkEnvs {
-				if em == nil {
-					t.Fatalf("envs map is nil, expected key %q=%q", key, want)
-				}
-				if got := em[key]; got != want {
-					t.Errorf("envs[%q] = %v, want %q", key, got, want)
-				}
-			}
+			assertEnvs(t, m, tt.checkEnvs, tt.expectKeys, tt.rejectKeys)
 		})
 	}
 }
@@ -215,139 +193,104 @@ func TestApplyHydraOverlay_GlobalEnvRouting(t *testing.T) {
 func TestApplyHydraOverlay_TypedMerge(t *testing.T) {
 	t.Parallel()
 
-	t.Run("envs key-based override spec wins", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]any{
-			"envs": map[string]any{"SPEC_KEY": "spec_val", "SHARED": "from_spec"},
-		}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypeMig,
-			hydraOverlays: map[string]*HydraJobConfig{
+	type sliceCheck struct {
+		field     string
+		wantLen   int
+		wantFirst string
+	}
+
+	tests := []struct {
+		name      string
+		spec      map[string]any
+		overlays  map[string]*HydraJobConfig
+		checkEnvs map[string]string
+		slices    []sliceCheck
+	}{
+		{
+			name: "envs key-based override spec wins",
+			spec: map[string]any{
+				"envs": map[string]any{"SPEC_KEY": "spec_val", "SHARED": "from_spec"},
+			},
+			overlays: map[string]*HydraJobConfig{
 				"mig": {Envs: map[string]string{"OVERLAY_KEY": "overlay_val", "SHARED": "from_overlay"}},
 			},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		envs := m["envs"].(map[string]any)
-		if envs["SPEC_KEY"] != "spec_val" {
-			t.Errorf("SPEC_KEY = %v, want spec_val", envs["SPEC_KEY"])
-		}
-		if envs["OVERLAY_KEY"] != "overlay_val" {
-			t.Errorf("OVERLAY_KEY = %v, want overlay_val", envs["OVERLAY_KEY"])
-		}
-		if envs["SHARED"] != "from_spec" {
-			t.Errorf("SHARED = %v, want from_spec (spec wins)", envs["SHARED"])
-		}
-	})
-
-	t.Run("ca append with dedup", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]any{
-			"ca": []any{"abcdef1234ab", "/ca/extra.pem"},
-		}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypeMig,
-			hydraOverlays: map[string]*HydraJobConfig{
+			checkEnvs: map[string]string{"SPEC_KEY": "spec_val", "OVERLAY_KEY": "overlay_val", "SHARED": "from_spec"},
+		},
+		{
+			name: "ca append with dedup",
+			spec: map[string]any{
+				"ca": []any{"abcdef1234ab", "/ca/extra.pem"},
+			},
+			overlays: map[string]*HydraJobConfig{
 				"mig": {CA: []string{"abcdef1234ab", "/ca/new.pem"}},
 			},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		ca := m["ca"].([]any)
-		if len(ca) != 3 {
-			t.Fatalf("ca length = %d, want 3: %v", len(ca), ca)
-		}
-	})
-
-	t.Run("in out home merge by destination", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]any{
-			"in":   []any{"/a.txt:/in/config.json"},
-			"out":  []any{"/b.txt:/out/result.txt"},
-			"home": []any{"/c.txt:.config/app.toml:ro"},
-		}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypeMig,
-			hydraOverlays: map[string]*HydraJobConfig{
+			slices: []sliceCheck{{"ca", 3, ""}},
+		},
+		{
+			name: "in out home merge by destination",
+			spec: map[string]any{
+				"in":   []any{"/a.txt:/in/config.json"},
+				"out":  []any{"/b.txt:/out/result.txt"},
+				"home": []any{"/c.txt:.config/app.toml:ro"},
+			},
+			overlays: map[string]*HydraJobConfig{
 				"mig": {
 					In:   []string{"/overlay.txt:/in/config.json", "/overlay2.txt:/in/extra.json"},
 					Out:  []string{"/overlay.txt:/out/new.txt"},
 					Home: []string{"/overlay.txt:.config/app.toml", "/overlay.txt:.config/other.toml"},
 				},
 			},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		in := m["in"].([]any)
-		if len(in) != 2 {
-			t.Fatalf("in length = %d, want 2: %v", len(in), in)
-		}
-		if in[0] != "/a.txt:/in/config.json" {
-			t.Errorf("in[0] = %v, want spec entry", in[0])
-		}
-
-		out := m["out"].([]any)
-		if len(out) != 2 {
-			t.Fatalf("out length = %d, want 2: %v", len(out), out)
-		}
-
-		home := m["home"].([]any)
-		if len(home) != 2 {
-			t.Fatalf("home length = %d, want 2: %v", len(home), home)
-		}
-		if home[0] != "/c.txt:.config/app.toml:ro" {
-			t.Errorf("home[0] = %v, want spec entry preserved", home[0])
-		}
-	})
-
-	t.Run("empty spec block gets overlay fields", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]any{}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypeMig,
-			hydraOverlays: map[string]*HydraJobConfig{
-				"mig": {
-					Envs: map[string]string{"K": "V"},
-					CA:   []string{"abc1234567ab"},
-					In:   []string{"/f:/in/f.txt"},
-				},
+			slices: []sliceCheck{
+				{"in", 2, "/a.txt:/in/config.json"},
+				{"out", 2, ""},
+				{"home", 2, "/c.txt:.config/app.toml:ro"},
 			},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		envs := m["envs"].(map[string]any)
-		if envs["K"] != "V" {
-			t.Fatalf("envs mismatch: %+v", envs)
-		}
-		ca := m["ca"].([]any)
-		if len(ca) != 1 {
-			t.Fatalf("ca length = %d, want 1", len(ca))
-		}
-	})
+		},
+		{
+			name: "empty spec block gets overlay fields",
+			spec: map[string]any{},
+			overlays: map[string]*HydraJobConfig{
+				"mig": {Envs: map[string]string{"K": "V"}, CA: []string{"abc1234567ab"}, In: []string{"/f:/in/f.txt"}},
+			},
+			checkEnvs: map[string]string{"K": "V"},
+			slices:    []sliceCheck{{"ca", 1, ""}},
+		},
+		{
+			name:      "nil overlay does nothing",
+			spec:      map[string]any{"envs": map[string]any{"K": "V"}},
+			checkEnvs: map[string]string{"K": "V"},
+		},
+	}
 
-	t.Run("nil overlay does nothing", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]any{"envs": map[string]any{"K": "V"}}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypeMig,
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := cloneSpecMap(tt.spec)
+			err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
+				job:           store.Job{Meta: []byte(`{}`)},
+				jobType:       domaintypes.JobTypeMig,
+				hydraOverlays: tt.overlays,
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for k, want := range tt.checkEnvs {
+				envs := m["envs"].(map[string]any)
+				if got := envs[k]; got != want {
+					t.Errorf("envs[%q] = %v, want %q", k, got, want)
+				}
+			}
+			for _, sc := range tt.slices {
+				raw := m[sc.field].([]any)
+				if len(raw) != sc.wantLen {
+					t.Fatalf("%s length = %d, want %d: %v", sc.field, len(raw), sc.wantLen, raw)
+				}
+				if sc.wantFirst != "" && raw[0] != sc.wantFirst {
+					t.Errorf("%s[0] = %v, want %s", sc.field, raw[0], sc.wantFirst)
+				}
+			}
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if m["envs"].(map[string]any)["K"] != "V" {
-			t.Fatal("spec changed unexpectedly")
-		}
-	})
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -410,13 +353,14 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		spec      map[string]any
-		jobType   domaintypes.JobType
-		overlays  map[string]*HydraJobConfig
-		wantPhase string // expected router envs["PHASE"]
-		wantCA    string // expected first router CA entry
-		noRouter  bool   // expect no router block created
+		name          string
+		spec          map[string]any
+		jobType       domaintypes.JobType
+		overlays      map[string]*HydraJobConfig
+		wantPhase     string // expected router envs["PHASE"]
+		wantCA        string // expected first router CA entry
+		noRouter      bool   // expect no router block created
+		checkRouterKV map[string]string // additional router envs key→value checks
 	}{
 		{
 			name: "pre_gate claim inherits from pre_gate",
@@ -495,6 +439,20 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 			overlays: allOverlays,
 			noRouter: true,
 		},
+		{
+			name: "router spec envs win over overlay envs",
+			spec: map[string]any{
+				"build_gate": map[string]any{
+					"pre":    map[string]any{"target": "unit"},
+					"router": map[string]any{"image": "router:latest", "envs": map[string]any{"SHARED": "from_spec"}},
+				},
+			},
+			jobType: domaintypes.JobTypePreGate,
+			overlays: map[string]*HydraJobConfig{
+				"pre_gate": {Envs: map[string]string{"SHARED": "from_overlay", "NEW": "overlay_val"}},
+			},
+			checkRouterKV: map[string]string{"SHARED": "from_spec", "NEW": "overlay_val"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -518,8 +476,10 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 			}
 			router := bg["router"].(map[string]any)
 			envs := router["envs"].(map[string]any)
-			if envs["PHASE"] != tt.wantPhase {
-				t.Errorf("router envs[PHASE] = %v, want %q", envs["PHASE"], tt.wantPhase)
+			if tt.wantPhase != "" {
+				if envs["PHASE"] != tt.wantPhase {
+					t.Errorf("router envs[PHASE] = %v, want %q", envs["PHASE"], tt.wantPhase)
+				}
 			}
 			if tt.wantCA != "" {
 				ca := router["ca"].([]any)
@@ -527,36 +487,13 @@ func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
 					t.Errorf("router ca = %v, want [%s]", ca, tt.wantCA)
 				}
 			}
+			for k, want := range tt.checkRouterKV {
+				if got := envs[k]; got != want {
+					t.Errorf("router envs[%q] = %v, want %q", k, got, want)
+				}
+			}
 		})
 	}
-
-	t.Run("router spec envs win over overlay envs", func(t *testing.T) {
-		t.Parallel()
-		m := map[string]any{
-			"build_gate": map[string]any{
-				"pre":    map[string]any{"target": "unit"},
-				"router": map[string]any{"image": "router:latest", "envs": map[string]any{"SHARED": "from_spec"}},
-			},
-		}
-		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-			job:     store.Job{Meta: []byte(`{}`)},
-			jobType: domaintypes.JobTypePreGate,
-			hydraOverlays: map[string]*HydraJobConfig{
-				"pre_gate": {Envs: map[string]string{"SHARED": "from_overlay", "NEW": "overlay_val"}},
-			},
-		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		router := m["build_gate"].(map[string]any)["router"].(map[string]any)
-		envs := router["envs"].(map[string]any)
-		if envs["SHARED"] != "from_spec" {
-			t.Errorf("router envs[SHARED] = %v, want from_spec (spec wins)", envs["SHARED"])
-		}
-		if envs["NEW"] != "overlay_val" {
-			t.Errorf("router envs[NEW] = %v, want overlay_val", envs["NEW"])
-		}
-	})
 }
 
 // ---------------------------------------------------------------------------
@@ -913,15 +850,7 @@ func TestApplyHydraOverlay_ThreeLayerPrecedence(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			envs, _ := m["envs"].(map[string]any)
-			for k, want := range tt.checkEnvs {
-				if envs == nil {
-					t.Fatalf("envs nil, want key %q=%q", k, want)
-				}
-				if got := envs[k]; got != want {
-					t.Errorf("envs[%q] = %v, want %q", k, got, want)
-				}
-			}
+			assertEnvs(t, m, tt.checkEnvs, nil, nil)
 			if tt.caLen > 0 {
 				ca := m["ca"].([]any)
 				if len(ca) != tt.caLen {
@@ -1149,6 +1078,31 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+func assertEnvs(t *testing.T, m map[string]any, checkEnvs map[string]string, expectKeys, rejectKeys []string) {
+	t.Helper()
+	em, _ := m["envs"].(map[string]any)
+	for _, key := range expectKeys {
+		if _, ok := em[key]; !ok {
+			t.Errorf("expected key %q to be present in envs", key)
+		}
+	}
+	for _, key := range rejectKeys {
+		if em != nil {
+			if _, ok := em[key]; ok {
+				t.Errorf("expected key %q to be absent from envs", key)
+			}
+		}
+	}
+	for key, want := range checkEnvs {
+		if em == nil {
+			t.Fatalf("envs map is nil, expected key %q=%q", key, want)
+		}
+		if got := em[key]; got != want {
+			t.Errorf("envs[%q] = %v, want %q", key, got, want)
+		}
+	}
+}
 
 func cloneSpecMap(m map[string]any) map[string]any {
 	b, _ := json.Marshal(m)
