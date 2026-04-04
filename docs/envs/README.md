@@ -31,7 +31,7 @@ defaults change, or components adopt additional configuration.
   Non-loopback hosts must be reachable from inside containers.
   Example:
   `postgres://ploy:ploy@localhost:5432/ploy?sslmode=disable`.
-- `PLOY_CA_CERTS` — Optional path to a PEM CA bundle used by
+- `PLOY_DEPLOY_CA_BUNDLE` — Optional path to a PEM CA bundle used by
   local, runtime-local, and offline-VPS deploy workflows to configure Docker daemon trust for container registries
   (`docker.io`, `registry-1.docker.io`, `auth.docker.io`, `index.docker.io`, `ghcr.io`).
   The script also installs the bundle into system CA trust before restarting

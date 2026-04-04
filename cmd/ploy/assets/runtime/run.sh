@@ -21,7 +21,7 @@ AUTH_JSON_PATH="${AUTH_JSON_PATH:-}"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"
 PLOY_DB_DSN_HOST=""
 PLOY_DB_DSN_CONTAINER=""
-PLOY_CA_CERTS="${PLOY_CA_CERTS:-}"
+PLOY_DEPLOY_CA_BUNDLE="${PLOY_DEPLOY_CA_BUNDLE:-}"
 PLOY_CONTAINER_SOCKET_PATH="${PLOY_CONTAINER_SOCKET_PATH:-/var/run/docker.sock}"
 PLOY_SERVER_PORT="${PLOY_SERVER_PORT:-8080}"
 PLOY_VERSION="${PLOY_VERSION:-}"
@@ -61,7 +61,7 @@ Environment:
   PLOY_OBJECTSTORE_ENDPOINT   S3-compatible endpoint URL used by server object store config
   PLOY_OBJECTSTORE_ACCESS_KEY S3 access key used by server object store config
   PLOY_OBJECTSTORE_SECRET_KEY S3 secret key used by server object store config
-  PLOY_CA_CERTS           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
+  PLOY_DEPLOY_CA_BUNDLE           Optional path to PEM CA bundle used for docker daemon trust and runtime container trust
   PLOY_VERSION            Runtime version tag (default from ./VERSION, example v0.1.0)
   PLOY_RUNTIME_SERVER_IMAGE   Runtime server image (default ghcr.io/iw2rmb/ploy/server:${PLOY_VERSION})
   PLOY_RUNTIME_NODE_IMAGE     Runtime node image (default ghcr.io/iw2rmb/ploy/node:${PLOY_VERSION})
@@ -313,7 +313,7 @@ install_registry_ca_colima() {
     exit 1
   fi
 
-  log "Installing PLOY_CA_CERTS into colima docker registry trust..."
+  log "Installing PLOY_DEPLOY_CA_BUNDLE into colima docker registry trust..."
   for reg in "${registries[@]}"; do
     colima ssh -- sudo mkdir -p "/etc/docker/certs.d/${reg}"
     cat "$ca_path" | colima ssh -- sudo tee "/etc/docker/certs.d/${reg}/ca.crt" >/dev/null
@@ -329,7 +329,7 @@ install_registry_ca_linux() {
   local ca_path="$1"
   local -a registries=(docker.io registry-1.docker.io auth.docker.io index.docker.io ghcr.io)
 
-  log "Installing PLOY_CA_CERTS into local docker registry trust..."
+  log "Installing PLOY_DEPLOY_CA_BUNDLE into local docker registry trust..."
   for reg in "${registries[@]}"; do
     if ! run_as_root mkdir -p "/etc/docker/certs.d/${reg}"; then
       echo "error: cannot create /etc/docker/certs.d/${reg}" >&2
@@ -378,49 +378,49 @@ install_registry_ca_linux() {
 configure_docker_registry_ca_if_needed() {
   local ca_path context os_name engine_name
 
-  if [[ -z "$PLOY_CA_CERTS" ]]; then
+  if [[ -z "$PLOY_DEPLOY_CA_BUNDLE" ]]; then
     return 0
   fi
 
-  ca_path="$PLOY_CA_CERTS"
+  ca_path="$PLOY_DEPLOY_CA_BUNDLE"
   if [[ "$ca_path" != /* ]]; then
     ca_path="$ROOT_DIR/$ca_path"
   fi
   if [[ ! -f "$ca_path" ]]; then
-    echo "error: PLOY_CA_CERTS file not found: $ca_path" >&2
+    echo "error: PLOY_DEPLOY_CA_BUNDLE file not found: $ca_path" >&2
     exit 1
   fi
   if [[ ! -s "$ca_path" ]]; then
-    echo "error: PLOY_CA_CERTS file is empty: $ca_path" >&2
+    echo "error: PLOY_DEPLOY_CA_BUNDLE file is empty: $ca_path" >&2
     exit 1
   fi
 
-  PLOY_CA_CERTS="$ca_path"
+  PLOY_DEPLOY_CA_BUNDLE="$ca_path"
   context="$(docker context show 2>/dev/null || true)"
   os_name="$(uname -s)"
   engine_name="$(docker info --format '{{.Name}}' 2>/dev/null || true)"
 
   if [[ "$context" == "colima" || "$engine_name" == "colima" ]]; then
-    install_registry_ca_colima "$PLOY_CA_CERTS"
+    install_registry_ca_colima "$PLOY_DEPLOY_CA_BUNDLE"
     wait_for_docker_engine_ready
     return
   fi
   if [[ "$os_name" == "Linux" ]]; then
-    install_registry_ca_linux "$PLOY_CA_CERTS"
+    install_registry_ca_linux "$PLOY_DEPLOY_CA_BUNDLE"
     wait_for_docker_engine_ready
     return
   fi
 
-  echo "error: PLOY_CA_CERTS auto-install is not supported for docker context '${context}' (engine='${engine_name}') on ${os_name}" >&2
+  echo "error: PLOY_DEPLOY_CA_BUNDLE auto-install is not supported for docker context '${context}' (engine='${engine_name}') on ${os_name}" >&2
   echo "error: configure docker daemon trust manually, then rerun ploy cluster deploy" >&2
   exit 1
 }
 
 resolve_runtime_ca_bundle() {
-  local ca_path="${PLOY_CA_CERTS:-}"
+  local ca_path="${PLOY_DEPLOY_CA_BUNDLE:-}"
 
   if [[ -z "$ca_path" ]]; then
-    PLOY_CA_CERTS="/dev/null"
+    PLOY_DEPLOY_CA_BUNDLE="/dev/null"
     return 0
   fi
 
@@ -428,15 +428,15 @@ resolve_runtime_ca_bundle() {
     ca_path="$ROOT_DIR/$ca_path"
   fi
   if [[ ! -f "$ca_path" ]]; then
-    echo "error: PLOY_CA_CERTS file not found: $ca_path" >&2
+    echo "error: PLOY_DEPLOY_CA_BUNDLE file not found: $ca_path" >&2
     exit 1
   fi
   if [[ ! -s "$ca_path" ]]; then
-    echo "error: PLOY_CA_CERTS file is empty: $ca_path" >&2
+    echo "error: PLOY_DEPLOY_CA_BUNDLE file is empty: $ca_path" >&2
     exit 1
   fi
 
-  PLOY_CA_CERTS="$ca_path"
+  PLOY_DEPLOY_CA_BUNDLE="$ca_path"
 }
 
 generate_tokens() {
@@ -719,7 +719,7 @@ main() {
   PLOY_DB_DSN="$PLOY_DB_DSN_CONTAINER"
   export PLOY_CONTAINER_SOCKET_PATH
   export PLOY_SERVER_PORT
-  export PLOY_CA_CERTS
+  export PLOY_DEPLOY_CA_BUNDLE
   export WORKER_TOKEN_PATH
   export PLOY_CONTAINER_REGISTRY
   if [[ -z "${PLOY_CONTAINER_REGISTRY:-}" ]]; then

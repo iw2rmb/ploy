@@ -126,9 +126,7 @@ func TestHydraMountEnforcement(t *testing.T) {
 	}
 
 	if !clusterReady(t, root) {
-		t.Log("cluster unavailable; running offline contract-level mount enforcement")
-		runMountEnforcementContractFallback(t, root)
-		return
+		t.Skip("cluster unavailable; offline contract coverage is in TestHydraMountEnforcementOffline")
 	}
 
 	cmd := exec.Command("bash", script)
@@ -139,90 +137,6 @@ func TestHydraMountEnforcement(t *testing.T) {
 		t.Fatalf("scenario-hydra-mount-enforcement failed:\n%s", out)
 	}
 	t.Logf("scenario-hydra-mount-enforcement passed:\n%s", out)
-}
-
-// runMountEnforcementContractFallback exercises mount enforcement at the
-// contract/parser level when the live cluster is unavailable. This ensures
-// TestHydraMountEnforcement never skips — it always proves coverage.
-func runMountEnforcementContractFallback(t *testing.T, root string) {
-	t.Helper()
-
-	t.Run("in_readonly", func(t *testing.T) {
-		p, err := contracts.ParseStoredInEntry("abcdef0123456:/in/config.json")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !p.ReadOnly {
-			t.Error("/in entry must be read-only")
-		}
-	})
-
-	t.Run("in_rejects_out_target", func(t *testing.T) {
-		if _, err := contracts.ParseStoredInEntry("abcdef0:/out/escape.txt"); err == nil {
-			t.Fatal("in entry targeting /out/ must be rejected")
-		}
-	})
-
-	t.Run("in_rejects_traversal", func(t *testing.T) {
-		if _, err := contracts.ParseStoredInEntry("abcdef0:/in/../etc/passwd"); err == nil {
-			t.Fatal("path traversal in /in must be rejected")
-		}
-	})
-
-	t.Run("in_rejects_duplicates", func(t *testing.T) {
-		err := contracts.ValidateHydraInEntries([]string{
-			"abcdef0:/in/config.json",
-			"bbbbbbb:/in/config.json",
-		}, "test")
-		if err == nil {
-			t.Fatal("duplicate /in destination must be rejected")
-		}
-	})
-
-	t.Run("out_writable", func(t *testing.T) {
-		p, err := contracts.ParseStoredOutEntry("abcdef0123456:/out/result.txt")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if p.ReadOnly {
-			t.Error("/out entry must be writable")
-		}
-	})
-
-	t.Run("out_rejects_in_target", func(t *testing.T) {
-		if _, err := contracts.ParseStoredOutEntry("abcdef0:/in/escape.txt"); err == nil {
-			t.Fatal("out entry targeting /in/ must be rejected")
-		}
-	})
-
-	t.Run("out_rejects_traversal", func(t *testing.T) {
-		if _, err := contracts.ParseStoredOutEntry("abcdef0:/out/../../etc/shadow"); err == nil {
-			t.Fatal("path traversal in /out must be rejected")
-		}
-	})
-
-	t.Run("out_rejects_duplicates", func(t *testing.T) {
-		err := contracts.ValidateHydraOutEntries([]string{
-			"abcdef0:/out/result.json",
-			"bbbbbbb:/out/result.json",
-		}, "test")
-		if err == nil {
-			t.Fatal("duplicate /out destination must be rejected")
-		}
-	})
-
-	t.Run("scenario_script_references_mount_paths", func(t *testing.T) {
-		data, err := os.ReadFile(filepath.Join(root, "tests", "e2e", "migs", "scenario-hydra-mount-enforcement", "run.sh"))
-		if err != nil {
-			t.Fatalf("scenario script missing: %v", err)
-		}
-		content := string(data)
-		for _, p := range []string{"/in/", "/out/"} {
-			if !strings.Contains(content, p) {
-				t.Errorf("run.sh missing Hydra mount path %q", p)
-			}
-		}
-	})
 }
 
 // TestHydraOutUpload runs the Hydra /out upload continuity e2e scenario,
@@ -240,9 +154,7 @@ func TestHydraOutUpload(t *testing.T) {
 	}
 
 	if !clusterReady(t, root) {
-		t.Log("cluster unavailable; running offline contract-level out upload continuity")
-		runOutUploadContinuityContractFallback(t)
-		return
+		t.Skip("cluster unavailable; offline contract coverage is in TestHydraOutUploadContinuityOffline")
 	}
 
 	cmd := exec.Command("bash", script)
@@ -253,97 +165,6 @@ func TestHydraOutUpload(t *testing.T) {
 		t.Fatalf("scenario-hydra-out-upload failed:\n%s", out)
 	}
 	t.Logf("scenario-hydra-out-upload passed:\n%s", out)
-}
-
-// runOutUploadContinuityContractFallback exercises out upload continuity at the
-// contract/parser level when the live cluster is unavailable. This ensures
-// TestHydraOutUpload never skips — it always proves coverage.
-func runOutUploadContinuityContractFallback(t *testing.T) {
-	t.Helper()
-
-	t.Run("out_preserves_hash_and_destination", func(t *testing.T) {
-		p, err := contracts.ParseStoredOutEntry("abcdef0123456:/out/report.json")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if p.Hash != "abcdef0123456" {
-			t.Errorf("expected hash abcdef0123456, got %q", p.Hash)
-		}
-		if p.Dst != "/out/report.json" {
-			t.Errorf("expected /out/report.json, got %q", p.Dst)
-		}
-		if p.ReadOnly {
-			t.Error("out entry must be writable for upload")
-		}
-	})
-
-	t.Run("out_nested_subdirectory", func(t *testing.T) {
-		p, err := contracts.ParseStoredOutEntry("abcdef0:/out/deep/nested/artifact.tar.gz")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if p.Dst != "/out/deep/nested/artifact.tar.gz" {
-			t.Errorf("expected nested path, got %q", p.Dst)
-		}
-	})
-
-	t.Run("out_empty_hash_rejected", func(t *testing.T) {
-		if _, err := contracts.ParseStoredOutEntry(":/out/file.txt"); err == nil {
-			t.Fatal("empty hash must be rejected (upload requires valid bundle ref)")
-		}
-	})
-
-	t.Run("out_empty_destination_rejected", func(t *testing.T) {
-		if _, err := contracts.ParseStoredOutEntry("abcdef0:"); err == nil {
-			t.Fatal("empty destination must be rejected (upload target unknown)")
-		}
-	})
-
-	t.Run("multiple_distinct_out_entries_valid", func(t *testing.T) {
-		err := contracts.ValidateHydraOutEntries([]string{
-			"abcdef0:/out/report-a.json",
-			"bbbbbbb:/out/report-b.json",
-			"ccccccc:/out/nested/report-c.txt",
-		}, "test")
-		if err != nil {
-			t.Fatalf("distinct out entries must be valid for upload: %v", err)
-		}
-	})
-
-	t.Run("spec_out_roundtrip", func(t *testing.T) {
-		spec := `{
-			"steps": [{
-				"image": "alpine:3.20",
-				"out": [
-					"abcdef0123456:/out/gate-profile-candidate.json",
-					"bbbbbbb012345:/out/build.log"
-				]
-			}],
-			"bundle_map": {"abcdef0123456": "bun-1", "bbbbbbb012345": "bun-2"}
-		}`
-		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(parsed.Steps[0].Out) != 2 {
-			t.Fatalf("expected 2 out entries, got %d", len(parsed.Steps[0].Out))
-		}
-		for _, entry := range parsed.Steps[0].Out {
-			p, err := contracts.ParseStoredOutEntry(entry)
-			if err != nil {
-				t.Fatalf("re-parse: %v", err)
-			}
-			if p.Hash == "" {
-				t.Error("hash must not be empty")
-			}
-			if !strings.HasPrefix(p.Dst, "/out/") {
-				t.Errorf("destination must start with /out/, got %q", p.Dst)
-			}
-			if p.ReadOnly {
-				t.Errorf("out entry %q must be writable for upload", entry)
-			}
-		}
-	})
 }
 
 // TestHydraScenarioOfflineValidation validates the Hydra e2e scenario
