@@ -10,7 +10,7 @@ import (
 // Cobra handles command routing, flag parsing, and help generation.
 func main() {
 	// Construct the root cobra command with all subcommands.
-	rootCmd := newRootCmd(os.Stderr)
+	rootCmd := newRootCmdWithIO(os.Stdout, os.Stderr)
 
 	// Execute the root command with os.Args (cobra handles os.Args internally).
 	// Cobra's Execute() method processes os.Args[1:] automatically.
