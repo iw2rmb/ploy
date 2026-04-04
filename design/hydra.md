@@ -246,9 +246,9 @@ Schema distribution contract:
 
 The following fields and patterns are not part of the Hydra contract and are rejected at validation:
 
-- `env`, `env_from_file` — replaced by `envs`.
-- `tmp_dir`, `tmp_bundle` — replaced by `in`/`out`/`home`.
-- `PLOY_CA_CERTS` env-based materialization — replaced by `ca`.
+- `env` — replaced by `envs`.
+- Temporary directory fields — replaced by `in`/`out`/`home`.
+- Env-based CA materialization — replaced by `ca`.
 
 ## Implementation Notes
 
