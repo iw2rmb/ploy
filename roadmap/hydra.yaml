@@ -284,6 +284,8 @@ items:
         commit: 5589cebc
       - gaps: ["`tests/e2e/migs/migs_e2e_test.go` still makes the Hydra mount/upload scenarios optional. When `dist/ploy` is missing or `/healthz` is unreachable, `clusterReady` returns false and both tests call `validateScenarioOffline` instead of running `scenario-hydra-mount-enforcement/run.sh` and `scenario-hydra-out-upload/run.sh` (`/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L23`, `/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L134`, `/Users/vk/@iw2rmb/ploy/tests/e2e/migs/migs_e2e_test.go#L163`). In this workspace, the verbose e2e run fell back to offline validation because the local cluster at `http://localhost:18080` was not reachable, so the requested verification command can succeed without actually exercising the live end-to-end flows."]
         commit: 4782bbdb
+      - gaps: ["`go test ./tests/integration/... ./tests/e2e/migs/...` does not guarantee execution of the new live Hydra scenarios yet: `tests/e2e/migs/migs_e2e_test.go` still gates `TestHydraMountEnforcement` and `TestHydraOutUpload` behind `clusterReady`, and in this workspace both skipped because `http://localhost:18080/healthz` was unreachable. That leaves the requested end-to-end coverage unproven by the verification command here (`tests/e2e/migs/migs_e2e_test.go:23-66`, `tests/e2e/migs/migs_e2e_test.go:120-171`)."]
+        commit: null
     label: "1.8"
     summary: Remove legacy code paths and finalize docs schemas and end-to-end coverage for Hydra-only behavior.
     classification: determined
