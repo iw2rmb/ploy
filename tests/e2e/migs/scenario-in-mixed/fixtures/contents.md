@@ -1,2 +1,2 @@
-[config.json](config.json) Minimal fixture config consumed by the mixed `in` scenario to verify file materialization behavior.
-[scripts/](scripts) Fixture helper scripts mounted via Hydra `in` records to validate executable script-path handling.
+[config.json](config.json) JSON fixture consumed as a file `in` mount to verify `/in/config.json` materialization in the scenario container.
+[scripts/](scripts) Fixture script directory consumed as a directory `in` mount to verify nested path visibility under `/in/scripts`.
