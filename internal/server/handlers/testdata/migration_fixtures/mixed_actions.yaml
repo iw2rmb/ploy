@@ -1,10 +1,10 @@
 # Mixed scenario: two rewrites, one reject (server target now migrates).
 description: mixed rewrite/reject across targets
 env:
-  PLOY_CA_CERTS:
-    - value: "cert"
+  CODEX_PROMPT:
+    - value: "prompt"
       target: gates
-      secret: true
+      secret: false
   CODEX_AUTH_JSON:
     - value: '{"token":"t"}'
       target: steps
@@ -35,8 +35,9 @@ expect:
       target_field: home
       destination: ".codex/config.toml"
       sections: [heal, mig, post_gate, pre_gate, re_gate]
-    - env_key: PLOY_CA_CERTS
+    - env_key: CODEX_PROMPT
       target: gates
       action: rewrite
-      target_field: ca
+      target_field: in
+      destination: "/in/codex-prompt.txt"
       sections: [pre_gate, re_gate, post_gate]

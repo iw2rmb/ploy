@@ -32,7 +32,6 @@ export PLOY_OBJECTSTORE_ENDPOINT='http://localhost:3900'
 export PLOY_OBJECTSTORE_ACCESS_KEY='...'
 export PLOY_OBJECTSTORE_SECRET_KEY='...'
 export PLOY_VERSION='v0.1.0'                  # optional; defaults to ./VERSION
-export PLOY_CA_CERTS='/path/to/ca-bundle.pem' # optional
 
 ploy cluster deploy
 ```

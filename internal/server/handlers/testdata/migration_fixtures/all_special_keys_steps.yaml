@@ -1,10 +1,6 @@
-# All six special env keys with steps target — all should rewrite to typed fields.
+# All five special env keys with steps target — all should rewrite to typed fields.
 description: full design mapping table rewrite for steps target
 env:
-  PLOY_CA_CERTS:
-    - value: "-----BEGIN CERT-----\nfake-cert\n-----END CERT-----"
-      target: steps
-      secret: true
   CODEX_AUTH_JSON:
     - value: '{"token":"test-auth"}'
       target: steps
@@ -28,7 +24,7 @@ env:
 existing_ca: {}
 existing_home: {}
 expect:
-  rewritten: 6
+  rewritten: 5
   rejected: 0
   skipped: 0
   entries:
@@ -61,9 +57,4 @@ expect:
       action: rewrite
       target_field: home
       destination: ".config/crush/crush.json"
-      sections: [heal, mig]
-    - env_key: PLOY_CA_CERTS
-      target: steps
-      action: rewrite
-      target_field: ca
       sections: [heal, mig]

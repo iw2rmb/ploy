@@ -14,7 +14,6 @@ func TestSpecialEnvMappingTable_DesignAlignment(t *testing.T) {
 		dst   string
 		mode  string
 	}{
-		{"PLOY_CA_CERTS", "ca", "", ""},
 		{"CODEX_AUTH_JSON", "home", ".codex/auth.json", "ro"},
 		{"CODEX_CONFIG_TOML", "home", ".codex/config.toml", "ro"},
 		{"CRUSH_JSON", "home", ".config/crush/crush.json", "ro"},
@@ -48,7 +47,7 @@ func TestSpecialEnvMappingTable_DesignAlignment(t *testing.T) {
 
 func TestIsSpecialEnvKey(t *testing.T) {
 	special := []string{
-		"PLOY_CA_CERTS", "CODEX_AUTH_JSON", "CODEX_CONFIG_TOML",
+		"CODEX_AUTH_JSON", "CODEX_CONFIG_TOML",
 		"CRUSH_JSON", "CCR_CONFIG_JSON", "CODEX_PROMPT",
 	}
 	for _, k := range special {
@@ -57,7 +56,7 @@ func TestIsSpecialEnvKey(t *testing.T) {
 		}
 	}
 
-	notSpecial := []string{"OPENAI_API_KEY", "PLOY_GRADLE_BUILD_CACHE_URL", "PATH", ""}
+	notSpecial := []string{"OPENAI_API_KEY", "PLOY_GRADLE_BUILD_CACHE_URL", "PLOY_CA_CERTS", "PATH", ""}
 	for _, k := range notSpecial {
 		if IsSpecialEnvKey(k) {
 			t.Errorf("IsSpecialEnvKey(%q) = true, want false", k)
@@ -73,7 +72,6 @@ func TestRewriteSpecialEnvEntry(t *testing.T) {
 		wantField string
 		wantEntry string
 	}{
-		{"ca", "PLOY_CA_CERTS", "abc1234", "ca", "abc1234"},
 		{"home_auth", "CODEX_AUTH_JSON", "def5678", "home", "def5678:.codex/auth.json:ro"},
 		{"home_config", "CODEX_CONFIG_TOML", "aaa1111", "home", "aaa1111:.codex/config.toml:ro"},
 		{"home_crush", "CRUSH_JSON", "bbb2222", "home", "bbb2222:.config/crush/crush.json:ro"},
@@ -99,9 +97,9 @@ func TestRewriteSpecialEnvEntry(t *testing.T) {
 
 func TestScanSpecialEnvKeys_RewriteCandidates(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS":  {{Value: "-----BEGIN CERT-----\n...", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
-		"CODEX_AUTH_JSON": {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
-		"OPENAI_API_KEY":  {{Value: "sk-xxx", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+		"CODEX_CONFIG_TOML": {{Value: "toml-data", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+		"CODEX_AUTH_JSON":   {{Value: `{"token":"xxx"}`, Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
+		"OPENAI_API_KEY":    {{Value: "sk-xxx", Target: domaintypes.GlobalEnvTargetSteps, Secret: true}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
@@ -123,14 +121,14 @@ func TestScanSpecialEnvKeys_RewriteCandidates(t *testing.T) {
 	if report.Entries[0].EnvKey != "CODEX_AUTH_JSON" {
 		t.Errorf("Entries[0].EnvKey = %q, want CODEX_AUTH_JSON", report.Entries[0].EnvKey)
 	}
-	if report.Entries[1].EnvKey != "PLOY_CA_CERTS" {
-		t.Errorf("Entries[1].EnvKey = %q, want PLOY_CA_CERTS", report.Entries[1].EnvKey)
+	if report.Entries[1].EnvKey != "CODEX_CONFIG_TOML" {
+		t.Errorf("Entries[1].EnvKey = %q, want CODEX_CONFIG_TOML", report.Entries[1].EnvKey)
 	}
 }
 
 func TestScanSpecialEnvKeys_ServerTargetMigrated(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true}},
+		"CRUSH_JSON": {{Value: "crush-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
@@ -149,7 +147,7 @@ func TestScanSpecialEnvKeys_ServerTargetMigrated(t *testing.T) {
 
 func TestScanSpecialEnvKeys_NodesTargetMigrated(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetNodes, Secret: true}},
+		"CRUSH_JSON": {{Value: "crush-data", Target: domaintypes.GlobalEnvTargetNodes, Secret: true}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
@@ -187,7 +185,7 @@ func TestScanSpecialEnvKeys_ConflictRejected(t *testing.T) {
 
 func TestScanSpecialEnvKeys_GatesTarget(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS": {{Value: "cert-data", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
+		"CRUSH_JSON": {{Value: "crush-data", Target: domaintypes.GlobalEnvTargetGates, Secret: true}},
 	}
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, nil, nil)
@@ -233,10 +231,10 @@ func TestScanSpecialEnvKeys_StepsTarget(t *testing.T) {
 
 func TestScanSpecialEnvKeys_MultipleTargets(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS": {
-			{Value: "cert-data", Target: domaintypes.GlobalEnvTargetGates, Secret: true},
-			{Value: "cert-data", Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
-			{Value: "cert-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true},
+		"CRUSH_JSON": {
+			{Value: "crush-data", Target: domaintypes.GlobalEnvTargetGates, Secret: true},
+			{Value: "crush-data", Target: domaintypes.GlobalEnvTargetSteps, Secret: true},
+			{Value: "crush-data", Target: domaintypes.GlobalEnvTargetServer, Secret: true},
 		},
 	}
 
@@ -314,7 +312,7 @@ func TestScanSpecialEnvKeys_InConflictRejected(t *testing.T) {
 
 func TestMigrationReport_Metrics(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"PLOY_CA_CERTS":    {{Value: "cert", Target: domaintypes.GlobalEnvTargetGates}},
+		"CODEX_PROMPT":      {{Value: "prompt", Target: domaintypes.GlobalEnvTargetGates}},
 		"CODEX_AUTH_JSON":   {{Value: "json", Target: domaintypes.GlobalEnvTargetSteps}},
 		"CODEX_CONFIG_TOML": {{Value: "toml", Target: domaintypes.GlobalEnvTargetServer}},
 		"CRUSH_JSON":        {{Value: "crush", Target: domaintypes.GlobalEnvTargetSteps}},
@@ -325,7 +323,7 @@ func TestMigrationReport_Metrics(t *testing.T) {
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
 
-	// CA gates → rewrite, AUTH steps → reject (conflict, hash mismatch),
+	// PROMPT gates → rewrite, AUTH steps → reject (conflict, hash mismatch),
 	// CONFIG server → rewrite (all sections), CRUSH steps → rewrite
 	if report.Rewritten != 3 {
 		t.Errorf("Rewritten = %d, want 3", report.Rewritten)
@@ -352,7 +350,7 @@ func TestLogMigrationReport_WithEntries(t *testing.T) {
 	// Smoke test: should not panic with entries.
 	report := &MigrationReport{
 		Entries: []MigrationReportEntry{
-			{EnvKey: "PLOY_CA_CERTS", Target: "steps", Action: MigrationActionRewrite, TargetField: "ca", Sections: []string{"mig"}},
+			{EnvKey: "CRUSH_JSON", Target: "steps", Action: MigrationActionRewrite, TargetField: "home", Sections: []string{"mig"}},
 			{EnvKey: "CODEX_AUTH_JSON", Target: "steps", Action: MigrationActionReject, TargetField: "home", Reason: "conflict"},
 			{EnvKey: "CRUSH_JSON", Target: "server", Action: MigrationActionSkip, TargetField: "home", Reason: "server target"},
 		},
