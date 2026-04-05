@@ -211,8 +211,8 @@ the run reaches a terminal state. The job graph shows:
 - Repo count, per-repo blocks, and step rows with status glyph, step, job ID, node, image, and duration.
 - For failures, a one-line error is shown directly under the failed step row.
 
-**Note:** `--follow` does not stream container stdout/stderr. Use `ploy run logs <run-id>`
-for log streaming.
+**Note:** `--follow` does not stream container stdout/stderr. Use `ploy job follow <job-id>`
+for container log streaming. `ploy run logs <run-id>` shows lifecycle events only.
 
 The follow engine subscribes to SSE events from `/v1/runs/{id}/logs` for change
 notifications and refreshes the job graph on each event. SSE reconnection uses:
@@ -222,10 +222,10 @@ notifications and refreshes the job graph on each event. SSE reconnection uses:
 
 Tip: The CLI can also fetch artifacts via `--artifact-dir` when the run succeeds.
 
-**Log Streaming (`ploy run logs`)**
+**Lifecycle Log Streaming (`ploy run logs`)**
 
-For container stdout/stderr streaming, use `ploy run logs <run-id>`. This is the canonical
-surface for viewing real-time log output. The log stream supports:
+`ploy run logs <run-id>` streams run lifecycle events (state transitions, scheduling, completion).
+For container stdout/stderr, use `ploy job follow <job-id>` instead. The lifecycle log stream supports:
 - **Automatic reconnection**: Same backoff policy as follow mode.
 - **Last-Event-ID support**: Resumes from the last processed event after reconnect.
 - **Idle timeout**: Default `45s` idle timeout. Configure via `--idle-timeout <duration>`.
@@ -257,7 +257,7 @@ This makes gate health visible without requiring raw artifact inspection.
   - Confirm the `migs-llm` image version the cluster pulls includes the healer stub. Re-publish if needed.
 - Monitoring runs:
   - Use `--follow` to display the job graph until completion.
-  - Use `ploy run logs <run-id>` to stream container stdout/stderr.
+  - Use `ploy job follow <job-id>` to stream container stdout/stderr.
   - Check the control plane logs if stages appear stuck (cluster scheduling/resources).
 
 **Multi-Step, Multi-Node Rehydration Scenario**
