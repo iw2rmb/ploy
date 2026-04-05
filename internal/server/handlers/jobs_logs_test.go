@@ -675,8 +675,11 @@ func TestGetJobLogsHandler_OverlapDedupDuringBackfill(t *testing.T) {
 	// hub so it lands in the gap window (hub ID > preCursor).
 	time.Sleep(50 * time.Millisecond)
 	ctx := context.Background()
+	// Timestamp must be empty to match the backfill timestamp (CreatedAt is
+	// zero-valued, so timestampToString returns ""). The composite dedup key
+	// includes timestamp+stream+line, so all three must match for dedup.
 	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
-		Timestamp: "2026-01-01T00:00:00Z",
+		Timestamp: "",
 		Stream:    "stdout",
 		Line:      overlapLine,
 		JobID:     jobID,
@@ -715,6 +718,81 @@ func TestGetJobLogsHandler_OverlapDedupDuringBackfill(t *testing.T) {
 	if overlapIdx > liveIdx {
 		t.Fatalf("backfill overlap must precede live; overlap@%d live@%d; body: %s",
 			overlapIdx, liveIdx, body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event; body: %s", body)
+	}
+}
+
+// TestGetJobLogsHandler_RepeatedLiveLineNotDropped verifies that a live log line
+// whose content matches a previously backfilled line but has a different timestamp
+// is NOT incorrectly deduplicated. Only true overlaps (same timestamp+stream+line)
+// should be suppressed.
+func TestGetJobLogsHandler_RepeatedLiveLineNotDropped(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	repeatedLine := "repeated-content"
+	objKey := "logs/repeated-job.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKey, "", gzipLines(t, repeatedLine))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	ctx := context.Background()
+
+	// Publish a live line with the SAME content but a DIFFERENT timestamp.
+	// This is a legitimate new log emission, not a true overlap, so it must
+	// NOT be deduplicated.
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-06-01T12:00:00Z",
+		Stream:    "stdout",
+		Line:      repeatedLine,
+		JobID:     jobID,
+	})
+
+	time.Sleep(20 * time.Millisecond)
+	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for repeated-line stream")
+	}
+
+	body := rr.Body.String()
+
+	// The repeated line must appear TWICE: once from backfill, once from live.
+	if count := strings.Count(body, repeatedLine); count != 2 {
+		t.Fatalf("repeated line should appear exactly twice (backfill + live), got %d; body: %s", count, body)
 	}
 	if !strings.Contains(body, "event: done") {
 		t.Fatalf("expected done event; body: %s", body)
