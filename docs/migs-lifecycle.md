@@ -1360,9 +1360,10 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - Maintains per-repo pull state in `<git-dir>/ploy/pull_state.json`.
 
 - `ploy run logs <run-id>`:
-  - Streams logs/events from `/v1/runs/{id}/logs`, focusing on `log` and
-    `retention` events (see runtime implementation).
-  - This is the canonical surface for streaming container stdout/stderr.
+  - Streams lifecycle events from `/v1/runs/{id}/logs`, displaying only `run`,
+    `stage`, and `done` frames (see runtime implementation).
+  - Container stdout/stderr is served via `ploy job follow <job-id>`
+    (`GET /v1/jobs/{job_id}/logs`).
 
 - `ploy run status <run-id>`:
   - Fetches the canonical `RunReport` model (run identity, mig name/spec, repos,
@@ -1401,12 +1402,13 @@ endpoint specification and event payload schemas.
 
 ### 7.1 Event types
 
-| Event Type   | Payload Schema       | Description                                    |
-|--------------|----------------------|------------------------------------------------|
-| `run`        | `RunSummary`         | Run lifecycle snapshot (state changes)         |
-| `log`        | `LogRecord`          | Enriched log line with execution context       |
-| `retention`  | `RetentionHint`      | Artifact retention metadata                    |
-| `done`       | `Status`             | Terminal sentinel; stream closes after this    |
+| Event Type   | Payload Schema       | Stream          | Description                                    |
+|--------------|----------------------|-----------------|------------------------------------------------|
+| `run`        | `RunSummary`         | run             | Run lifecycle snapshot (state changes)         |
+| `stage`      | `StageSummary`       | run             | Stage lifecycle update                         |
+| `log`        | `LogRecord`          | job             | Enriched log line with execution context       |
+| `retention`  | `RetentionHint`      | job             | Artifact retention metadata                    |
+| `done`       | `Status`             | run / job       | Terminal sentinel; stream closes after this    |
 
 **`event: run`** — Canonical `RunSummary` payload (see § 2.1). Published when run
 or job state changes. Clients can poll for the latest snapshot using the staged
@@ -1449,7 +1451,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 - The server caches job enrichment context in a bounded in-memory LRU cache to
   avoid unbounded growth in long-running processes.
 - `next_id` in logs is optional metadata and does not drive scheduler ordering.
-- CLI consumers (`ploy run logs`) use the enriched fields
+- CLI consumers (`ploy job follow`) use the enriched fields
   to display contextual information in structured output format.
 
 ### 7.3 Clients
@@ -1459,7 +1461,7 @@ data: {"timestamp":"2025-10-22T10:00:00Z","stream":"stdout","line":"Step started
 - runtime implementation handles `"run"` and `"stage"` events
   (from higher-level publishers) and ignores unknown types to remain
   forwards-compatible.
-- runtime implementation and `ploy run logs` focus on `"log"` and
-  `"retention"` events for human-readable tails.
+- `ploy job follow` focuses on `"log"` and `"retention"` events from the
+  job-scoped stream for human-readable tails.
 - The shared log printer (runtime implementation) formats log records using
   enriched fields when available (see "Structured Log Format" below).
