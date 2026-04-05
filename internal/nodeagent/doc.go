@@ -8,9 +8,9 @@
 //
 // Key files:
 //   - execution_orchestrator.go — high level run lifecycle and status upload.
-//   - execution_orchestrator_gate.go — gate job execution + failure router wiring.
+//   - execution_orchestrator_gate.go — gate job execution and failure context persistence.
 //   - execution_orchestrator_jobs.go — mig/heal/mr job execution and shared helpers.
-//   - recovery_io.go — shared recovery parsing helpers for router/heal outputs.
+//   - recovery_io.go — shared recovery parsing helpers for heal outputs.
 //   - recovery_runtime.go — recovery env and TLS manifest wiring.
 //   - execution_upload.go — centralized diff/status/artifact upload helpers.
 //   - execution.go — runtime factories, rehydration helpers, workspace/file utilities.

@@ -146,11 +146,6 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	}
 	r.persistGateProfileSnapshot(req.RunID, req.JobType, manifest.Gate, gateResult)
 
-	// When gate fails and healing is configured, run the router once to produce
-	// bug_summary and attach it to the gate job metadata before uploading status.
-	if !gateResultPassed(gateResult) {
-		r.runRouterForGateFailure(ctx, runner, req, typedOpts, workspace, gateResult)
-	}
 	if err := r.uploadOutDirBundle(ctx, req.RunID, req.JobID, filepath.Join(workspace, step.BuildGateWorkspaceOutDir), "build-gate-out"); err != nil {
 		slog.Warn("failed to upload gate /out bundle", "run_id", req.RunID, "job_id", req.JobID, "error", err)
 	}
@@ -216,8 +211,7 @@ func applyGatePhaseOverrides(manifest *contracts.StepManifest, req StartRunReque
 		manifest.Gate.StackDetect = nil // re-gate uses persisted stack from original gate run
 		manifest.Gate.Skip = req.GateSkip
 		if req.RecoveryContext != nil {
-			if kind, ok := contracts.ParseRecoveryErrorKind(req.RecoveryContext.SelectedErrorKind); ok &&
-				contracts.IsInfraRecoveryErrorKind(kind) &&
+			if strings.TrimSpace(req.RecoveryContext.GateProfileSchemaJSON) != "" &&
 				strings.TrimSpace(manifest.Gate.Target) != "" {
 				manifest.Gate.EnforceTargetLock = true
 			}

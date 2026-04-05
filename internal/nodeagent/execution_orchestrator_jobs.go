@@ -156,7 +156,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		"detected_stack", stack,
 		"resolved_image", manifest.Image,
 	)
-	workspacePolicy := resolveHealingWorkspacePolicy(req.TypedOptions.HealingSelector)
+	workspacePolicy := resolveHealingWorkspacePolicy(req.RecoveryContext)
 	schemaJSON := ""
 	if req.Env != nil {
 		schemaJSON = strings.TrimSpace(req.Env[contracts.GateProfileSchemaJSONEnv])
@@ -168,7 +168,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 		OutDirPattern: "ploy-heal-out-*",
 		InDirPattern:  "ploy-heal-in-*",
 		PopulateInDir: func(inDir string) error {
-			if err := r.populateHealingInDir(req.RunID, inDir, req.TypedOptions.HealingSelector, req.RecoveryContext, schemaJSON); err != nil {
+			if err := r.populateHealingInDir(req.RunID, inDir, req.RecoveryContext, schemaJSON); err != nil {
 				return err
 			}
 			return writeAmataSpecInDir(inDir, typedOpts.Healing.Mig.Amata)

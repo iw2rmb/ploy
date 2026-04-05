@@ -81,7 +81,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			name:    "re_gate uses stack detection output and post gate_profile override",
 			jobType: types.JobTypeReGate,
 			recoveryCtx: &contracts.RecoveryClaimContext{
-				SelectedErrorKind: "infra",
+				GateProfileSchemaJSON: `{"type":"object"}`,
 			},
 			buildPreConfig: &contracts.BuildGatePhaseConfig{
 				Stack: pre, GateProfile: preGateProfile,
@@ -101,7 +101,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			name:    "re_gate does not enforce target lock for non-infra recovery",
 			jobType: types.JobTypeReGate,
 			recoveryCtx: &contracts.RecoveryClaimContext{
-				SelectedErrorKind: "code",
+				LoopKind: "healing",
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Target: contracts.GateProfileTargetAllTests,

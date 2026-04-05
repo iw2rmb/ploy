@@ -29,18 +29,9 @@ func makeStep(img string, mutators ...func(*contracts.MigStep)) contracts.MigSte
 	return s
 }
 
-func withHealing(kind string, action contracts.HealingActionSpec) *contracts.BuildGateConfig {
+func withHealSpec(heal contracts.HealSpec) *contracts.BuildGateConfig {
 	return &contracts.BuildGateConfig{
-		Healing: &contracts.HealingSpec{
-			SelectedErrorKind: kind,
-			ByErrorKind:       map[string]contracts.HealingActionSpec{kind: action},
-		},
-	}
-}
-
-func withRouter(r contracts.RouterSpec) *contracts.BuildGateConfig {
-	return &contracts.BuildGateConfig{
-		Router: &r,
+		Heal: &heal,
 	}
 }
 
@@ -204,16 +195,11 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 						Env:     map[string]string{"CGO_ENABLED": "0"},
 					},
 				},
-				Healing: &contracts.HealingSpec{
-					SelectedErrorKind: "infra",
-					ByErrorKind: map[string]contracts.HealingActionSpec{
-						"infra": {
-							Retries: 3,
-							Image:   testJobImage("docker.io/test/heal:v1"),
-							Command: contracts.CommandSpec{Shell: "fix.sh"},
-							Envs:    map[string]string{"MODE": "auto"},
-						},
-					},
+				Heal: &contracts.HealSpec{
+					Retries: 3,
+					Image:   testJobImage("docker.io/test/heal:v1"),
+					Command: contracts.CommandSpec{Shell: "fix.sh"},
+					Envs:    map[string]string{"MODE": "auto"},
 				},
 			},
 			GitLabPAT:     "glpat-secret",
@@ -332,7 +318,7 @@ func TestMigsSpecToRunOptions_DirectConversion(t *testing.T) {
 		t.Parallel()
 
 		spec := singleStepSpec("img", func(s *contracts.MigSpec) {
-			s.BuildGate = withHealing("infra", contracts.HealingActionSpec{
+			s.BuildGate = withHealSpec(contracts.HealSpec{
 				Retries: 0,
 				Image:   testJobImage("heal"),
 			})
@@ -388,12 +374,11 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 	}
 
 	type fieldProbe struct {
-		name          string
-		stepMutator   func(*contracts.MigStep)
-		healMutator   func(*contracts.HealingActionSpec)
-		routerMutator func(*contracts.RouterSpec)
-		checkPresent  func(t *testing.T, mc MigContainerSpec)
-		checkAbsent   func(t *testing.T, mc MigContainerSpec)
+		name         string
+		stepMutator  func(*contracts.MigStep)
+		healMutator  func(*contracts.HealSpec)
+		checkPresent func(t *testing.T, mc MigContainerSpec)
+		checkAbsent  func(t *testing.T, mc MigContainerSpec)
 	}
 
 	probes := []fieldProbe{
@@ -405,17 +390,11 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				s.Out = hydraOut
 				s.Home = hydraHome
 			},
-			healMutator: func(a *contracts.HealingActionSpec) {
+			healMutator: func(a *contracts.HealSpec) {
 				a.CA = hydraCA
 				a.In = hydraIn
 				a.Out = hydraOut
 				a.Home = hydraHome
-			},
-			routerMutator: func(r *contracts.RouterSpec) {
-				r.CA = hydraCA
-				r.In = hydraIn
-				r.Out = hydraOut
-				r.Home = hydraHome
 			},
 			checkPresent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
@@ -443,10 +422,9 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 			},
 		},
 		{
-			name:          "Amata",
-			stepMutator:   func(s *contracts.MigStep) { s.Amata = amataSpec },
-			healMutator:   func(a *contracts.HealingActionSpec) { a.Amata = amataSpec },
-			routerMutator: func(r *contracts.RouterSpec) { r.Amata = amataSpec },
+			name:        "Amata",
+			stepMutator: func(s *contracts.MigStep) { s.Amata = amataSpec },
+			healMutator: func(a *contracts.HealSpec) { a.Amata = amataSpec },
 			checkPresent: func(t *testing.T, mc MigContainerSpec) {
 				t.Helper()
 				if mc.Amata == nil || mc.Amata.Spec != amataSpec.Spec {
@@ -491,30 +469,16 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 
 			t.Run("healing", func(t *testing.T) {
 				t.Parallel()
-				action := contracts.HealingActionSpec{Image: testJobImage("heal-img")}
-				probe.healMutator(&action)
+				heal := contracts.HealSpec{Image: testJobImage("heal-img")}
+				probe.healMutator(&heal)
 				spec := singleStepSpec("img", func(s *contracts.MigSpec) {
-					s.BuildGate = withHealing("code", action)
+					s.BuildGate = withHealSpec(heal)
 				})
 				opts := migsSpecToRunOptions(spec)
 				if opts.Healing == nil {
 					t.Fatal("expected Healing config")
 				}
 				probe.checkPresent(t, opts.Healing.Mig)
-			})
-
-			t.Run("router", func(t *testing.T) {
-				t.Parallel()
-				router := contracts.RouterSpec{Image: testJobImage("router-img")}
-				probe.routerMutator(&router)
-				spec := singleStepSpec("img", func(s *contracts.MigSpec) {
-					s.BuildGate = withRouter(router)
-				})
-				opts := migsSpecToRunOptions(spec)
-				if opts.Router == nil {
-					t.Fatal("expected Router config")
-				}
-				probe.checkPresent(t, *opts.Router)
 			})
 		})
 	}
@@ -523,19 +487,12 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 		t.Parallel()
 		spec := singleStepSpec("img", func(s *contracts.MigSpec) {
 			s.BuildGate = &contracts.BuildGateConfig{
-				Router: &contracts.RouterSpec{Image: testJobImage("router-img")},
-				Healing: &contracts.HealingSpec{
-					SelectedErrorKind: "code",
-					ByErrorKind: map[string]contracts.HealingActionSpec{
-						"code": {Image: testJobImage("heal-img")},
-					},
+				Heal: &contracts.HealSpec{
+					Image: testJobImage("heal-img"),
 				},
 			}
 		})
 		opts := migsSpecToRunOptions(spec)
-		if opts.Router != nil && opts.Router.Amata != nil {
-			t.Error("Router.Amata: expected nil when not configured")
-		}
 		if opts.Healing != nil && opts.Healing.Mig.Amata != nil {
 			t.Error("Healing.Mig.Amata: expected nil when not configured")
 		}

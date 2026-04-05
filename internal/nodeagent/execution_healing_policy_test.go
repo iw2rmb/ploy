@@ -11,25 +11,25 @@ func TestResolveHealingWorkspacePolicy(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		spec    *contracts.HealingSpec
+		ctx     *contracts.RecoveryClaimContext
 		wantPol workspaceChangePolicy
 	}{
 		{
-			name:    "nil spec defaults to require changes",
-			spec:    nil,
+			name:    "nil context defaults to require changes",
+			ctx:     nil,
 			wantPol: workspaceChangePolicyRequire,
 		},
 		{
-			name: "infra forbids changes",
-			spec: &contracts.HealingSpec{
-				SelectedErrorKind: "infra",
+			name: "infra (schema present) forbids changes",
+			ctx: &contracts.RecoveryClaimContext{
+				GateProfileSchemaJSON: `{"type":"object"}`,
 			},
 			wantPol: workspaceChangePolicyForbid,
 		},
 		{
-			name: "code requires changes",
-			spec: &contracts.HealingSpec{
-				SelectedErrorKind: "code",
+			name: "code (no schema) requires changes",
+			ctx: &contracts.RecoveryClaimContext{
+				LoopKind: "healing",
 			},
 			wantPol: workspaceChangePolicyRequire,
 		},
@@ -39,7 +39,7 @@ func TestResolveHealingWorkspacePolicy(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := resolveHealingWorkspacePolicy(tc.spec)
+			got := resolveHealingWorkspacePolicy(tc.ctx)
 			if got != tc.wantPol {
 				t.Fatalf("resolveHealingWorkspacePolicy() = %q, want %q", got, tc.wantPol)
 			}

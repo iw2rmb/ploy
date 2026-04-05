@@ -25,7 +25,6 @@ func TestPopulateHealingInDir(t *testing.T) {
 	type testCase struct {
 		name         string
 		seedFiles    map[string]string // relative to runDir -> content
-		healingSpec  *contracts.HealingSpec
 		recovery     *contracts.RecoveryClaimContext
 		schemaJSON   string            // "" = don't pass schema; "auto" = mustGateProfileSchemaJSON
 		wantFiles    map[string]string // relative to inDir -> expected content ("" = just check existence)
@@ -46,8 +45,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 				"build-gate-first.log":    "failure\n",
 				"build-gate-profile.json": profile,
 			},
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
-			schemaJSON:  "auto",
+			schemaJSON: "auto",
 			wantFiles: map[string]string{
 				"gate_profile.json":        profile,
 				"gate_profile.schema.json": "",
@@ -59,38 +57,27 @@ func TestPopulateHealingInDir(t *testing.T) {
 				"build-gate-first.log":    "failure\n",
 				"build-gate-profile.json": `{"schema_version":1}`,
 			},
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "code"},
-			wantAbsent:  []string{"gate_profile.json", "gate_profile.schema.json"},
+			wantAbsent: []string{"gate_profile.json", "gate_profile.schema.json"},
 		},
 		{
-			name:        "InfraMissingGateProfileIsAllowed",
-			seedFiles:   map[string]string{"build-gate-first.log": "failure\n"},
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
-			schemaJSON:  "auto",
-			wantFiles:   map[string]string{"gate_profile.schema.json": ""},
+			name:       "InfraMissingGateProfileIsAllowed",
+			seedFiles:  map[string]string{"build-gate-first.log": "failure\n"},
+			schemaJSON: "auto",
+			wantFiles:  map[string]string{"gate_profile.schema.json": ""},
 		},
 		{
-			name:        "InfraMissingGateLogStillHydratesSchema",
-			seedFiles:   map[string]string{}, // runDir exists but no files
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
-			schemaJSON:  "auto",
-			wantFiles:   map[string]string{"gate_profile.schema.json": ""},
-			wantAbsent:  []string{"build-gate.log"},
+			name:       "InfraMissingGateLogStillHydratesSchema",
+			seedFiles:  map[string]string{}, // runDir exists but no files
+			schemaJSON: "auto",
+			wantFiles:  map[string]string{"gate_profile.schema.json": ""},
+			wantAbsent: []string{"build-gate.log"},
 		},
 		{
-			name:        "InfraEmptyGateLogStillHydratesSchema",
-			seedFiles:   map[string]string{"build-gate-first.log": "  \n"},
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
-			schemaJSON:  "auto",
-			wantFiles:   map[string]string{"gate_profile.schema.json": ""},
-			wantAbsent:  []string{"build-gate.log"},
-		},
-		{
-			name:        "InfraMissingSchemaFails",
-			seedFiles:   map[string]string{"build-gate-first.log": "failure\n"},
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
-			schemaJSON:  "",
-			wantErr:     true,
+			name:       "InfraEmptyGateLogStillHydratesSchema",
+			seedFiles:  map[string]string{"build-gate-first.log": "  \n"},
+			schemaJSON: "auto",
+			wantFiles:  map[string]string{"gate_profile.schema.json": ""},
+			wantAbsent: []string{"build-gate.log"},
 		},
 		{
 			name: "UsesClaimRecoveryContextLog",
@@ -105,9 +92,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 				BuildGateLog:          "claim-log\n",
 				GateProfile:           json.RawMessage(profile),
 				GateProfileSchemaJSON: "auto", // resolved below
-				SelectedErrorKind:     "infra",
 			},
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "infra"},
 			wantFiles: map[string]string{
 				"gate_profile.json":        profile,
 				"gate_profile.schema.json": "auto", // resolved below
@@ -119,7 +104,6 @@ func TestPopulateHealingInDir(t *testing.T) {
 			recovery: func() *contracts.RecoveryClaimContext {
 				ver := "2.0.13"
 				return &contracts.RecoveryClaimContext{
-					SelectedErrorKind:  "deps",
 					DepsCompatEndpoint: "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=",
 					DepsBumps: map[string]*string{
 						"org.slf4j:slf4j-api": &ver,
@@ -127,7 +111,6 @@ func TestPopulateHealingInDir(t *testing.T) {
 					},
 				}
 			}(),
-			healingSpec: &contracts.HealingSpec{SelectedErrorKind: "deps"},
 			customAssert: func(t *testing.T, inDir string) {
 				t.Helper()
 				gotCompat, err := os.ReadFile(filepath.Join(inDir, "deps-compat-url.txt"))
@@ -198,7 +181,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 
 			inDir := t.TempDir()
 
-			err := rc.populateHealingInDir(runID, inDir, tc.healingSpec, tc.recovery, schemaJSON)
+			err := rc.populateHealingInDir(runID, inDir, tc.recovery, schemaJSON)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
