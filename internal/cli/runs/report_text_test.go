@@ -60,13 +60,12 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 		SpecID:  specID,
 		Repos: []RunEntry{
 			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/service.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/java17",
-				Attempt:     1,
-				Status:      "Running",
-				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/service.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/java17",
+				Attempt:   1,
+				Status:    "Running",
 				Jobs: []RunJobEntry{
 					{
 						JobID:      preGateID,
@@ -74,6 +73,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 						JobImage:   "ghcr.io/acme/pre-gate:1",
 						Status:     "Running",
 						DurationMs: 2450,
+						JobLogURL:  "https://example.test/v1/jobs/" + preGateID.String() + "/logs",
 					},
 					{
 						JobID:      migJobID,
@@ -81,6 +81,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 						JobImage:   "ghcr.io/acme/mig:1",
 						Status:     "Success",
 						DurationMs: 3000,
+						JobLogURL:  "https://example.test/v1/jobs/" + migJobID.String() + "/logs",
 						PatchURL:   "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc",
 					},
 				},
@@ -101,14 +102,12 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
 	assertx.Contains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
-	if strings.Count(out, "Logs (https://example.test/v1/runs/") != 1 {
-		t.Fatalf("expected exactly one logs link in output, got: %q", out)
-	}
+	assertx.NotContains(t, out, "Logs (https://example.test/v1/runs/")
 	if strings.Count(out, "Patch (https://example.test/v1/runs/") != 1 {
 		t.Fatalf("expected exactly one patch link in output, got: %q", out)
 	}
-	assertx.Contains(t, out, "Logs (https://example.test/v1/runs/")
-	assertx.Contains(t, out, " | Patch (https://example.test/v1/runs/")
+	assertx.Contains(t, out, "Patch (https://example.test/v1/runs/")
+	assertx.Contains(t, out, migJobID.String()+" (https://example.test/v1/jobs/"+migJobID.String()+"/logs)")
 	assertx.Contains(t, out, "⣾")
 }
 
@@ -132,14 +131,13 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 		SpecID:  specID,
 		Repos: []RunEntry{
 			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/heal.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/heal",
-				Attempt:     1,
-				Status:      "Fail",
-				LastError:   &errText,
-				BuildLogURL: "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs",
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/heal.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/heal",
+				Attempt:   1,
+				Status:    "Fail",
+				LastError: &errText,
 				Jobs: []RunJobEntry{
 					{
 						JobID:      preGateID,
@@ -259,7 +257,8 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	migID := domaintypes.NewMigID()
 	repoID := domaintypes.NewMigRepoID()
-	logURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs"
+	jobID := domaintypes.NewJobID()
+	jobLogURL := "https://example.test/v1/jobs/" + jobID.String() + "/logs"
 	patchURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs?download=true&diff_id=abc"
 	baseURL, err := url.Parse("https://example.test")
 	if err != nil {
@@ -273,23 +272,22 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/links.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/links",
-				Status:      "Success",
-				Attempt:     1,
-				BuildLogURL: logURL,
-				PatchURL:    patchURL,
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/links.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/links",
+				Status:    "Success",
+				Attempt:   1,
+				PatchURL:  patchURL,
 				Jobs: []RunJobEntry{
 					{
-						JobID:       domaintypes.NewJobID(),
-						JobType:     "mig",
-						JobImage:    "ghcr.io/acme/mig:1",
-						Status:      "Success",
-						DurationMs:  1000,
-						BuildLogURL: logURL,
-						PatchURL:    patchURL,
+						JobID:      jobID,
+						JobType:    "mig",
+						JobImage:   "ghcr.io/acme/mig:1",
+						Status:     "Success",
+						DurationMs: 1000,
+						JobLogURL:  jobLogURL,
+						PatchURL:   patchURL,
 					},
 				},
 			},
@@ -297,7 +295,8 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	}
 
 	plainOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL})
-	assertx.Contains(t, plainOut, "Logs ("+logURL+"?auth_token=test-token)")
+	assertx.NotContains(t, plainOut, "Logs (")
+	assertx.Contains(t, plainOut, jobID.String()+" ("+jobLogURL+"?auth_token=test-token)")
 	assertx.Contains(t, plainOut, "Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
 	assertx.Contains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
@@ -310,7 +309,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	}
 
 	linkedOut := renderText(t, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL})
-	assertx.Contains(t, linkedOut, "\x1b]8;;"+logURL+"?auth_token=test-token")
+	assertx.Contains(t, linkedOut, "\x1b]8;;"+jobLogURL+"?auth_token=test-token\x1b\\"+jobID.String()+"\x1b]8;;\x1b\\")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
 	assertx.NotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")
@@ -323,7 +322,7 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewMigRepoID()
-	logURL := "https://example.test/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/logs"
+	cancelledJobID := domaintypes.NewJobID()
 
 	report := RunReport{
 		RunID:   runID,
@@ -332,21 +331,20 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 		SpecID:  domaintypes.NewSpecID(),
 		Repos: []RunEntry{
 			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/cancelled.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/cancelled",
-				Status:      "Cancelled",
-				Attempt:     1,
-				BuildLogURL: logURL,
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/cancelled.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/cancelled",
+				Status:    "Cancelled",
+				Attempt:   1,
 				Jobs: []RunJobEntry{
 					{
-						JobID:       domaintypes.NewJobID(),
-						JobType:     "mig",
-						JobImage:    "ghcr.io/acme/mig:1",
-						Status:      "Cancelled",
-						DurationMs:  0,
-						BuildLogURL: logURL,
+						JobID:      cancelledJobID,
+						JobType:    "mig",
+						JobImage:   "ghcr.io/acme/mig:1",
+						Status:     "Cancelled",
+						DurationMs: 0,
+						JobLogURL:  "https://example.test/v1/jobs/" + cancelledJobID.String() + "/logs",
 					},
 				},
 			},
@@ -354,7 +352,7 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 	}
 
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
-	assertx.NotContains(t, out, "Logs (")
+	assertx.NotContains(t, out, "Patch (")
 }
 
 func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {

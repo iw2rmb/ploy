@@ -54,7 +54,7 @@ func TestRunLogsHelpUsesLogsUsage(t *testing.T) {
 				t.Fatalf("run logs %s: %v", tt.flag, err)
 			}
 			out := buf.String()
-			if !strings.Contains(out, "Usage: ploy run logs [--format <raw|structured>] [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>") {
+			if !strings.Contains(out, "Usage: ploy run logs [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>") {
 				t.Fatalf("expected logs usage, got: %q", out)
 			}
 			if strings.Contains(out, "Usage: ploy run <command>") {

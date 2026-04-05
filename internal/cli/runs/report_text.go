@@ -108,10 +108,10 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 		repoFrame.Columns = []string{"", "Step", "Job", "Node", "Image", "Duration", "Artefacts"}
 		repoFrame.Rows = make([]FollowStepRow, 0, len(repo.Jobs))
 		for _, job := range repo.Jobs {
-			buildLogURL := firstNonEmpty(strings.TrimSpace(job.BuildLogURL), strings.TrimSpace(repo.BuildLogURL))
 			patchURL := strings.TrimSpace(job.PatchURL)
 			state := ColoredStatusGlyph(job.Status.String(), opts.SpinnerFrame)
 			step := renderStepName(job.JobType.String())
+			jobIDCell := renderOptionalLink(valueOrDash(job.JobID.String()), job.JobLogURL, opts.EnableOSC8, opts.AuthToken)
 			duration := FormatDurationForStatus(job.Status.String(), job.DurationMs, job.StartedAt, job.FinishedAt, now)
 			if !opts.LiveDurations && !isTerminalJobStatus(job.Status.String()) {
 				duration = FormatDurationCompact(job.DurationMs)
@@ -121,11 +121,11 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 				Cells: []string{
 					state,
 					step,
-					valueOrDash(job.JobID.String()),
+					jobIDCell,
 					FormatNodeID(job.NodeID),
 					valueOrDash(strings.TrimSpace(job.JobImage)),
 					duration,
-					renderArtifactsForStatus(job.Status.String(), buildLogURL, patchURL, opts),
+					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
 			})
@@ -179,27 +179,20 @@ func renderOptionalLink(label, rawURL string, enableOSC8 bool, authToken string)
 	return renderLink(label, rawURL, enableOSC8, authToken)
 }
 
-func renderArtifacts(logURL, patchURL string, opts TextRenderOptions) string {
-	logURL = strings.TrimSpace(logURL)
+func renderArtifacts(patchURL string, opts TextRenderOptions) string {
 	patchURL = strings.TrimSpace(patchURL)
-	switch {
-	case logURL == "" && patchURL == "":
+	if patchURL == "" {
 		return "-"
-	case logURL != "" && patchURL != "":
-		return renderLink("Logs", logURL, opts.EnableOSC8, opts.AuthToken) + " | " + renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
-	case logURL != "":
-		return renderLink("Logs", logURL, opts.EnableOSC8, opts.AuthToken)
-	default:
-		return renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
 	}
+	return renderLink("Patch", patchURL, opts.EnableOSC8, opts.AuthToken)
 }
 
-func renderArtifactsForStatus(status, logURL, patchURL string, opts TextRenderOptions) string {
+func renderArtifactsForStatus(status, patchURL string, opts TextRenderOptions) string {
 	s := normalizeStatus(status)
 	if s == "cancelled" || s == "canceled" || !isTerminalJobStatus(status) {
 		return "-"
 	}
-	return renderArtifacts(logURL, patchURL, opts)
+	return renderArtifacts(patchURL, opts)
 }
 
 func appendAuthToken(rawURL, token string) string {
@@ -340,11 +333,3 @@ func valueOrDash(v string) string {
 	return v
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
-}

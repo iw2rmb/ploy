@@ -89,7 +89,6 @@ func (c GetRunReportCommand) buildRepoEntry(
 		return fmt.Errorf("run report: list repo diffs (%s): %w", repo.RepoID, err)
 	}
 
-	buildLogURL := buildRepoLogURL(c.BaseURL, c.RunID, repo.RepoID)
 	repoPatchURL := ""
 	if latest := latestRepoDiff(diffs); latest != nil {
 		repoPatchURL = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, latest.ID)
@@ -104,16 +103,15 @@ func (c GetRunReportCommand) buildRepoEntry(
 	}
 
 	*out = RunEntry{
-		RepoID:      repo.RepoID,
-		RepoURL:     repo.RepoURL,
-		BaseRef:     repo.BaseRef,
-		TargetRef:   repo.TargetRef,
-		Attempt:     repo.Attempt,
-		Status:      repo.Status,
-		LastError:   repo.LastError,
-		BuildLogURL: buildLogURL,
-		PatchURL:    repoPatchURL,
-		Jobs:        make([]RunJobEntry, 0, len(jobsResult.Jobs)),
+		RepoID:    repo.RepoID,
+		RepoURL:   repo.RepoURL,
+		BaseRef:   repo.BaseRef,
+		TargetRef: repo.TargetRef,
+		Attempt:   repo.Attempt,
+		Status:    repo.Status,
+		LastError: repo.LastError,
+		PatchURL:  repoPatchURL,
+		Jobs:      make([]RunJobEntry, 0, len(jobsResult.Jobs)),
 	}
 
 	for _, job := range jobsResult.Jobs {
@@ -132,7 +130,7 @@ func (c GetRunReportCommand) buildRepoEntry(
 			BugSummary:    job.BugSummary,
 			Recovery:      job.Recovery,
 			Artifacts:     buildJobArtifacts(c.BaseURL, stageArtifacts[job.JobID]),
-			BuildLogURL:   buildLogURL,
+			JobLogURL:     buildJobLogURL(c.BaseURL, job.JobID),
 			PatchURL:      jobPatchByID[job.JobID],
 		})
 	}
@@ -272,8 +270,11 @@ func latestRepoDiff(diffs []RepoDiffEntry) *RepoDiffEntry {
 	return &latest
 }
 
-func buildRepoLogURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID) string {
-	return baseURL.JoinPath("v1", "runs", runID.String(), "repos", repoID.String(), "logs").String()
+func buildJobLogURL(baseURL *url.URL, jobID domaintypes.JobID) string {
+	if baseURL == nil || jobID.IsZero() {
+		return ""
+	}
+	return baseURL.JoinPath("v1", "jobs", jobID.String(), "logs").String()
 }
 
 func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffID domaintypes.DiffID) string {

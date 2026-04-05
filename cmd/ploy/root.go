@@ -68,6 +68,7 @@ func newRootCmdWithIO(stdout, stderr io.Writer) *cobra.Command {
 	// Migs workflow commands
 	root.AddCommand(newMigCmd(stderr))  // ploy mig (run, fetch, cancel, inspect, artifacts, diffs)
 	root.AddCommand(newRunCmd(stderr))  // ploy run (events, inspect)
+	root.AddCommand(newJobCmd(stderr))  // ploy job (follow job logs)
 	root.AddCommand(newPullCmd(stderr)) // ploy pull (local repo pull workflow)
 
 	// Cluster and configuration commands
@@ -140,6 +141,8 @@ func printRequestedHelp(w io.Writer, args []string) {
 		_ = handleMig(withHelp, w)
 	case "run":
 		_ = handleRun(withHelp, w)
+	case "job":
+		_ = handleJob(withHelp, w)
 	case "pull":
 		_ = handlePull(withHelp, w)
 	case "cluster":
