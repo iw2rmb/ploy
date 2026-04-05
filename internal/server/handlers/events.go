@@ -133,13 +133,16 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 	preCursor := hubHighWater(hub.SnapshotJob(job.ID))
 
 	// Backfill historical logs filtered to this job.
-	if err := backfillRunLogs(r.Context(), w, flusher, st, bs, job.RunID, allowedJobs); err != nil {
+	backfilledLines, err := backfillRunLogs(r.Context(), w, flusher, st, bs, job.RunID, allowedJobs)
+	if err != nil {
 		slog.Error("backfill job logs failed", "job_id", job.ID.String(), "err", err)
 	}
 
-	// Replay all gap events that arrived during backfill (ID > preCursor).
-	// Log events published during backfill are NOT yet persisted to DB, so
-	// they must be replayed here to avoid loss.
+	// Replay all gap events that arrived during backfill (ID > preCursor),
+	// deduplicating against lines already emitted by backfill. A log
+	// published to the hub during backfill may also have been persisted to
+	// the DB fast enough to appear in ListLogsByRun results; without dedup
+	// the client would see such a line twice.
 	postSnapshot := hub.SnapshotJob(job.ID)
 	postCursor := preCursor
 	for _, evt := range postSnapshot {
@@ -147,6 +150,15 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			continue
 		}
 		postCursor = evt.ID
+		if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
+			var rec logstream.LogRecord
+			if json.Unmarshal(evt.Data, &rec) == nil {
+				if _, dup := backfilledLines[rec.Line]; dup {
+					delete(backfilledLines, rec.Line)
+					continue
+				}
+			}
+		}
 		if err := logstream.WriteEventFrame(w, evt); err != nil {
 			return true
 		}
@@ -189,6 +201,15 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			if !ok {
 				return true
 			}
+			if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
+				var rec logstream.LogRecord
+				if json.Unmarshal(evt.Data, &rec) == nil {
+					if _, dup := backfilledLines[rec.Line]; dup {
+						delete(backfilledLines, rec.Line)
+						continue
+					}
+				}
+			}
 			if err := logstream.WriteEventFrame(w, evt); err != nil {
 				return true
 			}
@@ -222,12 +243,13 @@ func isTerminalJobStatus(status domaintypes.JobStatus) bool {
 // backfillRunLogs fetches historical log chunks from the database and object store,
 // decompresses them, and writes them as SSE frames. If allowedJobs is non-nil, only
 // logs belonging to those jobs are included.
-func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st store.Store, bs blobstore.Store, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) error {
+func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st store.Store, bs blobstore.Store, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) (map[string]struct{}, error) {
 	logs, err := st.ListLogsByRun(ctx, runID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
+	emitted := make(map[string]struct{})
 	for _, lg := range logs {
 		// Filter by allowed jobs if specified.
 		if allowedJobs != nil {
@@ -243,18 +265,18 @@ func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st 
 			continue
 		}
 
-		if err := backfillOneChunk(ctx, w, bs, lg); err != nil {
+		if err := backfillOneChunk(ctx, w, bs, lg, emitted); err != nil {
 			slog.Warn("backfill chunk failed", "run_id", runID.String(), "log_id", lg.ID, "err", err)
 			continue
 		}
 		flusher.Flush()
 	}
-	return nil
+	return emitted, nil
 }
 
 // backfillOneChunk fetches a single gzipped log chunk from object store,
 // decompresses it, and writes each line as an SSE log frame.
-func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg store.Log) error {
+func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg store.Log, emitted map[string]struct{}) error {
 	data, err := blobstore.ReadAll(ctx, bs, *lg.ObjectKey)
 	if err != nil {
 		return err
@@ -283,6 +305,7 @@ func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg s
 		if line == "" {
 			continue
 		}
+		emitted[line] = struct{}{}
 		rec := logstream.LogRecord{
 			Timestamp: ts,
 			Stream:    "stdout",
