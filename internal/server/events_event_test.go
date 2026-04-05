@@ -123,7 +123,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 				if len(snapshot) == 0 {
 					t.Fatal("expected event in hub snapshot, got none")
 				}
-				if snapshot[0].Type != domaintypes.SSEEventLog {
+				if snapshot[0].Type != domaintypes.SSEEventStage {
 					t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
 				}
 			}
@@ -201,7 +201,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			if len(snapshot) == 0 {
 				t.Fatal("expected SSE event published")
 			}
-			if snapshot[0].Type != domaintypes.SSEEventLog {
+			if snapshot[0].Type != domaintypes.SSEEventStage {
 				t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
 			}
 			var rec logstream.LogRecord

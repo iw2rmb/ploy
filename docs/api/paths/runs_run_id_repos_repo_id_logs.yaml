@@ -1,10 +1,11 @@
-# GET /v1/runs/{run_id}/repos/{repo_id}/logs — SSE stream for repo-scoped logs and events
+# GET /v1/runs/{run_id}/repos/{repo_id}/logs — SSE stream for repo-scoped lifecycle events
 #
 # Event payloads:
 # - `event: run` → RunSummary (canonical schema, no wrapper; stages filtered to this repo's jobs)
-# - `event: log` → LogRecord (enriched log line; filtered to this repo's jobs)
-# - `event: retention` → RetentionHint (unchanged)
+# - `event: stage` → LogRecord (stage progress message)
 # - `event: done` → Terminal sentinel
+#
+# Container log frames are served via GET /v1/jobs/{job_id}/logs.
 #
 parameters:
   - in: path
@@ -30,7 +31,7 @@ parameters:
       example: "42"
 get:
   tags: [Control]
-  summary: Stream repo-scoped run logs (SSE)
+  summary: Stream repo-scoped run lifecycle events (SSE)
   parameters:
     - in: query
       name: auth_token
@@ -42,13 +43,16 @@ get:
         artifact link flows when setting the `Authorization` header is not
         possible.
   description: |
-    Server-Sent Events stream for real-time status and log updates, filtered to
-    jobs belonging to a specific repo execution within a run.
+    Server-Sent Events stream for real-time lifecycle updates, filtered to
+    stages belonging to a specific repo execution within a run.
+
+    Container log frames are **not** emitted on this stream. Use
+    `GET /v1/jobs/{job_id}/logs` for job-scoped container logs.
 
     Behavior:
-    - SSE event types/payloads are unchanged from GET /v1/runs/{id}/logs
-    - Filters the stream to jobs belonging to the repo execution
-    - `event: run` payloads are still RunSummary (stages map filtered to repo jobs)
+    - Only `run`, `stage`, and `done` event types are emitted
+    - `event: run` payloads carry RunSummary with stages filtered to repo jobs
+    - `event: stage` payloads carry stage progress messages
 
     See `docs/api/paths/runs_id_logs.yaml` for the canonical SSE contract.
   responses:

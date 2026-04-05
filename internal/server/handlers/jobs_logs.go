@@ -20,8 +20,12 @@ import (
 // getJobLogsHandler returns an HTTP handler that streams job logs over SSE.
 // GET /v1/jobs/{job_id}/logs — SSE for job-scoped container logs.
 //
-// Only log and done event types are emitted; run lifecycle frames are excluded.
+// Only log and done event types are emitted on the job-keyed stream.
 // Supports Last-Event-ID header for resuming from a specific cursor.
+//
+// For fresh connections (sinceID == 0), the handler backfills historical logs
+// from the database and object store, then subscribes to the job stream.
+// For terminal jobs, the handler writes a done sentinel after backfill.
 func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server.EventsService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		jobID, err := parseRequiredPathID[domaintypes.JobID](r, "job_id")
@@ -41,31 +45,30 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 			return
 		}
 
-		run, ok := getRunOrFail(w, r, st, job.RunID, "get job logs")
+		_, ok := getRunOrFail(w, r, st, job.RunID, "get job logs")
 		if !ok {
 			return
 		}
 
 		hub := eventsService.Hub()
-		if err := hub.Ensure(job.RunID); err != nil {
-			slog.Error("ensure stream failed", "run_id", job.RunID.String(), "err", err)
-			writeHTTPError(w, http.StatusBadRequest, "invalid run id")
+		if err := hub.EnsureJob(jobID); err != nil {
+			slog.Error("ensure job stream failed", "job_id", jobID.String(), "err", err)
+			writeHTTPError(w, http.StatusBadRequest, "invalid job id")
 			return
 		}
 
 		allowedJobs := map[domaintypes.JobID]struct{}{jobID: {}}
-
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
 
+		// For fresh connections, backfill historical logs then subscribe to job stream.
 		if sinceID == 0 && bs != nil {
-			if serveWithBackfill(w, r, st, bs, hub, run, job.RunID, allowedJobs, buildJobLogFilter(allowedJobs)) {
+			if serveJobWithBackfill(w, r, st, bs, hub, job, allowedJobs) {
 				return
 			}
 		}
 
-		filter := buildJobLogFilter(allowedJobs)
-
-		if err := logstream.ServeFiltered(w, r, hub, job.RunID, sinceID, filter); err != nil {
+		// Non-zero sinceID or backfill setup failed: subscribe directly to job stream.
+		if err := logstream.ServeJob(w, r, hub, jobID, sinceID); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream job logs", "job_id", jobID.String(), "err", err)
 			}

@@ -1,11 +1,11 @@
-# GET /v1/runs/{id}/logs — SSE stream for run logs and events
+# GET /v1/runs/{id}/logs — SSE stream for run lifecycle events
 #
 # Event payloads:
 # - `event: run` → RunSummary (canonical schema, no wrapper)
-# - `event: log` → LogRecord (enriched log line)
-# - `event: retention` → RetentionHint
+# - `event: stage` → LogRecord (stage progress message)
 # - `event: done` → Terminal sentinel
 #
+# Container log frames are served via GET /v1/jobs/{job_id}/logs.
 # See docs/migs-lifecycle.md § 7 for complete SSE contract.
 parameters:
   - in: path
@@ -25,7 +25,7 @@ parameters:
       example: "42"
 get:
   tags: [Control]
-  summary: Stream run logs (SSE)
+  summary: Stream run lifecycle events (SSE)
   parameters:
     - in: query
       name: auth_token
@@ -37,16 +37,18 @@ get:
         artifact link flows when setting the `Authorization` header is not
         possible.
   description: |
-    Server-Sent Events stream for real-time run status and log updates.
+    Server-Sent Events stream for real-time run lifecycle updates.
     Supports `Last-Event-ID` header for resume after reconnection.
+
+    Container log frames are **not** emitted on this stream. Use
+    `GET /v1/jobs/{job_id}/logs` for job-scoped container logs.
 
     ## Event Types
 
     | Event Type   | Payload Schema | Description                                    |
     |--------------|----------------|------------------------------------------------|
     | `run`        | `RunSummary`   | Run lifecycle snapshot (state changes)         |
-    | `log`        | `LogRecord`    | Enriched log line with execution context       |
-    | `retention`  | `RetentionHint`| Artifact retention metadata                    |
+    | `stage`      | `LogRecord`    | Stage progress message from node               |
     | `done`       | `Status`       | Terminal sentinel; stream closes after this    |
 
     ## `event: run` — Run Lifecycle Snapshots
@@ -65,37 +67,21 @@ get:
     data: {"run_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","state":"running","repository":"https://github.com/org/repo.git","metadata":{"node_id":"aB3xY9"},"created_at":"2025-01-15T10:00:00Z","updated_at":"2025-01-15T10:05:00Z","stages":{"2NQPoBfVkc8dFmGAQqJnUwMu9jS":{"state":"succeeded","next_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jT"}}}
     ```
 
-    ## `event: log` — Enriched Log Records
+    ## `event: stage` — Stage Progress Messages
 
-    Each `event: log` frame carries a JSON-encoded `LogRecord`:
+    Each `event: stage` frame carries a JSON-encoded `LogRecord` with node
+    progress information (e.g. "step started", "gate passed"):
 
-    **Core fields (always present):**
     | Field       | Type   | Description                                       |
     |-------------|--------|---------------------------------------------------|
-    | `timestamp` | string | RFC 3339 timestamp when the log line was captured |
-    | `stream`    | string | Output stream (`stdout` or `stderr`)              |
-    | `line`      | string | Log message content                               |
-
-    **Enriched fields (optional, omitempty):**
-    | Field        | Type   | Description                                                      |
-    |--------------|--------|------------------------------------------------------------------|
-    | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
-    | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
-    | `job_type`   | string | Job phase: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`     |
-    | `next_id` | number | Optional step metadata used for log enrichment                     |
+    | `timestamp` | string | RFC 3339 timestamp                                |
+    | `stream`    | string | Log level of the progress message                 |
+    | `line`      | string | Progress message content                          |
 
     **Example:**
     ```
-    event: log
-    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mig","next_id":2000}
-    ```
-
-    ## `event: retention` — Retention Metadata
-
-    Emitted when artifact retention status changes:
-    ```
-    event: retention
-    data: {"retained":true,"ttl":86400,"expires_at":"2025-01-16T10:00:00Z","bundle_cid":"QmXyz..."}
+    event: stage
+    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"info","line":"Step 1 started"}
     ```
 
     ## `event: done` — Terminal Sentinel
