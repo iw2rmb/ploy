@@ -45,7 +45,7 @@ func (o RunOptions) HasHealing() bool {
 }
 
 // MigContainerSpec describes a container's image, command, and env.
-// Used for healing migs, router, execution options, and step migs.
+// Used for healing migs, execution options, and step migs.
 type MigContainerSpec struct {
 	Image   contracts.JobImage
 	Command contracts.CommandSpec
