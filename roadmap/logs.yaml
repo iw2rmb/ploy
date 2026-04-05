@@ -22,7 +22,7 @@ reviews:
   - gaps: ["\"Extend stream and handler tests to assert strict event-type separation and ordered backfill-plus-live delivery.\" — Ordered backfill-plus-live delivery is still not correctness-safe for overlap records: `serveJobWithBackfill` snapshots `preCursor`, backfills via `ListLogsByRun`, then replays all job-stream events with `id > preCursor` without a dedup boundary against rows already emitted by backfill, so a log persisted/published during backfill can be emitted twice (`internal/server/handlers/events.go:131`, `internal/server/handlers/events.go:136`, `internal/server/handlers/events.go:145`). Coverage does not exercise this overlap-duplicate window (`internal/server/handlers/jobs_logs_test.go:534`)."]
     commit: e6279d56
   - gaps: ["\"Extend stream and handler tests to assert strict event-type separation and ordered backfill-plus-live delivery.\" — Backfill/live dedup in `serveJobWithBackfill` is keyed only by log line content (`backfilledLines[rec.Line]`), so a legitimate live log line that repeats a previously backfilled line is dropped once, which violates ordered backfill-plus-live delivery guarantees (`internal/server/handlers/events.go:153`, `internal/server/handlers/events.go:157`, `internal/server/handlers/events.go:204`, `internal/server/handlers/events.go:208`). Current tests validate overlap dedup but do not cover repeated same-content live lines across the boundary (`internal/server/handlers/jobs_logs_test.go:629`)."]
-    commit: null
+    commit: "81476643"
 items:
   - done: true
     reviews:
