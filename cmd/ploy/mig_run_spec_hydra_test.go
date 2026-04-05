@@ -455,7 +455,7 @@ func TestCompileHydraRecordsInPlace_InDirectoryRelativeDestination(t *testing.T)
 }
 
 // ---------------------------------------------------------------------------
-// Compile Hydra records: build_gate router & healing
+// Compile Hydra records: build_gate heal
 // ---------------------------------------------------------------------------
 
 func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
