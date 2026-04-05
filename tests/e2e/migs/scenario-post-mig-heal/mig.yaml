@@ -78,15 +78,6 @@ steps:
 build_gate:
   enabled: true
 
-  # Router: direct-Codex fallback mode — prompt via Hydra in mount; no amata.spec.
-  # Exercises the direct codex exec path for router.
-  router:
-    image: localhost:5000/ploy/codex:latest
-    in:
-      - ./codex-prompt-router.txt:/in/codex-prompt.txt
-    home:
-      - ~/.codex/auth.json:.codex/auth.json
-
   ################################################################################
   # HEALING POLICY FOR POST-MOD FAILURES
   ################################################################################
@@ -97,40 +88,38 @@ build_gate:
   # 3. Edits the workspace and exits; node agent re-gates only when workspace
   #    diffs are present. This tests the critical gate-heal-regate flow for
   #    post-mig failures using the workspace diff handshake.
-  healing:
-    by_error_kind:
-      code:
-        retries: 2 # Allow multiple healing attempts for complex errors
-        # Healing: amata mode — no prompt file required; amata spec drives the workflow.
-        # Exercises the amata execution path for healing.
-        image: localhost:5000/ploy/codex:latest
-        amata:
-          spec: |
-            version: amata/v1
-            name: code-healer
-            entry: main
-            workspace:
-              root: /workspace
-            flows:
-              main:
-                steps:
-                  - codex: |
-                      Rules:
-                      - Use /workspace and /in/build-gate.log to understand the compile error.
-                      - The error is likely a missing class reference (UnknownClass or similar).
-                      - Create the missing class in the appropriate package under /workspace.
-                      - The class should have a minimal implementation (empty constructor, toString).
-                      - Edit files under /workspace as needed to fix the error.
-                      - When you believe the code is ready for a full build validation, stop editing and end the session.
-                      - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-                        {"action_summary":"<<=200 chars, single line>"}
+  heal:
+    retries: 2 # Allow multiple healing attempts for complex errors
+    # Healing: amata mode — no prompt file required; amata spec drives the workflow.
+    # Exercises the amata execution path for healing.
+    image: localhost:5000/ploy/codex:latest
+    amata:
+      spec: |
+        version: amata/v1
+        name: code-healer
+        entry: main
+        workspace:
+          root: /workspace
+        flows:
+          main:
+            steps:
+              - codex: |
+                  Rules:
+                  - Use /workspace and /in/build-gate.log to understand the compile error.
+                  - The error is likely a missing class reference (UnknownClass or similar).
+                  - Create the missing class in the appropriate package under /workspace.
+                  - The class should have a minimal implementation (empty constructor, toString).
+                  - Edit files under /workspace as needed to fix the error.
+                  - When you believe the code is ready for a full build validation, stop editing and end the session.
+                  - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
+                    {"action_summary":"<<=200 chars, single line>"}
 
-                      Task:
-                      Fix the compilation error described in /in/build-gate.log.
-                      This is a post-mig gate failure (the mig transformation broke the build).
-                      Create any missing classes or fix any syntax errors introduced by the transformation.
-        home:
-          - ~/.codex/auth.json:.codex/auth.json
+                  Task:
+                  Fix the compilation error described in /in/build-gate.log.
+                  This is a post-mig gate failure (the mig transformation broke the build).
+                  Create any missing classes or fix any syntax errors introduced by the transformation.
+    home:
+      - ~/.codex/auth.json:.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION

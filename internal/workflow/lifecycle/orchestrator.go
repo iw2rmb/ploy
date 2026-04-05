@@ -114,11 +114,11 @@ const (
 // When ShouldAttachCandidate is true, the caller must invoke the infra-candidate
 // enrichment on ReGateMeta.Recovery before marshaling ReGateMeta.
 type HealChainSpec struct {
-	HealID        domaintypes.JobID
-	ReGateID      domaintypes.JobID
-	AttemptNumber int
-	HealImage     string
-	HealRepoSHAIn string
+	HealID         domaintypes.JobID
+	ReGateID       domaintypes.JobID
+	AttemptNumber  int
+	HealImage      string
+	HealRepoSHAIn  string
 	OldSuccessorID *domaintypes.JobID
 	// HealMeta is the unmaterialized job meta for the heal job.
 	HealMeta *contracts.JobMeta
@@ -134,7 +134,7 @@ type HealChainSpec struct {
 // GateFailureDecision is the pure result of gate failure transition evaluation.
 type GateFailureDecision struct {
 	Outcome      GateFailureOutcome
-	CancelReason string        // non-empty when Outcome == GateFailureOutcomeCancel
+	CancelReason string         // non-empty when Outcome == GateFailureOutcomeCancel
 	Chain        *HealChainSpec // non-nil when Outcome == GateFailureOutcomeHealChain
 }
 
@@ -150,15 +150,10 @@ func EvaluateGateFailureTransition(
 	failedJob store.Job,
 	jobsByID map[domaintypes.JobID]store.Job,
 	recoveryMeta *contracts.BuildGateRecoveryMetadata,
-	recoveryKind contracts.RecoveryErrorKind,
 	detectedStack contracts.MigStack,
 	heal *contracts.HealSpec,
 	newJobID func() domaintypes.JobID,
 ) (GateFailureDecision, error) {
-	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
-		return cancelDecision("terminal recovery classification")
-	}
-
 	if heal == nil {
 		return cancelDecision("no healing config")
 	}

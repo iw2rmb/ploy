@@ -53,24 +53,8 @@ func maybeCreateHealingJobs(
 	}
 
 	recoveryMeta, detectedStack, detectedExpectation := lifecycle.ResolveGateRecoveryContext(failedJob)
-	recoveryKind, ok := contracts.ParseRecoveryErrorKind(recoveryMeta.ErrorKind)
-	if !ok {
-		recoveryKind = contracts.DefaultRecoveryErrorKind()
-	}
 
-	// Terminal classification does not require spec I/O: cancel immediately so that
-	// a spec fetch failure cannot block cancellation on this path.
-	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
-		slog.Info("maybeCreateHealingJobs: canceling remaining linked jobs",
-			"run_id", failedJob.RunID,
-			"job_id", failedJob.ID,
-			"error_kind", recoveryMeta.ErrorKind,
-			"reason", "terminal recovery classification",
-		)
-		return cancelRemainingJobsAfterFailure(ctx, st, failedJob)
-	}
-
-	// Fetch spec only for non-terminal paths where healing config is needed.
+	// Fetch spec to evaluate the single heal/re-gate retry policy.
 	specRow, err := st.GetSpec(ctx, run.SpecID)
 	if err != nil {
 		return fmt.Errorf("get spec: %w", err)
@@ -86,7 +70,7 @@ func maybeCreateHealingJobs(
 	}
 
 	decision, decisionErr := lifecycle.EvaluateGateFailureTransition(
-		failedJob, jobsByID, recoveryMeta, recoveryKind, detectedStack, heal, domaintypes.NewJobID)
+		failedJob, jobsByID, recoveryMeta, detectedStack, heal, domaintypes.NewJobID)
 	if decisionErr != nil {
 		return fmt.Errorf("evaluate gate failure transition: %w", decisionErr)
 	}

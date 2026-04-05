@@ -83,7 +83,7 @@ Example spec:
 The `--spec` flag accepts a YAML or JSON file defining:
 - **Main mig configuration** (`image`, `command`, `envs`, `ca`, `in`, `out`, `home`)
 - **Build Gate settings** (`build_gate.enabled`, `build_gate.images`)
-- **Healing configuration** (`build_gate.router`, `build_gate.healing.by_error_kind`)
+- **Healing configuration** (`build_gate.heal`)
 - **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
 
 CLI flags override spec values when both are present. For example:
@@ -94,13 +94,12 @@ This uses `mig.yaml` as the base but overrides the image and PAT.
 
 **Build Gate Healing:**
 
-When `build_gate.healing.by_error_kind` is configured in the spec:
+When `build_gate.heal` is configured in the spec:
 1. The node runs the Build Gate before the main mig.
-2. If the gate fails, router runs first and emits `bug_summary` + `error_kind`.
-3. The selected healing action under `build_gate.healing.by_error_kind.<error_kind>` executes.
-4. After the healing mig completes, the gate is re-run. If it passes, the main mig proceeds.
-5. The loop retries up to `build_gate.healing.by_error_kind.<error_kind>.retries` (default: 1).
-6. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
+2. If the gate fails, the healing action under `build_gate.heal` executes.
+3. After the healing mig completes, the gate is re-run. If it passes, the main mig proceeds.
+4. The loop retries up to `build_gate.heal.retries` (default: 1).
+5. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
 
 **Repo+Diff Verification Semantics:**
 
@@ -155,7 +154,7 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
 - `PLOY_SERVER_URL` — ploy control plane base URL
 
-Router and healing containers support two execution modes:
+Healing containers support two execution modes:
 
 **amata mode** (recommended): set `amata.spec` — no prompt file required.
 The node agent materializes the spec as `/in/amata.yaml` and runs
@@ -164,42 +163,20 @@ The node agent materializes the spec as `/in/amata.yaml` and runs
 **Direct-Codex mode** (fallback): omit `amata` — prompt delivered via Hydra `in`
 mount at `/in/codex-prompt.txt`. The container uses the direct `codex exec` path.
 
-The `scenario-orw-fail` fixture exercises amata mode for the router and
-direct-Codex mode for healing. The `scenario-post-mig-heal` fixture reverses
-this — direct-Codex for the router and amata mode for healing.
+The `scenario-orw-fail` fixture exercises direct-Codex mode for healing.
+The `scenario-post-mig-heal` fixture exercises amata mode for healing.
 
-Example healing spec block (router in amata mode + healing in direct-Codex mode):
+Example healing spec block (direct-Codex mode):
 ```yaml
 build_gate:
   enabled: true
-  # amata mode: no prompt file required
-  router:
+  heal:
+    retries: 1
     image: ghcr.io/iw2rmb/ploy/codex:latest
-    amata:
-      spec: |
-        version: amata/v1
-        name: bug-router
-        entry: main
-        workspace:
-          root: /workspace
-        flows:
-          main:
-            steps:
-              - codex: |
-                  Output exactly one JSON line:
-                  {"bug_summary":"<<=200 chars>","error_kind":"code"}
+    in:
+      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
     home:
       - ~/.codex/auth.json:.codex/auth.json
-  # direct-Codex mode: prompt via Hydra in mount
-  healing:
-    by_error_kind:
-      code:
-        retries: 1
-        image: ghcr.io/iw2rmb/ploy/codex:latest
-        in:
-          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-        home:
-          - ~/.codex/auth.json:.codex/auth.json
 ```
 
 See `docs/schemas/mig.example.yaml` for the full spec schema.

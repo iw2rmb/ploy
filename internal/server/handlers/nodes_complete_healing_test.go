@@ -141,12 +141,19 @@ func TestMaybeCreateHealingJobs_CancelsRemaining(t *testing.T) {
 		errorKind   string
 		repoShaIn   string
 		specSetup   func(st *jobStore)
+		expectErr   string
 		extraAssert func(t *testing.T, st *jobStore)
 	}{
 		{
-			name:      "mixed_classification",
-			errorKind: "mixed",
+			name:      "no_heal_config",
+			errorKind: "infra",
 			repoShaIn: healingTestRepoSHAIn,
+			specSetup: func(st *jobStore) {
+				st.getSpec.val = store.Spec{
+					ID:   st.getSpec.val.ID,
+					Spec: []byte(`{"steps":[{"image":"migs-orw:latest"}],"build_gate":{"enabled":true}}`),
+				}
+			},
 		},
 		{
 			name:      "invalid_repo_sha_in",
@@ -154,16 +161,13 @@ func TestMaybeCreateHealingJobs_CancelsRemaining(t *testing.T) {
 			repoShaIn: "invalid",
 		},
 		{
-			name:      "terminal_without_spec_fetch",
-			errorKind: "mixed",
+			name:      "spec_fetch_error",
+			errorKind: "infra",
 			repoShaIn: healingTestRepoSHAIn,
 			specSetup: func(st *jobStore) {
 				st.getSpec.err = errors.New("db unavailable")
 			},
-			extraAssert: func(t *testing.T, st *jobStore) {
-				t.Helper()
-				assertNotCalled(t, "GetSpec", st.getSpec.called)
-			},
+			expectErr: "get spec: db unavailable",
 		},
 	}
 
@@ -180,7 +184,14 @@ func TestMaybeCreateHealingJobs_CancelsRemaining(t *testing.T) {
 				tc.specSetup(hc.Store)
 			}
 
-			if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
+			err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob)
+			if tc.expectErr != "" {
+				if err == nil || err.Error() != tc.expectErr {
+					t.Fatalf("maybeCreateHealingJobs error = %v, want %q", err, tc.expectErr)
+				}
+				return
+			}
+			if err != nil {
 				t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 			}
 
@@ -306,7 +317,7 @@ func TestMaybeCompleteMultiStepRun_FinishesWhenAllReposTerminal(t *testing.T) {
 	st.countRunReposByStatus.val = []store.CountRunReposByStatusRow{
 		{Status: domaintypes.RunRepoStatusSuccess, Count: 1},
 		{Status: domaintypes.RunRepoStatusFail, Count: 1},
-		}
+	}
 
 	run := store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
 	if _, err := recovery.MaybeCompleteRunIfAllReposTerminal(ctx, st, nil, run); err != nil {
@@ -334,7 +345,7 @@ func TestLoadRecoveryArtifact_Success(t *testing.T) {
 			JobID:     &jobID,
 			ObjectKey: ptr(objKey),
 		},
-		}
+	}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
 		"out/gate-profile-candidate.json": []byte(`{"schema_version":1}`),

@@ -650,12 +650,10 @@ NodeClaimResponse:
       nullable: true
       description: |
         Typed recovery context for `heal` and `re_gate` claims.
-        Carries server-resolved recovery inputs so healing/re-gate execution does
-        not depend on node-local run cache files.
+        Carries server-resolved healing inputs so heal/re-gate execution does not
+        depend on node-local run cache files.
       properties:
         loop_kind:
-          type: string
-        selected_error_kind:
           type: string
         detected_stack:
           type: string
@@ -665,6 +663,13 @@ NodeClaimResponse:
           oneOf:
             - type: object
             - type: array
+        deps_bumps:
+          type: object
+          additionalProperties:
+            type: string
+            nullable: true
+        deps_compat_endpoint:
+          type: string
         build_gate_log:
           type: string
         gate_profile:
@@ -1161,7 +1166,7 @@ RepoJobItem:
     bug_summary:
       type: string
       nullable: true
-      description: One-line build failure description produced by the router (gate jobs only)
+      description: One-line build failure description captured from gate metadata (gate jobs only)
     lang:
       type: string
       nullable: true
@@ -1184,22 +1189,22 @@ RepoJobItem:
           description: Loop kind (currently `healing`)
         error_kind:
           type: string
-          description: Router classification kind (`infra|code|mixed|unknown`)
+          description: Recovery error kind (`infra|code|deps|mixed|unknown`)
         strategy_id:
           type: string
           description: Selected strategy identifier when available
         confidence:
           type: number
           format: double
-          description: Router confidence score in range [0,1]
+          description: Optional recovery confidence score in range [0,1]
         reason:
           type: string
-          description: Short classifier rationale
+          description: Short recovery rationale
         expectations:
           oneOf:
             - type: object
             - type: array
-          description: Strategy-specific structured expectations from router classification
+          description: Strategy-specific structured expectations from recovery metadata
         candidate_schema_id:
           type: string
           description: Candidate prep schema id when infra recovery expects gate_profile artifact

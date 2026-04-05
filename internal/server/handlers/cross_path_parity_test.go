@@ -152,19 +152,19 @@ func TestCrossPathParity_GateJobStatusToChainAction(t *testing.T) {
 			wantCancelSuccessor: true,
 		},
 		// Gate test failures produce Fail → EvaluateGateFailure → healing path entered (GetRun called).
-		// With no job meta the recovery kind defaults to Unknown (terminal), so healing resolves to
-		// CancelRemainder internally — both the healing entry point and the cancel side-effect are present.
+		// Completion no longer short-circuits on terminal/unknown classification and instead evaluates
+		// heal/re-gate insertion from spec retry policy, so CancelRemainder is not expected here.
 		{
 			name:    "pre_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypePreGate, status: domaintypes.JobStatusFail, hasNext: true,
 			wantGetRunCalled:    true,
-			wantCancelSuccessor: true,
+			wantCancelSuccessor: false,
 		},
 		{
 			name:    "re_gate/test_fail/has-next",
 			jobType: domaintypes.JobTypeReGate, status: domaintypes.JobStatusFail, hasNext: true,
 			wantGetRunCalled:    true,
-			wantCancelSuccessor: true,
+			wantCancelSuccessor: false,
 		},
 		// Gate successes → AdvanceNext when a successor exists.
 		{

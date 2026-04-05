@@ -398,8 +398,8 @@ ploy completion <shell> --help
   shape for both single-step and multi-step runs. Each step supports
   `image`/`command`/`envs` plus Hydra file-record fields (`ca`, `in`, `out`, `home`)
   for deterministic file injection via content-addressed bundles.
-  Hydra records are also supported in Build Gate router/healing action blocks
-  (`build_gate.router`, `build_gate.healing.by_error_kind.<kind>`). The spec also supports
+  Hydra records are also supported in Build Gate healing action blocks
+  (`build_gate.heal`). The spec also supports
   GitLab MR settings. See `docs/schemas/mig.example.yaml` for the full schema and
   `tests/e2e/migs/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
@@ -577,18 +577,18 @@ See `docs/how-to/create-mr.md` for end-to-end usage examples and `internal/nodea
 ## Build Gate Healing
 
 When a Build Gate fails before the main mig runs, the node agent can execute a healing
-sequence configured via `build_gate.healing.by_error_kind` in the spec. This enables automated
+sequence configured via `build_gate.heal` in the spec. This enables automated
 repair of build failures using tools like Codex or other LLM-based workflows.
 
 **How it works (jobs-based gate model):**
 1. Gate checks run as jobs in the unified `jobs` queue (`pre_gate` and `re_gate` phases)
    and are claimed by nodes via `/v1/nodes/{id}/claim`.
-2. If the pre-gate job fails and `build_gate.healing.by_error_kind` is configured, the node executes
-   the selected healing action under `build_gate.healing.by_error_kind.<error_kind>` against the same workspace
+2. If the pre-gate job fails and `build_gate.heal` is configured, the node executes
+   the healing action under `build_gate.heal` against the same workspace
    and Build Gate logs.
 3. After all healing steps complete, a `re_gate` job runs as another job in the queue. If it
    passes, the main mig proceeds.
-4. The healing loop retries up to `build_gate.healing.by_error_kind.<error_kind>.retries` (default: 1).
+4. The healing loop retries up to `build_gate.heal.retries` (default: 1).
 5. If the gate still fails after exhausting retries, the run terminates with status `failed`
    and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
 
@@ -611,41 +611,31 @@ reporting.
 **Spec format (healing under Build Gate):**
 ```yaml
 build_gate:
-  router:
-    <<: !include ./healing/router/spec.yaml
-  healing:
-    by_error_kind:
-      infra:
-        <<: !include ./healing/infra/spec.yaml
-        retries: 1
-        image: ghcr.io/iw2rmb/ploy/codex:latest
-        command: ["codex", "--input", "/workspace", "--out", "/out"]
-        in:
-          - ./codex-prompt.txt:/in/codex-prompt.txt
-        home:
-          - ~/.codex/auth.json:.codex/auth.json:ro
-        expectations:
-          artifacts:
-            - path: /out/gate-profile-candidate.json
-              schema: gate_profile_v1
-      code:
-        <<: !include ./healing/code/spec.yaml
-        retries: 1
-        image: ghcr.io/iw2rmb/ploy/codex:latest
-        in:
-          - ./codex-prompt.txt:/in/codex-prompt.txt
+  heal:
+    <<: !include ./healing/spec.yaml
+    retries: 1
+    image: ghcr.io/iw2rmb/ploy/codex:latest
+    command: ["codex", "--input", "/workspace", "--out", "/out"]
+    in:
+      - ./codex-prompt.txt:/in/codex-prompt.txt
+    home:
+      - ~/.codex/auth.json:.codex/auth.json:ro
+    expectations:
+      artifacts:
+        - path: /out/gate-profile-candidate.json
+          schema: gate_profile_v1
 ```
 
 `!include` is a CLI-side YAML composition macro. Use it either as full
-replacement (`router: !include ./router.yaml#/router`) or deep merge
-(`router: {<<: !include ./router.yaml#/router, ...overrides}`).
+replacement (`heal: !include ./healing/spec.yaml#/heal`) or deep merge
+(`heal: {<<: !include ./healing/spec.yaml#/heal, ...overrides}`).
 Include references support `path[#/pointer]`, recurse through nested includes,
 and fail on include cycles. Relative include paths resolve from the including
 file directory. Relative local-source paths inside included fragments
 (`amata.spec`, `ca`, and source side of `in`/`out`/`home`) are rebased from
 that included file directory.
 
-For `infra` healing with `expectations.artifacts` schema `gate_profile_v1`, the
+For healing with `expectations.artifacts` schema `gate_profile_v1`, the
 healing container is expected to write `/out/gate-profile-candidate.json`. The
 candidate is considered for repo `gate_profile` promotion only after the immediate
 follow-up `re_gate` succeeds. Failed `re_gate` results never promote candidates.

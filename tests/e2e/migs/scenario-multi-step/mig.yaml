@@ -57,29 +57,21 @@ steps:
 build_gate:
   enabled: true
 
-  # Router emits bug_summary + error_kind before healing selection.
-  router:
-    image: localhost:5000/ploy/codex:latest
-    in:
-      - ./codex-prompt-router.txt:/in/codex-prompt.txt
-
   # Healing policy applies to any step that fails its gate check. The healing
   # sequence runs once per retry count, then the gate is re-evaluated before
   # proceeding to the next step.
-  healing:
-    by_error_kind:
-      code:
-        retries: 1
-        # Codex healing container using the workspace diff handshake.
-        # Codex edits the workspace and exits when done; the node agent inspects
-        # the workspace for diffs and re-runs the Build Gate externally when changes exist.
-        # Codex never runs the gate itself.
-        image: localhost:5000/ploy/codex:latest
-        in:
-          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-        # Uncomment to mount Codex auth via Hydra home:
-        # home:
-        #   - ~/.codex/auth.json:.codex/auth.json
+  heal:
+    retries: 1
+    # Codex healing container using the workspace diff handshake.
+    # Codex edits the workspace and exits when done; the node agent inspects
+    # the workspace for diffs and re-runs the Build Gate externally when changes exist.
+    # Codex never runs the gate itself.
+    image: localhost:5000/ploy/codex:latest
+    in:
+      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
+    # Uncomment to mount Codex auth via Hydra home:
+    # home:
+    #   - ~/.codex/auth.json:.codex/auth.json
 
 ################################################################################
 # GITLAB INTEGRATION (optional)

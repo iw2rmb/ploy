@@ -1,4 +1,4 @@
-# Minimal spec for the failing Build Gate → router summary → Codex heal → re-gate → ORW apply scenario.
+# Minimal spec for the failing Build Gate → Codex heal → re-gate → ORW apply scenario.
 # Submit with:
 #   dist/ploy mig run \
 #     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
@@ -21,51 +21,15 @@ steps:
 build_gate:
   enabled: true
 
-  # Router: amata mode — no prompt file required; amata spec drives the workflow.
-  # Exercises the amata execution path for router.
-  router:
+  heal:
+    retries: 1
+    # Healing: direct-Codex fallback mode — prompt via Hydra in mount; no amata.spec.
+    # Exercises the direct codex exec path for healing.
     image: localhost:5000/ploy/codex:latest
-    amata:
-      spec: |
-        version: amata/v1
-        name: bug-router
-        entry: main
-        workspace:
-          root: /workspace
-        flows:
-          main:
-            steps:
-              - codex: |
-                  Rules:
-                  - Read /in/build-gate.log.
-                  - Do not edit /workspace.
-                  - Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-                    {"bug_summary":"<<=200 chars, single line>","error_kind":"{{ .error_kind }}"}
-                  - Do not output any other text in the final message.
-
-                  Task:
-                  Summarize the build failure in /in/build-gate.log.
-      # amata.set: exercises --set flag forwarding and template rendering in amata executor.
-      # Two entries validate deterministic ordered multi---set forwarding (roadmap 1.6.3).
-      set:
-        - param: error_kind
-          value: code
-        - param: loop_kind
-          value: healing
+    in:
+      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
     home:
       - ~/.codex/auth.json:.codex/auth.json
-
-  healing:
-    by_error_kind:
-      code:
-        retries: 1
-        # Healing: direct-Codex fallback mode — prompt via Hydra in mount; no amata.spec.
-        # Exercises the direct codex exec path for healing.
-        image: localhost:5000/ploy/codex:latest
-        in:
-          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-        home:
-          - ~/.codex/auth.json:.codex/auth.json
 
 mr_on_fail: false
 mr_on_success: true
