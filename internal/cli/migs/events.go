@@ -9,11 +9,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
-	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // SimplePrinter prints a short human-readable summary of run and stage updates.
@@ -40,9 +38,9 @@ func (p *SimplePrinter) Stage(s migsapi.StageStatus) {
 	_, _ = io.WriteString(p.out, line+"\n")
 }
 
-// EventsCommand streams run events until a terminal state is reached.
-// When LogPrinter is set, also handles "log" events using the shared log printer
-// for unified log output alongside run/stage updates (used by `mig run --follow`).
+// EventsCommand streams run lifecycle events until a terminal state is reached.
+// Only run, stage, and done events are consumed from /v1/runs/{id}/logs.
+// Container log frames are served via the job-scoped endpoint.
 // Uses domain type (RunID) for type-safe identification.
 type EventsCommand struct {
 	Client  stream.Client
@@ -50,16 +48,11 @@ type EventsCommand struct {
 	RunID   domaintypes.RunID // Run ID (KSUID-backed)
 	Output  io.Writer
 	Printer *SimplePrinter
-
-	// LogPrinter is an optional log printer for handling "log" events.
-	// When nil, EventsCommand creates a default structured logs.Printer that
-	// writes to Output so log events are always rendered alongside run/stage updates.
-	LogPrinter *logs.Printer
 }
 
-// Run consumes "run", "stage", and optionally "log" SSE events from /v1/runs/{id}/logs.
+// Run consumes "run", "stage", and "done" SSE events from /v1/runs/{id}/logs.
 // Unknown event types are ignored so the CLI remains forward compatible. Returns the final
-// run state. When LogPrinter is set, "log" events are rendered using the shared printer.
+// run state.
 func (c EventsCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	if c.Client.HTTPClient == nil {
 		return "", errors.New("migs events: http client required")
@@ -81,13 +74,6 @@ func (c EventsCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	printer := c.Printer
 	if printer == nil {
 		printer = &SimplePrinter{out: out}
-	}
-
-	// Ensure log events are always rendered: when LogPrinter is nil, create a
-	// default structured printer that writes to the same output writer.
-	logPrinter := c.LogPrinter
-	if logPrinter == nil {
-		logPrinter = logs.NewPrinter(logs.FormatStructured, out)
 	}
 
 	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(runID), "logs")
@@ -116,36 +102,14 @@ func (c EventsCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 				return fmt.Errorf("migs events: decode stage: %w", err)
 			}
 			printer.Stage(payload.Stage)
-		case "log":
-			// Handle log events using the shared log printer for unified log streaming.
-			if logPrinter != nil && len(evt.Data) > 0 {
-				var rec logstream.LogRecord
-				if err := json.Unmarshal(evt.Data, &rec); err != nil {
-					return fmt.Errorf("migs events: decode log: %w", err)
-				}
-				logPrinter.PrintLog(rec)
-			}
-		case "retention":
-			// Handle retention hints; retention metadata is recorded for summary output
-			// at stream completion.
-			if logPrinter != nil && len(evt.Data) > 0 {
-				var hint logstream.RetentionHint
-				if err := json.Unmarshal(evt.Data, &hint); err != nil {
-					return fmt.Errorf("migs events: decode retention: %w", err)
-				}
-				logPrinter.RecordRetention(hint)
-			}
 		default:
-			// ignore unknown event types
+			// ignore unknown event types (including done — terminal state
+			// is detected from the run event payload)
 		}
 		return nil
 	}
 	if err := c.Client.Stream(ctx, endpoint, handler); err != nil {
 		return "", err
-	}
-	// Print retention summary when a log printer is available (for unified log streaming).
-	if logPrinter != nil {
-		logPrinter.PrintRetentionSummary()
 	}
 	return final, nil
 }

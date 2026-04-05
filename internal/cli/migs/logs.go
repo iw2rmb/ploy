@@ -9,34 +9,23 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	logstream "github.com/iw2rmb/ploy/internal/stream"
+	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-// ErrInvalidFormat indicates an unsupported format value.
-var ErrInvalidFormat = errors.New("migs: invalid format")
-
-// LogsCommand streams logs for a single Migs run over SSE.
+// LogsCommand streams run lifecycle events for a single Migs run over SSE.
+// The run stream carries only lifecycle frames (run, stage, done); container
+// log frames are served via the job-scoped endpoint.
 type LogsCommand struct {
 	Client  stream.Client
 	BaseURL *url.URL
 	RunID   domaintypes.RunID
-	Format  logs.Format // Use canonical logs.Format directly.
 	Output  io.Writer
 }
 
-// Run executes the streaming command.
+// Run executes the streaming command, printing lifecycle updates until done.
 func (c LogsCommand) Run(ctx context.Context) error {
-	format := c.Format
-	if format == "" {
-		format = logs.FormatStructured
-	}
-	// Validate format against canonical logs.Format constants.
-	if format != logs.FormatStructured && format != logs.FormatRaw {
-		return ErrInvalidFormat
-	}
 	if c.RunID.IsZero() {
 		return errors.New("migs: run id required")
 	}
@@ -50,27 +39,28 @@ func (c LogsCommand) Run(ctx context.Context) error {
 
 	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "logs")
 
-	// Use the shared log printer for consistent formatting across CLI commands.
-	printer := logs.NewPrinter(format, writer)
+	printer := &SimplePrinter{out: writer}
 
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
-		case "", "log":
-			if len(evt.Data) == 0 {
-				return nil
+		case "run":
+			var t migsapi.RunSummary
+			if err := json.Unmarshal(evt.Data, &t); err != nil {
+				return fmt.Errorf("migs: decode run event: %w", err)
 			}
-			// Decode into the shared LogRecord type which supports enriched fields.
-			var payload logstream.LogRecord
+			printer.Run(t)
+			if isTerminalRunState(t.State) {
+				return stream.ErrDone
+			}
+		case "stage":
+			var payload struct {
+				RunID domaintypes.RunID   `json:"run_id"`
+				Stage migsapi.StageStatus `json:"stage"`
+			}
 			if err := json.Unmarshal(evt.Data, &payload); err != nil {
-				return fmt.Errorf("migs: decode log event: %w", err)
+				return fmt.Errorf("migs: decode stage event: %w", err)
 			}
-			printer.PrintLog(payload)
-		case "retention":
-			var hint logstream.RetentionHint
-			if err := json.Unmarshal(evt.Data, &hint); err != nil {
-				return fmt.Errorf("migs: decode retention event: %w", err)
-			}
-			printer.RecordRetention(hint)
+			printer.Stage(payload.Stage)
 		case "done", "complete", "completed":
 			return stream.ErrDone
 		default:
@@ -79,9 +69,5 @@ func (c LogsCommand) Run(ctx context.Context) error {
 		return nil
 	}
 
-	if err := c.Client.Stream(ctx, endpoint.String(), handler); err != nil {
-		return err
-	}
-	printer.PrintRetentionSummary()
-	return nil
+	return c.Client.Stream(ctx, endpoint.String(), handler)
 }

@@ -1,7 +1,7 @@
 // Package logs provides a shared log printer for CLI commands that consume
-// enriched log events from the run SSE stream. The `ploy run logs` command
-// delegates to this printer to ensure consistent formatting across all
-// log-consuming commands.
+// enriched log events from the job-scoped SSE stream. The `ploy job follow`
+// command delegates to this printer to ensure consistent formatting across
+// all log-consuming commands.
 //
 // This package uses the canonical stream.LogRecord type from internal/stream
 // to ensure a single source of truth for log payload structures across the
