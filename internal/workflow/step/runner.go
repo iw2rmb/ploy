@@ -149,6 +149,18 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		if err := r.Containers.Start(ctx, handle); err != nil {
 			return Result{}, fmt.Errorf("container start failed: %w", err)
 		}
+
+		var streamDone <-chan error
+		if r.LogWriter != nil {
+			if streamer, ok := r.Containers.(logStreamingRuntime); ok {
+				done := make(chan error, 1)
+				streamDone = done
+				go func() {
+					done <- streamer.StreamLogs(ctx, handle, r.LogWriter, r.LogWriter)
+				}()
+			}
+		}
+
 		cRes, err := r.Containers.Wait(ctx, handle)
 		if err != nil {
 			return Result{}, fmt.Errorf("container wait failed: %w", err)
@@ -157,8 +169,19 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			result.ContainerResources = toContainerResourceUsage(usage)
 		}
 		if r.LogWriter != nil {
-			if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
-				_, _ = r.LogWriter.Write(logs)
+			streamOK := false
+			if streamDone != nil {
+				select {
+				case streamErr := <-streamDone:
+					streamOK = streamErr == nil
+				case <-time.After(2 * time.Second):
+					streamOK = false
+				}
+			}
+			if !streamOK {
+				if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
+					_, _ = r.LogWriter.Write(logs)
+				}
 			}
 		}
 		result.ExitCode = cRes.ExitCode
