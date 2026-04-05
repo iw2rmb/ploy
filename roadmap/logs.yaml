@@ -13,7 +13,7 @@ items:
   - done: false
     reviews:
       - gaps: ["\"Add handler tests for endpoint authorization, parameter validation, and contract-level event-type constraints.\" — Authorization coverage for the new endpoints is missing: `internal/server/handlers/jobs_logs_test.go` and `internal/server/handlers/path_params_test.go` cover parameter/error/filter behavior, but there are no tests asserting role/auth behavior for `GET /v1/jobs/{job_id}/logs` and `POST /v1/jobs/{job_id}/logs`.", "\"Define and expose job-scoped log API endpoints and contract boundaries.\" — The contract file is added (`docs/api/paths/jobs_job_id_logs.yaml`), but `docs/api/OpenAPI.yaml` does not reference `/v1/jobs/{job_id}/logs`, so the new API contract is not exposed in the main spec."]
-        commit: null
+        commit: 02a82dbf
     label: "1"
     summary: "Define and expose job-scoped log API endpoints and contract boundaries."
     classification: "determined"
