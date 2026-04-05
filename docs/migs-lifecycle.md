@@ -1103,13 +1103,13 @@ value is a `StageStatus` object describing that job's execution state.
     - Run stats (MR URL, gate summary).
   - Returns `RunSummary` directly (Go type `migsapi.RunSummary`); the canonical JSON shape for run state.
 
-- `GET /v1/runs/{id}/logs` — SSE event stream for a run's logs and status.
+- `GET /v1/runs/{id}/logs` — SSE event stream for run lifecycle events only.
   - Handler: `getRunLogsHandler`.
   - Uses the internal hub (runtime implementation) and events service to stream:
-    - `event: log`, data: `LogRecord {timestamp,stream,line,node_id,job_id,job_type,next_id}` (see § 7.2).
-    - `event:  run`, data: `RunSummary`.
-    - `event: retention`, data: `RetentionHint`.
+    - `event: run`, data: `RunSummary`.
+    - `event: stage`, data: stage transition.
     - `event: done`, data: `Status {status:"done"}` sentinel.
+  - Container log frames (`event: log`) and retention hints (`event: retention`) are NOT emitted on this stream; they are served via the job-scoped endpoint `GET /v1/jobs/{job_id}/logs`.
   - Supports `Last-Event-ID` for resumption.
 
 - `POST /v1/runs/{id}/cancel` — cancel a run.

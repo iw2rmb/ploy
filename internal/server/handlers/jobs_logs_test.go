@@ -613,6 +613,101 @@ func TestGetJobLogsHandler_BackfillLiveNoDuplicates(t *testing.T) {
 	}
 }
 
+// TestGetJobLogsHandler_GapLogEventsDelivered verifies that log events published
+// to the hub DURING backfill (after preCursor, before subscription) are delivered
+// to the client rather than being silently dropped.
+func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	objKey := "logs/gap-job.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKey, "", gzipLines(t, "backfill-line"))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	// Wait for handler to start backfill, then publish a log event that lands
+	// in the gap (after preCursor snapshot but before live subscription).
+	time.Sleep(50 * time.Millisecond)
+	ctx := context.Background()
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-01-01T00:00:00Z",
+		Stream:    "stdout",
+		Line:      "gap-log-line",
+		JobID:     jobID,
+	})
+
+	// Small delay, then publish another live event and done to terminate stream.
+	time.Sleep(20 * time.Millisecond)
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-01-01T00:00:01Z",
+		Stream:    "stdout",
+		Line:      "live-line",
+		JobID:     jobID,
+	})
+	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for gap log delivery stream")
+	}
+
+	body := rr.Body.String()
+
+	// Backfill content from DB must appear.
+	if !strings.Contains(body, "backfill-line") {
+		t.Fatalf("expected backfill-line in output; body: %s", body)
+	}
+	// Gap log event must NOT be dropped — it was published during backfill
+	// and is not in the DB, so it must be replayed from the hub gap.
+	if !strings.Contains(body, "gap-log-line") {
+		t.Fatalf("gap log event published during backfill must be delivered; body: %s", body)
+	}
+	// Live content must appear.
+	if !strings.Contains(body, "live-line") {
+		t.Fatalf("expected live-line in output; body: %s", body)
+	}
+	// Ordering: backfill < gap < live.
+	backfillIdx := strings.Index(body, "backfill-line")
+	gapIdx := strings.Index(body, "gap-log-line")
+	liveIdx := strings.Index(body, "live-line")
+	if backfillIdx > gapIdx || gapIdx > liveIdx {
+		t.Fatalf("expected backfill < gap < live ordering; backfill@%d gap@%d live@%d; body: %s",
+			backfillIdx, gapIdx, liveIdx, body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event; body: %s", body)
+	}
+}
+
 func TestBuildJobLogFilter_RejectsNilJobIDLog(t *testing.T) {
 	t.Parallel()
 
