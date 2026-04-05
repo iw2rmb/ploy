@@ -168,7 +168,7 @@ build_gate:
 ################################################################################
 # Healing runs directly when the Build Gate fails. A single `build_gate.heal`
 # entry defines the healing action, retries, and mig-like execution settings.
-# No router or error_kind classifier is needed — the system enters a direct
+# The system enters a direct
 # heal → re-gate loop until the gate passes or retries are exhausted.
 #
 # Mig-like fields (image, command, envs, in, out, home, ca) are specified
