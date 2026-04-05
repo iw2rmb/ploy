@@ -110,6 +110,7 @@ items:
       - "Run non-healing completion tests to confirm MR and regular success-chain progression remain unchanged."
     reasoning: "high"
     cfp: 16
+    commit: cbb5f4c0
   - done: false
     reviews: []
     label: "3"
