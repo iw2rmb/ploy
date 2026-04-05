@@ -1,9 +1,0 @@
-Rules:
-- Read /in/build-gate.log.
-- Do not edit /workspace.
-- Your final message MUST be EXACTLY one line of JSON (no markdown, no fences):
-  {"bug_summary":"<<=200 chars, single line>","error_kind":"code"}
-- Do not output any other text in the final message.
-
-Task:
-Summarize the build failure in /in/build-gate.log.

@@ -32,7 +32,7 @@ type BuildGateStageMetadata struct {
 	// Not serialized in JSON APIs.
 	Resources *BuildGateResourceUsage `json:"-"`
 	// BugSummary is a short one-line description of the build failure produced
-	// by the router container. Max 200 chars, no newlines.
+	// by the heal workflow. Max 200 chars, no newlines.
 	BugSummary string `json:"bug_summary,omitempty"`
 	// Recovery carries loop context for the universal recovery loop contract.
 	Recovery *BuildGateRecoveryMetadata `json:"recovery,omitempty"`
@@ -183,7 +183,7 @@ func (m BuildGateStageMetadata) Validate() error {
 	return nil
 }
 
-// BuildGateRecoveryMetadata captures router classification and strategy context
+// BuildGateRecoveryMetadata captures classification and strategy context
 // for a failed gate within the universal recovery loop.
 type BuildGateRecoveryMetadata struct {
 	LoopKind   string   `json:"loop_kind"`
@@ -192,7 +192,7 @@ type BuildGateRecoveryMetadata struct {
 	Confidence *float64 `json:"confidence,omitempty"`
 	Reason     string   `json:"reason,omitempty"`
 	// Expectations carries strategy-specific structured expectations emitted by
-	// router classification. Reserved for downstream strategy/artifact handling.
+	// heal classification. Reserved for downstream strategy/artifact handling.
 	Expectations json.RawMessage `json:"expectations,omitempty"`
 	// DepsBumps carries cumulative dependency bump state for deps healing loops.
 	// Values are non-empty versions or nil (meaning dependency disable/remove).
@@ -221,7 +221,7 @@ type RecoveryClaimContext struct {
 	DetectedStack MigStack `json:"detected_stack,omitempty"`
 	// ResolvedHealingImage is the concrete healing image selected for this chain.
 	ResolvedHealingImage string `json:"resolved_healing_image,omitempty"`
-	// Expectations carries router/recovery expectations payload.
+	// Expectations carries recovery expectations payload.
 	Expectations json.RawMessage `json:"expectations,omitempty"`
 	// DepsBumps carries cumulative dependency bump state for deps healing.
 	DepsBumps map[string]*string `json:"deps_bumps,omitempty"`
