@@ -228,8 +228,7 @@ func (r *runController) runGate(ctx context.Context, runner step.Runner, manifes
 			StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: true, Tool: "none"}},
 		}, nil
 	}
-
-	return runner.Gate.Execute(ctx, gateSpec, workspace)
+	return runner.Gate.Execute(step.WithExecutionLogWriter(ctx, runner.LogWriter), gateSpec, workspace)
 }
 
 // gateResultPassed reports whether the gate result indicates a passing gate.

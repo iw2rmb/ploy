@@ -28,15 +28,18 @@ package step
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	units "github.com/docker/go-units"
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -73,6 +76,10 @@ var errBuildGateRuntimeUnavailable = errors.New("build gate runtime unavailable"
 // behavior and complete history capture.
 type dockerGateExecutor struct {
 	rt ContainerRuntime
+}
+
+type logStreamingRuntime interface {
+	StreamLogs(ctx context.Context, handle ContainerHandle, stdout, stderr io.Writer) error
 }
 
 func readGradleBuildCacheHits(workspace string) []string {
@@ -230,11 +237,44 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	if err := e.rt.Start(ctx, h); err != nil {
 		return nil, err
 	}
+
+	var streamedLogs bytes.Buffer
+	liveWriter := executionLogWriterFromContext(ctx)
+	var streamDone <-chan error
+	if streamer, ok := e.rt.(logStreamingRuntime); ok {
+		outWriter := io.Writer(&streamedLogs)
+		if liveWriter != nil {
+			outWriter = io.MultiWriter(&streamedLogs, liveWriter)
+		}
+		done := make(chan error, 1)
+		streamDone = done
+		go func() {
+			done <- streamer.StreamLogs(ctx, h, outWriter, outWriter)
+		}()
+	}
+
 	res, err := e.rt.Wait(ctx, h)
 	if err != nil {
 		return nil, err
 	}
-	logs, _ := e.rt.Logs(ctx, h)
+
+	var logs []byte
+	if streamDone != nil {
+		select {
+		case streamErr := <-streamDone:
+			if streamErr == nil {
+				logs = append([]byte(nil), streamedLogs.Bytes()...)
+			}
+		case <-time.After(2 * time.Second):
+			// Fall back to one-shot log fetch if stream completion hangs unexpectedly.
+		}
+	}
+	if len(logs) == 0 {
+		logs, _ = e.rt.Logs(ctx, h)
+		if liveWriter != nil && len(logs) > 0 {
+			_, _ = liveWriter.Write(logs)
+		}
+	}
 
 	meta := buildGateExecutionMetadata(workspace, plan.language, plan.tool, plan.release, plan.image, res, logs)
 	meta.Resources = collectDockerResourceUsage(ctx, e.rt, h, specC)

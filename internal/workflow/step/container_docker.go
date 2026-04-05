@@ -308,6 +308,35 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 	return append(stdoutBuf.Bytes(), stderrBuf.Bytes()...), nil
 }
 
+// StreamLogs follows container logs and writes demultiplexed stdout/stderr into
+// the provided writers. This is used for live job log uploads while a container
+// is still running.
+func (r *DockerContainerRuntime) StreamLogs(ctx context.Context, handle ContainerHandle, stdout, stderr io.Writer) error {
+	if r == nil || r.client == nil {
+		return errors.New("step: docker runtime not configured")
+	}
+	if stdout == nil {
+		stdout = io.Discard
+	}
+	if stderr == nil {
+		stderr = io.Discard
+	}
+	reader, err := r.client.ContainerLogs(ctx, string(handle), client.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Follow:     true,
+	})
+	if err != nil {
+		return fmt.Errorf("step: stream container logs: %w", err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	if _, err := stdcopy.StdCopy(stdout, stderr, reader); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Remove deletes the container using the moby client ContainerRemove API.
 // Force remove is used to ensure cleanup even if some resources linger.
 //
