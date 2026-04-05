@@ -186,6 +186,7 @@ func TestHelpOutputMatchesDocumentation(t *testing.T) {
 				"Ploy CLI v2",
 				"Core Commands:",
 				"mig",
+				"job",
 				"cluster",
 				"config",
 				"manifest",

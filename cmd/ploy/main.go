@@ -43,6 +43,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Core Commands:")
 	_, _ = fmt.Fprintln(w, "  mig              Plan and run Migs workflows")
 	_, _ = fmt.Fprintln(w, "  run              Inspect runs and stream events")
+	_, _ = fmt.Fprintln(w, "  job              Inspect and follow job logs")
 	_, _ = fmt.Fprintln(w, "  pull             Pull Migs diffs for current repo HEAD")
 	_, _ = fmt.Fprintln(w, "  cluster          Manage clusters (deploy, nodes, tokens)")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")

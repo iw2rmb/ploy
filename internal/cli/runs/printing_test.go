@@ -2,7 +2,6 @@ package runs
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/cli/logs"
@@ -77,10 +76,3 @@ func TestPrintRetentionSummary(t *testing.T) {
 	}
 }
 
-func TestFollowCommandInvalidFormat(t *testing.T) {
-	t.Parallel()
-	err := (FollowCommand{Format: "bad"}).Run(context.TODO())
-	if err == nil || err != ErrInvalidFormat {
-		t.Fatalf("expected ErrInvalidFormat, got %v", err)
-	}
-}
