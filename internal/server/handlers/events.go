@@ -128,6 +128,15 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 	}
 	flusher.Flush()
 
+	// Capture the hub high-water mark BEFORE backfill so that events
+	// published while backfill runs are not lost — they will be replayed
+	// by the subscription starting from this cursor.
+	snapshot := hub.SnapshotJob(job.ID)
+	var hubSinceID domaintypes.EventID
+	if len(snapshot) > 0 {
+		hubSinceID = snapshot[len(snapshot)-1].ID
+	}
+
 	// Backfill historical logs filtered to this job.
 	if err := backfillRunLogs(r.Context(), w, flusher, st, bs, job.RunID, allowedJobs); err != nil {
 		slog.Error("backfill job logs failed", "job_id", job.ID.String(), "err", err)
@@ -139,13 +148,6 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 		_ = logstream.WriteEventFrame(w, logstream.Event{Type: domaintypes.SSEEventDone, Data: doneData})
 		flusher.Flush()
 		return true
-	}
-
-	// Job is still active — subscribe to job stream from current high-water mark.
-	snapshot := hub.SnapshotJob(job.ID)
-	var hubSinceID domaintypes.EventID
-	if len(snapshot) > 0 {
-		hubSinceID = snapshot[len(snapshot)-1].ID
 	}
 
 	sub, err := hub.SubscribeJob(r.Context(), job.ID, hubSinceID)
