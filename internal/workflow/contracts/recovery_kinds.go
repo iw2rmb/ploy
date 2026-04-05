@@ -11,7 +11,7 @@ const (
 
 func (k RecoveryLoopKind) String() string { return string(k) }
 
-// RecoveryErrorKind identifies router-classified failure domains for healing selection.
+// RecoveryErrorKind identifies failure domains for healing selection.
 type RecoveryErrorKind string
 
 const (

@@ -136,5 +136,5 @@ if ((FAILED > 0)); then
   exit 1
 fi
 
-echo "OK: scenario-orw-fail (amata-mode router, direct-mode healing — all assertions passed)."
+echo "OK: scenario-orw-fail (build_gate.heal workflow — all assertions passed)."
 echo "Artifacts saved to: ${E2E_ARTIFACT_DIR}"
