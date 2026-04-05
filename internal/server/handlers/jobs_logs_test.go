@@ -626,6 +626,101 @@ func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
 	}
 }
 
+// TestGetJobLogsHandler_OverlapDedupDuringBackfill verifies that a log line
+// persisted to the DB AND published to the hub during the backfill window is
+// emitted only once. Without dedup, the client would see the line from
+// backfill (via ListLogsByRun) and again from gap replay (hub ID > preCursor).
+func TestGetJobLogsHandler_OverlapDedupDuringBackfill(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	// The overlap line will appear in both the DB backfill chunk and the hub.
+	overlapLine := "overlap-persisted-and-hub"
+	objKey := "logs/overlap-job.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	// Chunk contains the overlap line (simulating it was persisted to DB
+	// during the backfill window).
+	_, _ = bs.Put(context.Background(), objKey, "", gzipLines(t, overlapLine))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	// Wait for handler to start backfill, then publish the SAME line to the
+	// hub so it lands in the gap window (hub ID > preCursor).
+	time.Sleep(50 * time.Millisecond)
+	ctx := context.Background()
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-01-01T00:00:00Z",
+		Stream:    "stdout",
+		Line:      overlapLine,
+		JobID:     jobID,
+	})
+
+	// Publish a distinct live line and done to terminate the stream.
+	time.Sleep(20 * time.Millisecond)
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-01-01T00:00:01Z",
+		Stream:    "stdout",
+		Line:      "unique-live-line",
+		JobID:     jobID,
+	})
+	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for overlap dedup stream")
+	}
+
+	body := rr.Body.String()
+
+	// The overlap line MUST appear exactly once — from backfill, not duplicated
+	// by gap replay.
+	if count := strings.Count(body, overlapLine); count != 1 {
+		t.Fatalf("overlap line should appear exactly once, got %d; body: %s", count, body)
+	}
+	// Unique live line must still be delivered.
+	if !strings.Contains(body, "unique-live-line") {
+		t.Fatalf("expected unique-live-line in output; body: %s", body)
+	}
+	// Ordering: overlap (from backfill) before unique live.
+	overlapIdx := strings.Index(body, overlapLine)
+	liveIdx := strings.Index(body, "unique-live-line")
+	if overlapIdx > liveIdx {
+		t.Fatalf("backfill overlap must precede live; overlap@%d live@%d; body: %s",
+			overlapIdx, liveIdx, body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event; body: %s", body)
+	}
+}
+
 // TestGetJobLogsHandler_TerminalBackfillIncludesRetention verifies that a fresh
 // connection (sinceID == 0) to a terminal job with blobstore configured emits
 // retention frames that were already published to the hub before the handler ran.
