@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -274,7 +275,7 @@ func TestBuildJobLogFilter_RejectsRunEvent(t *testing.T) {
 	}
 }
 
-func TestBuildJobLogFilter_RejectsRetentionEvent(t *testing.T) {
+func TestBuildJobLogFilter_PassesRetentionEvent(t *testing.T) {
 	t.Parallel()
 
 	filter := buildJobLogFilter(map[domaintypes.JobID]struct{}{})
@@ -283,8 +284,8 @@ func TestBuildJobLogFilter_RejectsRetentionEvent(t *testing.T) {
 	evt := logstream.Event{Type: domaintypes.SSEEventRetention, Data: data}
 
 	_, keep := filter(evt)
-	if keep {
-		t.Fatal("expected retention event to be rejected from job log stream")
+	if !keep {
+		t.Fatal("expected retention event to pass job log filter")
 	}
 }
 
@@ -390,6 +391,75 @@ func TestGetJobLogsHandler_BackfillExcludesOtherJobLogs(t *testing.T) {
 	}
 	if strings.Contains(body, "other-job") {
 		t.Fatal("other job's log must not appear in job-scoped backfill")
+	}
+}
+
+// TestGetJobLogsHandler_ResumeWithLastEventID verifies that GET /v1/jobs/{job_id}/logs
+// with Last-Event-ID resumes from the given cursor, skipping earlier events.
+func TestGetJobLogsHandler_ResumeWithLastEventID(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	// Pre-publish a log event (id=1) before subscriber joins.
+	ctx := context.Background()
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2025-01-01T00:00:00Z",
+		Stream:    "stdout",
+		Line:      "first",
+		JobID:     jobID,
+	})
+
+	h := getJobLogsHandler(st, nil, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	req.Header.Set("Last-Event-ID", "1")
+	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	// Allow subscription to establish, then publish id=2 and done.
+	time.Sleep(25 * time.Millisecond)
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2025-01-01T00:00:01Z",
+		Stream:    "stdout",
+		Line:      "second",
+		JobID:     jobID,
+	})
+	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for resumed job stream")
+	}
+
+	body := rr.Body.String()
+	if strings.Contains(body, "id: 1\n") {
+		t.Fatalf("resume should not include id 1; body: %s", body)
+	}
+	if !strings.Contains(body, "id: 2\n") {
+		t.Fatalf("resume body missing id 2: %s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("resume body missing done event: %s", body)
 	}
 }
 

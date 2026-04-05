@@ -20,7 +20,7 @@ import (
 // getJobLogsHandler returns an HTTP handler that streams job logs over SSE.
 // GET /v1/jobs/{job_id}/logs — SSE for job-scoped container logs.
 //
-// Only log and done event types are emitted on the job-keyed stream.
+// Only log, retention, and done event types are emitted on the job-keyed stream.
 // Supports Last-Event-ID header for resuming from a specific cursor.
 //
 // For fresh connections (sinceID == 0), the handler backfills historical logs
@@ -155,8 +155,8 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 	}
 }
 
-// buildJobLogFilter returns a filter that passes only log events for the given jobs
-// and done events. Run lifecycle events (run, stage, retention) are excluded.
+// buildJobLogFilter returns a filter that passes only log, retention, and done events
+// for the given jobs. Run lifecycle events (run, stage) are excluded.
 func buildJobLogFilter(allowedJobs map[domaintypes.JobID]struct{}) func(logstream.Event) (logstream.Event, bool) {
 	return func(evt logstream.Event) (logstream.Event, bool) {
 		switch evt.Type {
@@ -176,10 +176,12 @@ func buildJobLogFilter(allowedJobs map[domaintypes.JobID]struct{}) func(logstrea
 			}
 			_, ok := allowedJobs[jobID]
 			return evt, ok
+		case domaintypes.SSEEventRetention:
+			return evt, true
 		case domaintypes.SSEEventDone:
 			return evt, true
 		default:
-			// Exclude run, stage, retention from job-scoped stream.
+			// Exclude run, stage from job-scoped stream.
 			return evt, false
 		}
 	}

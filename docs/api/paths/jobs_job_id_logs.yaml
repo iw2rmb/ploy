@@ -3,6 +3,7 @@
 #
 # Event payloads (GET):
 # - `event: log` → LogRecord (enriched log line; filtered to this job only)
+# - `event: retention` → RetentionHint (retention metadata)
 # - `event: done` → Terminal sentinel
 #
 # Run lifecycle events (run, stage, retention) are excluded from this stream.
@@ -37,8 +38,8 @@ get:
         possible.
   description: |
     Server-Sent Events stream for real-time container log updates scoped to a
-    single job. Only `log` and `done` event types are emitted; run lifecycle
-    frames (`run`, `stage`, `retention`) are excluded.
+    single job. Only `log`, `retention`, and `done` event types are emitted;
+    run lifecycle frames (`run`, `stage`) are excluded.
 
     Supports `Last-Event-ID` header for resume after reconnection.
 
@@ -46,8 +47,9 @@ get:
 
     | Event Type | Payload Schema | Description                                  |
     |------------|----------------|----------------------------------------------|
-    | `log`      | `LogRecord`    | Enriched log line with execution context     |
-    | `done`     | `Status`       | Terminal sentinel; stream closes after this  |
+    | `log`       | `LogRecord`     | Enriched log line with execution context     |
+    | `retention` | `RetentionHint` | Retention metadata for the job's artifacts   |
+    | `done`      | `Status`        | Terminal sentinel; stream closes after this  |
 
     ## `event: log` — Enriched Log Records
 

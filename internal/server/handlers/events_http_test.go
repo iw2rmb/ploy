@@ -133,6 +133,70 @@ func TestGetRunLogsHandler_LifecycleOnly(t *testing.T) {
 	if strings.Contains(body, "event: log") {
 		t.Fatalf("unexpected log event on run stream: %s", body)
 	}
+	if strings.Contains(body, "event: retention") {
+		t.Fatalf("unexpected retention event on run stream: %s", body)
+	}
+}
+
+// TestGetRunLogsHandler_RejectsNonLifecycleFrames verifies that log and retention
+// frames published to the run stream are filtered out by the lifecycle filter.
+func TestGetRunLogsHandler_RejectsNonLifecycleFrames(t *testing.T) {
+	t.Parallel()
+	eventsService, _ := createTestEventsService()
+	hub := eventsService.Hub()
+	runID := testRunIDKSUID
+	st := func() *runStore { st := &runStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
+	h := getRunLogsHandler(st, nil, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
+	req.SetPathValue("id", runID)
+	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	time.Sleep(25 * time.Millisecond)
+	ctx := context.Background()
+
+	// Publish log and retention frames that should be rejected.
+	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Stream:    "stdout",
+		Line:      "container output",
+	})
+	_ = hub.PublishRetention(ctx, domaintypes.RunID(runID), logstream.RetentionHint{
+		Retained: true,
+	})
+	// Publish a lifecycle stage and done to terminate the stream.
+	_ = hub.PublishStage(ctx, domaintypes.RunID(runID), logstream.LogRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Stream:    "info",
+		Line:      "step ok",
+	})
+	_ = hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for stream to finish")
+	}
+
+	body := rr.Body.String()
+	if strings.Contains(body, "event: log") {
+		t.Fatalf("unexpected log event on run stream: %s", body)
+	}
+	if strings.Contains(body, "event: retention") {
+		t.Fatalf("unexpected retention event on run stream: %s", body)
+	}
+	if !strings.Contains(body, "event: stage") {
+		t.Fatalf("expected stage event in body: %s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event in body: %s", body)
+	}
 }
 
 func TestGetRunLogsHandler_Resume(t *testing.T) {
