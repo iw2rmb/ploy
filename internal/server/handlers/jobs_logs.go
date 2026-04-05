@@ -155,34 +155,3 @@ func createJobLogsHandler(st store.Store, bp *blobpersist.Service, eventsService
 	}
 }
 
-// buildJobLogFilter returns a filter that passes only log, retention, and done events
-// for the given jobs. Run lifecycle events (run, stage) are excluded.
-func buildJobLogFilter(allowedJobs map[domaintypes.JobID]struct{}) func(logstream.Event) (logstream.Event, bool) {
-	return func(evt logstream.Event) (logstream.Event, bool) {
-		switch evt.Type {
-		case domaintypes.SSEEventLog:
-			var payload struct {
-				JobID *string `json:"job_id,omitempty"`
-			}
-			if err := json.Unmarshal(evt.Data, &payload); err != nil {
-				return evt, false
-			}
-			if payload.JobID == nil {
-				return evt, false
-			}
-			var jobID domaintypes.JobID
-			if err := jobID.UnmarshalText([]byte(*payload.JobID)); err != nil {
-				return evt, false
-			}
-			_, ok := allowedJobs[jobID]
-			return evt, ok
-		case domaintypes.SSEEventRetention:
-			return evt, true
-		case domaintypes.SSEEventDone:
-			return evt, true
-		default:
-			// Exclude run, stage from job-scoped stream.
-			return evt, false
-		}
-	}
-}

@@ -156,8 +156,18 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 		}
 	}
 
-	// If job is terminal, write done and return.
+	// If job is terminal, replay any retention events from the snapshot
+	// that were published before the handler ran (id <= preCursor) and
+	// therefore skipped by the gap replay above, then write done.
 	if isTerminalJobStatus(job.Status) {
+		for _, evt := range postSnapshot {
+			if evt.Type == domaintypes.SSEEventRetention && evt.ID <= preCursor {
+				if err := logstream.WriteEventFrame(w, evt); err != nil {
+					return true
+				}
+				flusher.Flush()
+			}
+		}
 		doneData, _ := json.Marshal(map[string]string{"status": string(job.Status)})
 		_ = logstream.WriteEventFrame(w, logstream.Event{Type: domaintypes.SSEEventDone, Data: doneData})
 		flusher.Flush()
