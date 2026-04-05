@@ -138,7 +138,7 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	var err error
 
 	if typedOpts.Healing == nil || typedOpts.Healing.Mig.Image.IsEmpty() {
-		err = fmt.Errorf("healing job missing selected strategy image")
+		err = fmt.Errorf("healing job missing heal container image")
 	} else {
 		healMig := typedOpts.Healing.Mig
 		manifest, err = buildHealingManifest(req, healMig, 0, "", stack)
