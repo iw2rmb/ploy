@@ -9,6 +9,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 type completeRunCache struct {
@@ -145,9 +146,17 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 		"stats_size", len(input.StatsBytes),
 	)
 
-	// Emit done sentinel on the job-scoped SSE stream so clients know the
-	// job's container log stream has ended.
+	// Emit retention hint followed by done sentinel on the job-scoped SSE
+	// stream so clients receive log retention metadata before the stream closes.
 	if s.eventsService != nil {
+		if err := s.eventsService.PublishJobRetention(ctx, input.JobID, logstream.RetentionHint{
+			Retained: true,
+		}); err != nil {
+			slog.Error("complete job: publish job retention failed",
+				"job_id", input.JobID,
+				"err", err,
+			)
+		}
 		if err := s.eventsService.PublishJobDone(ctx, input.JobID, string(input.Status)); err != nil {
 			slog.Error("complete job: publish job done failed",
 				"job_id", input.JobID,

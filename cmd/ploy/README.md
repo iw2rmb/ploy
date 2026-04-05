@@ -55,7 +55,7 @@ flow into stage metadata so the control plane can respect concurrency/timebox co
 When `--follow` is set, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
 job type, job ID, display name, status glyph, duration, and status for each job.
-Note: `--follow` does not stream container logs. Use `ploy run logs <run-id>` for log streaming.
+Note: `--follow` does not stream container logs. Use `ploy job follow <job-id>` for container log streaming.
 
 `--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When
 build-gate fails with a retryable outcome the runner collects the failure
@@ -420,56 +420,25 @@ ploy completion <shell> --help
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the run too (e.g., `--cap 5m --cancel-on-cap`).
 
-## Structured Log Format
+## Run Logs (Lifecycle Stream)
 
-The `ploy run logs` command consumes enriched log events
-from the run SSE stream (`GET /v1/runs/{id}/logs`). A shared log printer
-(`internal/cli/logs`) formats these events consistently.
+The `ploy run logs` command streams lifecycle events from the run SSE endpoint
+(`GET /v1/runs/{id}/logs`). It emits only `run`, `stage`, and `done` frames —
+container log frames (`event: log`, `event: retention`) are not present on the
+run stream.
 
-### Log record fields
-
-Each `event: log` frame contains a JSON `LogRecord` with core and optional
-enriched fields for execution context:
-
-| Field        | Type   | Description                                                       |
-|--------------|--------|-------------------------------------------------------------------|
-| `timestamp`  | string | RFC 3339 timestamp when the log line was captured                 |
-| `stream`     | string | Output stream (`stdout` or `stderr`)                              |
-| `line`       | string | Log message content                                               |
-| `node_id`    | string | Execution node identifier (NanoID string, optional)               |
-| `job_id`     | string | Job identifier (KSUID string, optional)                           |
-| `job_type`   | string | Step type: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate` (opt)|
-| `next_id` | int    | Job ordering index, e.g., 1000, 2000 (optional)                   |
-
-### Output formats
-
-**Structured (default, `--format structured`):**
-
-When enriched fields are present:
-```
-2025-10-22T10:00:00Z stdout node=a1b2c3d4 mig=mig step=2000 job=e5f6g7h8 Step started
-```
-
-When only core fields are available:
-```
-2025-10-22T10:00:00Z stdout Step started
-```
-
-**Raw (`--format raw`):**
-
-Prints only the log line content, omitting timestamps and context:
-```
-Step started
-```
+For container log streaming, use `ploy job follow <job-id>`, which connects to
+the job-scoped SSE endpoint (`GET /v1/jobs/{job_id}/logs`) and receives `log`,
+`retention`, and `done` frames.
 
 ### Example usage
 
 ```bash
-# Follow logs in structured format (default)
+# Stream run lifecycle events
 ploy run logs <run-id>
 
-# Follow events in raw format (message only)
-ploy run logs <run-id> --format raw
+# Stream container logs for a specific job
+ploy job follow <job-id>
 ```
 
 See `docs/migs-lifecycle.md` § 7.2 for the complete SSE payload specification.
