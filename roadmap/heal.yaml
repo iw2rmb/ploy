@@ -161,7 +161,9 @@ items:
     cfp: 15
     commit: 789d619d
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"Verify migs-lifecycle.md and mig.example.yaml contain no router or by_error_kind references.\": `docs/schemas/mig.example.yaml:171` still contains a router reference (`No router or error_kind classifier is needed`), so this verification target is not fully satisfied."]
+        commit: null
     label: "4"
     summary: "Align run status rendering and docs to generic gate error output and heal-owned one-line summaries."
     classification: "determined"
