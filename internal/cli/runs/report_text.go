@@ -235,6 +235,10 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 		return ""
 	}
 
+	if isGateJobType(job.JobType.String()) {
+		return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), "Error", true)
+	}
+
 	msg := ""
 	colorizeContent := false
 	if normalizeStatus(job.JobType.String()) == "heal" {
@@ -250,14 +254,8 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 		if msg == "" {
 			msg = normalizeStatus(job.Status.String())
 		}
-			if isGateJobType(job.JobType.String()) {
-				if job.Recovery != nil && strings.TrimSpace(job.Recovery.ErrorKind) != "" {
-					errorKind := normalizeStatus(job.Recovery.ErrorKind)
-					msg = errorKind + " " + msg
-				}
-			}
-			colorizeContent = true
-		}
+		colorizeContent = true
+	}
 
 	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, colorizeContent)
 }
