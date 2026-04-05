@@ -1187,9 +1187,6 @@ RepoJobItem:
         loop_kind:
           type: string
           description: Loop kind (currently `healing`)
-        error_kind:
-          type: string
-          description: Recovery error kind (`infra|code|deps|mixed|unknown`)
         strategy_id:
           type: string
           description: Selected strategy identifier when available

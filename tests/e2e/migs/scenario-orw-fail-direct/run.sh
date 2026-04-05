@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # E2E: ORW apply on failing branch -> Build Gate fails -> healing -> re-gate.
-# Direct Codex mode: no amata.spec for router or healing; prompt via Hydra in mount.
+# Direct Codex mode: no amata.spec for healing; prompt via Hydra in mount.
 #
 # Validates (strict) — parity contract with scenario-orw-fail:
 #   1. Final repo status is "Success".
-#   2. Router produced a non-empty bug_summary (direct mode router summary).
+#   2. Heal produced a non-empty bug_summary (direct mode).
 #   3. A heal job is present (healing attempt in direct mode).
 #   4. A re_gate job is present (re-gate status sequence).
 #   5. Codex handshake artifacts satisfy the metadata contract (strict mode).
@@ -59,12 +59,12 @@ else
   FAILED=1
 fi
 
-# 2. Router must have produced a non-empty bug_summary (direct mode).
+# 2. Heal must have produced a non-empty bug_summary (direct mode).
 BUG_SUMMARY="$(printf '%s' "$RUN_JSON" | jq -r '[.repos[0].jobs[] | select(.bug_summary != null and .bug_summary != "")] | first | .bug_summary // empty')"
 if [[ -n "$BUG_SUMMARY" ]]; then
-  echo "  + router bug_summary: present (${BUG_SUMMARY:0:60}...)"
+  echo "  + bug_summary: present (${BUG_SUMMARY:0:60}...)"
 else
-  echo "  ! router bug_summary: missing or empty — direct-mode router did not produce a summary" >&2
+  echo "  ! bug_summary: missing or empty — heal did not produce a summary" >&2
   FAILED=1
 fi
 
@@ -101,7 +101,7 @@ fi
 CODEX_LAST="${E2E_ARTIFACT_DIR}/codex-last.txt"
 if [[ -f "$CODEX_LAST" ]]; then
   if ! jq -e . "$CODEX_LAST" > /dev/null 2>&1; then
-    echo "  ! codex-last.txt: not valid JSON — direct-mode router summary contract violated" >&2
+    echo "  ! codex-last.txt: not valid JSON — direct-mode heal summary contract violated" >&2
     FAILED=1
   else
     echo "  + codex-last.txt: valid JSON"
@@ -154,8 +154,9 @@ steps:
 
 build_gate:
   enabled: true
-  # Router: direct Codex mode — prompt file intentionally omitted to prove enforcement.
-  router:
+  # Heal: direct Codex mode — prompt file intentionally omitted to prove enforcement.
+  heal:
+    retries: 1
     image: localhost:5000/ploy/codex:latest
     home:
       - ~/.codex/auth.json:.codex/auth.json
@@ -187,5 +188,5 @@ if ((FAILED > 0)); then
   exit 1
 fi
 
-echo "OK: scenario-orw-fail-direct (direct-mode router and healing — all assertions passed)."
+echo "OK: scenario-orw-fail-direct (direct-mode healing — all assertions passed)."
 echo "Artifacts saved to: ${E2E_ARTIFACT_DIR}"
