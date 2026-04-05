@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mig-amata [run /in/amata.yaml [--set key=value ...]]
+amata [run /in/amata.yaml [--set key=value ...]]
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
@@ -59,14 +59,14 @@ activate_ccr_if_configured
 logfile="$out_dir/codex.log"
 manifest_file="$out_dir/codex-run.json"
 
-echo "[mig-amata] starting amata run" | tee "$logfile" >&2
+echo "[amata] starting amata run" | tee "$logfile" >&2
 set +e
 amata "$@" 2>&1 | tee -a "$logfile" >&2
 status=${PIPESTATUS[0]}
 set -e
 
 if [[ ! -s "$logfile" ]]; then
-  echo "[mig-amata] no output captured from amata" | tee -a "$logfile" >&2
+  echo "[amata] no output captured from amata" | tee -a "$logfile" >&2
 fi
 if [[ ! -s "$out_dir/codex-last.txt" ]]; then
   if [[ -s "$logfile" ]]; then

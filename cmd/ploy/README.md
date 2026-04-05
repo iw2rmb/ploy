@@ -601,7 +601,7 @@ replacement (`heal: !include ./healing/spec.yaml#/heal`) or deep merge
 Include references support `path[#/pointer]`, recurse through nested includes,
 and fail on include cycles. Relative include paths resolve from the including
 file directory. Relative local-source paths inside included fragments
-(`amata.spec`, `ca`, and source side of `in`/`out`/`home`) are rebased from
+(`ca`, and source side of `in`/`out`/`home`) are rebased from
 that included file directory.
 
 For healing with `expectations.artifacts` schema `gate_profile_v1`, the

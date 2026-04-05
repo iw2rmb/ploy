@@ -269,49 +269,6 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("single-step amata uses amata command", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Execution: MigContainerSpec{
-				Image: contracts.JobImage{Universal: "amata:latest"},
-				Amata: &contracts.AmataRunSpec{
-					Spec: "version: amata/v1\n",
-					Set:  []contracts.AmataSetParam{{Param: "mode", Value: "step"}},
-				},
-			},
-		}))
-		manifest, err := buildManifestDefault(req)
-		if err != nil {
-			t.Fatalf("buildManifestDefault() error: %v", err)
-		}
-		if want := []string{"amata", "run", "/in/amata.yaml", "--set", "mode=step"}; !slices.Equal(manifest.Command, want) {
-			t.Fatalf("command = %v, want %v", manifest.Command, want)
-		}
-	})
-
-	t.Run("multi-step amata uses amata command for selected step", func(t *testing.T) {
-		req := newStartRunRequest(withRunOptions(RunOptions{
-			Steps: []StepMig{
-				{MigContainerSpec: MigContainerSpec{
-					Image: contracts.JobImage{Universal: "migs-orw:latest"}, Command: contracts.CommandSpec{Shell: "echo plain"},
-				}},
-				{MigContainerSpec: MigContainerSpec{
-					Image: contracts.JobImage{Universal: "amata:latest"},
-					Amata: &contracts.AmataRunSpec{
-						Spec: "version: amata/v1\n",
-						Set:  []contracts.AmataSetParam{{Param: "model", Value: "gpt-5"}},
-					},
-				}},
-			},
-		}))
-		manifest, err := buildManifestAtStep(req, 1)
-		if err != nil {
-			t.Fatalf("step 1 error: %v", err)
-		}
-		if want := []string{"amata", "run", "/in/amata.yaml", "--set", "model=gpt-5"}; !slices.Equal(manifest.Command, want) {
-			t.Fatalf("command = %v, want %v", manifest.Command, want)
-		}
-	})
-
 	t.Run("multi-step run: step env overrides base env", func(t *testing.T) {
 		req := newStartRunRequest(
 			withRunEnv(map[string]string{"SHARED_VAR": "base", "UNIQUE_BASE": "base"}),

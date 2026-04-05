@@ -357,16 +357,6 @@ func normalizeIncludedLocalPaths(node *yaml.Node, sourcePath string) error {
 		}
 
 		switch key.Value {
-		case "amata":
-			if value.Kind == yaml.MappingNode {
-				specIdx := findMappingKeyIndex(value, "spec")
-				if specIdx >= 0 {
-					specNode := derefAlias(value.Content[specIdx+1])
-					if specNode.Kind == yaml.ScalarNode && specNode.Tag != "!include" {
-						specNode.Value = normalizeLocalSourcePath(sourcePath, specNode.Value)
-					}
-				}
-			}
 		case "ca":
 			normalizeCAEntries(value, sourcePath)
 		case "in":

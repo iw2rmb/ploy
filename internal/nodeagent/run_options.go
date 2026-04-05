@@ -56,10 +56,6 @@ type MigContainerSpec struct {
 	In   []string // canonical read-only input entries (shortHash:/in/dst)
 	Out  []string // canonical read-write output entries (shortHash:/out/dst)
 	Home []string // canonical home-relative entries (shortHash:dst{:ro})
-
-	// Amata configures amata-mode execution. When non-nil with a non-empty Spec,
-	// the container runs `amata run /in/amata.yaml` instead of image default behavior.
-	Amata *contracts.AmataRunSpec
 }
 
 // MRWiringOptions configures GitLab merge request creation for run outcomes.
@@ -123,7 +119,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 				In:      heal.In,
 				Out:     heal.Out,
 				Home:    heal.Home,
-				Amata:   heal.Amata,
 			}
 			runOpts.Healing = healing
 		}
@@ -149,7 +144,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		runOpts.Execution.In = step.In
 		runOpts.Execution.Out = step.Out
 		runOpts.Execution.Home = step.Home
-		runOpts.Execution.Amata = step.Amata
 	}
 
 	if len(spec.Steps) > 1 {
@@ -164,7 +158,6 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 					In:      step.In,
 					Out:     step.Out,
 					Home:    step.Home,
-					Amata:   step.Amata,
 				},
 				Stack:  step.Stack,
 				Always: step.Always,
