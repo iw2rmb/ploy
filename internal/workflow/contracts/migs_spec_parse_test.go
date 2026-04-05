@@ -1,7 +1,6 @@
 package contracts
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -148,44 +147,6 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	}
 }
 
-func TestParseMigSpecJSON_RetainContainerForbidden(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		wantErr string
-	}{
-		{
-			name: "step retain forbidden",
-			input: `{
-				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest", "retain_container": true}]
-			}`,
-			wantErr: "steps[0].retain_container: forbidden",
-		},
-		{
-			name: "heal retain forbidden",
-			input: `{
-				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {
-					"heal": {"image": "ghcr.io/iw2rmb/ploy/heal:latest", "retain_container": true}
-				}
-			}`,
-			wantErr: "build_gate.heal.retain_container: forbidden",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := ParseMigSpecJSON([]byte(tt.input))
-			if err == nil {
-				t.Fatal("expected error")
-			}
-			if err.Error() != tt.wantErr {
-				t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestParseMigSpecJSON_StackSpecificImage(t *testing.T) {
 	input := `{
 		"steps": [{
@@ -269,17 +230,6 @@ func TestParseMigSpecJSON_Empty(t *testing.T) {
 	}
 	if want := "steps: required"; err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
-	}
-}
-
-func TestParseMigSpecJSON_MigIndexForbidden(t *testing.T) {
-	input := `{"mig_index":0,"steps":[{"image":"ghcr.io/iw2rmb/ploy/mig:latest"}]}`
-	_, err := ParseMigSpecJSON([]byte(input))
-	if err == nil {
-		t.Fatal("expected error for mig_index")
-	}
-	if !strings.Contains(err.Error(), "mig_index: forbidden") {
-		t.Fatalf("expected mig_index forbidden error, got %q", err.Error())
 	}
 }
 

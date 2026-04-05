@@ -53,19 +53,23 @@ func TestParseRecoveryErrorKind(t *testing.T) {
 func TestIsTerminalRecoveryErrorKind(t *testing.T) {
 	t.Parallel()
 
-	if !IsTerminalRecoveryErrorKind(RecoveryErrorKindMixed) {
-		t.Fatal("mixed must be terminal")
+	tests := []struct {
+		kind     RecoveryErrorKind
+		terminal bool
+	}{
+		{RecoveryErrorKindMixed, true},
+		{RecoveryErrorKindUnknown, true},
+		{RecoveryErrorKindInfra, false},
+		{RecoveryErrorKindCode, false},
+		{RecoveryErrorKindDeps, false},
 	}
-	if !IsTerminalRecoveryErrorKind(RecoveryErrorKindUnknown) {
-		t.Fatal("unknown must be terminal")
-	}
-	if IsTerminalRecoveryErrorKind(RecoveryErrorKindInfra) {
-		t.Fatal("infra must be non-terminal")
-	}
-	if IsTerminalRecoveryErrorKind(RecoveryErrorKindCode) {
-		t.Fatal("code must be non-terminal")
-	}
-	if IsTerminalRecoveryErrorKind(RecoveryErrorKindDeps) {
-		t.Fatal("deps must be non-terminal")
+
+	for _, tt := range tests {
+		t.Run(string(tt.kind), func(t *testing.T) {
+			t.Parallel()
+			if got := IsTerminalRecoveryErrorKind(tt.kind); got != tt.terminal {
+				t.Errorf("IsTerminalRecoveryErrorKind(%q) = %v, want %v", tt.kind, got, tt.terminal)
+			}
+		})
 	}
 }

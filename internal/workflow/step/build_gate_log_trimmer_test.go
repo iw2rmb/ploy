@@ -5,10 +5,21 @@ import (
 	"testing"
 )
 
-func TestTrimBuildGateLog_Maven_WithErrorSummary(t *testing.T) {
+func TestTrimBuildGateLog(t *testing.T) {
 	t.Parallel()
 
-	const logText = `
+	tests := []struct {
+		name         string
+		tool         string
+		logText      string
+		wantTrimmed  bool   // true if output should differ from input
+		wantPrefix   string // expected prefix of trimmed output (after TrimSpace)
+		wantContains []string
+	}{
+		{
+			name: "maven with error summary",
+			tool: "maven",
+			logText: `
 [INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ sample ---
 [INFO]
 [INFO] -------------------------------------------------------
@@ -34,34 +45,15 @@ Mockito cannot mock/spy because :
  - final class
 [INFO] BUILD FAILURE
 [INFO] Total time:  23.456 s
-`
-
-	trimmed := TrimBuildGateLog("maven", logText)
-
-	if trimmed == logText {
-		t.Fatalf("TrimBuildGateLog(maven) did not trim logs")
-	}
-
-	// New behavior: Maven trimmer keeps everything starting from the first
-	// "[ERROR]" line to the end of the log.
-	if !strings.HasPrefix(strings.TrimSpace(trimmed), "[ERROR] Tests run:") {
-		t.Errorf("trimmed log should start at first [ERROR] line, got:\n%s", trimmed)
-	}
-
-	if !strings.Contains(trimmed, "[ERROR] Tests run:") {
-		t.Errorf("trimmed log missing error summary: %s", trimmed)
-	}
-	if !strings.Contains(trimmed, "Cannot mock/spy class") {
-		t.Errorf("trimmed log missing stack trace snippet")
-	}
-	// Footer lines (e.g. BUILD FAILURE / Total time) may remain; we no longer
-	// strip them when anchoring on the first [ERROR] line.
-}
-
-func TestTrimBuildGateLog_Gradle_WithFailureHeader(t *testing.T) {
-	t.Parallel()
-
-	const logText = `
+`,
+			wantTrimmed:  true,
+			wantPrefix:   "[ERROR] Tests run:",
+			wantContains: []string{"[ERROR] Tests run:", "Cannot mock/spy class"},
+		},
+		{
+			name: "gradle with failure header",
+			tool: "gradle",
+			logText: `
 > Task :compileJava
 > Task :test
 
@@ -76,32 +68,41 @@ Execution failed for task ':sample:test'.
 
 BUILD FAILED in 5s
 3 actionable tasks: 2 executed, 1 up-to-date
-`
-
-	trimmed := TrimBuildGateLog("gradle", logText)
-
-	if trimmed == logText {
-		t.Fatalf("TrimBuildGateLog(gradle) did not trim logs")
+`,
+			wantTrimmed: true,
+			wantContains: []string{
+				"FAILURE: Build failed with an exception.",
+				"Execution failed for task ':sample:test'.",
+				"BUILD FAILED in",
+			},
+		},
+		{
+			name:        "unknown tool passthrough",
+			tool:        "unknown",
+			logText:     "some tool output\nwith multiple lines\n",
+			wantTrimmed: false,
+		},
 	}
-	if !strings.Contains(trimmed, "FAILURE: Build failed with an exception.") {
-		t.Errorf("trimmed log missing Gradle failure header: %s", trimmed)
-	}
-	if !strings.Contains(trimmed, "Execution failed for task ':sample:test'.") {
-		t.Errorf("trimmed log missing task failure details")
-	}
-	if !strings.Contains(trimmed, "BUILD FAILED in") {
-		t.Errorf("trimmed log should keep BUILD FAILED summary")
-	}
-	// Gradle trimmer also keeps a small amount of task context above the
-	// failure header, so we do not assert on task lines being removed.
-}
 
-func TestTrimBuildGateLog_UnknownToolPassthrough(t *testing.T) {
-	t.Parallel()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			trimmed := TrimBuildGateLog(tt.tool, tt.logText)
 
-	const logText = "some tool output\nwith multiple lines\n"
-	trimmed := TrimBuildGateLog("unknown", logText)
-	if trimmed != logText {
-		t.Fatalf("expected unknown tool to return original logs")
+			if tt.wantTrimmed && trimmed == tt.logText {
+				t.Fatal("expected log to be trimmed, but got original")
+			}
+			if !tt.wantTrimmed && trimmed != tt.logText {
+				t.Fatal("expected original log, but got trimmed output")
+			}
+			if tt.wantPrefix != "" && !strings.HasPrefix(strings.TrimSpace(trimmed), tt.wantPrefix) {
+				t.Errorf("trimmed log should start with %q, got:\n%s", tt.wantPrefix, trimmed)
+			}
+			for _, s := range tt.wantContains {
+				if !strings.Contains(trimmed, s) {
+					t.Errorf("trimmed log missing %q", s)
+				}
+			}
+		})
 	}
 }

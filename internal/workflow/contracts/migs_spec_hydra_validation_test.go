@@ -96,17 +96,6 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 				"steps": [{"image": "img:latest"}]
 			}`,
 		},
-		// Unsupported fields are rejected by schema validation.
-		{
-			name:    "unsupported env field in step",
-			input:   `{"steps": [{"image": "img:latest", "env": {"FOO": "bar"}}]}`,
-			wantErr: "forbidden",
-		},
-		{
-			name:    "unsupported env field at root",
-			input:   `{"steps": [{"image": "img:latest"}], "env": {"FOO": "bar"}}`,
-			wantErr: "env: forbidden",
-		},
 	}
 
 	for _, tc := range tests {

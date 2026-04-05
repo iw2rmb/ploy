@@ -10,84 +10,72 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// TestRolloutPolicy verifies rollout policy matches existing rollout defaults.
-func TestRolloutPolicy(t *testing.T) {
+// TestPolicies verifies all named policy constructors return expected field values.
+func TestPolicies(t *testing.T) {
 	t.Parallel()
-	p := RolloutPolicy()
 
-	if time.Duration(p.InitialInterval) != 2*time.Second {
-		t.Errorf("InitialInterval = %v, want 2s", p.InitialInterval)
+	tests := []struct {
+		name            string
+		policy          Policy
+		wantInitial     time.Duration
+		wantMax         time.Duration
+		wantMultiplier  float64
+		wantMaxElapsed  time.Duration
+		wantMaxAttempts int
+	}{
+		{
+			name:           "rollout",
+			policy:         RolloutPolicy(),
+			wantInitial:    2 * time.Second,
+			wantMax:        30 * time.Second,
+			wantMultiplier: 2.0,
+			wantMaxElapsed: 5 * time.Minute,
+			wantMaxAttempts: 10,
+		},
+		{
+			name:           "heartbeat",
+			policy:         HeartbeatPolicy(),
+			wantInitial:    5 * time.Second,
+			wantMax:        5 * time.Minute,
+			wantMultiplier: 2.0,
+		},
+		{
+			name:           "claim loop",
+			policy:         ClaimLoopPolicy(),
+			wantInitial:    250 * time.Millisecond,
+			wantMax:        5 * time.Second,
+			wantMultiplier: 2.0,
+		},
+		{
+			name:            "gitlab MR",
+			policy:          GitLabMRPolicy(),
+			wantInitial:     1 * time.Second,
+			wantMax:         4 * time.Second,
+			wantMultiplier:  2.0,
+			wantMaxAttempts: 4,
+		},
 	}
-	if time.Duration(p.MaxInterval) != 30*time.Second {
-		t.Errorf("MaxInterval = %v, want 30s", p.MaxInterval)
-	}
-	if p.Multiplier != 2.0 {
-		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
-	}
-}
 
-// TestHeartbeatPolicy verifies heartbeat policy matches nodeagent heartbeat defaults.
-func TestHeartbeatPolicy(t *testing.T) {
-	t.Parallel()
-	p := HeartbeatPolicy()
-
-	if time.Duration(p.InitialInterval) != 5*time.Second {
-		t.Errorf("InitialInterval = %v, want 5s", p.InitialInterval)
-	}
-	if time.Duration(p.MaxInterval) != 5*time.Minute {
-		t.Errorf("MaxInterval = %v, want 5m", p.MaxInterval)
-	}
-	if p.Multiplier != 2.0 {
-		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
-	}
-	if p.MaxElapsedTime != 0 {
-		t.Errorf("MaxElapsedTime = %v, want 0 (infinite)", p.MaxElapsedTime)
-	}
-	if p.MaxAttempts != 0 {
-		t.Errorf("MaxAttempts = %d, want 0 (infinite)", p.MaxAttempts)
-	}
-}
-
-// TestClaimLoopPolicy verifies claim loop policy matches nodeagent claim loop defaults.
-func TestClaimLoopPolicy(t *testing.T) {
-	t.Parallel()
-	p := ClaimLoopPolicy()
-
-	if time.Duration(p.InitialInterval) != 250*time.Millisecond {
-		t.Errorf("InitialInterval = %v, want 250ms", p.InitialInterval)
-	}
-	if time.Duration(p.MaxInterval) != 5*time.Second {
-		t.Errorf("MaxInterval = %v, want 5s", p.MaxInterval)
-	}
-	if p.Multiplier != 2.0 {
-		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
-	}
-}
-
-// TestGitLabMRPolicy verifies GitLab MR policy matches existing retry behavior.
-func TestGitLabMRPolicy(t *testing.T) {
-	t.Parallel()
-	p := GitLabMRPolicy()
-
-	// Initial delay: 1s.
-	if time.Duration(p.InitialInterval) != 1*time.Second {
-		t.Errorf("InitialInterval = %v, want 1s", p.InitialInterval)
-	}
-	// Max delay: 4s (1s * 2^2).
-	if time.Duration(p.MaxInterval) != 4*time.Second {
-		t.Errorf("MaxInterval = %v, want 4s", p.MaxInterval)
-	}
-	// Multiplier: 2.0 for exponential backoff.
-	if p.Multiplier != 2.0 {
-		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
-	}
-	// No time limit for GitLab MR retries.
-	if p.MaxElapsedTime != 0 {
-		t.Errorf("MaxElapsedTime = %v, want 0 (no limit)", p.MaxElapsedTime)
-	}
-	// Max 4 attempts (initial + 3 retries).
-	if p.MaxAttempts != 4 {
-		t.Errorf("MaxAttempts = %d, want 4", p.MaxAttempts)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			p := tt.policy
+			if got := time.Duration(p.InitialInterval); got != tt.wantInitial {
+				t.Errorf("InitialInterval = %v, want %v", got, tt.wantInitial)
+			}
+			if got := time.Duration(p.MaxInterval); got != tt.wantMax {
+				t.Errorf("MaxInterval = %v, want %v", got, tt.wantMax)
+			}
+			if p.Multiplier != tt.wantMultiplier {
+				t.Errorf("Multiplier = %v, want %v", p.Multiplier, tt.wantMultiplier)
+			}
+			if got := time.Duration(p.MaxElapsedTime); got != tt.wantMaxElapsed {
+				t.Errorf("MaxElapsedTime = %v, want %v", got, tt.wantMaxElapsed)
+			}
+			if p.MaxAttempts != tt.wantMaxAttempts {
+				t.Errorf("MaxAttempts = %d, want %d", p.MaxAttempts, tt.wantMaxAttempts)
+			}
+		})
 	}
 }
 
@@ -113,225 +101,205 @@ func TestNewExponentialBackoff(t *testing.T) {
 	if eb.Multiplier != 2.0 {
 		t.Errorf("Multiplier = %v, want 2.0", eb.Multiplier)
 	}
-	// RandomizationFactor should be 0.5 (50% jitter).
 	if eb.RandomizationFactor != 0.5 {
 		t.Errorf("RandomizationFactor = %v, want 0.5", eb.RandomizationFactor)
 	}
 }
 
-// TestRunWithBackoff_Success verifies immediate success without retries.
-func TestRunWithBackoff_Success(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(1 * time.Second),
-		Multiplier:      2.0,
-		MaxAttempts:     3,
-	}
-
-	calls := 0
-	op := func() error {
-		calls++
-		return nil
-	}
-
-	err := RunWithBackoff(ctx, p, slog.Default(), op)
-	if err != nil {
-		t.Errorf("RunWithBackoff() = %v, want nil", err)
-	}
-	if calls != 1 {
-		t.Errorf("op called %d times, want 1", calls)
-	}
-}
-
-// TestRunWithBackoff_RetryUntilSuccess verifies retries until operation succeeds.
-func TestRunWithBackoff_RetryUntilSuccess(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
+func fastPolicy(maxAttempts int) Policy {
+	return Policy{
 		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
 		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
 		Multiplier:      2.0,
-		MaxAttempts:     5,
-	}
-
-	calls := 0
-	op := func() error {
-		calls++
-		if calls < 3 {
-			return errors.New("temporary error")
-		}
-		return nil
-	}
-
-	err := RunWithBackoff(ctx, p, slog.Default(), op)
-	if err != nil {
-		t.Errorf("RunWithBackoff() = %v, want nil", err)
-	}
-	if calls != 3 {
-		t.Errorf("op called %d times, want 3", calls)
+		MaxAttempts:     maxAttempts,
 	}
 }
 
-// TestRunWithBackoff_ExhaustAttempts verifies max attempts limit is enforced.
-func TestRunWithBackoff_ExhaustAttempts(t *testing.T) {
+// TestRunWithBackoff verifies retry behavior for RunWithBackoff across scenarios.
+func TestRunWithBackoff(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     3,
+
+	tests := []struct {
+		name      string
+		policy    Policy
+		logger    *slog.Logger
+		op        func(calls *int) error
+		ctx       func() (context.Context, context.CancelFunc)
+		wantErr   bool
+		wantCalls func(calls int) bool
+	}{
+		{
+			name:   "immediate success",
+			policy: fastPolicy(3),
+			op:     func(_ *int) error { return nil },
+			wantCalls: func(c int) bool { return c == 1 },
+		},
+		{
+			name:   "retry until success",
+			policy: fastPolicy(5),
+			op: func(calls *int) error {
+				if *calls < 3 {
+					return errors.New("temporary error")
+				}
+				return nil
+			},
+			wantCalls: func(c int) bool { return c == 3 },
+		},
+		{
+			name:   "exhaust attempts",
+			policy: fastPolicy(3),
+			op:     func(_ *int) error { return errors.New("persistent error") },
+			wantErr:   true,
+			wantCalls: func(c int) bool { return c == 3 },
+		},
+		{
+			name:   "context cancellation",
+			policy: fastPolicy(10),
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			op: func(calls *int) error {
+				if *calls == 2 {
+					// Cancel happens via ctx setup below.
+				}
+				return errors.New("error")
+			},
+			wantErr:   true,
+			wantCalls: func(c int) bool { return c <= 4 },
+		},
+		{
+			name:   "nil logger does not panic",
+			policy: fastPolicy(2),
+			logger: nil,
+			op:     func(_ *int) error { return nil },
+			wantCalls: func(c int) bool { return c == 1 },
+		},
+		{
+			name: "zero max attempts retries until context timeout",
+			policy: Policy{
+				InitialInterval: domaintypes.Duration(10 * time.Millisecond),
+				MaxInterval:     domaintypes.Duration(20 * time.Millisecond),
+				Multiplier:      2.0,
+				MaxAttempts:     0,
+			},
+			ctx: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 100*time.Millisecond)
+			},
+			op:        func(_ *int) error { return errors.New("persistent error") },
+			wantErr:   true,
+			wantCalls: func(c int) bool { return c >= 2 },
+		},
 	}
 
-	calls := 0
-	op := func() error {
-		calls++
-		return errors.New("persistent error")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			var cancel context.CancelFunc
+			if tt.ctx != nil {
+				ctx, cancel = tt.ctx()
+				defer cancel()
+			}
 
-	err := RunWithBackoff(ctx, p, slog.Default(), op)
-	if err == nil {
-		t.Error("RunWithBackoff() = nil, want error")
-	}
-	// MaxAttempts=3 means 3 attempts total.
-	if calls != 3 {
-		t.Errorf("op called %d times, want 3", calls)
+			calls := 0
+			logger := tt.logger
+			if logger == nil && tt.name != "nil logger does not panic" {
+				logger = slog.Default()
+			}
+
+			// For context cancellation test, cancel on second call.
+			op := func() error {
+				calls++
+				if tt.name == "context cancellation" && calls == 2 && cancel != nil {
+					cancel()
+				}
+				return tt.op(&calls)
+			}
+
+			err := RunWithBackoff(ctx, tt.policy, logger, op)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RunWithBackoff() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantCalls(calls) {
+				t.Errorf("op called %d times, unexpected", calls)
+			}
+		})
 	}
 }
 
-// TestRunWithBackoff_ContextCancellation verifies early exit on context cancellation.
-func TestRunWithBackoff_ContextCancellation(t *testing.T) {
+// TestPollWithBackoff verifies retry behavior for PollWithBackoff across scenarios.
+func TestPollWithBackoff(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithCancel(context.Background())
-	p := Policy{
-		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(1 * time.Second),
-		Multiplier:      2.0,
-		MaxAttempts:     10,
+
+	tests := []struct {
+		name      string
+		policy    Policy
+		logger    *slog.Logger
+		condition func(calls *int) (bool, error)
+		wantErr   bool
+		wantCalls int
+	}{
+		{
+			name:      "condition met immediately",
+			policy:    fastPolicy(3),
+			condition: func(_ *int) (bool, error) { return true, nil },
+			wantCalls: 1,
+		},
+		{
+			name:   "condition eventually met",
+			policy: fastPolicy(5),
+			condition: func(calls *int) (bool, error) {
+				return *calls >= 3, nil
+			},
+			wantCalls: 3,
+		},
+		{
+			name:      "condition error propagated",
+			policy:    fastPolicy(3),
+			condition: func(_ *int) (bool, error) { return false, errors.New("condition error") },
+			wantErr:   true,
+			wantCalls: 3,
+		},
+		{
+			name:      "exhaust attempts (never true)",
+			policy:    fastPolicy(4),
+			condition: func(_ *int) (bool, error) { return false, nil },
+			wantErr:   true,
+			wantCalls: 4,
+		},
+		{
+			name:      "nil logger does not panic",
+			policy:    fastPolicy(2),
+			logger:    nil,
+			condition: func(_ *int) (bool, error) { return true, nil },
+			wantCalls: 1,
+		},
 	}
 
-	calls := 0
-	op := func() error {
-		calls++
-		if calls == 2 {
-			cancel() // Cancel context on second call.
-		}
-		return errors.New("error")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			calls := 0
 
-	err := RunWithBackoff(ctx, p, slog.Default(), op)
-	if err == nil {
-		t.Error("RunWithBackoff() = nil, want error")
-	}
-	// Should stop after cancellation (at most 2 calls, possibly 3 due to timing).
-	if calls > 4 {
-		t.Errorf("op called %d times, want <= 4 (context cancelled early)", calls)
-	}
-}
+			logger := tt.logger
+			if logger == nil && tt.name != "nil logger does not panic" {
+				logger = slog.Default()
+			}
 
-// TestPollWithBackoff_ConditionMet verifies immediate success when condition is true.
-func TestPollWithBackoff_ConditionMet(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(1 * time.Second),
-		Multiplier:      2.0,
-		MaxAttempts:     3,
-	}
+			condition := func() (bool, error) {
+				calls++
+				return tt.condition(&calls)
+			}
 
-	calls := 0
-	condition := func() (bool, error) {
-		calls++
-		return true, nil
-	}
-
-	err := PollWithBackoff(ctx, p, slog.Default(), condition)
-	if err != nil {
-		t.Errorf("PollWithBackoff() = %v, want nil", err)
-	}
-	if calls != 1 {
-		t.Errorf("condition called %d times, want 1", calls)
-	}
-}
-
-// TestPollWithBackoff_ConditionEventuallyMet verifies retries until condition becomes true.
-func TestPollWithBackoff_ConditionEventuallyMet(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     5,
-	}
-
-	calls := 0
-	condition := func() (bool, error) {
-		calls++
-		return calls >= 3, nil
-	}
-
-	err := PollWithBackoff(ctx, p, slog.Default(), condition)
-	if err != nil {
-		t.Errorf("PollWithBackoff() = %v, want nil", err)
-	}
-	if calls != 3 {
-		t.Errorf("condition called %d times, want 3", calls)
-	}
-}
-
-// TestPollWithBackoff_ConditionError verifies error propagation from condition.
-func TestPollWithBackoff_ConditionError(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     3,
-	}
-
-	calls := 0
-	condition := func() (bool, error) {
-		calls++
-		return false, errors.New("condition error")
-	}
-
-	err := PollWithBackoff(ctx, p, slog.Default(), condition)
-	if err == nil {
-		t.Error("PollWithBackoff() = nil, want error")
-	}
-	if calls != 3 {
-		t.Errorf("condition called %d times, want 3", calls)
-	}
-}
-
-// TestPollWithBackoff_ExhaustAttempts verifies max attempts limit for polling.
-func TestPollWithBackoff_ExhaustAttempts(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     4,
-	}
-
-	calls := 0
-	condition := func() (bool, error) {
-		calls++
-		return false, nil // Never true.
-	}
-
-	err := PollWithBackoff(ctx, p, slog.Default(), condition)
-	if err == nil {
-		t.Error("PollWithBackoff() = nil, want error")
-	}
-	if calls != 4 {
-		t.Errorf("condition called %d times, want 4", calls)
+			err := PollWithBackoff(ctx, tt.policy, logger, condition)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PollWithBackoff() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if calls != tt.wantCalls {
+				t.Errorf("condition called %d times, want %d", calls, tt.wantCalls)
+			}
+		})
 	}
 }
 
@@ -342,209 +310,115 @@ func TestStatefulBackoff_ApplyAndReset(t *testing.T) {
 		InitialInterval: domaintypes.Duration(100 * time.Millisecond),
 		MaxInterval:     domaintypes.Duration(1 * time.Second),
 		Multiplier:      2.0,
-		MaxElapsedTime:  0, // Infinite.
-		MaxAttempts:     0, // Infinite.
 	}
 
 	sb := NewStatefulBackoff(p)
 
-	// Initial state: GetDuration returns initial interval.
+	// Initial state.
 	if d := time.Duration(sb.GetDuration()); d != 100*time.Millisecond {
 		t.Errorf("GetDuration() = %v, want 100ms (initial)", d)
 	}
 
-	// Apply backoff: uses NextBackOff() which returns initial interval with jitter.
-	// For InitialInterval=100ms with 50% jitter: [50ms, 150ms].
+	// Apply: initial interval with 50% jitter → [50ms, 150ms].
 	d1 := sb.Apply()
 	if time.Duration(d1) < 50*time.Millisecond || time.Duration(d1) > 150*time.Millisecond {
 		t.Errorf("Apply() = %v, want in range [50ms, 150ms]", d1)
 	}
 
-	// Apply again: NextBackOff() doubles the base with jitter.
-	// Expected base ~200ms with 50% jitter: [100ms, 300ms], capped at 1s.
+	// Apply again: doubled base with jitter, capped at 1s.
 	d2 := sb.Apply()
 	if time.Duration(d2) < 100*time.Millisecond || time.Duration(d2) > 1*time.Second {
 		t.Errorf("Apply() = %v, want in range [100ms, 1s]", d2)
 	}
 
-	// Apply again: should continue to grow (with jitter), capped at max 1s.
-	d3 := sb.Apply()
-	if time.Duration(d3) < 100*time.Millisecond || time.Duration(d3) > 1*time.Second {
-		t.Errorf("Apply() = %v, want in range [100ms, 1s]", d3)
-	}
-
-	// Reset: should return to initial state.
+	// Reset and verify return to initial.
 	sb.Reset()
 	if d := time.Duration(sb.GetDuration()); d != 100*time.Millisecond {
 		t.Errorf("GetDuration() after Reset = %v, want 100ms", d)
 	}
 
-	// Apply after reset: should start from initial again with jitter.
 	d4 := sb.Apply()
 	if time.Duration(d4) < 50*time.Millisecond || time.Duration(d4) > 150*time.Millisecond {
 		t.Errorf("Apply() after Reset = %v, want in range [50ms, 150ms]", d4)
 	}
 }
 
-// TestStatefulBackoff_CapAtMaxInterval verifies backoff caps at max interval.
-func TestStatefulBackoff_CapAtMaxInterval(t *testing.T) {
+// TestStatefulBackoff_Behaviors tests cap-at-max, jitter bounds, and pre-apply duration.
+func TestStatefulBackoff_Behaviors(t *testing.T) {
 	t.Parallel()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(50 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(200 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0, // Infinite.
-		MaxAttempts:     0, // Infinite.
+
+	tests := []struct {
+		name    string
+		policy  Policy
+		applies int
+		check   func(t *testing.T, sb *StatefulBackoff)
+	}{
+		{
+			name: "caps at max interval",
+			policy: Policy{
+				InitialInterval: domaintypes.Duration(50 * time.Millisecond),
+				MaxInterval:     domaintypes.Duration(200 * time.Millisecond),
+				Multiplier:      2.0,
+			},
+			applies: 10,
+			check: func(t *testing.T, sb *StatefulBackoff) {
+				// After many applies, should be capped. With 50% jitter on 200ms: ≤300ms.
+				d := time.Duration(sb.Apply())
+				if d > 300*time.Millisecond {
+					t.Errorf("Apply() = %v, want ≤ 300ms (200ms base + 50%% jitter)", d)
+				}
+			},
+		},
+		{
+			name: "jitter stays within bounds",
+			policy: Policy{
+				InitialInterval: domaintypes.Duration(1 * time.Second),
+				MaxInterval:     domaintypes.Duration(10 * time.Second),
+				Multiplier:      2.0,
+			},
+			applies: 0,
+			check: func(t *testing.T, sb *StatefulBackoff) {
+				// First: 1s base → [500ms, 1.5s].
+				d1 := time.Duration(sb.Apply())
+				if d1 < 500*time.Millisecond || d1 > 1500*time.Millisecond {
+					t.Errorf("Apply()[0] = %v, want [500ms, 1.5s]", d1)
+				}
+				// Second: 2s base → [1s, 3s].
+				d2 := time.Duration(sb.Apply())
+				if d2 < 1*time.Second || d2 > 3*time.Second {
+					t.Errorf("Apply()[1] = %v, want [1s, 3s]", d2)
+				}
+				// Third: 4s base → [2s, 6s].
+				d3 := time.Duration(sb.Apply())
+				if d3 < 2*time.Second || d3 > 6*time.Second {
+					t.Errorf("Apply()[2] = %v, want [2s, 6s]", d3)
+				}
+			},
+		},
+		{
+			name: "GetDuration before Apply returns initial interval",
+			policy: Policy{
+				InitialInterval: domaintypes.Duration(500 * time.Millisecond),
+				MaxInterval:     domaintypes.Duration(5 * time.Second),
+				Multiplier:      2.0,
+			},
+			applies: 0,
+			check: func(t *testing.T, sb *StatefulBackoff) {
+				if d := time.Duration(sb.GetDuration()); d != 500*time.Millisecond {
+					t.Errorf("GetDuration() = %v, want 500ms", d)
+				}
+			},
+		},
 	}
 
-	sb := NewStatefulBackoff(p)
-
-	// Apply backoff multiple times; should eventually cap at 200ms.
-	var lastDuration time.Duration
-	for i := 0; i < 10; i++ {
-		lastDuration = time.Duration(sb.Apply())
-	}
-
-	// After many applies, should be capped at max interval (200ms).
-	// With 50% jitter on 200ms: [100ms, 300ms].
-	// However, MaxInterval caps the base, so with jitter: [100ms, 300ms].
-	if lastDuration > 300*time.Millisecond {
-		t.Errorf("Apply() capped at %v, want <= 300ms (200ms base + 50%% jitter)", lastDuration)
-	}
-}
-
-// TestStatefulBackoff_JitterBounds verifies jitter stays within bounds.
-func TestStatefulBackoff_JitterBounds(t *testing.T) {
-	t.Parallel()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(1 * time.Second),
-		MaxInterval:     domaintypes.Duration(10 * time.Second),
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	}
-
-	sb := NewStatefulBackoff(p)
-
-	// First apply: NextBackOff() returns initial interval with jitter.
-	// For InitialInterval=1s with 50% jitter: [500ms, 1.5s].
-	d1 := sb.Apply()
-	if time.Duration(d1) < 500*time.Millisecond || time.Duration(d1) > 1500*time.Millisecond {
-		t.Errorf("Apply() = %v, want in range [500ms, 1.5s]", d1)
-	}
-
-	// Second apply: NextBackOff() doubles the base with jitter.
-	// Base 2s with 50% jitter: [1s, 3s].
-	d2 := sb.Apply()
-	if time.Duration(d2) < 1*time.Second || time.Duration(d2) > 3*time.Second {
-		t.Errorf("Apply() = %v, want in range [1s, 3s]", d2)
-	}
-
-	// Third apply: NextBackOff() doubles again with jitter.
-	// Base 4s with 50% jitter: [2s, 6s].
-	d3 := sb.Apply()
-	if time.Duration(d3) < 2*time.Second || time.Duration(d3) > 6*time.Second {
-		t.Errorf("Apply() = %v, want in range [2s, 6s]", d3)
-	}
-}
-
-// TestRunWithBackoff_NilLogger verifies nil logger defaults to slog.Default().
-func TestRunWithBackoff_NilLogger(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     2,
-	}
-
-	calls := 0
-	op := func() error {
-		calls++
-		return nil
-	}
-
-	// Pass nil logger; should not panic.
-	err := RunWithBackoff(ctx, p, nil, op)
-	if err != nil {
-		t.Errorf("RunWithBackoff() = %v, want nil", err)
-	}
-	if calls != 1 {
-		t.Errorf("op called %d times, want 1", calls)
-	}
-}
-
-// TestPollWithBackoff_NilLogger verifies nil logger defaults to slog.Default().
-func TestPollWithBackoff_NilLogger(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(50 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     2,
-	}
-
-	calls := 0
-	condition := func() (bool, error) {
-		calls++
-		return true, nil
-	}
-
-	// Pass nil logger; should not panic.
-	err := PollWithBackoff(ctx, p, nil, condition)
-	if err != nil {
-		t.Errorf("PollWithBackoff() = %v, want nil", err)
-	}
-	if calls != 1 {
-		t.Errorf("condition called %d times, want 1", calls)
-	}
-}
-
-// TestRunWithBackoff_ZeroMaxAttempts verifies infinite retries when MaxAttempts=0.
-// We limit the test by cancelling context after a few attempts.
-func TestRunWithBackoff_ZeroMaxAttempts(t *testing.T) {
-	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	p := Policy{
-		InitialInterval: domaintypes.Duration(10 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(20 * time.Millisecond),
-		Multiplier:      2.0,
-		MaxAttempts:     0, // Infinite attempts.
-	}
-
-	calls := 0
-	op := func() error {
-		calls++
-		return errors.New("persistent error")
-	}
-
-	err := RunWithBackoff(ctx, p, slog.Default(), op)
-	if err == nil {
-		t.Error("RunWithBackoff() = nil, want error (context timeout)")
-	}
-	// Should retry multiple times until context timeout.
-	if calls < 2 {
-		t.Errorf("op called %d times, want >= 2", calls)
-	}
-}
-
-// TestStatefulBackoff_GetDurationBeforeApply verifies GetDuration before any Apply.
-func TestStatefulBackoff_GetDurationBeforeApply(t *testing.T) {
-	t.Parallel()
-	p := Policy{
-		InitialInterval: domaintypes.Duration(500 * time.Millisecond),
-		MaxInterval:     domaintypes.Duration(5 * time.Second),
-		Multiplier:      2.0,
-	}
-
-	sb := NewStatefulBackoff(p)
-
-	// Before any Apply, GetDuration should return InitialInterval.
-	if d := time.Duration(sb.GetDuration()); d != 500*time.Millisecond {
-		t.Errorf("GetDuration() before Apply = %v, want 500ms", d)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			sb := NewStatefulBackoff(tt.policy)
+			for i := 0; i < tt.applies; i++ {
+				sb.Apply()
+			}
+			tt.check(t, sb)
+		})
 	}
 }

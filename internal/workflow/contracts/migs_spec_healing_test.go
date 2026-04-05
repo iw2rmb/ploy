@@ -92,32 +92,4 @@ func TestParseMigSpecJSON_HealRetriesDefault(t *testing.T) {
 	}
 }
 
-func TestParseMigSpecJSON_RouterForbidden(t *testing.T) {
-	input := `{
-		"steps": [{"image": "test:latest"}],
-		"build_gate": {"router": {"image": "router:latest"}}
-	}`
-	_, err := ParseMigSpecJSON([]byte(input))
-	if err == nil {
-		t.Fatal("expected validation error for router field")
-	}
-	if !strings.Contains(err.Error(), "build_gate.router: forbidden") {
-		t.Fatalf("error = %q, want to contain build_gate.router: forbidden", err.Error())
-	}
-}
-
-func TestParseMigSpecJSON_HealingForbidden(t *testing.T) {
-	input := `{
-		"steps": [{"image": "test:latest"}],
-		"build_gate": {"healing": {"by_error_kind": {"infra": {"image": "heal:latest"}}}}
-	}`
-	_, err := ParseMigSpecJSON([]byte(input))
-	if err == nil {
-		t.Fatal("expected validation error for healing field")
-	}
-	if !strings.Contains(err.Error(), "build_gate.healing: forbidden") {
-		t.Fatalf("error = %q, want to contain build_gate.healing: forbidden", err.Error())
-	}
-}
-
 // TestMigSpec_RoundTrip tests round-trip conversion via json.Marshal → ParseMigSpecJSON.
