@@ -80,6 +80,56 @@ func ServeFiltered(w http.ResponseWriter, r *http.Request, hub *Hub, runID domai
 	}
 }
 
+// ServeJob streams events for the provided job stream over SSE.
+// sinceID must be a valid EventID (non-negative); callers should validate before calling.
+// Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
+func ServeJob(w http.ResponseWriter, r *http.Request, hub *Hub, jobID domaintypes.JobID, sinceID domaintypes.EventID) error {
+	if hub == nil {
+		return ErrNoHub
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return errors.New("logstream: response does not support streaming")
+	}
+
+	if err := hub.EnsureJob(jobID); err != nil {
+		return err
+	}
+	sub, err := hub.SubscribeJob(r.Context(), jobID, sinceID)
+	if err != nil {
+		return err
+	}
+	defer sub.Cancel()
+
+	headers := w.Header()
+	headers.Set("Content-Type", "text/event-stream")
+	headers.Set("Cache-Control", "no-cache")
+	headers.Set("Connection", "keep-alive")
+
+	if _, err := io.WriteString(w, ":ok\n\n"); err != nil {
+		return err
+	}
+	flusher.Flush()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return r.Context().Err()
+		case evt, ok := <-sub.Events:
+			if !ok {
+				return nil
+			}
+			if err := WriteEventFrame(w, evt); err != nil {
+				return err
+			}
+			flusher.Flush()
+			if evt.Type == domaintypes.SSEEventDone {
+				return nil
+			}
+		}
+	}
+}
+
 // WriteEventFrame writes a single SSE frame (id + event + data lines) to the writer.
 func WriteEventFrame(w io.Writer, evt Event) error {
 	if evt.ID > 0 {

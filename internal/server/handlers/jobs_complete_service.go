@@ -145,6 +145,17 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 		"stats_size", len(input.StatsBytes),
 	)
 
+	// Emit done sentinel on the job-scoped SSE stream so clients know the
+	// job's container log stream has ended.
+	if s.eventsService != nil {
+		if err := s.eventsService.PublishJobDone(ctx, input.JobID, string(input.Status)); err != nil {
+			slog.Error("complete job: publish job done failed",
+				"job_id", input.JobID,
+				"err", err,
+			)
+		}
+	}
+
 	state := &completeJobState{
 		input:         input,
 		job:           job,

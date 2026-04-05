@@ -16,6 +16,9 @@ var ErrStreamClosed = errors.New("logstream: stream closed")
 // ErrInvalidRunID indicates a blank or whitespace-only run ID was provided.
 var ErrInvalidRunID = errors.New("logstream: invalid run ID (blank or whitespace)")
 
+// ErrInvalidJobID indicates a blank or whitespace-only job ID was provided.
+var ErrInvalidJobID = errors.New("logstream: invalid job ID (blank or whitespace)")
+
 // ErrInvalidEventType indicates an unknown SSE event type was provided.
 var ErrInvalidEventType = errors.New("logstream: invalid event type")
 
@@ -97,23 +100,31 @@ func (s Subscription) Cancel() {
 }
 
 // Hub manages log streams published by nodes and consumed by SSE clients.
+// Run-keyed streams carry lifecycle events (run, stage, done).
+// Job-keyed streams carry container logs (log, done).
 type Hub struct {
-	mu      sync.RWMutex
-	streams map[domaintypes.RunID]*stream
-	opts    Options
+	mu         sync.RWMutex
+	streams    map[domaintypes.RunID]*stream
+	jobStreams map[domaintypes.JobID]*stream
+	opts       Options
 }
 
 // NewHub constructs a log stream hub.
 func NewHub(opts Options) *Hub {
 	opts.normalize()
 	return &Hub{
-		streams: make(map[domaintypes.RunID]*stream),
-		opts:    opts,
+		streams:    make(map[domaintypes.RunID]*stream),
+		jobStreams: make(map[domaintypes.JobID]*stream),
+		opts:       opts,
 	}
 }
 
 func normalizeRunID(runID domaintypes.RunID) domaintypes.RunID {
 	return domaintypes.RunID(domaintypes.Normalize(runID.String()))
+}
+
+func normalizeJobID(jobID domaintypes.JobID) domaintypes.JobID {
+	return domaintypes.JobID(domaintypes.Normalize(jobID.String()))
 }
 
 // Ensure creates the stream if it does not already exist.
@@ -166,6 +177,13 @@ func (h *Hub) PublishStatus(ctx context.Context, runID domaintypes.RunID, status
 // Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
 func (h *Hub) PublishRun(ctx context.Context, runID domaintypes.RunID, run api.RunSummary) error {
 	_, err := h.publish(ctx, runID, domaintypes.SSEEventRun, run)
+	return err
+}
+
+// PublishStage appends a stage progress event to a run stream.
+// Returns ErrInvalidRunID if the run ID is blank or whitespace-only.
+func (h *Hub) PublishStage(ctx context.Context, runID domaintypes.RunID, record LogRecord) error {
+	_, err := h.publish(ctx, runID, domaintypes.SSEEventStage, record)
 	return err
 }
 
@@ -244,18 +262,166 @@ func (h *Hub) Close(runID domaintypes.RunID) {
 	}
 }
 
-// CloseAll tears down all streams and clears the hub. Safe for graceful shutdown.
+// CloseAll tears down all streams (run and job) and clears the hub. Safe for graceful shutdown.
 func (h *Hub) CloseAll() {
 	h.mu.Lock()
-	streams := make([]*stream, 0, len(h.streams))
+	streams := make([]*stream, 0, len(h.streams)+len(h.jobStreams))
 	for id, s := range h.streams {
 		streams = append(streams, s)
 		delete(h.streams, id)
+	}
+	for id, s := range h.jobStreams {
+		streams = append(streams, s)
+		delete(h.jobStreams, id)
 	}
 	h.mu.Unlock()
 	for _, s := range streams {
 		s.finish()
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Job-keyed stream methods (container log fanout).
+// ---------------------------------------------------------------------------
+
+// EnsureJob creates the job stream if it does not already exist.
+// Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
+func (h *Hub) EnsureJob(jobID domaintypes.JobID) error {
+	if jobID.IsZero() {
+		return ErrInvalidJobID
+	}
+	jobID = normalizeJobID(jobID)
+	h.mu.Lock()
+	if _, exists := h.jobStreams[jobID]; !exists {
+		h.jobStreams[jobID] = newStream(h.opts)
+	}
+	h.mu.Unlock()
+	return nil
+}
+
+// PublishJobLog appends a log record to a job stream.
+// Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
+func (h *Hub) PublishJobLog(ctx context.Context, jobID domaintypes.JobID, record LogRecord) error {
+	_, err := h.publishJob(ctx, jobID, domaintypes.SSEEventLog, record)
+	return err
+}
+
+// PublishJobStatus appends a terminal status event and closes the job stream.
+// Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
+func (h *Hub) PublishJobStatus(ctx context.Context, jobID domaintypes.JobID, status Status) error {
+	s, err := h.publishJob(ctx, jobID, domaintypes.SSEEventDone, status)
+	if err != nil {
+		return err
+	}
+	s.finish()
+	return nil
+}
+
+// SubscribeJob registers a consumer for the job stream starting after the provided id.
+// Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
+func (h *Hub) SubscribeJob(ctx context.Context, jobID domaintypes.JobID, sinceID domaintypes.EventID) (Subscription, error) {
+	if jobID.IsZero() {
+		return Subscription{}, ErrInvalidJobID
+	}
+	jobID = normalizeJobID(jobID)
+	if !sinceID.Valid() {
+		return Subscription{}, errors.New("logstream: invalid since id")
+	}
+	if ctx.Err() != nil {
+		return Subscription{}, ctx.Err()
+	}
+	s := h.getOrCreateJob(jobID)
+	sub, history, closed := s.subscribe(sinceID)
+	for _, evt := range history {
+		if !sub.send(evt) {
+			if sub.id >= 0 {
+				s.drop(sub.id)
+			}
+			break
+		}
+	}
+	if closed {
+		sub.close()
+		return Subscription{
+			Events: sub.ch,
+			cancel: func() {},
+		}, nil
+	}
+	return Subscription{
+		Events: sub.ch,
+		cancel: func() {
+			s.drop(sub.id)
+		},
+	}, nil
+}
+
+// SnapshotJob returns a copy of buffered events for the job stream.
+// Returns nil if the job ID is blank or the stream does not exist.
+func (h *Hub) SnapshotJob(jobID domaintypes.JobID) []Event {
+	if jobID.IsZero() {
+		return nil
+	}
+	jobID = normalizeJobID(jobID)
+	h.mu.RLock()
+	s := h.jobStreams[jobID]
+	h.mu.RUnlock()
+	if s == nil {
+		return nil
+	}
+	return s.snapshot()
+}
+
+// CloseJob tears down the job stream and removes it from the hub.
+func (h *Hub) CloseJob(jobID domaintypes.JobID) {
+	if jobID.IsZero() {
+		return
+	}
+	jobID = normalizeJobID(jobID)
+	h.mu.Lock()
+	s, ok := h.jobStreams[jobID]
+	if ok {
+		delete(h.jobStreams, jobID)
+	}
+	h.mu.Unlock()
+	if ok {
+		s.finish()
+	}
+}
+
+func (h *Hub) publishJob(ctx context.Context, jobID domaintypes.JobID, eventType domaintypes.SSEEventType, payload any) (*stream, error) {
+	if jobID.IsZero() {
+		return nil, ErrInvalidJobID
+	}
+	jobID = normalizeJobID(jobID)
+	if err := eventType.Validate(); err != nil {
+		return nil, ErrInvalidEventType
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	s := h.getOrCreateJob(jobID)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return s, s.publish(Event{Type: eventType, Data: data})
+}
+
+func (h *Hub) getOrCreateJob(jobID domaintypes.JobID) *stream {
+	h.mu.RLock()
+	s := h.jobStreams[jobID]
+	h.mu.RUnlock()
+	if s != nil {
+		return s
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	s = h.jobStreams[jobID]
+	if s == nil {
+		s = newStream(h.opts)
+		h.jobStreams[jobID] = s
+	}
+	return s
 }
 
 func (h *Hub) getOrCreate(runID domaintypes.RunID) *stream {

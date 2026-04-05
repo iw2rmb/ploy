@@ -82,7 +82,9 @@ func TestGetRunLogsHandler_DatabaseError(t *testing.T) {
 	}
 }
 
-func TestGetRunLogsHandler_Success(t *testing.T) {
+// TestGetRunLogsHandler_LifecycleOnly verifies that the run SSE stream
+// emits only lifecycle events (stage, done) and not container log frames.
+func TestGetRunLogsHandler_LifecycleOnly(t *testing.T) {
 	t.Parallel()
 	eventsService, _ := createTestEventsService()
 	hub := eventsService.Hub()
@@ -100,10 +102,15 @@ func TestGetRunLogsHandler_Success(t *testing.T) {
 		close(done)
 	}()
 
-	// Allow subscription to establish
+	// Allow subscription to establish.
 	time.Sleep(25 * time.Millisecond)
 	ctx := context.Background()
-	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "hello"})
+	// Publish a stage event (lifecycle) then done.
+	_ = hub.PublishStage(ctx, domaintypes.RunID(runID), logstream.LogRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Stream:    "info",
+		Line:      "step started",
+	})
 	_ = hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"})
 
 	select {
@@ -116,8 +123,15 @@ func TestGetRunLogsHandler_Success(t *testing.T) {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "event: log") || !strings.Contains(body, "event: done") {
-		t.Fatalf("unexpected SSE body: %s", body)
+	if !strings.Contains(body, "event: stage") {
+		t.Fatalf("expected stage event in body: %s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event in body: %s", body)
+	}
+	// Container log events must NOT appear on the run stream.
+	if strings.Contains(body, "event: log") {
+		t.Fatalf("unexpected log event on run stream: %s", body)
 	}
 }
 
@@ -129,9 +143,13 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 	st := func() *runStore { st := &runStore{}; st.getRun.val = store.Run{ID: domaintypes.RunID(runID)}; return st }()
 	h := getRunLogsHandler(st, nil, eventsService)
 
-	// Pre-publish an event so history contains id=1 before subscriber joins.
+	// Pre-publish a stage event so history contains id=1 before subscriber joins.
 	ctx := context.Background()
-	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "first"})
+	_ = hub.PublishStage(ctx, domaintypes.RunID(runID), logstream.LogRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Stream:    "info",
+		Line:      "first",
+	})
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
 	req.SetPathValue("id", runID)
@@ -144,9 +162,13 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 		close(done)
 	}()
 
-	// Allow subscription to establish, then publish id=2 and done
+	// Allow subscription to establish, then publish id=2 and done.
 	time.Sleep(25 * time.Millisecond)
-	_ = hub.PublishLog(ctx, domaintypes.RunID(runID), logstream.LogRecord{Timestamp: time.Now().UTC().Format(time.RFC3339), Stream: "stdout", Line: "second"})
+	_ = hub.PublishStage(ctx, domaintypes.RunID(runID), logstream.LogRecord{
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Stream:    "info",
+		Line:      "second",
+	})
 	_ = hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"})
 
 	select {
@@ -164,12 +186,46 @@ func TestGetRunLogsHandler_Resume(t *testing.T) {
 	}
 }
 
-// TestGetRunLogsHandler_EnrichedLogPayload verifies that the SSE HTTP
-// handler preserves enriched log fields (node_id, job_id, job_type,
-// next_id) in the JSON payload streamed to clients. This ensures the
-// HTTP layer does not strip or alter the enriched LogRecord shape used
-// by CLI consumers (run logs).
-func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
+// TestGetRunLogsHandler_TerminalRunDone verifies that a fresh connection
+// to a terminal run receives a done sentinel immediately.
+func TestGetRunLogsHandler_TerminalRunDone(t *testing.T) {
+	t.Parallel()
+	eventsService, _ := createTestEventsService()
+	runID := testRunIDKSUID
+	st := func() *runStore {
+		st := &runStore{}
+		st.getRun.val = store.Run{ID: domaintypes.RunID(runID), Status: domaintypes.RunStatusFinished}
+		return st
+	}()
+	h := getRunLogsHandler(st, nil, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/logs", nil)
+	req.SetPathValue("id", runID)
+	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	h.ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event for terminal run: %s", body)
+	}
+
+	// Verify done payload contains the run status.
+	var found bool
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "data: ") && strings.Contains(line, "Finished") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected done payload with Finished status: %s", body)
+	}
+}
+
+// TestGetRunLogsHandler_StageEventPayload verifies that stage events preserve
+// their payload structure when streamed to SSE clients.
+func TestGetRunLogsHandler_StageEventPayload(t *testing.T) {
 	t.Parallel()
 
 	eventsService, err := createTestEventsService()
@@ -192,21 +248,16 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 		close(done)
 	}()
 
-	// Allow subscription to establish before publishing events.
 	time.Sleep(25 * time.Millisecond)
 
 	ctx := context.Background()
-	jobID := domaintypes.NewJobID()
-	enriched := logstream.LogRecord{
+	stageRec := logstream.LogRecord{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Stream:    "stdout",
-		Line:      "enriched line",
-		NodeID:    "aB3xY9",
-		JobID:     jobID,
-		JobType:   "mig",
+		Stream:    "info",
+		Line:      "gate check passed",
 	}
-	if err := hub.PublishLog(ctx, domaintypes.RunID(runID), enriched); err != nil {
-		t.Fatalf("publish enriched log: %v", err)
+	if err := hub.PublishStage(ctx, domaintypes.RunID(runID), stageRec); err != nil {
+		t.Fatalf("publish stage: %v", err)
 	}
 	if err := hub.PublishStatus(ctx, domaintypes.RunID(runID), logstream.Status{Status: "completed"}); err != nil {
 		t.Fatalf("publish status: %v", err)
@@ -215,15 +266,12 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(500 * time.Millisecond):
-		t.Fatal("timeout waiting for enriched stream to finish")
+		t.Fatal("timeout waiting for stream to finish")
 	}
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
-	}
 	body := rr.Body.String()
 
-	// Extract the first "data: " line that contains a JSON object.
+	// Extract the first "data: " line with JSON.
 	var jsonLine string
 	for _, line := range strings.Split(body, "\n") {
 		line = strings.TrimSpace(line)
@@ -236,22 +284,15 @@ func TestGetRunLogsHandler_EnrichedLogPayload(t *testing.T) {
 		t.Fatalf("no JSON data line found in body: %s", body)
 	}
 
-	// Unmarshal and assert enriched fields are present with expected values.
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(jsonLine), &payload); err != nil {
-		t.Fatalf("unmarshal enriched log payload: %v", err)
+		t.Fatalf("unmarshal stage payload: %v", err)
 	}
 
-	if got := payload["node_id"]; got != "aB3xY9" {
-		t.Errorf("node_id = %v, want %q", got, "aB3xY9")
+	if got := payload["stream"]; got != "info" {
+		t.Errorf("stream = %v, want %q", got, "info")
 	}
-	if got := payload["job_id"]; got != jobID.String() {
-		t.Errorf("job_id = %v, want %q", got, jobID.String())
-	}
-	if got := payload["job_type"]; got != "mig" {
-		t.Errorf("job_type = %v, want %q", got, "mig")
-	}
-	if _, ok := payload["next_id"]; ok {
-		t.Errorf("next_id should be absent, got %v", payload["next_id"])
+	if got := payload["line"]; got != "gate check passed" {
+		t.Errorf("line = %v, want %q", got, "gate check passed")
 	}
 }

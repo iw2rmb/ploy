@@ -188,25 +188,21 @@ func (s *EventsService) CreateAndPublishEvent(ctx context.Context, params store.
 	return event, nil
 }
 
-// CreateAndPublishLog publishes a log to the SSE hub. The log metadata must already
-// be persisted via blobpersist; this method only handles SSE fanout.
-// Log data is decoded into per-line stdout LogRecord frames before fanout
-// so clients see structured "log" events.
+// CreateAndPublishLog publishes a log to the job-scoped SSE stream.
+// The log metadata must already be persisted via blobpersist; this method
+// only handles SSE fanout. Log data is decoded into per-line stdout LogRecord
+// frames and published to the job stream keyed by JobID.
 //
-// params.RunID is a KSUID-backed RunID; normalized for hub operations.
+// If the log has no JobID, SSE fanout is skipped (job-stream requires a job key).
 func (s *EventsService) CreateAndPublishLog(ctx context.Context, log store.Log, data []byte) error {
-	// Normalize for hub operations.
-	runID := domaintypes.RunID(domaintypes.Normalize(log.RunID.String()))
-	if runID.IsZero() {
-		s.logger.Warn("log runID invalid for SSE fanout", "log_id", log.ID)
+	if log.JobID == nil || log.JobID.IsZero() {
+		s.logger.Debug("log has no job_id, skipping job-stream SSE fanout", "log_id", log.ID)
 		return nil
 	}
+	jobID := *log.JobID
 
-	// Fan out to SSE hub with the provided data bytes.
-	// SSE fanout is best-effort; log errors but don't fail the operation
-	// since the blob is already persisted and is the source of truth.
-	if err := s.publishLogToHubWithBytes(ctx, runID, log, data); err != nil {
-		s.logger.Error("SSE fanout failed", "log_id", log.ID, "error", err)
+	if err := s.publishLogToJobStream(ctx, jobID, log, data); err != nil {
+		s.logger.Error("job SSE fanout failed", "log_id", log.ID, "job_id", jobID.String(), "error", err)
 	}
 
 	return nil
@@ -231,28 +227,27 @@ func (s *EventsService) PublishRun(ctx context.Context, runID domaintypes.RunID,
 	return s.hub.PublishRun(ctx, runID, payload)
 }
 
-// publishEventToHub converts a database event to a logstream event and publishes it.
+// publishEventToHub converts a database event to a stage event and publishes it
+// to the run-keyed stream. Stage events carry node progress messages (e.g.
+// "step started", "gate passed") and are distinct from container log frames.
 func (s *EventsService) publishEventToHub(ctx context.Context, runID domaintypes.RunID, event store.Event) error {
-	// Convert event to log record format for SSE.
-	// Use the event level as stream and message as line.
 	record := logstream.LogRecord{
 		Timestamp: timestampToString(event.Time),
 		Stream:    event.Level,
 		Line:      event.Message,
 	}
 
-	return s.hub.PublishLog(ctx, runID, record)
+	return s.hub.PublishStage(ctx, runID, record)
 }
 
-// publishLogToHubWithBytes converts log data to logstream events and publishes them.
-// It enriches each LogRecord with execution context (node_id, job_id, job_type)
-// by looking up the associated job metadata when available.
-func (s *EventsService) publishLogToHubWithBytes(ctx context.Context, runID domaintypes.RunID, log store.Log, data []byte) error {
+// publishLogToJobStream converts log data to logstream events and publishes
+// them to the job-keyed stream. It enriches each LogRecord with execution
+// context (node_id, job_id, job_type) by looking up the associated job
+// metadata when available.
+func (s *EventsService) publishLogToJobStream(ctx context.Context, jobID domaintypes.JobID, log store.Log, data []byte) error {
 	ts := timestampToString(log.CreatedAt)
 
 	// Fetch job metadata to enrich log records with execution context.
-	// If the job lookup fails (e.g., job doesn't exist yet or store unavailable),
-	// we still publish logs without enrichment to avoid losing data.
 	jobCtx := s.loadJobContext(ctx, log.JobID)
 
 	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
@@ -262,7 +257,6 @@ func (s *EventsService) publishLogToHubWithBytes(ctx context.Context, runID doma
 			_ = zr.Close()
 		}()
 		scanner := bufio.NewScanner(zr)
-		// Set a reasonable max token size (256 KiB per line) to avoid memory blowups.
 		const maxLine = 256 * 1024
 		buf := make([]byte, 0, 64*1024)
 		scanner.Buffer(buf, maxLine)
@@ -279,12 +273,11 @@ func (s *EventsService) publishLogToHubWithBytes(ctx context.Context, runID doma
 				JobID:     jobCtx.JobID,
 				JobType:   jobCtx.JobType,
 			}
-			if err := s.hub.PublishLog(ctx, runID, rec); err != nil {
+			if err := s.hub.PublishJobLog(ctx, jobID, rec); err != nil {
 				return err
 			}
 		}
 		if scanErr := scanner.Err(); scanErr != nil {
-			// On scanner error, emit a fallback lump to avoid total loss.
 			rec := logstream.LogRecord{
 				Timestamp: ts,
 				Stream:    "stdout",
@@ -293,11 +286,11 @@ func (s *EventsService) publishLogToHubWithBytes(ctx context.Context, runID doma
 				JobID:     jobCtx.JobID,
 				JobType:   jobCtx.JobType,
 			}
-			_ = s.hub.PublishLog(ctx, runID, rec)
+			_ = s.hub.PublishJobLog(ctx, jobID, rec)
 		}
 		return nil
 	}
-	// Fallback: publish raw bytes as a single frame (may look garbled to clients).
+	// Fallback: publish raw bytes as a single frame.
 	rec := logstream.LogRecord{
 		Timestamp: ts,
 		Stream:    "log",
@@ -306,7 +299,17 @@ func (s *EventsService) publishLogToHubWithBytes(ctx context.Context, runID doma
 		JobID:     jobCtx.JobID,
 		JobType:   jobCtx.JobType,
 	}
-	return s.hub.PublishLog(ctx, runID, rec)
+	return s.hub.PublishJobLog(ctx, jobID, rec)
+}
+
+// PublishJobDone emits a terminal done sentinel on the job-keyed stream,
+// signaling to SSE clients that the job has completed and the stream
+// will close. Returns ErrInvalidJobID if the job ID is blank.
+func (s *EventsService) PublishJobDone(ctx context.Context, jobID domaintypes.JobID, status string) error {
+	if jobID.IsZero() {
+		return logstream.ErrInvalidJobID
+	}
+	return s.hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: status})
 }
 
 // eventsJobContext holds execution context extracted from job metadata.

@@ -314,7 +314,7 @@ func TestGetJobLogsHandler_BackfillExcludesNilJobIDLogs(t *testing.T) {
 	objKeyNil := "logs/nil.gz"
 
 	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess},
 	}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
 	st.listLogsByRun.val = []store.Log{
@@ -359,7 +359,7 @@ func TestGetJobLogsHandler_BackfillExcludesOtherJobLogs(t *testing.T) {
 	objKeyOther := "logs/other.gz"
 
 	st := &jobStore{
-		getJobResult: store.Job{ID: jobID, RunID: runID},
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess},
 	}
 	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
 	st.listLogsByRun.val = []store.Log{

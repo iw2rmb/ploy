@@ -7,7 +7,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -33,9 +32,8 @@ func gzipData(t *testing.T, data string) []byte {
 }
 
 // TestStorage_LogEnrichmentWithJobMetadata verifies that log records are
-// enriched with execution context (node_id, job_id, job_type, next_id)
-// when job metadata is available. This ensures SSE clients receive correlated
-// log data for diagnostics.
+// enriched with execution context (node_id, job_id, job_type) when job
+// metadata is available, and published to the job-keyed stream.
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -43,12 +41,10 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	jobID := domaintypes.NewJobID()
 	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
 
-	// Create log data (gzipped, since that's how logs come from nodes).
 	logLine := "Build step completed successfully\n"
 	gzippedLog := gzipData(t, logLine)
 
 	mock := &mockStore{
-		// GetJob returns job metadata for enrichment.
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			if id != jobID {
 				t.Fatalf("GetJob called with unexpected id: got %v, want %v", id, jobID)
@@ -74,8 +70,6 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	// CreateAndPublishLog now takes the already-persisted log metadata and data bytes.
-	// The log is already persisted via blobpersist; this method only handles SSE fanout.
 	logRow := store.Log{
 		ID:        1,
 		RunID:     runID,
@@ -90,24 +84,20 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
 
-	// Verify SSE event contains enriched fields.
-	streamID := strings.TrimSpace(runID.String())
-	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
+	// Verify log was published to the job-keyed stream.
+	snapshot := svc.Hub().SnapshotJob(jobID)
 	if len(snapshot) == 0 {
-		t.Fatal("expected log event in hub snapshot, got none")
+		t.Fatal("expected log event in job hub snapshot, got none")
 	}
 	if snapshot[0].Type != domaintypes.SSEEventLog {
 		t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
 	}
 
-	// Unmarshal and verify enriched fields.
 	var rec logstream.LogRecord
 	if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
 		t.Fatalf("failed to unmarshal log record: %v", err)
 	}
 
-	// Verify enriched fields are present.
-	// Compare as domain types (LogRecord fields are now NodeID/JobID domain types).
 	if rec.NodeID != nodeID {
 		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
 	}
@@ -117,11 +107,17 @@ func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	if rec.JobType != "mig" {
 		t.Errorf("job_type: got %q, want %q", rec.JobType, "mig")
 	}
+
+	// Verify nothing was published to the run-keyed stream.
+	runSnapshot := svc.Hub().Snapshot(runID)
+	if len(runSnapshot) != 0 {
+		t.Fatalf("expected no events in run hub snapshot, got %d", len(runSnapshot))
+	}
 }
 
-// TestLogRecord_LogEnrichmentPreservesTypedFields is a contract test that runs under
-// `-run TestLogRecord` and ensures the server publish path emits the canonical
-// logstream.LogRecord shape with typed enriched fields without truncation.
+// TestLogRecord_LogEnrichmentPreservesTypedFields is a contract test that
+// ensures the server publish path emits the canonical logstream.LogRecord
+// shape with typed enriched fields to the job stream.
 func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 	t.Parallel()
 
@@ -164,9 +160,9 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
 
-	snapshot := svc.Hub().Snapshot(domaintypes.RunID(strings.TrimSpace(runID.String())))
+	snapshot := svc.Hub().SnapshotJob(jobID)
 	if len(snapshot) == 0 {
-		t.Fatal("expected log event in hub snapshot, got none")
+		t.Fatal("expected log event in job hub snapshot, got none")
 	}
 	if snapshot[0].Type != domaintypes.SSEEventLog {
 		t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
@@ -188,7 +184,7 @@ func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
 }
 
 // TestStorage_LogEnrichmentWithoutJobID verifies that logs without a valid
-// job_id are still published without enrichment (graceful degradation).
+// job_id skip SSE fanout entirely (job stream requires a job key).
 func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	t.Parallel()
 
@@ -215,7 +211,6 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	// Log without job ID (log already persisted via blobpersist).
 	logRow := store.Log{
 		ID:        1,
 		RunID:     runID,
@@ -230,48 +225,30 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
 
-	// GetJob should NOT be called when JobID is invalid.
+	// GetJob should NOT be called when JobID is nil.
 	if getJobCalled {
-		t.Error("GetJob should not be called when JobID is invalid")
+		t.Error("GetJob should not be called when JobID is nil")
 	}
 
-	// Verify log was still published (without enrichment).
-	streamID := strings.TrimSpace(runID.String())
-	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
-	if len(snapshot) == 0 {
-		t.Fatal("expected log event in hub snapshot, got none")
-	}
-
-	var rec logstream.LogRecord
-	if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
-		t.Fatalf("failed to unmarshal log record: %v", err)
-	}
-
-	// Enriched fields should be empty.
-	if !rec.NodeID.IsZero() {
-		t.Errorf("node_id should be empty, got %q", rec.NodeID)
-	}
-	if !rec.JobID.IsZero() {
-		t.Errorf("job_id should be empty, got %q", rec.JobID)
-	}
-	if !rec.JobType.IsZero() {
-		t.Errorf("job_type should be empty, got %q", rec.JobType)
+	// No events should appear on either stream.
+	runSnapshot := svc.Hub().Snapshot(runID)
+	if len(runSnapshot) != 0 {
+		t.Fatalf("expected no events on run stream, got %d", len(runSnapshot))
 	}
 }
 
 // TestStorage_LogEnrichmentJobLookupFailure verifies that logs are still
-// published even when job metadata lookup fails (resilience).
+// published to the job stream even when job metadata lookup fails.
 func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.RunID("run-log-lookup-fail")
-	jobID := domaintypes.JobID("job-log-lookup-fail")
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
 
 	logLine := "Log with failing job lookup\n"
 	gzippedLog := gzipData(t, logLine)
 
 	mock := &mockStore{
-		// Simulate job lookup failure.
 		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
 			return store.Job{}, context.DeadlineExceeded
 		},
@@ -296,17 +273,15 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	// Should succeed despite job lookup failure.
 	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
 	if err != nil {
 		t.Fatalf("CreateAndPublishLog should succeed despite job lookup failure: %v", err)
 	}
 
-	// Verify log was published (without enrichment due to lookup failure).
-	streamID := strings.TrimSpace(runID.String())
-	snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
+	// Verify log was published to job stream without enrichment.
+	snapshot := svc.Hub().SnapshotJob(jobID)
 	if len(snapshot) == 0 {
-		t.Fatal("expected log event in hub snapshot, got none")
+		t.Fatal("expected log event in job hub snapshot, got none")
 	}
 
 	var rec logstream.LogRecord
@@ -314,7 +289,6 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		t.Fatalf("failed to unmarshal log record: %v", err)
 	}
 
-	// Enriched fields should be empty due to lookup failure.
 	if !rec.NodeID.IsZero() {
 		t.Errorf("node_id should be empty after lookup failure, got %q", rec.NodeID)
 	}

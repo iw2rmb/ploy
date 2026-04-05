@@ -4,7 +4,6 @@ package server
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,21 +13,21 @@ import (
 )
 
 // TestStorage_CreateAndPublishLog verifies that logs are correctly published to
-// the SSE hub for real-time streaming. The log metadata is already persisted via
-// blobpersist; this method only handles SSE fanout with optional job enrichment.
+// the job-keyed SSE stream for real-time streaming. The log metadata is already
+// persisted via blobpersist; this method only handles SSE fanout.
 func TestStorage_CreateAndPublishLog(t *testing.T) {
-	runID := domaintypes.RunID("run-logs-123")
+	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 	logData := []byte("test log line")
 
 	tests := []struct {
-		name        string
-		log         store.Log
-		data        []byte
-		checkEvents bool
+		name           string
+		log            store.Log
+		data           []byte
+		checkJobEvents bool
 	}{
 		{
-			name: "successful log publish",
+			name: "successful log publish to job stream",
 			log: store.Log{
 				ID:        1,
 				RunID:     runID,
@@ -37,19 +36,20 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				DataSize:  int64(len(logData)),
 				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 			},
-			data:        logData,
-			checkEvents: true,
+			data:           logData,
+			checkJobEvents: true,
 		},
 		{
-			name: "invalid runID still succeeds (no SSE fanout)",
+			name: "nil job_id skips SSE fanout",
 			log: store.Log{
-				ID:       3,
-				RunID:    domaintypes.RunID("   "),
-				ChunkNo:  3,
+				ID:       2,
+				RunID:    runID,
+				JobID:    nil,
+				ChunkNo:  2,
 				DataSize: int64(len(logData)),
 			},
-			data:        logData,
-			checkEvents: false,
+			data:           logData,
+			checkJobEvents: false,
 		},
 	}
 
@@ -72,16 +72,20 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			// Check if log was published to hub.
-			if tt.checkEvents {
-				streamID := strings.TrimSpace(tt.log.RunID.String())
-				snapshot := svc.Hub().Snapshot(domaintypes.RunID(streamID))
+			if tt.checkJobEvents {
+				snapshot := svc.Hub().SnapshotJob(*tt.log.JobID)
 				if len(snapshot) == 0 {
-					t.Fatal("expected log event in hub snapshot, got none")
+					t.Fatal("expected log event in job hub snapshot, got none")
 				}
 				if snapshot[0].Type != domaintypes.SSEEventLog {
 					t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
 				}
+			}
+
+			// Verify run stream is empty (logs no longer go to run stream).
+			runSnapshot := svc.Hub().Snapshot(runID)
+			if len(runSnapshot) != 0 {
+				t.Fatalf("expected no events on run stream, got %d", len(runSnapshot))
 			}
 		})
 	}
