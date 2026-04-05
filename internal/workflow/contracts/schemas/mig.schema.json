@@ -38,11 +38,10 @@
       "properties": {
         "profile": false,
         "amata": false,
-        "healing": {
-          "$ref": "#/definitions/healingObject"
-        },
-        "router": {
-          "$ref": "#/definitions/routerObject"
+        "healing": false,
+        "router": false,
+        "heal": {
+          "$ref": "#/definitions/healObject"
         },
         "pre": {
           "$ref": "#/definitions/preObject"
@@ -53,38 +52,7 @@
       },
       "additionalProperties": true
     },
-    "healingObject": {
-      "type": "object",
-      "properties": {
-        "retries": false,
-        "image": false,
-        "command": false,
-        "env": false,
-        "retain_container": false,
-        "amata": false,
-        "by_error_kind": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/healingActionObject"
-          }
-        }
-      },
-      "additionalProperties": true
-    },
-    "healingActionObject": {
-      "type": "object",
-      "properties": {
-        "retain_container": false,
-        "env": false,
-        "spec": false,
-        "set": false,
-        "env_from_file": false,
-        "tmp_dir": false,
-        "tmp_bundle": false
-      },
-      "additionalProperties": true
-    },
-    "routerObject": {
+    "healObject": {
       "type": "object",
       "properties": {
         "retain_container": false,

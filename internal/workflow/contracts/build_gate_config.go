@@ -20,13 +20,9 @@ type BuildGateConfig struct {
 	// Post configures stack detection policy for the post-gate (and re-gate) phase.
 	Post *BuildGatePhaseConfig `json:"post,omitempty" yaml:"post,omitempty"`
 
-	// Healing configures the heal -> re-gate loop selector keyed by router
-	// error_kind classification.
-	Healing *HealingSpec `json:"healing,omitempty" yaml:"healing,omitempty"`
-
-	// Router configures the router container that runs on gate failure
-	// to produce a bug_summary before healing begins.
-	Router *RouterSpec `json:"router,omitempty" yaml:"router,omitempty"`
+	// Heal configures the single healing action for the heal -> re_gate loop.
+	// When non-nil, gate failures trigger direct heal -> re_gate retries.
+	Heal *HealSpec `json:"heal,omitempty" yaml:"heal,omitempty"`
 
 	// Images provides mig-level image mapping overrides for Build Gate image resolution.
 	// These rules override the default mapping file.
@@ -95,27 +91,14 @@ func (s *BuildGateStackConfig) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// HealingSpec describes recovery action selection keyed by router error_kind.
-// The control plane selects the action for a failed gate and injects the
-// selected kind as selected_error_kind for heal job claims.
-type HealingSpec struct {
-	// SelectedErrorKind is a server-injected selector for heal job claims.
-	// User specs should not set this field.
-	SelectedErrorKind string `json:"selected_error_kind,omitempty" yaml:"selected_error_kind,omitempty"`
-
-	// ByErrorKind defines recovery actions keyed by router classification
-	// (infra|code|deps|mixed|unknown).
-	ByErrorKind map[string]HealingActionSpec `json:"by_error_kind,omitempty" yaml:"by_error_kind,omitempty"`
-}
-
-// HealingActionSpec describes a per-error_kind healing action.
-type HealingActionSpec struct {
+// HealSpec describes the single healing action for gate failure recovery.
+// Gate failures trigger direct heal -> re_gate retries bounded by Retries.
+type HealSpec struct {
 	// Retries is the maximum number of healing attempts (default: 1).
 	// Each retry executes the healing action, then re-runs the gate.
 	Retries int `json:"retries,omitempty" yaml:"retries,omitempty"`
 
-	// Image is the container image for the healing action (required for
-	// non-terminal kinds).
+	// Image is the container image for the healing action (required).
 	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
 
 	// Command is the container command override (optional).
@@ -157,39 +140,6 @@ type RecoveryExpectationsSpec struct {
 type RecoveryExpectedArtifact struct {
 	Path   string `json:"path,omitempty" yaml:"path,omitempty"`
 	Schema string `json:"schema,omitempty" yaml:"schema,omitempty"`
-}
-
-// RouterSpec describes the router container that runs on gate failure to produce
-// a bug_summary before healing begins. Router is mig-like (Image, Command, Envs)
-// but has no Retries — it runs exactly once per gate failure.
-type RouterSpec struct {
-	// Image is the container image for the router (required).
-	Image JobImage `json:"image,omitempty" yaml:"image,omitempty"`
-
-	// Command is the container command override (optional).
-	Command CommandSpec `json:"command,omitempty" yaml:"command,omitempty"`
-
-	// Envs holds environment variables to inject into the router container.
-	Envs map[string]string `json:"envs,omitempty" yaml:"envs,omitempty"`
-
-	// CA lists canonical CA certificate entries for the router container.
-	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
-
-	// In lists canonical read-only input entries for the router container.
-	In []string `json:"in,omitempty" yaml:"in,omitempty"`
-
-	// Out lists canonical read-write output entries for the router container.
-	Out []string `json:"out,omitempty" yaml:"out,omitempty"`
-
-	// Home lists canonical home-relative entries for the router container.
-	Home []string `json:"home,omitempty" yaml:"home,omitempty"`
-
-	// Amata configures amata-mode execution for this router container.
-	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
-	// --set flags; no prompt file is required in this mode.
-	// When nil, the container uses the direct codex exec path and requires
-	// /in/codex-prompt.txt to be materialized via a Hydra in mount.
-	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
 // AmataRunSpec describes an amata execution configuration for router or healing containers.

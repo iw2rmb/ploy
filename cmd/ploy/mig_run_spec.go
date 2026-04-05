@@ -4,7 +4,7 @@
 // and compiles Hydra file-record entries (ca/in/out/home) into canonical
 // shortHash:dst form. Specs use a single canonical shape:
 //   - steps[] array with one entry per step (even single-step runs)
-//   - global build gate policy under build_gate (including build_gate.healing.by_error_kind)
+//   - global build gate policy under build_gate (including build_gate.heal)
 //
 // Spec parsing includes validation and error handling for missing files.
 // Isolating spec handling from execution flow enables focused testing
@@ -75,22 +75,9 @@ func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
 	}
 
 	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if healing, ok := bg["healing"].(map[string]any); ok {
-			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-				for errorKind, item := range byErrorKind {
-					action, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					if err := resolveEnvsInPlace(action); err != nil {
-						return fmt.Errorf("resolve envs (build_gate.healing.by_error_kind.%s): %w", errorKind, err)
-					}
-				}
-			}
-		}
-		if router, ok := bg["router"].(map[string]any); ok {
-			if err := resolveEnvsInPlace(router); err != nil {
-				return fmt.Errorf("resolve envs (build_gate.router): %w", err)
+		if heal, ok := bg["heal"].(map[string]any); ok {
+			if err := resolveEnvsInPlace(heal); err != nil {
+				return fmt.Errorf("resolve envs (build_gate.heal): %w", err)
 			}
 		}
 	}
@@ -159,23 +146,9 @@ func resolveImageEnvInPlace(spec map[string]any) error {
 		return nil
 	}
 
-	if router, ok := bg["router"].(map[string]any); ok {
-		if err := resolveImageInSection(router, "build_gate.router"); err != nil {
+	if heal, ok := bg["heal"].(map[string]any); ok {
+		if err := resolveImageInSection(heal, "build_gate.heal"); err != nil {
 			return err
-		}
-	}
-
-	if healing, ok := bg["healing"].(map[string]any); ok {
-		if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-			for errorKind, raw := range byErrorKind {
-				action, ok := raw.(map[string]any)
-				if !ok {
-					continue
-				}
-				if err := resolveImageInSection(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s", errorKind)); err != nil {
-					return err
-				}
-			}
 		}
 	}
 
@@ -304,23 +277,9 @@ func resolveAmataSpecPathInPlace(spec map[string]any, specBaseDir string) error 
 		return nil
 	}
 
-	if router, ok := bg["router"].(map[string]any); ok {
-		if err := resolveAmataSpecInSection(router, "build_gate.router.amata", specBaseDir); err != nil {
+	if heal, ok := bg["heal"].(map[string]any); ok {
+		if err := resolveAmataSpecInSection(heal, "build_gate.heal.amata", specBaseDir); err != nil {
 			return err
-		}
-	}
-
-	if healing, ok := bg["healing"].(map[string]any); ok {
-		if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-			for errorKind, raw := range byErrorKind {
-				action, ok := raw.(map[string]any)
-				if !ok {
-					continue
-				}
-				if err := resolveAmataSpecInSection(action, fmt.Sprintf("build_gate.healing.by_error_kind.%s.amata", errorKind), specBaseDir); err != nil {
-					return err
-				}
-			}
 		}
 	}
 	return nil
@@ -391,39 +350,13 @@ func expandSpecEnvValue(raw string) (string, error) {
 	return "", fmt.Errorf("unresolved environment variables: %s", strings.Join(names, ", "))
 }
 
-// deriveActiveGatePhase examines the spec's build_gate configuration and returns
-// the active gate phase string for router overlay selection. The router inherits
-// from the first enabled gate phase:
-//   - "pre_gate" when build_gate.pre is configured (default)
-//   - "re_gate" when only build_gate.re is configured
-//   - "post_gate" when only build_gate.post is configured
-//   - "pre_gate" as fallback
-func deriveActiveGatePhase(spec map[string]any) string {
-	bg, ok := spec["build_gate"].(map[string]any)
-	if !ok {
-		return "pre_gate"
-	}
-	if _, hasPre := bg["pre"].(map[string]any); hasPre {
-		return "pre_gate"
-	}
-	if _, hasRe := bg["re"].(map[string]any); hasRe {
-		return "re_gate"
-	}
-	if _, hasPost := bg["post"].(map[string]any); hasPost {
-		return "post_gate"
-	}
-	return "pre_gate"
-}
-
 // applyConfigOverlayInPlace loads the local config.yaml overlay and merges it
 // into the spec using deterministic rules. This runs after preprocessing and
 // before Hydra compilation so overlay file paths also get compiled.
 //
 // Routing:
 //   - steps[] entries receive the "mig" job section overlay
-//   - build_gate.router receives the active gate phase section (derived from
-//     spec build_gate.pre/post config; defaults to pre_gate)
-//   - build_gate.healing.by_error_kind entries receive the "heal" section
+//   - build_gate.heal receives the "heal" section overlay
 //   - top-level envs receive the "mig" section envs (primary job type)
 func applyConfigOverlayInPlace(spec map[string]any) error {
 	ov, err := cliconfig.LoadOverlay()
@@ -436,8 +369,6 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 
 	migCfg := ov.JobSection("mig")
 	healCfg := ov.JobSection("heal")
-	// Router inherits from the active gate phase derived from spec config.
-	routerCfg := ov.RouterSection(deriveActiveGatePhase(spec))
 
 	// Apply mig overlay to top-level envs.
 	if migCfg != nil && len(migCfg.Envs) > 0 {
@@ -455,21 +386,10 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 		}
 	}
 
-	// Apply overlays to build_gate containers.
+	// Apply heal overlay to build_gate.heal.
 	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if router, ok := bg["router"].(map[string]any); ok {
-			cliconfig.MergeJobConfigIntoSpec(router, routerCfg)
-		}
-		if healing, ok := bg["healing"].(map[string]any); ok {
-			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-				for _, item := range byErrorKind {
-					action, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					cliconfig.MergeJobConfigIntoSpec(action, healCfg)
-				}
-			}
+		if heal, ok := bg["heal"].(map[string]any); ok {
+			cliconfig.MergeJobConfigIntoSpec(heal, healCfg)
 		}
 	}
 

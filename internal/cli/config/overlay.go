@@ -18,8 +18,6 @@
 //   - envs: key-based override by precedence
 //   - ca:   append with dedup by value (digest-like strings)
 //   - in/out/home: merge by destination; higher precedence replaces same destination
-//
-// Router containers inherit the active gate phase section.
 package config
 
 import (
@@ -119,13 +117,6 @@ func (o *Overlay) JobSection(jobType string) *JobConfig {
 	default:
 		return nil
 	}
-}
-
-// RouterSection returns the JobConfig for the active gate phase that a router
-// container inherits. The caller derives the gate phase from the spec's
-// build_gate configuration. Valid values: "pre_gate", "re_gate", "post_gate".
-func (o *Overlay) RouterSection(gatePhase string) *JobConfig {
-	return o.JobSection(gatePhase)
 }
 
 // MergeJobConfigIntoSpec applies a JobConfig overlay onto a spec container block

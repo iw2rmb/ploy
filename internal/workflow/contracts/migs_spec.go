@@ -162,9 +162,7 @@ type MigStep struct {
 //
 // Validation rules:
 //   - steps must be non-empty and each step must have a non-empty image.
-//   - build_gate.healing.by_error_kind must configure non-terminal kinds.
-//   - build_gate.router must be configured when healing is configured.
-//   - Retries must be non-negative.
+//   - build_gate.heal requires a non-empty image and non-negative retries.
 //   - Stack Gate phases must not be disabled with expectations set.
 func (s MigSpec) Validate() error {
 	// Validate steps.
@@ -189,64 +187,31 @@ func (s MigSpec) Validate() error {
 		}
 	}
 
-	// Validate healing spec.
-	if s.BuildGate != nil && s.BuildGate.Healing != nil {
-		if len(s.BuildGate.Healing.ByErrorKind) == 0 {
-			return fmt.Errorf("build_gate.healing.by_error_kind: required when healing is configured")
+	// Validate heal spec.
+	if s.BuildGate != nil && s.BuildGate.Heal != nil {
+		heal := s.BuildGate.Heal
+		prefix := "build_gate.heal"
+		if heal.Retries < 0 {
+			return fmt.Errorf("%s.retries: must be non-negative, got %d", prefix, heal.Retries)
 		}
-		for errorKind, action := range s.BuildGate.Healing.ByErrorKind {
-			parsedKind, ok := ParseRecoveryErrorKind(errorKind)
-			if !ok {
-				return fmt.Errorf("build_gate.healing.by_error_kind.%s: invalid error_kind key", errorKind)
-			}
-			prefix := fmt.Sprintf("build_gate.healing.by_error_kind.%s", errorKind)
-			if action.Retries < 0 {
-				return fmt.Errorf("%s.retries: must be non-negative, got %d", prefix, action.Retries)
-			}
-			if IsTerminalRecoveryErrorKind(parsedKind) {
-				return fmt.Errorf("%s: forbidden for terminal error_kind %q", prefix, errorKind)
-			}
-			if action.Image.IsEmpty() {
-				return fmt.Errorf("%s.image: required", prefix)
-			}
-			if action.Expectations != nil {
-				for i, artifact := range action.Expectations.Artifacts {
-					if err := ValidateGateProfileArtifactContract(
-						artifact.Path,
-						artifact.Schema,
-						fmt.Sprintf("%s.expectations.artifacts[%d]", prefix, i),
-					); err != nil {
-						return err
-					}
+		if heal.Image.IsEmpty() {
+			return fmt.Errorf("%s.image: required", prefix)
+		}
+		if heal.Expectations != nil {
+			for i, artifact := range heal.Expectations.Artifacts {
+				if err := ValidateGateProfileArtifactContract(
+					artifact.Path,
+					artifact.Schema,
+					fmt.Sprintf("%s.expectations.artifacts[%d]", prefix, i),
+				); err != nil {
+					return err
 				}
 			}
-			if err := validateHydraFields(action.CA, action.In, action.Out, action.Home, prefix); err != nil {
-				return err
-			}
-			if err := validateAmataRunSpec(action.Amata, prefix+".amata"); err != nil {
-				return err
-			}
 		}
-		// Healing requires a router to be configured (router runs before healing).
-		if s.BuildGate.Router == nil || s.BuildGate.Router.Image.IsEmpty() {
-			return fmt.Errorf("build_gate.router: required when healing is configured")
-		}
-		if s.BuildGate.Healing.SelectedErrorKind != "" {
-			if _, ok := ParseRecoveryErrorKind(s.BuildGate.Healing.SelectedErrorKind); !ok {
-				return fmt.Errorf("build_gate.healing.selected_error_kind: invalid value %q", s.BuildGate.Healing.SelectedErrorKind)
-			}
-		}
-	}
-
-	// Validate router spec.
-	if s.BuildGate != nil && s.BuildGate.Router != nil {
-		if s.BuildGate.Router.Image.IsEmpty() {
-			return fmt.Errorf("build_gate.router.image: required when router is specified")
-		}
-		if err := validateHydraFields(s.BuildGate.Router.CA, s.BuildGate.Router.In, s.BuildGate.Router.Out, s.BuildGate.Router.Home, "build_gate.router"); err != nil {
+		if err := validateHydraFields(heal.CA, heal.In, heal.Out, heal.Home, prefix); err != nil {
 			return err
 		}
-		if err := validateAmataRunSpec(s.BuildGate.Router.Amata, "build_gate.router.amata"); err != nil {
+		if err := validateAmataRunSpec(heal.Amata, prefix+".amata"); err != nil {
 			return err
 		}
 	}

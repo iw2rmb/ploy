@@ -5,37 +5,22 @@ import (
 	"testing"
 )
 
-func TestParseMigSpecJSON_HealingValidation(t *testing.T) {
-	// Healing with image but no router.
+func TestParseMigSpecJSON_HealValidation(t *testing.T) {
+	// Heal without image.
 	input := `{
 		"steps": [{"image": "test:latest"}],
-		"build_gate": {"healing": {"by_error_kind":{"infra":{"retries": 1, "image": "codex:latest", "command": "fix"}}}}
+		"build_gate": {"heal": {"retries": 1}}
 	}`
 	_, err := ParseMigSpecJSON([]byte(input))
 	if err == nil {
-		t.Fatal("expected validation error for healing without router")
+		t.Fatal("expected validation error for heal without image")
 	}
-}
-
-func TestParseMigSpecJSON_HealingRequiresImage(t *testing.T) {
-	// Healing configured without an image.
-	input := `{
-		"steps": [{"image": "test:latest"}],
-		"build_gate": {
-			"healing": {"by_error_kind":{"infra":{"retries": 1}}},
-			"router": {"image": "router:latest"}
-		}
-	}`
-	_, err := ParseMigSpecJSON([]byte(input))
-	if err == nil {
-		t.Fatal("expected validation error for healing without image")
-	}
-	if want := "build_gate.healing.by_error_kind.infra.image: required"; err.Error() != want {
+	if want := "build_gate.heal.image: required"; err.Error() != want {
 		t.Fatalf("error = %q, want %q", err.Error(), want)
 	}
 }
 
-func TestParseMigSpecJSON_HealingRetriesCoercion(t *testing.T) {
+func TestParseMigSpecJSON_HealRetriesCoercion(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
@@ -46,7 +31,7 @@ func TestParseMigSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "int value",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 3, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
+				"build_gate": {"heal":{"retries": 3, "image":"codex:latest"}}
 			}`,
 			want: 3,
 		},
@@ -54,7 +39,7 @@ func TestParseMigSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "float rejected",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": 1.9, "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
+				"build_gate": {"heal":{"retries": 1.9, "image":"codex:latest"}}
 			}`,
 			wantErr: "parse migs spec json",
 		},
@@ -62,7 +47,7 @@ func TestParseMigSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			name: "non-number rejected",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"healing":{"by_error_kind":{"infra":{"retries": "nope", "image":"codex:latest"}}}, "router":{"image":"router:latest"}}
+				"build_gate": {"heal":{"retries": "nope", "image":"codex:latest"}}
 			}`,
 			wantErr: "parse migs spec json",
 		},
@@ -83,17 +68,55 @@ func TestParseMigSpecJSON_HealingRetriesCoercion(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
-				t.Fatal("build_gate.healing is nil")
+			if spec.BuildGate == nil || spec.BuildGate.Heal == nil {
+				t.Fatal("build_gate.heal is nil")
 			}
-			infra, ok := spec.BuildGate.Healing.ByErrorKind["infra"]
-			if !ok {
-				t.Fatal("missing build_gate.healing.by_error_kind.infra")
-			}
-			if infra.Retries != tt.want {
-				t.Fatalf("retries = %d, want %d", infra.Retries, tt.want)
+			if spec.BuildGate.Heal.Retries != tt.want {
+				t.Fatalf("retries = %d, want %d", spec.BuildGate.Heal.Retries, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseMigSpecJSON_HealRetriesDefault(t *testing.T) {
+	input := `{
+		"steps": [{"image":"test:latest"}],
+		"build_gate": {"heal":{"image":"codex:latest"}}
+	}`
+	spec, err := ParseMigSpecJSON([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if spec.BuildGate.Heal.Retries != 1 {
+		t.Fatalf("retries = %d, want 1 (default)", spec.BuildGate.Heal.Retries)
+	}
+}
+
+func TestParseMigSpecJSON_RouterForbidden(t *testing.T) {
+	input := `{
+		"steps": [{"image": "test:latest"}],
+		"build_gate": {"router": {"image": "router:latest"}}
+	}`
+	_, err := ParseMigSpecJSON([]byte(input))
+	if err == nil {
+		t.Fatal("expected validation error for router field")
+	}
+	if !strings.Contains(err.Error(), "build_gate.router: forbidden") {
+		t.Fatalf("error = %q, want to contain build_gate.router: forbidden", err.Error())
+	}
+}
+
+func TestParseMigSpecJSON_HealingForbidden(t *testing.T) {
+	input := `{
+		"steps": [{"image": "test:latest"}],
+		"build_gate": {"healing": {"by_error_kind": {"infra": {"image": "heal:latest"}}}}
+	}`
+	_, err := ParseMigSpecJSON([]byte(input))
+	if err == nil {
+		t.Fatal("expected validation error for healing field")
+	}
+	if !strings.Contains(err.Error(), "build_gate.healing: forbidden") {
+		t.Fatalf("error = %q, want to contain build_gate.healing: forbidden", err.Error())
 	}
 }
 

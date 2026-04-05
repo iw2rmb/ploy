@@ -470,9 +470,9 @@ func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
 		wantSuffix string
 	}{
 		{
-			name:     "router ca compiled",
-			fileName: "router-ca.pem",
-			content:  "router-cert",
+			name:     "heal ca compiled",
+			fileName: "heal-ca.pem",
+			content:  "heal-cert",
 			field:    "ca",
 			spec: func(filePath string) map[string]any {
 				return map[string]any{
@@ -480,17 +480,17 @@ func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
 						map[string]any{"image": "docker.io/test/mig:latest"},
 					},
 					"build_gate": map[string]any{
-						"router": map[string]any{
-							"image": "docker.io/test/router:latest",
+						"heal": map[string]any{
+							"image": "docker.io/test/healer:latest",
 							"ca":    []any{filePath},
 						},
 					},
 				}
 			},
-			digPath: []string{"build_gate", "router"},
+			digPath: []string{"build_gate", "heal"},
 		},
 		{
-			name:        "healing in compiled",
+			name:        "heal in compiled",
 			fileName:    "healing-config.json",
 			content:     `{"mode":"auto"}`,
 			field:       "in",
@@ -501,18 +501,14 @@ func TestCompileHydraRecordsInPlace_BuildGate(t *testing.T) {
 						map[string]any{"image": "docker.io/test/mig:latest"},
 					},
 					"build_gate": map[string]any{
-						"healing": map[string]any{
-							"by_error_kind": map[string]any{
-								"infra": map[string]any{
-									"image": "docker.io/test/healer:latest",
-									"in":    []any{filePath + ":healing-config.json"},
-								},
-							},
+						"heal": map[string]any{
+							"image": "docker.io/test/healer:latest",
+							"in":    []any{filePath + ":healing-config.json"},
 						},
 					},
 				}
 			},
-			digPath:    []string{"build_gate", "healing", "by_error_kind", "infra"},
+			digPath:    []string{"build_gate", "heal"},
 			wantSuffix: ":/in/healing-config.json",
 		},
 	}

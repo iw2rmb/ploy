@@ -100,63 +100,32 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("router_with_hydra_fields_accepted", func(t *testing.T) {
+	t.Run("heal_with_hydra_fields_accepted", func(t *testing.T) {
 		t.Parallel()
 		spec := `{
 			"steps": [{"image": "alpine:3.20"}],
 			"build_gate": {
-				"enabled": true,
-				"router": {
+				"heal": {
+					"retries": 1,
 					"image": "codex:latest",
-					"in": ["abcdef0:/in/codex-prompt.txt", "ccccccc:/in/auth.json"],
+					"in": ["abcdef0:/in/codex-prompt.txt", "eeeeeee:/in/auth.json"],
 					"ca": ["bbbbbbb0123456"]
 				}
 			},
-			"bundle_map": {"abcdef0": "bun-1", "bbbbbbb0123456": "bun-2", "ccccccc": "bun-3"}
+			"bundle_map": {"abcdef0": "bun-1", "bbbbbbb0123456": "bun-2", "eeeeeee": "bun-3"}
 		}`
 		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
 		if err != nil {
 			t.Fatalf("expected valid spec, got error: %v", err)
 		}
-		if parsed.BuildGate == nil || parsed.BuildGate.Router == nil {
-			t.Fatal("expected router to be parsed")
+		if parsed.BuildGate == nil || parsed.BuildGate.Heal == nil {
+			t.Fatal("expected heal to be parsed")
 		}
-		if len(parsed.BuildGate.Router.In) != 2 {
-			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(parsed.BuildGate.Router.In))
+		if len(parsed.BuildGate.Heal.In) != 2 {
+			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(parsed.BuildGate.Heal.In))
 		}
-	})
-
-	t.Run("healing_action_with_hydra_fields_accepted", func(t *testing.T) {
-		t.Parallel()
-		spec := `{
-			"steps": [{"image": "alpine:3.20"}],
-			"build_gate": {
-				"router": {
-					"image": "codex:latest",
-					"in": ["ddddddd:/in/codex-prompt.txt"]
-				},
-				"healing": {
-					"by_error_kind": {
-						"code": {
-							"retries": 1,
-							"image": "codex:latest",
-							"in": ["abcdef0:/in/codex-prompt.txt", "eeeeeee:/in/auth.json"]
-						}
-					}
-				}
-			},
-			"bundle_map": {"abcdef0": "bun-1", "ddddddd": "bun-2", "eeeeeee": "bun-3"}
-		}`
-		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
-		if err != nil {
-			t.Fatalf("expected valid spec, got error: %v", err)
-		}
-		if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || len(parsed.BuildGate.Healing.ByErrorKind) == 0 {
-			t.Fatal("expected healing action to be parsed")
-		}
-		action := parsed.BuildGate.Healing.ByErrorKind["code"]
-		if len(action.In) != 2 {
-			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(action.In))
+		if len(parsed.BuildGate.Heal.CA) != 1 {
+			t.Errorf("expected 1 ca entry, got %d", len(parsed.BuildGate.Heal.CA))
 		}
 	})
 
