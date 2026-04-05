@@ -61,6 +61,7 @@
 [mig_run_spec_bundle.go](mig_run_spec_bundle.go) Archive building and upload primitives for the Hydra file-record compiler.
 [mig_run_spec_hydra.go](mig_run_spec_hydra.go) Compiles Hydra authoring records into canonical shortHash entries and preserves prior bundle-map mappings for mixed specs.
 [mig_run_spec_hydra_test.go](mig_run_spec_hydra_test.go) Table-driven tests for Hydra entry canonicalization, upload dedup, and bundle_map preservation across mixed specs.
+[mig_run_spec_includes.go](mig_run_spec_includes.go) Resolves `!include` spec fragments with cycle checks, JSON-pointer selection, and deep-merge expansion before payload decoding.
 [mig_run_spec_parsing_test.go](mig_run_spec_parsing_test.go) Table-driven tests for buildSpecPayload parse and validation errors, including malformed specs, `!include` composition, and path resolution behavior.
 [mig_run_spec_test.go](mig_run_spec_test.go) Table-driven tests for buildSpecPayload defaults and overlays, including GitLab domain behavior and gate-phase env routing.
 [mig_spec.go](mig_spec.go) Shared MIG spec structures and helper logic used by command implementations.

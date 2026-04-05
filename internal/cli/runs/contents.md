@@ -5,6 +5,8 @@
 [follow_frame_text.go](follow_frame_text.go) Follow-frame text renderer that builds aligned multi-repo live sections with metadata.
 [follow_frame_text_test.go](follow_frame_text_test.go) Verifies follow-frame layout, line counting, alignment, and dynamic section rendering.
 [follow_test.go](follow_test.go) Tests follow streaming behavior including reconnects, event parsing, and completion handling.
+[follow_tui.go](follow_tui.go) Bubble Tea follow-mode coordinator that polls run reports, listens to SSE refreshes, and renders live terminal status.
+[follow_tui_test.go](follow_tui_test.go) Tests run-state derivation precedence for follow-mode terminal-state decisions.
 [jobs.go](jobs.go) Repo-job listing command with optional attempt filtering and chain-order reconstruction.
 [jobs_test.go](jobs_test.go) Tests repo-job command decoding, ordering logic, and request contract behavior.
 [printing_test.go](printing_test.go) Tests shared log printer output formats and retention summary rendering behavior.
