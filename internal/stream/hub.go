@@ -306,6 +306,13 @@ func (h *Hub) PublishJobLog(ctx context.Context, jobID domaintypes.JobID, record
 	return err
 }
 
+// PublishJobRetention appends a retention hint to a job stream.
+// Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
+func (h *Hub) PublishJobRetention(ctx context.Context, jobID domaintypes.JobID, hint RetentionHint) error {
+	_, err := h.publishJob(ctx, jobID, domaintypes.SSEEventRetention, hint)
+	return err
+}
+
 // PublishJobStatus appends a terminal status event and closes the job stream.
 // Returns ErrInvalidJobID if the job ID is blank or whitespace-only.
 func (h *Hub) PublishJobStatus(ctx context.Context, jobID domaintypes.JobID, status Status) error {
