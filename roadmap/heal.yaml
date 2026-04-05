@@ -155,6 +155,7 @@ items:
       - "Run non-recovery mig execution tests to confirm regular mig and gate dispatch behavior remains unchanged."
     reasoning: "high"
     cfp: 15
+    commit: 789d619d
   - done: false
     reviews: []
     label: "4"
