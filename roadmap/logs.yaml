@@ -88,7 +88,9 @@ items:
     cfp: 12
     commit: f777abb9
   - done: false
-    reviews: []
+    reviews:
+      - gaps: ["\"Add ploy job command surface with follow subcommand that streams only job logs from the new job SSE endpoint.\" — A legacy, conflicting job-log follow path remains in `internal/cli/runs/follow.go` and is still tested against `/v1/runs/{job_id}/logs` in `internal/cli/runs/follow_test.go`, leaving an old run-keyed job-log entrypoint in the codebase.", "\"Add and update CLI tests for new command wiring, output behavior, and link rendering contracts.\" — Top-level CLI usage output is not aligned with the new command wiring: `cmd/ploy/main.go` `printUsage` does not list `job`, and current command/help tests did not catch this discoverability mismatch."]
+        commit: null
     label: "3"
     summary: "Align CLI follow/log UX with the split stream contracts and job-level log entrypoint."
     classification: "determined"
