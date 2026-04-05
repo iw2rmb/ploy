@@ -463,6 +463,62 @@ func TestGetJobLogsHandler_ResumeWithLastEventID(t *testing.T) {
 	}
 }
 
+// TestGetJobLogsHandler_RetentionFrame verifies that GET /v1/jobs/{job_id}/logs
+// emits retention events published on the job stream.
+func TestGetJobLogsHandler_RetentionFrame(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	h := getJobLogsHandler(st, nil, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{ResponseRecorder: httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	// Allow subscription to establish, then publish retention + done.
+	time.Sleep(25 * time.Millisecond)
+	ctx := context.Background()
+	_ = hub.PublishJobRetention(ctx, jobID, logstream.RetentionHint{
+		Retained: true,
+		TTL:      "72h",
+		Expires:  "2026-04-08T00:00:00Z",
+	})
+	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for job stream with retention")
+	}
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "event: retention") {
+		t.Fatalf("expected retention event on job stream; body: %s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event on job stream; body: %s", body)
+	}
+}
+
 func TestBuildJobLogFilter_RejectsNilJobIDLog(t *testing.T) {
 	t.Parallel()
 

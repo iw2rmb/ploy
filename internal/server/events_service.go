@@ -302,6 +302,16 @@ func (s *EventsService) publishLogToJobStream(ctx context.Context, jobID domaint
 	return s.hub.PublishJobLog(ctx, jobID, rec)
 }
 
+// PublishJobRetention emits a retention hint on the job-keyed stream,
+// informing SSE clients about log retention metadata for the job.
+// Returns ErrInvalidJobID if the job ID is blank.
+func (s *EventsService) PublishJobRetention(ctx context.Context, jobID domaintypes.JobID, hint logstream.RetentionHint) error {
+	if jobID.IsZero() {
+		return logstream.ErrInvalidJobID
+	}
+	return s.hub.PublishJobRetention(ctx, jobID, hint)
+}
+
 // PublishJobDone emits a terminal done sentinel on the job-keyed stream,
 // signaling to SSE clients that the job has completed and the stream
 // will close. Returns ErrInvalidJobID if the job ID is blank.
