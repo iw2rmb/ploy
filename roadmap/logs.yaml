@@ -44,7 +44,7 @@ items:
     reasoning: "medium"
     cfp: 8
     commit: ecfb7fc8
-  - done: false
+  - done: true
     reviews:
       - gaps: ["\"Update run SSE handlers to reject log-frame emission and to stream only run lifecycle frames plus terminal done signaling.\" — `getRunLogsHandler` streams via `logstream.Serve` without lifecycle filtering, so it does not explicitly reject `log`/`retention` frames if they appear in the run stream history (`internal/server/handlers/events.go:83`).", "\"Run stream-focused tests to verify GET /v1/runs/{run_id}/logs never emits log or retention frames.\" — Run-stream tests only assert absence of `event: log`; they do not assert absence of `event: retention`, and they do not exercise rejection of non-lifecycle frames on `GET /v1/runs/{run_id}/logs` (`internal/server/handlers/events_http_test.go:85`).", "\"Run job log stream tests to verify GET /v1/jobs/{job_id}/logs emits only log, retention, and done frames with cursor resume support.\" — Current job-stream contract and implementation exclude `retention` (handler/docs state only `log` and `done`, filter rejects retention), and tests do not cover `Last-Event-ID` resume on `GET /v1/jobs/{job_id}/logs` (`internal/server/handlers/jobs_logs.go:23`, `internal/server/handlers/jobs_logs.go:160`, `internal/server/handlers/jobs_logs_test.go:277`, `docs/api/paths/jobs_job_id_logs.yaml:40`)."]
         commit: f78cb379
