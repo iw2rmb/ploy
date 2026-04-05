@@ -48,16 +48,13 @@ func ParseMigSpecJSON(data []byte) (*MigSpec, error) {
 	return &spec, nil
 }
 
-// normalizeHealingDefaults sets default values for healing action specs
+// normalizeHealingDefaults sets default values for the heal spec
 // that cannot be expressed via JSON struct tags (e.g., Retries defaults to 1).
 func normalizeHealingDefaults(spec *MigSpec) {
-	if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
+	if spec.BuildGate == nil || spec.BuildGate.Heal == nil {
 		return
 	}
-	for kind, action := range spec.BuildGate.Healing.ByErrorKind {
-		if action.Retries == 0 {
-			action.Retries = 1
-			spec.BuildGate.Healing.ByErrorKind[kind] = action
-		}
+	if spec.BuildGate.Heal.Retries == 0 {
+		spec.BuildGate.Heal.Retries = 1
 	}
 }

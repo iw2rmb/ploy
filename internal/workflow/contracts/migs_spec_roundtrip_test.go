@@ -54,16 +54,9 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 			}}},
 		},
 		BuildGate: &BuildGateConfig{
-			Healing: &HealingSpec{
-				ByErrorKind: map[string]HealingActionSpec{
-					"infra": {
-						Retries: 2,
-						Image:   JobImage{Universal: "codex:latest"},
-					},
-				},
-			},
-			Router: &RouterSpec{
-				Image: JobImage{Universal: "router:latest"},
+			Heal: &HealSpec{
+				Retries: 2,
+				Image:   JobImage{Universal: "codex:latest"},
 			},
 		},
 	}
@@ -87,8 +80,8 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 	if !parsed.Steps[1].Image.IsStackSpecific() {
 		t.Errorf("steps[1].image should be stack-specific")
 	}
-	if parsed.BuildGate == nil || parsed.BuildGate.Healing == nil || parsed.BuildGate.Healing.ByErrorKind["infra"].Retries != 2 {
-		t.Errorf("build_gate.healing.retries should be 2")
+	if parsed.BuildGate == nil || parsed.BuildGate.Heal == nil || parsed.BuildGate.Heal.Retries != 2 {
+		t.Errorf("build_gate.heal.retries should be 2")
 	}
 }
 

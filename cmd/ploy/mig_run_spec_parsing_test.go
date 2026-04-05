@@ -220,32 +220,16 @@ steps:
 			wantErr: "validate spec: steps[0].retain_container: forbidden",
 		},
 		{
-			name: "healing retain_container forbidden",
+			name: "heal retain_container forbidden",
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        image: docker.io/test/heal:latest
-        retain_container: true
-  router:
-    image: docker.io/test/router:latest
-`,
-			wantErr: "validate spec: build_gate.healing.by_error_kind.infra.retain_container: forbidden",
-		},
-		{
-			name: "router retain_container forbidden",
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-build_gate:
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    image: docker.io/test/heal:latest
     retain_container: true
 `,
-			wantErr: "validate spec: build_gate.router.retain_container: forbidden",
+			wantErr: "validate spec: build_gate.heal.retain_container: forbidden",
 		},
 	}
 
@@ -372,13 +356,9 @@ envs:
   KEY1: value1
   KEY2: value2
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        retries: 1
-        image: docker.io/test/healer:latest
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    retries: 1
+    image: docker.io/test/healer:latest
 gitlab_domain: gitlab.example.com
 mr_on_success: true
 `,
@@ -394,47 +374,38 @@ mr_on_success: true
   "steps": [{"image": "docker.io/test/mig:latest"}],
   "envs": {"KEY1": "value1"},
   "build_gate": {
-    "healing": {
-      "by_error_kind": {
-        "infra": {
-          "retries": 2,
-          "image": "docker.io/test/healer:latest"
-        }
-      }
-    },
-    "router": {"image": "docker.io/test/router:latest"}
+    "heal": {
+      "retries": 2,
+      "image": "docker.io/test/healer:latest"
+    }
   }
 }`,
 			wantStepImage: "docker.io/test/mig:latest",
 			wantRetries:   2,
 		},
 		{
-			name: "healing fields and envs",
+			name: "heal fields and envs",
 			ext:  ".yaml",
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        retries: 2
-        image: docker.io/test/healer:latest
-        command: "heal.sh"
-        envs:
-          HEALING_MODE: auto
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    retries: 2
+    image: docker.io/test/healer:latest
+    command: "heal.sh"
+    envs:
+      HEALING_MODE: auto
 `,
 			wantStepImage: "docker.io/test/mig:latest",
 			digChecks: []digCheck{
 				{
-					digPath:    []string{"build_gate", "healing", "by_error_kind", "infra"},
+					digPath:    []string{"build_gate", "heal"},
 					wantFields: map[string]any{"retries": 2.0, "image": "docker.io/test/healer:latest", "command": "heal.sh"},
 					wantAbsent: []string{"retain_container"},
 				},
 				{
-					digPath:    []string{"build_gate", "healing", "by_error_kind", "infra", "envs"},
+					digPath:    []string{"build_gate", "heal", "envs"},
 					wantFields: map[string]any{"HEALING_MODE": "auto"},
 				},
 			},
@@ -489,8 +460,8 @@ build_gate:
 				}
 			}
 			if tt.wantRetries != 0 {
-				infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
-				assertField(t, infra, "retries", tt.wantRetries)
+				heal := mustDig(t, result, "build_gate", "heal")
+				assertField(t, heal, "retries", tt.wantRetries)
 			}
 			if tt.wantDomain != "" {
 				assertField(t, result, "gitlab_domain", tt.wantDomain)
@@ -525,7 +496,7 @@ func TestBuildSpecPayload_IncludeMerge(t *testing.T) {
 		wantArtifactsLen int
 	}{
 		{
-			name: "healing include merge with inline overrides",
+			name: "heal include merge with inline overrides",
 			fragment: `
 retries: 2
 image: docker.io/test/healer:latest
@@ -541,46 +512,20 @@ expectations:
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        <<: !include %s
-        retries: 1
-        envs:
-          B: inline-override
-          C: inline-only
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    <<: !include %s
+    retries: 1
+    envs:
+      B: inline-override
+      C: inline-only
 `,
-			digPath:          []string{"build_gate", "healing", "by_error_kind", "infra"},
+			digPath:          []string{"build_gate", "heal"},
 			wantFields:       map[string]any{"retries": 1.0, "image": "docker.io/test/healer:latest"},
 			wantEnv:          map[string]any{"A": "from-fragment", "B": "inline-override", "C": "inline-only"},
 			wantArtifactsLen: 1,
 		},
 		{
-			name: "router include merge with inline overrides",
-			fragment: `
-image: docker.io/test/router:latest
-envs:
-  A: from-fragment
-  B: from-fragment
-`,
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-build_gate:
-  router:
-    <<: !include %s
-    envs:
-      B: inline-override
-      C: inline-only
-`,
-			digPath:    []string{"build_gate", "router"},
-			wantFields: map[string]any{"image": "docker.io/test/router:latest"},
-			wantEnv:    map[string]any{"A": "from-fragment", "B": "inline-override", "C": "inline-only"},
-		},
-		{
-			name: "normalizeMigsSpecToJSON healing include merge",
+			name: "normalizeMigsSpecToJSON heal include merge",
 			fragment: `
 retries: 2
 image: docker.io/test/healer:latest
@@ -591,16 +536,12 @@ envs:
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        <<: !include %s
-        envs:
-          INLINE_ONLY: "true"
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    <<: !include %s
+    envs:
+      INLINE_ONLY: "true"
 `,
-			digPath:      []string{"build_gate", "healing", "by_error_kind", "infra"},
+			digPath:      []string{"build_gate", "heal"},
 			useNormalize: true,
 			wantEnv:      map[string]any{"FRAGMENT_ONLY": nil, "INLINE_ONLY": nil},
 		},
@@ -663,40 +604,19 @@ func TestBuildSpecPayload_IncludePointerSelection(t *testing.T) {
 		wantEnv      map[string]any
 	}{
 		{
-			name:         "healing pointer include",
-			fragmentFile: "infra-fragment.yaml",
-			fragment:     "fragments:\n  infra:\n    image: docker.io/test/healer:latest\n    retries: 2\n",
+			name:         "heal pointer include",
+			fragmentFile: "heal-fragment.yaml",
+			fragment:     "fragments:\n  heal:\n    image: docker.io/test/healer:latest\n    retries: 2\n",
 			spec: `
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        <<: !include ./infra-fragment.yaml#/fragments/infra
-        retries: 1
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    <<: !include ./heal-fragment.yaml#/fragments/heal
+    retries: 1
 `,
-			digPath:    []string{"build_gate", "healing", "by_error_kind", "infra"},
+			digPath:    []string{"build_gate", "heal"},
 			wantFields: map[string]any{"image": "docker.io/test/healer:latest", "retries": 1.0},
-		},
-		{
-			name:         "router pointer include",
-			fragmentFile: "router-fragment.yaml",
-			fragment:     "fragments:\n  router:\n    image: docker.io/test/router:latest\n    envs:\n      A: from-fragment\n",
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-build_gate:
-  router:
-    <<: !include ./router-fragment.yaml#/fragments/router
-    envs:
-      B: inline-only
-`,
-			digPath:    []string{"build_gate", "router"},
-			wantFields: map[string]any{"image": "docker.io/test/router:latest"},
-			wantEnv:    map[string]any{"A": "from-fragment", "B": "inline-only"},
 		},
 	}
 
@@ -743,13 +663,9 @@ steps:
       TARGET: java17
 build_gate:
   enabled: true
-  healing:
-    by_error_kind:
-      infra:
-        retries: 1
-        image: docker.io/test/healer:latest
-  router:
-    image: docker.io/test/router:latest
+  heal:
+    retries: 1
+    image: docker.io/test/healer:latest
 `, ".yaml", specPayloadOpts{})
 
 	steps := mustSteps(t, result, 3)
@@ -759,15 +675,14 @@ build_gate:
 
 	assertField(t, steps[1], "image", "docker.io/test/mig-step2:latest")
 	assertField(t, steps[2], "image", "docker.io/test/mig-step3:latest")
-	mustDig(t, result, "build_gate", "healing")
+	mustDig(t, result, "build_gate", "heal")
 }
 
 func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
 	specDir := t.TempDir()
 	t.Chdir(t.TempDir())
 
-	writeFile(t, filepath.Join(specDir, "router-fragment.yaml"), "image: docker.io/test/router-fragment:latest\n")
-	writeFile(t, filepath.Join(specDir, "infra-fragment.yaml"), "image: docker.io/test/healer-fragment:latest\n")
+	writeFile(t, filepath.Join(specDir, "heal-fragment.yaml"), "image: docker.io/test/healer-fragment:latest\n")
 	amataContent := "version: amata/v1\nname: rel-path\n"
 	writeFile(t, filepath.Join(specDir, "amata.yaml"), amataContent)
 
@@ -779,12 +694,8 @@ steps:
     amata:
       spec: amata.yaml
 build_gate:
-  healing:
-    by_error_kind:
-      infra:
-        <<: !include infra-fragment.yaml
-  router:
-    <<: !include router-fragment.yaml
+  heal:
+    <<: !include heal-fragment.yaml
 `, ".yaml", specPayloadOpts{})
 
 	envs := mustDig(t, result, "envs")
@@ -794,24 +705,21 @@ build_gate:
 	amata := mustDig(t, steps[0], "amata")
 	assertField(t, amata, "spec", amataContent)
 
-	infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
-	assertField(t, infra, "image", "docker.io/test/healer-fragment:latest")
-
-	router := mustDig(t, result, "build_gate", "router")
-	assertField(t, router, "image", "docker.io/test/router-fragment:latest")
+	heal := mustDig(t, result, "build_gate", "heal")
+	assertField(t, heal, "image", "docker.io/test/healer-fragment:latest")
 }
 
 func TestBuildSpecPayload_IncludeCycleDetected(t *testing.T) {
 	specDir := t.TempDir()
-	writeFile(t, filepath.Join(specDir, "a.yaml"), "router: !include ./b.yaml#/router\n")
-	writeFile(t, filepath.Join(specDir, "b.yaml"), "router: !include ./a.yaml#/router\n")
+	writeFile(t, filepath.Join(specDir, "a.yaml"), "heal: !include ./b.yaml#/heal\n")
+	writeFile(t, filepath.Join(specDir, "b.yaml"), "heal: !include ./a.yaml#/heal\n")
 
 	specPath := filepath.Join(specDir, "spec.yaml")
 	writeFile(t, specPath, `
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  router: !include ./a.yaml#/router
+  heal: !include ./a.yaml#/heal
 `)
 
 	_, err := callBuildSpecPayload(t, specPath, specPayloadOpts{})
@@ -1003,13 +911,9 @@ steps:
       default: $PLOY_TEST_STEP_DEFAULT
       java-maven: ${PLOY_TEST_STEP_MAVEN}
 build_gate:
-  router:
-    image: $PLOY_TEST_IMG
-  healing:
-    by_error_kind:
-      infra:
-        retries: 1
-        image: ${PLOY_TEST_IMG}
+  heal:
+    retries: 1
+    image: ${PLOY_TEST_IMG}
 `, ".yaml", specPayloadOpts{})
 
 	steps := mustSteps(t, result, 1)
@@ -1017,9 +921,6 @@ build_gate:
 	assertField(t, stepImage, "default", "docker.io/test/default-step:latest")
 	assertField(t, stepImage, "java-maven", "docker.io/test/maven-step:latest")
 
-	router := mustDig(t, result, "build_gate", "router")
-	assertField(t, router, "image", "docker.io/test/codex:latest")
-
-	infra := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra")
-	assertField(t, infra, "image", "docker.io/test/codex:latest")
+	heal := mustDig(t, result, "build_gate", "heal")
+	assertField(t, heal, "image", "docker.io/test/codex:latest")
 }

@@ -241,10 +241,10 @@ envs:
 }
 
 // ---------------------------------------------------------------------------
-// applyConfigOverlayInPlace: phase routing for router/healing
+// applyConfigOverlayInPlace: heal overlay routing
 // ---------------------------------------------------------------------------
 
-func TestApplyConfigOverlayInPlace_PhaseRouting(t *testing.T) {
+func TestApplyConfigOverlayInPlace_HealOverlay(t *testing.T) {
 	tests := []struct {
 		name    string
 		config  string
@@ -253,29 +253,7 @@ func TestApplyConfigOverlayInPlace_PhaseRouting(t *testing.T) {
 		wantEnv map[string]any
 	}{
 		{
-			name: "router inherits pre_gate overlay",
-			config: `
-defaults:
-  job:
-    pre_gate:
-      envs:
-        GATE_KEY: gate_val
-`,
-			spec: map[string]any{
-				"steps": []any{
-					map[string]any{"image": "docker.io/test/mig:latest"},
-				},
-				"build_gate": map[string]any{
-					"router": map[string]any{
-						"image": "docker.io/test/router:latest",
-					},
-				},
-			},
-			digPath: []string{"build_gate", "router"},
-			wantEnv: map[string]any{"GATE_KEY": "gate_val"},
-		},
-		{
-			name: "healing gets heal overlay",
+			name: "heal gets heal overlay",
 			config: `
 defaults:
   job:
@@ -288,43 +266,13 @@ defaults:
 					map[string]any{"image": "docker.io/test/mig:latest"},
 				},
 				"build_gate": map[string]any{
-					"healing": map[string]any{
-						"by_error_kind": map[string]any{
-							"infra": map[string]any{
-								"image": "docker.io/test/healer:latest",
-							},
-						},
+					"heal": map[string]any{
+						"image": "docker.io/test/healer:latest",
 					},
 				},
 			},
-			digPath: []string{"build_gate", "healing", "by_error_kind", "infra"},
+			digPath: []string{"build_gate", "heal"},
 			wantEnv: map[string]any{"HEAL_KEY": "heal_val"},
-		},
-		{
-			name: "router derives active gate phase from spec",
-			config: `
-defaults:
-  job:
-    pre_gate:
-      envs:
-        PHASE_KEY: pre_gate_val
-    post_gate:
-      envs:
-        PHASE_KEY: post_gate_val
-`,
-			spec: map[string]any{
-				"steps": []any{
-					map[string]any{"image": "docker.io/test/mig:latest"},
-				},
-				"build_gate": map[string]any{
-					"post": map[string]any{"target": "unit"},
-					"router": map[string]any{
-						"image": "docker.io/test/router:latest",
-					},
-				},
-			},
-			digPath: []string{"build_gate", "router"},
-			wantEnv: map[string]any{"PHASE_KEY": "post_gate_val"},
 		},
 	}
 
@@ -342,36 +290,6 @@ defaults:
 			envs := mustDig(t, target, "envs")
 			for k, v := range tt.wantEnv {
 				assertField(t, envs, k, v)
-			}
-		})
-	}
-}
-
-// ---------------------------------------------------------------------------
-// deriveActiveGatePhase
-// ---------------------------------------------------------------------------
-
-func TestDeriveActiveGatePhase(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		spec map[string]any
-		want string
-	}{
-		{name: "no build_gate", spec: map[string]any{}, want: "pre_gate"},
-		{name: "pre configured", spec: map[string]any{"build_gate": map[string]any{"pre": map[string]any{"target": "build"}}}, want: "pre_gate"},
-		{name: "only re", spec: map[string]any{"build_gate": map[string]any{"re": map[string]any{"target": "build"}}}, want: "re_gate"},
-		{name: "only post", spec: map[string]any{"build_gate": map[string]any{"post": map[string]any{"target": "unit"}}}, want: "post_gate"},
-		{name: "pre and re", spec: map[string]any{"build_gate": map[string]any{"pre": map[string]any{"target": "build"}, "re": map[string]any{"target": "build"}}}, want: "pre_gate"},
-		{name: "re and post", spec: map[string]any{"build_gate": map[string]any{"re": map[string]any{"target": "build"}, "post": map[string]any{"target": "unit"}}}, want: "re_gate"},
-		{name: "pre and post", spec: map[string]any{"build_gate": map[string]any{"pre": map[string]any{"target": "build"}, "post": map[string]any{"target": "unit"}}}, want: "pre_gate"},
-		{name: "no pre/re/post", spec: map[string]any{"build_gate": map[string]any{"enabled": true}}, want: "pre_gate"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := deriveActiveGatePhase(tt.spec); got != tt.want {
-				t.Errorf("deriveActiveGatePhase() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -452,9 +370,6 @@ defaults:
     heal:
       envs:
         HEAL_LOCAL: heal_local_val
-    pre_gate:
-      envs:
-        GATE_LOCAL: gate_local_val
 `)
 
 	result := runBuildSpecPayload(t, `
@@ -468,12 +383,8 @@ envs:
 build_gate:
   pre:
     target: build
-  router:
-    image: docker.io/test/router:latest
-  healing:
-    by_error_kind:
-      infra:
-        image: docker.io/test/healer:latest
+  heal:
+    image: docker.io/test/healer:latest
 `, ".yaml", specPayloadOpts{})
 
 	// Top-level envs: spec wins for SHARED, local key preserved.
@@ -487,11 +398,7 @@ build_gate:
 	stepEnvs := mustDig(t, steps[0], "envs")
 	assertField(t, stepEnvs, "STEP_SHARED", "from_spec")
 
-	// Router: pre_gate overlay applied.
-	routerEnvs := mustDig(t, result, "build_gate", "router", "envs")
-	assertField(t, routerEnvs, "GATE_LOCAL", "gate_local_val")
-
-	// Healing: heal overlay applied.
-	healEnvs := mustDig(t, result, "build_gate", "healing", "by_error_kind", "infra", "envs")
+	// Heal: heal overlay applied.
+	healEnvs := mustDig(t, result, "build_gate", "heal", "envs")
 	assertField(t, healEnvs, "HEAL_LOCAL", "heal_local_val")
 }

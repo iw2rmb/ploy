@@ -84,18 +84,11 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 		],
 		"build_gate": {
 			"enabled": true,
-			"healing": {
-				"by_error_kind": {
-					"infra": {
-						"retries": 3,
-						"image": "ghcr.io/iw2rmb/ploy/codex:latest",
-						"command": "fix-it",
-						"envs": {"PROMPT": "fix the build"}
-					}
-				}
-			},
-			"router": {
-				"image": "ghcr.io/iw2rmb/ploy/router:latest"
+			"heal": {
+				"retries": 3,
+				"image": "ghcr.io/iw2rmb/ploy/codex:latest",
+				"command": "fix-it",
+				"envs": {"PROMPT": "fix the build"}
 			}
 		}
 	}`
@@ -138,31 +131,20 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 		t.Errorf("steps[1].always = true, want false")
 	}
 
-	// Verify healing.
-	if spec.BuildGate == nil || spec.BuildGate.Healing == nil {
-		t.Fatal("build_gate.healing is nil")
+	// Verify heal.
+	if spec.BuildGate == nil || spec.BuildGate.Heal == nil {
+		t.Fatal("build_gate.heal is nil")
 	}
-	infra, ok := spec.BuildGate.Healing.ByErrorKind["infra"]
-	if !ok {
-		t.Fatal("build_gate.healing.by_error_kind.infra is missing")
+	if spec.BuildGate.Heal.Retries != 3 {
+		t.Errorf("build_gate.heal.retries = %d, want 3", spec.BuildGate.Heal.Retries)
 	}
-	if infra.Retries != 3 {
-		t.Errorf("build_gate.healing.by_error_kind.infra.retries = %d, want 3", infra.Retries)
+	if spec.BuildGate.Heal.Image.Universal != "ghcr.io/iw2rmb/ploy/codex:latest" {
+		t.Errorf("build_gate.heal.image = %q, want %q",
+			spec.BuildGate.Heal.Image.Universal, "ghcr.io/iw2rmb/ploy/codex:latest")
 	}
-	if infra.Image.Universal != "ghcr.io/iw2rmb/ploy/codex:latest" {
-		t.Errorf("build_gate.healing.by_error_kind.infra.image = %q, want %q",
-			infra.Image.Universal, "ghcr.io/iw2rmb/ploy/codex:latest")
-	}
-	if infra.Command.Shell != "fix-it" {
-		t.Errorf("build_gate.healing.by_error_kind.infra.command = %q, want %q",
-			infra.Command.Shell, "fix-it")
-	}
-	if spec.BuildGate.Router == nil {
-		t.Fatal("build_gate.router is nil")
-	}
-	if spec.BuildGate.Router.Image.Universal != "ghcr.io/iw2rmb/ploy/router:latest" {
-		t.Errorf("build_gate.router.image = %q, want %q",
-			spec.BuildGate.Router.Image.Universal, "ghcr.io/iw2rmb/ploy/router:latest")
+	if spec.BuildGate.Heal.Command.Shell != "fix-it" {
+		t.Errorf("build_gate.heal.command = %q, want %q",
+			spec.BuildGate.Heal.Command.Shell, "fix-it")
 	}
 }
 
@@ -180,25 +162,14 @@ func TestParseMigSpecJSON_RetainContainerForbidden(t *testing.T) {
 			wantErr: "steps[0].retain_container: forbidden",
 		},
 		{
-			name: "healing retain forbidden",
+			name: "heal retain forbidden",
 			input: `{
 				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
 				"build_gate": {
-					"healing": {"by_error_kind": {"infra": {"image": "ghcr.io/iw2rmb/ploy/heal:latest", "retain_container": true}}},
-					"router": {"image": "ghcr.io/iw2rmb/ploy/router:latest"}
+					"heal": {"image": "ghcr.io/iw2rmb/ploy/heal:latest", "retain_container": true}
 				}
 			}`,
-			wantErr: "build_gate.healing.by_error_kind.infra.retain_container: forbidden",
-		},
-		{
-			name: "router retain forbidden",
-			input: `{
-				"steps": [{"image": "ghcr.io/iw2rmb/ploy/mig:latest"}],
-				"build_gate": {
-					"router": {"image": "ghcr.io/iw2rmb/ploy/router:latest", "retain_container": true}
-				}
-			}`,
-			wantErr: "build_gate.router.retain_container: forbidden",
+			wantErr: "build_gate.heal.retain_container: forbidden",
 		},
 	}
 

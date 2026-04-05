@@ -46,19 +46,15 @@ func newMockBundleSrvForLoadSpec(t *testing.T) (*httptest.Server, *url.URL, *htt
 	return srv, u, srv.Client()
 }
 
-func TestLoadSpec_ResolvesStepAndRouterHydraRecords(t *testing.T) {
+func TestLoadSpec_ResolvesStepHydraRecords(t *testing.T) {
 	_, base, client := newMockBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
 	stepInFile := filepath.Join(tmpDir, "step-config.txt")
-	routerInFile := filepath.Join(tmpDir, "router-config.txt")
 	specPath := filepath.Join(tmpDir, "spec.yaml")
 
 	if err := os.WriteFile(stepInFile, []byte("step-config-data"), 0o644); err != nil {
 		t.Fatalf("write step in file: %v", err)
-	}
-	if err := os.WriteFile(routerInFile, []byte("router-config-data"), 0o644); err != nil {
-		t.Fatalf("write router in file: %v", err)
 	}
 
 	spec := []byte(`
@@ -68,13 +64,6 @@ steps:
       STEP_TOKEN: step-token
     in:
       - ` + stepInFile + `:config.txt
-build_gate:
-  router:
-    image: docker.io/test/router:latest
-    envs:
-      ROUTER_TOKEN: router-token
-    in:
-      - ` + routerInFile + `:router-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -108,27 +97,9 @@ build_gate:
 	if !strings.Contains(stepInEntry, ":/in/config.txt") {
 		t.Errorf("expected steps[0].in[0] to contain :/in/config.txt, got %q", stepInEntry)
 	}
-
-	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
-	routerEnvs := router["envs"].(map[string]any)
-	if got, want := routerEnvs["ROUTER_TOKEN"].(string), "router-token"; got != want {
-		t.Fatalf("build_gate.router.envs.ROUTER_TOKEN got %q, want %q", got, want)
-	}
-
-	routerIn, ok := router["in"].([]any)
-	if !ok || len(routerIn) != 1 {
-		t.Fatalf("expected router.in with 1 entry, got %v", router["in"])
-	}
-	routerInEntry, ok := routerIn[0].(string)
-	if !ok {
-		t.Fatalf("expected router.in[0] to be string, got %T", routerIn[0])
-	}
-	if !strings.Contains(routerInEntry, ":/in/router-config.txt") {
-		t.Errorf("expected router.in[0] to contain :/in/router-config.txt, got %q", routerInEntry)
-	}
 }
 
-func TestLoadSpec_ResolvesHealingHydraRecords(t *testing.T) {
+func TestLoadSpec_ResolvesHealHydraRecords(t *testing.T) {
 	_, base, client := newMockBundleSrvForLoadSpec(t)
 
 	tmpDir := t.TempDir()
@@ -143,17 +114,13 @@ func TestLoadSpec_ResolvesHealingHydraRecords(t *testing.T) {
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  router:
-    image: docker.io/test/router:latest
-  healing:
-    by_error_kind:
-      infra:
-        retries: 1
-        image: docker.io/test/healer:latest
-        envs:
-          HEALING_TOKEN: healing-token
-        in:
-          - ` + healingInFile + `:healing-config.txt
+  heal:
+    retries: 1
+    image: docker.io/test/healer:latest
+    envs:
+      HEALING_TOKEN: healing-token
+    in:
+      - ` + healingInFile + `:healing-config.txt
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -169,22 +136,22 @@ build_gate:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	infra := result["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
-	healingEnvs := infra["envs"].(map[string]any)
+	heal := result["build_gate"].(map[string]any)["heal"].(map[string]any)
+	healingEnvs := heal["envs"].(map[string]any)
 	if got, want := healingEnvs["HEALING_TOKEN"].(string), "healing-token"; got != want {
-		t.Fatalf("build_gate.healing.by_error_kind.infra.envs.HEALING_TOKEN got %q, want %q", got, want)
+		t.Fatalf("build_gate.heal.envs.HEALING_TOKEN got %q, want %q", got, want)
 	}
 
-	healingIn, ok := infra["in"].([]any)
+	healingIn, ok := heal["in"].([]any)
 	if !ok || len(healingIn) != 1 {
-		t.Fatalf("expected infra.in with 1 entry, got %v", infra["in"])
+		t.Fatalf("expected heal.in with 1 entry, got %v", heal["in"])
 	}
 	healingInEntry, ok := healingIn[0].(string)
 	if !ok {
-		t.Fatalf("expected infra.in[0] to be string, got %T", healingIn[0])
+		t.Fatalf("expected heal.in[0] to be string, got %T", healingIn[0])
 	}
 	if !strings.Contains(healingInEntry, ":/in/healing-config.txt") {
-		t.Errorf("expected infra.in[0] to contain :/in/healing-config.txt, got %q", healingInEntry)
+		t.Errorf("expected heal.in[0] to contain :/in/healing-config.txt, got %q", healingInEntry)
 	}
 }
 
@@ -236,13 +203,9 @@ steps:
       default: $PLOY_TEST_LOADSPEC_STEP_DEFAULT
       java-gradle: ${PLOY_TEST_LOADSPEC_IMAGE}
 build_gate:
-  router:
-    image: $PLOY_TEST_LOADSPEC_IMAGE
-  healing:
-    by_error_kind:
-      infra:
-        retries: 1
-        image: ${PLOY_TEST_LOADSPEC_IMAGE}
+  heal:
+    retries: 1
+    image: ${PLOY_TEST_LOADSPEC_IMAGE}
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -267,14 +230,9 @@ build_gate:
 		t.Fatalf("steps[0].image.java-gradle got %q, want %q", got, want)
 	}
 
-	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
-	if got, want := router["image"].(string), "docker.io/test/codex:latest"; got != want {
-		t.Fatalf("build_gate.router.image got %q, want %q", got, want)
-	}
-
-	infra := result["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)["infra"].(map[string]any)
-	if got, want := infra["image"].(string), "docker.io/test/codex:latest"; got != want {
-		t.Fatalf("build_gate.healing.by_error_kind.infra.image got %q, want %q", got, want)
+	heal := result["build_gate"].(map[string]any)["heal"].(map[string]any)
+	if got, want := heal["image"].(string), "docker.io/test/codex:latest"; got != want {
+		t.Fatalf("build_gate.heal.image got %q, want %q", got, want)
 	}
 }
 
@@ -288,16 +246,16 @@ func TestLoadSpec_IncludeFragmentNormalizesRelativeHydraSources(t *testing.T) {
 	}
 
 	// Source file path is intentionally relative in the included fragment.
-	if err := os.WriteFile(filepath.Join(fragmentsDir, "router-config.txt"), []byte("router-config-data"), 0o644); err != nil {
-		t.Fatalf("write router config: %v", err)
+	if err := os.WriteFile(filepath.Join(fragmentsDir, "heal-config.txt"), []byte("heal-config-data"), 0o644); err != nil {
+		t.Fatalf("write heal config: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(fragmentsDir, "router.fragment.yaml"), []byte(`
-router:
-  image: docker.io/test/router:latest
+	if err := os.WriteFile(filepath.Join(fragmentsDir, "heal.fragment.yaml"), []byte(`
+heal:
+  image: docker.io/test/healer:latest
   in:
-    - ./router-config.txt:router-config.txt
+    - ./heal-config.txt:heal-config.txt
 `), 0o644); err != nil {
-		t.Fatalf("write router fragment: %v", err)
+		t.Fatalf("write heal fragment: %v", err)
 	}
 
 	specPath := filepath.Join(tmpDir, "spec.yaml")
@@ -305,8 +263,8 @@ router:
 steps:
   - image: docker.io/test/mig:latest
 build_gate:
-  router:
-    <<: !include ./fragments/router.fragment.yaml#/router
+  heal:
+    <<: !include ./fragments/heal.fragment.yaml#/heal
 `)
 	if err := os.WriteFile(specPath, spec, 0o644); err != nil {
 		t.Fatalf("write spec file: %v", err)
@@ -322,13 +280,13 @@ build_gate:
 		t.Fatalf("unmarshal payload: %v", err)
 	}
 
-	router := result["build_gate"].(map[string]any)["router"].(map[string]any)
-	routerIn := router["in"].([]any)
-	entry, ok := routerIn[0].(string)
+	heal := result["build_gate"].(map[string]any)["heal"].(map[string]any)
+	healIn := heal["in"].([]any)
+	entry, ok := healIn[0].(string)
 	if !ok {
-		t.Fatalf("expected router.in[0] string, got %T", routerIn[0])
+		t.Fatalf("expected heal.in[0] string, got %T", healIn[0])
 	}
-	if !strings.Contains(entry, ":/in/router-config.txt") {
-		t.Fatalf("router.in[0] = %q, want canonical /in destination", entry)
+	if !strings.Contains(entry, ":/in/heal-config.txt") {
+		t.Fatalf("heal.in[0] = %q, want canonical /in destination", entry)
 	}
 }

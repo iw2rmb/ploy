@@ -161,22 +161,9 @@ func compileHydraRecordsInPlace(ctx context.Context, base *url.URL, client *http
 	}
 
 	if bg, ok := spec["build_gate"].(map[string]any); ok {
-		if router, ok := bg["router"].(map[string]any); ok {
-			if hasAuthoringEntries(router) {
-				blocks = append(blocks, blockRef{router, "build_gate.router"})
-			}
-		}
-		if healing, ok := bg["healing"].(map[string]any); ok {
-			if byErrorKind, ok := healing["by_error_kind"].(map[string]any); ok {
-				for errorKind, item := range byErrorKind {
-					action, ok := item.(map[string]any)
-					if !ok {
-						continue
-					}
-					if hasAuthoringEntries(action) {
-						blocks = append(blocks, blockRef{action, fmt.Sprintf("build_gate.healing.by_error_kind.%s", errorKind)})
-					}
-				}
+		if heal, ok := bg["heal"].(map[string]any); ok {
+			if hasAuthoringEntries(heal) {
+				blocks = append(blocks, blockRef{heal, "build_gate.heal"})
 			}
 		}
 	}

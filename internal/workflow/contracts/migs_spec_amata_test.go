@@ -13,47 +13,12 @@ type amataPlacement struct {
 	wrapJSON func(amataFragment string) string           // build full spec JSON given an amata JSON object
 	baseJSON string                                      // valid spec JSON without amata (direct codex mode)
 	getAmata func(*MigSpec) *AmataRunSpec               // extract amata from parsed result
-	errPfx   string                                      // error path prefix, e.g. "build_gate.router.amata"
+	errPfx   string                                      // error path prefix, e.g. "build_gate.heal.amata"
 	forbid   []struct{ name, input, wantErr string }     // site-specific flat-key forbidden cases
 }
 
 func amataplacements() []amataPlacement {
 	return []amataPlacement{
-		{
-			name: "Router",
-			wrapJSON: func(frag string) string {
-				return fmt.Sprintf(`{
-					"steps": [{"image": "test:latest"}],
-					"build_gate": {
-						"router": {"image": "router:latest", "amata": %s}
-					}
-				}`, frag)
-			},
-			baseJSON: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {"router": {"image": "router:latest"}}
-			}`,
-			getAmata: func(s *MigSpec) *AmataRunSpec { return s.BuildGate.Router.Amata },
-			errPfx:   "build_gate.router.amata",
-			forbid: []struct{ name, input, wantErr string }{
-				{
-					name: "flat_spec_forbidden",
-					input: `{
-						"steps": [{"image": "test:latest"}],
-						"build_gate": {"router": {"image": "router:latest", "spec": "bad"}}
-					}`,
-					wantErr: "build_gate.router.spec: forbidden",
-				},
-				{
-					name: "flat_set_forbidden",
-					input: `{
-						"steps": [{"image": "test:latest"}],
-						"build_gate": {"router": {"image": "router:latest", "set": []}}
-					}`,
-					wantErr: "build_gate.router.set: forbidden",
-				},
-			},
-		},
 		{
 			name: "Step",
 			wrapJSON: func(frag string) string {
@@ -66,53 +31,41 @@ func amataplacements() []amataPlacement {
 			errPfx:   "steps[0].amata",
 		},
 		{
-			name: "Healing",
+			name: "Heal",
 			wrapJSON: func(frag string) string {
 				return fmt.Sprintf(`{
 					"steps": [{"image": "test:latest"}],
 					"build_gate": {
-						"healing": {
-							"by_error_kind": {
-								"code": {"image": "heal:latest", "amata": %s}
-							}
-						},
-						"router": {"image": "router:latest"}
+						"heal": {"image": "heal:latest", "amata": %s}
 					}
 				}`, frag)
 			},
 			baseJSON: `{
 				"steps": [{"image": "test:latest"}],
 				"build_gate": {
-					"healing": {"by_error_kind": {"infra": {"image": "heal:latest"}}},
-					"router": {"image": "router:latest"}
+					"heal": {"image": "heal:latest"}
 				}
 			}`,
 			getAmata: func(s *MigSpec) *AmataRunSpec {
-				return s.BuildGate.Healing.ByErrorKind["code"].Amata
+				return s.BuildGate.Heal.Amata
 			},
-			errPfx: "build_gate.healing.by_error_kind.code.amata",
+			errPfx: "build_gate.heal.amata",
 			forbid: []struct{ name, input, wantErr string }{
 				{
 					name: "flat_spec_forbidden",
 					input: `{
 						"steps": [{"image": "test:latest"}],
-						"build_gate": {
-							"healing": {"by_error_kind": {"infra": {"image": "heal:latest", "spec": "bad"}}},
-							"router": {"image": "router:latest"}
-						}
+						"build_gate": {"heal": {"image": "heal:latest", "spec": "bad"}}
 					}`,
-					wantErr: "build_gate.healing.by_error_kind.infra.spec: forbidden",
+					wantErr: "build_gate.heal.spec: forbidden",
 				},
 				{
 					name: "flat_set_forbidden",
 					input: `{
 						"steps": [{"image": "test:latest"}],
-						"build_gate": {
-							"healing": {"by_error_kind": {"code": {"image": "heal:latest", "set": []}}},
-							"router": {"image": "router:latest"}
-						}
+						"build_gate": {"heal": {"image": "heal:latest", "set": []}}
 					}`,
-					wantErr: "build_gate.healing.by_error_kind.code.set: forbidden",
+					wantErr: "build_gate.heal.set: forbidden",
 				},
 			},
 		},
@@ -120,7 +73,7 @@ func amataplacements() []amataPlacement {
 }
 
 // TestParseMigSpecJSON_Amata covers amata parsing and validation for every
-// valid placement site: router, step, and healing action.
+// valid placement site: step and heal action.
 func TestParseMigSpecJSON_Amata(t *testing.T) {
 	for _, p := range amataplacements() {
 		t.Run(p.name, func(t *testing.T) {
@@ -216,7 +169,7 @@ func TestParseMigSpecJSON_Amata(t *testing.T) {
 }
 
 // TestParseMigSpecJSON_AmataForbiddenPlacements verifies that amata is rejected
-// outside of steps[].amata, build_gate.router.amata, and build_gate.healing.by_error_kind.<kind>.amata.
+// outside of steps[].amata and build_gate.heal.amata.
 func TestParseMigSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -228,25 +181,10 @@ func TestParseMigSpecJSON_AmataForbiddenPlacements(t *testing.T) {
 			input: `{
 				"steps": [{"image": "test:latest"}],
 				"build_gate": {
-					"amata": {"spec": "bad"},
-					"router": {"image": "router:latest"}
+					"amata": {"spec": "bad"}
 				}
 			}`,
 			wantErr: "build_gate.amata: forbidden",
-		},
-		{
-			name: "build_gate.healing amata forbidden",
-			input: `{
-				"steps": [{"image": "test:latest"}],
-				"build_gate": {
-					"healing": {
-						"amata": {"spec": "bad"},
-						"by_error_kind": {}
-					},
-					"router": {"image": "router:latest"}
-				}
-			}`,
-			wantErr: "build_gate.healing.amata: forbidden",
 		},
 		{
 			name: "build_gate pre amata forbidden",

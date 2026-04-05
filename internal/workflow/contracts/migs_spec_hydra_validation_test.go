@@ -129,12 +129,11 @@ func TestMigSpecValidate_HydraFieldsStep(t *testing.T) {
 	}
 }
 
-func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
+func TestMigSpecValidate_HydraFieldsHeal(t *testing.T) {
 	base := `{
 		"steps": [{"image": "img:latest"}],
 		"build_gate": {
-			"router": {"image": "router:latest"},
-			"healing": {"by_error_kind": {"infra": {"retries": 1, "image": "healer:latest", %s}}}
+			"heal": {"retries": 1, "image": "healer:latest", %s}
 		}
 	}`
 
@@ -144,17 +143,17 @@ func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:  "valid in entry in healing action",
+			name:  "valid in entry in heal",
 			field: `"in": ["abcdef0:/in/patch.diff"]`,
 		},
 		{
-			name:  "valid home entry in healing action",
+			name:  "valid home entry in heal",
 			field: `"home": ["abcdef0:.config/app.json:ro"]`,
 		},
 		{
-			name:    "invalid in entry in healing action",
+			name:    "invalid in entry in heal",
 			field:   `"in": ["abcdef0:/tmp/bad"]`,
-			wantErr: "build_gate.healing.by_error_kind.infra.in[0]",
+			wantErr: "build_gate.heal.in[0]",
 		},
 	}
 
@@ -178,52 +177,3 @@ func TestMigSpecValidate_HydraFieldsHealing(t *testing.T) {
 		})
 	}
 }
-
-func TestMigSpecValidate_HydraFieldsRouter(t *testing.T) {
-	base := `{
-		"steps": [{"image": "img:latest"}],
-		"build_gate": {"router": {"image": "router:latest", %s}}
-	}`
-
-	tests := []struct {
-		name    string
-		field   string
-		wantErr string
-	}{
-		{
-			name:    "env forbidden in router",
-			field:   `"env": {"FOO": "bar"}`,
-			wantErr: "build_gate.router.env: forbidden",
-		},
-		{
-			name:  "valid ca entry in router",
-			field: `"ca": ["abcdef0123456"]`,
-		},
-		{
-			name:    "invalid ca in router",
-			field:   `"ca": ["NOT_HEX"]`,
-			wantErr: "build_gate.router.ca[0]",
-		},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			input := strings.ReplaceAll(base, "%s", tc.field)
-			_, err := ParseMigSpecJSON([]byte(input))
-			if tc.wantErr == "" {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				return
-			}
-			if err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-			}
-		})
-	}
-}
-
