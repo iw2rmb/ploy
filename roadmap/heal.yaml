@@ -12,11 +12,20 @@ reviews: []
 items:
   - done: true
     reviews:
-      - gaps: ["\"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings\": stale contract docs remain in [internal/workflow/contracts/build_gate_config.go](/Users/vk/@iw2rmb/ploy/internal/workflow/contracts/build_gate_config.go#L145) and [internal/workflow/contracts/build_gate_config.go](/Users/vk/@iw2rmb/ploy/internal/workflow/contracts/build_gate_config.go#L151), still referencing router/`RouterSpec`/`HealingActionSpec` after those types were removed."]
+      - gaps:
+          [
+            '"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings": stale contract docs remain in [internal/workflow/contracts/build_gate_config.go](/Users/vk/@iw2rmb/ploy/internal/workflow/contracts/build_gate_config.go#L145) and [internal/workflow/contracts/build_gate_config.go](/Users/vk/@iw2rmb/ploy/internal/workflow/contracts/build_gate_config.go#L151), still referencing router/`RouterSpec`/`HealingActionSpec` after those types were removed.',
+          ]
         commit: 2d5b3166
-      - gaps: ["\"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings\": stale router-era wording remains in `internal/workflow/contracts/hydra.go:210` (\"container spec (step, router, or healing action)\"), leaving Step 1 contract-surface cleanup incomplete."]
+      - gaps:
+          [
+            '"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings": stale router-era wording remains in `internal/workflow/contracts/hydra.go:210` ("container spec (step, router, or healing action)"), leaving Step 1 contract-surface cleanup incomplete.',
+          ]
         commit: b531a62b
-      - gaps: ["\"[replace] CLI spec shaping over build_gate.healing.by_error_kind entries -> CLI spec shaping over one build_gate.heal entry\": stale router-era wording remains in `cmd/ploy/mig_run_spec_hydra_test.go:458` (\"Compile Hydra records: build_gate router & healing\"), leaving a Step 1 leftover in CLI build-gate test surface."]
+      - gaps:
+          [
+            '"[replace] CLI spec shaping over build_gate.healing.by_error_kind entries -> CLI spec shaping over one build_gate.heal entry": stale router-era wording remains in `cmd/ploy/mig_run_spec_hydra_test.go:458` ("Compile Hydra records: build_gate router & healing"), leaving a Step 1 leftover in CLI build-gate test surface.',
+          ]
         commit: 54bb129c
     label: "1"
     summary: "Replace build-gate contracts and CLI spec shaping with a single build_gate.heal configuration surface."
@@ -62,7 +71,12 @@ items:
     cfp: 14
     commit: e77bb369
   - done: false
-    reviews: []
+    reviews:
+      - gaps:
+          [
+            '"Remove RouterCmd from build_gate_metadata struct and ErrorKind/RouterCmd from API job structs in server and migs/api layers.": `ErrorKind` is still present in API recovery projection structs and wiring at [internal/migs/api/run_repo_jobs.go](/Users/vk/@iw2rmb/ploy/internal/migs/api/run_repo_jobs.go) (`RunRepoJobRecovery.ErrorKind`) and [internal/server/handlers/runs_repo_jobs.go](/Users/vk/@iw2rmb/ploy/internal/server/handlers/runs_repo_jobs.go) (`newRecoveryView` still maps `meta.ErrorKind`).',
+          ]
+        commit: null
     label: "2"
     summary: "Simplify server gate-failure orchestration to direct heal -> re_gate retries without classifier-based action selection."
     classification: "determined"
