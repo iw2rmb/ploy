@@ -66,7 +66,7 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	jsonOut := fs.Bool("json", false, "print machine-readable JSON report with links and per-job artifacts")
 
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(normalizeRunStatusArgs(args)); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printRunStatusUsage(stderr)
 			return nil
@@ -130,6 +130,32 @@ func runStatusSupportsOSC8(w io.Writer) bool {
 		return false
 	}
 	return (info.Mode() & os.ModeCharDevice) != 0
+}
+
+// normalizeRunStatusArgs hoists --json before positionals so both
+// `ploy run status --json <run-id>` and `ploy run status <run-id> --json` work.
+func normalizeRunStatusArgs(args []string) []string {
+	if len(args) == 0 {
+		return nil
+	}
+
+	rest := make([]string, 0, len(args))
+	seenJSON := false
+	for _, arg := range args {
+		if arg == "--json" {
+			seenJSON = true
+			continue
+		}
+		rest = append(rest, arg)
+	}
+	if !seenJSON {
+		return rest
+	}
+
+	normalized := make([]string, 0, len(rest)+1)
+	normalized = append(normalized, "--json")
+	normalized = append(normalized, rest...)
+	return normalized
 }
 
 func printRunStatusUsage(w io.Writer) {
