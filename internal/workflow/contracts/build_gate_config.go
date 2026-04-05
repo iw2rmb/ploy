@@ -126,8 +126,7 @@ type HealSpec struct {
 	// Amata configures amata-mode execution for this healing action container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
 	// --set flags; no prompt file is required in this mode.
-	// When nil, the container uses the direct codex exec path and requires a
-	// prompt delivered via Hydra in mount (/in/codex-prompt.txt) or --prompt-file.
+	// When nil, the container uses the image default command/entrypoint.
 	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
@@ -149,8 +148,7 @@ type RecoveryExpectedArtifact struct {
 //     `amata run /in/amata.yaml` followed by ordered `--set '<param>=<value>'` flags
 //     from Set. No prompt file is required in this mode.
 //   - When AmataRunSpec is absent (nil pointer on HealSpec or MigStepSpec):
-//     fall through to the existing direct `codex exec` path;
-//     /in/codex-prompt.txt must be materialized via a Hydra in mount.
+//     fall through to the image default command/entrypoint.
 type AmataRunSpec struct {
 	// Spec is the amata spec content materialized as /in/amata.yaml before execution.
 	// Required when AmataRunSpec is present (non-empty).

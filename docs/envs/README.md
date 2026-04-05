@@ -147,7 +147,7 @@ steps:
 
 build_gate:
   heal:
-    image: docker.io/your-dh-user/codex:latest
+    image: docker.io/your-dh-user/amata:latest
     in:
       - ./prompt-extra.txt:/in/prompt-extra.txt
 ```
@@ -163,7 +163,7 @@ steps:
 
 build_gate:
   heal:
-    image: docker.io/your-dh-user/codex:latest
+    image: docker.io/your-dh-user/amata:latest
     in:
       - "g7h8i9j0k1l2:/in/prompt-extra.txt"
 ```
@@ -631,23 +631,20 @@ Run/API metadata propagation:
 
 ### How Official Images Consume These Variables
 
-**Codex images (`codex`)**: The entrypoint script supports two execution modes:
-- **amata mode**: when `amata.spec` is set on a mig step or healing action, the container runs
-  `amata run /in/amata.yaml` (with optional `--set` flags). No prompt file is required.
-- **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
-  A prompt must be delivered via `--prompt-file` or Hydra `in` mount as `/in/codex-prompt.txt`.
+**Amata image (`amata`)**: when `amata.spec` is set on a mig step or healing action,
+the container runs `amata run /in/amata.yaml` (with optional `--set` flags).
 
-In both modes, config files are delivered via Hydra `home` mounts to their
+Config files are delivered via Hydra `home` mounts to their
 expected paths under `$HOME`. No env-based materialization is performed:
 - `auth.json` → `$HOME/.codex/auth.json` (via `home` mount)
 - `config.toml` → `$HOME/.codex/config.toml` (via `home` mount)
 - `config.json` → `$HOME/.claude-code-router/config.json` (via `home` mount)
 - `crush.json` → `$HOME/.config/crush/crush.json` (via `home` mount)
 
-`codex` sets `CODEX_HOME=$HOME/.codex` by default. Configure delivery via
+`amata` sets `CODEX_HOME=$HOME/.codex` by default. Configure delivery via
 `ploy config home set` or the spec `home` field.
 
-If `/root/.claude-code-router/config.json` exists at startup, `codex` runs:
+If `/root/.claude-code-router/config.json` exists at startup, `amata` runs:
 - `ccr start`
 - `eval "$(ccr activate)"`
 

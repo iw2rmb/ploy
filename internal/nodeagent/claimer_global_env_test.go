@@ -52,8 +52,8 @@ func TestParseSpec_GlobalEnvFromServerClaim(t *testing.T) {
 			}`),
 			wantEnv: map[string]string{
 				"APP_TLS_CERT":   "-----BEGIN CERTIFICATE-----\nMIIBkTCC...\n-----END CERTIFICATE-----",
-				"APP_AUTH_JSON": `{"api_key":"sk-xxx","org_id":"org-yyy"}`,
-				"OPENAI_API_KEY":  "sk-openai-test-key-12345",
+				"APP_AUTH_JSON":  `{"api_key":"sk-xxx","org_id":"org-yyy"}`,
+				"OPENAI_API_KEY": "sk-openai-test-key-12345",
 			},
 		},
 		{
@@ -179,8 +179,8 @@ func TestGlobalEnvPropagation_SpecToManifest(t *testing.T) {
 
 	// Verify all global env vars are present in the manifest.
 	expectedEnv := map[string]string{
-		"APP_TLS_CERT":     "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
-		"APP_AUTH_JSON":   `{"token":"test-codex-token"}`,
+		"APP_TLS_CERT":      "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----",
+		"APP_AUTH_JSON":     `{"token":"test-codex-token"}`,
 		"OPENAI_API_KEY":    "sk-test-openai-key",
 		"CUSTOM_GLOBAL_VAR": "custom_value",
 	}
@@ -245,8 +245,8 @@ func TestGlobalEnvPropagation_GateManifest(t *testing.T) {
 
 	// Verify global env vars are preserved in gate manifest.
 	expectedEnv := map[string]string{
-		"APP_TLS_CERT":     "gate-test-cert-bundle",
-		"APP_AUTH_JSON":   "gate-codex-auth",
+		"APP_TLS_CERT":      "gate-test-cert-bundle",
+		"APP_AUTH_JSON":     "gate-codex-auth",
 		"GATE_SPECIFIC_VAR": "gate_value",
 	}
 
@@ -383,18 +383,18 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 		BaseRef:   types.GitRef("main"),
 		TargetRef: types.GitRef("feature/healing"),
 		Env: map[string]string{
-			"GLOBAL_VAR":    "global_value",
+			"GLOBAL_VAR":   "global_value",
 			"APP_TLS_CERT": "global-cert-bundle",
-			"SHARED_VAR":    "from_req",
+			"SHARED_VAR":   "from_req",
 		},
 	}
 
 	// Healing mig with its own env that overrides req.Env on collision.
 	healingMig := MigContainerSpec{
-		Image: testJobImage("codex:latest"),
+		Image: testJobImage("amata:latest"),
 		Env: map[string]string{
-			"APP_TLS_CERT":    "healing-cert-bundle",
-			"APP_AUTH_JSON":  `{"healing":"auth"}`,
+			"APP_TLS_CERT":     "healing-cert-bundle",
+			"APP_AUTH_JSON":    `{"healing":"auth"}`,
 			"HEALING_SPECIFIC": "healing_value",
 		},
 	}
@@ -408,8 +408,8 @@ func TestGlobalEnvPropagation_HealingManifest(t *testing.T) {
 	// Verify env vars are preserved with correct precedence.
 	expectedEnv := map[string]string{
 		"GLOBAL_VAR":       "global_value",        // from req.Env (no override)
-		"APP_TLS_CERT":    "healing-cert-bundle", // mig.Env overrides req.Env
-		"APP_AUTH_JSON":  `{"healing":"auth"}`,  // from mig.Env only
+		"APP_TLS_CERT":     "healing-cert-bundle", // mig.Env overrides req.Env
+		"APP_AUTH_JSON":    `{"healing":"auth"}`,  // from mig.Env only
 		"HEALING_SPECIFIC": "healing_value",       // from mig.Env only
 		"SHARED_VAR":       "from_req",            // from req.Env (no mig override)
 		"PLOY_REPO_URL":    "https://gitlab.com/test/repo.git",

@@ -31,7 +31,7 @@ func TestParseMigSpecJSON_HealRetriesCoercion(t *testing.T) {
 			name: "int value",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"heal":{"retries": 3, "image":"codex:latest"}}
+				"build_gate": {"heal":{"retries": 3, "image":"amata:latest"}}
 			}`,
 			want: 3,
 		},
@@ -39,7 +39,7 @@ func TestParseMigSpecJSON_HealRetriesCoercion(t *testing.T) {
 			name: "float rejected",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"heal":{"retries": 1.9, "image":"codex:latest"}}
+				"build_gate": {"heal":{"retries": 1.9, "image":"amata:latest"}}
 			}`,
 			wantErr: "parse migs spec json",
 		},
@@ -47,7 +47,7 @@ func TestParseMigSpecJSON_HealRetriesCoercion(t *testing.T) {
 			name: "non-number rejected",
 			input: `{
 				"steps": [{"image":"test:latest"}],
-				"build_gate": {"heal":{"retries": "nope", "image":"codex:latest"}}
+				"build_gate": {"heal":{"retries": "nope", "image":"amata:latest"}}
 			}`,
 			wantErr: "parse migs spec json",
 		},
@@ -81,7 +81,7 @@ func TestParseMigSpecJSON_HealRetriesCoercion(t *testing.T) {
 func TestParseMigSpecJSON_HealRetriesDefault(t *testing.T) {
 	input := `{
 		"steps": [{"image":"test:latest"}],
-		"build_gate": {"heal":{"image":"codex:latest"}}
+		"build_gate": {"heal":{"image":"amata:latest"}}
 	}`
 	spec, err := ParseMigSpecJSON([]byte(input))
 	if err != nil {

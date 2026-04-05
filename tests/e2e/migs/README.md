@@ -20,12 +20,11 @@
 - Build Migs images (requires Docker):
   - OpenRewrite CLI (Maven): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-maven/Dockerfile -t orw-cli-maven:e2e .`
   - OpenRewrite CLI (Gradle): `docker buildx build --platform linux/amd64 -f images/orw/orw-cli-gradle/Dockerfile -t orw-cli-gradle:e2e .`
-  - Codex healer (direct mode): `docker buildx build --platform linux/amd64 -f images/codex/Dockerfile -t codex:e2e .`
   - Amata runner: from repo root run `bash images/amata/build-amata.sh`, then `docker buildx build --platform linux/amd64 -f images/amata/Dockerfile -t amata:e2e .`
   - Optional: `migs-llm`, `migs-plan` as needed.
 - Push to local registry using the helper script:
   - `IMAGE_PREFIX=localhost:5000/ploy VERSION=v0.1.0 images/build-and-push.sh`
-  - The script pushes `amata`, `codex`, `shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
+  - The script pushes `amata`, `shell`, `orw-cli-maven`, `orw-cli-gradle`, plus `server` and `node`.
   - Images publish as `$IMAGE_PREFIX/<name>:<tag>`.
 
 Notes:
@@ -141,12 +140,10 @@ Validate the following artifacts after Codex-based healing runs:
    - `session_id`: Thread ID for conversation continuity (may be empty)
    - `resumed`: `true` if this was a resumed session, `false` otherwise
 
-See `tests/unit/mig_codex_sh_test.sh` for unit tests covering these behaviors.
 Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 
 **Cross-phase inputs available to healing migs:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
-- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag)
 
 **Environment variables injected by the node agent for healing migs:**
 - `PLOY_REPO_URL` — Git repository URL (same as the Migs run)
@@ -154,27 +151,32 @@ Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
 - `PLOY_SERVER_URL` — ploy control plane base URL
 
-Healing containers support two execution modes:
+Healing containers support amata execution mode:
 
 **amata mode** (recommended): set `amata.spec` — no prompt file required.
 The node agent materializes the spec as `/in/amata.yaml` and runs
 `amata run /in/amata.yaml` with optional `--set` flags from `amata.set`.
 
-**Direct-Codex mode** (fallback): omit `amata` — prompt delivered via Hydra `in`
-mount at `/in/codex-prompt.txt`. The container uses the direct `codex exec` path.
-
-The `scenario-orw-fail` fixture exercises direct-Codex mode for healing.
-The `scenario-post-mig-heal` fixture exercises amata mode for healing.
-
-Example healing spec block (direct-Codex mode):
+Example healing spec block:
 ```yaml
 build_gate:
   enabled: true
   heal:
     retries: 1
-    image: ghcr.io/iw2rmb/ploy/codex:latest
-    in:
-      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
+    image: ghcr.io/iw2rmb/ploy/amata:latest
+    amata:
+      spec: |
+        version: amata/v1
+        name: code-healer
+        entry: main
+        workspace:
+          root: /workspace
+        flows:
+          main:
+            steps:
+              - codex: |
+                  Fix the build failure in /in/build-gate.log.
+                  Your final message MUST be one line of JSON: {"action_summary":"..."}
     home:
       - ~/.codex/auth.json:.codex/auth.json
 ```
@@ -191,18 +193,17 @@ Run the failing→healing scenario with a single script:
     - `--follow --artifact-dir ./tmp/migs/scenario-orw-fail/<ts>`
 
 What to verify:
-- First Build Gate fails (Maven compile error), healing runs using `codex` with the workspace diff handshake—Codex edits the code and exits, the node agent detects workspace diffs and re-runs the Build Gate, then ORW proceeds.
+- First Build Gate fails (Maven compile error), healing runs using `amata` with the workspace diff handshake, the node agent detects workspace diffs, re-runs the Build Gate, then ORW proceeds.
 
 **Notes**
 
-When `codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the workspace diff handshake, Codex simply edits the code and exits; the node agent handles the actual gate execution and only re-runs the gate when workspace diffs are present.
+When `amata` runs inside the repository directory (`/workspace`), it uses the mounted repo directly. With the workspace diff handshake, the healer edits code and exits; the node agent handles gate execution and only re-runs the gate when workspace diffs are present.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing migs to reference
-- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag)
 
 What to expect with the provided E2E images:
-- Spec-driven healing runs with `codex`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
+- Spec-driven healing runs with `amata`; artifacts across stages are attached to the run and can be downloaded via `--artifact-dir`.
 
 **Follow Mode (`--follow`) and Job Graph**
 

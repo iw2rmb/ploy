@@ -237,9 +237,9 @@ func buildGateManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (co
 	return manifest, nil
 }
 
-// isCodexHealingImage returns true if the image name indicates a Codex-based healing container.
-func isCodexHealingImage(image string) bool {
-	return strings.Contains(strings.ToLower(image), "codex")
+// isAmataHealingImage returns true if the image name indicates an Amata-based healing container.
+func isAmataHealingImage(image string) bool {
+	return strings.Contains(strings.ToLower(image), "amata")
 }
 
 // resolveAmataCommand builds the command slice for amata-mode execution.
@@ -255,7 +255,7 @@ func resolveAmataCommand(amata *contracts.AmataRunSpec) []string {
 
 // buildHealingManifest constructs a StepManifest from a typed MigContainerSpec.
 // The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
-// When codexSession is non-empty and the image is Codex-based, CODEX_RESUME=1 is injected.
+// When codexSession is non-empty and the image is Amata-based, CODEX_RESUME=1 is injected.
 func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, codexSession string, stack contracts.MigStack) (contracts.StepManifest, error) {
 	if req.JobID.IsZero() {
 		return contracts.StepManifest{}, errors.New("job_id required")
@@ -282,7 +282,7 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 	}
 	injectRepoMetadataEnv(env, req)
 
-	if codexSession != "" && isCodexHealingImage(image) {
+	if codexSession != "" && isAmataHealingImage(image) {
 		env["CODEX_RESUME"] = "1"
 	}
 

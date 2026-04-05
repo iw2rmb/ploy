@@ -182,7 +182,7 @@ build_gate:
 #   heal:
 #     <<: !include ./healing/spec.yaml
 #     retries: 2
-#     image: docker.io/your-dh-user/codex:latest
+#     image: docker.io/your-dh-user/amata:latest
 #     amata:
 #       spec: |
 #         version: amata/v1
@@ -213,7 +213,7 @@ build_gate:
 #   heal:
 #     <<: !include ./healing/spec.yaml
 #     retries: 2
-#     image: docker.io/your-dh-user/codex:latest
+#     image: docker.io/your-dh-user/amata:latest
 #     in:
 #       codex-prompt.txt: |-
 #         Fix the build failure in /in/build-gate.log.
@@ -275,12 +275,10 @@ mr_on_fail: true
 #
 # - The node agent consumes build_gate.heal to run the heal → re-gate loop
 #   after the first gate fail (applies to both single-step and multi-step runs).
-# - Healing dual-mode execution:
+# - Healing execution:
 #   * When `amata` block is present (amata.spec non-empty): container runs
 #     `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags.
-#     No prompt file is required in this mode.
-#   * When `amata` block is absent: container uses direct `codex exec` path.
-#     A prompt must be delivered via --prompt-file or Hydra in mount (/in/codex-prompt.txt).
+#   * When `amata` block is absent: container uses its image default command/entrypoint.
 # - Container cleanup model:
 #   * Containers are retained after step/gate completion.
 #   * Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.

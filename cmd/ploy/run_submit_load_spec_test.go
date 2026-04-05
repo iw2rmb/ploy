@@ -194,7 +194,7 @@ envs:
 func TestLoadSpec_ExpandsImagePlaceholders(t *testing.T) {
 	tmpDir := t.TempDir()
 	specPath := filepath.Join(tmpDir, "spec.yaml")
-	t.Setenv("PLOY_TEST_LOADSPEC_IMAGE", "docker.io/test/codex:latest")
+	t.Setenv("PLOY_TEST_LOADSPEC_IMAGE", "docker.io/test/amata:latest")
 	t.Setenv("PLOY_TEST_LOADSPEC_STEP_DEFAULT", "docker.io/test/default-step:latest")
 
 	spec := []byte(`
@@ -226,12 +226,12 @@ build_gate:
 	if got, want := image["default"].(string), "docker.io/test/default-step:latest"; got != want {
 		t.Fatalf("steps[0].image.default got %q, want %q", got, want)
 	}
-	if got, want := image["java-gradle"].(string), "docker.io/test/codex:latest"; got != want {
+	if got, want := image["java-gradle"].(string), "docker.io/test/amata:latest"; got != want {
 		t.Fatalf("steps[0].image.java-gradle got %q, want %q", got, want)
 	}
 
 	heal := result["build_gate"].(map[string]any)["heal"].(map[string]any)
-	if got, want := heal["image"].(string), "docker.io/test/codex:latest"; got != want {
+	if got, want := heal["image"].(string), "docker.io/test/amata:latest"; got != want {
 		t.Fatalf("build_gate.heal.image got %q, want %q", got, want)
 	}
 }

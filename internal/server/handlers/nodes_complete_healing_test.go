@@ -43,8 +43,8 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if healJob.Status != domaintypes.JobStatusQueued {
 		t.Fatalf("expected heal-1-0 status=Queued, got %s", healJob.Status)
 	}
-	if healJob.JobImage != "codex:latest" {
-		t.Fatalf("expected heal-1-0 image=codex:latest, got %q", healJob.JobImage)
+	if healJob.JobImage != "amata:latest" {
+		t.Fatalf("expected heal-1-0 image=amata:latest, got %q", healJob.JobImage)
 	}
 	if healJob.NextID == nil {
 		t.Fatalf("expected heal-1-0 next_id to be set")

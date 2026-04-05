@@ -62,14 +62,24 @@ build_gate:
   # proceeding to the next step.
   heal:
     retries: 1
-    # Codex healing container using the workspace diff handshake.
-    # Codex edits the workspace and exits when done; the node agent inspects
-    # the workspace for diffs and re-runs the Build Gate externally when changes exist.
-    # Codex never runs the gate itself.
-    image: localhost:5000/ploy/codex:latest
-    in:
-      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-    # Uncomment to mount Codex auth via Hydra home:
+    # Amata healing container using the workspace diff handshake.
+    image: localhost:5000/ploy/amata:latest
+    amata:
+      spec: |
+        version: amata/v1
+        name: code-healer
+        entry: main
+        workspace:
+          root: /workspace
+        flows:
+          main:
+            steps:
+              - codex: |
+                  Fix the build failure in /in/build-gate.log.
+                  Edit files under /workspace as needed.
+                  End with one JSON line:
+                  {"action_summary":"<<=200 chars, single line>"}
+    # Uncomment to mount auth via Hydra home:
     # home:
     #   - ~/.codex/auth.json:.codex/auth.json
 
