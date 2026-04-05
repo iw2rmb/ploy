@@ -106,6 +106,51 @@ func TestPathParamsUseDomainTypes(t *testing.T) {
 		}
 	})
 
+	t.Run("GET /v1/jobs/{job_id}/logs rejects empty job_id before store calls", func(t *testing.T) {
+		t.Parallel()
+
+		st := &jobStore{}
+		eventsService, err := createTestEventsService()
+		if err != nil {
+			t.Fatalf("events service: %v", err)
+		}
+		h := getJobLogsHandler(st, nil, eventsService)
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/jobs//logs", nil)
+		req.SetPathValue("job_id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		assertStatus(t, rr, http.StatusBadRequest)
+		if st.getJobCalled {
+			t.Fatalf("expected no store calls, but GetJob was called")
+		}
+	})
+
+	t.Run("POST /v1/jobs/{job_id}/logs rejects empty job_id before store calls", func(t *testing.T) {
+		t.Parallel()
+
+		st := &jobStore{}
+		eventsService, err := createTestEventsServiceWithStore(st)
+		if err != nil {
+			t.Fatalf("events service: %v", err)
+		}
+		bp := blobpersist.New(st, bsmock.New())
+		h := createJobLogsHandler(st, bp, eventsService)
+
+		req := httptest.NewRequest(http.MethodPost, "/v1/jobs//logs", nil)
+		req.SetPathValue("job_id", "")
+		rr := httptest.NewRecorder()
+
+		h.ServeHTTP(rr, req)
+
+		assertStatus(t, rr, http.StatusBadRequest)
+		if st.getJobCalled {
+			t.Fatalf("expected no store calls, but GetJob was called")
+		}
+	})
+
 	t.Run("POST /v1/nodes/{id}/heartbeat rejects empty node id before store calls", func(t *testing.T) {
 		t.Parallel()
 
