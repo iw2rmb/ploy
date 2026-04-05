@@ -207,7 +207,7 @@ func ValidateHydraCAEntries(entries []string, prefix string) error {
 }
 
 // validateHydraFields validates the Hydra fields (ca, in, out, home) on a
-// container spec (step, router, or healing action).
+// container spec (step or heal action).
 func validateHydraFields(ca, in, out, home []string, prefix string) error {
 	if err := ValidateHydraCAEntries(ca, prefix+".ca"); err != nil {
 		return err
