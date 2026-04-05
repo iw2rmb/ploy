@@ -61,7 +61,7 @@ items:
     reasoning: "high"
     cfp: 14
     commit: e77bb369
-  - done: false
+  - done: true
     reviews:
       - gaps: ['"Remove RouterCmd from build_gate_metadata struct and ErrorKind/RouterCmd from API job structs in server and migs/api layers.": `ErrorKind` is still present in API recovery projection structs and wiring at [internal/migs/api/run_repo_jobs.go](/Users/vk/@iw2rmb/ploy/internal/migs/api/run_repo_jobs.go) (`RunRepoJobRecovery.ErrorKind`) and [internal/server/handlers/runs_repo_jobs.go](/Users/vk/@iw2rmb/ploy/internal/server/handlers/runs_repo_jobs.go) (`newRecoveryView` still maps `meta.ErrorKind`).']
         commit: 2c46a27e
