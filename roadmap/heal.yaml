@@ -14,6 +14,8 @@ items:
     reviews:
       - gaps: ["\"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings\": stale contract docs remain in [internal/workflow/contracts/build_gate_config.go](/Users/vk/@iw2rmb/ploy/internal/workflow/contracts/build_gate_config.go#L145) and [internal/workflow/contracts/build_gate_config.go](/Users/vk/@iw2rmb/ploy/internal/workflow/contracts/build_gate_config.go#L151), still referencing router/`RouterSpec`/`HealingActionSpec` after those types were removed."]
         commit: 2d5b3166
+      - gaps: ["\"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings\": stale router-era wording remains in `internal/workflow/contracts/hydra.go:210` (\"container spec (step, router, or healing action)\"), leaving Step 1 contract-surface cleanup incomplete."]
+        commit: null
     label: "1"
     summary: "Replace build-gate contracts and CLI spec shaping with a single build_gate.heal configuration surface."
     classification: "determined"
