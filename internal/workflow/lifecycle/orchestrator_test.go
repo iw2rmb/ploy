@@ -244,7 +244,6 @@ type gateFailureCase struct {
 	failedJob     store.Job
 	jobsByID      map[domaintypes.JobID]store.Job
 	recoveryMeta  *contracts.BuildGateRecoveryMetadata
-	recoveryKind  contracts.RecoveryErrorKind
 	detectedStack contracts.MigStack
 	heal          *contracts.HealSpec
 	newJobID      func() domaintypes.JobID
@@ -267,7 +266,6 @@ func retriesExhaustedCase() gateFailureCase {
 			reGate1ID:  {ID: reGate1ID, JobType: domaintypes.JobTypeReGate},
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-		recoveryKind: contracts.RecoveryErrorKindInfra,
 		heal:         basicHealSpec(1),
 		newJobID:     domaintypes.NewJobID,
 		wantOutcome:  lifecycle.GateFailureOutcomeCancel,
@@ -288,7 +286,6 @@ func firstAttemptCase() gateFailureCase {
 		failedJob:    failedJob,
 		jobsByID:     map[domaintypes.JobID]store.Job{baseGateID: failedJob},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra", StrategyID: "infra-default"},
-		recoveryKind: contracts.RecoveryErrorKindInfra,
 		heal:         basicHealSpec(2),
 		newJobID:     newFixedIDSequence(healID, reGateID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
@@ -345,7 +342,6 @@ func secondAttemptCase() gateFailureCase {
 			successorID: {ID: successorID, JobType: domaintypes.JobTypeMig},
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-		recoveryKind: contracts.RecoveryErrorKindInfra,
 		heal:         basicHealSpec(3),
 		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
@@ -363,19 +359,17 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 
 	cases := []gateFailureCase{
 		{
-			name:         "terminal recovery kind cancels",
+			name:         "mixed recovery kind still attempts healing",
 			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "mixed"},
-			recoveryKind: contracts.RecoveryErrorKindMixed,
 			heal:         basicHealSpec(1),
 			newJobID:     domaintypes.NewJobID,
-			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
+			wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		},
 		{
 			name:         "no healing config cancels",
 			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-			recoveryKind: contracts.RecoveryErrorKindInfra,
 			newJobID:     domaintypes.NewJobID,
 			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 		},
@@ -383,7 +377,6 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 			name:         "invalid SHA cancels",
 			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePreGate, RepoShaIn: "not-a-valid-sha"},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
-			recoveryKind: contracts.RecoveryErrorKindInfra,
 			heal:         basicHealSpec(1),
 			newJobID:     domaintypes.NewJobID,
 			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
@@ -406,7 +399,7 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 
 			decision, err := lifecycle.EvaluateGateFailureTransition(
 				tc.failedJob, tc.jobsByID, tc.recoveryMeta,
-				tc.recoveryKind, tc.detectedStack, tc.heal, tc.newJobID,
+				tc.detectedStack, tc.heal, tc.newJobID,
 			)
 
 			if err != nil {

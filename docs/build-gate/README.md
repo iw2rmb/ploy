@@ -296,14 +296,14 @@ provide repository metadata for healing migs that need Git baseline information.
 Primary source for these inputs is the typed `recovery_context` returned by
 `POST /v1/nodes/{id}/claim` for `heal`/`re_gate` jobs. Node-local run cache files
 remain an optional fallback optimization when claim context fields are absent.
-- For `selected_error_kind=deps`, claim `recovery_context` carries:
+- For deps-oriented healing runs, claim `recovery_context` may carry:
   - `deps_compat_endpoint`
   - `deps_bumps`
 - `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag).
 
 **Healing workspace policy:**
-- `build_gate.healing.selected_error_kind=infra`: healing is output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.
-- `build_gate.healing.selected_error_kind!=infra`: healing must modify `/workspace`; no workspace diff fails the heal job with `healing_warning=no_workspace_changes`.
+- Infra-style healing: output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.
+- Non-infra healing: must modify `/workspace`; no workspace diff fails the heal job with `healing_warning=no_workspace_changes`.
 
 See `docs/envs/README.md` for the complete environment variable reference.
 
@@ -311,7 +311,6 @@ See `docs/envs/README.md` for the complete environment variable reference.
 
 - Gate executor: `internal/workflow/step/gate_docker.go`
 - Gate job execution: `internal/nodeagent/execution_orchestrator_gate.go`
-- Router runtime: `internal/nodeagent/execution_orchestrator_router_runtime.go`
 - Healing job execution: `internal/nodeagent/execution_orchestrator_jobs.go`
 - Healing runtime helpers: `internal/nodeagent/execution_orchestrator_healing_runtime.go`
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go`

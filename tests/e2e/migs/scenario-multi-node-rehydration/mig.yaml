@@ -80,33 +80,25 @@ steps:
 build_gate:
   enabled: true
 
-  # Router emits bug_summary + error_kind before healing selection.
-  router:
-    image: localhost:5000/ploy/codex:latest
-    in:
-      - ./codex-prompt-router.txt:/in/codex-prompt.txt
-
   ################################################################################
   # HEALING POLICY (optional for E2E)
   ################################################################################
   # Include basic healing to validate that healing also works with rehydration.
   # If any step's build gate fails, the healing mig runs on the same rehydrated workspace.
-  healing:
-    by_error_kind:
-      code:
-        retries: 1
-        # Codex healing container using the workspace diff handshake.
-        # Codex edits the workspace and exits when done; the node agent inspects
-        # the workspace for diffs and re-runs the Build Gate externally when changes exist.
-        # Codex never runs the gate itself.
-        image: localhost:5000/ploy/codex:latest
-        envs:
-          E2E_STEP_NAME: "healing-codex"
-        in:
-          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-        # Uncomment if you have Codex auth configured:
-        # home:
-        #   - ~/.codex/auth.json:.codex/auth.json
+  heal:
+    retries: 1
+    # Codex healing container using the workspace diff handshake.
+    # Codex edits the workspace and exits when done; the node agent inspects
+    # the workspace for diffs and re-runs the Build Gate externally when changes exist.
+    # Codex never runs the gate itself.
+    image: localhost:5000/ploy/codex:latest
+    envs:
+      E2E_STEP_NAME: "healing-codex"
+    in:
+      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
+    # Uncomment if you have Codex auth configured:
+    # home:
+    #   - ~/.codex/auth.json:.codex/auth.json
 
 ################################################################################
 # GITLAB MR INTEGRATION

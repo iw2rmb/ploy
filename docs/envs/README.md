@@ -120,7 +120,7 @@ Role model (bearer token claims):
   - `out` — Read-write output files (`src:/out/dst`; CLI compiles local paths to `shortHash:/out/dst`)
   - `home` — Home-relative files (`src:dst{:ro}`; CLI compiles to `shortHash:dst{:ro}`)
   - `steps[]` — Multi-step spec steps (each with its own `image`/`command`/`envs`/`ca`/`in`/`out`/`home`)
-  - `build_gate.healing.by_error_kind` and `build_gate.router` — Automated repair routing/healing after Build Gate failures, including optional YAML `!include` composition for router/infra/code actions
+  - `build_gate.heal` — Automated healing action for Build Gate failures (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
   - See [mig.example.yaml](../schemas/mig.example.yaml) for the full schema.
 
@@ -146,16 +146,10 @@ steps:
       - ./ca-bundle.pem
 
 build_gate:
-  router:
+  heal:
     image: docker.io/your-dh-user/codex:latest
     in:
-      - ./router-instructions.txt:/in/router-instructions.txt
-  healing:
-    by_error_kind:
-      code:
-        image: docker.io/your-dh-user/codex:latest
-        in:
-          - ./prompt-extra.txt:/in/prompt-extra.txt
+      - ./prompt-extra.txt:/in/prompt-extra.txt
 ```
 
 **After CLI compile (canonical form submitted to server):**
@@ -168,16 +162,10 @@ steps:
       - "f8e9d0c1b2a3"
 
 build_gate:
-  router:
+  heal:
     image: docker.io/your-dh-user/codex:latest
     in:
-      - "d4e5f6a7b8c9:/in/router-instructions.txt"
-  healing:
-    by_error_kind:
-      code:
-        image: docker.io/your-dh-user/codex:latest
-        in:
-          - "g7h8i9j0k1l2:/in/prompt-extra.txt"
+      - "g7h8i9j0k1l2:/in/prompt-extra.txt"
 ```
 
 - `--name` — Creates a mig project with `ploy mig add --name <name> [--spec <path|->]`.
@@ -187,12 +175,12 @@ build_gate:
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
-- `build_gate.healing.by_error_kind` — Spec block defining per-`error_kind` healing actions:
-  - `infra`/`code` action entries configure include-composed action fields (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`)
+- `build_gate.heal` — Spec block defining the single healing action:
+  - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/codex-prompt.txt`) are available to healing migs
-  - For `infra` with `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
+  - For `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
   - Terminal unsupported candidate contract: `targets.active=unsupported`, `targets.build.status=failed`, `targets.build.failure_code=infra_support`
 - Container cleanup model:
   - Containers are retained after step/gate completion.
@@ -224,7 +212,7 @@ Server connection details:
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
 - `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node).
 
-Router runtime context (injected for `build_gate.router` executions):
+Healing runtime context:
 - `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
 - `PLOY_LOOP_KIND` — loop context (`healing`)
 

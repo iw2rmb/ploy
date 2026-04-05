@@ -380,7 +380,7 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 	}
 }
 
-func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.T) {
+func TestCompleteJob_GateFailure_MixedClassificationInsertsHealing(t *testing.T) {
 	t.Parallel()
 
 	gf := newGateFailureFixture(t, []byte(`{"kind":"gate","gate":{"recovery":{"loop_kind":"healing","error_kind":"mixed","strategy_id":"mixed-default"}}}`))
@@ -397,13 +397,10 @@ func TestCompleteJob_GateFailure_MixedClassificationCancelsRemaining(t *testing.
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if len(st.createJob.calls) != 0 {
-		t.Fatalf("expected no healing insertion jobs, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 2 {
+		t.Fatalf("expected healing insertion to create 2 jobs, got %d", len(st.createJob.calls))
 	}
-	if len(st.updateJobStatus.calls) != 1 {
-		t.Fatalf("expected one cancellation call, got %d", len(st.updateJobStatus.calls))
-	}
-	if st.updateJobStatus.calls[0].ID != gf.Successor.ID || st.updateJobStatus.calls[0].Status != domaintypes.JobStatusCancelled {
-		t.Fatalf("unexpected cancellation call: %+v", st.updateJobStatus.calls[0])
+	if len(st.updateJobStatus.calls) != 0 {
+		t.Fatalf("expected no cancellation calls, got %d", len(st.updateJobStatus.calls))
 	}
 }

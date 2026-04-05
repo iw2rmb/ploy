@@ -1,12 +1,12 @@
-# Failing Build Gate scenario — direct Codex mode for both router and healing.
+# Failing Build Gate scenario — direct Codex healing mode.
 # Proves that when amata.spec is absent, a prompt file is required and enforced
-# end-to-end through the healing loop (router summary → healing → re-gate).
+# end-to-end through the healing loop (healing → re-gate).
 #
 # Parity contract with scenario-orw-fail:
 #   - Same repo/branch combination (pre-gate ORW failure).
-#   - Same loop shape: Build Gate fail → router summary → heal → re-gate.
-#   - Different execution mode: direct codex exec (no amata.spec) for both
-#     router and healing; prompt delivered via Hydra in mount for both.
+#   - Same loop shape: Build Gate fail → heal → re-gate.
+#   - Execution mode: direct codex exec (no amata.spec) for healing;
+#     prompt delivered via Hydra in mount.
 #
 # Submit with:
 #   dist/ploy run \
@@ -30,25 +30,14 @@ steps:
 build_gate:
   enabled: true
 
-  # Router: direct Codex mode — no amata.spec; prompt via Hydra in mount.
-  # Proves direct codex exec path for router in the failing-gate loop.
-  router:
+  heal:
+    retries: 1
+    # Healing: direct Codex mode — no amata.spec; prompt via Hydra in mount.
     image: localhost:5000/ploy/codex:latest
     in:
-      - ./codex-prompt-router.txt:/in/codex-prompt.txt
+      - ./codex-prompt-healer.txt:/in/codex-prompt.txt
     home:
       - ~/.codex/auth.json:.codex/auth.json
-
-  healing:
-    by_error_kind:
-      code:
-        retries: 1
-        # Healing: direct Codex mode — no amata.spec; prompt via Hydra in mount.
-        image: localhost:5000/ploy/codex:latest
-        in:
-          - ./codex-prompt-healer.txt:/in/codex-prompt.txt
-        home:
-          - ~/.codex/auth.json:.codex/auth.json
 
 mr_on_fail: false
 mr_on_success: true
