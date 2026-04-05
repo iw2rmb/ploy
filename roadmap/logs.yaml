@@ -82,6 +82,7 @@ items:
       - "Check parity that run lifecycle completion and orchestration progression tests still pass without regressions in status transitions."
     reasoning: "high"
     cfp: 12
+    commit: f777abb9
   - done: false
     reviews: []
     label: "3"
