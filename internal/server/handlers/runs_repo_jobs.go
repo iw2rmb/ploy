@@ -155,7 +155,6 @@ func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *migsapi.RunRepo
 	}
 	return &migsapi.RunRepoJobRecovery{
 		LoopKind:                  meta.LoopKind,
-		ErrorKind:                 meta.ErrorKind,
 		StrategyID:                meta.StrategyID,
 		Confidence:                meta.Confidence,
 		Reason:                    meta.Reason,

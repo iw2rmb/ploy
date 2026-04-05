@@ -70,7 +70,6 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 					"duration_ms":123,
 					"recovery":{
 						"loop_kind":"healing",
-						"error_kind":"infra",
 						"strategy_id":"infra-default",
 						"confidence":0.8,
 						"reason":"docker socket missing",
@@ -109,9 +108,6 @@ func TestListRepoJobsCommand_DecodeRecoveryContract(t *testing.T) {
 	}
 	if got, want := result.Jobs[0].Recovery.LoopKind, "healing"; got != want {
 		t.Fatalf("loop_kind=%q, want %q", got, want)
-	}
-	if got, want := result.Jobs[0].Recovery.ErrorKind, "infra"; got != want {
-		t.Fatalf("error_kind=%q, want %q", got, want)
 	}
 	if got, want := result.Jobs[0].Recovery.StrategyID, "infra-default"; got != want {
 		t.Fatalf("strategy_id=%q, want %q", got, want)

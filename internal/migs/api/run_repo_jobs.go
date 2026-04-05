@@ -10,7 +10,6 @@ import (
 // RunRepoJobRecovery projects universal recovery metadata from job payloads.
 type RunRepoJobRecovery struct {
 	LoopKind                  string          `json:"loop_kind"`
-	ErrorKind                 string          `json:"error_kind"`
 	StrategyID                string          `json:"strategy_id,omitempty"`
 	Confidence                *float64        `json:"confidence,omitempty"`
 	Reason                    string          `json:"reason,omitempty"`

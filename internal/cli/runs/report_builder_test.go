@@ -108,7 +108,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"display_name": "apply",
 						"recovery": map[string]any{
 							"loop_kind":  "healing",
-							"error_kind": "infra",
 						},
 					},
 				},
@@ -196,8 +195,8 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	if strings.TrimSpace(job1.PatchURL) != "" {
 		t.Fatalf("expected no patch URL for job without diffs, got %q", job1.PatchURL)
 	}
-	if job1.Recovery == nil || job1.Recovery.ErrorKind != "infra" {
-		t.Fatalf("expected recovery.error_kind to propagate, got %#v", job1.Recovery)
+	if job1.Recovery == nil || job1.Recovery.LoopKind != "healing" {
+		t.Fatalf("expected recovery.loop_kind to propagate, got %#v", job1.Recovery)
 	}
 	if len(job1.Artifacts) != 1 {
 		t.Fatalf("expected one artifact for job1, got %d", len(job1.Artifacts))
