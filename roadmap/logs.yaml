@@ -20,6 +20,7 @@ items:
       - "internal/server/handlers/jobs_logs.go"
       - "internal/server/handlers/jobs_logs_test.go"
       - "internal/server/handlers/path_params_test.go"
+      - "docs/api/paths/jobs_job_id_logs.yaml"
     baseline:
       - "internal/server/handlers/register.go"
       - "internal/server/handlers/nodes_logs.go"
@@ -46,13 +47,15 @@ items:
     classification: "determined"
     components:
       - "internal/server/events_service.go"
-      - "internal/server/events_service_test.go"
+      - "internal/server/events_fanout_test.go"
       - "internal/server/handlers/events.go"
       - "internal/server/handlers/nodes_logs.go"
       - "internal/server/handlers/jobs_complete.go"
       - "internal/server/handlers/worker_logs_test.go"
       - "internal/stream/hub.go"
       - "internal/stream/hub_test.go"
+      - "docs/api/paths/runs_id_logs.yaml"
+      - "docs/api/paths/runs_run_id_repos_repo_id_logs.yaml"
     baseline:
       - "internal/server/events_service.go"
       - "internal/server/handlers/events.go"
@@ -61,6 +64,7 @@ items:
     delta:
       - "[replace] run-keyed stream publishing for lifecycle and container logs -> isolated run-state publishing and job-log publishing paths"
       - "[replace] run logs SSE emits run,log,retention,done -> run logs SSE emits run,stage,done only"
+      - "[replace] repo log SSE filters run stream for job log frames -> repo log SSE returns lifecycle-only frames after log removal from run stream"
       - "[additive] run completion done signaling only -> dedicated job-stream done signaling on job completion"
     implementation:
       - "Refactor event service interfaces into explicit run-state and job-log publish/subscribe flows keyed by run_id and job_id respectively."
@@ -82,9 +86,11 @@ items:
     classification: "determined"
     components:
       - "cmd/ploy/root.go"
+      - "cmd/ploy/run_commands.go"
       - "cmd/ploy/commands_job.go"
       - "cmd/ploy/job_follow.go"
       - "cmd/ploy/run_logs.go"
+      - "cmd/ploy/run_logs_test.go"
       - "internal/cli/jobs/follow.go"
       - "internal/cli/jobs/follow_test.go"
       - "internal/cli/runs/report_builder.go"
@@ -92,8 +98,6 @@ items:
       - "internal/cli/runs/report_text.go"
       - "internal/cli/runs/report_text_test.go"
     baseline:
-      - "cmd/ploy/root.go"
-      - "cmd/ploy/run_commands.go"
       - "internal/cli/runs/follow_tui.go"
       - "internal/cli/runs/report_builder.go"
     delta:
