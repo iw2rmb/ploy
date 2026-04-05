@@ -21,13 +21,23 @@ items:
       - "internal/workflow/contracts/migs_spec_parse.go"
       - "internal/workflow/contracts/migs_spec_healing_test.go"
       - "internal/workflow/contracts/migs_spec_hydra_validation_test.go"
+      - "internal/workflow/contracts/migs_spec_parse_test.go"
+      - "internal/workflow/contracts/migs_spec_roundtrip_test.go"
+      - "internal/workflow/contracts/migs_spec_amata_test.go"
+      - "internal/workflow/contracts/hydra.go"
+      - "internal/cli/config/overlay.go"
+      - "internal/cli/config/overlay_test.go"
       - "cmd/ploy/mig_run_spec.go"
       - "cmd/ploy/mig_run_spec_hydra.go"
       - "cmd/ploy/mig_run_spec_parsing_test.go"
       - "cmd/ploy/mig_run_spec_hydra_test.go"
+      - "cmd/ploy/mig_run_spec_test.go"
+      - "cmd/ploy/run_submit_load_spec_test.go"
+      - "tests/integration/hydra_contract_test.go"
     baseline:
       - "internal/workflow/contracts/build_gate_config.go"
       - "internal/workflow/contracts/migs_spec.go"
+      - "internal/cli/config/overlay.go"
       - "cmd/ploy/mig_run_spec.go"
       - "cmd/ploy/mig_run_spec_hydra.go"
     delta:
@@ -37,12 +47,13 @@ items:
       - "Refactor BuildGateConfig typed structs to represent one healing action spec at build_gate.heal and delete router and by_error_kind-specific type branches."
       - "Update MIG spec parsing and validation to normalize, validate, and expose build_gate.heal including amata and hydra sections."
       - "Update CLI spec preprocessors to resolve envs, image maps, amata.spec includes, and hydra entries for build_gate.heal only."
-      - "Adjust contract and CLI parsing tests to cover valid build_gate.heal specs and malformed heal-field combinations."
+      - "Remove RouterSection overlay method and router-specific overlay logic from CLI config overlay."
+      - "Adjust contract, CLI parsing, hydra, roundtrip, and amata tests to cover valid build_gate.heal specs and reject removed router/by_error_kind fields."
     verification:
       - "Run contracts and CLI parsing tests for build_gate.heal coverage and invalid-heal shape failures."
       - "Run adjacent build-gate stack/image parsing tests to confirm stack-aware image behavior for non-heal paths remains unchanged."
     reasoning: "high"
-    cfp: 10
+    cfp: 14
 
   - done: false
     reviews: []
@@ -51,18 +62,32 @@ items:
     classification: "determined"
     components:
       - "internal/workflow/lifecycle/orchestrator.go"
+      - "internal/workflow/lifecycle/orchestrator_test.go"
+      - "internal/workflow/contracts/build_gate_metadata.go"
       - "internal/server/handlers/nodes_complete_healing.go"
       - "internal/server/handlers/jobs_complete_service_post_actions.go"
       - "internal/server/handlers/claim_spec_mutator_healing.go"
       - "internal/server/handlers/claim_spec_mutator_pipeline.go"
+      - "internal/server/handlers/claim_spec_mutator_hydra.go"
+      - "internal/server/handlers/runs_repo_jobs.go"
       - "internal/server/handlers/nodes_complete_healing_test.go"
       - "internal/server/handlers/jobs_complete_recovery_flow_test.go"
+      - "internal/server/handlers/jobs_complete_orchestration_test.go"
       - "internal/server/handlers/claim_spec_mutator_test.go"
+      - "internal/server/handlers/claim_spec_mutator_hydra_test.go"
+      - "internal/server/handlers/test_helpers_healing_test.go"
+      - "internal/server/handlers/server_runs_claim_recovery_test.go"
+      - "internal/server/handlers/server_runs_claim_gate_profile_test.go"
+      - "internal/migs/api/run_repo_jobs.go"
     baseline:
       - "internal/workflow/lifecycle/orchestrator.go"
+      - "internal/workflow/contracts/build_gate_metadata.go"
       - "internal/server/handlers/nodes_complete_healing.go"
       - "internal/server/handlers/jobs_complete_service_post_actions.go"
       - "internal/server/handlers/claim_spec_mutator_healing.go"
+      - "internal/server/handlers/claim_spec_mutator_hydra.go"
+      - "internal/server/handlers/runs_repo_jobs.go"
+      - "internal/migs/api/run_repo_jobs.go"
     delta:
       - "[replace] gate-failure transition based on recovery.error_kind to healing.by_error_kind lookup -> gate-failure transition based on one heal spec with retry budget only"
       - "[replace] claim-time selected_error_kind-based healing mutation -> claim-time mutation for one heal spec without action-kind selector"
@@ -71,12 +96,14 @@ items:
       - "Refactor lifecycle transition logic to compute heal-chain insertion from a single heal configuration and attempt counters, independent of classifier keys."
       - "Update gate-failure completion flow to preserve deterministic chain rewiring and cancellation while deleting by_error_kind lookups."
       - "Simplify claim-spec mutator pipeline to materialize heal-specific metadata and runtime context without selected_error_kind coupling."
-      - "Update handler and lifecycle tests for retry exhaustion, cancellation, and chain progression under the single-heal model."
+      - "Remove applyRouterPhaseOverlay and by_error_kind iteration from claim-spec mutator hydra path."
+      - "Remove RouterCmd from build_gate_metadata struct and ErrorKind/RouterCmd from API job structs in server and migs/api layers."
+      - "Update handler, lifecycle, claim-recovery, hydra mutator, and orchestration tests for retry exhaustion, cancellation, and chain progression under the single-heal model."
     verification:
       - "Run completion-orchestration and healing-flow tests to validate deterministic heal -> re_gate progression and retry exhaustion."
       - "Run non-healing completion tests to confirm MR and regular success-chain progression remain unchanged."
     reasoning: "high"
-    cfp: 12
+    cfp: 16
 
   - done: false
     reviews: []
@@ -89,28 +116,37 @@ items:
       - "internal/nodeagent/execution_orchestrator_healing_runtime.go"
       - "internal/nodeagent/manifest.go"
       - "internal/nodeagent/run_options.go"
+      - "internal/nodeagent/recovery_io.go"
+      - "internal/nodeagent/doc.go"
       - "internal/nodeagent/execution_orchestrator_gate_test.go"
+      - "internal/nodeagent/execution_orchestrator_gate_stackdetect_test.go"
       - "internal/nodeagent/execution_orchestrator_jobs_amata_test.go"
       - "internal/nodeagent/manifest_healing_test.go"
       - "internal/nodeagent/manifest_router_test.go"
+      - "internal/nodeagent/recovery_io_test.go"
+      - "internal/nodeagent/run_options_test.go"
+      - "internal/nodeagent/claimer_spec_test.go"
     baseline:
       - "internal/nodeagent/execution_orchestrator_gate.go"
       - "internal/nodeagent/execution_orchestrator_router_runtime.go"
       - "internal/nodeagent/execution_orchestrator_healing_runtime.go"
       - "internal/nodeagent/manifest.go"
+      - "internal/nodeagent/recovery_io.go"
     delta:
       - "[replace] gate failure path with inline router execution before healing context propagation -> gate failure path that skips router and hands off directly to heal context propagation"
       - "[replace] run options and manifest generation for router plus healing blocks -> run options and manifest generation for one build_gate.heal block"
     implementation:
       - "Delete gate-path calls that execute router runtime and remove router-specific recovery metadata population."
+      - "Remove parseRouterDecision and router-specific classification logic from recovery_io."
       - "Refactor run option parsing and manifest builders to hydrate heal containers solely from build_gate.heal and existing recovery context inputs."
       - "Keep build-gate log hydration and healing artifact wiring unchanged for heal attempts."
-      - "Update nodeagent tests to cover no-router gate failures, heal runtime invocation, and amata-mode heal command construction."
+      - "Update doc.go package comment to remove router references."
+      - "Update nodeagent tests to cover no-router gate failures, heal runtime invocation, claimer spec hydration, and amata-mode heal command construction."
     verification:
       - "Run nodeagent gate and healing runtime tests to validate direct heal invocation and artifact hydration invariants."
       - "Run non-recovery mig execution tests to confirm regular mig and gate dispatch behavior remains unchanged."
     reasoning: "high"
-    cfp: 11
+    cfp: 15
 
   - done: false
     reviews: []
@@ -120,21 +156,34 @@ items:
     components:
       - "internal/cli/runs/report_text.go"
       - "internal/cli/runs/report_text_test.go"
+      - "internal/server/handlers/config_env_migration.go"
+      - "internal/server/handlers/config_env_migration_test.go"
       - "cmd/ploy/run_status_test.go"
+      - "docs/migs-lifecycle.md"
+      - "docs/schemas/mig.example.yaml"
     baseline:
       - "internal/cli/runs/report_text.go"
       - "internal/cli/runs/report_text_test.go"
+      - "internal/server/handlers/config_env_migration.go"
       - "cmd/ploy/run_status_test.go"
+      - "docs/migs-lifecycle.md"
+      - "docs/schemas/mig.example.yaml"
     delta:
       - "[replace] gate and re_gate continuation line composed from error_kind plus summary text -> gate and re_gate continuation line rendered as fixed Error token"
       - "[replace] mixed ownership of one-line failure text across gate and heal rows -> one-line human summary ownership only on heal action_summary rows"
+      - "[replace] lifecycle and spec docs describing router plus by_error_kind recovery model -> docs describing single build_gate.heal workflow and direct heal/re-gate loop"
+      - "[replace] config env migration router destination path -> config env migration heal destination path"
     implementation:
       - "Update run report text renderer so gate and re_gate failed or crashed lines always print Exit code plus Error."
       - "Keep heal rows rendering action_summary one-liners and fallback text unchanged."
       - "Adjust run status and report renderer tests for new gate line contract and retained heal summary contract."
-      - "Update lifecycle documentation sections that describe run status continuation-line formatting."
+      - "Update migs-lifecycle.md to remove router/by_error_kind sections and describe single build_gate.heal recovery model."
+      - "Update mig.example.yaml to remove router and by_error_kind examples and add build_gate.heal example."
+      - "Update config env migration router destination to heal destination and adjust tests."
     verification:
       - "Run run-status and report-text tests to confirm generic gate Error text and preserved heal one-line summaries."
       - "Run JSON report tests to confirm recovery payload fields for machine consumers remain unchanged."
-    reasoning: "medium"
-    cfp: 8
+      - "Verify migs-lifecycle.md and mig.example.yaml contain no router or by_error_kind references."
+      - "Run config env migration tests to confirm updated destination paths."
+    reasoning: "high"
+    cfp: 12
