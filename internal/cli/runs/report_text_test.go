@@ -148,7 +148,7 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 						Status:     "Failed",
 						ExitCode:   &failCode,
 						DurationMs: 1500,
-						Recovery:   &RunJobRecovery{ErrorKind: "infra"},
+						Recovery:   &RunJobRecovery{LoopKind: "healing"},
 					},
 					{
 						JobID:         healID,
@@ -204,7 +204,7 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 				ExitCode:   &failCode,
 				DurationMs: 750,
 				BugSummary: "missing ; in Foo.java",
-				Recovery:   &RunJobRecovery{ErrorKind: "code"},
+				Recovery:   &RunJobRecovery{LoopKind: "healing"},
 			},
 			contains:   []string{"└  Exit 1: " + colorizeErrorText("Error"), "0.8s"},
 			notContain: []string{"<code>"},

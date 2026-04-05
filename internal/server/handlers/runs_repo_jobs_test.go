@@ -171,7 +171,6 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 			BugSummary string `json:"bug_summary"`
 			Recovery   *struct {
 				LoopKind     string   `json:"loop_kind"`
-				ErrorKind    string   `json:"error_kind"`
 				StrategyID   string   `json:"strategy_id"`
 				Confidence   *float64 `json:"confidence"`
 				Reason       string   `json:"reason"`
@@ -198,9 +197,6 @@ func TestListRunRepoJobsHandler_ExposesGateBugSummary(t *testing.T) {
 	}
 	if got, want := resp.Jobs[0].Recovery.LoopKind, "healing"; got != want {
 		t.Fatalf("recovery.loop_kind = %q, want %q", got, want)
-	}
-	if got, want := resp.Jobs[0].Recovery.ErrorKind, "infra"; got != want {
-		t.Fatalf("recovery.error_kind = %q, want %q", got, want)
 	}
 	if got, want := resp.Jobs[0].Recovery.StrategyID, "infra-default"; got != want {
 		t.Fatalf("recovery.strategy_id = %q, want %q", got, want)
@@ -237,7 +233,6 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 		Jobs []struct {
 			Recovery *struct {
 				LoopKind  string `json:"loop_kind"`
-				ErrorKind string `json:"error_kind"`
 			} `json:"recovery"`
 		} `json:"jobs"`
 	}
@@ -252,9 +247,6 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	}
 	if got, want := resp.Jobs[0].Recovery.LoopKind, "healing"; got != want {
 		t.Fatalf("recovery.loop_kind = %q, want %q", got, want)
-	}
-	if got, want := resp.Jobs[0].Recovery.ErrorKind, "code"; got != want {
-		t.Fatalf("recovery.error_kind = %q, want %q", got, want)
 	}
 }
 
