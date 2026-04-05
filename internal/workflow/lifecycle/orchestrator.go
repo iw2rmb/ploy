@@ -152,23 +152,18 @@ func EvaluateGateFailureTransition(
 	recoveryMeta *contracts.BuildGateRecoveryMetadata,
 	recoveryKind contracts.RecoveryErrorKind,
 	detectedStack contracts.MigStack,
-	healing *contracts.HealingSpec,
+	heal *contracts.HealSpec,
 	newJobID func() domaintypes.JobID,
 ) (GateFailureDecision, error) {
 	if contracts.IsTerminalRecoveryErrorKind(recoveryKind) {
 		return cancelDecision("terminal recovery classification")
 	}
 
-	if healing == nil || len(healing.ByErrorKind) == 0 {
+	if heal == nil {
 		return cancelDecision("no healing config")
 	}
 
-	action, ok := healing.ByErrorKind[recoveryKind.String()]
-	if !ok {
-		return cancelDecision(fmt.Sprintf("no healing action for error_kind %q", recoveryKind))
-	}
-
-	retries := action.Retries
+	retries := heal.Retries
 	if retries <= 0 {
 		retries = 1
 	}
@@ -180,7 +175,7 @@ func EvaluateGateFailureTransition(
 		return cancelDecision("healing retries exhausted")
 	}
 
-	healImage, err := action.Image.ResolveImage(detectedStack)
+	healImage, err := heal.Image.ResolveImage(detectedStack)
 	if err != nil {
 		return GateFailureDecision{}, fmt.Errorf("resolve healing image for stack %q: %w", detectedStack, err)
 	}
@@ -190,16 +185,16 @@ func EvaluateGateFailureTransition(
 		return cancelDecision("invalid failed job repo_sha_in")
 	}
 
-	// Enrich recovery meta expectations from action spec if not already set.
+	// Enrich recovery meta expectations from heal spec if not already set.
 	enrichedMeta := CloneRecoveryMetadata(recoveryMeta)
-	if len(enrichedMeta.Expectations) == 0 && action.Expectations != nil {
-		if b, marshalErr := json.Marshal(action.Expectations); marshalErr == nil {
+	if len(enrichedMeta.Expectations) == 0 && heal.Expectations != nil {
+		if b, marshalErr := json.Marshal(heal.Expectations); marshalErr == nil {
 			enrichedMeta.Expectations = b
 		}
 	}
 
 	reGateRecoveryMeta := CloneRecoveryMetadata(enrichedMeta)
-	shouldAttachCandidate := shouldEvaluateInfraCandidate(enrichedMeta, action)
+	shouldAttachCandidate := shouldEvaluateInfraCandidate(enrichedMeta, heal)
 	if shouldAttachCandidate {
 		artifactPath := contracts.GateProfileCandidateArtifactPath
 		if p, resolved := resolveRecoveryCandidateArtifactPath(enrichedMeta.Expectations); resolved {
@@ -398,7 +393,7 @@ func CloneDepsBumpsMap(src map[string]*string) map[string]*string {
 
 func shouldEvaluateInfraCandidate(
 	recoveryMeta *contracts.BuildGateRecoveryMetadata,
-	action contracts.HealingActionSpec,
+	heal *contracts.HealSpec,
 ) bool {
 	if recoveryMeta == nil {
 		return false
@@ -407,10 +402,10 @@ func shouldEvaluateInfraCandidate(
 	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
 		return false
 	}
-	if action.Expectations == nil {
+	if heal == nil || heal.Expectations == nil {
 		return false
 	}
-	for _, artifact := range action.Expectations.Artifacts {
+	for _, artifact := range heal.Expectations.Artifacts {
 		if strings.TrimSpace(artifact.Schema) == contracts.GateProfileCandidateSchemaID {
 			return true
 		}

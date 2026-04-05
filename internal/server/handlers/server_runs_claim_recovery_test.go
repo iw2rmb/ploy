@@ -11,7 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) {
+func TestClaimJob_HealMergesExpectedArtifacts(t *testing.T) {
 	t.Parallel()
 
 	f := newClaimJobFixture(t, claimJobFixtureOptions{
@@ -20,12 +20,7 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 		specJSON: []byte(`{
 			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{
-				"healing":{
-					"by_error_kind":{
-						"infra":{"retries":2,"image":"docker.io/acme/heal:latest"}
-					}
-				},
-				"router":{"image":"docker.io/acme/router:latest"}
+				"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}
 			}
 		}`),
 		jobImage: "docker.io/acme/heal:latest",
@@ -38,17 +33,6 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 	specObj, ok := resp["spec"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected spec object, got %T", resp["spec"])
-	}
-	bg, ok := specObj["build_gate"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected build_gate object, got %T", specObj["build_gate"])
-	}
-	healing, ok := bg["healing"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected build_gate.healing object, got %T", bg["healing"])
-	}
-	if got := healing["selected_error_kind"]; got != "infra" {
-		t.Fatalf("build_gate.healing.selected_error_kind=%v, want infra", got)
 	}
 	paths, ok := specObj["artifact_paths"].([]any)
 	if !ok {
@@ -79,9 +63,6 @@ func TestClaimJob_HealMergesSelectedErrorKindAndExpectedArtifacts(t *testing.T) 
 	if !ok {
 		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
 	}
-	if got := rc["selected_error_kind"]; got != "infra" {
-		t.Fatalf("recovery_context.selected_error_kind=%v, want infra", got)
-	}
 	if got := rc["resolved_healing_image"]; got != "docker.io/acme/heal:latest" {
 		t.Fatalf("recovery_context.resolved_healing_image=%v, want docker.io/acme/heal:latest", got)
 	}
@@ -99,12 +80,7 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 		specJSON: []byte(`{
 			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{
-				"healing":{
-					"by_error_kind":{
-						"infra":{"retries":2,"image":"docker.io/acme/heal:latest"},
-						"code":{"retries":1,"image":"docker.io/acme/heal:latest"}
-					}
-				}
+				"heal":{"retries":1,"image":"docker.io/acme/heal:latest"}
 			}
 		}`),
 		jobImage: "docker.io/acme/heal:latest",
@@ -128,9 +104,6 @@ func TestClaimJob_HealNonInfraDoesNotInjectSchemaEnv(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
 	}
-	if got := rc["selected_error_kind"]; got != "code" {
-		t.Fatalf("recovery_context.selected_error_kind=%v, want code", got)
-	}
 	if _, ok := rc["gate_profile_schema_json"]; ok {
 		t.Fatalf("did not expect recovery_context.gate_profile_schema_json for non-infra heal")
 	}
@@ -148,11 +121,7 @@ func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T
 		specJSON: []byte(`{
 			"steps":[{"image":"docker.io/acme/mig:latest"}],
 			"build_gate":{
-				"healing":{
-					"by_error_kind":{
-						"deps":{"retries":2,"image":"docker.io/acme/heal:latest"}
-					}
-				}
+				"heal":{"retries":2,"image":"docker.io/acme/heal:latest"}
 			}
 		}`),
 		jobMeta: []byte(`{"kind":"mig","recovery":{"loop_kind":"healing","error_kind":"deps","strategy_id":"deps-default","deps_bumps":{"org.slf4j:slf4j-api":"2.0.13","legacy:shim":null}}}`),
@@ -184,9 +153,6 @@ func TestClaimJob_DepsCompatRecoveryContextIncludesEndpointAndBumps(t *testing.T
 	rc, ok := resp["recovery_context"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected recovery_context object, got %T", resp["recovery_context"])
-	}
-	if got := rc["selected_error_kind"]; got != "deps" {
-		t.Fatalf("recovery_context.selected_error_kind=%v, want deps", got)
 	}
 	if got := rc["deps_compat_endpoint"]; got != "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=" {
 		t.Fatalf("recovery_context.deps_compat_endpoint=%v, want stack-prefilled endpoint", got)

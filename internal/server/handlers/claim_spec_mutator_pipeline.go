@@ -63,9 +63,9 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 			},
 		},
 		{
-			errContext: "merge healing selected_error_kind into spec",
+			errContext: "merge healing metadata into spec",
 			apply: func(m map[string]any, in claimSpecMutatorInput) error {
-				return applyHealingSelectedKindMutator(m, in.job, in.jobType)
+				return applyHealingMutator(m, in.job, in.jobType)
 			},
 		},
 		{

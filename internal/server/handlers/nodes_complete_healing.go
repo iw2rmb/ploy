@@ -80,13 +80,13 @@ func maybeCreateHealingJobs(
 		return fmt.Errorf("parse run spec: %w", err)
 	}
 
-	var healing *contracts.HealingSpec
+	var heal *contracts.HealSpec
 	if spec.BuildGate != nil {
-		healing = spec.BuildGate.Healing
+		heal = spec.BuildGate.Heal
 	}
 
 	decision, decisionErr := lifecycle.EvaluateGateFailureTransition(
-		failedJob, jobsByID, recoveryMeta, recoveryKind, detectedStack, healing, domaintypes.NewJobID)
+		failedJob, jobsByID, recoveryMeta, recoveryKind, detectedStack, heal, domaintypes.NewJobID)
 	if decisionErr != nil {
 		return fmt.Errorf("evaluate gate failure transition: %w", decisionErr)
 	}

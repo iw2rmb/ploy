@@ -162,11 +162,6 @@ func TestMutateClaimSpec_HealInfraAddsSchemaAndArtifacts(t *testing.T) {
 		jobType: domaintypes.JobTypeHeal,
 	})
 
-	bg := out["build_gate"].(map[string]any)
-	healing := bg["healing"].(map[string]any)
-	if got := healing["selected_error_kind"]; got != "infra" {
-		t.Fatalf("build_gate.healing.selected_error_kind=%v, want infra", got)
-	}
 	env := out["env"].(map[string]any)
 	schemaRaw, ok := env[contracts.GateProfileSchemaJSONEnv].(string)
 	if !ok || schemaRaw == "" {

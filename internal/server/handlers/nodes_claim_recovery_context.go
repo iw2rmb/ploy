@@ -36,11 +36,9 @@ func buildRecoveryClaimContext(
 	if !ok {
 		kind = contracts.DefaultRecoveryErrorKind()
 	}
-	selectedKind := kind.String()
 	ctxPayload := &contracts.RecoveryClaimContext{
-		LoopKind:          strings.TrimSpace(recovery.LoopKind),
-		SelectedErrorKind: selectedKind,
-		Expectations:      cloneRawJSON(recovery.Expectations),
+		LoopKind:     strings.TrimSpace(recovery.LoopKind),
+		Expectations: cloneRawJSON(recovery.Expectations),
 	}
 	if kind == contracts.RecoveryErrorKindDeps && recovery.DepsBumps != nil {
 		ctxPayload.DepsBumps = lifecycle.CloneDepsBumpsMap(recovery.DepsBumps)
@@ -98,7 +96,7 @@ func buildRecoveryClaimContext(
 		ctxPayload.DepsCompatEndpoint = buildDepsCompatEndpoint(detectedExpectation)
 	}
 
-	if kind, ok := contracts.ParseRecoveryErrorKind(ctxPayload.SelectedErrorKind); ok && contracts.IsInfraRecoveryErrorKind(kind) {
+	if contracts.IsInfraRecoveryErrorKind(kind) {
 		schemaRaw, err := contracts.ReadGateProfileSchemaJSON()
 		if err != nil {
 			return nil, err
