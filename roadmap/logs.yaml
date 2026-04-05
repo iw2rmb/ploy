@@ -39,7 +39,7 @@ items:
       - "Check parity that unrelated node claim and completion handler tests pass without behavior changes."
     reasoning: "medium"
     cfp: 8
-
+    commit: ecfb7fc8
   - done: false
     reviews: []
     label: "2"
@@ -78,7 +78,6 @@ items:
       - "Check parity that run lifecycle completion and orchestration progression tests still pass without regressions in status transitions."
     reasoning: "high"
     cfp: 12
-
   - done: false
     reviews: []
     label: "3"
