@@ -24,6 +24,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
+// backfillKey uniquely identifies a backfilled log line so that dedup only
+// suppresses true overlaps (same timestamp + stream + content), not legitimate
+// live lines that happen to share the same text.
+type backfillKey struct {
+	Timestamp string
+	Stream    string
+	Line      string
+}
+
 // parseLastEventID parses the Last-Event-ID header to support SSE resumption.
 // Returns 0 if the header is absent, invalid, or negative.
 // Uses types.EventID for type-safe cursor handling.
@@ -153,8 +162,9 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 		if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
 			var rec logstream.LogRecord
 			if json.Unmarshal(evt.Data, &rec) == nil {
-				if _, dup := backfilledLines[rec.Line]; dup {
-					delete(backfilledLines, rec.Line)
+				key := backfillKey{Timestamp: rec.Timestamp, Stream: rec.Stream, Line: rec.Line}
+				if _, dup := backfilledLines[key]; dup {
+					delete(backfilledLines, key)
 					continue
 				}
 			}
@@ -204,8 +214,9 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			if evt.Type == domaintypes.SSEEventLog && backfilledLines != nil {
 				var rec logstream.LogRecord
 				if json.Unmarshal(evt.Data, &rec) == nil {
-					if _, dup := backfilledLines[rec.Line]; dup {
-						delete(backfilledLines, rec.Line)
+					key := backfillKey{Timestamp: rec.Timestamp, Stream: rec.Stream, Line: rec.Line}
+					if _, dup := backfilledLines[key]; dup {
+						delete(backfilledLines, key)
 						continue
 					}
 				}
@@ -243,13 +254,13 @@ func isTerminalJobStatus(status domaintypes.JobStatus) bool {
 // backfillRunLogs fetches historical log chunks from the database and object store,
 // decompresses them, and writes them as SSE frames. If allowedJobs is non-nil, only
 // logs belonging to those jobs are included.
-func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st store.Store, bs blobstore.Store, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) (map[string]struct{}, error) {
+func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st store.Store, bs blobstore.Store, runID domaintypes.RunID, allowedJobs map[domaintypes.JobID]struct{}) (map[backfillKey]struct{}, error) {
 	logs, err := st.ListLogsByRun(ctx, runID)
 	if err != nil {
 		return nil, err
 	}
 
-	emitted := make(map[string]struct{})
+	emitted := make(map[backfillKey]struct{})
 	for _, lg := range logs {
 		// Filter by allowed jobs if specified.
 		if allowedJobs != nil {
@@ -276,7 +287,7 @@ func backfillRunLogs(ctx context.Context, w io.Writer, flusher http.Flusher, st 
 
 // backfillOneChunk fetches a single gzipped log chunk from object store,
 // decompresses it, and writes each line as an SSE log frame.
-func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg store.Log, emitted map[string]struct{}) error {
+func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg store.Log, emitted map[backfillKey]struct{}) error {
 	data, err := blobstore.ReadAll(ctx, bs, *lg.ObjectKey)
 	if err != nil {
 		return err
@@ -305,7 +316,7 @@ func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg s
 		if line == "" {
 			continue
 		}
-		emitted[line] = struct{}{}
+		emitted[backfillKey{Timestamp: ts, Stream: "stdout", Line: line}] = struct{}{}
 		rec := logstream.LogRecord{
 			Timestamp: ts,
 			Stream:    "stdout",
