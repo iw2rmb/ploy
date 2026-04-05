@@ -248,3 +248,39 @@ func TestRunStatusJSONGate(t *testing.T) {
 		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
 	}
 }
+
+func TestRunStatusJSONGate_TrailingJSONFlag(t *testing.T) {
+	t.Helper()
+
+	runID := domaintypes.NewRunID()
+	migID := domaintypes.NewMigID()
+	specID := domaintypes.NewSpecID()
+	repoID := domaintypes.NewMigRepoID()
+	preGateID := domaintypes.NewJobID()
+	healID := domaintypes.NewJobID()
+	postGateID := domaintypes.NewJobID()
+
+	server := newRunStatusReportServer(t, runID, migID, specID, repoID, preGateID, healID, postGateID)
+	defer server.Close()
+
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{"run", "status", runID.String(), "--json"}, &buf)
+	if err != nil {
+		t.Fatalf("run status <run-id> --json error: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("expected valid JSON output, got %q (err=%v)", buf.String(), err)
+	}
+	for _, key := range []string{"mig_id", "mig_name", "repos"} {
+		if _, ok := parsed[key]; !ok {
+			t.Fatalf("expected %s in JSON output, got %v", key, parsed)
+		}
+	}
+	if strings.Contains(buf.String(), "Mig:") {
+		t.Fatalf("expected JSON output only, got text report marker in %q", buf.String())
+	}
+}
