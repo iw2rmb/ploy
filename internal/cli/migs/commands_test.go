@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -12,19 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/logs"
 	"github.com/iw2rmb/ploy/internal/cli/runs"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domainapi "github.com/iw2rmb/ploy/internal/domain/api"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
-
-// newTestLogPrinter creates a LogPrinter for testing that writes to the provided writer.
-// Uses structured format to enable verification of enriched fields.
-func newTestLogPrinter(w io.Writer) *logs.Printer {
-	return logs.NewPrinter(logs.FormatStructured, w)
-}
 
 func TestArtifactsCommand(t *testing.T) {
 	runID := domaintypes.NewRunID()
@@ -242,119 +234,10 @@ func TestSimplePrinterFormats(t *testing.T) {
 	}
 }
 
-// TestEventsCommandWithLogPrinter verifies that EventsCommand renders log events
-// using the shared LogPrinter when configured (unified log streaming for mig run --follow).
-func TestEventsCommandWithLogPrinter(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		buildEvents func(runID, nodeID, jobID string) []string
-		wantLog     string // expected substring in log output
-		wantFinal   migsapi.RunState
-		wantNodeID  bool // whether node= context should appear
-	}{
-		{
-			name: "log event with enriched fields",
-			buildEvents: func(runID, nodeID, jobID string) []string {
-				return []string{
-					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
-					"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Build started\",\"node_id\":\"" + nodeID + "\",\"job_id\":\"" + jobID + "\",\"job_type\":\"mig\",\"next_id\":100}\n\n",
-					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
-				}
-			},
-			wantLog:    "Build started",
-			wantFinal:  migsapi.RunStateSucceeded,
-			wantNodeID: true,
-		},
-		{
-			name: "log event without enriched fields",
-			buildEvents: func(runID, _ string, _ string) []string {
-				return []string{
-					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
-					"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:01Z\",\"stream\":\"stderr\",\"line\":\"Warning\"}\n\n",
-					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
-				}
-			},
-			wantLog:    "Warning",
-			wantFinal:  migsapi.RunStateSucceeded,
-			wantNodeID: false,
-		},
-		{
-			name: "retention event recorded",
-			buildEvents: func(runID, _ string, _ string) []string {
-				return []string{
-					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"running\"}\n\n",
-					"event: retention\ndata: {\"retained\":true,\"ttl\":\"24h\",\"expires_at\":\"2025-10-23T10:00:00Z\",\"bundle_cid\":\"bafy-bundle\"}\n\n",
-					"event: run\ndata: {\"run_id\":\"" + runID + "\",\"state\":\"succeeded\"}\n\n",
-				}
-			},
-			wantLog:    "retained", // retention summary is printed
-			wantFinal:  migsapi.RunStateSucceeded,
-			wantNodeID: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			runID := domaintypes.NewRunID()
-			nodeID := domaintypes.NewNodeKey()
-			jobID := domaintypes.NewJobID()
-
-			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/event-stream")
-				fl, ok := w.(http.Flusher)
-				if !ok {
-					t.Fatal("no flusher")
-				}
-				fl.Flush()
-
-				for _, evt := range tt.buildEvents(runID.String(), nodeID, jobID.String()) {
-					_, _ = w.Write([]byte(evt))
-					fl.Flush()
-					time.Sleep(2 * time.Millisecond)
-				}
-			}))
-			defer sse.Close()
-
-			base, _ := url.Parse(sse.URL)
-			var buf bytes.Buffer
-
-			// Create a LogPrinter to capture log output.
-			logPrinter := newTestLogPrinter(&buf)
-
-			cmd := EventsCommand{
-				Client:     stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
-				BaseURL:    base,
-				RunID:      runID,
-				Output:     &buf,
-				LogPrinter: logPrinter,
-			}
-
-			state, err := cmd.Run(context.Background())
-			if err != nil {
-				t.Fatalf("events run: %v", err)
-			}
-			if state != tt.wantFinal {
-				t.Errorf("state=%s, want %s", state, tt.wantFinal)
-			}
-
-			out := buf.String()
-			if tt.wantLog != "" && !bytes.Contains([]byte(out), []byte(tt.wantLog)) {
-				t.Errorf("output missing %q, got: %s", tt.wantLog, out)
-			}
-			if tt.wantNodeID && !bytes.Contains([]byte(out), []byte("node=")) {
-				t.Errorf("output missing node= context, got: %s", out)
-			}
-		})
-	}
-}
-
-// TestEventsCommandWithoutLogPrinter verifies that when LogPrinter is nil,
-// EventsCommand still renders log events using a default structured printer.
-func TestEventsCommandWithoutLogPrinter(t *testing.T) {
+// TestEventsCommandIgnoresUnknownFrames verifies that EventsCommand silently
+// ignores event types it does not handle (e.g. log, retention) since the run
+// stream is lifecycle-only.
+func TestEventsCommandIgnoresUnknownFrames(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -367,10 +250,11 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 		}
 		fl.Flush()
 
-		// Send run, log, and run events.
+		// Send run, unknown types, and terminal run events.
 		events := []string{
 			"event: run\ndata: {\"run_id\":\"" + runID.String() + "\",\"state\":\"running\"}\n\n",
-			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be printed\"}\n\n",
+			"event: log\ndata: {\"timestamp\":\"2025-10-22T10:00:00Z\",\"stream\":\"stdout\",\"line\":\"Should be ignored\"}\n\n",
+			"event: retention\ndata: {\"retained\":true}\n\n",
 			"event: run\ndata: {\"run_id\":\"" + runID.String() + "\",\"state\":\"succeeded\"}\n\n",
 		}
 		for _, evt := range events {
@@ -385,11 +269,10 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	var buf bytes.Buffer
 
 	cmd := EventsCommand{
-		Client:     stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
-		BaseURL:    base,
-		RunID:      runID,
-		Output:     &buf,
-		LogPrinter: nil, // No LogPrinter configured.
+		Client:  stream.Client{HTTPClient: sse.Client(), MaxRetries: 0},
+		BaseURL: base,
+		RunID:   runID,
+		Output:  &buf,
 	}
 
 	state, err := cmd.Run(context.Background())
@@ -401,12 +284,15 @@ func TestEventsCommandWithoutLogPrinter(t *testing.T) {
 	}
 
 	out := buf.String()
-	// Log message should appear even when LogPrinter is nil.
-	if !bytes.Contains([]byte(out), []byte("Should be printed")) {
-		t.Errorf("log message should appear when LogPrinter is nil, got: %s", out)
+	// Log/retention events must NOT appear — they are not handled.
+	if strings.Contains(out, "Should be ignored") {
+		t.Errorf("log events should be ignored on lifecycle-only stream, got: %s", out)
 	}
-	// Ticket state should still appear via SimplePrinter.
-	if !bytes.Contains([]byte(out), []byte(runID.String())) {
+	if strings.Contains(out, "retained") {
+		t.Errorf("retention events should be ignored on lifecycle-only stream, got: %s", out)
+	}
+	// Run state should appear via SimplePrinter.
+	if !strings.Contains(out, runID.String()) {
 		t.Errorf("run ID should appear in output, got: %s", out)
 	}
 }

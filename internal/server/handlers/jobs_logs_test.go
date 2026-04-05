@@ -519,6 +519,100 @@ func TestGetJobLogsHandler_RetentionFrame(t *testing.T) {
 	}
 }
 
+// TestGetJobLogsHandler_BackfillLiveNoDuplicates verifies that events published
+// to the hub during backfill are not delivered twice (once via backfill, once via
+// live subscription) and that ordering is backfill-first then live.
+func TestGetJobLogsHandler_BackfillLiveNoDuplicates(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	objKey := "logs/job.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusRunning},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusStarted}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKey, "", gzipLines(t, "backfill-line"))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	// Pre-publish a log event to the hub BEFORE the handler runs.
+	// This simulates an event published during backfill that overlaps with DB content.
+	ctx := context.Background()
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-01-01T00:00:00Z",
+		Stream:    "stdout",
+		Line:      "hub-overlap-line",
+		JobID:     jobID,
+	})
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	// Wait for handler to establish, then publish live events.
+	time.Sleep(50 * time.Millisecond)
+	_ = hub.PublishJobLog(ctx, jobID, logstream.LogRecord{
+		Timestamp: "2026-01-01T00:00:01Z",
+		Stream:    "stdout",
+		Line:      "live-line",
+		JobID:     jobID,
+	})
+	_ = hub.PublishJobStatus(ctx, jobID, logstream.Status{Status: "completed"})
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timeout waiting for backfill+live stream")
+	}
+
+	body := rr.Body.String()
+
+	// Backfill content must appear.
+	if !strings.Contains(body, "backfill-line") {
+		t.Fatalf("expected backfill-line in output; body: %s", body)
+	}
+	// Live content must appear.
+	if !strings.Contains(body, "live-line") {
+		t.Fatalf("expected live-line in output; body: %s", body)
+	}
+	// Hub overlap line (published before backfill, a log event) must NOT be
+	// replayed as a live event — it's covered by backfill from DB.
+	// Count occurrences of "hub-overlap-line" — should be zero (it's in hub, not DB backfill).
+	if strings.Count(body, "hub-overlap-line") > 0 {
+		t.Fatalf("hub log event published during backfill should be deduped; body: %s", body)
+	}
+	// Ordering: backfill content must appear before live content.
+	backfillIdx := strings.Index(body, "backfill-line")
+	liveIdx := strings.Index(body, "live-line")
+	if backfillIdx > liveIdx {
+		t.Fatalf("backfill must precede live; backfill@%d live@%d; body: %s", backfillIdx, liveIdx, body)
+	}
+	// Done sentinel must be present.
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event; body: %s", body)
+	}
+}
+
 func TestBuildJobLogFilter_RejectsNilJobIDLog(t *testing.T) {
 	t.Parallel()
 

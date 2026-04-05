@@ -128,18 +128,34 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 	}
 	flusher.Flush()
 
-	// Capture the hub high-water mark BEFORE backfill so that events
-	// published while backfill runs are not lost — they will be replayed
-	// by the subscription starting from this cursor.
-	snapshot := hub.SnapshotJob(job.ID)
-	var hubSinceID domaintypes.EventID
-	if len(snapshot) > 0 {
-		hubSinceID = snapshot[len(snapshot)-1].ID
-	}
+	// Capture the hub high-water mark BEFORE backfill so we can identify
+	// gap events (published during backfill) afterward.
+	preCursor := hubHighWater(hub.SnapshotJob(job.ID))
 
 	// Backfill historical logs filtered to this job.
 	if err := backfillRunLogs(r.Context(), w, flusher, st, bs, job.RunID, allowedJobs); err != nil {
 		slog.Error("backfill job logs failed", "job_id", job.ID.String(), "err", err)
+	}
+
+	// Replay non-log gap events (retention, done) that arrived during backfill.
+	// Log events are skipped — they overlap with backfill content from DB.
+	postSnapshot := hub.SnapshotJob(job.ID)
+	postCursor := preCursor
+	for _, evt := range postSnapshot {
+		if evt.ID <= preCursor {
+			continue
+		}
+		postCursor = evt.ID
+		if evt.Type == domaintypes.SSEEventLog {
+			continue
+		}
+		if err := logstream.WriteEventFrame(w, evt); err != nil {
+			return true
+		}
+		flusher.Flush()
+		if evt.Type == domaintypes.SSEEventDone {
+			return true
+		}
 	}
 
 	// If job is terminal, write done and return.
@@ -150,7 +166,7 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 		return true
 	}
 
-	sub, err := hub.SubscribeJob(r.Context(), job.ID, hubSinceID)
+	sub, err := hub.SubscribeJob(r.Context(), job.ID, postCursor)
 	if err != nil {
 		slog.Error("subscribe after backfill failed", "job_id", job.ID.String(), "err", err)
 		return true
@@ -174,6 +190,14 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			}
 		}
 	}
+}
+
+// hubHighWater returns the ID of the last event in the snapshot, or 0 if empty.
+func hubHighWater(snapshot []logstream.Event) domaintypes.EventID {
+	if len(snapshot) == 0 {
+		return 0
+	}
+	return snapshot[len(snapshot)-1].ID
 }
 
 // isTerminalJobStatus reports whether the job status is terminal.
