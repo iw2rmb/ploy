@@ -17,7 +17,7 @@ items:
       - gaps: ["\"[replace] build_gate router plus healing.by_error_kind contract fields -> single build_gate.heal contract field with retries and mig-like execution settings\": stale router-era wording remains in `internal/workflow/contracts/hydra.go:210` (\"container spec (step, router, or healing action)\"), leaving Step 1 contract-surface cleanup incomplete."]
         commit: b531a62b
       - gaps: ["\"[replace] CLI spec shaping over build_gate.healing.by_error_kind entries -> CLI spec shaping over one build_gate.heal entry\": stale router-era wording remains in `cmd/ploy/mig_run_spec_hydra_test.go:458` (\"Compile Hydra records: build_gate router & healing\"), leaving a Step 1 leftover in CLI build-gate test surface."]
-        commit: null
+        commit: 54bb129c
     label: "1"
     summary: "Replace build-gate contracts and CLI spec shaping with a single build_gate.heal configuration surface."
     classification: "determined"
