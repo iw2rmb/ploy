@@ -206,88 +206,6 @@ func TestGetJobLogsHandler_RunNotFound(t *testing.T) {
 	assertStatus(t, rr, http.StatusNotFound)
 }
 
-// --- buildJobLogFilter ---
-
-func TestBuildJobLogFilter_PassesMatchingLog(t *testing.T) {
-	t.Parallel()
-
-	jobID := domaintypes.NewJobID()
-	allowed := map[domaintypes.JobID]struct{}{jobID: {}}
-	filter := buildJobLogFilter(allowed)
-
-	jobIDStr := jobID.String()
-	data, _ := json.Marshal(map[string]any{"job_id": jobIDStr, "line": "hello"})
-	evt := logstream.Event{Type: domaintypes.SSEEventLog, Data: data}
-
-	out, keep := filter(evt)
-	if !keep {
-		t.Fatal("expected log event to pass filter")
-	}
-	if out.Type != domaintypes.SSEEventLog {
-		t.Fatalf("expected event type %q, got %q", domaintypes.SSEEventLog, out.Type)
-	}
-}
-
-func TestBuildJobLogFilter_RejectsNonMatchingLog(t *testing.T) {
-	t.Parallel()
-
-	jobID := domaintypes.NewJobID()
-	otherID := domaintypes.NewJobID()
-	allowed := map[domaintypes.JobID]struct{}{jobID: {}}
-	filter := buildJobLogFilter(allowed)
-
-	otherStr := otherID.String()
-	data, _ := json.Marshal(map[string]any{"job_id": otherStr, "line": "hello"})
-	evt := logstream.Event{Type: domaintypes.SSEEventLog, Data: data}
-
-	_, keep := filter(evt)
-	if keep {
-		t.Fatal("expected log event for other job to be rejected")
-	}
-}
-
-func TestBuildJobLogFilter_PassesDoneEvent(t *testing.T) {
-	t.Parallel()
-
-	filter := buildJobLogFilter(map[domaintypes.JobID]struct{}{})
-
-	data, _ := json.Marshal(map[string]string{"status": "done"})
-	evt := logstream.Event{Type: domaintypes.SSEEventDone, Data: data}
-
-	_, keep := filter(evt)
-	if !keep {
-		t.Fatal("expected done event to pass filter")
-	}
-}
-
-func TestBuildJobLogFilter_RejectsRunEvent(t *testing.T) {
-	t.Parallel()
-
-	jobID := domaintypes.NewJobID()
-	filter := buildJobLogFilter(map[domaintypes.JobID]struct{}{jobID: {}})
-
-	data, _ := json.Marshal(map[string]string{"state": "running"})
-	evt := logstream.Event{Type: domaintypes.SSEEventRun, Data: data}
-
-	_, keep := filter(evt)
-	if keep {
-		t.Fatal("expected run event to be rejected from job log stream")
-	}
-}
-
-func TestBuildJobLogFilter_PassesRetentionEvent(t *testing.T) {
-	t.Parallel()
-
-	filter := buildJobLogFilter(map[domaintypes.JobID]struct{}{})
-
-	data, _ := json.Marshal(map[string]any{"retained": true})
-	evt := logstream.Event{Type: domaintypes.SSEEventRetention, Data: data}
-
-	_, keep := filter(evt)
-	if !keep {
-		t.Fatal("expected retention event to pass job log filter")
-	}
-}
 
 // --- GET /v1/jobs/{job_id}/logs backfill path (sinceID == 0) ---
 
@@ -708,17 +626,65 @@ func TestGetJobLogsHandler_GapLogEventsDelivered(t *testing.T) {
 	}
 }
 
-func TestBuildJobLogFilter_RejectsNilJobIDLog(t *testing.T) {
+// TestGetJobLogsHandler_TerminalBackfillIncludesRetention verifies that a fresh
+// connection (sinceID == 0) to a terminal job with blobstore configured emits
+// retention frames that were already published to the hub before the handler ran.
+func TestGetJobLogsHandler_TerminalBackfillIncludesRetention(t *testing.T) {
 	t.Parallel()
 
+	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
-	filter := buildJobLogFilter(map[domaintypes.JobID]struct{}{jobID: {}})
 
-	data, _ := json.Marshal(map[string]any{"line": "hello"}) // no job_id field
-	evt := logstream.Event{Type: domaintypes.SSEEventLog, Data: data}
+	objKey := "logs/terminal-job.gz"
 
-	_, keep := filter(evt)
-	if keep {
-		t.Fatal("expected log event without job_id to be rejected")
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKey, "", gzipLines(t, "terminal-line"))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	// Publish a retention event to the hub BEFORE the handler runs.
+	ctx := context.Background()
+	_ = hub.PublishJobRetention(ctx, jobID, logstream.RetentionHint{
+		Retained: true,
+		TTL:      "72h",
+		Expires:  "2026-04-08T00:00:00Z",
+	})
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	h.ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+
+	if !strings.Contains(body, "terminal-line") {
+		t.Fatalf("expected terminal-line in backfill output; body: %s", body)
+	}
+	if !strings.Contains(body, "event: retention") {
+		t.Fatalf("terminal backfill must include retention event; body: %s", body)
+	}
+	if !strings.Contains(body, "event: done") {
+		t.Fatalf("expected done event; body: %s", body)
+	}
+	retIdx := strings.Index(body, "event: retention")
+	doneIdx := strings.Index(body, "event: done")
+	if retIdx > doneIdx {
+		t.Fatalf("retention must precede done; retention@%d done@%d; body: %s", retIdx, doneIdx, body)
 	}
 }
+
