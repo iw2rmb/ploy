@@ -405,7 +405,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 }
 
 // TestResolveAmataCommand tests the shared amata command resolution used by
-// both healing and router manifest builders.
+// healing manifest builders.
 func TestResolveAmataCommand(t *testing.T) {
 	t.Parallel()
 
