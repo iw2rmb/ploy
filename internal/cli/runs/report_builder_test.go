@@ -165,7 +165,6 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	if entry.PatchURL == "" {
 		t.Fatalf("expected repo patch URL to be populated")
 	}
-	assertURL(t, entry.BuildLogURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/logs", nil)
 	assertURL(t, entry.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
 		"download": "true",
 		"diff_id":  diffID2.String(),
@@ -176,7 +175,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	}
 
 	job0 := entry.Jobs[0]
-	assertURL(t, job0.BuildLogURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/logs", nil)
+	assertURL(t, job0.JobLogURL, "/api/v1/jobs/"+jobID1.String()+"/logs", nil)
 	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
 		"download": "true",
 		"diff_id":  diffID2.String(),
@@ -299,9 +298,10 @@ func TestGetRunReportCommandMissingOptionalFields(t *testing.T) {
 	if report.Repos[0].Jobs[0].PatchURL != "" {
 		t.Fatalf("expected empty job patch URL, got %q", report.Repos[0].Jobs[0].PatchURL)
 	}
-	if report.Repos[0].BuildLogURL == "" || report.Repos[0].Jobs[0].BuildLogURL == "" {
-		t.Fatalf("expected build log URLs to be populated")
+	if report.Repos[0].Jobs[0].JobLogURL == "" {
+		t.Fatalf("expected job log URL to be populated")
 	}
+	assertURL(t, report.Repos[0].Jobs[0].JobLogURL, "/api/v1/jobs/"+jobID.String()+"/logs", nil)
 }
 
 func TestGetRunReportCommandEmptyReposUsesEmptySlices(t *testing.T) {

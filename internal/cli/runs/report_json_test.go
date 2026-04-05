@@ -25,14 +25,13 @@ func TestRenderRunReportJSON(t *testing.T) {
 		SpecID:  specID,
 		Repos: []RunEntry{
 			{
-				RepoID:      repoID,
-				RepoURL:     "https://github.com/acme/service.git",
-				BaseRef:     "main",
-				TargetRef:   "ploy/java17",
-				Attempt:     1,
-				Status:      "Running",
-				BuildLogURL: "https://example.test/logs",
-				PatchURL:    "https://example.test/patch",
+				RepoID:    repoID,
+				RepoURL:   "https://github.com/acme/service.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/java17",
+				Attempt:   1,
+				Status:    "Running",
+				PatchURL:  "https://example.test/patch",
 				Jobs: []RunJobEntry{
 					{
 						JobID:       jobID,
@@ -48,8 +47,8 @@ func TestRenderRunReportJSON(t *testing.T) {
 								LookupURL: "https://example.test/v1/artifacts?cid=bafy-gate-report",
 							},
 						},
-						BuildLogURL: "https://example.test/logs",
-						PatchURL:    "https://example.test/patch",
+						JobLogURL: "https://example.test/v1/jobs/" + jobID.String() + "/logs",
+						PatchURL:  "https://example.test/patch",
 					},
 				},
 			},
@@ -119,7 +118,7 @@ func TestRenderRunReportJSONOmitsEmptyOptionalFields(t *testing.T) {
 	}
 
 	out := buf.String()
-	for _, field := range []string{"build_log_url", "patch_url", "last_error", "artifacts"} {
+	for _, field := range []string{"job_log_url", "patch_url", "last_error", "artifacts"} {
 		if strings.Contains(out, "\""+field+"\"") {
 			t.Fatalf("expected %q omitted for empty optional fields; got %q", field, out)
 		}

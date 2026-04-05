@@ -43,11 +43,12 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
 	assertx.Contains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
-	assertx.Contains(t, out, "Logs")
-	assertx.Contains(t, out, " | Patch")
+	assertx.NotContains(t, out, "Logs (")
+	assertx.Contains(t, out, "Patch")
 	if strings.Count(out, "Patch (") != 1 {
 		t.Fatalf("expected exactly one patch link, got %q", out)
 	}
+	assertx.Contains(t, out, "/v1/jobs/"+healID.String()+"/logs")
 	assertx.Contains(t, out, "⣾")
 	assertx.Contains(t, out, "✗")
 	assertx.Contains(t, out, "└  Exit 137: ")

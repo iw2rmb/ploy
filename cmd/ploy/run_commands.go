@@ -8,12 +8,8 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/logs"
-	"github.com/iw2rmb/ploy/internal/cli/migs"
 	runcmd "github.com/iw2rmb/ploy/internal/cli/runs"
-	"github.com/iw2rmb/ploy/internal/cli/stream"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
@@ -133,73 +129,6 @@ func runStatusSupportsOSC8(w io.Writer) bool {
 	return (info.Mode() & os.ModeCharDevice) != 0
 }
 
-func handleRunLogs(args []string, stderr io.Writer) error {
-	if wantsHelp(args) {
-		printRunLogsUsage(stderr)
-		return nil
-	}
-
-	fs := flag.NewFlagSet("run logs", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	format := fs.String("format", string(logs.FormatStructured), "output format (raw|structured)")
-	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
-	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			printRunLogsUsage(stderr)
-			return nil
-		}
-		printRunLogsUsage(stderr)
-		return err
-	}
-
-	runIDArgs := fs.Args()
-	if len(runIDArgs) == 0 {
-		printRunLogsUsage(stderr)
-		return errors.New("run id required")
-	}
-	runID := strings.TrimSpace(runIDArgs[0])
-	if runID == "" {
-		printRunLogsUsage(stderr)
-		return errors.New("run id required")
-	}
-	if *maxRetries < -1 {
-		printRunLogsUsage(stderr)
-		return fmt.Errorf("max retries must be >= -1")
-	}
-
-	ctx := context.Background()
-	if *overall > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, *overall)
-		defer cancel()
-	}
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-
-	cmd := migs.LogsCommand{
-		RunID:  domaintypes.RunID(runID),
-		Format: logs.Format(strings.ToLower(strings.TrimSpace(*format))),
-		Output: stderr,
-		Client: stream.Client{
-			HTTPClient:  cloneForStream(httpClient),
-			MaxRetries:  *maxRetries,
-			IdleTimeout: *idle,
-		},
-		BaseURL: base,
-	}
-	if err := cmd.Run(ctx); err != nil {
-		if errors.Is(err, migs.ErrInvalidFormat) {
-			printRunLogsUsage(stderr)
-		}
-		return err
-	}
-	return nil
-}
-
 func printRunStatusUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run status [--json] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
@@ -207,12 +136,3 @@ func printRunStatusUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  --json   Print machine-readable JSON report with links and per-job artifacts")
 }
 
-func printRunLogsUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run logs [--format <raw|structured>] [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>")
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Options:")
-	_, _ = fmt.Fprintln(w, "  --format <raw|structured>   Output format (default: structured)")
-	_, _ = fmt.Fprintln(w, "  --max-retries <n>           Max reconnect attempts (-1 for unlimited, default: 3)")
-	_, _ = fmt.Fprintln(w, "  --idle-timeout <duration>   Cancel if no events arrive (0=off, default: 45s)")
-	_, _ = fmt.Fprintln(w, "  --timeout <duration>        Overall stream timeout (0=off)")
-}
