@@ -4,12 +4,6 @@
   "title": "MIG raw contract schema",
   "type": "object",
   "properties": {
-    "mig_index": false,
-    "amata": false,
-    "env": false,
-    "env_from_file": false,
-    "tmp_dir": false,
-    "tmp_bundle": false,
     "steps": {
       "type": "array",
       "items": {
@@ -24,22 +18,11 @@
   "definitions": {
     "stepObject": {
       "type": "object",
-      "properties": {
-        "retain_container": false,
-        "env": false,
-        "env_from_file": false,
-        "tmp_dir": false,
-        "tmp_bundle": false
-      },
       "additionalProperties": true
     },
     "buildGateObject": {
       "type": "object",
       "properties": {
-        "profile": false,
-        "amata": false,
-        "healing": false,
-        "router": false,
         "heal": {
           "$ref": "#/definitions/healObject"
         },
@@ -54,15 +37,6 @@
     },
     "healObject": {
       "type": "object",
-      "properties": {
-        "retain_container": false,
-        "env": false,
-        "spec": false,
-        "set": false,
-        "env_from_file": false,
-        "tmp_dir": false,
-        "tmp_bundle": false
-      },
       "additionalProperties": true
     },
     "preObject": {
@@ -74,9 +48,6 @@
     "buildGatePhaseObject": {
       "type": "object",
       "properties": {
-        "amata": false,
-        "spec": false,
-        "set": false,
         "stack": {
           "$ref": "#/definitions/buildGatePhaseStackObject"
         }
@@ -85,11 +56,6 @@
     },
     "buildGatePhaseStackObject": {
       "type": "object",
-      "properties": {
-        "amata": false,
-        "spec": false,
-        "set": false
-      },
       "additionalProperties": true
     }
   }

@@ -365,13 +365,6 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 	hydraIn := []string{"def5678:/in/config"}
 	hydraOut := []string{"aaa1111:/out/result"}
 	hydraHome := []string{"bbb2222:dotfile:ro"}
-	amataSpec := &contracts.AmataRunSpec{
-		Spec: "task: fix-it\nprompt: fix the bug",
-		Set: []contracts.AmataSetParam{
-			{Param: "repo", Value: "myrepo"},
-			{Param: "env", Value: "prod"},
-		},
-	}
 
 	type fieldProbe struct {
 		name         string
@@ -421,26 +414,6 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:        "Amata",
-			stepMutator: func(s *contracts.MigStep) { s.Amata = amataSpec },
-			healMutator: func(a *contracts.HealSpec) { a.Amata = amataSpec },
-			checkPresent: func(t *testing.T, mc MigContainerSpec) {
-				t.Helper()
-				if mc.Amata == nil || mc.Amata.Spec != amataSpec.Spec {
-					t.Fatalf("Amata: got %v", mc.Amata)
-				}
-				if len(mc.Amata.Set) != 2 {
-					t.Fatalf("Amata.Set len: got %d, want 2", len(mc.Amata.Set))
-				}
-			},
-			checkAbsent: func(t *testing.T, mc MigContainerSpec) {
-				t.Helper()
-				if mc.Amata != nil {
-					t.Errorf("Amata: got non-nil, want nil")
-				}
-			},
-		},
 	}
 
 	for _, probe := range probes {
@@ -482,19 +455,4 @@ func TestMigsSpecToRunOptions_FieldPropagation(t *testing.T) {
 			})
 		})
 	}
-
-	t.Run("nil_propagates_nil", func(t *testing.T) {
-		t.Parallel()
-		spec := singleStepSpec("img", func(s *contracts.MigSpec) {
-			s.BuildGate = &contracts.BuildGateConfig{
-				Heal: &contracts.HealSpec{
-					Image: testJobImage("heal-img"),
-				},
-			}
-		})
-		opts := migsSpecToRunOptions(spec)
-		if opts.Healing != nil && opts.Healing.Mig.Amata != nil {
-			t.Error("Healing.Mig.Amata: expected nil when not configured")
-		}
-	})
 }

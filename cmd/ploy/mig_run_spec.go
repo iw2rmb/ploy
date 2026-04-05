@@ -62,9 +62,6 @@ func normalizeMigsSpecToJSON(ctx context.Context, base *url.URL, client *http.Cl
 }
 
 func preprocessMigsSpecInPlace(spec map[string]any, specBaseDir string) error {
-	if err := resolveAmataSpecPathInPlace(spec, specBaseDir); err != nil {
-		return fmt.Errorf("resolve amata.spec path: %w", err)
-	}
 	if err := resolveImageEnvInPlace(spec); err != nil {
 		return fmt.Errorf("resolve image env placeholders: %w", err)
 	}
@@ -257,65 +254,6 @@ func composeSpecRootPath(specBaseDir string) (string, error) {
 	return filepath.Join(resolved, ".root-spec.yaml"), nil
 }
 
-// resolveAmataSpecPathInPlace loads amata.spec from file paths and replaces each
-// path with the file content so typed validation/runtime receive canonical spec text.
-func resolveAmataSpecPathInPlace(spec map[string]any, specBaseDir string) error {
-	if steps, ok := spec["steps"].([]any); ok {
-		for i, raw := range steps {
-			stepSpec, ok := raw.(map[string]any)
-			if !ok {
-				continue
-			}
-			if err := resolveAmataSpecInSection(stepSpec, fmt.Sprintf("steps[%d].amata", i), specBaseDir); err != nil {
-				return err
-			}
-		}
-	}
-
-	bg, ok := spec["build_gate"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	if heal, ok := bg["heal"].(map[string]any); ok {
-		if err := resolveAmataSpecInSection(heal, "build_gate.heal.amata", specBaseDir); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func resolveAmataSpecInSection(section map[string]any, prefix, specBaseDir string) error {
-	amataRaw, hasAmata := section["amata"]
-	if !hasAmata {
-		return nil
-	}
-	amata, ok := amataRaw.(map[string]any)
-	if !ok {
-		return fmt.Errorf("%s: expected object, got %T", prefix, amataRaw)
-	}
-
-	specRaw, hasSpec := amata["spec"]
-	if !hasSpec {
-		return nil
-	}
-	specPath, ok := specRaw.(string)
-	if !ok {
-		return fmt.Errorf("%s.spec: expected string path, got %T", prefix, specRaw)
-	}
-
-	resolvedPath, err := resolvePath(specPath, specBaseDir)
-	if err != nil {
-		return fmt.Errorf("%s.spec: %w", prefix, err)
-	}
-	specContent, err := os.ReadFile(resolvedPath)
-	if err != nil {
-		return fmt.Errorf("%s.spec: read file %s: %w", prefix, resolvedPath, err)
-	}
-	amata["spec"] = string(specContent)
-	return nil
-}
-
 func expandSpecEnvValue(raw string) (string, error) {
 	if !strings.Contains(raw, "$") {
 		return raw, nil
@@ -401,7 +339,7 @@ func applyConfigOverlayInPlace(spec map[string]any) error {
 //
 // Processing order:
 //  1. Load spec file (YAML or JSON format) if provided
-//  2. Preprocess: resolve !include composition, amata.spec, image env, envs expansion
+//  2. Preprocess: resolve !include composition, image env, envs expansion
 //  3. Compile Hydra records: ca/in/out/home authoring entries → canonical shortHash:dst form
 //  4. Apply CLI flag overrides (higher precedence than spec file) to top-level fields
 //  5. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)

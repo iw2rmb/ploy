@@ -149,11 +149,6 @@ type MigStep struct {
 	// repo_sha_in and canonicalized step operations hash.
 	Always bool `json:"always,omitempty" yaml:"always,omitempty"`
 
-	// Amata configures amata-mode execution for this mig step container.
-	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
-	// --set flags; no prompt file is required in this mode.
-	// When nil, the container uses the image default command/entrypoint.
-	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
 // Validate checks that the spec is structurally valid.
@@ -181,9 +176,6 @@ func (s MigSpec) Validate() error {
 		if err := validateHydraFields(mig.CA, mig.In, mig.Out, mig.Home, fmt.Sprintf("steps[%d]", i)); err != nil {
 			return err
 		}
-		if err := validateAmataRunSpec(mig.Amata, fmt.Sprintf("steps[%d].amata", i)); err != nil {
-			return err
-		}
 	}
 
 	// Validate heal spec.
@@ -208,9 +200,6 @@ func (s MigSpec) Validate() error {
 			}
 		}
 		if err := validateHydraFields(heal.CA, heal.In, heal.Out, heal.Home, prefix); err != nil {
-			return err
-		}
-		if err := validateAmataRunSpec(heal.Amata, prefix+".amata"); err != nil {
 			return err
 		}
 	}
@@ -250,22 +239,6 @@ func (s MigSpec) Validate() error {
 	return nil
 }
 
-// validateAmataRunSpec validates an AmataRunSpec when present.
-// When amata is nil, image default command/entrypoint behavior is used.
-func validateAmataRunSpec(amata *AmataRunSpec, prefix string) error {
-	if amata == nil {
-		return nil
-	}
-	if strings.TrimSpace(amata.Spec) == "" {
-		return fmt.Errorf("%s.spec: required", prefix)
-	}
-	for i, p := range amata.Set {
-		if strings.TrimSpace(p.Param) == "" {
-			return fmt.Errorf("%s.set[%d].param: required", prefix, i)
-		}
-	}
-	return nil
-}
 
 func validateBuildGateStackConfig(stack *BuildGateStackConfig, prefix string) error {
 	if stack == nil {

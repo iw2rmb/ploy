@@ -193,14 +193,14 @@ build_gate:
 `,
 		},
 		{
-			name: "amata spec missing file",
+			name: "amata is forbidden in steps",
 			spec: `
 steps:
   - image: docker.io/test/step1:latest
     amata:
-      spec: $PLOY_PATH/missing-amata.yaml
+      spec: ignored
 `,
-			setenv: map[string]string{"PLOY_PATH": ""},
+			wantErr: "validate spec: steps[0].amata: forbidden",
 		},
 		{
 			name: "unresolved image env placeholder",
@@ -683,16 +683,12 @@ func TestBuildSpecPayload_RelativePathsResolveFromSpecDir(t *testing.T) {
 	t.Chdir(t.TempDir())
 
 	writeFile(t, filepath.Join(specDir, "heal-fragment.yaml"), "image: docker.io/test/healer-fragment:latest\n")
-	amataContent := "version: amata/v1\nname: rel-path\n"
-	writeFile(t, filepath.Join(specDir, "amata.yaml"), amataContent)
 
 	result := buildAndParseSpec(t, specDir, `
 envs:
   TOKEN: spec-dir-token
 steps:
   - image: docker.io/test/mig:latest
-    amata:
-      spec: amata.yaml
 build_gate:
   heal:
     <<: !include heal-fragment.yaml
@@ -700,10 +696,6 @@ build_gate:
 
 	envs := mustDig(t, result, "envs")
 	assertField(t, envs, "TOKEN", "spec-dir-token")
-
-	steps := mustSteps(t, result, 1)
-	amata := mustDig(t, steps[0], "amata")
-	assertField(t, amata, "spec", amataContent)
 
 	heal := mustDig(t, result, "build_gate", "heal")
 	assertField(t, heal, "image", "docker.io/test/healer-fragment:latest")
@@ -731,20 +723,18 @@ build_gate:
 	}
 }
 
-func TestBuildSpecPayload_AmataSpecPathInIncludedFragment(t *testing.T) {
+func TestBuildSpecPayload_InPathInIncludedFragment(t *testing.T) {
 	specDir := t.TempDir()
 	fragmentsDir := filepath.Join(specDir, "fragments")
 	if err := os.MkdirAll(fragmentsDir, 0o755); err != nil {
 		t.Fatalf("mkdir fragments: %v", err)
 	}
 
-	amataContent := "version: amata/v1\nname: from-include\n"
-	writeFile(t, filepath.Join(fragmentsDir, "step.amata.yaml"), amataContent)
 	writeFile(t, filepath.Join(fragmentsDir, "step.fragment.yaml"), `
 step:
   image: docker.io/test/mig:latest
-  amata:
-    spec: ./step.amata.yaml
+  in:
+    - 0123456789ab:/in/input.txt
 `)
 
 	result := buildAndParseSpec(t, specDir, `
@@ -753,8 +743,14 @@ steps:
 `, ".yaml", specPayloadOpts{})
 
 	steps := mustSteps(t, result, 1)
-	amata := mustDig(t, steps[0], "amata")
-	assertField(t, amata, "spec", amataContent)
+	inRaw, ok := steps[0]["in"].([]any)
+	if !ok || len(inRaw) != 1 {
+		t.Fatalf("expected one in entry, got %v", steps[0]["in"])
+	}
+	inEntry, _ := inRaw[0].(string)
+	if inEntry != "0123456789ab:/in/input.txt" {
+		t.Fatalf("expected canonical in entry to stay unchanged, got %q", inEntry)
+	}
 }
 
 func TestBuildSpecPayload_CLIOverrides(t *testing.T) {
@@ -868,36 +864,6 @@ steps:
 			}
 		})
 	}
-}
-
-func TestBuildSpecPayload_StepAmataSpecPathResolved(t *testing.T) {
-	tmpDir := t.TempDir()
-	amataContent := "version: amata/v1\nname: codex-step\n"
-	writeFile(t, filepath.Join(tmpDir, "amata.yaml"), amataContent)
-	t.Setenv("PLOY_PATH", tmpDir)
-
-	result := buildAndParseSpec(t, tmpDir, `
-steps:
-  - image: docker.io/test/step1:latest
-  - image: docker.io/test/step2:latest
-    amata:
-      spec: $PLOY_PATH/amata.yaml
-      set:
-        - param: model
-          value: gpt-5
-`, ".yaml", specPayloadOpts{})
-
-	steps := mustSteps(t, result, 2)
-	amata := mustDig(t, steps[1], "amata")
-	assertField(t, amata, "spec", amataContent)
-
-	set, ok := amata["set"].([]any)
-	if !ok || len(set) != 1 {
-		t.Fatalf("expected amata.set len=1, got %v", amata["set"])
-	}
-	param := set[0].(map[string]any)
-	assertField(t, param, "param", "model")
-	assertField(t, param, "value", "gpt-5")
 }
 
 func TestBuildSpecPayload_ImageInterpolationAcrossSections(t *testing.T) {

@@ -122,12 +122,6 @@ type HealSpec struct {
 	// Expectations defines typed strategy output contracts for downstream
 	// validation/promotion boundaries.
 	Expectations *RecoveryExpectationsSpec `json:"expectations,omitempty" yaml:"expectations,omitempty"`
-
-	// Amata configures amata-mode execution for this healing action container.
-	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
-	// --set flags; no prompt file is required in this mode.
-	// When nil, the container uses the image default command/entrypoint.
-	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
 // RecoveryExpectationsSpec defines structured expectations for recovery output.
@@ -139,33 +133,6 @@ type RecoveryExpectationsSpec struct {
 type RecoveryExpectedArtifact struct {
 	Path   string `json:"path,omitempty" yaml:"path,omitempty"`
 	Schema string `json:"schema,omitempty" yaml:"schema,omitempty"`
-}
-
-// AmataRunSpec describes an amata execution configuration for heal or mig-step containers.
-//
-// Command mapping rules (deterministic):
-//   - When Spec is non-empty: materialize Spec as /in/amata.yaml, then run
-//     `amata run /in/amata.yaml` followed by ordered `--set '<param>=<value>'` flags
-//     from Set. No prompt file is required in this mode.
-//   - When AmataRunSpec is absent (nil pointer on HealSpec or MigStepSpec):
-//     fall through to the image default command/entrypoint.
-type AmataRunSpec struct {
-	// Spec is the amata spec content materialized as /in/amata.yaml before execution.
-	// Required when AmataRunSpec is present (non-empty).
-	Spec string `json:"spec" yaml:"spec"`
-
-	// Set is an ordered list of --set parameters emitted as `--set '<param>=<value>'`
-	// flags to `amata run`. Order is preserved for deterministic CLI materialization.
-	Set []AmataSetParam `json:"set,omitempty" yaml:"set,omitempty"`
-}
-
-// AmataSetParam is a single --set parameter for amata run.
-type AmataSetParam struct {
-	// Param is the parameter name (required, non-empty).
-	Param string `json:"param" yaml:"param"`
-
-	// Value is the parameter value passed verbatim (may be empty string).
-	Value string `json:"value" yaml:"value"`
 }
 
 // BuildGateProfileOverrideToSpecMap converts a BuildGateProfileOverride to the

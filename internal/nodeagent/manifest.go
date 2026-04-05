@@ -81,11 +81,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			}
 			image = strings.TrimSpace(resolved)
 		}
-		if stepMig.Amata != nil && strings.TrimSpace(stepMig.Amata.Spec) != "" {
-			command = resolveAmataCommand(stepMig.Amata)
-		} else {
-			command = stepMig.Command.ToSlice()
-		}
+		command = stepMig.Command.ToSlice()
 		hydraCA = stepMig.CA
 		hydraIn = stepMig.In
 		hydraOut = stepMig.Out
@@ -106,11 +102,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 			}
 			image = strings.TrimSpace(resolved)
 		}
-		if typedOpts.Execution.Amata != nil && strings.TrimSpace(typedOpts.Execution.Amata.Spec) != "" {
-			command = resolveAmataCommand(typedOpts.Execution.Amata)
-		} else {
-			command = typedOpts.Execution.Command.ToSlice()
-		}
+		command = typedOpts.Execution.Command.ToSlice()
 		hydraCA = typedOpts.Execution.CA
 		hydraIn = typedOpts.Execution.In
 		hydraOut = typedOpts.Execution.Out
@@ -242,17 +234,6 @@ func isAmataHealingImage(image string) bool {
 	return strings.Contains(strings.ToLower(image), "amata")
 }
 
-// resolveAmataCommand builds the command slice for amata-mode execution.
-// Produces ["amata", "run", "/in/amata.yaml"] followed by ordered "--set" "param=value" pairs.
-// Order follows amata.Set slice order for deterministic CLI materialization.
-func resolveAmataCommand(amata *contracts.AmataRunSpec) []string {
-	cmd := []string{"amata", "run", "/in/amata.yaml"}
-	for _, p := range amata.Set {
-		cmd = append(cmd, "--set", p.Param+"="+p.Value)
-	}
-	return cmd
-}
-
 // buildHealingManifest constructs a StepManifest from a typed MigContainerSpec.
 // The healing mig runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // When codexSession is non-empty and the image is Amata-based, CODEX_RESUME=1 is injected.
@@ -266,12 +247,7 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 		return contracts.StepManifest{}, err
 	}
 
-	var command []string
-	if mig.Amata != nil && strings.TrimSpace(mig.Amata.Spec) != "" {
-		command = resolveAmataCommand(mig.Amata)
-	} else {
-		command = mig.Command.ToSlice()
-	}
+	command := mig.Command.ToSlice()
 
 	env := make(map[string]string, len(req.Env)+len(mig.Env)+4)
 	for k, v := range req.Env {
