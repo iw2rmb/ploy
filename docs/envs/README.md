@@ -632,7 +632,7 @@ Run/API metadata propagation:
 ### How Official Images Consume These Variables
 
 **Codex images (`codex`)**: The entrypoint script supports two execution modes:
-- **amata mode**: when `amata.spec` is set on a mig step, router, or healing action, the container runs
+- **amata mode**: when `amata.spec` is set on a mig step or healing action, the container runs
   `amata run /in/amata.yaml` (with optional `--set` flags). No prompt file is required.
 - **Direct-Codex mode**: when `amata.spec` is absent, the container runs `codex exec` directly.
   A prompt must be delivered via `--prompt-file` or Hydra `in` mount as `/in/codex-prompt.txt`.
