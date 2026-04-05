@@ -26,48 +26,62 @@ func handleJob(args []string, stderr io.Writer) error {
 	}
 
 	switch args[0] {
+	case "log":
+		return handleJobLog(args[1:], stderr)
 	case "follow":
-		return handleJobFollow(args[1:], stderr)
+		// Compatibility alias: `ploy job follow <job-id>` == `ploy job log --follow <job-id>`.
+		aliasArgs := append([]string{"--follow"}, args[1:]...)
+		return handleJobLog(aliasArgs, stderr)
 	default:
 		printJobUsage(stderr)
 		return fmt.Errorf("unknown job subcommand %q", args[0])
 	}
 }
 
-func handleJobFollow(args []string, stderr io.Writer) error {
+func handleJobLog(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
-		printJobFollowUsage(stderr)
+		printJobLogUsage(stderr)
 		return nil
 	}
 
-	fs := flag.NewFlagSet("job follow", flag.ContinueOnError)
+	fs := flag.NewFlagSet("job log", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	format := fs.String("format", string(logs.FormatStructured), "output format (raw|structured)")
+	follow := fs.Bool("follow", false, "follow stream after printing available logs")
+	fs.BoolVar(follow, "f", false, "follow stream after printing available logs (shorthand)")
 	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
 	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
 	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			printJobFollowUsage(stderr)
+			printJobLogUsage(stderr)
 			return nil
 		}
-		printJobFollowUsage(stderr)
+		printJobLogUsage(stderr)
 		return err
 	}
 
 	rest := fs.Args()
 	if len(rest) == 0 {
-		printJobFollowUsage(stderr)
+		printJobLogUsage(stderr)
 		return errors.New("job id required")
 	}
 	jobID := strings.TrimSpace(rest[0])
 	if jobID == "" {
-		printJobFollowUsage(stderr)
+		printJobLogUsage(stderr)
 		return errors.New("job id required")
 	}
 	if *maxRetries < -1 {
-		printJobFollowUsage(stderr)
+		printJobLogUsage(stderr)
 		return fmt.Errorf("max retries must be >= -1")
+	}
+
+	effectiveIdle := *idle
+	effectiveRetries := *maxRetries
+	if !*follow {
+		// Print currently available logs and exit if stream goes idle.
+		effectiveIdle = 2 * time.Second
+		effectiveRetries = 0
 	}
 
 	ctx := context.Background()
@@ -87,14 +101,14 @@ func handleJobFollow(args []string, stderr io.Writer) error {
 		Output: stderr,
 		Client: stream.Client{
 			HTTPClient:  cloneForStream(httpClient),
-			MaxRetries:  *maxRetries,
-			IdleTimeout: *idle,
+			MaxRetries:  effectiveRetries,
+			IdleTimeout: effectiveIdle,
 		},
 		BaseURL: base,
 	}
 	if err := cmd.Run(ctx); err != nil {
 		if errors.Is(err, jobs.ErrInvalidFormat) {
-			printJobFollowUsage(stderr)
+			printJobLogUsage(stderr)
 		}
 		return err
 	}
@@ -105,13 +119,15 @@ func printJobUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy job <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  follow      Stream job logs (SSE)")
+	_, _ = fmt.Fprintln(w, "  log         Print job logs (or follow with --follow)")
+	_, _ = fmt.Fprintln(w, "  follow      Alias for: ploy job log --follow")
 }
 
-func printJobFollowUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy job follow [--format <raw|structured>] [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <job-id>")
+func printJobLogUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy job log [--follow|-f] [--format <raw|structured>] [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <job-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
+	_, _ = fmt.Fprintln(w, "  --follow, -f                 Follow stream after printing logs")
 	_, _ = fmt.Fprintln(w, "  --format <raw|structured>   Output format (default: structured)")
 	_, _ = fmt.Fprintln(w, "  --max-retries <n>           Max reconnect attempts (-1 for unlimited, default: 3)")
 	_, _ = fmt.Fprintln(w, "  --idle-timeout <duration>   Cancel if no events arrive (0=off, default: 45s)")

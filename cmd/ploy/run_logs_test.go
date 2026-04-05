@@ -58,7 +58,7 @@ func TestRunLogsRequiresRunID(t *testing.T) {
 	}
 }
 
-func TestJobFollowStructuredOutput(t *testing.T) {
+func TestJobLogStructuredOutput(t *testing.T) {
 	t.Helper()
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, []sseTestEvent{
@@ -72,9 +72,9 @@ func TestJobFollowStructuredOutput(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow", "--format", "structured", jobID.String()}, buf)
+	err := executeCmd([]string{"job", "log", "--format", "structured", jobID.String()}, buf)
 	if err != nil {
-		t.Fatalf("job follow: %v", err)
+		t.Fatalf("job log: %v", err)
 	}
 
 	out := buf.String()
@@ -89,7 +89,7 @@ func TestJobFollowStructuredOutput(t *testing.T) {
 	}
 }
 
-func TestJobFollowRawOutput(t *testing.T) {
+func TestJobLogRawOutput(t *testing.T) {
 	t.Helper()
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, []sseTestEvent{
@@ -103,9 +103,9 @@ func TestJobFollowRawOutput(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow", "--format", "raw", jobID.String()}, buf)
+	err := executeCmd([]string{"job", "log", "--format", "raw", jobID.String()}, buf)
 	if err != nil {
-		t.Fatalf("job follow raw: %v", err)
+		t.Fatalf("job log raw: %v", err)
 	}
 
 	out := buf.String()
@@ -120,12 +120,12 @@ func TestJobFollowRawOutput(t *testing.T) {
 	}
 }
 
-func TestJobFollowRequiresJobID(t *testing.T) {
+func TestJobLogRequiresJobID(t *testing.T) {
 	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow"}, buf)
+	err := executeCmd([]string{"job", "log"}, buf)
 	if err == nil {
 		t.Fatal("expected error when job id is missing")
 	}
@@ -134,12 +134,12 @@ func TestJobFollowRequiresJobID(t *testing.T) {
 	}
 }
 
-func TestJobFollowInvalidFormat(t *testing.T) {
+func TestJobLogInvalidFormat(t *testing.T) {
 	t.Helper()
 	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow", "--format", "yaml", "job-123"}, buf)
+	err := executeCmd([]string{"job", "log", "--format", "yaml", "job-123"}, buf)
 	if err == nil {
 		t.Fatal("expected error for invalid format")
 	}
@@ -148,7 +148,7 @@ func TestJobFollowInvalidFormat(t *testing.T) {
 	}
 }
 
-func TestJobFollowReconnects(t *testing.T) {
+func TestJobLogFollowReconnects(t *testing.T) {
 	t.Helper()
 	jobID := domaintypes.NewJobID()
 	server := newJobStreamingServer(t, jobID, nil)
@@ -177,9 +177,9 @@ func TestJobFollowReconnects(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow", jobID.String()}, buf)
+	err := executeCmd([]string{"job", "log", "--follow", jobID.String()}, buf)
 	if err != nil {
-		t.Fatalf("job follow reconnect: %v", err)
+		t.Fatalf("job log --follow reconnect: %v", err)
 	}
 	out := buf.String()
 	if !strings.Contains(out, "first") {
@@ -187,6 +187,27 @@ func TestJobFollowReconnects(t *testing.T) {
 	}
 	if !strings.Contains(out, "second") {
 		t.Fatalf("expected 'second' in output, got: %q", out)
+	}
+}
+
+func TestJobFollowAlias(t *testing.T) {
+	t.Helper()
+	jobID := domaintypes.NewJobID()
+	server := newJobStreamingServer(t, jobID, []sseTestEvent{
+		{event: "log", data: `{"timestamp":"2026-03-01T10:00:00Z","stream":"stdout","line":"alias"}`},
+		{event: "done", data: `{"status":"completed"}`},
+	})
+	defer server.Close()
+
+	clienv.UseServerDescriptor(t, server.URL)
+
+	buf := &bytes.Buffer{}
+	err := executeCmd([]string{"job", "follow", "--format", "raw", jobID.String()}, buf)
+	if err != nil {
+		t.Fatalf("job follow alias: %v", err)
+	}
+	if !strings.Contains(buf.String(), "alias") {
+		t.Fatalf("expected alias output, got: %q", buf.String())
 	}
 }
 
