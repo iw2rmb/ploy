@@ -80,7 +80,8 @@ func getRunLogsHandler(st store.Store, _ blobstore.Store, eventsService *server.
 		}
 
 		// Subscribe to hub for live lifecycle events (run, stage, done).
-		if err := logstream.Serve(w, r, hub, runID, sinceID); err != nil {
+		// Reject log/retention frames that may exist in run stream history.
+		if err := logstream.ServeFiltered(w, r, hub, runID, sinceID, buildRunLifecycleFilter()); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream run logs", "run_id", runID.String(), "err", err)
 			}
@@ -353,6 +354,19 @@ func getRunRepoLogsHandler(st store.Store, _ blobstore.Store, eventsService *ser
 			if !errors.Is(err, context.Canceled) {
 				slog.Error("stream run repo logs", "run_id", runID.String(), "repo_id", repoID.String(), "err", err)
 			}
+		}
+	}
+}
+
+// buildRunLifecycleFilter returns a filter that passes only run lifecycle events
+// (run, stage, done) and rejects log and retention frames.
+func buildRunLifecycleFilter() func(logstream.Event) (logstream.Event, bool) {
+	return func(evt logstream.Event) (logstream.Event, bool) {
+		switch evt.Type {
+		case domaintypes.SSEEventRun, domaintypes.SSEEventStage, domaintypes.SSEEventDone:
+			return evt, true
+		default:
+			return evt, false
 		}
 	}
 }
