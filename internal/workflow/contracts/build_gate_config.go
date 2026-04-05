@@ -142,13 +142,13 @@ type RecoveryExpectedArtifact struct {
 	Schema string `json:"schema,omitempty" yaml:"schema,omitempty"`
 }
 
-// AmataRunSpec describes an amata execution configuration for router or healing containers.
+// AmataRunSpec describes an amata execution configuration for heal or mig-step containers.
 //
 // Command mapping rules (deterministic):
 //   - When Spec is non-empty: materialize Spec as /in/amata.yaml, then run
 //     `amata run /in/amata.yaml` followed by ordered `--set '<param>=<value>'` flags
 //     from Set. No prompt file is required in this mode.
-//   - When AmataRunSpec is absent (nil pointer on RouterSpec or HealingActionSpec):
+//   - When AmataRunSpec is absent (nil pointer on HealSpec or MigStepSpec):
 //     fall through to the existing direct `codex exec` path;
 //     /in/codex-prompt.txt must be materialized via a Hydra in mount.
 type AmataRunSpec struct {
