@@ -165,6 +165,5 @@ func newRecoveryView(meta *contracts.BuildGateRecoveryMetadata) *migsapi.RunRepo
 		CandidateValidationStatus: meta.CandidateValidationStatus,
 		CandidateValidationError:  meta.CandidateValidationError,
 		CandidatePromoted:         meta.CandidatePromoted,
-		RouterCmd:                 meta.RouterCmd,
 	}
 }

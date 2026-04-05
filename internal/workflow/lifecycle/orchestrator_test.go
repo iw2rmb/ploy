@@ -232,14 +232,10 @@ func newFixedIDSequence(ids ...domaintypes.JobID) func() domaintypes.JobID {
 	}
 }
 
-func basicHealingSpec(retries int) *contracts.HealingSpec {
-	return &contracts.HealingSpec{
-		ByErrorKind: map[string]contracts.HealingActionSpec{
-			"infra": {
-				Retries: retries,
-				Image:   contracts.JobImage{Universal: "heal:latest"},
-			},
-		},
+func basicHealSpec(retries int) *contracts.HealSpec {
+	return &contracts.HealSpec{
+		Retries: retries,
+		Image:   contracts.JobImage{Universal: "heal:latest"},
 	}
 }
 
@@ -250,7 +246,7 @@ type gateFailureCase struct {
 	recoveryMeta  *contracts.BuildGateRecoveryMetadata
 	recoveryKind  contracts.RecoveryErrorKind
 	detectedStack contracts.MigStack
-	healing       *contracts.HealingSpec
+	heal          *contracts.HealSpec
 	newJobID      func() domaintypes.JobID
 	wantOutcome   lifecycle.GateFailureOutcome
 	assertChain   func(*testing.T, *lifecycle.HealChainSpec)
@@ -272,7 +268,7 @@ func retriesExhaustedCase() gateFailureCase {
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 		recoveryKind: contracts.RecoveryErrorKindInfra,
-		healing:      basicHealingSpec(1),
+		heal:         basicHealSpec(1),
 		newJobID:     domaintypes.NewJobID,
 		wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 	}
@@ -293,7 +289,7 @@ func firstAttemptCase() gateFailureCase {
 		jobsByID:     map[domaintypes.JobID]store.Job{baseGateID: failedJob},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra", StrategyID: "infra-default"},
 		recoveryKind: contracts.RecoveryErrorKindInfra,
-		healing:      basicHealingSpec(2),
+		heal:         basicHealSpec(2),
 		newJobID:     newFixedIDSequence(healID, reGateID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
@@ -350,7 +346,7 @@ func secondAttemptCase() gateFailureCase {
 		},
 		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 		recoveryKind: contracts.RecoveryErrorKindInfra,
-		healing:      basicHealingSpec(3),
+		heal:         basicHealSpec(3),
 		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
 		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
 		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
@@ -371,7 +367,7 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "mixed"},
 			recoveryKind: contracts.RecoveryErrorKindMixed,
-			healing:      basicHealingSpec(1),
+			heal:         basicHealSpec(1),
 			newJobID:     domaintypes.NewJobID,
 			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 		},
@@ -384,20 +380,11 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 		},
 		{
-			name:         "no action for error kind cancels",
-			failedJob:    store.Job{ID: domaintypes.NewJobID(), RepoShaIn: testRepoSHAIn},
-			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "deps"},
-			recoveryKind: contracts.RecoveryErrorKindDeps,
-			healing:      basicHealingSpec(1), // only has "infra" action
-			newJobID:     domaintypes.NewJobID,
-			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
-		},
-		{
 			name:         "invalid SHA cancels",
 			failedJob:    store.Job{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypePreGate, RepoShaIn: "not-a-valid-sha"},
 			recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "infra"},
 			recoveryKind: contracts.RecoveryErrorKindInfra,
-			healing:      basicHealingSpec(1),
+			heal:         basicHealSpec(1),
 			newJobID:     domaintypes.NewJobID,
 			wantOutcome:  lifecycle.GateFailureOutcomeCancel,
 		},
@@ -419,7 +406,7 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 
 			decision, err := lifecycle.EvaluateGateFailureTransition(
 				tc.failedJob, tc.jobsByID, tc.recoveryMeta,
-				tc.recoveryKind, tc.detectedStack, tc.healing, tc.newJobID,
+				tc.recoveryKind, tc.detectedStack, tc.heal, tc.newJobID,
 			)
 
 			if err != nil {

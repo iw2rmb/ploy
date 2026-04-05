@@ -10,7 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType domaintypes.JobType) error {
+func applyHealingMutator(m map[string]any, job store.Job, jobType domaintypes.JobType) error {
 	if jobType != domaintypes.JobTypeHeal {
 		return nil
 	}
@@ -21,23 +21,10 @@ func applyHealingSelectedKindMutator(m map[string]any, job store.Job, jobType do
 	if err != nil {
 		return nil
 	}
-	if jobMeta.RecoveryMetadata == nil || strings.TrimSpace(jobMeta.RecoveryMetadata.ErrorKind) == "" {
+	if jobMeta.RecoveryMetadata == nil {
 		return nil
 	}
 
-	buildGate, err := ensureObjectField(m, "build_gate", "spec")
-	if err != nil {
-		return err
-	}
-	healing, err := ensureObjectField(buildGate, "healing", "spec.build_gate")
-	if err != nil {
-		return err
-	}
-	kind, ok := contracts.ParseRecoveryErrorKind(jobMeta.RecoveryMetadata.ErrorKind)
-	if !ok {
-		kind = contracts.DefaultRecoveryErrorKind()
-	}
-	healing["selected_error_kind"] = kind.String()
 	if len(jobMeta.RecoveryMetadata.Expectations) > 0 {
 		var ex struct {
 			Artifacts []struct {

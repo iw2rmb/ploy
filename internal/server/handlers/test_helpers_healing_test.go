@@ -29,7 +29,7 @@ func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture
 	f := newRepoScopedFixture(domaintypes.JobTypePreGate)
 	specID := domaintypes.NewSpecID()
 	f.Job.Meta = recoveryMeta
-	specBytes := buildHealingSpec(t, 1)
+	specBytes := buildHealingSpec(t, 1) // uses build_gate.heal
 
 	successor := store.Job{
 		ID:          domaintypes.NewJobID(),
@@ -64,13 +64,13 @@ func newGateFailureFixture(t *testing.T, recoveryMeta []byte) gateFailureFixture
 // Healing spec builder
 // ---------------------------------------------------------------------------
 
-// healingSpecOpt customises the healing spec built by buildHealingSpec.
-type healingSpecOpt func(infra map[string]any)
+// healSpecOpt customises the heal spec built by buildHealSpec.
+type healSpecOpt func(heal map[string]any)
 
 // withArtifactExpectations adds a standard expectations.artifacts block.
-func withArtifactExpectations() healingSpecOpt {
-	return func(infra map[string]any) {
-		infra["expectations"] = map[string]any{
+func withArtifactExpectations() healSpecOpt {
+	return func(heal map[string]any) {
+		heal["expectations"] = map[string]any{
 			"artifacts": []any{
 				map[string]any{
 					"path":   "/out/gate-profile-candidate.json",
@@ -81,30 +81,23 @@ func withArtifactExpectations() healingSpecOpt {
 	}
 }
 
-// buildHealingSpec returns a serialized spec with standard build_gate healing config.
-// Use opts (e.g. withArtifactExpectations) to extend the infra error-kind entry.
-func buildHealingSpec(t *testing.T, retries int, opts ...healingSpecOpt) []byte {
+// buildHealingSpec returns a serialized spec with standard build_gate.heal config.
+// Use opts (e.g. withArtifactExpectations) to extend the heal entry.
+func buildHealingSpec(t *testing.T, retries int, opts ...healSpecOpt) []byte {
 	t.Helper()
-	infra := map[string]any{
+	heal := map[string]any{
 		"retries": float64(retries),
 		"image":   "codex:latest",
 	}
 	for _, o := range opts {
-		o(infra)
+		o(heal)
 	}
 	b, err := json.Marshal(map[string]any{
 		"steps": []any{
 			map[string]any{"image": "migs-orw:latest"},
 		},
 		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": infra,
-				},
-			},
-			"router": map[string]any{
-				"image": "migs-router:latest",
-			},
+			"heal": heal,
 		},
 	})
 	if err != nil {

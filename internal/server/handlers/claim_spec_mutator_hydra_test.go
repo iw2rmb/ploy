@@ -323,162 +323,18 @@ func TestApplyHydraOverlay_SectionRouting(t *testing.T) {
 // Router phase inheritance
 // ---------------------------------------------------------------------------
 
-func TestApplyHydraOverlay_RouterPhaseInheritance(t *testing.T) {
-	t.Parallel()
-
-	allOverlays := map[string]*HydraJobConfig{
-		"pre_gate":  {Envs: map[string]string{"PHASE": "pre"}, CA: []string{"aaa1234567ab"}},
-		"re_gate":   {Envs: map[string]string{"PHASE": "re"}, CA: []string{"bbb1234567ab"}},
-		"post_gate": {Envs: map[string]string{"PHASE": "post"}, CA: []string{"ccc1234567ab"}},
-	}
-
-	tests := []struct {
-		name          string
-		spec          map[string]any
-		jobType       domaintypes.JobType
-		overlays      map[string]*HydraJobConfig
-		noRouter      bool              // expect no router block created
-		checkRouterKV map[string]string  // expected router envs key→value
-		routerSlices  []sliceCheck       // slice checks on router sub-block
-	}{
-		{
-			name: "pre_gate claim inherits from pre_gate",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre":    map[string]any{"target": "unit"},
-					"router": map[string]any{"image": "router:latest"},
-				},
-			},
-			jobType:       domaintypes.JobTypePreGate,
-			overlays:      allOverlays,
-			checkRouterKV: map[string]string{"PHASE": "pre"},
-			routerSlices:  []sliceCheck{{"ca", 1, "aaa1234567ab"}},
-		},
-		{
-			name: "re_gate claim inherits from re_gate not pre_gate",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre":    map[string]any{"target": "unit"},
-					"router": map[string]any{"image": "router:latest"},
-				},
-			},
-			jobType:       domaintypes.JobTypeReGate,
-			overlays:      allOverlays,
-			checkRouterKV: map[string]string{"PHASE": "re"},
-			routerSlices:  []sliceCheck{{"ca", 1, "bbb1234567ab"}},
-		},
-		{
-			name: "post_gate claim inherits from post_gate even when pre exists",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre":    map[string]any{"target": "unit"},
-					"post":   map[string]any{"target": "build"},
-					"router": map[string]any{"image": "router:latest"},
-				},
-			},
-			jobType:       domaintypes.JobTypePostGate,
-			overlays:      allOverlays,
-			checkRouterKV: map[string]string{"PHASE": "post"},
-			routerSlices:  []sliceCheck{{"ca", 1, "ccc1234567ab"}},
-		},
-		{
-			name: "mig claim falls back to spec presence pre_gate",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre":    map[string]any{"target": "unit"},
-					"router": map[string]any{"image": "router:latest"},
-				},
-			},
-			jobType:       domaintypes.JobTypeMig,
-			overlays:      allOverlays,
-			checkRouterKV: map[string]string{"PHASE": "pre"},
-			routerSlices:  []sliceCheck{{"ca", 1, "aaa1234567ab"}},
-		},
-		{
-			name: "mig claim falls back to post_gate when only post configured",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"post":   map[string]any{"target": "build"},
-					"router": map[string]any{"image": "router:latest"},
-				},
-			},
-			jobType:       domaintypes.JobTypeMig,
-			overlays:      allOverlays,
-			checkRouterKV: map[string]string{"PHASE": "post"},
-			routerSlices:  []sliceCheck{{"ca", 1, "ccc1234567ab"}},
-		},
-		{
-			name: "no router section does nothing",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre": map[string]any{"target": "unit"},
-				},
-			},
-			jobType:  domaintypes.JobTypePreGate,
-			overlays: allOverlays,
-			noRouter: true,
-		},
-		{
-			name: "router spec envs win over overlay envs",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre":    map[string]any{"target": "unit"},
-					"router": map[string]any{"image": "router:latest", "envs": map[string]any{"SHARED": "from_spec"}},
-				},
-			},
-			jobType: domaintypes.JobTypePreGate,
-			overlays: map[string]*HydraJobConfig{
-				"pre_gate": {Envs: map[string]string{"SHARED": "from_overlay", "NEW": "overlay_val"}},
-			},
-			checkRouterKV: map[string]string{"SHARED": "from_spec", "NEW": "overlay_val"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			m := cloneSpecMap(tt.spec)
-			err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
-				job:           store.Job{Meta: []byte(`{}`)},
-				jobType:       tt.jobType,
-				hydraOverlays: tt.overlays,
-			})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			bg := m["build_gate"].(map[string]any)
-			if tt.noRouter {
-				if _, ok := bg["router"]; ok {
-					t.Error("router section should not be created when absent")
-				}
-				return
-			}
-			router := bg["router"].(map[string]any)
-			assertEnvs(t, router, tt.checkRouterKV, nil, nil)
-			assertSlices(t, router, tt.routerSlices)
-		})
-	}
-}
-
 // ---------------------------------------------------------------------------
-// Healing container overlay
+// Heal block overlay
 // ---------------------------------------------------------------------------
 
-func TestApplyHydraOverlay_HealContainerOverlay(t *testing.T) {
+func TestApplyHydraOverlay_HealBlockOverlay(t *testing.T) {
 	t.Parallel()
 
 	m := map[string]any{
 		"build_gate": map[string]any{
-			"healing": map[string]any{
-				"by_error_kind": map[string]any{
-					"infra": map[string]any{
-						"image": "heal:latest",
-						"envs":  map[string]any{"EXISTING": "spec_val"},
-					},
-					"logic": map[string]any{
-						"image": "heal:latest",
-					},
-				},
+			"heal": map[string]any{
+				"image": "heal:latest",
+				"envs":  map[string]any{"EXISTING": "spec_val"},
 			},
 		},
 	}
@@ -496,14 +352,9 @@ func TestApplyHydraOverlay_HealContainerOverlay(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	byKind := m["build_gate"].(map[string]any)["healing"].(map[string]any)["by_error_kind"].(map[string]any)
-
-	infra := byKind["infra"].(map[string]any)
-	assertEnvs(t, infra, map[string]string{"EXISTING": "spec_val", "HEAL_KEY": "heal_val"}, nil, nil)
-	assertSlice(t, infra, "ca", 1, "heal1234567ab")
-
-	logic := byKind["logic"].(map[string]any)
-	assertEnvs(t, logic, map[string]string{"HEAL_KEY": "heal_val"}, nil, nil)
+	healBlock := m["build_gate"].(map[string]any)["heal"].(map[string]any)
+	assertEnvs(t, healBlock, map[string]string{"EXISTING": "spec_val", "HEAL_KEY": "heal_val"}, nil, nil)
+	assertSlice(t, healBlock, "ca", 1, "heal1234567ab")
 }
 
 // ---------------------------------------------------------------------------
@@ -553,30 +404,10 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 			errSubstr: ".config/app.toml",
 		},
 		{
-			name: "router overlay collision via gate phase",
-			spec: map[string]any{
-				"build_gate": map[string]any{
-					"pre":    map[string]any{"target": "unit"},
-					"router": map[string]any{"image": "router:latest"},
-				},
-			},
-			jobType: domaintypes.JobTypeMig,
-			overlays: map[string]*HydraJobConfig{
-				"mig":      {},
-				"pre_gate": {Out: []string{"/a:/out/result.txt", "/b:/out/result.txt"}},
-			},
-			wantErr:   true,
-			errSubstr: "build_gate.router",
-		},
-		{
 			name: "heal overlay collision detected via non-heal job",
 			spec: map[string]any{
 				"build_gate": map[string]any{
-					"healing": map[string]any{
-						"by_error_kind": map[string]any{
-							"infra": map[string]any{"image": "heal:latest"},
-						},
-					},
+					"heal": map[string]any{"image": "heal:latest"},
 				},
 			},
 			jobType: domaintypes.JobTypeMig,
@@ -585,7 +416,7 @@ func TestApplyHydraOverlay_DestinationCollision(t *testing.T) {
 				"heal": {In: []string{"/a:/in/data.json", "/b:/in/data.json"}},
 			},
 			wantErr:   true,
-			errSubstr: "build_gate.healing",
+			errSubstr: "build_gate.heal",
 		},
 		{
 			name: "spec and overlay share in dst replaces with spec entry",

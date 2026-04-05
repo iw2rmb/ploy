@@ -210,10 +210,6 @@ type BuildGateRecoveryMetadata struct {
 	// CandidatePromoted reports whether a validated candidate has been promoted
 	// into repo gate_profile after successful re-gate completion.
 	CandidatePromoted *bool `json:"candidate_promoted,omitempty"`
-	// RouterCmd is the exact argv slice used to invoke the router container,
-	// e.g. ["amata","run","/in/amata.yaml","--set","error_kind=code"].
-	// Present only when the router is amata-mode; nil for direct-Codex routers.
-	RouterCmd []string `json:"router_cmd,omitempty"`
 }
 
 // RecoveryClaimContext carries typed recovery inputs in node claim responses
@@ -221,8 +217,6 @@ type BuildGateRecoveryMetadata struct {
 // from node-local run cache files.
 type RecoveryClaimContext struct {
 	LoopKind string `json:"loop_kind,omitempty"`
-	// SelectedErrorKind is the resolved healing error kind selected by server.
-	SelectedErrorKind string `json:"selected_error_kind,omitempty"`
 	// DetectedStack is the gate-detected stack used for image resolution.
 	DetectedStack MigStack `json:"detected_stack,omitempty"`
 	// ResolvedHealingImage is the concrete healing image selected for this chain.

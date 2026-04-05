@@ -44,9 +44,8 @@ func ValidateHydraSection(section string) error {
 // map. Global env vars are folded into the overlay's envs field using
 // target-aware precedence (nodes < job-target < per-run spec).
 //
-// For gate jobs, the active gate phase overlay is also applied to
-// build_gate.router. For specs with healing configuration, the heal section
-// overlay is applied to build_gate.healing.by_error_kind.* containers.
+// For specs with a heal configuration, the heal section overlay is applied
+// to build_gate.heal.
 //
 // Merge precedence: per-run spec values always win over overlay values.
 func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error {
@@ -59,11 +58,7 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 
 	mergeHydraIntoBlock(m, overlay)
 
-	if err := applyRouterPhaseOverlay(m, in); err != nil {
-		return err
-	}
-
-	if err := applyHealContainerOverlay(m, in); err != nil {
+	if err := applyHealOverlay(m, in); err != nil {
 		return err
 	}
 
@@ -135,71 +130,15 @@ func assembleHydraOverlay(
 	return base
 }
 
-// deriveActiveGatePhase returns the gate phase for router overlay selection.
-// Gate job types (pre_gate, re_gate, post_gate) directly determine their
-// phase. Non-gate jobs fall back to spec-presence: pre_gate when build_gate.pre
-// is configured, post_gate when only build_gate.post is configured, pre_gate
-// as final fallback.
-func deriveActiveGatePhase(m map[string]any, jobType domaintypes.JobType) string {
-	switch jobType {
-	case domaintypes.JobTypePreGate:
-		return "pre_gate"
-	case domaintypes.JobTypeReGate:
-		return "re_gate"
-	case domaintypes.JobTypePostGate:
-		return "post_gate"
-	}
-	bg, ok := m["build_gate"].(map[string]any)
-	if !ok {
-		return "pre_gate"
-	}
-	if _, hasPre := bg["pre"].(map[string]any); hasPre {
-		return "pre_gate"
-	}
-	if _, hasPost := bg["post"].(map[string]any); hasPost {
-		return "post_gate"
-	}
-	return "pre_gate"
-}
-
-// applyRouterPhaseOverlay applies the active gate phase overlay to the
-// build_gate.router block when it exists. The router inherits from the
-// first enabled gate phase (pre_gate by default, post_gate when only post
-// is configured).
-func applyRouterPhaseOverlay(m map[string]any, in claimSpecMutatorInput) error {
+// applyHealOverlay applies the heal section overlay to build_gate.heal when
+// it exists. Returns a collision error when the heal overlay contains
+// duplicate destinations.
+func applyHealOverlay(m map[string]any, in claimSpecMutatorInput) error {
 	bg, ok := m["build_gate"].(map[string]any)
 	if !ok {
 		return nil
 	}
-	router, ok := bg["router"].(map[string]any)
-	if !ok {
-		return nil
-	}
-
-	gatePhase := deriveActiveGatePhase(m, in.jobType)
-	overlay := assembleHydraOverlay(in.hydraOverlays, gatePhase, nil, in.jobType)
-
-	if err := validateOverlayCollisions(overlay, "build_gate.router"); err != nil {
-		return err
-	}
-
-	mergeHydraIntoBlock(router, overlay)
-	return nil
-}
-
-// applyHealContainerOverlay applies the heal section overlay to each
-// build_gate.healing.by_error_kind.* action container. Returns a collision
-// error when the heal overlay contains duplicate destinations.
-func applyHealContainerOverlay(m map[string]any, in claimSpecMutatorInput) error {
-	bg, ok := m["build_gate"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	healing, ok := bg["healing"].(map[string]any)
-	if !ok {
-		return nil
-	}
-	byErrorKind, ok := healing["by_error_kind"].(map[string]any)
+	healBlock, ok := bg["heal"].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -209,24 +148,11 @@ func applyHealContainerOverlay(m map[string]any, in claimSpecMutatorInput) error
 		return nil
 	}
 
-	if err := validateOverlayCollisions(overlay, "build_gate.healing"); err != nil {
+	if err := validateOverlayCollisions(overlay, "build_gate.heal"); err != nil {
 		return err
 	}
 
-	// Apply to error kind actions in sorted order for determinism.
-	kinds := make([]string, 0, len(byErrorKind))
-	for k := range byErrorKind {
-		kinds = append(kinds, k)
-	}
-	sort.Strings(kinds)
-
-	for _, kind := range kinds {
-		action, ok := byErrorKind[kind].(map[string]any)
-		if !ok {
-			continue
-		}
-		mergeHydraIntoBlock(action, overlay)
-	}
+	mergeHydraIntoBlock(healBlock, overlay)
 	return nil
 }
 
