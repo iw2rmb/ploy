@@ -128,6 +128,9 @@ paths:
   # Job-level completion endpoint (job-scoped, no node ID) — canonical endpoint for job completion
   /v1/jobs/{job_id}/complete:
     $ref: "./paths/jobs_job_id_complete.yaml"
+  # Job-level log SSE stream and ingest endpoint
+  /v1/jobs/{job_id}/logs:
+    $ref: "./paths/jobs_job_id_logs.yaml"
   # Job-level status polling endpoint — workers use this to detect remote cancellation.
   /v1/jobs/{job_id}/status:
     $ref: "./paths/jobs_job_id_status.yaml"
