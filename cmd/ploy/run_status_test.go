@@ -51,7 +51,8 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "⣾")
 	assertx.Contains(t, out, "✗")
 	assertx.Contains(t, out, "└  Exit 137: ")
-	assertx.Contains(t, out, "infra compile failed at step 2")
+	assertx.Contains(t, out, "Error")
+	assertx.NotContains(t, out, "infra compile failed at step 2")
 	assertx.NotContains(t, out, "<infra>")
 	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
 }

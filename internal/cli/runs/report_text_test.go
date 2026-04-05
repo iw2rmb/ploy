@@ -167,7 +167,8 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
 	assertx.Contains(t, out, ColoredStatusGlyph("failed", 0))
 	assertx.Contains(t, out, "pre_gate")
-	assertx.Contains(t, out, "└  Exit 137: "+colorizeErrorText("infra compile failed at step 2"))
+	assertx.Contains(t, out, "└  Exit 137: "+colorizeErrorText("Error"))
+	assertx.NotContains(t, out, "infra compile failed at step 2")
 	assertx.NotContains(t, out, "<infra>")
 	assertx.Contains(t, out, "✓")
 	assertx.Contains(t, out, "Heal")
@@ -205,7 +206,7 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 				BugSummary: "missing ; in Foo.java",
 				Recovery:   &RunJobRecovery{ErrorKind: "code"},
 			},
-			contains:   []string{"└  Exit 1: " + colorizeErrorText("code missing ; in Foo.java"), "0.8s"},
+			contains:   []string{"└  Exit 1: " + colorizeErrorText("Error"), "0.8s"},
 			notContain: []string{"<code>"},
 		},
 		{
@@ -219,8 +220,8 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 				DurationMs: 1000,
 				BugSummary: "re-gate failed",
 			},
-			contains:   []string{"└  Exit 1: " + colorizeErrorText("re-gate failed")},
-			notContain: []string{"<unknown>", "unknown re-gate failed"},
+			contains:   []string{"└  Exit 1: " + colorizeErrorText("Error")},
+			notContain: []string{"<unknown>", "unknown re-gate failed", "re-gate failed"},
 		},
 		{
 			name: "wraps at 100 symbols",

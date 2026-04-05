@@ -1410,8 +1410,7 @@ The CLI entry points for Migs are implemented in CLI implementation:
   - `Spec` renders a `Download` hyperlink to `/v1/migs/{mig_ref}/specs/latest`.
   - `Artifacts` are shown only for terminal steps; unfinished steps render `-`.
   - Build gate failures/crashes render the continuation line as
-    `Exit <code>: <error_kind> <one-liner>` where `error_kind` defaults to
-    `unknown` when absent.
+    `Exit <code>: Error`.
   - Exit continuation content is soft-wrapped to max 100 symbols per line; wrapped
     lines align under the content start after `Exit <code>: `.
   - Healing rows keep `Exit <code>: <one-liner>` without an error-kind prefix.
