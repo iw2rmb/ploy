@@ -137,8 +137,9 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 		slog.Error("backfill job logs failed", "job_id", job.ID.String(), "err", err)
 	}
 
-	// Replay non-log gap events (retention, done) that arrived during backfill.
-	// Log events are skipped — they overlap with backfill content from DB.
+	// Replay all gap events that arrived during backfill (ID > preCursor).
+	// Log events published during backfill are NOT yet persisted to DB, so
+	// they must be replayed here to avoid loss.
 	postSnapshot := hub.SnapshotJob(job.ID)
 	postCursor := preCursor
 	for _, evt := range postSnapshot {
@@ -146,9 +147,6 @@ func serveJobWithBackfill(w http.ResponseWriter, r *http.Request, st store.Store
 			continue
 		}
 		postCursor = evt.ID
-		if evt.Type == domaintypes.SSEEventLog {
-			continue
-		}
 		if err := logstream.WriteEventFrame(w, evt); err != nil {
 			return true
 		}
