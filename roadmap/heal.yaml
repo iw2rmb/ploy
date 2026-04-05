@@ -54,7 +54,7 @@ items:
       - "Run adjacent build-gate stack/image parsing tests to confirm stack-aware image behavior for non-heal paths remains unchanged."
     reasoning: "high"
     cfp: 14
-
+    commit: e77bb369
   - done: false
     reviews: []
     label: "2"
@@ -104,7 +104,6 @@ items:
       - "Run non-healing completion tests to confirm MR and regular success-chain progression remain unchanged."
     reasoning: "high"
     cfp: 16
-
   - done: false
     reviews: []
     label: "3"
@@ -147,7 +146,6 @@ items:
       - "Run non-recovery mig execution tests to confirm regular mig and gate dispatch behavior remains unchanged."
     reasoning: "high"
     cfp: 15
-
   - done: false
     reviews: []
     label: "4"
