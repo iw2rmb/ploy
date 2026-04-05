@@ -148,7 +148,8 @@ type jobStore struct {
 	createEvent mockResult[store.Event]
 
 	// Ingest (logs)
-	createLog mockResult[store.Log]
+	createLog      mockResult[store.Log]
+	listLogsByRun  mockCall[string, []store.Log]
 
 	// Spec creation (for migs_ticket flow)
 	createSpecCalled bool
@@ -649,6 +650,10 @@ func (m *jobStore) CreateEvent(ctx context.Context, params store.CreateEventPara
 
 func (m *jobStore) CreateLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
 	return m.createLog.ret()
+}
+
+func (m *jobStore) ListLogsByRun(ctx context.Context, runID types.RunID) ([]store.Log, error) {
+	return m.listLogsByRun.record(runID.String())
 }
 
 // Spec creation (for migs_ticket flow)

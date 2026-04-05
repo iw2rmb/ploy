@@ -58,7 +58,7 @@ func getJobLogsHandler(st store.Store, bs blobstore.Store, eventsService *server
 		sinceID := parseLastEventID(r.Header.Get("Last-Event-ID"))
 
 		if sinceID == 0 && bs != nil {
-			if serveWithBackfill(w, r, st, bs, hub, run, job.RunID, allowedJobs) {
+			if serveWithBackfill(w, r, st, bs, hub, run, job.RunID, allowedJobs, buildJobLogFilter(allowedJobs)) {
 				return
 			}
 		}
