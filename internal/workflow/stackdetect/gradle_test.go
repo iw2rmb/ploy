@@ -245,15 +245,19 @@ kotlinOptions {
 	}
 }
 
-func TestDetectGradle_AllowsExtPropertiesWhenCompatibilityExplicit(t *testing.T) {
+func TestDetectGradle(t *testing.T) {
 	t.Parallel()
 
-	workspace := t.TempDir()
-	gradlePath := filepath.Join(workspace, "build.gradle")
-
-	// This mirrors real-world Gradle builds that use ext[...] but still have an
-	// explicit, static compatibility configuration.
-	gradle := `import static org.gradle.api.JavaVersion.VERSION_11
+	tests := []struct {
+		name        string
+		fileName    string
+		content     string
+		wantRelease string
+	}{
+		{
+			name:     "ext properties with explicit compatibility",
+			fileName: "build.gradle",
+			content: `import static org.gradle.api.JavaVersion.VERSION_11
 
 plugins { id 'java' }
 
@@ -261,35 +265,13 @@ sourceCompatibility = VERSION_11
 targetCompatibility = VERSION_11
 
 ext['log4j2.version'] = '2.16.0'
-`
-	if err := os.WriteFile(gradlePath, []byte(gradle), 0o600); err != nil {
-		t.Fatalf("write build.gradle: %v", err)
-	}
-
-	obs, err := detectGradle(context.Background(), workspace, gradlePath)
-	if err != nil {
-		t.Fatalf("detectGradle returned error: %v", err)
-	}
-	if obs == nil || obs.Release == nil {
-		t.Fatalf("detectGradle returned nil observation or release")
-	}
-	if got, want := *obs.Release, "11"; got != want {
-		t.Fatalf("release mismatch: got %q want %q", got, want)
-	}
-	if got, want := obs.Tool, "gradle"; got != want {
-		t.Fatalf("tool mismatch: got %q want %q", got, want)
-	}
-	if got, want := obs.Language, "java"; got != want {
-		t.Fatalf("language mismatch: got %q want %q", got, want)
-	}
-}
-
-func TestDetectGradle_ToolchainLanguageVersionAssign(t *testing.T) {
-	t.Parallel()
-
-	workspace := t.TempDir()
-	gradlePath := filepath.Join(workspace, "build.gradle")
-	gradle := `
+`,
+			wantRelease: "11",
+		},
+		{
+			name:     "toolchain languageVersion assign",
+			fileName: "build.gradle",
+			content: `
 plugins { id "java" }
 
 java {
@@ -297,32 +279,13 @@ java {
         languageVersion = JavaLanguageVersion.of(17)
     }
 }
-`
-	if err := os.WriteFile(gradlePath, []byte(gradle), 0o600); err != nil {
-		t.Fatalf("write build.gradle: %v", err)
-	}
-
-	obs, err := detectGradle(context.Background(), workspace, gradlePath)
-	if err != nil {
-		t.Fatalf("detectGradle returned error: %v", err)
-	}
-	if obs == nil || obs.Release == nil {
-		t.Fatalf("detectGradle returned nil observation or release")
-	}
-	if got, want := *obs.Release, "17"; got != want {
-		t.Fatalf("release mismatch: got %q want %q", got, want)
-	}
-	if got, want := obs.Tool, "gradle"; got != want {
-		t.Fatalf("tool mismatch: got %q want %q", got, want)
-	}
-}
-
-func TestDetectGradle_ToolchainLanguageVersionSetKTS(t *testing.T) {
-	t.Parallel()
-
-	workspace := t.TempDir()
-	gradlePath := filepath.Join(workspace, "build.gradle.kts")
-	gradle := `
+`,
+			wantRelease: "17",
+		},
+		{
+			name:     "toolchain languageVersion set KTS",
+			fileName: "build.gradle.kts",
+			content: `
 plugins { java }
 
 java {
@@ -330,22 +293,36 @@ java {
         languageVersion.set(JavaLanguageVersion.of("21"))
     }
 }
-`
-	if err := os.WriteFile(gradlePath, []byte(gradle), 0o600); err != nil {
-		t.Fatalf("write build.gradle.kts: %v", err)
+`,
+			wantRelease: "21",
+		},
 	}
 
-	obs, err := detectGradle(context.Background(), workspace, gradlePath)
-	if err != nil {
-		t.Fatalf("detectGradle returned error: %v", err)
-	}
-	if obs == nil || obs.Release == nil {
-		t.Fatalf("detectGradle returned nil observation or release")
-	}
-	if got, want := *obs.Release, "21"; got != want {
-		t.Fatalf("release mismatch: got %q want %q", got, want)
-	}
-	if got, want := obs.Tool, "gradle"; got != want {
-		t.Fatalf("tool mismatch: got %q want %q", got, want)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workspace := t.TempDir()
+			gradlePath := filepath.Join(workspace, tt.fileName)
+			if err := os.WriteFile(gradlePath, []byte(tt.content), 0o600); err != nil {
+				t.Fatalf("write %s: %v", tt.fileName, err)
+			}
+
+			obs, err := detectGradle(context.Background(), workspace, gradlePath)
+			if err != nil {
+				t.Fatalf("detectGradle error: %v", err)
+			}
+			if obs == nil || obs.Release == nil {
+				t.Fatal("nil observation or release")
+			}
+			if got := *obs.Release; got != tt.wantRelease {
+				t.Errorf("release = %q, want %q", got, tt.wantRelease)
+			}
+			if obs.Tool != "gradle" {
+				t.Errorf("tool = %q, want %q", obs.Tool, "gradle")
+			}
+			if obs.Language != "java" {
+				t.Errorf("language = %q, want %q", obs.Language, "java")
+			}
+		})
 	}
 }

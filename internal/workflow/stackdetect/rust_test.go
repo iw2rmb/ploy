@@ -6,66 +6,63 @@ import (
 	"testing"
 )
 
-func TestDetectRust_Rust176Cargo(t *testing.T) {
+func TestDetectRust_Success(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		workspace   string
+		wantRelease string
+		evidenceKey string
+		evidenceVal string
+	}{
+		{
+			name:        "cargo rust-version",
+			workspace:   filepath.Join("testdata", "rust", "rust176-cargo"),
+			wantRelease: "1.76",
+			evidenceKey: "rust-version",
+			evidenceVal: "1.76",
+		},
+		{
+			name:        "toolchain channel",
+			workspace:   filepath.Join("testdata", "rust", "rust175-toolchain"),
+			wantRelease: "1.75",
+			evidenceKey: "channel",
+			evidenceVal: "1.75",
+		},
+	}
+
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "rust", "rust176-cargo")
-
-	obs, err := detectRust(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "rust", "cargo", "1.76")
-	assertEvidence(t, obs, "rust-version", "1.76")
-}
-
-func TestDetectRust_Rust175Toolchain(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "rust", "rust175-toolchain")
-
-	obs, err := detectRust(ctx, workspace)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	assertObservation(t, obs, "rust", "cargo", "1.75")
-	assertEvidence(t, obs, "channel", "1.75")
-}
-
-func TestDetectRust_StableToolchain(t *testing.T) {
-	ctx := context.Background()
-	workspace := filepath.Join("testdata", "rust", "stable-toolchain")
-
-	_, err := detectRust(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for stable toolchain")
-	}
-
-	detErr, ok := err.(*DetectionError)
-	if !ok {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			obs, err := detectRust(ctx, tt.workspace)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			assertObservation(t, obs, "rust", "cargo", tt.wantRelease)
+			assertEvidence(t, obs, tt.evidenceKey, tt.evidenceVal)
+		})
 	}
 }
 
-func TestDetectRust_NightlyToolchain(t *testing.T) {
+func TestDetectRust_Unknown(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		workspace string
+	}{
+		{"stable toolchain", filepath.Join("testdata", "rust", "stable-toolchain")},
+		{"nightly toolchain", filepath.Join("testdata", "rust", "nightly-toolchain")},
+	}
+
 	ctx := context.Background()
-	workspace := filepath.Join("testdata", "rust", "nightly-toolchain")
-
-	_, err := detectRust(ctx, workspace)
-	if err == nil {
-		t.Fatal("expected error for nightly toolchain")
-	}
-
-	detErr, ok := err.(*DetectionError)
-	if !ok {
-		t.Fatalf("expected DetectionError, got %T", err)
-	}
-
-	if !detErr.IsUnknown() {
-		t.Errorf("expected reason 'unknown', got %q", detErr.Reason)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := detectRust(ctx, tt.workspace)
+			assertDetectionError(t, err, "unknown")
+		})
 	}
 }

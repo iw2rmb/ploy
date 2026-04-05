@@ -72,162 +72,119 @@ diff --git a/b.go b/b.go
 	}
 }
 
-func TestFilesystemDiffGenerator_Generate(t *testing.T) {
-	// Create a temporary directory for the test workspace.
-	tmpDir := t.TempDir()
+// initGitRepo creates a git repo in a temp dir with an initial committed file.
+// Returns the temp dir path and the path to the test file.
+func initGitRepo(t *testing.T, content string) (dir, filePath string) {
+	t.Helper()
+	dir = t.TempDir()
 
-	// Initialize a git repository.
-	if err := exec.Command("git", "init", tmpDir).Run(); err != nil {
-		t.Fatalf("failed to init git repo: %v", err)
-	}
-
-	// Configure git user for the test.
-	if err := exec.Command("git", "-C", tmpDir, "config", "user.email", "test@example.com").Run(); err != nil {
-		t.Fatalf("failed to set git user.email: %v", err)
-	}
-	if err := exec.Command("git", "-C", tmpDir, "config", "user.name", "Test User").Run(); err != nil {
-		t.Fatalf("failed to set git user.name: %v", err)
-	}
-
-	// Create an initial file and commit.
-	testFile := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("initial content\n"), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
+	for _, args := range [][]string{
+		{"init", dir},
+		{"-C", dir, "config", "user.email", "test@example.com"},
+		{"-C", dir, "config", "user.name", "Test User"},
+	} {
+		if err := exec.Command("git", args...).Run(); err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
 	}
 
-	if err := exec.Command("git", "-C", tmpDir, "add", "test.txt").Run(); err != nil {
-		t.Fatalf("failed to add test file: %v", err)
+	filePath = filepath.Join(dir, "test.txt")
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
 	}
 
-	if err := exec.Command("git", "-C", tmpDir, "commit", "-m", "Initial commit").Run(); err != nil {
-		t.Fatalf("failed to commit: %v", err)
+	for _, args := range [][]string{
+		{"-C", dir, "add", "test.txt"},
+		{"-C", dir, "commit", "-m", "Initial commit"},
+	} {
+		if err := exec.Command("git", args...).Run(); err != nil {
+			t.Fatalf("git %v: %v", args, err)
+		}
 	}
-
-	// Migify the file to create a diff.
-	if err := os.WriteFile(testFile, []byte("modified content\n"), 0644); err != nil {
-		t.Fatalf("failed to modify test file: %v", err)
-	}
-
-	// Create diff generator and generate diff.
-	generator := NewFilesystemDiffGenerator()
-	ctx := context.Background()
-
-	diffBytes, err := generator.Generate(ctx, tmpDir)
-	if err != nil {
-		t.Fatalf("failed to generate diff: %v", err)
-	}
-
-	// Verify diff contains expected content.
-	diffStr := string(diffBytes)
-	if !strings.Contains(diffStr, "test.txt") {
-		t.Errorf("diff should contain file name 'test.txt', got: %s", diffStr)
-	}
-	if !strings.Contains(diffStr, "-initial content") {
-		t.Errorf("diff should contain old content '-initial content', got: %s", diffStr)
-	}
-	if !strings.Contains(diffStr, "+modified content") {
-		t.Errorf("diff should contain new content '+modified content', got: %s", diffStr)
-	}
+	return dir, filePath
 }
 
-func TestFilesystemDiffGenerator_Generate_NoDiff(t *testing.T) {
-	// Create a temporary directory for the test workspace.
-	tmpDir := t.TempDir()
+func TestFilesystemDiffGenerator(t *testing.T) {
+	t.Parallel()
 
-	// Initialize a git repository.
-	if err := exec.Command("git", "init", tmpDir).Run(); err != nil {
-		t.Fatalf("failed to init git repo: %v", err)
+	tests := []struct {
+		name         string
+		setup        func(t *testing.T) string // returns workspace path
+		wantErr      bool
+		wantEmpty    bool
+		wantContains []string
+	}{
+		{
+			name: "generates diff for modified file",
+			setup: func(t *testing.T) string {
+				dir, filePath := initGitRepo(t, "initial content\n")
+				if err := os.WriteFile(filePath, []byte("modified content\n"), 0644); err != nil {
+					t.Fatalf("modify file: %v", err)
+				}
+				return dir
+			},
+			wantContains: []string{"test.txt", "-initial content", "+modified content"},
+		},
+		{
+			name: "empty diff when no changes",
+			setup: func(t *testing.T) string {
+				dir, _ := initGitRepo(t, "content\n")
+				return dir
+			},
+			wantEmpty: true,
+		},
+		{
+			name: "error for non-git repo",
+			setup: func(t *testing.T) string {
+				return t.TempDir()
+			},
+			wantErr: true,
+		},
+		{
+			name: "error on cancelled context",
+			setup: func(t *testing.T) string {
+				dir, _ := initGitRepo(t, "content\n")
+				return dir
+			},
+			wantErr: true,
+		},
 	}
 
-	// Configure git user for the test.
-	if err := exec.Command("git", "-C", tmpDir, "config", "user.email", "test@example.com").Run(); err != nil {
-		t.Fatalf("failed to set git user.email: %v", err)
-	}
-	if err := exec.Command("git", "-C", tmpDir, "config", "user.name", "Test User").Run(); err != nil {
-		t.Fatalf("failed to set git user.name: %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workspace := tt.setup(t)
+			generator := NewFilesystemDiffGenerator()
 
-	// Create an initial file and commit.
-	testFile := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("content\n"), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
+			ctx := context.Background()
+			if tt.name == "error on cancelled context" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
 
-	if err := exec.Command("git", "-C", tmpDir, "add", "test.txt").Run(); err != nil {
-		t.Fatalf("failed to add test file: %v", err)
-	}
-
-	if err := exec.Command("git", "-C", tmpDir, "commit", "-m", "Initial commit").Run(); err != nil {
-		t.Fatalf("failed to commit: %v", err)
-	}
-
-	// Create diff generator and generate diff (no changes).
-	generator := NewFilesystemDiffGenerator()
-	ctx := context.Background()
-
-	diffBytes, err := generator.Generate(ctx, tmpDir)
-	if err != nil {
-		t.Fatalf("failed to generate diff: %v", err)
-	}
-
-	// Verify diff is empty.
-	if len(diffBytes) > 0 {
-		t.Errorf("expected empty diff, got: %s", string(diffBytes))
-	}
-}
-
-func TestFilesystemDiffGenerator_Generate_NonGitRepo(t *testing.T) {
-	// Create a temporary directory that is NOT a git repository.
-	tmpDir := t.TempDir()
-
-	// Create diff generator and attempt to generate diff.
-	generator := NewFilesystemDiffGenerator()
-	ctx := context.Background()
-
-	_, err := generator.Generate(ctx, tmpDir)
-	if err == nil {
-		t.Error("expected error for non-git repository, got nil")
-	}
-}
-
-func TestFilesystemDiffGenerator_Generate_ContextCancellation(t *testing.T) {
-	// Create a temporary directory for the test workspace.
-	tmpDir := t.TempDir()
-
-	// Initialize a git repository.
-	if err := exec.Command("git", "init", tmpDir).Run(); err != nil {
-		t.Fatalf("failed to init git repo: %v", err)
-	}
-
-	// Configure git user for the test.
-	if err := exec.Command("git", "-C", tmpDir, "config", "user.email", "test@example.com").Run(); err != nil {
-		t.Fatalf("failed to set git user.email: %v", err)
-	}
-	if err := exec.Command("git", "-C", tmpDir, "config", "user.name", "Test User").Run(); err != nil {
-		t.Fatalf("failed to set git user.name: %v", err)
-	}
-
-	// Create an initial file and commit.
-	testFile := filepath.Join(tmpDir, "test.txt")
-	if err := os.WriteFile(testFile, []byte("content\n"), 0644); err != nil {
-		t.Fatalf("failed to create test file: %v", err)
-	}
-
-	if err := exec.Command("git", "-C", tmpDir, "add", "test.txt").Run(); err != nil {
-		t.Fatalf("failed to add test file: %v", err)
-	}
-
-	if err := exec.Command("git", "-C", tmpDir, "commit", "-m", "Initial commit").Run(); err != nil {
-		t.Fatalf("failed to commit: %v", err)
-	}
-
-	// Create diff generator with cancelled context.
-	generator := NewFilesystemDiffGenerator()
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately.
-
-	_, err := generator.Generate(ctx, tmpDir)
-	if err == nil {
-		t.Error("expected error for cancelled context, got nil")
+			diffBytes, err := generator.Generate(ctx, workspace)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantEmpty {
+				if len(diffBytes) > 0 {
+					t.Errorf("expected empty diff, got: %s", string(diffBytes))
+				}
+				return
+			}
+			diffStr := string(diffBytes)
+			for _, s := range tt.wantContains {
+				if !strings.Contains(diffStr, s) {
+					t.Errorf("diff missing %q, got: %s", s, diffStr)
+				}
+			}
+		})
 	}
 }
