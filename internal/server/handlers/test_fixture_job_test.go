@@ -147,6 +147,9 @@ type jobStore struct {
 	// Event
 	createEvent mockResult[store.Event]
 
+	// Ingest (logs)
+	createLog mockResult[store.Log]
+
 	// Spec creation (for migs_ticket flow)
 	createSpecCalled bool
 	createSpecParams store.CreateSpecParams
@@ -640,6 +643,12 @@ func (m *jobStore) ListMigReposByMig(ctx context.Context, migID types.MigID) ([]
 
 func (m *jobStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	return m.createEvent.ret()
+}
+
+// Ingest methods
+
+func (m *jobStore) CreateLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
+	return m.createLog.ret()
 }
 
 // Spec creation (for migs_ticket flow)

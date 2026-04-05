@@ -142,6 +142,10 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// Jobs — global jobs listing for TUI (list across all runs with mig context).
 	s.RegisterRouteFunc("GET /v1/jobs", listJobsHandler(st), auth.RoleControlPlane)
 
+	// Job-level log endpoints — SSE stream and ingest scoped to a single job.
+	s.RegisterRouteFuncAllowQueryToken("GET /v1/jobs/{job_id}/logs", getJobLogsHandler(st, bs, eventsService), auth.RoleControlPlane)
+	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/logs", createJobLogsHandler(st, bp, eventsService), auth.RoleWorker)
+
 	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
 	// Node identity is derived from mTLS certificate; no node_id in URL or body.
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService, bp, bs), auth.RoleWorker)

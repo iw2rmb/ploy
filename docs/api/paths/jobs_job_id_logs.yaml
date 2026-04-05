@@ -1,0 +1,141 @@
+# GET /v1/jobs/{job_id}/logs — SSE stream for job-scoped container logs
+# POST /v1/jobs/{job_id}/logs — Upload log chunk scoped to a job
+#
+# Event payloads (GET):
+# - `event: log` → LogRecord (enriched log line; filtered to this job only)
+# - `event: done` → Terminal sentinel
+#
+# Run lifecycle events (run, stage, retention) are excluded from this stream.
+parameters:
+  - in: path
+    name: job_id
+    required: true
+    schema:
+      type: string
+    description: Job ID (KSUID string, 27 characters).
+  - in: header
+    name: Last-Event-ID
+    required: false
+    description: |
+      Optional SSE resume token. Server replays events with `id` greater than
+      this value. Use for reconnection after network failures.
+    schema:
+      type: string
+      example: "42"
+get:
+  tags: [Control]
+  summary: Stream job logs (SSE)
+  parameters:
+    - in: query
+      name: auth_token
+      required: false
+      schema:
+        type: string
+      description: |
+        Optional bearer token supplied as a query parameter for browser/OSC8
+        artifact link flows when setting the `Authorization` header is not
+        possible.
+  description: |
+    Server-Sent Events stream for real-time container log updates scoped to a
+    single job. Only `log` and `done` event types are emitted; run lifecycle
+    frames (`run`, `stage`, `retention`) are excluded.
+
+    Supports `Last-Event-ID` header for resume after reconnection.
+
+    ## Event Types
+
+    | Event Type | Payload Schema | Description                                  |
+    |------------|----------------|----------------------------------------------|
+    | `log`      | `LogRecord`    | Enriched log line with execution context     |
+    | `done`     | `Status`       | Terminal sentinel; stream closes after this  |
+
+    ## `event: log` — Enriched Log Records
+
+    Each `event: log` frame carries a JSON-encoded `LogRecord`:
+
+    **Core fields (always present):**
+    | Field       | Type   | Description                                       |
+    |-------------|--------|---------------------------------------------------|
+    | `timestamp` | string | RFC 3339 timestamp when the log line was captured |
+    | `stream`    | string | Output stream (`stdout` or `stderr`)              |
+    | `line`      | string | Log message content                               |
+
+    **Enriched fields (optional, omitempty):**
+    | Field        | Type   | Description                                                      |
+    |--------------|--------|------------------------------------------------------------------|
+    | `node_id`    | string | Node ID (NanoID 6-character string) that produced this log line  |
+    | `job_id`     | string | Job ID (KSUID string) that produced this log line                |
+    | `job_type`   | string | Job phase: `pre_gate`, `mig`, `post_gate`, `heal`, `re_gate`     |
+    | `next_id`    | number | Optional step metadata used for log enrichment                   |
+
+    **Example:**
+    ```
+    event: log
+    data: {"timestamp":"2025-01-15T10:05:00Z","stream":"stdout","line":"Step started","node_id":"aB3xY9","job_id":"2NQPoBfVkc8dFmGAQqJnUwMu9jR","job_type":"mig","next_id":2000}
+    ```
+
+    ## `event: done` — Terminal Sentinel
+
+    Signals stream completion. The server closes the connection after this event:
+    ```
+    event: done
+    data: {"status":"done"}
+    ```
+  responses:
+    '200':
+      description: OK — SSE stream established.
+      content:
+        text/event-stream:
+          schema:
+            type: string
+            description: |
+              Server-Sent Events stream. Each frame consists of `event:` type and
+              `data:` JSON payload. See description above for payload schemas.
+    '400':
+      description: Bad Request — missing or invalid job ID.
+    '404':
+      description: Not Found — job does not exist.
+    '500':
+      description: Internal Server Error.
+
+post:
+  tags: [Worker]
+  summary: Upload job log chunk
+  description: |
+    Uploads a gzipped log chunk scoped to a specific job. The run context is
+    resolved from the job record; callers do not need to supply a run ID.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            chunk_no:
+              type: integer
+              format: int32
+              description: Monotonic chunk number per job.
+            data:
+              type: string
+              format: byte
+              description: Base64-encoded gzipped log bytes (<= 10 MiB decoded).
+          required: [chunk_no, data]
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id: { type: integer, format: int64 }
+              chunk_no: { type: integer, format: int32 }
+            required: [id, chunk_no]
+    '400':
+      description: Bad request
+    '404':
+      description: Job not found
+    '413':
+      description: Payload too large
+    '500':
+      description: Server error
