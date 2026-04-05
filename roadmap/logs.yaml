@@ -24,7 +24,7 @@ reviews:
   - gaps: ["\"Extend stream and handler tests to assert strict event-type separation and ordered backfill-plus-live delivery.\" — Backfill/live dedup in `serveJobWithBackfill` is keyed only by log line content (`backfilledLines[rec.Line]`), so a legitimate live log line that repeats a previously backfilled line is dropped once, which violates ordered backfill-plus-live delivery guarantees (`internal/server/handlers/events.go:153`, `internal/server/handlers/events.go:157`, `internal/server/handlers/events.go:204`, `internal/server/handlers/events.go:208`). Current tests validate overlap dedup but do not cover repeated same-content live lines across the boundary (`internal/server/handlers/jobs_logs_test.go:629`)."]
     commit: "81476643"
   - gaps: ["\"Adjust run logs command output handling to match lifecycle-only run stream payload contract.\" — Leftover E2E documentation still states container stdout/stderr should be streamed via `ploy run logs <run-id>`, conflicting with the implemented split (`ploy run logs` = lifecycle; `ploy job follow` = container logs): [tests/e2e/migs/README.md:214](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/README.md:214), [tests/e2e/migs/README.md:227](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/README.md:227), [tests/e2e/migs/README.md:260](/Users/vk/@iw2rmb/ploy/tests/e2e/migs/README.md:260)."]
-    commit: null
+    commit: ec74a01d
 items:
   - done: true
     reviews:
