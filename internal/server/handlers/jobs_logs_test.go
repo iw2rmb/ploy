@@ -2,9 +2,12 @@ package handlers
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -282,5 +285,125 @@ func TestBuildJobLogFilter_RejectsRetentionEvent(t *testing.T) {
 	_, keep := filter(evt)
 	if keep {
 		t.Fatal("expected retention event to be rejected from job log stream")
+	}
+}
+
+// --- GET /v1/jobs/{job_id}/logs backfill path (sinceID == 0) ---
+
+// gzipLines creates gzipped data from newline-joined lines.
+func gzipLines(t *testing.T, lines ...string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	for _, l := range lines {
+		_, _ = zw.Write([]byte(l + "\n"))
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestGetJobLogsHandler_BackfillExcludesNilJobIDLogs(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+
+	objKeyJob := "logs/job.gz"
+	objKeyNil := "logs/nil.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKeyJob},
+		{ID: 2, RunID: runID, JobID: nil, ObjectKey: &objKeyNil}, // no job_id — must be excluded
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKeyJob, "", gzipLines(t, "job-line"))
+	_, _ = bs.Put(context.Background(), objKeyNil, "", gzipLines(t, "nil-line"))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	h.ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "job-line") {
+		t.Fatal("expected job-line in backfill output")
+	}
+	if strings.Contains(body, "nil-line") {
+		t.Fatal("nil-job-id log must not appear in job-scoped backfill")
+	}
+}
+
+func TestGetJobLogsHandler_BackfillExcludesOtherJobLogs(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	otherID := domaintypes.NewJobID()
+
+	objKeyJob := "logs/job.gz"
+	objKeyOther := "logs/other.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKeyJob},
+		{ID: 2, RunID: runID, JobID: &otherID, ObjectKey: &objKeyOther},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKeyJob, "", gzipLines(t, "my-job"))
+	_, _ = bs.Put(context.Background(), objKeyOther, "", gzipLines(t, "other-job"))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	h.ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "my-job") {
+		t.Fatal("expected my-job in backfill output")
+	}
+	if strings.Contains(body, "other-job") {
+		t.Fatal("other job's log must not appear in job-scoped backfill")
+	}
+}
+
+func TestBuildJobLogFilter_RejectsNilJobIDLog(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	filter := buildJobLogFilter(map[domaintypes.JobID]struct{}{jobID: {}})
+
+	data, _ := json.Marshal(map[string]any{"line": "hello"}) // no job_id field
+	evt := logstream.Event{Type: domaintypes.SSEEventLog, Data: data}
+
+	_, keep := filter(evt)
+	if keep {
+		t.Fatal("expected log event without job_id to be rejected")
 	}
 }
