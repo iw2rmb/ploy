@@ -117,6 +117,8 @@ items:
     reviews:
       - gaps: ["\"Update nodeagent tests to cover no-router gate failures, heal runtime invocation, claimer spec hydration, and amata-mode heal command construction.\": stale router-era wording remains in `internal/nodeagent/manifest_healing_test.go:408` (comment says amata command resolution is used by \"both healing and router manifest builders\").", "\"Refactor run option parsing and manifest builders to hydrate heal containers solely from build_gate.heal and existing recovery context inputs.\": stale router-era wording remains in `internal/nodeagent/run_options.go:48` (comment for `MigContainerSpec` still says it is used for \"router\")."]
         commit: 8bff9197
+      - gaps: ["\"Refactor run option parsing and manifest builders to hydrate heal containers solely from build_gate.heal and existing recovery context inputs.\": stale router-era selection wording remains in `internal/nodeagent/execution_orchestrator_jobs.go:141` (`\"healing job missing selected strategy image\"`), leaving a Step 3 leftover in nodeagent heal-only recovery surface."]
+        commit: null
     label: "3"
     summary: "Remove node-side inline router execution and execute only heal runtime for recovery attempts."
     classification: "determined"
