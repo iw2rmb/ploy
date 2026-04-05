@@ -143,52 +143,36 @@ Stack Gate enforces stack expectations at gate boundaries. When failures occur:
 2. Error stored in `run_repos.last_error`, shown in CLI follow output
 3. Includes: phase, expected/detected, evidence (paths/keys only)
 
-### Router and healing configuration
+### Healing configuration
 
-When the Build Gate fails and healing is configured, the node agent runs a
-required **router** (to summarize the failure) followed by a **healing** loop
-(to fix the failure). Both are specified under `build_gate`:
+When the Build Gate fails and healing is configured, the node agent enters a
+direct **heal → re-gate** loop using the single `build_gate.heal` entry:
 
 ```yaml
 build_gate:
   enabled: true
 
-  # Router runs once after gate failure to produce bug_summary.
-  router:
-    <<: !include ./healing/router/spec.yaml
+  # Single heal entry — runs directly on gate failure.
+  heal:
+    <<: !include ./healing/spec.yaml
+    retries: 2
     image: ghcr.io/iw2rmb/ploy/codex:latest
     in:
       - ./codex-prompt.txt:/in/codex-prompt.txt
     home:
       - ~/.codex/auth.json:.codex/auth.json:ro
-
-  # Healing runs after router, selected by router error_kind.
-  healing:
-    by_error_kind:
-      infra:
-        <<: !include ./healing/infra/spec.yaml
-        retries: 2
-        image: ghcr.io/iw2rmb/ploy/codex:latest
-        in:
-          - ./codex-prompt.txt:/in/codex-prompt.txt
-        expectations:
-          artifacts:
-            - path: /out/gate-profile-candidate.json
-              schema: gate_profile_v1
-      code:
-        <<: !include ./healing/code/spec.yaml
-        retries: 2
-        image: ghcr.io/iw2rmb/ploy/codex:latest
-        in:
-          - ./codex-prompt.txt:/in/codex-prompt.txt
+    expectations:
+      artifacts:
+        - path: /out/gate-profile-candidate.json
+          schema: gate_profile_v1
 ```
 
-Healing action fields (image, command, env, home) are specified under
-`healing.by_error_kind.<error_kind>` — there is no nested `mig` key.
+Healing action fields (image, command, env, home) are specified directly under
+`build_gate.heal` — there is no nested `mig` key.
 
 #### Dual-mode execution (amata vs direct-Codex)
 
-Mig steps, router, and healing containers support two execution modes:
+Mig steps and healing containers support two execution modes:
 
 **amata mode** (recommended): set `amata.spec` to a path of an amata workflow YAML file.
 The CLI loads file content into the canonical spec. The node agent materializes it as `/in/amata.yaml` and runs
@@ -196,12 +180,12 @@ The CLI loads file content into the canonical spec. The node agent materializes 
 from `amata.set`. No prompt file is required in this mode.
 
 ```yaml
-router:
+heal:
   image: ghcr.io/iw2rmb/ploy/codex:latest
   amata:
     spec: |
       version: amata/v1
-      name: bug-router
+      name: code-healer
       entry: main
       workspace:
         root: /workspace
@@ -209,8 +193,8 @@ router:
         main:
           steps:
             - codex: |
-                Read /in/build-gate.log and output one JSON line:
-                {"bug_summary":"...","error_kind":"code"}
+                Fix the build failure in /in/build-gate.log.
+                Your final message MUST be one line of JSON: {"action_summary":"..."}
     # set:   # optional; passed as ordered --set '<param>=<value>' flags
     #   - param: model
     #     value: gpt-4o
@@ -223,7 +207,7 @@ router:
 `/in/codex-prompt.txt`.
 
 ```yaml
-router:
+heal:
   image: ghcr.io/iw2rmb/ploy/codex:latest
   in:
     - ./codex-prompt.txt:/in/codex-prompt.txt
@@ -231,16 +215,16 @@ router:
     - ~/.codex/auth.json:.codex/auth.json:ro
 ```
 
-The same dual-mode rules apply to `steps[]`, `router`, and `healing.by_error_kind.<error_kind>` entries.
+The same dual-mode rules apply to `steps[]` and `build_gate.heal` entries.
 Use YAML `!include` for spec composition: full replacement
-(`router: !include ./router.yaml#/router`) or deep merge
-(`router: {<<: !include ./router.yaml#/router, ...inline-overrides}`).
+(`heal: !include ./healing/spec.yaml#/heal`) or deep merge
+(`heal: {<<: !include ./healing/spec.yaml#/heal, ...inline-overrides}`).
 Include references support `path[#/pointer]`, nested includes, and cycle
 detection. Relative include paths resolve from each including file directory.
 Relative local-source paths inside included fragments (`amata.spec`, `ca`, and
 the source side of `in`/`out`/`home`) are resolved from that included file
 directory.
-For `infra` recovery with `schema=gate_profile_v1`, healing is expected to emit
+For recovery with `schema=gate_profile_v1`, healing is expected to emit
 `/out/gate-profile-candidate.json`. Promotion to repo `gate_profile` happens only
 when the immediate follow-up `re_gate` succeeds.
 Candidate stack validation uses failed-gate `BuildGateStageMetadata.detected_stack`
@@ -249,41 +233,21 @@ as canonical expectation (`language`, `tool`, optional `release`):
 - when detected `release` is non-empty, release must match exactly
 - when detected `release` is empty, release is treated as wildcard
 
-**Router** runs once per gate failure that triggers healing (each iteration),
-before the corresponding healing attempt. It reads `/in/build-gate.log` and writes a JSON one-liner to
-`/out/codex-last.txt` containing `bug_summary` plus classifier metadata:
-`error_kind`, optional `strategy_id`, optional `confidence`, optional `reason`,
-and optional structured `expectations`.
-The `bug_summary` (max 200 chars, single-line) is persisted in
-`jobs.meta.gate.bug_summary`.
-Classifier metadata is persisted in `jobs.meta.gate.recovery`.
-If router output is missing/invalid for classification, `error_kind` defaults to `unknown`.
-Router is required when healing is configured.
-
-Router runtime environment:
-- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
-- `PLOY_LOOP_KIND` — loop context (`healing`)
-
 **Healing** semantics:
 
 - **Single workspace**: Healing runs on the same workspace that the failing gate validated.
 - **Linear execution**: The healing mig runs, then the gate is re-run.
-- **Retries**: If the gate still fails, the selected healing action may be retried up to configured `retries`.
+- **Retries**: If the gate still fails, healing may be retried up to the configured `retries`.
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
-- **Workspace policy by error kind**:
-  - `infra` healing must leave `/workspace` unchanged; if files are changed, the heal job fails with `healing_warning=unexpected_workspace_changes`.
-  - non-`infra` healing must change `/workspace`; if no files are changed, the heal job fails with `healing_warning=no_workspace_changes`.
+- **Workspace policy**: Healing must change `/workspace`; if no files are changed,
+  the heal job fails with `healing_warning=no_workspace_changes`.
 - **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
-  `jobs.meta.action_summary` for mig jobs.
-- **`deps` compatibility hints**: for `selected_error_kind=deps`, claim-time
-  `recovery_context` includes:
-  - `deps_compat_endpoint`: stack-prefilled SBOM endpoint
-    `/v1/sboms/compat?lang=<...>&release=<...>&tool=<...>&libs=...`.
-  - `deps_bumps`: prior cumulative dependency bump state.
-  Node hydration writes these into healing `/in` as:
-  - `/in/deps-compat-url.txt`
-  - `/in/deps-bumps.json`
+  `jobs.meta.action_summary` for heal jobs.
+
+Healing runtime environment:
+- `PLOY_GATE_PHASE` — phase that failed (`pre_gate|post_gate|re_gate`)
+- `PLOY_LOOP_KIND` — loop context (`healing`)
 
 ### Per-iteration artifacts and healing log
 
@@ -293,12 +257,12 @@ to `/in` for debugging and cross-iteration context:
 | Artifact | Description |
 |---|---|
 | `/in/build-gate.log` | Latest gate failure log (updated after each re-gate) |
-| `/in/gate_profile.json` | Gate profile used by the failed gate when available (provided for `infra` healing) |
+| `/in/gate_profile.json` | Gate profile used by the failed gate when available |
 | `/in/build-gate-iteration-N.log` | Gate failure log snapshot for iteration N |
 | `/in/healing-iteration-N.log` | Healing agent output log for iteration N |
 | <code>/in/healing-log.md</code> | Cumulative markdown log across all iterations |
-| `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for `deps` healing |
-| `/in/deps-bumps.json` | Prior cumulative dependency bump map for `deps` healing |
+| `/in/deps-compat-url.txt` | Prefilled SBOM compatibility endpoint for dependency healing |
+| `/in/deps-bumps.json` | Prior cumulative dependency bump map for dependency healing |
 
 For `heal`/`re_gate`, claim-time `recovery_context` is the primary source for
 `/in/build-gate.log`, `/in/gate_profile.json`, and `/in/gate_profile.schema.json`.
@@ -401,7 +365,7 @@ for optimized per-build-tool containers (e.g., dedicated Maven or Gradle images)
 
 ### Image specification forms
 
-The `image` field (in `steps[]` and in `build_gate.healing.by_error_kind.<kind>`/`build_gate.router`) accepts two forms:
+The `image` field (in `steps[]` and in `build_gate.heal`) accepts two forms:
 
 **Universal image (string)** — A single image used regardless of stack:
 ```yaml
@@ -620,7 +584,7 @@ Rewire example:
 - Persistence order is tail-first (`re-gate` row first, then `heal`, then failed-job rewire)
   so each non-null `next_id` always points to an already existing row under the
   `jobs.next_id -> jobs.id` foreign key.
-- For `infra` recovery with expected artifact `schema=gate_profile_v1`, healing insertion
+- For recovery with expected artifact `schema=gate_profile_v1`, healing insertion
   validates candidate bytes from the previous heal artifact
   (`/out/gate-profile-candidate.json`) and records candidate schema/path/validation
   status in `re_gate` recovery metadata.
@@ -827,7 +791,7 @@ Gate profile to Build Gate mapping:
 
 Resolution precedence:
 1. Explicit `build_gate.<phase>.gate_profile` in submitted run spec
-2. For `re_gate` only: validated infra recovery candidate prep override
+2. For `re_gate` only: validated recovery candidate prep override
 3. Resolved gate profile payload from `gate_profiles`
 4. Default detected-tool command fallback
 
@@ -1214,7 +1178,7 @@ Gate profile behavior:
   fallback profiles are copied into a new exact row before execution.
 - Successful gate jobs (`pre_gate|post_gate|re_gate`) persist refreshed exact
   profiles keyed by `(repo_id, repo_sha, stack_id)`.
-- Infra healing candidate validation uses `docs/schemas/gate_profile.schema.json`
+- Healing candidate validation uses `docs/schemas/gate_profile.schema.json`
   (`title: Ploy Build Gate Profile`, `$comment` guidance included) plus contract parsing.
 - A validated candidate is tracked in `re_gate` recovery metadata and marked
   `candidate_promoted=true` after successful `re_gate` for idempotent audit.
@@ -1328,7 +1292,7 @@ Migs container images are standard OCI images with the following expectations:
   - Spec `env` maps are resolved and merged by `buildSpecPayload`.
     - Supported on:
       - each `steps[]` entry (single-step and multi-step runs),
-      - `build_gate.healing.by_error_kind` and `build_gate.router`.
+      - `build_gate.heal`.
   - **Typed file delivery (Hydra)**: Config files, CA bundles, and inputs are
     delivered via typed mount records (`ca`, `in`, `out`, `home`) instead of env
     vars. See [Environment Variables](./envs/README.md) § "Common Variables

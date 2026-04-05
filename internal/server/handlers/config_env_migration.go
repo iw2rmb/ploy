@@ -49,7 +49,7 @@ type SpecialEnvMapping struct {
 // specialEnvMappings is the canonical mapping table. Order is stable and
 // deterministic (sorted by key name) so migration output is reproducible.
 var specialEnvMappings = []SpecialEnvMapping{
-	{EnvKey: "CCR_CONFIG_JSON", TargetField: "home", Destination: ".claude-code-router/config.json", Mode: "ro"},
+	{EnvKey: "CCR_CONFIG_JSON", TargetField: "home", Destination: ".claude-code/config.json", Mode: "ro"},
 	{EnvKey: "CODEX_AUTH_JSON", TargetField: "home", Destination: ".codex/auth.json", Mode: "ro"},
 	{EnvKey: "CODEX_CONFIG_TOML", TargetField: "home", Destination: ".codex/config.toml", Mode: "ro"},
 	{EnvKey: "CODEX_PROMPT", TargetField: "in", Destination: "/in/codex-prompt.txt"},

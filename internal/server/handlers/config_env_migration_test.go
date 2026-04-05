@@ -17,7 +17,7 @@ func TestSpecialEnvMappingTable_DesignAlignment(t *testing.T) {
 		{"CODEX_AUTH_JSON", "home", ".codex/auth.json", "ro"},
 		{"CODEX_CONFIG_TOML", "home", ".codex/config.toml", "ro"},
 		{"CRUSH_JSON", "home", ".config/crush/crush.json", "ro"},
-		{"CCR_CONFIG_JSON", "home", ".claude-code-router/config.json", "ro"},
+		{"CCR_CONFIG_JSON", "home", ".claude-code/config.json", "ro"},
 		{"CODEX_PROMPT", "in", "/in/codex-prompt.txt", ""},
 	}
 
@@ -75,7 +75,7 @@ func TestRewriteSpecialEnvEntry(t *testing.T) {
 		{"home_auth", "CODEX_AUTH_JSON", "def5678", "home", "def5678:.codex/auth.json:ro"},
 		{"home_config", "CODEX_CONFIG_TOML", "aaa1111", "home", "aaa1111:.codex/config.toml:ro"},
 		{"home_crush", "CRUSH_JSON", "bbb2222", "home", "bbb2222:.config/crush/crush.json:ro"},
-		{"home_ccr", "CCR_CONFIG_JSON", "ccc3333", "home", "ccc3333:.claude-code-router/config.json:ro"},
+		{"home_ccr", "CCR_CONFIG_JSON", "ccc3333", "home", "ccc3333:.claude-code/config.json:ro"},
 		{"in_prompt", "CODEX_PROMPT", "eee5555", "in", "eee5555:/in/codex-prompt.txt"},
 	}
 	for _, tt := range tests {
