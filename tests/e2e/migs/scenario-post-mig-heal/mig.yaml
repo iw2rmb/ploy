@@ -92,7 +92,7 @@ build_gate:
     retries: 2 # Allow multiple healing attempts for complex errors
     # Healing: amata mode — no prompt file required; amata spec drives the workflow.
     # Exercises the amata execution path for healing.
-    image: localhost:5000/ploy/codex:latest
+    image: localhost:5000/ploy/amata:latest
     amata:
       spec: |
         version: amata/v1

@@ -63,26 +63,6 @@ func clusterReady(t *testing.T, root string) bool {
 	return true
 }
 
-// TestCodexEntrypointUnit runs the shell-based unit test suite for the codex
-// entrypoint (images/codex/entrypoint.sh). This wraps the bash test runner so
-// that `go test ./tests/e2e/migs/...` covers the codex entrypoint contract.
-func TestCodexEntrypointUnit(t *testing.T) {
-	root := repoRoot(t)
-	script := filepath.Join(root, "tests", "unit", "mig_codex_sh_test.sh")
-	if _, err := os.Stat(script); err != nil {
-		t.Skipf("codex unit test script not found: %v", err)
-	}
-
-	cmd := exec.Command("bash", script)
-	cmd.Dir = root
-	cmd.Env = os.Environ()
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("codex entrypoint unit tests failed:\n%s", out)
-	}
-	t.Logf("codex entrypoint unit tests passed:\n%s", out)
-}
-
 // TestHydraMountEnforcement runs the Hydra mount-enforcement e2e scenario,
 // validating that /in is read-only and /out is writable. Requires a live
 // cluster; skips when unavailable. Offline contract validation is covered

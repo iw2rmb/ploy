@@ -6,7 +6,6 @@ set -Eeuo pipefail
 # Builds and pushes:
 # - server  -> server
 # - node    -> node
-# - codex   -> codex
 # - amata   -> amata
 # - shell   -> shell
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
@@ -130,9 +129,6 @@ build_push server images/server/Dockerfile .
 
 # node
 build_push node images/node/Dockerfile .
-
-# codex
-build_push codex images/codex/Dockerfile .
 
 # amata
 bash images/amata/build-amata.sh

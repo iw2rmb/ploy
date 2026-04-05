@@ -107,7 +107,7 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 			"build_gate": {
 				"heal": {
 					"retries": 1,
-					"image": "codex:latest",
+					"image": "amata:latest",
 					"in": ["abcdef0:/in/codex-prompt.txt", "eeeeeee:/in/auth.json"],
 					"ca": ["bbbbbbb0123456"]
 				}

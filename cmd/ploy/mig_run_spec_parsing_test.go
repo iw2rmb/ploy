@@ -901,7 +901,7 @@ steps:
 }
 
 func TestBuildSpecPayload_ImageInterpolationAcrossSections(t *testing.T) {
-	t.Setenv("PLOY_TEST_IMG", "docker.io/test/codex:latest")
+	t.Setenv("PLOY_TEST_IMG", "docker.io/test/amata:latest")
 	t.Setenv("PLOY_TEST_STEP_DEFAULT", "docker.io/test/default-step:latest")
 	t.Setenv("PLOY_TEST_STEP_MAVEN", "docker.io/test/maven-step:latest")
 
@@ -922,5 +922,5 @@ build_gate:
 	assertField(t, stepImage, "java-maven", "docker.io/test/maven-step:latest")
 
 	heal := mustDig(t, result, "build_gate", "heal")
-	assertField(t, heal, "image", "docker.io/test/codex:latest")
+	assertField(t, heal, "image", "docker.io/test/amata:latest")
 }

@@ -583,7 +583,7 @@ build_gate:
   heal:
     <<: !include ./healing/spec.yaml
     retries: 1
-    image: ghcr.io/iw2rmb/ploy/codex:latest
+    image: ghcr.io/iw2rmb/ploy/amata:latest
     command: ["codex", "--input", "/workspace", "--out", "/out"]
     in:
       - ./codex-prompt.txt:/in/codex-prompt.txt
@@ -611,14 +611,13 @@ follow-up `re_gate` succeeds. Failed `re_gate` results never promote candidates.
 
 **Cross-phase inputs:**
 - `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing migs).
-- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag).
 
 **Container cleanup model:**
 - Containers are retained after step/gate completion.
 - Cleanup trigger: before claim; threshold: 1 GiB free on Docker data-root filesystem.
 
 See `docs/schemas/mig.example.yaml` for a complete example and `tests/e2e/migs/README.md`
-for end-to-end usage with `codex`.
+for end-to-end healing usage.
 
 ## Job Graph and DAG State
 

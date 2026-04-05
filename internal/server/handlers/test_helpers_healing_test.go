@@ -87,7 +87,7 @@ func buildHealingSpec(t *testing.T, retries int, opts ...healSpecOpt) []byte {
 	t.Helper()
 	heal := map[string]any{
 		"retries": float64(retries),
-		"image":   "codex:latest",
+		"image":   "amata:latest",
 	}
 	for _, o := range opts {
 		o(heal)

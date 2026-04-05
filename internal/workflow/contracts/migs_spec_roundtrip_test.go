@@ -56,7 +56,7 @@ func TestMigSpec_RoundTrip_MultiStep(t *testing.T) {
 		BuildGate: &BuildGateConfig{
 			Heal: &HealSpec{
 				Retries: 2,
-				Image:   JobImage{Universal: "codex:latest"},
+				Image:   JobImage{Universal: "amata:latest"},
 			},
 		},
 	}

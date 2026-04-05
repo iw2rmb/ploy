@@ -200,7 +200,7 @@ func TestDockerContainerRuntimeCreate_ImagePullUsesRegistryAuth(t *testing.T) {
 	})
 
 	_, err := rt.Create(context.Background(), ContainerSpec{
-		Image: "ghcr.io/iw2rmb/ploy/codex:latest",
+		Image: "ghcr.io/iw2rmb/ploy/amata:latest",
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -244,7 +244,7 @@ func TestDockerContainerRuntimeCreate_InvalidRegistryAuthConfig(t *testing.T) {
 	})
 
 	_, err := rt.Create(context.Background(), ContainerSpec{
-		Image: "ghcr.io/iw2rmb/ploy/codex:latest",
+		Image: "ghcr.io/iw2rmb/ploy/amata:latest",
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid registry auth config")
@@ -315,7 +315,7 @@ func TestDockerContainerRuntimeEnvPassthrough(t *testing.T) {
 		{
 			name: "global_env_vars",
 			env: map[string]string{
-				"PLOY_CA_CERTS":  "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+				"PLOY_CA_CERTS":   "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
 				"CODEX_AUTH_JSON": `{"token":"secret123"}`,
 				"OPENAI_API_KEY":  "sk-test-key",
 			},

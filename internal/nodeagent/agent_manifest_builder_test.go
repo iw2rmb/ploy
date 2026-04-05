@@ -272,7 +272,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("single-step amata uses amata command", func(t *testing.T) {
 		req := newStartRunRequest(withRunOptions(RunOptions{
 			Execution: MigContainerSpec{
-				Image: contracts.JobImage{Universal: "codex:latest"},
+				Image: contracts.JobImage{Universal: "amata:latest"},
 				Amata: &contracts.AmataRunSpec{
 					Spec: "version: amata/v1\n",
 					Set:  []contracts.AmataSetParam{{Param: "mode", Value: "step"}},
@@ -295,7 +295,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 					Image: contracts.JobImage{Universal: "migs-orw:latest"}, Command: contracts.CommandSpec{Shell: "echo plain"},
 				}},
 				{MigContainerSpec: MigContainerSpec{
-					Image: contracts.JobImage{Universal: "codex:latest"},
+					Image: contracts.JobImage{Universal: "amata:latest"},
 					Amata: &contracts.AmataRunSpec{
 						Spec: "version: amata/v1\n",
 						Set:  []contracts.AmataSetParam{{Param: "model", Value: "gpt-5"}},

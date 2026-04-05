@@ -156,7 +156,7 @@ build_gate:
   heal:
     <<: !include ./healing/spec.yaml
     retries: 2
-    image: ghcr.io/iw2rmb/ploy/codex:latest
+    image: ghcr.io/iw2rmb/ploy/amata:latest
     in:
       - ./codex-prompt.txt:/in/codex-prompt.txt
     home:
@@ -170,18 +170,16 @@ build_gate:
 Healing action fields (image, command, env, home) are specified directly under
 `build_gate.heal` — there is no nested `mig` key.
 
-#### Dual-mode execution (amata vs direct-Codex)
+#### Amata execution mode
 
-Mig steps and healing containers support two execution modes:
-
-**amata mode** (recommended): set `amata.spec` to a path of an amata workflow YAML file.
+Mig steps and healing containers support amata execution by setting `amata.spec` to a path of an amata workflow YAML file.
 The CLI loads file content into the canonical spec. The node agent materializes it as `/in/amata.yaml` and runs
 `amata run /in/amata.yaml` with optional ordered `--set '<param>=<value>'` flags
 from `amata.set`. No prompt file is required in this mode.
 
 ```yaml
 heal:
-  image: ghcr.io/iw2rmb/ploy/codex:latest
+  image: ghcr.io/iw2rmb/ploy/amata:latest
   amata:
     spec: |
       version: amata/v1
@@ -202,20 +200,7 @@ heal:
     - ~/.codex/auth.json:.codex/auth.json:ro
 ```
 
-**Direct-Codex mode** (fallback): omit `amata`. The container uses the direct
-`codex exec` path. A prompt must be delivered via Hydra `in` mount as
-`/in/codex-prompt.txt`.
-
-```yaml
-heal:
-  image: ghcr.io/iw2rmb/ploy/codex:latest
-  in:
-    - ./codex-prompt.txt:/in/codex-prompt.txt
-  home:
-    - ~/.codex/auth.json:.codex/auth.json:ro
-```
-
-The same dual-mode rules apply to `steps[]` and `build_gate.heal` entries.
+The same amata rules apply to `steps[]` and `build_gate.heal` entries.
 Use YAML `!include` for spec composition: full replacement
 (`heal: !include ./healing/spec.yaml#/heal`) or deep merge
 (`heal: {<<: !include ./healing/spec.yaml#/heal, ...inline-overrides}`).

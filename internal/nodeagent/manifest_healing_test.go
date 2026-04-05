@@ -270,46 +270,46 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 	}
 }
 
-// TestIsCodexHealingImage verifies that the heuristic for detecting Codex-based
+// TestIsAmataHealingImage verifies that the heuristic for detecting Amata-based
 // healing images correctly identifies common patterns.
-func TestIsCodexHealingImage(t *testing.T) {
+func TestIsAmataHealingImage(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		image string
 		want  bool
 	}{
-		// Positive cases: images containing "codex".
-		{"codex", true},
-		{"codex:latest", true},
-		{"registry.io/codex:v1", true},
-		{"my-codex-healer", true},
-		{"codex-fixer", true},
-		{"MODS-CODEX", true}, // case insensitive
-		{"Codex", true},
+		// Positive cases: images containing "amata".
+		{"amata:latest", true},
+		{"amata", true},
+		{"registry.io/amata:v1", true},
+		{"my-amata-healer", true},
+		{"AMATA-runner", true}, // case insensitive
 
-		// Negative cases: images without "codex".
+		// Negative cases: images without "amata".
+		{"codex", false},
+		{"registry.io/codex:v1", false},
 		{"standard-healer", false},
 		{"ubuntu:latest", false},
 		{"maven:3.8", false},
 		{"mig-fix:latest", false},
-		{"codecov-tool", false}, // "codec" but not "codex"
+		{"amigo-tool", false},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.image, func(t *testing.T) {
 			t.Parallel()
-			got := isCodexHealingImage(tc.image)
+			got := isAmataHealingImage(tc.image)
 			if got != tc.want {
-				t.Errorf("isCodexHealingImage(%q) = %v, want %v", tc.image, got, tc.want)
+				t.Errorf("isAmataHealingImage(%q) = %v, want %v", tc.image, got, tc.want)
 			}
 		})
 	}
 }
 
-// TestBuildHealingManifest_CodexResumeInjection verifies CODEX_RESUME=1 injection
+// TestBuildHealingManifest_AmataResumeInjection verifies CODEX_RESUME=1 injection
 // rules and that user env vars are preserved alongside it.
-func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
+func TestBuildHealingManifest_AmataResumeInjection(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -320,45 +320,45 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 		wantEnv      map[string]string // additional env assertions (optional)
 	}{
 		{
-			name:         "codex image with session sets CODEX_RESUME=1",
-			mig:          MigContainerSpec{Image: testJobImage("codex:latest")},
+			name:         "amata image with session sets CODEX_RESUME=1",
+			mig:          MigContainerSpec{Image: testJobImage("amata:latest")},
 			codexSession: "session-abc-123",
 			wantResume:   true,
 		},
 		{
-			name:         "codex image without session does not set CODEX_RESUME",
-			mig:          MigContainerSpec{Image: testJobImage("codex:latest")},
+			name:         "amata image without session does not set CODEX_RESUME",
+			mig:          MigContainerSpec{Image: testJobImage("amata:latest")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
-			name:         "non-codex image with session does not set CODEX_RESUME",
+			name:         "non-amata image with session does not set CODEX_RESUME",
 			mig:          MigContainerSpec{Image: testJobImage("standard-healer:v1")},
 			codexSession: "session-xyz-456",
 			wantResume:   false,
 		},
 		{
-			name:         "non-codex image without session does not set CODEX_RESUME",
+			name:         "non-amata image without session does not set CODEX_RESUME",
 			mig:          MigContainerSpec{Image: testJobImage("maven:3.8")},
 			codexSession: "",
 			wantResume:   false,
 		},
 		{
-			name:         "registry prefixed codex image with session",
-			mig:          MigContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/codex:v2")},
+			name:         "registry prefixed amata image with session",
+			mig:          MigContainerSpec{Image: testJobImage("registry.gitlab.io/ploy/amata:v2")},
 			codexSession: "session-def-789",
 			wantResume:   true,
 		},
 		{
-			name:         "case insensitive codex detection",
-			mig:          MigContainerSpec{Image: testJobImage("my-CODEX-fixer:latest")},
+			name:         "case insensitive amata detection",
+			mig:          MigContainerSpec{Image: testJobImage("my-AMATA-fixer:latest")},
 			codexSession: "session-ghi-012",
 			wantResume:   true,
 		},
 		{
-			name: "codex resume preserves user env vars",
+			name: "amata resume preserves user env vars",
 			mig: MigContainerSpec{
-				Image: testJobImage("codex:latest"),
+				Image: testJobImage("amata:latest"),
 				Env: map[string]string{
 					"CUSTOM_VAR": "custom_value",
 					"ANOTHER":    "another_value",
@@ -374,7 +374,7 @@ func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
 	}
 
 	req := newStartRunRequest(
-		withRunID("test-run-codex-resume"), withJobID("test-job-codex-resume"),
+		withRunID("test-run-amata-resume"), withJobID("test-job-amata-resume"),
 		withRunRepoURL("https://gitlab.com/test/repo.git"),
 		withRunBaseRef("main"),
 	)
@@ -459,7 +459,7 @@ func TestBuildHealingManifest_AmataVsShellCommand(t *testing.T) {
 		{
 			name: "amata spec selects amata command",
 			mig: MigContainerSpec{
-				Image:   testJobImage("codex:latest"),
+				Image:   testJobImage("amata:latest"),
 				Command: contracts.CommandSpec{Shell: "codex exec"},
 				Amata:   &contracts.AmataRunSpec{Spec: "task: fix"},
 			},
@@ -468,7 +468,7 @@ func TestBuildHealingManifest_AmataVsShellCommand(t *testing.T) {
 		{
 			name: "nil amata uses shell command",
 			mig: MigContainerSpec{
-				Image:   testJobImage("codex:latest"),
+				Image:   testJobImage("amata:latest"),
 				Command: contracts.CommandSpec{Shell: "codex exec"},
 			},
 			wantCmd: []string{"/bin/sh", "-c", "codex exec"},
@@ -476,7 +476,7 @@ func TestBuildHealingManifest_AmataVsShellCommand(t *testing.T) {
 		{
 			name: "empty amata spec uses shell command",
 			mig: MigContainerSpec{
-				Image:   testJobImage("codex:latest"),
+				Image:   testJobImage("amata:latest"),
 				Command: contracts.CommandSpec{Shell: "codex exec"},
 				Amata:   &contracts.AmataRunSpec{Spec: "   "},
 			},

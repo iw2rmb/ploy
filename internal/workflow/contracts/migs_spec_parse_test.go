@@ -86,7 +86,7 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 			"enabled": true,
 			"heal": {
 				"retries": 3,
-				"image": "ghcr.io/iw2rmb/ploy/codex:latest",
+				"image": "ghcr.io/iw2rmb/ploy/amata:latest",
 				"command": "fix-it",
 				"envs": {"PROMPT": "fix the build"}
 			}
@@ -138,9 +138,9 @@ func TestParseMigSpecJSON_MultiStep(t *testing.T) {
 	if spec.BuildGate.Heal.Retries != 3 {
 		t.Errorf("build_gate.heal.retries = %d, want 3", spec.BuildGate.Heal.Retries)
 	}
-	if spec.BuildGate.Heal.Image.Universal != "ghcr.io/iw2rmb/ploy/codex:latest" {
+	if spec.BuildGate.Heal.Image.Universal != "ghcr.io/iw2rmb/ploy/amata:latest" {
 		t.Errorf("build_gate.heal.image = %q, want %q",
-			spec.BuildGate.Heal.Image.Universal, "ghcr.io/iw2rmb/ploy/codex:latest")
+			spec.BuildGate.Heal.Image.Universal, "ghcr.io/iw2rmb/ploy/amata:latest")
 	}
 	if spec.BuildGate.Heal.Command.Shell != "fix-it" {
 		t.Errorf("build_gate.heal.command = %q, want %q",

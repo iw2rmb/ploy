@@ -58,7 +58,7 @@ type MigContainerSpec struct {
 	Home []string // canonical home-relative entries (shortHash:dst{:ro})
 
 	// Amata configures amata-mode execution. When non-nil with a non-empty Spec,
-	// the container runs `amata run /in/amata.yaml` instead of the direct codex path.
+	// the container runs `amata run /in/amata.yaml` instead of image default behavior.
 	Amata *contracts.AmataRunSpec
 }
 
@@ -203,4 +203,3 @@ func copyStringMap(m map[string]string) map[string]string {
 	}
 	return out
 }
-

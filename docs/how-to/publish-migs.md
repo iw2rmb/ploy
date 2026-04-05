@@ -1,12 +1,11 @@
 Publish Migs Images to a Local Registry
 
 Overview
-- Migs images live under `images/orw/`, `images/codex/`, `images/amata/`, and `images/shell/`:
+- Migs images live under `images/orw/`, `images/amata/`, and `images/shell/`:
   - `orw-cli-maven` (`images/orw/orw-cli-maven`) -> `orw-cli-maven`
   - `orw-cli-gradle` (`images/orw/orw-cli-gradle`) -> `orw-cli-gradle`
-  - `codex` (`images/codex`) -> `codex`
   - `amata` (`images/amata`) -> `amata`
-ghcr.io/iw2rmb- The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
+- The runner resolves images as `$PLOY_CONTAINER_REGISTRY/<name>:latest`.
 
 Local Registry Prerequisites
 - Deploy the local stack:
@@ -17,7 +16,7 @@ Local Registry Prerequisites
 Publish all Migs images
 ```bash
 images/build-and-push.sh
-# Builds and pushes: amata, codex, shell, orw-cli-maven, orw-cli-gradle,
+# Builds and pushes: amata, shell, orw-cli-maven, orw-cli-gradle,
 # gate-gradle:jdk11, gate-gradle:jdk17.
 # Also mirrors Maven gate bases into your registry namespace:
 # maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17.
@@ -46,17 +45,6 @@ IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}" \
   docker buildx build --platform linux/amd64 \
   -f images/orw/orw-cli-maven/Dockerfile \
   -t "${IMAGE_PREFIX}/orw-cli-maven:latest" \
-  --push .
-```
-
-Publish `codex` (manual one-off)
-
-```bash
-IMAGE_PREFIX="${PLOY_CONTAINER_REGISTRY:-ghcr.io/iw2rmb/ploy}"
-docker buildx build \
-  --platform linux/amd64 \
-  -f images/codex/Dockerfile \
-  -t "${IMAGE_PREFIX}/codex:latest" \
   --push .
 ```
 
@@ -99,5 +87,5 @@ Verification
 ```bash
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-maven:latest"
 docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/orw-cli-gradle:latest"
-docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/codex:latest"
+docker buildx imagetools inspect "$PLOY_CONTAINER_REGISTRY/amata:latest"
 ```

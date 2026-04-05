@@ -229,13 +229,13 @@ func TestParseSpec_HealingSingleMig(t *testing.T) {
 				"build_gate": {
 					"heal": {
 						"retries": 3,
-						"image": "docker.io/test/codex:latest",
+						"image": "docker.io/test/amata:latest",
 						"command": "fix-with-ai"
 					}
 				}
 			}`,
 			wantRetries: 3,
-			wantImage:   "docker.io/test/codex:latest",
+			wantImage:   "docker.io/test/amata:latest",
 		},
 	}
 

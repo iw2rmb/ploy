@@ -152,8 +152,7 @@ type MigStep struct {
 	// Amata configures amata-mode execution for this mig step container.
 	// When non-nil, the container runs `amata run /in/amata.yaml` with optional
 	// --set flags; no prompt file is required in this mode.
-	// When nil, the container uses the direct codex exec path and requires a
-	// prompt delivered via Hydra in mount (/in/codex-prompt.txt) or --prompt-file.
+	// When nil, the container uses the image default command/entrypoint.
 	Amata *AmataRunSpec `json:"amata,omitempty" yaml:"amata,omitempty"`
 }
 
@@ -252,7 +251,7 @@ func (s MigSpec) Validate() error {
 }
 
 // validateAmataRunSpec validates an AmataRunSpec when present.
-// When amata is nil, direct codex exec path is assumed and no error is returned.
+// When amata is nil, image default command/entrypoint behavior is used.
 func validateAmataRunSpec(amata *AmataRunSpec, prefix string) error {
 	if amata == nil {
 		return nil
@@ -320,7 +319,6 @@ func validateBuildGatePhaseTarget(target string, prefix string) error {
 		return fmt.Errorf("%s: invalid value %q (expected one of: %s|%s|%s)", prefix, target, GateProfileTargetBuild, GateProfileTargetUnit, GateProfileTargetAllTests)
 	}
 }
-
 
 func validateStackGateSpec(spec *StackGateSpec, prefix string) error {
 	if spec == nil {
