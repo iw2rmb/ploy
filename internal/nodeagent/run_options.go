@@ -11,17 +11,15 @@ import (
 
 // RunOptions holds all typed configuration options for a run execution.
 type RunOptions struct {
-	BuildGate       BuildGateOptions
-	HealingSelector *contracts.HealingSpec
-	Healing         *HealingConfig
-	Router          *MigContainerSpec
-	MRWiring        MRWiringOptions
-	MRFlagsPresent  MRFlagsPresence
-	Execution       MigContainerSpec
-	Artifacts       ArtifactOptions
-	ServerMetadata  ServerMetadataOptions
-	Steps           []StepMig
-	StackGate       *contracts.StepGateStackSpec
+	BuildGate      BuildGateOptions
+	Healing        *HealingConfig
+	MRWiring       MRWiringOptions
+	MRFlagsPresent MRFlagsPresence
+	Execution      MigContainerSpec
+	Artifacts      ArtifactOptions
+	ServerMetadata ServerMetadataOptions
+	Steps          []StepMig
+	StackGate      *contracts.StepGateStackSpec
 
 	// BundleMap maps content hashes to spec bundle download identifiers.
 	// Populated from MigSpec.BundleMap during spec-to-run-options conversion.
@@ -42,8 +40,8 @@ type HealingConfig struct {
 	Mig     MigContainerSpec
 }
 
-func (o RunOptions) HasHealingSelector() bool {
-	return o.HealingSelector != nil && len(o.HealingSelector.ByErrorKind) > 0
+func (o RunOptions) HasHealing() bool {
+	return o.Healing != nil && !o.Healing.Mig.Image.IsEmpty()
 }
 
 // MigContainerSpec describes a container's image, command, and env.
@@ -111,41 +109,23 @@ func migsSpecToRunOptions(spec *contracts.MigSpec) RunOptions {
 		runOpts.BuildGate.Pre = spec.BuildGate.Pre
 		runOpts.BuildGate.Post = spec.BuildGate.Post
 
-		if spec.BuildGate.Healing != nil {
-			runOpts.HealingSelector = copyHealingSpec(spec.BuildGate.Healing)
-			selectedKind := strings.TrimSpace(spec.BuildGate.Healing.SelectedErrorKind)
-			if selectedKind != "" {
-				if action, ok := spec.BuildGate.Healing.ByErrorKind[selectedKind]; ok {
-					healing := &HealingConfig{Retries: action.Retries}
-					if healing.Retries <= 0 {
-						healing.Retries = 1
-					}
-					healing.Mig = MigContainerSpec{
-						Image:   action.Image,
-						Command: action.Command,
-						Env:     copyStringMap(action.Envs),
-						CA:      action.CA,
-						In:      action.In,
-						Out:     action.Out,
-						Home:    action.Home,
-						Amata:   action.Amata,
-					}
-					runOpts.Healing = healing
-				}
+		if spec.BuildGate.Heal != nil {
+			heal := spec.BuildGate.Heal
+			healing := &HealingConfig{Retries: heal.Retries}
+			if healing.Retries <= 0 {
+				healing.Retries = 1
 			}
-		}
-
-		if spec.BuildGate.Router != nil {
-			runOpts.Router = &MigContainerSpec{
-				Image:   spec.BuildGate.Router.Image,
-				Command: spec.BuildGate.Router.Command,
-				Env:     copyStringMap(spec.BuildGate.Router.Envs),
-				CA:      spec.BuildGate.Router.CA,
-				In:      spec.BuildGate.Router.In,
-				Out:     spec.BuildGate.Router.Out,
-				Home:    spec.BuildGate.Router.Home,
-				Amata:   spec.BuildGate.Router.Amata,
+			healing.Mig = MigContainerSpec{
+				Image:   heal.Image,
+				Command: heal.Command,
+				Env:     copyStringMap(heal.Envs),
+				CA:      heal.CA,
+				In:      heal.In,
+				Out:     heal.Out,
+				Home:    heal.Home,
+				Amata:   heal.Amata,
 			}
+			runOpts.Healing = healing
 		}
 	}
 
@@ -224,27 +204,3 @@ func copyStringMap(m map[string]string) map[string]string {
 	return out
 }
 
-func copyHealingSpec(in *contracts.HealingSpec) *contracts.HealingSpec {
-	if in == nil {
-		return nil
-	}
-	out := &contracts.HealingSpec{
-		SelectedErrorKind: in.SelectedErrorKind,
-	}
-	if len(in.ByErrorKind) > 0 {
-		out.ByErrorKind = make(map[string]contracts.HealingActionSpec, len(in.ByErrorKind))
-		for k, v := range in.ByErrorKind {
-			item := v
-			item.Envs = copyStringMap(v.Envs)
-			if v.Expectations != nil {
-				exp := *v.Expectations
-				if len(v.Expectations.Artifacts) > 0 {
-					exp.Artifacts = append([]contracts.RecoveryExpectedArtifact(nil), v.Expectations.Artifacts...)
-				}
-				item.Expectations = &exp
-			}
-			out.ByErrorKind[k] = item
-		}
-	}
-	return out
-}

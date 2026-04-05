@@ -60,51 +60,6 @@ func parseORWFailureMetadata(outDir string) (map[string]string, error) {
 	return meta, nil
 }
 
-// parseRouterDecision reads /out/codex-last.txt and extracts structured
-// classifier fields for recovery metadata. It always returns non-nil metadata
-// with deterministic fallback values for loop/error kinds.
-func parseRouterDecision(outDir string) *contracts.BuildGateRecoveryMetadata {
-	decision := &contracts.BuildGateRecoveryMetadata{
-		LoopKind:  contracts.DefaultRecoveryLoopKind().String(),
-		ErrorKind: contracts.DefaultRecoveryErrorKind().String(),
-	}
-	obj, ok := parseCodexLastJSONObject(outDir)
-	if !ok {
-		return decision
-	}
-
-	if val, ok := obj["error_kind"].(string); ok {
-		if kind, ok := contracts.ParseRecoveryErrorKind(val); ok {
-			decision.ErrorKind = kind.String()
-		}
-	}
-	if val, ok := obj["strategy_id"].(string); ok {
-		decision.StrategyID = truncateOneLine(val, 200)
-	}
-	if val, ok := obj["reason"].(string); ok {
-		decision.Reason = truncateOneLine(val, 200)
-	}
-	if val, ok := obj["confidence"].(float64); ok {
-		decision.Confidence = &val
-	}
-	if raw, ok := obj["expectations"]; ok {
-		switch raw.(type) {
-		case map[string]any, []any:
-			if b, err := json.Marshal(raw); err == nil {
-				decision.Expectations = b
-			}
-		}
-	}
-	if err := decision.Validate(); err != nil {
-		decision.ErrorKind = contracts.DefaultRecoveryErrorKind().String()
-		decision.StrategyID = ""
-		decision.Confidence = nil
-		decision.Reason = ""
-		decision.Expectations = nil
-	}
-	return decision
-}
-
 // parseCodexLastField reads codex-last.txt from outDir and extracts a named string
 // field from the JSON content. The file is expected to contain one or more lines;
 // each line is tried as a JSON object. The first line containing the requested field
@@ -144,28 +99,6 @@ func parseCodexLastField(outDir, field string) string {
 	}
 
 	return ""
-}
-
-func parseCodexLastJSONObject(outDir string) (map[string]any, bool) {
-	data, err := os.ReadFile(filepath.Join(outDir, "codex-last.txt"))
-	if err != nil {
-		return nil, false
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || line[0] != '{' {
-			continue
-		}
-		var obj map[string]any
-		if err := json.Unmarshal([]byte(line), &obj); err == nil {
-			return obj, true
-		}
-	}
-	var obj map[string]any
-	if err := json.Unmarshal(data, &obj); err == nil {
-		return obj, true
-	}
-	return nil, false
 }
 
 func truncateOneLine(s string, maxRunes int) string {

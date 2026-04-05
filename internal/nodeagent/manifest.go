@@ -315,62 +315,6 @@ func buildHealingManifest(req StartRunRequest, mig MigContainerSpec, index int, 
 	return manifest, nil
 }
 
-// buildRouterManifest constructs a StepManifest for the router container that
-// produces bug_summary before healing begins.
-func buildRouterManifest(req StartRunRequest, router MigContainerSpec, stack contracts.MigStack, gatePhase types.JobType, loopKind string) (contracts.StepManifest, error) {
-	if req.JobID.IsZero() {
-		return contracts.StepManifest{}, errors.New("job_id required")
-	}
-
-	image, err := resolveImage(router.Image, stack, "router")
-	if err != nil {
-		return contracts.StepManifest{}, err
-	}
-
-	var command []string
-	if router.Amata != nil && strings.TrimSpace(router.Amata.Spec) != "" {
-		command = resolveAmataCommand(router.Amata)
-	} else {
-		command = router.Command.ToSlice()
-	}
-
-	env := make(map[string]string, len(router.Env)+4)
-	for k, v := range router.Env {
-		env[k] = v
-	}
-	injectRepoMetadataEnv(env, req)
-	env["PLOY_GATE_PHASE"] = gatePhase.String()
-	env["PLOY_LOOP_KIND"] = loopKind
-
-	routerStepID := types.StepID(fmt.Sprintf("%s-router", req.JobID))
-
-	manifest := contracts.StepManifest{
-		ID:         routerStepID,
-		Name:       fmt.Sprintf("Router for run %s", req.RunID),
-		Image:      image,
-		Command:    command,
-		WorkingDir: "/workspace",
-		Envs:       env,
-		CA:         router.CA,
-		In:         router.In,
-		Out:        router.Out,
-		Home:       router.Home,
-		Gate:       &contracts.StepGateSpec{Enabled: false},
-		Inputs: []contracts.StepInput{
-			{
-				Name:      "workspace",
-				MountPath: "/workspace",
-				Mode:      contracts.StepInputModeReadOnly,
-			},
-		},
-		Options: map[string]any{
-			"mount_docker_socket": true,
-		},
-	}
-
-	return manifest, nil
-}
-
 // --- Stack Gate chaining ---
 
 // validateAndDeriveStackGateChaining validates and derives Stack Gate chaining for multi-step runs.

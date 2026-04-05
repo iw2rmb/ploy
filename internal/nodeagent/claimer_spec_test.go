@@ -7,24 +7,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// TestParseSpec_PassesThroughBuildGateHealing verifies that the node agent
-// extracts the build_gate.healing block into typed RunOptions so discrete healing
+// TestParseSpec_PassesThroughBuildGateHeal verifies that the node agent
+// extracts the build_gate.heal block into typed RunOptions so discrete healing
 // jobs can honor the configured heal → re-gate loop.
-func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
+func TestParseSpec_PassesThroughBuildGateHeal(t *testing.T) {
 	specJSON := `{
 	        "steps": [{"image": "docker.io/test/mig:latest"}],
 	        "build_gate": {
-	            "healing": {
-	                "selected_error_kind": "infra",
-	                "by_error_kind": {
-	                    "infra": {
-	                        "retries": 2,
-	                        "image": "docker.io/test/heal:latest"
-	                    }
-	                }
-	            },
-	            "router": {
-	                "image": "docker.io/test/router:latest"
+	            "heal": {
+	                "retries": 2,
+	                "image": "docker.io/test/heal:latest"
 	            }
 	        }
 	    }`
@@ -146,17 +138,9 @@ func TestParseSpec_PreservesStepsArray(t *testing.T) {
 		],
 		"build_gate": {
 			"enabled": true,
-			"healing": {
-				"selected_error_kind": "infra",
-				"by_error_kind": {
-					"infra": {
-						"retries": 1,
-						"image": "docker.io/test/healer:latest"
-					}
-				}
-			},
-			"router": {
-				"image": "docker.io/test/router:latest"
+			"heal": {
+				"retries": 1,
+				"image": "docker.io/test/healer:latest"
 			}
 		}
 	}`
@@ -243,18 +227,10 @@ func TestParseSpec_HealingSingleMig(t *testing.T) {
 			specJSON: `{
 				"steps": [{"image": "docker.io/test/mig:latest"}],
 				"build_gate": {
-					"healing": {
-						"selected_error_kind": "infra",
-						"by_error_kind": {
-							"infra": {
-								"retries": 3,
-								"image": "docker.io/test/codex:latest",
-								"command": "fix-with-ai"
-							}
-						}
-					},
-					"router": {
-						"image": "docker.io/test/router:latest"
+					"heal": {
+						"retries": 3,
+						"image": "docker.io/test/codex:latest",
+						"command": "fix-with-ai"
 					}
 				}
 			}`,
@@ -292,22 +268,14 @@ func TestParseHealingMig_MigFields(t *testing.T) {
 	specJSON := `{
 		"steps": [{"image": "docker.io/test/mig:latest"}],
 		"build_gate": {
-			"healing": {
-				"selected_error_kind": "infra",
-				"by_error_kind": {
-					"infra": {
-						"retries": 1,
-						"image": "docker.io/test/healer:v1",
-						"command": "heal.sh --fix",
-						"envs": {
-							"MODE": "aggressive",
-							"DEBUG": "true"
-						}
-					}
+			"heal": {
+				"retries": 1,
+				"image": "docker.io/test/healer:v1",
+				"command": "heal.sh --fix",
+				"envs": {
+					"MODE": "aggressive",
+					"DEBUG": "true"
 				}
-			},
-			"router": {
-				"image": "docker.io/test/router:latest"
 			}
 		}
 	}`
@@ -338,7 +306,6 @@ func TestParseHealingMig_MigFields(t *testing.T) {
 	if mig.Env["DEBUG"] != "true" {
 		t.Errorf("Mig env DEBUG: got %q, want %q", mig.Env["DEBUG"], "true")
 	}
-
 }
 
 // TestParseSpec_ProducesTypedOptions_SingleStepExecArray is a regression test

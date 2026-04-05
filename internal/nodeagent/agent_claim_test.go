@@ -225,7 +225,6 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				withCommitSHA("deadbeef"),
 				withRecoveryContext(&contracts.RecoveryClaimContext{
 					LoopKind:             "healing",
-					SelectedErrorKind:    "infra",
 					DetectedStack:        contracts.MigStackJavaMaven,
 					ResolvedHealingImage: "docker.io/acme/heal:latest",
 					BuildGateLog:         "[ERROR] build failed\n",
@@ -254,8 +253,8 @@ func TestClaimLoop_FieldMapping(t *testing.T) {
 				if got.RecoveryContext == nil {
 					t.Fatalf("RecoveryContext=nil, want non-nil")
 				}
-				if got.RecoveryContext.SelectedErrorKind != "infra" {
-					t.Errorf("RecoveryContext.SelectedErrorKind=%q, want infra", got.RecoveryContext.SelectedErrorKind)
+				if got.RecoveryContext.LoopKind != "healing" {
+					t.Errorf("RecoveryContext.LoopKind=%q, want healing", got.RecoveryContext.LoopKind)
 				}
 			},
 		},

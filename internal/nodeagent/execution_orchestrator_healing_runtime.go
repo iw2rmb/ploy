@@ -22,11 +22,11 @@ const (
 	workspaceChangePolicyForbid  workspaceChangePolicy = "forbid_changes"
 )
 
-func resolveHealingWorkspacePolicy(healingSpec *contracts.HealingSpec) workspaceChangePolicy {
-	if healingSpec == nil {
+func resolveHealingWorkspacePolicy(recoveryCtx *contracts.RecoveryClaimContext) workspaceChangePolicy {
+	if recoveryCtx == nil {
 		return workspaceChangePolicyRequire
 	}
-	if kind, ok := contracts.ParseRecoveryErrorKind(healingSpec.SelectedErrorKind); ok && contracts.IsInfraRecoveryErrorKind(kind) {
+	if strings.TrimSpace(recoveryCtx.GateProfileSchemaJSON) != "" {
 		return workspaceChangePolicyForbid
 	}
 	return workspaceChangePolicyRequire
@@ -69,7 +69,6 @@ func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context,
 func (r *runController) populateHealingInDir(
 	runID types.RunID,
 	inDir string,
-	healingSpec *contracts.HealingSpec,
 	recoveryCtx *contracts.RecoveryClaimContext,
 	schemaJSON string,
 ) error {
@@ -109,8 +108,8 @@ func (r *runController) populateHealingInDir(
 		slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
 	}
 
-	kind, ok := resolveRecoveryKindForHealingHydration(healingSpec, recoveryCtx)
-	if ok && kind == contracts.RecoveryErrorKindDeps && recoveryCtx != nil {
+	// Hydrate deps healing inputs when recovery context carries deps state.
+	if recoveryCtx != nil {
 		if recoveryCtx.DepsBumps != nil {
 			depsBumpsRaw, err := json.Marshal(recoveryCtx.DepsBumps)
 			if err != nil {
@@ -131,16 +130,13 @@ func (r *runController) populateHealingInDir(
 		}
 	}
 
-	if !ok || !contracts.IsInfraRecoveryErrorKind(kind) {
-		return nil
-	}
-
+	// Hydrate infra healing inputs when schema JSON is available.
 	effectiveSchema := schemaJSON
 	if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.GateProfileSchemaJSON) != "" {
 		effectiveSchema = recoveryCtx.GateProfileSchemaJSON
 	}
 	if strings.TrimSpace(effectiveSchema) == "" {
-		return fmt.Errorf("infra healing requires %s env", contracts.GateProfileSchemaJSONEnv)
+		return nil
 	}
 	schemaRaw := []byte(effectiveSchema)
 	if !json.Valid(schemaRaw) {
@@ -179,21 +175,4 @@ func (r *runController) populateHealingInDir(
 	slog.Info("hydrated /in/gate_profile.json for healing job", "run_id", runID, "path", inProfilePath)
 
 	return nil
-}
-
-func resolveRecoveryKindForHealingHydration(
-	healingSpec *contracts.HealingSpec,
-	recoveryCtx *contracts.RecoveryClaimContext,
-) (contracts.RecoveryErrorKind, bool) {
-	if healingSpec != nil {
-		if kind, ok := contracts.ParseRecoveryErrorKind(healingSpec.SelectedErrorKind); ok {
-			return kind, true
-		}
-	}
-	if recoveryCtx != nil {
-		if kind, ok := contracts.ParseRecoveryErrorKind(recoveryCtx.SelectedErrorKind); ok {
-			return kind, true
-		}
-	}
-	return "", false
 }
