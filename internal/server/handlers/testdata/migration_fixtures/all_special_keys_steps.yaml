@@ -32,7 +32,7 @@ expect:
       target: steps
       action: rewrite
       target_field: home
-      destination: ".claude-code-router/config.json"
+      destination: ".claude-code/config.json"
       sections: [heal, mig]
     - env_key: CODEX_AUTH_JSON
       target: steps
