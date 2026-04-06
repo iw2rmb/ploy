@@ -36,6 +36,9 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	}
 
 	out := buf.String()
+	if !strings.HasPrefix(out, "\n   Mig:   ") {
+		t.Fatalf("expected leading blank line before Mig header, got %q", out)
+	}
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")

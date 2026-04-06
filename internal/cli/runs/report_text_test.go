@@ -97,6 +97,9 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	}
 
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL})
+	if !strings.HasPrefix(out, "\n   Mig:   ") {
+		t.Fatalf("expected leading blank line before Mig header, got %q", out)
+	}
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
@@ -573,9 +576,15 @@ func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 	}
 
 	out := renderText(t, report, TextRenderOptions{})
+	if !strings.HasPrefix(out, "\n   Mig:   ") {
+		t.Fatalf("expected leading blank line before Mig header, got %q", out)
+	}
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"\n")
-	firstLine := strings.SplitN(out, "\n", 2)[0]
-	assertx.NotContains(t, firstLine, "|")
+	lines := strings.Split(out, "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 lines, got %q", out)
+	}
+	assertx.NotContains(t, lines[1], "|")
 }
 
 func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {

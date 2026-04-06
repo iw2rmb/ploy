@@ -69,6 +69,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	}
 
 	headerLines := []string{
+		"",
 		fmt.Sprintf("   Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
 		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
 		fmt.Sprintf("   Repos: %d", len(report.Repos)),
