@@ -10,9 +10,14 @@ import (
 )
 
 var ansiCSIRe = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
+var ansiOSC8Re = regexp.MustCompile(`\x1b]8;;[^\x1b]*\x1b\\`)
 
 func stripCSI(s string) string {
 	return ansiCSIRe.ReplaceAllString(s, "")
+}
+
+func stripOSC8(s string) string {
+	return ansiOSC8Re.ReplaceAllString(s, "")
 }
 
 func TestRenderFollowFrameText_RendersRowsAndExitOneLiner(t *testing.T) {
@@ -217,4 +222,40 @@ func TestRenderFollowFrameText_RendersEmptyLineForRepoWithoutRows(t *testing.T) 
 	out, _ := RenderFollowFrameText(frame)
 	assertx.Contains(t, out, "Repo:  [1/1] example.com/acme/repo main -> feature")
 	assertx.Contains(t, out, "Jobs: none")
+}
+
+func TestRenderFollowFrameText_OSC8LinkDoesNotInflateSiblingColumnPadding(t *testing.T) {
+	t.Parallel()
+
+	longURL := "https://example.test/v1/runs/run-1/repos/repo-1/diffs?download=true&diff_id=" + strings.Repeat("x", 300)
+	patchLink := "\x1b]8;;" + longURL + "\x1b\\Patch\x1b]8;;\x1b\\"
+	frame := FollowFrame{
+		Repos: []FollowRepoFrame{
+			{
+				Columns: []string{"", "Step", "Artifact", "Node"},
+				Rows: []FollowStepRow{
+					{Cells: []string{"✓", "mig", patchLink, "local1"}},
+					{Cells: []string{"✓", "post_gate", "-", "local1"}},
+				},
+			},
+		},
+	}
+
+	out, _ := RenderFollowFrameText(frame)
+	plain := stripOSC8(stripCSI(out))
+	lines := strings.Split(strings.TrimSuffix(plain, "\n"), "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected header + 2 rows, got %q", plain)
+	}
+
+	secondRow := lines[len(lines)-1]
+	idxDash := strings.Index(secondRow, "-")
+	idxNode := strings.Index(secondRow, "local1")
+	if idxDash == -1 || idxNode == -1 || idxNode <= idxDash {
+		t.Fatalf("failed to locate artifact/node cells in row %q", secondRow)
+	}
+	gap := idxNode - idxDash - 1
+	if gap > 20 {
+		t.Fatalf("expected bounded padding between '-' artifact and node, got gap=%d in row %q", gap, secondRow)
+	}
 }

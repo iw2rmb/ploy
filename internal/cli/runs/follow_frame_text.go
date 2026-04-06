@@ -2,9 +2,7 @@ package runs
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
-	"text/tabwriter"
 	"unicode/utf8"
 )
 
@@ -134,13 +132,6 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 }
 
 func renderFollowRepoTableLines(repo FollowRepoFrame) []string {
-	var buf bytes.Buffer
-	tw := tabwriter.NewWriter(&buf, 0, 8, 2, ' ', tabwriter.StripEscape)
-
-	if len(repo.Columns) > 0 {
-		_, _ = fmt.Fprintln(tw, renderFollowColumns(repo.Columns))
-	}
-
 	columnCount := len(repo.Columns)
 	for _, row := range repo.Rows {
 		if len(row.Cells) > columnCount {
@@ -152,42 +143,46 @@ func renderFollowRepoTableLines(repo FollowRepoFrame) []string {
 	}
 
 	durationColumn := followDurationColumnIndex(repo.Columns)
-	durationWidth := 0
-	if durationColumn >= 0 {
-		durationWidth = utf8.RuneCountInString(strings.TrimSpace(repo.Columns[durationColumn]))
-		for _, row := range repo.Rows {
-			cells := normalizeFollowCells(row.Cells, columnCount)
-			if durationColumn >= len(cells) {
+	tableRows := make([][]string, 0, len(repo.Rows)+1)
+	if len(repo.Columns) > 0 {
+		tableRows = append(tableRows, renderFollowColumns(repo.Columns, columnCount))
+	}
+	for _, row := range repo.Rows {
+		tableRows = append(tableRows, normalizeFollowCells(row.Cells, columnCount))
+	}
+
+	widths := make([]int, columnCount)
+	for _, row := range tableRows {
+		for col, cell := range row {
+			cellWidth := visibleRuneWidth(cell)
+			if cellWidth > widths[col] {
+				widths[col] = cellWidth
+			}
+		}
+	}
+
+	out := make([]string, 0, len(tableRows))
+	for _, row := range tableRows {
+		renderedCells := make([]string, columnCount)
+		for col, cell := range row {
+			trimmed := strings.TrimSpace(cell)
+			current := cell
+			if durationColumn == col && trimmed != "" {
+				current = trimmed
+			}
+			padding := widths[col] - visibleRuneWidth(current)
+			if padding < 0 {
+				padding = 0
+			}
+			if durationColumn == col && trimmed != "" {
+				renderedCells[col] = strings.Repeat(" ", padding) + current
 				continue
 			}
-			width := utf8.RuneCountInString(strings.TrimSpace(cells[durationColumn]))
-			if width > durationWidth {
-				durationWidth = width
-			}
+			renderedCells[col] = current + strings.Repeat(" ", padding)
 		}
+		out = append(out, strings.TrimRight(strings.Join(renderedCells, "  "), " "))
 	}
-
-	for _, row := range repo.Rows {
-		cells := normalizeFollowCells(row.Cells, columnCount)
-		for i := range cells {
-			cells[i] = shieldTerminalEscapesForTabwriter(cells[i])
-		}
-		if durationColumn >= 0 && durationColumn < len(cells) {
-			duration := strings.TrimSpace(cells[durationColumn])
-			if duration != "" {
-				padding := durationWidth - utf8.RuneCountInString(duration)
-				if padding > 0 {
-					cells[durationColumn] = strings.Repeat(" ", padding) + duration
-				} else {
-					cells[durationColumn] = duration
-				}
-			}
-		}
-		_, _ = fmt.Fprintln(tw, strings.Join(cells, "\t"))
-	}
-
-	_ = tw.Flush()
-	return splitRenderedLines(buf.String())
+	return out
 }
 
 func normalizeFollowCells(cells []string, width int) []string {
@@ -230,33 +225,6 @@ func joinRenderedLineRange(lines []string, start int, count int) string {
 	return strings.Join(lines[start:end], "\n") + "\n"
 }
 
-func shieldTerminalEscapesForTabwriter(value string) string {
-	if !strings.Contains(value, "\x1b") {
-		return value
-	}
-	escape := string([]byte{tabwriter.Escape})
-	var out strings.Builder
-	for i := 0; i < len(value); {
-		if value[i] != 0x1b {
-			out.WriteByte(value[i])
-			i++
-			continue
-		}
-		start := i
-		end := terminalEscapeSeqEnd(value, i)
-		if end <= start {
-			out.WriteByte(value[i])
-			i++
-			continue
-		}
-		out.WriteString(escape)
-		out.WriteString(value[start:end])
-		out.WriteString(escape)
-		i = end
-	}
-	return out.String()
-}
-
 func terminalEscapeSeqEnd(value string, escPos int) int {
 	if escPos+1 >= len(value) {
 		return 0
@@ -289,13 +257,39 @@ func terminalEscapeSeqEnd(value string, escPos int) int {
 	}
 }
 
-func renderFollowColumns(columns []string) string {
+func renderFollowColumns(columns []string, width int) []string {
+	headerCells := normalizeFollowCells(columns, width)
 	if len(columns) > 1 && strings.TrimSpace(columns[0]) == "" {
-		headerCells := make([]string, len(columns))
-		copy(headerCells, columns)
 		// Keep an explicit first status column so table headers align with data rows.
-		headerCells[0] = shieldTerminalEscapesForTabwriter(neutralGlyphStyle.Render(" "))
-		return strings.Join(headerCells, "\t")
+		headerCells[0] = neutralGlyphStyle.Render(" ")
 	}
-	return strings.Join(columns, "\t")
+	return headerCells
+}
+
+func visibleRuneWidth(value string) int {
+	if value == "" {
+		return 0
+	}
+	return utf8.RuneCountInString(stripTerminalControlSequences(value))
+}
+
+func stripTerminalControlSequences(value string) string {
+	if !strings.Contains(value, "\x1b") {
+		return value
+	}
+	var out strings.Builder
+	for i := 0; i < len(value); {
+		if value[i] != 0x1b {
+			out.WriteByte(value[i])
+			i++
+			continue
+		}
+		end := terminalEscapeSeqEnd(value, i)
+		if end <= i {
+			i++
+			continue
+		}
+		i = end
+	}
+	return out.String()
 }
