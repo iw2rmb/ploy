@@ -680,6 +680,13 @@ binary and should only be overridden for controlled debugging. Recipes are
 resolved dynamically from `RECIPE_GROUP/RECIPE_ARTIFACT/RECIPE_VERSION`; no
 per-recipe image rebuild is required.
 
+ORW jobs also support node-local persistent runtime dependency cache under
+`$PLOY_ORW_CACHE_ROOT/maven/<image>`, mounted into the container at `/root/.m2`.
+When `PLOY_ORW_CACHE_ROOT` is unset, default root is `/var/cache/ploy/orw` and,
+when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/orw`.
+The same oldest-first free-space pruning policy is applied in the active ORW
+cache directory before mounting.
+
 ### Security Considerations
 
 - **Secrets flag**: Variables marked with `--secret=true` (the default) are redacted in
@@ -717,6 +724,8 @@ The Build Gate executor supports optional resource limits via environment variab
 - `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU limit in millicores (e.g., `500` = 0.5 CPU, `1500` = 1.5 CPU).
 - `PLOY_BUILDGATE_CACHE_ROOT` — Host path root for persistent Build Gate tool caches.
   Default is `/var/cache/ploy/gates`; when unset and not writable, fallback is `${TMPDIR:-/tmp}/ploy/gates`.
+- `PLOY_ORW_CACHE_ROOT` — Host path root for persistent ORW runtime recipe/dependency cache.
+  Default is `/var/cache/ploy/orw`; when unset and not writable, fallback is `${TMPDIR:-/tmp}/ploy/orw`.
 
 Notes:
 - Memory and disk limits accept human‑friendly suffixes; CPU uses numeric millicores only.

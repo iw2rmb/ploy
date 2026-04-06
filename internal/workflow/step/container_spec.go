@@ -90,6 +90,13 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: false})
 	}
+	// ORW images may resolve recipe artifacts at runtime through Maven Resolver.
+	// Mount a persistent host cache to /root/.m2 when an ORW image is detected.
+	orwCacheMounts, err := buildORWToolCacheMounts(manifest.Image)
+	if err != nil {
+		return ContainerSpec{}, fmt.Errorf("prepare orw tool cache mounts: %w", err)
+	}
+	mounts = appendMountsIfTargetMissing(mounts, orwCacheMounts)
 
 	// Mount Hydra materialized resources from the staging directory.
 	// Each entry references a shortHash; staged content lives at stagingDir/<shortHash>.
@@ -211,6 +218,24 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 		LimitDiskBytes:   diskBytes,
 		StorageSizeOpt:   storageSizeOpt,
 	}, nil
+}
+
+func appendMountsIfTargetMissing(existing []ContainerMount, additional []ContainerMount) []ContainerMount {
+	if len(additional) == 0 {
+		return existing
+	}
+	seen := make(map[string]struct{}, len(existing))
+	for _, mount := range existing {
+		seen[mount.Target] = struct{}{}
+	}
+	for _, mount := range additional {
+		if _, ok := seen[mount.Target]; ok {
+			continue
+		}
+		existing = append(existing, mount)
+		seen[mount.Target] = struct{}{}
+	}
+	return existing
 }
 
 // SeedOutDirFromStaging copies materialized Hydra out entry content from the
