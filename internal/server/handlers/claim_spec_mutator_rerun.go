@@ -35,6 +35,9 @@ func applyRerunAlterMutator(m map[string]any, in claimSpecMutatorInput) error {
 	if len(alter.In) > 0 {
 		mergeRecordsByDstOverrideBlock(block, "in", alter.In)
 	}
+	if len(alter.BundleMap) > 0 {
+		mergeBundleMapOverrideSpec(m, alter.BundleMap)
+	}
 	return nil
 }
 
@@ -134,5 +137,32 @@ func mergeRecordsByDstOverrideBlock(block map[string]any, field string, overlay 
 
 	if len(merged) > 0 {
 		block[field] = merged
+	}
+}
+
+func mergeBundleMapOverrideSpec(spec map[string]any, overlay map[string]string) {
+	if len(overlay) == 0 {
+		return
+	}
+	existing := make(map[string]string)
+	switch raw := spec["bundle_map"].(type) {
+	case map[string]string:
+		for k, v := range raw {
+			existing[k] = v
+		}
+	case map[string]any:
+		for k, v := range raw {
+			if s, ok := v.(string); ok {
+				existing[k] = s
+			}
+		}
+	}
+	for hash, bundleID := range overlay {
+		if _, has := existing[hash]; !has {
+			existing[hash] = bundleID
+		}
+	}
+	if len(existing) > 0 {
+		spec["bundle_map"] = existing
 	}
 }

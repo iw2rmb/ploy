@@ -24,9 +24,10 @@ const (
 )
 
 type rerunAlter struct {
-	Image string
-	Envs  map[string]string
-	In    []string
+	Image     string
+	Envs      map[string]string
+	In        []string
+	BundleMap map[string]string
 }
 
 type rerunResponse struct {
@@ -218,7 +219,7 @@ func normalizeRerunAlter(raw map[string]any) (rerunAlter, error) {
 	if raw == nil {
 		return rerunAlter{}, fmt.Errorf("alter is required")
 	}
-	alter := rerunAlter{Envs: map[string]string{}}
+	alter := rerunAlter{Envs: map[string]string{}, BundleMap: map[string]string{}}
 
 	for key, value := range raw {
 		switch key {
@@ -240,6 +241,12 @@ func normalizeRerunAlter(raw map[string]any) (rerunAlter, error) {
 				return rerunAlter{}, err
 			}
 			alter.In = inEntries
+		case "bundle_map":
+			bundleMap, err := normalizeRerunAlterBundleMap(value)
+			if err != nil {
+				return rerunAlter{}, err
+			}
+			alter.BundleMap = bundleMap
 		default:
 			return rerunAlter{}, fmt.Errorf("unsupported key %q", key)
 		}
@@ -249,6 +256,45 @@ func normalizeRerunAlter(raw map[string]any) (rerunAlter, error) {
 		return rerunAlter{}, fmt.Errorf("at least one of image/envs/in must be provided")
 	}
 	return alter, nil
+}
+
+func normalizeRerunAlterBundleMap(value any) (map[string]string, error) {
+	raw, ok := value.(map[string]any)
+	if !ok {
+		if m, ok := value.(map[string]string); ok {
+			copyMap := make(map[string]string, len(m))
+			for k, v := range m {
+				key := strings.TrimSpace(k)
+				if key == "" {
+					return nil, fmt.Errorf("bundle_map key cannot be empty")
+				}
+				val := strings.TrimSpace(v)
+				if val == "" {
+					return nil, fmt.Errorf("bundle_map[%q] cannot be empty", key)
+				}
+				copyMap[key] = val
+			}
+			return copyMap, nil
+		}
+		return nil, fmt.Errorf("bundle_map must be an object")
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		key := strings.TrimSpace(k)
+		if key == "" {
+			return nil, fmt.Errorf("bundle_map key cannot be empty")
+		}
+		val, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("bundle_map[%q] must be a string", key)
+		}
+		val = strings.TrimSpace(val)
+		if val == "" {
+			return nil, fmt.Errorf("bundle_map[%q] cannot be empty", key)
+		}
+		out[key] = val
+	}
+	return out, nil
 }
 
 func normalizeRerunAlterEnvs(value any) (map[string]string, error) {
@@ -339,6 +385,18 @@ func buildRerunMeta(sourceMeta []byte, sourceJobID domaintypes.JobID, alter reru
 			entries = append(entries, entry)
 		}
 		alterMap["in"] = entries
+	}
+	if len(alter.BundleMap) > 0 {
+		keys := make([]string, 0, len(alter.BundleMap))
+		for k := range alter.BundleMap {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		bundleMap := make(map[string]any, len(keys))
+		for _, k := range keys {
+			bundleMap[k] = alter.BundleMap[k]
+		}
+		alterMap["bundle_map"] = bundleMap
 	}
 
 	alterRaw, err := json.Marshal(alterMap)

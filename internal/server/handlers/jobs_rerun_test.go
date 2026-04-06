@@ -48,9 +48,10 @@ func TestRerunJobHandler_HealCreatesNewAttemptAndTail(t *testing.T) {
 	h := rerunJobHandler(st)
 	rr := doRequest(t, h, http.MethodPost, "/v1/jobs/"+sourceID.String()+"/rerun", map[string]any{
 		"alter": map[string]any{
-			"image": "docker.io/test/heal:debug",
-			"envs":  map[string]any{"DEBUG": "1"},
-			"in":    []any{"abc1234:/in/build-log.txt"},
+			"image":      "docker.io/test/heal:debug",
+			"envs":       map[string]any{"DEBUG": "1"},
+			"in":         []any{"abc1234:/in/build-log.txt"},
+			"bundle_map": map[string]any{"abc1234": "bundle_1"},
 		},
 	}, "job_id", sourceID.String())
 
@@ -90,6 +91,17 @@ func TestRerunJobHandler_HealCreatesNewAttemptAndTail(t *testing.T) {
 	}
 	if got := rerunMeta["source_job_id"]; got != sourceID.String() {
 		t.Fatalf("source_job_id=%v want %s", got, sourceID)
+	}
+	alterMeta, _ := rerunMeta[rerunMetaAlterKey].(map[string]any)
+	if alterMeta == nil {
+		t.Fatalf("expected %s.%s metadata object", rerunMetaKey, rerunMetaAlterKey)
+	}
+	bundleMap, _ := alterMeta["bundle_map"].(map[string]any)
+	if bundleMap == nil {
+		t.Fatalf("expected alter.bundle_map metadata")
+	}
+	if got := bundleMap["abc1234"]; got != "bundle_1" {
+		t.Fatalf("bundle_map[abc1234]=%v want bundle_1", got)
 	}
 }
 
@@ -163,6 +175,19 @@ func TestNormalizeRerunAlter_RejectsEmpty(t *testing.T) {
 	_, err := normalizeRerunAlter(map[string]any{})
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestNormalizeRerunAlter_RejectsInvalidBundleMap(t *testing.T) {
+	_, err := normalizeRerunAlter(map[string]any{
+		"image":      "docker.io/test/heal:debug",
+		"bundle_map": "not-an-object",
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if got := err.Error(); got != "bundle_map must be an object" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
