@@ -35,18 +35,23 @@ func TestPopulateHealingInDir(t *testing.T) {
 
 	cases := []testCase{
 		{
-			name:      "CopiesGateLog",
-			seedFiles: map[string]string{"build-gate-first.log": "trimmed failure log\n"},
+			name: "CopiesGateLog",
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog: "trimmed failure log\n",
+			},
 			wantFiles: map[string]string{"build-gate.log": "trimmed failure log\n"},
 		},
 		{
 			name: "CopiesGateProfileForInfra",
 			seedFiles: map[string]string{
-				"build-gate-first.log":    "failure\n",
 				"build-gate-profile.json": profile,
+			},
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog: "failure\n",
 			},
 			schemaJSON: "auto",
 			wantFiles: map[string]string{
+				"build-gate.log":          "failure\n",
 				"gate_profile.json":        profile,
 				"gate_profile.schema.json": "",
 			},
@@ -54,30 +59,36 @@ func TestPopulateHealingInDir(t *testing.T) {
 		{
 			name: "SkipsGateProfileForNonInfra",
 			seedFiles: map[string]string{
-				"build-gate-first.log":    "failure\n",
 				"build-gate-profile.json": `{"schema_version":1}`,
 			},
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog: "failure\n",
+			},
+			wantFiles:  map[string]string{"build-gate.log": "failure\n"},
 			wantAbsent: []string{"gate_profile.json", "gate_profile.schema.json"},
 		},
 		{
 			name:       "InfraMissingGateProfileIsAllowed",
-			seedFiles:  map[string]string{"build-gate-first.log": "failure\n"},
+			recovery:   &contracts.RecoveryClaimContext{BuildGateLog: "failure\n"},
 			schemaJSON: "auto",
-			wantFiles:  map[string]string{"gate_profile.schema.json": ""},
+			wantFiles: map[string]string{
+				"build-gate.log":          "failure\n",
+				"gate_profile.schema.json": "",
+			},
 		},
 		{
-			name:       "InfraMissingGateLogStillHydratesSchema",
+			name:       "InfraMissingGateLogReturnsError",
 			seedFiles:  map[string]string{}, // runDir exists but no files
 			schemaJSON: "auto",
-			wantFiles:  map[string]string{"gate_profile.schema.json": ""},
-			wantAbsent: []string{"build-gate.log"},
+			wantErr:    true,
 		},
 		{
-			name:       "InfraEmptyGateLogStillHydratesSchema",
-			seedFiles:  map[string]string{"build-gate-first.log": "  \n"},
+			name: "InfraEmptyGateLogReturnsError",
+			recovery: &contracts.RecoveryClaimContext{
+				BuildGateLog: "  \n",
+			},
 			schemaJSON: "auto",
-			wantFiles:  map[string]string{"gate_profile.schema.json": ""},
-			wantAbsent: []string{"build-gate.log"},
+			wantErr:    true,
 		},
 		{
 			name: "UsesClaimRecoveryContextLog",
@@ -104,6 +115,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 			recovery: func() *contracts.RecoveryClaimContext {
 				ver := "2.0.13"
 				return &contracts.RecoveryClaimContext{
+					BuildGateLog:       "deps failure\n",
 					DepsCompatEndpoint: "/v1/sboms/compat?lang=java&release=17&tool=maven&libs=",
 					DepsBumps: map[string]*string{
 						"org.slf4j:slf4j-api": &ver,
@@ -111,6 +123,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 					},
 				}
 			}(),
+			wantFiles: map[string]string{"build-gate.log": "deps failure\n"},
 			customAssert: func(t *testing.T, inDir string) {
 				t.Helper()
 				gotCompat, err := os.ReadFile(filepath.Join(inDir, "deps-compat-url.txt"))
