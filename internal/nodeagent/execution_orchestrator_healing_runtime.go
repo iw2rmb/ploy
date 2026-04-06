@@ -63,9 +63,9 @@ func (r *runController) uploadHealingWorkspacePolicyFailure(ctx context.Context,
 }
 
 // populateHealingInDir copies recovery context into the healing job /in directory.
-// It attempts to hydrate build-gate.log when available and, for infra healing,
-// writes gate_profile.schema.json from server-injected schema env and
-// hydrates gate_profile.json when a run-local snapshot is available.
+// It requires recovery_context.build_gate_log and, for infra healing, writes
+// gate_profile.schema.json from server-injected schema env and hydrates
+// gate_profile.json when a run-local snapshot is available.
 func (r *runController) populateHealingInDir(
 	runID types.RunID,
 	inDir string,
@@ -77,36 +77,14 @@ func (r *runController) populateHealingInDir(
 	}
 
 	cacheDir := runCacheDir(runID)
-	srcPath := filepath.Join(cacheDir, "build-gate-first.log")
-
-	gateLogAvailable := false
-	var data []byte
-	if recoveryCtx != nil && strings.TrimSpace(recoveryCtx.BuildGateLog) != "" {
-		data = []byte(recoveryCtx.BuildGateLog)
-		gateLogAvailable = true
-	} else {
-		var err error
-		data, err = os.ReadFile(srcPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				slog.Warn("missing run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
-			} else {
-				return fmt.Errorf("read first gate log: %w", err)
-			}
-		} else if len(strings.TrimSpace(string(data))) == 0 {
-			slog.Warn("empty run-local build-gate log snapshot for healing job", "run_id", runID, "path", srcPath)
-		} else {
-			gateLogAvailable = true
-		}
+	if recoveryCtx == nil || strings.TrimSpace(recoveryCtx.BuildGateLog) == "" {
+		return fmt.Errorf("missing recovery_context.build_gate_log for healing job")
 	}
-
-	if gateLogAvailable {
-		destPath := filepath.Join(inDir, "build-gate.log")
-		if err := os.WriteFile(destPath, data, 0o644); err != nil {
-			return fmt.Errorf("write /in/build-gate.log: %w", err)
-		}
-		slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
+	destPath := filepath.Join(inDir, "build-gate.log")
+	if err := os.WriteFile(destPath, []byte(recoveryCtx.BuildGateLog), 0o644); err != nil {
+		return fmt.Errorf("write /in/build-gate.log: %w", err)
 	}
+	slog.Info("hydrated /in/build-gate.log for healing job", "run_id", runID, "path", destPath)
 
 	// Hydrate deps healing inputs when recovery context carries deps state.
 	if recoveryCtx != nil {
