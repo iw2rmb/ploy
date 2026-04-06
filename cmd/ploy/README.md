@@ -238,6 +238,9 @@ ploy run patch <run-id> --output latest.patch.gz
 # Download a specific diff patch artifact.
 ploy run patch <run-id> --repo-id <repo-id> --diff-id <diff-id> --output step1.patch.gz
 
+# Select repo by URL for multi-repo runs.
+ploy run patch <run-id> --repo-url https://github.com/org/repo-a.git --output repo-a.patch.gz
+
 # Preview what would be pulled without making changes.
 ploy run pull --dry-run <run-id>
 
