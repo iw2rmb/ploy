@@ -103,15 +103,18 @@ func (c GetRunReportCommand) buildRepoEntry(
 	}
 
 	*out = RunEntry{
-		RepoID:    repo.RepoID,
-		RepoURL:   repo.RepoURL,
-		BaseRef:   repo.BaseRef,
-		TargetRef: repo.TargetRef,
-		Attempt:   repo.Attempt,
-		Status:    repo.Status,
-		LastError: repo.LastError,
-		PatchURL:  repoPatchURL,
-		Jobs:      make([]RunJobEntry, 0, len(jobsResult.Jobs)),
+		RepoID:          repo.RepoID,
+		RepoURL:         repo.RepoURL,
+		BaseRef:         repo.BaseRef,
+		TargetRef:       repo.TargetRef,
+		SourceCommitSHA: repo.SourceCommitSHA,
+		MROnSuccess:     repo.MROnSuccess,
+		MROnFail:        repo.MROnFail,
+		Attempt:         repo.Attempt,
+		Status:          repo.Status,
+		LastError:       repo.LastError,
+		PatchURL:        repoPatchURL,
+		Jobs:            make([]RunJobEntry, 0, len(jobsResult.Jobs)),
 	}
 
 	for _, job := range jobsResult.Jobs {
@@ -139,17 +142,20 @@ func (c GetRunReportCommand) buildRepoEntry(
 }
 
 type runRepoReportSource struct {
-	RunID      domaintypes.RunID         `json:"run_id"`
-	RepoID     domaintypes.MigRepoID     `json:"repo_id"`
-	RepoURL    string                    `json:"repo_url"`
-	BaseRef    string                    `json:"base_ref"`
-	TargetRef  string                    `json:"target_ref"`
-	Status     domaintypes.RunRepoStatus `json:"status"`
-	Attempt    int32                     `json:"attempt"`
-	LastError  *string                   `json:"last_error,omitempty"`
-	CreatedAt  time.Time                 `json:"created_at"`
-	StartedAt  *time.Time                `json:"started_at,omitempty"`
-	FinishedAt *time.Time                `json:"finished_at,omitempty"`
+	RunID           domaintypes.RunID         `json:"run_id"`
+	RepoID          domaintypes.MigRepoID     `json:"repo_id"`
+	RepoURL         string                    `json:"repo_url"`
+	BaseRef         string                    `json:"base_ref"`
+	TargetRef       string                    `json:"target_ref"`
+	SourceCommitSHA string                    `json:"source_commit_sha,omitempty"`
+	MROnSuccess     bool                      `json:"mr_on_success,omitempty"`
+	MROnFail        bool                      `json:"mr_on_fail,omitempty"`
+	Status          domaintypes.RunRepoStatus `json:"status"`
+	Attempt         int32                     `json:"attempt"`
+	LastError       *string                   `json:"last_error,omitempty"`
+	CreatedAt       time.Time                 `json:"created_at"`
+	StartedAt       *time.Time                `json:"started_at,omitempty"`
+	FinishedAt      *time.Time                `json:"finished_at,omitempty"`
 }
 
 func listRunRepos(ctx context.Context, httpClient *http.Client, baseURL *url.URL, runID domaintypes.RunID) ([]runRepoReportSource, error) {

@@ -40,7 +40,10 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertx.Contains(t, out, "   ["+repoID.String()+"] github.com/acme/service (https://github.com/acme/service.git) @ ")
+	assertx.Contains(t, out, "\x1b[1mmain")
+	assertx.Contains(t, out, " (01234567) -> ")
+	assertx.Contains(t, out, "\x1b[1mploy/java17")
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (")
@@ -106,15 +109,17 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repos": []map[string]any{
 					{
-						"run_id":     runID.String(),
-						"repo_id":    repoID.String(),
-						"repo_url":   "https://github.com/acme/service.git",
-						"base_ref":   "main",
-						"target_ref": "ploy/java17",
-						"status":     "Running",
-						"attempt":    1,
-						"last_error": lastErr,
-						"created_at": "2026-02-24T08:01:00Z",
+						"run_id":            runID.String(),
+						"repo_id":           repoID.String(),
+						"repo_url":          "https://github.com/acme/service.git",
+						"base_ref":          "main",
+						"target_ref":        "ploy/java17",
+						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+						"mr_on_success":     true,
+						"status":            "Running",
+						"attempt":           1,
+						"last_error":        lastErr,
+						"created_at":        "2026-02-24T08:01:00Z",
 					},
 				},
 			})

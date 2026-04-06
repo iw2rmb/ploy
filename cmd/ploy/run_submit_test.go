@@ -510,14 +510,16 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"repos": []map[string]any{
 					{
-						"run_id":     runID.String(),
-						"repo_id":    repoID.String(),
-						"repo_url":   "https://github.com/acme/service.git",
-						"base_ref":   "main",
-						"target_ref": "ploy/java17",
-						"status":     repoStatus,
-						"attempt":    1,
-						"created_at": "2026-02-24T08:01:00Z",
+						"run_id":            runID.String(),
+						"repo_id":           repoID.String(),
+						"repo_url":          "https://github.com/acme/service.git",
+						"base_ref":          "main",
+						"target_ref":        "ploy/java17",
+						"source_commit_sha": "0123456789abcdef0123456789abcdef01234567",
+						"mr_on_success":     true,
+						"status":            repoStatus,
+						"attempt":           1,
+						"created_at":        "2026-02-24T08:01:00Z",
 					},
 				},
 			})
@@ -573,13 +575,16 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if !strings.Contains(out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
 		t.Fatalf("expected run status spec download link, got: %q", out)
 	}
-	if !strings.Contains(out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") {
+	if !strings.Contains(out, "   ["+repoID.String()+"] github.com/acme/service (https://github.com/acme/service.git) @ ") {
 		t.Fatalf("expected run status repo header, got: %q", out)
+	}
+	if !strings.Contains(out, "\x1b[1mmain") || !strings.Contains(out, " (01234567) -> ") || !strings.Contains(out, "\x1b[1mploy/java17") {
+		t.Fatalf("expected bold branch names and short sha, got: %q", out)
 	}
 	if strings.Count(out, "   Mig:   "+migID.String()+"   | java17-upgrade") != 1 {
 		t.Fatalf("expected mig header to render once in follow output, got: %q", out)
 	}
-	if strings.Count(out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") != 1 {
+	if strings.Count(out, "   ["+repoID.String()+"] github.com/acme/service (https://github.com/acme/service.git) @ ") != 1 {
 		t.Fatalf("expected repo header to render once in follow output, got: %q", out)
 	}
 	if strings.Contains(out, "run_id: ") || strings.Contains(out, "mig_id: ") {
