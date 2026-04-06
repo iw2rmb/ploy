@@ -108,11 +108,17 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 				ReadOnly: true,
 			})
 		}
-		// In entries: mount read-only at the declared destination.
+		// In entries:
+		// - when inDir is present, entries are seeded into inDir and exposed via
+		//   the single /in mount (no nested bind mounts under /in/*).
+		// - when inDir is absent, mount read-only at the declared destination.
 		for _, entry := range manifest.In {
 			parsed, err := contracts.ParseStoredInEntry(entry)
 			if err != nil {
 				return ContainerSpec{}, fmt.Errorf("in entry %q: %w", entry, err)
+			}
+			if strings.TrimSpace(inDir) != "" {
+				continue
 			}
 			mounts = append(mounts, ContainerMount{
 				Source:   filepath.Join(stagingDir, parsed.Hash, "content"),
@@ -229,6 +235,32 @@ func SeedOutDirFromStaging(manifest contracts.StepManifest, stagingDir, outDir s
 		}
 		if err := copyPath(src, dst); err != nil {
 			return fmt.Errorf("seed out %s: %w", parsed.Dst, err)
+		}
+	}
+	return nil
+}
+
+// SeedInDirFromStaging copies materialized Hydra in entry content from the
+// staging directory into inDir so that the single /in mount can expose both
+// pre-seeded content and runtime-provided cross-phase files.
+func SeedInDirFromStaging(manifest contracts.StepManifest, stagingDir, inDir string) error {
+	if stagingDir == "" || inDir == "" {
+		return nil
+	}
+	cleanInDir := filepath.Clean(inDir)
+	for _, entry := range manifest.In {
+		parsed, err := contracts.ParseStoredInEntry(entry)
+		if err != nil {
+			return fmt.Errorf("in entry %q: %w", entry, err)
+		}
+		rel := strings.TrimPrefix(parsed.Dst, "/in/")
+		src := filepath.Join(stagingDir, parsed.Hash, "content")
+		dst := filepath.Clean(filepath.Join(inDir, rel))
+		if dst != cleanInDir && !strings.HasPrefix(dst, cleanInDir+string(filepath.Separator)) {
+			return fmt.Errorf("in entry %q: resolved path %s escapes inDir", entry, dst)
+		}
+		if err := copyPath(src, dst); err != nil {
+			return fmt.Errorf("seed in %s: %w", parsed.Dst, err)
 		}
 	}
 	return nil

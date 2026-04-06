@@ -45,3 +45,36 @@ func TestBuildContainerSpec_InMountPresent(t *testing.T) {
 		t.Fatalf("/in mount not present: %+v", spec.Mounts)
 	}
 }
+
+func TestBuildContainerSpec_InMountSkipsNestedHydraInMounts(t *testing.T) {
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("step-in-mount-hydra"),
+		Name:  "With /in and Hydra in",
+		Image: "alpine:3",
+		Inputs: []contracts.StepInput{{
+			Name:        "src",
+			MountPath:   "/workspace",
+			Mode:        contracts.StepInputModeReadWrite,
+			SnapshotCID: types.CID("bafy123"),
+		}},
+		In: []string{"abcdef0:/in/amata.yaml"},
+	}
+
+	spec, err := buildContainerSpec(types.RunID("run-in"), types.JobID("job-in"), manifest, "/tmp/ws", "", "/tmp/in", "/tmp/staging")
+	if err != nil {
+		t.Fatalf("buildContainerSpec error: %v", err)
+	}
+
+	var foundIn bool
+	for _, m := range spec.Mounts {
+		if m.Target == "/in" {
+			foundIn = true
+		}
+		if m.Target == "/in/amata.yaml" {
+			t.Fatalf("unexpected nested Hydra in mount: %+v", m)
+		}
+	}
+	if !foundIn {
+		t.Fatalf("/in mount not present: %+v", spec.Mounts)
+	}
+}
