@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,7 +20,7 @@ import (
 
 // handleRunPatch implements:
 //
-//	ploy run patch [--repo-id <id> | --origin <remote>] [--diff-id <uuid>] [--output <path|->] <run-id>
+//	ploy run patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>
 //
 // It is a read-only command: it downloads the stored patch artifact and does not apply it.
 func handleRunPatch(args []string, stderr io.Writer) error {
@@ -31,8 +32,8 @@ func handleRunPatch(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("run patch", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 
-	repoIDFlag := fs.String("repo-id", "", "repo id (skip repo-url resolution from git remote)")
-	origin := fs.String("origin", "origin", "git remote to match when --repo-id is not provided")
+	repoIDFlag := fs.String("repo-id", "", "repo id")
+	repoURLFlag := fs.String("repo-url", "", "repo url")
 	diffIDFlag := fs.String("diff-id", "", "specific diff id to download (default: latest)")
 	output := fs.String("output", "-", "output path for .patch.gz bytes ('-' for stdout)")
 
@@ -60,7 +61,7 @@ func handleRunPatch(args []string, stderr io.Writer) error {
 		return fmt.Errorf("run patch: %w", err)
 	}
 
-	repoID, err := resolveRunPatchRepoID(ctx, httpClient, base, runID, strings.TrimSpace(*repoIDFlag), strings.TrimSpace(*origin))
+	repoID, err := resolveRunPatchRepoID(ctx, httpClient, base, runID, strings.TrimSpace(*repoIDFlag), strings.TrimSpace(*repoURLFlag))
 	if err != nil {
 		return fmt.Errorf("run patch: %w", err)
 	}
@@ -103,8 +104,12 @@ func resolveRunPatchRepoID(
 	baseURL *url.URL,
 	runID domaintypes.RunID,
 	repoIDFlag string,
-	origin string,
+	repoURLFlag string,
 ) (domaintypes.MigRepoID, error) {
+	if repoIDFlag != "" && repoURLFlag != "" {
+		return "", errors.New("--repo-id and --repo-url are mutually exclusive")
+	}
+
 	if repoIDFlag != "" {
 		var repoID domaintypes.MigRepoID
 		if err := repoID.UnmarshalText([]byte(repoIDFlag)); err != nil {
@@ -113,23 +118,36 @@ func resolveRunPatchRepoID(
 		return repoID, nil
 	}
 
-	rawOriginURL, err := resolveGitRemoteURL(ctx, origin)
-	if err != nil {
-		return "", err
+	if repoURLFlag != "" {
+		if err := domaintypes.RepoURL(repoURLFlag).Validate(); err != nil {
+			return "", errors.New("invalid --repo-url")
+		}
+
+		pullCmd := migs.RunPullCommand{
+			Client:  httpClient,
+			BaseURL: baseURL,
+			RunID:   runID,
+			RepoURL: repoURLFlag,
+		}
+		resolution, err := pullCmd.Run(ctx)
+		if err != nil {
+			return "", fmt.Errorf("resolve repo: %w", err)
+		}
+		return resolution.RepoID, nil
 	}
 
-	pullCmd := migs.RunPullCommand{
-		Client:  httpClient,
-		BaseURL: baseURL,
-		RunID:   runID,
-		RepoURL: rawOriginURL,
-	}
-	resolution, err := pullCmd.Run(ctx)
+	repos, err := listRunPatchRepos(ctx, httpClient, baseURL, runID)
 	if err != nil {
-		return "", fmt.Errorf("resolve repo: %w", err)
+		return "", fmt.Errorf("list run repos: %w", err)
 	}
-
-	return resolution.RepoID, nil
+	switch len(repos) {
+	case 0:
+		return "", errors.New("run has no repos")
+	case 1:
+		return repos[0].RepoID, nil
+	default:
+		return "", errors.New("multiple repos found in run; provide --repo-id or --repo-url")
+	}
 }
 
 func resolveRunPatchDiffID(diffs []migs.DiffEntry, diffIDFlag string) (domaintypes.DiffID, error) {
@@ -164,18 +182,63 @@ func writeRunPatchOutput(outputPath string, patchGzip []byte) error {
 }
 
 func printRunPatchUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run patch [--repo-id <id> | --origin <remote>] [--diff-id <uuid>] [--output <path|->] <run-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy run patch [--repo-id <id> | --repo-url <url>] [--diff-id <uuid>] [--output <path|->] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Downloads a stored patch artifact (.patch.gz) without applying it.")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Flags:")
-	_, _ = fmt.Fprintln(w, "  --repo-id <id>       Repo ID (skip repo-url resolution from git remote)")
-	_, _ = fmt.Fprintln(w, "  --origin <remote>    Git remote for repo-url resolution (default: origin)")
+	_, _ = fmt.Fprintln(w, "  --repo-id <id>       Repo ID selector")
+	_, _ = fmt.Fprintln(w, "  --repo-url <url>     Repo URL selector")
 	_, _ = fmt.Fprintln(w, "  --diff-id <uuid>     Specific diff ID to download (default: latest)")
 	_, _ = fmt.Fprintln(w, "  --output <path|->    Output path for raw .patch.gz bytes (default: -)")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Notes:")
+	_, _ = fmt.Fprintln(w, "  - If no repo selector is provided and the run has one repo, it is selected automatically.")
+	_, _ = fmt.Fprintln(w, "  - For multi-repo runs, provide --repo-id or --repo-url.")
 	_, _ = fmt.Fprintln(w, "  - This command does not run git prechecks.")
 	_, _ = fmt.Fprintln(w, "  - This command does not create or switch branches.")
 	_, _ = fmt.Fprintln(w, "  - This command does not apply patch content.")
+}
+
+type runPatchRepoEntry struct {
+	RepoID  domaintypes.MigRepoID `json:"repo_id"`
+	RepoURL string                `json:"repo_url"`
+}
+
+func listRunPatchRepos(
+	ctx context.Context,
+	httpClient *http.Client,
+	baseURL *url.URL,
+	runID domaintypes.RunID,
+) ([]runPatchRepoEntry, error) {
+	if baseURL == nil {
+		return nil, errors.New("base url required")
+	}
+
+	endpoint := baseURL.JoinPath("v1", "runs", runID.String(), "repos")
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Repos []runPatchRepoEntry `json:"repos"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	if result.Repos == nil {
+		result.Repos = make([]runPatchRepoEntry, 0)
+	}
+	return result.Repos, nil
 }
