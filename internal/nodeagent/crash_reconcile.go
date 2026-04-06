@@ -177,16 +177,16 @@ func (r *startupCrashReconciler) WaitRecoveredContainer(ctx context.Context, con
 	}, nil
 }
 
-func (r *startupCrashReconciler) ReadContainerLogs(ctx context.Context, containerID string) ([]byte, error) {
+func (r *startupCrashReconciler) ReadContainerLogs(ctx context.Context, containerID string) ([]byte, []byte, error) {
 	if r == nil || r.docker == nil {
-		return nil, errors.New("startup crash reconciler not configured")
+		return nil, nil, errors.New("startup crash reconciler not configured")
 	}
 	reader, err := r.docker.ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("read container logs %s: %w", containerID, err)
+		return nil, nil, fmt.Errorf("read container logs %s: %w", containerID, err)
 	}
 	defer func() { _ = reader.Close() }()
 
@@ -194,11 +194,11 @@ func (r *startupCrashReconciler) ReadContainerLogs(ctx context.Context, containe
 	if _, err := stdcopy.StdCopy(&stdoutBuf, &stderrBuf, reader); err != nil {
 		raw, rawErr := io.ReadAll(reader)
 		if rawErr != nil {
-			return nil, fmt.Errorf("demux container logs %s: %w", containerID, err)
+			return nil, nil, fmt.Errorf("demux container logs %s: %w", containerID, err)
 		}
-		return raw, nil
+		return raw, nil, nil
 	}
-	return append(stdoutBuf.Bytes(), stderrBuf.Bytes()...), nil
+	return stdoutBuf.Bytes(), stderrBuf.Bytes(), nil
 }
 
 func ployContainerIdentity(labels map[string]string) (types.RunID, types.JobID, bool) {

@@ -115,6 +115,8 @@ post:
   summary: Upload run log chunk
   description: |
     Uploads a gzipped log chunk for a run with an optional job association.
+    The gzip payload must contain stream-aware framed lines:
+    JSON per line with `stream` (`stdout|stderr`) and `line`.
   requestBody:
     required: true
     content:
@@ -133,7 +135,7 @@ post:
             data:
               type: string
               format: byte
-              description: Base64-encoded gzipped log bytes (<= 10 MiB decoded).
+              description: Base64-encoded gzipped framed log bytes (<= 10 MiB decoded).
           required: [chunk_no, data]
   responses:
     '201':

@@ -9,9 +9,10 @@ post:
   tags: [Artifacts]
   summary: Ingest a gzipped log chunk for a run (node → server)
   description: |
-    Node agents upload gzipped log chunks for a specific run. The server enforces
-    a hard cap of ≤ 10 MiB on the decoded `data` bytes. The JSON request body is
-    allowed up to 16 MiB to accommodate base64 overhead.
+    Node agents upload gzipped log chunks for a specific run. Inside the gzip
+    payload, each line is a JSON log frame with `stream` (`stdout|stderr`) and
+    `line` fields. The server enforces a hard cap of ≤ 10 MiB on decoded `data`
+    bytes. The JSON request body is allowed up to 16 MiB to accommodate base64 overhead.
   requestBody:
     required: true
     content:
@@ -22,7 +23,7 @@ post:
           minimal_chunk:
             summary: First log chunk for a run
             description: |
-              Minimal example with gzipped log data (base64-encoded).
+              Minimal example with stream-aware framed gzipped log data (base64-encoded).
               The actual payload size is limited to 16 MiB JSON body, with decoded data ≤ 10 MiB.
             value:
               run_id: "2NQPoBfVkc8dFmGAQqJnUwMu9jR"

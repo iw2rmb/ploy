@@ -1137,7 +1137,8 @@ Nodeagents use `/v1/nodes/*` to execute work:
     successor job as `repo_sha_in`/`repo_sha_in8` when `next_id` is present.
 - `POST /v1/nodes/{id}/events` — publish run-scoped node exceptions/events
   (for example claim/start failures and runtime panics) into the run SSE stream.
-- `POST /v1/nodes/{id}/logs` — upload gzipped log chunks.
+- `POST /v1/nodes/{id}/logs` — upload gzipped log chunks (JSON-per-line framed
+  records with `stream` = `stdout|stderr` and `line` text).
 - `POST /v1/runs/{run_id}/jobs/{job_id}/diff` — upload per-job diffs.
 - `POST /v1/runs/{run_id}/jobs/{job_id}/artifact` — upload per-job artifacts.
 - Legacy HTTP Build Gate endpoints (`/v1/nodes/{id}/buildgate/*`) have been

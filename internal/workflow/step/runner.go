@@ -53,6 +53,11 @@ type Runner struct {
 	LogWriter  io.Writer // Optional: streams logs to server as gzipped chunks.
 }
 
+type splitLogWriter interface {
+	StdoutWriter() io.Writer
+	StderrWriter() io.Writer
+}
+
 // Request describes a step execution request.
 type Request struct {
 	// RunID threads the workflow run identifier for correlation/labels.
@@ -159,10 +164,16 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		var streamDone <-chan error
 		if r.LogWriter != nil {
 			if streamer, ok := r.Containers.(logStreamingRuntime); ok {
+				stdoutWriter := r.LogWriter
+				stderrWriter := r.LogWriter
+				if split, ok := r.LogWriter.(splitLogWriter); ok {
+					stdoutWriter = split.StdoutWriter()
+					stderrWriter = split.StderrWriter()
+				}
 				done := make(chan error, 1)
 				streamDone = done
 				go func() {
-					done <- streamer.StreamLogs(ctx, handle, r.LogWriter, r.LogWriter)
+					done <- streamer.StreamLogs(ctx, handle, stdoutWriter, stderrWriter)
 				}()
 			}
 		}

@@ -1,9 +1,6 @@
 package handlers
 
 import (
-	"bufio"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +14,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/blobstore"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 	"github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/server"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -292,12 +290,10 @@ func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg s
 	if err != nil {
 		return err
 	}
-
-	zr, err := gzip.NewReader(bytes.NewReader(data))
+	records, err := logchunk.DecodeGzip(data)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = zr.Close() }()
 
 	ts := timestampToString(lg.CreatedAt)
 
@@ -305,22 +301,12 @@ func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg s
 	if lg.JobID != nil {
 		jobID = *lg.JobID
 	}
-
-	scanner := bufio.NewScanner(zr)
-	const maxLine = 256 * 1024
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, maxLine)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		emitted[backfillKey{Timestamp: ts, Stream: "stdout", Line: line}] = struct{}{}
+	for _, frame := range records {
+		emitted[backfillKey{Timestamp: ts, Stream: frame.Stream, Line: frame.Line}] = struct{}{}
 		rec := logstream.LogRecord{
 			Timestamp: ts,
-			Stream:    "stdout",
-			Line:      line,
+			Stream:    frame.Stream,
+			Line:      frame.Line,
 			JobID:     jobID,
 		}
 		data, err := json.Marshal(rec)
@@ -335,7 +321,7 @@ func backfillOneChunk(ctx context.Context, w io.Writer, bs blobstore.Store, lg s
 			return err
 		}
 	}
-	return scanner.Err()
+	return nil
 }
 
 // timestampToString converts a pgtype.Timestamptz to RFC3339 string.
