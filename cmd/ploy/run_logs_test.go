@@ -190,24 +190,17 @@ func TestJobLogFollowReconnects(t *testing.T) {
 	}
 }
 
-func TestJobFollowAlias(t *testing.T) {
+func TestJobFollowSubcommandRemoved(t *testing.T) {
 	t.Helper()
-	jobID := domaintypes.NewJobID()
-	server := newJobStreamingServer(t, jobID, []sseTestEvent{
-		{event: "log", data: `{"timestamp":"2026-03-01T10:00:00Z","stream":"stdout","line":"alias"}`},
-		{event: "done", data: `{"status":"completed"}`},
-	})
-	defer server.Close()
-
-	clienv.UseServerDescriptor(t, server.URL)
+	clienv.UseServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
-	err := executeCmd([]string{"job", "follow", "--format", "raw", jobID.String()}, buf)
-	if err != nil {
-		t.Fatalf("job follow alias: %v", err)
+	err := executeCmd([]string{"job", "follow", "job-123"}, buf)
+	if err == nil {
+		t.Fatal("expected error for removed job follow subcommand")
 	}
-	if !strings.Contains(buf.String(), "alias") {
-		t.Fatalf("expected alias output, got: %q", buf.String())
+	if !strings.Contains(err.Error(), `unknown job subcommand "follow"`) {
+		t.Fatalf("expected unknown subcommand error, got: %v", err)
 	}
 }
 

@@ -128,7 +128,7 @@ func printRunLogsUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy run logs [--max-retries <n>] [--idle-timeout <duration>] [--timeout <duration>] <run-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Streams run lifecycle events (run state changes and stage transitions).")
-	_, _ = fmt.Fprintln(w, "For container logs, use: ploy job follow <job-id>")
+	_, _ = fmt.Fprintln(w, "For container logs, use: ploy job log --follow <job-id>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --max-retries <n>           Max reconnect attempts (-1 for unlimited, default: 3)")

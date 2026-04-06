@@ -60,7 +60,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 
 	headerLines := []string{
 		fmt.Sprintf("   Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
-		fmt.Sprintf("   Spec:  %s | %s", valueOrDash(report.SpecID.String()), renderOptionalLink("Download", buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
+		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
 		fmt.Sprintf("   Repos: %d", len(report.Repos)),
 		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
 		"",
@@ -105,7 +105,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 			continue
 		}
 
-		repoFrame.Columns = []string{"", "Step", "Job", "Node", "Image", "Duration", "Artefacts"}
+		repoFrame.Columns = nil
 		repoFrame.Rows = make([]FollowStepRow, 0, len(repo.Jobs))
 		for _, job := range repo.Jobs {
 			patchURL := strings.TrimSpace(job.PatchURL)
@@ -122,10 +122,10 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 					state,
 					step,
 					jobIDCell,
-					FormatNodeID(job.NodeID),
 					valueOrDash(strings.TrimSpace(job.JobImage)),
 					duration,
 					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
+					FormatNodeID(job.NodeID),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
 			})
@@ -332,4 +332,3 @@ func valueOrDash(v string) string {
 	}
 	return v
 }
-
