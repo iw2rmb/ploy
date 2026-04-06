@@ -78,8 +78,12 @@ install_ploy_ca_bundle() {
   fi
 
   # Fallback for runtimes that honor explicit CA bundle env vars.
+  # Use a persistent path (not mktemp) because codex starts after this function.
+  local fallback_dir="/tmp/ploy-extra-ca"
+  mkdir -p "$fallback_dir"
+  cp "$tmp_dir"/*.crt "$fallback_dir"/ 2>/dev/null || true
   local first_ca
-  first_ca="$(ls "$tmp_dir"/*.crt 2>/dev/null | head -1 || true)"
+  first_ca="$(ls "$fallback_dir"/*.crt 2>/dev/null | head -1 || true)"
   if [[ -n "$first_ca" ]]; then
     export SSL_CERT_FILE="$first_ca"
     export CURL_CA_BUNDLE="$first_ca"
