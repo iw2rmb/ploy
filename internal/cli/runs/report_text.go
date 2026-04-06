@@ -80,7 +80,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 		Repos: make([]FollowRepoFrame, 0, len(report.Repos)),
 	}
 
-	for i, repo := range report.Repos {
+	for _, repo := range report.Repos {
 		repoLinkLabel := strings.TrimSpace(repo.RepoURL)
 		if repoLinkLabel != "" {
 			repoLinkLabel = domaintypes.NormalizeRepoURLSchemless(repoLinkLabel)
@@ -89,14 +89,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 		}
 
 		repoFrame := FollowRepoFrame{
-			HeaderLine: fmt.Sprintf(
-				"   [%d/%d] %s %s -> %s",
-				i+1,
-				len(report.Repos),
-				renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, ""),
-				valueOrDash(strings.TrimSpace(repo.BaseRef)),
-				valueOrDash(strings.TrimSpace(repo.TargetRef)),
-			),
+			HeaderLine: renderRepoHeaderLine(repo, repoLinkLabel, opts),
 		}
 
 		if len(repo.Jobs) == 0 {
@@ -220,6 +213,37 @@ func renderStepName(jobType string) string {
 	default:
 		return valueOrDash(strings.TrimSpace(jobType))
 	}
+}
+
+func renderRepoHeaderLine(repo RunEntry, repoLinkLabel string, opts TextRenderOptions) string {
+	repoIDCell := valueOrDash(repo.RepoID.String())
+	repoLabel := renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, "")
+	baseRef := valueOrDash(strings.TrimSpace(repo.BaseRef))
+	shortSHA := formatShortSHA(strings.TrimSpace(repo.SourceCommitSHA))
+	basePart := fmt.Sprintf("@ %s (%s)", boldBranchName(baseRef), shortSHA)
+
+	header := fmt.Sprintf("   [%s] %s %s", repoIDCell, repoLabel, basePart)
+	if repo.MROnSuccess || repo.MROnFail {
+		targetRef := valueOrDash(strings.TrimSpace(repo.TargetRef))
+		header += fmt.Sprintf(" -> %s", boldBranchName(targetRef))
+	}
+	return header
+}
+
+func formatShortSHA(raw string) string {
+	if len(raw) != 40 {
+		return "-"
+	}
+	for _, r := range raw {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
+			return "-"
+		}
+	}
+	return raw[:8]
+}
+
+func boldBranchName(name string) string {
+	return lipgloss.NewStyle().Bold(true).Render(name)
 }
 
 func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {

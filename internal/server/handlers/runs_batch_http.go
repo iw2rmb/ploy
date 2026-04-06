@@ -13,6 +13,7 @@ import (
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
@@ -155,7 +156,7 @@ func addRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL))
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL, false, false))
 	}
 }
 
@@ -169,6 +170,13 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		mrOnSuccess, mrOnFail, err := resolveRunMRWiring(r, st, runID)
+		if err != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to resolve run spec: %v", err)
+			slog.Error("list run repos: resolve run spec failed", "run_id", runID.String(), "err", err)
+			return
+		}
+
 		repos, err := st.ListRunReposWithURLByRun(r.Context(), runID)
 		if err != nil {
 			writeHTTPError(w, http.StatusInternalServerError, "failed to list run repos: %v", err)
@@ -179,18 +187,19 @@ func listRunReposHandler(st store.Store) http.HandlerFunc {
 		reposResp := make([]RunRepoResponse, 0, len(repos))
 		for _, rr := range repos {
 			reposResp = append(reposResp, runRepoToResponse(store.RunRepo{
-				MigID:         rr.MigID,
-				RunID:         rr.RunID,
-				RepoID:        rr.RepoID,
-				RepoBaseRef:   rr.RepoBaseRef,
-				RepoTargetRef: rr.RepoTargetRef,
-				Status:        rr.Status,
-				Attempt:       rr.Attempt,
-				LastError:     rr.LastError,
-				CreatedAt:     rr.CreatedAt,
-				StartedAt:     rr.StartedAt,
-				FinishedAt:    rr.FinishedAt,
-			}, rr.RepoUrl))
+				MigID:           rr.MigID,
+				RunID:           rr.RunID,
+				RepoID:          rr.RepoID,
+				RepoBaseRef:     rr.RepoBaseRef,
+				RepoTargetRef:   rr.RepoTargetRef,
+				SourceCommitSha: rr.SourceCommitSha,
+				Status:          rr.Status,
+				Attempt:         rr.Attempt,
+				LastError:       rr.LastError,
+				CreatedAt:       rr.CreatedAt,
+				StartedAt:       rr.StartedAt,
+				FinishedAt:      rr.FinishedAt,
+			}, rr.RepoUrl, mrOnSuccess, mrOnFail))
 		}
 
 		resp := struct {
@@ -236,7 +245,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL))
+			_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL, false, false))
 			return
 		}
 
@@ -274,7 +283,7 @@ func cancelRunRepoHandlerV1(st store.Store) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL))
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(rr, repoURL, false, false))
 	}
 }
 
@@ -388,8 +397,27 @@ func restartRunRepoHandler(st store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL))
+		_ = json.NewEncoder(w).Encode(runRepoToResponse(runRepo, repoURL, false, false))
 	}
+}
+
+func resolveRunMRWiring(r *http.Request, st store.Store, runID domaintypes.RunID) (bool, bool, error) {
+	run, err := st.GetRun(r.Context(), runID)
+	if err != nil {
+		return false, false, err
+	}
+	spec, err := st.GetSpec(r.Context(), run.SpecID)
+	if err != nil {
+		return false, false, err
+	}
+	parsed, err := contracts.ParseMigSpecJSON(spec.Spec)
+	if err != nil {
+		return false, false, err
+	}
+
+	mrOnSuccess := parsed.MROnSuccess != nil && *parsed.MROnSuccess
+	mrOnFail := parsed.MROnFail != nil && *parsed.MROnFail
+	return mrOnSuccess, mrOnFail, nil
 }
 
 // StartRunResponse contains the result of starting a batch run.

@@ -60,12 +60,14 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 		SpecID:  specID,
 		Repos: []RunEntry{
 			{
-				RepoID:    repoID,
-				RepoURL:   "https://github.com/acme/service.git",
-				BaseRef:   "main",
-				TargetRef: "ploy/java17",
-				Attempt:   1,
-				Status:    "Running",
+				RepoID:          repoID,
+				RepoURL:         "https://github.com/acme/service.git",
+				BaseRef:         "main",
+				TargetRef:       "ploy/java17",
+				SourceCommitSHA: "0123456789abcdef0123456789abcdef01234567",
+				MROnSuccess:     true,
+				Attempt:         1,
+				Status:          "Running",
 				Jobs: []RunJobEntry{
 					{
 						JobID:      preGateID,
@@ -99,7 +101,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
+	assertx.Contains(t, out, "   ["+repoID.String()+"] github.com/acme/service (https://github.com/acme/service.git) @ "+boldBranchName("main")+" (01234567) -> "+boldBranchName("ploy/java17"))
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (https://example.test/v1/runs/")
@@ -109,6 +111,34 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "Patch (https://example.test/v1/runs/")
 	assertx.Contains(t, out, migJobID.String()+" (https://example.test/v1/jobs/"+migJobID.String()+"/logs)")
 	assertx.Contains(t, out, "⣾")
+}
+
+func TestRenderRunReportTextHidesTargetBranchWhenMRFlagsDisabled(t *testing.T) {
+	t.Parallel()
+
+	repoID := domaintypes.NewMigRepoID()
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "no-mr-target",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:          repoID,
+				RepoURL:         "https://github.com/acme/no-mr.git",
+				BaseRef:         "main",
+				TargetRef:       "feature/no-mr",
+				SourceCommitSHA: "fedcba9876543210fedcba9876543210fedcba98",
+				Status:          "Queued",
+				Attempt:         1,
+			},
+		},
+	}
+
+	out := renderText(t, report, TextRenderOptions{EnableOSC8: false})
+	assertx.Contains(t, out, "   ["+repoID.String()+"] github.com/acme/no-mr (https://github.com/acme/no-mr.git) @ "+boldBranchName("main")+" (fedcba98)")
+	assertx.NotContains(t, out, "feature/no-mr")
+	assertx.NotContains(t, out, " -> ")
 }
 
 func TestRenderRunReportTextExitOneLiners(t *testing.T) {

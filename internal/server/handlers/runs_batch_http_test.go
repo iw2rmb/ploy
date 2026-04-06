@@ -151,18 +151,31 @@ func TestListRunReposHandler_Success(t *testing.T) {
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
+	specID := domaintypes.NewSpecID()
 
 	st := &runStore{}
+	st.getRun.val = store.Run{
+		ID:        runID,
+		MigID:     domaintypes.NewMigID(),
+		SpecID:    specID,
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+	st.getSpec.val = store.Spec{
+		ID:   specID,
+		Spec: []byte(`{"steps":[{"image":"a"}],"mr_on_success":true}`),
+	}
 	st.listRunReposWithURLByRun.val = []store.ListRunReposWithURLByRunRow{
 		{
-			RunID:         runID,
-			RepoID:        repoID,
-			RepoBaseRef:   "main",
-			RepoTargetRef: "feature",
-			Status:        domaintypes.RunRepoStatusQueued,
-			Attempt:       1,
-			CreatedAt:     pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-			RepoUrl:       "https://github.com/org/repo.git",
+			RunID:           runID,
+			RepoID:          repoID,
+			RepoBaseRef:     "main",
+			RepoTargetRef:   "feature",
+			SourceCommitSha: "0123456789abcdef0123456789abcdef01234567",
+			Status:          domaintypes.RunRepoStatusQueued,
+			Attempt:         1,
+			CreatedAt:       pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			RepoUrl:         "https://github.com/org/repo.git",
 		},
 	}
 
@@ -183,6 +196,12 @@ func TestListRunReposHandler_Success(t *testing.T) {
 	if len(resp.Repos) != 1 || resp.Repos[0].RepoID != repoID || resp.Repos[0].RepoURL != "https://github.com/org/repo.git" {
 		t.Fatalf("unexpected repos response: %+v", resp.Repos)
 	}
+	if got := resp.Repos[0].SourceCommitSHA; got != "0123456789abcdef0123456789abcdef01234567" {
+		t.Fatalf("expected source_commit_sha, got %q", got)
+	}
+	if !resp.Repos[0].MROnSuccess || resp.Repos[0].MROnFail {
+		t.Fatalf("unexpected mr flags: success=%v fail=%v", resp.Repos[0].MROnSuccess, resp.Repos[0].MROnFail)
+	}
 	if !st.listRunReposWithURLByRun.called {
 		t.Fatalf("expected ListRunReposWithURLByRun to be called")
 	}
@@ -195,7 +214,19 @@ func TestListRunReposHandler_ListError(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
+	specID := domaintypes.NewSpecID()
 	st := &runStore{}
+	st.getRun.val = store.Run{
+		ID:        runID,
+		MigID:     domaintypes.NewMigID(),
+		SpecID:    specID,
+		Status:    domaintypes.RunStatusStarted,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+	}
+	st.getSpec.val = store.Spec{
+		ID:   specID,
+		Spec: []byte(`{"steps":[{"image":"a"}]}`),
+	}
 	st.listRunReposWithURLByRun.err = errors.New("db exploded")
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos", nil)
