@@ -341,12 +341,15 @@ func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, r
 		followCtx, cancel = context.WithTimeout(ctx, capDuration)
 		defer cancel()
 	}
+	renderOpts := followRunRenderOptions(baseURL, stderr)
 
 	final, err := runs.FollowRunCommand{
 		Client:     cloneForStream(client),
 		BaseURL:    baseURL,
 		RunID:      runID,
 		Output:     stderr,
+		EnableOSC8: renderOpts.EnableOSC8,
+		AuthToken:  renderOpts.AuthToken,
 		MaxRetries: maxRetries,
 	}.Run(followCtx)
 	if err != nil {
@@ -369,7 +372,6 @@ func followPullRun(ctx context.Context, baseURL *url.URL, client *http.Client, r
 		return "", err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
 	return final, nil
 }
 

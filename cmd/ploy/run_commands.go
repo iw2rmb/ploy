@@ -104,7 +104,7 @@ func handleRunStatus(args []string, stderr io.Writer) error {
 		return runcmd.RenderRunReportJSON(stderr, report)
 	}
 
-	if err := runcmd.RenderRunReportText(stderr, report, runcmd.TextRenderOptions{
+	if err := runcmd.RenderRunStatusSnapshotText(stderr, report, runcmd.TextRenderOptions{
 		EnableOSC8: runStatusSupportsOSC8(stderr),
 		AuthToken:  token,
 		BaseURL:    base,

@@ -63,6 +63,20 @@ func RenderRunReportText(w io.Writer, report RunReport, opts TextRenderOptions) 
 	return nil
 }
 
+// RenderRunStatusSnapshotText renders a static status snapshot using the same
+// output shape as `ploy run status`.
+func RenderRunStatusSnapshotText(w io.Writer, report RunReport, opts TextRenderOptions) error {
+	opts.SpinnerFrame = 0
+	opts.LiveDurations = false
+	opts.Now = time.Time{}
+	opts.JobIOPreviews = nil
+	opts.ExpandStdout = false
+	opts.ExpandStderr = false
+	opts.FilterRunningRepos = false
+	opts.EmptyReposLine = ""
+	return RenderRunReportText(w, report, opts)
+}
+
 // RenderRunReportTextLayout renders run report text plus mutable per-repo row sections.
 func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunReportTextLayout, error) {
 	now := opts.Now
