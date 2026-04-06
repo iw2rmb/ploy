@@ -46,6 +46,7 @@ type RunJobEntry struct {
 	DisplayName   string                `json:"display_name,omitempty"`
 	ActionSummary string                `json:"action_summary,omitempty"`
 	BugSummary    string                `json:"bug_summary,omitempty"`
+	ErrorKind     string                `json:"error_kind,omitempty"`
 	Recovery      *RunJobRecovery       `json:"recovery,omitempty"`
 	Artifacts     []RunJobArtifact      `json:"artifacts,omitempty"`
 	JobLogURL     string                `json:"job_log_url,omitempty"`

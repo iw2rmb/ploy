@@ -238,12 +238,11 @@ func appendAuthToken(rawURL, token string) string {
 }
 
 func renderStepName(jobType string) string {
-	switch normalizeStatus(jobType) {
-	case "heal":
-		return "Heal"
-	default:
-		return valueOrDash(strings.TrimSpace(jobType))
+	step := normalizeStatus(jobType)
+	if step == "" {
+		step = "-"
 	}
+	return lipgloss.NewStyle().Bold(true).Render(step)
 }
 
 func renderRepoHeaderLine(repo RunEntry, repoLinkLabel string, opts TextRenderOptions) string {
@@ -280,8 +279,16 @@ func boldBranchName(name string) string {
 }
 
 func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
-	shouldRender := isFailedOrCrashedStatus(job.Status.String()) || normalizeStatus(job.JobType.String()) == "heal"
-	if !shouldRender {
+	isHeal := normalizeStatus(job.JobType.String()) == "heal"
+	if isHeal {
+		exit := renderExitCode(job.ExitCode)
+		if exit != "0" && isFailedOrCrashedStatus(job.Status.String()) {
+			return renderWrappedExitOneLiner(exit, "Error", true)
+		}
+		return renderHealSummaryBlock(job)
+	}
+
+	if !isFailedOrCrashedStatus(job.Status.String()) {
 		return ""
 	}
 
@@ -289,25 +296,15 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 		return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), "Error", true)
 	}
 
-	msg := ""
-	colorizeContent := false
-	if normalizeStatus(job.JobType.String()) == "heal" {
-		msg = strings.TrimSpace(job.ActionSummary)
-		if msg == "" {
-			msg = "healer output unavailable"
-		}
-	} else {
-		msg = strings.Join(strings.Fields(strings.TrimSpace(job.BugSummary)), " ")
-		if msg == "" {
-			msg = FormatErrorOneLiner(repoLastError)
-		}
-		if msg == "" {
-			msg = normalizeStatus(job.Status.String())
-		}
-		colorizeContent = true
+	msg := strings.Join(strings.Fields(strings.TrimSpace(job.BugSummary)), " ")
+	if msg == "" {
+		msg = FormatErrorOneLiner(repoLastError)
+	}
+	if msg == "" {
+		msg = normalizeStatus(job.Status.String())
 	}
 
-	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, colorizeContent)
+	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, true)
 }
 
 func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
@@ -482,7 +479,13 @@ func wrapRunesFixed(value string, width int) []string {
 func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) string {
 	const wrapWidth = 100
 
+	if exitCode == "0" {
+		return ""
+	}
 	content = strings.Join(strings.Fields(strings.TrimSpace(content)), " ")
+	if content == "" {
+		return ""
+	}
 	prefix := "└  Exit " + exitCode + ": "
 	indent := strings.Repeat(" ", len(prefix))
 	wrapped := wrapFixedWidth(content, wrapWidth)
@@ -496,6 +499,46 @@ func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) s
 			continue
 		}
 		lines = append(lines, indent+line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func renderHealSummaryBlock(job RunJobEntry) string {
+	lines := make([]string, 0, 2)
+	errorKind := strings.TrimSpace(job.ErrorKind)
+	bugSummary := strings.TrimSpace(job.BugSummary)
+	actionSummary := strings.TrimSpace(job.ActionSummary)
+
+	if errorKind != "" && bugSummary != "" {
+		lines = append(lines, renderWrappedLabelLine("└  Issue ["+errorKind+"]: ", bugSummary))
+	}
+	if actionSummary != "" {
+		lines = append(lines, renderWrappedLabelLine("└  Action: ", actionSummary))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func renderWrappedLabelLine(prefix, content string) string {
+	const wrapWidth = 80
+
+	content = strings.Join(strings.Fields(strings.TrimSpace(content)), " ")
+	if content == "" {
+		return ""
+	}
+	wrapped := lipgloss.Wrap(content, wrapWidth, " ")
+	rows := strings.Split(wrapped, "\n")
+	if len(rows) == 0 {
+		return ""
+	}
+
+	indent := strings.Repeat(" ", lipgloss.Width(prefix))
+	lines := make([]string, 0, len(rows))
+	for i, row := range rows {
+		if i == 0 {
+			lines = append(lines, prefix+row)
+			continue
+		}
+		lines = append(lines, indent+row)
 	}
 	return strings.Join(lines, "\n")
 }

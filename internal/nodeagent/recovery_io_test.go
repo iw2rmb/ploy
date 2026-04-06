@@ -59,6 +59,19 @@ func TestParseActionSummary(t *testing.T) {
 	}
 }
 
+func TestParseErrorKind(t *testing.T) {
+	t.Parallel()
+
+	outDir := t.TempDir()
+	payload := `{"error_kind":"infra"}` + "\n"
+	if err := os.WriteFile(filepath.Join(outDir, "heal.json"), []byte(payload), 0o644); err != nil {
+		t.Fatalf("write heal.json: %v", err)
+	}
+	if got, want := parseErrorKind(outDir), "infra"; got != want {
+		t.Fatalf("parseErrorKind() = %q, want %q", got, want)
+	}
+}
+
 func TestParseORWFailureMetadata(t *testing.T) {
 	t.Parallel()
 

@@ -73,6 +73,10 @@ type JobMeta struct {
 	// Max 200 chars, no newlines.
 	ActionSummary string `json:"action_summary,omitempty"`
 
+	// Heal contains structured healing output extracted from /out/heal.json.
+	// Only allowed for mig jobs (kind="mig").
+	Heal *HealJobMetadata `json:"heal,omitempty"`
+
 	// RecoveryMetadata stores universal recovery loop metadata.
 	// Allowed for gate and mig jobs; rejected for build jobs.
 	RecoveryMetadata *RecoveryJobMetadata `json:"recovery,omitempty"`
@@ -80,6 +84,13 @@ type JobMeta struct {
 
 // RecoveryJobMetadata captures loop context persisted at job level.
 type RecoveryJobMetadata = BuildGateRecoveryMetadata
+
+// HealJobMetadata captures structured healing details emitted by the healer.
+type HealJobMetadata struct {
+	BugSummary    string `json:"bug_summary,omitempty"`
+	ActionSummary string `json:"action_summary,omitempty"`
+	ErrorKind     string `json:"error_kind,omitempty"`
+}
 
 // BuildMeta captures metadata for build tool invocations stored in jobs.meta.
 // This consolidates fields previously tracked in the separate builds table.
@@ -132,6 +143,46 @@ func (m JobMeta) Validate() error {
 		}
 		if utf8.RuneCountInString(m.ActionSummary) > 200 {
 			return fmt.Errorf("action_summary: must be at most 200 characters, got %d", utf8.RuneCountInString(m.ActionSummary))
+		}
+	}
+	if m.Heal != nil {
+		if m.Kind != JobKindMig {
+			return fmt.Errorf("heal metadata present but kind is %q (only allowed for %q)", m.Kind, JobKindMig)
+		}
+		if err := m.Heal.Validate(); err != nil {
+			return fmt.Errorf("heal metadata invalid: %w", err)
+		}
+	}
+	return nil
+}
+
+// Validate ensures HealJobMetadata is well-formed.
+func (m HealJobMetadata) Validate() error {
+	validateLine := func(name, value string) error {
+		if value == "" {
+			return nil
+		}
+		if strings.ContainsAny(value, "\n\r") {
+			return fmt.Errorf("%s: must be single-line", name)
+		}
+		if utf8.RuneCountInString(value) > 200 {
+			return fmt.Errorf("%s: must be at most 200 characters, got %d", name, utf8.RuneCountInString(value))
+		}
+		return nil
+	}
+
+	if err := validateLine("bug_summary", m.BugSummary); err != nil {
+		return err
+	}
+	if err := validateLine("action_summary", m.ActionSummary); err != nil {
+		return err
+	}
+	if err := validateLine("error_kind", m.ErrorKind); err != nil {
+		return err
+	}
+	if m.ErrorKind != "" {
+		if _, ok := ParseRecoveryErrorKind(m.ErrorKind); !ok {
+			return fmt.Errorf("error_kind invalid: %q", m.ErrorKind)
 		}
 	}
 	return nil

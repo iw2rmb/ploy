@@ -250,6 +250,43 @@ func TestListRunRepoJobsHandler_ExposesJobLevelRecovery(t *testing.T) {
 	}
 }
 
+func TestListRunRepoJobsHandler_ExposesHealMetadataFields(t *testing.T) {
+	t.Parallel()
+
+	metaJSON := `{"kind":"mig","heal":{"bug_summary":"missing ; in Foo.java","action_summary":"added missing ;","error_kind":"code"}}`
+	st, handler, runID, repoID := newRunRepoJobsFixture(t, metaJSON)
+	st.listJobsByRunRepoAttempt.val[0].Name = "heal"
+	st.listJobsByRunRepoAttempt.val[0].JobType = "heal"
+	st.listJobsByRunRepoAttempt.val[0].Status = domaintypes.JobStatusSuccess
+
+	rr := doRequest(t, handler, http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/jobs", nil, "run_id", runID.String(), "repo_id", repoID.String())
+
+	assertStatus(t, rr, http.StatusOK)
+
+	var resp struct {
+		Jobs []struct {
+			BugSummary    string `json:"bug_summary"`
+			ActionSummary string `json:"action_summary"`
+			ErrorKind     string `json:"error_kind"`
+		} `json:"jobs"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Jobs) != 1 {
+		t.Fatalf("expected 1 job entry, got %d", len(resp.Jobs))
+	}
+	if got, want := resp.Jobs[0].BugSummary, "missing ; in Foo.java"; got != want {
+		t.Fatalf("bug_summary = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].ActionSummary, "added missing ;"; got != want {
+		t.Fatalf("action_summary = %q, want %q", got, want)
+	}
+	if got, want := resp.Jobs[0].ErrorKind, "code"; got != want {
+		t.Fatalf("error_kind = %q, want %q", got, want)
+	}
+}
+
 func TestListRunRepoJobsHandler_ExposesRecoveryCandidateAuditFields(t *testing.T) {
 	t.Parallel()
 
