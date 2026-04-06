@@ -63,7 +63,7 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 				m.Home = []string{"ccccccc:.codex/auth.json"}
 				return ""
 			},
-			wantTarget: "/home/user/.codex/auth.json",
+			wantTarget: "/root/.codex/auth.json",
 			wantSrcSfx: filepath.Join("ccccccc", "content"),
 			wantRO:     false,
 		},
@@ -73,7 +73,7 @@ func TestBuildContainerSpec_HydraSingleMount(t *testing.T) {
 				m.Home = []string{"ddddddd:.config/app.toml:ro"}
 				return ""
 			},
-			wantTarget: "/home/user/.config/app.toml",
+			wantTarget: "/root/.config/app.toml",
 			wantSrcSfx: filepath.Join("ddddddd", "content"),
 			wantRO:     true,
 		},
@@ -252,7 +252,7 @@ func TestBuildContainerSpec_HydraMixedMountPlan(t *testing.T) {
 		{target: "/out", readOnly: false, source: outDir},
 		{target: "/etc/ploy/ca/aaa0000", readOnly: true, source: filepath.Join(stagingDir, "aaa0000", "content")},
 		{target: "/in/data.json", readOnly: true, source: filepath.Join(stagingDir, "bbb1111", "content")},
-		{target: "/home/user/.config/app.toml", readOnly: true, source: filepath.Join(stagingDir, "ddd3333", "content")},
+		{target: "/root/.config/app.toml", readOnly: true, source: filepath.Join(stagingDir, "ddd3333", "content")},
 	}
 
 	for _, w := range wants {

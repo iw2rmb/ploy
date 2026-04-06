@@ -522,7 +522,7 @@ func TestHydraResources_MixedMaterializationAndMountPlanning(t *testing.T) {
 	wantMounts := []wantMount{
 		{hash: caHash, field: "ca", target: "/etc/ploy/ca/" + caHash, readOnly: true},
 		{hash: inHash, field: "in", target: "/in/config.json", readOnly: true},
-		{hash: homeHash, field: "home", target: "/home/user/.auth.json", readOnly: true},
+		{hash: homeHash, field: "home", target: "/root/.auth.json", readOnly: true},
 	}
 	for _, w := range wantMounts {
 		contentPath := filepath.Join(stagingDir, w.hash, "content")
