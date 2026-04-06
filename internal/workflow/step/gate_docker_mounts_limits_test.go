@@ -108,6 +108,72 @@ func TestDockerGateExecutor_MountsOutDir(t *testing.T) {
 	}
 }
 
+func TestDockerGateExecutor_MountsGradleNativeCacheDir(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+	workspace := createGradleWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{Enabled: true}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	cacheRoot, err := resolveBuildGateCacheRoot()
+	if err != nil {
+		t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+	}
+	wantSource := filepath.Join(cacheRoot, "java", "gradle", "17")
+	found := false
+	for _, mount := range rt.captured.Mounts {
+		if mount.Source == wantSource && mount.Target == BuildGateGradleUserHomeDir && !mount.ReadOnly {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected gradle cache mount %q -> %q in mounts=%+v", wantSource, BuildGateGradleUserHomeDir, rt.captured.Mounts)
+	}
+}
+
+func TestDockerGateExecutor_MountsMavenNativeCacheDir(t *testing.T) {
+	t.Parallel()
+
+	rt := &testContainerRuntime{}
+	executor := NewDockerGateExecutor(rt)
+	workspace := createMavenWorkspace(t, "17")
+	spec := &contracts.StepGateSpec{Enabled: true}
+
+	_, err := executor.Execute(context.Background(), spec, workspace)
+	if err != nil {
+		t.Fatalf("Execute() unexpected error: %v", err)
+	}
+	if !rt.createCalled {
+		t.Fatal("expected Create to be called")
+	}
+
+	cacheRoot, err := resolveBuildGateCacheRoot()
+	if err != nil {
+		t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+	}
+	wantSource := filepath.Join(cacheRoot, "java", "maven", "17")
+	found := false
+	for _, mount := range rt.captured.Mounts {
+		if mount.Source == wantSource && mount.Target == BuildGateMavenUserHomeDir && !mount.ReadOnly {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected maven cache mount %q -> %q in mounts=%+v", wantSource, BuildGateMavenUserHomeDir, rt.captured.Mounts)
+	}
+}
+
 func TestDockerGateExecutor_LimitEnvParsing(t *testing.T) {
 	memHuman, err := units.RAMInBytes("1GiB")
 	if err != nil {
