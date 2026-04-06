@@ -37,11 +37,11 @@ func TestRunStatusReportTextContract(t *testing.T) {
 
 	out := buf.String()
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
-	assertx.Contains(t, out, "   Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
+	assertx.Contains(t, out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
 	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
-	assertx.Contains(t, out, "Artefacts")
+	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (")
 	assertx.Contains(t, out, "Patch")

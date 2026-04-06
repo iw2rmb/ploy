@@ -96,11 +96,11 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 
 	out := renderText(t, report, TextRenderOptions{EnableOSC8: false, BaseURL: baseURL})
 	assertx.Contains(t, out, "   Mig:   "+migID.String()+"   | java17-upgrade")
-	assertx.Contains(t, out, "   Spec:  "+specID.String()+" | Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
+	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
 	assertx.Contains(t, out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17")
-	assertx.Contains(t, out, "Artefacts")
+	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (https://example.test/v1/runs/")
 	if strings.Count(out, "Patch (https://example.test/v1/runs/") != 1 {
@@ -297,7 +297,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	plainOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL})
 	assertx.NotContains(t, plainOut, "Logs (")
 	assertx.Contains(t, plainOut, jobID.String()+" ("+jobLogURL+"?auth_token=test-token)")
-	assertx.Contains(t, plainOut, "Download (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
+	assertx.Contains(t, plainOut, report.SpecID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
 	assertx.Contains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
 	assertx.Contains(t, plainOut, "Patch (https://example.test/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs?")

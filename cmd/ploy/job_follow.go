@@ -28,10 +28,6 @@ func handleJob(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "log":
 		return handleJobLog(args[1:], stderr)
-	case "follow":
-		// Compatibility alias: `ploy job follow <job-id>` == `ploy job log --follow <job-id>`.
-		aliasArgs := append([]string{"--follow"}, args[1:]...)
-		return handleJobLog(aliasArgs, stderr)
 	default:
 		printJobUsage(stderr)
 		return fmt.Errorf("unknown job subcommand %q", args[0])
@@ -120,7 +116,6 @@ func printJobUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
 	_, _ = fmt.Fprintln(w, "  log         Print job logs (or follow with --follow)")
-	_, _ = fmt.Fprintln(w, "  follow      Alias for: ploy job log --follow")
 }
 
 func printJobLogUsage(w io.Writer) {

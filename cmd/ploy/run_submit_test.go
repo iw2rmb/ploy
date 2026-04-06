@@ -570,7 +570,7 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if !strings.Contains(out, "   Mig:   "+migID.String()+"   | java17-upgrade") {
 		t.Fatalf("expected run status mig header, got: %q", out)
 	}
-	if !strings.Contains(out, "   Spec:  "+specID.String()+" | Download ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
+	if !strings.Contains(out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)") {
 		t.Fatalf("expected run status spec download link, got: %q", out)
 	}
 	if !strings.Contains(out, "   [1/1] github.com/acme/service (https://github.com/acme/service.git) main -> ploy/java17") {
