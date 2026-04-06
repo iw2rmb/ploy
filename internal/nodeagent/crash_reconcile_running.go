@@ -77,15 +77,15 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 		return fmt.Errorf("wait recovered container: %w", err)
 	}
 
-	if logs, logsErr := c.startupReconciler.ReadContainerLogs(ctx, recovered.ContainerID); logsErr != nil {
+	if stdoutLogs, stderrLogs, logsErr := c.startupReconciler.ReadContainerLogs(ctx, recovered.ContainerID); logsErr != nil {
 		slog.Warn("failed to read recovered container logs",
 			"run_id", recovered.RunID,
 			"job_id", recovered.JobID,
 			"container_id", recovered.ContainerID,
 			"error", logsErr,
 		)
-	} else if len(logs) > 0 {
-		if err := c.uploadRecoveredLogs(recovered.RunID, recovered.JobID, logs); err != nil {
+	} else if len(stdoutLogs) > 0 || len(stderrLogs) > 0 {
+		if err := c.uploadRecoveredLogs(recovered.RunID, recovered.JobID, stdoutLogs, stderrLogs); err != nil {
 			slog.Warn("failed to upload recovered container logs",
 				"run_id", recovered.RunID,
 				"job_id", recovered.JobID,
@@ -118,14 +118,22 @@ func (c *ClaimManager) waitAndUploadRecoveredContainer(ctx context.Context, reco
 	return nil
 }
 
-func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID, logs []byte) error {
+func (c *ClaimManager) uploadRecoveredLogs(runID types.RunID, jobID types.JobID, stdoutLogs, stderrLogs []byte) error {
 	logStreamer, err := NewLogStreamer(c.cfg, runID, jobID, nil)
 	if err != nil {
 		return fmt.Errorf("create recovered log streamer: %w", err)
 	}
-	if _, err := logStreamer.Write(logs); err != nil {
-		_ = logStreamer.Close()
-		return fmt.Errorf("write recovered logs: %w", err)
+	if len(stdoutLogs) > 0 {
+		if _, err := logStreamer.StdoutWriter().Write(stdoutLogs); err != nil {
+			_ = logStreamer.Close()
+			return fmt.Errorf("write recovered stdout logs: %w", err)
+		}
+	}
+	if len(stderrLogs) > 0 {
+		if _, err := logStreamer.StderrWriter().Write(stderrLogs); err != nil {
+			_ = logStreamer.Close()
+			return fmt.Errorf("write recovered stderr logs: %w", err)
+		}
 	}
 	if err := logStreamer.Close(); err != nil {
 		return fmt.Errorf("close recovered log streamer: %w", err)

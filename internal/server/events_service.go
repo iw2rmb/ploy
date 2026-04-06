@@ -1,9 +1,6 @@
 package server
 
 import (
-	"bufio"
-	"bytes"
-	"compress/gzip"
 	"container/list"
 	"context"
 	"errors"
@@ -14,6 +11,7 @@ import (
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -250,56 +248,34 @@ func (s *EventsService) publishLogToJobStream(ctx context.Context, jobID domaint
 	// Fetch job metadata to enrich log records with execution context.
 	jobCtx := s.loadJobContext(ctx, log.JobID)
 
-	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
-	zr, err := gzip.NewReader(bytes.NewReader(data))
-	if err == nil {
-		defer func() {
-			_ = zr.Close()
-		}()
-		scanner := bufio.NewScanner(zr)
-		const maxLine = 256 * 1024
-		buf := make([]byte, 0, 64*1024)
-		scanner.Buffer(buf, maxLine)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				continue
-			}
-			rec := logstream.LogRecord{
-				Timestamp: ts,
-				Stream:    "stdout",
-				Line:      line,
-				NodeID:    jobCtx.NodeID,
-				JobID:     jobCtx.JobID,
-				JobType:   jobCtx.JobType,
-			}
-			if err := s.hub.PublishJobLog(ctx, jobID, rec); err != nil {
-				return err
-			}
+	records, err := logchunk.DecodeGzip(data)
+	if err != nil {
+		rec := logstream.LogRecord{
+			Timestamp: ts,
+			Stream:    logchunk.StreamStderr,
+			Line:      "[log decode error]",
+			NodeID:    jobCtx.NodeID,
+			JobID:     jobCtx.JobID,
+			JobType:   jobCtx.JobType,
 		}
-		if scanErr := scanner.Err(); scanErr != nil {
-			rec := logstream.LogRecord{
-				Timestamp: ts,
-				Stream:    "stdout",
-				Line:      "[log decode error]",
-				NodeID:    jobCtx.NodeID,
-				JobID:     jobCtx.JobID,
-				JobType:   jobCtx.JobType,
-			}
-			_ = s.hub.PublishJobLog(ctx, jobID, rec)
-		}
+		_ = s.hub.PublishJobLog(ctx, jobID, rec)
 		return nil
 	}
-	// Fallback: publish raw bytes as a single frame.
-	rec := logstream.LogRecord{
-		Timestamp: ts,
-		Stream:    "log",
-		Line:      string(data),
-		NodeID:    jobCtx.NodeID,
-		JobID:     jobCtx.JobID,
-		JobType:   jobCtx.JobType,
+
+	for _, frame := range records {
+		rec := logstream.LogRecord{
+			Timestamp: ts,
+			Stream:    frame.Stream,
+			Line:      frame.Line,
+			NodeID:    jobCtx.NodeID,
+			JobID:     jobCtx.JobID,
+			JobType:   jobCtx.JobType,
+		}
+		if err := s.hub.PublishJobLog(ctx, jobID, rec); err != nil {
+			return err
+		}
 	}
-	return s.hub.PublishJobLog(ctx, jobID, rec)
+	return nil
 }
 
 // PublishJobRetention emits a retention hint on the job-keyed stream,

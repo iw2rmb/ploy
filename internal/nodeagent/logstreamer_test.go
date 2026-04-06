@@ -13,6 +13,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 )
 
 func TestLogStreamer_Write(t *testing.T) {
@@ -385,5 +386,74 @@ func TestLogStreamer_JobIDInPayload(t *testing.T) {
 				t.Errorf("run_id = %q, want %q", payload.RunID.String(), runID.String())
 			}
 		})
+	}
+}
+
+func TestLogStreamer_PreservesStdoutAndStderrFrames(t *testing.T) {
+	t.Parallel()
+
+	type logChunkPayload struct {
+		Data []byte `json:"data"`
+	}
+
+	var (
+		mu      sync.Mutex
+		records []logchunk.Record
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("read request body: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		var payload logChunkPayload
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Errorf("unmarshal payload: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		frames, err := logchunk.DecodeGzip(payload.Data)
+		if err != nil {
+			t.Errorf("decode framed chunk: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		records = append(records, frames...)
+		mu.Unlock()
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	ls, err := NewLogStreamer(Config{
+		NodeID:    "aB3xY9",
+		ServerURL: server.URL,
+	}, types.NewRunID(), types.NewJobID(), nil)
+	if err != nil {
+		t.Fatalf("NewLogStreamer() failed: %v", err)
+	}
+
+	if _, err := ls.StdoutWriter().Write([]byte("out-line\n")); err != nil {
+		t.Fatalf("stdout write failed: %v", err)
+	}
+	if _, err := ls.StderrWriter().Write([]byte("err-line\n")); err != nil {
+		t.Fatalf("stderr write failed: %v", err)
+	}
+	if err := ls.Close(); err != nil {
+		t.Fatalf("close log streamer: %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(records) < 2 {
+		t.Fatalf("expected at least 2 framed records, got %d", len(records))
+	}
+	if records[0].Stream != logchunk.StreamStdout || records[0].Line != "out-line" {
+		t.Fatalf("first record = %+v, want stdout out-line", records[0])
+	}
+	if records[1].Stream != logchunk.StreamStderr || records[1].Line != "err-line" {
+		t.Fatalf("second record = %+v, want stderr err-line", records[1])
 	}
 }

@@ -7,11 +7,13 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -20,15 +22,78 @@ import (
 // gzipData compresses data using gzip and returns the compressed bytes.
 func gzipData(t *testing.T, data string) []byte {
 	t.Helper()
+	var records []logchunk.Record
+	for _, line := range strings.Split(data, "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		records = append(records, logchunk.Record{
+			Stream: logchunk.StreamStdout,
+			Line:   line,
+		})
+	}
+	return gzipRecords(t, records...)
+}
+
+func gzipRecords(t *testing.T, records ...logchunk.Record) []byte {
+	t.Helper()
 	var buf bytes.Buffer
 	gzWriter := gzip.NewWriter(&buf)
-	if _, err := gzWriter.Write([]byte(data)); err != nil {
-		t.Fatalf("gzip write failed: %v", err)
+	for _, record := range records {
+		if strings.TrimSpace(record.Line) == "" {
+			continue
+		}
+		if err := logchunk.EncodeRecordLine(gzWriter, record.Stream, record.Line); err != nil {
+			t.Fatalf("encode framed log line failed: %v", err)
+		}
 	}
 	if err := gzWriter.Close(); err != nil {
 		t.Fatalf("gzip close failed: %v", err)
 	}
 	return buf.Bytes()
+}
+
+func TestStorage_LogStreamPreservesStderr(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	svc := newTestEventsService(t, &mockStore{})
+
+	logRow := store.Log{
+		ID:        1,
+		RunID:     runID,
+		JobID:     &jobID,
+		ChunkNo:   1,
+		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+	}
+	payload := gzipRecords(t,
+		logchunk.Record{Stream: logchunk.StreamStdout, Line: "out"},
+		logchunk.Record{Stream: logchunk.StreamStderr, Line: "err"},
+	)
+
+	if err := svc.CreateAndPublishLog(context.Background(), logRow, payload); err != nil {
+		t.Fatalf("CreateAndPublishLog failed: %v", err)
+	}
+
+	snapshot := svc.Hub().SnapshotJob(jobID)
+	if len(snapshot) < 2 {
+		t.Fatalf("expected 2 log events, got %d", len(snapshot))
+	}
+
+	var first, second logstream.LogRecord
+	if err := json.Unmarshal(snapshot[0].Data, &first); err != nil {
+		t.Fatalf("decode first record: %v", err)
+	}
+	if err := json.Unmarshal(snapshot[1].Data, &second); err != nil {
+		t.Fatalf("decode second record: %v", err)
+	}
+	if first.Stream != logchunk.StreamStdout || first.Line != "out" {
+		t.Fatalf("first record = %+v, want stdout/out", first)
+	}
+	if second.Stream != logchunk.StreamStderr || second.Line != "err" {
+		t.Fatalf("second record = %+v, want stderr/err", second)
+	}
 }
 
 // TestStorage_LogEnrichmentWithJobMetadata verifies that log records are

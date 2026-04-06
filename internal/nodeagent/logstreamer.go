@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 )
 
 const (
@@ -45,6 +48,8 @@ type LogStreamer struct {
 	closed     bool    // Set to true when Close() is called to prevent sending during shutdown.
 	hook       LogHook // Optional hook to process logs before compression.
 	httpClient *http.Client
+	pendingOut string
+	pendingErr string
 }
 
 // NewLogStreamer creates a new log streamer for a specific run and (optionally) job.
@@ -85,6 +90,32 @@ func (ls *LogStreamer) SetHook(hook LogHook) {
 
 // Write implements io.Writer interface for capturing logs.
 func (ls *LogStreamer) Write(p []byte) (n int, err error) {
+	return ls.writeStream(logchunk.StreamStdout, p)
+}
+
+type logStreamWriter struct {
+	ls     *LogStreamer
+	stream string
+}
+
+func (w logStreamWriter) Write(p []byte) (int, error) {
+	if w.ls == nil {
+		return 0, errors.New("log streamer writer is nil")
+	}
+	return w.ls.writeStream(w.stream, p)
+}
+
+// StdoutWriter returns an io.Writer that tags all writes as stdout.
+func (ls *LogStreamer) StdoutWriter() io.Writer {
+	return logStreamWriter{ls: ls, stream: logchunk.StreamStdout}
+}
+
+// StderrWriter returns an io.Writer that tags all writes as stderr.
+func (ls *LogStreamer) StderrWriter() io.Writer {
+	return logStreamWriter{ls: ls, stream: logchunk.StreamStderr}
+}
+
+func (ls *LogStreamer) writeStream(stream string, p []byte) (n int, err error) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
 
@@ -104,10 +135,9 @@ func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	// Write to gzip writer.
-	_, err = ls.gzWriter.Write(processed)
-	if err != nil {
-		return 0, fmt.Errorf("write to gzip: %w", err)
+	// Convert bytes to framed records preserving stream identity.
+	if err := ls.appendProcessedLocked(stream, processed); err != nil {
+		return 0, err
 	}
 
 	// Check if we need to flush due to size.
@@ -124,6 +154,50 @@ func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 
 	// Return the number of bytes consumed from the original input.
 	return len(p), nil
+}
+
+func (ls *LogStreamer) appendProcessedLocked(stream string, processed []byte) error {
+	var carry *string
+	switch strings.ToLower(strings.TrimSpace(stream)) {
+	case logchunk.StreamStderr:
+		carry = &ls.pendingErr
+	default:
+		carry = &ls.pendingOut
+		stream = logchunk.StreamStdout
+	}
+
+	text := *carry + string(processed)
+	for {
+		idx := strings.IndexByte(text, '\n')
+		if idx < 0 {
+			break
+		}
+		line := strings.TrimRight(text[:idx], "\r")
+		if line != "" {
+			if err := logchunk.EncodeRecordLine(ls.gzWriter, stream, line); err != nil {
+				return fmt.Errorf("write framed log line: %w", err)
+			}
+		}
+		text = text[idx+1:]
+	}
+	*carry = text
+	return nil
+}
+
+func (ls *LogStreamer) flushPendingLocked() error {
+	if strings.TrimSpace(ls.pendingOut) != "" {
+		if err := logchunk.EncodeRecordLine(ls.gzWriter, logchunk.StreamStdout, strings.TrimRight(ls.pendingOut, "\r")); err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(ls.pendingErr) != "" {
+		if err := logchunk.EncodeRecordLine(ls.gzWriter, logchunk.StreamStderr, strings.TrimRight(ls.pendingErr, "\r")); err != nil {
+			return err
+		}
+	}
+	ls.pendingOut = ""
+	ls.pendingErr = ""
+	return nil
 }
 
 // periodicFlush runs in the background and flushes buffered logs periodically.
@@ -272,6 +346,9 @@ func (ls *LogStreamer) Close() error {
 		defer ls.mu.Unlock()
 
 		var errs []error
+		if err := ls.flushPendingLocked(); err != nil {
+			errs = append(errs, fmt.Errorf("flush pending logs: %w", err))
+		}
 		if ls.buffer.Len() > 0 {
 			if err := ls.flushLocked(); err != nil {
 				errs = append(errs, err)

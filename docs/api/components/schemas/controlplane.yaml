@@ -816,7 +816,7 @@ Log:
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
-      description: Gzipped log chunk (≤10 MiB gzipped), base64-encoded.
+      description: Gzipped framed log chunk (JSON-per-line frames with stream+line; ≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
     created_at: { type: string, format: date-time }
   required: [id, run_id, chunk_no, data, created_at]
@@ -840,7 +840,7 @@ CreateLogRequest:
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
-      description: Gzipped log chunk (≤10 MiB gzipped), base64-encoded.
+      description: Gzipped framed log chunk (JSON-per-line frames with stream+line; ≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
   required: [chunk_no, data]
 
@@ -855,7 +855,7 @@ NodeCreateLogRequest:
     chunk_no: { type: integer, format: int32 }
     data:
       type: string
-      description: Gzipped log chunk (≤10 MiB gzipped), base64-encoded.
+      description: Gzipped framed log chunk (JSON-per-line frames with stream+line; ≤10 MiB gzipped), base64-encoded.
       contentEncoding: base64
   required: [run_id, chunk_no, data]
 

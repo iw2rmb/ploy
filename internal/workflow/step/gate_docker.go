@@ -242,14 +242,22 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	liveWriter := executionLogWriterFromContext(ctx)
 	var streamDone <-chan error
 	if streamer, ok := e.rt.(logStreamingRuntime); ok {
-		outWriter := io.Writer(&streamedLogs)
+		stdoutWriter := io.Writer(&streamedLogs)
+		stderrWriter := io.Writer(&streamedLogs)
 		if liveWriter != nil {
-			outWriter = io.MultiWriter(&streamedLogs, liveWriter)
+			liveStdout := liveWriter
+			liveStderr := liveWriter
+			if split, ok := liveWriter.(splitLogWriter); ok {
+				liveStdout = split.StdoutWriter()
+				liveStderr = split.StderrWriter()
+			}
+			stdoutWriter = io.MultiWriter(&streamedLogs, liveStdout)
+			stderrWriter = io.MultiWriter(&streamedLogs, liveStderr)
 		}
 		done := make(chan error, 1)
 		streamDone = done
 		go func() {
-			done <- streamer.StreamLogs(ctx, h, outWriter, outWriter)
+			done <- streamer.StreamLogs(ctx, h, stdoutWriter, stderrWriter)
 		}()
 	}
 

@@ -15,6 +15,7 @@ import (
 
 	bsmock "github.com/iw2rmb/ploy/internal/blobstore/mock"
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/logchunk"
 	"github.com/iw2rmb/ploy/internal/server/blobpersist"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -206,7 +207,6 @@ func TestGetJobLogsHandler_RunNotFound(t *testing.T) {
 	assertStatus(t, rr, http.StatusNotFound)
 }
 
-
 // --- GET /v1/jobs/{job_id}/logs backfill path (sinceID == 0) ---
 
 // gzipLines creates gzipped data from newline-joined lines.
@@ -215,7 +215,30 @@ func gzipLines(t *testing.T, lines ...string) []byte {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	for _, l := range lines {
-		_, _ = zw.Write([]byte(l + "\n"))
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		if err := logchunk.EncodeRecordLine(zw, logchunk.StreamStdout, l); err != nil {
+			t.Fatalf("encode framed line: %v", err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func gzipFrames(t *testing.T, records ...logchunk.Record) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	for _, record := range records {
+		if strings.TrimSpace(record.Line) == "" {
+			continue
+		}
+		if err := logchunk.EncodeRecordLine(zw, record.Stream, record.Line); err != nil {
+			t.Fatalf("encode framed line: %v", err)
+		}
 	}
 	if err := zw.Close(); err != nil {
 		t.Fatal(err)
@@ -264,6 +287,48 @@ func TestGetJobLogsHandler_BackfillExcludesNilJobIDLogs(t *testing.T) {
 	}
 	if strings.Contains(body, "nil-line") {
 		t.Fatal("nil-job-id log must not appear in job-scoped backfill")
+	}
+}
+
+func TestGetJobLogsHandler_BackfillPreservesStderrStream(t *testing.T) {
+	t.Parallel()
+
+	runID := domaintypes.NewRunID()
+	jobID := domaintypes.NewJobID()
+	objKey := "logs/job-stderr.gz"
+
+	st := &jobStore{
+		getJobResult: store.Job{ID: jobID, RunID: runID, Status: domaintypes.JobStatusSuccess},
+	}
+	st.getRun.val = store.Run{ID: runID, Status: domaintypes.RunStatusFinished}
+	st.listLogsByRun.val = []store.Log{
+		{ID: 1, RunID: runID, JobID: &jobID, ObjectKey: &objKey},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.Background(), objKey, "", gzipFrames(t,
+		logchunk.Record{Stream: logchunk.StreamStdout, Line: "out-line"},
+		logchunk.Record{Stream: logchunk.StreamStderr, Line: "err-line"},
+	))
+
+	eventsService, err := createTestEventsServiceWithStore(st)
+	if err != nil {
+		t.Fatalf("events service: %v", err)
+	}
+	h := getJobLogsHandler(st, bs, eventsService)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/jobs/"+jobID.String()+"/logs", nil)
+	req.SetPathValue("job_id", jobID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	h.ServeHTTP(rr, req)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `"stream":"stdout","line":"out-line"`) {
+		t.Fatalf("expected stdout frame in output; body: %s", body)
+	}
+	if !strings.Contains(body, `"stream":"stderr","line":"err-line"`) {
+		t.Fatalf("expected stderr frame in output; body: %s", body)
 	}
 }
 
@@ -860,4 +925,3 @@ func TestGetJobLogsHandler_TerminalBackfillIncludesRetention(t *testing.T) {
 		t.Fatalf("retention must precede done; retention@%d done@%d; body: %s", retIdx, doneIdx, body)
 	}
 }
-
