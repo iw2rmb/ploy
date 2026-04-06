@@ -115,12 +115,11 @@ The recommended approach for Codex-based healing is the workspace diff handshake
 
 **Codex Healing Handshake Checklist (Validation):**
 
-Validate the following artifacts after Codex-based healing runs:
+Validate the following artifact after Codex-based healing runs:
 
 | Artifact | Location | Description | Required |
 |----------|----------|-------------|----------|
-| Session ID | `codex-session.txt` | Thread ID for resume mode across healing retries | Recommended |
-| Run manifest | `codex-run.json` | JSON with `session_id`, `resumed` fields | Required |
+| Healing summary | `heal.json` | Last assistant message summary | Required |
 
 **Validation steps:**
 
@@ -129,16 +128,9 @@ Validate the following artifacts after Codex-based healing runs:
    - The node agent re-runs the Build Gate only when workspace diffs are present (`git status --porcelain` non-empty).
    - When healing performs no net changes (clean `git status`), the gate is not re-run and the run terminates as failed.
 
-2. **Session resume across healing retries**: When `retries > 1` in healing config:
-   - After first healing attempt: `codex-session.txt` is written to `/out` with thread ID
-   - Before second healing attempt: Session ID is propagated to `/in/codex-session.txt`
-   - Subsequent healing migs receive `CODEX_RESUME=1` environment variable
-   - `codex.log` shows "resume mode enabled; session=<id>" on retry attempts
-   - `codex-run.json` contains `"resumed":true` for resumed runs
-
-3. **Run manifest fields** (`codex-run.json`):
-   - `session_id`: Thread ID for conversation continuity (may be empty)
-   - `resumed`: `true` if this was a resumed session, `false` otherwise
+2. **Healing summary artifact**:
+   - `heal.json` is written to `/out`
+   - File may be empty when the healing tool does not emit a final summary payload
 
 Cross-reference: `AGENTS.md` and `docs/testing-workflow.md`.
 

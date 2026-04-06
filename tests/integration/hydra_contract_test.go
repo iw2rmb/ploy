@@ -108,11 +108,11 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 				"heal": {
 					"retries": 1,
 					"image": "amata:latest",
-					"in": ["abcdef0:/in/codex-prompt.txt", "eeeeeee:/in/auth.json"],
+					"in": ["eeeeeee:/in/auth.json"],
 					"ca": ["bbbbbbb0123456"]
 				}
 			},
-			"bundle_map": {"abcdef0": "bun-1", "bbbbbbb0123456": "bun-2", "eeeeeee": "bun-3"}
+			"bundle_map": {"bbbbbbb0123456": "bun-2", "eeeeeee": "bun-3"}
 		}`
 		parsed, err := contracts.ParseMigSpecJSON([]byte(spec))
 		if err != nil {
@@ -121,8 +121,8 @@ func TestHydraContract_PrecedenceAndEdgeCases(t *testing.T) {
 		if parsed.BuildGate == nil || parsed.BuildGate.Heal == nil {
 			t.Fatal("expected heal to be parsed")
 		}
-		if len(parsed.BuildGate.Heal.In) != 2 {
-			t.Errorf("expected 2 in entries (prompt + auth), got %d", len(parsed.BuildGate.Heal.In))
+		if len(parsed.BuildGate.Heal.In) != 1 {
+			t.Errorf("expected 1 in entry (auth), got %d", len(parsed.BuildGate.Heal.In))
 		}
 		if len(parsed.BuildGate.Heal.CA) != 1 {
 			t.Errorf("expected 1 ca entry, got %d", len(parsed.BuildGate.Heal.CA))

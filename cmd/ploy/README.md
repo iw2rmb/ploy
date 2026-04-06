@@ -597,9 +597,19 @@ build_gate:
     <<: !include ./healing/spec.yaml
     retries: 1
     image: ghcr.io/iw2rmb/ploy/amata:latest
-    command: ["codex", "--input", "/workspace", "--out", "/out"]
-    in:
-      - ./codex-prompt.txt:/in/codex-prompt.txt
+    amata:
+      spec: |
+        version: amata/v1
+        name: gate-healer
+        entry: main
+        workspace:
+          root: /workspace
+        flows:
+          main:
+            steps:
+              - codex: |
+                  Fix the build failure in /in/build-gate.log.
+                  Your final message MUST be one line of JSON: {"action_summary":"..."}
     home:
       - ~/.codex/auth.json:.codex/auth.json:ro
     expectations:

@@ -158,7 +158,7 @@ build_gate:
     retries: 2
     image: ghcr.io/iw2rmb/ploy/amata:latest
     in:
-      - ./codex-prompt.txt:/in/codex-prompt.txt
+      - ./healing/amata.yaml:amata.yaml
     home:
       - ~/.codex/auth.json:.codex/auth.json:ro
     expectations:
@@ -1270,8 +1270,7 @@ Migs container images are standard OCI images with the following expectations:
     - per-iteration gate logs (`/in/build-gate-iteration-N.log`),
     - per-iteration healing logs (`/in/healing-iteration-N.log`),
     - cumulative healing log (<code>/in/healing-log.md</code>),
-    - Codex session state (`/in/codex-session.txt`),
-    - prompt files (`/in/codex-prompt.txt`), etc.
+    - amata workflow spec (`/in/amata.yaml`), etc.
 
 - **Environment**
   - Spec `env` maps are resolved and merged by `buildSpecPayload`.

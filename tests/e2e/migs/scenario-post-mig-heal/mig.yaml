@@ -158,8 +158,7 @@ mr_on_success: true
 #    - Run should complete with status=success
 #
 # 5. Artifact validation:
-#    - codex.log should contain healing output
-#    - codex-run.json should include session_id/resumed fields
+#    - heal.json should be present
 #    - Final workspace should include healing fix
 #
 # Success criteria:

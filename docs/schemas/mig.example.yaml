@@ -207,24 +207,6 @@ build_gate:
 #     home:
 #       - ~/.codex/auth.json:.codex/auth.json
 #
-# 2. Direct-Codex mode (fallback): omit `amata` — prompt delivered via Hydra `in` mount.
-#
-# build_gate:
-#   heal:
-#     <<: !include ./healing/spec.yaml
-#     retries: 2
-#     image: docker.io/your-dh-user/amata:latest
-#     in:
-#       codex-prompt.txt: |-
-#         Fix the build failure in /in/build-gate.log.
-#         Your final message MUST be one line of JSON: {"action_summary":"..."}
-#     home:
-#       - ~/.codex/auth.json:.codex/auth.json
-#     expectations:
-#       artifacts:
-#         - path: /out/gate-profile-candidate.json
-#           schema: gate_profile_v1
-#
 # `!include` is optional preprocessing handled by CLI:
 # - scalar replacement: `field: !include ./file.yaml#/pointer`
 # - deep merge with overrides: `field: {<<: !include ./file.yaml#/pointer, ...}`

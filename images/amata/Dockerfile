@@ -27,7 +27,6 @@ RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \
-    CODEX_MODEL="" \
     PLOY_SERVER_URL="" \
     PLOY_API_TOKEN="" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \

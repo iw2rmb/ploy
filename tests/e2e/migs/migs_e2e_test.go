@@ -211,9 +211,6 @@ func runScenarioScriptOffline(t *testing.T, root, dir string, mountPaths []strin
 			t.Errorf("%s/run.sh: missing expected Hydra mount path %q", dir, p)
 		}
 	}
-	if strings.Contains(content, "CODEX_PROMPT") {
-		t.Errorf("%s/run.sh: contains legacy CODEX_PROMPT; must use Hydra in mount", dir)
-	}
 }
 
 // TestHydraInMixed runs the Hydra in-record mixed inputs e2e scenario,
@@ -328,9 +325,9 @@ func TestHydraScenarioOfflineValidation(t *testing.T) {
 				}
 			}
 
-			// Verify no legacy /in/prompt.txt reference.
+			// Verify no legacy prompt-file references.
 			if strings.Contains(content, "/in/prompt.txt") {
-				t.Errorf("%s/run.sh: contains legacy /in/prompt.txt; should use /in/codex-prompt.txt", sc.dir)
+				t.Errorf("%s/run.sh: contains legacy /in/prompt.txt; prompts must come from /in/amata.yaml", sc.dir)
 			}
 		})
 	}
@@ -596,48 +593,6 @@ func TestHydraOutUploadContinuityOffline(t *testing.T) {
 	})
 }
 
-// TestMigSpecsPromptFilesExist verifies that all prompt files referenced via
-// Hydra in mounts in mig.yaml specs actually exist alongside the spec.
-func TestMigSpecsPromptFilesExist(t *testing.T) {
-	root := repoRoot(t)
-	scenarioDir := filepath.Join(root, "tests", "e2e", "migs")
-
-	entries, err := os.ReadDir(scenarioDir)
-	if err != nil {
-		t.Fatalf("read scenario dir: %v", err)
-	}
-
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		specPath := filepath.Join(scenarioDir, e.Name(), "mig.yaml")
-		data, err := os.ReadFile(specPath)
-		if err != nil {
-			continue
-		}
-
-		// Check for in-mount entries referencing codex-prompt files.
-		for _, line := range strings.Split(string(data), "\n") {
-			trimmed := strings.TrimSpace(line)
-			if !strings.HasPrefix(trimmed, "- ./") || !strings.Contains(trimmed, ":/in/codex-prompt.txt") {
-				continue
-			}
-			// Extract the local source path from "- ./foo.txt:/in/codex-prompt.txt"
-			entry := strings.TrimPrefix(trimmed, "- ")
-			parts := strings.SplitN(entry, ":", 2)
-			if len(parts) != 2 {
-				continue
-			}
-			src := parts[0]
-			absPath := filepath.Join(scenarioDir, e.Name(), src)
-			if _, err := os.Stat(absPath); err != nil {
-				t.Errorf("%s/mig.yaml: references %s but file does not exist", e.Name(), src)
-			}
-		}
-	}
-}
-
 // TestHydraE2EDefaultCoverageGate runs unconditionally to ensure the default
 // `go test` path proves Hydra-only e2e coverage. When the live cluster is
 // unavailable, this gate validates that each live Hydra scenario has an
@@ -703,11 +658,6 @@ func TestHydraE2EDefaultCoverageGate(t *testing.T) {
 				if !strings.Contains(content, p) {
 					t.Errorf("%s/run.sh: missing Hydra mount path %q", sc.scriptDir, p)
 				}
-			}
-
-			// Verify no legacy CODEX_PROMPT in scenario scripts.
-			if strings.Contains(content, "CODEX_PROMPT") {
-				t.Errorf("%s/run.sh: contains legacy CODEX_PROMPT; must use Hydra in mount", sc.scriptDir)
 			}
 
 			// Validate contract-level parsers accept the mount paths
