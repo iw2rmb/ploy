@@ -514,6 +514,38 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 			},
 			notContain: []string{"STD[O]UT", "STD[E]RR", "should not render"},
 		},
+		{
+			name: "running expanded collapses overly wrapped line",
+			report: func() RunReport {
+				jobID := domaintypes.NewJobID()
+				job := RunJobEntry{
+					JobID:      jobID,
+					JobType:    "mig",
+					JobImage:   "ghcr.io/acme/mig:1",
+					Status:     domaintypes.JobStatusRunning,
+					DurationMs: 1000,
+				}
+				return singleJobReport("io-long-line", "Running", job)
+			}(),
+			opts: TextRenderOptions{
+				EnableOSC8:   false,
+				ExpandStdout: true,
+				ExpandStderr: false,
+			},
+			contains: []string{
+				"\n     " + strings.Repeat("a", 80) + "\n",
+				"\n     " + strings.Repeat("b", 80) + "\n",
+				"\n     " + strings.Repeat("c", 80) + "\n",
+				"\n     ... +2 rows\n",
+				"\n     " + strings.Repeat("f", 80) + "\n",
+				"\n     " + strings.Repeat("g", 80) + "\n",
+				"\n     " + strings.Repeat("h", 80) + "\n",
+			},
+			notContain: []string{
+				"\n     " + strings.Repeat("d", 80) + "\n",
+				"\n     " + strings.Repeat("e", 80) + "\n",
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -549,6 +581,22 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
 					jobID: {
 						Stdout: []string{"first", strings.Repeat("o", 95)},
+						Stderr: []string{"warning line"},
+					},
+				}
+			case "running expanded collapses overly wrapped line":
+				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
+					jobID: {
+						Stdout: []string{
+							strings.Repeat("a", 80) +
+								strings.Repeat("b", 80) +
+								strings.Repeat("c", 80) +
+								strings.Repeat("d", 80) +
+								strings.Repeat("e", 80) +
+								strings.Repeat("f", 80) +
+								strings.Repeat("g", 80) +
+								strings.Repeat("h", 80),
+						},
 						Stderr: []string{"warning line"},
 					},
 				}
