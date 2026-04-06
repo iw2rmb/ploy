@@ -299,7 +299,7 @@ remain an optional fallback optimization when claim context fields are absent.
 - For deps-oriented healing runs, claim `recovery_context` may carry:
   - `deps_compat_endpoint`
   - `deps_bumps`
-- `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag).
+- `/in/amata.yaml` — Workflow spec materialized from `build_gate.heal.amata.spec`.
 
 **Healing workspace policy:**
 - Infra-style healing: output-only and must not modify `/workspace`; any workspace diff fails the heal job with `healing_warning=unexpected_workspace_changes`.

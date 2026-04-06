@@ -111,7 +111,7 @@ Role model (bearer token claims):
   - `/in/build-gate.log` — First Build Gate failure log (primarily from claim `recovery_context`; node-local cache fallback)
   - `/in/gate_profile.json` — Gate profile used by the failed gate when available (provided for `infra` healing context)
   - `/in/gate_profile.schema.json` — Gate profile schema for `infra` healing context (`title: Ploy Build Gate Profile`, includes `$comment` guidance for key fields)
-  - `/in/codex-prompt.txt` — Prompt file delivered via Hydra `in` mount (or `--prompt-file` flag)
+  - `/in/amata.yaml` — Amata workflow spec materialized from `amata.spec`
 - `--spec` — Path to a YAML/JSON spec file for `ploy run` defining mig parameters,
   Build Gate settings, and healing configuration. The spec supports:
   - `envs` — Environment variables (key-value map, merged by key across precedence layers)
@@ -175,11 +175,11 @@ build_gate:
   `ploy mig run repo add --repo-url https://... --base-ref main --target-ref feature my-batch`.
   See [Migs lifecycle](../migs-lifecycle.md) § "1.4 Batched Migs Runs (`runs` + `run_repos`)"
   for full usage.
-- `build_gate.heal` — Spec block defining the single healing action:
+  - `build_gate.heal` — Spec block defining the single healing action:
   - Action fields support include-composition (`retries`, `image`, `command`, `envs`, `ca`, `in`, `out`, `home`, optional `amata`, optional `expectations`)
   - After each healing attempt, the Build Gate is re-run; on pass, the main mig proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
-  - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/codex-prompt.txt`) are available to healing migs
+  - Cross-phase inputs (`/in/build-gate.log`, `/in/gate_profile.json`, `/in/amata.yaml`) are available to healing migs
   - For `expectations.artifacts` schema `gate_profile_v1`, healing is expected to write `/out/gate-profile-candidate.json` with explicit `targets.active` (`all_tests|unit|build|unsupported`); candidate promotion to repo `gate_profile` occurs only on successful follow-up `re_gate`
   - Terminal unsupported candidate contract: `targets.active=unsupported`, `targets.build.status=failed`, `targets.build.failure_code=infra_support`
 - Container cleanup model:
@@ -573,7 +573,7 @@ The `show` and `unset` commands use **`--from`** to specify the target:
 |----------|----------|-------------|
 | `ca` (typed) | ORW migs, build-gate, custom migs | PEM-encoded CA certificates; mounted via Hydra `ca` materialization at `/etc/ploy/ca/<hash>` |
 | `home` (typed) | `codex` | File mounts relative to $HOME (replaces `CODEX_AUTH_JSON`, `CODEX_CONFIG_TOML`, `CCR_CONFIG_JSON`, `CRUSH_JSON`) |
-| `in` (typed) | `codex`, healing | Read-only input file mounts (replaces `CODEX_PROMPT` file injection) |
+| `in` (typed) | `codex`, healing | Read-only input file mounts |
 | `OPENAI_API_KEY` | Future OpenAI-integrated migs | API key for LLM operations |
 | `PLOY_GRADLE_BUILD_CACHE_URL` | Build Gate (Gradle) | HTTP URL of the remote Gradle Build Cache endpoint (e.g. `http://gradle-build-cache:5071/cache/`). When unset, remote cache is disabled. |
 | `PLOY_GRADLE_BUILD_CACHE_PUSH` | Build Gate (Gradle) | Whether to push results to the remote cache. Defaults to `true` when `PLOY_GRADLE_BUILD_CACHE_URL` is set. |

@@ -7,7 +7,6 @@ amata [run /in/amata.yaml [--set key=value ...]]
 
 Environment:
   CODEX_HOME        Codex home directory for auth/config files.
-  CODEX_MODEL       Optional model override (written into manifest metadata).
 
 File delivery (Hydra):
   Config files (auth.json, config.toml, crush.json, ccr config.json) are delivered
@@ -17,7 +16,7 @@ Behavior:
   - Always executes the amata binary.
   - If invoked without args and /in/amata.yaml exists, runs: amata run /in/amata.yaml
   - Imports extra CA certs from /etc/ploy/ca when present.
-  - Writes codex-compatible artifacts to /out: codex.log, heal.json, codex-run.json.
+  - Writes artifacts to /out: heal.json.
 USAGE
 }
 
@@ -53,33 +52,19 @@ if [[ $# -eq 0 && -s "/in/amata.yaml" ]]; then
 fi
 
 out_dir="${OUTDIR:-/out}"
-model="${CODEX_MODEL:-}"
 mkdir -p "$out_dir" "$codex_config_dir"
 check_hydra_configs
 install_ploy_ca_bundle
 activate_ccr_if_configured
 
-logfile="$out_dir/codex.log"
-manifest_file="$out_dir/codex-run.json"
-
-echo "[amata] starting amata run" | tee "$logfile" >&2
+echo "[amata] starting amata run" >&2
 set +e
-amata "$@" 2>&1 | tee -a "$logfile" >&2
-status=${PIPESTATUS[0]}
+amata --out jsonl "$@"
+status=$?
 set -e
 
-if [[ ! -s "$logfile" ]]; then
-  echo "[amata] no output captured from amata" | tee -a "$logfile" >&2
-fi
 if [[ ! -s "$out_dir/heal.json" ]]; then
-  if [[ -s "$logfile" ]]; then
-    grep -v '^\s*$' "$logfile" | tail -1 > "$out_dir/heal.json" || true
-  fi
-  [[ -s "$out_dir/heal.json" ]] || touch "$out_dir/heal.json"
+  touch "$out_dir/heal.json"
 fi
-
-ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","session_id":"%s","resumed":%s}\n' \
-  "$ts" "${status:-0}" "${model}" "${WORKSPACE:-/workspace}" "" "false" > "$manifest_file"
 
 exit "${status:-0}"

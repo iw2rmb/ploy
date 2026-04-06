@@ -194,70 +194,37 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   VALIDATION_FAILED=0
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 1. Verify Codex logs are present. Codex now signals completion by exiting;
+  # 1. Verify healing summary artifact is present. Codex now signals completion by exiting;
   #    the node agent decides whether to re-run the gate based on workspace diffs.
   # ─────────────────────────────────────────────────────────────────────────────
-  CODEX_LOG="${ARTIFACT_DIR}/codex.log"
   CODEX_LAST="${ARTIFACT_DIR}/heal.json"
 
-  echo "  1. Codex log artifacts:"
-  if [[ -f "$CODEX_LOG" ]]; then
-    echo "     ✓ codex.log present"
-  else
-    echo "     - codex.log not found (Codex healing may not have run)"
-  fi
+  echo "  1. Healing artifacts:"
   if [[ -f "$CODEX_LAST" ]]; then
     echo "     ✓ heal.json present (last assistant message captured)"
+  else
+    echo "     - heal.json not found (healing may not have run)"
   fi
   echo ""
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 2. Verify session resume support: codex-session.txt enables retry continuity.
+  # 2. Verify heal.json artifact.
   # ─────────────────────────────────────────────────────────────────────────────
-  CODEX_SESSION="${ARTIFACT_DIR}/codex-session.txt"
+  CODEX_LAST="${ARTIFACT_DIR}/heal.json"
 
-  echo "  2. Session resume support (healing retry continuity):"
-  if [[ -f "$CODEX_SESSION" ]]; then
-    SESSION_ID=$(tr -d '\r\n' < "$CODEX_SESSION")
-    if [[ -n "$SESSION_ID" ]]; then
-      echo "     ✓ Codex session captured: ${SESSION_ID:0:20}..."
-    else
-      echo "     ⚠ codex-session.txt is empty (session resume not available)"
-    fi
+  echo "  2. Healing summary artifact:"
+  if [[ -f "$CODEX_LAST" ]]; then
+    echo "     ✓ heal.json present"
   else
-    echo "     - codex-session.txt not found (session resume not available)"
+    echo "     - heal.json not found"
     echo "       This is expected if healing did not run."
   fi
   echo ""
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # 3. Verify codex-run.json manifest contains required fields.
+  # 3. Verify gate-related artifacts exist (from Build Gate runs).
   # ─────────────────────────────────────────────────────────────────────────────
-  CODEX_MANIFEST="${ARTIFACT_DIR}/codex-run.json"
-
-  echo "  3. Codex run manifest (healing metadata):"
-  if [[ -f "$CODEX_MANIFEST" ]]; then
-    echo "     ✓ codex-run.json present"
-    if grep -q '"session_id"' "$CODEX_MANIFEST"; then
-      echo "     ✓ Manifest contains session_id field"
-    else
-      echo "     ⚠ Manifest missing session_id field"
-    fi
-    if grep -q '"resumed"' "$CODEX_MANIFEST"; then
-      echo "     ✓ Manifest contains resumed field"
-    else
-      echo "     ⚠ Manifest missing resumed field"
-    fi
-  else
-    echo "     - codex-run.json not found"
-    echo "       This is expected if healing did not run."
-  fi
-  echo ""
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # 4. Verify gate-related artifacts exist (from Build Gate runs).
-  # ─────────────────────────────────────────────────────────────────────────────
-  echo "  4. Build Gate artifacts:"
+  echo "  3. Build Gate artifacts:"
   GATE_ARTIFACTS=$(find "$ARTIFACT_DIR" -name "*build-gate*.log*" -o -name "*build-gate*.bin" 2>/dev/null | wc -l)
   if [[ $GATE_ARTIFACTS -gt 0 ]]; then
     echo "     ✓ Found $GATE_ARTIFACTS gate-related artifacts"
@@ -301,7 +268,6 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   echo "   - Logs should indicate post-mig (not pre-mig) gate failure"
   echo ""
   echo "2. Healing execution:"
-  echo "   - Review codex.log for healing activity"
   echo "   - Confirm Codex edited files under /workspace and exited (no in-container gate runs)"
   echo "   - Verify healing created/modified files to fix the error"
   echo ""

@@ -18,7 +18,6 @@ func TestSpecialEnvMappingTable_DesignAlignment(t *testing.T) {
 		{"CODEX_CONFIG_TOML", "home", ".codex/config.toml", "ro"},
 		{"CRUSH_JSON", "home", ".config/crush/crush.json", "ro"},
 		{"CCR_CONFIG_JSON", "home", ".claude-code/config.json", "ro"},
-		{"CODEX_PROMPT", "in", "/in/codex-prompt.txt", ""},
 	}
 
 	table := SpecialEnvMappingTable()
@@ -48,7 +47,7 @@ func TestSpecialEnvMappingTable_DesignAlignment(t *testing.T) {
 func TestIsSpecialEnvKey(t *testing.T) {
 	special := []string{
 		"CODEX_AUTH_JSON", "CODEX_CONFIG_TOML",
-		"CRUSH_JSON", "CCR_CONFIG_JSON", "CODEX_PROMPT",
+		"CRUSH_JSON", "CCR_CONFIG_JSON",
 	}
 	for _, k := range special {
 		if !IsSpecialEnvKey(k) {
@@ -76,7 +75,6 @@ func TestRewriteSpecialEnvEntry(t *testing.T) {
 		{"home_config", "CODEX_CONFIG_TOML", "aaa1111", "home", "aaa1111:.codex/config.toml:ro"},
 		{"home_crush", "CRUSH_JSON", "bbb2222", "home", "bbb2222:.config/crush/crush.json:ro"},
 		{"home_ccr", "CCR_CONFIG_JSON", "ccc3333", "home", "ccc3333:.claude-code/config.json:ro"},
-		{"in_prompt", "CODEX_PROMPT", "eee5555", "in", "eee5555:/in/codex-prompt.txt"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -181,7 +179,6 @@ func TestScanSpecialEnvKeys_ConflictCases(t *testing.T) {
 		name         string
 		globalEnv    map[string][]GlobalEnvVar
 		existingHome map[string][]ConfigHomeEntry
-		existingIn   map[string][]ConfigInEntry
 	}{
 		{
 			name: "home conflict full",
@@ -201,19 +198,10 @@ func TestScanSpecialEnvKeys_ConflictCases(t *testing.T) {
 				"mig": {{Entry: "abc1234:.codex/auth.json:ro", Dst: ".codex/auth.json", Section: "mig"}},
 			},
 		},
-		{
-			name: "in conflict",
-			globalEnv: map[string][]GlobalEnvVar{
-				"CODEX_PROMPT": {{Value: "do the thing", Target: domaintypes.GlobalEnvTargetSteps}},
-			},
-			existingIn: map[string][]ConfigInEntry{
-				"mig": {{Entry: "abc123:/in/codex-prompt.txt", Dst: "/in/codex-prompt.txt", Section: "mig"}},
-			},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			report := ScanSpecialEnvKeys(tt.globalEnv, nil, tt.existingHome, tt.existingIn)
+			report := ScanSpecialEnvKeys(tt.globalEnv, nil, tt.existingHome, nil)
 
 			if report.Rejected != 1 {
 				t.Fatalf("Rejected = %d, want 1", report.Rejected)
@@ -269,7 +257,6 @@ func TestScanSpecialEnvKeys_NonSpecialKeysIgnored(t *testing.T) {
 
 func TestMigrationReport_Metrics(t *testing.T) {
 	globalEnv := map[string][]GlobalEnvVar{
-		"CODEX_PROMPT":      {{Value: "prompt", Target: domaintypes.GlobalEnvTargetGates}},
 		"CODEX_AUTH_JSON":   {{Value: "json", Target: domaintypes.GlobalEnvTargetSteps}},
 		"CODEX_CONFIG_TOML": {{Value: "toml", Target: domaintypes.GlobalEnvTargetServer}},
 		"CRUSH_JSON":        {{Value: "crush", Target: domaintypes.GlobalEnvTargetSteps}},
@@ -280,10 +267,10 @@ func TestMigrationReport_Metrics(t *testing.T) {
 
 	report := ScanSpecialEnvKeys(globalEnv, nil, existingHome, nil)
 
-	// PROMPT gates → rewrite, AUTH steps → reject (conflict, hash mismatch),
+	// AUTH steps → reject (conflict, hash mismatch),
 	// CONFIG server → rewrite (all sections), CRUSH steps → rewrite
-	if report.Rewritten != 3 {
-		t.Errorf("Rewritten = %d, want 3", report.Rewritten)
+	if report.Rewritten != 2 {
+		t.Errorf("Rewritten = %d, want 2", report.Rewritten)
 	}
 	if report.Rejected != 1 {
 		t.Errorf("Rejected = %d, want 1", report.Rejected)

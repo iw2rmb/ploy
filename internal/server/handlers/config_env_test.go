@@ -556,7 +556,6 @@ func TestConfigEnvPut_SpecialKeyBlocked(t *testing.T) {
 	}{
 		{"CODEX_AUTH_JSON/gates", "CODEX_AUTH_JSON", "gates"},
 		{"CODEX_CONFIG_TOML/steps", "CODEX_CONFIG_TOML", "steps"},
-		{"CODEX_PROMPT/steps", "CODEX_PROMPT", "steps"},
 		{"CCR_CONFIG_JSON/gates", "CCR_CONFIG_JSON", "gates"},
 		{"CRUSH_JSON/steps", "CRUSH_JSON", "steps"},
 		{"CODEX_AUTH_JSON/server", "CODEX_AUTH_JSON", "server"},

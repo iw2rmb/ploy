@@ -202,30 +202,15 @@ if [[ $EXIT_CODE -eq 0 ]]; then
 
     echo "6. Codex healing handshake (if healing was triggered):"
     echo "   - Codex completion: Codex exits after editing; node agent re-gates when workspace diffs exist"
-    echo "   - Session resume: Check for codex-session.txt artifact for retry continuity"
+    echo "   - Healing artifact: Check for heal.json in exported artifacts"
     echo ""
 
     # Automated validation of Codex artifacts (if present).
-    CODEX_LOG="${ARTIFACT_DIR}/codex.log"
-    CODEX_SESSION="${ARTIFACT_DIR}/codex-session.txt"
-    CODEX_MANIFEST="${ARTIFACT_DIR}/codex-run.json"
+    HEAL_JSON="${ARTIFACT_DIR}/heal.json"
 
     echo "   Automated artifact checks:"
-    if [[ -f "$CODEX_LOG" ]]; then
-      echo "   ✓ codex.log present"
-    else
-      echo "   - codex.log not present (no Codex healing in this run)"
-    fi
-
-    if [[ -f "$CODEX_SESSION" ]]; then
-      SESSION_ID=$(cat "$CODEX_SESSION" | tr -d '\r\n')
-      if [[ -n "$SESSION_ID" ]]; then
-        echo "   ✓ Session ID captured for resume: ${SESSION_ID:0:20}..."
-      fi
-    fi
-
-    if [[ -f "$CODEX_MANIFEST" ]]; then
-      echo "   ✓ codex-run.json manifest present"
+    if [[ -f "$HEAL_JSON" ]]; then
+      echo "   ✓ heal.json present"
     fi
     echo ""
   fi
