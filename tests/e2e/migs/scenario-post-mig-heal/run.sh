@@ -198,7 +198,7 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
   #    the node agent decides whether to re-run the gate based on workspace diffs.
   # ─────────────────────────────────────────────────────────────────────────────
   CODEX_LOG="${ARTIFACT_DIR}/codex.log"
-  CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
+  CODEX_LAST="${ARTIFACT_DIR}/heal.json"
 
   echo "  1. Codex log artifacts:"
   if [[ -f "$CODEX_LOG" ]]; then
@@ -207,7 +207,7 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
     echo "     - codex.log not found (Codex healing may not have run)"
   fi
   if [[ -f "$CODEX_LAST" ]]; then
-    echo "     ✓ codex-last.txt present (last assistant message captured)"
+    echo "     ✓ heal.json present (last assistant message captured)"
   fi
   echo ""
 

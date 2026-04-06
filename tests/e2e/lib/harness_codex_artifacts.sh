@@ -44,8 +44,8 @@ e2e_validate_codex_handshake() {
     [[ "$mode" == "strict" ]] && failed=1
   fi
 
-  if [[ -f "${artifact_dir}/codex-last.txt" ]]; then
-    echo "  + codex-last.txt present"
+  if [[ -f "${artifact_dir}/heal.json" ]]; then
+    echo "  + heal.json present"
   fi
 
   if [[ -f "${artifact_dir}/codex-session.txt" ]]; then
