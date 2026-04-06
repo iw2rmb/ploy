@@ -9,12 +9,14 @@ func TestTrimBuildGateLog(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		tool         string
-		logText      string
-		wantTrimmed  bool   // true if output should differ from input
-		wantPrefix   string // expected prefix of trimmed output (after TrimSpace)
-		wantContains []string
+		name            string
+		tool            string
+		logText         string
+		wantTrimmed     bool   // true if output should differ from input
+		wantPrefix      string // expected prefix of trimmed output (after TrimSpace)
+		wantContains    []string
+		wantNotContains []string
+		wantExact       string
 	}{
 		{
 			name: "maven with error summary",
@@ -51,29 +53,98 @@ Mockito cannot mock/spy because :
 			wantContains: []string{"[ERROR] Tests run:", "Cannot mock/spy class"},
 		},
 		{
-			name: "gradle with failure header",
+			name: "gradle compile issues keeps latest K, removes try, dedupes stack and preserves failure",
+			tool: "gradle",
+			logText: `
+/workspace/src/main/java/a/Old.java:1: error: cannot find symbol
+  symbol:   class MissingA
+/workspace/src/main/java/b/Old2.java:2: error: cannot find symbol
+  symbol:   class MissingB
+/workspace/src/main/java/c/New.java:3: error: cannot find symbol
+  symbol:   class MissingC
+2 errors
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+* Try:
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+* Exception is:
+  at org.example.Top.a(Top.java:1)
+  at org.example.Top.b(Top.java:2)
+Caused by: java.lang.RuntimeException: x
+  at org.example.Top.b(Top.java:2)
+  at org.example.Top.c(Top.java:3)
+BUILD FAILED in 5s
+`,
+			wantTrimmed: true,
+			wantPrefix:  "/workspace/src/main/java/b/Old2.java:2: error: cannot find symbol",
+			wantContains: []string{
+				"/workspace/src/main/java/c/New.java:3: error: cannot find symbol",
+				"* What went wrong:",
+				"Execution failed for task ':compileJava'.",
+				"* Exception is:",
+				"...repeated 2 frames",
+				"BUILD FAILED in",
+			},
+			wantNotContains: []string{
+				"/workspace/src/main/java/a/Old.java:1: error: cannot find symbol",
+				"* Try:",
+				"> Run with --info or --debug option to get more log output.",
+			},
+		},
+		{
+			name: "gradle kotlin scala and kapt issue collection",
+			tool: "gradle",
+			logText: `
+e: /workspace/src/main/kotlin/a/App.kt:7:11 Unresolved reference: Foo
+   ^
+[error] /workspace/src/main/scala/a/App.scala:9: not found: type Foo
+[error]  val x: Foo = ??? 
+e: [kapt] An exception occurred: java.lang.IllegalStateException: kapt blew up
+  at org.jetbrains.kotlin.kapt3.base.AnnotationProcessingKt.doAnnotationProcessing(annotationProcessing.kt:90)
+* What went wrong:
+Execution failed for task ':compileKotlin'.
+> Compilation error. See log for more details
+BUILD FAILED in 1m
+`,
+			wantTrimmed: true,
+			wantPrefix:  "e: /workspace/src/main/kotlin/a/App.kt:7:11 Unresolved reference: Foo",
+			wantContains: []string{
+				"[error] /workspace/src/main/scala/a/App.scala:9: not found: type Foo",
+				"e: [kapt] An exception occurred: java.lang.IllegalStateException: kapt blew up",
+				"* What went wrong:",
+			},
+		},
+		{
+			name: "gradle without what went wrong passthrough",
 			tool: "gradle",
 			logText: `
 > Task :compileJava
-> Task :test
-
 FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':sample:test'.
-> There were failing tests. See the report at: file:///workspace/build/reports/tests/test/index.html
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-
-BUILD FAILED in 5s
-3 actionable tasks: 2 executed, 1 up-to-date
+BUILD FAILED in 2s
 `,
+			wantTrimmed: false,
+			wantExact: `
+> Task :compileJava
+FAILURE: Build failed with an exception.
+BUILD FAILED in 2s
+`,
+		},
+		{
+			name: "gradle preserves trailing newline",
+			tool: "gradle",
+			logText: "/workspace/src/main/java/a/A.java:1: error: cannot find symbol\n" +
+				"  symbol: class X\n" +
+				"1 errors\n" +
+				"* What went wrong:\n" +
+				"Execution failed for task ':compileJava'.\n" +
+				"* Try:\n" +
+				"> help\n" +
+				"BUILD FAILED in 1s\n",
 			wantTrimmed: true,
 			wantContains: []string{
-				"FAILURE: Build failed with an exception.",
-				"Execution failed for task ':sample:test'.",
-				"BUILD FAILED in",
+				"Execution failed for task ':compileJava'.",
 			},
 		},
 		{
@@ -95,6 +166,9 @@ BUILD FAILED in 5s
 			if !tt.wantTrimmed && trimmed != tt.logText {
 				t.Fatal("expected original log, but got trimmed output")
 			}
+			if tt.wantExact != "" && trimmed != tt.wantExact {
+				t.Errorf("unexpected exact output:\nwant:\n%s\ngot:\n%s", tt.wantExact, trimmed)
+			}
 			if tt.wantPrefix != "" && !strings.HasPrefix(strings.TrimSpace(trimmed), tt.wantPrefix) {
 				t.Errorf("trimmed log should start with %q, got:\n%s", tt.wantPrefix, trimmed)
 			}
@@ -102,6 +176,14 @@ BUILD FAILED in 5s
 				if !strings.Contains(trimmed, s) {
 					t.Errorf("trimmed log missing %q", s)
 				}
+			}
+			for _, s := range tt.wantNotContains {
+				if strings.Contains(trimmed, s) {
+					t.Errorf("trimmed log should not contain %q", s)
+				}
+			}
+			if strings.HasSuffix(tt.logText, "\n") != strings.HasSuffix(trimmed, "\n") {
+				t.Errorf("trailing newline mismatch: input=%t output=%t", strings.HasSuffix(tt.logText, "\n"), strings.HasSuffix(trimmed, "\n"))
 			}
 		})
 	}
