@@ -2,6 +2,8 @@ package runs
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -34,19 +37,31 @@ type followErrMsg struct {
 	err error
 }
 
-type followModel struct {
-	renderOpts   TextRenderOptions
-	spinner      spinner.Model
-	spinnerFrame int
-	report       *RunReport
-	finalState   migsapi.RunState
-	renderErr    error
+type followJobPreviewMsg struct {
+	jobID    domaintypes.JobID
+	preview  RunJobIOPreview
+	clearRow bool
 }
 
-func newFollowModel(opts TextRenderOptions) followModel {
+type followModel struct {
+	renderOpts      TextRenderOptions
+	spinner         spinner.Model
+	spinnerFrame    int
+	report          *RunReport
+	finalState      migsapi.RunState
+	renderErr       error
+	jobIOPreviews   map[domaintypes.JobID]RunJobIOPreview
+	expandStdout    bool
+	expandStderr    bool
+	interactiveMode bool
+}
+
+func newFollowModel(opts TextRenderOptions, interactive bool) followModel {
 	return followModel{
-		renderOpts: opts,
-		spinner:    spinner.New(spinner.WithSpinner(spinner.Dot)),
+		renderOpts:      opts,
+		spinner:         spinner.New(spinner.WithSpinner(spinner.Dot)),
+		jobIOPreviews:   make(map[domaintypes.JobID]RunJobIOPreview),
+		interactiveMode: interactive,
 	}
 }
 
@@ -65,10 +80,26 @@ func (m followModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if strings.EqualFold(strings.TrimSpace(typed.String()), "ctrl+c") {
 			return m, tea.Quit
 		}
+		if !m.interactiveMode {
+			return m, nil
+		}
+		switch strings.ToLower(strings.TrimSpace(typed.String())) {
+		case "o":
+			m.expandStdout = !m.expandStdout
+		case "e":
+			m.expandStderr = !m.expandStderr
+		}
 		return m, nil
 	case followReportMsg:
 		report := typed.report
 		m.report = &report
+		return m, nil
+	case followJobPreviewMsg:
+		if typed.clearRow {
+			delete(m.jobIOPreviews, typed.jobID)
+			return m, nil
+		}
+		m.jobIOPreviews[typed.jobID] = typed.preview
 		return m, nil
 	case followTerminalMsg:
 		report := typed.report
@@ -92,6 +123,9 @@ func (m followModel) View() tea.View {
 	opts.SpinnerFrame = m.spinnerFrame
 	opts.LiveDurations = true
 	opts.Now = time.Now()
+	opts.JobIOPreviews = m.jobIOPreviews
+	opts.ExpandStdout = m.expandStdout
+	opts.ExpandStderr = m.expandStderr
 	layout, err := RenderRunReportTextLayout(*m.report, opts)
 	if err != nil {
 		return tea.NewView("")
@@ -133,15 +167,21 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 
 	coordCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	interactive := isTTYWriter(c.Output) && isTTYReader(os.Stdin)
+
+	input := io.Reader(nil)
+	if interactive {
+		input = os.Stdin
+	}
 
 	program := tea.NewProgram(
 		newFollowModel(TextRenderOptions{
 			EnableOSC8: c.EnableOSC8,
 			AuthToken:  c.AuthToken,
 			BaseURL:    c.BaseURL,
-		}),
+		}, interactive),
 		tea.WithContext(coordCtx),
-		tea.WithInput(nil),
+		tea.WithInput(input),
 		tea.WithOutput(c.Output),
 		tea.WithoutSignalHandler(),
 	)
@@ -218,6 +258,126 @@ func (c FollowRunCommand) coordinate(
 		MaxRetries: c.MaxRetries,
 		Logger:     slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
 	}
+	jobStreamClient := stream.Client{
+		HTTPClient: c.Client,
+		MaxRetries: -1,
+		Logger:     slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{})),
+	}
+	var trackerMu sync.Mutex
+	type jobLogTracker struct {
+		cancel context.CancelFunc
+	}
+	jobTrackers := make(map[domaintypes.JobID]jobLogTracker)
+	stopTracker := func(jobID domaintypes.JobID) {
+		trackerMu.Lock()
+		tracker, ok := jobTrackers[jobID]
+		if ok {
+			delete(jobTrackers, jobID)
+		}
+		trackerMu.Unlock()
+		if ok {
+			tracker.cancel()
+		}
+	}
+	stopAllTrackers := func() {
+		trackerMu.Lock()
+		ids := make([]domaintypes.JobID, 0, len(jobTrackers))
+		for id := range jobTrackers {
+			ids = append(ids, id)
+		}
+		trackerMu.Unlock()
+		for _, id := range ids {
+			stopTracker(id)
+		}
+	}
+	defer stopAllTrackers()
+
+	previews := make(map[domaintypes.JobID]RunJobIOPreview)
+	appendPreview := func(jobID domaintypes.JobID, streamName, line string) {
+		trimmed := strings.TrimRight(line, "\r\n")
+		if strings.TrimSpace(trimmed) == "" {
+			return
+		}
+		trackerMu.Lock()
+		current := previews[jobID]
+		switch normalizeStatus(streamName) {
+		case "stderr":
+			current.Stderr = append(current.Stderr, trimmed)
+			if len(current.Stderr) > 3 {
+				current.Stderr = current.Stderr[len(current.Stderr)-3:]
+			}
+		default:
+			current.Stdout = append(current.Stdout, trimmed)
+			if len(current.Stdout) > 3 {
+				current.Stdout = current.Stdout[len(current.Stdout)-3:]
+			}
+		}
+		previews[jobID] = current
+		trackerMu.Unlock()
+		program.Send(followJobPreviewMsg{jobID: jobID, preview: current})
+	}
+	startJobTracker := func(jobID domaintypes.JobID) {
+		trackerMu.Lock()
+		if _, exists := jobTrackers[jobID]; exists {
+			trackerMu.Unlock()
+			return
+		}
+		jobCtx, cancelJob := context.WithCancel(ctx)
+		jobTrackers[jobID] = jobLogTracker{cancel: cancelJob}
+		trackerMu.Unlock()
+
+		endpoint := strings.TrimRight(c.BaseURL.String(), "/") + "/v1/jobs/" + jobID.String() + "/logs"
+		go func() {
+			err := jobStreamClient.Stream(jobCtx, endpoint, func(evt stream.Event) error {
+				switch normalizeStatus(evt.Type) {
+				case "", "log":
+					var rec struct {
+						Stream string `json:"stream"`
+						Line   string `json:"line"`
+					}
+					if err := json.Unmarshal(evt.Data, &rec); err != nil {
+						return nil
+					}
+					appendPreview(jobID, rec.Stream, rec.Line)
+					return nil
+				case "done", "complete", "completed":
+					return stream.ErrDone
+				default:
+					return nil
+				}
+			})
+			if err != nil && !errors.Is(err, context.Canceled) {
+				// Polling stays authoritative; preview stream failures are non-fatal.
+			}
+			stopTracker(jobID)
+		}()
+	}
+	reconcileTrackers := func(report RunReport) {
+		statusByJob := make(map[domaintypes.JobID]string)
+		for _, repo := range report.Repos {
+			for _, job := range repo.Jobs {
+				if job.JobID.IsZero() {
+					continue
+				}
+				statusByJob[job.JobID] = normalizeStatus(job.Status.String())
+			}
+		}
+		for jobID, status := range statusByJob {
+			isRunning := status == "running" || status == "started"
+			isFailed := status == "fail" || status == "failed" || status == "error" || status == "crash" || status == "crashed"
+			if isRunning || isFailed {
+				startJobTracker(jobID)
+				continue
+			}
+			stopTracker(jobID)
+			if status == "success" || status == "succeeded" || status == "finished" || status == "completed" {
+				trackerMu.Lock()
+				delete(previews, jobID)
+				trackerMu.Unlock()
+				program.Send(followJobPreviewMsg{jobID: jobID, clearRow: true})
+			}
+		}
+	}
 
 	endpoint := strings.TrimRight(c.BaseURL.String(), "/") + "/v1/runs/" + c.RunID.String() + "/logs"
 
@@ -258,6 +418,7 @@ func (c FollowRunCommand) coordinate(
 			return false
 		}
 		consecutiveFailures = 0
+		reconcileTrackers(report)
 		if state := DeriveRunStateFromReport(report); state != "" {
 			stateCh <- state
 			program.Send(followTerminalMsg{report: report, state: state})
@@ -357,6 +518,18 @@ var _ tea.Model = followModel{}
 
 func isTTYWriter(w io.Writer) bool {
 	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return (info.Mode() & os.ModeCharDevice) != 0
+}
+
+func isTTYReader(r io.Reader) bool {
+	f, ok := r.(*os.File)
 	if !ok {
 		return false
 	}

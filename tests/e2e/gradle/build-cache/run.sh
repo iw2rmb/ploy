@@ -15,7 +15,7 @@ set -euo pipefail
 # - post_gate job meta includes a GRADLE_BUILD_CACHE_HIT finding emitted by the gate executor.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
-export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy/local}"
+export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
 source "$REPO_ROOT/tests/e2e/lib/ensure_local_descriptor.sh"
 ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 PLOY_DB_DSN="${PLOY_DB_DSN:-}"

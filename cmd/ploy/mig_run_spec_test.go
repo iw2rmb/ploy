@@ -121,11 +121,11 @@ steps:
 envs:
   KEY1: value1
 `,
-			gitlabPAT:    "glpat-test-123",
-			mrFail:       true,
-			wantDomain:   "gitlab.com",
+			gitlabPAT:     "glpat-test-123",
+			mrFail:        true,
+			wantDomain:    "gitlab.com",
 			wantDomainSet: true,
-			wantMRFail:   true,
+			wantMRFail:    true,
 		},
 	}
 
@@ -183,10 +183,10 @@ envs:
 
 func TestBuildSpecPayload_ConfigOverlay(t *testing.T) {
 	tests := []struct {
-		name       string
-		config     string // config.yaml content; empty → no config file
-		spec       string
-		wantEnvs   map[string]any
+		name     string
+		config   string // config.yaml content; empty → no config file
+		spec     string
+		wantEnvs map[string]any
 	}{
 		{
 			name: "overlay < spec precedence",

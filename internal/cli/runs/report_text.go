@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"charm.land/lipgloss/v2"
 
@@ -21,6 +22,15 @@ type TextRenderOptions struct {
 	SpinnerFrame  int
 	LiveDurations bool
 	Now           time.Time
+	JobIOPreviews map[domaintypes.JobID]RunJobIOPreview
+	ExpandStdout  bool
+	ExpandStderr  bool
+}
+
+// RunJobIOPreview contains bounded stdout/stderr previews for a single job.
+type RunJobIOPreview struct {
+	Stdout []string
+	Stderr []string
 }
 
 // RunReportDynamicSection represents one mutable block of lines in rendered run text.
@@ -121,6 +131,7 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 					FormatNodeID(job.NodeID),
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
+				DetailLines:  renderJobIOPreviewLines(job, opts),
 			})
 		}
 		frame.Repos = append(frame.Repos, repoFrame)
@@ -275,6 +286,132 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 	}
 
 	return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), msg, colorizeContent)
+}
+
+func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
+	status := normalizeStatus(job.Status.String())
+	isRunning := status == "running" || status == "started"
+	isFailed := status == "fail" || status == "failed" || status == "error" || status == "crash" || status == "crashed"
+	if !isRunning && !isFailed {
+		return nil
+	}
+
+	preview := RunJobIOPreview{}
+	if opts.JobIOPreviews != nil {
+		if got, ok := opts.JobIOPreviews[job.JobID]; ok {
+			preview = got
+		}
+	}
+
+	expandStdout := opts.ExpandStdout || isFailed
+	expandStderr := opts.ExpandStderr || isFailed
+	return renderStreamPreviewLines(preview, expandStdout, expandStderr)
+}
+
+func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStderr bool) []string {
+	const (
+		collapsedWidth = 80
+		expandedWidth  = 80
+		labelIndent    = "    "
+		lineIndent     = "     "
+	)
+
+	stdoutLast := placeholderLastLine(preview.Stdout)
+	stderrLast := placeholderLastLine(preview.Stderr)
+
+	lines := []string{
+		"",
+		labelIndent + "STD[O]UT " + truncateRunesWithEllipsis(stdoutLast, collapsedWidth),
+	}
+	if expandStdout {
+		lines = append(lines, "")
+		for _, line := range expandedPreviewLines(preview.Stdout, expandedWidth) {
+			lines = append(lines, lineIndent+line)
+		}
+		lines = append(lines, "")
+	}
+
+	stderrCollapsed := truncateRunesWithEllipsis(stderrLast, collapsedWidth)
+	lines = append(lines, labelIndent+"STD[E]RR "+colorizeErrorText(stderrCollapsed))
+	if expandStderr {
+		lines = append(lines, "")
+		for _, line := range expandedPreviewLines(preview.Stderr, expandedWidth) {
+			lines = append(lines, lineIndent+colorizeErrorText(line))
+		}
+		lines = append(lines, "")
+	}
+	return lines
+}
+
+func placeholderLastLine(lines []string) string {
+	if len(lines) == 0 {
+		return "(none yet)"
+	}
+	last := strings.TrimSpace(lines[len(lines)-1])
+	if last == "" {
+		return "(none yet)"
+	}
+	return last
+}
+
+func expandedPreviewLines(lines []string, width int) []string {
+	if len(lines) == 0 {
+		return []string{"(none yet)"}
+	}
+	var out []string
+	start := 0
+	if len(lines) > 3 {
+		start = len(lines) - 3
+	}
+	for _, line := range lines[start:] {
+		trimmed := strings.TrimRight(line, "\r\n")
+		if strings.TrimSpace(trimmed) == "" {
+			trimmed = "(none yet)"
+		}
+		out = append(out, wrapRunesFixed(trimmed, width)...)
+	}
+	if len(out) == 0 {
+		return []string{"(none yet)"}
+	}
+	return out
+}
+
+func truncateRunesWithEllipsis(value string, width int) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if width <= 0 {
+		return ""
+	}
+	if utf8.RuneCountInString(value) <= width {
+		return value
+	}
+	if width <= 3 {
+		return strings.Repeat(".", width)
+	}
+	runes := []rune(value)
+	return string(runes[:width-3]) + "..."
+}
+
+func wrapRunesFixed(value string, width int) []string {
+	if width <= 0 {
+		return []string{value}
+	}
+	runes := []rune(value)
+	if len(runes) == 0 {
+		return []string{""}
+	}
+	lines := make([]string, 0, (len(runes)+width-1)/width)
+	for len(runes) > 0 {
+		chunk := width
+		if len(runes) < width {
+			chunk = len(runes)
+		}
+		lines = append(lines, string(runes[:chunk]))
+		runes = runes[chunk:]
+	}
+	return lines
 }
 
 func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) string {

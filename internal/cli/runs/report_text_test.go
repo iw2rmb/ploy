@@ -385,6 +385,132 @@ func TestRenderRunReportTextArtifactsHiddenForCancelledJobs(t *testing.T) {
 	assertx.NotContains(t, out, "Patch (")
 }
 
+func TestRenderRunReportTextRunningJobIOPreviewCollapsed(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	job := RunJobEntry{
+		JobID:      jobID,
+		JobType:    "mig",
+		JobImage:   "ghcr.io/acme/mig:1",
+		Status:     domaintypes.JobStatusRunning,
+		DurationMs: 1000,
+	}
+	report := singleJobReport("io-collapsed", "Running", job)
+
+	longStdout := strings.Repeat("o", 95)
+	out := renderText(t, report, TextRenderOptions{
+		EnableOSC8: false,
+		JobIOPreviews: map[domaintypes.JobID]RunJobIOPreview{
+			jobID: {
+				Stdout: []string{"first", longStdout},
+				Stderr: []string{"warning line"},
+			},
+		},
+	})
+
+	assertx.Contains(t, out, "STD[O]UT")
+	assertx.Contains(t, out, "STD[E]RR")
+	assertx.Contains(t, out, strings.Repeat("o", 77)+"...")
+	assertx.NotContains(t, out, "\n     first\n")
+	assertx.NotContains(t, out, "\n     warning line\n")
+}
+
+func TestRenderRunReportTextRunningJobIOPreviewExpanded(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	job := RunJobEntry{
+		JobID:      jobID,
+		JobType:    "mig",
+		JobImage:   "ghcr.io/acme/mig:1",
+		Status:     domaintypes.JobStatusRunning,
+		DurationMs: 1000,
+	}
+	report := singleJobReport("io-expanded", "Running", job)
+
+	wrapCandidate := strings.Repeat("z", 90)
+	out := renderText(t, report, TextRenderOptions{
+		EnableOSC8:   false,
+		ExpandStdout: true,
+		ExpandStderr: true,
+		JobIOPreviews: map[domaintypes.JobID]RunJobIOPreview{
+			jobID: {
+				Stdout: []string{"one", "two", wrapCandidate, "tail"},
+				Stderr: []string{"err-one", "err-two"},
+			},
+		},
+	})
+
+	assertx.Contains(t, out, "\n     two\n")
+	assertx.Contains(t, out, "\n     "+strings.Repeat("z", 80)+"\n")
+	assertx.Contains(t, out, "\n     "+strings.Repeat("z", 10)+"\n")
+	assertx.Contains(t, out, "\n     tail\n")
+	assertx.Contains(t, out, colorizeErrorText("err-one"))
+	assertx.Contains(t, out, colorizeErrorText("err-two"))
+}
+
+func TestRenderRunReportTextFailedJobIOPreviewAlwaysExpanded(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	job := RunJobEntry{
+		JobID:      jobID,
+		JobType:    "post_gate",
+		JobImage:   "ghcr.io/acme/post-gate:1",
+		Status:     domaintypes.JobStatusFail,
+		DurationMs: 2200,
+	}
+	report := singleJobReport("io-failed", "Fail", job)
+
+	out := renderText(t, report, TextRenderOptions{
+		EnableOSC8:   false,
+		ExpandStdout: false,
+		ExpandStderr: false,
+		JobIOPreviews: map[domaintypes.JobID]RunJobIOPreview{
+			jobID: {
+				Stdout: []string{"s1", "s2", "s3"},
+				Stderr: []string{"e1"},
+			},
+		},
+	})
+
+	assertx.Contains(t, out, "\n     s1\n")
+	assertx.Contains(t, out, "\n     s2\n")
+	assertx.Contains(t, out, "\n     s3\n")
+	assertx.Contains(t, out, colorizeErrorText("e1"))
+}
+
+func TestRenderRunReportTextSucceededJobDoesNotRenderIOPreview(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	job := RunJobEntry{
+		JobID:      jobID,
+		JobType:    "mig",
+		JobImage:   "ghcr.io/acme/mig:1",
+		Status:     domaintypes.JobStatusSuccess,
+		DurationMs: 1200,
+	}
+	report := singleJobReport("io-hidden", "Success", job)
+
+	out := renderText(t, report, TextRenderOptions{
+		EnableOSC8: false,
+		JobIOPreviews: map[domaintypes.JobID]RunJobIOPreview{
+			jobID: {
+				Stdout: []string{"should not render"},
+				Stderr: []string{"should not render"},
+			},
+		},
+		ExpandStdout: true,
+		ExpandStderr: true,
+	})
+
+	assertx.NotContains(t, out, "STD[O]UT")
+	assertx.NotContains(t, out, "STD[E]RR")
+	assertx.NotContains(t, out, "should not render")
+}
+
 func TestRenderRunReportTextMigHeaderOnlyIDWhenNameMatches(t *testing.T) {
 	t.Parallel()
 
