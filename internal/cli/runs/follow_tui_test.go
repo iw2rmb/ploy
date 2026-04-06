@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -181,5 +182,61 @@ func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
 	view := strings.TrimSpace(model.View().Content)
 	if !strings.Contains(view, "No repos with in-progress jobs.") {
 		t.Fatalf("expected empty-running message in view, got %q", view)
+	}
+}
+
+func TestWriteFinalStatusSnapshot_NonTTYUsesStatusRenderer(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "final-snapshot",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/running.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusRunning,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusRunning},
+				},
+			},
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	opts := TextRenderOptions{
+		FilterRunningRepos: true,
+		EmptyReposLine:     "No repos with in-progress jobs.",
+		LiveDurations:      true,
+		SpinnerFrame:       3,
+	}
+	if err := writeFinalStatusSnapshot(&out, report, opts); err != nil {
+		t.Fatalf("writeFinalStatusSnapshot() error: %v", err)
+	}
+
+	rendered := out.String()
+	if strings.Contains(rendered, "\x1b[2J\x1b[H") {
+		t.Fatalf("expected no clear sequence for non-tty output, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "   Repos: 2") {
+		t.Fatalf("expected status snapshot with all repos, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "github.com/acme/done") {
+		t.Fatalf("expected terminal repo in final status snapshot, got %q", rendered)
+	}
+	if strings.Contains(rendered, "No repos with in-progress jobs.") {
+		t.Fatalf("expected status snapshot semantics, got %q", rendered)
 	}
 }

@@ -128,12 +128,15 @@ func followMigRunProject(ctx context.Context, baseURL *url.URL, client *http.Cli
 		followCtx, cancel = context.WithTimeout(ctx, capDuration)
 		defer cancel()
 	}
+	renderOpts := followRunRenderOptions(baseURL, stderr)
 
 	final, err := runs.FollowRunCommand{
 		Client:     cloneForStream(client),
 		BaseURL:    baseURL,
 		RunID:      runID,
 		Output:     stderr,
+		EnableOSC8: renderOpts.EnableOSC8,
+		AuthToken:  renderOpts.AuthToken,
 		MaxRetries: maxRetries,
 	}.Run(followCtx)
 	if err != nil {
@@ -156,7 +159,6 @@ func followMigRunProject(ctx context.Context, baseURL *url.URL, client *http.Cli
 		return err
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
 	if final != migsapi.RunStateSucceeded {
 		return fmt.Errorf("mig run ended in %s", strings.ToLower(string(final)))
 	}

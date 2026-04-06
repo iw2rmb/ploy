@@ -69,12 +69,15 @@ func handleRerun(args []string, stderr io.Writer) error {
 	if !*follow {
 		return nil
 	}
+	renderOpts := followRunRenderOptions(base, stderr)
 
 	_, err = runcmd.FollowRunCommand{
 		Client:     httpClient,
 		BaseURL:    base,
 		RunID:      result.RunID,
 		Output:     stderr,
+		EnableOSC8: renderOpts.EnableOSC8,
+		AuthToken:  renderOpts.AuthToken,
 		MaxRetries: 5,
 	}.Run(ctx)
 	return err

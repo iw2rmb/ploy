@@ -312,17 +312,7 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		defer cancel()
 	}
 
-	token, err := resolveControlPlaneToken()
-	if err != nil {
-		return "", err
-	}
-
-	renderOpts := runs.TextRenderOptions{
-		EnableOSC8:    runStatusSupportsOSC8(stderr),
-		AuthToken:     token,
-		BaseURL:       baseURL,
-		LiveDurations: true,
-	}
+	renderOpts := followRunRenderOptions(baseURL, stderr)
 
 	maxRetries := 5
 	if flags.MaxRetries != nil {
@@ -378,7 +368,6 @@ func followRunSubmit(ctx context.Context, baseURL *url.URL, client *http.Client,
 		return "", nil
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
 	if final != migsapi.RunStateSucceeded {
 		return final, fmt.Errorf("run ended in %s", strings.ToLower(string(final)))
 	}

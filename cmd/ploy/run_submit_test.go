@@ -593,7 +593,7 @@ func TestRunSubmitFollowUsesRunStatusFormat(t *testing.T) {
 	if strings.Contains(out, "Repo 1/1:") {
 		t.Fatalf("expected old follow format to be absent, got: %q", out)
 	}
-	if !strings.Contains(out, "Final state: succeeded") {
-		t.Fatalf("expected final success line, got: %q", out)
+	if strings.Contains(out, "Final state:") {
+		t.Fatalf("expected follow output to omit final state footer, got: %q", out)
 	}
 }

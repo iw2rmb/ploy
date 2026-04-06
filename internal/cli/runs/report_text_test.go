@@ -819,6 +819,70 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 	}
 }
 
+func TestRenderRunStatusSnapshotText_NormalizesFollowOnlyOptions(t *testing.T) {
+	t.Parallel()
+
+	runningJobID := domaintypes.NewJobID()
+	doneJobID := domaintypes.NewJobID()
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "status-snapshot",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/running.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusRunning,
+				Jobs: []RunJobEntry{
+					{
+						JobID:   runningJobID,
+						JobType: "mig",
+						Status:  domaintypes.JobStatusRunning,
+					},
+				},
+			},
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{
+						JobID:   doneJobID,
+						JobType: "mig",
+						Status:  domaintypes.JobStatusSuccess,
+					},
+				},
+			},
+		},
+	}
+
+	var out bytes.Buffer
+	err := RenderRunStatusSnapshotText(&out, report, TextRenderOptions{
+		FilterRunningRepos: true,
+		EmptyReposLine:     "No repos with in-progress jobs.",
+		LiveDurations:      true,
+		SpinnerFrame:       4,
+		JobIOPreviews: map[domaintypes.JobID]RunJobIOPreview{
+			runningJobID: {Stdout: []string{"preview"}},
+		},
+		ExpandStdout: true,
+		ExpandStderr: true,
+	})
+	if err != nil {
+		t.Fatalf("RenderRunStatusSnapshotText error: %v", err)
+	}
+
+	rendered := out.String()
+	assertx.Contains(t, rendered, "   Repos: 2")
+	assertx.Contains(t, rendered, "github.com/acme/running")
+	assertx.Contains(t, rendered, "github.com/acme/done")
+	assertx.NotContains(t, rendered, "No repos with in-progress jobs.")
+	assertx.NotContains(t, rendered, "preview")
+}
+
 func TestRenderRunReportTextCreatedJobDurationKeepsStepAdjacent(t *testing.T) {
 	t.Parallel()
 

@@ -205,18 +205,12 @@ func (c FollowRunCommand) Run(ctx context.Context) (migsapi.RunState, error) {
 	if model.renderErr != nil {
 		return "", model.renderErr
 	}
-	if model.report != nil && !isTTYWriter(c.Output) {
-		opts := model.renderOpts
-		opts.SpinnerFrame = model.spinnerFrame
-		opts.LiveDurations = true
-		opts.Now = time.Now()
-		layout, err := RenderRunReportTextLayout(*model.report, opts)
-		if err != nil {
-			return "", err
-		}
-		_, _ = io.WriteString(c.Output, layout.Text)
-	}
 	if model.finalState != "" {
+		if model.report != nil {
+			if err := writeFinalStatusSnapshot(c.Output, *model.report, model.renderOpts); err != nil {
+				return "", err
+			}
+		}
 		return model.finalState, nil
 	}
 
@@ -548,4 +542,11 @@ func shouldTrackJobPreview(status string) bool {
 	default:
 		return false
 	}
+}
+
+func writeFinalStatusSnapshot(w io.Writer, report RunReport, opts TextRenderOptions) error {
+	if isTTYWriter(w) {
+		_, _ = io.WriteString(w, "\x1b[2J\x1b[H")
+	}
+	return RenderRunStatusSnapshotText(w, report, opts)
 }
