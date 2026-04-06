@@ -16,15 +16,17 @@ import (
 
 // TextRenderOptions controls optional features for the text report renderer.
 type TextRenderOptions struct {
-	EnableOSC8    bool
-	AuthToken     string
-	BaseURL       *url.URL
-	SpinnerFrame  int
-	LiveDurations bool
-	Now           time.Time
-	JobIOPreviews map[domaintypes.JobID]RunJobIOPreview
-	ExpandStdout  bool
-	ExpandStderr  bool
+	EnableOSC8         bool
+	AuthToken          string
+	BaseURL            *url.URL
+	SpinnerFrame       int
+	LiveDurations      bool
+	Now                time.Time
+	JobIOPreviews      map[domaintypes.JobID]RunJobIOPreview
+	ExpandStdout       bool
+	ExpandStderr       bool
+	FilterRunningRepos bool
+	EmptyReposLine     string
 }
 
 // RunJobIOPreview contains bounded stdout/stderr previews for a single job.
@@ -67,18 +69,26 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	if now.IsZero() {
 		now = time.Now()
 	}
+	repos := report.Repos
+	if opts.FilterRunningRepos {
+		repos = filterRunningRepos(report.Repos)
+	}
+	emptyReposLine := strings.TrimSpace(opts.EmptyReposLine)
+	if emptyReposLine == "" {
+		emptyReposLine = "No repos found in this run."
+	}
 
 	headerLines := []string{
 		"",
 		fmt.Sprintf("   Mig:   %s", renderMigHeader(report.MigID.String(), report.MigName)),
 		fmt.Sprintf("   Spec:  %s", renderOptionalLink(valueOrDash(report.SpecID.String()), buildSpecDownloadURL(report, opts.BaseURL), opts.EnableOSC8, opts.AuthToken)),
-		fmt.Sprintf("   Repos: %d", len(report.Repos)),
+		fmt.Sprintf("   Repos: %d", len(repos)),
 		fmt.Sprintf("   Run:   %s", valueOrDash(report.RunID.String())),
 		"",
 	}
 
-	if len(report.Repos) == 0 {
-		block := strings.Join(append(headerLines, "No repos found in this run."), "\n")
+	if len(repos) == 0 {
+		block := strings.Join(append(headerLines, emptyReposLine), "\n")
 		rendered := lipgloss.NewStyle().Render(block) + "\n"
 		return RunReportTextLayout{
 			Text:            rendered,
@@ -88,10 +98,10 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 	}
 
 	frame := FollowFrame{
-		Repos: make([]FollowRepoFrame, 0, len(report.Repos)),
+		Repos: make([]FollowRepoFrame, 0, len(repos)),
 	}
 
-	for _, repo := range report.Repos {
+	for _, repo := range repos {
 		repoLinkLabel := strings.TrimSpace(repo.RepoURL)
 		if repoLinkLabel != "" {
 			repoLinkLabel = domaintypes.NormalizeRepoURLSchemless(repoLinkLabel)
@@ -302,9 +312,7 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 
 func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
 	status := normalizeStatus(job.Status.String())
-	isRunning := status == "running" || status == "started"
-	isFailed := status == "fail" || status == "failed" || status == "error" || status == "crash" || status == "crashed"
-	if !isRunning && !isFailed {
+	if status != "running" && status != "started" {
 		return nil
 	}
 
@@ -315,9 +323,28 @@ func renderJobIOPreviewLines(job RunJobEntry, opts TextRenderOptions) []string {
 		}
 	}
 
-	expandStdout := opts.ExpandStdout || isFailed
-	expandStderr := opts.ExpandStderr || isFailed
+	expandStdout := opts.ExpandStdout
+	expandStderr := opts.ExpandStderr
 	return renderStreamPreviewLines(preview, expandStdout, expandStderr)
+}
+
+func filterRunningRepos(repos []RunEntry) []RunEntry {
+	filtered := make([]RunEntry, 0, len(repos))
+	for _, repo := range repos {
+		if repoHasRunningJob(repo) {
+			filtered = append(filtered, repo)
+		}
+	}
+	return filtered
+}
+
+func repoHasRunningJob(repo RunEntry) bool {
+	for _, job := range repo.Jobs {
+		if isRunningStatus(job.Status.String()) {
+			return true
+		}
+	}
+	return false
 }
 
 func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStderr bool) []string {

@@ -206,6 +206,96 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 	}
 }
 
+func TestRenderRunReportTextLayout_FilterRunningRepos(t *testing.T) {
+	t.Parallel()
+
+	runningJobID := domaintypes.NewJobID()
+	doneJobID := domaintypes.NewJobID()
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "running-only",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/running.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusRunning,
+				Jobs: []RunJobEntry{
+					{
+						JobID:   runningJobID,
+						JobType: "mig",
+						Status:  domaintypes.JobStatusRunning,
+					},
+				},
+			},
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusFail,
+				Jobs: []RunJobEntry{
+					{
+						JobID:   doneJobID,
+						JobType: "mig",
+						Status:  domaintypes.JobStatusFail,
+					},
+				},
+			},
+		},
+	}
+
+	layout, err := RenderRunReportTextLayout(report, TextRenderOptions{
+		FilterRunningRepos: true,
+		EnableOSC8:         false,
+	})
+	if err != nil {
+		t.Fatalf("RenderRunReportTextLayout error: %v", err)
+	}
+	assertx.Contains(t, layout.Text, "   Repos: 1")
+	assertx.Contains(t, layout.Text, "github.com/acme/running")
+	assertx.NotContains(t, layout.Text, "github.com/acme/done")
+}
+
+func TestRenderRunReportTextLayout_FilterRunningReposEmptyMessage(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "none-running",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				BaseRef: "main",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{
+						JobID:   domaintypes.NewJobID(),
+						JobType: "mig",
+						Status:  domaintypes.JobStatusSuccess,
+					},
+				},
+			},
+		},
+	}
+
+	layout, err := RenderRunReportTextLayout(report, TextRenderOptions{
+		FilterRunningRepos: true,
+		EmptyReposLine:     "No repos with in-progress jobs.",
+		EnableOSC8:         false,
+	})
+	if err != nil {
+		t.Fatalf("RenderRunReportTextLayout error: %v", err)
+	}
+	assertx.Contains(t, layout.Text, "No repos with in-progress jobs.")
+	assertx.Contains(t, layout.Text, "   Repos: 0")
+	assertx.NotContains(t, layout.Text, "github.com/acme/done")
+}
+
 func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	t.Parallel()
 
@@ -475,7 +565,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 			notContain: []string{"STD[O]UT tail", "STD[E]RR err-two"},
 		},
 		{
-			name: "failed always expanded",
+			name: "failed hides preview",
 			report: func() RunReport {
 				jobID := domaintypes.NewJobID()
 				job := RunJobEntry{
@@ -492,7 +582,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 				ExpandStdout: false,
 				ExpandStderr: false,
 			},
-			contains: []string{"\n     s1\n", "\n     s2\n", "\n     s3\n", colorizeErrorText("e1")},
+			notContain: []string{"STD[O]UT", "STD[E]RR", "s1", "s2", "s3", "e1"},
 		},
 		{
 			name: "success hides preview even when expand flags are set",
@@ -563,7 +653,7 @@ func TestRenderRunReportTextIOPreviewModes(t *testing.T) {
 						Stderr: []string{"err-one", "err-two"},
 					},
 				}
-			case "failed always expanded":
+			case "failed hides preview":
 				opts.JobIOPreviews = map[domaintypes.JobID]RunJobIOPreview{
 					jobID: {
 						Stdout: []string{"s1", "s2", "s3"},
