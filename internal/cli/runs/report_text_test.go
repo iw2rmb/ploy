@@ -104,7 +104,7 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   ["+repoID.String()+"] github.com/acme/service (https://github.com/acme/service.git) @ "+boldBranchName("main")+" (01234567) -> "+boldBranchName("ploy/java17"))
+	assertx.Contains(t, out, "   "+colorizeNeutralText("["+repoID.String()+"]")+" github.com/acme/service (https://github.com/acme/service.git) @ "+boldBranchName("main")+" "+colorizeNeutralText("(01234567)")+" -> "+boldBranchName("ploy/java17"))
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
 	assertx.NotContains(t, out, "Logs (https://example.test/v1/runs/")
@@ -112,8 +112,10 @@ func TestRenderRunReportTextHeadersAndArtifacts(t *testing.T) {
 		t.Fatalf("expected exactly one patch link in output, got: %q", out)
 	}
 	assertx.Contains(t, out, "Patch (https://example.test/v1/runs/")
-	assertx.Contains(t, out, migJobID.String()+" (https://example.test/v1/jobs/"+migJobID.String()+"/logs)")
+	assertx.Contains(t, out, colorizeNeutralText(migJobID.String())+" (https://example.test/v1/jobs/"+migJobID.String()+"/logs)")
 	assertx.Contains(t, out, "⣾")
+	plain := stripCSI(out)
+	assertx.Contains(t, plain, "    2.5s  pre_gate")
 }
 
 func TestRenderRunReportTextVisibilityRules(t *testing.T) {
@@ -148,7 +150,7 @@ func TestRenderRunReportTextVisibilityRules(t *testing.T) {
 				}
 			}(),
 			contains: []string{
-				"github.com/acme/no-mr (https://github.com/acme/no-mr.git) @ " + boldBranchName("main") + " (fedcba98)",
+				"github.com/acme/no-mr (https://github.com/acme/no-mr.git) @ " + boldBranchName("main") + " " + colorizeNeutralText("(fedcba98)"),
 			},
 			notContain: []string{"feature/no-mr", " -> "},
 		},
@@ -389,7 +391,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 
 	plainOut := renderText(t, report, TextRenderOptions{EnableOSC8: false, AuthToken: "test-token", BaseURL: baseURL})
 	assertx.NotContains(t, plainOut, "Logs (")
-	assertx.Contains(t, plainOut, jobID.String()+" ("+jobLogURL+"?auth_token=test-token)")
+	assertx.Contains(t, plainOut, colorizeNeutralText(jobID.String())+" ("+jobLogURL+"?auth_token=test-token)")
 	assertx.Contains(t, plainOut, report.SpecID.String()+" (https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token)")
 	assertx.Contains(t, plainOut, "github.com/acme/links (https://github.com/acme/links.git)")
 	assertx.NotContains(t, plainOut, "https://github.com/acme/links.git?auth_token=")
@@ -402,7 +404,7 @@ func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
 	}
 
 	linkedOut := renderText(t, report, TextRenderOptions{EnableOSC8: true, AuthToken: "test-token", BaseURL: baseURL})
-	assertx.Contains(t, linkedOut, "\x1b]8;;"+jobLogURL+"?auth_token=test-token\x1b\\"+jobID.String()+"\x1b]8;;\x1b\\")
+	assertx.Contains(t, linkedOut, "\x1b]8;;"+jobLogURL+"?auth_token=test-token\x1b\\"+colorizeNeutralText(jobID.String())+"\x1b]8;;\x1b\\")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://example.test/v1/migs/"+migID.String()+"/specs/latest?auth_token=test-token")
 	assertx.Contains(t, linkedOut, "\x1b]8;;https://github.com/acme/links.git\x1b\\github.com/acme/links\x1b]8;;\x1b\\")
 	assertx.NotContains(t, linkedOut, "github.com/acme/links.git?auth_token=")

@@ -124,6 +124,10 @@ func colorizeErrorText(value string) string {
 	return errorGlyphStyle.Render(value)
 }
 
+func colorizeNeutralText(value string) string {
+	return neutralGlyphStyle.Render(value)
+}
+
 func isFailedOrCrashedStatus(status string) bool {
 	switch normalizeStatus(status) {
 	case "fail", "failed", "crash", "crashed", "error":
