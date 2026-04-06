@@ -50,6 +50,8 @@ const (
 	buildGateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
 	buildGateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
 	buildGateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
+	buildGateCacheRootDir   = "/var/cache/ploy/gates"
+	buildGateTmpCacheRoot   = "ploy/gates"
 	// BuildGateGradleCacheHitsHostFile is the workspace-local file mounted into
 	// Gradle gate containers for cache-hit signaling from the init script.
 	BuildGateGradleCacheHitsHostFile = ".ploy-gradle-build-cache-hits"
@@ -63,6 +65,10 @@ const (
 	// BuildGateContainerOutDir is the writable output mount path inside gate
 	// containers used by runtime-generated artifacts (for example Gradle reports).
 	BuildGateContainerOutDir = "/out"
+	// BuildGateGradleUserHomeDir is the native Gradle home path in gate-gradle images.
+	BuildGateGradleUserHomeDir = "/home/gradle/.gradle"
+	// BuildGateMavenUserHomeDir is the native Maven repository path in Maven gate images.
+	BuildGateMavenUserHomeDir = "/root/.m2"
 )
 
 var errBuildGateRuntimeUnavailable = errors.New("build gate runtime unavailable")
@@ -203,6 +209,11 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		{Source: workspace, Target: "/workspace", ReadOnly: false},
 		{Source: gateOutDir, Target: BuildGateContainerOutDir, ReadOnly: false},
 	}
+	toolCacheMounts, err := buildGateToolCacheMounts(plan.language, plan.tool, plan.release)
+	if err != nil {
+		return nil, fmt.Errorf("prepare build gate tool cache mounts: %w", err)
+	}
+	mounts = append(mounts, toolCacheMounts...)
 	if strings.EqualFold(plan.tool, "gradle") {
 		gradleCacheHitsHostPath := filepath.Join(workspace, BuildGateGradleCacheHitsHostFile)
 		if err := os.WriteFile(gradleCacheHitsHostPath, nil, 0o644); err != nil {
@@ -312,6 +323,82 @@ func appendDockerHostSocketMount(mounts []ContainerMount, env map[string]string)
 		Target:   socketPath,
 		ReadOnly: false,
 	})
+}
+
+func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount, error) {
+	target := buildGateToolCacheTarget(tool)
+	if target == "" {
+		return nil, nil
+	}
+	cacheRoot, err := resolveBuildGateCacheRoot()
+	if err != nil {
+		return nil, err
+	}
+	hostPath := filepath.Join(
+		cacheRoot,
+		sanitizeCachePathPart(language, "unknown-lang"),
+		sanitizeCachePathPart(tool, "unknown-tool"),
+		sanitizeCachePathPart(release, "unknown-release"),
+	)
+	if err := os.MkdirAll(hostPath, 0o755); err != nil {
+		return nil, err
+	}
+	if err := pruneGateCacheDirOldestFirst(hostPath); err != nil {
+		return nil, err
+	}
+	return []ContainerMount{{
+		Source:   hostPath,
+		Target:   target,
+		ReadOnly: false,
+	}}, nil
+}
+
+func resolveBuildGateCacheRoot() (string, error) {
+	if err := os.MkdirAll(buildGateCacheRootDir, 0o755); err == nil {
+		return buildGateCacheRootDir, nil
+	} else if !os.IsPermission(err) {
+		return "", err
+	}
+	fallback := filepath.Join(os.TempDir(), buildGateTmpCacheRoot)
+	if err := os.MkdirAll(fallback, 0o755); err != nil {
+		return "", err
+	}
+	return fallback, nil
+}
+
+func buildGateToolCacheTarget(tool string) string {
+	switch strings.ToLower(strings.TrimSpace(tool)) {
+	case "gradle":
+		return BuildGateGradleUserHomeDir
+	case "maven":
+		return BuildGateMavenUserHomeDir
+	default:
+		return ""
+	}
+}
+
+func sanitizeCachePathPart(value, fallback string) string {
+	s := strings.ToLower(strings.TrimSpace(value))
+	if s == "" {
+		return fallback
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+		case r == '.' || r == '_' || r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return fallback
+	}
+	return out
 }
 
 func dockerHostSocketPathFromEnv(env map[string]string) string {

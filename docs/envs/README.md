@@ -659,6 +659,16 @@ entries to install CA certificates into the container trust store:
 
 **Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
+Build Gate jobs also use node-local persistent tool caches under
+`/var/cache/ploy/gates/<language>/<tool>/<release>` (when that path is not writable,
+the node falls back to `${TMPDIR:-/tmp}/ploy/gates/...`):
+- Gradle gates mount that path to `/home/gradle/.gradle`.
+- Maven gates mount that path to `/root/.m2`.
+- On every gate execution, before mounting the cache path, the node checks free
+  space on that filesystem. If free space is below `2 GiB`, it prunes entries in
+  the active cache directory (`<language>/<tool>/<release>`) from oldest to newest
+  until free space reaches `2 GiB` or the directory is exhausted.
+
 **ORW images (`orw-cli-maven`, `orw-cli-gradle`)**: Same Hydra `ca` materialization behavior as
 build-gate, ensuring OpenRewrite can fetch dependencies from internal artifact repositories while
 staying isolated from Maven/Gradle project task execution.
