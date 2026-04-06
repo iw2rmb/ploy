@@ -495,6 +495,46 @@ func TestJobMeta_ActionSummary_TooLong(t *testing.T) {
 	}
 }
 
+func TestJobMeta_HealMetadata_Valid(t *testing.T) {
+	t.Parallel()
+	m := &JobMeta{
+		Kind: JobKindMig,
+		Heal: &HealJobMetadata{
+			BugSummary:    "Missing semicolon",
+			ActionSummary: "Added missing semicolon and reran build",
+			ErrorKind:     "code",
+		},
+	}
+	if err := m.Validate(); err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+}
+
+func TestJobMeta_HealMetadata_OnGateJob_Rejected(t *testing.T) {
+	t.Parallel()
+	m := &JobMeta{
+		Kind:         JobKindGate,
+		GateMetadata: &BuildGateStageMetadata{},
+		Heal:         &HealJobMetadata{BugSummary: "x", ErrorKind: "code"},
+	}
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected validation error for heal metadata on gate job")
+	}
+}
+
+func TestJobMeta_HealMetadata_InvalidErrorKind(t *testing.T) {
+	t.Parallel()
+	m := &JobMeta{
+		Kind: JobKindMig,
+		Heal: &HealJobMetadata{
+			ErrorKind: "routing",
+		},
+	}
+	if err := m.Validate(); err == nil {
+		t.Fatal("expected validation error for invalid heal.error_kind")
+	}
+}
+
 func TestJobMeta_Recovery_RoundTrip(t *testing.T) {
 	t.Parallel()
 	original := &JobMeta{

@@ -43,9 +43,10 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "   Spec:  "+specID.String()+" ("+server.URL+"/v1/migs/"+migID.String()+"/specs/latest)")
 	assertx.Contains(t, out, "   Repos: 1")
 	assertx.Contains(t, out, "\n   Repos: 1\n   Run:   "+runID.String()+"\n\n")
-	assertx.Contains(t, out, "   ["+repoID.String()+"] github.com/acme/service (https://github.com/acme/service.git) @ ")
+	assertx.Contains(t, out, "github.com/acme/service (https://github.com/acme/service.git) @ ")
 	assertx.Contains(t, out, "\x1b[1mmain")
-	assertx.Contains(t, out, " (01234567) -> ")
+	assertx.Contains(t, out, "01234567")
+	assertx.Contains(t, out, " -> ")
 	assertx.Contains(t, out, "\x1b[1mploy/java17")
 	assertx.NotContains(t, out, "Artefacts")
 	assertx.NotContains(t, out, "State")
@@ -61,7 +62,9 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.Contains(t, out, "Error")
 	assertx.NotContains(t, out, "infra compile failed at step 2")
 	assertx.NotContains(t, out, "<infra>")
-	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
+	assertx.NotContains(t, out, "Exit 0")
+	assertx.Contains(t, out, "└  Issue [deps]: Missing dependency lockfile")
+	assertx.Contains(t, out, "└  Action: Applied import fix and retried build")
 }
 
 func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {
@@ -156,7 +159,9 @@ func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domai
 						"status":         "Success",
 						"exit_code":      0,
 						"duration_ms":    1200,
+						"bug_summary":    "Missing dependency lockfile",
 						"action_summary": "Applied import fix and retried build",
+						"error_kind":     "deps",
 					},
 					{
 						"job_id":      postGateID.String(),

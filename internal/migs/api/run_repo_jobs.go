@@ -39,6 +39,7 @@ type RunRepoJob struct {
 	DisplayName   string                `json:"display_name,omitempty"`
 	ActionSummary string                `json:"action_summary,omitempty"`
 	BugSummary    string                `json:"bug_summary,omitempty"`
+	ErrorKind     string                `json:"error_kind,omitempty"`
 	Recovery      *RunRepoJobRecovery   `json:"recovery,omitempty"`
 	// Build-gate stack detection fields (gate jobs only).
 	// Populated from gate metadata's detected_stack when present.

@@ -173,13 +173,20 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 			r.uploadDiffWithBaseline(ctx, runID, jobID, jobName, diffGen, baseDir, workspace, result, types.DiffJobTypeHealing, false)
 		},
 		BuildJobMeta: func(outDir string) json.RawMessage {
+			bugSummary := parseBugSummary(outDir)
 			actionSummary := parseActionSummary(outDir)
-			if actionSummary == "" {
+			errorKind := parseErrorKind(outDir)
+			if bugSummary == "" && actionSummary == "" && errorKind == "" {
 				return nil
 			}
-			meta := &contracts.JobMeta{
-				Kind:          contracts.JobKindMig,
+			heal := &contracts.HealJobMetadata{
+				BugSummary:    bugSummary,
 				ActionSummary: actionSummary,
+				ErrorKind:     errorKind,
+			}
+			meta := &contracts.JobMeta{
+				Kind: contracts.JobKindMig,
+				Heal: heal,
 			}
 			data, err := contracts.MarshalJobMeta(meta)
 			if err != nil {

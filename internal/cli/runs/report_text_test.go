@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/lipgloss/v2"
+
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
@@ -341,6 +343,8 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 						ExitCode:      &healCode,
 						DurationMs:    1200,
 						ActionSummary: "Applied import fix and retried build",
+						BugSummary:    "Missing dependency lockfile",
+						ErrorKind:     "deps",
 					},
 				},
 			},
@@ -354,8 +358,10 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	assertx.NotContains(t, out, "infra compile failed at step 2")
 	assertx.NotContains(t, out, "<infra>")
 	assertx.Contains(t, out, "✓")
-	assertx.Contains(t, out, "Heal")
-	assertx.Contains(t, out, "└  Exit 0: Applied import fix and retried build")
+	assertx.Contains(t, out, "heal")
+	assertx.NotContains(t, out, "Exit 0")
+	assertx.Contains(t, out, "└  Issue [deps]: Missing dependency lockfile")
+	assertx.Contains(t, out, "└  Action: Applied import fix and retried build")
 }
 
 func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
@@ -434,6 +440,31 @@ func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderRunReportText_HealSummaryWrapsAtEighty(t *testing.T) {
+	t.Parallel()
+
+	longBug := strings.Repeat("dependency resolution failed due to missing lockfile entry ", 3)
+	longAction := strings.Repeat("updated lockfile and normalized dependency versions ", 3)
+	job := RunJobEntry{
+		JobID:         domaintypes.NewJobID(),
+		JobType:       "heal",
+		JobImage:      "ghcr.io/acme/heal:1",
+		Status:        "Success",
+		DurationMs:    900,
+		BugSummary:    longBug,
+		ActionSummary: longAction,
+		ErrorKind:     "infra",
+	}
+
+	out := renderText(t, singleJobReport("heal-wrap", "Success", job), TextRenderOptions{EnableOSC8: false})
+	issuePrefix := "└  Issue [infra]: "
+	actionPrefix := "└  Action: "
+	assertx.Contains(t, out, issuePrefix)
+	assertx.Contains(t, out, actionPrefix)
+	assertx.Contains(t, out, "\n"+strings.Repeat(" ", lipgloss.Width(issuePrefix)))
+	assertx.Contains(t, out, "\n"+strings.Repeat(" ", lipgloss.Width(actionPrefix)))
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {

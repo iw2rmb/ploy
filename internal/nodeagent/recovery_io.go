@@ -32,6 +32,12 @@ func parseActionSummary(outDir string) string {
 	return parseCodexLastField(outDir, "action_summary")
 }
 
+// parseErrorKind reads /out/heal.json and extracts the "error_kind" field.
+// Returns empty string when the file/field is unavailable.
+func parseErrorKind(outDir string) string {
+	return parseCodexLastField(outDir, "error_kind")
+}
+
 // parseORWFailureMetadata reads /out/report.json and extracts deterministic ORW
 // failure fields for run stats metadata. Missing report.json returns (nil, nil).
 func parseORWFailureMetadata(outDir string) (map[string]string, error) {

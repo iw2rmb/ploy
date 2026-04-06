@@ -101,10 +101,15 @@ func listRunRepoJobsHandler(st store.Store) http.HandlerFunc {
 					if meta.MigStepName != "" {
 						jr.DisplayName = meta.MigStepName
 					}
-					if meta.ActionSummary != "" {
-						jr.ActionSummary = meta.ActionSummary
+					if meta.Heal != nil {
+						jr.BugSummary = strings.TrimSpace(meta.Heal.BugSummary)
+						jr.ActionSummary = strings.TrimSpace(meta.Heal.ActionSummary)
+						jr.ErrorKind = strings.TrimSpace(meta.Heal.ErrorKind)
 					}
-					if meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
+					if jr.ActionSummary == "" && meta.ActionSummary != "" {
+						jr.ActionSummary = strings.TrimSpace(meta.ActionSummary)
+					}
+					if jr.BugSummary == "" && meta.GateMetadata != nil && strings.TrimSpace(meta.GateMetadata.BugSummary) != "" {
 						jr.BugSummary = strings.TrimSpace(meta.GateMetadata.BugSummary)
 					}
 					if meta.GateMetadata != nil && meta.GateMetadata.StackGate != nil {
