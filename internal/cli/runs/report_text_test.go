@@ -649,3 +649,43 @@ func TestRenderRunReportTextSpinnerFrameAndLiveDuration(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderRunReportTextCreatedJobDurationKeepsStepAdjacent(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "duration-placeholder",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:    domaintypes.NewMigRepoID(),
+				RepoURL:   "https://github.com/acme/duration-placeholder.git",
+				BaseRef:   "main",
+				TargetRef: "ploy/duration-placeholder",
+				Status:    "Running",
+				Attempt:   1,
+				Jobs: []RunJobEntry{
+					{
+						JobID:      domaintypes.NewJobID(),
+						JobType:    "mig",
+						JobImage:   "ghcr.io/acme/mig:1",
+						Status:     "Running",
+						DurationMs: 295400,
+					},
+					{
+						JobID:      domaintypes.NewJobID(),
+						JobType:    "post_gate",
+						Status:     "Created",
+						DurationMs: 0,
+					},
+				},
+			},
+		},
+	}
+
+	out := stripCSI(renderText(t, report, TextRenderOptions{EnableOSC8: false}))
+	assertx.Contains(t, out, "-  post_gate")
+	assertx.NotContains(t, out, "-          post_gate")
+}

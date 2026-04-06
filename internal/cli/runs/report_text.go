@@ -125,9 +125,6 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 				duration = FormatDurationCompact(job.DurationMs)
 			}
 			durationCell := fmt.Sprintf("%8s", duration)
-			if strings.TrimSpace(duration) != "-" {
-				durationCell = colorizeNeutralText(durationCell)
-			}
 			nodeIDCell := FormatNodeID(job.NodeID)
 			if nodeIDCell != "-" {
 				nodeIDCell = colorizeNeutralText(nodeIDCell)
