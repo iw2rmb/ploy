@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -185,7 +186,7 @@ func TestAuthorizerBearerToken_Rejected(t *testing.T) {
 			if called {
 				t.Error("handler should not be called")
 			}
-			if tt.wantBody != "" && !contains(rr.Body.String(), tt.wantBody) {
+			if tt.wantBody != "" && !strings.Contains(rr.Body.String(), tt.wantBody) {
 				t.Errorf("body %q missing %q", rr.Body.String(), tt.wantBody)
 			}
 		})

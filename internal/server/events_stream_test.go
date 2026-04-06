@@ -19,13 +19,7 @@ import (
 // lifecycle: publish log event, subscribe to stream, publish status to close
 // stream, and verify all events are received in order.
 func TestStream_ServiceHubIntegration(t *testing.T) {
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, nil)
 
 	ctx := context.Background()
 	hub := svc.Hub()
@@ -140,13 +134,7 @@ func TestStream_PublishRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, err := NewEventsService(EventsOptions{
-				BufferSize:  4,
-				HistorySize: 8,
-			})
-			if err != nil {
-				t.Fatalf("failed to create service: %v", err)
-			}
+			svc := newTestEventsService(t, nil)
 
 			ctx := context.Background()
 			now := time.Now()
@@ -172,7 +160,7 @@ func TestStream_PublishRun(t *testing.T) {
 				},
 			}
 
-			err = svc.PublishRun(ctx, domaintypes.RunID(tt.runID), payload)
+			err := svc.PublishRun(ctx, domaintypes.RunID(tt.runID), payload)
 
 			if tt.wantErr {
 				if err == nil {
@@ -220,13 +208,7 @@ func TestStream_PublishRun(t *testing.T) {
 // handles context cancellation and returns appropriate errors when the context
 // is already cancelled before the publish operation begins.
 func TestStream_PublishRunWithContext(t *testing.T) {
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, nil)
 
 	runID := domaintypes.NewRunID().String()
 	payload := migsapi.RunSummary{
@@ -242,7 +224,7 @@ func TestStream_PublishRunWithContext(t *testing.T) {
 	cancel()
 
 	// Call renamed PublishRun method.
-	err = svc.PublishRun(ctx, domaintypes.RunID(runID), payload)
+	err := svc.PublishRun(ctx, domaintypes.RunID(runID), payload)
 	if err == nil {
 		t.Fatal("expected error with cancelled context, got nil")
 	}

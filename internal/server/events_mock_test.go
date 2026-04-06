@@ -2,11 +2,30 @@ package server
 
 import (
 	"context"
+	"testing"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// newTestEventsService creates an EventsService with sensible test defaults.
+func newTestEventsService(t *testing.T, store store.Store, opts ...func(*EventsOptions)) *EventsService {
+	t.Helper()
+	o := EventsOptions{
+		BufferSize:  4,
+		HistorySize: 8,
+		Store:       store,
+	}
+	for _, fn := range opts {
+		fn(&o)
+	}
+	svc, err := NewEventsService(o)
+	if err != nil {
+		t.Fatalf("NewEventsService() error = %v", err)
+	}
+	return svc
+}
 
 // mockStore is a minimal mock implementation of store.Store for testing.
 type mockStore struct {

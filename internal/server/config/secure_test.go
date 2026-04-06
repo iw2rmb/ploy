@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -19,21 +20,18 @@ func TestLoadTokenFromFile(t *testing.T) {
 			name:      "valid token file with 0600 permissions",
 			content:   "glpat-abc123xyz",
 			perm:      0600,
-			wantErr:   false,
 			wantToken: "glpat-abc123xyz",
 		},
 		{
 			name:      "valid token with whitespace trimmed",
 			content:   "  glpat-abc123xyz\n",
 			perm:      0600,
-			wantErr:   false,
 			wantToken: "glpat-abc123xyz",
 		},
 		{
 			name:      "valid token with 0400 permissions (read-only)",
 			content:   "glpat-abc123xyz",
 			perm:      0400,
-			wantErr:   false,
 			wantToken: "glpat-abc123xyz",
 		},
 		{
@@ -81,7 +79,7 @@ func TestLoadTokenFromFile(t *testing.T) {
 					t.Errorf("loadTokenFromFile() expected error containing %q, got nil", tt.errContains)
 					return
 				}
-				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("loadTokenFromFile() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
@@ -102,17 +100,4 @@ func TestLoadTokenFromFile_NonExistent(t *testing.T) {
 	if err == nil {
 		t.Error("loadTokenFromFile() expected error for non-existent file, got nil")
 	}
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || (len(s) > 0 && len(substr) > 0 && stringContains(s, substr)))
-}
-
-func stringContains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

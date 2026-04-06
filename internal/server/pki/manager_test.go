@@ -101,86 +101,42 @@ func TestStopNotRunning(t *testing.T) {
 	}
 }
 
-func TestManagerLoopWithZeroRenewBefore(t *testing.T) {
-	rotator := &stubRotator{ch: make(chan struct{}, 1)}
-	cfg := config.PKIConfig{
-		BundleDir:   "/etc/ploy/pki",
-		RenewBefore: 0,
+func TestManagerLoop_EdgeCaseRenewBefore(t *testing.T) {
+	tests := []struct {
+		name        string
+		renewBefore time.Duration
+	}{
+		{"zero", 0},
+		{"negative", -10 * time.Millisecond},
+		{"very small", 5 * time.Millisecond},
 	}
-	manager, err := pki.New(pki.Options{
-		Config:  cfg,
-		Rotator: rotator,
-	})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	if err := manager.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-	select {
-	case <-rotator.ch:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("expected rotation trigger with zero RenewBefore")
-	}
-	if err := manager.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop() error = %v", err)
-	}
-}
 
-func TestManagerLoopWithNegativeRenewBefore(t *testing.T) {
-	rotator := &stubRotator{ch: make(chan struct{}, 1)}
-	cfg := config.PKIConfig{
-		BundleDir:   "/etc/ploy/pki",
-		RenewBefore: -10 * time.Millisecond,
-	}
-	manager, err := pki.New(pki.Options{
-		Config:  cfg,
-		Rotator: rotator,
-	})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	if err := manager.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-	select {
-	case <-rotator.ch:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("expected rotation trigger with negative RenewBefore")
-	}
-	if err := manager.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop() error = %v", err)
-	}
-}
-
-func TestManagerLoopWithVerySmallRenewBefore(t *testing.T) {
-	rotator := &stubRotator{ch: make(chan struct{}, 1)}
-	cfg := config.PKIConfig{
-		BundleDir:   "/etc/ploy/pki",
-		RenewBefore: 5 * time.Millisecond,
-	}
-	manager, err := pki.New(pki.Options{
-		Config:  cfg,
-		Rotator: rotator,
-	})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	if err := manager.Start(ctx); err != nil {
-		t.Fatalf("Start() error = %v", err)
-	}
-	select {
-	case <-rotator.ch:
-	case <-time.After(100 * time.Millisecond):
-		t.Fatal("expected rotation trigger with very small RenewBefore")
-	}
-	if err := manager.Stop(context.Background()); err != nil {
-		t.Fatalf("Stop() error = %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rotator := &stubRotator{ch: make(chan struct{}, 1)}
+			manager, err := pki.New(pki.Options{
+				Config: config.PKIConfig{
+					BundleDir:   "/etc/ploy/pki",
+					RenewBefore: tt.renewBefore,
+				},
+				Rotator: rotator,
+			})
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+			if err := manager.Start(ctx); err != nil {
+				t.Fatalf("Start() error = %v", err)
+			}
+			select {
+			case <-rotator.ch:
+			case <-time.After(100 * time.Millisecond):
+				t.Fatalf("expected rotation trigger with RenewBefore=%v", tt.renewBefore)
+			}
+			if err := manager.Stop(context.Background()); err != nil {
+				t.Fatalf("Stop() error = %v", err)
+			}
+		})
 	}
 }

@@ -1,88 +1,15 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestAuthorizerAllowsInsecureDefaultRole(t *testing.T) {
-	a := NewAuthorizer(Options{
-		AllowInsecure: true,
-		DefaultRole:   RoleControlPlane,
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	rr := httptest.NewRecorder()
-	called := false
-	handler := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", rr.Code)
-	}
-	if !called {
-		t.Fatalf("expected wrapped handler invoked")
-	}
-}
-
-func TestAdminAllowedForControlPlaneEndpoints(t *testing.T) {
-	// In insecure mode with default role set to cli-admin, requests to a
-	// handler that allows control-plane should be permitted.
-	a := NewAuthorizer(Options{
-		AllowInsecure: true,
-		DefaultRole:   RoleCLIAdmin,
-	})
-	rr := httptest.NewRecorder()
-	h := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
-	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK, got %d", rr.Code)
-	}
-}
-
-func TestAdminNotAllowedForWorkerEndpoints(t *testing.T) {
-	// Even as cli-admin, endpoints restricted to worker role should reject.
-	a := NewAuthorizer(Options{
-		AllowInsecure: true,
-		DefaultRole:   RoleCLIAdmin,
-	})
-	rr := httptest.NewRecorder()
-	h := a.Middleware(RoleWorker)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/x/heartbeat", nil)
-	h.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 Forbidden, got %d", rr.Code)
-	}
-}
-
-func TestAuthorizerRejectsForbiddenRole(t *testing.T) {
-	a := NewAuthorizer(Options{
-		AllowInsecure: true,
-		DefaultRole:   RoleWorker,
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1/nodes", nil)
-	rr := httptest.NewRecorder()
-	handler := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	handler.ServeHTTP(rr, req)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", rr.Code)
-	}
-}
-
-// TestAuthorizerRoleGates verifies role-based access control with multiple allowed roles.
+// TestAuthorizerRoleGates verifies role-based access control with multiple allowed roles
+// in insecure mode, covering all role/allowlist combinations.
 func TestAuthorizerRoleGates(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -133,6 +60,20 @@ func TestAuthorizerRoleGates(t *testing.T) {
 			wantCode:     http.StatusOK,
 			wantCalled:   true,
 		},
+		{
+			name:         "cli-admin cannot access worker endpoints",
+			allowedRoles: []Role{RoleWorker},
+			defaultRole:  RoleCLIAdmin,
+			wantCode:     http.StatusForbidden,
+			wantCalled:   false,
+		},
+		{
+			name:         "worker cannot access control-plane endpoints",
+			allowedRoles: []Role{RoleControlPlane},
+			defaultRole:  RoleWorker,
+			wantCode:     http.StatusForbidden,
+			wantCalled:   false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -168,7 +109,6 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 	tests := []struct {
 		name          string
 		allowInsecure bool
-		hasTLS        bool
 		wantCode      int
 		wantCalled    bool
 		wantErrorMsg  string
@@ -176,7 +116,6 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 		{
 			name:          "secure mode rejects request without bearer token or mTLS",
 			allowInsecure: false,
-			hasTLS:        false,
 			wantCode:      http.StatusUnauthorized,
 			wantCalled:    false,
 			wantErrorMsg:  "authentication failed",
@@ -184,10 +123,8 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 		{
 			name:          "insecure mode allows request without authentication",
 			allowInsecure: true,
-			hasTLS:        false,
 			wantCode:      http.StatusOK,
 			wantCalled:    true,
-			wantErrorMsg:  "",
 		},
 	}
 
@@ -199,7 +136,6 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 			})
 
 			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			// Note: We don't set req.TLS to simulate missing mTLS.
 			rr := httptest.NewRecorder()
 			called := false
 
@@ -217,25 +153,27 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 				t.Errorf("handler called=%v, want %v", called, tt.wantCalled)
 			}
 			if tt.wantErrorMsg != "" {
-				body := rr.Body.String()
-				if !contains(body, tt.wantErrorMsg) {
-					t.Errorf("expected error message to contain %q, got %q", tt.wantErrorMsg, body)
+				if !strings.Contains(rr.Body.String(), tt.wantErrorMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tt.wantErrorMsg, rr.Body.String())
 				}
 			}
 		})
 	}
 }
 
-// contains checks if a string contains a substring (case-sensitive).
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexOf(s, substr) >= 0)
+func TestMiddlewareNilNextReturns404(t *testing.T) {
+	a := NewAuthorizer(Options{AllowInsecure: true, DefaultRole: RoleControlPlane})
+	h := a.Middleware()(nil)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rr.Code)
+	}
 }
 
-func indexOf(s, substr string) int {
-	for i := 0; i+len(substr) <= len(s); i++ {
-		if s[i:i+len(substr)] == substr {
-			return i
-		}
+func TestIdentityFromContextNone(t *testing.T) {
+	if _, ok := IdentityFromContext(context.TODO()); ok {
+		t.Fatalf("expected no identity for nil context")
 	}
-	return -1
 }
