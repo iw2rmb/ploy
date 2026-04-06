@@ -5,7 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -18,7 +20,8 @@ type configCAListItem struct {
 
 // configCAPutRequest represents the request body for PUT /v1/config/ca/{hash}.
 type configCAPutRequest struct {
-	Section string `json:"section"`
+	Section  string `json:"section"`
+	BundleID string `json:"bundle_id,omitempty"`
 }
 
 // listConfigCAHandler returns all CA entries grouped by section.
@@ -100,6 +103,31 @@ func putConfigCAHandler(holder *ConfigHolder, st store.Store) http.HandlerFunc {
 		if err := ValidateHydraSection(req.Section); err != nil {
 			writeHTTPError(w, http.StatusBadRequest, "%s", err)
 			return
+		}
+
+		bundleID := strings.TrimSpace(req.BundleID)
+		if bundleID != "" {
+			var id domaintypes.SpecBundleID
+			if err := id.UnmarshalText([]byte(bundleID)); err != nil {
+				writeHTTPError(w, http.StatusBadRequest, "invalid bundle_id: %v", err)
+				return
+			}
+			bundleID = id.String()
+			if err := st.UpsertConfigBundleMap(r.Context(), store.UpsertConfigBundleMapParams{
+				Hash:     hash,
+				BundleID: bundleID,
+			}); err != nil {
+				slog.Error("config ca put: bundle mapping upsert failed", "err", err, "hash", hash, "bundle_id", bundleID)
+				writeHTTPError(w, http.StatusInternalServerError, "failed to persist bundle mapping: %v", err)
+				return
+			}
+			holder.AddBundleMapping(hash, bundleID)
+		} else {
+			bundleMap := holder.GetBundleMap()
+			if _, ok := bundleMap[hash]; !ok {
+				writeHTTPError(w, http.StatusBadRequest, "bundle mapping missing for hash %s (provide bundle_id or upload via --file)", hash)
+				return
+			}
 		}
 
 		// Persist to store.

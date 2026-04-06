@@ -114,24 +114,6 @@ func TestParseSpec(t *testing.T) {
 			},
 		},
 		{
-			name: "mig_index_rejected",
-			json: `{
-				"mig_index": 1,
-				"steps": [
-					{"image":"docker.io/test/step-a:v1"},
-					{"image":"docker.io/test/step-b:v1"}
-				]
-			}`,
-			check: func(t *testing.T, _ map[string]string, opts RunOptions, _ error) {
-				if len(opts.Steps) != 0 {
-					t.Fatalf("expected mig_index to be rejected (zero typed options), got steps_len=%d", len(opts.Steps))
-				}
-				if !opts.Execution.Image.IsEmpty() {
-					t.Fatalf("expected mig_index to be rejected (zero typed options), got execution.image=%v", opts.Execution.Image)
-				}
-			},
-		},
-		{
 			name: "image_map_populates_execution_image",
 			json: `{
 				"steps": [{

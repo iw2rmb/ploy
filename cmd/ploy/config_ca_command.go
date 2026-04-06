@@ -190,6 +190,7 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 	}
 
 	var resolvedHash string
+	var resolvedBundleID string
 	if file.set {
 		// Upload the CA bundle file as a spec bundle and derive the hash.
 		archiveBytes, buildErr := buildSourceArchive(expandPath(file.value))
@@ -197,18 +198,11 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 			return fmt.Errorf("build archive from %s: %w", file.value, buildErr)
 		}
 		resolvedHash = computeArchiveShortHash(archiveBytes)
-		cid := computeSpecBundleCID(archiveBytes)
-
-		// Probe before uploading to avoid redundant transfers.
-		_, exists, probeErr := probeSpecBundleByCID(ctx, baseURL, client, cid)
-		if probeErr != nil {
-			return fmt.Errorf("probe spec bundle: %w", probeErr)
+		bundleID, _, _, uploadErr := uploadSpecBundle(ctx, baseURL, client, archiveBytes)
+		if uploadErr != nil {
+			return fmt.Errorf("upload CA bundle: %w", uploadErr)
 		}
-		if !exists {
-			if _, _, _, uploadErr := uploadSpecBundle(ctx, baseURL, client, archiveBytes); uploadErr != nil {
-				return fmt.Errorf("upload CA bundle: %w", uploadErr)
-			}
-		}
+		resolvedBundleID = bundleID
 	} else {
 		normalizedHash, parseErr := contracts.ParseStoredCAEntry(hash.value)
 		if parseErr != nil {
@@ -219,7 +213,7 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 
 	// Register the hash for each requested section.
 	for _, section := range sections.values {
-		if regErr := putConfigCAEntry(ctx, baseURL, client, resolvedHash, section); regErr != nil {
+		if regErr := putConfigCAEntry(ctx, baseURL, client, resolvedHash, section, resolvedBundleID); regErr != nil {
 			return regErr
 		}
 	}
@@ -233,10 +227,11 @@ func handleConfigCASet(args []string, stderr io.Writer) error {
 }
 
 // putConfigCAEntry registers a CA hash for a single section via PUT /v1/config/ca/{hash}.
-func putConfigCAEntry(ctx context.Context, baseURL *url.URL, client *http.Client, hash, section string) error {
+func putConfigCAEntry(ctx context.Context, baseURL *url.URL, client *http.Client, hash, section, bundleID string) error {
 	reqBody := struct {
-		Section string `json:"section"`
-	}{Section: section}
+		Section  string `json:"section"`
+		BundleID string `json:"bundle_id,omitempty"`
+	}{Section: section, BundleID: strings.TrimSpace(bundleID)}
 	bodyJSON, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("marshal request: %w", err)

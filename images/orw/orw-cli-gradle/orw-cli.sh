@@ -109,15 +109,29 @@ parse_bool_default_true() {
 
 import_ca_bundle() {
   local ca_path="${PLOY_CA_CERT_PATH:-/etc/ploy/certs/ca.crt}"
-  if [[ ! -r "$ca_path" ]] || [[ ! -s "$ca_path" ]]; then
+  local has_input=0
+  if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
+    has_input=1
+  fi
+  if compgen -G "/etc/ploy/ca/*" >/dev/null; then
+    has_input=1
+  fi
+  if [[ "$has_input" -eq 0 ]]; then
     return 0
   fi
 
-  local pem_file pem_dir sys_ca_dir
-  pem_file="$ca_path"
+  local pem_dir sys_ca_dir
   pem_dir="$(mktemp -d)"
 
-  awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$pem_dir" "$pem_file"
+  if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
+    awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$pem_dir" "$ca_path"
+  fi
+  if compgen -G "/etc/ploy/ca/*" >/dev/null; then
+    for mounted_ca in /etc/ploy/ca/*; do
+      [[ -f "$mounted_ca" ]] || continue
+      awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$pem_dir" "$mounted_ca"
+    done
+  fi
 
   if command -v update-ca-certificates >/dev/null 2>&1; then
     sys_ca_dir="/usr/local/share/ca-certificates/orw-cli"

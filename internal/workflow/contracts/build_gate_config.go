@@ -35,6 +35,9 @@ type BuildGatePhaseConfig struct {
 	// Stack configures stack detection behavior for this gate phase.
 	Stack *BuildGateStackConfig `json:"stack,omitempty" yaml:"stack,omitempty"`
 
+	// CA lists canonical CA certificate entries for this gate phase.
+	CA []string `json:"ca,omitempty" yaml:"ca,omitempty"`
+
 	// GateProfile configures gate_profile-derived command/env overrides for this phase.
 	GateProfile *BuildGateProfileOverride `json:"gate_profile,omitempty" yaml:"gate_profile,omitempty"`
 
