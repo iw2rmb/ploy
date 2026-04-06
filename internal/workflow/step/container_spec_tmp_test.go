@@ -347,3 +347,54 @@ func TestSeedOutDirFromStaging(t *testing.T) {
 		t.Errorf("seeded content = %q, want %q", got, "output")
 	}
 }
+
+func TestSeedInDirFromStaging(t *testing.T) {
+	stagingDir := t.TempDir()
+	inDir := t.TempDir()
+
+	fileHash := "abc0001"
+	dirHash := "abc0002"
+
+	fileContentPath := filepath.Join(stagingDir, fileHash, "content")
+	if err := os.MkdirAll(filepath.Dir(fileContentPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fileContentPath, []byte("yaml"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dirContentPath := filepath.Join(stagingDir, dirHash, "content")
+	if err := os.MkdirAll(dirContentPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dirContentPath, "route.yaml"), []byte("route"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest := contracts.StepManifest{
+		In: []string{
+			fileHash + ":/in/amata.yaml",
+			dirHash + ":/in/amata",
+		},
+	}
+
+	if err := SeedInDirFromStaging(manifest, stagingDir, inDir); err != nil {
+		t.Fatalf("SeedInDirFromStaging error: %v", err)
+	}
+
+	fileData, err := os.ReadFile(filepath.Join(inDir, "amata.yaml"))
+	if err != nil {
+		t.Fatalf("seeded file content missing: %v", err)
+	}
+	if string(fileData) != "yaml" {
+		t.Errorf("seeded file content = %q, want %q", fileData, "yaml")
+	}
+
+	dirData, err := os.ReadFile(filepath.Join(inDir, "amata", "route.yaml"))
+	if err != nil {
+		t.Fatalf("seeded dir content missing: %v", err)
+	}
+	if string(dirData) != "route" {
+		t.Errorf("seeded dir content = %q, want %q", dirData, "route")
+	}
+}

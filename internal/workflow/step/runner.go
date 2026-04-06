@@ -128,6 +128,12 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	if err := SeedOutDirFromStaging(req.Manifest, req.StagingDir, req.OutDir); err != nil {
 		return Result{}, fmt.Errorf("seed out dir from staging: %w", err)
 	}
+	// Seed inDir with materialized Hydra in entries when /in is mounted as a
+	// parent path. This avoids nested /in/* bind mounts that can be ambiguous on
+	// some Docker environments.
+	if err := SeedInDirFromStaging(req.Manifest, req.StagingDir, req.InDir); err != nil {
+		return Result{}, fmt.Errorf("seed in dir from staging: %w", err)
+	}
 
 	// Stage 3: Execute container via configured runtime.
 	executionStart := time.Now()
