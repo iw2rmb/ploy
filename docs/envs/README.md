@@ -660,8 +660,9 @@ entries to install CA certificates into the container trust store:
 **Build Gate Gradle images (`gate-gradle:*`)**: Ship a Gradle init script under `~/.gradle/init.d/` that enables a remote Gradle Build Cache when `PLOY_GRADLE_BUILD_CACHE_URL` is set (push behavior controlled by `PLOY_GRADLE_BUILD_CACHE_PUSH`).
 
 Build Gate jobs also use node-local persistent tool caches under
-`/var/cache/ploy/gates/<language>/<tool>/<release>` (when that path is not writable,
-the node falls back to `${TMPDIR:-/tmp}/ploy/gates/...`):
+`$PLOY_BUILDGATE_CACHE_ROOT/<language>/<tool>/<release>`.
+When `PLOY_BUILDGATE_CACHE_ROOT` is unset, default root is `/var/cache/ploy/gates`
+and, when not writable, the node falls back to `${TMPDIR:-/tmp}/ploy/gates`.
 - Gradle gates mount that path to `/home/gradle/.gradle`.
 - Maven gates mount that path to `/root/.m2`.
 - On every gate execution, before mounting the cache path, the node checks free
@@ -714,6 +715,8 @@ The Build Gate executor supports optional resource limits via environment variab
   human suffixes (e.g., `2G`). Passed to Docker as the storage option `size` (driver dependent; requires
   overlay2 with xfs project quotas or equivalent). When unsupported by the driver, container creation may fail.
 - `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU limit in millicores (e.g., `500` = 0.5 CPU, `1500` = 1.5 CPU).
+- `PLOY_BUILDGATE_CACHE_ROOT` — Host path root for persistent Build Gate tool caches.
+  Default is `/var/cache/ploy/gates`; when unset and not writable, fallback is `${TMPDIR:-/tmp}/ploy/gates`.
 
 Notes:
 - Memory and disk limits accept human‑friendly suffixes; CPU uses numeric millicores only.
