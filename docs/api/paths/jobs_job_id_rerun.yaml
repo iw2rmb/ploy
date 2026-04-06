@@ -1,0 +1,79 @@
+post:
+  tags: [Control]
+  summary: Rerun a terminal heal/re_gate job with alter overlays
+  description: |
+    Creates a new repo attempt in the same run and queues a copied root job
+    (`heal` or `re_gate`) with the provided alter overlay. The source attempt
+    and jobs remain unchanged.
+  parameters:
+    - in: path
+      name: job_id
+      required: true
+      schema:
+        type: string
+      description: Job ID (KSUID string)
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [alter]
+          properties:
+            alter:
+              type: object
+              additionalProperties: false
+              properties:
+                image:
+                  type: string
+                envs:
+                  type: object
+                  additionalProperties:
+                    type: string
+                in:
+                  type: array
+                  items:
+                    type: string
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [run_id, repo_id, attempt, root_job_id, copied_from_job_id]
+            properties:
+              run_id:
+                type: string
+              repo_id:
+                type: string
+              attempt:
+                type: integer
+              root_job_id:
+                type: string
+              copied_from_job_id:
+                type: string
+    '400':
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '409':
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'

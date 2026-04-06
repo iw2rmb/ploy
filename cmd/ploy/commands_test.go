@@ -25,6 +25,7 @@ func TestCommandsWiredIntoRoot(t *testing.T) {
 		"version",  // Built-in version command
 		"mig",      // newMigCmd
 		"run",      // newRunCmd
+		"rerun",    // newRerunCmd
 		"job",      // newJobCmd
 		"pull",     // newPullCmd
 		"cluster",  // newClusterCmd (includes token, node, deploy)
@@ -73,6 +74,7 @@ func TestCommandBuildersFunctional(t *testing.T) {
 	}{
 		{"newMigCmd", func(w *bytes.Buffer) *cobra.Command { return newMigCmd(w) }},
 		{"newRunCmd", func(w *bytes.Buffer) *cobra.Command { return newRunCmd(w) }},
+		{"newRerunCmd", func(w *bytes.Buffer) *cobra.Command { return newRerunCmd(w) }},
 		{"newJobCmd", func(w *bytes.Buffer) *cobra.Command { return newJobCmd(w) }},
 		{"newPullCmd", func(w *bytes.Buffer) *cobra.Command { return newPullCmd(w) }},
 		{"newClusterCmd", func(w *bytes.Buffer) *cobra.Command { return newClusterCmd(w) }},

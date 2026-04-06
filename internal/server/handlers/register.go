@@ -152,6 +152,8 @@ func RegisterRoutes(s *server.HTTPServer, st store.Store, bs blobstore.Store, bp
 	// Job-level status polling endpoint — allows workers to stop local execution
 	// when control plane transitions a running job to Cancelled.
 	s.RegisterRouteFunc("GET /v1/jobs/{job_id}/status", getJobStatusHandler(st), auth.RoleWorker)
+	// Job-level rerun endpoint — replays a job with altered inputs as a new repo attempt.
+	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/rerun", rerunJobHandler(st), auth.RoleControlPlane)
 	// Job-level runtime image persistence — nodes persist the resolved container image name
 	// that will be used to execute a mig/heal job (stack-aware resolution).
 	s.RegisterRouteFunc("POST /v1/jobs/{job_id}/image", saveJobImageNameHandler(st), auth.RoleWorker)

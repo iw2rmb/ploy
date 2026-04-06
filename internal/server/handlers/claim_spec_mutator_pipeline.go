@@ -48,7 +48,7 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 		},
 		{
 			errContext: "merge hydra overlay into spec",
-			apply:     applyHydraOverlayMutator,
+			apply:      applyHydraOverlayMutator,
 		},
 		{
 			errContext: "merge recovery candidate prep into spec",
@@ -76,7 +76,11 @@ func mutateClaimSpec(input claimSpecMutatorInput) (json.RawMessage, error) {
 		},
 		{
 			errContext: "merge server bundle map into spec",
-			apply:     applyBundleMapMutator,
+			apply:      applyBundleMapMutator,
+		},
+		{
+			errContext: "merge rerun alter into spec",
+			apply:      applyRerunAlterMutator,
 		},
 	}
 
