@@ -34,8 +34,9 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
 COPY images/amata/entrypoint.sh /usr/local/bin/ploy/entrypoint.sh
+COPY images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 COPY images/amata/amata /usr/local/bin/amata
-RUN chmod +x /usr/local/bin/ploy/entrypoint.sh /usr/local/bin/amata
+RUN chmod +x /usr/local/bin/ploy/entrypoint.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh /usr/local/bin/amata
 
 WORKDIR /workspace
 ENTRYPOINT ["/usr/local/bin/ploy/entrypoint.sh"]

@@ -32,6 +32,7 @@ RUN printf '%s\n' '#!/usr/bin/env bash' \
     'exec java -jar /opt/orw-cli-runner/orw-cli-runner.jar "$@"' \
     > /usr/local/bin/rewrite && chmod +x /usr/local/bin/rewrite
 
+COPY --chmod=755 images/install_ploy_ca_bundle.sh /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 COPY --chmod=755 images/orw/orw-cli-gradle/orw-cli.sh /usr/local/bin/orw-cli
 RUN ln -s /usr/local/bin/orw-cli /usr/local/bin/migs-orw-cli
 

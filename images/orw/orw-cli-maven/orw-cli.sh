@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source /usr/local/lib/ploy/install_ploy_ca_bundle.sh
 
 usage() {
   cat <<'USAGE'
@@ -107,59 +108,6 @@ parse_bool_default_true() {
   esac
 }
 
-import_ca_bundle() {
-  local ca_path="${PLOY_CA_CERT_PATH:-/etc/ploy/certs/ca.crt}"
-  local has_input=0
-  if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
-    has_input=1
-  fi
-  if compgen -G "/etc/ploy/ca/*" >/dev/null; then
-    has_input=1
-  fi
-  if [[ "$has_input" -eq 0 ]]; then
-    return 0
-  fi
-
-  local pem_dir sys_ca_dir
-  pem_dir="$(mktemp -d)"
-
-  if [[ -r "$ca_path" ]] && [[ -s "$ca_path" ]]; then
-    awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$pem_dir" "$ca_path"
-  fi
-  if compgen -G "/etc/ploy/ca/*" >/dev/null; then
-    for mounted_ca in /etc/ploy/ca/*; do
-      [[ -f "$mounted_ca" ]] || continue
-      awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$pem_dir" "$mounted_ca"
-    done
-  fi
-
-  if command -v update-ca-certificates >/dev/null 2>&1; then
-    sys_ca_dir="/usr/local/share/ca-certificates/orw-cli"
-    mkdir -p "$sys_ca_dir"
-  else
-    sys_ca_dir=""
-  fi
-
-  shopt -s nullglob
-  for cert_path in "$pem_dir"/*.crt; do
-    if command -v keytool >/dev/null 2>&1; then
-      local alias_name
-      alias_name="orw_cli_$(basename "$cert_path" .crt)"
-      keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "$alias_name" -file "$cert_path" >/dev/null 2>&1 || {
-        echo "warning: keytool import failed for ${cert_path}" >>"$transform_log"
-      }
-    fi
-    if [[ -n "$sys_ca_dir" ]]; then
-      cp "$cert_path" "$sys_ca_dir/" || true
-    fi
-  done
-  shopt -u nullglob
-
-  if [[ -n "$sys_ca_dir" ]]; then
-    update-ca-certificates >/dev/null 2>&1 || true
-  fi
-}
-
 if [[ "${MIGS_SELF_TEST:-}" == "1" ]]; then
   write_success_report "orw-cli self-test passed"
   exit 0
@@ -199,7 +147,7 @@ if [[ -n "$repo_username" && -z "$repo_password" ]] || [[ -z "$repo_username" &&
   exit 4
 fi
 
-import_ca_bundle
+PLOY_CA_IMPORT_JAVA=1 PLOY_CA_LOG_FILE="$transform_log" install_ploy_ca_bundle
 
 fail_on_unsupported=true
 if ! parse_bool_default_true "${ORW_FAIL_ON_UNSUPPORTED:-}"; then
