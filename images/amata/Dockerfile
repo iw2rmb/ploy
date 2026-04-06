@@ -27,7 +27,6 @@ RUN echo 'if [ -f ~/.bashrc ]; then . ~/.bashrc; fi' >> /root/.bash_profile
 ENV PATH="/usr/local/bin:${PATH}" \
     WORKSPACE=/workspace \
     OUTDIR=/out \
-    CODEX_HOME=/out/codex \
     CODEX_MODEL="" \
     PLOY_SERVER_URL="" \
     PLOY_API_TOKEN="" \
