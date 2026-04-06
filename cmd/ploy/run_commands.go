@@ -47,6 +47,9 @@ func handleRun(args []string, stderr io.Writer) error {
 	case "pull":
 		// Pull command: pulls diffs from a specific run into the current repo.
 		return handleRunPull(args[1:], stderr)
+	case "patch":
+		// Patch command: downloads a diff artifact without applying it.
+		return handleRunPatch(args[1:], stderr)
 	default:
 		printRunUsage(stderr)
 		return fmt.Errorf("unknown run subcommand %q", args[0])
@@ -135,4 +138,3 @@ func printRunStatusUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --json   Print machine-readable JSON report with links and per-job artifacts")
 }
-

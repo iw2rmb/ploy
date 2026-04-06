@@ -87,6 +87,7 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")
 	_, _ = fmt.Fprintln(w, "  start       Start pending repos for a batch run")
 	_, _ = fmt.Fprintln(w, "  pull        Pull diffs into the current git worktree")
+	_, _ = fmt.Fprintln(w, "  patch       Download a run patch artifact (.patch.gz) without applying")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Run submission (direct flags without subcommand):")
 	_, _ = fmt.Fprintln(w, "  --repo <url>       Git repository URL (https/ssh/file)")

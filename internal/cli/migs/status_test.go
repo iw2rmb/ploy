@@ -192,3 +192,45 @@ func TestDownloadDiffCommand_EmptyPatch(t *testing.T) {
 		t.Errorf("got %d bytes, want 0 for empty patch", len(result))
 	}
 }
+
+// TestDownloadDiffGzipCommand_Success verifies raw gzip bytes are returned as-is.
+func TestDownloadDiffGzipCommand_Success(t *testing.T) {
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewMigRepoID()
+	diffID := domaintypes.DiffID("550e8400-e29b-41d4-a716-4466554400cc")
+	rawGzip := []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wantPath := "/v1/runs/" + runID.String() + "/repos/" + repoID.String() + "/diffs"
+		if r.URL.Path != wantPath {
+			t.Errorf("expected path %s, got %s", wantPath, r.URL.Path)
+		}
+		if r.URL.Query().Get("download") != "true" {
+			t.Error("expected download=true query param")
+		}
+		if r.URL.Query().Get("diff_id") != diffID.String() {
+			t.Errorf("expected diff_id=%s, got %s", diffID.String(), r.URL.Query().Get("diff_id"))
+		}
+		w.Header().Set("Content-Type", "application/gzip")
+		_, _ = w.Write(rawGzip)
+	}))
+	defer srv.Close()
+
+	base, _ := url.Parse(srv.URL)
+	cmd := DownloadDiffGzipCommand{
+		Client:  srv.Client(),
+		BaseURL: base,
+		RunID:   runID,
+		RepoID:  repoID,
+		DiffID:  diffID,
+	}
+
+	result, err := cmd.Run(context.Background())
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if string(result) != string(rawGzip) {
+		t.Errorf("gzip bytes mismatch: got %v, want %v", result, rawGzip)
+	}
+}

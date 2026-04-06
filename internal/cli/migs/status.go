@@ -3,6 +3,7 @@
 // This file implements helpers used by `ploy run pull` and `ploy mig pull`:
 //   - ListRunRepoDiffsCommand: Fetches repo-scoped diffs via GET /v1/runs/{run_id}/repos/{repo_id}/diffs (v1).
 //   - DownloadDiffCommand: Downloads a single diff via GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>.
+//   - DownloadDiffGzipCommand: Downloads raw gzip bytes for a single diff from the same endpoint.
 package migs
 
 import (
@@ -92,6 +93,16 @@ type DownloadDiffCommand struct {
 	DiffID  domaintypes.DiffID
 }
 
+// DownloadDiffGzipCommand downloads a single diff patch as raw gzip bytes via:
+// GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+type DownloadDiffGzipCommand struct {
+	Client  *http.Client
+	BaseURL *url.URL
+	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
+	RepoID  domaintypes.MigRepoID
+	DiffID  domaintypes.DiffID
+}
+
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
 // and returns the decompressed patch.
 func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
@@ -136,4 +147,48 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	}
 
 	return patch, nil
+}
+
+// Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
+// and returns raw gzip-compressed patch bytes from the server.
+func (c DownloadDiffGzipCommand) Run(ctx context.Context) ([]byte, error) {
+	if err := httpx.RequireClientAndURL(c.Client, c.BaseURL); err != nil {
+		return nil, fmt.Errorf("download diff gzip: %w", err)
+	}
+	if c.RunID.IsZero() {
+		return nil, fmt.Errorf("download diff gzip: run id required")
+	}
+	if c.RepoID.IsZero() {
+		return nil, fmt.Errorf("download diff gzip: repo id required")
+	}
+	if c.DiffID.IsZero() {
+		return nil, fmt.Errorf("download diff gzip: diff id required")
+	}
+
+	endpoint := c.BaseURL.JoinPath("v1", "runs", c.RunID.String(), "repos", c.RepoID.String(), "diffs")
+	q := endpoint.Query()
+	q.Set("download", "true")
+	q.Set("diff_id", c.DiffID.String())
+	endpoint.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("download diff gzip: build request: %w", err)
+	}
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("download diff gzip: http request failed: %w", err)
+	}
+	defer httpx.DrainAndClose(resp)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpx.WrapError("download diff gzip", resp.Status, resp.Body)
+	}
+
+	patchGzip, err := io.ReadAll(io.LimitReader(resp.Body, httpx.MaxDownloadBodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("download diff gzip: read body: %w", err)
+	}
+	return patchGzip, nil
 }

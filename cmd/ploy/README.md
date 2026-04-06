@@ -184,6 +184,7 @@ ploy mig run repo remove \
 | `mig run repo remove`    | Detach a repository from a batch              |
 | `mig run repo restart`   | Re-queue a repo job with optional new branch  |
 | `run pull <run-id>`      | Pull diffs for the current repo from a run    |
+| `run patch <run-id>`     | Download a stored `.patch.gz` artifact only   |
 | `mig pull [<mig>]`       | Pull diffs for the current repo from a mig    |
 | `run logs <batch>`       | Stream logs/events for all repos in a batch   |
 
@@ -230,6 +231,12 @@ ploy mig pull <mig-id|name>
 ```bash
 # Pull changes from a run ID.
 ploy run pull <run-id>
+
+# Download the latest stored patch artifact only (no apply).
+ploy run patch <run-id> --output latest.patch.gz
+
+# Download a specific diff patch artifact.
+ploy run patch <run-id> --repo-id <repo-id> --diff-id <diff-id> --output step1.patch.gz
 
 # Preview what would be pulled without making changes.
 ploy run pull --dry-run <run-id>
