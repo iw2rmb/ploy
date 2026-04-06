@@ -393,11 +393,24 @@ func expandedPreviewLines(lines []string, width int) []string {
 		if strings.TrimSpace(trimmed) == "" {
 			trimmed = "(none yet)"
 		}
-		out = append(out, wrapRunesFixed(trimmed, width)...)
+		out = append(out, collapsedWrappedPreviewRows(wrapRunesFixed(trimmed, width))...)
 	}
 	if len(out) == 0 {
 		return []string{"(none yet)"}
 	}
+	return out
+}
+
+func collapsedWrappedPreviewRows(rows []string) []string {
+	const maxRowsBeforeCollapse = 7
+	if len(rows) <= maxRowsBeforeCollapse {
+		return rows
+	}
+	hidden := len(rows) - 6
+	out := make([]string, 0, 7)
+	out = append(out, rows[:3]...)
+	out = append(out, fmt.Sprintf("... +%d rows", hidden))
+	out = append(out, rows[len(rows)-3:]...)
 	return out
 }
 
