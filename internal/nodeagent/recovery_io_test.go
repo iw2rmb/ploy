@@ -51,7 +51,7 @@ func TestParseActionSummary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			outDir := t.TempDir()
-			if err := os.WriteFile(filepath.Join(outDir, "codex-last.txt"), []byte(tt.payload), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(outDir, "heal.json"), []byte(tt.payload), 0o644); err != nil {
 				t.Fatalf("write codex-last: %v", err)
 			}
 			tt.check(t, parseActionSummary(outDir))

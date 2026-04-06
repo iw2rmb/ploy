@@ -9,7 +9,7 @@ set -euo pipefail
 #   3. A heal job is present (healing attempt).
 #   4. A re_gate job is present (re-gate status sequence).
 #   5. Codex handshake artifacts satisfy the metadata contract (strict mode).
-#   6. codex-last.txt satisfies the JSON schema contract: valid JSON, .error_kind == "code",
+#   6. heal.json satisfies the JSON schema contract: valid JSON, .error_kind == "code",
 #      .bug_summary present and non-empty, no unresolved template tokens.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,40 +92,40 @@ if ! e2e_validate_codex_handshake "$E2E_ARTIFACT_DIR" strict; then
   FAILED=1
 fi
 
-# 6. codex-last.txt must satisfy the JSON schema contract.
-CODEX_LAST="${E2E_ARTIFACT_DIR}/codex-last.txt"
+# 6. heal.json must satisfy the JSON schema contract.
+CODEX_LAST="${E2E_ARTIFACT_DIR}/heal.json"
 if [[ -f "$CODEX_LAST" ]]; then
   if ! jq -e . "$CODEX_LAST" > /dev/null 2>&1; then
-    echo "  ! codex-last.txt: not valid JSON — heal summary contract violated" >&2
+    echo "  ! heal.json: not valid JSON — heal summary contract violated" >&2
     FAILED=1
   else
-    echo "  + codex-last.txt: valid JSON"
+    echo "  + heal.json: valid JSON"
 
     ERROR_KIND="$(jq -r '.error_kind // empty' "$CODEX_LAST")"
     if [[ "$ERROR_KIND" == "code" ]]; then
-      echo "  + codex-last.txt .error_kind: \"code\""
+      echo "  + heal.json .error_kind: \"code\""
     else
-      echo "  ! codex-last.txt .error_kind: expected \"code\", got \"${ERROR_KIND}\"" >&2
+      echo "  ! heal.json .error_kind: expected \"code\", got \"${ERROR_KIND}\"" >&2
       FAILED=1
     fi
 
     CODEX_BUG_SUMMARY="$(jq -r '.bug_summary // empty' "$CODEX_LAST")"
     if [[ -n "$CODEX_BUG_SUMMARY" ]]; then
-      echo "  + codex-last.txt .bug_summary: present"
+      echo "  + heal.json .bug_summary: present"
     else
-      echo "  ! codex-last.txt .bug_summary: missing or empty" >&2
+      echo "  ! heal.json .bug_summary: missing or empty" >&2
       FAILED=1
     fi
 
     if grep -qF '{{' "$CODEX_LAST"; then
-      echo "  ! codex-last.txt: contains unresolved template tokens ({{)" >&2
+      echo "  ! heal.json: contains unresolved template tokens ({{)" >&2
       FAILED=1
     else
-      echo "  + codex-last.txt: no unresolved template tokens"
+      echo "  + heal.json: no unresolved template tokens"
     fi
   fi
 else
-  echo "  ! codex-last.txt: missing" >&2
+  echo "  ! heal.json: missing" >&2
   FAILED=1
 fi
 

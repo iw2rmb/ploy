@@ -17,7 +17,7 @@ Behavior:
   - Always executes the amata binary.
   - If invoked without args and /in/amata.yaml exists, runs: amata run /in/amata.yaml
   - Imports extra CA certs from /etc/ploy/ca when present.
-  - Writes codex-compatible artifacts to /out: codex.log, codex-last.txt, codex-run.json.
+  - Writes codex-compatible artifacts to /out: codex.log, heal.json, codex-run.json.
 USAGE
 }
 
@@ -71,11 +71,11 @@ set -e
 if [[ ! -s "$logfile" ]]; then
   echo "[amata] no output captured from amata" | tee -a "$logfile" >&2
 fi
-if [[ ! -s "$out_dir/codex-last.txt" ]]; then
+if [[ ! -s "$out_dir/heal.json" ]]; then
   if [[ -s "$logfile" ]]; then
-    grep -v '^\s*$' "$logfile" | tail -1 > "$out_dir/codex-last.txt" || true
+    grep -v '^\s*$' "$logfile" | tail -1 > "$out_dir/heal.json" || true
   fi
-  [[ -s "$out_dir/codex-last.txt" ]] || touch "$out_dir/codex-last.txt"
+  [[ -s "$out_dir/heal.json" ]] || touch "$out_dir/heal.json"
 fi
 
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)

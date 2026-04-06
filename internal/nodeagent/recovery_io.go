@@ -18,14 +18,14 @@ const (
 	orwStatsMetadataReason    = "orw_reason"
 )
 
-// parseBugSummary reads /out/codex-last.txt and extracts the "bug_summary" field
+// parseBugSummary reads /out/heal.json and extracts the "bug_summary" field
 // from a JSON one-liner. Returns an empty string if the file is missing, unreadable,
 // or does not contain a bug_summary field.
 func parseBugSummary(outDir string) string {
 	return parseCodexLastField(outDir, "bug_summary")
 }
 
-// parseActionSummary reads /out/codex-last.txt and extracts the "action_summary"
+// parseActionSummary reads /out/heal.json and extracts the "action_summary"
 // field from a JSON one-liner. Returns an empty string if the file is missing,
 // unreadable, or does not contain an action_summary field.
 func parseActionSummary(outDir string) string {
@@ -60,12 +60,12 @@ func parseORWFailureMetadata(outDir string) (map[string]string, error) {
 	return meta, nil
 }
 
-// parseCodexLastField reads codex-last.txt from outDir and extracts a named string
+// parseCodexLastField reads heal.json from outDir and extracts a named string
 // field from the JSON content. The file is expected to contain one or more lines;
 // each line is tried as a JSON object. The first line containing the requested field
 // wins. The returned value is trimmed and truncated to 200 characters.
 func parseCodexLastField(outDir, field string) string {
-	data, err := os.ReadFile(filepath.Join(outDir, "codex-last.txt"))
+	data, err := os.ReadFile(filepath.Join(outDir, "heal.json"))
 	if err != nil {
 		return ""
 	}

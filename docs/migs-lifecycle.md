@@ -226,7 +226,7 @@ as canonical expectation (`language`, `tool`, optional `release`):
 - **Exhaustion handling**: If all retries are exhausted and the gate still fails, the run fails.
 - **Workspace policy**: Healing must change `/workspace`; if no files are changed,
   the heal job fails with `healing_warning=no_workspace_changes`.
-- **action_summary**: After each healing iteration, the agent reads `/out/codex-last.txt`
+- **action_summary**: After each healing iteration, the agent reads `/out/heal.json`
   for `{"action_summary":"..."}` (max 200 chars, single-line). This is persisted in
   `jobs.meta.action_summary` for heal jobs.
 
