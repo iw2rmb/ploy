@@ -218,8 +218,10 @@ run_e2e_selftest() {
     fi
 
     # Check if cluster is configured
-    if [[ ! -d ~/.config/ploy/default ]]; then
-        log_warn "Skipping e2e selftest (no cluster configured at ~/.config/ploy/default)"
+    local config_home="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
+    local default_marker="${config_home}/default"
+    if [[ ! -e "$default_marker" ]]; then
+        log_warn "Skipping e2e selftest (no cluster configured at ${default_marker})"
         return 0
     fi
 

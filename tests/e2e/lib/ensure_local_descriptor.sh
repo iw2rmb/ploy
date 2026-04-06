@@ -32,7 +32,7 @@ ensure_local_descriptor() {
     server_url="${PLOY_SERVER_URL:-http://localhost:${PLOY_SERVER_PORT:-8080}}"
   fi
 
-  generated_tokens="$HOME/.config/ploy/local/generated-tokens.env"
+  generated_tokens="${base_dir}/generated-tokens.env"
   if [[ -f "$generated_tokens" ]]; then
     # shellcheck disable=SC1090
     source "$generated_tokens"
@@ -45,7 +45,7 @@ ensure_local_descriptor() {
     fi
   fi
 
-  if token="$(mint_valid_local_admin_token "$server_url" "$cluster_id" "$repo_root")"; then
+  if token="$(mint_valid_local_admin_token "$server_url" "$cluster_id" "$repo_root" "$base_dir")"; then
     write_descriptor "$base_dir" "$marker" "$cluster_id" "$server_url" "$token"
     return 0
   fi
@@ -168,6 +168,7 @@ mint_valid_local_admin_token() {
   local server_url="$1"
   local cluster_id="$2"
   local repo_root="$3"
+  local base_dir="$4"
   local secret=""
   local token=""
   local -a secrets=()
@@ -175,8 +176,8 @@ mint_valid_local_admin_token() {
   if [[ -n "${PLOY_AUTH_SECRET:-}" ]]; then
     secrets+=("${PLOY_AUTH_SECRET}")
   fi
-  if [[ -f "$HOME/.config/ploy/local/auth-secret.txt" ]]; then
-    secrets+=("$(cat "$HOME/.config/ploy/local/auth-secret.txt")")
+  if [[ -f "${base_dir}/auth-secret.txt" ]]; then
+    secrets+=("$(cat "${base_dir}/auth-secret.txt")")
   fi
 
   local container_secret=""

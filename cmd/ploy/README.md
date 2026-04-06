@@ -55,6 +55,9 @@ flow into stage metadata so the control plane can respect concurrency/timebox co
 When `--follow` is set, the CLI displays a summarized per-repo job graph that
 refreshes until the run reaches a terminal state. The job graph shows step index,
 job type, job ID, display name, status glyph, duration, and status for each job.
+For running jobs, follow mode also shows `STD[O]UT` and `STD[E]RR` preview rows
+(collapsed by default). Press `o` to expand/collapse stdout previews for all
+currently running jobs, and `e` for stderr previews. Failed jobs are kept expanded.
 Note: `--follow` does not stream container logs. Use `ploy job follow <job-id>` for container log streaming.
 
 `--cap` enforces an overall time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the run. When

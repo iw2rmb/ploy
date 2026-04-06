@@ -10,7 +10,7 @@
 #
 # Prerequisites:
 # - ploy binary available at dist/ploy (run: make build)
-# - Cluster descriptor configured at ~/.config/ploy/default
+# - Cluster descriptor configured at ${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default
 # - Access to target repository (public read, auth for MR creation)
 # - Optional: PLOY_GITLAB_PAT for MR creation validation
 #

@@ -47,7 +47,7 @@ tests/
    The database must exist and have migrations applied. See `internal/store/migrations/` for schema.
 
 3. **For e2e tests, configure a cluster:**
-   - Ensure `~/.config/ploy/default` exists with cluster descriptor.
+   - Ensure `${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default` exists with cluster descriptor.
    - Set `PLOY_GITLAB_PAT` if testing GitLab MR creation.
 
 ### Running Smoke Tests
@@ -298,7 +298,7 @@ The smoke test suite is designed for CI environments:
 - Verify database exists and migrations are applied.
 
 ### E2E tests fail: "cluster not configured"
-- Ensure `~/.config/ploy/default` exists.
+- Ensure `${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default` exists.
 - Verify cluster is accessible (network, credentials).
 
 ### E2E tests fail: "image not found"

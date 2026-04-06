@@ -20,7 +20,7 @@
 #
 # Prerequisites:
 # - ploy binary available at dist/ploy (run: make build)
-# - Cluster descriptor at ~/.config/ploy/default
+# - Cluster descriptor at ${PLOY_CONFIG_HOME:-$HOME/.config/ploy}/default
 # - Codex auth at ~/.codex/auth.json (for healing)
 # - Optional: PLOY_GITLAB_PAT for MR creation
 #

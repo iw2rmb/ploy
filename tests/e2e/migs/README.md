@@ -8,7 +8,7 @@
 
 - Local Docker cluster deployed via `ploy cluster deploy`.
 - CLI configured for the local cluster:
-  - `export PLOY_CONFIG_HOME="$HOME/.config/ploy/local"`
+  - `export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"`
   - Scenario scripts auto-rebuild/repair `default` and validate the bearer token before run submission.
   - Repair first tries `cmd/ploy/assets/runtime/generated-tokens.env`, then mints a local admin token from known local secrets when needed.
   - If both descriptor and token seed are missing, rerun `ploy cluster deploy`.

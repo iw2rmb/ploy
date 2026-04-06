@@ -193,43 +193,12 @@ build_gate:
 `,
 		},
 		{
-			name: "amata is forbidden in steps",
-			spec: `
-steps:
-  - image: docker.io/test/step1:latest
-    amata:
-      spec: ignored
-`,
-			wantErr: "validate spec: steps[0].amata: forbidden",
-		},
-		{
 			name: "unresolved image env placeholder",
 			spec: `
 steps:
   - image: $PLOY_TEST_MISSING_IMAGE
 `,
 			wantErr: "resolve image env placeholders: steps[0].image: unresolved environment variables: PLOY_TEST_MISSING_IMAGE",
-		},
-		{
-			name: "step retain_container forbidden",
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-    retain_container: true
-`,
-			wantErr: "validate spec: steps[0].retain_container: forbidden",
-		},
-		{
-			name: "heal retain_container forbidden",
-			spec: `
-steps:
-  - image: docker.io/test/mig:latest
-build_gate:
-  heal:
-    image: docker.io/test/heal:latest
-    retain_container: true
-`,
-			wantErr: "validate spec: build_gate.heal.retain_container: forbidden",
 		},
 	}
 

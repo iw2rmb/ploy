@@ -40,6 +40,7 @@ type FollowRepoFrame struct {
 type FollowStepRow struct {
 	Cells        []string
 	ExitOneLiner string
+	DetailLines  []string
 }
 
 type followDynamicSectionRange struct {
@@ -101,10 +102,13 @@ func RenderFollowFrameTextLayout(frame FollowFrame) FollowFrameRender {
 			}
 
 			if strings.TrimSpace(row.ExitOneLiner) == "" {
-				continue
+			} else {
+				for _, exitLine := range strings.Split(row.ExitOneLiner, "\n") {
+					appendLine(exitLine)
+				}
 			}
-			for _, exitLine := range strings.Split(row.ExitOneLiner, "\n") {
-				appendLine(exitLine)
+			for _, detailLine := range row.DetailLines {
+				appendLine(detailLine)
 			}
 		}
 		sectionRanges[i] = followDynamicSectionRange{start: sectionStart, count: lineNo - sectionStart}

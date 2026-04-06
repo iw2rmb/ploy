@@ -34,7 +34,7 @@ e2e_init() {
   REPO_ROOT="$(e2e_repo_root_from_script "$script_path")"
   export REPO_ROOT
 
-  export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy/local}"
+  export PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$HOME/.config/ploy}"
   ensure_local_descriptor "$REPO_ROOT" "$PLOY_CONFIG_HOME"
 
   PLOY_BIN="$REPO_ROOT/dist/ploy"
