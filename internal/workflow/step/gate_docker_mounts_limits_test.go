@@ -141,6 +141,25 @@ func TestDockerGateExecutor_MountsGradleNativeCacheDir(t *testing.T) {
 	}
 }
 
+func TestResolveBuildGateCacheRoot_UsesOverrideEnv(t *testing.T) {
+	override := filepath.Join(t.TempDir(), "gate-cache")
+	t.Setenv(buildGateCacheRootEnv, override)
+	got, err := resolveBuildGateCacheRoot()
+	if err != nil {
+		t.Fatalf("resolveBuildGateCacheRoot() error: %v", err)
+	}
+	if got != override {
+		t.Fatalf("resolveBuildGateCacheRoot()=%q, want %q", got, override)
+	}
+	info, err := os.Stat(override)
+	if err != nil {
+		t.Fatalf("expected override dir to be created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatalf("expected override path to be a directory: %q", override)
+	}
+}
+
 func TestDockerGateExecutor_MountsMavenNativeCacheDir(t *testing.T) {
 	t.Parallel()
 

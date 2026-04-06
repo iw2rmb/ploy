@@ -50,6 +50,7 @@ const (
 	buildGateLimitMemoryEnv = "PLOY_BUILDGATE_LIMIT_MEMORY_BYTES"
 	buildGateLimitCPUEnv    = "PLOY_BUILDGATE_LIMIT_CPU_MILLIS"
 	buildGateLimitDiskEnv   = "PLOY_BUILDGATE_LIMIT_DISK_SPACE"
+	buildGateCacheRootEnv   = "PLOY_BUILDGATE_CACHE_ROOT"
 	buildGateCacheRootDir   = "/var/cache/ploy/gates"
 	buildGateTmpCacheRoot   = "ploy/gates"
 	// BuildGateGradleCacheHitsHostFile is the workspace-local file mounted into
@@ -354,6 +355,12 @@ func buildGateToolCacheMounts(language, tool, release string) ([]ContainerMount,
 }
 
 func resolveBuildGateCacheRoot() (string, error) {
+	if override := strings.TrimSpace(os.Getenv(buildGateCacheRootEnv)); override != "" {
+		if err := os.MkdirAll(override, 0o755); err != nil {
+			return "", err
+		}
+		return override, nil
+	}
 	if err := os.MkdirAll(buildGateCacheRootDir, 0o755); err == nil {
 		return buildGateCacheRootDir, nil
 	} else if !os.IsPermission(err) {
