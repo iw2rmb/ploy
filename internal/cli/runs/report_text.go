@@ -115,21 +115,33 @@ func RenderRunReportTextLayout(report RunReport, opts TextRenderOptions) (RunRep
 			patchURL := strings.TrimSpace(job.PatchURL)
 			state := ColoredStatusGlyph(job.Status.String(), opts.SpinnerFrame)
 			step := renderStepName(job.JobType.String())
-			jobIDCell := renderOptionalLink(valueOrDash(job.JobID.String()), job.JobLogURL, opts.EnableOSC8, opts.AuthToken)
+			jobIDLabel := valueOrDash(job.JobID.String())
+			if jobIDLabel != "-" {
+				jobIDLabel = colorizeNeutralText(jobIDLabel)
+			}
+			jobIDCell := renderOptionalLink(jobIDLabel, job.JobLogURL, opts.EnableOSC8, opts.AuthToken)
 			duration := FormatDurationForStatus(job.Status.String(), job.DurationMs, job.StartedAt, job.FinishedAt, now)
 			if !opts.LiveDurations && !isTerminalJobStatus(job.Status.String()) {
 				duration = FormatDurationCompact(job.DurationMs)
+			}
+			durationCell := fmt.Sprintf("%8s", duration)
+			if strings.TrimSpace(duration) != "-" {
+				durationCell = colorizeNeutralText(durationCell)
+			}
+			nodeIDCell := FormatNodeID(job.NodeID)
+			if nodeIDCell != "-" {
+				nodeIDCell = colorizeNeutralText(nodeIDCell)
 			}
 
 			repoFrame.Rows = append(repoFrame.Rows, FollowStepRow{
 				Cells: []string{
 					state,
+					durationCell,
 					step,
 					jobIDCell,
 					valueOrDash(strings.TrimSpace(job.JobImage)),
-					duration,
 					renderArtifactsForStatus(job.Status.String(), patchURL, opts),
-					FormatNodeID(job.NodeID),
+					nodeIDCell,
 				},
 				ExitOneLiner: renderExitOneLiner(job, repo.LastError),
 				DetailLines:  renderJobIOPreviewLines(job, opts),
@@ -229,12 +241,14 @@ func renderStepName(jobType string) string {
 
 func renderRepoHeaderLine(repo RunEntry, repoLinkLabel string, opts TextRenderOptions) string {
 	repoIDCell := valueOrDash(repo.RepoID.String())
+	repoIDCell = colorizeNeutralText("[" + repoIDCell + "]")
 	repoLabel := renderOptionalLink(repoLinkLabel, repo.RepoURL, opts.EnableOSC8, "")
 	baseRef := valueOrDash(strings.TrimSpace(repo.BaseRef))
 	shortSHA := formatShortSHA(strings.TrimSpace(repo.SourceCommitSHA))
-	basePart := fmt.Sprintf("@ %s (%s)", boldBranchName(baseRef), shortSHA)
+	shaPart := colorizeNeutralText(fmt.Sprintf("(%s)", shortSHA))
+	basePart := fmt.Sprintf("@ %s %s", boldBranchName(baseRef), shaPart)
 
-	header := fmt.Sprintf("   [%s] %s %s", repoIDCell, repoLabel, basePart)
+	header := fmt.Sprintf("   %s %s %s", repoIDCell, repoLabel, basePart)
 	if repo.MROnSuccess || repo.MROnFail {
 		targetRef := valueOrDash(strings.TrimSpace(repo.TargetRef))
 		header += fmt.Sprintf(" -> %s", boldBranchName(targetRef))
@@ -354,7 +368,7 @@ func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStder
 }
 
 func renderStreamPreviewLabel(label string) string {
-	return neutralGlyphStyle.Render(label)
+	return colorizeNeutralText(label)
 }
 
 func placeholderLastLine(lines []string) string {
