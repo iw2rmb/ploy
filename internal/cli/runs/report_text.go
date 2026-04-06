@@ -340,6 +340,7 @@ func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStder
 		lines = append(lines, labelIndent+stderrLabel)
 	} else {
 		lines = append(lines, labelIndent+stderrLabel+" "+colorizeErrorText(stderrCollapsed))
+		lines = append(lines, "")
 	}
 	if expandStderr {
 		lines = append(lines, "")
