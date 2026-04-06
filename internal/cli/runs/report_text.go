@@ -318,10 +318,14 @@ func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStder
 
 	stdoutLast := placeholderLastLine(preview.Stdout)
 	stderrLast := placeholderLastLine(preview.Stderr)
+	stdoutLabel := renderStreamPreviewLabel("STD[O]UT")
+	stderrLabel := renderStreamPreviewLabel("STD[E]RR")
 
-	lines := []string{
-		"",
-		labelIndent + "STD[O]UT " + truncateRunesWithEllipsis(stdoutLast, collapsedWidth),
+	lines := []string{""}
+	if expandStdout {
+		lines = append(lines, labelIndent+stdoutLabel)
+	} else {
+		lines = append(lines, labelIndent+stdoutLabel+" "+truncateRunesWithEllipsis(stdoutLast, collapsedWidth))
 	}
 	if expandStdout {
 		lines = append(lines, "")
@@ -332,7 +336,11 @@ func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStder
 	}
 
 	stderrCollapsed := truncateRunesWithEllipsis(stderrLast, collapsedWidth)
-	lines = append(lines, labelIndent+"STD[E]RR "+colorizeErrorText(stderrCollapsed))
+	if expandStderr {
+		lines = append(lines, labelIndent+stderrLabel)
+	} else {
+		lines = append(lines, labelIndent+stderrLabel+" "+colorizeErrorText(stderrCollapsed))
+	}
 	if expandStderr {
 		lines = append(lines, "")
 		for _, line := range expandedPreviewLines(preview.Stderr, expandedWidth) {
@@ -341,6 +349,10 @@ func renderStreamPreviewLines(preview RunJobIOPreview, expandStdout, expandStder
 		lines = append(lines, "")
 	}
 	return lines
+}
+
+func renderStreamPreviewLabel(label string) string {
+	return neutralGlyphStyle.Render(label)
 }
 
 func placeholderLastLine(lines []string) string {

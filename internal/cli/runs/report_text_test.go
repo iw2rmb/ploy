@@ -446,6 +446,8 @@ func TestRenderRunReportTextRunningJobIOPreviewExpanded(t *testing.T) {
 	assertx.Contains(t, out, "\n     "+strings.Repeat("z", 80)+"\n")
 	assertx.Contains(t, out, "\n     "+strings.Repeat("z", 10)+"\n")
 	assertx.Contains(t, out, "\n     tail\n")
+	assertx.NotContains(t, out, "STD[O]UT tail")
+	assertx.NotContains(t, out, "STD[E]RR err-two")
 	assertx.Contains(t, out, colorizeErrorText("err-one"))
 	assertx.Contains(t, out, colorizeErrorText("err-two"))
 }
