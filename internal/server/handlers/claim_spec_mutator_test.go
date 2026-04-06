@@ -202,3 +202,51 @@ func TestMutateClaimSpec_InvalidSpec(t *testing.T) {
 		t.Fatalf("expected merge job_id wrapper in error, got %q", got)
 	}
 }
+
+func TestMutateClaimSpec_RerunAlterMergesBundleMap(t *testing.T) {
+	t.Parallel()
+
+	jobID := domaintypes.NewJobID()
+	out := mustMutateAndUnmarshal(t, claimSpecMutatorInput{
+		spec: []byte(`{
+			"build_gate":{"heal":{"image":"docker.io/test/heal:v1","in":["oldhash:/in/gate_profile.schema.json"]}},
+			"bundle_map":{"oldhash":"bundle-old","keep":"bundle-keep"}
+		}`),
+		job: store.Job{
+			ID: jobID,
+			Meta: []byte(`{
+				"_rerun":{
+					"source_job_id":"src",
+					"mode":"drift-ok",
+					"alter":{
+						"in":["newhash:/in/gate_profile.schema.json"],
+						"bundle_map":{"newhash":"bundle-new","keep":"bundle-rerun"}
+					}
+				}
+			}`),
+		},
+		jobType: domaintypes.JobTypeHeal,
+	})
+
+	bg := out["build_gate"].(map[string]any)
+	heal := bg["heal"].(map[string]any)
+	inVals := heal["in"].([]any)
+	if len(inVals) != 1 {
+		t.Fatalf("in len=%d want 1", len(inVals))
+	}
+	if got := inVals[0]; got != "newhash:/in/gate_profile.schema.json" {
+		t.Fatalf("in[0]=%v want newhash:/in/gate_profile.schema.json", got)
+	}
+
+	bundleMap := out["bundle_map"].(map[string]any)
+	if got := bundleMap["oldhash"]; got != "bundle-old" {
+		t.Fatalf("bundle_map[oldhash]=%v want bundle-old", got)
+	}
+	if got := bundleMap["newhash"]; got != "bundle-new" {
+		t.Fatalf("bundle_map[newhash]=%v want bundle-new", got)
+	}
+	// Existing spec mapping wins when key already exists.
+	if got := bundleMap["keep"]; got != "bundle-keep" {
+		t.Fatalf("bundle_map[keep]=%v want bundle-keep", got)
+	}
+}

@@ -34,6 +34,10 @@ post:
                   type: array
                   items:
                     type: string
+                bundle_map:
+                  type: object
+                  additionalProperties:
+                    type: string
   responses:
     '201':
       description: Created

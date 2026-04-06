@@ -42,13 +42,13 @@ func handleRerun(args []string, stderr io.Writer) error {
 		return errors.New("--alter is required")
 	}
 
-	alterRaw, err := loadRerunAlterFile(*alterPath)
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	alterRaw, err := loadRerunAlterFile(ctx, base, httpClient, *alterPath)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func doRerunRequest(ctx context.Context, baseURL *url.URL, client *http.Client, 
 	return result, nil
 }
 
-func loadRerunAlterFile(path string) (map[string]any, error) {
+func loadRerunAlterFile(ctx context.Context, base *url.URL, client *http.Client, path string) (map[string]any, error) {
 	resolved, err := resolvePath(path)
 	if err != nil {
 		return nil, fmt.Errorf("rerun: resolve alter path: %w", err)
@@ -133,7 +133,47 @@ func loadRerunAlterFile(path string) (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("rerun: parse alter file %s (not valid JSON or YAML): %w", resolved, err)
 	}
+	if err := preprocessRerunAlterInPlace(ctx, base, client, obj, filepath.Dir(resolved)); err != nil {
+		return nil, err
+	}
 	return obj, nil
+}
+
+// preprocessRerunAlterInPlace compiles authoring-form alter.in entries
+// (src:dst with local paths) into canonical shortHash:/in/... records and
+// threads generated hash->bundle mappings into alter.bundle_map.
+func preprocessRerunAlterInPlace(ctx context.Context, base *url.URL, client *http.Client, alter map[string]any, specBaseDir string) error {
+	rawIn, hasIn := alter["in"]
+	if !hasIn {
+		return nil
+	}
+	inEntries, ok := rawIn.([]any)
+	if !ok {
+		return fmt.Errorf("rerun: alter.in must be an array of strings")
+	}
+	// Reuse the Hydra compiler by building a minimal spec shape with
+	// build_gate.heal as the target block for in entries.
+	spec := map[string]any{
+		"build_gate": map[string]any{
+			"heal": map[string]any{
+				"in": inEntries,
+			},
+		},
+	}
+	if existing, ok := alter["bundle_map"]; ok {
+		spec["bundle_map"] = existing
+	}
+	if err := compileHydraRecordsInPlace(ctx, base, client, spec, specBaseDir); err != nil {
+		return fmt.Errorf("rerun: compile alter.in file-backed records: %w", err)
+	}
+	heal := spec["build_gate"].(map[string]any)["heal"].(map[string]any)
+	if compiled, ok := heal["in"].([]any); ok {
+		alter["in"] = compiled
+	}
+	if bm, ok := spec["bundle_map"]; ok {
+		alter["bundle_map"] = bm
+	}
+	return nil
 }
 
 func printRerunUsage(w io.Writer) {

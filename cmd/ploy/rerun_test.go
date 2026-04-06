@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -61,5 +62,92 @@ func TestRerunRequiresFlags(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "--job is required") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRerunCompilesAlterInLocalPathToHashAndBundleMap(t *testing.T) {
+	sourceJobID := domaintypes.NewJobID()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	rootJobID := domaintypes.NewJobID()
+
+	type rerunPayload struct {
+		Alter map[string]any `json:"alter"`
+	}
+	var gotPayload rerunPayload
+	var rerunCalled bool
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodHead && r.URL.Path == "/v1/spec-bundles":
+			w.WriteHeader(http.StatusNotFound)
+			return
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/spec-bundles":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"bundle_id":"bundle_123","cid":"bafytestcid","digest":"sha256:abc","size":12,"deduplicated":false}`))
+			return
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/jobs/"+sourceJobID.String()+"/rerun":
+			rerunCalled = true
+			if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+				t.Fatalf("decode rerun payload: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"run_id":"` + runID.String() + `","repo_id":"` + repoID.String() + `","attempt":3,"root_job_id":"` + rootJobID.String() + `","copied_from_job_id":"` + sourceJobID.String() + `"}`))
+			return
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "gate_profile.schema.json")
+	if err := os.WriteFile(src, []byte(`{"type":"object"}`), 0o644); err != nil {
+		t.Fatalf("write src file: %v", err)
+	}
+	alterPath := filepath.Join(tmp, "alter.yaml")
+	if err := os.WriteFile(alterPath, []byte("in:\n  - "+src+":gate_profile.schema.json\n"), 0o644); err != nil {
+		t.Fatalf("write alter file: %v", err)
+	}
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{"rerun", "--job", sourceJobID.String(), "--alter", alterPath}, &buf)
+	if err != nil {
+		t.Fatalf("rerun error: %v", err)
+	}
+	if !rerunCalled {
+		t.Fatal("expected rerun endpoint to be called")
+	}
+
+	inRaw, ok := gotPayload.Alter["in"].([]any)
+	if !ok || len(inRaw) != 1 {
+		t.Fatalf("alter.in=%T/%v want []any len=1", gotPayload.Alter["in"], gotPayload.Alter["in"])
+	}
+	inEntry, ok := inRaw[0].(string)
+	if !ok {
+		t.Fatalf("alter.in[0] type=%T want string", inRaw[0])
+	}
+	idx := strings.Index(inEntry, ":")
+	if idx <= 0 {
+		t.Fatalf("alter.in[0]=%q want shortHash:/in/...", inEntry)
+	}
+	hash := inEntry[:idx]
+	dst := inEntry[idx+1:]
+	if !shortHashPattern.MatchString(hash) {
+		t.Fatalf("alter.in hash=%q is not canonical short hash", hash)
+	}
+	if dst != "/in/gate_profile.schema.json" {
+		t.Fatalf("alter.in dst=%q want /in/gate_profile.schema.json", dst)
+	}
+
+	bundleMap, ok := gotPayload.Alter["bundle_map"].(map[string]any)
+	if !ok {
+		t.Fatalf("alter.bundle_map=%T want map[string]any", gotPayload.Alter["bundle_map"])
+	}
+	if got := bundleMap[hash]; got != "bundle_123" {
+		t.Fatalf("alter.bundle_map[%q]=%v want bundle_123", hash, got)
 	}
 }
