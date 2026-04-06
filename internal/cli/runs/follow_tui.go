@@ -363,9 +363,7 @@ func (c FollowRunCommand) coordinate(
 			}
 		}
 		for jobID, status := range statusByJob {
-			isRunning := status == "running" || status == "started"
-			isFailed := status == "fail" || status == "failed" || status == "error" || status == "crash" || status == "crashed"
-			if isRunning || isFailed {
+			if shouldTrackJobPreview(status) {
 				startJobTracker(jobID)
 				continue
 			}
@@ -538,4 +536,13 @@ func isTTYReader(r io.Reader) bool {
 		return false
 	}
 	return (info.Mode() & os.ModeCharDevice) != 0
+}
+
+func shouldTrackJobPreview(status string) bool {
+	switch normalizeStatus(status) {
+	case "running", "started":
+		return true
+	default:
+		return false
+	}
 }

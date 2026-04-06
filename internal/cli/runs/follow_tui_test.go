@@ -88,3 +88,30 @@ func TestFollowModelAppliesAndClearsPreviewRows(t *testing.T) {
 		t.Fatalf("jobIOPreviews size = %d, want 0", len(cleared.jobIOPreviews))
 	}
 }
+
+func TestShouldTrackJobPreview(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		status string
+		want   bool
+	}{
+		{name: "running", status: "running", want: true},
+		{name: "started", status: "started", want: true},
+		{name: "failed", status: "failed", want: false},
+		{name: "error", status: "error", want: false},
+		{name: "success", status: "success", want: false},
+		{name: "cancelled", status: "cancelled", want: false},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldTrackJobPreview(tc.status); got != tc.want {
+				t.Fatalf("shouldTrackJobPreview(%q) = %v, want %v", tc.status, got, tc.want)
+			}
+		})
+	}
+}
