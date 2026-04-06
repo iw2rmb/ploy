@@ -1,6 +1,7 @@
 package runs
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -113,5 +114,72 @@ func TestShouldTrackJobPreview(t *testing.T) {
 				t.Fatalf("shouldTrackJobPreview(%q) = %v, want %v", tc.status, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFollowModelViewFiltersToRunningRepos(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "follow-filter",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/running.git",
+				Status:  domaintypes.RunRepoStatusRunning,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusRunning},
+				},
+			},
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				Status:  domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusSuccess},
+				},
+			},
+		},
+	}
+	model := newFollowModel(TextRenderOptions{}, true)
+	model.report = &report
+
+	view := strings.TrimSpace(model.View().Content)
+	if !strings.Contains(view, "github.com/acme/running") {
+		t.Fatalf("expected running repo in view, got %q", view)
+	}
+	if strings.Contains(view, "github.com/acme/done") {
+		t.Fatalf("expected terminal repo to be hidden, got %q", view)
+	}
+}
+
+func TestFollowModelViewShowsNoRunningReposMessage(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		RunID:   domaintypes.NewRunID(),
+		MigID:   domaintypes.NewMigID(),
+		MigName: "follow-empty",
+		SpecID:  domaintypes.NewSpecID(),
+		Repos: []RunEntry{
+			{
+				RepoID:  domaintypes.NewMigRepoID(),
+				RepoURL: "https://github.com/acme/done.git",
+				Status:  domaintypes.RunRepoStatusFail,
+				Jobs: []RunJobEntry{
+					{JobID: domaintypes.NewJobID(), JobType: "mig", Status: domaintypes.JobStatusFail},
+				},
+			},
+		},
+	}
+	model := newFollowModel(TextRenderOptions{}, true)
+	model.report = &report
+
+	view := strings.TrimSpace(model.View().Content)
+	if !strings.Contains(view, "No repos with in-progress jobs.") {
+		t.Fatalf("expected empty-running message in view, got %q", view)
 	}
 }

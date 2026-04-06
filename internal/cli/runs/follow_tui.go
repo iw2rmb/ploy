@@ -126,6 +126,8 @@ func (m followModel) View() tea.View {
 	opts.JobIOPreviews = m.jobIOPreviews
 	opts.ExpandStdout = m.expandStdout
 	opts.ExpandStderr = m.expandStderr
+	opts.FilterRunningRepos = true
+	opts.EmptyReposLine = "No repos with in-progress jobs."
 	layout, err := RenderRunReportTextLayout(*m.report, opts)
 	if err != nil {
 		return tea.NewView("")
@@ -368,10 +370,11 @@ func (c FollowRunCommand) coordinate(
 				continue
 			}
 			stopTracker(jobID)
-			if status == "success" || status == "succeeded" || status == "finished" || status == "completed" {
-				trackerMu.Lock()
-				delete(previews, jobID)
-				trackerMu.Unlock()
+			trackerMu.Lock()
+			_, hadPreview := previews[jobID]
+			delete(previews, jobID)
+			trackerMu.Unlock()
+			if hadPreview {
 				program.Send(followJobPreviewMsg{jobID: jobID, clearRow: true})
 			}
 		}
