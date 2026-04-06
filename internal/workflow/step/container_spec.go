@@ -139,8 +139,8 @@ func buildContainerSpec(runID types.RunID, jobID types.JobID, manifest contracts
 			}
 		}
 		// Home entries: mount at $HOME/<dst> with mode from entry.
-		// Resolve HOME from manifest envs; fall back to /home/user.
-		homeDir := "/home/user"
+		// Resolve HOME from manifest envs; fall back to /root.
+		homeDir := "/root"
 		if h := manifest.Envs["HOME"]; h != "" {
 			homeDir = h
 		}
