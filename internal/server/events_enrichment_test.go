@@ -37,149 +37,87 @@ func gzipData(t *testing.T, data string) []byte {
 func TestStorage_LogEnrichmentWithJobMetadata(t *testing.T) {
 	t.Parallel()
 
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+	tests := []struct {
+		name    string
+		jobName string
+		jobType string
+	}{
+		{name: "mig job", jobName: "build-step", jobType: "mig"},
+		{name: "pre_gate job", jobName: "pre-gate", jobType: string(domaintypes.JobTypePreGate)},
+	}
 
-	logLine := "Build step completed successfully\n"
-	gzippedLog := gzipData(t, logLine)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	mock := &mockStore{
-		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
-			if id != jobID {
-				t.Fatalf("GetJob called with unexpected id: got %v, want %v", id, jobID)
+			runID := domaintypes.NewRunID()
+			jobID := domaintypes.NewJobID()
+			nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
+
+			logLine := "Build step completed successfully\n"
+			gzippedLog := gzipData(t, logLine)
+
+			mock := &mockStore{
+				getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
+					if id != jobID {
+						t.Fatalf("GetJob called with unexpected id: got %v, want %v", id, jobID)
+					}
+					return store.Job{
+						ID:      jobID,
+						RunID:   runID,
+						Name:    tt.jobName,
+						JobType: domaintypes.JobType(tt.jobType),
+						Meta:    []byte(`{"next_id":2000}`),
+						NodeID:  &nodeID,
+					}, nil
+				},
 			}
-			return store.Job{
-				ID:      jobID,
-				RunID:   runID,
-				Name:    "build-step",
-				JobType: "mig",
-				Meta:    []byte(`{"next_id":2000}`),
-				NodeID:  &nodeID,
-			}, nil
-		},
-	}
 
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-		Store:       mock,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+			svc := newTestEventsService(t, mock)
 
-	ctx := context.Background()
-	logRow := store.Log{
-		ID:        1,
-		RunID:     runID,
-		JobID:     &jobID,
-		ChunkNo:   1,
-		DataSize:  int64(len(gzippedLog)),
-		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	}
+			ctx := context.Background()
+			logRow := store.Log{
+				ID:        1,
+				RunID:     runID,
+				JobID:     &jobID,
+				ChunkNo:   1,
+				DataSize:  int64(len(gzippedLog)),
+				CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+			}
 
-	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
-	if err != nil {
-		t.Fatalf("CreateAndPublishLog failed: %v", err)
-	}
+			if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
+				t.Fatalf("CreateAndPublishLog failed: %v", err)
+			}
 
-	// Verify log was published to the job-keyed stream.
-	snapshot := svc.Hub().SnapshotJob(jobID)
-	if len(snapshot) == 0 {
-		t.Fatal("expected log event in job hub snapshot, got none")
-	}
-	if snapshot[0].Type != domaintypes.SSEEventLog {
-		t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
-	}
+			snapshot := svc.Hub().SnapshotJob(jobID)
+			if len(snapshot) == 0 {
+				t.Fatal("expected log event in job hub snapshot, got none")
+			}
+			if snapshot[0].Type != domaintypes.SSEEventLog {
+				t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
+			}
 
-	var rec logstream.LogRecord
-	if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
-		t.Fatalf("failed to unmarshal log record: %v", err)
-	}
+			var rec logstream.LogRecord
+			if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
+				t.Fatalf("failed to unmarshal log record: %v", err)
+			}
 
-	if rec.NodeID != nodeID {
-		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
-	}
-	if rec.JobID != jobID {
-		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
-	}
-	if rec.JobType != "mig" {
-		t.Errorf("job_type: got %q, want %q", rec.JobType, "mig")
-	}
+			if rec.NodeID != nodeID {
+				t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
+			}
+			if rec.JobID != jobID {
+				t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
+			}
+			if string(rec.JobType) != tt.jobType {
+				t.Errorf("job_type: got %q, want %q", rec.JobType, tt.jobType)
+			}
 
-	// Verify nothing was published to the run-keyed stream.
-	runSnapshot := svc.Hub().Snapshot(runID)
-	if len(runSnapshot) != 0 {
-		t.Fatalf("expected no events in run hub snapshot, got %d", len(runSnapshot))
-	}
-}
-
-// TestLogRecord_LogEnrichmentPreservesTypedFields is a contract test that
-// ensures the server publish path emits the canonical logstream.LogRecord
-// shape with typed enriched fields to the job stream.
-func TestLogRecord_LogEnrichmentPreservesTypedFields(t *testing.T) {
-	t.Parallel()
-
-	runID := domaintypes.NewRunID()
-	jobID := domaintypes.NewJobID()
-	nodeID := domaintypes.NodeID(domaintypes.NewNodeKey())
-
-	logLine := "hello\n"
-	gzippedLog := gzipData(t, logLine)
-
-	mock := &mockStore{
-		getJobFunc: func(ctx context.Context, id domaintypes.JobID) (store.Job, error) {
-			return store.Job{
-				ID:      jobID,
-				RunID:   runID,
-				Name:    "pre-gate",
-				JobType: "pre_gate",
-				Meta:    []byte(`{"next_id":2000}`),
-				NodeID:  &nodeID,
-			}, nil
-		},
-	}
-
-	svc, err := NewEventsService(EventsOptions{BufferSize: 4, HistorySize: 8, Store: mock})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
-
-	ctx := context.Background()
-	logRow := store.Log{
-		ID:        1,
-		RunID:     runID,
-		JobID:     &jobID,
-		ChunkNo:   1,
-		DataSize:  int64(len(gzippedLog)),
-		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
-	}
-	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
-	if err != nil {
-		t.Fatalf("CreateAndPublishLog failed: %v", err)
-	}
-
-	snapshot := svc.Hub().SnapshotJob(jobID)
-	if len(snapshot) == 0 {
-		t.Fatal("expected log event in job hub snapshot, got none")
-	}
-	if snapshot[0].Type != domaintypes.SSEEventLog {
-		t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
-	}
-
-	var rec logstream.LogRecord
-	if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
-		t.Fatalf("failed to unmarshal log record: %v", err)
-	}
-	if rec.NodeID != nodeID {
-		t.Errorf("node_id: got %q, want %q", rec.NodeID, nodeID)
-	}
-	if rec.JobID != jobID {
-		t.Errorf("job_id: got %q, want %q", rec.JobID, jobID)
-	}
-	if rec.JobType != domaintypes.JobTypePreGate {
-		t.Errorf("job_type: got %q, want %q", rec.JobType, domaintypes.JobTypePreGate)
+			// Verify nothing was published to the run-keyed stream.
+			runSnapshot := svc.Hub().Snapshot(runID)
+			if len(runSnapshot) != 0 {
+				t.Fatalf("expected no events in run hub snapshot, got %d", len(runSnapshot))
+			}
+		})
 	}
 }
 
@@ -201,36 +139,26 @@ func TestStorage_LogEnrichmentWithoutJobID(t *testing.T) {
 		},
 	}
 
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-		Store:       mock,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, mock)
 
 	ctx := context.Background()
 	logRow := store.Log{
 		ID:        1,
 		RunID:     runID,
-		JobID:     nil, // No job ID.
+		JobID:     nil,
 		ChunkNo:   1,
 		DataSize:  int64(len(gzippedLog)),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
-	if err != nil {
+	if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
 		t.Fatalf("CreateAndPublishLog failed: %v", err)
 	}
 
-	// GetJob should NOT be called when JobID is nil.
 	if getJobCalled {
 		t.Error("GetJob should not be called when JobID is nil")
 	}
 
-	// No events should appear on either stream.
 	runSnapshot := svc.Hub().Snapshot(runID)
 	if len(runSnapshot) != 0 {
 		t.Fatalf("expected no events on run stream, got %d", len(runSnapshot))
@@ -254,14 +182,7 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		},
 	}
 
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-		Store:       mock,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, mock)
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -273,12 +194,10 @@ func TestStorage_LogEnrichmentJobLookupFailure(t *testing.T) {
 		CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 	}
 
-	err = svc.CreateAndPublishLog(ctx, logRow, gzippedLog)
-	if err != nil {
+	if err := svc.CreateAndPublishLog(ctx, logRow, gzippedLog); err != nil {
 		t.Fatalf("CreateAndPublishLog should succeed despite job lookup failure: %v", err)
 	}
 
-	// Verify log was published to job stream without enrichment.
 	snapshot := svc.Hub().SnapshotJob(jobID)
 	if len(snapshot) == 0 {
 		t.Fatal("expected log event in job hub snapshot, got none")
@@ -323,15 +242,9 @@ func TestStorage_LogEnrichmentJobContextCacheEvictsLRU(t *testing.T) {
 		},
 	}
 
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:   4,
-		HistorySize:  8,
-		Store:        mock,
-		JobCacheSize: 2,
+	svc := newTestEventsService(t, mock, func(o *EventsOptions) {
+		o.JobCacheSize = 2
 	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
 
 	gzippedLog := gzipData(t, "cached line\n")
 	ctx := context.Background()

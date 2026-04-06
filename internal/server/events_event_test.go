@@ -89,14 +89,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockStore{createEventFunc: tt.storeFunc}
-			svc, err := NewEventsService(EventsOptions{
-				BufferSize:  4,
-				HistorySize: 8,
-				Store:       mock,
-			})
-			if err != nil {
-				t.Fatalf("failed to create service: %v", err)
-			}
+			svc := newTestEventsService(t, mock)
 
 			ctx := context.Background()
 			event, err := svc.CreateAndPublishEvent(ctx, tt.params)
@@ -170,11 +163,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 					Meta:    arg.Meta,
 				}, nil
 			}}
-
-			svc, err := NewEventsService(EventsOptions{BufferSize: 4, HistorySize: 8, Store: mock})
-			if err != nil {
-				t.Fatalf("failed to create service: %v", err)
-			}
+			svc := newTestEventsService(t, mock)
 
 			ctx := context.Background()
 			params := store.CreateEventParams{

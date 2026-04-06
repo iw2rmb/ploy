@@ -20,15 +20,7 @@ func TestFanout_LogsGoToJobStreamOnly(t *testing.T) {
 	runID := domaintypes.NewRunID()
 	jobID := domaintypes.NewJobID()
 
-	mock := &mockStore{}
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-		Store:       mock,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, &mockStore{})
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -78,17 +70,10 @@ func TestFanout_EventsGoToRunStreamAsStage(t *testing.T) {
 			}, nil
 		},
 	}
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-		Store:       mock,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, mock)
 
 	ctx := context.Background()
-	_, err = svc.CreateAndPublishEvent(ctx, store.CreateEventParams{
+	_, err := svc.CreateAndPublishEvent(ctx, store.CreateEventParams{
 		RunID:   runID,
 		Level:   "info",
 		Message: "step started",
@@ -121,11 +106,7 @@ func TestFanout_NilJobIDSkipsFanout(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
-
-	svc, err := NewEventsService(EventsOptions{BufferSize: 4, HistorySize: 8})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, nil)
 
 	ctx := context.Background()
 	logRow := store.Log{
@@ -151,11 +132,7 @@ func TestFanout_JobDoneSentinelClosesStream(t *testing.T) {
 	t.Parallel()
 
 	jobID := domaintypes.NewJobID()
-
-	svc, err := NewEventsService(EventsOptions{BufferSize: 4, HistorySize: 8})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, nil)
 
 	ctx := context.Background()
 

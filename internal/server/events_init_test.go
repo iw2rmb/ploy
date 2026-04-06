@@ -85,13 +85,7 @@ func TestStorage_New(t *testing.T) {
 // TestStorage_ServiceReadyImmediately verifies the service hub is usable
 // immediately after construction without a lifecycle phase.
 func TestStorage_ServiceReadyImmediately(t *testing.T) {
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, nil)
 	if svc.Hub() == nil {
 		t.Fatal("expected hub, got nil")
 	}
@@ -99,30 +93,18 @@ func TestStorage_ServiceReadyImmediately(t *testing.T) {
 
 // TestStorage_WithoutStore verifies that the service correctly returns
 // errors when attempting to persist events without a configured store.
-// CreateAndPublishLog only handles SSE fanout (no store required), so it doesn't fail.
-// This ensures proper error handling for services created without database backing.
 func TestStorage_WithoutStore(t *testing.T) {
-	svc, err := NewEventsService(EventsOptions{
-		BufferSize:  4,
-		HistorySize: 8,
-		Store:       nil,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
+	svc := newTestEventsService(t, nil)
 
 	ctx := context.Background()
 
-	// Test CreateAndPublishEvent without store — should fail (requires DB persistence).
-	_, err = svc.CreateAndPublishEvent(ctx, store.CreateEventParams{})
-	if err == nil {
+	// CreateAndPublishEvent without store — should fail (requires DB persistence).
+	if _, err := svc.CreateAndPublishEvent(ctx, store.CreateEventParams{}); err == nil {
 		t.Fatal("expected error when store not configured, got nil")
 	}
 
-	// Test CreateAndPublishLog without store — should NOT fail since it only fans out to SSE.
-	// The log metadata is already persisted via blobpersist; this method only handles SSE fanout.
-	err = svc.CreateAndPublishLog(ctx, store.Log{}, []byte{})
-	if err != nil {
+	// CreateAndPublishLog without store — should NOT fail (SSE fanout only).
+	if err := svc.CreateAndPublishLog(ctx, store.Log{}, []byte{}); err != nil {
 		t.Fatalf("expected no error for CreateAndPublishLog (SSE-only), got: %v", err)
 	}
 }
