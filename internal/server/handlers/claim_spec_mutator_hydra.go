@@ -56,13 +56,62 @@ func applyHydraOverlayMutator(m map[string]any, in claimSpecMutatorInput) error 
 		return err
 	}
 
+	// Keep legacy top-level merge for compatibility with existing consumers/tests.
 	mergeHydraIntoBlock(m, overlay)
+	// Ensure typed fields are injected into canonical schema locations consumed
+	// by node parsing for each job phase.
+	applyCanonicalHydraOverlay(m, in.jobType, overlay)
 
 	if err := applyHealOverlay(m, in); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func applyCanonicalHydraOverlay(spec map[string]any, jobType domaintypes.JobType, overlay *HydraJobConfig) {
+	if spec == nil || overlay == nil {
+		return
+	}
+	switch jobType {
+	case domaintypes.JobTypeMig:
+		applyOverlayToSteps(spec, overlay)
+	case domaintypes.JobTypePreGate:
+		mergeCABlock(ensureBuildGatePhase(spec, "pre"), overlay.CA)
+	case domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+		mergeCABlock(ensureBuildGatePhase(spec, "post"), overlay.CA)
+	}
+}
+
+func applyOverlayToSteps(spec map[string]any, overlay *HydraJobConfig) {
+	rawSteps, ok := spec["steps"].([]any)
+	if !ok || len(rawSteps) == 0 {
+		return
+	}
+	for i := range rawSteps {
+		step, ok := rawSteps[i].(map[string]any)
+		if !ok || step == nil {
+			continue
+		}
+		mergeCABlock(step, overlay.CA)
+		mergeRecordsByDstBlock(step, "in", overlay.In)
+		mergeRecordsByDstBlock(step, "out", overlay.Out)
+		mergeRecordsByDstBlock(step, "home", overlay.Home)
+	}
+}
+
+func ensureBuildGatePhase(spec map[string]any, phase string) map[string]any {
+	bg, ok := spec["build_gate"].(map[string]any)
+	if !ok || bg == nil {
+		bg = make(map[string]any)
+		spec["build_gate"] = bg
+	}
+	block, ok := bg[phase].(map[string]any)
+	if !ok || block == nil {
+		block = make(map[string]any)
+		bg[phase] = block
+	}
+	return block
 }
 
 // assembleHydraOverlay builds the complete HydraJobConfig for a job section by

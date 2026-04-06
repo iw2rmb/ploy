@@ -72,7 +72,7 @@ func TestConfigCAPutUpsertsEntry(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putConfigCAHandler(holder, st)
-	reqBody := map[string]any{"section": "mig"}
+	reqBody := map[string]any{"section": "mig", "bundle_id": "AbCdEf12"}
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/ca/abcdef1234567", reqBody, "hash", "abcdef1234567")
 
 	assertStatus(t, rr, http.StatusOK)
@@ -85,6 +85,12 @@ func TestConfigCAPutUpsertsEntry(t *testing.T) {
 	}
 	if st.upsertConfigCA.params.Section != "mig" {
 		t.Errorf("store Section = %q, want mig", st.upsertConfigCA.params.Section)
+	}
+	if !st.upsertConfigBundleMap.called {
+		t.Error("store.UpsertConfigBundleMap was not called")
+	}
+	if st.upsertConfigBundleMap.params.BundleID != "AbCdEf12" {
+		t.Errorf("store BundleID = %q, want AbCdEf12", st.upsertConfigBundleMap.params.BundleID)
 	}
 
 	// Verify holder was updated.
@@ -111,7 +117,7 @@ func TestConfigCAPut_ValidationErrors(t *testing.T) {
 			holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 			handler := putConfigCAHandler(holder, st)
-			reqBody := map[string]any{"section": tt.section}
+			reqBody := map[string]any{"section": tt.section, "bundle_id": "AbCdEf12"}
 			rr := doRequest(t, handler, http.MethodPut, "/v1/config/ca/"+tt.hash, reqBody, "hash", tt.hash)
 
 			assertStatus(t, rr, http.StatusBadRequest)
@@ -192,7 +198,7 @@ func TestConfigCA_StoreErrors(t *testing.T) {
 			setup:  func(st *configStore) { st.upsertConfigCA.err = errMockDatabase },
 			invoke: func(h *ConfigHolder, st *configStore) (http.Handler, string, any, []string) {
 				return putConfigCAHandler(h, st), "/v1/config/ca/abcdef1234567",
-					map[string]any{"section": "mig"}, []string{"hash", "abcdef1234567"}
+					map[string]any{"section": "mig", "bundle_id": "AbCdEf12"}, []string{"hash", "abcdef1234567"}
 			},
 		},
 		{
@@ -229,7 +235,7 @@ func TestConfigCAPutDeduplicates(t *testing.T) {
 	holder := NewConfigHolder(config.GitLabConfig{}, nil)
 
 	handler := putConfigCAHandler(holder, st)
-	reqBody := map[string]any{"section": "mig"}
+	reqBody := map[string]any{"section": "mig", "bundle_id": "AbCdEf12"}
 
 	rr := doRequest(t, handler, http.MethodPut, "/v1/config/ca/abcdef1234567", reqBody, "hash", "abcdef1234567")
 	assertStatus(t, rr, http.StatusOK)
@@ -240,6 +246,20 @@ func TestConfigCAPutDeduplicates(t *testing.T) {
 	hashes := holder.GetConfigCA("mig")
 	if len(hashes) != 1 {
 		t.Errorf("holder CA = %v, want exactly 1 entry", hashes)
+	}
+}
+
+func TestConfigCAPut_RequiresBundleMapping(t *testing.T) {
+	st := &configStore{}
+	holder := NewConfigHolder(config.GitLabConfig{}, nil)
+	handler := putConfigCAHandler(holder, st)
+
+	reqBody := map[string]any{"section": "mig"}
+	rr := doRequest(t, handler, http.MethodPut, "/v1/config/ca/abcdef1234567", reqBody, "hash", "abcdef1234567")
+
+	assertStatus(t, rr, http.StatusBadRequest)
+	if st.upsertConfigCA.called {
+		t.Error("store.UpsertConfigCA should not be called when bundle mapping is missing")
 	}
 }
 

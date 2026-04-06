@@ -9,6 +9,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+const gateCAPreamble = `if [ -d /etc/ploy/ca ]; then c=0; tmp="$(mktemp -d)"; for f in /etc/ploy/ca/*; do [ -f "$f" ] || continue; awk '/-----BEGIN CERTIFICATE-----/{n++} {print > (d"/cert" n ".crt")}' d="$tmp" "$f"; c=$((c+1)); done; if [ "$c" -gt 0 ]; then if command -v update-ca-certificates >/dev/null 2>&1; then mkdir -p /usr/local/share/ca-certificates/ploy; for crt in "$tmp"/*.crt; do [ -f "$crt" ] || continue; cp "$crt" /usr/local/share/ca-certificates/ploy/ || true; done; update-ca-certificates >/dev/null 2>&1 || true; fi; if command -v keytool >/dev/null 2>&1; then i=0; for crt in "$tmp"/*.crt; do [ -f "$crt" ] || continue; keytool -importcert -noprompt -trustcacerts -cacerts -storepass changeit -alias "ploy_gate_ca_$i" -file "$crt" >/dev/null 2>&1 || true; i=$((i+1)); done; fi; caf="$(ls "$tmp"/*.crt 2>/dev/null | head -1 || true)"; if [ -n "$caf" ]; then export SSL_CERT_FILE="$caf"; export CURL_CA_BUNDLE="$caf"; export GIT_SSL_CAINFO="$caf"; fi; fi; fi`
+
 // buildCommandForTool returns the default all-tests command for the given tool.
 func buildCommandForTool(workspace string, tool string) ([]string, error) {
 	return buildCommandForToolTarget(workspace, tool, contracts.GateProfileTargetAllTests)
@@ -16,13 +18,16 @@ func buildCommandForTool(workspace string, tool string) ([]string, error) {
 
 // buildCommandForToolTarget returns a deterministic command for a tool/target pair.
 func buildCommandForToolTarget(workspace string, tool string, target string) ([]string, error) {
+	wrap := func(cmd string) []string {
+		return []string{"/bin/sh", "-lc", gateCAPreamble + "; " + cmd}
+	}
 	switch strings.ToLower(strings.TrimSpace(tool)) {
 	case "maven":
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			return []string{"/bin/sh", "-lc", "mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install"}, nil
+			return wrap("mvn --ff -B -q -e -DskipTests=true -Dstyle.color=never -f /workspace/pom.xml clean install"), nil
 		case contracts.GateProfileTargetAllTests:
-			return []string{"/bin/sh", "-lc", "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"}, nil
+			return wrap("mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"), nil
 		default:
 			return nil, fmt.Errorf("unsupported maven target: %q", target)
 		}
@@ -33,18 +38,18 @@ func buildCommandForToolTarget(workspace string, tool string, target string) ([]
 		}
 		switch strings.TrimSpace(target) {
 		case contracts.GateProfileTargetBuild:
-			return []string{"/bin/sh", "-lc", gradleExec + " -q --stacktrace --build-cache build -x test -p /workspace"}, nil
+			return wrap(gradleExec + " -q --stacktrace --build-cache build -x test -p /workspace"), nil
 		case contracts.GateProfileTargetAllTests:
-			return []string{"/bin/sh", "-lc", gradleExec + " -q --stacktrace --build-cache test -p /workspace"}, nil
+			return wrap(gradleExec + " -q --stacktrace --build-cache test -p /workspace"), nil
 		default:
 			return nil, fmt.Errorf("unsupported gradle target: %q", target)
 		}
 	case "go":
-		return []string{"/bin/sh", "-lc", "go test ./..."}, nil
+		return wrap("go test ./..."), nil
 	case "cargo":
-		return []string{"/bin/sh", "-lc", "cargo test"}, nil
+		return wrap("cargo test"), nil
 	case "pip", "poetry":
-		return []string{"/bin/sh", "-lc", "python -m compileall -q /workspace"}, nil
+		return wrap("python -m compileall -q /workspace"), nil
 	default:
 		return nil, fmt.Errorf("unsupported build tool: %q", tool)
 	}

@@ -764,6 +764,55 @@ func TestMutateClaimSpec_HydraOverlayInPipeline(t *testing.T) {
 	})
 }
 
+func TestApplyHydraOverlay_CanonicalCAInjection(t *testing.T) {
+	t.Parallel()
+
+	t.Run("mig_section_applies_to_steps", func(t *testing.T) {
+		m := map[string]any{
+			"steps": []any{
+				map[string]any{"image": "img:latest"},
+				map[string]any{"image": "img2:latest", "ca": []any{"111111111111"}},
+			},
+		}
+		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
+			job:     store.Job{Meta: []byte(`{}`)},
+			jobType: domaintypes.JobTypeMig,
+			hydraOverlays: map[string]*HydraJobConfig{
+				"mig": {CA: []string{"abcdef1234567"}},
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		steps := m["steps"].([]any)
+		step0 := steps[0].(map[string]any)
+		step1 := steps[1].(map[string]any)
+		assertSlice(t, step0, "ca", 1, "abcdef1234567")
+		assertSlice(t, step1, "ca", 2, "111111111111")
+	})
+
+	t.Run("pre_gate_section_applies_to_build_gate_pre", func(t *testing.T) {
+		m := map[string]any{
+			"steps": []any{map[string]any{"image": "img:latest"}},
+		}
+		err := applyHydraOverlayMutator(m, claimSpecMutatorInput{
+			job:     store.Job{Meta: []byte(`{}`)},
+			jobType: domaintypes.JobTypePreGate,
+			hydraOverlays: map[string]*HydraJobConfig{
+				"pre_gate": {CA: []string{"abcdef1234567"}},
+			},
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		bg := m["build_gate"].(map[string]any)
+		pre := bg["pre"].(map[string]any)
+		assertSlice(t, pre, "ca", 1, "abcdef1234567")
+	})
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

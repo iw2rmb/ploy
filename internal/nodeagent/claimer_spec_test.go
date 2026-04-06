@@ -35,6 +35,28 @@ func TestParseSpec_PassesThroughBuildGateHeal(t *testing.T) {
 	}
 }
 
+func TestParseSpec_PassesThroughBuildGatePhaseCA(t *testing.T) {
+	specJSON := `{
+	        "steps": [{"image": "docker.io/test/mig:latest"}],
+	        "build_gate": {
+	            "pre": {"ca": ["abcdef1234567"]},
+	            "post": {"ca": ["bbbbbbb222222"]}
+	        }
+	    }`
+
+	var raw json.RawMessage = []byte(specJSON)
+	_, typedOpts, err := parseSpec(raw)
+	if err != nil {
+		t.Fatalf("parseSpec error: %v", err)
+	}
+	if typedOpts.BuildGate.Pre == nil || len(typedOpts.BuildGate.Pre.CA) != 1 || typedOpts.BuildGate.Pre.CA[0] != "abcdef1234567" {
+		t.Fatalf("BuildGate.Pre.CA = %#v, want [abcdef1234567]", typedOpts.BuildGate.Pre)
+	}
+	if typedOpts.BuildGate.Post == nil || len(typedOpts.BuildGate.Post.CA) != 1 || typedOpts.BuildGate.Post.CA[0] != "bbbbbbb222222" {
+		t.Fatalf("BuildGate.Post.CA = %#v, want [bbbbbbb222222]", typedOpts.BuildGate.Post)
+	}
+}
+
 func TestParseSpec_CanonicalSingleStepFormat(t *testing.T) {
 	specJSON := `{
         "steps": [{

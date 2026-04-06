@@ -227,6 +227,9 @@ func (s MigSpec) Validate() error {
 			if err := validateBuildGateStackConfig(pair.phase.Stack, pair.prefix+".stack"); err != nil {
 				return err
 			}
+			if err := ValidateHydraCAEntries(pair.phase.CA, pair.prefix+".ca"); err != nil {
+				return err
+			}
 			if err := validateBuildGateProfileOverride(pair.phase.GateProfile, pair.prefix+".gate_profile"); err != nil {
 				return err
 			}

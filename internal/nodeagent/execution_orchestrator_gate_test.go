@@ -32,6 +32,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 		wantAlways            bool
 		wantEnforceTargetLock bool
 		wantSkip              *contracts.BuildGateSkipMetadata
+		wantCA                []string
 	}{
 		{
 			name:    "pre_gate uses pre stack",
@@ -41,6 +42,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			},
 			buildPreConfig: &contracts.BuildGatePhaseConfig{
 				Stack: pre, GateProfile: preGateProfile,
+				CA: []string{"aaaaaaa11111", "bbbbbbb22222"},
 				Target: contracts.GateProfileTargetUnit, Always: true,
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
@@ -54,6 +56,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			wantSkip: &contracts.BuildGateSkipMetadata{
 				Enabled: true, SourceProfileID: 11, MatchedTarget: contracts.GateProfileTargetUnit,
 			},
+			wantCA: []string{"aaaaaaa11111", "bbbbbbb22222"},
 		},
 		{
 			name:    "post_gate uses post stack",
@@ -67,6 +70,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Stack: post, GateProfile: postGateProfile,
+				CA: []string{"ccccccc33333"},
 				Target: contracts.GateProfileTargetAllTests, Always: false,
 			},
 			wantStackDetect: post,
@@ -76,6 +80,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			wantSkip: &contracts.BuildGateSkipMetadata{
 				Enabled: true, SourceProfileID: 22, MatchedTarget: contracts.GateProfileTargetAllTests,
 			},
+			wantCA: []string{"ccccccc33333"},
 		},
 		{
 			name:    "re_gate uses stack detection output and post gate_profile override",
@@ -89,6 +94,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
 				Stack: post, GateProfile: postGateProfile,
+				CA: []string{"ddddddd44444"},
 				Target: contracts.GateProfileTargetAllTests, Always: false,
 			},
 			wantStackDetect:       nil,
@@ -96,6 +102,7 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			wantTarget:            contracts.GateProfileTargetAllTests,
 			wantAlways:            false,
 			wantEnforceTargetLock: true,
+			wantCA:                []string{"ddddddd44444"},
 		},
 		{
 			name:    "re_gate does not enforce target lock for non-infra recovery",
@@ -104,9 +111,11 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 				LoopKind: "healing",
 			},
 			buildPostConfig: &contracts.BuildGatePhaseConfig{
+				CA:     []string{"eeeeeee55555"},
 				Target: contracts.GateProfileTargetAllTests,
 			},
 			wantEnforceTargetLock: false,
+			wantCA:                []string{"eeeeeee55555"},
 		},
 	}
 
@@ -144,6 +153,16 @@ func TestApplyGatePhaseOverrides(t *testing.T) {
 			}
 			if tc.wantSkip != nil && manifest.Gate.Skip != tc.gateSkip {
 				t.Fatalf("Gate.Skip=%v; want skip payload", manifest.Gate.Skip)
+			}
+			if len(tc.wantCA) > 0 {
+				if got, want := len(manifest.CA), len(tc.wantCA); got != want {
+					t.Fatalf("manifest.CA length=%d; want %d (%v)", got, want, manifest.CA)
+				}
+				for i, want := range tc.wantCA {
+					if manifest.CA[i] != want {
+						t.Fatalf("manifest.CA[%d]=%q; want %q", i, manifest.CA[i], want)
+					}
+				}
 			}
 		})
 	}
