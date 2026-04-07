@@ -94,6 +94,33 @@ BUILD FAILED in 5s
 			},
 		},
 		{
+			name: "gradle dedupes tab-prefixed stacktrace frames",
+			tool: "gradle",
+			logText: `
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+* Exception is:
+	org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':compileJava'.
+		at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:142)
+		at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:131)
+Caused by: java.lang.RuntimeException: x
+		at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:142)
+		at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:131)
+		at org.gradle.other.Frame.y(Frame.java:1)
+BUILD FAILED in 1s
+`,
+			wantTrimmed: true,
+			wantContains: []string{
+				"* What went wrong:",
+				"...repeated 3 frames",
+				"BUILD FAILED in 1s",
+			},
+			wantNotContains: []string{
+				"\tat org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:142)\n\t\tat org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.execute(ExecuteActionsTaskExecuter.java:131)\n\t\tat org.gradle.other.Frame.y(Frame.java:1)",
+			},
+		},
+		{
 			name: "gradle kotlin scala and kapt issue collection",
 			tool: "gradle",
 			logText: `
