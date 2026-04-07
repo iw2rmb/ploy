@@ -80,11 +80,12 @@ func handleRunPatch(args []string, stderr io.Writer) error {
 	}
 
 	downloadCmd := migs.DownloadDiffGzipCommand{
-		Client:  httpClient,
-		BaseURL: base,
-		RunID:   runID,
-		RepoID:  repoID,
-		DiffID:  selectedDiff,
+		Client:      httpClient,
+		BaseURL:     base,
+		RunID:       runID,
+		RepoID:      repoID,
+		DiffID:      selectedDiff,
+		Accumulated: true,
 	}
 	patchGzip, err := downloadCmd.Run(ctx)
 	if err != nil {

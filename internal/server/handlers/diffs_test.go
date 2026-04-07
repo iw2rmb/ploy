@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -57,6 +59,50 @@ func TestRunRepoDiffs_Download(t *testing.T) {
 	}
 	if !st.getJobCalled {
 		t.Fatal("expected GetJob to be called")
+	}
+}
+
+func TestRunRepoDiffs_DownloadAccumulated(t *testing.T) {
+	st := &artifactStore{}
+	runID := domaintypes.NewRunID()
+	repoID := "repoAAAA"
+	jobID := domaintypes.NewJobID()
+	diffID1 := uuid.New()
+	diffID2 := uuid.New()
+	objKey1 := "diffs/run/" + runID.String() + "/diff/" + diffID1.String() + ".patch.gz"
+	objKey2 := "diffs/run/" + runID.String() + "/diff/" + diffID2.String() + ".patch.gz"
+	patch1 := "diff --git a/a.txt b/a.txt\n+one\n"
+	patch2 := "diff --git a/b.txt b/b.txt\n+two\n"
+
+	st.listDiffsByRunRepo.val = []store.Diff{
+		{
+			ID:        pgtype.UUID{Bytes: diffID1, Valid: true},
+			RunID:     runID,
+			JobID:     &jobID,
+			ObjectKey: &objKey1,
+		},
+		{
+			ID:        pgtype.UUID{Bytes: diffID2, Valid: true},
+			RunID:     runID,
+			JobID:     &jobID,
+			ObjectKey: &objKey2,
+		},
+	}
+
+	bs := bsmock.New()
+	_, _ = bs.Put(context.TODO(), objKey1, "application/gzip", gzipTestBytes(t, []byte(patch1)))
+	_, _ = bs.Put(context.TODO(), objKey2, "application/gzip", gzipTestBytes(t, []byte(patch2)))
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/repos/"+repoID+"/diffs?download=true&accumulated=true&diff_id="+diffID2.String(), nil)
+	req.SetPathValue("run_id", runID.String())
+	req.SetPathValue("repo_id", repoID)
+	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
+
+	assertStatus(t, rr, http.StatusOK)
+	gotPlain := gunzipTestBytes(t, rr.Body.Bytes())
+	if string(gotPlain) != patch1+patch2 {
+		t.Fatalf("accumulated patch mismatch: got %q, want %q", string(gotPlain), patch1+patch2)
 	}
 }
 
@@ -204,4 +250,31 @@ func TestRunRepoDiffs_MissingRepoID(t *testing.T) {
 	listRunRepoDiffsHandler(st, bs).ServeHTTP(rr, req)
 
 	assertStatus(t, rr, http.StatusBadRequest)
+}
+
+func gzipTestBytes(t *testing.T, input []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(input); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func gunzipTestBytes(t *testing.T, input []byte) []byte {
+	t.Helper()
+	zr, err := gzip.NewReader(bytes.NewReader(input))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer zr.Close()
+	out, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("gzip read: %v", err)
+	}
+	return out
 }

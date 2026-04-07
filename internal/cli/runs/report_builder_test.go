@@ -107,7 +107,7 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 						"duration_ms":  5,
 						"display_name": "apply",
 						"recovery": map[string]any{
-							"loop_kind":  "healing",
+							"loop_kind": "healing",
 						},
 					},
 				},
@@ -166,8 +166,9 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 		t.Fatalf("expected repo patch URL to be populated")
 	}
 	assertURL(t, entry.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
-		"download": "true",
-		"diff_id":  diffID2.String(),
+		"download":    "true",
+		"diff_id":     diffID2.String(),
+		"accumulated": "true",
 	})
 
 	if len(entry.Jobs) != 2 {
@@ -177,8 +178,9 @@ func TestGetRunReportCommandAssemblesCanonicalReport(t *testing.T) {
 	job0 := entry.Jobs[0]
 	assertURL(t, job0.JobLogURL, "/api/v1/jobs/"+jobID1.String()+"/logs", nil)
 	assertURL(t, job0.PatchURL, "/api/v1/runs/"+runID.String()+"/repos/"+repoID.String()+"/diffs", map[string]string{
-		"download": "true",
-		"diff_id":  diffID2.String(),
+		"download":    "true",
+		"diff_id":     diffID2.String(),
+		"accumulated": "true",
 	})
 	if len(job0.Artifacts) != 1 {
 		t.Fatalf("expected one artifact for job0, got %d", len(job0.Artifacts))

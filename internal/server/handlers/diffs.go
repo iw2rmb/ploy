@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,11 +74,20 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 			return
 		}
 
-		// Optional download mode: serve the gzipped patch for a specific diff.
+		// Optional download mode: serve a specific gzipped patch artifact.
+		// When accumulated=true, returns a gzipped patch that contains all diffs
+		// for this repo up to and including diff_id, in list order.
 		if r.URL.Query().Get("download") == "true" {
 			diffID, err := parseQuery[domaintypes.DiffID](r, "diff_id")
 			if err != nil {
 				writeHTTPError(w, http.StatusBadRequest, "%s", err)
+				return
+			}
+			accumulated := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("accumulated")), "true")
+			if accumulated {
+				if !downloadAccumulatedRunRepoDiff(w, r, st, bs, runID, repoID, diffID) {
+					return
+				}
 				return
 			}
 			diffUUID := uuid.MustParse(diffID.String())
@@ -160,4 +173,103 @@ func listRunRepoDiffsHandler(st store.Store, bs blobstore.Store) http.HandlerFun
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
 	}
+}
+
+func downloadAccumulatedRunRepoDiff(
+	w http.ResponseWriter,
+	r *http.Request,
+	st store.Store,
+	bs blobstore.Store,
+	runID domaintypes.RunID,
+	repoID domaintypes.RepoID,
+	diffID domaintypes.DiffID,
+) bool {
+	diffs, err := st.ListDiffsByRunRepo(r.Context(), store.ListDiffsByRunRepoParams{
+		RunID:  runID,
+		RepoID: repoID,
+	})
+	if err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to list diffs: %v", err)
+		slog.Error("download accumulated run repo diff: list diffs failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+		return false
+	}
+
+	diffUUID := uuid.MustParse(diffID.String())
+	targetIndex := -1
+	for i, item := range diffs {
+		if item.ID.Valid && item.ID.Bytes == diffUUID {
+			targetIndex = i
+			break
+		}
+	}
+	if targetIndex < 0 {
+		writeHTTPError(w, http.StatusNotFound, "diff not found")
+		return false
+	}
+
+	var plain bytes.Buffer
+	for _, item := range diffs[:targetIndex+1] {
+		if item.ObjectKey == nil || strings.TrimSpace(*item.ObjectKey) == "" {
+			writeHTTPError(w, http.StatusNotFound, "diff blob not found")
+			slog.Error("download accumulated run repo diff: missing object key", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String())
+			return false
+		}
+
+		rc, _, getErr := bs.Get(r.Context(), *item.ObjectKey)
+		if getErr != nil {
+			if errors.Is(getErr, blobstore.ErrNotFound) {
+				writeHTTPError(w, http.StatusNotFound, "diff blob not found")
+				slog.Error("download accumulated run repo diff: missing blob", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey)
+				return false
+			}
+			writeHTTPError(w, http.StatusServiceUnavailable, "failed to retrieve diff blob")
+			slog.Error("download accumulated run repo diff: get blob failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", getErr)
+			return false
+		}
+
+		zr, zerr := gzip.NewReader(rc)
+		if zerr != nil {
+			_ = rc.Close()
+			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
+			slog.Error("download accumulated run repo diff: open gzip reader failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", zerr)
+			return false
+		}
+
+		if _, copyErr := io.Copy(&plain, zr); copyErr != nil {
+			_ = zr.Close()
+			_ = rc.Close()
+			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
+			slog.Error("download accumulated run repo diff: gunzip copy failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", copyErr)
+			return false
+		}
+
+		if closeErr := zr.Close(); closeErr != nil {
+			_ = rc.Close()
+			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
+			slog.Error("download accumulated run repo diff: close gzip reader failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", closeErr)
+			return false
+		}
+		if closeErr := rc.Close(); closeErr != nil {
+			writeHTTPError(w, http.StatusInternalServerError, "failed to read diff blob")
+			slog.Error("download accumulated run repo diff: close blob reader failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "object_key", *item.ObjectKey, "err", closeErr)
+			return false
+		}
+	}
+
+	var gz bytes.Buffer
+	zw := gzip.NewWriter(&gz)
+	if _, err := zw.Write(plain.Bytes()); err != nil {
+		_ = zw.Close()
+		writeHTTPError(w, http.StatusInternalServerError, "failed to build accumulated diff")
+		slog.Error("download accumulated run repo diff: write gzip failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+		return false
+	}
+	if err := zw.Close(); err != nil {
+		writeHTTPError(w, http.StatusInternalServerError, "failed to build accumulated diff")
+		slog.Error("download accumulated run repo diff: close gzip failed", "run_id", runID.String(), "repo_id", repoID.String(), "diff_id", diffID.String(), "err", err)
+		return false
+	}
+
+	streamBlob(w, bytes.NewReader(gz.Bytes()), int64(gz.Len()), fmt.Sprintf("diff-%s-accumulated.patch.gz", diffUUID.String()), "application/gzip")
+	return true
 }
