@@ -276,7 +276,10 @@ func (r *dbGateProfileResolver) resolveStackID(ctx context.Context, job store.Jo
 			return 0, err
 		}
 	}
-	return r.st.ResolveAnyStackID(ctx)
+	// Do not pick an arbitrary "first" stack when no stack signal is available.
+	// Returning no rows keeps gate profile resolution tied to detected/runtime stack
+	// and avoids promoting wrong-stack defaults as exact repo+sha profiles.
+	return 0, pgx.ErrNoRows
 }
 
 func (r *dbGateProfileResolver) loadObject(ctx context.Context, key string) ([]byte, error) {
