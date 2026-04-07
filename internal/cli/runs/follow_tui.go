@@ -455,58 +455,38 @@ func DeriveRunStateFromReport(report RunReport) migsapi.RunState {
 	if len(report.Repos) == 0 {
 		return ""
 	}
-	anyJobError := false
-	anyJobFail := false
 	for _, entry := range report.Repos {
 		for _, job := range entry.Jobs {
 			status := strings.ToLower(strings.TrimSpace(string(job.Status)))
 			switch status {
 			case "created", "queued", "running":
 				return ""
-			case "error":
-				anyJobError = true
-			case "fail", "failed":
-				anyJobFail = true
 			}
 		}
 	}
-	if anyJobError {
-		return migsapi.RunStateError
-	}
-	if anyJobFail {
-		return migsapi.RunStateFailed
-	}
-
-	allSuccess := true
-	allCancelled := true
-	hasFailure := false
+	anyCancelled := false
+	anyFailure := false
 
 	for _, entry := range report.Repos {
 		status := strings.ToLower(strings.TrimSpace(string(entry.Status)))
 		switch status {
 		case "success", "succeeded", "finished":
-			allCancelled = false
 		case "cancelled", "canceled":
-			allSuccess = false
+			anyCancelled = true
 		case "fail", "failed", "error":
-			hasFailure = true
-			allSuccess = false
-			allCancelled = false
+			anyFailure = true
 		default:
 			return ""
 		}
 	}
 
-	if hasFailure {
+	if anyFailure {
 		return migsapi.RunStateFailed
 	}
-	if allSuccess {
-		return migsapi.RunStateSucceeded
-	}
-	if allCancelled {
+	if anyCancelled {
 		return migsapi.RunStateCancelled
 	}
-	return ""
+	return migsapi.RunStateSucceeded
 }
 
 var _ tea.Model = followModel{}
