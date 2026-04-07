@@ -13,7 +13,7 @@ func TestHelpRegressionLeafHelpReturnsNoError(t *testing.T) {
 		args          []string
 		expectSnippet string
 	}{
-		{args: []string{"run", "list", "--help"}, expectSnippet: "Usage: ploy run list"},
+		{args: []string{"run", "ls", "--help"}, expectSnippet: "Usage: ploy run ls"},
 		{args: []string{"run", "cancel", "--help"}, expectSnippet: "Usage: ploy run cancel"},
 		{args: []string{"run", "start", "--help"}, expectSnippet: "Usage: ploy run start"},
 		{args: []string{"cluster", "node", "add", "--help"}, expectSnippet: "Usage: ploy cluster node add"},

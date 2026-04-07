@@ -81,7 +81,7 @@ func printRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "       ploy run --repo <url> --base-ref <ref> --target-ref <ref> --spec <path|->")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  list        List batch runs with pagination")
+	_, _ = fmt.Fprintln(w, "  ls          List batch runs with pagination")
 	_, _ = fmt.Fprintln(w, "  status      Show status for a run (use --json for machine-readable links/artifacts)")
 	_, _ = fmt.Fprintln(w, "  logs        Stream run lifecycle events (SSE)")
 	_, _ = fmt.Fprintln(w, "  cancel      Cancel a run via the control plane")

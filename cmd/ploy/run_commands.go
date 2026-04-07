@@ -32,7 +32,7 @@ func handleRun(args []string, stderr io.Writer) error {
 	}
 
 	switch args[0] {
-	case "list":
+	case "ls":
 		return handleRunList(args[1:], stderr)
 	case "cancel":
 		return handleRunCancel(args[1:], stderr)
