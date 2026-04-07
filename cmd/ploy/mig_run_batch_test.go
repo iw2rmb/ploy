@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/testutil/clienv"
 )
 
-// TestRunListCallsControlPlane validates list command calls the API.
+// TestRunListCallsControlPlane validates ls command calls the API.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunListCallsControlPlane(t *testing.T) {
 	var called bool
@@ -99,9 +99,9 @@ func TestRunListCallsControlPlane(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "list", "--limit", "10", "--offset", "5"}, &buf)
+	err := executeCmd([]string{"run", "ls", "--limit", "10", "--offset", "5"}, &buf)
 	if err != nil {
-		t.Fatalf("run list error: %v", err)
+		t.Fatalf("run ls error: %v", err)
 	}
 	if !called {
 		t.Fatal("expected GET /v1/runs to be called")
@@ -123,7 +123,7 @@ func TestRunListCallsControlPlane(t *testing.T) {
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestMigRunBatchStatusRemoved(t *testing.T) {}
 
-// TestRunListEmptyResult validates list command handles empty results.
+// TestRunListEmptyResult validates ls command handles empty results.
 // Not parallel because useServerDescriptor uses t.Setenv.
 func TestRunListEmptyResult(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -143,9 +143,9 @@ func TestRunListEmptyResult(t *testing.T) {
 	clienv.UseServerDescriptor(t, server.URL)
 
 	var buf bytes.Buffer
-	err := executeCmd([]string{"run", "list"}, &buf)
+	err := executeCmd([]string{"run", "ls"}, &buf)
 	if err != nil {
-		t.Fatalf("run list error: %v", err)
+		t.Fatalf("run ls error: %v", err)
 	}
 
 	output := buf.String()
@@ -154,7 +154,7 @@ func TestRunListEmptyResult(t *testing.T) {
 	}
 }
 
-// TestRunListInvalidLimit validates list command rejects invalid limit.
+// TestRunListInvalidLimit validates ls command rejects invalid limit.
 // This uses t.Parallel since it does not use t.Setenv.
 func TestRunListInvalidLimit(t *testing.T) {
 	t.Parallel()
@@ -166,17 +166,17 @@ func TestRunListInvalidLimit(t *testing.T) {
 	}{
 		{
 			name:    "limit below minimum",
-			args:    []string{"run", "list", "--limit", "0"},
+			args:    []string{"run", "ls", "--limit", "0"},
 			wantErr: "limit must be between 1 and 100",
 		},
 		{
 			name:    "limit above maximum",
-			args:    []string{"run", "list", "--limit", "101"},
+			args:    []string{"run", "ls", "--limit", "101"},
 			wantErr: "limit must be between 1 and 100",
 		},
 		{
 			name:    "negative offset",
-			args:    []string{"run", "list", "--offset", "-1"},
+			args:    []string{"run", "ls", "--offset", "-1"},
 			wantErr: "offset must be non-negative",
 		},
 	}

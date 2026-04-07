@@ -1,11 +1,11 @@
-// run_list.go implements batch run list CLI commands.
+// run_list.go implements batch run ls CLI commands.
 //
 // This file provides CLI handlers for managing batch runs as a whole, complementing
 // the repo-level operations in mig_run_repo.go. Batch commands delegate to the
 // internal/cli/migs batch client for HTTP communication with the control plane.
 //
 // Command structure:
-//   - ploy run list [--limit N] [--offset N]
+//   - ploy run ls [--limit N] [--offset N]
 package main
 
 import (
@@ -19,7 +19,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/migs"
 )
 
-// handleRunList implements `ploy run list [--limit N] [--offset N]`.
+// handleRunList implements `ploy run ls [--limit N] [--offset N]`.
 // Lists batch runs with pagination, showing ID, name, status, and repo counts.
 func handleRunList(args []string, stderr io.Writer) error {
 	if wantsHelp(args) {
@@ -27,7 +27,7 @@ func handleRunList(args []string, stderr io.Writer) error {
 		return nil
 	}
 
-	fs := flag.NewFlagSet("run list", flag.ContinueOnError)
+	fs := flag.NewFlagSet("run ls", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	limit := fs.Int("limit", 50, "Max number of runs to return (1-100)")
 	offset := fs.Int("offset", 0, "Number of runs to skip")
@@ -88,9 +88,9 @@ func handleRunList(args []string, stderr io.Writer) error {
 	return nil
 }
 
-// printRunListUsage renders help for run list.
+// printRunListUsage renders help for run ls.
 func printRunListUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy run list [--limit N] [--offset N]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy run ls [--limit N] [--offset N]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Lists batch runs with pagination.")
 	_, _ = fmt.Fprintln(w, "")
