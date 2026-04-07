@@ -334,6 +334,14 @@ func (r *runController) runContainerJob(
 		return bundleErr
 	}
 
+	if runErr != nil || result.ExitCode != 0 {
+		if preserveRoot, preserveErr := preserveFailureArtifacts(req.RunID, req.JobID, workspace, outDir, inDir); preserveErr != nil {
+			slog.Warn("failed to preserve failure artifacts", "run_id", req.RunID, "job_id", req.JobID, "error", preserveErr)
+		} else {
+			slog.Info("preserved failure artifacts", "run_id", req.RunID, "job_id", req.JobID, "path", preserveRoot)
+		}
+	}
+
 	if cfg.UploadDiff != nil {
 		cfg.UploadDiff(ctx, req.RunID, req.JobID, req.JobName, execCtx.diffGenerator, baselineDir, workspace, result)
 	}
