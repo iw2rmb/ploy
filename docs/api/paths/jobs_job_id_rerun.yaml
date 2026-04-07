@@ -18,10 +18,10 @@ post:
       application/json:
         schema:
           type: object
-          required: [alter]
           properties:
             alter:
               type: object
+              description: Optional alter overlay; omit or pass an empty object for a plain rerun.
               additionalProperties: false
               properties:
                 image:

@@ -216,10 +216,10 @@ func rerunRootJobName(jobType domaintypes.JobType) string {
 }
 
 func normalizeRerunAlter(raw map[string]any) (rerunAlter, error) {
-	if raw == nil {
-		return rerunAlter{}, fmt.Errorf("alter is required")
-	}
 	alter := rerunAlter{Envs: map[string]string{}, BundleMap: map[string]string{}}
+	if raw == nil {
+		return alter, nil
+	}
 
 	for key, value := range raw {
 		switch key {
@@ -252,9 +252,6 @@ func normalizeRerunAlter(raw map[string]any) (rerunAlter, error) {
 		}
 	}
 
-	if alter.Image == "" && len(alter.Envs) == 0 && len(alter.In) == 0 {
-		return rerunAlter{}, fmt.Errorf("at least one of image/envs/in must be provided")
-	}
 	return alter, nil
 }
 

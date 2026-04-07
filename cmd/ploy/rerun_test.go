@@ -65,6 +65,45 @@ func TestRerunRequiresFlags(t *testing.T) {
 	}
 }
 
+func TestRerunWithoutAlterSendsEmptyAlterObject(t *testing.T) {
+	sourceJobID := domaintypes.NewJobID()
+	runID := domaintypes.NewRunID()
+	repoID := domaintypes.NewRepoID()
+	rootJobID := domaintypes.NewJobID()
+
+	type rerunPayload struct {
+		Alter map[string]any `json:"alter"`
+	}
+	var gotPayload rerunPayload
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/v1/jobs/"+sourceJobID.String()+"/rerun" {
+			if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+				t.Fatalf("decode rerun payload: %v", err)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"run_id":"` + runID.String() + `","repo_id":"` + repoID.String() + `","attempt":3,"root_job_id":"` + rootJobID.String() + `","copied_from_job_id":"` + sourceJobID.String() + `"}`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+	clienv.UseServerDescriptor(t, server.URL)
+
+	var buf bytes.Buffer
+	err := executeCmd([]string{"rerun", "--job", sourceJobID.String()}, &buf)
+	if err != nil {
+		t.Fatalf("rerun error: %v", err)
+	}
+	if gotPayload.Alter == nil {
+		t.Fatal("expected alter object in request, got nil")
+	}
+	if len(gotPayload.Alter) != 0 {
+		t.Fatalf("expected empty alter object, got %#v", gotPayload.Alter)
+	}
+}
+
 func TestRerunCompilesAlterInLocalPathToHashAndBundleMap(t *testing.T) {
 	sourceJobID := domaintypes.NewJobID()
 	runID := domaintypes.NewRunID()

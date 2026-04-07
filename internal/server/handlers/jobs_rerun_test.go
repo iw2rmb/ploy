@@ -171,10 +171,23 @@ func TestApplyRerunAlterMutator_OverridesSpecValues(t *testing.T) {
 	}
 }
 
-func TestNormalizeRerunAlter_RejectsEmpty(t *testing.T) {
-	_, err := normalizeRerunAlter(map[string]any{})
-	if err == nil {
-		t.Fatal("expected error")
+func TestNormalizeRerunAlter_AllowsEmpty(t *testing.T) {
+	alter, err := normalizeRerunAlter(map[string]any{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if alter.Image != "" || len(alter.Envs) != 0 || len(alter.In) != 0 || len(alter.BundleMap) != 0 {
+		t.Fatalf("expected zero-value alter, got %#v", alter)
+	}
+}
+
+func TestNormalizeRerunAlter_AllowsNil(t *testing.T) {
+	alter, err := normalizeRerunAlter(nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if alter.Image != "" || len(alter.Envs) != 0 || len(alter.In) != 0 || len(alter.BundleMap) != 0 {
+		t.Fatalf("expected zero-value alter, got %#v", alter)
 	}
 }
 
