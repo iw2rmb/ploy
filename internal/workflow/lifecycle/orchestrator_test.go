@@ -354,6 +354,35 @@ func secondAttemptCase() gateFailureCase {
 	}
 }
 
+func rerunRootSecondAttemptCase() gateFailureCase {
+	rerunRootID := domaintypes.NewJobID()
+	heal1ID := domaintypes.NewJobID()
+	failedReGateID := domaintypes.NewJobID()
+	heal2ID := domaintypes.NewJobID()
+	reGate2ID := domaintypes.NewJobID()
+	return gateFailureCase{
+		name: "rerun-root re-gate chain continues with second healing attempt",
+		failedJob: store.Job{
+			ID: failedReGateID, JobType: domaintypes.JobTypeReGate, RepoShaIn: testRepoSHAIn,
+		},
+		jobsByID: map[domaintypes.JobID]store.Job{
+			rerunRootID:    {ID: rerunRootID, JobType: domaintypes.JobTypeReGate, NextID: &heal1ID},
+			heal1ID:        {ID: heal1ID, JobType: domaintypes.JobTypeHeal, NextID: &failedReGateID},
+			failedReGateID: {ID: failedReGateID, JobType: domaintypes.JobTypeReGate},
+		},
+		recoveryMeta: &contracts.BuildGateRecoveryMetadata{ErrorKind: "code", StrategyID: "code-default"},
+		heal:         basicHealSpec(3),
+		newJobID:     newFixedIDSequence(heal2ID, reGate2ID),
+		wantOutcome:  lifecycle.GateFailureOutcomeHealChain,
+		assertChain: func(t *testing.T, chain *lifecycle.HealChainSpec) {
+			t.Helper()
+			if chain.AttemptNumber != 2 {
+				t.Fatalf("AttemptNumber = %d, want 2", chain.AttemptNumber)
+			}
+		},
+	}
+}
+
 func TestEvaluateGateFailureTransition(t *testing.T) {
 	t.Parallel()
 
@@ -384,6 +413,7 @@ func TestEvaluateGateFailureTransition(t *testing.T) {
 		retriesExhaustedCase(),
 		firstAttemptCase(),
 		secondAttemptCase(),
+		rerunRootSecondAttemptCase(),
 	}
 
 	for _, tc := range cases {

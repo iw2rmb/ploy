@@ -315,7 +315,10 @@ func resolveBaseGateID(failedJob store.Job, jobsByID map[domaintypes.JobID]store
 		}
 		currentID = prev.ID
 	}
-	return failedJob.ID
+	// For rerun-root chains (re_gate -> heal -> re_gate -> ...), there is no
+	// pre/post gate predecessor. In that case, currentID points to the earliest
+	// reachable re_gate root and must be used as the base for retry counting.
+	return currentID
 }
 
 func countExistingHealingAttempts(baseGateID domaintypes.JobID, jobsByID map[domaintypes.JobID]store.Job) int {

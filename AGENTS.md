@@ -2,6 +2,11 @@
 
 Use this flow for any "why did run/job fail?" request.
 
+## Exec summary
+- This repository is the orchestrator/control-plane, not the user project that failed to build/test.
+- For job/run failure analysis, default to runtime evidence from the failed run/job first (status, logs, artifacts, preserved temp), then inspect orchestrator code only when evidence points there.
+- Do not answer language/build-tool behavior questions from orchestrator internals unless explicitly asked to analyze orchestrator implementation.
+
 ## 1) Assume local cluster first
 - Check running containers directly (`ploy-server-1`, `ploy-node-1`).
 - Do not start with broad repo searches.

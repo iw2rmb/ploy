@@ -1,0 +1,72 @@
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "SBOM and Hook Jobs Around Gates: Phase 1 Contracts and Scheduling"
+scope: "Add root-level hook declarations and deterministic sbom and hook job scheduling before each gate stage."
+documentation:
+  - "docs/build-gate/README.md"
+  - "docs/schemas/mig.example.yaml"
+  - "docs/api/OpenAPI.yaml"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: "Extend mig spec contracts to declare root-level hook sources and parse them deterministically."
+    classification: "determined"
+    components:
+      - "internal/workflow/contracts/migs_spec.go"
+      - "internal/workflow/contracts/migs_spec_parse.go"
+      - "internal/workflow/contracts/schemas/mig.schema.json"
+      - "internal/workflow/contracts/migs_spec_parse_test.go"
+      - "docs/schemas/mig.example.yaml"
+    baseline:
+      - "internal/workflow/contracts/migs_spec.go"
+      - "internal/workflow/contracts/migs_spec_parse.go"
+      - "internal/workflow/contracts/schemas/mig.schema.json"
+    delta:
+      - "[additive] mig spec without root-level hook source definition -> mig spec with root-level hooks array and strict schema validation"
+    implementation:
+      - "Add root-level hooks field to mig spec model and schema as array of sources (path or URL)."
+      - "Parse and normalize hook sources during mig spec loading; reject empty and duplicate entries."
+      - "Add parser tests for valid hooks arrays and malformed hook declarations."
+      - "Update mig schema example to include hooks usage."
+    verification:
+      - "Parse existing mig specs without hooks and keep resulting execution plan unchanged."
+      - "Parse mig specs with hooks and verify normalized hook source list is preserved in contracts."
+      - "Reject malformed hook declarations and surface deterministic validation errors."
+    reasoning: "medium"
+    cfp: 6
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: "Add sbom and hook job types and wire deterministic pre-gate scheduling for pre_gate post_gate and re_gate."
+    classification: "determined"
+    components:
+      - "internal/domain/types/migs.go"
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/execution_orchestrator_gate.go"
+      - "internal/nodeagent/execution_orchestrator_test.go"
+      - "internal/server/handlers/jobs_complete.go"
+      - "internal/server/handlers/jobs_complete_service_types.go"
+    baseline:
+      - "internal/nodeagent/execution_orchestrator_jobs.go"
+      - "internal/nodeagent/execution_orchestrator_gate.go"
+      - "internal/server/handlers/jobs_complete.go"
+    delta:
+      - "[additive] gate stages scheduled directly -> gate stages preceded by sbom job and optional hook job evaluation for each gate cycle"
+    implementation:
+      - "Introduce new job types sbom and hook in domain type definitions and validation switch points."
+      - "Inject sbom scheduling before pre_gate post_gate and re_gate execution paths."
+      - "Inject hook scheduling after sbom and before the corresponding gate stage."
+      - "Define sbom artifact contract so sbom job always writes canonical output to /out/sbom.spdx.json."
+      - "Define hook input contract so every hook step receives current snapshot as /in/sbom.spdx.json."
+      - "Keep gate command resolution and runtime image selection unchanged."
+    verification:
+      - "Runs without hooks still execute gate commands and statuses in the same order with added sbom no-op jobs."
+      - "Pre-gate and re-gate paths schedule sbom and hook once per gate cycle."
+      - "Each successful sbom job produces /out/sbom.spdx.json and each hook step sees /in/sbom.spdx.json."
+      - "Unknown job type handling remains unchanged for existing job types."
+    reasoning: "high"
+    cfp: 10
