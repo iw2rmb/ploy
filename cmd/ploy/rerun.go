@@ -37,10 +37,6 @@ func handleRerun(args []string, stderr io.Writer) error {
 		printRerunUsage(stderr)
 		return errors.New("--job is required")
 	}
-	if strings.TrimSpace(*alterPath) == "" {
-		printRerunUsage(stderr)
-		return errors.New("--alter is required")
-	}
 
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
@@ -48,9 +44,13 @@ func handleRerun(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	alterRaw, err := loadRerunAlterFile(ctx, base, httpClient, *alterPath)
-	if err != nil {
-		return err
+	alterRaw := map[string]any{}
+	if strings.TrimSpace(*alterPath) != "" {
+		loaded, err := loadRerunAlterFile(ctx, base, httpClient, *alterPath)
+		if err != nil {
+			return err
+		}
+		alterRaw = loaded
 	}
 
 	result, err := doRerunRequest(ctx, base, httpClient, strings.TrimSpace(*jobID), alterRaw)
@@ -180,10 +180,10 @@ func preprocessRerunAlterInPlace(ctx context.Context, base *url.URL, client *htt
 }
 
 func printRerunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy rerun --job <job-id> --alter <path.yaml|json> [--follow]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy rerun --job <job-id> [--alter <path.yaml|json>] [--follow]")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Options:")
 	_, _ = fmt.Fprintln(w, "  --job <job-id>       Source terminal job ID (heal/re_gate)")
-	_, _ = fmt.Fprintln(w, "  --alter <path>       Alter overlay file (YAML/JSON) with image/envs/in")
+	_, _ = fmt.Fprintln(w, "  --alter <path>       Optional alter overlay file (YAML/JSON) with image/envs/in")
 	_, _ = fmt.Fprintln(w, "  --follow             Follow run until completion")
 }
