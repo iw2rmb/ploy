@@ -342,7 +342,7 @@ func TestGateProfileResolver_NormalResolution(t *testing.T) {
 			name: "fallback_default",
 			st: &stubGateProfileResolverStore{
 				stackByImage: map[string]int64{},
-				anyStackID:   9,
+				repoSHAStackID: 9,
 				exactErr:     pgx.ErrNoRows,
 				latestErr:    pgx.ErrNoRows,
 				defaultRow: gateProfileRow{
@@ -364,7 +364,19 @@ func TestGateProfileResolver_NormalResolution(t *testing.T) {
 			wantLink:         true,
 			wantResolveExact: true,
 			wantResolveRepo:  true,
-			wantResolveAny:   true,
+		},
+		{
+			name: "no_stack_signal_returns_nil",
+			st: &stubGateProfileResolverStore{
+				stackByImage: map[string]int64{},
+				exactErr:     pgx.ErrNoRows,
+				latestErr:    pgx.ErrNoRows,
+				defaultErr:   pgx.ErrNoRows,
+			},
+			bs:              &stubBlobStore{},
+			job:             store.Job{RepoID: repoC, RepoShaIn: sha2},
+			wantNil:         true,
+			wantResolveRepo: true,
 		},
 		{
 			name: "exact_hit_short_circuits_errors",
