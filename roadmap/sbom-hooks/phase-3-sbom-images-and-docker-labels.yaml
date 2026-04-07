@@ -1,0 +1,80 @@
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "SBOM and Hook Jobs Around Gates: Phase 3 SBOM Images and Docker Labels"
+scope: "Produce dedicated sbom runner images for gradle and maven and standardize OCI metadata labels across all Dockerfiles."
+documentation:
+  - "images/README.md"
+  - "docs/how-to/publish-migs.md"
+  - "docs/envs/README.md"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: "Add buildable and publishable sbom-gradle and sbom-maven images and include them in image release pipeline."
+    classification: "determined"
+    components:
+      - "images/sbom/gradle/Dockerfile"
+      - "images/sbom/gradle/README.md"
+      - "images/sbom/maven/Dockerfile"
+      - "images/sbom/maven/README.md"
+      - "images/build-and-push.sh"
+      - "images/README.md"
+      - "docs/how-to/publish-migs.md"
+    baseline:
+      - "images/build-and-push.sh"
+      - "images/README.md"
+      - "docs/how-to/publish-migs.md"
+    delta:
+      - "[additive] no dedicated sbom runner images -> dedicated ploy/sbom-gradle and ploy/sbom-maven images built and published by standard image pipeline"
+    implementation:
+      - "Create sbom-gradle image under images/sbom/gradle with deterministic tooling required to collect full Gradle SBOM data."
+      - "Create sbom-maven image under images/sbom/maven with deterministic tooling required to collect full Maven SBOM data."
+      - "Extend images build and push script to build and publish both new images with standard tag policy."
+      - "Document new images and intended usage in images and publish docs."
+    verification:
+      - "Run image build script in dry-run equivalent and verify sbom-gradle and sbom-maven build targets are included."
+      - "Build both images locally and verify expected tooling binaries are available in containers."
+      - "Confirm image docs reference exact image names ploy/sbom-gradle and ploy/sbom-maven."
+    reasoning: "medium"
+    cfp: 8
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: "Add standard OCI labels for source description and license to every repository Dockerfile."
+    classification: "determined"
+    components:
+      - "images/amata/Dockerfile"
+      - "images/node/Dockerfile"
+      - "images/server/Dockerfile"
+      - "images/shell/Dockerfile"
+      - "images/gates/gradle/Dockerfile.jdk11"
+      - "images/gates/gradle/Dockerfile.jdk17"
+      - "images/orw/orw-cli-gradle/Dockerfile"
+      - "images/orw/orw-cli-maven/Dockerfile"
+      - "images/sbom/gradle/Dockerfile"
+      - "images/sbom/maven/Dockerfile"
+      - "images/README.md"
+    baseline:
+      - "images/amata/Dockerfile"
+      - "images/node/Dockerfile"
+      - "images/server/Dockerfile"
+      - "images/shell/Dockerfile"
+      - "images/gates/gradle/Dockerfile.jdk11"
+      - "images/gates/gradle/Dockerfile.jdk17"
+      - "images/orw/orw-cli-gradle/Dockerfile"
+      - "images/orw/orw-cli-maven/Dockerfile"
+    delta:
+      - "[additive] dockerfiles without consistent source description and license OCI labels -> all dockerfiles include org.opencontainers.image.source description and licenses labels"
+    implementation:
+      - "Add labels to each Dockerfile with source fixed to https://github.com/iw2rmb/ploy, one-line image-specific description, and licenses set to MIT."
+      - "Keep existing OCI labels intact and avoid duplicate keys by normalizing final label set per Dockerfile."
+      - "Update image documentation to state common labeling policy for new and existing images."
+    verification:
+      - "Scan all Dockerfiles and verify each includes source description and licenses labels exactly once."
+      - "Build one representative image from each image family and inspect final image labels."
+      - "Confirm added labels do not change runtime entrypoints or build contexts."
+    reasoning: "medium"
+    cfp: 7

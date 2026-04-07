@@ -1,0 +1,76 @@
+policy: "~/.codex/policies/composing-roadmaps.md"
+schema: "~/.codex/policies/roadmap.schema.json"
+title: "SBOM and Hook Jobs Around Gates: Phase 2 Hook Runtime and Persistence"
+scope: "Implement hook matching and once semantics with persistent state and API visibility for new job types."
+documentation:
+  - "docs/build-gate/README.md"
+  - "docs/schemas/mig.example.yaml"
+  - "docs/api/OpenAPI.yaml"
+done: false
+reviews: []
+items:
+  - done: false
+    reviews: []
+    label: "1"
+    summary: "Implement hook spec loading stack matching SBOM condition evaluation and once-by-hash semantics."
+    classification: "determined"
+    components:
+      - "internal/workflow/hook/spec.go"
+      - "internal/workflow/hook/loader.go"
+      - "internal/workflow/hook/matcher.go"
+      - "internal/workflow/hook/version_compare.go"
+      - "internal/workflow/hook/loader_test.go"
+      - "internal/workflow/hook/matcher_test.go"
+      - "internal/workflow/hook/testdata/openapi-generator-cli/hook.yaml"
+    baseline:
+      - "internal/workflow/contracts/stack_match.go"
+      - "internal/server/sbom/version_compare.go"
+    delta:
+      - "[additive] no hook runtime conditions -> hook runtime with stack filter and sbom match add remove change predicates"
+    implementation:
+      - "Add hook spec model with id stack filter steps once and sbom conditions plus strict YAML loader."
+      - "Resolve hook sources from mig spec root hooks entries and recursively discover hook.yaml files in directories."
+      - "Implement matcher that evaluates on_match on_add on_remove and on_change against current and previous sbom snapshots."
+      - "Compute deterministic hook hash from canonical hook content for once semantics keying."
+    verification:
+      - "Hook discovery from directory sources finds nested hook.yaml files and ignores unrelated files."
+      - "SBOM condition evaluator returns stable decisions for add remove and version transition predicates."
+      - "Repeated evaluation with same run and hook hash skips execution when once is enabled."
+    reasoning: "xhigh"
+    cfp: 18
+
+  - done: false
+    reviews: []
+    label: "2"
+    summary: "Persist hook execution state and expose sbom and hook job types in run and job APIs."
+    classification: "determined"
+    components:
+      - "internal/store/schema.sql"
+      - "internal/store/queries/jobs.sql"
+      - "internal/store/queries/hooks_once.sql"
+      - "internal/store/hooks_once.sql.go"
+      - "internal/store/jobs.sql.go"
+      - "internal/server/handlers/runs_repo_jobs.go"
+      - "internal/server/handlers/runs_repo_jobs_test.go"
+      - "internal/server/handlers/jobs_complete_service_post_actions.go"
+    baseline:
+      - "internal/store/schema.sql"
+      - "internal/store/queries/jobs.sql"
+      - "internal/server/handlers/runs_repo_jobs.go"
+    delta:
+      - "[additive] job persistence without hook once ledger -> job persistence with hook hash ledger and api visibility for sbom and hook job types"
+      - "[replace] gate-success-only sbom row persistence path -> latest-successful-mig-cycle sbom snapshot persistence path"
+    implementation:
+      - "Add storage table and queries for hook once ledger keyed by run repo and hook hash."
+      - "Extend jobs query and API serialization to include sbom and hook types."
+      - "Record hook execution decision and once skip marker during job completion flow."
+      - "Persist normalized SBOM rows to database from the latest successful MIG-cycle sbom snapshot when MIG completes successfully."
+      - "Remove legacy gate-success-only SBOM persistence mechanism to keep single authoritative ingestion path."
+      - "Regenerate sqlc outputs and update related store tests."
+    verification:
+      - "Repeated hook execution with same run repo and hook hash is skipped exactly once after first success."
+      - "Run status API returns sbom and hook jobs with correct type and status."
+      - "Successful MIG completion writes DB SBOM rows from the most recent successful sbom job and ignores stale failed snapshots."
+      - "Existing gate-only runs remain queryable without schema regressions."
+    reasoning: "high"
+    cfp: 12
