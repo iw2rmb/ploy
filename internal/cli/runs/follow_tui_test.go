@@ -11,23 +11,23 @@ import (
 	migsapi "github.com/iw2rmb/ploy/internal/migs/api"
 )
 
-func TestDeriveRunStateFromReport_PrefersJobErrorOverCancelledRepos(t *testing.T) {
+func TestDeriveRunStateFromReport_IgnoresHistoricalJobFailureWhenRepoSucceeded(t *testing.T) {
 	t.Parallel()
 
 	report := RunReport{
 		Repos: []RunEntry{
 			{
-				Status: domaintypes.RunRepoStatusCancelled,
+				Status: domaintypes.RunRepoStatusSuccess,
 				Jobs: []RunJobEntry{
-					{Status: domaintypes.JobStatusError},
-					{Status: domaintypes.JobStatusCancelled},
+					{Status: domaintypes.JobStatusFail},
+					{Status: domaintypes.JobStatusSuccess},
 				},
 			},
 		},
 	}
 
-	if got := DeriveRunStateFromReport(report); got != migsapi.RunStateError {
-		t.Fatalf("DeriveRunStateFromReport() = %q, want %q", got, migsapi.RunStateError)
+	if got := DeriveRunStateFromReport(report); got != migsapi.RunStateSucceeded {
+		t.Fatalf("DeriveRunStateFromReport() = %q, want %q", got, migsapi.RunStateSucceeded)
 	}
 }
 
@@ -47,6 +47,31 @@ func TestDeriveRunStateFromReport_RunningJobKeepsRunNonTerminal(t *testing.T) {
 
 	if got := DeriveRunStateFromReport(report); got != "" {
 		t.Fatalf("DeriveRunStateFromReport() = %q, want empty", got)
+	}
+}
+
+func TestDeriveRunStateFromReport_MixedSuccessAndCancelledIsCancelled(t *testing.T) {
+	t.Parallel()
+
+	report := RunReport{
+		Repos: []RunEntry{
+			{
+				Status: domaintypes.RunRepoStatusSuccess,
+				Jobs: []RunJobEntry{
+					{Status: domaintypes.JobStatusSuccess},
+				},
+			},
+			{
+				Status: domaintypes.RunRepoStatusCancelled,
+				Jobs: []RunJobEntry{
+					{Status: domaintypes.JobStatusCancelled},
+				},
+			},
+		},
+	}
+
+	if got := DeriveRunStateFromReport(report); got != migsapi.RunStateCancelled {
+		t.Fatalf("DeriveRunStateFromReport() = %q, want %q", got, migsapi.RunStateCancelled)
 	}
 }
 
