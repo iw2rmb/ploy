@@ -179,14 +179,14 @@ func removeGradleTryBlock(lines []string) []string {
 func trimGradleStacktraceOccurrences(lines []string) []string {
 	out := make([]string, 0, len(lines))
 	for i := 0; i < len(lines); {
-		if !strings.HasPrefix(lines[i], "  at") {
+		if !isGradleStackFrameLine(lines[i]) {
 			out = append(out, lines[i])
 			i++
 			continue
 		}
 
 		j := i
-		for j < len(lines) && (strings.HasPrefix(lines[j], "  at") || strings.HasPrefix(lines[j], "Caused by")) {
+		for j < len(lines) && (isGradleStackFrameLine(lines[j]) || isGradleCausedByLine(lines[j])) {
 			j++
 		}
 		out = append(out, dedupeGradleStacktraceBlock(lines[i:j])...)
@@ -207,9 +207,10 @@ func dedupeGradleStacktraceBlock(block []string) []string {
 
 	referenceFrames := make(map[string]struct{}, len(parts[0]))
 	for _, line := range parts[0] {
-		if strings.HasPrefix(line, "  at") {
-			referenceFrames[line] = struct{}{}
+		if !isGradleStackFrameLine(line) {
+			continue
 		}
+		referenceFrames[normalizeGradleStackFrame(line)] = struct{}{}
 	}
 	if len(referenceFrames) == 0 {
 		return block
@@ -218,10 +219,10 @@ func dedupeGradleStacktraceBlock(block []string) []string {
 	for i := 1; i < len(parts); i++ {
 		cutAt := -1
 		for idx, line := range parts[i] {
-			if !strings.HasPrefix(line, "  at") {
+			if !isGradleStackFrameLine(line) {
 				continue
 			}
-			if _, ok := referenceFrames[line]; ok {
+			if _, ok := referenceFrames[normalizeGradleStackFrame(line)]; ok {
 				cutAt = idx
 				break
 			}
@@ -232,7 +233,7 @@ func dedupeGradleStacktraceBlock(block []string) []string {
 
 		removedFrames := 0
 		for _, line := range parts[i][cutAt:] {
-			if strings.HasPrefix(line, "  at") {
+			if isGradleStackFrameLine(line) {
 				removedFrames++
 			}
 		}
@@ -253,7 +254,7 @@ func splitByCausedBy(block []string) [][]string {
 	parts := make([][]string, 0, 2)
 	current := make([]string, 0, len(block))
 	for _, line := range block {
-		if strings.HasPrefix(line, "Caused by") && len(current) > 0 {
+		if isGradleCausedByLine(line) && len(current) > 0 {
 			parts = append(parts, current)
 			current = []string{line}
 			continue
@@ -273,4 +274,16 @@ func slicesClone(lines []string) []string {
 	out := make([]string, len(lines))
 	copy(out, lines)
 	return out
+}
+
+func isGradleStackFrameLine(line string) bool {
+	return strings.HasPrefix(strings.TrimLeft(line, " \t"), "at ")
+}
+
+func isGradleCausedByLine(line string) bool {
+	return strings.HasPrefix(strings.TrimLeft(line, " \t"), "Caused by")
+}
+
+func normalizeGradleStackFrame(line string) string {
+	return strings.TrimLeft(line, " \t")
 }
