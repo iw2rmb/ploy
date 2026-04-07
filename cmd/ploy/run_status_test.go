@@ -62,8 +62,9 @@ func TestRunStatusReportTextContract(t *testing.T) {
 	assertx.NotContains(t, out, "infra compile failed at step 2")
 	assertx.NotContains(t, out, "<infra>")
 	assertx.NotContains(t, out, "Exit 0")
-	assertx.Contains(t, out, "└  Issue [deps]: Missing dependency lockfile")
-	assertx.Contains(t, out, "└  Action: Applied import fix and retried build")
+	assertx.NotContains(t, out, "Issue [deps]: Missing dependency lockfile")
+	assertx.NotContains(t, out, "Action:")
+	assertx.Contains(t, out, "└ [deps] Applied import fix and retried build")
 }
 
 func newRunStatusReportServer(t *testing.T, runID domaintypes.RunID, migID domaintypes.MigID, specID domaintypes.SpecID, repoID domaintypes.MigRepoID, preGateID domaintypes.JobID, healID domaintypes.JobID, postGateID domaintypes.JobID) *httptest.Server {

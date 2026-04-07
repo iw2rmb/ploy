@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source /usr/local/lib/ploy/install_ploy_ca_bundle.sh
+
+ca_installer="/usr/local/lib/ploy/install_ploy_ca_bundle.sh"
+if [[ -f "$ca_installer" ]]; then
+  source "$ca_installer"
+else
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local_ca_installer="$(cd "$script_dir/../../.." && pwd)/install_ploy_ca_bundle.sh"
+  if [[ -f "$local_ca_installer" ]]; then
+    source "$local_ca_installer"
+  else
+    install_ploy_ca_bundle() { return 0; }
+  fi
+fi
 
 usage() {
   cat <<'USAGE'
