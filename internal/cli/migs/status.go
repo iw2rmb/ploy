@@ -91,6 +91,8 @@ type DownloadDiffCommand struct {
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
 	RepoID  domaintypes.MigRepoID
 	DiffID  domaintypes.DiffID
+	// Accumulated requests cumulative patch content up to DiffID.
+	Accumulated bool
 }
 
 // DownloadDiffGzipCommand downloads a single diff patch as raw gzip bytes via:
@@ -101,6 +103,8 @@ type DownloadDiffGzipCommand struct {
 	RunID   domaintypes.RunID // Run ID (KSUID-backed domain type)
 	RepoID  domaintypes.MigRepoID
 	DiffID  domaintypes.DiffID
+	// Accumulated requests cumulative patch content up to DiffID.
+	Accumulated bool
 }
 
 // Run executes GET /v1/runs/{run_id}/repos/{repo_id}/diffs?download=true&diff_id=<uuid>
@@ -124,6 +128,9 @@ func (c DownloadDiffCommand) Run(ctx context.Context) ([]byte, error) {
 	q := endpoint.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", c.DiffID.String())
+	if c.Accumulated {
+		q.Set("accumulated", "true")
+	}
 	endpoint.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
@@ -169,6 +176,9 @@ func (c DownloadDiffGzipCommand) Run(ctx context.Context) ([]byte, error) {
 	q := endpoint.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", c.DiffID.String())
+	if c.Accumulated {
+		q.Set("accumulated", "true")
+	}
 	endpoint.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)

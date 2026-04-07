@@ -91,7 +91,7 @@ func (c GetRunReportCommand) buildRepoEntry(
 
 	repoPatchURL := ""
 	if latest := latestRepoDiff(diffs); latest != nil {
-		repoPatchURL = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, latest.ID)
+		repoPatchURL = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, latest.ID, true)
 	}
 
 	jobPatchByID := make(map[domaintypes.JobID]string, len(diffs))
@@ -99,7 +99,7 @@ func (c GetRunReportCommand) buildRepoEntry(
 		if diff.JobID.IsZero() {
 			continue
 		}
-		jobPatchByID[diff.JobID] = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, diff.ID)
+		jobPatchByID[diff.JobID] = buildRepoPatchURL(c.BaseURL, c.RunID, repo.RepoID, diff.ID, true)
 	}
 
 	*out = RunEntry{
@@ -284,11 +284,14 @@ func buildJobLogURL(baseURL *url.URL, jobID domaintypes.JobID) string {
 	return baseURL.JoinPath("v1", "jobs", jobID.String(), "logs").String()
 }
 
-func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffID domaintypes.DiffID) string {
+func buildRepoPatchURL(baseURL *url.URL, runID domaintypes.RunID, repoID domaintypes.MigRepoID, diffID domaintypes.DiffID, accumulated bool) string {
 	u := baseURL.JoinPath("v1", "runs", runID.String(), "repos", repoID.String(), "diffs")
 	q := u.Query()
 	q.Set("download", "true")
 	q.Set("diff_id", diffID.String())
+	if accumulated {
+		q.Set("accumulated", "true")
+	}
 	u.RawQuery = q.Encode()
 	return u.String()
 }

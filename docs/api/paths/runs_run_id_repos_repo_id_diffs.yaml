@@ -13,6 +13,9 @@ get:
     Download mode:
     - When `download=true` and `diff_id` is provided, the endpoint returns the
       gzipped patch bytes for that diff (only if it belongs to this run+repo).
+    - When `download=true&accumulated=true`, the returned gzipped patch contains
+      accumulated content from the first diff through `diff_id` (inclusive),
+      in repo diff order.
 
     Diffs are ordered by execution chain position, then by created_at (ascending).
   parameters:
@@ -44,6 +47,15 @@ get:
         type: string
         format: uuid
       description: Diff ID to download when `download=true`.
+    - in: query
+      name: accumulated
+      required: false
+      schema:
+        type: string
+        enum: ["true"]
+      description: |
+        Optional accumulated download mode for `download=true`. When set to
+        `true`, returns the cumulative patch up to and including `diff_id`.
     - in: query
       name: auth_token
       required: false

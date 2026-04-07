@@ -101,6 +101,9 @@ func TestHandleRunPatch_RepoIDLatestToFile(t *testing.T) {
 			if got := r.URL.Query().Get("diff_id"); got != diffID2.String() {
 				t.Fatalf("download diff_id=%q, want %q", got, diffID2.String())
 			}
+			if got := r.URL.Query().Get("accumulated"); got != "true" {
+				t.Fatalf("download accumulated=%q, want true", got)
+			}
 			w.Header().Set("Content-Type", "application/gzip")
 			_, _ = w.Write(expectedPatch)
 			return
@@ -212,6 +215,9 @@ func TestHandleRunPatch_ResolveRepoViaRepoURL(t *testing.T) {
 				if got := r.URL.Query().Get("diff_id"); got != diffID.String() {
 					t.Fatalf("download diff_id=%q, want %q", got, diffID.String())
 				}
+				if got := r.URL.Query().Get("accumulated"); got != "true" {
+					t.Fatalf("download accumulated=%q, want true", got)
+				}
 				_, _ = w.Write(patchBytes)
 				return
 			}
@@ -292,6 +298,9 @@ func TestHandleRunPatch_AutoResolveSingleRunRepo(t *testing.T) {
 				downloadCalled = true
 				if got := r.URL.Query().Get("diff_id"); got != diffID.String() {
 					t.Fatalf("download diff_id=%q, want %q", got, diffID.String())
+				}
+				if got := r.URL.Query().Get("accumulated"); got != "true" {
+					t.Fatalf("download accumulated=%q, want true", got)
 				}
 				_, _ = w.Write(patchBytes)
 				return
