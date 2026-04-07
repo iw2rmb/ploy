@@ -307,7 +307,7 @@ func renderExitOneLiner(job RunJobEntry, repoLastError *string) string {
 	}
 
 	if isGateJobType(job.JobType.String()) {
-		return renderWrappedExitOneLiner(renderExitCode(job.ExitCode), "Error", true)
+		return ""
 	}
 
 	msg := strings.Join(strings.Fields(strings.TrimSpace(job.BugSummary)), " ")
