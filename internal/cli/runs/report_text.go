@@ -518,21 +518,20 @@ func renderWrappedExitOneLiner(exitCode, content string, colorizeContent bool) s
 }
 
 func renderHealSummaryBlock(job RunJobEntry) string {
-	lines := make([]string, 0, 2)
-	errorKind := strings.TrimSpace(job.ErrorKind)
-	bugSummary := strings.TrimSpace(job.BugSummary)
 	actionSummary := strings.TrimSpace(job.ActionSummary)
+	if actionSummary == "" {
+		return ""
+	}
 
-	if errorKind != "" && bugSummary != "" {
-		lines = append(lines, renderWrappedLabelLine("└  Issue ["+errorKind+"]: ", bugSummary))
+	prefix := "             └ "
+	errorKind := strings.TrimSpace(job.ErrorKind)
+	if errorKind != "" {
+		prefix += "[" + errorKind + "] "
 	}
-	if actionSummary != "" {
-		lines = append(lines, renderWrappedLabelLine("└  Action: ", actionSummary))
-	}
-	return strings.Join(lines, "\n")
+	return renderWrappedPrefixedLine(prefix, "               ", actionSummary)
 }
 
-func renderWrappedLabelLine(prefix, content string) string {
+func renderWrappedPrefixedLine(firstPrefix, continuationPrefix, content string) string {
 	const wrapWidth = 80
 
 	content = strings.Join(strings.Fields(strings.TrimSpace(content)), " ")
@@ -545,14 +544,13 @@ func renderWrappedLabelLine(prefix, content string) string {
 		return ""
 	}
 
-	indent := strings.Repeat(" ", lipgloss.Width(prefix))
 	lines := make([]string, 0, len(rows))
 	for i, row := range rows {
 		if i == 0 {
-			lines = append(lines, prefix+row)
+			lines = append(lines, firstPrefix+row)
 			continue
 		}
-		lines = append(lines, indent+row)
+		lines = append(lines, continuationPrefix+row)
 	}
 	return strings.Join(lines, "\n")
 }

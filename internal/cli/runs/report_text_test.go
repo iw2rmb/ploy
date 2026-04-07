@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"charm.land/lipgloss/v2"
-
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/testutil/assertx"
 )
@@ -360,8 +358,9 @@ func TestRenderRunReportTextExitOneLiners(t *testing.T) {
 	assertx.Contains(t, out, "✓")
 	assertx.Contains(t, out, "heal")
 	assertx.NotContains(t, out, "Exit 0")
-	assertx.Contains(t, out, "└  Issue [deps]: Missing dependency lockfile")
-	assertx.Contains(t, out, "└  Action: Applied import fix and retried build")
+	assertx.NotContains(t, out, "Issue [deps]: Missing dependency lockfile")
+	assertx.NotContains(t, out, "Action:")
+	assertx.Contains(t, out, "             └ [deps] Applied import fix and retried build")
 }
 
 func TestRenderRunReportTextExitOneLinerVariants(t *testing.T) {
@@ -459,12 +458,10 @@ func TestRenderRunReportText_HealSummaryWrapsAtEighty(t *testing.T) {
 	}
 
 	out := renderText(t, singleJobReport("heal-wrap", "Success", job), TextRenderOptions{EnableOSC8: false})
-	issuePrefix := "└  Issue [infra]: "
-	actionPrefix := "└  Action: "
-	assertx.Contains(t, out, issuePrefix)
-	assertx.Contains(t, out, actionPrefix)
-	assertx.Contains(t, out, "\n"+strings.Repeat(" ", lipgloss.Width(issuePrefix)))
-	assertx.Contains(t, out, "\n"+strings.Repeat(" ", lipgloss.Width(actionPrefix)))
+	assertx.Contains(t, out, "             └ [infra] ")
+	assertx.Contains(t, out, "\n               ")
+	assertx.NotContains(t, out, "Issue [infra]:")
+	assertx.NotContains(t, out, "Action:")
 }
 
 func TestRenderRunReportTextOSC8OnAndOff(t *testing.T) {
