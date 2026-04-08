@@ -15,7 +15,6 @@ import (
 //   - JobTypeReGate: re-run Build Gate after healing
 //   - JobTypeSBOM: SBOM generation job
 //   - JobTypeHook: hook execution job
-//   - JobTypeMR: post-run MR creation job
 //
 // Unknown or empty values should be treated carefully at boundaries; use
 // JobType.IsZero/Validate to enforce invariants when appropriate.
@@ -29,7 +28,6 @@ const (
 	JobTypeReGate   JobType = "re_gate"
 	JobTypeSBOM     JobType = "sbom"
 	JobTypeHook     JobType = "hook"
-	JobTypeMR       JobType = "mr"
 )
 
 // String returns the underlying string value.
@@ -42,7 +40,7 @@ func (v JobType) IsZero() bool { return IsEmpty(string(v)) }
 func (v JobType) Validate() error {
 	s := strings.TrimSpace(string(v))
 	switch JobType(s) {
-	case JobTypePreGate, JobTypeMig, JobTypePostGate, JobTypeHeal, JobTypeReGate, JobTypeSBOM, JobTypeHook, JobTypeMR:
+	case JobTypePreGate, JobTypeMig, JobTypePostGate, JobTypeHeal, JobTypeReGate, JobTypeSBOM, JobTypeHook:
 		return nil
 	default:
 		return fmt.Errorf("invalid job_type %q", s)

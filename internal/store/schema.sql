@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS ploy.schema_version (
 -- - run_status: Started | Cancelled | Finished
 -- - run_repo_status: Queued | Running | Cancelled | Fail | Success
 -- - job_status: Created | Queued | Running | Success | Fail | Error | Cancelled
+-- - job_type: pre_gate | mig | post_gate | heal | re_gate | sbom | hook
 --
 -- Capitalized values are canonical; no aliases.
 DO $$
@@ -45,6 +46,18 @@ BEGIN
     WHERE t.typname = 'job_status' AND n.nspname = 'ploy'
   ) THEN
     CREATE TYPE job_status AS ENUM ('Created', 'Queued', 'Running', 'Success', 'Fail', 'Error', 'Cancelled');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'job_type' AND n.nspname = 'ploy'
+  ) THEN
+    CREATE TYPE job_type AS ENUM ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'sbom', 'hook');
   END IF;
 END $$;
 
@@ -233,7 +246,7 @@ CREATE INDEX IF NOT EXISTS run_repos_status_idx ON run_repos(status) WHERE statu
 -- Index for repo history queries (list runs per repo).
 CREATE INDEX IF NOT EXISTS run_repos_repo_created_idx ON run_repos(repo_id, created_at);
 
--- Jobs (unified job queue for all execution units: pre-build, step, post-build, heal, re-build, mr)
+-- Jobs (unified job queue for all execution units: pre-build, step, post-build, heal, re-build)
 -- Jobs for a repo attempt form a singly-linked chain through next_id -> jobs.id.
 -- Server-driven scheduling: only chain head starts as 'Queued'; successors remain 'Created'
 -- until their predecessor succeeds and they are promoted.
@@ -257,7 +270,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
   name            TEXT NOT NULL,
   status          job_status NOT NULL DEFAULT 'Created',  -- v1: 'Created' or 'Queued' (first job per repo attempt).
-  job_type        TEXT NOT NULL CHECK (job_type IN ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'sbom', 'hook', 'mr')),
+  job_type        job_type NOT NULL,
   job_image       TEXT NOT NULL DEFAULT '',
   next_id         TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id; which node claimed this job.
@@ -281,6 +294,25 @@ CREATE INDEX IF NOT EXISTS jobs_next_id_idx ON jobs(next_id) WHERE next_id IS NO
 CREATE INDEX IF NOT EXISTS jobs_predecessor_lookup_idx ON jobs(run_id, repo_id, attempt, next_id);
 -- Index for repo attribution queries (logs/diffs/events join via job_id → jobs.repo_id).
 CREATE INDEX IF NOT EXISTS jobs_repo_idx ON jobs(repo_id);
+
+-- Repo-scoped action queue for terminal follow-up work (e.g., MR creation).
+CREATE TABLE IF NOT EXISTS run_repo_actions (
+  id              TEXT PRIMARY KEY,  -- KSUID-backed string ID; app-generated.
+  run_id          TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  repo_id         TEXT NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
+  attempt         INTEGER NOT NULL,
+  action_type     TEXT NOT NULL CHECK (action_type IN ('mr_create')),
+  status          job_status NOT NULL DEFAULT 'Queued',
+  node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,
+  started_at      TIMESTAMPTZ,
+  finished_at     TIMESTAMPTZ,
+  duration_ms     BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
+  meta            JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (run_id, repo_id, attempt, action_type)
+);
+CREATE INDEX IF NOT EXISTS run_repo_actions_pending_idx ON run_repo_actions(run_id, repo_id, attempt, id) WHERE status = 'Queued';
+CREATE INDEX IF NOT EXISTS run_repo_actions_node_idx ON run_repo_actions(node_id) WHERE node_id IS NOT NULL;
 
 -- Steps cache metadata keyed by execution job.
 -- Stores canonicalized step ops payload, deterministic hash, and optional reference

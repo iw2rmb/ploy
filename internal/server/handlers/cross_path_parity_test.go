@@ -36,13 +36,9 @@ func TestCrossPathParity_StandardJobErrorToChainAction(t *testing.T) {
 		// context.Canceled: non-gate jobs → Cancelled → onCancelled → CancelRemainder.
 		{name: "ctx_canceled/mig/has-next", err: context.Canceled, jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 		{name: "ctx_deadline/heal/has-next", err: context.DeadlineExceeded, jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
-		// MR jobs: Cancelled maps to NoAction — failures do not cascade.
-		{name: "ctx_canceled/mr/no-next", err: context.Canceled, jobType: domaintypes.JobTypeMR, hasNext: false, wantCancelSuccessor: false},
 		// Runtime errors: non-gate jobs → Error → CancelRemainder.
 		{name: "runtime_error/mig/has-next", err: errors.New("container exited unexpectedly"), jobType: domaintypes.JobTypeMig, hasNext: true, wantCancelSuccessor: true},
 		{name: "runtime_error/heal/has-next", err: errors.New("image pull failed"), jobType: domaintypes.JobTypeHeal, hasNext: true, wantCancelSuccessor: true},
-		// MR runtime errors: Error maps to NoAction.
-		{name: "runtime_error/mr/no-next", err: errors.New("git push: authentication failed"), jobType: domaintypes.JobTypeMR, hasNext: false, wantCancelSuccessor: false},
 	}
 
 	for _, tc := range cases {

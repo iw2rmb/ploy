@@ -38,10 +38,10 @@ type ClaimDecision struct {
 }
 
 // EvaluateClaimDecision computes whether the RunRepo should advance to Running.
-// Non-MR jobs advance the RunRepo from Queued to Running on first claim.
+// Jobs advance the RunRepo from Queued to Running on first claim.
 func EvaluateClaimDecision(jobType domaintypes.JobType, rrStatus domaintypes.RunRepoStatus) ClaimDecision {
 	return ClaimDecision{
-		AdvanceRunRepoToRunning: jobType != domaintypes.JobTypeMR && rrStatus == domaintypes.RunRepoStatusQueued,
+		AdvanceRunRepoToRunning: !jobType.IsZero() && rrStatus == domaintypes.RunRepoStatusQueued,
 	}
 }
 
@@ -51,7 +51,7 @@ func EvaluateClaimDecision(jobType domaintypes.JobType, rrStatus domaintypes.Run
 type CompletionChainAction int
 
 const (
-	// CompletionChainNoAction means no chain management is needed (e.g. MR jobs, success with no successor).
+	// CompletionChainNoAction means no chain management is needed (e.g. success with no successor).
 	CompletionChainNoAction CompletionChainAction = iota
 	// CompletionChainCancelRemainder cancels remaining non-terminal jobs in the chain.
 	CompletionChainCancelRemainder
@@ -81,9 +81,6 @@ func EvaluateCompletionDecision(
 		}
 		return CompletionDecision{ChainAction: CompletionChainNoAction}
 	case domaintypes.JobStatusFail, domaintypes.JobStatusError, domaintypes.JobStatusCancelled:
-		if jobType == domaintypes.JobTypeMR {
-			return CompletionDecision{ChainAction: CompletionChainNoAction}
-		}
 		if jobStatus == domaintypes.JobStatusFail && IsGateJobType(jobType) {
 			return CompletionDecision{ChainAction: CompletionChainEvaluateGateFailure}
 		}

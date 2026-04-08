@@ -270,7 +270,7 @@ func TestSaveJobImageName_ConflictWrongJobType(t *testing.T) {
 		RunID:   runID,
 		NodeID:  &nodeID,
 		Status:  domaintypes.JobStatusRunning,
-		JobType: "mr",
+		JobType: "unknown",
 	}
 
 	st := &jobStore{getJobResult: job}

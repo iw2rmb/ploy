@@ -62,10 +62,7 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
 	switch decision.ChainAction {
 	case lifecycle.CompletionChainNoAction:
-		slog.Warn("complete job: MR job failed; ignoring for run-level failure handling",
-			"job_id", state.job.ID,
-			"next_id", state.job.NextID,
-		)
+		return
 	case lifecycle.CompletionChainEvaluateGateFailure:
 		if errMsg := formatStackGateError(jobType, state.persistedMeta); errMsg != nil {
 			if updateErr := s.store.UpdateRunRepoError(ctx, store.UpdateRunRepoErrorParams{
@@ -227,11 +224,6 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 }
 
 func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *completeJobState) {
-	isMRJob := state.serviceType == completeJobServiceTypeMR
-	if isMRJob {
-		return
-	}
-
 	repoUpdated, repoErr := recovery.MaybeUpdateRunRepoStatus(ctx, s.store, state.job.RunID, state.job.RepoID, state.job.Attempt)
 	if repoErr != nil {
 		slog.Error("complete job: failed to check repo completion",
@@ -246,7 +238,7 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 		return
 	}
 
-	_, runRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{
+	runRepo, runRepoErr := s.store.GetRunRepo(ctx, store.GetRunRepoParams{
 		RunID:  state.job.RunID,
 		RepoID: state.job.RepoID,
 	})
@@ -257,6 +249,16 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 			"attempt", state.job.Attempt,
 			"err", runRepoErr,
 		)
+	} else {
+		if enqueueErr := enqueueAutoMRCreateAction(ctx, s.store, state.job.RunID, runRepo); enqueueErr != nil {
+			slog.Error("complete job: failed to enqueue auto MR action",
+				"job_id", state.job.ID,
+				"run_id", state.job.RunID,
+				"repo_id", state.job.RepoID,
+				"attempt", state.job.Attempt,
+				"err", enqueueErr,
+			)
+		}
 	}
 
 	run, ok := s.loadRunForPostCompletion(ctx, state, "run completion reconciliation")
@@ -268,26 +270,6 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 			"job_id", state.job.ID,
 			"next_id", state.job.NextID,
 			"err", completeErr,
-		)
-	}
-}
-
-func (s *CompleteJobService) mergeMRURL(ctx context.Context, state *completeJobState) {
-	if state.serviceType != completeJobServiceTypeMR {
-		return
-	}
-	mrURL := state.input.StatsPayload.MRURL()
-	if mrURL == "" {
-		return
-	}
-	if updateErr := s.store.UpdateRunStatsMRURL(ctx, store.UpdateRunStatsMRURLParams{
-		ID:    state.job.RunID,
-		MrUrl: mrURL,
-	}); updateErr != nil {
-		slog.Error("complete job: failed to merge MR URL into run stats",
-			"job_id", state.job.ID,
-			"run_id", state.job.RunID,
-			"err", updateErr,
 		)
 	}
 }

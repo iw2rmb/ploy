@@ -167,8 +167,7 @@ WHERE id = $1;
 -- Atomically claim the next claimable job for a node (unified queue).
 -- v1:
 -- - claimable jobs have status='Queued'
--- - normal jobs are claimable only when runs.status='Started'
--- - MR jobs (job_type='mr') are claimable only when runs.status='Finished'
+-- - jobs are claimable only when runs.status='Started'
 -- - nodeID must be non-empty
 WITH eligible AS (
   SELECT j.id, n.id AS node_id
@@ -179,10 +178,7 @@ WITH eligible AS (
     AND @node_id::TEXT != ''
     AND j.status = 'Queued'
     AND j.node_id IS NULL
-    AND (
-      (j.job_type = 'mr' AND r.status = 'Finished') OR
-      (j.job_type != 'mr' AND r.status = 'Started')
-    )
+    AND r.status = 'Started'
   ORDER BY j.run_id ASC, j.repo_id ASC, j.attempt ASC, j.id ASC
   FOR UPDATE OF j SKIP LOCKED
   LIMIT 1
@@ -438,15 +434,13 @@ FROM completed
 WHERE next_job.id = completed.next_id;
 
 -- name: CountJobsByRunRepoAttemptGroupByStatus :many
--- Counts jobs by status for a specific repo attempt, excluding MR jobs.
+-- Counts jobs by status for a specific repo attempt.
 -- Used by repo-scoped terminal detection to determine run_repos.status.
--- MR jobs (job_type='mr') are auxiliary and must not affect run_repos.status derivation.
 SELECT status, COUNT(*)::int AS count
 FROM jobs
 WHERE run_id = $1
   AND repo_id = $2
   AND attempt = $3
-  AND job_type != 'mr'
 GROUP BY status;
 
 -- name: ListJobsForTUI :many

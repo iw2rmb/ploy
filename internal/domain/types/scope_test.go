@@ -114,7 +114,6 @@ func TestGlobalEnvTarget_MatchesJobType(t *testing.T) {
 		{name: "gates matches post_gate", target: GlobalEnvTargetGates, jobType: JobTypePostGate, want: true},
 		{name: "gates does not match mig", target: GlobalEnvTargetGates, jobType: JobTypeMig, want: false},
 		{name: "gates does not match heal", target: GlobalEnvTargetGates, jobType: JobTypeHeal, want: false},
-		{name: "gates does not match mr", target: GlobalEnvTargetGates, jobType: JobTypeMR, want: false},
 
 		// "steps" target matches step jobs.
 		{name: "steps matches mig", target: GlobalEnvTargetSteps, jobType: JobTypeMig, want: true},
@@ -122,7 +121,6 @@ func TestGlobalEnvTarget_MatchesJobType(t *testing.T) {
 		{name: "steps does not match pre_gate", target: GlobalEnvTargetSteps, jobType: JobTypePreGate, want: false},
 		{name: "steps does not match re_gate", target: GlobalEnvTargetSteps, jobType: JobTypeReGate, want: false},
 		{name: "steps does not match post_gate", target: GlobalEnvTargetSteps, jobType: JobTypePostGate, want: false},
-		{name: "steps does not match mr", target: GlobalEnvTargetSteps, jobType: JobTypeMR, want: false},
 
 		// "server" target does not match any job type (not job-routed).
 		{name: "server does not match mig", target: GlobalEnvTargetServer, jobType: JobTypeMig, want: false},

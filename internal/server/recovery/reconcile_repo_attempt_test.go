@@ -40,11 +40,12 @@ func TestReconcileRepo_EvaluateRepoAttemptTerminalStatus(t *testing.T) {
 			wantStatus: domaintypes.RunRepoStatusSuccess,
 		},
 		{
-			name: "ignores MR jobs",
+			name: "single terminal mig updates status",
 			jobs: []store.Job{
-				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMR, Status: domaintypes.JobStatusSuccess},
+				{ID: domaintypes.NewJobID(), JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
 			},
-			wantUpdate: false,
+			wantUpdate: true,
+			wantStatus: domaintypes.RunRepoStatusSuccess,
 		},
 		{
 			name: "error status maps repo to fail",

@@ -63,8 +63,9 @@ type jobStore struct {
 	countJobsForTUI mockCall[*string, int64]
 
 	// Claiming
-	claimJob   mockCall[types.NodeID, store.Job]
-	unclaimJob mockCall[store.UnclaimJobParams, struct{}]
+	claimJob           mockCall[types.NodeID, store.Job]
+	claimRunRepoAction mockCall[types.NodeID, store.RunRepoAction]
+	unclaimJob         mockCall[store.UnclaimJobParams, struct{}]
 
 	claimRun mockResult[store.Run]
 
@@ -137,6 +138,11 @@ type jobStore struct {
 	cancelActiveJobsByRunRepoAttempt mockCallSlice[store.CancelActiveJobsByRunRepoAttemptParams, int64]
 
 	getLatestRunRepoByMigAndRepoStatus mockCall[store.GetLatestRunRepoByMigAndRepoStatusParams, store.GetLatestRunRepoByMigAndRepoStatusRow]
+	createRunRepoAction               mockCall[store.CreateRunRepoActionParams, store.RunRepoAction]
+	getRunRepoAction                  mockCall[types.JobID, store.RunRepoAction]
+	getRunRepoActionByKey             mockCall[store.GetRunRepoActionByKeyParams, store.RunRepoAction]
+	updateRunRepoActionCompletion     mockCall[store.UpdateRunRepoActionCompletionParams, struct{}]
+	listRunRepoActionsByRunRepoAttempt mockCall[store.ListRunRepoActionsByRunRepoAttemptParams, []store.RunRepoAction]
 
 	// Stale recovery
 	listStaleRunningJobs           mockCall[pgtype.Timestamptz, []store.ListStaleRunningJobsRow]
@@ -398,6 +404,21 @@ func (m *jobStore) ClaimJob(ctx context.Context, nodeID types.NodeID) (store.Job
 	return m.claimJob.val, nil
 }
 
+func (m *jobStore) ClaimRunRepoAction(ctx context.Context, nodeID types.NodeID) (store.RunRepoAction, error) {
+	m.claimRunRepoAction.called = true
+	m.claimRunRepoAction.params = nodeID
+	if nodeID.IsZero() {
+		return store.RunRepoAction{}, store.ErrEmptyNodeID
+	}
+	if m.claimRunRepoAction.err != nil {
+		return store.RunRepoAction{}, m.claimRunRepoAction.err
+	}
+	if m.claimRunRepoAction.val.ID.IsZero() {
+		return store.RunRepoAction{}, pgx.ErrNoRows
+	}
+	return m.claimRunRepoAction.val, nil
+}
+
 func (m *jobStore) UnclaimJob(ctx context.Context, arg store.UnclaimJobParams) error {
 	_, err := m.unclaimJob.record(arg)
 	return err
@@ -642,6 +663,70 @@ func (m *jobStore) CancelActiveJobsByRunRepoAttempt(ctx context.Context, params 
 
 func (m *jobStore) GetLatestRunRepoByMigAndRepoStatus(ctx context.Context, arg store.GetLatestRunRepoByMigAndRepoStatusParams) (store.GetLatestRunRepoByMigAndRepoStatusRow, error) {
 	return m.getLatestRunRepoByMigAndRepoStatus.record(arg)
+}
+
+func (m *jobStore) CreateRunRepoAction(ctx context.Context, params store.CreateRunRepoActionParams) (store.RunRepoAction, error) {
+	m.createRunRepoAction.called = true
+	m.createRunRepoAction.params = params
+	if m.createRunRepoAction.err != nil {
+		return store.RunRepoAction{}, m.createRunRepoAction.err
+	}
+	result := m.createRunRepoAction.val
+	if result.ID.IsZero() {
+		result.ID = params.ID
+	}
+	if result.RunID.IsZero() {
+		result.RunID = params.RunID
+	}
+	if result.RepoID.IsZero() {
+		result.RepoID = params.RepoID
+	}
+	if result.Attempt == 0 {
+		result.Attempt = params.Attempt
+	}
+	if result.ActionType == "" {
+		result.ActionType = params.ActionType
+	}
+	if result.Status == "" {
+		result.Status = params.Status
+	}
+	if len(result.Meta) == 0 {
+		result.Meta = params.Meta
+	}
+	return result, nil
+}
+
+func (m *jobStore) GetRunRepoAction(ctx context.Context, id types.JobID) (store.RunRepoAction, error) {
+	m.getRunRepoAction.called = true
+	m.getRunRepoAction.params = id
+	if m.getRunRepoAction.err != nil {
+		return store.RunRepoAction{}, m.getRunRepoAction.err
+	}
+	if m.getRunRepoAction.val.ID.IsZero() {
+		return store.RunRepoAction{}, pgx.ErrNoRows
+	}
+	return m.getRunRepoAction.val, nil
+}
+
+func (m *jobStore) GetRunRepoActionByKey(ctx context.Context, arg store.GetRunRepoActionByKeyParams) (store.RunRepoAction, error) {
+	m.getRunRepoActionByKey.called = true
+	m.getRunRepoActionByKey.params = arg
+	if m.getRunRepoActionByKey.err != nil {
+		return store.RunRepoAction{}, m.getRunRepoActionByKey.err
+	}
+	if m.getRunRepoActionByKey.val.ID.IsZero() {
+		return store.RunRepoAction{}, pgx.ErrNoRows
+	}
+	return m.getRunRepoActionByKey.val, nil
+}
+
+func (m *jobStore) UpdateRunRepoActionCompletion(ctx context.Context, params store.UpdateRunRepoActionCompletionParams) error {
+	_, err := m.updateRunRepoActionCompletion.record(params)
+	return err
+}
+
+func (m *jobStore) ListRunRepoActionsByRunRepoAttempt(ctx context.Context, arg store.ListRunRepoActionsByRunRepoAttemptParams) ([]store.RunRepoAction, error) {
+	return m.listRunRepoActionsByRunRepoAttempt.record(arg)
 }
 
 // Stale recovery methods

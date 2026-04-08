@@ -268,6 +268,21 @@ type RunRepo struct {
 	FinishedAt      pgtype.Timestamptz  `json:"finished_at"`
 }
 
+type RunRepoAction struct {
+	ID         types.JobID        `json:"id"`
+	RunID      types.RunID        `json:"run_id"`
+	RepoID     types.RepoID       `json:"repo_id"`
+	Attempt    int32              `json:"attempt"`
+	ActionType string             `json:"action_type"`
+	Status     types.JobStatus    `json:"status"`
+	NodeID     *types.NodeID      `json:"node_id"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	DurationMs int64              `json:"duration_ms"`
+	Meta       []byte             `json:"meta"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type RunsTiming struct {
 	ID      types.RunID `json:"id"`
 	QueueMs int64       `json:"queue_ms"`

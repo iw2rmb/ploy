@@ -271,45 +271,6 @@ func TestCompleteJob_RepoStatusUsesLastJobStatus(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_MRJobDoesNotAffectRepoStatus verifies that MR jobs (job_type='mr')
-// do NOT trigger repo status updates. MR jobs are auxiliary post-run jobs.
-func TestCompleteJob_MRJobDoesNotAffectRepoStatus(t *testing.T) {
-	t.Parallel()
-
-	f := newRepoScopedFixture("mr")
-	f.Job.Name = "mr-0"
-
-	// MR job (auxiliary, should not affect repo/run status).
-	st := newJobStoreForFixture(f, withRunStatus(domaintypes.RunStatusFinished))
-
-	handler := completeJobHandler(st, nil, nil)
-
-	req := f.completeJobReq(map[string]any{
-		"status":    "Success",
-		"exit_code": 0,
-	})
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-
-	assertStatus(t, rr, http.StatusNoContent)
-
-	// Verify ListJobsByRunRepoAttempt was NOT called for MR jobs.
-	if st.listJobsByRunRepoAttempt.called {
-		t.Error("did not expect ListJobsByRunRepoAttempt to be called for MR job")
-	}
-
-	// Verify repo status was NOT updated.
-	if st.updateRunRepoStatus.called {
-		t.Error("did not expect UpdateRunRepoStatus to be called for MR job")
-	}
-
-	// Verify run status was NOT updated (already Finished, MR doesn't change it).
-	if st.updateRunStatus.called {
-		t.Error("did not expect UpdateRunStatus to be called for MR job")
-	}
-}
-
 // TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal verifies that runs.status
 // becomes Finished only when ALL repos reach terminal state, not just one.
 func TestCompleteJob_MultiRepoRunFinishesWhenAllReposTerminal(t *testing.T) {
@@ -391,4 +352,3 @@ func TestCompleteJob_RejectsV0Status(t *testing.T) {
 		})
 	}
 }
-
