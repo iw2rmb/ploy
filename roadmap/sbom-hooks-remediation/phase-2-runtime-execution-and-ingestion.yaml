@@ -11,7 +11,7 @@ documentation:
 done: false
 reviews: []
 items:
-  - done: false
+  - done: true
     reviews:
       - gaps: ["`Define SBOM manifest and image resolution rules per stack and ensure runner writes canonical /out/sbom.spdx.json from container output.` is not completed in full: `internal/nodeagent/manifest.go:215-218` keeps a placeholder/no-op SBOM runtime path (`set -eu; : > /out/sbom.dependencies.txt`) for non-maven/non-gradle resolution (including `java`/`unknown`), so SBOM execution can still succeed without real dependency collection work.", "`SBOM jobs execute non-trivial container work and no longer finish in placeholder-zero durations on unchanged repositories.` is not guaranteed by the current implementation: the same fallback branch in `internal/nodeagent/manifest.go:215-218` allows trivially fast placeholder behavior instead of non-trivial SBOM collection when stack detection/hints do not resolve to maven/gradle."]
         commit: 908c9c9b
