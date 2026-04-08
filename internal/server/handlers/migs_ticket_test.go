@@ -489,6 +489,46 @@ steps:
 	}
 }
 
+func TestCreateJobsFromSpec_MissingBundleBlobFailsBeforeQueueingJobs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		hookHash = "deadc0de1234"
+		bundleID = "bundle_missing_blob"
+	)
+
+	st := &jobStore{}
+	bs := bsmock.New() // intentionally empty; metadata exists but blob is missing
+	objKey := "spec_bundles/" + bundleID + "/bundle.tar.gz"
+	st.getSpecBundle.val = store.SpecBundle{
+		ID:        bundleID,
+		ObjectKey: &objKey,
+	}
+
+	spec := []byte(`{"hooks":["` + hookHash + `"],"bundle_map":{"` + hookHash + `":"` + bundleID + `"},"steps":[{"image":"a"}]}`)
+	err := createJobsFromSpec(
+		context.Background(),
+		st,
+		domaintypes.RunID("run_missing_bundle_blob_123"),
+		domaintypes.RepoID("repo_missing_bundle_blob"),
+		"main",
+		1,
+		testRepoSHA0,
+		spec,
+		bs,
+	)
+	if err == nil {
+		t.Fatal("expected createJobsFromSpec to fail when hook bundle blob is missing")
+	}
+	want := `spec bundle "bundle_missing_blob" blob is missing from object storage`
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("expected error to contain %q, got %v", want, err)
+	}
+	if len(st.createJob.calls) != 0 {
+		t.Fatalf("expected no jobs queued when hook bundle preflight fails, got %d", len(st.createJob.calls))
+	}
+}
+
 func TestCreateSingleRepoRunHandler_ValidationErrors(t *testing.T) {
 	t.Parallel()
 
