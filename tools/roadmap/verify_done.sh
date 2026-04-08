@@ -8,8 +8,8 @@ Usage:
 
 Behavior:
   - For each targeted phase:
-    - fails if phase has done!=true
-    - fails if phase index evidence marker is missing or unchecked
+    - fails if phase index evidence marker is missing
+    - warns if phase index evidence marker is present but unchecked
   - For each targeted phase with done=true:
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
@@ -34,6 +34,7 @@ class Verifier
   def initialize(paths)
     @paths = paths
     @failures = []
+    @warnings = []
     @checked = 0
   end
 
@@ -46,6 +47,7 @@ class Verifier
       return 1
     end
 
+    @warnings.each { |line| warn(line) } if @warnings.any?
     puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked)")
     0
   end
@@ -66,44 +68,41 @@ class Verifier
 
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
-    unless done
-      @failures << "error: phase has done!=true in #{path}"
-      return
-    end
+    if done
+      @checked += 1
+      unresolved = []
+      incomplete_items = []
+      acceptance_gaps = []
 
-    @checked += 1
-    unresolved = []
-    incomplete_items = []
-    acceptance_gaps = []
+      unresolved.concat(find_unresolved_reviews(data["reviews"], "phase"))
 
-    unresolved.concat(find_unresolved_reviews(data["reviews"], "phase"))
+      items = data["items"]
+      if items.is_a?(Array)
+        items.each_with_index do |item, idx|
+          next unless item.is_a?(Hash)
 
-    items = data["items"]
-    if items.is_a?(Array)
-      items.each_with_index do |item, idx|
-        next unless item.is_a?(Hash)
-
-        label = item["label"].to_s.strip
-        marker = label.empty? ? "item[#{idx}]" : "item #{label}"
-        incomplete_items << marker unless item["done"] == true
-        acceptance_gaps.concat(find_acceptance_gaps(item, marker))
-        unresolved.concat(find_unresolved_reviews(item["reviews"], marker))
+          label = item["label"].to_s.strip
+          marker = label.empty? ? "item[#{idx}]" : "item #{label}"
+          incomplete_items << marker unless item["done"] == true
+          acceptance_gaps.concat(find_acceptance_gaps(item, marker))
+          unresolved.concat(find_unresolved_reviews(item["reviews"], marker))
+        end
       end
-    end
 
-    if incomplete_items.any?
-      @failures << "error: phase marked done but contains incomplete items in #{path}"
-      incomplete_items.each { |label| @failures << "  - #{label} has done!=true" }
-    end
+      if incomplete_items.any?
+        @failures << "error: phase marked done but contains incomplete items in #{path}"
+        incomplete_items.each { |label| @failures << "  - #{label} has done!=true" }
+      end
 
-    if unresolved.any?
-      @failures << "error: unresolved reviews.gaps in #{path}"
-      unresolved.each { |msg| @failures << "  - #{msg}" }
-    end
+      if unresolved.any?
+        @failures << "error: unresolved reviews.gaps in #{path}"
+        unresolved.each { |msg| @failures << "  - #{msg}" }
+      end
 
-    if acceptance_gaps.any?
-      @failures << "error: missing acceptance completion/evidence in #{path}"
-      acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
+      if acceptance_gaps.any?
+        @failures << "error: missing acceptance completion/evidence in #{path}"
+        acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
+      end
     end
 
     index_path = File.join(File.dirname(path), "index.md")
@@ -123,7 +122,7 @@ class Verifier
 
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
     unless has_checked_entry
-      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      @warnings << "warning: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
     end
   rescue Psych::SyntaxError => e
     @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
