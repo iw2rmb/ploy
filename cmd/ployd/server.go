@@ -64,7 +64,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// The scheduler is disabled when BatchSchedulerInterval is 0.
 	var batchSched *batchscheduler.Scheduler
 	if cfg.Scheduler.BatchSchedulerInterval > 0 {
-		repoStarter := handlers.NewBatchRepoStarter(st)
+		repoStarter := handlers.NewBatchRepoStarter(st, bs)
 		batchSched, err = batchscheduler.New(batchscheduler.Options{
 			Store:       st,
 			RepoStarter: repoStarter,
