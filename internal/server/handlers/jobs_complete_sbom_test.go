@@ -10,28 +10,28 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccessfulGate(t *testing.T) {
+func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccessfulSBOMJob(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
 	repoID := domaintypes.NewRepoID()
 	attempt := int32(1)
-	preGateID := domaintypes.JobID("job-pre-gate")
-	postGateID := domaintypes.JobID("job-post-gate")
-	reGateID := domaintypes.JobID("job-re-gate")
+	sbomOldSuccessID := domaintypes.JobID("job-pre-sbom")
+	sbomFailID := domaintypes.JobID("job-post-sbom")
+	sbomLatestSuccessID := domaintypes.JobID("job-regate-sbom")
 	migID := domaintypes.JobID("job-mig")
 
 	st := &jobStore{}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
-		{ID: preGateID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePreGate, Status: domaintypes.JobStatusSuccess},
+		{ID: sbomOldSuccessID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess},
 		{ID: migID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
-		{ID: postGateID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePostGate, Status: domaintypes.JobStatusFail},
-		{ID: reGateID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeReGate, Status: domaintypes.JobStatusSuccess},
+		{ID: sbomFailID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusFail},
+		{ID: sbomLatestSuccessID, RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusSuccess},
 	}
 
 	objKey := "artifacts/run/" + runID.String() + "/bundle/sbom.tar.gz"
 	st.listArtifactBundlesByRunAndJob.val = []store.ArtifactBundle{
-		{RunID: runID, JobID: &reGateID, ObjectKey: &objKey},
+		{RunID: runID, JobID: &sbomLatestSuccessID, ObjectKey: &objKey},
 	}
 	bs := bsmock.New()
 	bundle := mustTarGzPayload(t, map[string][]byte{
@@ -55,19 +55,19 @@ func TestMaybePersistLatestSuccessfulCycleSBOMRows_PersistsRowsFromLatestSuccess
 
 	assertCalled(t, "DeleteSBOMRowsByJob", st.deleteSBOMRowsByJob.called)
 	if len(st.deleteSBOMRowsByJob.calls) != 3 {
-		t.Fatalf("DeleteSBOMRowsByJob calls = %d, want 3 (pre/post/re gate jobs)", len(st.deleteSBOMRowsByJob.calls))
+		t.Fatalf("DeleteSBOMRowsByJob calls = %d, want 3 (sbom jobs)", len(st.deleteSBOMRowsByJob.calls))
 	}
 
 	if len(st.upsertSBOMRow.calls) != 1 {
 		t.Fatalf("upsertSBOMRow params count = %d, want 1", len(st.upsertSBOMRow.calls))
 	}
 	got := st.upsertSBOMRow.calls[0]
-	if got.JobID != reGateID || got.RepoID != repoID || got.Lib != "org.example:lib-a" || got.Ver != "1.0.0" {
+	if got.JobID != sbomLatestSuccessID || got.RepoID != repoID || got.Lib != "org.example:lib-a" || got.Ver != "1.0.0" {
 		t.Fatalf("unexpected upsert row: %+v", got)
 	}
 }
 
-func TestMaybePersistLatestSuccessfulCycleSBOMRows_SkipsWhenNoSuccessfulGate(t *testing.T) {
+func TestMaybePersistLatestSuccessfulCycleSBOMRows_SkipsWhenNoSuccessfulSBOMJob(t *testing.T) {
 	t.Parallel()
 
 	runID := domaintypes.NewRunID()
@@ -76,8 +76,8 @@ func TestMaybePersistLatestSuccessfulCycleSBOMRows_SkipsWhenNoSuccessfulGate(t *
 
 	st := &jobStore{}
 	st.listJobsByRunRepoAttempt.val = []store.Job{
-		{ID: domaintypes.JobID("job-pre-gate"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePreGate, Status: domaintypes.JobStatusFail},
-		{ID: domaintypes.JobID("job-post-gate"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypePostGate, Status: domaintypes.JobStatusCancelled},
+		{ID: domaintypes.JobID("job-pre-sbom"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusFail},
+		{ID: domaintypes.JobID("job-post-sbom"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeSBOM, Status: domaintypes.JobStatusCancelled},
 		{ID: domaintypes.JobID("job-mig"), RunID: runID, RepoID: repoID, Attempt: attempt, JobType: domaintypes.JobTypeMig, Status: domaintypes.JobStatusSuccess},
 	}
 

@@ -522,6 +522,10 @@ func withClaimJobName(name string) claimOption {
 	return func(c *ClaimResponse) { c.JobName = name }
 }
 
+func withClaimHookRuntime(decision *contracts.HookRuntimeDecision) claimOption {
+	return func(c *ClaimResponse) { c.HookRuntime = decision }
+}
+
 // newClaimResponse returns a ClaimResponse with generated IDs and sensible defaults.
 func newClaimResponse(opts ...claimOption) ClaimResponse {
 	now := time.Now().UTC().Format(time.RFC3339)

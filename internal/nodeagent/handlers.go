@@ -58,6 +58,8 @@ type StartRunRequest struct {
 	GateSkip *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	// StepSkip carries optional cache-hit skip metadata for mig jobs.
 	StepSkip *contracts.MigStepSkipMetadata `json:"step_skip,omitempty"`
+	// HookRuntime carries optional hook once-by-hash runtime decision from claim.
+	HookRuntime *contracts.HookRuntimeDecision `json:"hook_runtime,omitempty"`
 	// TypedOptions contains strongly-typed run configuration. This is the canonical
 	// source of truth for all option keys understood by the nodeagent. Execution,
 	// healing, manifest building, and artifact upload paths all consume TypedOptions

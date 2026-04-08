@@ -37,6 +37,7 @@ type claimResponsePayload struct {
 	RecoveryContext        *contracts.RecoveryClaimContext  `json:"recovery_context,omitempty"`
 	GateSkip               *contracts.BuildGateSkipMetadata `json:"gate_skip,omitempty"`
 	StepSkip               *contracts.MigStepSkipMetadata   `json:"step_skip,omitempty"`
+	HookRuntime            *contracts.HookRuntimeDecision   `json:"hook_runtime,omitempty"`
 }
 
 func buildClaimResponsePayload(
@@ -114,6 +115,10 @@ func buildClaimResponsePayload(
 	if err != nil {
 		return claimResponsePayload{}, fmt.Errorf("build recovery context: %w", err)
 	}
+	hookRuntime, err := resolveHookRuntimeDecision(ctx, st, job, mergedSpec, jobType)
+	if err != nil {
+		return claimResponsePayload{}, fmt.Errorf("resolve hook runtime decision: %w", err)
+	}
 
 	return claimResponsePayload{
 		RunID:                  run.ID,
@@ -138,6 +143,7 @@ func buildClaimResponsePayload(
 		RecoveryContext:        recoveryCtx,
 		GateSkip:               gateSkip,
 		StepSkip:               stepSkip,
+		HookRuntime:            hookRuntime,
 	}, nil
 }
 

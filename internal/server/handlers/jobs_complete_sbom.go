@@ -30,22 +30,22 @@ func maybePersistLatestSuccessfulCycleSBOMRows(
 		return 0, fmt.Errorf("list jobs for sbom persistence: %w", err)
 	}
 
-	latestGateJob, ok := latestSuccessfulGateJob(jobs)
+	latestSBOMJob, ok := latestSuccessfulSBOMJob(jobs)
 	if !ok {
 		return 0, nil
 	}
 
-	rows, err := bp.ExtractSBOMRowsForJob(ctx, runID, latestGateJob.ID, repoID)
+	rows, err := bp.ExtractSBOMRowsForJob(ctx, runID, latestSBOMJob.ID, repoID)
 	if err != nil {
-		return 0, fmt.Errorf("extract sbom rows for latest successful gate job %s: %w", latestGateJob.ID, err)
+		return 0, fmt.Errorf("extract sbom rows for latest successful sbom job %s: %w", latestSBOMJob.ID, err)
 	}
 
 	for _, candidate := range jobs {
-		if !isSBOMGateJobType(candidate.JobType) {
+		if !isSBOMJobType(candidate.JobType) {
 			continue
 		}
 		if err := st.DeleteSBOMRowsByJob(ctx, candidate.ID); err != nil {
-			return 0, fmt.Errorf("delete sbom rows for gate job %s: %w", candidate.ID, err)
+			return 0, fmt.Errorf("delete sbom rows for sbom job %s: %w", candidate.ID, err)
 		}
 	}
 
@@ -56,17 +56,17 @@ func maybePersistLatestSuccessfulCycleSBOMRows(
 			Lib:    row.Lib,
 			Ver:    row.Ver,
 		}); err != nil {
-			return 0, fmt.Errorf("upsert sbom row for gate job %s: %w", latestGateJob.ID, err)
+			return 0, fmt.Errorf("upsert sbom row for sbom job %s: %w", latestSBOMJob.ID, err)
 		}
 	}
 	return len(rows), nil
 }
 
-func latestSuccessfulGateJob(jobs []store.Job) (store.Job, bool) {
+func latestSuccessfulSBOMJob(jobs []store.Job) (store.Job, bool) {
 	var latest store.Job
 	found := false
 	for _, job := range jobs {
-		if !isSBOMGateJobType(job.JobType) || job.Status != domaintypes.JobStatusSuccess {
+		if !isSBOMJobType(job.JobType) || job.Status != domaintypes.JobStatusSuccess {
 			continue
 		}
 		if !found || job.ID.String() > latest.ID.String() {
@@ -77,11 +77,6 @@ func latestSuccessfulGateJob(jobs []store.Job) (store.Job, bool) {
 	return latest, found
 }
 
-func isSBOMGateJobType(jobType domaintypes.JobType) bool {
-	switch jobType {
-	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
-		return true
-	default:
-		return false
-	}
+func isSBOMJobType(jobType domaintypes.JobType) bool {
+	return jobType == domaintypes.JobTypeSBOM
 }
