@@ -148,6 +148,55 @@ func TestCompleteJob_PromotesLinkedNextJob(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_SBOMAndHookSuccessPromoteLinkedNextJob(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		jobType domaintypes.JobType
+	}{
+		{name: "sbom", jobType: domaintypes.JobTypeSBOM},
+		{name: "hook", jobType: domaintypes.JobTypeHook},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newJobFixture(tc.jobType)
+			nextJobID := domaintypes.NewJobID()
+			f.Job.NextID = &nextJobID
+
+			nextJob := store.Job{
+				ID:     nextJobID,
+				RunID:  f.RunID,
+				Status: domaintypes.JobStatusCreated,
+			}
+
+			st := newJobStoreForFixture(f,
+				withListJobsByRun([]store.Job{f.Job, nextJob}),
+				withPromoteResult(nextJob),
+			)
+
+			handler := completeJobHandler(st, nil, nil)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":       "Success",
+				"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
+			}))
+
+			assertStatus(t, rr, http.StatusNoContent)
+			assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblocked.called)
+			if st.promoteJobByIDIfUnblocked.params != nextJobID {
+				t.Fatalf("expected PromoteJobByIDIfUnblocked(%s), got %s", nextJobID, st.promoteJobByIDIfUnblocked.params)
+			}
+			assertNotCalled(t, "UpdateRunStatsMRURL", st.updateRunStatsMRURL.called)
+		})
+	}
+}
+
 // TestCompleteJob_FailedJobDoesNotScheduleNext verifies that a failed job
 // does not trigger scheduling of the next job.
 func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
@@ -169,85 +218,98 @@ func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
 	}
 }
 
-// TestCompleteJob_MigFailureCancelsRemainingJobs verifies that when a non-gate
-// mig job fails, remaining non-terminal jobs are canceled so the run can
+// TestCompleteJob_NonGateFailureCancelsRemainingJobs verifies that when a non-gate
+// job fails, remaining non-terminal jobs are canceled so the run can
 // transition to a terminal state instead of leaving jobs stranded.
-func TestCompleteJob_MigFailureCancelsRemainingJobs(t *testing.T) {
+func TestCompleteJob_NonGateFailureCancelsRemainingJobs(t *testing.T) {
 	t.Parallel()
 
-	f := newRepoScopedFixture(domaintypes.JobTypeMig)
-	repoID := f.Job.RepoID
-	postJobID := domaintypes.NewJobID()
-	f.Job.Meta = []byte(`{"kind":"mig"}`)
-
-	// Jobs: pre-gate succeeded, mig failed, post-gate created.
-	jobs := []store.Job{
-		{
-			ID:          domaintypes.NewJobID(),
-			RunID:       f.RunID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			NodeID:      &f.NodeID,
-			Status:      domaintypes.JobStatusSuccess,
-			JobType:     domaintypes.JobTypePreGate,
-			Meta:        withNextIDMeta([]byte(`{}`), 1000),
-		},
-		f.Job,
-		{
-			ID:          postJobID,
-			RunID:       f.RunID,
-			RepoID:      repoID,
-			RepoBaseRef: "main",
-			Attempt:     1,
-			Status:      domaintypes.JobStatusCreated,
-			JobType:     domaintypes.JobTypePostGate,
-			Meta:        withNextIDMeta([]byte(`{}`), 3000),
-		},
-	}
-	f.Job.NextID = &postJobID
-	jobs[0].NextID = &f.Job.ID
-	jobs[1].NextID = &postJobID
-
-	st := newJobStoreForFixture(f,
-		withListJobsByRun(jobs),
-		withRepoAttemptJobs(jobs),
-	)
-
-	handler := completeJobHandler(st, nil, nil)
-
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
-		"status":    "Fail",
-		"exit_code": 1,
-	}))
-
-	assertStatus(t, rr, http.StatusNoContent)
-
-	// Verify UpdateJobCompletion was called for the mig job.
-	assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
-	if st.updateJobCompletion.params.ID != jobs[1].ID {
-		t.Fatalf("expected UpdateJobCompletion for mig job, got %v", st.updateJobCompletion.params.ID)
+	tests := []struct {
+		name    string
+		jobType domaintypes.JobType
+	}{
+		{name: "mig", jobType: domaintypes.JobTypeMig},
+		{name: "sbom", jobType: domaintypes.JobTypeSBOM},
+		{name: "hook", jobType: domaintypes.JobTypeHook},
 	}
 
-	// Verify UpdateJobStatus was called to cancel the post-gate job.
-	if !st.updateJobStatus.called {
-		t.Fatal("expected UpdateJobStatus to be called to cancel remaining jobs")
-	}
-	if len(st.updateJobStatus.calls) == 0 {
-		t.Fatal("expected at least one UpdateJobStatus call")
-	}
-	foundPostCancel := false
-	for _, call := range st.updateJobStatus.calls {
-		if call.ID == jobs[2].ID {
-			foundPostCancel = true
-			if call.Status != domaintypes.JobStatusCancelled {
-				t.Fatalf("expected post-gate job to be canceled, got status %s", call.Status)
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newRepoScopedFixture(tc.jobType)
+			repoID := f.Job.RepoID
+			postJobID := domaintypes.NewJobID()
+			f.Job.Meta = []byte(`{}`)
+
+			// Jobs: pre-gate succeeded, non-gate failed, post-gate created.
+			jobs := []store.Job{
+				{
+					ID:          domaintypes.NewJobID(),
+					RunID:       f.RunID,
+					RepoID:      repoID,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					NodeID:      &f.NodeID,
+					Status:      domaintypes.JobStatusSuccess,
+					JobType:     domaintypes.JobTypePreGate,
+					Meta:        withNextIDMeta([]byte(`{}`), 1000),
+				},
+				f.Job,
+				{
+					ID:          postJobID,
+					RunID:       f.RunID,
+					RepoID:      repoID,
+					RepoBaseRef: "main",
+					Attempt:     1,
+					Status:      domaintypes.JobStatusCreated,
+					JobType:     domaintypes.JobTypePostGate,
+					Meta:        withNextIDMeta([]byte(`{}`), 3000),
+				},
 			}
-		}
-	}
-	if !foundPostCancel {
-		t.Fatal("expected post-gate job to be canceled")
+			f.Job.NextID = &postJobID
+			jobs[0].NextID = &f.Job.ID
+			jobs[1].NextID = &postJobID
+
+			st := newJobStoreForFixture(f,
+				withListJobsByRun(jobs),
+				withRepoAttemptJobs(jobs),
+			)
+
+			handler := completeJobHandler(st, nil, nil)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":    "Fail",
+				"exit_code": 1,
+			}))
+
+			assertStatus(t, rr, http.StatusNoContent)
+
+			assertCalled(t, "UpdateJobCompletion", st.updateJobCompletion.called)
+			if st.updateJobCompletion.params.ID != jobs[1].ID {
+				t.Fatalf("expected UpdateJobCompletion for %s job, got %v", tc.jobType, st.updateJobCompletion.params.ID)
+			}
+			if !st.updateJobStatus.called {
+				t.Fatal("expected UpdateJobStatus to be called to cancel remaining jobs")
+			}
+			foundPostCancel := false
+			for _, call := range st.updateJobStatus.calls {
+				if call.ID == jobs[2].ID {
+					foundPostCancel = true
+					if call.Status != domaintypes.JobStatusCancelled {
+						t.Fatalf("expected post-gate job to be canceled, got status %s", call.Status)
+					}
+				}
+			}
+			if !foundPostCancel {
+				t.Fatal("expected post-gate job to be canceled")
+			}
+			if len(st.createJob.calls) > 0 {
+				t.Fatalf("did not expect healing job insertion for %s failure", tc.jobType)
+			}
+		})
 	}
 }
 

@@ -20,6 +20,9 @@ type completeRunCache struct {
 type completeJobState struct {
 	input         CompleteJobInput
 	job           store.Job
+	jobType       domaintypes.JobType
+	serviceType   completeJobServiceType
+	serviceTypeOK bool
 	persistedMeta []byte
 	runCache      completeRunCache
 }
@@ -38,6 +41,14 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 	}
 	if job.Status != domaintypes.JobStatusRunning {
 		return CompleteJobResult{}, completeConflict("job status is %s, expected Running", job.Status)
+	}
+	jobType := domaintypes.JobType(job.JobType)
+	serviceType, serviceTypeOK := routeCompleteJobServiceType(jobType)
+	if !serviceTypeOK {
+		slog.Error("complete job: invalid job_type in job record; treating as non-gate for post-completion routing",
+			"job_id", input.JobID,
+			"job_type", job.JobType,
+		)
 	}
 
 	if input.Status == domaintypes.JobStatusSuccess && job.NextID != nil {
@@ -168,6 +179,9 @@ func (s *CompleteJobService) Complete(ctx context.Context, input CompleteJobInpu
 	state := &completeJobState{
 		input:         input,
 		job:           job,
+		jobType:       jobType,
+		serviceType:   serviceType,
+		serviceTypeOK: serviceTypeOK,
 		persistedMeta: persistedMeta,
 	}
 

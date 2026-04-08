@@ -13,6 +13,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/lifecycle"
 )
 
+func (state *completeJobState) routedJobType() domaintypes.JobType {
+	if state.serviceTypeOK {
+		return state.jobType
+	}
+	return ""
+}
+
 func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState) {
 	if state.input.Status != domaintypes.JobStatusFail && state.input.Status != domaintypes.JobStatusError {
 		return
@@ -50,15 +57,7 @@ func (s *CompleteJobService) onFail(ctx context.Context, state *completeJobState
 		}
 	}
 
-	jobType := domaintypes.JobType(state.job.JobType)
-	if err := jobType.Validate(); err != nil {
-		slog.Error("complete job: invalid job_type in job record; treating as non-gate for failure handling",
-			"job_id", state.job.ID,
-			"job_type", state.job.JobType,
-			"err", err,
-		)
-		jobType = ""
-	}
+	jobType := state.routedJobType()
 
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
 	switch decision.ChainAction {
@@ -106,7 +105,7 @@ func (s *CompleteJobService) onCancelled(ctx context.Context, state *completeJob
 	if state.input.Status != domaintypes.JobStatusCancelled {
 		return
 	}
-	jobType := domaintypes.JobType(state.job.JobType)
+	jobType := state.routedJobType()
 	decision := lifecycle.EvaluateCompletionDecision(jobType, state.input.Status, state.job.NextID != nil)
 	if decision.ChainAction == lifecycle.CompletionChainNoAction {
 		return
@@ -125,9 +124,9 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 		return
 	}
 
-	jobType := domaintypes.JobType(state.job.JobType)
+	jobType := state.routedJobType()
 	if s.gateProfilesBS != nil {
-		if lifecycle.IsGateJobType(jobType) {
+		if state.serviceType == completeJobServiceTypeGate {
 			run, ok := s.loadRunForPostCompletion(ctx, state, "gate profile persistence")
 			if ok {
 				specRow, specErr := s.store.GetSpec(ctx, run.SpecID)
@@ -177,8 +176,7 @@ func (s *CompleteJobService) onSuccess(ctx context.Context, state *completeJobSt
 }
 
 func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *completeJobState) {
-	jobType := domaintypes.JobType(state.job.JobType)
-	isMRJob := jobType.Validate() == nil && jobType == domaintypes.JobTypeMR
+	isMRJob := state.serviceType == completeJobServiceTypeMR
 	if isMRJob {
 		return
 	}
@@ -211,8 +209,7 @@ func (s *CompleteJobService) reconcileRepoRun(ctx context.Context, state *comple
 }
 
 func (s *CompleteJobService) mergeMRURL(ctx context.Context, state *completeJobState) {
-	jobType := domaintypes.JobType(state.job.JobType)
-	if jobType.Validate() != nil || jobType != domaintypes.JobTypeMR {
+	if state.serviceType != completeJobServiceTypeMR {
 		return
 	}
 	mrURL := state.input.StatsPayload.MRURL()
