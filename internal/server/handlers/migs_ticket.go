@@ -236,7 +236,14 @@ func createJobsFromSpec(
 		jobImage string
 		stepName string
 	}
-	drafts := []draft{{name: "pre-gate", jobType: domaintypes.JobTypePreGate}}
+	drafts := []draft{{name: "pre-gate-sbom", jobType: domaintypes.JobTypeSBOM}}
+	for i := range migsSpec.Hooks {
+		drafts = append(drafts, draft{
+			name:    fmt.Sprintf("pre-gate-hook-%03d", i),
+			jobType: domaintypes.JobTypeHook,
+		})
+	}
+	drafts = append(drafts, draft{name: "pre-gate", jobType: domaintypes.JobTypePreGate})
 
 	if len(migsSpec.Steps) > 1 {
 		for i, mig := range migsSpec.Steps {
@@ -276,7 +283,7 @@ func createJobsFromSpec(
 			status = domaintypes.JobStatusQueued
 		}
 		jobImage := d.jobImage
-		if i == 0 && preGateBinding != nil && strings.TrimSpace(preGateBinding.JobImage) != "" {
+		if d.jobType == domaintypes.JobTypePreGate && preGateBinding != nil && strings.TrimSpace(preGateBinding.JobImage) != "" {
 			jobImage = strings.TrimSpace(preGateBinding.JobImage)
 		}
 		planned = append(planned, plannedJob{
@@ -304,11 +311,24 @@ func createJobsFromSpec(
 		}
 	}
 	if preGateBinding != nil && preGateBinding.ProfileID > 0 {
-		if err := upsertPreGateCreationProfileLink(ctx, st, planned[0].ID, preGateBinding.ProfileID); err != nil {
+		preGateJobID, ok := findPlannedJobIDByType(planned, domaintypes.JobTypePreGate)
+		if !ok {
+			return fmt.Errorf("pre-gate job missing from planned chain")
+		}
+		if err := upsertPreGateCreationProfileLink(ctx, st, preGateJobID, preGateBinding.ProfileID); err != nil {
 			return fmt.Errorf("link pre-gate profile: %w", err)
 		}
 	}
 	return nil
+}
+
+func findPlannedJobIDByType(planned []plannedJob, jobType domaintypes.JobType) (domaintypes.JobID, bool) {
+	for _, p := range planned {
+		if p.JobType == jobType {
+			return p.ID, true
+		}
+	}
+	return "", false
 }
 
 func resolvePreGateCreationBindingFromStore(

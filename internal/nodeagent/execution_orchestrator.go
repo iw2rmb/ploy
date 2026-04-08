@@ -84,6 +84,12 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	case types.JobTypePreGate, types.JobTypePostGate, types.JobTypeReGate:
 		req.JobType = jobType
 		r.executeGateJob(ctx, req)
+	case types.JobTypeSBOM:
+		req.JobType = jobType
+		r.executeSBOMJob(ctx, req)
+	case types.JobTypeHook:
+		req.JobType = jobType
+		r.executeHookJob(ctx, req)
 	case types.JobTypeMig:
 		req.JobType = jobType
 		r.executeMigJob(ctx, req)

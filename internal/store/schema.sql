@@ -257,7 +257,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   attempt         INTEGER NOT NULL,  -- Copied from run_repos.attempt at job creation time.
   name            TEXT NOT NULL,
   status          job_status NOT NULL DEFAULT 'Created',  -- v1: 'Created' or 'Queued' (first job per repo attempt).
-  job_type        TEXT NOT NULL CHECK (job_type IN ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'mr')),
+  job_type        TEXT NOT NULL CHECK (job_type IN ('pre_gate', 'mig', 'post_gate', 'heal', 're_gate', 'sbom', 'hook', 'mr')),
   job_image       TEXT NOT NULL DEFAULT '',
   next_id         TEXT REFERENCES jobs(id) ON DELETE SET NULL,
   node_id         TEXT REFERENCES nodes(id) ON DELETE SET NULL,  -- NanoID string FK to nodes.id; which node claimed this job.

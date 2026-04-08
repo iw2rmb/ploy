@@ -81,7 +81,8 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"mig1:v1"}]}`),
 			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
@@ -95,7 +96,8 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"mig1:v1"},{"image":"mig2:v2"},{"image":"mig3:v3"}]}`),
 			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig1:v1", ""},
 				{"mig-1", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig2:v2", ""},
 				{"mig-2", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "mig3:v3", ""},
@@ -111,7 +113,25 @@ func TestCreateJobsFromSpec(t *testing.T) {
 			repoSHA0:    testRepoSHA0,
 			spec:        []byte(`{"steps":[{"image":"a"}]}`),
 			expected: []expectedJob{
-				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
+				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
+				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
+			},
+		},
+		{
+			name:        "WithHooks",
+			runID:       domaintypes.RunID("run_hooks_123456789012345"),
+			repoID:      domaintypes.RepoID("repo_hooks"),
+			repoBaseRef: "main",
+			attempt:     1,
+			repoSHA0:    testRepoSHA0,
+			spec:        []byte(`{"hooks":["./hooks/lint.yaml","https://hooks.example.com/policy.yaml"],"steps":[{"image":"mig1:v1"}]}`),
+			expected: []expectedJob{
+				{"pre-gate-sbom", domaintypes.JobTypeSBOM, domaintypes.JobStatusQueued, "", testRepoSHA0},
+				{"pre-gate-hook-000", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
+				{"pre-gate-hook-001", domaintypes.JobTypeHook, domaintypes.JobStatusCreated, "", ""},
+				{"pre-gate", domaintypes.JobTypePreGate, domaintypes.JobStatusCreated, "", ""},
 				{"mig-0", domaintypes.JobTypeMig, domaintypes.JobStatusCreated, "", ""},
 				{"post-gate", domaintypes.JobTypePostGate, domaintypes.JobStatusCreated, "", ""},
 			},
@@ -161,9 +181,9 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 		spec         []byte
 		expectedJobs int
 	}{
-		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 3},
-		{"two_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 4},
-		{"five_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 7},
+		{"single_mod", []byte(`{"steps":[{"image":"a"}]}`), 4},
+		{"two_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"}]}`), 5},
+		{"five_migs", []byte(`{"steps":[{"image":"a"},{"image":"b"},{"image":"c"},{"image":"d"},{"image":"e"}]}`), 8},
 	}
 
 	for _, tc := range testCases {
@@ -180,12 +200,12 @@ func TestJobQueueingRules_FirstJobQueued(t *testing.T) {
 			}
 
 			byName := createJobsByName(st.createJob.calls)
-			if byName["pre-gate"].Status != domaintypes.JobStatusQueued {
-				t.Errorf("expected pre-gate to be Queued, got %s", byName["pre-gate"].Status)
+			if byName["pre-gate-sbom"].Status != domaintypes.JobStatusQueued {
+				t.Errorf("expected pre-gate-sbom to be Queued, got %s", byName["pre-gate-sbom"].Status)
 			}
 
 			for _, p := range st.createJob.calls {
-				if p.Name != "pre-gate" && p.Status != domaintypes.JobStatusCreated {
+				if p.Name != "pre-gate-sbom" && p.Status != domaintypes.JobStatusCreated {
 					t.Errorf("job %q: expected status Created, got %s", p.Name, p.Status)
 				}
 			}
@@ -206,11 +226,15 @@ func TestCreateJobsFromSpec_ChainIntegrity(t *testing.T) {
 
 	// Verify next_id chain ordering.
 	byName := createJobsByName(st.createJob.calls)
+	preGateSBOM := byName["pre-gate-sbom"]
 	preGate := byName["pre-gate"]
 	mig0 := byName["mig-0"]
 	mig1 := byName["mig-1"]
 	postGate := byName["post-gate"]
 
+	if preGateSBOM.NextID == nil || *preGateSBOM.NextID != preGate.ID {
+		t.Fatalf("pre-gate-sbom next_id = %v, want %s", preGateSBOM.NextID, preGate.ID)
+	}
 	if preGate.NextID == nil || *preGate.NextID != mig0.ID {
 		t.Fatalf("pre-gate next_id = %v, want %s", preGate.NextID, mig0.ID)
 	}
