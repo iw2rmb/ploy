@@ -32,6 +32,33 @@ type CompleteJobService struct {
 	gateProfilesBS blobstore.Store
 }
 
+type completeJobServiceType string
+
+const (
+	completeJobServiceTypeGate completeJobServiceType = "gate"
+	completeJobServiceTypeStep completeJobServiceType = "step"
+	completeJobServiceTypeSBOM completeJobServiceType = "sbom"
+	completeJobServiceTypeHook completeJobServiceType = "hook"
+	completeJobServiceTypeMR   completeJobServiceType = "mr"
+)
+
+func routeCompleteJobServiceType(jobType domaintypes.JobType) (completeJobServiceType, bool) {
+	switch jobType {
+	case domaintypes.JobTypePreGate, domaintypes.JobTypePostGate, domaintypes.JobTypeReGate:
+		return completeJobServiceTypeGate, true
+	case domaintypes.JobTypeMig, domaintypes.JobTypeHeal:
+		return completeJobServiceTypeStep, true
+	case domaintypes.JobTypeSBOM:
+		return completeJobServiceTypeSBOM, true
+	case domaintypes.JobTypeHook:
+		return completeJobServiceTypeHook, true
+	case domaintypes.JobTypeMR:
+		return completeJobServiceTypeMR, true
+	default:
+		return "", false
+	}
+}
+
 func NewCompleteJobService(st store.Store, eventsService *server.EventsService, bp *blobpersist.Service, gateProfilesBS blobstore.Store) *CompleteJobService {
 	return &CompleteJobService{
 		store:          st,
