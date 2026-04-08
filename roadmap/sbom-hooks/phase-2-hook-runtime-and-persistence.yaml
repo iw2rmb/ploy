@@ -35,7 +35,7 @@ items:
     reasoning: "medium"
     cfp: 8
     commit: 140c00dd
-  - done: false
+  - done: true
     reviews: []
     label: "2"
     summary: "Implement hook matching decisions with stack and SBOM predicates and deterministic once-by-hash keys."
