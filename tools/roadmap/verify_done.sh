@@ -8,7 +8,7 @@ Usage:
 
 Behavior:
   - For each targeted phase:
-    - skips validation when done!=true
+    - fails when done!=true
     - fails if any item has done!=true
     - fails if any done item is missing acceptance checks (`verification`) or acceptance evidence (`reviews[*].commit`)
     - fails if any unresolved reviews.gaps exist (phase or item level)
@@ -36,7 +36,6 @@ class Verifier
     @paths = paths
     @failures = []
     @checked = 0
-    @skipped = 0
   end
 
   def run
@@ -48,7 +47,7 @@ class Verifier
       return 1
     end
 
-    puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked, #{@skipped} skipped)")
+    puts("roadmap verification passed (#{@checked} phase#{@checked == 1 ? "" : "s"} checked)")
     0
   end
 
@@ -69,7 +68,7 @@ class Verifier
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
     unless done
-      @skipped += 1
+      @failures << "error: targeted phase not done in #{path} (set done: true after acceptance checks and review gaps are closed)"
       verify_not_done_evidence_marker(path, phase_name)
       return
     end
