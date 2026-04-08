@@ -15,6 +15,15 @@ SBOM runner image details:
 - [`images/sbom/maven/README.md`](sbom/maven/README.md)
 - [`images/sbom/gradle/README.md`](sbom/gradle/README.md)
 
+OCI Labeling Policy
+
+- Every image Dockerfile in this repository must define these OCI labels exactly once:
+  - `org.opencontainers.image.source="https://github.com/iw2rmb/ploy"`
+  - `org.opencontainers.image.description="<single-line image-specific purpose>"`
+  - `org.opencontainers.image.licenses="MIT"`
+- Keep existing image-specific OCI metadata (for example `org.opencontainers.image.title` and `org.opencontainers.image.created`) intact when present.
+- Do not duplicate OCI label keys in a Dockerfile; normalize to one final value per key.
+
 Contract
 
 - Repo workspace

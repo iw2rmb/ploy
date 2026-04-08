@@ -1,6 +1,11 @@
 ARG ALPINE_VERSION=3.20
 
 FROM alpine:${ALPINE_VERSION}
+LABEL org.opencontainers.image.title="ploy-server" \
+    org.opencontainers.image.description="Ploy control-plane server runtime image" \
+    org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
+    org.opencontainers.image.licenses="MIT"
+
 RUN set -eux; \
     apk_pkgs="ca-certificates bash tzdata curl jq git"; \
     apk add --no-cache ${apk_pkgs} || { \

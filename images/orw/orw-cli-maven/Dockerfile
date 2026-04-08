@@ -16,6 +16,7 @@ ARG BUILD_TS
 LABEL org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
     org.opencontainers.image.title="orw-cli-maven" \
     org.opencontainers.image.description="Ploy Migs: standalone OpenRewrite CLI runner (Maven lane)" \
+    org.opencontainers.image.licenses="MIT" \
     org.opencontainers.image.created="$BUILD_TS"
 
 RUN apt-get update \
