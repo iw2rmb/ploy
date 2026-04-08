@@ -8,7 +8,7 @@ documentation:
   - "research/sbom-hooks-incident-2026-04-08.md"
   - "docs/build-gate/README.md"
   - "docs/api/OpenAPI.yaml"
-done: false
+done: true
 reviews: []
 items:
   - done: true
