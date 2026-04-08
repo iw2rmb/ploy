@@ -10,6 +10,8 @@ done: false
 reviews:
   - gaps: ["\"Inject sbom scheduling before post_gate and re_gate execution paths.\" still carries compatibility leftover behavior in `internal/nodeagent/execution_orchestrator_jobs.go:460`: `materializeGateSBOMForGate` falls back to `preGateFinalSnapshotPath(...)` for non-pre cycles when cycle-specific snapshot is missing, so post_gate/re_gate can continue without their own cycle SBOM snapshot path being present."]
     commit: 89f3b2a2
+  - gaps: ["\"documentation: \\\"docs/build-gate/README.md\\\"\" is not aligned with implemented sbom/hook scheduling: the doc still describes only gate jobs and pre-gate → mig → post-gate flow (`docs/build-gate/README.md:15`, `docs/build-gate/README.md:20`, `docs/build-gate/README.md:54`).", "\"documentation: \\\"docs/api/OpenAPI.yaml\\\"\" is not aligned with implemented job families: OpenAPI schemas/descriptions still omit `sbom` and `hook` from job phase contracts (`docs/api/components/schemas/controlplane.yaml:620`, `docs/api/components/schemas/controlplane.yaml:946`, `docs/api/paths/jobs_job_id_logs.yaml:70`)."]
+    commit: null
 items:
   - done: true
     reviews: []
