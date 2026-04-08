@@ -2,6 +2,19 @@ Migs Contract
 
 This directory contains example Migs images (container build contexts). Ploy does not know what a mig does; it only runs your container with a mounted Git workspace and collects outputs you choose to emit. Containers must follow a small, stable runtime contract described here.
 
+Image Catalog (selected)
+
+- `amata` (`images/amata`) - Amata-based migration runner image.
+- `shell` (`images/shell`) - generic shell-based migration runner.
+- `orw-cli-maven` (`images/orw/orw-cli-maven`) - OpenRewrite Maven lane runtime.
+- `orw-cli-gradle` (`images/orw/orw-cli-gradle`) - OpenRewrite Gradle lane runtime.
+- `sbom-maven` (`images/sbom/maven`) - Maven SBOM collection runtime.
+- `sbom-gradle` (`images/sbom/gradle`) - Gradle SBOM collection runtime.
+
+SBOM runner image details:
+- [`images/sbom/maven/README.md`](sbom/maven/README.md)
+- [`images/sbom/gradle/README.md`](sbom/gradle/README.md)
+
 Contract
 
 - Repo workspace

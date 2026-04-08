@@ -8,6 +8,7 @@ set -Eeuo pipefail
 # - node    -> node
 # - amata   -> amata
 # - shell   -> shell
+# - sbom runners -> sbom-gradle, sbom-maven
 # - gate-gradle -> gate-gradle:jdk11, gate-gradle:jdk17
 # - maven mirrors -> maven:3-eclipse-temurin-11, maven:3-eclipse-temurin-17
 # - orw/*   -> <dir name> (for example: orw-cli-maven, orw-cli-gradle)
@@ -136,6 +137,10 @@ build_push amata images/amata/Dockerfile .
 
 # shell
 build_push shell images/shell/Dockerfile images/shell
+
+# sbom runners
+build_push sbom-gradle images/sbom/gradle/Dockerfile .
+build_push sbom-maven images/sbom/maven/Dockerfile .
 
 # build gate (gradle)
 build_push_fixed_tag gate-gradle images/gates/gradle/Dockerfile.jdk11 images/gates/gradle jdk11
