@@ -8,6 +8,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/step"
 )
 
 func mustGateProfileSchemaJSON(t *testing.T) string {
@@ -51,7 +52,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 			},
 			schemaJSON: "auto",
 			wantFiles: map[string]string{
-				"build-gate.log":          "failure\n",
+				"build-gate.log":           "failure\n",
 				"gate_profile.json":        profile,
 				"gate_profile.schema.json": "",
 			},
@@ -72,7 +73,7 @@ func TestPopulateHealingInDir(t *testing.T) {
 			recovery:   &contracts.RecoveryClaimContext{BuildGateLog: "failure\n"},
 			schemaJSON: "auto",
 			wantFiles: map[string]string{
-				"build-gate.log":          "failure\n",
+				"build-gate.log":           "failure\n",
 				"gate_profile.schema.json": "",
 			},
 		},
@@ -266,5 +267,130 @@ func TestMigStepIndexFromJobName_MultiStep(t *testing.T) {
 				t.Fatalf("migStepIndexFromJobName(%q,%d)=%d want %d", tc.jobName, tc.steps, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestGateCycleNameFromSBOMJobName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		jobName string
+		want    string
+		wantErr bool
+	}{
+		{name: "pre", jobName: "pre-gate-sbom", want: "pre-gate"},
+		{name: "post", jobName: "post-gate-sbom", want: "post-gate"},
+		{name: "regate", jobName: "re-gate-2-sbom", want: "re-gate-2"},
+		{name: "invalid", jobName: "post-gate", wantErr: true},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := gateCycleNameFromSBOMJobName(tc.jobName)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for job_name=%q", tc.jobName)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("gateCycleNameFromSBOMJobName(%q): %v", tc.jobName, err)
+			}
+			if got != tc.want {
+				t.Fatalf("gateCycleNameFromSBOMJobName(%q)=%q want %q", tc.jobName, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGateCycleHookIndexFromJobName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		jobName string
+		hooks   int
+		wantID  string
+		wantIdx int
+		wantErr bool
+	}{
+		{name: "pre", jobName: "pre-gate-hook-001", hooks: 2, wantID: "pre-gate", wantIdx: 1},
+		{name: "post", jobName: "post-gate-hook-000", hooks: 1, wantID: "post-gate", wantIdx: 0},
+		{name: "regate", jobName: "re-gate-3-hook-002", hooks: 3, wantID: "re-gate-3", wantIdx: 2},
+		{name: "invalid", jobName: "hook-1", hooks: 2, wantErr: true},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			gotID, gotIdx, err := gateCycleHookIndexFromJobName(tc.jobName, tc.hooks)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for job_name=%q", tc.jobName)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("gateCycleHookIndexFromJobName(%q,%d): %v", tc.jobName, tc.hooks, err)
+			}
+			if gotID != tc.wantID || gotIdx != tc.wantIdx {
+				t.Fatalf("gateCycleHookIndexFromJobName(%q,%d)=(%q,%d) want (%q,%d)", tc.jobName, tc.hooks, gotID, gotIdx, tc.wantID, tc.wantIdx)
+			}
+		})
+	}
+}
+
+func TestMaterializeGateSBOMForGate_UsesPostAndReGateCycleSnapshots(t *testing.T) {
+	cacheHome := t.TempDir()
+	t.Setenv("PLOYD_CACHE_HOME", cacheHome)
+
+	runID := types.RunID("run-cycle-materialize")
+	postSnapshot := []byte(`{"spdxVersion":"SPDX-2.3","name":"post-gate-cycle"}`)
+	postLastHookOut := gateCycleHookOutPath(runID, postGateCycleName, 1)
+	if err := os.MkdirAll(filepath.Dir(postLastHookOut), 0o755); err != nil {
+		t.Fatalf("mkdir post hook out: %v", err)
+	}
+	if err := os.WriteFile(postLastHookOut, postSnapshot, 0o644); err != nil {
+		t.Fatalf("write post hook snapshot: %v", err)
+	}
+
+	postWorkspace := t.TempDir()
+	if err := materializeGateSBOMForGate(runID, postGateCycleName, []string{"./hooks/a.yaml", "./hooks/b.yaml"}, postWorkspace); err != nil {
+		t.Fatalf("materialize post-gate sbom: %v", err)
+	}
+	postOutPath := filepath.Join(postWorkspace, step.BuildGateWorkspaceOutDir, preGateCanonicalSBOMFileName)
+	postOut, err := os.ReadFile(postOutPath)
+	if err != nil {
+		t.Fatalf("read post-gate out snapshot: %v", err)
+	}
+	if string(postOut) != string(postSnapshot) {
+		t.Fatalf("post-gate snapshot mismatch: got %q want %q", string(postOut), string(postSnapshot))
+	}
+
+	reGateCycle := "re-gate-2"
+	reGateSnapshot := []byte(`{"spdxVersion":"SPDX-2.3","name":"re-gate-cycle"}`)
+	reGateSBOMOut := gateCycleSBOMOutPath(runID, reGateCycle)
+	if err := os.MkdirAll(filepath.Dir(reGateSBOMOut), 0o755); err != nil {
+		t.Fatalf("mkdir re-gate sbom dir: %v", err)
+	}
+	if err := os.WriteFile(reGateSBOMOut, reGateSnapshot, 0o644); err != nil {
+		t.Fatalf("write re-gate sbom snapshot: %v", err)
+	}
+
+	reGateWorkspace := t.TempDir()
+	if err := materializeGateSBOMForGate(runID, reGateCycle, nil, reGateWorkspace); err != nil {
+		t.Fatalf("materialize re-gate sbom: %v", err)
+	}
+	reGateOutPath := filepath.Join(reGateWorkspace, step.BuildGateWorkspaceOutDir, preGateCanonicalSBOMFileName)
+	reGateOut, err := os.ReadFile(reGateOutPath)
+	if err != nil {
+		t.Fatalf("read re-gate out snapshot: %v", err)
+	}
+	if string(reGateOut) != string(reGateSnapshot) {
+		t.Fatalf("re-gate snapshot mismatch: got %q want %q", string(reGateOut), string(reGateSnapshot))
 	}
 }

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -27,19 +28,23 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	if len(hc.Store.createJob.calls) != 2 {
-		t.Fatalf("expected 2 CreateJob calls (heal + re-gate), got %d", len(hc.Store.createJob.calls))
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls (heal + re-gate-sbom + re-gate), got %d", len(hc.Store.createJob.calls))
 	}
 	if hc.Store.createJob.calls[0].Name != "re-gate-1" {
 		t.Fatalf("expected first created job to be re-gate-1 (tail-first FK-safe insert), got %q", hc.Store.createJob.calls[0].Name)
 	}
-	if hc.Store.createJob.calls[1].Name != "heal-1-0" {
-		t.Fatalf("expected second created job to be heal-1-0, got %q", hc.Store.createJob.calls[1].Name)
+	if hc.Store.createJob.calls[1].Name != "re-gate-1-sbom" {
+		t.Fatalf("expected second created job to be re-gate-1-sbom, got %q", hc.Store.createJob.calls[1].Name)
+	}
+	if hc.Store.createJob.calls[2].Name != "heal-1-0" {
+		t.Fatalf("expected third created job to be heal-1-0, got %q", hc.Store.createJob.calls[2].Name)
 	}
 
 	byName := createJobsByName(hc.Store.createJob.calls)
 
 	healJob := byName["heal-1-0"]
+	reGateSBOMJob := byName["re-gate-1-sbom"]
 	if healJob.Status != domaintypes.JobStatusQueued {
 		t.Fatalf("expected heal-1-0 status=Queued, got %s", healJob.Status)
 	}
@@ -57,8 +62,14 @@ func TestMaybeCreateHealingJobs_FirstAttemptCreatesJobs(t *testing.T) {
 	if reGateJob.Status != domaintypes.JobStatusCreated {
 		t.Fatalf("expected re-gate-1 status=Created, got %s", reGateJob.Status)
 	}
-	if healJob.NextID == nil || *healJob.NextID != reGateJob.ID {
-		t.Fatalf("expected heal to point to re-gate")
+	if reGateSBOMJob.Status != domaintypes.JobStatusCreated {
+		t.Fatalf("expected re-gate-1-sbom status=Created, got %s", reGateSBOMJob.Status)
+	}
+	if healJob.NextID == nil || *healJob.NextID != reGateSBOMJob.ID {
+		t.Fatalf("expected heal to point to re-gate sbom")
+	}
+	if reGateSBOMJob.NextID == nil || *reGateSBOMJob.NextID != reGateJob.ID {
+		t.Fatalf("expected re-gate sbom to point to re-gate")
 	}
 	if reGateJob.NextID == nil || *reGateJob.NextID != hc.SuccessorID {
 		t.Fatalf("expected re-gate to preserve original successor %s", hc.SuccessorID)
@@ -111,8 +122,8 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
 
-	if len(hc.Store.createJob.calls) != 2 {
-		t.Fatalf("expected 2 CreateJob calls (heal + re-gate), got %d", len(hc.Store.createJob.calls))
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls (heal + re-gate-sbom + re-gate), got %d", len(hc.Store.createJob.calls))
 	}
 	if hc.Store.createJob.calls[0].Name != "re-gate-2" {
 		t.Fatalf("expected first healing job name re-gate-2, got %q", hc.Store.createJob.calls[0].Name)
@@ -120,14 +131,77 @@ func TestMaybeCreateHealingJobs_SecondAttemptUsesExistingHealJobs(t *testing.T) 
 	if hc.Store.createJob.calls[0].JobType != domaintypes.JobTypeReGate {
 		t.Fatalf("expected first job JobType=re_gate, got %q", hc.Store.createJob.calls[0].JobType)
 	}
-	if hc.Store.createJob.calls[1].Name != "heal-2-0" {
-		t.Fatalf("expected second healing job name heal-2-0, got %q", hc.Store.createJob.calls[1].Name)
+	if hc.Store.createJob.calls[1].Name != "re-gate-2-sbom" {
+		t.Fatalf("expected second healing job name re-gate-2-sbom, got %q", hc.Store.createJob.calls[1].Name)
 	}
-	if hc.Store.createJob.calls[1].JobType != domaintypes.JobTypeHeal {
-		t.Fatalf("expected second job JobType=heal, got %q", hc.Store.createJob.calls[1].JobType)
+	if hc.Store.createJob.calls[1].JobType != domaintypes.JobTypeSBOM {
+		t.Fatalf("expected second job JobType=sbom, got %q", hc.Store.createJob.calls[1].JobType)
+	}
+	if hc.Store.createJob.calls[2].Name != "heal-2-0" {
+		t.Fatalf("expected third healing job name heal-2-0, got %q", hc.Store.createJob.calls[2].Name)
+	}
+	if hc.Store.createJob.calls[2].JobType != domaintypes.JobTypeHeal {
+		t.Fatalf("expected third job JobType=heal, got %q", hc.Store.createJob.calls[2].JobType)
 	}
 	if hc.Store.createJob.calls[0].NextID == nil || *hc.Store.createJob.calls[0].NextID != hc.SuccessorID {
 		t.Fatalf("expected re-gate-2 to link back to original successor %s", hc.SuccessorID)
+	}
+}
+
+func TestMaybeCreateHealingJobs_ReGateHooksScheduledOncePerCycle(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	hc := newHealingChain(t,
+		withHealingSpec(func(t *testing.T) []byte {
+			t.Helper()
+			spec := map[string]any{
+				"hooks": []any{"./hooks/one.yaml", "./hooks/two.yaml"},
+				"steps": []any{map[string]any{"image": "migs-orw:latest"}},
+				"build_gate": map[string]any{
+					"heal": map[string]any{
+						"retries": float64(2),
+						"image":   "amata:latest",
+					},
+				},
+			}
+			raw, err := json.Marshal(spec)
+			if err != nil {
+				t.Fatalf("marshal healing spec with hooks: %v", err)
+			}
+			return raw
+		}),
+	)
+
+	if err := maybeCreateHealingJobs(ctx, hc.Store, nil, hc.Run, hc.FailedJob); err != nil {
+		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
+	}
+
+	if len(hc.Store.createJob.calls) != 5 {
+		t.Fatalf("expected 5 CreateJob calls (heal + sbom + 2 hooks + re-gate), got %d", len(hc.Store.createJob.calls))
+	}
+
+	byName := createJobsByName(hc.Store.createJob.calls)
+	healJob := byName["heal-1-0"]
+	sbomJob := byName["re-gate-1-sbom"]
+	hook0 := byName["re-gate-1-hook-000"]
+	hook1 := byName["re-gate-1-hook-001"]
+	reGate := byName["re-gate-1"]
+
+	if healJob.NextID == nil || *healJob.NextID != sbomJob.ID {
+		t.Fatalf("expected heal to point to re-gate sbom")
+	}
+	if sbomJob.NextID == nil || *sbomJob.NextID != hook0.ID {
+		t.Fatalf("expected re-gate sbom to point to first hook")
+	}
+	if hook0.NextID == nil || *hook0.NextID != hook1.ID {
+		t.Fatalf("expected hook-000 to point to hook-001")
+	}
+	if hook1.NextID == nil || *hook1.NextID != reGate.ID {
+		t.Fatalf("expected hook-001 to point to re-gate")
+	}
+	if reGate.NextID == nil || *reGate.NextID != hc.SuccessorID {
+		t.Fatalf("expected re-gate to preserve successor %s", hc.SuccessorID)
 	}
 }
 
@@ -255,8 +329,8 @@ func TestMaybeCreateHealingJobs_ReGateInfraCandidateValidatedFromPreviousHeal(t 
 	if err := maybeCreateHealingJobs(ctx, hc.Store, bp, hc.Run, hc.FailedJob); err != nil {
 		t.Fatalf("maybeCreateHealingJobs returned error: %v", err)
 	}
-	if len(hc.Store.createJob.calls) != 2 {
-		t.Fatalf("expected 2 CreateJob calls, got %d", len(hc.Store.createJob.calls))
+	if len(hc.Store.createJob.calls) != 3 {
+		t.Fatalf("expected 3 CreateJob calls, got %d", len(hc.Store.createJob.calls))
 	}
 
 	createdReGateMeta, err := contracts.UnmarshalJobMeta(hc.Store.createJob.calls[0].Meta)

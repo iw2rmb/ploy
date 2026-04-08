@@ -197,6 +197,56 @@ func TestCompleteJob_SBOMAndHookSuccessPromoteLinkedNextJob(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_PostAndReGatePreludeSuccessPromoteLinkedNextJob(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		jobType domaintypes.JobType
+		jobName string
+	}{
+		{name: "post_gate_sbom", jobType: domaintypes.JobTypeSBOM, jobName: "post-gate-sbom"},
+		{name: "regate_hook", jobType: domaintypes.JobTypeHook, jobName: "re-gate-1-hook-000"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newJobFixture(tc.jobType)
+			f.Job.Name = tc.jobName
+			nextJobID := domaintypes.NewJobID()
+			f.Job.NextID = &nextJobID
+
+			nextJob := store.Job{
+				ID:     nextJobID,
+				RunID:  f.RunID,
+				Status: domaintypes.JobStatusCreated,
+			}
+
+			st := newJobStoreForFixture(f,
+				withListJobsByRun([]store.Job{f.Job, nextJob}),
+				withPromoteResult(nextJob),
+			)
+
+			handler := completeJobHandler(st, nil, nil)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":       "Success",
+				"repo_sha_out": "0123456789abcdef0123456789abcdef01234567",
+			}))
+
+			assertStatus(t, rr, http.StatusNoContent)
+			assertCalled(t, "PromoteJobByIDIfUnblocked", st.promoteJobByIDIfUnblocked.called)
+			if st.promoteJobByIDIfUnblocked.params != nextJobID {
+				t.Fatalf("expected PromoteJobByIDIfUnblocked(%s), got %s", nextJobID, st.promoteJobByIDIfUnblocked.params)
+			}
+		})
+	}
+}
+
 // TestCompleteJob_FailedJobDoesNotScheduleNext verifies that a failed job
 // does not trigger scheduling of the next job.
 func TestCompleteJob_FailedJobDoesNotScheduleNext(t *testing.T) {
@@ -313,6 +363,90 @@ func TestCompleteJob_NonGateFailureCancelsRemainingJobs(t *testing.T) {
 	}
 }
 
+func TestCompleteJob_PostAndReGatePreludeFailureCancelsRemainingJobs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		jobType       domaintypes.JobType
+		jobName       string
+		successorName string
+		successorType domaintypes.JobType
+	}{
+		{
+			name:          "post_gate_sbom_failure",
+			jobType:       domaintypes.JobTypeSBOM,
+			jobName:       "post-gate-sbom",
+			successorName: "post-gate",
+			successorType: domaintypes.JobTypePostGate,
+		},
+		{
+			name:          "regate_hook_failure",
+			jobType:       domaintypes.JobTypeHook,
+			jobName:       "re-gate-1-hook-000",
+			successorName: "re-gate-1",
+			successorType: domaintypes.JobTypeReGate,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			f := newRepoScopedFixture(tc.jobType)
+			f.Job.Name = tc.jobName
+			successorID := domaintypes.NewJobID()
+			f.Job.NextID = &successorID
+
+			successor := store.Job{
+				ID:          successorID,
+				RunID:       f.RunID,
+				RepoID:      f.Job.RepoID,
+				RepoBaseRef: "main",
+				Attempt:     1,
+				Name:        tc.successorName,
+				Status:      domaintypes.JobStatusCreated,
+				JobType:     tc.successorType,
+				Meta:        withNextIDMeta([]byte(`{}`), 3000),
+			}
+			completed := f.Job
+			completed.Status = domaintypes.JobStatusFail
+
+			st := newJobStoreForFixture(f,
+				withListJobsByRun([]store.Job{f.Job, successor}),
+				withRepoAttemptJobs([]store.Job{completed, successor}),
+			)
+
+			handler := completeJobHandler(st, nil, nil)
+
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, f.completeJobReq(map[string]any{
+				"status":    "Fail",
+				"exit_code": 1,
+			}))
+
+			assertStatus(t, rr, http.StatusNoContent)
+			if !st.updateJobStatus.called {
+				t.Fatal("expected UpdateJobStatus to cancel successor")
+			}
+			cancelledSuccessor := false
+			for _, call := range st.updateJobStatus.calls {
+				if call.ID == successorID && call.Status == domaintypes.JobStatusCancelled {
+					cancelledSuccessor = true
+					break
+				}
+			}
+			if !cancelledSuccessor {
+				t.Fatalf("expected successor %s to be cancelled", successorID)
+			}
+			if len(st.createJob.calls) > 0 {
+				t.Fatalf("did not expect healing insertion for %s failure", tc.jobName)
+			}
+		})
+	}
+}
+
 // TestCompleteJob_CanceledStatus verifies that canceled status is accepted.
 func TestCompleteJob_CanceledStatus(t *testing.T) {
 	t.Parallel()
@@ -391,19 +525,26 @@ func TestCompleteJob_GateFailure_HealingInsertionRewiresNextChain(t *testing.T) 
 	if len(st.createJob.calls) == 0 {
 		t.Fatal("expected healing insertion to create follow-up jobs")
 	}
-	if len(st.createJob.calls) != 2 {
-		t.Fatalf("expected 2 healing jobs, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected 3 healing jobs, got %d", len(st.createJob.calls))
 	}
 	reGate := st.createJob.calls[0]
-	heal := st.createJob.calls[1]
+	reGateSBOM := st.createJob.calls[1]
+	heal := st.createJob.calls[2]
 	if reGate.Name != "re-gate-1" {
 		t.Fatalf("expected first created healing job to be re-gate-1, got %q", reGate.Name)
 	}
-	if heal.Name != "heal-1-0" {
-		t.Fatalf("expected second created healing job to be heal-1-0, got %q", heal.Name)
+	if reGateSBOM.Name != "re-gate-1-sbom" {
+		t.Fatalf("expected second created healing job to be re-gate-1-sbom, got %q", reGateSBOM.Name)
 	}
-	if heal.NextID == nil || *heal.NextID != reGate.ID {
-		t.Fatalf("expected heal.NextID to point to re-gate job")
+	if heal.Name != "heal-1-0" {
+		t.Fatalf("expected third created healing job to be heal-1-0, got %q", heal.Name)
+	}
+	if heal.NextID == nil || *heal.NextID != reGateSBOM.ID {
+		t.Fatalf("expected heal.NextID to point to re-gate sbom job")
+	}
+	if reGateSBOM.NextID == nil || *reGateSBOM.NextID != reGate.ID {
+		t.Fatalf("expected re-gate sbom to point to re-gate job")
 	}
 	if reGate.NextID == nil || *reGate.NextID != gf.Successor.ID {
 		t.Fatalf("expected re-gate.NextID to preserve old successor %s", gf.Successor.ID)
@@ -437,8 +578,8 @@ func TestCompleteJob_GateFailure_HealingInsertionRetriesRunLookup(t *testing.T) 
 	if st.calls < 2 {
 		t.Fatalf("expected run lookup retry after transient failure, calls=%d", st.calls)
 	}
-	if len(gf.Store.createJob.calls) != 2 {
-		t.Fatalf("expected healing insertion to create 2 jobs after run lookup retry, got %d", len(gf.Store.createJob.calls))
+	if len(gf.Store.createJob.calls) != 3 {
+		t.Fatalf("expected healing insertion to create 3 jobs after run lookup retry, got %d", len(gf.Store.createJob.calls))
 	}
 }
 
@@ -459,8 +600,8 @@ func TestCompleteJob_GateFailure_MixedClassificationInsertsHealing(t *testing.T)
 	}))
 
 	assertStatus(t, rr, http.StatusNoContent)
-	if len(st.createJob.calls) != 2 {
-		t.Fatalf("expected healing insertion to create 2 jobs, got %d", len(st.createJob.calls))
+	if len(st.createJob.calls) != 3 {
+		t.Fatalf("expected healing insertion to create 3 jobs, got %d", len(st.createJob.calls))
 	}
 	if len(st.updateJobStatus.calls) != 0 {
 		t.Fatalf("expected no cancellation calls, got %d", len(st.updateJobStatus.calls))

@@ -91,12 +91,16 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 		}
 	}()
 
-	if req.JobType == types.JobTypePreGate {
-		if err := materializePreGateSBOMForGate(req.RunID, req.TypedOptions.Hooks, workspace); err != nil {
-			slog.Error("failed to materialize pre-gate sbom snapshot", "run_id", req.RunID, "job_id", req.JobID, "error", err)
-			r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
-			return
-		}
+	cycleName, err := gateCycleNameFromGateJob(req.JobType, req.JobName)
+	if err != nil {
+		slog.Error("failed to derive gate cycle", "run_id", req.RunID, "job_id", req.JobID, "job_name", req.JobName, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	if err := materializeGateSBOMForGate(req.RunID, cycleName, req.TypedOptions.Hooks, workspace); err != nil {
+		slog.Error("failed to materialize gate sbom snapshot", "run_id", req.RunID, "job_id", req.JobID, "cycle_name", cycleName, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
 	}
 
 	// Run the build gate.
