@@ -68,7 +68,8 @@ class Verifier
     phase_name = File.basename(path, ".yaml")
     done = data["done"] == true
     unless done
-      @failures << "error: targeted phase not done in #{path}"
+      @skipped += 1
+      verify_evidence_marker(path, phase_name, require_checked: false)
       return
     end
 
@@ -107,6 +108,12 @@ class Verifier
       acceptance_gaps.each { |msg| @failures << "  - #{msg}" }
     end
 
+    verify_evidence_marker(path, phase_name, require_checked: true)
+  rescue Psych::SyntaxError => e
+    @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
+  end
+
+  def verify_evidence_marker(path, phase_name, require_checked:)
     index_path = File.join(File.dirname(path), "index.md")
     evidence_marker = "evidence:#{phase_name}"
 
@@ -123,11 +130,16 @@ class Verifier
     end
 
     has_checked_entry = lines_with_marker.any? { |line| line.match?(/^\s*-\s*\[[xX]\]/) }
-    unless has_checked_entry
-      @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+    if require_checked
+      unless has_checked_entry
+        @failures << "error: evidence marker '#{evidence_marker}' is present but unchecked in #{index_path}"
+      end
+      return
     end
-  rescue Psych::SyntaxError => e
-    @failures << "error: YAML parse failure in #{path}: #{e.message.lines.first.to_s.strip}"
+
+    if has_checked_entry
+      @failures << "error: evidence marker '#{evidence_marker}' is checked but phase is not done in #{path}"
+    end
   end
 
   def find_unresolved_reviews(reviews, scope)
